@@ -27,7 +27,7 @@ export function GettingStartedWireframe() {
         <div className="min-w-0">
           <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground">Get started</h1>
           <p className="mt-1.5 text-[13px] text-muted-foreground">
-            Repositories are connected. Finish these steps to run your first factory pass.
+            Repositories are connected. Finish these steps to run your first work order.
           </p>
         </div>
         <div className="shrink-0 text-[12px] text-muted-foreground">1 of 3 complete</div>
@@ -45,7 +45,7 @@ export function GettingStartedWireframe() {
           <div className="min-w-0 flex-1">
             <div className="text-[13px] font-medium tracking-[-0.01em] text-muted-foreground">Connect repositories</div>
             <p className="mt-0.5 text-[13px] text-muted-foreground/80">
-              GitHub or GitLab is linked so this factory can open PRs.
+              GitHub or GitLab is linked so this workspace can open pull requests.
             </p>
           </div>
         </div>
@@ -59,8 +59,7 @@ export function GettingStartedWireframe() {
               Create your first work order
             </div>
             <p className="mt-0.5 text-[13px] text-muted-foreground">
-              Factories in SuperPlane run on work orders. The easiest way to try it is to create one manually and watch
-              it execute.
+              Workspaces in SuperPlane run on work orders. Create one manually and watch it execute.
             </p>
             <Button type="button" size="sm" className="mt-3" onClick={() => handleCreateWorkOrder()}>
               Create work order
@@ -73,11 +72,9 @@ export function GettingStartedWireframe() {
             3
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-medium tracking-[-0.01em] text-foreground">
-              See how it runs on a factory line
-            </div>
+            <div className="text-[13px] font-medium tracking-[-0.01em] text-foreground">See how it runs on a line</div>
             <p className="mt-0.5 text-[13px] text-muted-foreground">
-              Your work order goes through one of the pre-configured lines—intake, build, verify, and related phases.
+              Your work order goes through a pre-configured line: intake, build, verify, and related phases.
             </p>
             <Link
               to={linesPath(organizationId, factoryId)}
@@ -86,7 +83,7 @@ export function GettingStartedWireframe() {
                 "text-foreground transition-colors hover:bg-accent",
               )}
             >
-              View Lines
+              View lines
             </Link>
           </div>
         </div>

@@ -1,255 +1,235 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { Check, Search } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Check, ChevronDown } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
-import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import { factoryOverviewPath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
-import { ONBOARDING_AVAILABLE_REPOS, providerLabel, type GitProvider, type OnboardingRepo } from "./onboardingMocks";
+import { factoryOverviewPath } from "../../lib/factoryPagePaths";
+import { AnalysisSidePanel } from "./redesign/AnalysisSidePanel";
+import type { IntegrationId } from "./redesign/redesignFixtures";
+import { AgentStep, DonePanel, IssuesStep, NameInviteStep, RepoStep, Shell } from "./redesign/redesignShared";
+import { useConnectDialog } from "./redesign/useConnectDialog";
+import { useRedesignSetupState } from "./redesign/useRedesignSetupState";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
-function ProviderButton({
-  provider,
-  connected,
-  onConnect,
-}: {
-  provider: GitProvider;
-  connected: boolean;
-  onConnect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onConnect}
-      disabled={connected}
-      className={cn(
-        "flex h-10 flex-1 items-center justify-center gap-2 rounded-md border px-3 text-[13px] font-medium transition-colors",
-        connected
-          ? "cursor-default border-emerald-700/40 bg-emerald-50 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300"
-          : "cursor-pointer border-border bg-background text-foreground hover:bg-accent",
-      )}
-      data-testid={`onboarding-connect-${provider}`}
-    >
-      {connected ? <Check className="size-3.5" strokeWidth={2} aria-hidden /> : null}
-      {connected ? `${providerLabel(provider)} connected` : `Connect ${providerLabel(provider)}`}
-    </button>
-  );
-}
+type SectionId = "name" | "repo" | "issues" | "agent";
 
-function RepoRow({
-  repo,
-  selected,
-  onToggle,
+function Section({
+  id,
+  title,
+  summary,
+  open,
+  complete,
+  locked,
+  onOpen,
+  children,
 }: {
-  repo: OnboardingRepo;
-  selected: boolean;
-  onToggle: (repo: OnboardingRepo) => void;
+  id: SectionId;
+  title: string;
+  summary?: string;
+  open: boolean;
+  complete: boolean;
+  locked?: boolean;
+  onOpen: (id: SectionId) => void;
+  children: ReactNode;
 }) {
   return (
-    <li>
+    <section
+      className={cn(
+        "overflow-hidden rounded-lg border",
+        open ? "border-foreground/40" : "border-border",
+        locked && "opacity-50",
+      )}
+    >
       <button
         type="button"
-        onClick={() => onToggle(repo)}
-        className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/50"
+        disabled={locked}
+        onClick={() => onOpen(id)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
       >
-        <span
-          className={cn(
-            "flex size-4 shrink-0 items-center justify-center rounded border",
-            selected ? "border-foreground bg-foreground text-background" : "border-border bg-background",
-          )}
-          aria-hidden
-        >
-          {selected ? <Check className="size-3" strokeWidth={2.5} /> : null}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-medium tracking-[-0.01em] text-foreground">
-            {repo.org}/{repo.name}
+        <span className="flex min-w-0 items-center gap-2">
+          <span
+            className={cn(
+              "flex size-5 shrink-0 items-center justify-center rounded-full border text-[11px]",
+              complete
+                ? "border-emerald-600 bg-emerald-600 text-white"
+                : "border-border bg-background text-muted-foreground",
+            )}
+          >
+            {complete ? <Check className="size-3" strokeWidth={2.5} aria-hidden /> : null}
           </span>
-          <span className="mt-0.5 block text-[12px] text-muted-foreground">{providerLabel(repo.provider)}</span>
+          <span className="min-w-0">
+            <span className="block text-[13px] font-medium">{title}</span>
+            {summary && !open ? (
+              <span className="block truncate text-[12px] text-muted-foreground">{summary}</span>
+            ) : null}
+          </span>
         </span>
+        <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition", open && "rotate-180")} />
       </button>
-    </li>
+      {open ? <div className="border-t border-border px-4 py-4">{children}</div> : null}
+    </section>
   );
 }
 
-function RepositoryPicker({
-  integrationsPath,
-  query,
-  onQueryChange,
-  visibleRepos,
-  selectedIds,
-  selectedRepos,
-  onToggleRepo,
+function SetupSections({
+  setup,
+  openSection,
+  setOpenSection,
+  requestConnect,
+  onFinish,
 }: {
-  integrationsPath: string;
-  query: string;
-  onQueryChange: (value: string) => void;
-  visibleRepos: OnboardingRepo[];
-  selectedIds: string[];
-  selectedRepos: OnboardingRepo[];
-  onToggleRepo: (repo: OnboardingRepo) => void;
+  setup: ReturnType<typeof useRedesignSetupState>;
+  openSection: SectionId;
+  setOpenSection: (id: SectionId) => void;
+  requestConnect: (id: IntegrationId) => void;
+  onFinish: () => void;
 }) {
   return (
-    <div className="mt-8">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <div className="text-[13px] font-medium tracking-[-0.01em] text-foreground">Repositories</div>
-          <p className="mt-0.5 text-[12px] text-muted-foreground">Select one or more repositories to enable.</p>
+    <div className="space-y-3">
+      <Section
+        id="name"
+        title="Name & invite"
+        summary={setup.nameReady ? setup.workspaceName.trim() : undefined}
+        open={openSection === "name"}
+        complete={setup.nameReady}
+        onOpen={setOpenSection}
+      >
+        <NameInviteStep setup={setup} />
+        <div className="mt-4">
+          <Button type="button" size="sm" disabled={!setup.nameReady} onClick={() => setOpenSection("repo")}>
+            Continue to repository
+          </Button>
         </div>
-        <Link
-          to={integrationsPath}
-          className="shrink-0 text-[12px] text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-        >
-          Configure permissions
-        </Link>
-      </div>
+      </Section>
 
-      <div className="relative mt-3">
-        <Search
-          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-          strokeWidth={1.75}
-          aria-hidden
-        />
-        <Input
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Search repositories..."
-          className="h-9 bg-background pl-9 text-[13px] shadow-none"
-          aria-label="Search repositories"
-        />
-      </div>
-
-      <div className="mt-3 overflow-hidden rounded-lg border border-border">
-        {visibleRepos.length === 0 ? (
-          <p className="px-4 py-8 text-center text-[13px] text-muted-foreground">
-            No repositories match. Try another search or configure permissions.
-          </p>
-        ) : (
-          <ul className="divide-y divide-border">
-            {visibleRepos.map((repo) => (
-              <RepoRow key={repo.id} repo={repo} selected={selectedIds.includes(repo.id)} onToggle={onToggleRepo} />
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {selectedRepos.length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {selectedRepos.map((repo) => (
-            <span
-              key={repo.id}
-              className="rounded-md border border-border bg-accent px-2 py-1 text-[12px] text-foreground"
-            >
-              {repo.org}/{repo.name}
-            </span>
-          ))}
+      <Section
+        id="repo"
+        title="Repository"
+        summary={setup.selectedRepo ?? undefined}
+        open={openSection === "repo"}
+        complete={setup.repoReady}
+        locked={!setup.nameReady}
+        onOpen={setOpenSection}
+      >
+        <RepoStep setup={setup} onRequestConnect={requestConnect} />
+        <div className="mt-4">
+          <Button type="button" size="sm" disabled={!setup.repoReady} onClick={() => setOpenSection("issues")}>
+            Continue to issues
+          </Button>
         </div>
-      ) : (
-        <p className="mt-3 text-[12px] text-muted-foreground">Select at least one repository to continue.</p>
-      )}
+      </Section>
+
+      <Section
+        id="issues"
+        title="Issues"
+        summary={
+          setup.issuesChoice === "skip"
+            ? "Skipped. Manual work orders."
+            : setup.issuesChoice
+              ? "Source selected"
+              : undefined
+        }
+        open={openSection === "issues"}
+        complete={setup.issuesReady}
+        locked={!setup.repoReady}
+        onOpen={setOpenSection}
+      >
+        <IssuesStep setup={setup} onRequestConnect={requestConnect} autoDiscover />
+        <div className="mt-4">
+          <Button type="button" size="sm" disabled={!setup.issuesReady} onClick={() => setOpenSection("agent")}>
+            Continue to agent
+          </Button>
+        </div>
+      </Section>
+
+      <Section
+        id="agent"
+        title="Agent"
+        summary={setup.agentReady ? (setup.agent ?? undefined) : undefined}
+        open={openSection === "agent"}
+        complete={setup.agentReady}
+        locked={!setup.issuesReady}
+        onOpen={setOpenSection}
+      >
+        <AgentStep setup={setup} onRequestConnect={requestConnect} />
+        <div className="mt-4">
+          <Button type="button" size="sm" disabled={!setup.canFinish} onClick={onFinish}>
+            Finish setup
+          </Button>
+        </div>
+      </Section>
     </div>
   );
 }
 
 /**
- * Storybook-only factory onboarding wireframe (v3 parity).
- * Not mounted on production app routes.
+ * Storybook-only workspace onboarding: progressive stack + setup.log side panel.
+ * Connect uses the real IntegrationCreateDialog. Not mounted on production routes.
  */
 export function OnboardingWireframe() {
   const navigate = useNavigate();
   const { organizationId = "", factoryId = "" } = useParams<{ organizationId: string; factoryId: string }>();
-  const layout = useFactoriesLayout();
   const onboarding = useOnboardingStorybook();
+  const setup = useRedesignSetupState(onboarding?.pending?.workspaceName ?? "");
+  const { requestConnect, dialog } = useConnectDialog(setup);
+  const [openSection, setOpenSection] = useState<SectionId>("name");
 
-  const workspaceId = onboarding?.pending?.workspaceId ?? factoryId;
-  const workspaceName = onboarding?.pending?.workspaceName ?? layout.factory?.name ?? "New workspace";
-
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [query, setQuery] = useState("");
-
-  const providers = useMemo(() => onboarding?.connectedProviders ?? [], [onboarding?.connectedProviders]);
-  const connected = providers.length > 0;
-
-  const visibleRepos = useMemo(() => {
-    const allowed = new Set(providers);
-    const repos = ONBOARDING_AVAILABLE_REPOS.filter((repo) => allowed.has(repo.provider));
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return repos;
-    return repos.filter(
-      (repo) =>
-        repo.name.toLowerCase().includes(normalized) ||
-        repo.org.toLowerCase().includes(normalized) ||
-        repo.provider.includes(normalized),
-    );
-  }, [providers, query]);
-
-  const selectedRepos = useMemo(
-    () => ONBOARDING_AVAILABLE_REPOS.filter((repo) => selectedIds.includes(repo.id)),
-    [selectedIds],
-  );
-
-  const canContinue = selectedIds.length > 0;
-  const integrationsPath = factorySettingsSectionPath(organizationId, workspaceId, "integrations");
-
-  const toggleRepo = (repo: OnboardingRepo) => {
-    setSelectedIds((current) =>
-      current.includes(repo.id) ? current.filter((id) => id !== repo.id) : [...current, repo.id],
-    );
+  const finishSetup = () => {
+    if (onboarding && factoryId) {
+      onboarding.completeOnboarding(factoryId, []);
+    }
+    if (organizationId && factoryId) {
+      navigate(factoryOverviewPath(organizationId, factoryId), { replace: true });
+      return;
+    }
+    setup.setFinished(true);
   };
 
+  if (setup.finished) {
+    return (
+      <Shell className="w-full">
+        <div className="mx-auto max-w-lg px-8 py-14">
+          <DonePanel setup={setup} />
+        </div>
+        {dialog}
+      </Shell>
+    );
+  }
+
   return (
-    <div className="mx-auto flex w-full max-w-[560px] flex-col px-8 py-10" data-testid="onboarding-wireframe">
-      <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground">Set up {workspaceName}</h1>
-      <p className="mt-1.5 text-[13px] text-muted-foreground">
-        Connect at least one repository so this factory can open PRs and run work orders.
-      </p>
-
-      <div className="mt-8 flex flex-col gap-2 sm:flex-row">
-        <ProviderButton
-          provider="github"
-          connected={providers.includes("github")}
-          onConnect={() => onboarding?.connectProvider("github")}
-        />
-        <ProviderButton
-          provider="gitlab"
-          connected={providers.includes("gitlab")}
-          onConnect={() => onboarding?.connectProvider("gitlab")}
-        />
-      </div>
-
-      {!connected ? (
-        <p className="mt-6 text-[13px] text-muted-foreground">
-          Connect GitHub or GitLab to see repositories you can add to this factory.
+    <Shell className="w-full">
+      <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8">
+        <h1 className="text-[22px] font-semibold tracking-[-0.02em]">Set up your workspace</h1>
+        <p className="mt-1.5 max-w-2xl text-[13px] text-muted-foreground">
+          Finish each section to unlock the next. The setup log on the right follows each step.
         </p>
-      ) : (
-        <RepositoryPicker
-          integrationsPath={integrationsPath}
-          query={query}
-          onQueryChange={setQuery}
-          visibleRepos={visibleRepos}
-          selectedIds={selectedIds}
-          selectedRepos={selectedRepos}
-          onToggleRepo={toggleRepo}
-        />
-      )}
 
-      <div className="mt-8 flex justify-end border-t border-border pt-5">
-        <Button
-          type="button"
-          size="sm"
-          disabled={!canContinue}
-          onClick={() => {
-            if (!canContinue || !onboarding) return;
-            onboarding.completeOnboarding(workspaceId, selectedRepos);
-            navigate(factoryOverviewPath(organizationId, workspaceId), { replace: true });
-          }}
-          data-testid="onboarding-continue"
-        >
-          Continue
-        </Button>
+        <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
+          <SetupSections
+            setup={setup}
+            openSection={openSection}
+            setOpenSection={setOpenSection}
+            requestConnect={requestConnect}
+            onFinish={finishSetup}
+          />
+          <div className="lg:sticky lg:top-6 lg:self-start">
+            <AnalysisSidePanel
+              progress={{
+                workspaceName: setup.workspaceName,
+                nameReady: setup.nameReady,
+                selectedRepo: setup.selectedRepo,
+                vcsHost: setup.vcsHost,
+                repoReady: setup.repoReady,
+                issuesChoice: setup.issuesChoice,
+                agent: setup.agent,
+                agentReady: setup.agentReady,
+              }}
+            />
+          </div>
+        </div>
       </div>
-    </div>
+      {dialog}
+    </Shell>
   );
 }

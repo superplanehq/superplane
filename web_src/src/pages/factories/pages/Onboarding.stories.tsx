@@ -10,7 +10,7 @@ import { ONBOARDING_AVAILABLE_REPOS } from "./onboarding/onboardingMocks";
 import { OnboardingWireframe } from "./onboarding/OnboardingWireframe";
 
 /**
- * Storybook-only workspace onboarding funnel (v3 parity).
+ * Storybook-only workspace onboarding (progressive stack + setup.log).
  * Production create still navigates straight to overview.
  */
 const meta = {
@@ -25,15 +25,10 @@ type Story = StoryObj<typeof meta>;
 const factoryBase = `workspaces/${PRIMARY_FACTORY_ID}`;
 
 const pendingSeed = {
-  pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" },
+  pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds" },
 };
 
-export const EmptyCreate: Story = {
-  name: "Empty → Create",
-  render: () => <FactoriesHarness pathSuffix="workspaces" factoriesFixture={emptyFactoriesFixture} />,
-};
-
-export const ConnectProviders: Story = {
+export const Default: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={`${factoryBase}/onboarding`}
@@ -43,17 +38,9 @@ export const ConnectProviders: Story = {
   ),
 };
 
-export const SelectRepositories: Story = {
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={`${factoryBase}/onboarding`}
-      factoriesFixture={defaultFactoriesFixture}
-      onboardingSeed={{
-        ...pendingSeed,
-        connectedProviders: ["github", "gitlab"],
-      }}
-    />
-  ),
+export const EmptyCreate: Story = {
+  name: "Empty → Create",
+  render: () => <FactoriesHarness pathSuffix="workspaces" factoriesFixture={emptyFactoriesFixture} />,
 };
 
 export const GettingStarted: Story = {

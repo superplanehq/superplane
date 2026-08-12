@@ -63,7 +63,7 @@ function factoriesCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {
       const request = (body ?? {}) as RequestBody;
       const created = {
         id: `storybook-factory-${fixture.factories.length + 1}`,
-        name: stringOrEmpty(request.name) || "New Factory",
+        name: stringOrEmpty(request.name) || "New workspace",
         description: stringOrEmpty(request.description),
         lines: [],
       };

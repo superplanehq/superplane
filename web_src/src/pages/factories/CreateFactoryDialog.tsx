@@ -116,10 +116,10 @@ export function CreateFactoryDialog({ open, isSaving, onClose, onCreate }: Creat
             onClick={() => void handleCreate()}
             disabled={!name.trim()}
             loading={isSaving}
-            loadingText="Creating..."
+            loadingText="Creating workspace..."
             data-testid="factory-create-button"
           >
-            Create
+            Create workspace
           </LoadingButton>
           <Button type="button" variant="outline" onClick={handleClose} disabled={isSaving}>
             Cancel

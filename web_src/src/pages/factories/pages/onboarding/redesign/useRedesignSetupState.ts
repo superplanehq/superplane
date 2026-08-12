@@ -1,0 +1,120 @@
+import { useCallback, useMemo, useState } from "react";
+
+import {
+  fixtureIssueCount,
+  type AgentHarnessId,
+  type IntegrationId,
+  type IssuesChoiceId,
+  type VcsHostId,
+} from "./redesignFixtures";
+
+export type RedesignSetupState = {
+  workspaceName: string;
+  inviteCopied: boolean;
+  connected: Set<IntegrationId>;
+  vcsHost: VcsHostId | null;
+  selectedRepo: string | null;
+  issuesDiscovering: boolean;
+  issuesDiscovered: boolean;
+  issuesChoice: IssuesChoiceId | null;
+  agent: AgentHarnessId | null;
+  finished: boolean;
+};
+
+export function useRedesignSetupState(initialName = "") {
+  const [workspaceName, setWorkspaceName] = useState(initialName);
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [connected, setConnected] = useState<Set<IntegrationId>>(() => new Set());
+  const [vcsHost, setVcsHost] = useState<VcsHostId | null>(null);
+  const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
+  const [issuesDiscovering, setIssuesDiscovering] = useState(false);
+  const [issuesDiscovered, setIssuesDiscovered] = useState(false);
+  const [issuesChoice, setIssuesChoice] = useState<IssuesChoiceId | null>(null);
+  const [agent, setAgent] = useState<AgentHarnessId | null>(null);
+  const [finished, setFinished] = useState(false);
+
+  const connectIntegration = useCallback((id: IntegrationId) => {
+    setConnected((prev) => new Set(prev).add(id));
+  }, []);
+
+  const selectVcsHost = useCallback((host: VcsHostId) => {
+    setVcsHost(host);
+    setSelectedRepo(null);
+    setIssuesDiscovering(false);
+    setIssuesDiscovered(false);
+    setIssuesChoice(null);
+  }, []);
+
+  const selectRepo = useCallback((repo: string) => {
+    setSelectedRepo(repo);
+    setIssuesDiscovering(false);
+    setIssuesDiscovered(false);
+    setIssuesChoice(null);
+  }, []);
+
+  const startIssuesDiscovery = useCallback(() => {
+    if (!selectedRepo) return;
+    setIssuesDiscovering(true);
+    setIssuesDiscovered(false);
+    window.setTimeout(() => {
+      setIssuesDiscovering(false);
+      setIssuesDiscovered(true);
+    }, 900);
+  }, [selectedRepo]);
+
+  const issueCount = selectedRepo ? fixtureIssueCount(selectedRepo) : 0;
+
+  const nameReady = workspaceName.trim().length > 0;
+  const repoReady = vcsHost !== null && connected.has(vcsHost) && selectedRepo !== null;
+  const issuesReady = issuesChoice !== null;
+  const agentReady =
+    agent !== null &&
+    ((agent === "claude-code" && connected.has("claude")) ||
+      (agent === "cursor" && connected.has("cursor")) ||
+      (agent === "codex" && connected.has("openai")));
+
+  const canFinish = nameReady && repoReady && agentReady;
+
+  const summary = useMemo(
+    () => ({
+      workspaceName: workspaceName.trim(),
+      vcsHost,
+      selectedRepo,
+      issuesChoice,
+      agent,
+      issueCount,
+    }),
+    [workspaceName, vcsHost, selectedRepo, issuesChoice, agent, issueCount],
+  );
+
+  return {
+    workspaceName,
+    setWorkspaceName,
+    inviteCopied,
+    setInviteCopied,
+    connected,
+    connectIntegration,
+    vcsHost,
+    selectVcsHost,
+    selectedRepo,
+    selectRepo,
+    issuesDiscovering,
+    issuesDiscovered,
+    startIssuesDiscovery,
+    issuesChoice,
+    setIssuesChoice,
+    agent,
+    setAgent,
+    finished,
+    setFinished,
+    issueCount,
+    nameReady,
+    repoReady,
+    issuesReady,
+    agentReady,
+    canFinish,
+    summary,
+  };
+}
+
+export type RedesignSetupApi = ReturnType<typeof useRedesignSetupState>;
