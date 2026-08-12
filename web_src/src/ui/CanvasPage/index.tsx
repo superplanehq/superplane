@@ -2887,9 +2887,7 @@ function CanvasContent({
       }
 
       const canvasWidth =
-        typeof document === "undefined"
-          ? 0
-          : (document.querySelector(".react-flow")?.clientWidth ?? window.innerWidth);
+        typeof document === "undefined" ? 0 : (document.querySelector(".react-flow")?.clientWidth ?? window.innerWidth);
       const canvasHeight =
         typeof document === "undefined"
           ? 0

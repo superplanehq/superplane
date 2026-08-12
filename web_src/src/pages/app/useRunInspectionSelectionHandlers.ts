@@ -1,10 +1,4 @@
-import {
-  startTransition,
-  useCallback,
-  type Dispatch,
-  type MutableRefObject,
-  type SetStateAction,
-} from "react";
+import { startTransition, useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
 import type { CanvasFocusRequest } from "./useAgentNodeFocusRequest";
@@ -197,11 +191,7 @@ function useSecondaryRunSelectHandlers(options: SharedSelectOptions) {
 function useRunDetailHandlers(
   options: Pick<
     RunSelectionHandlersOptions,
-    | "clearDismissedRunDetail"
-    | "setRunDetailNodeId"
-    | "setFocusRequest"
-    | "setSearchParams"
-    | "clearParticipantFit"
+    "clearDismissedRunDetail" | "setRunDetailNodeId" | "setFocusRequest" | "setSearchParams" | "clearParticipantFit"
   >,
 ) {
   const { clearDismissedRunDetail, setRunDetailNodeId, setFocusRequest, setSearchParams, clearParticipantFit } =

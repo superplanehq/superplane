@@ -33,10 +33,7 @@ export function useFactoryAppCanvasPageModel() {
   const lineId = searchParams.get("lineId");
   const orderId = searchParams.get("orderId");
   const isConfigure = isFactoryAppConfigureMode(searchParams);
-  const lineName = useMemo(
-    () => resolveFactoryLineName(factory?.lines, lineId),
-    [factory?.lines, lineId],
-  );
+  const lineName = useMemo(() => resolveFactoryLineName(factory?.lines, lineId), [factory?.lines, lineId]);
 
   const { data: order } = useWorkOrder(organizationId, factoryId, orderId ?? "");
 

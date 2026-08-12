@@ -46,8 +46,7 @@ export function computeAppendFromNodePlacement({
       };
 
   if (!isVerticalFlow) {
-    const placeholderRightScreenX =
-      (placeholderPosition.x + PLACEHOLDER_ESTIMATED_WIDTH) * viewport.zoom + viewport.x;
+    const placeholderRightScreenX = (placeholderPosition.x + PLACEHOLDER_ESTIMATED_WIDTH) * viewport.zoom + viewport.x;
     const maxVisibleScreenX = canvasWidth - RIGHT_SIDEBAR_SAFE_AREA - VIEWPORT_BUFFER;
     if (canvasWidth > 0 && placeholderRightScreenX > maxVisibleScreenX) {
       const overflow = placeholderRightScreenX - maxVisibleScreenX;
@@ -59,8 +58,7 @@ export function computeAppendFromNodePlacement({
     return { placeholderPosition, nextViewport: null };
   }
 
-  const placeholderBottomScreenY =
-    (placeholderPosition.y + PLACEHOLDER_ESTIMATED_HEIGHT) * viewport.zoom + viewport.y;
+  const placeholderBottomScreenY = (placeholderPosition.y + PLACEHOLDER_ESTIMATED_HEIGHT) * viewport.zoom + viewport.y;
   const maxVisibleScreenY = canvasHeight - BOTTOM_SAFE_AREA - VIEWPORT_BUFFER;
   if (canvasHeight > 0 && placeholderBottomScreenY > maxVisibleScreenY) {
     const overflow = placeholderBottomScreenY - maxVisibleScreenY;
