@@ -38,7 +38,13 @@ export function Shell({ children, className }: { children: ReactNode; className?
 }
 
 function IntegrationChoiceIcon({ name, size = 20 }: { name: IntegrationId | VcsHostId; size?: number }) {
-  return <IntegrationIcon integrationName={name} className="size-5" size={size} />;
+  return (
+    <IntegrationIcon
+      integrationName={name}
+      className={size <= 16 ? "size-3.5" : "size-5"}
+      size={size}
+    />
+  );
 }
 
 function ComingSoonRibbon() {
@@ -207,11 +213,15 @@ function RepositoryPicker({
   repos,
   selectedRepo,
   onSelect,
+  title = "Select repository",
+  description = "Choose the app repository SuperPlane will analyze and agents will change. Pull requests open here.",
 }: {
   host: VcsHostId;
   repos: string[];
   selectedRepo: string | null;
   onSelect: (repo: string) => void;
+  title?: string;
+  description?: string;
 }) {
   const [query, setQuery] = useState("");
 
@@ -227,10 +237,8 @@ function RepositoryPicker({
 
   return (
     <div className="space-y-3 rounded-lg border border-border p-4">
-      <div className="text-[13px] font-medium">Select repository</div>
-      <p className="text-[12px] text-muted-foreground">
-        Choose the app repository SuperPlane will analyze and agents will change. Pull requests open here.
-      </p>
+      <div className="text-[13px] font-medium">{title}</div>
+      <p className="text-[12px] text-muted-foreground">{description}</p>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -334,7 +342,16 @@ export function IssuesStep({
   onRequestConnect: (id: IntegrationId) => void;
   autoDiscover?: boolean;
 }) {
-  const { selectedRepo, issuesDiscovered, issuesDiscovering, issuesChoice, startIssuesDiscovery } = setup;
+  const {
+    selectedRepo,
+    issuesRepo,
+    issuesDiscovered,
+    issuesDiscovering,
+    issuesChoice,
+    startIssuesDiscovery,
+    selectIssuesRepo,
+  } = setup;
+  const [pickingBacklogRepo, setPickingBacklogRepo] = useState(false);
 
   useEffect(() => {
     if (!autoDiscover) return;
@@ -342,37 +359,76 @@ export function IssuesStep({
     startIssuesDiscovery();
   }, [autoDiscover, selectedRepo, issuesDiscovered, issuesDiscovering, issuesChoice, startIssuesDiscovery]);
 
+  useEffect(() => {
+    setPickingBacklogRepo(false);
+  }, [selectedRepo]);
+
   const host = setup.vcsHost;
-  if (!host || !setup.selectedRepo) {
+  if (!host || !selectedRepo) {
     return <p className="text-[13px] text-muted-foreground">Select an app repository first.</p>;
   }
 
+  const backlogRepo = issuesRepo ?? selectedRepo;
+  const repos = FIXTURE_REPOS[host];
+  const showDiscoveryResult = setup.issuesDiscovered || Boolean(setup.issuesChoice);
+
   return (
     <div className="space-y-4">
-      {(setup.issuesDiscovering || (!setup.issuesDiscovered && !setup.issuesChoice)) && (
+      {(setup.issuesDiscovering || (!showDiscoveryResult && !pickingBacklogRepo)) && (
         <div className="flex items-center gap-2 rounded-lg border border-border bg-accent/30 px-4 py-3 text-[13px]">
           <Loader2 className="size-3.5 animate-spin" aria-hidden />
-          Looking for backlog issues on {setup.selectedRepo}…
+          Looking for backlog issues on {backlogRepo}…
         </div>
       )}
 
-      {setup.issuesDiscovered || setup.issuesChoice ? (
+      {showDiscoveryResult && !setup.issuesDiscovering ? (
         <>
           <div className="rounded-lg border border-border px-4 py-3">
-            <div className="flex items-center gap-2 text-[13px] font-medium">
-              <IntegrationChoiceIcon name={host} />
-              Found {setup.issueCount} open issues on {vcsLabel(host)}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[13px] font-medium">
+                  Found {setup.issueCount} open issues on {vcsLabel(host)}
+                </div>
+                <p className="mt-1 text-[12px] text-muted-foreground">
+                  SuperPlane can score these for autonomous work.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPickingBacklogRepo((open) => !open)}
+                className={cn(
+                  "inline-flex max-w-[55%] shrink-0 items-center gap-1.5 rounded-md border border-border bg-accent/40 px-2 py-1 text-left text-[12px] font-medium tracking-[-0.01em] transition-colors hover:bg-accent",
+                  pickingBacklogRepo && "border-foreground bg-accent",
+                )}
+                aria-label="Change backlog repository"
+                aria-expanded={pickingBacklogRepo}
+              >
+                <IntegrationChoiceIcon name={host} size={14} />
+                <span className="truncate">{backlogRepo}</span>
+              </button>
             </div>
-            <p className="mt-1 text-[12px] text-muted-foreground">
-              SuperPlane can score these for autonomous work. Use this backlog, connect another tracker, or skip.
-            </p>
+            {pickingBacklogRepo ? (
+              <div className="mt-3">
+                <RepositoryPicker
+                  host={host}
+                  repos={repos}
+                  selectedRepo={backlogRepo}
+                  title="Select backlog repository"
+                  description="Choose the repository that holds the issue backlog. The app repository does not change."
+                  onSelect={(repo) => {
+                    selectIssuesRepo(repo);
+                    setPickingBacklogRepo(false);
+                  }}
+                />
+              </div>
+            ) : null}
           </div>
 
           <div className="grid gap-2">
             <ConnectOptionRow
               icon={<IntegrationChoiceIcon name={host} />}
               title={`Use ${vcsLabel(host)} Issues`}
-              detail={`Find agent-ready work in open issues on ${setup.selectedRepo}.`}
+              detail={`Find agent-ready work in open issues on ${backlogRepo}.`}
               selected={setup.issuesChoice === "vcs"}
               connectLabel={vcsLabel(host)}
               connected
@@ -446,7 +502,12 @@ export function AgentStep({
 
 export function DonePanel({ setup }: { setup: RedesignSetupApi }) {
   const issuesLabel = (choice: IssuesChoiceId | null) => {
-    if (choice === "vcs" && setup.vcsHost) return `${vcsLabel(setup.vcsHost)} Issues`;
+    if (choice === "vcs" && setup.vcsHost) {
+      const backlog = setup.issuesRepo ?? setup.selectedRepo;
+      return backlog
+        ? `${vcsLabel(setup.vcsHost)} Issues · ${backlog}`
+        : `${vcsLabel(setup.vcsHost)} Issues`;
+    }
     if (choice === "linear") return "Linear";
     if (choice === "jira") return "Jira";
     if (choice === "skip") return "Manual work orders";

@@ -146,7 +146,7 @@ function SetupSections({
           setup.issuesChoice === "skip"
             ? "Skipped. Create work orders yourself."
             : setup.issuesChoice === "vcs" && setup.vcsHost
-              ? `${setup.vcsHost === "github" ? "GitHub" : "GitLab"} Issues`
+              ? `${setup.vcsHost === "github" ? "GitHub" : "GitLab"} Issues · ${setup.issuesRepo ?? setup.selectedRepo}`
               : setup.issuesChoice === "linear"
                 ? "Linear"
                 : setup.issuesChoice === "jira"

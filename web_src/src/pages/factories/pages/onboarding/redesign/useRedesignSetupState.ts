@@ -15,6 +15,7 @@ export type RedesignSetupState = {
   connected: Set<IntegrationId>;
   vcsHost: VcsHostId | null;
   selectedRepo: string | null;
+  issuesRepo: string | null;
   issuesDiscovering: boolean;
   issuesDiscovered: boolean;
   issuesChoice: IssuesChoiceId | null;
@@ -30,6 +31,8 @@ export function useRedesignSetupState(initialName = "") {
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
   /** True after Continue to issues — starts repository analysis. */
   const [repoCommitted, setRepoCommitted] = useState(false);
+  /** Backlog repository for GitHub/GitLab Issues (may differ from the app repo). */
+  const [issuesRepo, setIssuesRepo] = useState<string | null>(null);
   const [issuesDiscovering, setIssuesDiscovering] = useState(false);
   const [issuesDiscovered, setIssuesDiscovered] = useState(false);
   const [issuesChoice, setIssuesChoice] = useState<IssuesChoiceId | null>(null);
@@ -42,24 +45,32 @@ export function useRedesignSetupState(initialName = "") {
     setConnected((prev) => new Set(prev).add(id));
   }, []);
 
-  const selectVcsHost = useCallback((host: VcsHostId) => {
-    setVcsHost(host);
-    setSelectedRepo(null);
-    setRepoCommitted(false);
+  const resetIssuesState = useCallback(() => {
+    setIssuesRepo(null);
     setIssuesDiscovering(false);
     setIssuesDiscovered(false);
     setIssuesChoice(null);
     setIssuesCommitted(false);
   }, []);
 
-  const selectRepo = useCallback((repo: string) => {
-    setSelectedRepo(repo);
-    setRepoCommitted(false);
-    setIssuesDiscovering(false);
-    setIssuesDiscovered(false);
-    setIssuesChoice(null);
-    setIssuesCommitted(false);
-  }, []);
+  const selectVcsHost = useCallback(
+    (host: VcsHostId) => {
+      setVcsHost(host);
+      setSelectedRepo(null);
+      setRepoCommitted(false);
+      resetIssuesState();
+    },
+    [resetIssuesState],
+  );
+
+  const selectRepo = useCallback(
+    (repo: string) => {
+      setSelectedRepo(repo);
+      setRepoCommitted(false);
+      resetIssuesState();
+    },
+    [resetIssuesState],
+  );
 
   const commitRepoStep = useCallback(() => {
     setRepoCommitted(true);
@@ -69,8 +80,8 @@ export function useRedesignSetupState(initialName = "") {
     setIssuesCommitted(true);
   }, []);
 
-  const startIssuesDiscovery = useCallback(() => {
-    if (!selectedRepo) return;
+  const runIssuesDiscovery = useCallback((backlogRepo: string) => {
+    setIssuesRepo(backlogRepo);
     setIssuesDiscovering(true);
     setIssuesDiscovered(false);
     window.setTimeout(() => {
@@ -79,9 +90,24 @@ export function useRedesignSetupState(initialName = "") {
       // Default to the connected host's Issues (GitHub or GitLab).
       setIssuesChoice((current) => current ?? "vcs");
     }, 900);
-  }, [selectedRepo]);
+  }, []);
 
-  const issueCount = selectedRepo ? fixtureIssueCount(selectedRepo) : 0;
+  const startIssuesDiscovery = useCallback(() => {
+    const backlogRepo = issuesRepo ?? selectedRepo;
+    if (!backlogRepo) return;
+    runIssuesDiscovery(backlogRepo);
+  }, [issuesRepo, selectedRepo, runIssuesDiscovery]);
+
+  const selectIssuesRepo = useCallback(
+    (repo: string) => {
+      setIssuesCommitted(false);
+      runIssuesDiscovery(repo);
+    },
+    [runIssuesDiscovery],
+  );
+
+  const backlogRepo = issuesRepo ?? selectedRepo;
+  const issueCount = backlogRepo ? fixtureIssueCount(backlogRepo) : 0;
 
   const nameReady = workspaceName.trim().length > 0;
   const repoReady = vcsHost !== null && connected.has(vcsHost) && selectedRepo !== null;
@@ -103,11 +129,12 @@ export function useRedesignSetupState(initialName = "") {
       workspaceName: workspaceName.trim(),
       vcsHost,
       selectedRepo,
+      issuesRepo: backlogRepo,
       issuesChoice,
       agent,
       issueCount,
     }),
-    [workspaceName, vcsHost, selectedRepo, issuesChoice, agent, issueCount],
+    [workspaceName, vcsHost, selectedRepo, backlogRepo, issuesChoice, agent, issueCount],
   );
 
   return {
@@ -123,6 +150,8 @@ export function useRedesignSetupState(initialName = "") {
     selectRepo,
     repoCommitted,
     commitRepoStep,
+    issuesRepo: backlogRepo,
+    selectIssuesRepo,
     issuesDiscovering,
     issuesDiscovered,
     startIssuesDiscovery,
