@@ -4,7 +4,6 @@ import { Link } from "@/components/Link/link";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { formatTimeAgo } from "@/lib/date";
-import { appRunPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
 import { Fragment, useMemo, type ReactNode } from "react";
 import {
@@ -31,11 +30,13 @@ import {
   type WorkOrderTimelineStep,
 } from "./lib/workOrderTimelineEvents";
 import { getWorkOrderExecutionDisplayMeta, getWorkOrderExecutionRunHref } from "./lib/workOrderExecutions";
+import { factoryAppRunPath } from "./lib/factoryPagePaths";
 import { OrgUserReference } from "./OrgUserReference";
 import { ArtifactTimelineBody, CommentTimelineBody, TimelineAutomationActor } from "./timeline";
 
 interface WorkOrderTimelineProps {
   organizationId: string;
+  factoryId: string;
   order: FactoriesWorkOrder;
   events?: FactoriesWorkOrderEvent[];
   eventsError?: Error | null;
@@ -48,6 +49,7 @@ interface WorkOrderTimelineProps {
 
 export function WorkOrderActivityTimeline({
   organizationId,
+  factoryId,
   order,
   events,
   eventsError = null,
@@ -76,6 +78,8 @@ export function WorkOrderActivityTimeline({
     <WorkOrderTimelineList
       timeline={timeline}
       organizationId={organizationId}
+      factoryId={factoryId}
+      orderId={order.id}
       resolveUserDisplay={resolveUserDisplay}
       hasMoreEvents={hasMoreEvents}
       isLoadingMoreEvents={isLoadingMoreEvents}
@@ -134,6 +138,8 @@ function TimelineActivityEmpty() {
 function WorkOrderTimelineList({
   timeline,
   organizationId,
+  factoryId,
+  orderId,
   resolveUserDisplay,
   hasMoreEvents,
   isLoadingMoreEvents,
@@ -141,6 +147,8 @@ function WorkOrderTimelineList({
 }: {
   timeline: ReturnType<typeof buildWorkOrderTimelineView>;
   organizationId: string;
+  factoryId: string;
+  orderId?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   hasMoreEvents: boolean;
   isLoadingMoreEvents: boolean;
@@ -166,6 +174,8 @@ function WorkOrderTimelineList({
           key={event.id}
           event={event}
           organizationId={organizationId}
+          factoryId={factoryId}
+          orderId={orderId}
           resolveUserDisplay={resolveUserDisplay}
           isLast={index === timeline.events.length - 1}
         />
@@ -177,11 +187,15 @@ function WorkOrderTimelineList({
 function TimelineItem({
   event,
   organizationId,
+  factoryId,
+  orderId,
   resolveUserDisplay,
   isLast,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
+  factoryId: string;
+  orderId?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   isLast: boolean;
 }) {
@@ -194,7 +208,13 @@ function TimelineItem({
       ) : null}
       <TimelineMarker icon={Icon} />
       <div className={cn("min-w-0 flex-1", isLast ? "pb-2" : "pb-8")}>
-        <TimelineItemContent event={event} organizationId={organizationId} resolveUserDisplay={resolveUserDisplay} />
+        <TimelineItemContent
+          event={event}
+          organizationId={organizationId}
+          factoryId={factoryId}
+          orderId={orderId}
+          resolveUserDisplay={resolveUserDisplay}
+        />
       </div>
     </li>
   );
@@ -205,10 +225,14 @@ const USER_ACTION_EVENT_KINDS: WorkOrderTimelineEventKind[] = ["created", "assig
 function TimelineItemContent({
   event,
   organizationId,
+  factoryId,
+  orderId,
   resolveUserDisplay,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
+  factoryId: string;
+  orderId?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
@@ -237,6 +261,8 @@ function TimelineItemContent({
         <UserActionEventDescription
           event={event}
           organizationId={organizationId}
+          factoryId={factoryId}
+          orderId={orderId}
           resolveUserDisplay={resolveUserDisplay}
         />
         <time className="mt-2 block text-xs text-gray-500 dark:text-gray-400">{formatTimeAgo(new Date(event.at))}</time>
@@ -250,7 +276,13 @@ function TimelineItemContent({
       {event.steps?.length ? (
         <ul className="mt-2 space-y-1">
           {event.steps.map((step) => (
-            <DispatchStepRow key={step.id} organizationId={organizationId} step={step} />
+            <DispatchStepRow
+              key={step.id}
+              organizationId={organizationId}
+              factoryId={factoryId}
+              orderId={orderId}
+              step={step}
+            />
           ))}
         </ul>
       ) : null}
@@ -268,10 +300,14 @@ const SOMEONE_FALLBACK_KINDS: WorkOrderTimelineEventKind[] = ["created", "status
 function UserActionEventDescription({
   event,
   organizationId,
+  factoryId,
+  orderId,
   resolveUserDisplay,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
+  factoryId: string;
+  orderId?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
@@ -303,7 +339,7 @@ function UserActionEventDescription({
           resolveUserDisplay={resolveUserDisplay}
         />
       ) : hasSourceRun ? (
-        <SourceRunAttribution event={event} organizationId={organizationId} />
+        <SourceRunAttribution event={event} organizationId={organizationId} factoryId={factoryId} orderId={orderId} />
       ) : (
         <span>{event.title}</span>
       )}
@@ -319,9 +355,24 @@ function UserActionEventDescription({
 // Renders an event title followed by "run" (linked to the originating canvas
 // run when the app+run ids are known). Used for events attributed to a run
 // rather than to a user or a factory-line automation.
-function SourceRunAttribution({ event, organizationId }: { event: WorkOrderTimelineEvent; organizationId: string }) {
+function SourceRunAttribution({
+  event,
+  organizationId,
+  factoryId,
+  orderId,
+}: {
+  event: WorkOrderTimelineEvent;
+  organizationId: string;
+  factoryId: string;
+  orderId?: string;
+}) {
   const runHref =
-    event.sourceAppId && event.sourceRunId ? appRunPath(organizationId, event.sourceAppId, event.sourceRunId) : null;
+    event.sourceAppId && event.sourceRunId
+      ? factoryAppRunPath(organizationId, factoryId, event.sourceAppId, event.sourceRunId, {
+          from: "work-order",
+          orderId,
+        })
+      : null;
 
   // `created` events read "Work order created from run"; other kinds (e.g.
   // `statusChanged` for the `draft → open` marker) read "opened this work
@@ -458,8 +509,18 @@ function InlineUserList({
   );
 }
 
-function DispatchStepRow({ organizationId, step }: { organizationId: string; step: WorkOrderTimelineStep }) {
-  const runHref = getWorkOrderExecutionRunHref(organizationId, step.execution);
+function DispatchStepRow({
+  organizationId,
+  factoryId,
+  orderId,
+  step,
+}: {
+  organizationId: string;
+  factoryId: string;
+  orderId?: string;
+  step: WorkOrderTimelineStep;
+}) {
+  const runHref = getWorkOrderExecutionRunHref(organizationId, factoryId, step.execution, { orderId });
   const durationLabel = formatStepExecutionDuration(step);
   const linkClassName = timelineRunLinkClassName;
   const stepContent = (

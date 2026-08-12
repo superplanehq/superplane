@@ -6,8 +6,10 @@ const CANVAS_NODE_HEIGHT = 280;
 const MIN_DISTANCE_FROM_TARGET_TOP = 50;
 const MIN_DISTANCE_FROM_SOURCE_BOTTOM = 50;
 const SAME_ROW_TOLERANCE = 40;
+const SAME_COLUMN_TOLERANCE = 40;
 const TARGET_HANDLE_TOP_OFFSET = 18;
 const SMOOTH_STEP_BORDER_RADIUS = 16;
+const RECT_BORDER_RADIUS = 0;
 const HANDLE_OFFSET = 24;
 
 type Point = { x: number; y: number };
@@ -20,6 +22,16 @@ export type CanvasEdgePathParams = {
   targetY: number;
   targetPosition: Position;
 };
+
+export function isVerticalFlowEdge({
+  sourcePosition,
+  targetPosition,
+}: Pick<CanvasEdgePathParams, "sourcePosition" | "targetPosition">): boolean {
+  return (
+    (sourcePosition === Position.Bottom && targetPosition === Position.Top) ||
+    (sourcePosition === Position.Top && targetPosition === Position.Bottom)
+  );
+}
 
 export function isBackwardEdge({
   sourceX,
@@ -71,10 +83,15 @@ function getBend(a: Point, b: Point, c: Point, size: number): string {
   return `L ${x},${y + bendSize * yDir}Q ${x},${y} ${x + bendSize * xDir},${y}`;
 }
 
-function buildSmoothStepPath(points: Point[], borderRadius: number): string {
+function buildOrthogonalPath(points: Point[], borderRadius: number): string {
   let path = `M ${points[0].x} ${points[0].y}`;
 
   for (let i = 1; i < points.length - 1; i++) {
+    if (borderRadius <= 0) {
+      path += ` L ${points[i].x} ${points[i].y}`;
+      continue;
+    }
+
     path += ` ${getBend(points[i - 1], points[i], points[i + 1], borderRadius)}`;
   }
 
@@ -118,7 +135,10 @@ export function getBackwardRouteCenterY(sourceY: number, targetY: number): numbe
   return Math.min(biasedY, maxCenterY);
 }
 
-function getUpwardBackwardEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
+function getUpwardBackwardEdgePath(
+  params: CanvasEdgePathParams,
+  borderRadius: number,
+): [path: string, labelX: number, labelY: number] {
   const { sourceX, sourceY, targetX, targetY } = params;
   const gutterY = getUpwardBackwardGutterY(sourceY, targetY);
   const exitX = sourceX + HANDLE_OFFSET;
@@ -133,17 +153,59 @@ function getUpwardBackwardEdgePath(params: CanvasEdgePathParams): [path: string,
     { x: targetX, y: targetY },
   ];
 
-  const path = buildSmoothStepPath(points, SMOOTH_STEP_BORDER_RADIUS);
+  const path = buildOrthogonalPath(points, borderRadius);
 
   return [path, (exitX + entryX) / 2, gutterY];
 }
 
-function getBackwardEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
+function getLeftwardBackwardGutterX(sourceX: number, targetX: number): number {
+  const targetLeft = targetX;
+  const sourceRight = sourceX;
+  const gap = sourceRight - targetLeft;
+
+  if (gap > 0) {
+    return Math.min(
+      targetLeft + Math.min(MIN_DISTANCE_FROM_SOURCE_BOTTOM, gap * (1 - BACKWARD_ROUTE_TARGET_BIAS)),
+      sourceRight - Math.min(MIN_DISTANCE_FROM_TARGET_TOP, gap * BACKWARD_ROUTE_TARGET_BIAS),
+    );
+  }
+
+  return targetLeft - BACKWARD_ROUTE_OFFSET;
+}
+
+function getVerticalBackwardEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
+  const { sourceX, sourceY, targetX, targetY } = params;
+  const horizontalDelta = targetX - sourceX;
+  const gutterX =
+    Math.abs(horizontalDelta) <= SAME_COLUMN_TOLERANCE
+      ? Math.max(sourceX, targetX) + BACKWARD_ROUTE_OFFSET
+      : horizontalDelta < 0
+        ? getLeftwardBackwardGutterX(sourceX, targetX)
+        : sourceX + horizontalDelta * BACKWARD_ROUTE_TARGET_BIAS;
+
+  const exitY = sourceY + HANDLE_OFFSET;
+  const entryY = targetY - HANDLE_OFFSET;
+
+  const points: Point[] = [
+    { x: sourceX, y: sourceY },
+    { x: sourceX, y: exitY },
+    { x: gutterX, y: exitY },
+    { x: gutterX, y: entryY },
+    { x: targetX, y: entryY },
+    { x: targetX, y: targetY },
+  ];
+
+  const path = buildOrthogonalPath(points, RECT_BORDER_RADIUS);
+
+  return [path, gutterX, (exitY + entryY) / 2];
+}
+
+function getHorizontalBackwardEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
   const { sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition } = params;
   const verticalDelta = targetY - sourceY;
 
   if (verticalDelta < -SAME_ROW_TOLERANCE) {
-    return getUpwardBackwardEdgePath(params);
+    return getUpwardBackwardEdgePath(params, SMOOTH_STEP_BORDER_RADIUS);
   }
 
   const centerY = getBackwardRouteCenterY(sourceY, targetY);
@@ -163,9 +225,30 @@ function getBackwardEdgePath(params: CanvasEdgePathParams): [path: string, label
   return [path, labelX, labelY];
 }
 
-export function getCanvasEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
+function getRectEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
   if (isBackwardEdge(params)) {
-    return getBackwardEdgePath(params);
+    if (isVerticalFlowEdge(params)) {
+      return getVerticalBackwardEdgePath(params);
+    }
+
+    return getHorizontalBackwardEdgePath(params);
+  }
+
+  const [path, labelX, labelY] = getSmoothStepPath({
+    ...params,
+    borderRadius: RECT_BORDER_RADIUS,
+  });
+
+  return [path, labelX, labelY];
+}
+
+export function getCanvasEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
+  if (isVerticalFlowEdge(params)) {
+    return getRectEdgePath(params);
+  }
+
+  if (isBackwardEdge(params)) {
+    return getHorizontalBackwardEdgePath(params);
   }
 
   const [path, labelX, labelY] = getBezierPath(params);
