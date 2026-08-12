@@ -7,8 +7,6 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateFactory, useFactories } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
-import { getApiErrorMessage } from "@/lib/errors";
-import { showErrorToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { Factory as FactoryIcon, Plus } from "lucide-react";
 import { useState } from "react";
@@ -73,24 +71,21 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
   const canCreate = canAct("factories", "create");
 
   const handleCreate = async (input: { name: string; description: string }) => {
-    try {
-      const factory = await createFactory.mutateAsync(input);
-      setCreateOpen(false);
-      if (!factory.id) {
-        return;
-      }
-      if (storybookOnboarding) {
-        storybookOnboarding.beginOnboarding({
-          workspaceId: factory.id,
-          workspaceName: factory.name || input.name,
-        });
-        navigate(factoryOnboardingPath(organizationId, factory.id));
-        return;
-      }
-      navigate(factoryDetailPath(organizationId, factory.id));
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to create workspace"));
+    // Let CreateFactoryDialog catch failures so duplicate-name inline errors work.
+    const factory = await createFactory.mutateAsync(input);
+    setCreateOpen(false);
+    if (!factory.id) {
+      return;
     }
+    if (storybookOnboarding) {
+      storybookOnboarding.beginOnboarding({
+        workspaceId: factory.id,
+        workspaceName: factory.name || input.name,
+      });
+      navigate(factoryOnboardingPath(organizationId, factory.id));
+      return;
+    }
+    navigate(factoryDetailPath(organizationId, factory.id));
   };
 
   return (
