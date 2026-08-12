@@ -44,84 +44,104 @@ export function useFactoryConfigureEnter({
   resyncStagedEditorState,
   setLastSavedWorkflowSnapshot,
 }: UseFactoryConfigureEnterOptions) {
-  const factoryConfigureEnterStartedRef = useRef(false);
+  // Latest values via refs so the enter effect deps stay stable. Unstable
+  // callback/query identities must not re-fire enter (update-depth loop), and
+  // resync setQueryData must not cancel the in-flight path before edit enables.
+  const liveCanvasRef = useRef(liveCanvas);
+  liveCanvasRef.current = liveCanvas;
+  const liveCanvasVersionRef = useRef(liveCanvasVersion);
+  liveCanvasVersionRef.current = liveCanvasVersion;
+  const enterDepsRef = useRef({
+    activateCanvasVersionForEditing,
+    draftCanvasSpecsRef,
+    previewingCurrentVersionRef,
+    resyncStagedEditorState,
+    setDraftCanvasSpec,
+    setEditSessionActive,
+    setLastSavedWorkflowSnapshot,
+  });
+  enterDepsRef.current = {
+    activateCanvasVersionForEditing,
+    draftCanvasSpecsRef,
+    previewingCurrentVersionRef,
+    resyncStagedEditorState,
+    setDraftCanvasSpec,
+    setEditSessionActive,
+    setLastSavedWorkflowSnapshot,
+  };
 
   useEffect(() => {
-    if (!factoryConfigure) {
-      factoryConfigureEnterStartedRef.current = false;
+    if (!factoryConfigure || editSessionActive) {
       return;
     }
-    if (factoryConfigureEnterStartedRef.current || editSessionActive) {
-      return;
-    }
-    if (!canStageCanvasVersion || !liveCanvasVersionId || !liveCanvasVersion) {
+    if (!canStageCanvasVersion || !liveCanvasVersionId) {
       return;
     }
     if (canvasLoading || liveCanvasVersionLoading) {
       return;
     }
 
-    factoryConfigureEnterStartedRef.current = true;
+    const version = liveCanvasVersionRef.current;
+    if (!version) {
+      return;
+    }
+
     // Seed draft from the live version directly — do not wait on the versions
     // list (handleUseVersion), which often left Configure with no activeVersionId.
-    const immediateSpec = liveCanvas?.spec ?? liveCanvasVersion.spec ?? { nodes: [], edges: [] };
+    const immediateSpec = liveCanvasRef.current?.spec ?? version.spec ?? { nodes: [], edges: [] };
     const versionForEdit: CanvasesCanvasVersion = {
-      ...liveCanvasVersion,
+      ...version,
       metadata: {
-        ...liveCanvasVersion.metadata,
+        ...version.metadata,
         id: liveCanvasVersionId,
       },
       spec: immediateSpec,
     };
     const configureVersionId = liveCanvasVersionId;
     let cancelled = false;
-    let editEnabled = false;
+    const {
+      activateCanvasVersionForEditing: activate,
+      draftCanvasSpecsRef: specsRef,
+      previewingCurrentVersionRef: previewingRef,
+      resyncStagedEditorState: resync,
+      setDraftCanvasSpec: setDraft,
+      setEditSessionActive: setEditActive,
+      setLastSavedWorkflowSnapshot: setSnapshot,
+    } = enterDepsRef.current;
 
-    previewingCurrentVersionRef.current = true;
-    activateCanvasVersionForEditing(configureVersionId, versionForEdit, { preserveStagedLayer: true });
-    draftCanvasSpecsRef.current.set(configureVersionId, immediateSpec);
-    setDraftCanvasSpec(immediateSpec);
+    previewingRef.current = true;
+    activate(configureVersionId, versionForEdit, { preserveStagedLayer: true });
+    specsRef.current.set(configureVersionId, immediateSpec);
+    setDraft(immediateSpec);
 
     // Await staged resync before enabling edit so a late applyStagedSpec cannot
     // wipe edits typed against the immediate seed.
     void (async () => {
       try {
-        await resyncStagedEditorState(configureVersionId, { bumpResetNonce: false });
+        await resync(configureVersionId, { bumpResetNonce: false });
       } catch {
         // Keep the immediate live/committed spec so Configure stays usable.
       }
       if (cancelled) {
         return;
       }
-      editEnabled = true;
-      setEditSessionActive(true);
-      if (liveCanvas) {
-        const spec = draftCanvasSpecsRef.current.get(configureVersionId) ?? immediateSpec;
-        setLastSavedWorkflowSnapshot({ ...liveCanvas, spec });
+      setEditActive(true);
+      const canvas = liveCanvasRef.current;
+      if (canvas) {
+        const spec = specsRef.current.get(configureVersionId) ?? immediateSpec;
+        setSnapshot({ ...canvas, spec });
       }
     })();
 
     return () => {
       cancelled = true;
-      if (!editEnabled) {
-        factoryConfigureEnterStartedRef.current = false;
-      }
     };
   }, [
-    activateCanvasVersionForEditing,
     canStageCanvasVersion,
     canvasLoading,
-    draftCanvasSpecsRef,
     editSessionActive,
     factoryConfigure,
-    liveCanvas,
-    liveCanvasVersion,
     liveCanvasVersionId,
     liveCanvasVersionLoading,
-    previewingCurrentVersionRef,
-    resyncStagedEditorState,
-    setDraftCanvasSpec,
-    setEditSessionActive,
-    setLastSavedWorkflowSnapshot,
   ]);
 }
