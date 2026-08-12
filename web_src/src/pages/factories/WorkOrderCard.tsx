@@ -88,7 +88,13 @@ export function WorkOrderCard({
           <WorkOrderCardActors creatorDisplay={creatorDisplay} assigneeDisplays={assigneeDisplays} />
         </div>
 
-        <WorkOrderExecutionsList organizationId={organizationId} executions={order.executions} variant="compact" />
+        <WorkOrderExecutionsList
+          organizationId={organizationId}
+          factoryId={factoryId}
+          orderId={order.id}
+          executions={order.executions}
+          variant="compact"
+        />
       </div>
     </article>
   );
