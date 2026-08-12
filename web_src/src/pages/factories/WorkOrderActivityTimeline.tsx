@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import type { OrgUserDisplay, OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
+import { MarkdownContent } from "@/pages/app/Markdown";
 import { useMemo, type ReactNode } from "react";
 import { FileText, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
 import {
@@ -60,21 +61,69 @@ export function WorkOrderActivityTimeline({
   const resolveUserName = useMemo(() => buildWorkOrderUserNameLookup(users, order), [users, order]);
   const resolveUserDisplay = useMemo(() => buildWorkOrderUserDisplayLookup(users, order), [users, order]);
   const pendingView = renderTimelinePendingView({ events, eventsError, isLoading, onRetryEvents });
+  const timeline = pendingView
+    ? { events: [] as WorkOrderTimelineEvent[] }
+    : buildWorkOrderTimelineView(events, resolveUserName, order.executions);
 
-  if (pendingView) {
+  // Without a footer, keep the historical "single message" layout: the
+  // pending/empty state occupies the whole slot on its own.
+  if (!footer && pendingView) {
     return pendingView;
   }
-
-  const timeline = buildWorkOrderTimelineView(events, resolveUserName, order.executions);
-
-  if (timeline.events.length === 0 && !footer) {
+  if (!footer && timeline.events.length === 0) {
     return <TimelineActivityEmpty />;
   }
 
-  const latestDispatchIndex = findLatestDispatchIndex(timeline.events);
-
   return (
     <div>
+      {pendingView ? (
+        <div className="mb-4">{pendingView}</div>
+      ) : (
+        <TimelineEventsList
+          organizationId={organizationId}
+          factoryId={factoryId}
+          orderId={order.id}
+          events={timeline.events}
+          resolveUserDisplay={resolveUserDisplay}
+          hasMoreEvents={hasMoreEvents}
+          isLoadingMoreEvents={isLoadingMoreEvents}
+          onLoadMoreEvents={onLoadMoreEvents}
+        />
+      )}
+      {footer ? (
+        <div className="relative mt-4 flex gap-3">
+          <TimelineMarker icon={MessageSquare} />
+          <div className="min-w-0 flex-1">{footer}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+interface TimelineEventsListProps {
+  organizationId: string;
+  factoryId: string;
+  orderId?: string;
+  events: WorkOrderTimelineEvent[];
+  resolveUserDisplay: OrgUserDisplayLookup;
+  hasMoreEvents: boolean;
+  isLoadingMoreEvents: boolean;
+  onLoadMoreEvents?: () => void;
+}
+
+function TimelineEventsList({
+  organizationId,
+  factoryId,
+  orderId,
+  events,
+  resolveUserDisplay,
+  hasMoreEvents,
+  isLoadingMoreEvents,
+  onLoadMoreEvents,
+}: TimelineEventsListProps) {
+  const latestDispatchIndex = findLatestDispatchIndex(events);
+  return (
+    <>
       {hasMoreEvents ? (
         <div className="mb-3">
           <Button
@@ -89,27 +138,23 @@ export function WorkOrderActivityTimeline({
         </div>
       ) : null}
 
-      <ul className="relative space-y-4">
-        <span className="pointer-events-none absolute left-[11px] top-3 bottom-3 w-px bg-border" aria-hidden />
-        {timeline.events.map((event, index) => (
-          <TimelineItem
-            key={event.id}
-            event={event}
-            organizationId={organizationId}
-            factoryId={factoryId}
-            orderId={order.id}
-            resolveUserDisplay={resolveUserDisplay}
-            isLatestDispatch={index === latestDispatchIndex}
-          />
-        ))}
-      </ul>
-      {footer ? (
-        <div className="relative mt-4 flex gap-3">
-          <TimelineMarker icon={MessageSquare} />
-          <div className="min-w-0 flex-1">{footer}</div>
-        </div>
+      {events.length > 0 ? (
+        <ul className="relative space-y-4">
+          <span className="pointer-events-none absolute left-[11px] top-3 bottom-3 w-px bg-border" aria-hidden />
+          {events.map((event, index) => (
+            <TimelineItem
+              key={event.id}
+              event={event}
+              organizationId={organizationId}
+              factoryId={factoryId}
+              orderId={orderId}
+              resolveUserDisplay={resolveUserDisplay}
+              isLatestDispatch={index === latestDispatchIndex}
+            />
+          ))}
+        </ul>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -297,7 +342,9 @@ function CommentEventBody({
           {timeLabel}
         </span>
       </p>
-      <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">{comment.body}</p>
+      <div className="mt-1" data-testid="work-order-timeline-comment-body">
+        <MarkdownContent content={comment.body} variant="workspace" />
+      </div>
     </>
   );
 }

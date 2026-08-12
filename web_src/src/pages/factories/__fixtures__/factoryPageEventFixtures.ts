@@ -349,7 +349,13 @@ export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
   commentAddedEvent(
     OPEN_WORK_ORDER,
     HOUR_AGO,
-    "I re-ran the failing test locally and confirmed the duplicate entry appears only on retry #3.",
+    [
+      "**Blocked** on the ledger writer — reproduced on retry `#3`.",
+      "",
+      "Next steps:",
+      "- Confirm the idempotency window in staging",
+      "- Follow up on [PR #482](https://github.com/example/ledger/pull/482)",
+    ].join("\n"),
     {
       kind: "automation",
       automation: { nodeName: "reproduce-failure", appName: "Refund Diagnostics" },
