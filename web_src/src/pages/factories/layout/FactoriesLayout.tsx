@@ -157,7 +157,7 @@ function FactoriesSidebar({
 }: FactoriesSidebarProps) {
   return (
     <aside
-      className="sticky top-0 flex h-screen w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
+      className="sticky top-0 flex h-screen w-[var(--workspace-navigation-width)] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
       data-testid="factories-sidebar"
     >
       <WorkspaceSwitcher

@@ -12,7 +12,6 @@ import {
   OPEN_WORK_ORDER,
   OPEN_WORK_ORDER_ARTIFACTS,
   PRIMARY_FACTORY_ID,
-  REFUND_FACTORY,
   REFUND_FACTORY_LINES,
   RUNNING_WORK_ORDER,
 } from "./__fixtures__/factoryPageResponses";
@@ -57,8 +56,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const factoryHref = `/${FACTORIES_ORGANIZATION_ID}/workspaces/${PRIMARY_FACTORY_ID}`;
-
 interface BuildLoadedViewOverrides {
   events?: FactoriesWorkOrderEvent[];
   artifacts?: FactoriesWorkOrderArtifact[];
@@ -67,9 +64,8 @@ interface BuildLoadedViewOverrides {
 function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedViewOverrides = {}) {
   const derived = getWorkOrderDetailDerived(order);
   return {
-    factory: REFUND_FACTORY,
-    factoryHref,
     organizationId: FACTORIES_ORGANIZATION_ID,
+    factoryId: PRIMARY_FACTORY_ID,
     order,
     events: overrides.events ?? [],
     artifacts: overrides.artifacts ?? [],
@@ -79,6 +75,7 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     assigneeIds: derived.assigneeIds,
     assigneeNames: derived.assigneeNames,
     factoryLines: REFUND_FACTORY_LINES,
+    canEditFactoryLines: true,
     isOpen: derived.isOpen,
     isDispatchable: derived.isDispatchable,
     isClosed: derived.isClosed,
@@ -94,8 +91,8 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     isAssigneesSaving: false,
     isUpdatingStatus: false,
     isAddingComment: false,
-    onDispatch: async (lineName: string) => {
-      console.log("dispatch", lineName);
+    onDispatch: async (input: { lineName: string }) => {
+      console.log("dispatch", input);
     },
     onClose: (result: "RESULT_COMPLETED" | "RESULT_REJECTED" | "RESULT_FAILED") => {
       console.log("close", result);
