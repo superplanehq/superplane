@@ -28,6 +28,7 @@ export function FactoriesNav({ organizationId, factoryId, recentWorkOrders }: Fa
         {FACTORIES_NAV_ITEMS.map((item) => {
           const Icon = item.Icon;
           const href = item.buildHref(organizationId, factoryId);
+
           return (
             <li key={item.id}>
               <NavLink
