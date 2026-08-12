@@ -34,8 +34,8 @@ export const WithLines: Story = {
     isSaving: false,
     canDispatch: true,
     align: "center",
-    onDispatch: async (lineName) => {
-      console.log("dispatch to", lineName);
+    onDispatch: async (input) => {
+      console.log("dispatch to", input);
     },
     children: <Button type="button">Dispatch</Button>,
   },
