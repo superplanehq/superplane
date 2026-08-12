@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 
 export const useOrganizationId = (): string | null => {
   const { organizationId } = useParams<{ organizationId: string }>();

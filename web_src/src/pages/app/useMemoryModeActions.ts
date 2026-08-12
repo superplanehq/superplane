@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { SetURLSearchParams } from "react-router-dom";
+import type { SetURLSearchParams } from "react-router";
 
 interface MemoryModeActionsConfig {
   setIsConsoleAddPanelOpen: (value: boolean) => void;

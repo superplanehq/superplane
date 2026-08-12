@@ -68,6 +68,10 @@ export default tseslint.config({ ignores: ['dist', 'dist-ssr', 'storybook-static
           {
             "name": "@storybook/react",
             "message": "Use @storybook/react-vite instead."
+          },
+          {
+            "name": "react-router-dom",
+            "message": "react-router-dom is frozen at v7. Import from \"react-router\" instead."
           }
         ]
       }

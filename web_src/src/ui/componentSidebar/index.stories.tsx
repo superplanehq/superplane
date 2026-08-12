@@ -1,8 +1,8 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ComponentSidebar } from "./";
 import GithubIcon from "@/assets/icons/integrations/github.svg";
 import { useState } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { DEFAULT_EVENT_STATE_MAP } from "../componentBase";
 
 const meta: Meta<typeof ComponentSidebar> = {

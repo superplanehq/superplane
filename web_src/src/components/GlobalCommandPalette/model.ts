@@ -15,8 +15,8 @@ import { getRouteContext } from "./route";
 import type { CanvasCommandListProps, CommandPage, PaletteAction } from "./types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import type { NavigateFunction } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
+import type { NavigateFunction } from "react-router";
 
 export type CommandPaletteModel = {
   adminActions: PaletteAction[];

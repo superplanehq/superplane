@@ -1,5 +1,5 @@
 import { useRef, type ReactElement } from "react";
-import { Navigate, useLocation, useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useLocation, useParams, useSearchParams } from "react-router";
 
 import { useCanvas, useCanvasConsole } from "@/hooks/useCanvasData";
 import { isFactoryApp } from "@/lib/canvasFlowDirection";

@@ -5,7 +5,7 @@ import { useFactoryApps } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { ArrowLeft } from "lucide-react";
 import { useMemo } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router";
 import { FactoryLineForm } from "../FactoryLineForm";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryLineDetailPath, linesPath } from "../lib/factoryPagePaths";

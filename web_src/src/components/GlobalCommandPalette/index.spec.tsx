@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type * as ReactRouterDom from "react-router-dom";
-import { MemoryRouter } from "react-router-dom";
+import type * as ReactRouterDom from "react-router";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GlobalCommandPalette } from ".";
 import { registerCanvasNodeSearchProvider } from "./canvasNodeSearchStore";
@@ -55,8 +55,8 @@ const {
   };
 });
 
-vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof ReactRouterDom>("react-router-dom");
+vi.mock("react-router", async () => {
+  const actual = await vi.importActual<typeof ReactRouterDom>("react-router");
   return {
     ...actual,
     useNavigate: () => navigateMock,

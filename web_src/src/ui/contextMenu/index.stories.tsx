@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Check, Loader2, Settings } from "lucide-react";
 
 import { Button } from "../button";
