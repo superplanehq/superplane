@@ -1,4 +1,4 @@
-import { Navigate, Outlet, useLocation, useParams } from "react-router-dom";
+import { Navigate, Outlet, useLocation, useParams } from "react-router";
 
 import { factoryOnboardingPath } from "../../lib/factoryPagePaths";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
