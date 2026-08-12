@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { SpecsTooltip } from "./SpecsTooltip";
 import type { ComponentBaseSpecValue } from "./index";
 import { ListFilter } from "lucide-react";

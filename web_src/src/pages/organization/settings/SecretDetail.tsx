@@ -11,7 +11,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Edit2, Key, Loader2, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router";
 import {
   useDeleteSecret,
   useSecret,

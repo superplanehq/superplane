@@ -10,7 +10,7 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { Factory as FactoryIcon, Plus } from "lucide-react";
 import { useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router";
 import { CreateFactoryDialog } from "./CreateFactoryDialog";
 import { factoryDetailPath, factoryOnboardingPath } from "./lib/factoryPagePaths";
 import { pickInitialFactoryId, readLastVisitedFactory } from "./lib/lastVisitedFactory";

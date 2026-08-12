@@ -1,4 +1,4 @@
-import { Navigate } from "react-router-dom";
+import { Navigate } from "react-router";
 import { factoryOverviewPath } from "../lib/factoryPagePaths";
 
 export function FactoryAppCanvasRedirect({ organizationId, factoryId }: { organizationId: string; factoryId: string }) {

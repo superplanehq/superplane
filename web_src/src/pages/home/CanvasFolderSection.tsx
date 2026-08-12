@@ -20,7 +20,7 @@ import { CanvasFolderActionsMenu } from "./CanvasFolderActionsMenu";
 import { CanvasCardsGrid } from "./CanvasCardsGrid";
 import { FOLDER_COLOR_OPTIONS, CANVAS_FOLDER_SECTION_SHELL_CLASS, folderColorStyles } from "./canvasFolderStyles";
 import type { CanvasCardData, CanvasFolderData } from "./types";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 
 interface CanvasFolderSectionProps {
   folder: CanvasFolderData;

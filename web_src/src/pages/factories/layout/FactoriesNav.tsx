@@ -1,6 +1,6 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 import { cn } from "@/lib/utils";
-import { NavLink } from "react-router-dom";
+import { NavLink } from "react-router";
 import { workOrderDetailPath } from "../lib/factoryPagePaths";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { FACTORIES_NAV_ITEMS } from "./factoriesNavItems";

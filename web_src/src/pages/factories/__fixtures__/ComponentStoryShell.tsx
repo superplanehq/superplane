@@ -1,4 +1,4 @@
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import type { ReactNode } from "react";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -11,7 +11,7 @@ interface ComponentStoryShellProps {
 
 /**
  * Minimal wrapper for factory *component* stories that use `Link`
- * (`react-router-dom`) or `PermissionTooltip` (needs tooltip context).
+ * (`react-router`) or `PermissionTooltip` (needs tooltip context).
  * Full-page stories should use `FactoriesHarness` instead so hooks fetch.
  */
 export function ComponentStoryShell({

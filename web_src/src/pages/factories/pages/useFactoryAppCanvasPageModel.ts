@@ -2,7 +2,7 @@ import { useCanvas } from "@/hooks/useCanvasData";
 import { useWorkOrder } from "@/hooks/useFactoryData";
 import type { FactoryConfigureActions } from "@/pages/app";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { resolveFactoryAppBackNav } from "../lib/factoryAppNav";
 import {
