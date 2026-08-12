@@ -4,7 +4,7 @@ import { CANVAS_CONNECTOR_COLOR } from "@/lib/canvasEdgeColors";
 import { nodeCanvasChannelLabelClassName } from "@/lib/nodeCanvasSections";
 import { AppendHandlePreview, AppendSourceHandle, type AppendFromNodeHandler } from "./appendHandle";
 import { isAlreadyConnectedToNode } from "./connectionState";
-import { HANDLE_STYLE } from "./handleStyle";
+import { resolveHandleStyle } from "./handleStyle";
 import type { BlockConnectionState, BlockEdgeState } from "./types";
 
 const MULTI_HANDLE_CHANNEL_SPACING = 96;
@@ -149,7 +149,7 @@ function MultiBottomChannelControl({
           position={Position.Bottom}
           id={channel}
           style={{
-            ...HANDLE_STYLE,
+            ...resolveHandleStyle(true),
             left: `calc(50% + ${offsetX}px)`,
             top: handleTop,
             transform: "translateX(-50%)",

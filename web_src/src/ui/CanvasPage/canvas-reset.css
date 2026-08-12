@@ -19,6 +19,25 @@
   --sp-append-handle-icon-hover: #d1d5db;
 }
 
+/* Factory canvases: Storybook WorkOrderCanvas edge weight + slate stroke. */
+.sp-canvas.sp-canvas-factory {
+  --xy-edge-stroke: #cbd5e1;
+  --xy-edge-stroke-selected: #94a3b8;
+  --xy-edge-stroke-width: 1.5;
+  --sp-handle-border: #e5e7eb;
+  --sp-handle-border-hover: #cbd5e1;
+  --sp-handle-highlight-border: #94a3b8;
+}
+
+.dark .sp-canvas.sp-canvas-factory {
+  --xy-edge-stroke: #4a4740;
+  --xy-edge-stroke-selected: #6b6560;
+  --xy-edge-stroke-width: 1.5;
+  --sp-handle-border: #4a4740;
+  --sp-handle-border-hover: #6b6560;
+  --sp-handle-highlight-border: #8a847c;
+}
+
 .sp-canvas .react-flow__node {
   background: none !important;
   border: none !important;

@@ -1,9 +1,6 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getDraftDiffOutlineClassName, type DraftDiffStatus } from "@/lib/draftDiff";
-import { withEventSectionDarkBackground } from "@/lib/eventSectionBackground";
-import { withEventStatusBadgeClasses } from "@/lib/eventStatusBadge";
-import { eventSectionMetadataTextClassName } from "@/lib/nodeCanvasSections";
-import { calcRelativeTimeFromDiff, cn, resolveIcon } from "@/lib/utils";
+import { cn, resolveIcon } from "@/lib/utils";
 import { CircleAlert, Rabbit } from "lucide-react";
 import React from "react";
 import { ComponentHeader } from "../componentHeader";
@@ -14,102 +11,17 @@ import { SelectionWrapper } from "../selectionWrapper";
 import type { ComponentActionsProps } from "../types/componentActions";
 import { PayloadTooltip } from "./PayloadTooltip";
 import { SpecsTooltip } from "./SpecsTooltip";
-import { Timestamp } from "@/components/Timestamp";
+import { FactoryNodeCard } from "../factoryNodeChrome";
+import { DEFAULT_EVENT_STATE_MAP as defaultEventStateMap } from "./defaultEventStateMap";
+import { EventSectionDisplay } from "./EventSectionDisplay";
+import type { EventSection, EventStateMap } from "./eventState";
 
-interface EventSectionDisplayProps {
-  section: EventSection;
-  index: number;
-  totalSections: number;
-  className?: string;
-  stateMap?: EventStateMap;
-  lastSection?: boolean;
-}
+export type { EventState, EventStateStyle, EventStateMap, EventSection } from "./eventState";
 
-const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
-  section,
-  index,
-  totalSections,
-  className,
-  stateMap = DEFAULT_EVENT_STATE_MAP,
-  lastSection = false,
-}) => {
-  // Live timer for running executions
-  const [liveDuration, setLiveDuration] = React.useState<number | null>(null);
+// eslint-disable-next-line react-refresh/only-export-components
+export const DEFAULT_EVENT_STATE_MAP = defaultEventStateMap;
 
-  React.useEffect(() => {
-    if (section.eventState === "running" && section.receivedAt) {
-      const receivedAt = section.receivedAt;
 
-      // Calculate initial duration
-      setLiveDuration(Date.now() - receivedAt.getTime());
-
-      // Update every second
-      const interval = setInterval(() => {
-        setLiveDuration(Date.now() - receivedAt.getTime());
-      }, 1000);
-
-      return () => clearInterval(interval);
-    } else {
-      setLiveDuration(null);
-    }
-  }, [section.eventState, section.receivedAt]);
-
-  const currentState = section.eventState || "neutral";
-  const stateStyle = stateMap[currentState] || stateMap["neutral"];
-
-  const LastEventBackground = withEventSectionDarkBackground(stateStyle.backgroundColor);
-  const LastEventStateColor = withEventStatusBadgeClasses(stateStyle.badgeColor);
-  const durationText = liveDuration !== null ? calcRelativeTimeFromDiff(liveDuration) : "";
-
-  return (
-    <div
-      key={index}
-      className={
-        `px-2 pt-2 relative ${lastSection ? "rounded-b-md" : ""} ${LastEventBackground}` +
-        (index < totalSections - 1 ? " border-b border-slate-950/20 dark:border-gray-600/70" : "") +
-        ` ${className}`
-      }
-    >
-      <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
-        <div
-          className={`uppercase text-[11px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${LastEventStateColor}`}
-        >
-          <span>{stateStyle.label || currentState}</span>
-        </div>
-        {section.eventSubtitle ? (
-          <span
-            title={typeof section.eventSubtitle === "string" ? section.eventSubtitle : undefined}
-            className={cn(
-              "text-[13px] font-medium truncate flex-shrink-0 max-w-[65%]",
-              eventSectionMetadataTextClassName,
-            )}
-          >
-            {section.showAutomaticTime && durationText ? durationText : section.eventSubtitle}
-          </span>
-        ) : (
-          <span
-            className={cn(
-              "text-[13px] font-medium truncate flex-shrink-0 max-w-[65%]",
-              eventSectionMetadataTextClassName,
-            )}
-          >
-            <Timestamp date={section.receivedAt} display="relative" relativeStyle="abbreviated" />
-          </span>
-        )}
-      </div>
-      <div className="flex justify-left items-center mt-1 gap-2">
-        {section.eventId && (
-          <span className={cn("text-[13px] font-mono", eventSectionMetadataTextClassName)}>
-            #{section.eventId?.slice(0, 4)}
-          </span>
-        )}
-        <span className="text-sm text-gray-700 font-inter truncate text-md min-w-0 font-medium truncate dark:text-white/70">
-          {section.eventTitle}
-        </span>
-      </div>
-    </div>
-  );
-};
 
 export interface SpecBadge {
   label: string;
@@ -138,87 +50,6 @@ export interface ComponentBaseSpec {
 }
 
 export type EmptyStatePurpose = "runtime" | "setup" | "fallback";
-
-export type EventState = "success" | "failed" | "neutral" | "queued" | "running" | string;
-
-export interface EventStateStyle {
-  icon: string;
-  textColor: string;
-  backgroundColor: string;
-  badgeColor: string;
-  label?: string; // Optional display label, defaults to state name if not provided
-}
-
-export type EventStateMap = Record<EventState, EventStateStyle>;
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const DEFAULT_EVENT_STATE_MAP: EventStateMap = {
-  triggered: {
-    icon: "circle",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-violet-100",
-    badgeColor: "bg-violet-400",
-  },
-  success: {
-    icon: "circle-check",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-green-100",
-    badgeColor: "bg-emerald-500",
-  },
-  failed: {
-    icon: "circle-x",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-red-100",
-    badgeColor: "bg-red-400",
-  },
-  cancelled: {
-    icon: "circle-slash-2",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
-    badgeColor: "bg-gray-500",
-  },
-  error: {
-    icon: "triangle-alert",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-red-100",
-    badgeColor: "bg-red-500",
-  },
-  neutral: {
-    icon: "circle",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-50",
-    badgeColor: "bg-gray-400",
-  },
-  queued: {
-    icon: "circle-dashed",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-orange-100",
-    badgeColor: "bg-yellow-600",
-  },
-  running: {
-    icon: "refresh-cw",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-sky-100",
-    badgeColor: "bg-blue-500",
-  },
-  cancelling: {
-    icon: "refresh-cw",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-amber-100",
-    badgeColor: "bg-amber-500",
-    label: "Cancelling",
-  },
-};
-
-export interface EventSection {
-  showAutomaticTime?: boolean;
-  receivedAt?: Date;
-  eventId: string;
-  eventState?: EventState;
-  eventTitle?: string;
-  eventSubtitle?: string | React.ReactNode;
-  handleComponent?: React.ReactNode;
-}
 
 export interface ComponentBaseProps extends ComponentActionsProps {
   iconSrc?: string;
@@ -258,9 +89,41 @@ export interface ComponentBaseProps extends ComponentActionsProps {
    */
   dimBodyBelowHeader?: boolean;
   draftDiffStatus?: DraftDiffStatus;
+  /**
+   * Factory-app canvases only. Switches node chrome to the card + tinted status
+   * footer design. Non-factory canvases must leave this unset/false.
+   */
+  isFactoryApp?: boolean;
 }
 
-export const ComponentBase: React.FC<ComponentBaseProps> = ({
+export const ComponentBase: React.FC<ComponentBaseProps> = (props) => {
+  if (props.isFactoryApp) {
+    return (
+      <FactoryNodeCard
+        title={props.title}
+        iconSrc={props.iconSrc}
+        iconSlug={props.iconSlug}
+        iconColor={props.iconColor}
+        selected={props.selected}
+        metadata={Array.isArray(props.metadata) ? props.metadata : undefined}
+        eventSections={Array.isArray(props.eventSections) ? props.eventSections : undefined}
+        error={typeof props.error === "string" ? props.error : undefined}
+        warning={typeof props.warning === "string" ? props.warning : undefined}
+        draftDiffStatus={props.draftDiffStatus}
+        dimBodyBelowHeader={props.dimBodyBelowHeader}
+        showHeader={props.showHeader}
+        onDuplicate={props.onDuplicate}
+        onDelete={props.onDelete}
+        onToggleView={props.onToggleView}
+        isCompactView={props.isCompactView}
+      />
+    );
+  }
+
+  return <ClassicComponentBase {...props} />;
+};
+
+const ClassicComponentBase: React.FC<ComponentBaseProps> = ({
   iconSrc,
   iconSlug,
   iconColor,
