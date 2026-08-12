@@ -416,6 +416,7 @@ function PhaseTickDot({ tick }: { tick: LinePhaseTick }) {
         "size-2 shrink-0 rounded-full bg-[#c4c4c4]",
         tick === "running" && "bg-[#3b82f6] animate-pulse",
         tick === "waiting" && "bg-[#f59e0b]",
+        tick === "failed" && "bg-[#ef4444]",
         tick === "queued" && "bg-[#a3a3a3]",
       )}
       aria-hidden
