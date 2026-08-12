@@ -10,9 +10,10 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { generateWorkspaceName } from "@/lib/workspaceNameGenerator";
 import { Factory as FactoryIcon, Plus } from "lucide-react";
+import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { CreateFactoryDialog } from "./CreateFactoryDialog";
 import { factoryDetailPath, factoryOnboardingPath } from "./lib/factoryPagePaths";
 import { pickInitialFactoryId, readLastVisitedFactory } from "./lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "./lib/useFactoriesThemeClass";
@@ -32,6 +33,7 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
   const navigate = useNavigate();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const [createOpen, setCreateOpen] = useState(false);
   const { data: factories = [], isLoading, error } = useFactories(organizationId);
   const createFactory = useCreateFactory(organizationId);
   const storybookOnboarding = useOnboardingStorybook();
@@ -70,20 +72,17 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
 
   const canCreate = canAct("factories", "create");
 
-  const handleCreate = async () => {
-    if (!canCreate || createFactory.isPending) {
-      return;
-    }
-    const workspaceName = generateWorkspaceName();
+  const handleCreate = async (input: { name: string; description: string }) => {
     try {
-      const factory = await createFactory.mutateAsync({ name: workspaceName, description: "" });
+      const factory = await createFactory.mutateAsync(input);
+      setCreateOpen(false);
       if (!factory.id) {
         return;
       }
       if (storybookOnboarding) {
         storybookOnboarding.beginOnboarding({
           workspaceId: factory.id,
-          workspaceName: factory.name || workspaceName,
+          workspaceName: factory.name || input.name,
         });
         navigate(factoryOnboardingPath(organizationId, factory.id));
         return;
@@ -114,8 +113,8 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
           <Button
             type="button"
             className="mt-6"
-            onClick={() => void handleCreate()}
-            disabled={!canCreate || createFactory.isPending}
+            onClick={() => setCreateOpen(true)}
+            disabled={!canCreate}
             data-testid="factories-index-create-button"
           >
             <Plus className="h-4 w-4" aria-hidden />
@@ -123,6 +122,13 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
           </Button>
         </PermissionTooltip>
       </div>
+
+      <CreateFactoryDialog
+        open={createOpen}
+        isSaving={createFactory.isPending}
+        onClose={() => setCreateOpen(false)}
+        onCreate={handleCreate}
+      />
     </div>
   );
 }

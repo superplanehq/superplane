@@ -1,4 +1,3 @@
-import { generateWorkspaceName } from "@/lib/workspaceNameGenerator";
 import { useCallback, useMemo, useState } from "react";
 
 import {
@@ -71,7 +70,7 @@ function setupReadiness(input: {
 }
 
 export function useRedesignSetupState(initialName = "") {
-  const [workspaceName, setWorkspaceName] = useState(() => initialName.trim() || generateWorkspaceName());
+  const [workspaceName, setWorkspaceName] = useState(() => initialName.trim());
   const [inviteCopied, setInviteCopied] = useState(false);
   const [connected, setConnected] = useState<Set<IntegrationId>>(() => new Set());
   const [vcsHost, setVcsHost] = useState<VcsHostId | null>(null);
