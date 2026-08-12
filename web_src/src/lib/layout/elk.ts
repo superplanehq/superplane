@@ -9,7 +9,6 @@ const DEFAULT_NODE_HEIGHT = 180;
 const ANNOTATION_NODE_WIDTH = 320;
 const ANNOTATION_NODE_HEIGHT = 200;
 const DISCONNECTED_COMPONENT_VERTICAL_GAP = 220;
-const DISCONNECTED_COMPONENT_HORIZONTAL_GAP = 220;
 /** Side-by-side packing gap for vertical (factory) canvases — tighter than horizontal. */
 const DISCONNECTED_COMPONENT_HORIZONTAL_GAP_VERTICAL = 100;
 /** Same-layer horizontal gap when flow is top→bottom. */

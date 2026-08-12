@@ -119,6 +119,7 @@ import { useEnterLiveEditSession } from "./useEnterLiveEditSession";
 import { useCanvasEchoReleaseGuards } from "./useCanvasEchoReleaseGuards";
 import { useCanvasLifecycleEventHandlers } from "./useCanvasLifecycleEventHandlers";
 import { useDraftStagingActions } from "./useDraftStagingActions";
+import { useFactoryConfigureSession, type FactoryConfigureActions } from "./useFactoryConfigureSession";
 import { executeCommitStaging } from "./lib/commit-staging-flow";
 import { buildDuplicatedEdges, buildDuplicatedNodes } from "./lib/duplicate-nodes";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
@@ -217,11 +218,7 @@ function whenAllowed<T>(allowed: boolean, value: T): T | undefined {
   return allowed ? value : undefined;
 }
 
-export type FactoryConfigureActions = {
-  save: () => void;
-  discard: () => void;
-  busy: boolean;
-};
+export type { FactoryConfigureActions } from "./useFactoryConfigureSession";
 
 export function AppPage({
   factoryEmbed = false,
@@ -239,8 +236,6 @@ export function AppPage({
   onFactoryConfigureDone?: () => void;
 } = {}) {
   const factoryViewOnly = factoryEmbed && !factoryConfigure;
-  const onFactoryConfigureDoneRef = useRef(onFactoryConfigureDone);
-  onFactoryConfigureDoneRef.current = onFactoryConfigureDone;
   const {
     organizationId,
     appId,
@@ -3771,90 +3766,37 @@ export function AppPage({
     }
   }, [clearRunInspectionForEdit, liveCanvasVersionId, handleUseVersion]);
 
-  const factoryConfigureEnterStartedRef = useRef(false);
-  const [factoryConfigureSavePending, setFactoryConfigureSavePending] = useState(false);
-  useEffect(() => {
-    if (!factoryConfigure) {
-      factoryConfigureEnterStartedRef.current = false;
-      return;
-    }
-    if (factoryConfigureEnterStartedRef.current || editSessionActive) {
-      return;
-    }
-    if (!canStageCanvasVersion || !liveCanvasVersionId || !liveCanvasVersion) {
-      return;
-    }
-    if (canvasLoading || liveCanvasVersionLoading) {
-      return;
-    }
-
-    factoryConfigureEnterStartedRef.current = true;
-    // Seed draft from the live version directly — do not wait on the versions
-    // list (handleUseVersion), which often left Configure with no activeVersionId.
-    const immediateSpec = liveCanvas?.spec ?? liveCanvasVersion.spec ?? { nodes: [], edges: [] };
-    const versionForEdit: CanvasesCanvasVersion = {
-      ...liveCanvasVersion,
-      metadata: {
-        ...liveCanvasVersion.metadata,
-        id: liveCanvasVersionId,
-      },
-      spec: immediateSpec,
-    };
-    const configureVersionId = liveCanvasVersionId;
-    let cancelled = false;
-    let editEnabled = false;
-
-    previewingCurrentVersionRef.current = true;
-    activateCanvasVersionForEditing(configureVersionId, versionForEdit, { preserveStagedLayer: true });
-    draftCanvasSpecsRef.current.set(configureVersionId, immediateSpec);
-    setDraftCanvasSpec(immediateSpec);
-
-    // Await staged resync before enabling edit so a late applyStagedSpec cannot
-    // wipe edits typed against the immediate seed.
-    void (async () => {
-      try {
-        await resyncStagedEditorState(configureVersionId, { bumpResetNonce: false });
-      } catch {
-        // Keep the immediate live/committed spec so Configure stays usable.
-      }
-      if (cancelled) {
-        return;
-      }
-      editEnabled = true;
-      setEditSessionActive(true);
-      if (liveCanvas) {
-        const spec = draftCanvasSpecsRef.current.get(configureVersionId) ?? immediateSpec;
-        setLastSavedWorkflowSnapshot({ ...liveCanvas, spec });
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      if (!editEnabled) {
-        factoryConfigureEnterStartedRef.current = false;
-      }
-    };
-  }, [
-    activateCanvasVersionForEditing,
+  useFactoryConfigureSession({
+    factoryConfigure,
+    factoryConfigureActionsRef,
+    onFactoryConfigureBusyChange,
+    onFactoryConfigureDone,
+    editSessionActive,
+    setEditSessionActive,
     canStageCanvasVersion,
     canvasLoading,
-    editSessionActive,
-    factoryConfigure,
-    liveCanvas,
-    liveCanvasVersion,
-    liveCanvasVersionId,
     liveCanvasVersionLoading,
+    liveCanvasVersionId,
+    liveCanvasVersion,
+    liveCanvas,
+    previewingCurrentVersionRef,
+    activateCanvasVersionForEditing,
+    draftCanvasSpecsRef,
+    setDraftCanvasSpec,
     resyncStagedEditorState,
     setLastSavedWorkflowSnapshot,
-  ]);
-
-  const factoryConfigureBusy = commitStagingPending || resetStagingPending || factoryConfigureSavePending;
-  useEffect(() => {
-    if (!factoryConfigure || !onFactoryConfigureBusyChange) {
-      return;
-    }
-    onFactoryConfigureBusyChange(factoryConfigureBusy);
-  }, [factoryConfigure, factoryConfigureBusy, onFactoryConfigureBusyChange]);
+    commitStagingPending,
+    resetStagingPending,
+    activeCanvasVersionIdRef,
+    activeCanvasVersionId,
+    getCurrentWorkflowSnapshot,
+    updateCanvasVersionMutation,
+    handleCommitStaging,
+    handleResetStaging,
+    handleExitEditSession,
+    hasStagingChanges,
+    hasUncommittedCanvasDraftChanges,
+  });
 
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
@@ -4233,84 +4175,6 @@ export function AppPage({
     loadMoreLiveVersionsDisabled: !hasMoreLiveVersions || isLoadingMoreLiveVersions,
     loadMoreLiveVersionsPending: isLoadingMoreLiveVersions,
   });
-
-  if (factoryConfigureActionsRef) {
-    factoryConfigureActionsRef.current = !factoryConfigure
-      ? null
-      : {
-          busy: factoryConfigureBusy,
-          save: () => {
-            if (factoryConfigureBusy) {
-              return;
-            }
-            void (async () => {
-              if (!canStageCanvasVersion) {
-                showErrorToast("You don't have permission to edit this canvas.");
-                return;
-              }
-
-              const savingVersionId =
-                activeCanvasVersionIdRef.current || activeCanvasVersionId || liveCanvasVersionId || "";
-              if (!savingVersionId) {
-                showErrorToast("Edit session is not ready. Try Configure again.");
-                return;
-              }
-
-              // Align the sync ref before staging. The shared save queue rejects as
-              // "stale" when ref !== savingVersionId — that was failing Configure Save.
-              activeCanvasVersionIdRef.current = savingVersionId;
-              if (!editSessionActive) {
-                setEditSessionActive(true);
-              }
-
-              const workflow = getCurrentWorkflowSnapshot();
-              if (!workflow?.spec) {
-                showErrorToast("Nothing to save");
-                return;
-              }
-
-              setFactoryConfigureSavePending(true);
-              try {
-                // Stage canvas.yaml directly — skip enqueueCanvasSave stale/session checks.
-                await updateCanvasVersionMutation.mutateAsync({
-                  versionId: savingVersionId,
-                  canvasYaml: materializeCanvasSpec(workflow),
-                });
-                draftCanvasSpecsRef.current.set(savingVersionId, workflow.spec);
-                setDraftCanvasSpec(workflow.spec);
-                setLastSavedWorkflowSnapshot(workflow);
-
-                const committed = await handleCommitStaging("Update automation", { versionId: savingVersionId });
-                if (!committed) {
-                  return;
-                }
-                onFactoryConfigureDoneRef.current?.();
-              } catch (error) {
-                showErrorToast(getApiErrorMessage(error, "Failed to stage canvas changes"));
-              } finally {
-                setFactoryConfigureSavePending(false);
-              }
-            })();
-          },
-          discard: () => {
-            if (factoryConfigureBusy) {
-              return;
-            }
-            void (async () => {
-              setFactoryConfigureSavePending(true);
-              try {
-                if (hasStagingChanges || hasUncommittedCanvasDraftChanges) {
-                  await handleResetStaging();
-                }
-                handleExitEditSession();
-                onFactoryConfigureDoneRef.current?.();
-              } finally {
-                setFactoryConfigureSavePending(false);
-              }
-            })();
-          },
-        };
-  }
 
   return (
     <>
