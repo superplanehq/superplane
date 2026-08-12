@@ -55,9 +55,6 @@ var exampleOutputGetInstanceMetricsBytes []byte
 //go:embed example_output_update_instance.json
 var exampleOutputUpdateInstanceBytes []byte
 
-//go:embed example_output_create_alarm.json
-var exampleOutputCreateAlarmBytes []byte
-
 //go:embed example_output_get_alarm.json
 var exampleOutputGetAlarmBytes []byte
 
@@ -75,9 +72,6 @@ var exampleOutputCreateLoadBalancerBytes []byte
 
 //go:embed example_output_delete_load_balancer.json
 var exampleOutputDeleteLoadBalancerBytes []byte
-
-//go:embed example_output_update_alarm.json
-var exampleOutputUpdateAlarmBytes []byte
 
 //go:embed example_output_delete_alarm.json
 var exampleOutputDeleteAlarmBytes []byte
@@ -130,9 +124,6 @@ var exampleOutputGetInstanceMetrics map[string]any
 var exampleOutputUpdateInstanceOnce sync.Once
 var exampleOutputUpdateInstance map[string]any
 
-var exampleOutputCreateAlarmOnce sync.Once
-var exampleOutputCreateAlarm map[string]any
-
 var exampleOutputGetAlarmOnce sync.Once
 var exampleOutputGetAlarm map[string]any
 
@@ -150,9 +141,6 @@ var exampleOutputCreateLoadBalancer map[string]any
 
 var exampleOutputDeleteLoadBalancerOnce sync.Once
 var exampleOutputDeleteLoadBalancer map[string]any
-
-var exampleOutputUpdateAlarmOnce sync.Once
-var exampleOutputUpdateAlarm map[string]any
 
 var exampleOutputDeleteAlarmOnce sync.Once
 var exampleOutputDeleteAlarm map[string]any
@@ -257,14 +245,6 @@ func (c *UpdateInstance) ExampleOutput() map[string]any {
 	)
 }
 
-func (c *CreateAlarm) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreateAlarmOnce,
-		exampleOutputCreateAlarmBytes,
-		&exampleOutputCreateAlarm,
-	)
-}
-
 func (c *GetAlarm) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
 		&exampleOutputGetAlarmOnce,
@@ -310,14 +290,6 @@ func (c *DeleteLoadBalancer) ExampleOutput() map[string]any {
 		&exampleOutputDeleteLoadBalancerOnce,
 		exampleOutputDeleteLoadBalancerBytes,
 		&exampleOutputDeleteLoadBalancer,
-	)
-}
-
-func (c *UpdateAlarm) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputUpdateAlarmOnce,
-		exampleOutputUpdateAlarmBytes,
-		&exampleOutputUpdateAlarm,
 	)
 }
 
