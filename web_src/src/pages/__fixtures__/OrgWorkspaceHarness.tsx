@@ -34,6 +34,7 @@ import {
 } from "@/pages/factories";
 import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
 import { createFactoryLinePath, editFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
+import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
 import { HomePage } from "@/pages/home";
 import { homePageIds, type HomePageFixture } from "@/pages/home/__fixtures__/handlers";
 import { NewAppPage } from "@/pages/home/NewAppPage";
@@ -70,6 +71,9 @@ function fixtureFetchState(): FixtureFetchState {
 /** Storybook-only route swaps. App routes ignore this. */
 export interface OrgWorkspacePageOverrides {
   wiki?: ComponentType;
+  overview?: ComponentType;
+  /** When set, mounts `/onboarding` and gates other factory pages while pending. */
+  onboarding?: ComponentType;
 }
 
 export interface OrgWorkspaceHarnessProps {
@@ -175,8 +179,18 @@ function HarnessLegacyAutomationsLineEditRedirect() {
   return <Navigate to={editFactoryLinePath(organizationId, factoryId, lineId)} replace />;
 }
 
+function OptionalOnboardingGate({ enabled }: { enabled: boolean }) {
+  if (!enabled) {
+    return <Outlet />;
+  }
+  return <OnboardingGate />;
+}
+
 function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePageOverrides }) {
   const WikiRoutePage = pageOverrides?.wiki ?? WikiPage;
+  const OverviewRoutePage = pageOverrides?.overview ?? OverviewPage;
+  const OnboardingRoutePage = pageOverrides?.onboarding;
+  const onboardingEnabled = Boolean(OnboardingRoutePage);
 
   return (
     <Routes>
@@ -194,29 +208,32 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
         <Route path="workspaces">
           <Route index element={factoryRoute(<FactoriesIndexPage />)} />
           <Route path=":factoryId" element={factoryRoute(<FactoriesLayout />)}>
-            <Route index element={<Navigate to="overview" replace />} />
-            <Route path="overview" element={<OverviewPage />} />
-            <Route path="missions" element={<MissionsPage />} />
-            <Route path="wiki" element={<WikiRoutePage />} />
-            <Route path="velocity" element={<VelocityPage />} />
-            <Route path="work-orders">
-              <Route index element={<WorkOrdersPage />} />
-              <Route path="new" element={<CreateWorkOrderPage />} />
-              <Route path=":orderId" element={<WorkOrderDetailPage />} />
+            <Route element={<OptionalOnboardingGate enabled={onboardingEnabled} />}>
+              <Route index element={<Navigate to="overview" replace />} />
+              {OnboardingRoutePage ? <Route path="onboarding" element={<OnboardingRoutePage />} /> : null}
+              <Route path="overview" element={<OverviewRoutePage />} />
+              <Route path="missions" element={<MissionsPage />} />
+              <Route path="wiki" element={<WikiRoutePage />} />
+              <Route path="velocity" element={<VelocityPage />} />
+              <Route path="work-orders">
+                <Route index element={<WorkOrdersPage />} />
+                <Route path="new" element={<CreateWorkOrderPage />} />
+                <Route path=":orderId" element={<WorkOrderDetailPage />} />
+              </Route>
+              <Route path="lines">
+                <Route index element={<LinesPage />} />
+                <Route path="new" element={<FactoryLineEditPage />} />
+                <Route path=":lineId" element={<LinesPage />} />
+                <Route path=":lineId/edit" element={<FactoryLineEditPage />} />
+              </Route>
+              <Route path="automations">
+                <Route index element={<AutomationsPage />} />
+                <Route path="new" element={<HarnessLegacyAutomationsNewLineRedirect />} />
+                <Route path=":lineId/edit" element={<HarnessLegacyAutomationsLineEditRedirect />} />
+                <Route path=":appId" element={<AutomationsPage />} />
+              </Route>
+              <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
             </Route>
-            <Route path="lines">
-              <Route index element={<LinesPage />} />
-              <Route path="new" element={<FactoryLineEditPage />} />
-              <Route path=":lineId" element={<LinesPage />} />
-              <Route path=":lineId/edit" element={<FactoryLineEditPage />} />
-            </Route>
-            <Route path="automations">
-              <Route index element={<AutomationsPage />} />
-              <Route path="new" element={<HarnessLegacyAutomationsNewLineRedirect />} />
-              <Route path=":lineId/edit" element={<HarnessLegacyAutomationsLineEditRedirect />} />
-              <Route path=":appId" element={<AutomationsPage />} />
-            </Route>
-            <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
           </Route>
           <Route path=":factoryId/settings" element={factoryRoute(<FactorySettingsLayout />)}>
             <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />

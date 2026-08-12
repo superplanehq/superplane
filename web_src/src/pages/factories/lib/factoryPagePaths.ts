@@ -10,6 +10,10 @@ export function factoryOverviewPath(organizationId: string, factoryId: string) {
   return `${factoryDetailPath(organizationId, factoryId)}/overview`;
 }
 
+export function factoryOnboardingPath(organizationId: string, factoryId: string) {
+  return `${factoryDetailPath(organizationId, factoryId)}/onboarding`;
+}
+
 export function workOrdersPath(organizationId: string, factoryId: string) {
   return `${factoryDetailPath(organizationId, factoryId)}/work-orders`;
 }

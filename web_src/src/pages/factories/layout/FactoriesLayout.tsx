@@ -10,9 +10,10 @@ import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Outlet, useNavigate, useParams } from "react-router-dom";
 import { CreateFactoryDialog } from "../CreateFactoryDialog";
-import { factoryDetailPath, factoryListPath } from "../lib/factoryPagePaths";
+import { factoryDetailPath, factoryListPath, factoryOnboardingPath } from "../lib/factoryPagePaths";
 import { clearLastVisitedFactory, recordLastVisitedFactory } from "../lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
+import { useOnboardingStorybook } from "../pages/onboarding/useOnboardingStorybook";
 import { FactoriesLayoutContext } from "./factoriesLayoutContext";
 import { FactoriesNav } from "./FactoriesNav";
 import { SidebarUserMenu } from "./SidebarUserMenu";
@@ -44,6 +45,7 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
 
   const createFactory = useCreateFactory(organizationId);
+  const storybookOnboarding = useOnboardingStorybook();
 
   const pageTitle = useMemo(() => (factory?.name ? [factory.name] : ["Workspaces"]), [factory?.name]);
   usePageTitle(pageTitle);
@@ -78,9 +80,16 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
   const handleCreateFactory = async (input: { name: string; description: string }) => {
     const created = await createFactory.mutateAsync(input);
     setCreateFactoryOpen(false);
-    if (created.id) {
-      navigate(factoryDetailPath(organizationId, created.id));
+    if (!created.id) {
+      return;
     }
+    if (storybookOnboarding) {
+      const workspaceName = created.name || input.name;
+      storybookOnboarding.beginOnboarding({ workspaceId: created.id, workspaceName });
+      navigate(factoryOnboardingPath(organizationId, created.id));
+      return;
+    }
+    navigate(factoryDetailPath(organizationId, created.id));
   };
 
   if (factoryError) {
