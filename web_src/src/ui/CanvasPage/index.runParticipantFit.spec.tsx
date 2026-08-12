@@ -23,6 +23,12 @@ vi.mock("@/sentry", () => ({
 }));
 
 vi.mock("@xyflow/react", () => ({
+  Position: {
+    Left: "left",
+    Right: "right",
+    Top: "top",
+    Bottom: "bottom",
+  },
   Background: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   Panel: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   ReactFlow: ({ children }: { children?: ReactNode }) => <div>{children}</div>,

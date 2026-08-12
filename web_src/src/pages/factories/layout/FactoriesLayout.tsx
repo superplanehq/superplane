@@ -93,7 +93,7 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
 
   return (
     <FactoriesLayoutContext.Provider value={layoutContextValue}>
-      <div className="flex min-h-screen w-full bg-background text-foreground" data-testid="factories-layout">
+      <div className="flex h-screen w-full bg-background text-foreground" data-testid="factories-layout">
         <FactoriesSidebar
           organizationId={organizationId}
           factoryId={factoryId}
@@ -109,7 +109,7 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
           recentWorkOrders={recentWorkOrders}
           onOpenCreateFactory={() => setCreateFactoryOpen(true)}
         />
-        <main className="flex min-h-screen min-w-0 flex-1 flex-col bg-background">
+        <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
           <Outlet />
         </main>
       </div>

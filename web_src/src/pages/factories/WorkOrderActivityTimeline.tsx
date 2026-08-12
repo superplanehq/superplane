@@ -4,9 +4,8 @@ import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import type { OrgUserDisplay, OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
-import { appRunPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
-import { Fragment, useMemo, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { FileText, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
 import {
   buildWorkOrderTimelineView,
@@ -16,6 +15,7 @@ import {
   type WorkOrderTimelineEventKind,
 } from "./lib/workOrderTimelineEvents";
 import { formatWorkOrderDateTime as formatTimelineDate } from "./lib/workOrderDateTime";
+import { factoryAppRunPath } from "./lib/factoryPagePaths";
 import { OrgUserReference } from "./OrgUserReference";
 import { DispatchTimelineItem } from "./timeline/DispatchTimelineItem";
 import { TimelineAutomationActor } from "./timeline";
@@ -27,9 +27,11 @@ import {
   timelineTimeClassName as inlineTimeClassName,
 } from "./timeline/timelineStyles";
 import { WorkOrderArtifactInline } from "./WorkOrderArtifactInline";
+import { AssigneeChangeDescription } from "./workOrderTimelineAssignee";
 
 interface WorkOrderTimelineProps {
   organizationId: string;
+  factoryId: string;
   order: FactoriesWorkOrder;
   events?: FactoriesWorkOrderEvent[];
   eventsError?: Error | null;
@@ -44,6 +46,7 @@ interface WorkOrderTimelineProps {
 
 export function WorkOrderActivityTimeline({
   organizationId,
+  factoryId,
   order,
   events,
   eventsError = null,
@@ -94,6 +97,8 @@ export function WorkOrderActivityTimeline({
             key={event.id}
             event={event}
             organizationId={organizationId}
+            factoryId={factoryId}
+            orderId={order.id}
             resolveUserDisplay={resolveUserDisplay}
             isLatestDispatch={index === latestDispatchIndex}
           />
@@ -180,16 +185,28 @@ const AVATAR_MARKER_KINDS: WorkOrderTimelineEventKind[] = [
 function TimelineItem({
   event,
   organizationId,
+  factoryId,
+  orderId,
   resolveUserDisplay,
   isLatestDispatch,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
+  factoryId: string;
+  orderId?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   isLatestDispatch: boolean;
 }) {
   if (event.kind === "dispatched") {
-    return <DispatchTimelineItem event={event} organizationId={organizationId} isLatestDispatch={isLatestDispatch} />;
+    return (
+      <DispatchTimelineItem
+        event={event}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        orderId={orderId}
+        isLatestDispatch={isLatestDispatch}
+      />
+    );
   }
 
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
@@ -203,7 +220,13 @@ function TimelineItem({
           icon={useAvatar ? undefined : getFallbackMarkerIcon(event.kind)}
         />
         <div className="min-w-0 flex-1 pt-0.5">
-          <TimelineItemBody event={event} organizationId={organizationId} resolveUserDisplay={resolveUserDisplay} />
+          <TimelineItemBody
+            event={event}
+            organizationId={organizationId}
+            factoryId={factoryId}
+            orderId={orderId}
+            resolveUserDisplay={resolveUserDisplay}
+          />
         </div>
       </div>
     </li>
@@ -213,10 +236,14 @@ function TimelineItem({
 function TimelineItemBody({
   event,
   organizationId,
+  factoryId,
+  orderId,
   resolveUserDisplay,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
+  factoryId: string;
+  orderId?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
@@ -234,6 +261,8 @@ function TimelineItemBody({
     <UserActionEventDescription
       event={event}
       organizationId={organizationId}
+      factoryId={factoryId}
+      orderId={orderId}
       resolveUserDisplay={resolveUserDisplay}
       timeLabel={timeLabel}
     />
@@ -295,7 +324,7 @@ function ArtifactEventBody({
       ) : (
         <span className={inlineActorClassName}>Someone</span>
       )}{" "}
-      attached <ArtifactInlineChip artifact={artifact} />
+      attached <WorkOrderArtifactInline artifact={artifact} className="align-baseline" />
       <span className={inlineTimeClassName}>
         {" · "}
         {timeLabel}
@@ -304,21 +333,21 @@ function ArtifactEventBody({
   );
 }
 
-function ArtifactInlineChip({ artifact }: { artifact: NonNullable<WorkOrderTimelineEvent["artifact"]> }) {
-  return <WorkOrderArtifactInline artifact={artifact} className="align-baseline" />;
-}
-
 const AUTOMATION_ATTRIBUTABLE_KINDS: WorkOrderTimelineEventKind[] = ["created", "statusChanged", "closed"];
 const SOMEONE_FALLBACK_KINDS: WorkOrderTimelineEventKind[] = ["created", "statusChanged", "closed"];
 
 function UserActionEventDescription({
   event,
   organizationId,
+  factoryId,
+  orderId,
   resolveUserDisplay,
   timeLabel,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
+  factoryId: string;
+  orderId?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   timeLabel: string;
 }) {
@@ -346,7 +375,7 @@ function UserActionEventDescription({
             resolveUserDisplay={resolveUserDisplay}
           />
         ) : hasSourceRun ? (
-          <SourceRunAttribution event={event} organizationId={organizationId} />
+          <SourceRunAttribution event={event} organizationId={organizationId} factoryId={factoryId} orderId={orderId} />
         ) : (
           <span>{event.title}</span>
         )}
@@ -362,9 +391,24 @@ function UserActionEventDescription({
   );
 }
 
-function SourceRunAttribution({ event, organizationId }: { event: WorkOrderTimelineEvent; organizationId: string }) {
+function SourceRunAttribution({
+  event,
+  organizationId,
+  factoryId,
+  orderId,
+}: {
+  event: WorkOrderTimelineEvent;
+  organizationId: string;
+  factoryId: string;
+  orderId?: string;
+}) {
   const runHref =
-    event.sourceAppId && event.sourceRunId ? appRunPath(organizationId, event.sourceAppId, event.sourceRunId) : null;
+    event.sourceAppId && event.sourceRunId
+      ? factoryAppRunPath(organizationId, factoryId, event.sourceAppId, event.sourceRunId, {
+          from: "work-order",
+          orderId,
+        })
+      : null;
   const connector = event.kind === "created" ? "from" : "via";
   return (
     <span className="inline-flex flex-wrap items-baseline gap-x-1">
@@ -377,116 +421,6 @@ function SourceRunAttribution({ event, organizationId }: { event: WorkOrderTimel
       ) : (
         <span>run</span>
       )}
-    </span>
-  );
-}
-
-function AssigneeChangeDescription({
-  actorUserId,
-  assigneeChange,
-  resolveUserDisplay,
-}: {
-  actorUserId?: string;
-  assigneeChange: NonNullable<WorkOrderTimelineEvent["assigneeChange"]>;
-  resolveUserDisplay: OrgUserDisplayLookup;
-}) {
-  const { assignedUserIds, unassignedUserIds } = assigneeChange;
-  const parts: ReactNode[] = [];
-
-  const assignedDescription = buildAssignedChangeDescription(actorUserId, assignedUserIds, resolveUserDisplay);
-  if (assignedDescription) parts.push(<span key="assigned">{assignedDescription}</span>);
-
-  if (unassignedUserIds.length > 0) {
-    parts.push(
-      <span key="unassigned" className="inline-flex flex-wrap items-baseline gap-x-1">
-        unassigned <InlineUserList userIds={unassignedUserIds} resolveUserDisplay={resolveUserDisplay} />
-      </span>,
-    );
-  }
-
-  if (parts.length === 0) return <span>updated assignees</span>;
-
-  return (
-    <>
-      {parts.map((part, index) => (
-        <Fragment key={index}>
-          {index > 0 ? <span>and</span> : null}
-          {part}
-        </Fragment>
-      ))}
-    </>
-  );
-}
-
-function buildAssignedChangeDescription(
-  actorUserId: string | undefined,
-  assignedUserIds: string[],
-  resolveUserDisplay: OrgUserDisplayLookup,
-): ReactNode | null {
-  if (assignedUserIds.length === 0) return null;
-  const assignedOthers = actorUserId ? assignedUserIds.filter((userId) => userId !== actorUserId) : assignedUserIds;
-  const selfAssigned = Boolean(actorUserId && assignedUserIds.includes(actorUserId));
-
-  if (selfAssigned && assignedOthers.length === 0) return <span>self-assigned</span>;
-
-  if (selfAssigned && assignedOthers.length > 0) {
-    return (
-      <span className="inline-flex flex-wrap items-baseline gap-x-1">
-        self-assigned and assigned <InlineUserList userIds={assignedOthers} resolveUserDisplay={resolveUserDisplay} />
-      </span>
-    );
-  }
-
-  return (
-    <span className="inline-flex flex-wrap items-baseline gap-x-1">
-      assigned <InlineUserList userIds={assignedUserIds} resolveUserDisplay={resolveUserDisplay} />
-    </span>
-  );
-}
-
-function InlineUserList({
-  userIds,
-  resolveUserDisplay,
-}: {
-  userIds: string[];
-  resolveUserDisplay: OrgUserDisplayLookup;
-}) {
-  if (userIds.length === 0) return null;
-
-  if (userIds.length === 1) {
-    return <InlineUserName display={resolveUserDisplay(userIds[0])} />;
-  }
-
-  if (userIds.length === 2) {
-    return (
-      <>
-        <InlineUserName display={resolveUserDisplay(userIds[0])} />
-        <span>and</span>
-        <InlineUserName display={resolveUserDisplay(userIds[1])} />
-      </>
-    );
-  }
-
-  return (
-    <>
-      {userIds.slice(0, -1).map((userId, index) => (
-        <Fragment key={userId}>
-          {index > 0 ? <span>,</span> : null}
-          <InlineUserName display={resolveUserDisplay(userId)} />
-        </Fragment>
-      ))}
-      <span>, and</span>
-      <InlineUserName display={resolveUserDisplay(userIds[userIds.length - 1])} />
-    </>
-  );
-}
-
-function InlineUserName({ display }: { display: OrgUserDisplay | null }) {
-  if (!display) return <span className={inlineActorClassName}>Someone</span>;
-  return (
-    <span className="inline-flex items-baseline gap-1">
-      <OrgUserReference display={display} size="xs" showName={false} className="translate-y-[1px]" />
-      <span className={inlineActorClassName}>{display.name}</span>
     </span>
   );
 }

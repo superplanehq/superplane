@@ -1,6 +1,12 @@
 import { Position } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
-import { getBackwardRouteCenterY, getCanvasEdgePath, getUpwardBackwardGutterY, isBackwardEdge } from "./edgePath";
+import {
+  getBackwardRouteCenterY,
+  getCanvasEdgePath,
+  getUpwardBackwardGutterY,
+  isBackwardEdge,
+  isVerticalFlowEdge,
+} from "./edgePath";
 
 describe("isBackwardEdge", () => {
   it("detects right-to-left edges that target an earlier node", () => {
@@ -50,8 +56,28 @@ describe("getBackwardRouteCenterY", () => {
   });
 });
 
+describe("isVerticalFlowEdge", () => {
+  it("detects top-to-bottom handle pairs", () => {
+    expect(
+      isVerticalFlowEdge({
+        sourcePosition: Position.Bottom,
+        targetPosition: Position.Top,
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects horizontal handle pairs", () => {
+    expect(
+      isVerticalFlowEdge({
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+      }),
+    ).toBe(false);
+  });
+});
+
 describe("getCanvasEdgePath", () => {
-  it("uses a bezier path for forward edges", () => {
+  it("uses a bezier path for forward horizontal edges", () => {
     const [path] = getCanvasEdgePath({
       sourceX: 100,
       sourceY: 100,
@@ -62,6 +88,20 @@ describe("getCanvasEdgePath", () => {
     });
 
     expect(path).toContain("C");
+  });
+
+  it("uses a rect orthogonal path for forward vertical edges", () => {
+    const [path] = getCanvasEdgePath({
+      sourceX: 100,
+      sourceY: 100,
+      sourcePosition: Position.Bottom,
+      targetX: 100,
+      targetY: 400,
+      targetPosition: Position.Top,
+    });
+
+    expect(path).not.toContain("C");
+    expect(path).not.toContain("Q");
   });
 
   it("uses a smooth step path for same-row loop-back edges below both nodes", () => {

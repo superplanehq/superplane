@@ -1,11 +1,13 @@
 import { useRef, type ReactElement } from "react";
 import { Navigate, useLocation, useParams, useSearchParams } from "react-router-dom";
 
-import { useCanvasConsole } from "@/hooks/useCanvasData";
+import { useCanvas, useCanvasConsole } from "@/hooks/useCanvasData";
+import { isFactoryApp } from "@/lib/canvasFlowDirection";
 import { readLastVisitedAppTab, type AppTabId } from "@/lib/lastVisitedAppTab";
 import { Skeleton } from "@/ui/skeleton";
 
 import { AppPage } from "./index";
+import { decideAppDefaultTabGate } from "./appDefaultTabGateDecision";
 import {
   buildAppTabSearchParams,
   resolveDefaultTab,
@@ -13,41 +15,83 @@ import {
   urlViewFlagsToTab,
   type DefaultTabResolution,
 } from "./defaultAppTab";
-import { getWorkflowViewFlagsFromSearchParams } from "./viewState";
+import { getWorkflowViewFlagsFromSearchParams, isNonCanvasAppViewParam } from "./viewState";
 
 /**
  * Route-level gate that decides which tab the user should land on for an app
  * URL before AppPage mounts. Priorities:
- * 1. If the URL already pins navigation (tab-selecting `view` or a deep link
+ * 1. Factory apps are canvas-only — never open Console / Memory / Files.
+ * 2. If the URL already pins navigation (tab-selecting `view` or a deep link
  *    like `run`/`version`/`edit`/`sidebar`/`node`/`file`), render AppPage.
- * 2. If localStorage records a last-visited tab, redirect there via Navigate.
- * 3. Otherwise consult the live console; redirect to Console if the app has
+ * 3. If localStorage records a last-visited tab, redirect there via Navigate.
+ * 4. Otherwise consult the live console; redirect to Console if the app has
  *    panels, else render AppPage on Canvas.
  *
  * Once we hand off to AppPage for a canvas, we do not re-resolve for that
  * canvas: in-page URL changes (opening a run, switching tabs, closing a run
  * inspection back to a bare URL) must not trigger another redirect.
  */
+function resetCommittedCanvasIfChanged(committedCanvasIdRef: { current: string | null }, canvasId: string) {
+  if (committedCanvasIdRef.current !== null && committedCanvasIdRef.current !== canvasId) {
+    committedCanvasIdRef.current = null;
+  }
+}
+
+function shouldEnableConsoleQuery({
+  alreadyCommitted,
+  factoryOwnedApp,
+  pinned,
+  canvasId,
+  storedTab,
+}: {
+  alreadyCommitted: boolean;
+  factoryOwnedApp: boolean;
+  pinned: boolean;
+  canvasId: string;
+  storedTab: AppTabId | null;
+}) {
+  if (alreadyCommitted || factoryOwnedApp || pinned || !canvasId) {
+    return false;
+  }
+  return storedTab === null;
+}
+
 export function AppDefaultTabGate() {
-  const { appId } = useParams<{ appId: string }>();
+  const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const canvasId = appId ?? "";
 
   const committedCanvasIdRef = useRef<string | null>(null);
-  if (committedCanvasIdRef.current !== null && committedCanvasIdRef.current !== canvasId) {
-    committedCanvasIdRef.current = null;
-  }
+  resetCommittedCanvasIfChanged(committedCanvasIdRef, canvasId);
   const alreadyCommitted = canvasId !== "" && committedCanvasIdRef.current === canvasId;
+
+  const canvasQueryEnabled = !alreadyCommitted && !!organizationId && !!canvasId;
+  const { data: canvas, isLoading: canvasLoading } = useCanvas(organizationId ?? "", canvasId, {
+    enabled: canvasQueryEnabled,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+  });
+  const factoryOwnedApp = isFactoryApp(canvas?.metadata?.factoryId);
 
   const pinned = urlPinsNavigation(searchParams);
   const storedTab = canvasId ? readLastVisitedAppTab(canvasId) : null;
   const currentUrlTab = urlViewFlagsToTab(getWorkflowViewFlagsFromSearchParams(searchParams));
+  const viewParam = searchParams.get("view") ?? "";
+  const isNonCanvasView = isNonCanvasAppViewParam(viewParam);
 
   // The console query is only useful for the Console fallback (no stored tab).
   // Keep it disabled otherwise so bookmarks that pin navigation or restore a
-  // stored tab do not pay for an unused read.
-  const consoleQueryEnabled = !alreadyCommitted && !pinned && !!canvasId && storedTab === null;
+  // stored tab do not pay for an unused read. Factory apps never use Console.
+  const consoleQueryEnabled = shouldEnableConsoleQuery({
+    alreadyCommitted,
+    factoryOwnedApp,
+    pinned,
+    canvasId,
+    storedTab,
+  });
   const liveConsoleQuery = useCanvasConsole(canvasId, undefined, consoleQueryEnabled);
 
   const commit = (): ReactElement => {
@@ -55,16 +99,49 @@ export function AppDefaultTabGate() {
     return <AppPage />;
   };
 
-  if (alreadyCommitted || !canvasId || pinned) {
-    return commit();
-  }
+  const decision = decideAppDefaultTabGate({
+    alreadyCommitted,
+    canvasId,
+    pinned,
+    viewParam,
+    isNonCanvasView,
+    canvasQueryEnabled,
+    canvasLoading,
+    canvasUndefined: canvas === undefined,
+    factoryOwnedApp,
+    storedTab,
+    resolution: resolveDefaultTab({ storedTab, liveConsoleQuery }),
+  });
 
-  if (storedTab !== null) {
-    return resolveWithStoredTab(storedTab, currentUrlTab, searchParams, location.pathname, commit);
-  }
+  return renderAppDefaultTabGateDecision(decision, {
+    currentUrlTab,
+    searchParams,
+    pathname: location.pathname,
+    commit,
+  });
+}
 
-  const resolution = resolveDefaultTab({ storedTab, liveConsoleQuery });
-  return renderResolution(resolution, currentUrlTab, searchParams, location.pathname, commit);
+function renderAppDefaultTabGateDecision(
+  decision: ReturnType<typeof decideAppDefaultTabGate>,
+  ctx: {
+    currentUrlTab: AppTabId | null;
+    searchParams: URLSearchParams;
+    pathname: string;
+    commit: () => ReactElement;
+  },
+): ReactElement {
+  switch (decision.kind) {
+    case "commit":
+      return ctx.commit();
+    case "skeleton":
+      return <AppTabGateSkeleton />;
+    case "factory-canvas":
+      return navigateToFactoryCanvas(ctx.searchParams, ctx.pathname);
+    case "stored-tab":
+      return resolveWithStoredTab(decision.tab, ctx.currentUrlTab, ctx.searchParams, ctx.pathname, ctx.commit);
+    case "resolution":
+      return renderResolution(decision.resolution, ctx.currentUrlTab, ctx.searchParams, ctx.pathname, ctx.commit);
+  }
 }
 
 function resolveWithStoredTab(
@@ -101,6 +178,15 @@ function renderResolution(
 
 function navigateToTab(tab: AppTabId, searchParams: URLSearchParams, pathname: string): ReactElement {
   const nextParams = buildAppTabSearchParams(tab, searchParams);
+  const search = nextParams.toString();
+  return <Navigate to={{ pathname, search: search ? `?${search}` : "" }} replace />;
+}
+
+/** Drop Console/Memory/Files view params without clearing run/edit deep links. */
+function navigateToFactoryCanvas(searchParams: URLSearchParams, pathname: string): ReactElement {
+  const nextParams = new URLSearchParams(searchParams);
+  nextParams.delete("view");
+  nextParams.delete("file");
   const search = nextParams.toString();
   return <Navigate to={{ pathname, search: search ? `?${search}` : "" }} replace />;
 }

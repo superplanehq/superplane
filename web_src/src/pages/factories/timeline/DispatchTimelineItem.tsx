@@ -20,10 +20,18 @@ import { timelineActorClassName, timelineParagraphClassName, timelineTimeClassNa
 interface DispatchTimelineItemProps {
   event: WorkOrderTimelineEvent;
   organizationId: string;
+  factoryId: string;
+  orderId?: string;
   isLatestDispatch: boolean;
 }
 
-export function DispatchTimelineItem({ event, organizationId, isLatestDispatch }: DispatchTimelineItemProps) {
+export function DispatchTimelineItem({
+  event,
+  organizationId,
+  factoryId,
+  orderId,
+  isLatestDispatch,
+}: DispatchTimelineItemProps) {
   const [isExpanded, setIsExpanded] = useState(isLatestDispatch);
   const steps = event.steps ?? [];
   const latestStep = steps.at(-1);
@@ -76,7 +84,13 @@ export function DispatchTimelineItem({ event, organizationId, isLatestDispatch }
           {isExpanded ? (
             <ul id={contentId} className="mt-1 space-y-0.5">
               {steps.map((step) => (
-                <DispatchStepRow key={step.id} organizationId={organizationId} step={step} />
+                <DispatchStepRow
+                  key={step.id}
+                  organizationId={organizationId}
+                  factoryId={factoryId}
+                  orderId={orderId}
+                  step={step}
+                />
               ))}
             </ul>
           ) : null}
@@ -86,8 +100,18 @@ export function DispatchTimelineItem({ event, organizationId, isLatestDispatch }
   );
 }
 
-function DispatchStepRow({ organizationId, step }: { organizationId: string; step: WorkOrderTimelineStep }) {
-  const runHref = getWorkOrderExecutionRunHref(organizationId, step.execution);
+function DispatchStepRow({
+  organizationId,
+  factoryId,
+  orderId,
+  step,
+}: {
+  organizationId: string;
+  factoryId: string;
+  orderId?: string;
+  step: WorkOrderTimelineStep;
+}) {
+  const runHref = getWorkOrderExecutionRunHref(organizationId, factoryId, step.execution, { orderId });
   const duration = formatStepExecutionDuration(step);
   const status = executionStatus(step.execution);
 

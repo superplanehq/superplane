@@ -16,6 +16,12 @@ vi.mock("@/sentry", () => ({
 }));
 
 vi.mock("@xyflow/react", () => ({
+  Position: {
+    Left: "left",
+    Right: "right",
+    Top: "top",
+    Bottom: "bottom",
+  },
   Background: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   Panel: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   ReactFlow: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
@@ -128,6 +134,26 @@ describe("RunInspectionFloatingBar", () => {
     );
 
     expect(screen.queryByText("Previewing previous run")).not.toBeInTheDocument();
+  });
+
+  it("hides the run inspection bar when back-to-live is not provided", () => {
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          isRunInspectionMode
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText("Previewing previous run")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Back to Live Canvas" })).not.toBeInTheDocument();
   });
 
   it("does not show the previous version bar while inspecting a run", () => {

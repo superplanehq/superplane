@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { MemoryRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { useEffect, useState, type ComponentType } from "react";
+import { MemoryRouter, Navigate, Outlet, Route, Routes, useParams } from "react-router-dom";
 
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
@@ -18,11 +18,13 @@ import {
   CreateWorkOrderPage,
   FactoriesIndexPage,
   FactoriesLayout,
+  FactoryAppCanvasPage,
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
   FactorySettingsSoonPage,
   FACTORY_SETTINGS_NAV_ITEMS,
+  LinesPage,
   MissionsPage,
   OverviewPage,
   VelocityPage,
@@ -31,6 +33,7 @@ import {
   WorkOrdersPage,
 } from "@/pages/factories";
 import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
+import { createFactoryLinePath, editFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
 import { HomePage } from "@/pages/home";
 import { homePageIds, type HomePageFixture } from "@/pages/home/__fixtures__/handlers";
 import { NewAppPage } from "@/pages/home/NewAppPage";
@@ -64,6 +67,11 @@ function fixtureFetchState(): FixtureFetchState {
   return state;
 }
 
+/** Storybook-only route swaps. App routes ignore this. */
+export interface OrgWorkspacePageOverrides {
+  wiki?: ComponentType;
+}
+
 export interface OrgWorkspaceHarnessProps {
   /** Where to land when the story mounts. */
   startAt?: "home" | "app";
@@ -82,6 +90,8 @@ export interface OrgWorkspaceHarnessProps {
   factoriesFixture?: FactoriesFixture;
   /** Storybook-only: seed post-install Agent improvement suggestions for the canvas. */
   agentSuggestions?: AgentSuggestion[];
+  /** Storybook-only: replace selected factory page elements (e.g. wiki wireframe). */
+  pageOverrides?: OrgWorkspacePageOverrides;
 }
 
 interface FixtureFetchOptions {
@@ -145,7 +155,29 @@ function factoryRoute(element: React.ReactNode) {
   return <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>{element}</RequireExperimentalFeature>;
 }
 
-function OrgWorkspaceRoutes() {
+function HarnessLegacyAutomationsNewLineRedirect() {
+  const { organizationId, factoryId } = useParams<{ organizationId: string; factoryId: string }>();
+  if (!organizationId || !factoryId) {
+    return <Navigate to="/" replace />;
+  }
+  return <Navigate to={createFactoryLinePath(organizationId, factoryId)} replace />;
+}
+
+function HarnessLegacyAutomationsLineEditRedirect() {
+  const { organizationId, factoryId, lineId } = useParams<{
+    organizationId: string;
+    factoryId: string;
+    lineId: string;
+  }>();
+  if (!organizationId || !factoryId || !lineId) {
+    return <Navigate to="/" replace />;
+  }
+  return <Navigate to={editFactoryLinePath(organizationId, factoryId, lineId)} replace />;
+}
+
+function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePageOverrides }) {
+  const WikiRoutePage = pageOverrides?.wiki ?? WikiPage;
+
   return (
     <Routes>
       <Route
@@ -165,19 +197,26 @@ function OrgWorkspaceRoutes() {
             <Route index element={<Navigate to="overview" replace />} />
             <Route path="overview" element={<OverviewPage />} />
             <Route path="missions" element={<MissionsPage />} />
-            <Route path="wiki" element={<WikiPage />} />
+            <Route path="wiki" element={<WikiRoutePage />} />
             <Route path="velocity" element={<VelocityPage />} />
             <Route path="work-orders">
               <Route index element={<WorkOrdersPage />} />
               <Route path="new" element={<CreateWorkOrderPage />} />
               <Route path=":orderId" element={<WorkOrderDetailPage />} />
             </Route>
-            <Route path="automations">
-              <Route index element={<AutomationsPage />} />
+            <Route path="lines">
+              <Route index element={<LinesPage />} />
               <Route path="new" element={<FactoryLineEditPage />} />
-              <Route path=":lineId" element={<AutomationsPage />} />
+              <Route path=":lineId" element={<LinesPage />} />
               <Route path=":lineId/edit" element={<FactoryLineEditPage />} />
             </Route>
+            <Route path="automations">
+              <Route index element={<AutomationsPage />} />
+              <Route path="new" element={<HarnessLegacyAutomationsNewLineRedirect />} />
+              <Route path=":lineId/edit" element={<HarnessLegacyAutomationsLineEditRedirect />} />
+              <Route path=":appId" element={<AutomationsPage />} />
+            </Route>
+            <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
           </Route>
           <Route path=":factoryId/settings" element={factoryRoute(<FactorySettingsLayout />)}>
             <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
@@ -219,6 +258,7 @@ export function OrgWorkspaceHarness({
   appFixture,
   factoriesFixture,
   agentSuggestions,
+  pageOverrides,
 }: OrgWorkspaceHarnessProps) {
   const { orgId, canvasId } = resolveWorkspaceIds(homeFixture, appFixture, factoriesFixture);
   useOrgWorkspaceFixtureFetch({
@@ -251,7 +291,7 @@ export function OrgWorkspaceHarness({
           <div className="h-dvh w-full overflow-auto">
             <MemoryRouter initialEntries={[initialPath]}>
               <AccountProvider>
-                <OrgWorkspaceRoutes />
+                <OrgWorkspaceRoutes pageOverrides={pageOverrides} />
               </AccountProvider>
             </MemoryRouter>
           </div>
