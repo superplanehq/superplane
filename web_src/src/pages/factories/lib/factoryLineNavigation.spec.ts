@@ -11,13 +11,13 @@ const destination = {
 describe("factoryLineDestinationPath", () => {
   it("sends editors to the line editor", () => {
     expect(factoryLineDestinationPath({ ...destination, canEdit: true })).toBe(
-      "/organization/workspaces/factory/automations/line/edit",
+      "/organization/workspaces/factory/lines/line/edit",
     );
   });
 
   it("sends viewers to the readable line page", () => {
     expect(factoryLineDestinationPath({ ...destination, canEdit: false })).toBe(
-      "/organization/workspaces/factory/automations/line",
+      "/organization/workspaces/factory/lines/line",
     );
   });
 });

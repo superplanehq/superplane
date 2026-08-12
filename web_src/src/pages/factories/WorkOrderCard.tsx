@@ -10,6 +10,7 @@ import { Link } from "react-router-dom";
 import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
 import { factoryWorkOrderRowClassName } from "./lib/factoryPageStyles";
 import { factoryDetailPath, workOrderDetailPath } from "./lib/factoryPagePaths";
+import { resolveWorkOrderCreatorDisplay } from "./lib/workOrderCreator";
 import { OrgUserReference } from "./OrgUserReference";
 import { WorkOrderExecutionsList } from "./WorkOrderExecutionsList";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "./lib/workOrderProgress";
@@ -41,7 +42,7 @@ export function WorkOrderCard({
   const href = order.id
     ? workOrderDetailPath(organizationId, factoryId, order.id)
     : factoryDetailPath(organizationId, factoryId);
-  const creatorDisplay = resolveUser(order.createdBy?.id, order.createdBy?.name);
+  const creatorDisplay = resolveWorkOrderCreatorDisplay(order.createdBy, resolveUser);
   const assigneeDisplays = (order.assignees ?? [])
     .filter((assignee) => assignee.id)
     .map((assignee) => resolveUser(assignee.id, assignee.name));

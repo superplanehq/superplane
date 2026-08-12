@@ -147,7 +147,7 @@ type FactoryWorkOrderExecutionRecord struct {
 	RunState   string
 	RunResult  string
 	// Steps snapshot the containing line's step definitions so the UI can
-	// render Intake -> Implement -> Verify phases without a separate lookup.
+	// render the Intake -> Implement -> Verify sequence without a separate lookup.
 	LineSteps datatypes.JSONSlice[FactoryLineStep] `gorm:"column:line_steps"`
 }
 

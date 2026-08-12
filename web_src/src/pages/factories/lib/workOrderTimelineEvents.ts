@@ -151,7 +151,8 @@ export function formatStepExecutionDuration(step: WorkOrderTimelineStep): string
 }
 
 function addOrderFallbackNames(usersById: Map<string, OrgUserDisplay>, order: FactoriesWorkOrder): void {
-  registerOrderUserFallback(usersById, order.createdBy?.id, order.createdBy?.name);
+  const creator = order.createdBy?.user;
+  registerOrderUserFallback(usersById, creator?.id, creator?.name);
 
   for (const assignee of order.assignees ?? []) {
     registerOrderUserFallback(usersById, assignee.id, assignee.name);

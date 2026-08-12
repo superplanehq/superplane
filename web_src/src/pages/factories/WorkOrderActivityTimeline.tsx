@@ -16,7 +16,6 @@ import {
 } from "./lib/workOrderTimelineEvents";
 import { formatWorkOrderDateTime as formatTimelineDate } from "./lib/workOrderDateTime";
 import { factoryAppRunPath } from "./lib/factoryPagePaths";
-import { OrgUserReference } from "./OrgUserReference";
 import { DispatchTimelineItem } from "./timeline/DispatchTimelineItem";
 import { TimelineAutomationActor } from "./timeline";
 import { TimelineMarker } from "./timeline/TimelineMarker";

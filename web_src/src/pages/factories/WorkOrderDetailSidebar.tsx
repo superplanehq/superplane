@@ -25,6 +25,7 @@ import { Link } from "react-router-dom";
 
 import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
 import { factoryLineDestinationPath } from "./lib/factoryLineNavigation";
+import { resolveWorkOrderCreatorDisplay } from "./lib/workOrderCreator";
 import { formatWorkOrderDateTime } from "./lib/workOrderDateTime";
 import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "./lib/workOrderUsage";
 import { OrgUserReference } from "./OrgUserReference";
@@ -238,15 +239,15 @@ function StatusValue({ displayStatus, label }: { displayStatus: WorkOrderDisplay
 
 function CreatorValue({ organizationId, order }: { organizationId: string; order: FactoriesWorkOrder }) {
   const { resolveUser } = useOrgUserLookup(organizationId);
-  const automation = order.createdByAutomation;
+  const automation = order.createdBy?.automation;
   if (isAutomationRefResolved(automation)) {
     return <AutomationLink organizationId={organizationId} automation={automation} />;
   }
-  const display = resolveUser(order.createdBy?.id, order.createdBy?.name);
+  const display = resolveWorkOrderCreatorDisplay(order.createdBy, resolveUser);
   if (display) {
     return <OrgUserReference display={display} size="xs" nameClassName="truncate text-[13px]" />;
   }
-  return <span className="truncate">{order.createdBy?.name ?? "Unknown"}</span>;
+  return <span className="truncate">{order.createdBy?.user?.name ?? "Unknown"}</span>;
 }
 
 function isAutomationRefResolved(ref: FactoriesAutomationRef | undefined): ref is FactoriesAutomationRef {

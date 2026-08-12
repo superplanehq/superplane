@@ -417,13 +417,19 @@ message WorkOrder {
   google.protobuf.Timestamp updated_at = 7;
   repeated UserRef assignees = 8;
   repeated WorkOrderExecution executions = 9;
-  UserRef created_by = 10;
-  // Automation that created the work order (from the originating canvas run).
-  // Populated when the order was opened by a canvas automation.
-  AutomationRef created_by_automation = 11;
+  // Author of the work order: either a member (`user`) or the canvas
+  // automation (`automation`) that opened the order from a source run.
+  WorkOrderCreator created_by = 10;
   // Aggregate usage summed across executions. UI hides values that are zero.
-  int64 total_tokens = 12;
-  int64 total_cost_cents = 13;
+  int64 total_tokens = 11;
+  int64 total_cost_cents = 12;
+}
+
+message WorkOrderCreator {
+  oneof kind {
+    UserRef user = 1;
+    AutomationRef automation = 2;
+  }
 }
 
 message UserRef {
@@ -467,11 +473,11 @@ message WorkOrderExecution {
   google.protobuf.Timestamp updated_at = 7;
   RunRef run = 8;
   // Zero-based index of the step inside the containing line; matches the
-  // position in `phases` so the UI can highlight the current phase.
+  // position in `steps` so the UI can highlight the current step.
   int32 step_index = 9;
-  // Phases the run walks through, snapshotted from the line's step
-  // definitions. The current execution's `step_index` marks the active phase.
-  repeated WorkOrderExecutionPhase phases = 10;
+  // Steps the run walks through, snapshotted from the line's step
+  // definitions. The current execution's `step_index` marks the active step.
+  repeated WorkOrderExecutionStep steps = 10;
   // Optional aggregate usage; UI hides zero values.
   int64 total_tokens = 11;
   int64 cost_cents = 12;
@@ -479,7 +485,7 @@ message WorkOrderExecution {
   google.protobuf.Timestamp finished_at = 13;
 }
 
-message WorkOrderExecutionPhase {
+message WorkOrderExecutionStep {
   string name = 1;
   int32 step_index = 2;
 }
