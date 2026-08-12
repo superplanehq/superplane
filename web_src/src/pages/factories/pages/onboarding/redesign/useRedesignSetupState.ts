@@ -23,6 +23,53 @@ export type RedesignSetupState = {
   finished: boolean;
 };
 
+function isIssuesReady(issuesChoice: IssuesChoiceId | null, connected: Set<IntegrationId>): boolean {
+  if (issuesChoice === "skip" || issuesChoice === "vcs") {
+    return true;
+  }
+  if (issuesChoice === "linear") {
+    return connected.has("linear");
+  }
+  if (issuesChoice === "jira") {
+    return connected.has("jira");
+  }
+  return false;
+}
+
+function isAgentReady(agent: AgentHarnessId | null, connected: Set<IntegrationId>): boolean {
+  if (agent === "claude-code") {
+    return connected.has("claude");
+  }
+  if (agent === "cursor") {
+    return connected.has("cursor");
+  }
+  if (agent === "codex") {
+    return connected.has("openai");
+  }
+  return false;
+}
+
+function setupReadiness(input: {
+  workspaceName: string;
+  vcsHost: VcsHostId | null;
+  selectedRepo: string | null;
+  connected: Set<IntegrationId>;
+  issuesChoice: IssuesChoiceId | null;
+  agent: AgentHarnessId | null;
+}) {
+  const nameReady = input.workspaceName.trim().length > 0;
+  const repoReady = input.vcsHost !== null && input.connected.has(input.vcsHost) && input.selectedRepo !== null;
+  const issuesReady = isIssuesReady(input.issuesChoice, input.connected);
+  const agentReady = isAgentReady(input.agent, input.connected);
+  return {
+    nameReady,
+    repoReady,
+    issuesReady,
+    agentReady,
+    canFinish: nameReady && repoReady && agentReady,
+  };
+}
+
 export function useRedesignSetupState(initialName = "") {
   const [workspaceName, setWorkspaceName] = useState(() => initialName.trim() || generateWorkspaceName());
   const [inviteCopied, setInviteCopied] = useState(false);
@@ -108,21 +155,14 @@ export function useRedesignSetupState(initialName = "") {
 
   const backlogRepo = issuesRepo ?? selectedRepo;
   const issueCount = backlogRepo ? fixtureIssueCount(backlogRepo) : 0;
-
-  const nameReady = workspaceName.trim().length > 0;
-  const repoReady = vcsHost !== null && connected.has(vcsHost) && selectedRepo !== null;
-  const issuesReady =
-    issuesChoice === "skip" ||
-    issuesChoice === "vcs" ||
-    (issuesChoice === "linear" && connected.has("linear")) ||
-    (issuesChoice === "jira" && connected.has("jira"));
-  const agentReady =
-    agent !== null &&
-    ((agent === "claude-code" && connected.has("claude")) ||
-      (agent === "cursor" && connected.has("cursor")) ||
-      (agent === "codex" && connected.has("openai")));
-
-  const canFinish = nameReady && repoReady && agentReady;
+  const { nameReady, repoReady, issuesReady, agentReady, canFinish } = setupReadiness({
+    workspaceName,
+    vcsHost,
+    selectedRepo,
+    connected,
+    issuesChoice,
+    agent,
+  });
 
   const summary = useMemo(
     () => ({

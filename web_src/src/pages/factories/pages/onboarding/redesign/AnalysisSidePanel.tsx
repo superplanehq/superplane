@@ -53,9 +53,9 @@ type LogBatch = {
   lineIntervalMs?: number;
 };
 
-function repoPreface(progress: AnalysisProgress): string[] {
-  const host = progress.vcsHost ? vcsLabel(progress.vcsHost) : "git";
-  const repo = progress.selectedRepo ?? "app repository";
+function repoPreface(vcsHost: VcsHostId | null, selectedRepo: string | null): string[] {
+  const host = vcsHost ? vcsLabel(vcsHost) : "git";
+  const repo = selectedRepo ?? "app repository";
   return [`${host} connected`, `analyzing app repository ${repo}`];
 }
 
@@ -90,31 +90,31 @@ function repoBatches(): LogBatch[] {
   ];
 }
 
-function issuesBatch(progress: AnalysisProgress): LogBatch {
-  if (progress.issuesChoice === "skip") {
+function issuesBatch(issuesChoice: IssuesChoiceId | null, vcsHost: VcsHostId | null): LogBatch {
+  if (issuesChoice === "skip") {
     return {
       taskId: "issues",
       finishStatus: "skipped",
       lines: ["backlog import skipped - create work orders manually"],
     };
   }
-  if (progress.issuesChoice === "vcs" && progress.vcsHost) {
+  if (issuesChoice === "vcs" && vcsHost) {
     return {
       taskId: "issues",
       lines: [
-        `backlog: ${vcsLabel(progress.vcsHost)} Issues`,
+        `backlog: ${vcsLabel(vcsHost)} Issues`,
         "scoring open issues for agent work…",
         "candidate work orders drafted",
       ],
     };
   }
-  if (progress.issuesChoice === "linear") {
+  if (issuesChoice === "linear") {
     return {
       taskId: "issues",
       lines: ["backlog: Linear", "scoring Linear issues for agent work…", "candidate work orders drafted"],
     };
   }
-  if (progress.issuesChoice === "jira") {
+  if (issuesChoice === "jira") {
     return {
       taskId: "issues",
       lines: ["backlog: Jira", "scoring Jira issues for agent work…", "candidate work orders drafted"],
@@ -123,16 +123,26 @@ function issuesBatch(progress: AnalysisProgress): LogBatch {
   return { taskId: "issues", lines: ["reviewing backlog for candidate work orders…"] };
 }
 
-function linesBatch(progress: AnalysisProgress): LogBatch {
+function linesBatch(agent: AgentHarnessId | null): LogBatch {
   return {
     taskId: "lines",
     lines: [
-      `coding agent: ${progress.agent ?? "configured"}`,
+      `coding agent: ${agent ?? "configured"}`,
       "credentials verified",
       "configuring lines and automations…",
       "ready to hand off the first work order",
     ],
   };
+}
+
+function panelSubtitle(complete: boolean, nameReady: boolean): string {
+  if (complete) {
+    return "Ready for the first work order.";
+  }
+  if (nameReady) {
+    return "SuperPlane runs these tasks as you finish each section.";
+  }
+  return "Shows setup tasks while you configure this workspace.";
 }
 
 function TaskStatusIcon({ status }: { status: TaskStatus }) {
@@ -362,7 +372,7 @@ export function AnalysisSidePanel({ progress }: { progress: AnalysisProgress }) 
     return scheduleSetupGroup({
       groupId: "repo",
       ready: progress.repoCommitted && progress.selectedRepo !== null,
-      preface: repoPreface(progress),
+      preface: repoPreface(progress.vcsHost, progress.selectedRepo),
       batches: repoBatches(),
       parallel: true,
       completedGroupsRef,
@@ -371,35 +381,32 @@ export function AnalysisSidePanel({ progress }: { progress: AnalysisProgress }) 
       setTaskStatus,
       setPendingWrites,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only repo commit gates this group
   }, [progress.repoCommitted, progress.selectedRepo, progress.vcsHost]);
 
   useEffect(() => {
     return scheduleSetupGroup({
       groupId: "issues",
       ready: progress.issuesCommitted && progress.issuesChoice !== null,
-      batches: [issuesBatch(progress)],
+      batches: [issuesBatch(progress.issuesChoice, progress.vcsHost)],
       completedGroupsRef,
       inFlightGroupsRef,
       setLogLines,
       setTaskStatus,
       setPendingWrites,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only issues commit gates this group
   }, [progress.issuesCommitted, progress.issuesChoice, progress.vcsHost]);
 
   useEffect(() => {
     return scheduleSetupGroup({
       groupId: "lines",
       ready: progress.agentReady,
-      batches: [linesBatch(progress)],
+      batches: [linesBatch(progress.agent)],
       completedGroupsRef,
       inFlightGroupsRef,
       setLogLines,
       setTaskStatus,
       setPendingWrites,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only agent readiness gates this group
   }, [progress.agentReady, progress.agent]);
 
   useEffect(() => {
@@ -407,11 +414,7 @@ export function AnalysisSidePanel({ progress }: { progress: AnalysisProgress }) 
     if (el) el.scrollTop = el.scrollHeight;
   }, [logLines, statusLabel]);
 
-  const subtitle = complete
-    ? "Ready for the first work order."
-    : progress.nameReady
-      ? "SuperPlane runs these tasks as you finish each section."
-      : "Shows setup tasks while you configure this workspace.";
+  const subtitle = panelSubtitle(complete, progress.nameReady);
 
   return (
     <aside

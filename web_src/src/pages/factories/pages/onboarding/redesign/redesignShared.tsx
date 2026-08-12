@@ -38,28 +38,29 @@ export function Shell({ children, className }: { children: ReactNode; className?
 }
 
 function IntegrationChoiceIcon({ name, size = 20 }: { name: IntegrationId | VcsHostId; size?: number }) {
-  return (
-    <IntegrationIcon
-      integrationName={name}
-      className={size <= 16 ? "size-3.5" : "size-5"}
-      size={size}
-    />
-  );
+  return <IntegrationIcon integrationName={name} className={size <= 16 ? "size-3.5" : "size-5"} size={size} />;
 }
 
 function ComingSoonRibbon() {
   // Nested clip box so the diagonal band can extend past the corner while the
   // label stays fully inside the visible triangle.
   return (
-    <span
-      className="pointer-events-none absolute -right-px -top-px z-10 size-[5.5rem] overflow-hidden"
-      aria-hidden
-    >
+    <span className="pointer-events-none absolute -right-px -top-px z-10 size-[5.5rem] overflow-hidden" aria-hidden>
       <span className="absolute top-[1.35rem] -right-8 w-[8.5rem] rotate-45 bg-muted py-1 text-center text-[9px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
         Coming soon
       </span>
     </span>
   );
+}
+
+function connectOptionRowTone(soon: boolean, selected: boolean): string {
+  if (soon) {
+    return "overflow-hidden border-border/70 bg-muted/20 opacity-70";
+  }
+  if (selected) {
+    return "border-foreground bg-accent/40";
+  }
+  return "border-border bg-background";
 }
 
 /**
@@ -91,6 +92,7 @@ function ConnectOptionRow({
   onConnect?: () => void;
 }) {
   const needsConnect = Boolean(connectLabel) && !connected && !soon;
+  const rowToneClass = connectOptionRowTone(Boolean(soon), Boolean(selected));
 
   const select = () => {
     if (soon) return;
@@ -100,14 +102,7 @@ function ConnectOptionRow({
 
   return (
     <div
-      className={cn(
-        "relative rounded-lg border px-4 py-3 transition-colors",
-        soon
-          ? "overflow-hidden border-border/70 bg-muted/20 opacity-70"
-          : selected
-            ? "border-foreground bg-accent/40"
-            : "border-border bg-background",
-      )}
+      className={cn("relative rounded-lg border px-4 py-3 transition-colors", rowToneClass)}
       aria-disabled={soon || undefined}
       data-soon={soon ? "true" : undefined}
     >
@@ -115,10 +110,7 @@ function ConnectOptionRow({
       <div className="flex flex-wrap items-start gap-3">
         <button
           type="button"
-          className={cn(
-            "flex min-w-0 flex-1 items-start gap-3 text-left",
-            soon && "cursor-not-allowed",
-          )}
+          className={cn("flex min-w-0 flex-1 items-start gap-3 text-left", soon && "cursor-not-allowed")}
           onClick={select}
           disabled={soon}
         >
@@ -504,9 +496,7 @@ export function DonePanel({ setup }: { setup: RedesignSetupApi }) {
   const issuesLabel = (choice: IssuesChoiceId | null) => {
     if (choice === "vcs" && setup.vcsHost) {
       const backlog = setup.issuesRepo ?? setup.selectedRepo;
-      return backlog
-        ? `${vcsLabel(setup.vcsHost)} Issues · ${backlog}`
-        : `${vcsLabel(setup.vcsHost)} Issues`;
+      return backlog ? `${vcsLabel(setup.vcsHost)} Issues · ${backlog}` : `${vcsLabel(setup.vcsHost)} Issues`;
     }
     if (choice === "linear") return "Linear";
     if (choice === "jira") return "Jira";

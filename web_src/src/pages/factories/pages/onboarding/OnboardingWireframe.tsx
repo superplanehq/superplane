@@ -5,14 +5,43 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { factoryOverviewPath } from "../../lib/factoryPagePaths";
+import type { OnboardingRepo } from "./onboardingMocks";
 import { AnalysisSidePanel } from "./redesign/AnalysisSidePanel";
-import { AGENT_OPTIONS, type IntegrationId } from "./redesign/redesignFixtures";
+import { AGENT_OPTIONS, type IntegrationId, type VcsHostId } from "./redesign/redesignFixtures";
 import { AgentStep, DonePanel, IssuesStep, NameInviteStep, RepoStep, Shell } from "./redesign/redesignShared";
 import { useConnectDialog } from "./redesign/useConnectDialog";
-import { useRedesignSetupState } from "./redesign/useRedesignSetupState";
+import { useRedesignSetupState, type RedesignSetupApi } from "./redesign/useRedesignSetupState";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
 type SectionId = "name" | "repo" | "issues" | "agent";
+
+function issuesSectionSummary(setup: RedesignSetupApi): string | undefined {
+  if (setup.issuesChoice === "skip") {
+    return "Skipped. Create work orders yourself.";
+  }
+  if (setup.issuesChoice === "vcs" && setup.vcsHost) {
+    const hostLabel = setup.vcsHost === "github" ? "GitHub" : "GitLab";
+    return `${hostLabel} Issues · ${setup.issuesRepo ?? setup.selectedRepo}`;
+  }
+  if (setup.issuesChoice === "linear") {
+    return "Linear";
+  }
+  if (setup.issuesChoice === "jira") {
+    return "Jira";
+  }
+  return undefined;
+}
+
+function onboardingReposFromSetup(selectedRepo: string | null, vcsHost: VcsHostId | null): OnboardingRepo[] {
+  if (!selectedRepo || !vcsHost) {
+    return [];
+  }
+  const [org, name] = selectedRepo.split("/");
+  if (!org || !name) {
+    return [];
+  }
+  return [{ id: `${vcsHost}-${org}-${name}`, name, org, provider: vcsHost }];
+}
 
 function Section({
   id,
@@ -87,7 +116,7 @@ function SetupSections({
   requestConnect,
   onFinish,
 }: {
-  setup: ReturnType<typeof useRedesignSetupState>;
+  setup: RedesignSetupApi;
   openSection: SectionId;
   setOpenSection: (id: SectionId) => void;
   requestConnect: (id: IntegrationId) => void;
@@ -142,17 +171,7 @@ function SetupSections({
         id="issues"
         title="Issues"
         purpose="Optional. Point SuperPlane at a backlog so it can find small work that agents can solve. Or skip and create work orders yourself."
-        summary={
-          setup.issuesChoice === "skip"
-            ? "Skipped. Create work orders yourself."
-            : setup.issuesChoice === "vcs" && setup.vcsHost
-              ? `${setup.vcsHost === "github" ? "GitHub" : "GitLab"} Issues · ${setup.issuesRepo ?? setup.selectedRepo}`
-              : setup.issuesChoice === "linear"
-                ? "Linear"
-                : setup.issuesChoice === "jira"
-                  ? "Jira"
-                  : undefined
-        }
+        summary={issuesSectionSummary(setup)}
         open={openSection === "issues"}
         complete={setup.issuesReady}
         locked={!setup.repoReady}
@@ -215,7 +234,7 @@ export function OnboardingWireframe() {
   const navigate = useNavigate();
   const { organizationId = "", factoryId = "" } = useParams<{ organizationId: string; factoryId: string }>();
   const onboarding = useOnboardingStorybook();
-  const setup = useRedesignSetupState();
+  const setup = useRedesignSetupState(onboarding?.pending?.workspaceName ?? "");
   const { requestConnect, dialog } = useConnectDialog(setup);
   const [openSection, setOpenSection] = useState<SectionId>("name");
 
@@ -231,7 +250,7 @@ export function OnboardingWireframe() {
 
   const finishSetup = () => {
     if (onboarding && factoryId) {
-      onboarding.completeOnboarding(factoryId, []);
+      onboarding.completeOnboarding(factoryId, onboardingReposFromSetup(setup.selectedRepo, setup.vcsHost));
     }
     if (organizationId && factoryId) {
       navigate(factoryOverviewPath(organizationId, factoryId), { replace: true });

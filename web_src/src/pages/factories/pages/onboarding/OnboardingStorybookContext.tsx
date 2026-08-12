@@ -8,6 +8,28 @@ import {
   type OnboardingNavProgress,
 } from "./onboardingStorybookContextValue";
 
+function nextAnalyzingFlag(wasReady: boolean, nowReady: boolean, current: boolean): boolean {
+  if (!nowReady) {
+    return false;
+  }
+  if (!wasReady) {
+    return true;
+  }
+  return current;
+}
+
+function analyzingFieldForKey(
+  key: OnboardingNavAnalyzingKey,
+): keyof Pick<OnboardingNavProgress, "analyzingRepo" | "analyzingIssues" | "analyzingAgent"> {
+  if (key === "repo") {
+    return "analyzingRepo";
+  }
+  if (key === "issues") {
+    return "analyzingIssues";
+  }
+  return "analyzingAgent";
+}
+
 export function OnboardingStorybookProvider({
   children,
   initial,
@@ -44,21 +66,9 @@ export function OnboardingStorybookProvider({
           ...current,
           ...progress,
           // Analyze only after Continue commits the step (repoReady / issuesReady here).
-          analyzingRepo: !progress.repoReady
-            ? false
-            : !current.repoReady
-              ? true
-              : current.analyzingRepo,
-          analyzingIssues: !progress.issuesReady
-            ? false
-            : !current.issuesReady
-              ? true
-              : current.analyzingIssues,
-          analyzingAgent: !progress.agentReady
-            ? false
-            : !current.agentReady
-              ? true
-              : current.analyzingAgent,
+          analyzingRepo: nextAnalyzingFlag(current.repoReady, progress.repoReady, current.analyzingRepo),
+          analyzingIssues: nextAnalyzingFlag(current.issuesReady, progress.issuesReady, current.analyzingIssues),
+          analyzingAgent: nextAnalyzingFlag(current.agentReady, progress.agentReady, current.analyzingAgent),
         };
       });
     },
@@ -66,8 +76,7 @@ export function OnboardingStorybookProvider({
   );
 
   const reportNavAnalyzing = useCallback((key: OnboardingNavAnalyzingKey, analyzing: boolean) => {
-    const field =
-      key === "repo" ? "analyzingRepo" : key === "issues" ? "analyzingIssues" : ("analyzingAgent" as const);
+    const field = analyzingFieldForKey(key);
     setSetupProgress((current) => (current[field] === analyzing ? current : { ...current, [field]: analyzing }));
   }, []);
 
