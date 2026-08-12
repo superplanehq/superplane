@@ -12,6 +12,35 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
+const describeAlarmsXML = `
+<DescribeAlarmsResponse xmlns="http://monitoring.amazonaws.com/doc/2010-08-01/">
+  <DescribeAlarmsResult>
+    <MetricAlarms>
+      <member>
+        <AlarmName>HighCPU</AlarmName>
+        <AlarmArn>arn:aws:cloudwatch:us-east-1:123456789012:alarm:HighCPU</AlarmArn>
+        <AlarmDescription>High CPU utilization alarm</AlarmDescription>
+        <Namespace>AWS/EC2</Namespace>
+        <MetricName>CPUUtilization</MetricName>
+        <Statistic>Average</Statistic>
+        <Period>300</Period>
+        <EvaluationPeriods>1</EvaluationPeriods>
+        <Threshold>80</Threshold>
+        <ComparisonOperator>GreaterThanThreshold</ComparisonOperator>
+        <StateValue>OK</StateValue>
+        <StateReason>Threshold Crossed: no datapoints</StateReason>
+        <TreatMissingData>missing</TreatMissingData>
+        <Dimensions>
+          <member>
+            <Name>InstanceId</Name>
+            <Value>i-abc123</Value>
+          </member>
+        </Dimensions>
+      </member>
+    </MetricAlarms>
+  </DescribeAlarmsResult>
+</DescribeAlarmsResponse>`
+
 func Test__GetAlarm__Setup(t *testing.T) {
 	component := &GetAlarm{}
 
