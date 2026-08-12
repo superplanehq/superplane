@@ -83,18 +83,20 @@ const preview: Preview = {
       },
     },
     backgrounds: {
-      default: "light",
-      values: [
-        {
+      options: {
+        light: {
           name: "light",
           value: "#ffffff",
         },
-        {
+        dark: {
           name: "dark",
           value: "#1a1a1a",
         },
-      ],
+      },
     },
+  },
+  initialGlobals: {
+    backgrounds: { value: "light" },
   },
 };
 
