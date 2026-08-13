@@ -52,6 +52,8 @@ const DEFAULT_NODE_HEIGHT = 104;
 const MAIN_X = 120;
 const SIDE_GAP = 96;
 const VERTICAL_GAP = 104;
+/** Extra Y between side-column siblings so multi-output forks (done/next) fan apart. */
+const SIDE_COLUMN_EXTRA_GAP = 88;
 const COMPONENT_GAP_X = 120;
 const GUTTER_PAD = 48;
 /** Target must sit at least this far right of source to count as a side fan-out. */
@@ -333,7 +335,7 @@ export function layoutFactoryRunLeafGraph(
       column.set(id, isMainSuccessor(parentId, id) ? parentCol : parentCol + 1);
     }
 
-    // Coordinates: layer base Y, pack per column so stacked siblings never collide.
+    // Coordinates: spine by layer; side columns align first child with parent Y (right of Loop).
     let maxRight = componentOriginX;
     const strideY = DEFAULT_NODE_HEIGHT + VERTICAL_GAP;
     const strideX = DEFAULT_NODE_WIDTH + SIDE_GAP;
@@ -346,17 +348,30 @@ export function layoutFactoryRunLeafGraph(
       byColumn.set(col, list);
     }
 
-    for (const [col, ids] of byColumn) {
+    const columnsAsc = [...byColumn.keys()].sort((a, b) => a - b);
+    for (const col of columnsAsc) {
+      const ids = byColumn.get(col)!;
       ids.sort((a, b) => (layer.get(a) ?? 0) - (layer.get(b) ?? 0) || a.localeCompare(b));
       const x = componentOriginX + col * strideX;
+      const gapY = col > 0 ? VERTICAL_GAP + SIDE_COLUMN_EXTRA_GAP : VERTICAL_GAP;
       let nextY = 0;
       for (const id of ids) {
-        const lyr = layer.get(id) ?? 0;
         const size = nodeSize(nodeById.get(id)!);
-        const y = Math.max(lyr * strideY, nextY);
+        let preferredY = (layer.get(id) ?? 0) * strideY;
+        if (col > 0) {
+          // Sit beside the parent (e.g. first noop right of Loop), then stack further siblings.
+          const parentYs = (incoming.get(id) ?? [])
+            .filter((edge) => componentSet.has(edge.source))
+            .map((edge) => positions.get(edge.source)?.y)
+            .filter((y): y is number => y != null);
+          if (parentYs.length > 0) {
+            preferredY = Math.min(...parentYs);
+          }
+        }
+        const y = Math.max(preferredY, nextY);
         positions.set(id, { x, y });
         maxRight = Math.max(maxRight, x + size.width);
-        nextY = y + size.height + VERTICAL_GAP;
+        nextY = y + size.height + gapY;
       }
     }
 
@@ -384,11 +399,23 @@ export function layoutFactoryRunLeafGraph(
       const targetLayer = layer.get(edge.target) ?? 0;
       const layerSkip = targetLayer - sourceLayer > 1;
       const crossColumn = Math.abs((column.get(edge.source) ?? 0) - (column.get(edge.target) ?? 0)) > 0;
-
-      // Long vertical or merge-style cross edges need a right gutter (not short side fan-outs).
-      if (!isSide && (layerSkip || crossColumn)) {
-        edgeRouteGutters.set(key, graphRight);
+      if (isSide || (!layerSkip && !crossColumn)) {
+        continue;
       }
+
+      const leftwardMerge = sourcePos.x > targetPos.x + SIDE_X_THRESHOLD;
+      if (leftwardMerge) {
+        // Never send leftward merges to graphRight — that is the giant empty rectangle.
+        // Nearby merges: plain Bottom→Top. Long drops: jog just outside the source card.
+        const verticalSpan = targetPos.y - sourcePos.y;
+        const nearby = verticalSpan < (DEFAULT_NODE_HEIGHT + VERTICAL_GAP) * 3;
+        if (!nearby) {
+          edgeRouteGutters.set(key, sourcePos.x + DEFAULT_NODE_WIDTH + GUTTER_PAD);
+        }
+        continue;
+      }
+
+      edgeRouteGutters.set(key, graphRight);
     }
 
     for (const id of component) {

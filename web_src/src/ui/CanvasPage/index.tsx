@@ -3275,7 +3275,7 @@ function CanvasContent({
           targetPosition: targetSide,
           ...(typeof routeGutterX === "number" ? { routeGutterX } : {}),
         });
-        pathEntries.push({ id: edge.id, path });
+        pathEntries.push({ id: edge.id, path, source: edge.source, target: edge.target });
       }
       const touchContrast = findTouchContrastEdgeIds(pathEntries);
       contrastEdgeIds = touchContrast.contrastIds;

@@ -150,6 +150,29 @@ describe("layoutFactoryRunLeafGraph", () => {
     expectNoOverlaps(result.positions);
   });
 
+  it("places the first side child beside the parent and stacks later siblings below", () => {
+    const result = layoutFactoryRunLeafGraph(
+      [{ id: "loop" }, { id: "done" }, { id: "next" }],
+      [
+        { source: "loop", target: "done", sourceHandle: "done" },
+        { source: "loop", target: "next", sourceHandle: "next" },
+      ],
+    );
+
+    const loop = result.positions.get("loop")!;
+    const done = result.positions.get("done")!;
+    const next = result.positions.get("next")!;
+
+    expect(done.x).toBe(next.x);
+    expect(done.x).toBeGreaterThan(loop.x);
+    // First side output sits to the right of Loop (same row).
+    expect(done.y).toBe(loop.y);
+    expect(next.y).toBeGreaterThan(done.y);
+    // Side-column gap is larger than spine VERTICAL_GAP alone (104 + 88).
+    expect(next.y - done.y).toBeGreaterThanOrEqual(104 + 88);
+    expectNoOverlaps(result.positions);
+  });
+
   it("prefers default/true channels on the spine when branch depths are equal", () => {
     const result = layoutFactoryRunLeafGraph(
       [
@@ -201,7 +224,50 @@ describe("layoutFactoryRunLeafGraph", () => {
     // side → merge goes left/down to spine column — vertical, not side remap.
     expect(result.leafEdgeKeys.has(factoryRunLeafEdgeKey("side", "merge", "default"))).toBe(false);
     expect(result.spineEdgeKeys.has(factoryRunLeafEdgeKey("side", "merge", "default"))).toBe(true);
-    expect(result.edgeRouteGutters.has(factoryRunLeafEdgeKey("side", "merge", "default"))).toBe(true);
+    // Short leftward merges must not take the far-right gutter (giant drift).
+    expect(result.edgeRouteGutters.has(factoryRunLeafEdgeKey("side", "merge", "default"))).toBe(false);
+    expectNoOverlaps(result.positions);
+  });
+
+  it("does not route a side merge through the far-right gutter even when layers skip", () => {
+    // true chain longer on spine; false side merges back — longest-path can inflate join layer.
+    const result = layoutFactoryRunLeafGraph(
+      [
+        { id: "root" },
+        { id: "if2" },
+        { id: "noop3" },
+        { id: "t1" },
+        { id: "t2" },
+        { id: "join" },
+        { id: "noop8" },
+      ],
+      [
+        { source: "root", target: "if2", sourceHandle: "default" },
+        { source: "root", target: "noop8", sourceHandle: "failed" },
+        { source: "if2", target: "t1", sourceHandle: "true" },
+        { source: "t1", target: "t2", sourceHandle: "default" },
+        { source: "t2", target: "join", sourceHandle: "default" },
+        { source: "if2", target: "noop3", sourceHandle: "false" },
+        { source: "noop3", target: "join", sourceHandle: "default" },
+        { source: "noop8", target: "join", sourceHandle: "default" },
+      ],
+    );
+
+    const if2 = result.positions.get("if2")!;
+    const noop3 = result.positions.get("noop3")!;
+    const join = result.positions.get("join")!;
+    const mergeKey = factoryRunLeafEdgeKey("noop3", "join", "default");
+
+    expect(noop3.x).toBeGreaterThan(if2.x);
+    expect(join.x).toBe(if2.x);
+    expect(result.edgeRouteGutters.has(mergeKey)).toBe(false);
+
+    const longKey = factoryRunLeafEdgeKey("noop8", "join", "default");
+    const longGutter = result.edgeRouteGutters.get(longKey);
+    // Long leftward drops may jog locally beside the source — never use a far graph-right trunk.
+    if (longGutter != null) {
+      expect(longGutter).toBeLessThanOrEqual(result.positions.get("noop8")!.x + 280 + 48);
+    }
     expectNoOverlaps(result.positions);
   });
 

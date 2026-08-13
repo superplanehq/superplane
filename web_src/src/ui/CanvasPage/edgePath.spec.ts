@@ -125,6 +125,24 @@ describe("getCanvasEdgePath", () => {
     expect(path).toContain("Q");
   });
 
+  it("routes upward factory loops left of the target without a U-hook above it", () => {
+    const [path] = getCanvasEdgePath({
+      sourceX: 496,
+      sourceY: 520,
+      sourcePosition: Position.Bottom,
+      targetX: 260,
+      targetY: 200,
+      targetPosition: Position.Top,
+    });
+
+    expect(path).toContain("Q");
+    // Left gutter clears the Loop card (target center 260 − ≥160).
+    expect(path).toContain("100");
+    // Ends at the Top handle — no segment above targetY.
+    expect(path).toContain("260 200");
+    expect(path).not.toMatch(/260,\s*1\d\d/);
+  });
+
   it("uses a smooth step path for same-row loop-back edges below both nodes", () => {
     const [path] = getCanvasEdgePath({
       sourceX: 500,
@@ -302,14 +320,24 @@ describe("getCanvasEdgePath", () => {
     const forkPath = "M 260 200 L 260 500";
 
     const { contrastIds, involvedIds } = findTouchContrastEdgeIds([
-      { id: "gutter", path: gutterPath },
-      { id: "fork", path: forkPath },
+      { id: "gutter", path: gutterPath, source: "a", target: "merge" },
+      { id: "fork", path: forkPath, source: "b", target: "c" },
     ]);
 
     expect(involvedIds.has("gutter")).toBe(true);
     expect(involvedIds.has("fork")).toBe(true);
     expect(contrastIds.has("gutter")).toBe(true);
     expect(contrastIds.has("fork")).toBe(false);
+  });
+
+  it("does not contrast edges that only meet at a shared merge target", () => {
+    const { contrastIds, involvedIds } = findTouchContrastEdgeIds([
+      { id: "true", path: "M 120 100 L 120 400", source: "if", target: "noop4" },
+      { id: "merge", path: "M 400 300 L 120 300 L 120 400", source: "noop3", target: "noop4" },
+    ]);
+
+    expect(involvedIds.size).toBe(0);
+    expect(contrastIds.size).toBe(0);
   });
 });
 

@@ -174,8 +174,41 @@ function getLeftwardBackwardGutterX(sourceX: number, targetX: number): number {
   return targetLeft - BACKWARD_ROUTE_OFFSET;
 }
 
+/**
+ * Factory / vertical loop-back (source below target).
+ * - Side gutter clears the target node (not through its body).
+ * - Approaches the Top handle at handle Y — no U-hook above the node.
+ */
+function getVerticalUpwardLoopPath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
+  const { sourceX, sourceY, targetX, targetY } = params;
+  // Clear ~half default factory node (140) + pad so the riser sits outside the card.
+  const sideClearance = Math.max(BACKWARD_ROUTE_OFFSET * 2, 160);
+  const gutterX =
+    targetX <= sourceX + SAME_COLUMN_TOLERANCE
+      ? Math.min(sourceX, targetX) - sideClearance
+      : Math.max(sourceX, targetX) + sideClearance;
+
+  const exitY = sourceY + HANDLE_OFFSET;
+  // Horizontal into the Top handle — do not overshoot above targetY.
+  const points: Point[] = [
+    { x: sourceX, y: sourceY },
+    { x: sourceX, y: exitY },
+    { x: gutterX, y: exitY },
+    { x: gutterX, y: targetY },
+    { x: targetX, y: targetY },
+  ];
+
+  const path = buildOrthogonalPath(points, SMOOTH_STEP_BORDER_RADIUS);
+  return [path, gutterX, (exitY + targetY) / 2];
+}
+
 function getVerticalBackwardEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
   const { sourceX, sourceY, targetX, targetY } = params;
+
+  if (targetY < sourceY - SAME_ROW_TOLERANCE) {
+    return getVerticalUpwardLoopPath(params);
+  }
+
   const horizontalDelta = targetX - sourceX;
   const gutterX =
     Math.abs(horizontalDelta) <= SAME_COLUMN_TOLERANCE
@@ -627,8 +660,15 @@ export function pathsTouch(
   return false;
 }
 
+export type TouchEdgePathEntry = {
+  id: string;
+  path: string;
+  source?: string;
+  target?: string;
+};
+
 /** Edge ids whose paths geometrically touch/cross at least one other edge. */
-export function findTouchingEdgeIds(edges: Array<{ id: string; path: string }>): Set<string> {
+export function findTouchingEdgeIds(edges: TouchEdgePathEntry[]): Set<string> {
   return findTouchContrastEdgeIds(edges).involvedIds;
 }
 
@@ -642,28 +682,34 @@ export type TouchContrastEdgeIds = {
 /**
  * For each geometric touch/cross, darken only the longer path so the pair
  * keeps contrast (short true/false forks stay pale).
+ * Skips pairs that only meet at a shared source/target node (normal fork/merge).
  */
-export function findTouchContrastEdgeIds(edges: Array<{ id: string; path: string }>): TouchContrastEdgeIds {
+export function findTouchContrastEdgeIds(edges: TouchEdgePathEntry[]): TouchContrastEdgeIds {
   const contrastIds = new Set<string>();
   const involvedIds = new Set<string>();
   const lengths = edges.map((edge) => estimatePathLength(edge.path));
 
   for (let i = 0; i < edges.length; i++) {
     for (let j = i + 1; j < edges.length; j++) {
-      if (!pathsTouch(edges[i].path, edges[j].path)) continue;
-      involvedIds.add(edges[i].id);
-      involvedIds.add(edges[j].id);
+      const a = edges[i];
+      const b = edges[j];
+      // Fan-out / fan-in at the same node is not a mid-path tangle.
+      if (a.source && a.source === b.source) continue;
+      if (a.target && a.target === b.target) continue;
+      if (!pathsTouch(a.path, b.path)) continue;
+      involvedIds.add(a.id);
+      involvedIds.add(b.id);
 
       const lenA = lengths[i];
       const lenB = lengths[j];
       if (lenA > lenB) {
-        contrastIds.add(edges[i].id);
+        contrastIds.add(a.id);
       } else if (lenB > lenA) {
-        contrastIds.add(edges[j].id);
-      } else if (edges[i].id.localeCompare(edges[j].id) <= 0) {
-        contrastIds.add(edges[i].id);
+        contrastIds.add(b.id);
+      } else if (a.id.localeCompare(b.id) <= 0) {
+        contrastIds.add(a.id);
       } else {
-        contrastIds.add(edges[j].id);
+        contrastIds.add(b.id);
       }
     }
   }
