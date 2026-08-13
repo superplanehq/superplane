@@ -9,7 +9,8 @@ import {
 import { WorkOrdersPage } from "./WorkOrdersPage";
 
 /**
- * Work Orders list inside the FactoriesLayout: filters, list, and "New" CTA.
+ * Work Orders list inside the FactoriesLayout: filters, list, and "New Work Order".
+ * New Work Order opens the create dialog (requires work_orders create permission in /me).
  */
 const meta = {
   title: "Factories/Pages/Work Orders",

@@ -1,24 +1,42 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture, PRIMARY_FACTORY_ID } from "../__fixtures__/factoryPageResponses";
-import { CreateWorkOrderPage } from "./CreateWorkOrderPage";
+import { defaultFactoriesFixture, EMPTY_FACTORY_ID, PRIMARY_FACTORY_ID } from "../__fixtures__/factoryPageResponses";
 
 /**
- * "New work order" form inside the FactoriesLayout — title, description, assignees.
+ * Linear-style create dialog. `/work-orders/new` opens it over the list.
+ * Click New Work Order on Work Orders stories to open the same dialog.
  */
 const meta = {
   title: "Factories/Pages/Create Work Order",
-  component: CreateWorkOrderPage,
   parameters: { layout: "fullscreen" },
-} satisfies Meta<typeof CreateWorkOrderPage>;
+} satisfies Meta;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const createPath = `workspaces/${PRIMARY_FACTORY_ID}/work-orders/new`;
+const createPath = (factoryId: string) => `workspaces/${factoryId}/work-orders/new`;
 
 export const Empty: Story = {
-  render: () => <FactoriesHarness pathSuffix={createPath} factoriesFixture={defaultFactoriesFixture} />,
+  render: () => (
+    <FactoriesHarness pathSuffix={createPath(PRIMARY_FACTORY_ID)} factoriesFixture={defaultFactoriesFixture} />
+  ),
+};
+
+export const Assigned: Story = {
+  name: "Assignees available",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/work-orders`}
+      factoriesFixture={defaultFactoriesFixture}
+    />
+  ),
+};
+
+export const NoLines: Story = {
+  name: "No lines",
+  render: () => (
+    <FactoriesHarness pathSuffix={createPath(EMPTY_FACTORY_ID)} factoriesFixture={defaultFactoriesFixture} />
+  ),
 };
