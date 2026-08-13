@@ -1,6 +1,6 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { WorkOrderAssigneePicker } from "./WorkOrderAssigneePicker";
 
 interface WorkOrderAssigneesPopoverProps {
@@ -13,6 +13,16 @@ interface WorkOrderAssigneesPopoverProps {
   onChange?: (assigneeIds: string[]) => void;
   onSave?: (assigneeIds: string[]) => Promise<void>;
   children: ReactNode;
+}
+
+function haveSameIds(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  const sortedLeft = [...left].sort();
+  const sortedRight = [...right].sort();
+  return sortedLeft.every((id, index) => id === sortedRight[index]);
 }
 
 export function WorkOrderAssigneesPopover({
@@ -28,17 +38,27 @@ export function WorkOrderAssigneesPopover({
 }: WorkOrderAssigneesPopoverProps) {
   const [open, setOpen] = useState(false);
   const [draftIds, setDraftIds] = useState<string[]>(selectedIds);
+  // The set of assignees as they were when the popover was opened. Used only
+  // to keep already-assigned users pinned to the top of the list while it's
+  // open, so rows don't jump around as the user toggles checkboxes.
+  const [pinnedIds, setPinnedIds] = useState<string[]>(selectedIds);
   const isSaveMode = Boolean(onSave);
 
-  useEffect(() => {
-    if (open) {
-      setDraftIds(selectedIds);
-    }
-  }, [open, selectedIds]);
-
+  // Note: `draftIds` is intentionally *not* resynced from `selectedIds` on
+  // every render where the popover happens to still be open. `selectedIds`
+  // is recomputed from the latest server data and can change identity (or
+  // even value, via websocket/refetch/window-refocus) while the user is
+  // mid-edit; resyncing here would silently discard their pending changes.
+  // We only ever want to snapshot the server-confirmed state at the moment
+  // the popover transitions from closed to open, which is handled below.
   const handleOpenChange = (nextOpen: boolean) => {
     if (isSaving) {
       return;
+    }
+
+    if (nextOpen && !open) {
+      setDraftIds(selectedIds);
+      setPinnedIds(selectedIds);
     }
 
     setOpen(nextOpen);
@@ -62,6 +82,13 @@ export function WorkOrderAssigneesPopover({
       return;
     }
 
+    if (haveSameIds(draftIds, selectedIds)) {
+      // Nothing actually changed (e.g. the user toggled a checkbox back to
+      // its original state) — avoid a pointless request and toast.
+      setOpen(false);
+      return;
+    }
+
     try {
       await onSave(draftIds);
       setOpen(false);
@@ -81,6 +108,7 @@ export function WorkOrderAssigneesPopover({
           <WorkOrderAssigneePicker
             organizationId={organizationId}
             selectedIds={activeIds}
+            pinnedIds={isSaveMode ? pinnedIds : selectedIds}
             onChange={handleChange}
             disabled={pickerDisabled}
             variant="popover"

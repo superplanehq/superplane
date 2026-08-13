@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -190,10 +191,26 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 		return err
 	}
 
+	// `o.Assignees` still holds whatever was preloaded before ReplaceAssignees
+	// ran above, so it's stale the moment we've just deleted/recreated those
+	// rows. GORM's Update callbacks save has-many associations present on the
+	// model by default (not just Save/Create) — without `Omit(clause.
+	// Associations)`, the plain `updated_at` update below would upsert that
+	// stale in-memory assignee list right back into
+	// `factory_work_order_assignees`, silently reverting the unassign we just
+	// did. This was the actual root cause of "can't unassign users".
 	now := time.Now()
 	o.UpdatedAt = now
-	if err := tx.Model(o).Update("updated_at", now).Error; err != nil {
+	if err := tx.Model(o).Omit(clause.Associations).Update("updated_at", now).Error; err != nil {
 		return err
+	}
+
+	// Bring the in-memory association back in sync with what we just wrote,
+	// so callers that keep using `o` after this call (e.g. within the same
+	// transaction) don't see the stale pre-update list.
+	o.Assignees = make([]FactoryWorkOrderAssignee, 0, len(assigneeIDs))
+	for _, assigneeID := range assigneeIDs {
+		o.Assignees = append(o.Assignees, FactoryWorkOrderAssignee{WorkOrderID: o.ID, UserID: assigneeID})
 	}
 
 	assigned, unassigned := assigneeDiff(previousAssignees, assigneeIDs)
