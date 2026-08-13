@@ -3,7 +3,7 @@ import { AutomationDetail, AutomationsPageList, EmptyAutomationsState } from "./
 
 type AutomationsPageBodyProps = {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   apps: FactoryApp[];
   workOrders: Parameters<typeof AutomationsPageList>[0]["workOrders"];
   appsLoading: boolean;
@@ -14,7 +14,7 @@ type AutomationsPageBodyProps = {
 
 export function AutomationsPageBody({
   organizationId,
-  factoryId,
+  factoryKey,
   apps,
   workOrders,
   appsLoading,
@@ -26,12 +26,12 @@ export function AutomationsPageBody({
     return <p className="text-[13px] text-muted-foreground">Loading automations…</p>;
   }
   if (selectedApp) {
-    return <AutomationDetail organizationId={organizationId} factoryId={factoryId} app={selectedApp} />;
+    return <AutomationDetail organizationId={organizationId} factoryKey={factoryKey} app={selectedApp} />;
   }
   if (apps.length === 0) {
     return <EmptyAutomationsState canCreate={canCreate} onCreate={onCreate} />;
   }
   return (
-    <AutomationsPageList organizationId={organizationId} factoryId={factoryId} apps={apps} workOrders={workOrders} />
+    <AutomationsPageList organizationId={organizationId} factoryKey={factoryKey} apps={apps} workOrders={workOrders} />
   );
 }

@@ -7,7 +7,7 @@ import { FACTORIES_NAV_ITEMS } from "./factoriesNavItems";
 
 interface FactoriesNavProps {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   recentWorkOrders: FactoriesWorkOrder[];
 }
 
@@ -22,13 +22,13 @@ const RECENT_STATUS_DOT_CLASS: Record<WorkOrderDisplayStatus, string> = {
   cancelled: "bg-[color:var(--status-cancelled-dot)]",
 };
 
-export function FactoriesNav({ organizationId, factoryId, recentWorkOrders }: FactoriesNavProps) {
+export function FactoriesNav({ organizationId, factoryKey, recentWorkOrders }: FactoriesNavProps) {
   return (
     <nav className="flex flex-1 flex-col gap-4 px-2 pt-2 pb-4" data-testid="factories-nav">
       <ul className="flex flex-col gap-0.5">
         {FACTORIES_NAV_ITEMS.map((item) => {
           const Icon = item.Icon;
-          const href = item.buildHref(organizationId, factoryId);
+          const href = item.buildHref(organizationId, factoryKey);
 
           return (
             <li key={item.id}>
@@ -57,7 +57,7 @@ export function FactoriesNav({ organizationId, factoryId, recentWorkOrders }: Fa
           </p>
           <ul className="flex flex-col gap-0.5">
             {recentWorkOrders.map((order) => {
-              if (!order.id) {
+              if (!order.id || order.number === undefined) {
                 return null;
               }
               const status = getWorkOrderDisplayStatus(order);
@@ -66,7 +66,7 @@ export function FactoriesNav({ organizationId, factoryId, recentWorkOrders }: Fa
               return (
                 <li key={order.id}>
                   <NavLink
-                    to={workOrderDetailPath(organizationId, factoryId, order.id)}
+                    to={workOrderDetailPath(organizationId, factoryKey, order.number)}
                     className={({ isActive }) =>
                       cn(
                         "group block rounded-md px-2.5 py-1.5 text-[13px] tracking-[-0.01em] text-foreground/80 hover:bg-sidebar-accent hover:text-foreground",
