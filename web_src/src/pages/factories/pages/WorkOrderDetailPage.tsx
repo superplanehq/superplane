@@ -41,7 +41,12 @@ function WorkOrderDetailPageContent({
   const artifactsQuery = useWorkOrderArtifacts(organizationId, factoryId, orderId);
 
   const actions = useWorkOrderDetailActions(organizationId, factoryId, orderId);
-  const derived = getWorkOrderDetailDerived(order);
+  // `order` comes from a query with `staleTime: 0` and is invalidated on
+  // nearly every websocket event, so it's refetched (and its object
+  // identity changes) far more often than its actual contents. Memoize the
+  // derived value so consumers like `assigneeIds` don't see a brand-new
+  // array reference on every unrelated re-render/refetch.
+  const derived = useMemo(() => getWorkOrderDetailDerived(order), [order]);
 
   usePageTitle([order?.title ?? "Work Order", factory?.name ?? "Workspace"]);
 
