@@ -85,6 +85,39 @@ describe("buildWorkOrderListEntry", () => {
     expect(entry.searchHaystack).toContain("plan-and-implement");
   });
 
+  it("prefers an in-flight execution when timestamps tie", () => {
+    const sameMoment = "2024-06-02T10:00:00Z";
+    const entry = buildWorkOrderListEntry(
+      order({
+        executions: [
+          {
+            id: "e1",
+            step: "plan",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            line: { id: "line-a", name: "plan-and-implement" },
+            updatedAt: sameMoment,
+          },
+          {
+            id: "e2",
+            step: "verify",
+            state: "STATE_CANCELLING",
+            result: "RESULT_UNKNOWN",
+            line: { id: "line-b", name: "hotfix" },
+            updatedAt: sameMoment,
+          },
+        ],
+      }),
+      factory,
+    );
+
+    // A cancelling step is still active, so it must win the tie and agree
+    // with the Running status pill.
+    expect(entry.latestStepName).toBe("verify");
+    expect(entry.latestLineName).toBe("hotfix");
+    expect(entry.displayStatus).toBe("running");
+  });
+
   it("aggregates usage across executions when order totals are absent", () => {
     const entry = buildWorkOrderListEntry(
       order({

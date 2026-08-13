@@ -1,4 +1,5 @@
 import type { FactoriesFactory, FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
+import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "./workOrderUsage";
 import {
   WORK_ORDER_DISPLAY_STATUSES,
@@ -167,8 +168,10 @@ export function buildWorkOrderListEntries(
 
 /**
  * Latest execution across every line, ordered by `updatedAt` then `createdAt`.
- * A running execution wins ties so an in-flight retry surfaces over a stale
- * finished one that happens to share a timestamp.
+ * An active execution wins ties so an in-flight step surfaces over a stale
+ * finished one that happens to share a timestamp. "Active" must match the
+ * predicate behind the Running display status, or a tie can show a line and
+ * step that disagree with the status pill.
  */
 function findLatestExecution(executions: FactoriesWorkOrderExecution[]): FactoriesWorkOrderExecution | null {
   if (executions.length === 0) {
@@ -178,16 +181,12 @@ function findLatestExecution(executions: FactoriesWorkOrderExecution[]): Factori
   let winnerAt = -Infinity;
   for (const execution of executions) {
     const at = Date.parse(execution.updatedAt ?? execution.createdAt ?? "") || 0;
-    if (at > winnerAt || (at === winnerAt && isRunningExecution(execution))) {
+    if (at > winnerAt || (at === winnerAt && isActiveWorkOrderExecution(execution))) {
       winner = execution;
       winnerAt = at;
     }
   }
   return winner;
-}
-
-function isRunningExecution(execution: FactoriesWorkOrderExecution): boolean {
-  return execution.state === "STATE_STARTED" || execution.state === "STATE_PENDING";
 }
 
 function formatUsageLabel(totalTokens: number, totalCostCents: number): string | null {
