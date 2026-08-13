@@ -50,6 +50,17 @@ export interface JiraComment {
   updateAuthor?: JiraUser;
 }
 
+export interface JiraServiceDesk {
+  id?: string;
+  projectKey?: string;
+  projectName?: string;
+}
+
+export interface JiraOpsTeam {
+  teamId?: string;
+  teamName?: string;
+}
+
 export interface JiraNodeMetadata {
   project?: JiraProject;
   issueType?: string;
