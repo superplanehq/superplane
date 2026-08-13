@@ -42,3 +42,21 @@ export function resolveConfigurationFields({
 
   return [];
 }
+
+export function resolveComponentLabel({
+  workflowNode,
+  componentDefinitionsByName,
+  triggerDefinitionsByName,
+}: {
+  workflowNode?: ComponentsNode;
+  componentDefinitionsByName: Map<string, ActionsAction>;
+  triggerDefinitionsByName: Map<string, TriggersTrigger>;
+}): string | undefined {
+  if (!workflowNode?.component) return undefined;
+
+  if (workflowNode.type === "TYPE_TRIGGER") {
+    return triggerDefinitionsByName.get(workflowNode.component)?.label;
+  }
+
+  return componentDefinitionsByName.get(workflowNode.component)?.label;
+}

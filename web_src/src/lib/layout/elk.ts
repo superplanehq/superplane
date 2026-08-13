@@ -1,5 +1,10 @@
 import type { CanvasesCanvas, ActionsAction, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import type { CanvasFlowDirection } from "@/lib/canvasFlowDirection";
+import {
+  FACTORY_NODE_CARD_HEIGHT,
+  FACTORY_NODE_CARD_WIDTH,
+  FACTORY_NODE_VERTICAL_GAP,
+} from "@/lib/factoryCanvasChrome";
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { LayoutEngine, LayoutEngineApplyOptions } from "./types";
 import { appendUniqueChannels, resolveForwardLayoutEdges } from "./layoutGraph";
@@ -24,15 +29,23 @@ const DISCONNECTED_COMPONENT_HORIZONTAL_GAP_VERTICAL = 100;
 const VERTICAL_FLOW_NODE_NODE_SPACING = "48";
 const HORIZONTAL_FLOW_NODE_NODE_SPACING = "100";
 const NODE_NODE_BETWEEN_LAYERS = "180";
+const VERTICAL_FLOW_NODE_NODE_BETWEEN_LAYERS = String(FACTORY_NODE_VERTICAL_GAP);
 
 export class ElkLayoutEngine implements LayoutEngine {
   private readonly elk = new ELK();
 
-  estimateNodeSize(node: ComponentsNode): { width: number; height: number } {
+  estimateNodeSize(node: ComponentsNode, direction: CanvasFlowDirection = "horizontal"): { width: number; height: number } {
     if (node.type === "TYPE_WIDGET") {
       return {
         width: Number(node.configuration?.width) || ANNOTATION_NODE_WIDTH,
         height: Number(node.configuration?.height) || ANNOTATION_NODE_HEIGHT,
+      };
+    }
+
+    if (direction === "vertical") {
+      return {
+        width: FACTORY_NODE_CARD_WIDTH,
+        height: FACTORY_NODE_CARD_HEIGHT,
       };
     }
 
@@ -343,12 +356,14 @@ export class ElkLayoutEngine implements LayoutEngine {
         "elk.algorithm": "layered",
         "elk.direction": isVertical ? "DOWN" : "RIGHT",
         "elk.spacing.nodeNode": isVertical ? VERTICAL_FLOW_NODE_NODE_SPACING : HORIZONTAL_FLOW_NODE_NODE_SPACING,
-        "elk.layered.spacing.nodeNodeBetweenLayers": NODE_NODE_BETWEEN_LAYERS,
+        "elk.layered.spacing.nodeNodeBetweenLayers": isVertical
+          ? VERTICAL_FLOW_NODE_NODE_BETWEEN_LAYERS
+          : NODE_NODE_BETWEEN_LAYERS,
         "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
         "elk.contentAlignment": isVertical ? "H_CENTER" : "V_CENTER",
       },
       children: layoutNodes.map((node) => {
-        const { width, height } = this.estimateNodeSize(node);
+        const { width, height } = this.estimateNodeSize(node, direction);
         const nodeId = node.id!;
         const metadataOutputChannels = (outputChannelsByNodeId.get(nodeId) || [])
           .map((channel) => this.normalizeChannel(channel))
@@ -451,7 +466,9 @@ export class ElkLayoutEngine implements LayoutEngine {
         continue;
       }
 
-      const bounds = resolveLayoutBounds(componentNodes, componentPositions, (node) => this.estimateNodeSize(node));
+      const bounds = resolveLayoutBounds(componentNodes, componentPositions, (node) =>
+        this.estimateNodeSize(node, direction),
+      );
       for (const [nodeID, position] of packComponentPositions(
         componentPositions,
         bounds,
