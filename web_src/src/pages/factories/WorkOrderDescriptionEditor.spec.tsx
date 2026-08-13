@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -205,6 +205,27 @@ describe("WorkOrderDescriptionEditor", () => {
 
     const input = await screen.findByTestId("work-order-description-input");
     await user.click(input);
+    await user.keyboard("{Control>}a{/Control}");
+    await user.click(await screen.findByRole("button", { name: "Bold" }));
+
+    expect(input.textContent).toContain(initial);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("does not drop description text after a no-op paste at the length limit", async () => {
+    const user = userEvent.setup();
+    const initial = "Hello world";
+    const onChange = vi.fn();
+
+    render(
+      <WorkOrderDescriptionEditor value={initial} maxLength={initial.length} disabled={false} onChange={onChange} />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await user.click(input);
+    fireEvent.paste(input, {
+      clipboardData: { getData: () => "" },
+    });
     await user.keyboard("{Control>}a{/Control}");
     await user.click(await screen.findByRole("button", { name: "Bold" }));
 

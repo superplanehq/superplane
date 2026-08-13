@@ -58,9 +58,17 @@ export function WorkOrderDescriptionEditor({
         "data-testid": "work-order-description-input",
       },
       handlePaste: (_view, event) => {
+        const text = event.clipboardData?.getData("text/plain") ?? "";
+        if (!text) {
+          return false;
+        }
         pasteInFlightRef.current = true;
+        queueMicrotask(() => {
+          pasteInFlightRef.current = false;
+        });
         const current = editorRef.current;
         if (!current) {
+          pasteInFlightRef.current = false;
           return false;
         }
         return pasteMarkdownFromClipboard(current, event);
