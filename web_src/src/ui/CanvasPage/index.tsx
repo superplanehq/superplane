@@ -16,6 +16,13 @@ import {
   type Viewport,
 } from "@xyflow/react";
 import { resolveCanvasFlowDirection } from "@/lib/canvasFlowDirection";
+import {
+  factoryCanvasBackground,
+  factoryEdgePalette,
+  factoryEdgeToneClassName,
+  primaryEventStateFromCanvasNodeData,
+  resolveFactoryEdgeTone,
+} from "@/lib/factoryCanvasChrome";
 
 import { GlobalCommandPaletteCanvasNodeSearch } from "@/components/GlobalCommandPalette/canvasNodeSearch";
 import { openGlobalCommandPalette } from "@/components/GlobalCommandPalette/controller";
@@ -104,6 +111,7 @@ import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
 import { RightSideControls } from "./RightSideControls";
 import { computeAppendFromNodePlacement } from "./appendFromNodePlacement";
 import { selectCreatedRerun } from "./runInspectionRerunSelection";
+import { resolveRunInspectorOpen } from "./resolveRunInspectorOpen";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
@@ -465,7 +473,7 @@ function ComponentSidebarLoadingSkeleton({ layout = "sidebar" }: { layout?: "sid
   );
 }
 
-const EDGE_STYLE = {
+const CLASSIC_EDGE_STYLE = {
   type: "custom",
   style: { stroke: "#C9D5E1", strokeWidth: 3 },
 } as const;
@@ -528,6 +536,7 @@ type CanvasNodeRendererCallbacks = {
   showHeader: boolean;
   hasMultiSelection: boolean;
   canvasMode: "live" | "edit";
+  showRuntimeStatus: boolean;
 };
 
 type CanvasBlockNodeData = CanvasBlockData &
@@ -699,6 +708,7 @@ function buildInteractiveNodeBlockProps(
   return {
     showHeader: callbacks.showHeader && !callbacks.hasMultiSelection,
     canvasMode: callbacks.canvasMode,
+    showRuntimeStatus: callbacks.showRuntimeStatus,
     onAppendFromNode: callbacks.onAppendFromNode,
     onClick: (event) => callbacks.handleNodeClick(nodeId, event),
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
@@ -1311,13 +1321,14 @@ function CanvasPage(props: CanvasPageProps) {
   const showPreviewFloatingBar =
     canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion && !showRunInspectionFloatingBar;
 
-  // Factory embed opens the inspector on ?run= even before a node is selected;
-  // the factory body prompts "Select a node…" until one is picked.
-  const runInspectorOpen =
-    props.isRunInspectionMode &&
-    !props.isEditing &&
-    !!props.runNodeDetailCanvasId &&
-    (!!props.runNodeDetailRun || !!props.runCanvasLoading);
+  const runInspectorOpen = resolveRunInspectorOpen({
+    isRunInspectionMode: props.isRunInspectionMode,
+    isEditing: props.isEditing,
+    hasCanvasId: !!props.runNodeDetailCanvasId,
+    hasRunOrLoading: !!props.runNodeDetailRun || !!props.runCanvasLoading,
+    factoryEmbed: props.factoryEmbed,
+    selectedNodeId: props.runNodeDetailNodeId,
+  });
 
   const renderInspectorSidebar = useCallback(
     (layout: "sidebar" | "bottom") => (
@@ -1414,6 +1425,7 @@ function CanvasPage(props: CanvasPageProps) {
           "sp-canvas-live",
         props.isRunInspectionMode && "sp-canvas-live",
         props.isEditing && "sp-canvas-editing",
+        props.factoryId && "sp-canvas-factory",
       )}
     >
       {/* Header at the top spanning full width (omitted for factory embed chrome). */}
@@ -1559,6 +1571,7 @@ function CanvasPage(props: CanvasPageProps) {
                 <CanvasContent
                   state={state}
                   factoryId={props.factoryId}
+                  factoryEmbed={props.factoryEmbed}
                   onNodeDelete={handleNodeDelete}
                   onNodesDelete={handleNodesDelete}
                   onDuplicateNodes={props.onDuplicateNodes}
@@ -2186,6 +2199,7 @@ function applySidebarTabOnNodeOpen(
 function CanvasContent({
   state,
   factoryId,
+  factoryEmbed = false,
   onNodeDelete,
   onNodesDelete,
   onDuplicateNodes,
@@ -2237,6 +2251,7 @@ function CanvasContent({
 }: {
   state: CanvasPageState;
   factoryId?: string;
+  factoryEmbed?: boolean;
   onNodeDelete?: (nodeId: string) => void;
   onNodesDelete?: (nodeIds: string[]) => void;
   onDuplicateNodes?: (nodeIds: string[]) => void;
@@ -2296,11 +2311,14 @@ function CanvasContent({
   const { zoom } = useViewport();
   const { resolvedTheme } = useTheme();
   const flowColorMode = resolvedTheme === "dark" ? "dark" : "light";
-  const flowBgColor = resolvedTheme === "dark" ? DARK_BASE_BG_HEX : "#F1F5F9";
-  const flowDotColor = resolvedTheme === "dark" ? "#374151" : "#cbd5e1";
   const isReadOnly = readOnly ?? false;
   const flowDirection = resolveCanvasFlowDirection(factoryId);
   const isVerticalFlow = flowDirection === "vertical";
+  const factoryBackground = isVerticalFlow ? factoryCanvasBackground(resolvedTheme === "dark") : null;
+  const flowBgColor = factoryBackground?.bgColor ?? (resolvedTheme === "dark" ? DARK_BASE_BG_HEX : "#F1F5F9");
+  const flowDotColor = factoryBackground?.color ?? (resolvedTheme === "dark" ? "#374151" : "#cbd5e1");
+  const flowDotGap = factoryBackground?.gap ?? 8;
+  const flowDotSize = factoryBackground?.size ?? 2;
   // The content-key driven re-fit only applies when viewing the live/version
   // canvas. Run inspection keeps its own dedicated fit/viewport handling, and
   // while editing the viewport must stay put (the draft is the same graph the
@@ -2915,6 +2933,9 @@ function CanvasContent({
     [getViewport, isReadOnly, isVerticalFlow, onConnectionDropInEmptySpace, setViewport, viewportRef],
   );
 
+  // Factory Live without a run is topology-only — no runtime status footers.
+  const showRuntimeStatus = !factoryEmbed || isRunInspectionMode;
+
   // Store callback handlers in a ref so they can be accessed without being in node data
   const callbacksRef = useRef({
     handleNodeClick,
@@ -2928,6 +2949,7 @@ function CanvasContent({
     showHeader,
     hasMultiSelection,
     canvasMode: isEditMode ? ("edit" as const) : ("live" as const),
+    showRuntimeStatus,
   });
   callbacksRef.current = {
     handleNodeClick,
@@ -2941,6 +2963,7 @@ function CanvasContent({
     showHeader,
     hasMultiSelection,
     canvasMode: isEditMode ? "edit" : "live",
+    showRuntimeStatus,
   };
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes
@@ -3136,15 +3159,43 @@ function CanvasContent({
     (edgeId: string) => onEdgesChangeRef.current([{ id: edgeId, type: "remove" }]),
     [],
   );
+  const edgeDefaults = useMemo(() => {
+    if (!isVerticalFlow) return CLASSIC_EDGE_STYLE;
+    const palette = factoryEdgePalette(resolvedTheme === "dark");
+    return {
+      type: "custom" as const,
+      style: { stroke: palette.default.stroke, strokeWidth: palette.default.strokeWidth },
+    };
+  }, [isVerticalFlow, resolvedTheme]);
+
   const styledEdges = useMemo(() => {
+    const nodesById = isVerticalFlow ? new Map(state.nodes.map((node) => [node.id, node])) : null;
+    const palette = isVerticalFlow ? factoryEdgePalette(resolvedTheme === "dark") : null;
+
     return state.edges?.map((e) => {
       const diffStatus = (e.data as Record<string, unknown> | undefined)?._draftDiffStatus;
       const diffStyle = getDraftDiffEdgeStyle(diffStatus) ?? {};
 
+      let factoryToneClassName: string | undefined;
+      let factoryToneStyle: { stroke: string; strokeWidth: number } | undefined;
+      let animated = e.animated;
+
+      if (isVerticalFlow && nodesById && palette) {
+        const targetNode = nodesById.get(e.target);
+        const tone = resolveFactoryEdgeTone(primaryEventStateFromCanvasNodeData(targetNode?.data));
+        factoryToneClassName = factoryEdgeToneClassName(tone);
+        factoryToneStyle = palette[tone];
+        animated = tone === "running";
+      }
+
+      const className = [e.className, factoryToneClassName].filter(Boolean).join(" ") || undefined;
+
       return {
         ...e,
-        ...EDGE_STYLE,
-        style: { ...EDGE_STYLE.style, ...diffStyle },
+        ...edgeDefaults,
+        animated,
+        className,
+        style: { ...edgeDefaults.style, ...factoryToneStyle, ...diffStyle },
         data: {
           ...e.data,
           isHovered: e.id === hoveredEdgeId,
@@ -3154,7 +3205,17 @@ function CanvasContent({
         zIndex: e.id === hoveredEdgeId ? 1000 : 0,
       };
     });
-  }, [state.edges, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly]);
+  }, [
+    state.edges,
+    state.nodes,
+    hoveredEdgeId,
+    stableEdgeDelete,
+    isEditMode,
+    isReadOnly,
+    isVerticalFlow,
+    resolvedTheme,
+    edgeDefaults,
+  ]);
 
   const { visibleNodeIds, visibleEdgeIds } = useCanvasViewportCulling(nodesWithCallbacks, styledEdges ?? [], true);
   const { nodes: culledNodes, edges: culledEdges } = useMemo(
@@ -3337,7 +3398,7 @@ function CanvasContent({
             style={reactFlowStyle}
             className="h-full w-full"
           >
-            <Background gap={8} size={2} bgColor={flowBgColor} color={flowDotColor} />
+            <Background gap={flowDotGap} size={flowDotSize} bgColor={flowBgColor} color={flowDotColor} />
             <GlobalCommandPaletteCanvasNodeSearch onSearch={handleNodeSearch} onSelectNode={handleNodeSearchSelect} />
             <Panel
               position="bottom-left"
