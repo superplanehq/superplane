@@ -57,7 +57,7 @@ func (c *AddLogEvent) Documentation() string {
 - **Log Group**: Target log group
 - **Log Stream**: Name of the log stream to write to; created automatically if missing
 - **Message**: The log event message
-- **Timestamp**: Optional RFC3339 timestamp; defaults to now. Must be within the last 14 days and no more than 2 hours in the future
+- **Timestamp**: Optional; defaults to now. Must be within the last 14 days and no more than 2 hours in the future
 
 ## Output
 
@@ -138,7 +138,7 @@ func (c *AddLogEvent) Configuration() []configuration.Field {
 			Label:       "Timestamp",
 			Type:        configuration.FieldTypeDateTime,
 			Required:    false,
-			Description: "Defaults to now (RFC3339)",
+			Description: "Defaults to now",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "logStream", Values: []string{"*"}},
 			},
@@ -241,10 +241,27 @@ func validateAddLogEventConfiguration(config AddLogEventConfiguration) (time.Tim
 		return time.Now().UTC(), nil
 	}
 
-	timestamp, err := time.Parse(time.RFC3339, timestampStr)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("invalid timestamp %q: must be RFC3339", config.Timestamp)
+	return parseLogEventTimestamp(timestampStr)
+}
+
+// datetimeLocalLayouts covers the value shape produced by the "datetime" field's
+// HTML datetime-local input ("2006-01-02T15:04", with seconds if the user's
+// browser includes them), which carries no timezone and is treated as UTC.
+var datetimeLocalLayouts = []string{
+	"2006-01-02T15:04:05",
+	"2006-01-02T15:04",
+}
+
+func parseLogEventTimestamp(raw string) (time.Time, error) {
+	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+		return parsed.UTC(), nil
 	}
 
-	return timestamp.UTC(), nil
+	for _, layout := range datetimeLocalLayouts {
+		if parsed, err := time.Parse(layout, raw); err == nil {
+			return parsed.UTC(), nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("invalid timestamp %q: expected RFC3339 or YYYY-MM-DDTHH:MM", raw)
 }

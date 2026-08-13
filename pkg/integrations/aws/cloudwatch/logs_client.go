@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -20,6 +21,10 @@ import (
 const (
 	logsServiceName  = "logs"
 	logsTargetPrefix = "Logs_20140328."
+
+	// DescribeLogGroups is paginated. The cap keeps the log group picker
+	// responsive on accounts with very large numbers of log groups.
+	maxLogGroupPages = 20
 )
 
 // LogsClient talks to the CloudWatch Logs API (a separate service/protocol from
@@ -77,25 +82,38 @@ type LogEvent struct {
 
 // DescribeLogGroups lists log groups whose name starts with namePrefix (all log groups when empty).
 func (c *LogsClient) DescribeLogGroups(namePrefix string) ([]LogGroup, error) {
-	payload := map[string]any{}
-	if namePrefix != "" {
-		payload["logGroupNamePrefix"] = namePrefix
-	}
+	logGroups := []LogGroup{}
+	nextToken := ""
 
-	var response struct {
-		LogGroups []struct {
-			LogGroupName string `json:"logGroupName"`
-			Arn          string `json:"arn"`
-		} `json:"logGroups"`
-	}
+	for page := 0; page < maxLogGroupPages; page++ {
+		payload := map[string]any{}
+		if namePrefix != "" {
+			payload["logGroupNamePrefix"] = namePrefix
+		}
+		if nextToken != "" {
+			payload["nextToken"] = nextToken
+		}
 
-	if err := c.postJSON("DescribeLogGroups", payload, &response); err != nil {
-		return nil, err
-	}
+		var response struct {
+			LogGroups []struct {
+				LogGroupName string `json:"logGroupName"`
+				Arn          string `json:"arn"`
+			} `json:"logGroups"`
+			NextToken string `json:"nextToken"`
+		}
 
-	logGroups := make([]LogGroup, 0, len(response.LogGroups))
-	for _, lg := range response.LogGroups {
-		logGroups = append(logGroups, LogGroup{Name: lg.LogGroupName, Arn: lg.Arn})
+		if err := c.postJSON("DescribeLogGroups", payload, &response); err != nil {
+			return nil, err
+		}
+
+		for _, lg := range response.LogGroups {
+			logGroups = append(logGroups, LogGroup{Name: lg.LogGroupName, Arn: lg.Arn})
+		}
+
+		nextToken = response.NextToken
+		if nextToken == "" {
+			break
+		}
 	}
 
 	return logGroups, nil
@@ -148,6 +166,30 @@ func (c *LogsClient) CreateLogStream(logGroupName, logStreamName string) error {
 	return c.postJSON("CreateLogStream", payload, nil)
 }
 
+// rejectedLogEventsInfo mirrors PutLogEvents' response field of the same name.
+// Fields are pointers because CloudWatch omits each one unless that specific
+// rejection happened, and a present index of 0 is a valid, meaningful value.
+type rejectedLogEventsInfo struct {
+	ExpiredLogEventEndIndex  *int `json:"expiredLogEventEndIndex"`
+	TooNewLogEventStartIndex *int `json:"tooNewLogEventStartIndex"`
+	TooOldLogEventEndIndex   *int `json:"tooOldLogEventEndIndex"`
+}
+
+func (r *rejectedLogEventsInfo) String() string {
+	reasons := []string{}
+	if r.ExpiredLogEventEndIndex != nil {
+		reasons = append(reasons, "events at or before the log group's retention period expired")
+	}
+	if r.TooNewLogEventStartIndex != nil {
+		reasons = append(reasons, "events more than 2 hours in the future")
+	}
+	if r.TooOldLogEventEndIndex != nil {
+		reasons = append(reasons, "events older than 14 days")
+	}
+
+	return strings.Join(reasons, "; ")
+}
+
 // PutLogEvents uploads a batch of log events to a log stream. Events must be
 // in chronological order, per the CloudWatch Logs API contract.
 func (c *LogsClient) PutLogEvents(logGroupName, logStreamName string, events []LogEvent) error {
@@ -165,7 +207,19 @@ func (c *LogsClient) PutLogEvents(logGroupName, logStreamName string, events []L
 		"logEvents":     logEvents,
 	}
 
-	return c.postJSON("PutLogEvents", payload, nil)
+	var response struct {
+		RejectedLogEventsInfo *rejectedLogEventsInfo `json:"rejectedLogEventsInfo"`
+	}
+
+	if err := c.postJSON("PutLogEvents", payload, &response); err != nil {
+		return err
+	}
+
+	if response.RejectedLogEventsInfo != nil {
+		return fmt.Errorf("CloudWatch Logs rejected the log event(s): %s", response.RejectedLogEventsInfo)
+	}
+
+	return nil
 }
 
 func (c *LogsClient) postJSON(action string, payload any, out any) error {
