@@ -31,7 +31,7 @@ import { AssigneeChangeDescription } from "./workOrderTimelineAssignee";
 
 interface WorkOrderTimelineProps {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   order: FactoriesWorkOrder;
   events?: FactoriesWorkOrderEvent[];
   eventsError?: Error | null;
@@ -46,7 +46,7 @@ interface WorkOrderTimelineProps {
 
 export function WorkOrderActivityTimeline({
   organizationId,
-  factoryId,
+  factoryKey,
   order,
   events,
   eventsError = null,
@@ -81,8 +81,8 @@ export function WorkOrderActivityTimeline({
       ) : (
         <TimelineEventsList
           organizationId={organizationId}
-          factoryId={factoryId}
-          orderId={order.id}
+          factoryKey={factoryKey}
+          orderNumber={order.number}
           events={timeline.events}
           resolveUserDisplay={resolveUserDisplay}
           hasMoreEvents={hasMoreEvents}
@@ -102,8 +102,8 @@ export function WorkOrderActivityTimeline({
 
 interface TimelineEventsListProps {
   organizationId: string;
-  factoryId: string;
-  orderId?: string;
+  factoryKey: string;
+  orderNumber?: string;
   events: WorkOrderTimelineEvent[];
   resolveUserDisplay: OrgUserDisplayLookup;
   hasMoreEvents: boolean;
@@ -113,8 +113,8 @@ interface TimelineEventsListProps {
 
 function TimelineEventsList({
   organizationId,
-  factoryId,
-  orderId,
+  factoryKey,
+  orderNumber,
   events,
   resolveUserDisplay,
   hasMoreEvents,
@@ -146,8 +146,8 @@ function TimelineEventsList({
               key={event.id}
               event={event}
               organizationId={organizationId}
-              factoryId={factoryId}
-              orderId={orderId}
+              factoryKey={factoryKey}
+              orderNumber={orderNumber}
               resolveUserDisplay={resolveUserDisplay}
               isLatestDispatch={index === latestDispatchIndex}
             />
@@ -229,15 +229,15 @@ const AVATAR_MARKER_KINDS: WorkOrderTimelineEventKind[] = [
 function TimelineItem({
   event,
   organizationId,
-  factoryId,
-  orderId,
+  factoryKey,
+  orderNumber,
   resolveUserDisplay,
   isLatestDispatch,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
-  factoryId: string;
-  orderId?: string;
+  factoryKey: string;
+  orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   isLatestDispatch: boolean;
 }) {
@@ -246,8 +246,8 @@ function TimelineItem({
       <DispatchTimelineItem
         event={event}
         organizationId={organizationId}
-        factoryId={factoryId}
-        orderId={orderId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
         isLatestDispatch={isLatestDispatch}
       />
     );
@@ -267,8 +267,8 @@ function TimelineItem({
           <TimelineItemBody
             event={event}
             organizationId={organizationId}
-            factoryId={factoryId}
-            orderId={orderId}
+            factoryKey={factoryKey}
+            orderNumber={orderNumber}
             resolveUserDisplay={resolveUserDisplay}
           />
         </div>
@@ -280,14 +280,14 @@ function TimelineItem({
 function TimelineItemBody({
   event,
   organizationId,
-  factoryId,
-  orderId,
+  factoryKey,
+  orderNumber,
   resolveUserDisplay,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
-  factoryId: string;
-  orderId?: string;
+  factoryKey: string;
+  orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
@@ -300,8 +300,8 @@ function TimelineItemBody({
         actorDisplay={actorDisplay}
         timeLabel={timeLabel}
         organizationId={organizationId}
-        factoryId={factoryId}
-        orderId={orderId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
       />
     );
   }
@@ -314,8 +314,8 @@ function TimelineItemBody({
     <UserActionEventDescription
       event={event}
       organizationId={organizationId}
-      factoryId={factoryId}
-      orderId={orderId}
+      factoryKey={factoryKey}
+      orderNumber={orderNumber}
       resolveUserDisplay={resolveUserDisplay}
       timeLabel={timeLabel}
     />
@@ -327,20 +327,20 @@ function CommentEventBody({
   actorDisplay,
   timeLabel,
   organizationId,
-  factoryId,
-  orderId,
+  factoryKey,
+  orderNumber,
 }: {
   event: WorkOrderTimelineEvent;
   actorDisplay: OrgUserDisplay | null;
   timeLabel: string;
   organizationId: string;
-  factoryId: string;
-  orderId?: string;
+  factoryKey: string;
+  orderNumber?: string;
 }) {
   const comment = event.comment;
   if (!comment) return null;
   const isAutomation = (comment.authorKind ?? "").toLowerCase() === "automation";
-  const runHref = getWorkOrderRunHref(organizationId, factoryId, event.sourceAppId, event.sourceRunId, { orderId });
+  const runHref = getWorkOrderRunHref(organizationId, factoryKey, event.sourceAppId, event.sourceRunId, { orderNumber });
 
   return (
     <>
@@ -410,15 +410,15 @@ const SOMEONE_FALLBACK_KINDS: WorkOrderTimelineEventKind[] = ["created", "status
 function UserActionEventDescription({
   event,
   organizationId,
-  factoryId,
-  orderId,
+  factoryKey,
+  orderNumber,
   resolveUserDisplay,
   timeLabel,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
-  factoryId: string;
-  orderId?: string;
+  factoryKey: string;
+  orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   timeLabel: string;
 }) {
@@ -446,7 +446,7 @@ function UserActionEventDescription({
             resolveUserDisplay={resolveUserDisplay}
           />
         ) : hasSourceRun ? (
-          <SourceRunAttribution event={event} organizationId={organizationId} factoryId={factoryId} orderId={orderId} />
+          <SourceRunAttribution event={event} organizationId={organizationId} factoryKey={factoryKey} orderNumber={orderNumber} />
         ) : (
           <span>{event.title}</span>
         )}
@@ -465,15 +465,15 @@ function UserActionEventDescription({
 function SourceRunAttribution({
   event,
   organizationId,
-  factoryId,
-  orderId,
+  factoryKey,
+  orderNumber,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
-  factoryId: string;
-  orderId?: string;
+  factoryKey: string;
+  orderNumber?: string;
 }) {
-  const runHref = getWorkOrderRunHref(organizationId, factoryId, event.sourceAppId, event.sourceRunId, { orderId });
+  const runHref = getWorkOrderRunHref(organizationId, factoryKey, event.sourceAppId, event.sourceRunId, { orderNumber });
   const connector = event.kind === "created" ? "from" : "via";
   return (
     <span className="inline-flex flex-wrap items-baseline gap-x-1">

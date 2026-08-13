@@ -39,8 +39,8 @@ describe("DispatchTimelineItem", () => {
       <DispatchTimelineItem
         event={dispatchEvent([{ body: "Applying the fix now." }])}
         organizationId="org-1"
-        factoryId="factory-1"
-        orderId="order-1"
+        factoryKey="factory-1"
+        orderNumber="1"
         isLatestDispatch
       />,
     );

@@ -15,7 +15,7 @@ import { AssigneeGroup, InlineDispatchButton } from "./WorkOrderRowActions";
 interface WorkOrdersBoardViewProps {
   entries: WorkOrderListEntry[];
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
   canAssign: boolean;
@@ -92,7 +92,7 @@ type BoardCardProps = Omit<WorkOrdersBoardViewProps, "entries"> & { entry: WorkO
 function BoardCard({
   entry,
   organizationId,
-  factoryId,
+  factoryKey,
   factoryLines,
   canDispatch,
   canAssign,
@@ -102,7 +102,8 @@ function BoardCard({
   onAssigneesSave,
 }: BoardCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
-  const href = workOrderDetailPath(organizationId, factoryId, entry.id);
+  const href =
+    entry.order.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, entry.order.number) : "#";
   const timeLabel = entry.updatedAtMs > 0 ? formatTimeAgo(new Date(entry.updatedAtMs)) : "—";
   return (
     <article className="group relative rounded-md border border-border bg-card p-2.5 shadow-sm transition hover:border-foreground/20 hover:shadow">

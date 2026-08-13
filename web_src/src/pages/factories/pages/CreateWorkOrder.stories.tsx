@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture, PRIMARY_FACTORY_ID } from "../__fixtures__/factoryPageResponses";
+import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 import { CreateWorkOrderPage } from "./CreateWorkOrderPage";
 
 /**
@@ -17,7 +17,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const createPath = `workspaces/${PRIMARY_FACTORY_ID}/work-orders/new`;
+const createPath = `workspaces/${PRIMARY_FACTORY_KEY}/work-orders/new`;
 
 export const Empty: Story = {
   render: () => <FactoriesHarness pathSuffix={createPath} factoriesFixture={defaultFactoriesFixture} />,

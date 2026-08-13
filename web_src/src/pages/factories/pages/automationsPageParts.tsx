@@ -24,11 +24,11 @@ import {
 
 export function AutomationDetail({
   organizationId,
-  factoryId,
+  factoryKey,
   app,
 }: {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   app: FactoryApp;
 }) {
   const canvasId = app.id ?? "";
@@ -43,7 +43,7 @@ export function AutomationDetail({
   const status = resolveFactoryAutomationStatusFromCanvasRuns(canvasRuns);
   const runs = useMemo(() => listFactoryAutomationRuns(canvasRuns), [canvasRuns]);
   const configureHref = canvasId
-    ? factoryAppConfigurePath(organizationId, factoryId, canvasId, { from: "automations" })
+    ? factoryAppConfigurePath(organizationId, factoryKey, canvasId, { from: "automations" })
     : "#";
 
   const runsScrollRef = useRef<HTMLUListElement>(null);
@@ -66,7 +66,7 @@ export function AutomationDetail({
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="automations-detail">
       <Link
-        href={automationsPath(organizationId, factoryId)}
+        href={automationsPath(organizationId, factoryKey)}
         className="mb-3 inline-flex shrink-0 items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
         data-testid="automations-detail-back"
       >
@@ -106,7 +106,7 @@ export function AutomationDetail({
             <>
               {runs.map((run) => (
                 <li key={run.runId}>
-                  <AutomationRunCard organizationId={organizationId} factoryId={factoryId} appId={canvasId} run={run} />
+                  <AutomationRunCard organizationId={organizationId} factoryKey={factoryKey} appId={canvasId} run={run} />
                 </li>
               ))}
               {isFetchingNextPage ? (
@@ -122,16 +122,16 @@ export function AutomationDetail({
 
 function AutomationRunCard({
   organizationId,
-  factoryId,
+  factoryKey,
   appId,
   run,
 }: {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   appId: string;
   run: FactoryAutomationRunCard;
 }) {
-  const href = factoryAppRunPath(organizationId, factoryId, appId, run.runId, { from: "automations" });
+  const href = factoryAppRunPath(organizationId, factoryKey, appId, run.runId, { from: "automations" });
   const timestamp = run.updatedAt ?? run.finishedAt ?? run.createdAt;
   const timeLabel =
     run.tick === "queued" && !timestamp ? "next" : timestamp ? formatTimeAgo(new Date(timestamp), false) : null;
@@ -251,12 +251,12 @@ export function EmptyAutomationsState({ canCreate, onCreate }: { canCreate: bool
 
 export function AutomationsPageList({
   organizationId,
-  factoryId,
+  factoryKey,
   apps,
   workOrders,
 }: {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   apps: FactoryApp[];
   workOrders: Parameters<typeof resolveFactoryAutomationStatus>[1];
 }) {
@@ -271,7 +271,7 @@ export function AutomationsPageList({
           <li key={app.id}>
             <AutomationCard
               app={app}
-              href={automationDetailPath(organizationId, factoryId, app.id)}
+              href={automationDetailPath(organizationId, factoryKey, app.id)}
               tick={status.tick}
               statusLabel={status.label}
             />

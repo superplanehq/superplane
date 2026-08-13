@@ -14,6 +14,11 @@ export const FACTORIES_ORGANIZATION_ID = "3ee1aa47-3a60-4c1f-b645-0b9859ab91f8";
 export const PRIMARY_FACTORY_ID = "factory-refunds";
 export const EMPTY_FACTORY_ID = "factory-payments";
 
+/** Workspace key for `PRIMARY_FACTORY_ID` — routes use this, not the raw id. */
+export const PRIMARY_FACTORY_KEY = "RF";
+/** Workspace key for `EMPTY_FACTORY_ID` — routes use this, not the raw id. */
+export const EMPTY_FACTORY_KEY = "PF";
+
 export const STORYBOOK_ME_USER_ID = "storybook-user";
 export const STORYBOOK_ME_USER_NAME = "Storybook User";
 export const STORYBOOK_ME_USER_EMAIL = "storybook@superplane.dev";

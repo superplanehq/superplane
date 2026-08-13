@@ -1,10 +1,11 @@
 import { useAccount } from "@/contexts/useAccount";
-import { useFactory } from "@/hooks/useFactoryData";
+import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
-import { Navigate, NavLink, Outlet, useParams } from "react-router";
+import { Navigate, NavLink, Outlet, useLocation, useParams } from "react-router";
+import { factoryRouteNeedsCanonicalRedirect, replaceFactoryKeySegment, resolveFactoryByKey } from "../../lib/factoryKeyResolution";
 import { factoryDetailPath, factoryListPath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { SidebarUserMenu } from "../../layout/SidebarUserMenu";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
@@ -12,16 +13,60 @@ import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 import { FACTORY_SETTINGS_NAV_ITEMS } from "./settingsNavItems";
 
 export function FactorySettingsLayout() {
-  const { organizationId, factoryId } = useParams<{ organizationId: string; factoryId: string }>();
+  const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
 
-  if (!organizationId || !factoryId) {
+  if (!organizationId || !factoryKey) {
     return null;
   }
 
-  return <FactorySettingsLayoutContent organizationId={organizationId} factoryId={factoryId} />;
+  return <FactorySettingsLayoutResolver organizationId={organizationId} factoryKey={factoryKey} />;
 }
 
-function FactorySettingsLayoutContent({ organizationId, factoryId }: { organizationId: string; factoryId: string }) {
+/** Mirrors `FactoriesLayoutResolver` — resolves `:factoryKey` before rendering the settings shell. */
+function FactorySettingsLayoutResolver({ organizationId, factoryKey }: { organizationId: string; factoryKey: string }) {
+  const location = useLocation();
+  const {
+    data: factories = [],
+    isLoading: factoriesLoading,
+    isFetching: factoriesFetching,
+  } = useFactories(organizationId);
+  const resolution = resolveFactoryByKey(factories, factoryKey, factoriesLoading || factoriesFetching);
+
+  if (factoryRouteNeedsCanonicalRedirect(resolution, factoryKey)) {
+    const target = replaceFactoryKeySegment(location.pathname, organizationId, factoryKey, resolution.factory!.key!);
+    return <Navigate to={`${target}${location.search}`} replace />;
+  }
+
+  if (resolution.status === "not-found") {
+    return <Navigate to={factoryListPath(organizationId)} replace />;
+  }
+
+  if (resolution.status === "loading" || !resolution.factory?.id) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
+        <p className="text-[13px] text-muted-foreground">Loading settings…</p>
+      </div>
+    );
+  }
+
+  return (
+    <FactorySettingsLayoutContent
+      organizationId={organizationId}
+      factoryId={resolution.factory.id}
+      factoryKey={resolution.factory.key ?? factoryKey}
+    />
+  );
+}
+
+function FactorySettingsLayoutContent({
+  organizationId,
+  factoryId,
+  factoryKey,
+}: {
+  organizationId: string;
+  factoryId: string;
+  factoryKey: string;
+}) {
   useFactoriesThemeClass();
   const { account } = useAccount();
   const { data: organization } = useOrganization(organizationId);
@@ -53,7 +98,7 @@ function FactorySettingsLayoutContent({ organizationId, factoryId }: { organizat
         >
           <div className="border-b border-sidebar-border px-3 py-3">
             <NavLink
-              to={factoryDetailPath(organizationId, factoryId)}
+              to={factoryDetailPath(organizationId, factoryKey)}
               className="inline-flex h-8 items-center gap-2 rounded-md px-2.5 text-[13px] tracking-[-0.01em] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
               data-testid="factory-settings-back"
             >
@@ -69,8 +114,8 @@ function FactorySettingsLayoutContent({ organizationId, factoryId }: { organizat
             </p>
           </div>
           <nav className="flex flex-1 flex-col gap-4 px-2 py-4">
-            <SettingsNavGroup organizationId={organizationId} factoryId={factoryId} items={workspaceGroup} />
-            <SettingsNavGroup organizationId={organizationId} factoryId={factoryId} items={governanceGroup} />
+            <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={workspaceGroup} />
+            <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={governanceGroup} />
           </nav>
           <SidebarUserMenu
             organizationId={organizationId}
@@ -90,11 +135,11 @@ function FactorySettingsLayoutContent({ organizationId, factoryId }: { organizat
 
 function SettingsNavGroup({
   organizationId,
-  factoryId,
+  factoryKey,
   items,
 }: {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   items: typeof FACTORY_SETTINGS_NAV_ITEMS;
 }) {
   return (
@@ -104,7 +149,7 @@ function SettingsNavGroup({
         return (
           <li key={item.id}>
             <NavLink
-              to={factorySettingsSectionPath(organizationId, factoryId, item.id)}
+              to={factorySettingsSectionPath(organizationId, factoryKey, item.id)}
               className={({ isActive }) =>
                 cn(
                   "group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] tracking-[-0.01em] text-foreground/80 hover:bg-sidebar-accent hover:text-foreground",
