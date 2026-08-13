@@ -601,6 +601,84 @@ func TestFactoryWorkOrder_CreateArtifact_Key(t *testing.T) {
 	})
 }
 
+func TestFactoryWorkOrder_UpdateArtifactData(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "update-artifact")
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Update artifact target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	const prKey = "https://github.com/example/repo/pull/7"
+	_, err = order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+		Type: FactoryWorkOrderArtifactTypePR,
+		Data: map[string]any{
+			"url":    prKey,
+			"title":  "Draft implementation",
+			"number": "7",
+		},
+		Key: prKey,
+	})
+	require.NoError(t, err)
+
+	t.Run("merges state without clobbering unrelated fields", func(t *testing.T) {
+		updated, err := order.UpdateArtifactData(database.Conn(), prKey, map[string]any{"state": "merged"})
+		require.NoError(t, err)
+
+		var data map[string]any
+		require.NoError(t, json.Unmarshal(updated.Data, &data))
+		assert.Equal(t, "merged", data["state"])
+		assert.Equal(t, "Draft implementation", data["title"])
+		assert.Equal(t, "7", data["number"])
+		assert.Equal(t, prKey, data["url"])
+
+		artifacts, err := order.ListArtifacts(database.Conn())
+		require.NoError(t, err)
+		require.Len(t, artifacts, 1)
+		var persisted map[string]any
+		require.NoError(t, json.Unmarshal(artifacts[0].Data, &persisted))
+		assert.Equal(t, "merged", persisted["state"])
+	})
+
+	t.Run("does not emit a new timeline event", func(t *testing.T) {
+		before, err := order.ListEvents(database.Conn(), 50, nil)
+		require.NoError(t, err)
+
+		_, err = order.UpdateArtifactData(database.Conn(), prKey, map[string]any{"state": "closed"})
+		require.NoError(t, err)
+
+		after, err := order.ListEvents(database.Conn(), 50, nil)
+		require.NoError(t, err)
+		assert.Len(t, after, len(before))
+	})
+
+	t.Run("rejects an unknown state value", func(t *testing.T) {
+		_, err := order.UpdateArtifactData(database.Conn(), prKey, map[string]any{"state": "not-a-state"})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+	})
+
+	t.Run("errors when the key does not resolve to an artifact on this order", func(t *testing.T) {
+		_, err := order.UpdateArtifactData(database.Conn(), "no-such-key", map[string]any{"state": "open"})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactNotFound)
+	})
+
+	t.Run("errors on a blank key", func(t *testing.T) {
+		_, err := order.UpdateArtifactData(database.Conn(), "   ", map[string]any{"state": "open"})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+	})
+
+	t.Run("does not find a key belonging to a different work order", func(t *testing.T) {
+		otherOrder, err := factoryModel.CreateWorkOrder(database.Conn(), "Other order", "", &userID, nil, nil)
+		require.NoError(t, err)
+
+		_, err = otherOrder.UpdateArtifactData(database.Conn(), prKey, map[string]any{"state": "open"})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactNotFound)
+	})
+}
+
 func TestFactory_FindWorkOrderByArtifactKey(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 

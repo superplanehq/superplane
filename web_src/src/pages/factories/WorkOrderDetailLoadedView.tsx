@@ -136,6 +136,7 @@ export function WorkOrderDetailLoadedView({
                 isLoadingMoreEvents={isLoadingMoreEvents}
                 onLoadMoreEvents={onLoadMoreEvents}
                 onRetryEvents={onRetryEvents}
+                artifacts={artifacts}
                 footer={
                   <WorkOrderCommentComposer
                     canComment={canManage}
