@@ -228,7 +228,7 @@ func (c *LogsClient) postJSON(action string, payload any, out any) error {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	endpoint := fmt.Sprintf("https://logs.%s.amazonaws.com/", c.region)
+	endpoint := fmt.Sprintf("https://logs.%s.%s/", c.region, APIDNSSuffix(c.region))
 	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("failed to build request: %w", err)
