@@ -1,11 +1,11 @@
 import type { FactoriesFactoryLine } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date";
-import { CircleDashed, Loader2 } from "lucide-react";
 import { Link } from "react-router";
 import { workOrderDetailPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
+import { WorkOrderLineStep } from "./WorkOrderLineStep";
 import { AssigneeGroup, InlineDispatchButton } from "./WorkOrderRowActions";
 
 interface WorkOrdersTableViewProps {
@@ -64,7 +64,6 @@ function TableRow({
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const href = workOrderDetailPath(organizationId, factoryId, entry.id);
   const timeLabel = entry.updatedAtMs > 0 ? formatTimeAgo(new Date(entry.updatedAtMs)) : "—";
-  const lineLabel = buildLineStepLabel(entry);
   return (
     <article
       className="group relative grid grid-cols-[110px_60px_1fr_auto] items-center gap-3 px-3 py-2 transition-colors hover:bg-accent/40 md:grid-cols-[110px_60px_1fr_140px_120px_auto] lg:grid-cols-[110px_70px_1fr_180px_100px_120px_auto]"
@@ -86,14 +85,7 @@ function TableRow({
 
       <p className="relative z-10 min-w-0 truncate text-[13px] font-medium text-foreground">{entry.title}</p>
 
-      {lineLabel ? (
-        <p className="relative z-10 hidden min-w-0 items-center gap-1 truncate text-[11px] text-muted-foreground md:inline-flex">
-          <LineStepIcon status={entry.displayStatus} />
-          <span className="truncate">{lineLabel}</span>
-        </p>
-      ) : (
-        <span className="relative z-10 hidden text-[11px] text-muted-foreground md:inline">—</span>
-      )}
+      <WorkOrderLineStep entry={entry} className="relative z-10 hidden min-w-0 md:inline-flex" fallback="—" />
 
       <span
         className="relative z-10 hidden text-[11px] text-muted-foreground lg:inline"
@@ -123,24 +115,4 @@ function TableRow({
       </div>
     </article>
   );
-}
-
-function LineStepIcon({ status }: { status: WorkOrderListEntry["displayStatus"] }) {
-  if (status === "running") {
-    return <Loader2 className="size-3 animate-spin" aria-hidden />;
-  }
-  return <CircleDashed className="size-3" aria-hidden />;
-}
-
-function buildLineStepLabel(entry: WorkOrderListEntry): string {
-  const parts: string[] = [];
-  if (entry.latestLineName) parts.push(entry.latestLineName);
-  if (entry.latestStepName) parts.push(entry.latestStepName);
-  if (parts.length === 0) {
-    return "";
-  }
-  const label = parts.join(" · ");
-  return entry.distinctLineCount > 1
-    ? `${label} · +${entry.distinctLineCount - 1} more line${entry.distinctLineCount - 1 === 1 ? "" : "s"}`
-    : label;
 }

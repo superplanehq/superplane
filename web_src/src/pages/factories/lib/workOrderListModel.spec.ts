@@ -11,6 +11,7 @@ import {
   applyWorkOrderSearch,
   buildWorkOrderListEntries,
   buildWorkOrderListEntry,
+  groupWorkOrderEntriesByLane,
 } from "./workOrderListModel";
 
 const factory: FactoriesFactory = { id: "f", name: "Refunds", key: "RF" };
@@ -83,6 +84,35 @@ describe("buildWorkOrderListEntry", () => {
     expect(entry.lineIds).toEqual(["line-a", "line-b"]);
     expect(entry.displayStatus).toBe("running");
     expect(entry.searchHaystack).toContain("plan-and-implement");
+  });
+
+  it("builds the shared line and step caption", () => {
+    const single = buildWorkOrderListEntry(
+      order({
+        executions: [{ id: "e1", step: "plan", state: "STATE_STARTED", line: { id: "line-a", name: "hotfix" } }],
+      }),
+      factory,
+    );
+    expect(single.lineStepLabel).toBe("hotfix · plan");
+
+    const twoLines = buildWorkOrderListEntry(
+      order({
+        executions: [
+          { id: "e1", step: "plan", state: "STATE_FINISHED", line: { id: "line-a", name: "review" } },
+          {
+            id: "e2",
+            step: "verify",
+            state: "STATE_STARTED",
+            line: { id: "line-b", name: "hotfix" },
+            updatedAt: "2024-06-03T00:00:00Z",
+          },
+        ],
+      }),
+      factory,
+    );
+    expect(twoLines.lineStepLabel).toBe("hotfix · verify · +1 more line");
+
+    expect(buildWorkOrderListEntry(order(), factory).lineStepLabel).toBe("");
   });
 
   it("prefers an in-flight execution when timestamps tie", () => {
@@ -262,5 +292,27 @@ describe("scope + filter + search + ordering", () => {
       factory,
     );
     expect(applyWorkOrderOrdering(numbered, "key").map((e) => e.displayKey)).toEqual(["RF-10", "RF-2", "RF-1"]);
+  });
+});
+
+describe("groupWorkOrderEntriesByLane", () => {
+  it("maps every display status to its board lane", () => {
+    const grouped = groupWorkOrderEntriesByLane(
+      buildWorkOrderListEntries(
+        [
+          order({ id: "draft", state: "STATE_DRAFT" }),
+          order({ id: "waiting" }),
+          order({ id: "completed", state: "STATE_CLOSED", result: "RESULT_COMPLETED" }),
+          order({ id: "failed", state: "STATE_CLOSED", result: "RESULT_FAILED" }),
+          order({ id: "cancelled", state: "STATE_CLOSED", result: "RESULT_REJECTED" }),
+        ],
+        factory,
+      ),
+    );
+
+    expect(grouped.get("backlog")?.map((entry) => entry.id)).toEqual(["draft"]);
+    expect(grouped.get("running")).toEqual([]);
+    expect(grouped.get("review")?.map((entry) => entry.id)).toEqual(["waiting"]);
+    expect(grouped.get("done")?.map((entry) => entry.id)).toEqual(["completed", "failed", "cancelled"]);
   });
 });

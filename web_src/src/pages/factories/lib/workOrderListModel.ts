@@ -2,10 +2,12 @@ import type { FactoriesFactory, FactoriesWorkOrder, FactoriesWorkOrderExecution 
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "./workOrderUsage";
 import {
+  WORK_ORDER_BOARD_LANES,
   WORK_ORDER_DISPLAY_STATUSES,
   getWorkOrderDisplayKey,
   getWorkOrderDisplayStatus,
   isUnassignedWorkOrder,
+  type WorkOrderBoardLaneId,
   type WorkOrderDisplayStatus,
 } from "./workOrderProgress";
 
@@ -30,6 +32,8 @@ export interface WorkOrderListEntry {
   latestExecution: FactoriesWorkOrderExecution | null;
   latestLineName: string | null;
   latestStepName: string | null;
+  /** Caption every layout shows under the title, empty when nothing ran yet. */
+  lineStepLabel: string;
   lineIds: string[];
   lineNames: string[];
   distinctLineCount: number;
@@ -59,6 +63,7 @@ export function buildWorkOrderListEntry(
   const createdAtMs = parseTimestamp(order.createdAt);
   const displayKey = getWorkOrderDisplayKey(order, factory?.key ?? null);
   const title = trimOrNull(order.title) ?? "Untitled work order";
+  const latestLineName = trimOrNull(latestExecution?.line?.name);
   const latestStepName = trimOrNull(latestExecution?.step);
 
   return {
@@ -69,8 +74,9 @@ export function buildWorkOrderListEntry(
     title,
     displayStatus: getWorkOrderDisplayStatus(order),
     latestExecution,
-    latestLineName: trimOrNull(latestExecution?.line?.name),
+    latestLineName,
     latestStepName,
+    lineStepLabel: buildLineStepLabel(latestLineName, latestStepName, lines.ids.length),
     lineIds: lines.ids,
     lineNames: lines.names,
     distinctLineCount: lines.ids.length,
@@ -110,6 +116,23 @@ function isDispatchableState(state: FactoriesWorkOrder["state"]): boolean {
 
 function buildSearchHaystack(parts: Array<string | null | undefined>): string {
   return parts.filter(Boolean).join(" ").toLowerCase();
+}
+
+/**
+ * "line · step" for the newest execution, plus a count of the other lines
+ * the order touched. Built here so Board, List, and Table cannot drift
+ * apart on the wording.
+ */
+function buildLineStepLabel(lineName: string | null, stepName: string | null, distinctLineCount: number): string {
+  const label = [lineName, stepName].filter(Boolean).join(" · ");
+  if (!label) {
+    return "";
+  }
+  const otherLines = distinctLineCount - 1;
+  if (otherLines < 1) {
+    return label;
+  }
+  return `${label} · +${otherLines} more line${otherLines === 1 ? "" : "s"}`;
 }
 
 /** Distinct lines the order has run on, in first-seen order. */
@@ -332,6 +355,26 @@ export function applyWorkOrderOrdering(
       break;
   }
   return sorted;
+}
+
+/**
+ * Buckets entries into the shared board lanes, keeping the incoming order
+ * inside each lane. Board and List both group this way so a work order
+ * never lands in different sections depending on the layout.
+ */
+export function groupWorkOrderEntriesByLane(
+  entries: WorkOrderListEntry[],
+): Map<WorkOrderBoardLaneId, WorkOrderListEntry[]> {
+  const grouped = new Map<WorkOrderBoardLaneId, WorkOrderListEntry[]>(
+    WORK_ORDER_BOARD_LANES.map((lane) => [lane.id, []]),
+  );
+  for (const entry of entries) {
+    const lane = WORK_ORDER_BOARD_LANES.find((candidate) => candidate.statuses.includes(entry.displayStatus));
+    if (lane) {
+      grouped.get(lane.id)?.push(entry);
+    }
+  }
+  return grouped;
 }
 
 /** Numeric suffix of `SP-42`, so `SP-10` sorts above `SP-9`. */

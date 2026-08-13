@@ -1,11 +1,11 @@
 import type { FactoriesFactoryLine } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date";
-import { CircleDashed, Loader2 } from "lucide-react";
 import { Link } from "react-router";
 import { workOrderDetailPath } from "../lib/factoryPagePaths";
-import type { WorkOrderListEntry } from "../lib/workOrderListModel";
+import { groupWorkOrderEntriesByLane, type WorkOrderListEntry } from "../lib/workOrderListModel";
 import { WORK_ORDER_BOARD_LANES, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
+import { WorkOrderLineStep } from "./WorkOrderLineStep";
 import { AssigneeGroup, InlineDispatchButton } from "./WorkOrderRowActions";
 
 interface WorkOrdersListViewProps {
@@ -26,7 +26,7 @@ interface WorkOrdersListViewProps {
  * users have a single mental model across layouts.
  */
 export function WorkOrdersListView(props: WorkOrdersListViewProps) {
-  const grouped = groupEntries(props.entries);
+  const grouped = groupWorkOrderEntriesByLane(props.entries);
   return (
     <div className="flex flex-col gap-4" data-testid="work-orders-list">
       {WORK_ORDER_BOARD_LANES.map((lane) => {
@@ -56,22 +56,6 @@ export function WorkOrdersListView(props: WorkOrdersListViewProps) {
   );
 }
 
-function groupEntries(entries: WorkOrderListEntry[]): Map<string, WorkOrderListEntry[]> {
-  const grouped = new Map<string, WorkOrderListEntry[]>();
-  for (const lane of WORK_ORDER_BOARD_LANES) {
-    grouped.set(lane.id, []);
-  }
-  for (const entry of entries) {
-    for (const lane of WORK_ORDER_BOARD_LANES) {
-      if (lane.statuses.includes(entry.displayStatus)) {
-        grouped.get(lane.id)!.push(entry);
-        break;
-      }
-    }
-  }
-  return grouped;
-}
-
 function ListRow({
   entry,
   organizationId,
@@ -87,7 +71,6 @@ function ListRow({
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const href = workOrderDetailPath(organizationId, factoryId, entry.id);
   const timeLabel = entry.updatedAtMs > 0 ? formatTimeAgo(new Date(entry.updatedAtMs)) : "—";
-  const lineLabel = buildLineStepLabel(entry);
   return (
     <article
       className="group relative flex items-center gap-3 px-3 py-2 transition-colors hover:bg-accent/40"
@@ -111,12 +94,7 @@ function ListRow({
 
       <div className="relative z-10 min-w-0 flex-1">
         <p className="truncate text-[13px] font-medium text-foreground">{entry.title}</p>
-        {lineLabel ? (
-          <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-            <LineStepIcon status={entry.displayStatus} />
-            <span className="truncate">{lineLabel}</span>
-          </p>
-        ) : null}
+        <WorkOrderLineStep entry={entry} className="mt-0.5 max-w-full" />
       </div>
 
       {entry.usageLabel ? (
@@ -149,24 +127,4 @@ function ListRow({
       </div>
     </article>
   );
-}
-
-function LineStepIcon({ status }: { status: WorkOrderListEntry["displayStatus"] }) {
-  if (status === "running") {
-    return <Loader2 className="size-3 animate-spin" aria-hidden />;
-  }
-  return <CircleDashed className="size-3" aria-hidden />;
-}
-
-function buildLineStepLabel(entry: WorkOrderListEntry): string {
-  const parts: string[] = [];
-  if (entry.latestLineName) parts.push(entry.latestLineName);
-  if (entry.latestStepName) parts.push(entry.latestStepName);
-  if (parts.length === 0) {
-    return "";
-  }
-  const label = parts.join(" · ");
-  return entry.distinctLineCount > 1
-    ? `${label} · +${entry.distinctLineCount - 1} more line${entry.distinctLineCount - 1 === 1 ? "" : "s"}`
-    : label;
 }

@@ -1,15 +1,15 @@
 import type { FactoriesFactoryLine } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date";
-import { CircleDashed, Loader2 } from "lucide-react";
 import { Link } from "react-router";
 import { workOrderDetailPath } from "../lib/factoryPagePaths";
-import type { WorkOrderListEntry } from "../lib/workOrderListModel";
+import { groupWorkOrderEntriesByLane, type WorkOrderListEntry } from "../lib/workOrderListModel";
 import {
   WORK_ORDER_BOARD_LANES,
   getWorkOrderDisplayStatusMeta,
   type WorkOrderBoardLaneDefinition,
 } from "../lib/workOrderProgress";
+import { WorkOrderLineStep } from "./WorkOrderLineStep";
 import { AssigneeGroup, InlineDispatchButton } from "./WorkOrderRowActions";
 
 interface WorkOrdersBoardViewProps {
@@ -27,7 +27,7 @@ interface WorkOrdersBoardViewProps {
 
 /** Four-lane Kanban-style board mapping to the shared display statuses. */
 export function WorkOrdersBoardView(props: WorkOrdersBoardViewProps) {
-  const grouped = groupEntriesByLane(props.entries);
+  const grouped = groupWorkOrderEntriesByLane(props.entries);
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4" data-testid="work-orders-board">
       {WORK_ORDER_BOARD_LANES.map((lane) => (
@@ -35,22 +35,6 @@ export function WorkOrdersBoardView(props: WorkOrdersBoardViewProps) {
       ))}
     </div>
   );
-}
-
-function groupEntriesByLane(entries: WorkOrderListEntry[]): Map<string, WorkOrderListEntry[]> {
-  const grouped = new Map<string, WorkOrderListEntry[]>();
-  for (const lane of WORK_ORDER_BOARD_LANES) {
-    grouped.set(lane.id, []);
-  }
-  for (const entry of entries) {
-    for (const lane of WORK_ORDER_BOARD_LANES) {
-      if (lane.statuses.includes(entry.displayStatus)) {
-        grouped.get(lane.id)!.push(entry);
-        break;
-      }
-    }
-  }
-  return grouped;
 }
 
 interface BoardLaneProps extends WorkOrdersBoardViewProps {
@@ -120,7 +104,6 @@ function BoardCard({
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const href = workOrderDetailPath(organizationId, factoryId, entry.id);
   const timeLabel = entry.updatedAtMs > 0 ? formatTimeAgo(new Date(entry.updatedAtMs)) : "—";
-  const lineLabel = buildLineStepLabel(entry);
   return (
     <article className="group relative rounded-md border border-border bg-card p-2.5 shadow-sm transition hover:border-foreground/20 hover:shadow">
       <Link to={href} className="absolute inset-0 z-0 rounded-md" aria-label={`Open ${entry.title}`} />
@@ -142,12 +125,7 @@ function BoardCard({
         {entry.title}
       </h3>
 
-      {lineLabel ? (
-        <p className="relative z-10 mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-          <LineStepIcon status={entry.displayStatus} />
-          <span className="truncate">{lineLabel}</span>
-        </p>
-      ) : null}
+      <WorkOrderLineStep entry={entry} className="relative z-10 mt-1 max-w-full" />
 
       <div className="relative z-10 mt-2 flex items-center justify-between gap-2">
         <span className="text-[11px] text-muted-foreground">{timeLabel}</span>
@@ -176,24 +154,4 @@ function BoardCard({
       </div>
     </article>
   );
-}
-
-function LineStepIcon({ status }: { status: WorkOrderListEntry["displayStatus"] }) {
-  if (status === "running") {
-    return <Loader2 className="size-3 animate-spin" aria-hidden />;
-  }
-  return <CircleDashed className="size-3" aria-hidden />;
-}
-
-function buildLineStepLabel(entry: WorkOrderListEntry): string {
-  const parts: string[] = [];
-  if (entry.latestLineName) parts.push(entry.latestLineName);
-  if (entry.latestStepName) parts.push(entry.latestStepName);
-  if (parts.length === 0) {
-    return "";
-  }
-  const label = parts.join(" · ");
-  return entry.distinctLineCount > 1
-    ? `${label} · +${entry.distinctLineCount - 1} more line${entry.distinctLineCount - 1 === 1 ? "" : "s"}`
-    : label;
 }

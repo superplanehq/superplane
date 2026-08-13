@@ -17,7 +17,7 @@ import {
   WorkOrdersScopedEmptyState,
   WorkOrdersTrueEmptyState,
 } from "./WorkOrdersEmptyStates";
-import { WorkOrdersHeader } from "./WorkOrdersHeader";
+import { WorkOrdersHeader } from "./header/WorkOrdersHeader";
 import { WorkOrdersListView } from "./WorkOrdersListView";
 import { WorkOrdersTableView } from "./WorkOrdersTableView";
 
