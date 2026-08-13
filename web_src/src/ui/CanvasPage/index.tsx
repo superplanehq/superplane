@@ -111,6 +111,7 @@ import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
 import { RightSideControls } from "./RightSideControls";
 import { computeAppendFromNodePlacement } from "./appendFromNodePlacement";
 import { selectCreatedRerun } from "./runInspectionRerunSelection";
+import { resolveRunInspectorOpen } from "./resolveRunInspectorOpen";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
@@ -535,6 +536,7 @@ type CanvasNodeRendererCallbacks = {
   showHeader: boolean;
   hasMultiSelection: boolean;
   canvasMode: "live" | "edit";
+  showRuntimeStatus: boolean;
 };
 
 type CanvasBlockNodeData = CanvasBlockData &
@@ -706,6 +708,7 @@ function buildInteractiveNodeBlockProps(
   return {
     showHeader: callbacks.showHeader && !callbacks.hasMultiSelection,
     canvasMode: callbacks.canvasMode,
+    showRuntimeStatus: callbacks.showRuntimeStatus,
     onAppendFromNode: callbacks.onAppendFromNode,
     onClick: (event) => callbacks.handleNodeClick(nodeId, event),
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
@@ -1318,13 +1321,14 @@ function CanvasPage(props: CanvasPageProps) {
   const showPreviewFloatingBar =
     canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion && !showRunInspectionFloatingBar;
 
-  // Factory embed opens the inspector on ?run= even before a node is selected;
-  // the factory body prompts "Select a node…" until one is picked.
-  const runInspectorOpen =
-    props.isRunInspectionMode &&
-    !props.isEditing &&
-    !!props.runNodeDetailCanvasId &&
-    (!!props.runNodeDetailRun || !!props.runCanvasLoading);
+  const runInspectorOpen = resolveRunInspectorOpen({
+    isRunInspectionMode: props.isRunInspectionMode,
+    isEditing: props.isEditing,
+    hasCanvasId: !!props.runNodeDetailCanvasId,
+    hasRunOrLoading: !!props.runNodeDetailRun || !!props.runCanvasLoading,
+    factoryEmbed: props.factoryEmbed,
+    selectedNodeId: props.runNodeDetailNodeId,
+  });
 
   const renderInspectorSidebar = useCallback(
     (layout: "sidebar" | "bottom") => (
@@ -1567,6 +1571,7 @@ function CanvasPage(props: CanvasPageProps) {
                 <CanvasContent
                   state={state}
                   factoryId={props.factoryId}
+                  factoryEmbed={props.factoryEmbed}
                   onNodeDelete={handleNodeDelete}
                   onNodesDelete={handleNodesDelete}
                   onDuplicateNodes={props.onDuplicateNodes}
@@ -2194,6 +2199,7 @@ function applySidebarTabOnNodeOpen(
 function CanvasContent({
   state,
   factoryId,
+  factoryEmbed = false,
   onNodeDelete,
   onNodesDelete,
   onDuplicateNodes,
@@ -2245,6 +2251,7 @@ function CanvasContent({
 }: {
   state: CanvasPageState;
   factoryId?: string;
+  factoryEmbed?: boolean;
   onNodeDelete?: (nodeId: string) => void;
   onNodesDelete?: (nodeIds: string[]) => void;
   onDuplicateNodes?: (nodeIds: string[]) => void;
@@ -2926,6 +2933,9 @@ function CanvasContent({
     [getViewport, isReadOnly, isVerticalFlow, onConnectionDropInEmptySpace, setViewport, viewportRef],
   );
 
+  // Factory Live without a run is topology-only — no runtime status footers.
+  const showRuntimeStatus = !factoryEmbed || isRunInspectionMode;
+
   // Store callback handlers in a ref so they can be accessed without being in node data
   const callbacksRef = useRef({
     handleNodeClick,
@@ -2939,6 +2949,7 @@ function CanvasContent({
     showHeader,
     hasMultiSelection,
     canvasMode: isEditMode ? ("edit" as const) : ("live" as const),
+    showRuntimeStatus,
   });
   callbacksRef.current = {
     handleNodeClick,
@@ -2952,6 +2963,7 @@ function CanvasContent({
     showHeader,
     hasMultiSelection,
     canvasMode: isEditMode ? "edit" : "live",
+    showRuntimeStatus,
   };
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes

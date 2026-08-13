@@ -68,6 +68,7 @@ export interface CompositeProps extends ComponentActionsProps {
   dimBodyBelowHeader?: boolean;
   draftDiffStatus?: DraftDiffStatus;
   isFactoryApp?: boolean;
+  showRuntimeStatus?: boolean;
 }
 
 export const Composite: React.FC<CompositeProps> = ({
@@ -93,6 +94,7 @@ export const Composite: React.FC<CompositeProps> = ({
   dimBodyBelowHeader,
   draftDiffStatus,
   isFactoryApp = false,
+  showRuntimeStatus,
   onDuplicate,
   onToggleView,
   onDelete,
@@ -216,6 +218,7 @@ export const Composite: React.FC<CompositeProps> = ({
       dimBodyBelowHeader={dimBodyBelowHeader}
       draftDiffStatus={draftDiffStatus}
       isFactoryApp={isFactoryApp}
+      showRuntimeStatus={showRuntimeStatus}
     />
   );
 };
