@@ -31,6 +31,7 @@ export function WorkOrderDescriptionEditor({
   const onBlurRef = useRef(onBlur);
   const maxLengthRef = useRef(maxLength);
   const emittedMarkdownRef = useRef(value);
+  const pasteInFlightRef = useRef(false);
 
   onChangeRef.current = onChange;
   onFocusRef.current = onFocus;
@@ -57,6 +58,7 @@ export function WorkOrderDescriptionEditor({
         "data-testid": "work-order-description-input",
       },
       handlePaste: (_view, event) => {
+        pasteInFlightRef.current = true;
         const current = editorRef.current;
         if (!current) {
           return false;
@@ -68,7 +70,9 @@ export function WorkOrderDescriptionEditor({
       const markdown = current.getMarkdown();
       const limit = maxLengthRef.current;
       const previous = emittedMarkdownRef.current;
-      const next = markdownWithinLimit(markdown, previous, limit);
+      const fromPaste = pasteInFlightRef.current;
+      pasteInFlightRef.current = false;
+      const next = markdownWithinLimit(markdown, previous, limit, fromPaste);
       if (next !== markdown) {
         current.commands.setContent(next, {
           contentType: "markdown",
@@ -130,12 +134,12 @@ export function WorkOrderDescriptionEditor({
   );
 }
 
-function markdownWithinLimit(markdown: string, previous: string, limit: number): string {
+function markdownWithinLimit(markdown: string, previous: string, limit: number, fromPaste: boolean): string {
   if (markdown.length <= limit) {
     return markdown;
   }
-  if (previous.length >= limit && markdown.length - previous.length <= 1) {
-    return previous;
+  if (fromPaste) {
+    return markdown.slice(0, limit);
   }
-  return markdown.slice(0, limit);
+  return previous;
 }

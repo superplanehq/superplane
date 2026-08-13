@@ -194,6 +194,24 @@ describe("WorkOrderDescriptionEditor", () => {
     expect(onChange.mock.calls.at(-1)?.[0]).toHaveLength(maxLength);
   });
 
+  it("does not drop description text when formatting at the length limit", async () => {
+    const user = userEvent.setup();
+    const initial = "Hello world";
+    const onChange = vi.fn();
+
+    render(
+      <WorkOrderDescriptionEditor value={initial} maxLength={initial.length} disabled={false} onChange={onChange} />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await user.click(input);
+    await user.keyboard("{Control>}a{/Control}");
+    await user.click(await screen.findByRole("button", { name: "Bold" }));
+
+    expect(input.textContent).toContain(initial);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("applies bold from the format toolbar with the keyboard", async () => {
     const user = userEvent.setup();
 
