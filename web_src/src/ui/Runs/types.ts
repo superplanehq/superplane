@@ -70,6 +70,8 @@ export type RunInspectorNodeSection = {
   sectionValue: string;
   nodeId: string;
   nodeName: string;
+  /** Component/trigger Label() for factory sidebar titles. */
+  componentLabel?: string;
   workflowNode?: ComponentsNode;
   execution?: CanvasesCanvasNodeExecution;
   executionRef?: CanvasesCanvasNodeExecutionRef;
