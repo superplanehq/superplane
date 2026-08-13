@@ -2,8 +2,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Check, ChevronDown } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate } from "react-router";
 
+import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { factoryOverviewPath } from "../../lib/factoryPagePaths";
 import type { OnboardingRepo } from "./onboardingMocks";
 import { AnalysisSidePanel } from "./AnalysisSidePanel";
@@ -232,7 +233,7 @@ function SetupSections({
  */
 export function OnboardingWireframe() {
   const navigate = useNavigate();
-  const { organizationId = "", factoryId = "" } = useParams<{ organizationId: string; factoryId: string }>();
+  const { organizationId, factoryId, factoryKey } = useFactoriesLayout();
   const onboarding = useOnboardingStorybook();
   const setup = useOnboardingSetupState(onboarding?.pending?.workspaceName ?? "");
   const { requestConnect, dialog } = useConnectDialog(setup);
@@ -242,8 +243,8 @@ export function OnboardingWireframe() {
     if (onboarding && factoryId) {
       onboarding.completeOnboarding(factoryId, onboardingReposFromSetup(setup.selectedRepo, setup.vcsHost));
     }
-    if (organizationId && factoryId) {
-      navigate(factoryOverviewPath(organizationId, factoryId), { replace: true });
+    if (organizationId && factoryKey) {
+      navigate(factoryOverviewPath(organizationId, factoryKey), { replace: true });
       return;
     }
     setup.setFinished(true);

@@ -12,7 +12,7 @@ export function FactoryAppCanvasPage() {
   const model = useFactoryAppCanvasPageModel();
 
   if (model.shouldRedirect) {
-    return <FactoryAppCanvasRedirect organizationId={model.organizationId} factoryId={model.factoryId} />;
+    return <FactoryAppCanvasRedirect organizationId={model.organizationId} factoryKey={model.factoryKey} />;
   }
 
   return (

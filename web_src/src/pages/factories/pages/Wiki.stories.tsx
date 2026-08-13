@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture, PRIMARY_FACTORY_ID } from "../__fixtures__/factoryPageResponses";
+import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 import { WikiWireframe } from "./wiki/WikiWireframe";
 import { WIKI_DOCUMENTS_DEFAULT, WIKI_DOCUMENTS_REFRESHED } from "./wiki/wikiMocks";
 
@@ -18,7 +18,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const wikiPath = `workspaces/${PRIMARY_FACTORY_ID}/wiki`;
+const wikiPath = `workspaces/${PRIMARY_FACTORY_KEY}/wiki`;
 
 function EmptyWikiWireframe() {
   return <WikiWireframe initialDocuments={[]} refreshedDocuments={WIKI_DOCUMENTS_REFRESHED} />;

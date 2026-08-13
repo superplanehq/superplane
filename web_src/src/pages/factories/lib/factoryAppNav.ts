@@ -19,13 +19,13 @@ export type FactoryAppBackNav = {
  */
 export function resolveFactoryAppBackNav(
   organizationId: string,
-  factoryId: string,
+  factoryKey: string,
   options: {
     from?: string | null;
     appId?: string | null;
     appName?: string | null;
     lineId?: string | null;
-    orderId?: string | null;
+    orderNumber?: string | null;
     lineName?: string | null;
     orderTitle?: string | null;
   },
@@ -36,31 +36,31 @@ export function resolveFactoryAppBackNav(
     if (options.appId) {
       return {
         label: options.appName?.trim() || "Automations",
-        href: automationDetailPath(organizationId, factoryId, options.appId),
+        href: automationDetailPath(organizationId, factoryKey, options.appId),
       };
     }
-    return { label: "Automations", href: automationsPath(organizationId, factoryId) };
+    return { label: "Automations", href: automationsPath(organizationId, factoryKey) };
   }
 
   if (from === "lines") {
     if (options.lineId) {
       return {
         label: options.lineName?.trim() || "All lines",
-        href: factoryLineDetailPath(organizationId, factoryId, options.lineId),
+        href: factoryLineDetailPath(organizationId, factoryKey, options.lineId),
       };
     }
-    return { label: "All lines", href: linesPath(organizationId, factoryId) };
+    return { label: "All lines", href: linesPath(organizationId, factoryKey) };
   }
 
   if (from === "work-order") {
-    if (options.orderId) {
+    if (options.orderNumber) {
       return {
         label: options.orderTitle?.trim() || "Work Orders",
-        href: workOrderDetailPath(organizationId, factoryId, options.orderId),
+        href: workOrderDetailPath(organizationId, factoryKey, options.orderNumber),
       };
     }
-    return { label: "Work Orders", href: workOrdersPath(organizationId, factoryId) };
+    return { label: "Work Orders", href: workOrdersPath(organizationId, factoryKey) };
   }
 
-  return { label: "Overview", href: factoryOverviewPath(organizationId, factoryId) };
+  return { label: "Overview", href: factoryOverviewPath(organizationId, factoryKey) };
 }

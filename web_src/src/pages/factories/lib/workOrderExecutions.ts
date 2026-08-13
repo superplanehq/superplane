@@ -69,28 +69,28 @@ const EXECUTION_RESULT_META: Record<
  */
 export function getWorkOrderRunHref(
   organizationId: string,
-  factoryId: string,
+  factoryKey: string,
   appId: string | undefined,
   runId: string | undefined,
-  options?: { orderId?: string },
+  options?: { orderNumber?: string },
 ): string | null {
   if (!appId || !runId) {
     return null;
   }
 
-  return factoryAppRunPath(organizationId, factoryId, appId, runId, {
+  return factoryAppRunPath(organizationId, factoryKey, appId, runId, {
     from: "work-order",
-    orderId: options?.orderId,
+    orderNumber: options?.orderNumber,
   });
 }
 
 export function getWorkOrderExecutionRunHref(
   organizationId: string,
-  factoryId: string,
+  factoryKey: string,
   execution: FactoriesWorkOrderExecution,
-  options?: { orderId?: string },
+  options?: { orderNumber?: string },
 ): string | null {
-  return getWorkOrderRunHref(organizationId, factoryId, execution.run?.appId, execution.run?.id, options);
+  return getWorkOrderRunHref(organizationId, factoryKey, execution.run?.appId, execution.run?.id, options);
 }
 
 export function getExecutionStepTimestamp(execution: FactoriesWorkOrderExecution): string {

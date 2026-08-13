@@ -11,7 +11,7 @@ import {
   FAILED_WORK_ORDER,
   OPEN_WORK_ORDER,
   OPEN_WORK_ORDER_ARTIFACTS,
-  PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
   RUNNING_WORK_ORDER,
 } from "./__fixtures__/factoryPageResponses";
@@ -43,7 +43,7 @@ const meta = {
   decorators: [
     (Story) => (
       <ComponentStoryShell
-        initialPath={`/${FACTORIES_ORGANIZATION_ID}/workspaces/${PRIMARY_FACTORY_ID}`}
+        initialPath={`/${FACTORIES_ORGANIZATION_ID}/workspaces/${PRIMARY_FACTORY_KEY}`}
         className="min-h-screen w-full bg-gray-50 dark:bg-gray-950"
       >
         <Story />
@@ -65,7 +65,7 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
   const derived = getWorkOrderDetailDerived(order);
   return {
     organizationId: FACTORIES_ORGANIZATION_ID,
-    factoryId: PRIMARY_FACTORY_ID,
+    factoryKey: PRIMARY_FACTORY_KEY,
     order,
     events: overrides.events ?? [],
     artifacts: overrides.artifacts ?? [],

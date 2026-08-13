@@ -9,7 +9,7 @@ import {
   FACTORIES_ORGANIZATION_ID,
   HOUR_AGO,
   LAST_WEEK,
-  PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_APPS,
   TWO_HOURS_AGO,
 } from "../__fixtures__/factoryPageResponses";
@@ -28,7 +28,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const automationsPath = `workspaces/${PRIMARY_FACTORY_ID}/automations`;
+const automationsPath = `workspaces/${PRIMARY_FACTORY_KEY}/automations`;
 const implementerAppId = REFUND_FACTORY_APPS[1]?.id ?? "app-refund-implementer";
 
 const implementerCanvasRunsFixture: CanvasAppFixture = {

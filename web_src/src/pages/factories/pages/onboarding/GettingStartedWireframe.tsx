@@ -13,12 +13,12 @@ import { useOnboardingStorybook } from "./useOnboardingStorybook";
  */
 export function GettingStartedWireframe() {
   const navigate = useNavigate();
-  const { organizationId, factoryId } = useFactoriesLayout();
+  const { organizationId, factoryKey } = useFactoriesLayout();
   const onboarding = useOnboardingStorybook();
 
   function handleCreateWorkOrder() {
     onboarding?.clearOverviewTips();
-    navigate(createWorkOrderPath(organizationId, factoryId));
+    navigate(createWorkOrderPath(organizationId, factoryKey));
   }
 
   return (
@@ -82,7 +82,7 @@ export function GettingStartedWireframe() {
               Each work order runs through a line: intake, build, verify, and related phases you can configure later.
             </p>
             <Link
-              to={linesPath(organizationId, factoryId)}
+              to={linesPath(organizationId, factoryKey)}
               className={cn(
                 "mt-3 inline-flex h-8 items-center rounded-md border border-border px-3 text-[13px]",
                 "text-foreground transition-colors hover:bg-accent",

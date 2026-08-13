@@ -36,6 +36,22 @@ describe("resolveFactoryAppBackNav", () => {
       href: "/org/workspaces/fac/overview",
     });
   });
+
+  it("returns work order detail when orderNumber present", () => {
+    expect(
+      resolveFactoryAppBackNav("org", "fac", { from: "work-order", orderNumber: "42", orderTitle: "Fix things" }),
+    ).toEqual({
+      label: "Fix things",
+      href: "/org/workspaces/fac/work-order/42",
+    });
+  });
+
+  it("falls back to Work Orders list when from=work-order but orderNumber missing", () => {
+    expect(resolveFactoryAppBackNav("org", "fac", { from: "work-order" })).toEqual({
+      label: "Work Orders",
+      href: "/org/workspaces/fac/work-orders",
+    });
+  });
 });
 
 describe("factoryAppPath", () => {
