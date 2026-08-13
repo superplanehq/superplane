@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { createRef } from "react";
+import type { RefObject } from "react";
 import { resolveFactoryEmbedCanvasChrome } from "./factoryEmbedCanvasChrome";
+
+function refOf<T>(value: T): RefObject<T> {
+  return { current: value };
+}
 
 function buildInput(overrides: Partial<Parameters<typeof resolveFactoryEmbedCanvasChrome>[0]> = {}) {
   const handleSelectLiveCanvas = vi.fn();
@@ -24,10 +28,10 @@ function buildInput(overrides: Partial<Parameters<typeof resolveFactoryEmbedCanv
       handleSelectLiveCanvas,
       handleBackToRunList,
       filesHeaderActionsSlotId: "files-actions",
-      runsHasFitToViewRef: createRef<boolean>(),
-      hasFitToViewRef: createRef<boolean>(),
-      runsViewportRef: createRef<{ x: number; y: number; zoom: number } | undefined>(),
-      viewportRef: createRef<{ x: number; y: number; zoom: number } | undefined>(),
+      runsHasFitToViewRef: refOf(false),
+      hasFitToViewRef: refOf(false),
+      runsViewportRef: refOf<{ x: number; y: number; zoom: number } | undefined>(undefined),
+      viewportRef: refOf<{ x: number; y: number; zoom: number } | undefined>(undefined),
       selectedRunId: "run-1",
       selectedRunDetailDismissed: false,
       runCanvasLoading: false,
