@@ -1,10 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import { createWorkOrderPath, linesPath } from "../../lib/factoryPagePaths";
+import { linesPath } from "../../lib/factoryPagePaths";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
 /**
@@ -12,13 +12,12 @@ import { useOnboardingStorybook } from "./useOnboardingStorybook";
  * Shown on overview when tips are active for the current workspace.
  */
 export function GettingStartedWireframe() {
-  const navigate = useNavigate();
-  const { organizationId, factoryId } = useFactoriesLayout();
+  const { organizationId, factoryId, openCreateWorkOrder } = useFactoriesLayout();
   const onboarding = useOnboardingStorybook();
 
   function handleCreateWorkOrder() {
     onboarding?.clearOverviewTips();
-    navigate(createWorkOrderPath(organizationId, factoryId));
+    openCreateWorkOrder();
   }
 
   return (
