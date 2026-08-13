@@ -24,14 +24,7 @@ const mockUsers: SuperplaneUsersUser[] = [
 
 function renderPicker(overrides: Partial<Parameters<typeof WorkOrderAssigneePicker>[0]> = {}) {
   const onChange = vi.fn();
-  render(
-    <WorkOrderAssigneePicker
-      organizationId="org-1"
-      selectedIds={[]}
-      onChange={onChange}
-      {...overrides}
-    />,
-  );
+  render(<WorkOrderAssigneePicker organizationId="org-1" selectedIds={[]} onChange={onChange} {...overrides} />);
   return { onChange };
 }
 

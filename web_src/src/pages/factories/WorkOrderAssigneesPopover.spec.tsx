@@ -15,10 +15,7 @@ function buildUser(id: string, displayName: string): SuperplaneUsersUser {
   } as SuperplaneUsersUser;
 }
 
-const mockUsers: SuperplaneUsersUser[] = [
-  buildUser("alice", "Alice Anderson"),
-  buildUser("bob", "Bob Brown"),
-];
+const mockUsers: SuperplaneUsersUser[] = [buildUser("alice", "Alice Anderson"), buildUser("bob", "Bob Brown")];
 
 function checkboxFor(name: string) {
   const item = screen.getAllByRole("listitem").find((el) => el.textContent?.includes(name));
