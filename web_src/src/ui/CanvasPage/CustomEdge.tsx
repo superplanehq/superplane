@@ -2,10 +2,12 @@ import type { CSSProperties } from "react";
 import React, { useCallback } from "react";
 import type { EdgeProps } from "@xyflow/react";
 import { BaseEdge, EdgeLabelRenderer, useReactFlow } from "@xyflow/react";
+import { useTheme } from "@/contexts/useTheme";
 import {
   DEFAULT_FACTORY_EDGE_STROKE,
   LONG_EDGE_PATH_LENGTH,
   TOUCHING_EDGE_STROKE,
+  TOUCHING_EDGE_STROKE_DARK,
   estimatePathLength,
   getCanvasEdgePath,
   getFlowArrowPoints,
@@ -142,9 +144,17 @@ function readCustomEdgeData(data: EdgeProps["data"]) {
   };
 }
 
-function resolveEdgeLineStroke(contrastStroke: boolean, styleStroke: CSSProperties["stroke"]): string {
+function resolveTouchingEdgeStroke(isDark: boolean): string {
+  return isDark ? TOUCHING_EDGE_STROKE_DARK : TOUCHING_EDGE_STROKE;
+}
+
+function resolveEdgeLineStroke(
+  contrastStroke: boolean,
+  styleStroke: CSSProperties["stroke"],
+  isDark: boolean,
+): string {
   if (contrastStroke) {
-    return TOUCHING_EDGE_STROKE;
+    return resolveTouchingEdgeStroke(isDark);
   }
   if (typeof styleStroke === "string") {
     return styleStroke;
@@ -178,6 +188,8 @@ export const CustomEdge = React.memo(function CustomEdge({
   data,
 }: EdgeProps) {
   const { setEdges } = useReactFlow();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
   const { isHovered, canDelete, onDeleteEdge, channelLabel, touchesOtherEdge, contrastStroke, routeGutterX } =
     readCustomEdgeData(data);
 
@@ -220,7 +232,8 @@ export const CustomEdge = React.memo(function CustomEdge({
     [handleEdgeDelete],
   );
 
-  const lineStroke = resolveEdgeLineStroke(contrastStroke, style.stroke);
+  const lineStroke = resolveEdgeLineStroke(contrastStroke, style.stroke, isDark);
+  const touchingStroke = resolveTouchingEdgeStroke(isDark);
 
   return (
     <>
@@ -235,7 +248,7 @@ export const CustomEdge = React.memo(function CustomEdge({
               transform: `translate(-50%, -50%) translate(${channelLabelX}px,${channelLabelY}px)`,
               pointerEvents: "none",
               zIndex: 1000,
-              ...(contrastStroke ? { borderColor: TOUCHING_EDGE_STROKE, color: TOUCHING_EDGE_STROKE } : {}),
+              ...(contrastStroke ? { borderColor: touchingStroke, color: touchingStroke } : {}),
             }}
             className="nodrag nopan rounded-md border border-border bg-card px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm"
           >

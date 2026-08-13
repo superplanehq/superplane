@@ -39,6 +39,8 @@ export type EnrichedCanvasNodeCacheEntry = {
   hasHighlightedNodes: boolean;
   runParticipantKey: string;
   flowDirection: ReturnType<typeof resolveCanvasFlowDirection>;
+  /** Ephemeral leaf layout active when this entry was built. */
+  factoryLeafLayoutActive: boolean;
 };
 
 export function canReuseEnrichedNodeData({
@@ -51,6 +53,7 @@ export function canReuseEnrichedNodeData({
   hasHighlightedNodes,
   runParticipantKey,
   flowDirection,
+  factoryLeafLayoutActive,
 }: {
   cachedNode: EnrichedCanvasNodeCacheEntry | undefined;
   node: ReactFlowNode;
@@ -61,6 +64,7 @@ export function canReuseEnrichedNodeData({
   hasHighlightedNodes: boolean;
   runParticipantKey: string;
   flowDirection: ReturnType<typeof resolveCanvasFlowDirection>;
+  factoryLeafLayoutActive: boolean;
 }) {
   return (
     cachedNode &&
@@ -71,7 +75,8 @@ export function canReuseEnrichedNodeData({
     cachedNode.isHighlighted === isHighlighted &&
     cachedNode.hasHighlightedNodes === hasHighlightedNodes &&
     cachedNode.runParticipantKey === runParticipantKey &&
-    cachedNode.flowDirection === flowDirection
+    cachedNode.flowDirection === flowDirection &&
+    cachedNode.factoryLeafLayoutActive === factoryLeafLayoutActive
   );
 }
 
@@ -184,6 +189,7 @@ export function enrichOneCanvasNode(args: {
   factoryRunLeafLayout: FactoryRunLeafLayoutResult | null | undefined;
 }): ReactFlowNode {
   const { node, cache } = args;
+  const factoryLeafLayoutActive = Boolean(args.factoryRunLeafLayout);
   const cachedNode = cache.get(node.id);
   const canReuseData = Boolean(
     canReuseEnrichedNodeData({
@@ -196,13 +202,14 @@ export function enrichOneCanvasNode(args: {
       hasHighlightedNodes: args.hasHighlightedNodes,
       runParticipantKey: args.runParticipantKey,
       flowDirection: args.flowDirection,
+      factoryLeafLayoutActive,
     }),
   );
 
   const layoutFlags = resolveFactoryLayoutFlags(args.factoryRunLeafLayout, node.id);
 
-  // Skip full reuse when run leaf layout overlays positions / side handles.
-  if (canReuseData && cachedNode && cachedNode.sourceNode === node && !args.factoryRunLeafLayout) {
+  // Full node reuse only when leaf layout is off (no overlay positions / side handles).
+  if (canReuseData && cachedNode && cachedNode.sourceNode === node && !factoryLeafLayoutActive) {
     return cachedNode.node;
   }
 
@@ -244,6 +251,7 @@ export function enrichOneCanvasNode(args: {
     hasHighlightedNodes: args.hasHighlightedNodes,
     runParticipantKey: args.runParticipantKey,
     flowDirection: args.flowDirection,
+    factoryLeafLayoutActive,
   });
 
   return enrichedNode;
