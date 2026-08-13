@@ -1,12 +1,23 @@
 import type { FactoryApp } from "@/api-client";
 import { Link } from "@/components/Link/link";
+import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Plus, Workflow } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdownMenu";
+import { ArrowLeft, Copy, MoreHorizontal, Pencil, Plus, Trash2, Workflow } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router";
 import {
   listFactoryAutomationRuns,
@@ -15,21 +26,20 @@ import {
   type FactoryAutomationRunCard,
   type FactoryAutomationTick,
 } from "../lib/factoryAutomationStatus";
-import {
-  automationDetailPath,
-  automationsPath,
-  factoryAppConfigurePath,
-  factoryAppRunPath,
-} from "../lib/factoryPagePaths";
+import { automationDetailPath, automationsPath, factoryAppRunPath } from "../lib/factoryPagePaths";
+import { type AutomationCardActions } from "./automationCardActions";
+import { LineVelocityPanel } from "./LineVelocityPanel";
 
 export function AutomationDetail({
   organizationId,
   factoryId,
   app,
+  actions,
 }: {
   organizationId: string;
   factoryId: string;
   app: FactoryApp;
+  actions: AutomationCardActions;
 }) {
   const canvasId = app.id ?? "";
   const {
@@ -42,9 +52,6 @@ export function AutomationDetail({
   const canvasRuns = useMemo(() => runsPages?.pages.flatMap((page) => page?.runs ?? []) ?? [], [runsPages]);
   const status = resolveFactoryAutomationStatusFromCanvasRuns(canvasRuns);
   const runs = useMemo(() => listFactoryAutomationRuns(canvasRuns), [canvasRuns]);
-  const configureHref = canvasId
-    ? factoryAppConfigurePath(organizationId, factoryId, canvasId, { from: "automations" })
-    : "#";
 
   const runsScrollRef = useRef<HTMLUListElement>(null);
   const loadMoreRuns = useCallback(() => {
@@ -75,52 +82,60 @@ export function AutomationDetail({
       </Link>
 
       <div className="shrink-0">
-        <AutomationCard app={app} tick={status.tick} statusLabel={status.label} emphasized />
+        <AutomationCard app={app} tick={status.tick} statusLabel={status.label} emphasized actions={actions} />
       </div>
 
-      <section
-        className="mt-6 flex min-h-[12rem] min-w-0 max-h-[calc(100dvh-16rem)] flex-1 flex-col overflow-hidden rounded-lg border border-border bg-background"
-        aria-label="Runs"
-      >
-        <div className="flex h-9 shrink-0 items-center justify-between gap-2 border-b border-border px-3">
-          <h2 className="truncate text-[12px] font-medium tracking-[-0.01em] text-foreground">Runs</h2>
-          <Link
-            href={configureHref}
-            className="cursor-pointer text-[13px] text-muted-foreground transition-colors hover:text-foreground"
-            data-testid="automations-configure"
+      <Tabs defaultValue="runs" className="mt-6 flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+        <TabsList>
+          <TabsTrigger value="runs" data-testid="automations-tab-runs">
+            Runs
+          </TabsTrigger>
+          <TabsTrigger value="velocity" data-testid="automations-tab-velocity">
+            Velocity
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="runs" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col outline-none">
+          <ul
+            ref={runsScrollRef}
+            className="flex min-h-[12rem] min-w-0 max-h-[calc(100dvh-16rem)] flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-0.5 [scrollbar-width:thin]"
+            onScroll={(event) => loadMoreRunsIfNeeded(event.currentTarget)}
+            data-testid="automations-runs-scroll"
           >
-            Configure
-          </Link>
-        </div>
-        <ul
-          ref={runsScrollRef}
-          className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-2 [scrollbar-width:thin]"
-          onScroll={(event) => loadMoreRunsIfNeeded(event.currentTarget)}
-          data-testid="automations-runs-scroll"
+            {runsLoading && runs.length === 0 ? (
+              <li className="px-2 py-4 text-[12px] text-muted-foreground">Loading runs…</li>
+            ) : runs.length === 0 ? (
+              <li className="px-2 py-4 text-[12px] text-muted-foreground">No runs</li>
+            ) : (
+              <>
+                {runs.map((run) => (
+                  <li key={run.runId}>
+                    <AutomationRunRow
+                      organizationId={organizationId}
+                      factoryId={factoryId}
+                      appId={canvasId}
+                      run={run}
+                    />
+                  </li>
+                ))}
+                {isFetchingNextPage ? (
+                  <li className="py-2 text-center text-[12px] text-muted-foreground">Loading more…</li>
+                ) : null}
+              </>
+            )}
+          </ul>
+        </TabsContent>
+        <TabsContent
+          value="velocity"
+          className="mt-0 min-h-0 max-h-[calc(100dvh-16rem)] flex-1 overflow-y-auto outline-none [scrollbar-width:thin]"
         >
-          {runsLoading && runs.length === 0 ? (
-            <li className="px-2 py-4 text-[12px] text-muted-foreground">Loading runs…</li>
-          ) : runs.length === 0 ? (
-            <li className="px-2 py-4 text-[12px] text-muted-foreground">No runs</li>
-          ) : (
-            <>
-              {runs.map((run) => (
-                <li key={run.runId}>
-                  <AutomationRunCard organizationId={organizationId} factoryId={factoryId} appId={canvasId} run={run} />
-                </li>
-              ))}
-              {isFetchingNextPage ? (
-                <li className="px-2 py-2 text-center text-[12px] text-muted-foreground">Loading more…</li>
-              ) : null}
-            </>
-          )}
-        </ul>
-      </section>
+          <LineVelocityPanel intro="Run throughput for this automation." />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
 
-function AutomationRunCard({
+function AutomationRunRow({
   organizationId,
   factoryId,
   appId,
@@ -142,7 +157,7 @@ function AutomationRunCard({
       className="block w-full rounded-md border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-foreground/25 hover:bg-accent/40"
       data-testid={`automations-run-${run.runId}`}
     >
-      <div className="text-[13px] font-medium tracking-[-0.01em] text-foreground">{run.title}</div>
+      <div className="truncate text-[13px] font-medium tracking-[-0.01em] text-foreground">{run.title}</div>
       <div className="mt-1.5 flex items-center gap-1.5 text-[12px] text-muted-foreground">
         <StatusTick tick={run.tick} size="sm" />
         <span>
@@ -160,16 +175,20 @@ export function AutomationCard({
   tick,
   statusLabel,
   emphasized,
+  actions,
 }: {
   app: FactoryApp;
   href?: string;
   tick: FactoryAutomationTick;
   statusLabel: string;
   emphasized?: boolean;
+  actions?: AutomationCardActions;
 }) {
   const navigate = useNavigate();
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const description = app.description?.trim() || "Factory automation canvas.";
   const interactive = Boolean(href);
+  const automationName = app.name?.trim() || "Unnamed automation";
 
   return (
     <div
@@ -197,18 +216,178 @@ export function AutomationCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Workflow className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden />
-            <span className="text-[13px] font-medium tracking-[-0.01em] text-foreground">
-              {app.name?.trim() || "Unnamed automation"}
-            </span>
+            <span className="text-[13px] font-medium tracking-[-0.01em] text-foreground">{automationName}</span>
           </div>
           <p className="mt-1 text-[12px] leading-snug text-muted-foreground">{description}</p>
         </div>
+        {actions ? (
+          <AutomationCardMenu
+            name={automationName}
+            actions={actions}
+            hoverReveal={!emphasized}
+            onRequestDelete={() => setDeleteOpen(true)}
+          />
+        ) : null}
       </div>
       <div className="mt-3.5 flex items-center gap-1.5">
         <StatusTick tick={tick} />
         <span className="text-[12px] leading-tight text-muted-foreground">{statusLabel}</span>
       </div>
+      {actions ? (
+        <DeleteAutomationDialog
+          open={deleteOpen}
+          name={automationName}
+          canDelete={actions.canDelete}
+          isDeleting={Boolean(actions.isDeleting)}
+          onClose={() => setDeleteOpen(false)}
+          onConfirm={actions.onDelete}
+        />
+      ) : null}
     </div>
+  );
+}
+
+const overflowMenuContentClassName = "min-w-[12rem] rounded-xl border-border p-1 shadow-lg";
+const overflowMenuItemClassName = "cursor-pointer rounded-md px-2 py-1.5 text-[13px] [&_svg]:size-3.5";
+const overflowMenuDestructiveItemClassName =
+  "text-destructive focus:bg-destructive/10 focus:text-destructive dark:focus:bg-destructive/15";
+
+function AutomationCardMenu({
+  name,
+  actions,
+  hoverReveal,
+  onRequestDelete,
+}: {
+  name: string;
+  actions: AutomationCardActions;
+  hoverReveal: boolean;
+  onRequestDelete: () => void;
+}) {
+  const stopCardClick = (event: MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+  };
+
+  return (
+    <div className="shrink-0" onClick={stopCardClick}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={`${name} menu`}
+            className={cn(
+              "flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground",
+              hoverReveal &&
+                "opacity-0 group-hover/automation:opacity-100 group-focus-within/automation:opacity-100 data-[state=open]:opacity-100",
+            )}
+            disabled={actions.isDuplicating || actions.isDeleting}
+            data-testid="automations-card-menu"
+          >
+            <MoreHorizontal className="size-3.5" aria-hidden />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" sideOffset={6} className={overflowMenuContentClassName}>
+          <PermissionTooltip allowed={actions.canEdit} message="You don't have permission to edit this automation.">
+            <DropdownMenuItem
+              className={overflowMenuItemClassName}
+              onClick={actions.onEdit}
+              disabled={!actions.canEdit}
+              data-testid="automations-card-edit"
+            >
+              <Pencil aria-hidden />
+              Edit
+            </DropdownMenuItem>
+          </PermissionTooltip>
+          <PermissionTooltip
+            allowed={actions.canDuplicate}
+            message="You don't have permission to duplicate this automation."
+          >
+            <DropdownMenuItem
+              className={overflowMenuItemClassName}
+              onClick={() => {
+                void actions.onDuplicate();
+              }}
+              disabled={!actions.canDuplicate || actions.isDuplicating}
+              data-testid="automations-card-duplicate"
+            >
+              <Copy aria-hidden />
+              Duplicate
+            </DropdownMenuItem>
+          </PermissionTooltip>
+          <DropdownMenuSeparator />
+          <PermissionTooltip allowed={actions.canDelete} message="You don't have permission to delete this automation.">
+            <DropdownMenuItem
+              className={cn(overflowMenuItemClassName, overflowMenuDestructiveItemClassName)}
+              onClick={onRequestDelete}
+              disabled={!actions.canDelete || actions.isDeleting}
+              data-testid="automations-card-delete"
+            >
+              <Trash2 aria-hidden />
+              Delete
+            </DropdownMenuItem>
+          </PermissionTooltip>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+function DeleteAutomationDialog({
+  open,
+  name,
+  canDelete,
+  isDeleting,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  name: string;
+  canDelete: boolean;
+  isDeleting: boolean;
+  onClose: () => void;
+  onConfirm: () => void | Promise<void>;
+}) {
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && !isDeleting) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent showCloseButton={false} className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Delete "{name}"?</DialogTitle>
+        </DialogHeader>
+        <p className="text-[13px] text-muted-foreground">This cannot be undone.</p>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isDeleting}>
+            Cancel
+          </Button>
+          <LoadingButton
+            type="button"
+            variant="destructive"
+            onClick={() => {
+              void (async () => {
+                try {
+                  await onConfirm();
+                  onClose();
+                } catch {
+                  // Toast is handled by the caller; keep the dialog open for retry.
+                }
+              })();
+            }}
+            disabled={!canDelete}
+            loading={isDeleting}
+            loadingText="Deleting..."
+            data-testid="automations-delete-confirm"
+          >
+            <Trash2 className="h-3.5 w-3.5" aria-hidden />
+            Delete
+          </LoadingButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -254,11 +433,13 @@ export function AutomationsPageList({
   factoryId,
   apps,
   workOrders,
+  actionsForApp,
 }: {
   organizationId: string;
   factoryId: string;
   apps: FactoryApp[];
   workOrders: Parameters<typeof resolveFactoryAutomationStatus>[1];
+  actionsForApp: (app: FactoryApp) => AutomationCardActions;
 }) {
   return (
     <ul className="flex flex-col gap-2" data-testid="automations-list">
@@ -274,6 +455,7 @@ export function AutomationsPageList({
               href={automationDetailPath(organizationId, factoryId, app.id)}
               tick={status.tick}
               statusLabel={status.label}
+              actions={actionsForApp(app)}
             />
           </li>
         );

@@ -668,6 +668,7 @@ func setupFactoryWithUser(t *testing.T, prefix string) (org *Organization, userI
 		organization.ID,
 		fmt.Sprintf("factory-%s-%d", prefix, nonce),
 		"",
+		"",
 	)
 	require.NoError(t, err)
 

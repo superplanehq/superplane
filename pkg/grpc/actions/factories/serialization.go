@@ -12,6 +12,7 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 		Id:          factory.ID.String(),
 		Name:        factory.Name,
 		Description: factory.Description,
+		Key:         factory.Key,
 	}
 }
 
@@ -23,6 +24,7 @@ func serializeFactoryWithLines(
 		Id:          factory.ID.String(),
 		Name:        factory.Name,
 		Description: factory.Description,
+		Key:         factory.Key,
 		Lines:       serializeFactoryLines(lines),
 	}
 }
@@ -85,6 +87,7 @@ func serializeFactories(factories []models.Factory) []*pb.Factory {
 }
 
 func serializeWorkOrder(
+	f *models.Factory,
 	order *models.FactoryWorkOrder,
 	executions []models.FactoryWorkOrderExecutionRecord,
 	createdByAutomation *factory.AutomationRef,
@@ -97,10 +100,17 @@ func serializeWorkOrder(
 		totalCostCents += e.CostCents
 	}
 
+	displayKey := ""
+	if f != nil {
+		displayKey = f.WorkOrderKey(order.Number)
+	}
+
 	return &pb.WorkOrder{
 		Id:             order.ID.String(),
 		Title:          order.Title,
 		Description:    order.Description,
+		Number:         order.Number,
+		Key:            displayKey,
 		State:          serializeWorkOrderState(order.State),
 		Result:         serializeWorkOrderResult(order.Result),
 		CreatedAt:      timestamppb.New(order.CreatedAt),

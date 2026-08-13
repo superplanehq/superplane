@@ -133,11 +133,7 @@ function DispatchStepRow({
         ))}
       </div>
       {step.comments?.map((comment, index) => (
-        <StepDetail
-          key={`${comment.label ?? "comment"}-${index}`}
-          label={comment.label ?? "Comment"}
-          body={comment.body}
-        />
+        <StepDetail key={`comment-${index}`} body={comment.body} />
       ))}
     </li>
   );
@@ -157,12 +153,8 @@ function StepName({ name, runHref }: { name: string; runHref: string | null }) {
   );
 }
 
-function StepDetail({ label, body }: { label: string; body: string }) {
-  return (
-    <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-      <span className="font-medium text-foreground/80">{label}</span>: {body}
-    </p>
-  );
+function StepDetail({ body }: { body: string }) {
+  return <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{body}</p>;
 }
 
 interface ExecutionStatus {
