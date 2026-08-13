@@ -16,7 +16,7 @@ import {
 import { AutomationsPage } from "./AutomationsPage";
 
 /**
- * Automations page: v3-style card list + detail (automation card + Runs board).
+ * Automations page: v3-style card list + detail (automation card + Runs / Velocity tabs).
  */
 const meta = {
   title: "Factories/Pages/Automations",
