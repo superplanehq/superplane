@@ -19,7 +19,7 @@ func TestSerializeWorkOrderCreator_UserBranch(t *testing.T) {
 		CreatedBy:   &models.User{Name: "Alice"},
 	}
 
-	creator := serializeWorkOrder(order, nil, nil).GetCreatedBy()
+	creator := serializeWorkOrder(nil, order, nil, nil).GetCreatedBy()
 	require.NotNil(t, creator)
 	assert.Nil(t, creator.GetAutomation())
 	require.NotNil(t, creator.GetUser())
@@ -42,7 +42,7 @@ func TestSerializeWorkOrderCreator_AutomationBranchWinsOverUser(t *testing.T) {
 		AppName:  "Release automation",
 	}
 
-	creator := serializeWorkOrder(order, nil, automation).GetCreatedBy()
+	creator := serializeWorkOrder(nil, order, nil, automation).GetCreatedBy()
 	require.NotNil(t, creator)
 	assert.Nil(t, creator.GetUser())
 	require.NotNil(t, creator.GetAutomation())
@@ -53,7 +53,7 @@ func TestSerializeWorkOrderCreator_AutomationBranchWinsOverUser(t *testing.T) {
 
 func TestSerializeWorkOrderCreator_NoneReturnsNil(t *testing.T) {
 	order := &models.FactoryWorkOrder{ID: uuid.New()}
-	assert.Nil(t, serializeWorkOrder(order, nil, nil).GetCreatedBy())
+	assert.Nil(t, serializeWorkOrder(nil, order, nil, nil).GetCreatedBy())
 }
 
 func TestSerializeExecutionSteps_SnapshotsLineSteps(t *testing.T) {

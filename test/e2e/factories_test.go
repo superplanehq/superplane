@@ -63,7 +63,7 @@ func (s *factorySteps) start() {
 }
 
 func (s *factorySteps) givenFactoryExists(name, description string) *models.Factory {
-	factory, err := models.CreateFactory(database.DB(s.t.Context()), s.session.OrgID, name, description)
+	factory, err := models.CreateFactory(database.DB(s.t.Context()), s.session.OrgID, name, description, "")
 	require.NoError(s.t, err)
 	return factory
 }

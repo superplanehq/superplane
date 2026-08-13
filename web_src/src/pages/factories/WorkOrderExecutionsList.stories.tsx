@@ -11,8 +11,8 @@ import { WorkOrderExecutionsList } from "./WorkOrderExecutionsList";
 
 /**
  * List of line-run steps with status icons and run links. Three visual
- * variants: `default` (grouped card), `compact` (inline group used in
- * `WorkOrderCard`), and `inline` (single flat list).
+ * variants: `default` (grouped card), `compact` (inline group), and
+ * `inline` (single flat list).
  */
 const meta = {
   title: "Factories/Components/WorkOrderExecutionsList",
