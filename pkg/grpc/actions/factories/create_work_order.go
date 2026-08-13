@@ -65,7 +65,7 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
 	}
 
-	serialized, err := loadAndSerializeWorkOrder(ctx, order)
+	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
