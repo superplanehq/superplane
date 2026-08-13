@@ -5,6 +5,7 @@ import {
   extractArtifactName,
   extractArtifactTitle,
   extractArtifactUrl,
+  extractPrArtifactState,
   formatPrArtifactLabel,
 } from "./workOrderArtifact";
 
@@ -87,5 +88,26 @@ describe("extractArtifactName", () => {
     expect(extractArtifactName({})).toBeUndefined();
     expect(extractArtifactName({ name: "" })).toBeUndefined();
     expect(extractArtifactName({ name: "  " })).toBeUndefined();
+  });
+});
+
+describe("extractPrArtifactState", () => {
+  it("returns each known state as-is", () => {
+    expect(extractPrArtifactState({ state: "open" })).toBe("open");
+    expect(extractPrArtifactState({ state: "draft" })).toBe("draft");
+    expect(extractPrArtifactState({ state: "closed" })).toBe("closed");
+    expect(extractPrArtifactState({ state: "merged" })).toBe("merged");
+  });
+
+  it("normalizes case", () => {
+    expect(extractPrArtifactState({ state: "MERGED" })).toBe("merged");
+    expect(extractPrArtifactState({ state: "Draft" })).toBe("draft");
+  });
+
+  it("returns undefined for missing, blank, or unrecognized values (back-compat default)", () => {
+    expect(extractPrArtifactState(undefined)).toBeUndefined();
+    expect(extractPrArtifactState({})).toBeUndefined();
+    expect(extractPrArtifactState({ state: "" })).toBeUndefined();
+    expect(extractPrArtifactState({ state: "in_review" })).toBeUndefined();
   });
 });
