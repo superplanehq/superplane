@@ -172,7 +172,8 @@ describe("WorkOrderDescriptionEditor", () => {
     await user.click(input);
     await user.keyboard(" extra");
 
-    expect(input).toHaveTextContent(initial);
+    expect(input.textContent).toContain(initial);
+    expect(input.textContent).not.toContain("extra");
     expect(onChange).not.toHaveBeenCalled();
   });
 });

@@ -40,6 +40,7 @@ describe("CreateWorkOrderPropertyPills", () => {
       within(panel).getByText((_, element) => element?.tagName === "SPAN" && element.textContent === "Alex Reviewer"),
     ).toBeInTheDocument();
     expect(screen.getByTestId("work-order-save-assignees")).toBeInTheDocument();
+    expect(screen.getByTestId("work-order-assignees-button")).toHaveAttribute("aria-expanded", "true");
   });
 
   it("shows the line picker inside the dialog when Line is clicked", async () => {

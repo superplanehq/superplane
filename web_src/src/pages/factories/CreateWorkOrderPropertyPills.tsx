@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Layers, User } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
 
 import { OrgUserReference } from "./OrgUserReference";
 import { WorkOrderAssigneePicker } from "./WorkOrderAssigneePicker";
@@ -207,12 +207,14 @@ function PropertyPill({
   disabled,
   testId,
   onClick,
+  className,
+  ...triggerProps
 }: {
   children: ReactNode;
   disabled?: boolean;
   testId?: string;
   onClick?: () => void;
-}) {
+} & Omit<ComponentProps<typeof Button>, "children" | "disabled" | "onClick" | "type" | "variant">) {
   return (
     <Button
       type="button"
@@ -220,7 +222,8 @@ function PropertyPill({
       disabled={disabled}
       data-testid={testId}
       onClick={onClick}
-      className="h-7 gap-1.5 rounded-md px-2 text-[12px] font-normal text-muted-foreground"
+      className={cn("h-7 gap-1.5 rounded-md px-2 text-[12px] font-normal text-muted-foreground", className)}
+      {...triggerProps}
     >
       {children}
     </Button>
