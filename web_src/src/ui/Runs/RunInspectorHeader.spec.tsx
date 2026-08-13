@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvasRun } from "@/api-client";
 import { RunInspectorHeader } from "./RunInspectorHeader";
 
@@ -12,7 +12,7 @@ const baseRun: CanvasesCanvasRun = {
   createdAt: "2026-05-01T12:00:00Z",
 };
 
-function renderHeader(run: CanvasesCanvasRun) {
+function renderHeader(run: CanvasesCanvasRun, onAskAgentAboutEvent?: () => void) {
   return render(
     <MemoryRouter initialEntries={["/org-1/apps/child-canvas-id?run=child-run-id"]}>
       <RunInspectorHeader
@@ -23,6 +23,7 @@ function renderHeader(run: CanvasesCanvasRun) {
         actionPending={false}
         actionDisabled={false}
         onAction={() => {}}
+        onAskAgentAboutEvent={onAskAgentAboutEvent}
       />
     </MemoryRouter>,
   );
@@ -47,6 +48,30 @@ describe("RunInspectorHeader", () => {
     renderHeader(baseRun);
 
     expect(screen.queryByRole("link", { name: "See parent" })).not.toBeInTheDocument();
+  });
+
+  it("shows and invokes the agent event action when a root event is present", () => {
+    const onAskAgentAboutEvent = vi.fn();
+
+    renderHeader(
+      {
+        ...baseRun,
+        rootEvent: { id: "root-event-id" },
+      },
+      onAskAgentAboutEvent,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Ask agent about this event" }));
+
+    expect(onAskAgentAboutEvent).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Rerun" })).toBeInTheDocument();
+  });
+
+  it("hides the agent event action when the run has no root event", () => {
+    renderHeader(baseRun, vi.fn());
+
+    expect(screen.queryByRole("button", { name: "Ask agent about this event" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rerun" })).toBeInTheDocument();
   });
 
   it("shows a disabled cancelling action while the run is stopping", () => {

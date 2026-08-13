@@ -1,4 +1,4 @@
-import { CornerLeftUp, Loader2 } from "lucide-react";
+import { CornerLeftUp, Loader2, MessageCircle } from "lucide-react";
 import { Link, useParams } from "react-router";
 import type { CanvasesCanvasRun } from "@/api-client";
 import { Timestamp } from "@/components/Timestamp";
@@ -56,6 +56,7 @@ export function RunInspectorHeader({
   actionPending,
   actionDisabled,
   onAction,
+  onAskAgentAboutEvent,
   /** Nested inside a node accordion (factory): drop sticky page chrome styles. */
   embedded = false,
 }: {
@@ -66,6 +67,7 @@ export function RunInspectorHeader({
   actionPending: boolean;
   actionDisabled: boolean;
   onAction: () => void;
+  onAskAgentAboutEvent?: () => void;
   embedded?: boolean;
 }) {
   const { organizationId: routeOrganizationId } = useParams<{ organizationId: string }>();
@@ -77,6 +79,7 @@ export function RunInspectorHeader({
   const actionLabel = getActionLabel(status);
   const actionTooltip = getActionTooltip(status);
   const isStopAction = status === "running";
+  const canAskAgentAboutEvent = !!run.rootEvent?.id && !!onAskAgentAboutEvent;
 
   return (
     <div className={headerChromeClassName(embedded)}>
@@ -114,27 +117,49 @@ export function RunInspectorHeader({
               {stepCount} {stepCount === 1 ? "step" : "steps"}
             </span>
           </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="inline-flex">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  disabled={actionDisabled || actionPending}
-                  onClick={onAction}
-                  className={cn(
-                    isStopAction &&
-                      "border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/50 dark:hover:text-red-200",
-                  )}
-                >
-                  {actionPending ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : null}
-                  {actionPending ? `${actionLabel}...` : actionLabel}
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{actionTooltip}</TooltipContent>
-          </Tooltip>
+          <div className="flex shrink-0 items-center gap-1">
+            {canAskAgentAboutEvent ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    className="h-6 w-6 rounded-full p-0"
+                    aria-label="Ask agent about this event"
+                    onClick={onAskAgentAboutEvent}
+                  >
+                    <MessageCircle className="size-3.5" aria-hidden />
+                  </Button>
+                </TooltipTrigger>
+
+                <TooltipContent side="bottom">Ask agent about this event</TooltipContent>
+              </Tooltip>
+            ) : null}
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    disabled={actionDisabled || actionPending}
+                    onClick={onAction}
+                    className={cn(
+                      isStopAction &&
+                        "border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/50 dark:hover:text-red-200",
+                    )}
+                  >
+                    {actionPending ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : null}
+                    {actionPending ? `${actionLabel}...` : actionLabel}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+
+              <TooltipContent side="bottom">{actionTooltip}</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       </div>
     </div>

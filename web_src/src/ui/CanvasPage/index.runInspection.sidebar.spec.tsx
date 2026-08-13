@@ -5,10 +5,19 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 
-const { fitViewMock, getNodesMock, getViewportMock, reactFlowPropsRef, setViewportMock } = vi.hoisted(() => ({
+const {
+  fitViewMock,
+  getNodesMock,
+  getViewportMock,
+  openCanvasToolSidebarTabMock,
+  reactFlowPropsRef,
+  requestAgentComposerSendMock,
+  setViewportMock,
+} = vi.hoisted(() => ({
   fitViewMock: vi.fn().mockResolvedValue(true),
   getNodesMock: vi.fn<() => Array<{ id: string; position: { x: number; y: number } }>>(() => []),
   getViewportMock: vi.fn(() => ({ x: 0, y: 0, zoom: 1 })),
+  openCanvasToolSidebarTabMock: vi.fn(),
   reactFlowPropsRef: {
     current: null as null | {
       nodes?: unknown;
@@ -16,6 +25,7 @@ const { fitViewMock, getNodesMock, getViewportMock, reactFlowPropsRef, setViewpo
       onInit?: (instance: { setViewport: (viewport: { x: number; y: number; zoom: number }) => void }) => unknown;
     },
   },
+  requestAgentComposerSendMock: vi.fn(),
   setViewportMock: vi.fn(),
 }));
 
@@ -28,6 +38,14 @@ vi.mock("@/sentry", () => ({
       }),
     captureException: vi.fn(),
   },
+}));
+
+vi.mock("@/components/AgentSidebar/composerPrefill", () => ({
+  requestAgentComposerSend: requestAgentComposerSendMock,
+}));
+
+vi.mock("@/components/CanvasToolSidebar/events", () => ({
+  openCanvasToolSidebarTab: openCanvasToolSidebarTabMock,
 }));
 
 vi.mock("@xyflow/react", () => ({
@@ -83,10 +101,12 @@ vi.mock("../Runs/RunInspectorPanel", () => ({
   RunInspectorPanel: ({
     onClose,
     onEditNode,
+    onAskAgentAboutEvent,
     onRerunCreated,
   }: {
     onClose?: () => void;
     onEditNode?: (nodeId: string) => void;
+    onAskAgentAboutEvent?: () => void;
     onRerunCreated?: (eventId: string) => void;
   }) => (
     <div data-testid="run-inspector-panel">
@@ -94,6 +114,11 @@ vi.mock("../Runs/RunInspectorPanel", () => ({
       <button type="button" onClick={() => onEditNode?.("run-node-1")}>
         Edit runtime config
       </button>
+      {onAskAgentAboutEvent ? (
+        <button type="button" onClick={onAskAgentAboutEvent}>
+          Ask agent about this event
+        </button>
+      ) : null}
       <button type="button" onClick={() => onRerunCreated?.("rerun-event-1")}>
         Rerun
       </button>
@@ -107,12 +132,13 @@ vi.mock("@/components/CanvasToolSidebar", () => ({
 
 vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({
   useCanvasToolSidebarState: () => ({
-    canvasId: undefined,
-    organizationId: undefined,
+    canvasId: "canvas-1",
+    organizationId: "org-1",
     isEditing: false,
     readOnly: false,
     isToolSidebarOpen: false,
-    showToolSidebarToggle: false,
+    showToolSidebarToggle: true,
+    isAgentEnabled: true,
     handleToolSidebarToggle: vi.fn(),
     openToolSidebar: vi.fn(),
     closeToolSidebar: vi.fn(),
@@ -153,6 +179,8 @@ describe("CanvasPage run inspection sidebar", () => {
     getNodesMock.mockReturnValue([]);
     getViewportMock.mockReset();
     getViewportMock.mockReturnValue({ x: 0, y: 0, zoom: 1 });
+    openCanvasToolSidebarTabMock.mockClear();
+    requestAgentComposerSendMock.mockClear();
     setViewportMock.mockClear();
     globalThis.ResizeObserver = class {
       observe() {}
@@ -198,6 +226,45 @@ describe("CanvasPage run inspection sidebar", () => {
       expect(screen.getByTestId("run-inspector-panel")).toBeInTheDocument();
     });
     expect(screen.queryByTestId("live-node-detail-pane")).not.toBeInTheDocument();
+  });
+
+  it("queues the root event for the agent and opens the agent sidebar", async () => {
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          canvasId="canvas-1"
+          organizationId="org-1"
+          headerMode="version-live"
+          isRunInspectionMode
+          runNodeDetailNodeId="run-node-1"
+          runNodeDetailCanvasId="canvas-1"
+          runNodeDetailRun={{
+            id: "run-1",
+            rootEvent: {
+              id: "root-event-1",
+              nodeId: "trigger-node",
+              data: { secret: "do-not-send" },
+            },
+          }}
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Ask agent about this event" }));
+
+    expect(requestAgentComposerSendMock).toHaveBeenCalledWith(
+      "canvas-1",
+      expect.stringContaining('event ID "root-event-1"'),
+    );
+    const prompt = requestAgentComposerSendMock.mock.calls[0]?.[1] as string;
+    expect(prompt).not.toContain("do-not-send");
+    expect(openCanvasToolSidebarTabMock).toHaveBeenCalledWith("agent");
   });
 
   it("closes only the right run inspector when the inspector close button is clicked", async () => {

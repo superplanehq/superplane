@@ -39,6 +39,7 @@ export interface RunInspectorPanelProps {
   onSelectNode: (nodeId: string) => void;
   onClearSelectedNode?: () => void;
   onEditNode?: (nodeId: string) => void;
+  onAskAgentAboutEvent?: () => void;
   onRerunCreated?: (eventId: string) => void | Promise<void>;
   runNavigation?: { newerRunId?: string | null; olderRunId?: string | null; canNavigateOlder?: boolean } | null;
   onNavigateRun?: (runId: string) => void;
@@ -98,6 +99,7 @@ export function RunInspectorPanel(props: RunInspectorPanelProps) {
         model={model}
         componentIconMap={componentIconMap}
         onEditNode={onEditNode}
+        onAskAgentAboutEvent={props.onAskAgentAboutEvent}
       />
     </aside>
   );
@@ -114,6 +116,7 @@ function RunInspectorPanelBody({
   model,
   componentIconMap,
   onEditNode,
+  onAskAgentAboutEvent,
 }: {
   factoryContext: boolean;
   organizationId?: string;
@@ -121,6 +124,7 @@ function RunInspectorPanelBody({
   model: ReturnType<typeof useRunInspectorPanelModel>;
   componentIconMap: Record<string, string>;
   onEditNode?: (nodeId: string) => void;
+  onAskAgentAboutEvent?: () => void;
 }) {
   if (factoryContext) {
     return (
@@ -150,6 +154,7 @@ function RunInspectorPanelBody({
         onAction={() => (stopping ? model.actions.stop() : model.actions.rerun())}
         actionPending={stopping ? model.actions.stopPending : model.actions.rerunPending}
         actionDisabled={stopping ? model.actions.stopDisabled : !run.rootEvent?.id}
+        onAskAgentAboutEvent={onAskAgentAboutEvent}
       />
       <RunInspectorContent
         errorSummaries={model.errorSummaries}
