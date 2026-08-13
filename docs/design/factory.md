@@ -242,12 +242,15 @@ superplane factory artifacts add \
 
 For markdown, provide `--body` or `-f` / `--file` (file contents become `data.body`).
 
-Read-only work order commands (`orders`/`order`), for listing and inspecting
-work orders:
+Work order commands (`orders`/`order`), for creating, dispatching, assigning,
+listing, and inspecting work orders:
 
 ```bash
 superplane factory orders list [flags]
 superplane factory orders describe --order <uuid> [flags]
+superplane factory orders create --title <title> [flags]
+superplane factory orders dispatch --order <uuid> --line <line-name>
+superplane factory orders assign --order <uuid> --assignee <id-or-email> [flags]
 ```
 
 `orders list` flags:
@@ -297,11 +300,61 @@ superplane factory orders describe --factory shipping --order "$OID"
 in one call; the event timeline is capped at the API's max page size (200)
 and `eventsTruncated` is `true` when there are more.
 
+`orders create` creates a work order in `draft` state:
+
+- `--factory` — factory name or UUID (default: active factory).
+- `--title` — work order title (required).
+- `--description` — description text (inline). Mutually exclusive with
+  `--file`.
+- `-f`/`--file` — read the description from a file, or `-` for stdin.
+  Mutually exclusive with `--description`.
+- `--assignee` — assignee user UUID or email, repeatable. When omitted
+  entirely, the work order is assigned to the user running the command
+  (the API itself does not default assignees; the CLI does).
+
+```bash
+superplane factory orders create --title "Ship the feature" --description "..."
+
+superplane factory orders create \
+  --title "Ship the feature" \
+  -f ./description.md \
+  --assignee alice@example.com \
+  --assignee bob@example.com
+```
+
+`orders dispatch` dispatches a work order to a factory line, starting its
+execution. A `draft` work order moves to `open` on its first dispatch;
+dispatching fails if the line doesn't exist, has no steps, or the order
+already has an active execution:
+
+- `--factory` — factory name or UUID (default: active factory).
+- `--order` — work order UUID (`--order-id` is accepted as a deprecated
+  alias).
+- `--line` — target factory line's name (required).
+
+```bash
+superplane factory orders dispatch --order "$OID" --line build
+```
+
+`orders assign` **sets** a work order's assignee list — it replaces the
+existing assignees with exactly the ones given, rather than adding to them
+(there is no additive assign/unassign endpoint):
+
+- `--factory` — factory name or UUID (default: active factory).
+- `--order` — work order UUID (`--order-id` is accepted as a deprecated
+  alias).
+- `--assignee` — assignee user UUID or email, repeatable; at least one is
+  required (clearing all assignees is out of scope for this command).
+
+```bash
+superplane factory orders assign --order "$OID" --assignee alice@example.com --assignee bob@example.com
+```
+
 ## Not implemented yet
 
-- Broader CLI mutation commands (`superplane factory` create/dispatch/close/
-  comment/assign — currently CLI-side only `artifacts add` and the new
-  `orders list`/`orders describe` read commands exist).
+- `superplane factory orders close`/`comment` and other work order status
+  transitions (backend RPCs exist; CLI-side `create`/`dispatch`/`assign`
+  are implemented, these are not yet).
 - Work orders sourced from external systems or factory-app components.
 - Full PRD approval flow (gated approvals on `open → closed`).
 - Auto-close work order when a line finishes all steps.

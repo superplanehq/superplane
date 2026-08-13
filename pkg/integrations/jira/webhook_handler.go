@@ -10,10 +10,18 @@ import (
 	"github.com/superplanehq/superplane/pkg/retry"
 )
 
-// WebhookConfiguration tracks the union of native Jira event names the shared webhook must
-// deliver: Jira's dynamic webhook API accepts only one registered callback URL per OAuth
-// connection
+// webhookKindAlert marks a WebhookConfiguration as a dedicated JSM Ops alert webhook rather than
+// the shared Jira issue/comment webhook (the default, empty Kind) - the two use entirely
+// different Atlassian APIs and need different registration, dedup, and cleanup behavior.
+const webhookKindAlert = "alert"
+
+// WebhookConfiguration covers two unrelated registrations: an empty Kind tracks the union of
+// native Jira event names the shared issue/comment webhook must deliver (see allProjectsJQLFilter
+// and legacyIssueEvents), while Kind "alert" is a dedicated JSM Ops alert webhook scoped by
+// TeamID - CompareConfig decides which of the two gets deduped.
 type WebhookConfiguration struct {
+	Kind   string   `json:"kind,omitempty" mapstructure:"kind,omitempty"`
+	TeamID string   `json:"teamId,omitempty" mapstructure:"teamId,omitempty"`
 	Events []string `json:"events,omitempty" mapstructure:"events,omitempty"`
 }
 
@@ -21,13 +29,38 @@ type WebhookMetadata struct {
 	WebhookID *int64 `json:"webhookId,omitempty" mapstructure:"webhookId,omitempty"`
 }
 
+// AlertWebhookMetadata is the JSM Ops integration id for a dedicated jira.onAlert webhook.
+type AlertWebhookMetadata struct {
+	IntegrationID string `json:"integrationId,omitempty" mapstructure:"integrationId,omitempty"`
+}
+
+// allProjectsJQLFilter matches every issue in every project. An empty jqlFilter is rejected
+// outright by Atlassian ("Empty JQL search not supported") even though the key itself must be
+// present - this is the simplest clause confirmed (live, against a real site) to both be accepted
+// and match unconditionally, needed since this single registration is shared by every
+// jira.onIssue trigger on the integration regardless of project.
 const allProjectsJQLFilter = "project != EMPTY"
 
+// legacyIssueEvents is what every shared Jira webhook registered before WebhookConfiguration
+// tracked Events explicitly - an empty stored Events list means a row predates that change, not
+// that the webhook currently delivers nothing, since jira.onIssue was the only trigger able to
+// create it and always registered exactly these.
 var legacyIssueEvents = []string{issueEventCreated, issueEventUpdated, issueEventDeleted}
 
 type JiraWebhookHandler struct{}
 
 func (h *JiraWebhookHandler) CompareConfig(a, b any) (bool, error) {
+	configA, configB := WebhookConfiguration{}, WebhookConfiguration{}
+	_ = mapstructure.Decode(a, &configA)
+	_ = mapstructure.Decode(b, &configB)
+
+	// Alert webhooks are scoped by team, not shared like the issue/comment webhook - two configs
+	// only match if both are alert configs for the same team, so publishing an unchanged
+	// jira.onAlert trigger doesn't tear down and recreate its JSM Ops integration every time.
+	if configA.Kind == webhookKindAlert || configB.Kind == webhookKindAlert {
+		return configA.Kind == webhookKindAlert && configB.Kind == webhookKindAlert && configA.TeamID == configB.TeamID, nil
+	}
+
 	return true, nil
 }
 
@@ -65,6 +98,34 @@ func (h *JiraWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) 
 	config := WebhookConfiguration{}
 	_ = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config)
 
+	if config.Kind == webhookKindAlert {
+		return h.setupAlertWebhook(ctx, config)
+	}
+
+	return h.setupIssueWebhook(ctx, config)
+}
+
+func (h *JiraWebhookHandler) setupAlertWebhook(ctx core.WebhookHandlerContext, config WebhookConfiguration) (any, error) {
+	cloudID, err := cloudIDFromIntegration(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	name := fmt.Sprintf("SuperPlane (%s)", ctx.Webhook.GetID())
+	integration, err := client.CreateAlertWebhookIntegration(cloudID, name, ctx.Webhook.GetURL(), config.TeamID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create JSM Ops alert webhook: %w", err)
+	}
+
+	return &AlertWebhookMetadata{IntegrationID: integration.ID}, nil
+}
+
+func (h *JiraWebhookHandler) setupIssueWebhook(ctx core.WebhookHandlerContext, config WebhookConfiguration) (any, error) {
 	events := config.Events
 	if len(events) == 0 {
 		events = legacyIssueEvents
@@ -79,8 +140,8 @@ func (h *JiraWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) 
 	_ = mapstructure.Decode(ctx.Webhook.GetMetadata(), &previous)
 
 	// This single registration must cover every project and every trigger type sharing it
-	// (jira.onIssue, jira.onIssueComment) - each trigger filters to its own configured project
-	// and events itself, in HandleWebhook.
+	// (jira.onIssue, jira.onIssueComment, jira.onIncident) - each trigger filters to its own
+	// configured project and events itself, in HandleWebhook.
 	var webhookID int64
 	createWebhook := func() error {
 		var createErr error
@@ -135,6 +196,39 @@ func (h *JiraWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) 
 }
 
 func (h *JiraWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
+	config := WebhookConfiguration{}
+	_ = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config)
+
+	if config.Kind == webhookKindAlert {
+		return h.cleanupAlertWebhook(ctx)
+	}
+
+	return h.cleanupIssueWebhook(ctx)
+}
+
+func (h *JiraWebhookHandler) cleanupAlertWebhook(ctx core.WebhookHandlerContext) error {
+	metadata := AlertWebhookMetadata{}
+	if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode webhook metadata: %w", err)
+	}
+	if metadata.IntegrationID == "" {
+		return nil
+	}
+
+	cloudID, err := cloudIDFromIntegration(ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	return client.DeleteAlertWebhookIntegration(cloudID, metadata.IntegrationID)
+}
+
+func (h *JiraWebhookHandler) cleanupIssueWebhook(ctx core.WebhookHandlerContext) error {
 	metadata := WebhookMetadata{}
 	if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata); err != nil {
 		return fmt.Errorf("failed to decode webhook metadata: %w", err)
