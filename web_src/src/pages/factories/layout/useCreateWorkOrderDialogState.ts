@@ -18,7 +18,7 @@ export function useCreateWorkOrderDialogState(organizationId: string, factoryId:
 
   useEffect(() => {
     setCreateWorkOrderOpen(canCreate && isCreateWorkOrderRoute);
-  }, [canCreate, factoryId, isCreateWorkOrderRoute]);
+  }, [canCreate, factoryId, isCreateWorkOrderRoute, location.pathname]);
 
   const closeCreateWorkOrder = useCallback(() => {
     setCreateWorkOrderOpen(false);

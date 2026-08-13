@@ -1,9 +1,9 @@
 import { act, renderHook } from "@testing-library/react";
 import { type ReactNode } from "react";
-import { MemoryRouter, useLocation } from "react-router";
+import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { createWorkOrderPath, workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
+import { createWorkOrderPath, linesPath, workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
 import { useCreateWorkOrderDialogState } from "./useCreateWorkOrderDialogState";
 
 const ORGANIZATION_ID = "org-1";
@@ -17,8 +17,9 @@ function wrapper(path: string) {
 
 function useDialogState(canCreate: boolean) {
   const location = useLocation();
+  const navigate = useNavigate();
   const state = useCreateWorkOrderDialogState(ORGANIZATION_ID, FACTORY_ID, canCreate);
-  return { ...state, pathname: location.pathname };
+  return { ...state, pathname: location.pathname, navigate };
 }
 
 describe("useCreateWorkOrderDialogState", () => {
@@ -58,6 +59,24 @@ describe("useCreateWorkOrderDialogState", () => {
 
     act(() => {
       result.current.openCreateWorkOrder();
+    });
+
+    expect(result.current.createWorkOrderOpen).toBe(false);
+  });
+
+  it("closes an opened dialog when the path changes", () => {
+    const { result } = renderHook(() => useDialogState(true), {
+      wrapper: wrapper(workOrdersPath(ORGANIZATION_ID, FACTORY_ID)),
+    });
+
+    act(() => {
+      result.current.openCreateWorkOrder();
+    });
+
+    expect(result.current.createWorkOrderOpen).toBe(true);
+
+    act(() => {
+      result.current.navigate(linesPath(ORGANIZATION_ID, FACTORY_ID));
     });
 
     expect(result.current.createWorkOrderOpen).toBe(false);
