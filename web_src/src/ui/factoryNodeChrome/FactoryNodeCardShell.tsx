@@ -19,6 +19,7 @@ type FactoryNodeCardShellProps = {
   dimBodyBelowHeader?: boolean;
   isCompactView?: boolean;
   showStatusFooter?: boolean;
+  statusLabel?: string;
 };
 
 /** Monochrome logos (github / SuperPlane) need invert on dark card chrome. */
@@ -41,6 +42,7 @@ export function FactoryNodeCardShell({
   dimBodyBelowHeader = false,
   isCompactView,
   showStatusFooter = true,
+  statusLabel,
 }: FactoryNodeCardShellProps) {
   const Icon = React.useMemo(() => resolveIcon(iconSlug), [iconSlug]);
   const invertMonoIcon = shouldInvertMonoFactoryIcon(iconSrc);
@@ -49,15 +51,18 @@ export function FactoryNodeCardShell({
     <div
       data-testid={toTestId(`factory-node-${title}`)}
       className={cn(
-        "canvas-node-drag-handle cursor-pointer overflow-hidden rounded-2xl border border-border bg-card text-left shadow-[0_1px_2px_rgba(15,23,42,0.04),0_4px_12px_rgba(15,23,42,0.04)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.35)] w-[280px]",
-        getDraftDiffOutlineClassName(draftDiffStatus),
-        selected && "border-ring shadow-[0_0_0_3px_rgba(15,23,42,0.06)] dark:shadow-[0_0_0_3px_rgba(163,163,163,0.25)]",
+        // No border box — transparent border left a 1px canvas gap that read as white rim.
+        "canvas-node-drag-handle cursor-pointer overflow-hidden rounded-2xl border-0 bg-card text-left shadow-[0_1px_3px_rgba(15,23,42,0.06),0_2px_6px_rgba(15,23,42,0.04)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.28)] w-[280px]",
+        draftDiffStatus
+          ? getDraftDiffOutlineClassName(draftDiffStatus)
+          : "outline-1 outline-black/[0.04] dark:outline-white/[0.06]",
+        selected && "outline-ring/40 shadow-[0_0_0_2px_rgba(15,23,42,0.05)] dark:shadow-[0_0_0_2px_rgba(163,163,163,0.2)]",
         dimBodyBelowHeader && "opacity-70",
       )}
     >
       <div className="px-3.5 pt-3.5 pb-3 text-left">
         <div className="flex items-start justify-start gap-2.5">
-          <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
+          <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-black/[0.06] dark:border-white/[0.08] bg-muted">
             {iconSrc ? (
               <img
                 src={iconSrc}
@@ -78,7 +83,7 @@ export function FactoryNodeCardShell({
           </div>
         </div>
       </div>
-      {showStatusFooter ? <NodeStatusFooter status={status} metrics={metrics} /> : null}
+      {showStatusFooter ? <NodeStatusFooter status={status} metrics={metrics} label={statusLabel} /> : null}
     </div>
   );
 }

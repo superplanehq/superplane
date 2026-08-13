@@ -217,6 +217,18 @@ function whenAllowed<T>(allowed: boolean, value: T): T | undefined {
   return allowed ? value : undefined;
 }
 
+/** Factory apps keep nodes always expanded — omit collapse toggle. */
+function resolveFactoryAwareToggleView(
+  isReadOnly: boolean,
+  factoryOwnedApp: boolean,
+  handler: (nodeId: string) => void,
+): ((nodeId: string) => void) | undefined {
+  if (isReadOnly || factoryOwnedApp) {
+    return undefined;
+  }
+  return handler;
+}
+
 export type { FactoryConfigureActions } from "./useFactoryConfigureSession";
 
 export function AppPage({
@@ -4044,7 +4056,7 @@ export function AppPage({
           onToggleAutoLayoutOnUpdate={!isReadOnly ? handleToggleAutoLayoutOnUpdate : undefined}
           onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
           onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
-          onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
+          onToggleView={resolveFactoryAwareToggleView(isReadOnly, factoryOwnedApp, handleNodeCollapseChange)}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
           buildingBlocks={buildingBlocks}
           isEditing={isEditing}

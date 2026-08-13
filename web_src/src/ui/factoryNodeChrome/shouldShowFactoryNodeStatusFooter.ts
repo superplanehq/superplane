@@ -1,4 +1,4 @@
-/** Status footer is for run-scoped / live views only — not edit, compact, or factory topology Live. */
+/** Status footer for factory cards: live/run views, or edit with "No run". */
 export function shouldShowFactoryNodeStatusFooter({
   canvasMode,
   isCompactView,
@@ -9,8 +9,9 @@ export function shouldShowFactoryNodeStatusFooter({
   /** False on factory Live without a selected run (topology only). */
   showRuntimeStatus?: boolean;
 }): boolean {
-  if (!showRuntimeStatus) return false;
   if (isCompactView) return false;
-  if (canvasMode === "edit") return false;
+  // Edit always shows the neutral "No run" footer (even when runtime maps are empty).
+  if (canvasMode === "edit") return true;
+  if (!showRuntimeStatus) return false;
   return true;
 }
