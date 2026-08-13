@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Factory as FactoryIcon, Maximize2, Minimize2, XIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { useFactoriesLayout } from "./layout/factoriesLayoutContext";
 import { CreateWorkOrderPropertyPills } from "./CreateWorkOrderPropertyPills";
@@ -16,19 +16,28 @@ import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
 interface CreateWorkOrderDialogProps {
   open: boolean;
   onClose: () => void;
+  onCreated: (orderId: string) => void;
 }
 
-export function CreateWorkOrderDialog({ open, onClose }: CreateWorkOrderDialogProps) {
+export function CreateWorkOrderDialog({ open, onClose, onCreated }: CreateWorkOrderDialogProps) {
+  if (!open) {
+    return null;
+  }
+
+  return <CreateWorkOrderDialogSession onClose={onClose} onCreated={onCreated} />;
+}
+
+function CreateWorkOrderDialogSession({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (orderId: string) => void;
+}) {
   const { organizationId, factoryId, factory } = useFactoriesLayout();
-  const composer = useCreateWorkOrderComposer({ organizationId, factoryId, open, onClose });
+  const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });
   const lines = factory?.lines ?? [];
   const [isExpanded, setIsExpanded] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      setIsExpanded(false);
-    }
-  }, [open]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -44,7 +53,7 @@ export function CreateWorkOrderDialog({ open, onClose }: CreateWorkOrderDialogPr
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open onOpenChange={handleOpenChange}>
       <DialogContent
         showCloseButton={false}
         size="large"

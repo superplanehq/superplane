@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -34,8 +34,11 @@ describe("CreateWorkOrderPropertyPills", () => {
 
     await user.click(screen.getByTestId("work-order-assignees-button"));
 
-    expect(screen.getByTestId("work-order-assignee-picker-panel")).toBeInTheDocument();
-    expect(screen.getByText("Alex Reviewer")).toBeInTheDocument();
+    const panel = screen.getByTestId("work-order-assignee-picker-panel");
+    expect(panel).toBeInTheDocument();
+    expect(
+      within(panel).getByText((_, element) => element?.tagName === "SPAN" && element.textContent === "Alex Reviewer"),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("work-order-save-assignees")).toBeInTheDocument();
   });
 

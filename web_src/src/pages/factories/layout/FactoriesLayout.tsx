@@ -43,10 +43,8 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [createFactoryOpen, setCreateFactoryOpen] = useState(false);
-  const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder } = useCreateWorkOrderDialogState(
-    organizationId,
-    factoryId,
-  );
+  const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
+    useCreateWorkOrderDialogState(organizationId, factoryId, canAct("work_orders", "create"));
 
   const { data: factories = [] } = useFactories(organizationId);
   const { data: organization } = useOrganization(organizationId);
@@ -145,7 +143,13 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
         onClose={() => setCreateFactoryOpen(false)}
         onCreate={handleCreateFactory}
       />
-      <CreateWorkOrderDialog open={createWorkOrderOpen} onClose={closeCreateWorkOrder} />
+      {canAct("work_orders", "create") ? (
+        <CreateWorkOrderDialog
+          open={createWorkOrderOpen}
+          onClose={closeCreateWorkOrder}
+          onCreated={completeCreateWorkOrder}
+        />
+      ) : null}
     </FactoriesLayoutContext.Provider>
   );
 }

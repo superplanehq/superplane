@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { cn } from "@/lib/utils";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Layers, User } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { OrgUserReference } from "./OrgUserReference";
 import { WorkOrderAssigneePicker } from "./WorkOrderAssigneePicker";
@@ -33,7 +34,7 @@ export function CreateWorkOrderPropertyPills({
   const { resolveUser } = useOrgUserLookup(organizationId);
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [draftAssigneeIds, setDraftAssigneeIds] = useState(assigneeIds);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const [portalRoot, setPortalRoot] = useState<HTMLDivElement | null>(null);
   const hasLines = lines.length > 0;
 
   useEffect(() => {
@@ -42,33 +43,14 @@ export function CreateWorkOrderPropertyPills({
     }
   }, [assigneeIds, openPicker]);
 
-  useEffect(() => {
-    if (!openPicker) {
-      return;
-    }
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!(event.target instanceof Node)) {
-        return;
-      }
-      if (rootRef.current?.contains(event.target)) {
-        return;
-      }
-      setOpenPicker(null);
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [openPicker]);
-
-  const togglePicker = (picker: Exclude<OpenPicker, null>) => {
+  const handlePickerOpenChange = (picker: Exclude<OpenPicker, null>) => (nextOpen: boolean) => {
     if (isSaving) {
       return;
     }
-    setOpenPicker((current) => (current === picker ? null : picker));
+    setOpenPicker(nextOpen ? picker : null);
   };
 
-  const handleSaveAssignees = async () => {
+  const handleSaveAssignees = () => {
     onAssigneeChange(draftAssigneeIds);
     setOpenPicker(null);
   };
@@ -79,48 +61,52 @@ export function CreateWorkOrderPropertyPills({
   };
 
   return (
-    <div ref={rootRef} className="relative flex min-w-0 flex-wrap items-center gap-1.5">
-      <PropertyPill disabled={isSaving} testId="work-order-assignees-button" onClick={() => togglePicker("assignee")}>
-        {assigneeIds.length === 0 ? (
-          <>
-            <User className="size-3.5" aria-hidden />
-            Assignee
-          </>
-        ) : (
-          <AssigneePillBody assigneeIds={assigneeIds} resolveUser={resolveUser} />
-        )}
-      </PropertyPill>
+    <div ref={setPortalRoot} className="relative flex min-w-0 flex-wrap items-center gap-1.5">
+      <Popover modal={false} open={openPicker === "assignee"} onOpenChange={handlePickerOpenChange("assignee")}>
+        <PopoverTrigger asChild>
+          <PropertyPill disabled={isSaving} testId="work-order-assignees-button">
+            {assigneeIds.length === 0 ? (
+              <>
+                <User className="size-3.5" aria-hidden />
+                Assignee
+              </>
+            ) : (
+              <AssigneePillBody assigneeIds={assigneeIds} resolveUser={resolveUser} />
+            )}
+          </PropertyPill>
+        </PopoverTrigger>
+        <AssigneePickerPanel
+          organizationId={organizationId}
+          selectedIds={draftAssigneeIds}
+          isSaving={isSaving}
+          portalRoot={portalRoot}
+          onChange={setDraftAssigneeIds}
+          onSave={handleSaveAssignees}
+        />
+      </Popover>
 
       {hasLines ? (
-        <PropertyPill disabled={isSaving} testId="work-order-line-button" onClick={() => togglePicker("line")}>
-          <Layers className="size-3.5" aria-hidden />
-          {selectedLineName || "Line"}
-        </PropertyPill>
+        <Popover modal={false} open={openPicker === "line"} onOpenChange={handlePickerOpenChange("line")}>
+          <PopoverTrigger asChild>
+            <PropertyPill disabled={isSaving} testId="work-order-line-button">
+              <Layers className="size-3.5" aria-hidden />
+              {selectedLineName || "Line"}
+            </PropertyPill>
+          </PopoverTrigger>
+          <LinePickerPanel
+            lines={lines}
+            selectedLineName={selectedLineName}
+            isSaving={isSaving}
+            portalRoot={portalRoot}
+            onSelect={handleLineChange}
+          />
+        </Popover>
       ) : (
         <PropertyPill disabled testId="work-order-line-button">
           <Layers className="size-3.5" aria-hidden />
           Line required
         </PropertyPill>
       )}
-
-      {openPicker === "assignee" ? (
-        <AssigneePickerPanel
-          organizationId={organizationId}
-          selectedIds={draftAssigneeIds}
-          isSaving={isSaving}
-          onChange={setDraftAssigneeIds}
-          onSave={() => void handleSaveAssignees()}
-        />
-      ) : null}
-
-      {openPicker === "line" ? (
-        <LinePickerPanel
-          lines={lines}
-          selectedLineName={selectedLineName}
-          isSaving={isSaving}
-          onSelect={handleLineChange}
-        />
-      ) : null}
     </div>
   );
 }
@@ -129,18 +115,23 @@ function AssigneePickerPanel({
   organizationId,
   selectedIds,
   isSaving,
+  portalRoot,
   onChange,
   onSave,
 }: {
   organizationId: string;
   selectedIds: string[];
   isSaving: boolean;
+  portalRoot: HTMLElement | null;
   onChange: (ids: string[]) => void;
   onSave: () => void;
 }) {
   return (
-    <div
-      className="absolute bottom-full left-0 z-20 mb-2 w-72 rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-md"
+    <PopoverContent
+      align="start"
+      side="top"
+      container={portalRoot}
+      className="z-20 w-72 p-3"
       data-testid="work-order-assignee-picker-panel"
     >
       <WorkOrderAssigneePicker
@@ -161,7 +152,7 @@ function AssigneePickerPanel({
       >
         Save
       </LoadingButton>
-    </div>
+    </PopoverContent>
   );
 }
 
@@ -169,16 +160,21 @@ function LinePickerPanel({
   lines,
   selectedLineName,
   isSaving,
+  portalRoot,
   onSelect,
 }: {
   lines: FactoriesFactoryLine[];
   selectedLineName: string;
   isSaving: boolean;
+  portalRoot: HTMLElement | null;
   onSelect: (lineName: string) => void;
 }) {
   return (
-    <div
-      className="absolute bottom-full left-0 z-20 mb-2 w-72 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
+    <PopoverContent
+      align="start"
+      side="top"
+      container={portalRoot}
+      className="z-20 w-72 p-1"
       data-testid="work-order-line-picker-panel"
     >
       <p className="px-2 py-1.5 text-[11px] font-medium text-muted-foreground">Line</p>
@@ -202,7 +198,7 @@ function LinePickerPanel({
           </Button>
         );
       })}
-    </div>
+    </PopoverContent>
   );
 }
 

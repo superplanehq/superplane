@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { useEditorState, type Editor } from "@tiptap/react";
 import {
   Bold,
@@ -15,6 +16,8 @@ import {
   Underline,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
+
+import { hrefFromInput } from "./lib/workOrderDescriptionHref";
 
 type HeadingLevel = 1 | 2 | 3 | 4;
 
@@ -35,6 +38,7 @@ export function WorkOrderDescriptionFormatToolbar({ editor, disabled }: WorkOrde
   const [headingMenuOpen, setHeadingMenuOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkHref, setLinkHref] = useState("");
+  const [portalRoot, setPortalRoot] = useState<HTMLDivElement | null>(null);
   const format = useEditorState({
     editor,
     selector: ({ editor: current }) => ({
@@ -72,6 +76,7 @@ export function WorkOrderDescriptionFormatToolbar({ editor, disabled }: WorkOrde
 
   return (
     <div
+      ref={setPortalRoot}
       className="z-50 flex flex-col rounded-md border border-border bg-popover text-popover-foreground shadow-md"
       data-testid="work-order-description-toolbar"
     >
@@ -80,10 +85,13 @@ export function WorkOrderDescriptionFormatToolbar({ editor, disabled }: WorkOrde
         disabled={disabled}
         format={format}
         headingMenuOpen={headingMenuOpen}
+        headingMenuContainer={portalRoot}
         linkOpen={linkOpen}
-        onToggleHeadingMenu={() => {
-          setLinkOpen(false);
-          setHeadingMenuOpen((current) => !current);
+        onOpenChangeHeadingMenu={(nextOpen) => {
+          setHeadingMenuOpen(nextOpen);
+          if (nextOpen) {
+            setLinkOpen(false);
+          }
         }}
         onSelectHeading={applyHeading}
         onToggleLink={() => {
@@ -102,8 +110,9 @@ function FormatToolbarActions({
   disabled,
   format,
   headingMenuOpen,
+  headingMenuContainer,
   linkOpen,
-  onToggleHeadingMenu,
+  onOpenChangeHeadingMenu,
   onSelectHeading,
   onToggleLink,
 }: {
@@ -122,8 +131,9 @@ function FormatToolbarActions({
     link: boolean;
   };
   headingMenuOpen: boolean;
+  headingMenuContainer: HTMLElement | null;
   linkOpen: boolean;
-  onToggleHeadingMenu: () => void;
+  onOpenChangeHeadingMenu: (open: boolean) => void;
   onSelectHeading: (level: HeadingLevel | 0) => void;
   onToggleLink: () => void;
 }) {
@@ -133,7 +143,8 @@ function FormatToolbarActions({
         disabled={disabled}
         headingLevel={format.headingLevel}
         open={headingMenuOpen}
-        onToggle={onToggleHeadingMenu}
+        container={headingMenuContainer}
+        onOpenChange={onOpenChangeHeadingMenu}
         onSelect={onSelectHeading}
       />
       <ToolbarDivider />
@@ -246,58 +257,55 @@ function HeadingMenu({
   disabled,
   headingLevel,
   open,
-  onToggle,
+  container,
+  onOpenChange,
   onSelect,
 }: {
   disabled: boolean;
   headingLevel: HeadingLevel | 0;
   open: boolean;
-  onToggle: () => void;
+  container: HTMLElement | null;
+  onOpenChange: (open: boolean) => void;
   onSelect: (level: HeadingLevel | 0) => void;
 }) {
   return (
-    <div className="relative">
-      <Button
-        type="button"
-        variant="ghost"
-        disabled={disabled}
-        aria-label="Heading"
-        aria-expanded={open}
-        aria-haspopup="menu"
-        className="h-7 gap-0.5 rounded-sm px-1.5 text-[12px] font-medium text-muted-foreground"
-        onMouseDown={(event) => {
-          event.preventDefault();
-          onToggle();
-        }}
-      >
-        {headingLevel === 0 ? "P" : `H${headingLevel}`}
-        <ChevronDown className="size-3" aria-hidden />
-      </Button>
-      {open ? (
-        <div
-          role="menu"
-          className="absolute top-full left-0 z-50 mt-1 min-w-36 rounded-md border border-border bg-popover p-1 shadow-md"
+    <DropdownMenu modal={false} open={open} onOpenChange={onOpenChange}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={disabled}
+          aria-label="Heading"
+          className="h-7 gap-0.5 rounded-sm px-1.5 text-[12px] font-medium text-muted-foreground"
+          onMouseDown={(event) => {
+            event.preventDefault();
+          }}
         >
-          {HEADING_OPTIONS.map((option) => (
-            <button
-              key={option.label}
-              type="button"
-              role="menuitem"
-              className={cn(
-                "flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent",
-                option.level === headingLevel ? "font-medium text-foreground" : "text-muted-foreground",
-              )}
-              onMouseDown={(event) => {
-                event.preventDefault();
-                onSelect(option.level);
-              }}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
+          {headingLevel === 0 ? "P" : `H${headingLevel}`}
+          <ChevronDown className="size-3" aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        container={container}
+        className="min-w-36"
+        onCloseAutoFocus={(event) => event.preventDefault()}
+      >
+        {HEADING_OPTIONS.map((option) => (
+          <DropdownMenuItem
+            key={option.label}
+            className={cn(
+              "text-[12px]",
+              option.level === headingLevel ? "font-medium text-foreground" : "text-muted-foreground",
+            )}
+            onMouseDown={(event) => event.preventDefault()}
+            onSelect={() => onSelect(option.level)}
+          >
+            {option.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -344,15 +352,4 @@ function activeHeadingLevel(editor: Editor): HeadingLevel | 0 {
     }
   }
   return 0;
-}
-
-function hrefFromInput(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return "";
-  }
-  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
-    return trimmed;
-  }
-  return `https://${trimmed}`;
 }
