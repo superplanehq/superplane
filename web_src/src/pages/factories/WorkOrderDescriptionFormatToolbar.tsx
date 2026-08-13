@@ -152,7 +152,7 @@ function FormatToolbarActions({
         label="Bold"
         disabled={disabled}
         pressed={format.bold}
-        onMouseDown={() => editor.chain().focus().toggleBold().run()}
+        onActivate={() => editor.chain().focus().toggleBold().run()}
       >
         <Bold className="size-3.5" aria-hidden />
       </FormatButton>
@@ -160,7 +160,7 @@ function FormatToolbarActions({
         label="Italic"
         disabled={disabled}
         pressed={format.italic}
-        onMouseDown={() => editor.chain().focus().toggleItalic().run()}
+        onActivate={() => editor.chain().focus().toggleItalic().run()}
       >
         <Italic className="size-3.5" aria-hidden />
       </FormatButton>
@@ -168,7 +168,7 @@ function FormatToolbarActions({
         label="Underline"
         disabled={disabled}
         pressed={format.underline}
-        onMouseDown={() => editor.chain().focus().toggleUnderline().run()}
+        onActivate={() => editor.chain().focus().toggleUnderline().run()}
       >
         <Underline className="size-3.5" aria-hidden />
       </FormatButton>
@@ -176,7 +176,7 @@ function FormatToolbarActions({
         label="Strikethrough"
         disabled={disabled}
         pressed={format.strike}
-        onMouseDown={() => editor.chain().focus().toggleStrike().run()}
+        onActivate={() => editor.chain().focus().toggleStrike().run()}
       >
         <Strikethrough className="size-3.5" aria-hidden />
       </FormatButton>
@@ -185,7 +185,7 @@ function FormatToolbarActions({
         label="Code"
         disabled={disabled}
         pressed={format.code}
-        onMouseDown={() => editor.chain().focus().toggleCode().run()}
+        onActivate={() => editor.chain().focus().toggleCode().run()}
       >
         <Code className="size-3.5" aria-hidden />
       </FormatButton>
@@ -193,7 +193,7 @@ function FormatToolbarActions({
         label="Code block"
         disabled={disabled}
         pressed={format.codeBlock}
-        onMouseDown={() => editor.chain().focus().toggleCodeBlock().run()}
+        onActivate={() => editor.chain().focus().toggleCodeBlock().run()}
       >
         <SquareCode className="size-3.5" aria-hidden />
       </FormatButton>
@@ -202,7 +202,7 @@ function FormatToolbarActions({
         label="Quote"
         disabled={disabled}
         pressed={format.blockquote}
-        onMouseDown={() => editor.chain().focus().toggleBlockquote().run()}
+        onActivate={() => editor.chain().focus().toggleBlockquote().run()}
       >
         <Quote className="size-3.5" aria-hidden />
       </FormatButton>
@@ -210,12 +210,12 @@ function FormatToolbarActions({
         label="List"
         disabled={disabled}
         pressed={format.bulletList}
-        onMouseDown={() => editor.chain().focus().toggleBulletList().run()}
+        onActivate={() => editor.chain().focus().toggleBulletList().run()}
       >
         <List className="size-3.5" aria-hidden />
       </FormatButton>
       <ToolbarDivider />
-      <FormatButton label="Link" disabled={disabled} pressed={format.link || linkOpen} onMouseDown={onToggleLink}>
+      <FormatButton label="Link" disabled={disabled} pressed={format.link || linkOpen} onActivate={onToggleLink}>
         <LinkIcon className="size-3.5" aria-hidden />
       </FormatButton>
     </div>
@@ -314,13 +314,13 @@ function FormatButton({
   label,
   disabled,
   pressed,
-  onMouseDown,
+  onActivate,
   children,
 }: {
   label: string;
   disabled: boolean;
   pressed?: boolean;
-  onMouseDown: () => void;
+  onActivate: () => void;
   children: ReactNode;
 }) {
   return (
@@ -334,7 +334,13 @@ function FormatButton({
       className={cn("size-7 text-muted-foreground", pressed && "bg-accent text-foreground")}
       onMouseDown={(event) => {
         event.preventDefault();
-        onMouseDown();
+        onActivate();
+      }}
+      onClick={(event) => {
+        if (event.detail !== 0) {
+          return;
+        }
+        onActivate();
       }}
     >
       {children}

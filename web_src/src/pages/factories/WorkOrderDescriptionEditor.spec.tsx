@@ -176,4 +176,36 @@ describe("WorkOrderDescriptionEditor", () => {
     expect(input.textContent).not.toContain("extra");
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it("keeps the first characters of a long pasted description", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const maxLength = 20;
+
+    render(<WorkOrderDescriptionEditor value="" maxLength={maxLength} disabled={false} onChange={onChange} />);
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await user.click(input);
+    await user.paste("a".repeat(40));
+
+    expect(input.textContent).toMatch(/^a+$/);
+    expect(input.textContent?.length).toBe(maxLength);
+    expect(onChange).toHaveBeenCalled();
+    expect(onChange.mock.calls.at(-1)?.[0]).toHaveLength(maxLength);
+  });
+
+  it("applies bold from the format toolbar with the keyboard", async () => {
+    const user = userEvent.setup();
+
+    render(<WorkOrderDescriptionEditor value="Hello world" maxLength={5000} disabled={false} onChange={vi.fn()} />);
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await user.click(input);
+    await user.keyboard("{Control>}a{/Control}");
+    const bold = await screen.findByRole("button", { name: "Bold" });
+    bold.focus();
+    await user.keyboard("{Enter}");
+
+    expect(input.querySelector("strong")).toHaveTextContent("Hello world");
+  });
 });

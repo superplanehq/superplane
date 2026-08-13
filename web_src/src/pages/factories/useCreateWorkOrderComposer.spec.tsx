@@ -104,4 +104,21 @@ describe("useCreateWorkOrderComposer", () => {
 
     expect(result.current.title).toHaveLength(256);
   });
+
+  it("keeps the first 5000 characters of a long pasted description", () => {
+    const { result } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    act(() => {
+      result.current.updateDescription("a".repeat(5200));
+    });
+
+    expect(result.current.description).toHaveLength(5000);
+  });
 });

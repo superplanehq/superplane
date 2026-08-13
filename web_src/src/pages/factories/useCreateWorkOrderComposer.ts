@@ -104,10 +104,7 @@ export function useCreateWorkOrderComposer({
   };
 
   const updateDescription = (next: string) => {
-    if (next.length > MAX_DESCRIPTION_LENGTH) {
-      return;
-    }
-    setDescription(next);
+    setDescription(next.slice(0, MAX_DESCRIPTION_LENGTH));
   };
 
   return {

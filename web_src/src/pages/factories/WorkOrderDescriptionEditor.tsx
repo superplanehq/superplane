@@ -66,18 +66,20 @@ export function WorkOrderDescriptionEditor({
     },
     onUpdate: ({ editor: current }) => {
       const markdown = current.getMarkdown();
-      if (markdown.length > maxLengthRef.current) {
-        current.commands.setContent(emittedMarkdownRef.current, {
+      const limit = maxLengthRef.current;
+      const previous = emittedMarkdownRef.current;
+      const next = markdownWithinLimit(markdown, previous, limit);
+      if (next !== markdown) {
+        current.commands.setContent(next, {
           contentType: "markdown",
           emitUpdate: false,
         });
+      }
+      if (next === previous) {
         return;
       }
-      if (markdown === emittedMarkdownRef.current) {
-        return;
-      }
-      emittedMarkdownRef.current = markdown;
-      onChangeRef.current(markdown);
+      emittedMarkdownRef.current = next;
+      onChangeRef.current(next);
     },
     onFocus: () => {
       onFocusRef.current?.();
@@ -126,4 +128,14 @@ export function WorkOrderDescriptionEditor({
       <EditorContent editor={editor} />
     </>
   );
+}
+
+function markdownWithinLimit(markdown: string, previous: string, limit: number): string {
+  if (markdown.length <= limit) {
+    return markdown;
+  }
+  if (previous.length >= limit && markdown.length - previous.length <= 1) {
+    return previous;
+  }
+  return markdown.slice(0, limit);
 }
