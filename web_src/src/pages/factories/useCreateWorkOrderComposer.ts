@@ -97,10 +97,7 @@ export function useCreateWorkOrderComposer({
   };
 
   const updateTitle = (next: string) => {
-    if (next.length > MAX_TITLE_LENGTH) {
-      return;
-    }
-    setTitle(next);
+    setTitle(next.slice(0, MAX_TITLE_LENGTH));
     if (titleError) {
       setTitleError("");
     }
@@ -125,6 +122,7 @@ export function useCreateWorkOrderComposer({
     canSaveDraft,
     canSendToLine,
     maxDescriptionLength: MAX_DESCRIPTION_LENGTH,
+    maxTitleLength: MAX_TITLE_LENGTH,
     setAssigneeIds,
     setSelectedLineName,
     updateTitle,

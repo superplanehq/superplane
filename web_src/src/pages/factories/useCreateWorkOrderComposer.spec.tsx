@@ -87,4 +87,21 @@ describe("useCreateWorkOrderComposer", () => {
     expect(onCreated).toHaveBeenCalledWith("order-1");
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it("keeps the first 256 characters of a long pasted title", () => {
+    const { result } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    act(() => {
+      result.current.updateTitle("a".repeat(300));
+    });
+
+    expect(result.current.title).toHaveLength(256);
+  });
 });

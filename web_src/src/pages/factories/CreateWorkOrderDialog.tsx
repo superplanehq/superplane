@@ -85,6 +85,7 @@ function CreateWorkOrderDialogSession({
             value={composer.title}
             onChange={(event) => composer.updateTitle(event.target.value)}
             placeholder="Work order title"
+            maxLength={composer.maxTitleLength}
             autoFocus
             className="h-auto border-0 bg-transparent p-0 text-[22px] font-semibold tracking-[-0.02em] shadow-none placeholder:font-semibold placeholder:text-muted-foreground/70 focus-visible:ring-0"
           />
