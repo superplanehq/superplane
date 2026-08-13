@@ -67,7 +67,12 @@ export function WorkOrderDescriptionEditor({
     onUpdate: ({ editor: current }) => {
       const markdown = current.getMarkdown();
       if (markdown.length > maxLengthRef.current) {
-        current.commands.undo();
+        if (markdown !== emittedMarkdownRef.current) {
+          current.commands.setContent(emittedMarkdownRef.current, { contentType: "markdown" });
+        }
+        return;
+      }
+      if (markdown === emittedMarkdownRef.current) {
         return;
       }
       emittedMarkdownRef.current = markdown;

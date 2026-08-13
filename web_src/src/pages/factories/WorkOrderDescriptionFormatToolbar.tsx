@@ -289,7 +289,7 @@ function HeadingMenu({
         align="start"
         container={container}
         className="min-w-36"
-        onOpenAutoFocus={(event) => event.preventDefault()}
+        onOpenAutoFocus={(event: Event) => event.preventDefault()}
         onCloseAutoFocus={(event) => event.preventDefault()}
       >
         {HEADING_OPTIONS.map((option) => (

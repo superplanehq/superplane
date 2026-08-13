@@ -158,4 +158,21 @@ describe("WorkOrderDescriptionEditor", () => {
     expect(screen.getByTestId("work-order-description-toolbar")).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Heading 1" })).toBeInTheDocument();
   });
+
+  it("keeps existing description text when the length limit is reached", async () => {
+    const user = userEvent.setup();
+    const initial = "Hello world";
+    const onChange = vi.fn();
+
+    render(
+      <WorkOrderDescriptionEditor value={initial} maxLength={initial.length} disabled={false} onChange={onChange} />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await user.click(input);
+    await user.keyboard(" extra");
+
+    expect(input).toHaveTextContent(initial);
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

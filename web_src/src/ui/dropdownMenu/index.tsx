@@ -58,6 +58,7 @@ const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content> & {
     container?: HTMLElement | null;
+    onOpenAutoFocus?: (event: Event) => void;
   }
 >(({ className, sideOffset = 4, container, ...props }, ref) => (
   <DropdownMenuPrimitive.Portal container={container ?? undefined}>
