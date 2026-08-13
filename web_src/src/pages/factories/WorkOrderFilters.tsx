@@ -36,7 +36,7 @@ export function WorkOrderFilters({
           My Work
         </FilterPill>
         <FilterPill active={ownerFilter === "unassigned"} onClick={() => onOwnerFilterChange("unassigned")}>
-          Unassigned
+          No Owner
         </FilterPill>
         <FilterPill active={ownerFilter === "all"} onClick={() => onOwnerFilterChange("all")}>
           All
