@@ -1,7 +1,7 @@
 import { useCreateWorkOrder, useDispatchWorkOrder } from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { workOrderDetailPath, workOrdersPath } from "./lib/factoryPagePaths";
@@ -25,14 +25,12 @@ export function useCreateWorkOrderComposer({
   const navigate = useNavigate();
   const createWorkOrder = useCreateWorkOrder(organizationId, factoryId);
   const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);
-  const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [selectedLineName, setSelectedLineName] = useState("");
   const [titleError, setTitleError] = useState("");
-  const [descriptionFocused, setDescriptionFocused] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -43,7 +41,6 @@ export function useCreateWorkOrderComposer({
     setAssigneeIds([]);
     setSelectedLineName("");
     setTitleError("");
-    setDescriptionFocused(false);
   }, [open]);
 
   const isSaving = createWorkOrder.isPending || dispatchWorkOrder.isPending;
@@ -126,8 +123,6 @@ export function useCreateWorkOrderComposer({
     assigneeIds,
     selectedLineName,
     titleError,
-    descriptionFocused,
-    descriptionRef,
     isSaving,
     isSavingDraft: createWorkOrder.isPending && !dispatchWorkOrder.isPending,
     isSendingToLine: dispatchWorkOrder.isPending,
@@ -136,7 +131,6 @@ export function useCreateWorkOrderComposer({
     maxDescriptionLength: MAX_DESCRIPTION_LENGTH,
     setAssigneeIds,
     setSelectedLineName,
-    setDescriptionFocused,
     updateTitle,
     updateDescription,
     handleSaveDraft,

@@ -4,14 +4,13 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Factory as FactoryIcon, Maximize2, Minimize2, XIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { useFactoriesLayout } from "./layout/factoriesLayoutContext";
 import { CreateWorkOrderPropertyPills } from "./CreateWorkOrderPropertyPills";
-import { WorkOrderDescriptionFormatToolbar } from "./WorkOrderDescriptionFormatToolbar";
+import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
 
 interface CreateWorkOrderDialogProps {
@@ -79,31 +78,15 @@ export function CreateWorkOrderDialog({ open, onClose }: CreateWorkOrderDialogPr
           />
           {composer.titleError ? <p className="mt-1 text-[12px] text-destructive">{composer.titleError}</p> : null}
 
-          <div className="mt-3 min-h-0 flex-1">
-            {composer.descriptionFocused ? (
-              <WorkOrderDescriptionFormatToolbar
-                textareaRef={composer.descriptionRef}
-                value={composer.description}
-                maxLength={composer.maxDescriptionLength}
-                disabled={composer.isSaving}
-                onChange={composer.updateDescription}
-              />
-            ) : null}
+          <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
             <Label htmlFor="work-order-description-input" className="sr-only">
               Description
             </Label>
-            <Textarea
-              ref={composer.descriptionRef}
-              id="work-order-description-input"
-              data-testid="work-order-description-input"
+            <WorkOrderDescriptionEditor
               value={composer.description}
-              disabled={composer.isSaving}
-              onFocus={() => composer.setDescriptionFocused(true)}
-              onBlur={() => composer.setDescriptionFocused(false)}
-              onChange={(event) => composer.updateDescription(event.target.value)}
               maxLength={composer.maxDescriptionLength}
-              placeholder="Add description…"
-              className="min-h-40 resize-none border-0 bg-transparent p-0 text-[15px] leading-6 shadow-none placeholder:text-muted-foreground/70 focus-visible:ring-0"
+              disabled={composer.isSaving}
+              onChange={composer.updateDescription}
             />
           </div>
         </div>
