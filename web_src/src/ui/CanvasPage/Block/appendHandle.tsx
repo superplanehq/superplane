@@ -5,6 +5,7 @@ import { useState } from "react";
 import { CANVAS_CONNECTOR_COLOR } from "@/lib/canvasEdgeColors";
 import { resolveHandleStyle } from "./handleStyle";
 import type { BlockProps } from "./types";
+
 const APPEND_SOURCE_LINE_WIDTH = 42;
 const APPEND_SOURCE_BUTTON_LEFT = 54;
 const APPEND_HORIZONTAL_NUDGE = -4;

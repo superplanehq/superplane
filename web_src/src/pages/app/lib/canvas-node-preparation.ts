@@ -111,6 +111,9 @@ function buildPreparedTriggerCanvasNode(args: {
     actions: openModal ? buildTriggerActionContext(canvasId, node.id!, openModal) : undefined,
   });
 
+  const componentLabel = triggerMetadata?.label || node.component || undefined;
+  const nodeName = typeof node.name === "string" && node.name.trim() ? node.name.trim() : undefined;
+
   return {
     id: node.id!,
     position,
@@ -121,6 +124,8 @@ function buildPreparedTriggerCanvasNode(args: {
       outputChannels: ["default"],
       trigger: {
         ...triggerProps,
+        componentLabel,
+        nodeName,
         collapsed: node.isCollapsed,
         error: node.errorMessage,
         warning: node.warningMessage,
@@ -259,6 +264,8 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
     }
 
     const emptyStateProps = resolveComponentEmptyStateProps(componentBaseProps, node);
+    const componentLabel = metadata?.label || node.component || undefined;
+    const nodeName = typeof node.name === "string" && node.name.trim() ? node.name.trim() : undefined;
 
     return {
       id: node.id!,
@@ -271,6 +278,8 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
         component: {
           ...componentBaseProps,
           emptyStateProps,
+          componentLabel,
+          nodeName,
           error: node.errorMessage,
           warning: node.warningMessage,
         },

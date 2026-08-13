@@ -13,6 +13,7 @@ import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import {
   buildComponentDefinitionsByName,
   buildTriggerDefinitionsByName,
+  resolveComponentLabel,
   resolveConfigurationFields,
 } from "./runNodeConfigurationFields";
 import {
@@ -240,6 +241,11 @@ export function buildRunInspectorNodeSections({
       sectionValue: nodeId,
       nodeId,
       nodeName: workflowNode?.name || nodeId,
+      componentLabel: resolveComponentLabel({
+        workflowNode,
+        componentDefinitionsByName,
+        triggerDefinitionsByName,
+      }),
       workflowNode,
       execution,
       executionRef,
@@ -276,7 +282,15 @@ export function buildRunInspectorNodeSections({
     };
   });
 
-  return [...executionSections, ...buildQueuedNodeSections({ run, workflowNodes })];
+  return [
+    ...executionSections,
+    ...buildQueuedNodeSections({
+      run,
+      workflowNodes,
+      componentDefinitionsByName,
+      triggerDefinitionsByName,
+    }),
+  ];
 }
 
 function getExecutionErrorMessage(

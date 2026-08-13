@@ -2,7 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { LineVelocityPanel, VELOCITY_BY_PERIOD } from "./LineVelocityPanel";
+import { LineVelocityPanel } from "./LineVelocityPanel";
+import { VELOCITY_BY_PERIOD } from "./lineVelocityMockData";
 
 describe("LineVelocityPanel", () => {
   it("shows Cursor-style period pills, hero run stats, cost rows, and daily velocity", () => {
