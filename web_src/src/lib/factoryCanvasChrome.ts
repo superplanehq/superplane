@@ -83,4 +83,12 @@ export const FACTORY_HANDLE_STYLE = {
   border: "1px solid var(--border, #e5e7eb)",
   background: "var(--card, #ffffff)",
   boxShadow: "none",
+  // Half-in ports must paint above the card body.
+  zIndex: 11,
 } as const;
+
+/** Keep FactoryNodeCard, append ghost, placement gap, and ELK estimates aligned. */
+export const FACTORY_NODE_CARD_WIDTH = 280;
+export const FACTORY_NODE_CARD_HEIGHT = 104;
+/** Vertical gap below a factory card when appending / layering. */
+export const FACTORY_NODE_VERTICAL_GAP = 64;

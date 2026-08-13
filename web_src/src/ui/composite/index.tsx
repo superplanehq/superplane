@@ -69,6 +69,9 @@ export interface CompositeProps extends ComponentActionsProps {
   draftDiffStatus?: DraftDiffStatus;
   isFactoryApp?: boolean;
   showRuntimeStatus?: boolean;
+  runIsActive?: boolean;
+  componentLabel?: string;
+  nodeName?: string;
 }
 
 export const Composite: React.FC<CompositeProps> = ({
@@ -95,6 +98,9 @@ export const Composite: React.FC<CompositeProps> = ({
   draftDiffStatus,
   isFactoryApp = false,
   showRuntimeStatus,
+  runIsActive,
+  componentLabel,
+  nodeName,
   onDuplicate,
   onToggleView,
   onDelete,
@@ -219,6 +225,9 @@ export const Composite: React.FC<CompositeProps> = ({
       draftDiffStatus={draftDiffStatus}
       isFactoryApp={isFactoryApp}
       showRuntimeStatus={showRuntimeStatus}
+      runIsActive={runIsActive}
+      componentLabel={componentLabel}
+      nodeName={nodeName}
     />
   );
 };
