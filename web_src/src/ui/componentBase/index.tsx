@@ -92,6 +92,8 @@ export interface ComponentBaseProps extends ComponentActionsProps {
    * footer design. Non-factory canvases must leave this unset/false.
    */
   isFactoryApp?: boolean;
+  /** False on factory Live without a selected run (topology only). */
+  showRuntimeStatus?: boolean;
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = (props) => {
@@ -115,6 +117,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = (props) => {
         onToggleView={props.onToggleView}
         isCompactView={props.isCompactView}
         canvasMode={props.canvasMode}
+        showRuntimeStatus={props.showRuntimeStatus}
       />
     );
   }

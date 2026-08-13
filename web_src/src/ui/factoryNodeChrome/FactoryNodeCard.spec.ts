@@ -14,4 +14,8 @@ describe("shouldShowFactoryNodeStatusFooter", () => {
   it("hides footer in compact view even when live", () => {
     expect(shouldShowFactoryNodeStatusFooter({ canvasMode: "live", isCompactView: true })).toBe(false);
   });
+
+  it("hides footer when runtime status is suppressed", () => {
+    expect(shouldShowFactoryNodeStatusFooter({ canvasMode: "live", showRuntimeStatus: false })).toBe(false);
+  });
 });

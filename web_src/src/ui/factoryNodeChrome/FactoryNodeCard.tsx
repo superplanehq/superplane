@@ -37,6 +37,8 @@ export type FactoryNodeCardProps = {
   isCompactView?: boolean;
   /** Edit mode hides the runtime status footer (no fake Pending). */
   canvasMode?: "live" | "edit";
+  /** False on factory Live without a selected run (topology only). */
+  showRuntimeStatus?: boolean;
 };
 
 function resolveSubtitle(
@@ -104,13 +106,18 @@ export function FactoryNodeCard({
   onToggleView,
   isCompactView,
   canvasMode = "live",
+  showRuntimeStatus = true,
 }: FactoryNodeCardProps) {
   const primarySection = eventSections?.[0];
   const status = normalizeFactoryNodeStatus(primarySection?.eventState);
   const metrics = useFactoryNodeMetrics(status, primarySection);
   const subtitle = resolveSubtitle(metadata, eventSections);
   const badgeText = error?.trim() || warning?.trim() || "";
-  const showStatusFooter = shouldShowFactoryNodeStatusFooter({ canvasMode, isCompactView });
+  const showStatusFooter = shouldShowFactoryNodeStatusFooter({
+    canvasMode,
+    isCompactView,
+    showRuntimeStatus,
+  });
 
   return (
     <div className="group relative" data-view-mode={isCompactView ? "compact" : "expanded"}>

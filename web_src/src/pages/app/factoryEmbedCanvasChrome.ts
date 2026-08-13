@@ -68,7 +68,8 @@ function resolveFactoryShellModeProps(input: FactoryEmbedCanvasChromeInput) {
 
 function resolveFactoryRunInspectionProps(input: FactoryEmbedCanvasChromeInput) {
   return {
-    onRunNodeDetailClose: input.factoryEmbed ? input.handleSelectLiveCanvas : input.handleBackToRunList,
+    // Keep ?run= on close so factory canvas stays run-scoped (no stale Live lastExecutions).
+    onRunNodeDetailClose: input.handleBackToRunList,
     onBackToLiveCanvas: input.factoryEmbed ? undefined : input.handleSelectLiveCanvas,
     hasFitToViewRef: input.runInspectionChromeActive ? input.runsHasFitToViewRef : input.hasFitToViewRef,
     isRunInspectionMode: input.runInspectionChromeActive,
