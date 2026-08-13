@@ -134,7 +134,7 @@ func Test__RunInitializer__FinishesFactoryWorkOrderExecutionWhenInitializationFa
 		},
 	})
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)

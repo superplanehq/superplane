@@ -101,7 +101,7 @@ func Test__ListCanvases__ExcludesFactoryOwnedCanvases(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, "Test Factory", "")
+	factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, "Test Factory", "", "")
 	require.NoError(t, err)
 
 	factoryCanvas, _ := support.CreateCanvas(

@@ -209,7 +209,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	sourceCanvas, _ := support.CreateCanvas(
