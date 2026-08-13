@@ -58,9 +58,10 @@ func (c *Client) GetMe() (*User, error) {
 }
 
 // SetWebhook sets the webhook URL for receiving updates
-func (c *Client) SetWebhook(url string) error {
+func (c *Client) SetWebhook(url, secretToken string) error {
 	payload := map[string]string{
-		"url": url,
+		"url":          url,
+		"secret_token": secretToken,
 	}
 
 	body, err := json.Marshal(payload)
