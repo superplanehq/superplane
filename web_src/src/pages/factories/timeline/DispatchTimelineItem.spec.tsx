@@ -36,7 +36,9 @@ describe("DispatchTimelineItem", () => {
   it("renders a step comment's automation label as a link to its run", () => {
     render(
       <DispatchTimelineItem
-        event={dispatchEvent([{ body: "Applying the fix now.", label: "CI", sourceRunId: "run-42", sourceAppId: "app-1" }])}
+        event={dispatchEvent([
+          { body: "Applying the fix now.", label: "CI", sourceRunId: "run-42", sourceAppId: "app-1" },
+        ])}
         organizationId="org-1"
         factoryId="factory-1"
         orderId="order-1"
