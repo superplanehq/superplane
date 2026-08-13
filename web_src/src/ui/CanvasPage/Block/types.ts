@@ -50,6 +50,14 @@ export interface BlockInternalData {
   _draftDiffStatus?: "added" | "updated" | "removed";
   /** Factory apps use vertical (top→bottom) handles and edges. */
   _flowDirection?: CanvasFlowDirection;
+  /** Factory run-inspection leaf layout: show Right side source handle. */
+  _factorySideSource?: boolean;
+  /** Factory run-inspection leaf layout: use Left target handle. */
+  _factorySideTarget?: boolean;
+  /** Suppress MultiBottom true/false stems; use center spine + side handles. */
+  _factoryCompactFork?: boolean;
+  /** Compact fork has a spine child — show centered `__factorySpine` bottom handle. */
+  _factorySpineSource?: boolean;
   isTemplate?: boolean;
   isPendingConnection?: boolean;
 }

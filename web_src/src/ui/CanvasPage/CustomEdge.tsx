@@ -2,14 +2,33 @@ import type { CSSProperties } from "react";
 import React, { useCallback } from "react";
 import type { EdgeProps } from "@xyflow/react";
 import { BaseEdge, EdgeLabelRenderer, useReactFlow } from "@xyflow/react";
-import { getCanvasEdgePath } from "./edgePath";
+import {
+  DEFAULT_FACTORY_EDGE_STROKE,
+  LONG_EDGE_PATH_LENGTH,
+  TOUCHING_EDGE_STROKE,
+  estimatePathLength,
+  getCanvasEdgePath,
+  getFlowArrowPoints,
+  getPointAlongPath,
+} from "./edgePath";
 import { CircleX } from "lucide-react";
 
 interface CustomEdgeData {
   isHovered?: boolean;
   canDelete?: boolean;
   onDelete?: (edgeId: string) => void;
+  /** Factory run compact forks: original channel name (true/false/…). */
+  channelLabel?: string;
+  /** Factory run long/cross-column edges: route clear of node cards. */
+  routeGutterX?: number;
+  /** Factory run: this edge geometrically touches/crosses another. */
+  touchesOtherEdge?: boolean;
+  /** Factory run: longer edge in a touch pair — darker stroke + label border. */
+  contrastStroke?: boolean;
 }
+
+/** Near source on the stroke — on-edge, not mid-path / merge. */
+const CHANNEL_LABEL_PATH_FRACTION = 0.32;
 
 function DeleteEdgeControls({
   canDelete,
@@ -64,6 +83,48 @@ function DeleteEdgeControls({
   );
 }
 
+/** Open chevron (two strokes), not a filled triangle. */
+function FlowChevronMarkers({
+  arrows,
+  color,
+}: {
+  arrows: Array<{ x: number; y: number; angleDeg: number }>;
+  color: string;
+}) {
+  if (arrows.length === 0) return null;
+
+  return (
+    <EdgeLabelRenderer>
+      {arrows.map((arrow, index) => (
+        <div
+          key={`${arrow.x}-${arrow.y}-${index}`}
+          data-testid="edge-flow-arrow"
+          style={{
+            position: "absolute",
+            transform: `translate(-50%, -50%) translate(${arrow.x}px,${arrow.y}px) rotate(${arrow.angleDeg}deg)`,
+            pointerEvents: "none",
+            zIndex: 998,
+            color,
+            opacity: 0.95,
+          }}
+          className="nodrag nopan select-none"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+            <path
+              d="M4 2.5 L8.5 6 L4 9.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+      ))}
+    </EdgeLabelRenderer>
+  );
+}
+
 export const CustomEdge = React.memo(function CustomEdge({
   id,
   sourceX,
@@ -81,6 +142,13 @@ export const CustomEdge = React.memo(function CustomEdge({
   const isHovered = edgeData?.isHovered === true;
   const canDelete = edgeData?.canDelete === true;
   const onDeleteEdge = edgeData?.onDelete;
+  const channelLabel = typeof edgeData?.channelLabel === "string" ? edgeData.channelLabel.trim() : "";
+  const touchesOtherEdge = edgeData?.touchesOtherEdge === true;
+  const contrastStroke = edgeData?.contrastStroke === true;
+  const routeGutterX =
+    typeof edgeData?.routeGutterX === "number" && Number.isFinite(edgeData.routeGutterX)
+      ? edgeData.routeGutterX
+      : undefined;
 
   const [edgePath, labelX, labelY] = getCanvasEdgePath({
     sourceX,
@@ -89,7 +157,17 @@ export const CustomEdge = React.memo(function CustomEdge({
     targetX,
     targetY,
     targetPosition,
+    routeGutterX,
   });
+
+  const pathLength = estimatePathLength(edgePath);
+  const isLongEdge = pathLength >= LONG_EDGE_PATH_LENGTH || routeGutterX != null;
+  const flowArrows = isLongEdge ? getFlowArrowPoints(edgePath) : [];
+  // Near-source only when this edge crosses/touches another — otherwise keep mid-path label.
+  const channelPoint =
+    channelLabel && touchesOtherEdge ? getPointAlongPath(edgePath, CHANNEL_LABEL_PATH_FRACTION) : null;
+  const channelLabelX = channelPoint?.x ?? labelX;
+  const channelLabelY = channelPoint?.y ?? labelY;
 
   const handleEdgeDelete = useCallback(() => {
     if (onDeleteEdge) {
@@ -100,6 +178,7 @@ export const CustomEdge = React.memo(function CustomEdge({
     setEdges((edges) => edges.filter((edge) => edge.id !== id));
   }, [id, onDeleteEdge, setEdges]);
 
+  // Stroke color comes from CSS (incl. sp-edge-factory-touching). Do not fight !important inline.
   const edgeStyle: CSSProperties = {
     strokeWidth: selected ? 3 : style.strokeWidth || 3,
     pointerEvents: "visibleStroke",
@@ -116,9 +195,33 @@ export const CustomEdge = React.memo(function CustomEdge({
     [handleEdgeDelete],
   );
 
+  const lineStroke = contrastStroke
+    ? TOUCHING_EDGE_STROKE
+    : typeof style.stroke === "string"
+      ? style.stroke
+      : DEFAULT_FACTORY_EDGE_STROKE;
+
   return (
     <>
       <BaseEdge path={edgePath} style={edgeStyle} interactionWidth={20} />
+      <FlowChevronMarkers arrows={flowArrows} color={lineStroke} />
+      {channelLabel && !shouldShowIcon ? (
+        <EdgeLabelRenderer>
+          <div
+            data-testid="edge-channel-label"
+            style={{
+              position: "absolute",
+              transform: `translate(-50%, -50%) translate(${channelLabelX}px,${channelLabelY}px)`,
+              pointerEvents: "none",
+              zIndex: 1000,
+              ...(contrastStroke ? { borderColor: TOUCHING_EDGE_STROKE, color: TOUCHING_EDGE_STROKE } : {}),
+            }}
+            className="nodrag nopan rounded-md border border-border bg-card px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm"
+          >
+            {channelLabel}
+          </div>
+        </EdgeLabelRenderer>
+      ) : null}
       <DeleteEdgeControls
         canDelete={canDelete}
         edgePath={edgePath}

@@ -19,6 +19,7 @@ type FactoryNodeCardShellProps = {
   dimBodyBelowHeader?: boolean;
   isCompactView?: boolean;
   showStatusFooter?: boolean;
+  statusLabel?: string;
 };
 
 /** Monochrome logos (github / SuperPlane) need invert on dark card chrome. */
@@ -41,6 +42,7 @@ export function FactoryNodeCardShell({
   dimBodyBelowHeader = false,
   isCompactView,
   showStatusFooter = true,
+  statusLabel,
 }: FactoryNodeCardShellProps) {
   const Icon = React.useMemo(() => resolveIcon(iconSlug), [iconSlug]);
   const invertMonoIcon = shouldInvertMonoFactoryIcon(iconSrc);
@@ -78,7 +80,7 @@ export function FactoryNodeCardShell({
           </div>
         </div>
       </div>
-      {showStatusFooter ? <NodeStatusFooter status={status} metrics={metrics} /> : null}
+      {showStatusFooter ? <NodeStatusFooter status={status} metrics={metrics} label={statusLabel} /> : null}
     </div>
   );
 }

@@ -4044,7 +4044,7 @@ export function AppPage({
           onToggleAutoLayoutOnUpdate={!isReadOnly ? handleToggleAutoLayoutOnUpdate : undefined}
           onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
           onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
-          onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
+          onToggleView={!isReadOnly && !factoryOwnedApp ? handleNodeCollapseChange : undefined}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
           buildingBlocks={buildingBlocks}
           isEditing={isEditing}

@@ -84,3 +84,9 @@ export const FACTORY_HANDLE_STYLE = {
   background: "var(--card, #ffffff)",
   boxShadow: "none",
 } as const;
+
+/** Keep FactoryNodeCard, append ghost, placement gap, and ELK estimates aligned. */
+export const FACTORY_NODE_CARD_WIDTH = 280;
+export const FACTORY_NODE_CARD_HEIGHT = 104;
+/** Vertical gap below a factory card when appending / layering. */
+export const FACTORY_NODE_VERTICAL_GAP = 64;

@@ -23,6 +23,17 @@ import {
   primaryEventStateFromCanvasNodeData,
   resolveFactoryEdgeTone,
 } from "@/lib/factoryCanvasChrome";
+import {
+  FACTORY_SIDE_HANDLE_ID,
+  FACTORY_SPINE_HANDLE_ID,
+  factoryRunLeafEdgeKey,
+  layoutFactoryRunLeafGraph,
+} from "@/lib/layout/factoryRunLeafLayout";
+import {
+  FACTORY_TOUCHING_EDGE_CLASS,
+  findTouchContrastEdgeIds,
+  getCanvasEdgePath,
+} from "@/ui/CanvasPage/edgePath";
 
 import { GlobalCommandPaletteCanvasNodeSearch } from "@/components/GlobalCommandPalette/canvasNodeSearch";
 import { openGlobalCommandPalette } from "@/components/GlobalCommandPalette/controller";
@@ -477,6 +488,29 @@ const CLASSIC_EDGE_STYLE = {
   type: "custom",
   style: { stroke: "#C9D5E1", strokeWidth: 3 },
 } as const;
+
+/** Match factoryRunLeafLayout defaults when measuring handles for touch detection. */
+const FACTORY_RUN_NODE_WIDTH = 280;
+const FACTORY_RUN_NODE_HEIGHT = 104;
+
+function factoryRunHandleAnchor(
+  position: { x: number; y: number },
+  width: number,
+  height: number,
+  side: Position,
+): { x: number; y: number } {
+  switch (side) {
+    case Position.Top:
+      return { x: position.x + width / 2, y: position.y };
+    case Position.Bottom:
+      return { x: position.x + width / 2, y: position.y + height };
+    case Position.Left:
+      return { x: position.x, y: position.y + height / 2 };
+    case Position.Right:
+    default:
+      return { x: position.x + width, y: position.y + height / 2 };
+  }
+}
 
 const DEFAULT_CANVAS_ZOOM = 0.8;
 const MIN_CANVAS_ZOOM = 0.1;
@@ -1425,7 +1459,7 @@ function CanvasPage(props: CanvasPageProps) {
           "sp-canvas-live",
         props.isRunInspectionMode && "sp-canvas-live",
         props.isEditing && "sp-canvas-editing",
-        props.factoryId && "sp-canvas-factory",
+        (props.factoryId || props.factoryEmbed) && "sp-canvas-factory",
       )}
     >
       {/* Header at the top spanning full width (omitted for factory embed chrome). */}
@@ -2936,6 +2970,22 @@ function CanvasContent({
   // Factory Live without a run is topology-only — no runtime status footers.
   const showRuntimeStatus = !factoryEmbed || isRunInspectionMode;
 
+  // Ephemeral leaf-right layout while inspecting a factory run (does not persist).
+  const factoryRunLeafLayout = useMemo(() => {
+    if (!factoryEmbed || !isRunInspectionMode) {
+      return null;
+    }
+    return layoutFactoryRunLeafGraph(
+      state.nodes.map((node) => ({ id: node.id })),
+      (state.edges ?? []).map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: edge.sourceHandle,
+      })),
+    );
+  }, [factoryEmbed, isRunInspectionMode, state.nodes, state.edges]);
+
   // Store callback handlers in a ref so they can be accessed without being in node data
   const callbacksRef = useRef({
     handleNodeClick,
@@ -3084,14 +3134,29 @@ function CanvasContent({
         flowDirection,
       });
 
-      if (canReuseData && cachedNode && cachedNode.sourceNode === node) {
+      const sideSource = factoryRunLeafLayout?.sideHandleNodeIds.has(node.id) ?? false;
+      const sideTarget = factoryRunLeafLayout?.sideTargetNodeIds.has(node.id) ?? false;
+      const compactFork = factoryRunLeafLayout?.compactForkNodeIds.has(node.id) ?? false;
+      const spineSource = factoryRunLeafLayout?.spineSourceNodeIds.has(node.id) ?? false;
+      const overlayPosition = factoryRunLeafLayout?.positions.get(node.id);
+
+      // Skip full reuse when run leaf layout overlays positions / side handles.
+      if (canReuseData && cachedNode && cachedNode.sourceNode === node && !factoryRunLeafLayout) {
         return cachedNode.node;
       }
-
       const sourceData = node.data as CanvasBlockNodeData;
+      const factoryLayoutFlags = {
+        _factorySideSource: sideSource,
+        _factorySideTarget: sideTarget,
+        _factoryCompactFork: compactFork,
+        _factorySpineSource: spineSource,
+      };
       const data =
         canReuseData && cachedNode
-          ? cachedNode.data
+          ? {
+              ...cachedNode.data,
+              ...factoryLayoutFlags,
+            }
           : {
               ...sourceData,
               _callbacksRef: callbacksRef,
@@ -3102,12 +3167,14 @@ function CanvasContent({
               _hasHighlightedNodes: hasHighlightedNodes,
               _dimBodyBelowHeader: shouldBlankBody,
               _flowDirection: flowDirection,
+              ...factoryLayoutFlags,
             };
       const enrichedNode: ReactFlowNode = {
         ...node,
+        position: overlayPosition ?? node.position,
         selectable: runSelectableSet ? runSelectableSet.has(node.id) : (node.selectable ?? true),
-        sourcePosition: isVerticalFlow ? Position.Bottom : Position.Right,
-        targetPosition: isVerticalFlow ? Position.Top : Position.Left,
+        sourcePosition: sideSource && !spineSource ? Position.Right : isVerticalFlow ? Position.Bottom : Position.Right,
+        targetPosition: sideTarget ? Position.Left : isVerticalFlow ? Position.Top : Position.Left,
         data: data as ReactFlowNode["data"],
       };
 
@@ -3145,6 +3212,7 @@ function CanvasContent({
     isVerticalFlow,
     runParticipantNodeIds,
     runSelectableSet,
+    factoryRunLeafLayout,
   ]);
 
   const edgeTypes = useMemo(
@@ -3169,30 +3237,106 @@ function CanvasContent({
   }, [isVerticalFlow, resolvedTheme]);
 
   const styledEdges = useMemo(() => {
-    const nodesById = isVerticalFlow ? new Map(state.nodes.map((node) => [node.id, node])) : null;
+    const nodesById = new Map(state.nodes.map((node) => [node.id, node]));
     const palette = isVerticalFlow ? factoryEdgePalette(resolvedTheme === "dark") : null;
+    const edges = state.edges ?? [];
 
-    return state.edges?.map((e) => {
+    let contrastEdgeIds = new Set<string>();
+    let involvedTouchEdgeIds = new Set<string>();
+    if (factoryRunLeafLayout) {
+      const pathEntries: Array<{ id: string; path: string }> = [];
+      for (const edge of edges) {
+        const edgeKey = factoryRunLeafEdgeKey(edge.source, edge.target, edge.sourceHandle);
+        const leafEdge = factoryRunLeafLayout.leafEdgeKeys.has(edgeKey);
+        const sourcePos =
+          factoryRunLeafLayout.positions.get(edge.source) ?? nodesById.get(edge.source)?.position;
+        const targetPos =
+          factoryRunLeafLayout.positions.get(edge.target) ?? nodesById.get(edge.target)?.position;
+        if (!sourcePos || !targetPos) continue;
+
+        const sourceNode = nodesById.get(edge.source);
+        const targetNode = nodesById.get(edge.target);
+        const sourceW = sourceNode?.width && sourceNode.width > 0 ? sourceNode.width : FACTORY_RUN_NODE_WIDTH;
+        const sourceH = sourceNode?.height && sourceNode.height > 0 ? sourceNode.height : FACTORY_RUN_NODE_HEIGHT;
+        const targetW = targetNode?.width && targetNode.width > 0 ? targetNode.width : FACTORY_RUN_NODE_WIDTH;
+        const targetH = targetNode?.height && targetNode.height > 0 ? targetNode.height : FACTORY_RUN_NODE_HEIGHT;
+
+        const sourceSide = leafEdge ? Position.Right : Position.Bottom;
+        const targetSide = leafEdge ? Position.Left : Position.Top;
+        const sourceAnchor = factoryRunHandleAnchor(sourcePos, sourceW, sourceH, sourceSide);
+        const targetAnchor = factoryRunHandleAnchor(targetPos, targetW, targetH, targetSide);
+        const routeGutterX = factoryRunLeafLayout.edgeRouteGutters.get(edgeKey);
+        const [path] = getCanvasEdgePath({
+          sourceX: sourceAnchor.x,
+          sourceY: sourceAnchor.y,
+          targetX: targetAnchor.x,
+          targetY: targetAnchor.y,
+          sourcePosition: sourceSide,
+          targetPosition: targetSide,
+          ...(typeof routeGutterX === "number" ? { routeGutterX } : {}),
+        });
+        pathEntries.push({ id: edge.id, path });
+      }
+      const touchContrast = findTouchContrastEdgeIds(pathEntries);
+      contrastEdgeIds = touchContrast.contrastIds;
+      involvedTouchEdgeIds = touchContrast.involvedIds;
+    }
+
+    return edges.map((e) => {
       const diffStatus = (e.data as Record<string, unknown> | undefined)?._draftDiffStatus;
       const diffStyle = getDraftDiffEdgeStyle(diffStatus) ?? {};
 
       let factoryToneClassName: string | undefined;
       let factoryToneStyle: { stroke: string; strokeWidth: number } | undefined;
       let animated = e.animated;
+      let factoryTone: ReturnType<typeof resolveFactoryEdgeTone> = "default";
 
-      if (isVerticalFlow && nodesById && palette) {
+      if (isVerticalFlow && palette) {
         const targetNode = nodesById.get(e.target);
-        const tone = resolveFactoryEdgeTone(primaryEventStateFromCanvasNodeData(targetNode?.data));
-        factoryToneClassName = factoryEdgeToneClassName(tone);
-        factoryToneStyle = palette[tone];
-        animated = tone === "running";
+        factoryTone = resolveFactoryEdgeTone(primaryEventStateFromCanvasNodeData(targetNode?.data));
+        factoryToneClassName = factoryEdgeToneClassName(factoryTone);
+        factoryToneStyle = palette[factoryTone];
+        animated = factoryTone === "running";
       }
 
-      const className = [e.className, factoryToneClassName].filter(Boolean).join(" ") || undefined;
+      const edgeKey = factoryRunLeafEdgeKey(e.source, e.target, e.sourceHandle);
+      const leafEdge = factoryRunLeafLayout != null && factoryRunLeafLayout.leafEdgeKeys.has(edgeKey);
+      const spineEdge =
+        factoryRunLeafLayout != null &&
+        factoryRunLeafLayout.spineEdgeKeys.has(edgeKey) &&
+        factoryRunLeafLayout.compactForkNodeIds.has(e.source);
+      const originalChannel =
+        typeof e.sourceHandle === "string" && e.sourceHandle.length > 0 && e.sourceHandle !== "default"
+          ? e.sourceHandle
+          : undefined;
+      const routeGutterX = factoryRunLeafLayout?.edgeRouteGutters.get(edgeKey);
+      const statusBlocksContrast = factoryTone === "running" || factoryTone === "failed";
+      const touchesOtherEdge =
+        factoryRunLeafLayout != null && involvedTouchEdgeIds.has(e.id) && !statusBlocksContrast;
+      const contrastStroke =
+        factoryRunLeafLayout != null && contrastEdgeIds.has(e.id) && !statusBlocksContrast;
+
+      const className =
+        [e.className, factoryToneClassName, contrastStroke ? FACTORY_TOUCHING_EDGE_CLASS : undefined]
+          .filter(Boolean)
+          .join(" ") || undefined;
 
       return {
         ...e,
         ...edgeDefaults,
+        ...(leafEdge
+          ? {
+              sourceHandle: FACTORY_SIDE_HANDLE_ID,
+              sourcePosition: Position.Right,
+              targetPosition: Position.Left,
+            }
+          : spineEdge
+            ? {
+                sourceHandle: FACTORY_SPINE_HANDLE_ID,
+                sourcePosition: Position.Bottom,
+                targetPosition: Position.Top,
+              }
+            : {}),
         animated,
         className,
         style: { ...edgeDefaults.style, ...factoryToneStyle, ...diffStyle },
@@ -3201,6 +3345,10 @@ function CanvasContent({
           isHovered: e.id === hoveredEdgeId,
           canDelete: isEditMode && !isReadOnly && diffStatus !== "removed",
           onDelete: isEditMode && !isReadOnly && diffStatus !== "removed" ? stableEdgeDelete : undefined,
+          ...(factoryRunLeafLayout && originalChannel ? { channelLabel: originalChannel } : {}),
+          ...(typeof routeGutterX === "number" ? { routeGutterX } : {}),
+          ...(touchesOtherEdge ? { touchesOtherEdge: true } : {}),
+          ...(contrastStroke ? { contrastStroke: true } : {}),
         },
         zIndex: e.id === hoveredEdgeId ? 1000 : 0,
       };
@@ -3215,6 +3363,7 @@ function CanvasContent({
     isVerticalFlow,
     resolvedTheme,
     edgeDefaults,
+    factoryRunLeafLayout,
   ]);
 
   const { visibleNodeIds, visibleEdgeIds } = useCanvasViewportCulling(nodesWithCallbacks, styledEdges ?? [], true);

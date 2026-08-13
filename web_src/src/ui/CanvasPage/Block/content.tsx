@@ -14,6 +14,11 @@ import { isRecord } from "@/pages/app/mappers/safeMappers";
 import { isVerticalCanvasFlow } from "@/lib/canvasFlowDirection";
 
 function getCompactView(data: BlockProps["data"], isCompactView: BlockProps["isCompactView"]) {
+  // Factory nodes always render expanded — collapse chrome is disabled.
+  if (isVerticalCanvasFlow(data._flowDirection)) {
+    return false;
+  }
+
   if (isCompactView !== undefined) {
     return isCompactView;
   }
@@ -30,10 +35,14 @@ function getCompactView(data: BlockProps["data"], isCompactView: BlockProps["isC
   }
 }
 
-function getActionProps(compactView: boolean, props: Pick<BlockProps, ComponentActionKeys>) {
+function getActionProps(
+  compactView: boolean,
+  props: Pick<BlockProps, ComponentActionKeys>,
+  options?: { omitToggleView?: boolean },
+) {
   return {
     onDuplicate: props.onDuplicate,
-    onToggleView: props.onToggleView,
+    onToggleView: options?.omitToggleView ? undefined : props.onToggleView,
     onDelete: props.onDelete,
     isCompactView: compactView,
   };
@@ -259,12 +268,17 @@ export function BlockContent({
   onAnnotationBlur,
   dimBodyBelowHeader,
 }: BlockProps) {
+  const isFactoryApp = isVerticalCanvasFlow(data._flowDirection);
   const compactView = getCompactView(data, isCompactView);
-  const actionProps = getActionProps(compactView, {
-    onDuplicate,
-    onToggleView,
-    onDelete,
-  });
+  const actionProps = getActionProps(
+    compactView,
+    {
+      onDuplicate,
+      onToggleView,
+      onDelete,
+    },
+    { omitToggleView: isFactoryApp },
+  );
 
   return renderBlockByType({
     data,

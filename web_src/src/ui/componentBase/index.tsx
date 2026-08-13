@@ -94,6 +94,10 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   isFactoryApp?: boolean;
   /** False on factory Live without a selected run (topology only). */
   showRuntimeStatus?: boolean;
+  /** Go Action.Label() — factory card primary title. */
+  componentLabel?: string;
+  /** User-given node name — factory card gray subtitle. */
+  nodeName?: string;
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = (props) => {
@@ -101,6 +105,8 @@ export const ComponentBase: React.FC<ComponentBaseProps> = (props) => {
     return (
       <FactoryNodeCard
         title={props.title}
+        componentLabel={props.componentLabel}
+        nodeName={props.nodeName}
         iconSrc={props.iconSrc}
         iconSlug={props.iconSlug}
         iconColor={props.iconColor}
