@@ -103,18 +103,18 @@ function FlowChevronMarkers({
             position: "absolute",
             transform: `translate(-50%, -50%) translate(${arrow.x}px,${arrow.y}px) rotate(${arrow.angleDeg}deg)`,
             pointerEvents: "none",
-            zIndex: 998,
+            zIndex: 0,
             color,
             opacity: 0.95,
           }}
           className="nodrag nopan select-none"
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 12 12" aria-hidden="true">
             <path
               d="M4 2.5 L8.5 6 L4 9.5"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.5"
+              strokeWidth="1.6"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
@@ -123,6 +123,46 @@ function FlowChevronMarkers({
       ))}
     </EdgeLabelRenderer>
   );
+}
+
+function readCustomEdgeData(data: EdgeProps["data"]) {
+  const edgeData = data as CustomEdgeData | undefined;
+  const routeGutterX =
+    typeof edgeData?.routeGutterX === "number" && Number.isFinite(edgeData.routeGutterX)
+      ? edgeData.routeGutterX
+      : undefined;
+  return {
+    isHovered: edgeData?.isHovered === true,
+    canDelete: edgeData?.canDelete === true,
+    onDeleteEdge: edgeData?.onDelete,
+    channelLabel: typeof edgeData?.channelLabel === "string" ? edgeData.channelLabel.trim() : "",
+    touchesOtherEdge: edgeData?.touchesOtherEdge === true,
+    contrastStroke: edgeData?.contrastStroke === true,
+    routeGutterX,
+  };
+}
+
+function resolveEdgeLineStroke(contrastStroke: boolean, styleStroke: CSSProperties["stroke"]): string {
+  if (contrastStroke) {
+    return TOUCHING_EDGE_STROKE;
+  }
+  if (typeof styleStroke === "string") {
+    return styleStroke;
+  }
+  return DEFAULT_FACTORY_EDGE_STROKE;
+}
+
+function buildEdgeStrokeStyle(
+  style: CSSProperties,
+  selected: boolean | undefined,
+  isHovered: boolean,
+): CSSProperties {
+  return {
+    strokeWidth: selected ? 3 : style.strokeWidth || 3,
+    pointerEvents: "visibleStroke",
+    ...(style.strokeDasharray ? { strokeDasharray: style.strokeDasharray } : {}),
+    ...(selected || isHovered ? { strokeOpacity: 1 } : {}),
+  };
 }
 
 export const CustomEdge = React.memo(function CustomEdge({
@@ -138,17 +178,8 @@ export const CustomEdge = React.memo(function CustomEdge({
   data,
 }: EdgeProps) {
   const { setEdges } = useReactFlow();
-  const edgeData = data as CustomEdgeData | undefined;
-  const isHovered = edgeData?.isHovered === true;
-  const canDelete = edgeData?.canDelete === true;
-  const onDeleteEdge = edgeData?.onDelete;
-  const channelLabel = typeof edgeData?.channelLabel === "string" ? edgeData.channelLabel.trim() : "";
-  const touchesOtherEdge = edgeData?.touchesOtherEdge === true;
-  const contrastStroke = edgeData?.contrastStroke === true;
-  const routeGutterX =
-    typeof edgeData?.routeGutterX === "number" && Number.isFinite(edgeData.routeGutterX)
-      ? edgeData.routeGutterX
-      : undefined;
+  const { isHovered, canDelete, onDeleteEdge, channelLabel, touchesOtherEdge, contrastStroke, routeGutterX } =
+    readCustomEdgeData(data);
 
   const [edgePath, labelX, labelY] = getCanvasEdgePath({
     sourceX,
@@ -178,13 +209,7 @@ export const CustomEdge = React.memo(function CustomEdge({
     setEdges((edges) => edges.filter((edge) => edge.id !== id));
   }, [id, onDeleteEdge, setEdges]);
 
-  // Stroke color comes from CSS (incl. sp-edge-factory-touching). Do not fight !important inline.
-  const edgeStyle: CSSProperties = {
-    strokeWidth: selected ? 3 : style.strokeWidth || 3,
-    pointerEvents: "visibleStroke",
-    ...(style.strokeDasharray ? { strokeDasharray: style.strokeDasharray } : {}),
-    ...(selected || isHovered ? { strokeOpacity: 1 } : {}),
-  };
+  const edgeStyle = buildEdgeStrokeStyle(style, selected, isHovered);
   const shouldShowIcon = canDelete && (isHovered || selected === true);
   const handleDeletePointerDown = useCallback(
     (event: React.PointerEvent<SVGPathElement>) => {
@@ -195,11 +220,7 @@ export const CustomEdge = React.memo(function CustomEdge({
     [handleEdgeDelete],
   );
 
-  const lineStroke = contrastStroke
-    ? TOUCHING_EDGE_STROKE
-    : typeof style.stroke === "string"
-      ? style.stroke
-      : DEFAULT_FACTORY_EDGE_STROKE;
+  const lineStroke = resolveEdgeLineStroke(contrastStroke, style.stroke);
 
   return (
     <>

@@ -1,7 +1,6 @@
 import {
   Background,
   Panel,
-  Position,
   ReactFlow,
   ReactFlowProvider,
   ViewportPortal,
@@ -16,24 +15,8 @@ import {
   type Viewport,
 } from "@xyflow/react";
 import { resolveCanvasFlowDirection } from "@/lib/canvasFlowDirection";
-import {
-  factoryCanvasBackground,
-  factoryEdgePalette,
-  factoryEdgeToneClassName,
-  primaryEventStateFromCanvasNodeData,
-  resolveFactoryEdgeTone,
-} from "@/lib/factoryCanvasChrome";
-import {
-  FACTORY_SIDE_HANDLE_ID,
-  FACTORY_SPINE_HANDLE_ID,
-  factoryRunLeafEdgeKey,
-  layoutFactoryRunLeafGraph,
-} from "@/lib/layout/factoryRunLeafLayout";
-import {
-  FACTORY_TOUCHING_EDGE_CLASS,
-  findTouchContrastEdgeIds,
-  getCanvasEdgePath,
-} from "@/ui/CanvasPage/edgePath";
+import { factoryCanvasBackground, factoryEdgePalette } from "@/lib/factoryCanvasChrome";
+import { layoutFactoryRunLeafGraph } from "@/lib/layout/factoryRunLeafLayout";
 
 import { GlobalCommandPaletteCanvasNodeSearch } from "@/components/GlobalCommandPalette/canvasNodeSearch";
 import { openGlobalCommandPalette } from "@/components/GlobalCommandPalette/controller";
@@ -41,7 +24,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ZoomSlider } from "@/components/zoom-slider";
-import { getDraftDiffEdgeStyle } from "@/lib/draftDiff";
 import { DARK_BASE_BG_HEX } from "@/lib/darkThemeSurfaces";
 import { cn } from "@/lib/utils";
 import { CircleX, Copy, LayoutGrid, Loader2, Search, Trash2, CircleAlert } from "lucide-react";
@@ -111,13 +93,15 @@ import type { SidebarEvent } from "../componentSidebar/types";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { RunInspectorLoadingPanel } from "../Runs/RunInspectorLoadingPanel";
 import { RunInspectorPanel } from "../Runs/RunInspectorPanel";
+import { getRunStatus } from "../Runs/runPresentation";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
 import type { AgentSuggestion } from "./components/AgentSuggestionsHoverCard";
 import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
-import { isCanvasNodeHighlighted, shouldBlankCanvasNodeBody } from "./nodeDimming";
+import { enrichCanvasNodes, type EnrichedCanvasNodeCacheEntry } from "./enrichCanvasNodes";
+import { buildStyledCanvasEdges } from "./factoryCanvasEdgeStyle";
 import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
 import { RightSideControls } from "./RightSideControls";
 import { computeAppendFromNodePlacement } from "./appendFromNodePlacement";
@@ -489,29 +473,6 @@ const CLASSIC_EDGE_STYLE = {
   style: { stroke: "#C9D5E1", strokeWidth: 3 },
 } as const;
 
-/** Match factoryRunLeafLayout defaults when measuring handles for touch detection. */
-const FACTORY_RUN_NODE_WIDTH = 280;
-const FACTORY_RUN_NODE_HEIGHT = 104;
-
-function factoryRunHandleAnchor(
-  position: { x: number; y: number },
-  width: number,
-  height: number,
-  side: Position,
-): { x: number; y: number } {
-  switch (side) {
-    case Position.Top:
-      return { x: position.x + width / 2, y: position.y };
-    case Position.Bottom:
-      return { x: position.x + width / 2, y: position.y + height };
-    case Position.Left:
-      return { x: position.x, y: position.y + height / 2 };
-    case Position.Right:
-    default:
-      return { x: position.x + width, y: position.y + height / 2 };
-  }
-}
-
 const DEFAULT_CANVAS_ZOOM = 0.8;
 const MIN_CANVAS_ZOOM = 0.1;
 const SNAP_GRID_STEP_PX = 24;
@@ -571,6 +532,7 @@ type CanvasNodeRendererCallbacks = {
   hasMultiSelection: boolean;
   canvasMode: "live" | "edit";
   showRuntimeStatus: boolean;
+  runIsActive: boolean;
 };
 
 type CanvasBlockNodeData = CanvasBlockData &
@@ -584,54 +546,6 @@ type CanvasConnectionState = {
   handleId: string | null;
   handleType: "source" | "target" | null;
 };
-
-type EnrichedCanvasNodeCacheEntry = {
-  sourceNode: ReactFlowNode;
-  sourceData: ReactFlowNode["data"];
-  node: ReactFlowNode;
-  data: CanvasBlockNodeData;
-  hoveredEdge: CanvasEdge | null;
-  connectingFrom: CanvasConnectionState | null;
-  edges: CanvasEdge[];
-  isHighlighted: boolean;
-  hasHighlightedNodes: boolean;
-  runParticipantKey: string;
-  flowDirection: ReturnType<typeof resolveCanvasFlowDirection>;
-};
-
-function canReuseEnrichedNodeData({
-  cachedNode,
-  node,
-  hoveredEdge,
-  connectingFrom,
-  edges,
-  isHighlighted,
-  hasHighlightedNodes,
-  runParticipantKey,
-  flowDirection,
-}: {
-  cachedNode: EnrichedCanvasNodeCacheEntry | undefined;
-  node: ReactFlowNode;
-  hoveredEdge: CanvasEdge | null;
-  connectingFrom: CanvasConnectionState | null;
-  edges: CanvasEdge[];
-  isHighlighted: boolean;
-  hasHighlightedNodes: boolean;
-  runParticipantKey: string;
-  flowDirection: ReturnType<typeof resolveCanvasFlowDirection>;
-}) {
-  return (
-    cachedNode &&
-    cachedNode.sourceData === node.data &&
-    cachedNode.hoveredEdge === hoveredEdge &&
-    cachedNode.connectingFrom === connectingFrom &&
-    cachedNode.edges === edges &&
-    cachedNode.isHighlighted === isHighlighted &&
-    cachedNode.hasHighlightedNodes === hasHighlightedNodes &&
-    cachedNode.runParticipantKey === runParticipantKey &&
-    cachedNode.flowDirection === flowDirection
-  );
-}
 
 type CollapsibleNodeData = {
   type?: unknown;
@@ -743,6 +657,7 @@ function buildInteractiveNodeBlockProps(
     showHeader: callbacks.showHeader && !callbacks.hasMultiSelection,
     canvasMode: callbacks.canvasMode,
     showRuntimeStatus: callbacks.showRuntimeStatus,
+    runIsActive: callbacks.runIsActive,
     onAppendFromNode: callbacks.onAppendFromNode,
     onClick: (event) => callbacks.handleNodeClick(nodeId, event),
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
@@ -1405,6 +1320,7 @@ function CanvasPage(props: CanvasPageProps) {
         canReadIntegrations={props.canReadIntegrations}
         canCreateIntegrations={props.canCreateIntegrations}
         canUpdateIntegrations={props.canUpdateIntegrations}
+        factoryChrome={Boolean(props.factoryEmbed || props.factoryId)}
       />
     ),
     [
@@ -1417,6 +1333,8 @@ function CanvasPage(props: CanvasPageProps) {
       props.canCreateIntegrations,
       props.canReadIntegrations,
       props.canUpdateIntegrations,
+      props.factoryEmbed,
+      props.factoryId,
       props.fetchRunIdForSidebarEvent,
       props.getAllHistoryEvents,
       props.getAllQueueEvents,
@@ -1630,6 +1548,7 @@ function CanvasPage(props: CanvasPageProps) {
                   setCurrentTab={setCurrentTab}
                   showBottomStatusControls={props.showBottomStatusControls}
                   isRunInspectionMode={props.isRunInspectionMode}
+                  runNodeDetailRun={props.runNodeDetailRun}
                   isEditing={props.isEditing}
                   isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
                   onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
@@ -1767,6 +1686,7 @@ function Sidebar({
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
+  factoryChrome = false,
   layout = "sidebar",
 }: {
   layout?: "sidebar" | "bottom";
@@ -1814,6 +1734,7 @@ function Sidebar({
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
+  factoryChrome?: boolean;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -1972,6 +1893,7 @@ function Sidebar({
       hideRunsTab={isAnnotationNode}
       hideDocsTab={isAnnotationNode}
       hideNodeId={isAnnotationNode}
+      factoryChrome={factoryChrome}
       readOnly={readOnly}
       resolveRunId={resolveRunId}
       fetchRunId={fetchRunId}
@@ -2258,6 +2180,7 @@ function CanvasContent({
   setCurrentTab,
   showBottomStatusControls = true,
   isRunInspectionMode = false,
+  runNodeDetailRun = null,
   isEditing = false,
   isAutoLayoutOnUpdateEnabled,
   onToggleAutoLayoutOnUpdate,
@@ -2316,6 +2239,7 @@ function CanvasContent({
   setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
   showBottomStatusControls?: boolean;
   isRunInspectionMode?: boolean;
+  runNodeDetailRun?: CanvasesCanvasRun | null;
   isEditing?: boolean;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
@@ -2969,6 +2893,14 @@ function CanvasContent({
 
   // Factory Live without a run is topology-only — no runtime status footers.
   const showRuntimeStatus = !factoryEmbed || isRunInspectionMode;
+  // Default true when no run yet — do not flip unfinished views to Did not run.
+  const runIsActive = useMemo(() => {
+    if (!runNodeDetailRun) {
+      return true;
+    }
+    const status = getRunStatus(runNodeDetailRun);
+    return status === "running" || status === "cancelling";
+  }, [runNodeDetailRun]);
 
   // Ephemeral leaf-right layout while inspecting a factory run (does not persist).
   const factoryRunLeafLayout = useMemo(() => {
@@ -3000,6 +2932,7 @@ function CanvasContent({
     hasMultiSelection,
     canvasMode: isEditMode ? ("edit" as const) : ("live" as const),
     showRuntimeStatus,
+    runIsActive,
   });
   callbacksRef.current = {
     handleNodeClick,
@@ -3014,6 +2947,7 @@ function CanvasContent({
     hasMultiSelection,
     canvasMode: isEditMode ? "edit" : "live",
     showRuntimeStatus,
+    runIsActive,
   };
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes
@@ -3101,107 +3035,23 @@ function CanvasContent({
         : "";
     const runParticipantSet =
       runParticipantNodeIds !== undefined && runParticipantNodeIds.length > 0 ? new Set(runParticipantNodeIds) : null;
-    const edgeHoverActive = false;
-    const runDimActive = runParticipantSet !== null;
-    const hasHighlightedNodes = edgeHoverActive || runDimActive;
-    const visibleNodeIds = new Set<string>();
-    const enrichedNodes = state.nodes.map((node) => {
-      visibleNodeIds.add(node.id);
 
-      const isHighlighted = isCanvasNodeHighlighted({
-        nodeId: node.id,
-        edgeHoverActive,
-        highlightedNodeIds: new Set<string>(),
-        runDimActive,
-        runParticipantSet,
-      });
-      const shouldBlankBody = shouldBlankCanvasNodeBody({
-        nodeId: node.id,
-        edgeHoverActive,
-        runDimActive,
-        runParticipantSet,
-      });
-      const cachedNode = enrichedNodeCacheRef.current.get(node.id);
-      const canReuseData = canReuseEnrichedNodeData({
-        cachedNode,
-        node,
-        hoveredEdge,
-        connectingFrom,
-        edges: state.edges,
-        isHighlighted,
-        hasHighlightedNodes,
-        runParticipantKey,
-        flowDirection,
-      });
-
-      const sideSource = factoryRunLeafLayout?.sideHandleNodeIds.has(node.id) ?? false;
-      const sideTarget = factoryRunLeafLayout?.sideTargetNodeIds.has(node.id) ?? false;
-      const compactFork = factoryRunLeafLayout?.compactForkNodeIds.has(node.id) ?? false;
-      const spineSource = factoryRunLeafLayout?.spineSourceNodeIds.has(node.id) ?? false;
-      const overlayPosition = factoryRunLeafLayout?.positions.get(node.id);
-
-      // Skip full reuse when run leaf layout overlays positions / side handles.
-      if (canReuseData && cachedNode && cachedNode.sourceNode === node && !factoryRunLeafLayout) {
-        return cachedNode.node;
-      }
-      const sourceData = node.data as CanvasBlockNodeData;
-      const factoryLayoutFlags = {
-        _factorySideSource: sideSource,
-        _factorySideTarget: sideTarget,
-        _factoryCompactFork: compactFork,
-        _factorySpineSource: spineSource,
-      };
-      const data =
-        canReuseData && cachedNode
-          ? {
-              ...cachedNode.data,
-              ...factoryLayoutFlags,
-            }
-          : {
-              ...sourceData,
-              _callbacksRef: callbacksRef,
-              _hoveredEdge: hoveredEdge ?? undefined,
-              _connectingFrom: blockConnectingFrom,
-              _allEdges: state.edges,
-              _isHighlighted: isHighlighted,
-              _hasHighlightedNodes: hasHighlightedNodes,
-              _dimBodyBelowHeader: shouldBlankBody,
-              _flowDirection: flowDirection,
-              ...factoryLayoutFlags,
-            };
-      const enrichedNode: ReactFlowNode = {
-        ...node,
-        position: overlayPosition ?? node.position,
-        selectable: runSelectableSet ? runSelectableSet.has(node.id) : (node.selectable ?? true),
-        sourcePosition: sideSource && !spineSource ? Position.Right : isVerticalFlow ? Position.Bottom : Position.Right,
-        targetPosition: sideTarget ? Position.Left : isVerticalFlow ? Position.Top : Position.Left,
-        data: data as ReactFlowNode["data"],
-      };
-
-      enrichedNodeCacheRef.current.set(node.id, {
-        sourceNode: node,
-        sourceData: node.data,
-        node: enrichedNode,
-        data,
-        hoveredEdge,
-        connectingFrom,
-        edges: state.edges,
-        isHighlighted,
-        hasHighlightedNodes,
-        runParticipantKey,
-        flowDirection,
-      });
-
-      return enrichedNode;
+    return enrichCanvasNodes({
+      nodes: state.nodes,
+      cache: enrichedNodeCacheRef.current,
+      hoveredEdge,
+      connectingFrom,
+      edges: state.edges,
+      blockConnectingFrom,
+      callbacksRef,
+      edgeHoverActive: false,
+      runParticipantSet,
+      runParticipantKey,
+      flowDirection,
+      isVerticalFlow,
+      runSelectableSet,
+      factoryRunLeafLayout,
     });
-
-    for (const nodeId of enrichedNodeCacheRef.current.keys()) {
-      if (!visibleNodeIds.has(nodeId)) {
-        enrichedNodeCacheRef.current.delete(nodeId);
-      }
-    }
-
-    return enrichedNodes;
   }, [
     state.nodes,
     hoveredEdge,
@@ -3236,135 +3086,33 @@ function CanvasContent({
     };
   }, [isVerticalFlow, resolvedTheme]);
 
-  const styledEdges = useMemo(() => {
-    const nodesById = new Map(state.nodes.map((node) => [node.id, node]));
-    const palette = isVerticalFlow ? factoryEdgePalette(resolvedTheme === "dark") : null;
-    const edges = state.edges ?? [];
-
-    let contrastEdgeIds = new Set<string>();
-    let involvedTouchEdgeIds = new Set<string>();
-    if (factoryRunLeafLayout) {
-      const pathEntries: Array<{ id: string; path: string }> = [];
-      for (const edge of edges) {
-        const edgeKey = factoryRunLeafEdgeKey(edge.source, edge.target, edge.sourceHandle);
-        const leafEdge = factoryRunLeafLayout.leafEdgeKeys.has(edgeKey);
-        const sourcePos =
-          factoryRunLeafLayout.positions.get(edge.source) ?? nodesById.get(edge.source)?.position;
-        const targetPos =
-          factoryRunLeafLayout.positions.get(edge.target) ?? nodesById.get(edge.target)?.position;
-        if (!sourcePos || !targetPos) continue;
-
-        const sourceNode = nodesById.get(edge.source);
-        const targetNode = nodesById.get(edge.target);
-        const sourceW = sourceNode?.width && sourceNode.width > 0 ? sourceNode.width : FACTORY_RUN_NODE_WIDTH;
-        const sourceH = sourceNode?.height && sourceNode.height > 0 ? sourceNode.height : FACTORY_RUN_NODE_HEIGHT;
-        const targetW = targetNode?.width && targetNode.width > 0 ? targetNode.width : FACTORY_RUN_NODE_WIDTH;
-        const targetH = targetNode?.height && targetNode.height > 0 ? targetNode.height : FACTORY_RUN_NODE_HEIGHT;
-
-        const sourceSide = leafEdge ? Position.Right : Position.Bottom;
-        const targetSide = leafEdge ? Position.Left : Position.Top;
-        const sourceAnchor = factoryRunHandleAnchor(sourcePos, sourceW, sourceH, sourceSide);
-        const targetAnchor = factoryRunHandleAnchor(targetPos, targetW, targetH, targetSide);
-        const routeGutterX = factoryRunLeafLayout.edgeRouteGutters.get(edgeKey);
-        const [path] = getCanvasEdgePath({
-          sourceX: sourceAnchor.x,
-          sourceY: sourceAnchor.y,
-          targetX: targetAnchor.x,
-          targetY: targetAnchor.y,
-          sourcePosition: sourceSide,
-          targetPosition: targetSide,
-          ...(typeof routeGutterX === "number" ? { routeGutterX } : {}),
-        });
-        pathEntries.push({ id: edge.id, path, source: edge.source, target: edge.target });
-      }
-      const touchContrast = findTouchContrastEdgeIds(pathEntries);
-      contrastEdgeIds = touchContrast.contrastIds;
-      involvedTouchEdgeIds = touchContrast.involvedIds;
-    }
-
-    return edges.map((e) => {
-      const diffStatus = (e.data as Record<string, unknown> | undefined)?._draftDiffStatus;
-      const diffStyle = getDraftDiffEdgeStyle(diffStatus) ?? {};
-
-      let factoryToneClassName: string | undefined;
-      let factoryToneStyle: { stroke: string; strokeWidth: number } | undefined;
-      let animated = e.animated;
-      let factoryTone: ReturnType<typeof resolveFactoryEdgeTone> = "default";
-
-      if (isVerticalFlow && palette) {
-        const targetNode = nodesById.get(e.target);
-        factoryTone = resolveFactoryEdgeTone(primaryEventStateFromCanvasNodeData(targetNode?.data));
-        factoryToneClassName = factoryEdgeToneClassName(factoryTone);
-        factoryToneStyle = palette[factoryTone];
-        animated = factoryTone === "running";
-      }
-
-      const edgeKey = factoryRunLeafEdgeKey(e.source, e.target, e.sourceHandle);
-      const leafEdge = factoryRunLeafLayout != null && factoryRunLeafLayout.leafEdgeKeys.has(edgeKey);
-      const spineEdge =
-        factoryRunLeafLayout != null &&
-        factoryRunLeafLayout.spineEdgeKeys.has(edgeKey) &&
-        factoryRunLeafLayout.compactForkNodeIds.has(e.source);
-      const originalChannel =
-        typeof e.sourceHandle === "string" && e.sourceHandle.length > 0 && e.sourceHandle !== "default"
-          ? e.sourceHandle
-          : undefined;
-      const routeGutterX = factoryRunLeafLayout?.edgeRouteGutters.get(edgeKey);
-      const statusBlocksContrast = factoryTone === "running" || factoryTone === "failed";
-      const touchesOtherEdge =
-        factoryRunLeafLayout != null && involvedTouchEdgeIds.has(e.id) && !statusBlocksContrast;
-      const contrastStroke =
-        factoryRunLeafLayout != null && contrastEdgeIds.has(e.id) && !statusBlocksContrast;
-
-      const className =
-        [e.className, factoryToneClassName, contrastStroke ? FACTORY_TOUCHING_EDGE_CLASS : undefined]
-          .filter(Boolean)
-          .join(" ") || undefined;
-
-      return {
-        ...e,
-        ...edgeDefaults,
-        ...(leafEdge
-          ? {
-              sourceHandle: FACTORY_SIDE_HANDLE_ID,
-              sourcePosition: Position.Right,
-              targetPosition: Position.Left,
-            }
-          : spineEdge
-            ? {
-                sourceHandle: FACTORY_SPINE_HANDLE_ID,
-                sourcePosition: Position.Bottom,
-                targetPosition: Position.Top,
-              }
-            : {}),
-        animated,
-        className,
-        style: { ...edgeDefaults.style, ...factoryToneStyle, ...diffStyle },
-        data: {
-          ...e.data,
-          isHovered: e.id === hoveredEdgeId,
-          canDelete: isEditMode && !isReadOnly && diffStatus !== "removed",
-          onDelete: isEditMode && !isReadOnly && diffStatus !== "removed" ? stableEdgeDelete : undefined,
-          ...(factoryRunLeafLayout && originalChannel ? { channelLabel: originalChannel } : {}),
-          ...(typeof routeGutterX === "number" ? { routeGutterX } : {}),
-          ...(touchesOtherEdge ? { touchesOtherEdge: true } : {}),
-          ...(contrastStroke ? { contrastStroke: true } : {}),
-        },
-        zIndex: e.id === hoveredEdgeId ? 1000 : 0,
-      };
-    });
-  }, [
-    state.edges,
-    state.nodes,
-    hoveredEdgeId,
-    stableEdgeDelete,
-    isEditMode,
-    isReadOnly,
-    isVerticalFlow,
-    resolvedTheme,
-    edgeDefaults,
-    factoryRunLeafLayout,
-  ]);
+  const styledEdges = useMemo(
+    () =>
+      buildStyledCanvasEdges({
+        edges: state.edges,
+        nodes: state.nodes,
+        isVerticalFlow,
+        resolvedThemeIsDark: resolvedTheme === "dark",
+        edgeDefaults,
+        hoveredEdgeId,
+        isEditMode,
+        isReadOnly,
+        stableEdgeDelete,
+        factoryRunLeafLayout,
+      }),
+    [
+      state.edges,
+      state.nodes,
+      hoveredEdgeId,
+      stableEdgeDelete,
+      isEditMode,
+      isReadOnly,
+      isVerticalFlow,
+      resolvedTheme,
+      edgeDefaults,
+      factoryRunLeafLayout,
+    ],
+  );
 
   const { visibleNodeIds, visibleEdgeIds } = useCanvasViewportCulling(nodesWithCallbacks, styledEdges ?? [], true);
   const { nodes: culledNodes, edges: culledEdges } = useMemo(

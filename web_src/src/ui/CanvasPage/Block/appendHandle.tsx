@@ -3,16 +3,12 @@ import { Plus } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { CANVAS_CONNECTOR_COLOR } from "@/lib/canvasEdgeColors";
-import { FACTORY_NODE_CARD_HEIGHT, FACTORY_NODE_CARD_WIDTH } from "@/lib/factoryCanvasChrome";
 import { resolveHandleStyle } from "./handleStyle";
 import type { BlockProps } from "./types";
 
 const APPEND_SOURCE_LINE_WIDTH = 42;
 const APPEND_SOURCE_BUTTON_LEFT = 54;
 const APPEND_HORIZONTAL_NUDGE = -4;
-const CLASSIC_PREVIEW_WIDTH = "23rem";
-const CLASSIC_PREVIEW_HEIGHT = 96;
-const CLASSIC_PREVIEW_RADIUS = 8;
 
 const APPEND_HANDLE_STYLE: React.CSSProperties = {
   width: 24,

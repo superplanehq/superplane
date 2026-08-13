@@ -55,7 +55,34 @@ export const Pending: Story = {
     nodeName: "onRun",
     iconSlug: "play",
     canvasMode: "live",
+    runIsActive: true,
     eventSections: [{ eventId: "4", eventState: "neutral", eventTitle: "Idle" }],
+  },
+};
+
+/** Finished run, node never executed (untaken branch). */
+export const DidNotRun: Story = {
+  args: {
+    title: "noop 7",
+    componentLabel: "No Operation",
+    nodeName: "noop 7",
+    iconSlug: "circle",
+    canvasMode: "live",
+    runIsActive: false,
+    eventSections: [],
+  },
+};
+
+/** If component resolved true — must show Passed, not Pending. */
+export const IfResolvedTrue: Story = {
+  args: {
+    title: "if",
+    componentLabel: "If",
+    nodeName: "if",
+    iconSlug: "split",
+    canvasMode: "live",
+    runIsActive: false,
+    eventSections: [{ eventId: "if-1", eventState: "true", eventTitle: "Resolved", eventSubtitle: "5h ago" }],
   },
 };
 

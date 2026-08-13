@@ -74,6 +74,8 @@ export interface BlockProps extends ComponentActionsProps {
   canvasMode?: "live" | "edit";
   /** False on factory Live without a selected run (topology only). */
   showRuntimeStatus?: boolean;
+  /** Factory run inspection: selected run still active (default true). */
+  runIsActive?: boolean;
   onAnnotationUpdate?: (
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },

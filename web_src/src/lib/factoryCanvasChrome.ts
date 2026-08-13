@@ -83,6 +83,8 @@ export const FACTORY_HANDLE_STYLE = {
   border: "1px solid var(--border, #e5e7eb)",
   background: "var(--card, #ffffff)",
   boxShadow: "none",
+  // Half-in ports must paint above the card body.
+  zIndex: 11,
 } as const;
 
 /** Keep FactoryNodeCard, append ghost, placement gap, and ELK estimates aligned. */
