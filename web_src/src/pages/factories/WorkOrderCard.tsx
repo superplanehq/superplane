@@ -153,7 +153,7 @@ function WorkOrderCardActors({
       </span>
       {assigneeDisplays.length > 0 ? (
         <span className="inline-flex items-center gap-1.5">
-          Assignees:
+          Owners:
           <span className="inline-flex items-center -space-x-1">
             {assigneeDisplays.map((display, index) => (
               <OrgUserReference

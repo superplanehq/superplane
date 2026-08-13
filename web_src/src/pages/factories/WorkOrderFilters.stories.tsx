@@ -5,7 +5,7 @@ import { WorkOrderFilters } from "./WorkOrderFilters";
 import type { WorkOrderOwnerFilter, WorkOrderStatusFilter } from "./lib/workOrderProgress";
 
 /**
- * Row of interactive pills: "My Work / Unassigned / All" on the left and
+ * Row of interactive pills: "My Work / No Owner / All" on the left and
  * status filters ("All / Active / Draft / Open / Running / Failed /
  * Completed / Rejected") on the right. Stories manage local state so the
  * pills toggle live.
@@ -56,9 +56,9 @@ export const AllRunning: Story = {
   render: () => <InteractiveFilters initialOwner="all" initialStatus="running" />,
 };
 
-/** Unassigned + Failed — triage view (includes closed-as-failed orders). */
+/** No Owner + Failed — triage view (includes closed-as-failed orders). */
 export const UnassignedFailed: Story = {
-  name: "Unassigned / Failed",
+  name: "No Owner / Failed",
   render: () => <InteractiveFilters initialOwner="unassigned" initialStatus="failed" />,
 };
 

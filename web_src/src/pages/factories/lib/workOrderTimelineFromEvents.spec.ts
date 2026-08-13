@@ -67,7 +67,7 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
       },
     ]);
 
-    expect(view.events[0]?.title).toBe("self-assigned");
+    expect(view.events[0]?.title).toBe("took ownership");
   });
 
   it("renders a draft→open transition as an open with source-run enrichment", () => {
