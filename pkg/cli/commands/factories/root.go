@@ -76,7 +76,13 @@ Examples:
   superplane factory artifacts add \
     --order-id "$OID" \
     --type branch \
-    --name feature/login`,
+    --name feature/login
+
+  superplane factory artifacts add \
+    --order-id "$OID" \
+    --type branch \
+    --name feature/login \
+    --url https://github.com/org/repo/tree/feature/login`,
 		Args: cobra.NoArgs,
 	}
 	addCmd.Flags().StringVar(&factory, "factory", "", "factory name or UUID (default: active factory)")
@@ -85,7 +91,7 @@ Examples:
 	addCmd.Flags().StringVar(&title, "title", "", "artifact title")
 	addCmd.Flags().StringVar(&body, "body", "", "markdown body (inline)")
 	addCmd.Flags().StringVarP(&file, "file", "f", "", "read markdown body from file (or - for stdin)")
-	addCmd.Flags().StringVar(&url, "url", "", "artifact URL (required for pr)")
+	addCmd.Flags().StringVar(&url, "url", "", "artifact URL (required for pr, optional link for branch)")
 	addCmd.Flags().Int64Var(&number, "number", 0, "pull request number")
 	addCmd.Flags().StringVar(&name, "name", "", "branch name (required for branch)")
 	_ = addCmd.MarkFlagRequired("order-id")

@@ -307,6 +307,7 @@ export const OPEN_WORK_ORDER_ARTIFACTS: FactoriesWorkOrderArtifact[] = [
     type: "TYPE_BRANCH",
     data: {
       name: "feature/refund-retry",
+      url: "https://github.com/example/ledger/tree/feature/refund-retry",
     },
     createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
     createdAt: HOUR_AGO,
