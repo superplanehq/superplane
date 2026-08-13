@@ -16,7 +16,7 @@ import {
   type WorkOrderTimelineEventKind,
 } from "./lib/workOrderTimelineEvents";
 import { formatWorkOrderDateTime as formatTimelineDate } from "./lib/workOrderDateTime";
-import { factoryAppRunPath } from "./lib/factoryPagePaths";
+import { getWorkOrderRunHref } from "./lib/workOrderExecutions";
 import { DispatchTimelineItem } from "./timeline/DispatchTimelineItem";
 import { TimelineAutomationActor } from "./timeline";
 import { TimelineMarker } from "./timeline/TimelineMarker";
@@ -294,7 +294,16 @@ function TimelineItemBody({
   const timeLabel = formatTimelineDate(new Date(event.at));
 
   if (event.kind === "commented") {
-    return <CommentEventBody event={event} actorDisplay={actorDisplay} timeLabel={timeLabel} />;
+    return (
+      <CommentEventBody
+        event={event}
+        actorDisplay={actorDisplay}
+        timeLabel={timeLabel}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        orderId={orderId}
+      />
+    );
   }
 
   if (event.kind === "artifactAdded") {
@@ -317,14 +326,21 @@ function CommentEventBody({
   event,
   actorDisplay,
   timeLabel,
+  organizationId,
+  factoryId,
+  orderId,
 }: {
   event: WorkOrderTimelineEvent;
   actorDisplay: OrgUserDisplay | null;
   timeLabel: string;
+  organizationId: string;
+  factoryId: string;
+  orderId?: string;
 }) {
   const comment = event.comment;
   if (!comment) return null;
   const isAutomation = (comment.authorKind ?? "").toLowerCase() === "automation";
+  const runHref = getWorkOrderRunHref(organizationId, factoryId, event.sourceAppId, event.sourceRunId, { orderId });
 
   return (
     <>
@@ -337,6 +353,15 @@ function CommentEventBody({
           <span className={inlineActorClassName}>Someone</span>
         )}{" "}
         commented
+        {isAutomation && runHref ? (
+          <>
+            {" "}
+            via{" "}
+            <Link href={runHref} className={inlineLinkClassName}>
+              run
+            </Link>
+          </>
+        ) : null}
         <span className={inlineTimeClassName}>
           {" · "}
           {timeLabel}
@@ -448,13 +473,7 @@ function SourceRunAttribution({
   factoryId: string;
   orderId?: string;
 }) {
-  const runHref =
-    event.sourceAppId && event.sourceRunId
-      ? factoryAppRunPath(organizationId, factoryId, event.sourceAppId, event.sourceRunId, {
-          from: "work-order",
-          orderId,
-        })
-      : null;
+  const runHref = getWorkOrderRunHref(organizationId, factoryId, event.sourceAppId, event.sourceRunId, { orderId });
   const connector = event.kind === "created" ? "from" : "via";
   return (
     <span className="inline-flex flex-wrap items-baseline gap-x-1">
