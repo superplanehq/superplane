@@ -11,6 +11,8 @@ const (
 const (
 	CreateAlarmPayloadType = "aws.cloudwatch.alarm"
 	UpdateAlarmPayloadType = "aws.cloudwatch.alarm"
+	GetAlarmPayloadType    = "aws.cloudwatch.alarm"
+	DeleteAlarmPayloadType = "aws.cloudwatch.alarm.deleted"
 )
 
 const (

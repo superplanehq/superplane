@@ -1,9 +1,8 @@
-package ec2
+package cloudwatch
 
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -25,37 +24,43 @@ type GetAlarmNodeMetadata struct {
 }
 
 func (c *GetAlarm) Name() string {
-	return "aws.ec2.getAlarm"
+	return "aws.cloudwatch.getAlarm"
 }
 
 func (c *GetAlarm) Label() string {
-	return "EC2 • Get Alarm"
+	return "CloudWatch • Get Alarm"
 }
 
 func (c *GetAlarm) Description() string {
-	return "Fetch the current state and details of a CloudWatch alarm for an EC2 instance"
+	return "Read the configuration and current state of a CloudWatch metric alarm"
 }
 
 func (c *GetAlarm) Documentation() string {
-	return `The Get Alarm component describes a CloudWatch alarm and emits its current details.
+	return `The Get Alarm component describes a CloudWatch metric alarm and emits its current details.
 
 ## Use Cases
 
-- **State inspection**: Check whether an alarm is in ALARM, OK, or INSUFFICIENT_DATA state before taking action
-- **Alarm metadata lookup**: Retrieve threshold, metric, and dimension details mid-workflow
-- **Audit**: Record alarm configuration at a point in time
+- **State inspection**: Check whether an alarm is in ALARM, OK or INSUFFICIENT_DATA before taking action
+- **Conditional workflows**: Branch on the alarm threshold, statistic or missing-data handling
+- **Audit**: Record the alarm configuration at a point in time, before or after a change
 
 ## Configuration
 
-- **Region**: AWS region where the alarm resides
-- **Alarm**: CloudWatch alarm to describe, selected from all alarms in the chosen region (` + "`ec2.alarm`" + ` resource picker)
+- **Region**: AWS region where the alarm lives
+- **Alarm**: CloudWatch alarm to describe (` + "`cloudwatch.alarm`" + ` resource picker)
 
 ## Output
 
-Emits the alarm details on the default output channel:
-- ` + "`alarmName`" + `, ` + "`alarmArn`" + `, ` + "`namespace`" + `, ` + "`metricName`" + `
-- ` + "`statistic`" + `, ` + "`threshold`" + `, ` + "`comparisonOperator`" + `, ` + "`stateValue`" + `
-- ` + "`period`" + `, ` + "`evaluationPeriods`" + `, ` + "`dimensions`" + `, ` + "`region`" + `
+Emits the alarm on the default output channel, with the same fields as Create Alarm:
+- ` + "`alarmName`" + `, ` + "`alarmArn`" + `, ` + "`alarmDescription`" + `, ` + "`namespace`" + `, ` + "`metricName`" + `, ` + "`dimensions`" + `
+- ` + "`statistic`" + `, ` + "`extendedStatistic`" + `, ` + "`unit`" + `, ` + "`period`" + `, ` + "`evaluationPeriods`" + `, ` + "`datapointsToAlarm`" + `
+- ` + "`threshold`" + `, ` + "`comparisonOperator`" + `, ` + "`treatMissingData`" + `, ` + "`actionsEnabled`" + `
+- ` + "`stateValue`" + `, ` + "`stateReason`" + `, ` + "`stateUpdatedTimestamp`" + `, ` + "`stateTransitionedTimestamp`" + `
+- ` + "`alarmActions`" + `, ` + "`okActions`" + `, ` + "`insufficientDataActions`" + `, ` + "`region`" + `, ` + "`consoleUrl`" + `
+
+This component reads metric alarms; composite alarms are not returned. An alarm driven by metric
+math, anomaly detection or a Metrics Insights query is returned, but its metric definition is not:
+` + "`namespace`" + `, ` + "`metricName`" + `, ` + "`statistic`" + ` and ` + "`period`" + ` come back empty.
 `
 }
 
@@ -73,41 +78,8 @@ func (c *GetAlarm) OutputChannels(_ any) []core.OutputChannel {
 
 func (c *GetAlarm) Configuration() []configuration.Field {
 	return []configuration.Field{
-		{
-			Name:     "region",
-			Label:    "Region",
-			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			Default:  "us-east-1",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: common.AllRegions,
-				},
-			},
-		},
-		{
-			Name:        "alarm",
-			Label:       "Alarm",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "CloudWatch alarm to describe",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "region", Values: []string{"*"}},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: "ec2.alarm",
-					Parameters: []configuration.ParameterRef{
-						{
-							Name: "region",
-							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "region",
-							},
-						},
-					},
-				},
-			},
-		},
+		regionField(),
+		alarmField("CloudWatch alarm to describe"),
 	}
 }
 
@@ -139,14 +111,14 @@ func (c *GetAlarm) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	region := strings.TrimSpace(config.Region)
-	alarmName := strings.TrimSpace(config.AlarmName)
-
-	if region == "" {
-		return fmt.Errorf("region is required")
+	region, err := requireRegion(config.Region)
+	if err != nil {
+		return err
 	}
-	if alarmName == "" {
-		return fmt.Errorf("alarm name is required")
+
+	alarmName, err := requireAlarmName(config.AlarmName)
+	if err != nil {
+		return err
 	}
 
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
