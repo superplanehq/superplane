@@ -94,7 +94,10 @@ describe("buildWorkOrderTimelineViewFromEvents: dispatch-step grouping", () => {
     expect(view.events.find((event) => event.kind === "artifactAdded")?.artifact?.id).toBe("artifact-1");
   });
 
-  it("groups an automation comment into its dispatch step, labelled with the line name and linked to its run", () => {
+  it("groups an automation comment into its dispatch step, keeping only the comment body", () => {
+    // Regression: a step comment carries only its body. The automation line
+    // is already named and linked to its run in the step's own title, so the
+    // comment itself must not repeat that attribution (no label/run fields).
     const view = buildWorkOrderTimelineViewFromEvents([
       stepExecutionEvent("step.execution.created", "2026-08-04T12:00:00.000Z", "started"),
       {
@@ -122,23 +125,17 @@ describe("buildWorkOrderTimelineViewFromEvents: dispatch-step grouping", () => {
       steps: [
         {
           stepName: "Build",
-          comments: [
-            {
-              body: "Ready for review",
-              label: "CI",
-              sourceRunId: "run-comment-1",
-              sourceAppId: "app-comment",
-            },
-          ],
+          comments: [{ body: "Ready for review" }],
         },
       ],
     });
+    expect(view.events[0]?.steps?.[0]?.comments?.[0]).toEqual({ body: "Ready for review" });
   });
 
-  it("labels a step comment with the line name even when the node name differs (regression)", () => {
-    // Guards against reintroducing the "node name" bug: the label shown in
-    // the timeline must be the automation (line) name, never the canvas
-    // node name, even though both are present on the author ref.
+  it("matches a step comment by line id even when the node name differs from the line name", () => {
+    // Guards against reintroducing a "node name" mismatch bug: the step is
+    // resolved from the automation's line id/name, never the canvas node
+    // name, even though both are present on the author ref.
     const view = buildWorkOrderTimelineViewFromEvents([
       stepExecutionEvent("step.execution.created", "2026-08-04T12:00:00.000Z", "started"),
       {
@@ -160,32 +157,7 @@ describe("buildWorkOrderTimelineViewFromEvents: dispatch-step grouping", () => {
       },
     ]);
 
-    const step = view.events[0]?.steps?.[0];
-    expect(step?.comments?.[0]?.label).toBe("CI");
-  });
-
-  it("falls back to a node/app label for a step comment with no resolvable line name", () => {
-    const view = buildWorkOrderTimelineViewFromEvents([
-      stepExecutionEvent("step.execution.created", "2026-08-04T12:00:00.000Z", "started"),
-      {
-        timestamp: "2026-08-04T12:01:00.000Z",
-        type: "order.comment.added",
-        event: {
-          body: "Ready for review",
-          author: {
-            kind: "automation",
-            automation: {
-              lineId: "line-1",
-              nodeName: "review-payload",
-              appName: "Refund Diagnostics",
-              stepName: "Build",
-            },
-          },
-        },
-      },
-    ]);
-
-    const step = view.events[0]?.steps?.[0];
-    expect(step?.comments?.[0]?.label).toBe("review-payload · Refund Diagnostics");
+    const dispatched = view.events.find((event) => event.kind === "dispatched");
+    expect(dispatched?.steps?.[0]?.comments).toEqual([{ body: "Ready for review" }]);
   });
 });

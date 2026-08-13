@@ -254,8 +254,9 @@ export const RUNNING_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     appId: "app-refund-implementer",
   }),
   // Automation-authored comment attached to the in-flight "implement" step.
-  // The label should be the line name ("plan-and-implement"), linking to the
-  // run that produced it — not the canvas node name.
+  // It is matched to the step by line id ("plan-and-implement"), not the
+  // canvas node name, and renders as plain text — the step's own title
+  // already names the line and links to its run.
   commentAddedEvent(
     RUNNING_WORK_ORDER,
     HOUR_AGO,

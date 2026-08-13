@@ -1,7 +1,6 @@
 import type { FactoriesWorkOrderEvent, FactoriesWorkOrderResult } from "@/api-client";
 import { formatWorkOrderResult } from "./workOrderPresentation";
 import { extractArtifactName, extractArtifactTitle, extractArtifactUrl } from "./workOrderArtifact";
-import { formatAutomationLabel } from "../timeline/authorLabels";
 import { UNKNOWN_ORG_USER_NAME } from "@/lib/orgUserDisplay";
 import type {
   UserNameLookup,
@@ -265,12 +264,7 @@ function appendCommentEvent(
   const automationActor = toAutomationActor(author.automation);
   const sourceRunId = payload.run?.id;
   const sourceAppId = automationActor?.appId ?? payload.app?.id;
-  const stepComment: WorkOrderTimelineStepComment = {
-    body,
-    label: describeCommentAutomationLabel(automationActor),
-    sourceRunId,
-    sourceAppId,
-  };
+  const stepComment: WorkOrderTimelineStepComment = { body };
   const step = findAutomationStep(state, automationActor);
   if (step) {
     step.comments = [...(step.comments ?? []), stepComment];
@@ -293,13 +287,6 @@ function appendCommentEvent(
     },
     title: "commented",
   });
-}
-
-// Prefer the automation (line) name — matching how line completion notes are
-// attributed — falling back to a node/app label only when no line resolved
-// (e.g. ad-hoc automation runs outside a dispatched line).
-function describeCommentAutomationLabel(actor: WorkOrderTimelineAutomationActor | undefined): string | undefined {
-  return actor?.lineName || formatAutomationLabel(actor?.nodeName, actor?.appName);
 }
 
 function appendArtifactEvent(
