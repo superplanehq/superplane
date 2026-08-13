@@ -225,26 +225,14 @@ function getHorizontalBackwardEdgePath(params: CanvasEdgePathParams): [path: str
   return [path, labelX, labelY];
 }
 
-function getRectEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
-  if (isBackwardEdge(params)) {
-    if (isVerticalFlowEdge(params)) {
+export function getCanvasEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
+  // Factory (vertical) canvases use curvy bezier edges like WorkOrderCanvas Storybook.
+  if (isVerticalFlowEdge(params)) {
+    if (isBackwardEdge(params)) {
       return getVerticalBackwardEdgePath(params);
     }
-
-    return getHorizontalBackwardEdgePath(params);
-  }
-
-  const [path, labelX, labelY] = getSmoothStepPath({
-    ...params,
-    borderRadius: RECT_BORDER_RADIUS,
-  });
-
-  return [path, labelX, labelY];
-}
-
-export function getCanvasEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
-  if (isVerticalFlowEdge(params)) {
-    return getRectEdgePath(params);
+    const [path, labelX, labelY] = getBezierPath(params);
+    return [path, labelX, labelY];
   }
 
   if (isBackwardEdge(params)) {

@@ -11,6 +11,7 @@ import {
   getSafeTriggerProps,
 } from "./data";
 import { isRecord } from "@/pages/app/mappers/safeMappers";
+import { isVerticalCanvasFlow } from "@/lib/canvasFlowDirection";
 
 function getCompactView(data: BlockProps["data"], isCompactView: BlockProps["isCompactView"]) {
   if (isCompactView !== undefined) {
@@ -57,6 +58,7 @@ function renderFallbackBlock(args: {
       showHeader={showHeader}
       dimBodyBelowHeader={dimBodyBelowHeader}
       draftDiffStatus={data._draftDiffStatus}
+      isFactoryApp={isVerticalCanvasFlow(data._flowDirection)}
       {...actionProps}
     />
   );
@@ -169,6 +171,7 @@ function renderBlockByType(args: {
           showHeader={showHeader}
           dimBodyBelowHeader={dimBodyBelowHeader}
           draftDiffStatus={draftDiffStatus}
+          isFactoryApp={isVerticalCanvasFlow(data._flowDirection)}
           {...actionProps}
         />
       );
@@ -182,6 +185,7 @@ function renderBlockByType(args: {
           showHeader={showHeader}
           dimBodyBelowHeader={dimBodyBelowHeader}
           draftDiffStatus={draftDiffStatus}
+          isFactoryApp={isVerticalCanvasFlow(data._flowDirection)}
           {...actionProps}
         />
       );
@@ -195,6 +199,7 @@ function renderBlockByType(args: {
           showHeader={showHeader}
           dimBodyBelowHeader={dimBodyBelowHeader}
           draftDiffStatus={draftDiffStatus}
+          isFactoryApp={isVerticalCanvasFlow(data._flowDirection)}
           {...actionProps}
         />
       );

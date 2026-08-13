@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { CANVAS_CONNECTOR_COLOR } from "@/lib/canvasEdgeColors";
-import { HANDLE_STYLE } from "./handleStyle";
+import { resolveHandleStyle } from "./handleStyle";
 import type { BlockProps } from "./types";
 const APPEND_SOURCE_LINE_WIDTH = 42;
 const APPEND_SOURCE_BUTTON_LEFT = 54;
@@ -69,7 +69,7 @@ export function AppendSourceHandle({
   const isVertical = orientation === "vertical";
 
   const handleStyle: React.CSSProperties = {
-    ...HANDLE_STYLE,
+    ...resolveHandleStyle(isVertical),
     pointerEvents: "auto",
     zIndex: 12,
     ...style,
