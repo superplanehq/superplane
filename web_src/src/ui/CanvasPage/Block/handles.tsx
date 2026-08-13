@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { Handle, Position } from "@xyflow/react";
 import { isVerticalCanvasFlow } from "@/lib/canvasFlowDirection";
 import { AppendHandlePreview, AppendSourceHandle, type AppendFromNodeHandler } from "./appendHandle";
@@ -8,6 +9,10 @@ import { FACTORY_HANDLE_OUTSET_PX, resolveHandleStyle } from "./handleStyle";
 import { MultiBottomHandle } from "./multiBottomHandle";
 import { MultiRightHandle } from "./multiRightHandle";
 import type { BlockConnectionState, BlockEdgeState, BlockProps, CanvasBlockData } from "./types";
+
+function connectionPointerEvents(isConnectionInteractive: boolean): CSSProperties["pointerEvents"] {
+  return isConnectionInteractive ? "auto" : "none";
+}
 
 function getBlockEdges(data: CanvasBlockData): BlockEdgeState[] {
   return data._allEdges || [];
@@ -266,13 +271,13 @@ export function LeftHandle({
   });
 
   const position = useSideTarget ? Position.Left : isVertical ? Position.Top : Position.Left;
-  const style = useSideTarget
+  const style: CSSProperties = useSideTarget
     ? {
         ...resolveHandleStyle(isVertical),
         left: -FACTORY_HANDLE_OUTSET_PX,
         top: "50%",
         transform: "translateY(-50%)",
-        pointerEvents: isConnectionInteractive ? "auto" : "none",
+        pointerEvents: connectionPointerEvents(isConnectionInteractive),
       }
     : {
         ...resolveHandleStyle(isVertical),
@@ -286,7 +291,7 @@ export function LeftHandle({
               left: -15,
               top: 18,
             }),
-        pointerEvents: isConnectionInteractive ? "auto" : "none",
+        pointerEvents: connectionPointerEvents(isConnectionInteractive),
       };
 
   return (
@@ -305,7 +310,7 @@ function FactorySideSourceHandle({ isConnectionInteractive }: { isConnectionInte
         right: -FACTORY_HANDLE_OUTSET_PX,
         top: "50%",
         transform: "translateY(-50%)",
-        pointerEvents: isConnectionInteractive ? "auto" : "none",
+        pointerEvents: connectionPointerEvents(isConnectionInteractive),
       }}
     />
   );
@@ -322,7 +327,7 @@ function FactorySpineSourceHandle({ isConnectionInteractive }: { isConnectionInt
         bottom: -FACTORY_HANDLE_OUTSET_PX,
         left: "50%",
         transform: "translateX(-50%)",
-        pointerEvents: isConnectionInteractive ? "auto" : "none",
+        pointerEvents: connectionPointerEvents(isConnectionInteractive),
       }}
     />
   );

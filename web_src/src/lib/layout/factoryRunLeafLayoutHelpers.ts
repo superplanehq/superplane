@@ -1,8 +1,4 @@
-import type {
-  FactoryRunLayoutEdge,
-  FactoryRunLayoutNode,
-  FactoryRunLayoutPosition,
-} from "./factoryRunLeafLayout";
+import type { FactoryRunLayoutEdge, FactoryRunLayoutNode, FactoryRunLayoutPosition } from "./factoryRunLeafLayout";
 
 export function factoryRunLeafEdgeKey(source: string, target: string, sourceHandle?: string | null): string {
   return `${source}\0${target}\0${sourceHandle ?? "default"}`;
@@ -19,8 +15,15 @@ export const GUTTER_PAD = 48;
 const SIDE_X_THRESHOLD = SIDE_GAP / 2;
 
 const SPINE_CHANNEL_PRIORITY: Record<string, number> = {
-  default: 0, success: 1, true: 2, passed: 3, yes: 4,
-  false: 80, failed: 90, error: 100, no: 110,
+  default: 0,
+  success: 1,
+  true: 2,
+  passed: 3,
+  yes: 4,
+  false: 80,
+  failed: 90,
+  error: 100,
+  no: 110,
 };
 
 export function nodeSize(node: FactoryRunLayoutNode): { width: number; height: number } {
@@ -63,10 +66,7 @@ function hasPath(
   return false;
 }
 
-export function resolveForwardEdges(
-  edges: FactoryRunLayoutEdge[],
-  nodeIds: Set<string>,
-): FactoryRunLayoutEdge[] {
+export function resolveForwardEdges(edges: FactoryRunLayoutEdge[], nodeIds: Set<string>): FactoryRunLayoutEdge[] {
   const forward: FactoryRunLayoutEdge[] = [];
   const adjacency = new Map<string, string[]>();
 
@@ -412,14 +412,31 @@ export function placeComponentNodes(options: PlaceComponentNodesOptions): number
 }
 
 type ResolveEdgeGutterOptions = {
-  key: string; isSide: boolean; sourcePos: FactoryRunLayoutPosition; targetPos: FactoryRunLayoutPosition;
-  sourceLayer: number; targetLayer: number; sourceCol: number; targetCol: number;
-  graphRight: number; edgeRouteGutters: Map<string, number>;
+  key: string;
+  isSide: boolean;
+  sourcePos: FactoryRunLayoutPosition;
+  targetPos: FactoryRunLayoutPosition;
+  sourceLayer: number;
+  targetLayer: number;
+  sourceCol: number;
+  targetCol: number;
+  graphRight: number;
+  edgeRouteGutters: Map<string, number>;
 };
 
 export function resolveEdgeGutter(options: ResolveEdgeGutterOptions): void {
-  const { key, isSide, sourcePos, targetPos, sourceLayer, targetLayer, sourceCol, targetCol, graphRight, edgeRouteGutters } =
-    options;
+  const {
+    key,
+    isSide,
+    sourcePos,
+    targetPos,
+    sourceLayer,
+    targetLayer,
+    sourceCol,
+    targetCol,
+    graphRight,
+    edgeRouteGutters,
+  } = options;
   const layerSkip = targetLayer - sourceLayer > 1;
   const crossColumn = Math.abs(sourceCol - targetCol) > 0;
   if (isSide || (!layerSkip && !crossColumn)) return;
@@ -439,15 +456,29 @@ export function resolveEdgeGutter(options: ResolveEdgeGutterOptions): void {
 type ClassifyComponentEdgesOptions = {
   componentEdges: FactoryRunLayoutEdge[];
   positions: Map<string, FactoryRunLayoutPosition>;
-  layer: Map<string, number>; column: Map<string, number>; graphRight: number;
-  leafEdgeKeys: Set<string>; spineEdgeKeys: Set<string>;
-  sideHandleNodeIds: Set<string>; sideTargetNodeIds: Set<string>;
+  layer: Map<string, number>;
+  column: Map<string, number>;
+  graphRight: number;
+  leafEdgeKeys: Set<string>;
+  spineEdgeKeys: Set<string>;
+  sideHandleNodeIds: Set<string>;
+  sideTargetNodeIds: Set<string>;
   edgeRouteGutters: Map<string, number>;
 };
 
 export function classifyComponentEdges(options: ClassifyComponentEdgesOptions): void {
-  const { componentEdges, positions, layer, column, graphRight, leafEdgeKeys, spineEdgeKeys, sideHandleNodeIds, sideTargetNodeIds, edgeRouteGutters } =
-    options;
+  const {
+    componentEdges,
+    positions,
+    layer,
+    column,
+    graphRight,
+    leafEdgeKeys,
+    spineEdgeKeys,
+    sideHandleNodeIds,
+    sideTargetNodeIds,
+    edgeRouteGutters,
+  } = options;
   for (const edge of componentEdges) {
     const sourcePos = positions.get(edge.source);
     const targetPos = positions.get(edge.target);
@@ -463,7 +494,12 @@ export function classifyComponentEdges(options: ClassifyComponentEdgesOptions): 
       spineEdgeKeys.add(key);
     }
     resolveEdgeGutter({
-      key, isSide, sourcePos, targetPos, graphRight, edgeRouteGutters,
+      key,
+      isSide,
+      sourcePos,
+      targetPos,
+      graphRight,
+      edgeRouteGutters,
       sourceLayer: layer.get(edge.source) ?? 0,
       targetLayer: layer.get(edge.target) ?? 0,
       sourceCol: column.get(edge.source) ?? 0,
@@ -473,9 +509,12 @@ export function classifyComponentEdges(options: ClassifyComponentEdgesOptions): 
 }
 
 type MarkCompactForkNodesOptions = {
-  component: string[]; outgoing: Map<string, FactoryRunLayoutEdge[]>;
-  leafEdgeKeys: Set<string>; spineEdgeKeys: Set<string>;
-  compactForkNodeIds: Set<string>; spineSourceNodeIds: Set<string>;
+  component: string[];
+  outgoing: Map<string, FactoryRunLayoutEdge[]>;
+  leafEdgeKeys: Set<string>;
+  spineEdgeKeys: Set<string>;
+  compactForkNodeIds: Set<string>;
+  spineSourceNodeIds: Set<string>;
 };
 
 export function markCompactForkNodes(options: MarkCompactForkNodesOptions): void {

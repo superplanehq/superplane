@@ -34,7 +34,10 @@ const VERTICAL_FLOW_NODE_NODE_BETWEEN_LAYERS = String(FACTORY_NODE_VERTICAL_GAP)
 export class ElkLayoutEngine implements LayoutEngine {
   private readonly elk = new ELK();
 
-  estimateNodeSize(node: ComponentsNode, direction: CanvasFlowDirection = "horizontal"): { width: number; height: number } {
+  estimateNodeSize(
+    node: ComponentsNode,
+    direction: CanvasFlowDirection = "horizontal",
+  ): { width: number; height: number } {
     if (node.type === "TYPE_WIDGET") {
       return {
         width: Number(node.configuration?.width) || ANNOTATION_NODE_WIDTH,

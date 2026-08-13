@@ -221,8 +221,8 @@ function whenAllowed<T>(allowed: boolean, value: T): T | undefined {
 function resolveFactoryAwareToggleView(
   isReadOnly: boolean,
   factoryOwnedApp: boolean,
-  handler: (nodeId: string) => void,
-): ((nodeId: string) => void) | undefined {
+  handler: (nodeId: string, collapsed: boolean) => void,
+): ((nodeId: string, collapsed: boolean) => void) | undefined {
   if (isReadOnly || factoryOwnedApp) {
     return undefined;
   }

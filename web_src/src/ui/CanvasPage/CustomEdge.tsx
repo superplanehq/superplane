@@ -148,11 +148,7 @@ function resolveTouchingEdgeStroke(isDark: boolean): string {
   return isDark ? TOUCHING_EDGE_STROKE_DARK : TOUCHING_EDGE_STROKE;
 }
 
-function resolveEdgeLineStroke(
-  contrastStroke: boolean,
-  styleStroke: CSSProperties["stroke"],
-  isDark: boolean,
-): string {
+function resolveEdgeLineStroke(contrastStroke: boolean, styleStroke: CSSProperties["stroke"], isDark: boolean): string {
   if (contrastStroke) {
     return resolveTouchingEdgeStroke(isDark);
   }
@@ -162,11 +158,7 @@ function resolveEdgeLineStroke(
   return DEFAULT_FACTORY_EDGE_STROKE;
 }
 
-function buildEdgeStrokeStyle(
-  style: CSSProperties,
-  selected: boolean | undefined,
-  isHovered: boolean,
-): CSSProperties {
+function buildEdgeStrokeStyle(style: CSSProperties, selected: boolean | undefined, isHovered: boolean): CSSProperties {
   return {
     strokeWidth: selected ? 3 : style.strokeWidth || 3,
     pointerEvents: "visibleStroke",

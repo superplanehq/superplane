@@ -169,8 +169,7 @@ function resolveFactoryEdgeRouting(
 ): FactoryEdgeRouting {
   const edgeKey = factoryRunLeafEdgeKey(edge.source, edge.target, edge.sourceHandle);
   const leafEdge = layout != null && layout.leafEdgeKeys.has(edgeKey);
-  const spineEdge =
-    layout != null && layout.spineEdgeKeys.has(edgeKey) && layout.compactForkNodeIds.has(edge.source);
+  const spineEdge = layout != null && layout.spineEdgeKeys.has(edgeKey) && layout.compactForkNodeIds.has(edge.source);
   const originalChannel =
     typeof edge.sourceHandle === "string" && edge.sourceHandle.length > 0 && edge.sourceHandle !== "default"
       ? edge.sourceHandle
@@ -192,7 +191,13 @@ function resolveFactoryEdgeContrastFlags(
   return { touchesOtherEdge, contrastStroke };
 }
 
-function factoryLeafSpineHandlePatch(routing: FactoryEdgeRouting): Partial<CanvasEdge> {
+type FactoryEdgeHandlePatch = {
+  sourceHandle?: string | null;
+  sourcePosition?: Position;
+  targetPosition?: Position;
+};
+
+function factoryLeafSpineHandlePatch(routing: FactoryEdgeRouting): FactoryEdgeHandlePatch {
   if (routing.leafEdge) {
     return {
       sourceHandle: FACTORY_SIDE_HANDLE_ID,

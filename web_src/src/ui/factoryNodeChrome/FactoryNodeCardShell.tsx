@@ -56,7 +56,8 @@ export function FactoryNodeCardShell({
         draftDiffStatus
           ? getDraftDiffOutlineClassName(draftDiffStatus)
           : "outline-1 outline-black/[0.04] dark:outline-white/[0.06]",
-        selected && "outline-ring/40 shadow-[0_0_0_2px_rgba(15,23,42,0.05)] dark:shadow-[0_0_0_2px_rgba(163,163,163,0.2)]",
+        selected &&
+          "outline-ring/40 shadow-[0_0_0_2px_rgba(15,23,42,0.05)] dark:shadow-[0_0_0_2px_rgba(163,163,163,0.2)]",
         dimBodyBelowHeader && "opacity-70",
       )}
     >

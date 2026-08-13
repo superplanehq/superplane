@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FACTORY_SIDE_HANDLE_ID, factoryRunLeafEdgeKey, layoutFactoryRunLeafGraph } from "./factoryRunLeafLayout";
 
-function expectNoOverlaps(
-  positions: Map<string, { x: number; y: number }>,
-  width = 280,
-  height = 104,
-  gap = 8,
-) {
+function expectNoOverlaps(positions: Map<string, { x: number; y: number }>, width = 280, height = 104, gap = 8) {
   const ids = [...positions.keys()];
   for (let i = 0; i < ids.length; i++) {
     for (let j = i + 1; j < ids.length; j++) {
@@ -71,14 +66,7 @@ describe("layoutFactoryRunLeafGraph", () => {
 
   it("puts the shorter fork to the right as a subtree when a router has two non-leaf branches", () => {
     const result = layoutFactoryRunLeafGraph(
-      [
-        { id: "router" },
-        { id: "success" },
-        { id: "s1" },
-        { id: "s2" },
-        { id: "failed" },
-        { id: "f1" },
-      ],
+      [{ id: "router" }, { id: "success" }, { id: "s1" }, { id: "s2" }, { id: "failed" }, { id: "f1" }],
       [
         { source: "router", target: "success", sourceHandle: "true" },
         { source: "success", target: "s1", sourceHandle: "default" },
@@ -175,13 +163,7 @@ describe("layoutFactoryRunLeafGraph", () => {
 
   it("prefers default/true channels on the spine when branch depths are equal", () => {
     const result = layoutFactoryRunLeafGraph(
-      [
-        { id: "router" },
-        { id: "ok" },
-        { id: "okLeaf" },
-        { id: "bad" },
-        { id: "badLeaf" },
-      ],
+      [{ id: "router" }, { id: "ok" }, { id: "okLeaf" }, { id: "bad" }, { id: "badLeaf" }],
       [
         { source: "router", target: "bad", sourceHandle: "false" },
         { source: "bad", target: "badLeaf", sourceHandle: "default" },
@@ -232,15 +214,7 @@ describe("layoutFactoryRunLeafGraph", () => {
   it("does not route a side merge through the far-right gutter even when layers skip", () => {
     // true chain longer on spine; false side merges back — longest-path can inflate join layer.
     const result = layoutFactoryRunLeafGraph(
-      [
-        { id: "root" },
-        { id: "if2" },
-        { id: "noop3" },
-        { id: "t1" },
-        { id: "t2" },
-        { id: "join" },
-        { id: "noop8" },
-      ],
+      [{ id: "root" }, { id: "if2" }, { id: "noop3" }, { id: "t1" }, { id: "t2" }, { id: "join" }, { id: "noop8" }],
       [
         { source: "root", target: "if2", sourceHandle: "default" },
         { source: "root", target: "noop8", sourceHandle: "failed" },
@@ -273,14 +247,7 @@ describe("layoutFactoryRunLeafGraph", () => {
 
   it("converges two branches without classifying the join as a leftward side edge", () => {
     const result = layoutFactoryRunLeafGraph(
-      [
-        { id: "root" },
-        { id: "left1" },
-        { id: "left2" },
-        { id: "right1" },
-        { id: "right2" },
-        { id: "join" },
-      ],
+      [{ id: "root" }, { id: "left1" }, { id: "left2" }, { id: "right1" }, { id: "right2" }, { id: "join" }],
       [
         { source: "root", target: "left1", sourceHandle: "true" },
         { source: "left1", target: "left2", sourceHandle: "default" },

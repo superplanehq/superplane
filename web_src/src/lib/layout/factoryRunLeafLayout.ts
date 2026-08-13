@@ -84,7 +84,9 @@ type ComponentLayoutContext = {
 
 function layoutOneComponent(component: string[], componentOriginX: number, ctx: ComponentLayoutContext): number {
   const componentSet = new Set(component);
-  const componentRoots = component.filter((id) => (ctx.incoming.get(id) ?? []).every((e) => !componentSet.has(e.source)));
+  const componentRoots = component.filter((id) =>
+    (ctx.incoming.get(id) ?? []).every((e) => !componentSet.has(e.source)),
+  );
   const rootsForComponent = componentRoots.length > 0 ? componentRoots : [component[0]];
 
   const layer = computeComponentLayers(component, componentSet, rootsForComponent, ctx.incoming);

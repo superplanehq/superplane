@@ -340,5 +340,3 @@ describe("getCanvasEdgePath", () => {
     expect(contrastIds.size).toBe(0);
   });
 });
-
-
