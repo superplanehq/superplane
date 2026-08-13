@@ -17,7 +17,6 @@ interface WorkOrderDetailSidebarProps {
   assigneeIds: string[];
   assigneeNames: string[];
   factoryLines: FactoriesFactoryLine[];
-  canEditFactoryLines: boolean;
   canAssign: boolean;
   canDispatch: boolean;
   permissionsLoading: boolean;
@@ -41,7 +40,6 @@ export function WorkOrderDetailSidebar({
   assigneeIds,
   assigneeNames,
   factoryLines,
-  canEditFactoryLines,
   canAssign,
   canDispatch,
   permissionsLoading,
@@ -68,7 +66,6 @@ export function WorkOrderDetailSidebar({
       <WorkOrderSidebarFactoryLines
         organizationId={organizationId}
         factoryId={factoryId}
-        canEditFactoryLines={canEditFactoryLines}
         executions={order.executions ?? []}
         factoryLines={factoryLines}
         canDispatch={canDispatch}

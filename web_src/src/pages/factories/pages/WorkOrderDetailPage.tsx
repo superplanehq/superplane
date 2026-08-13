@@ -74,7 +74,6 @@ function WorkOrderDetailPageContent({
       eventsQuery={eventsQuery}
       artifactsQuery={artifactsQuery}
       canManageWorkOrders={canAct("work_orders", "update")}
-      canEditFactoryLines={canAct("factories", "update")}
       permissionsLoading={permissionsLoading}
       actions={actions}
     />
@@ -102,7 +101,6 @@ interface LoadedWorkOrderDetailProps {
   eventsQuery: ReturnType<typeof useWorkOrderEvents>;
   artifactsQuery: ReturnType<typeof useWorkOrderArtifacts>;
   canManageWorkOrders: boolean;
-  canEditFactoryLines: boolean;
   permissionsLoading: boolean;
   actions: ReturnType<typeof useWorkOrderDetailActions>;
 }
@@ -117,7 +115,6 @@ function LoadedWorkOrderDetail({
   eventsQuery,
   artifactsQuery,
   canManageWorkOrders,
-  canEditFactoryLines,
   permissionsLoading,
   actions,
 }: LoadedWorkOrderDetailProps) {
@@ -145,7 +142,6 @@ function LoadedWorkOrderDetail({
       assigneeIds={derived.assigneeIds}
       assigneeNames={derived.assigneeNames}
       factoryLines={factoryLines}
-      canEditFactoryLines={canEditFactoryLines}
       isOpen={derived.isOpen}
       isDispatchable={derived.isDispatchable}
       isClosed={derived.isClosed}
