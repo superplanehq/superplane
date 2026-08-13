@@ -61,20 +61,36 @@ const EXECUTION_RESULT_META: Record<
   },
 };
 
+/**
+ * Build a link to the automation run that produced a piece of work-order
+ * timeline content (a step execution, a comment, a status change, ...).
+ * Centralizes the `appId` + `runId` → app-run-page URL construction so every
+ * timeline surface links to runs the same way.
+ */
+export function getWorkOrderRunHref(
+  organizationId: string,
+  factoryId: string,
+  appId: string | undefined,
+  runId: string | undefined,
+  options?: { orderId?: string },
+): string | null {
+  if (!appId || !runId) {
+    return null;
+  }
+
+  return factoryAppRunPath(organizationId, factoryId, appId, runId, {
+    from: "work-order",
+    orderId: options?.orderId,
+  });
+}
+
 export function getWorkOrderExecutionRunHref(
   organizationId: string,
   factoryId: string,
   execution: FactoriesWorkOrderExecution,
   options?: { orderId?: string },
 ): string | null {
-  if (execution.run?.appId && execution.run.id) {
-    return factoryAppRunPath(organizationId, factoryId, execution.run.appId, execution.run.id, {
-      from: "work-order",
-      orderId: options?.orderId,
-    });
-  }
-
-  return null;
+  return getWorkOrderRunHref(organizationId, factoryId, execution.run?.appId, execution.run?.id, options);
 }
 
 export function getExecutionStepTimestamp(execution: FactoriesWorkOrderExecution): string {
