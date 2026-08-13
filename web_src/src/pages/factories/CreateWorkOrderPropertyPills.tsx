@@ -1,4 +1,5 @@
 import type { FactoriesFactoryLine } from "@/api-client";
+import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,7 @@ interface CreateWorkOrderPropertyPillsProps {
   lines: FactoriesFactoryLine[];
   selectedLineName: string;
   isSaving: boolean;
+  canDispatch?: boolean;
   onAssigneeChange: (ids: string[]) => void;
   onLineSelect: (lineName: string) => void;
 }
@@ -28,6 +30,7 @@ export function CreateWorkOrderPropertyPills({
   lines,
   selectedLineName,
   isSaving,
+  canDispatch = true,
   onAssigneeChange,
   onLineSelect,
 }: CreateWorkOrderPropertyPillsProps) {
@@ -45,6 +48,9 @@ export function CreateWorkOrderPropertyPills({
 
   const handlePickerOpenChange = (picker: Exclude<OpenPicker, null>) => (nextOpen: boolean) => {
     if (isSaving) {
+      return;
+    }
+    if (picker === "line" && !canDispatch) {
       return;
     }
     setOpenPicker(nextOpen ? picker : null);
@@ -86,21 +92,23 @@ export function CreateWorkOrderPropertyPills({
       </Popover>
 
       {hasLines ? (
-        <Popover modal={false} open={openPicker === "line"} onOpenChange={handlePickerOpenChange("line")}>
-          <PopoverTrigger asChild>
-            <PropertyPill disabled={isSaving} testId="work-order-line-button">
-              <Layers className="size-3.5" aria-hidden />
-              {selectedLineName || "Line"}
-            </PropertyPill>
-          </PopoverTrigger>
-          <LinePickerPanel
-            lines={lines}
-            selectedLineName={selectedLineName}
-            isSaving={isSaving}
-            portalRoot={portalRoot}
-            onSelect={handleLineChange}
-          />
-        </Popover>
+        <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
+          <Popover modal={false} open={openPicker === "line"} onOpenChange={handlePickerOpenChange("line")}>
+            <PopoverTrigger asChild>
+              <PropertyPill disabled={isSaving || !canDispatch} testId="work-order-line-button">
+                <Layers className="size-3.5" aria-hidden />
+                {selectedLineName || "Line"}
+              </PropertyPill>
+            </PopoverTrigger>
+            <LinePickerPanel
+              lines={lines}
+              selectedLineName={selectedLineName}
+              isSaving={isSaving}
+              portalRoot={portalRoot}
+              onSelect={handleLineChange}
+            />
+          </Popover>
+        </PermissionTooltip>
       ) : (
         <PropertyPill disabled testId="work-order-line-button">
           <Layers className="size-3.5" aria-hidden />

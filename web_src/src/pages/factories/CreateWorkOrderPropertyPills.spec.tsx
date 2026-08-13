@@ -62,4 +62,24 @@ describe("CreateWorkOrderPropertyPills", () => {
     expect(screen.getByTestId("work-order-line-picker-panel")).toBeInTheDocument();
     expect(screen.getByTestId("work-order-line-option-plan-and-implement")).toBeInTheDocument();
   });
+
+  it("does not open the line picker when the user cannot dispatch", async () => {
+    const user = userEvent.setup();
+    render(
+      <CreateWorkOrderPropertyPills
+        organizationId="org-1"
+        assigneeIds={[]}
+        lines={REFUND_FACTORY_LINES}
+        selectedLineName=""
+        isSaving={false}
+        canDispatch={false}
+        onAssigneeChange={vi.fn()}
+        onLineSelect={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByTestId("work-order-line-button"));
+
+    expect(screen.queryByTestId("work-order-line-picker-panel")).not.toBeInTheDocument();
+  });
 });

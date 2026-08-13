@@ -1,9 +1,11 @@
 import type { FactoriesFactoryLine } from "@/api-client";
+import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { usePermissions } from "@/contexts/usePermissions";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Factory as FactoryIcon, Maximize2, Minimize2, XIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -35,9 +37,11 @@ function CreateWorkOrderDialogSession({
   onCreated: (orderId: string) => void;
 }) {
   const { organizationId, factoryId, factory } = useFactoriesLayout();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });
   const lines = factory?.lines ?? [];
   const [isExpanded, setIsExpanded] = useState(false);
+  const canDispatch = canAct("work_orders", "update") || permissionsLoading;
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -110,6 +114,7 @@ function CreateWorkOrderDialogSession({
           lines={lines}
           selectedLineName={composer.selectedLineName}
           isSaving={composer.isSaving}
+          canDispatch={canDispatch}
           canSendToLine={composer.canSendToLine}
           isSendingToLine={composer.isSendingToLine}
           onAssigneeChange={composer.setAssigneeIds}
@@ -191,6 +196,7 @@ function CreateWorkOrderDialogFooter({
   lines,
   selectedLineName,
   isSaving,
+  canDispatch,
   canSendToLine,
   isSendingToLine,
   onAssigneeChange,
@@ -202,6 +208,7 @@ function CreateWorkOrderDialogFooter({
   lines: FactoriesFactoryLine[];
   selectedLineName: string;
   isSaving: boolean;
+  canDispatch: boolean;
   canSendToLine: boolean;
   isSendingToLine: boolean;
   onAssigneeChange: (ids: string[]) => void;
@@ -216,21 +223,24 @@ function CreateWorkOrderDialogFooter({
         lines={lines}
         selectedLineName={selectedLineName}
         isSaving={isSaving}
+        canDispatch={canDispatch}
         onAssigneeChange={onAssigneeChange}
         onLineSelect={onLineSelect}
       />
 
-      <LoadingButton
-        type="button"
-        disabled={!canSendToLine}
-        loading={isSendingToLine}
-        loadingText="Sending..."
-        onClick={onSendToLine}
-        className="h-8 shrink-0 rounded-full px-4"
-        data-testid="work-order-create-send-to-line"
-      >
-        Send to line
-      </LoadingButton>
+      <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
+        <LoadingButton
+          type="button"
+          disabled={!canDispatch || !canSendToLine}
+          loading={isSendingToLine}
+          loadingText="Sending..."
+          onClick={onSendToLine}
+          className="h-8 shrink-0 rounded-full px-4"
+          data-testid="work-order-create-send-to-line"
+        >
+          Send to line
+        </LoadingButton>
+      </PermissionTooltip>
     </div>
   );
 }
