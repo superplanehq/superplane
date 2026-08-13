@@ -335,6 +335,20 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 	c := &AddWorkOrderArtifact{}
 	fields := c.Configuration()
 
+	t.Run("shows url for pull requests and branches", func(t *testing.T) {
+		var urlField *configuration.Field
+		for i := range fields {
+			if fields[i].Name == "url" {
+				urlField = &fields[i]
+				break
+			}
+		}
+
+		require.NotNil(t, urlField)
+		assert.Equal(t, []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "branch"}}}, urlField.VisibilityConditions)
+		assert.Equal(t, []configuration.RequiredCondition{{Field: "artifactType", Values: []string{"pr"}}}, urlField.RequiredConditions)
+	})
+
 	t.Run("requires url for pr", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":      "{{ order().id }}",
@@ -405,6 +419,18 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 			"orderId":      "{{ order().id }}",
 			"artifactType": "branch",
 			"name":         "feature/refund-retry",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("accepts branch with name and url", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
+			"url":          "https://github.com/example/repo/tree/feature/refund-retry",
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
