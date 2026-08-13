@@ -44,6 +44,8 @@ export const factoryQueryKeys = {
     ["factories", organizationId, factoryId, "work-orders", orderId] as const,
   workOrderEvents: (organizationId: string, factoryId: string, orderId: string) =>
     ["factories", organizationId, factoryId, "work-orders", orderId, "events"] as const,
+  workOrderArtifacts: (organizationId: string, factoryId: string, orderId: string) =>
+    ["factories", organizationId, factoryId, "work-orders", orderId, "artifacts"] as const,
   apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
 };
 
@@ -68,7 +70,7 @@ function workOrderEventsKey(organizationId: string, factoryId: string, orderId: 
 }
 
 function workOrderArtifactsKey(organizationId: string, factoryId: string, orderId: string) {
-  return ["factories", organizationId, factoryId, "work-orders", orderId, "artifacts"] as const;
+  return factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, orderId);
 }
 
 export function factoryAppsKey(organizationId: string, factoryId: string) {
