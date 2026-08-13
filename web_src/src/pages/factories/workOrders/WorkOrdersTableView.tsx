@@ -74,7 +74,7 @@ function TableRow({
 
       <span
         className={cn(
-          "relative z-10 inline-flex w-fit items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.04em]",
+          "relative z-10 pointer-events-none inline-flex w-fit items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.04em]",
           meta.className,
         )}
       >
@@ -82,22 +82,32 @@ function TableRow({
         {meta.label}
       </span>
 
-      <span className="relative z-10 truncate font-mono text-[11px] text-muted-foreground">{entry.displayKey}</span>
+      <span className="relative z-10 pointer-events-none truncate font-mono text-[11px] text-muted-foreground">
+        {entry.displayKey}
+      </span>
 
-      <p className="relative z-10 min-w-0 truncate text-[13px] font-medium text-foreground">{entry.title}</p>
+      <p className="relative z-10 pointer-events-none min-w-0 truncate text-[13px] font-medium text-foreground">
+        {entry.title}
+      </p>
 
-      <WorkOrderLineStep entry={entry} className="relative z-10 hidden min-w-0 md:inline-flex" fallback="—" />
+      <WorkOrderLineStep
+        entry={entry}
+        className="relative z-10 pointer-events-none hidden min-w-0 md:inline-flex"
+        fallback="—"
+      />
 
       <span
-        className="relative z-10 hidden text-[11px] text-muted-foreground lg:inline"
+        className="relative z-10 pointer-events-none hidden text-[11px] text-muted-foreground lg:inline"
         title={entry.usageTooltip ?? undefined}
       >
         {entry.usageLabel ?? "—"}
       </span>
 
-      <span className="relative z-10 hidden text-[11px] text-muted-foreground md:inline">{timeLabel}</span>
+      <span className="relative z-10 pointer-events-none hidden text-[11px] text-muted-foreground md:inline">
+        {timeLabel}
+      </span>
 
-      <div className="relative z-10 flex items-center justify-end gap-1">
+      <div className="relative z-10 pointer-events-none flex items-center justify-end gap-1">
         <InlineDispatchButton
           entry={entry}
           lines={factoryLines}

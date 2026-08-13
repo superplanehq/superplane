@@ -81,7 +81,7 @@ function ListRow({
 
       <span
         className={cn(
-          "relative z-10 inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.04em]",
+          "relative z-10 pointer-events-none inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.04em]",
           meta.className,
         )}
       >
@@ -89,27 +89,29 @@ function ListRow({
         {meta.label}
       </span>
 
-      <span className="relative z-10 shrink-0 font-mono text-[11px] text-muted-foreground w-[54px]">
+      <span className="relative z-10 pointer-events-none shrink-0 font-mono text-[11px] text-muted-foreground w-[54px]">
         {entry.displayKey}
       </span>
 
-      <div className="relative z-10 min-w-0 flex-1">
+      <div className="relative z-10 pointer-events-none min-w-0 flex-1">
         <p className="truncate text-[13px] font-medium text-foreground">{entry.title}</p>
         <WorkOrderLineStep entry={entry} className="mt-0.5 max-w-full" />
       </div>
 
       {entry.usageLabel ? (
         <span
-          className="relative z-10 hidden text-[11px] text-muted-foreground sm:inline"
+          className="relative z-10 pointer-events-none hidden text-[11px] text-muted-foreground sm:inline"
           title={entry.usageTooltip ?? undefined}
         >
           {entry.usageLabel}
         </span>
       ) : null}
 
-      <span className="relative z-10 hidden shrink-0 text-[11px] text-muted-foreground sm:inline">{timeLabel}</span>
+      <span className="relative z-10 pointer-events-none hidden shrink-0 text-[11px] text-muted-foreground sm:inline">
+        {timeLabel}
+      </span>
 
-      <div className="relative z-10 flex shrink-0 items-center gap-1">
+      <div className="relative z-10 pointer-events-none flex shrink-0 items-center gap-1">
         <InlineDispatchButton
           entry={entry}
           lines={factoryLines}
