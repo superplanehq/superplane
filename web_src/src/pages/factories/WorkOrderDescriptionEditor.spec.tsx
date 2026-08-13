@@ -144,4 +144,18 @@ describe("WorkOrderDescriptionEditor", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "Hello world" })).toBeInTheDocument();
   });
+
+  it("keeps the format toolbar visible when the heading menu opens", async () => {
+    const user = userEvent.setup();
+
+    render(<WorkOrderDescriptionEditor value="Hello world" maxLength={5000} disabled={false} onChange={vi.fn()} />);
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await user.click(input);
+    await user.keyboard("{Control>}a{/Control}");
+    await user.click(await screen.findByRole("button", { name: "Heading" }));
+
+    expect(screen.getByTestId("work-order-description-toolbar")).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Heading 1" })).toBeInTheDocument();
+  });
 });

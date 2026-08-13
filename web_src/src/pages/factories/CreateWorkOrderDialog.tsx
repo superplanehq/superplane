@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Factory as FactoryIcon, Maximize2, Minimize2, XIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { useFactoriesLayout } from "./layout/factoriesLayoutContext";
 import { CreateWorkOrderPropertyPills } from "./CreateWorkOrderPropertyPills";
@@ -70,7 +70,10 @@ function CreateWorkOrderDialogSession({
           isExpanded={isExpanded}
           onSaveDraft={() => void composer.handleSaveDraft()}
           onToggleExpanded={() => setIsExpanded((current) => !current)}
-        />
+        >
+          <DialogTitle className="text-[13px] font-medium text-foreground">New work order</DialogTitle>
+          <DialogDescription className="sr-only">Create a work order for this workspace.</DialogDescription>
+        </CreateWorkOrderDialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col px-5 py-4">
           <Label htmlFor="work-order-title-input" className="sr-only">
@@ -124,6 +127,7 @@ function CreateWorkOrderDialogHeader({
   isExpanded,
   onSaveDraft,
   onToggleExpanded,
+  children,
 }: {
   workspaceName: string;
   canSaveDraft: boolean;
@@ -131,6 +135,7 @@ function CreateWorkOrderDialogHeader({
   isExpanded: boolean;
   onSaveDraft: () => void;
   onToggleExpanded: () => void;
+  children: ReactNode;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
@@ -140,9 +145,8 @@ function CreateWorkOrderDialogHeader({
         </span>
         <span className="truncate text-foreground">{workspaceName}</span>
         <ChevronRight className="size-3.5 shrink-0" aria-hidden />
-        <DialogTitle className="text-[13px] font-medium text-foreground">New work order</DialogTitle>
+        {children}
       </div>
-      <DialogDescription className="sr-only">Create a work order for this workspace.</DialogDescription>
       <div className="flex shrink-0 items-center gap-1">
         <LoadingButton
           type="button"
