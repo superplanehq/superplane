@@ -45,15 +45,18 @@ function renderFallbackBlock(args: {
   selected: boolean;
   showHeader: boolean | undefined;
   canvasMode: BlockProps["canvasMode"];
+  showRuntimeStatus?: boolean;
   actionProps: ReturnType<typeof getActionProps>;
   dimBodyBelowHeader?: boolean;
 }) {
-  const { data, fallbackTitle, selected, showHeader, canvasMode, actionProps, dimBodyBelowHeader } = args;
+  const { data, fallbackTitle, selected, showHeader, canvasMode, showRuntimeStatus, actionProps, dimBodyBelowHeader } =
+    args;
 
   return (
     <ComponentBase
       {...buildFallbackComponentProps(data, fallbackTitle)}
       canvasMode={canvasMode}
+      showRuntimeStatus={showRuntimeStatus}
       selected={selected}
       showHeader={showHeader}
       dimBodyBelowHeader={dimBodyBelowHeader}
@@ -70,6 +73,7 @@ function AnnotationBlockContent({
   selected,
   showHeader,
   canvasMode,
+  showRuntimeStatus,
   onAnnotationUpdate,
   onAnnotationBlur,
   actionProps,
@@ -80,6 +84,7 @@ function AnnotationBlockContent({
   selected: boolean;
   showHeader?: boolean;
   canvasMode?: BlockProps["canvasMode"];
+  showRuntimeStatus?: boolean;
   onAnnotationUpdate?: BlockProps["onAnnotationUpdate"];
   onAnnotationBlur?: BlockProps["onAnnotationBlur"];
   actionProps: ReturnType<typeof getActionProps>;
@@ -106,6 +111,7 @@ function AnnotationBlockContent({
       selected,
       showHeader,
       canvasMode,
+      showRuntimeStatus,
       actionProps,
       dimBodyBelowHeader,
     });
@@ -132,6 +138,7 @@ function renderBlockByType(args: {
   selected: boolean;
   showHeader?: boolean;
   canvasMode?: BlockProps["canvasMode"];
+  showRuntimeStatus?: boolean;
   onAnnotationUpdate?: BlockProps["onAnnotationUpdate"];
   onAnnotationBlur?: BlockProps["onAnnotationBlur"];
   actionProps: ReturnType<typeof getActionProps>;
@@ -143,6 +150,7 @@ function renderBlockByType(args: {
     selected,
     showHeader,
     canvasMode,
+    showRuntimeStatus,
     onAnnotationUpdate,
     onAnnotationBlur,
     actionProps,
@@ -159,6 +167,7 @@ function renderBlockByType(args: {
           selected,
           showHeader,
           canvasMode,
+          showRuntimeStatus,
           actionProps,
           dimBodyBelowHeader,
         });
@@ -167,6 +176,7 @@ function renderBlockByType(args: {
         <Trigger
           {...getSafeTriggerProps(data)}
           canvasMode={canvasMode}
+          showRuntimeStatus={showRuntimeStatus}
           selected={selected}
           showHeader={showHeader}
           dimBodyBelowHeader={dimBodyBelowHeader}
@@ -181,6 +191,7 @@ function renderBlockByType(args: {
         <ComponentBase
           {...safeComponentProps}
           canvasMode={canvasMode}
+          showRuntimeStatus={showRuntimeStatus}
           selected={selected}
           showHeader={showHeader}
           dimBodyBelowHeader={dimBodyBelowHeader}
@@ -195,6 +206,7 @@ function renderBlockByType(args: {
         <Composite
           {...getSafeCompositeProps(data)}
           canvasMode={canvasMode}
+          showRuntimeStatus={showRuntimeStatus}
           selected={selected}
           showHeader={showHeader}
           dimBodyBelowHeader={dimBodyBelowHeader}
@@ -211,6 +223,7 @@ function renderBlockByType(args: {
           selected={selected}
           showHeader={showHeader}
           canvasMode={canvasMode}
+          showRuntimeStatus={showRuntimeStatus}
           onAnnotationUpdate={onAnnotationUpdate}
           onAnnotationBlur={onAnnotationBlur}
           actionProps={actionProps}
@@ -224,6 +237,7 @@ function renderBlockByType(args: {
         selected,
         showHeader,
         canvasMode,
+        showRuntimeStatus,
         actionProps,
         dimBodyBelowHeader,
       });
@@ -239,6 +253,7 @@ export function BlockContent({
   onDelete,
   showHeader,
   canvasMode,
+  showRuntimeStatus,
   isCompactView,
   onAnnotationUpdate,
   onAnnotationBlur,
@@ -257,6 +272,7 @@ export function BlockContent({
     selected,
     showHeader,
     canvasMode,
+    showRuntimeStatus,
     onAnnotationUpdate,
     onAnnotationBlur,
     actionProps,

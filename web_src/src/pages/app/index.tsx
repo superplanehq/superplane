@@ -66,7 +66,7 @@ import { DefaultLayoutEngine } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
-import type { CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
+import type { CanvasNode, NewNodeData, NodeEditData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
 import { CanvasPageLoadingOverlay } from "@/ui/CanvasPage/CanvasPageLoadingOverlay";
 import { resolveFitViewVersionId } from "@/ui/CanvasPage/fitView";
@@ -135,6 +135,8 @@ import { buildAppFiles } from "./files/lib/app-files";
 import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
+import { useVisibleNodeRuntimeMaps } from "./useVisibleNodeRuntimeMaps";
+import { useGetSidebarData } from "./useGetSidebarData";
 import { useRunParticipantFitRequest } from "./useRunParticipantFitRequest";
 import { useAgentNodeFocusRequest, type CanvasFocusRequest } from "./useAgentNodeFocusRequest";
 import { isRunDetailDismissed, useRunsDetailState } from "./useRunsDetailState";
@@ -174,7 +176,6 @@ import {
   isValidRunId,
   prepareCanvasLogNodes,
   prepareData,
-  prepareSidebarData,
   shouldClearRunDetailNode,
 } from "./workflowPageHelpers";
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
@@ -943,23 +944,20 @@ export function AppPage({
 
     return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap, nodeEventsMap: eventsMap };
   }, [storeVersion]);
-  const visibleNodeExecutionsMap = useMemo(
-    () => (showLiveActivity ? nodeExecutionsMap : {}),
-    [showLiveActivity, nodeExecutionsMap],
-  );
+  const { showNodeRuntimeActivity, visibleNodeExecutionsMap, visibleNodeQueueItemsMap, visibleNodeEventsMap } =
+    useVisibleNodeRuntimeMaps({
+      showLiveActivity,
+      factoryEmbed,
+      isRunInspectionMode,
+      nodeExecutionsMap,
+      nodeQueueItemsMap,
+      nodeEventsMap,
+    });
   const consoleNodeStatuses = useMemo(
     () => deriveConsoleNodeStatuses(visibleNodeExecutionsMap),
     [visibleNodeExecutionsMap],
   );
   const handleConsoleTriggerNode = useConsoleTriggerNode({ canvasId, canvas: canvas ?? undefined, queryClient });
-  const visibleNodeQueueItemsMap = useMemo(
-    () => (showLiveActivity ? nodeQueueItemsMap : {}),
-    [showLiveActivity, nodeQueueItemsMap],
-  );
-  const visibleNodeEventsMap = useMemo(
-    () => (showLiveActivity ? nodeEventsMap : {}),
-    [showLiveActivity, nodeEventsMap],
-  );
 
   const {
     stagingStale,
@@ -1555,48 +1553,15 @@ export function AppPage({
     triggersLoading,
   ]);
 
-  const getSidebarData = useCallback(
-    (nodeId: string): SidebarData | null => {
-      const node = canvasNodesById.get(nodeId);
-      if (!node) return null;
-
-      // Get current data from store (don't trigger load here - that's done in useEffect)
-      const nodeData = getNodeData(nodeId);
-
-      // Build maps with current node data for sidebar
-      const executionsMap =
-        !showLiveActivity || nodeData.executions.length === 0 ? {} : { [nodeId]: nodeData.executions };
-      const queueItemsMap =
-        !showLiveActivity || nodeData.queueItems.length === 0
-          ? {}
-          : { [nodeId]: nodeData.queueItems.slice().reverse() };
-      const eventsMapForSidebar =
-        !showLiveActivity || nodeData.events.length === 0
-          ? {}
-          : { [nodeId]: nodeData.events.length > 0 ? nodeData.events : visibleNodeEventsMap[nodeId] || [] };
-      const totalHistoryCount = !showLiveActivity ? 0 : nodeData.totalInHistoryCount;
-      const totalQueueCount = !showLiveActivity ? 0 : nodeData.totalInQueueCount;
-
-      const sidebarData = prepareSidebarData(
-        node,
-        canvasNodes,
-        allComponents,
-        allTriggers,
-        executionsMap,
-        queueItemsMap,
-        eventsMapForSidebar,
-        totalHistoryCount,
-        totalQueueCount,
-      );
-
-      // Add loading state to sidebar data
-      return {
-        ...sidebarData,
-        isLoading: nodeData.isLoading,
-      };
-    },
-    [canvasNodes, canvasNodesById, allComponents, allTriggers, visibleNodeEventsMap, showLiveActivity, getNodeData],
-  );
+  const getSidebarData = useGetSidebarData({
+    canvasNodes,
+    canvasNodesById,
+    allComponents,
+    allTriggers,
+    visibleNodeEventsMap,
+    showNodeRuntimeActivity,
+    getNodeData,
+  });
 
   // Trigger data loading when sidebar opens for a node
   const loadSidebarData = useCallback(

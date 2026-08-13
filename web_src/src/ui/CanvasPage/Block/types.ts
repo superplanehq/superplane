@@ -64,6 +64,8 @@ export interface BlockProps extends ComponentActionsProps {
   selected?: boolean;
   showHeader?: boolean;
   canvasMode?: "live" | "edit";
+  /** False on factory Live without a selected run (topology only). */
+  showRuntimeStatus?: boolean;
   onAnnotationUpdate?: (
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
