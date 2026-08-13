@@ -77,7 +77,7 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
     [organizationId, factoryId, factory, factories],
   );
 
-  const handleCreateFactory = async (input: { name: string; description: string }) => {
+  const handleCreateFactory = async (input: { name: string; description: string; key: string }) => {
     // Let CreateFactoryDialog catch failures so duplicate-name inline errors work.
     const created = await createFactory.mutateAsync(input);
     setCreateFactoryOpen(false);

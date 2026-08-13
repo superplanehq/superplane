@@ -25,7 +25,7 @@ func UpdateFactory(ctx context.Context, organizationID string, req *pb.UpdateFac
 		return nil, factoryErrorToStatus(err, "failed to update factory")
 	}
 
-	if err := factory.Update(db, req.Name, req.Description); err != nil {
+	if err := factory.Update(db, req.Name, req.Description, req.Key); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory")
 	}
 
