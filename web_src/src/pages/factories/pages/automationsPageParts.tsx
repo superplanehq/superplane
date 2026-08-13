@@ -3,6 +3,7 @@ import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
@@ -27,6 +28,7 @@ import {
 } from "../lib/factoryAutomationStatus";
 import { automationDetailPath, automationsPath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { type AutomationCardActions } from "./automationCardActions";
+import { LineVelocityPanel } from "./LineVelocityPanel";
 
 export function AutomationDetail({
   organizationId,
@@ -83,42 +85,57 @@ export function AutomationDetail({
         <AutomationCard app={app} tick={status.tick} statusLabel={status.label} emphasized actions={actions} />
       </div>
 
-      <section
-        className="mt-6 flex min-h-[12rem] min-w-0 max-h-[calc(100dvh-16rem)] flex-1 flex-col overflow-hidden rounded-lg border border-border bg-background"
-        aria-label="Runs"
-      >
-        <div className="flex h-9 shrink-0 items-center border-b border-border px-3">
-          <h2 className="truncate text-[12px] font-medium tracking-[-0.01em] text-foreground">Runs</h2>
-        </div>
-        <ul
-          ref={runsScrollRef}
-          className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-2 [scrollbar-width:thin]"
-          onScroll={(event) => loadMoreRunsIfNeeded(event.currentTarget)}
-          data-testid="automations-runs-scroll"
+      <Tabs defaultValue="runs" className="mt-6 flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+        <TabsList>
+          <TabsTrigger value="runs" data-testid="automations-tab-runs">
+            Runs
+          </TabsTrigger>
+          <TabsTrigger value="velocity" data-testid="automations-tab-velocity">
+            Velocity
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="runs" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col outline-none">
+          <ul
+            ref={runsScrollRef}
+            className="flex min-h-[12rem] min-w-0 max-h-[calc(100dvh-16rem)] flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-0.5 [scrollbar-width:thin]"
+            onScroll={(event) => loadMoreRunsIfNeeded(event.currentTarget)}
+            data-testid="automations-runs-scroll"
+          >
+            {runsLoading && runs.length === 0 ? (
+              <li className="px-2 py-4 text-[12px] text-muted-foreground">Loading runs…</li>
+            ) : runs.length === 0 ? (
+              <li className="px-2 py-4 text-[12px] text-muted-foreground">No runs</li>
+            ) : (
+              <>
+                {runs.map((run) => (
+                  <li key={run.runId}>
+                    <AutomationRunRow
+                      organizationId={organizationId}
+                      factoryId={factoryId}
+                      appId={canvasId}
+                      run={run}
+                    />
+                  </li>
+                ))}
+                {isFetchingNextPage ? (
+                  <li className="py-2 text-center text-[12px] text-muted-foreground">Loading more…</li>
+                ) : null}
+              </>
+            )}
+          </ul>
+        </TabsContent>
+        <TabsContent
+          value="velocity"
+          className="mt-0 min-h-0 max-h-[calc(100dvh-16rem)] flex-1 overflow-y-auto outline-none [scrollbar-width:thin]"
         >
-          {runsLoading && runs.length === 0 ? (
-            <li className="px-2 py-4 text-[12px] text-muted-foreground">Loading runs…</li>
-          ) : runs.length === 0 ? (
-            <li className="px-2 py-4 text-[12px] text-muted-foreground">No runs</li>
-          ) : (
-            <>
-              {runs.map((run) => (
-                <li key={run.runId}>
-                  <AutomationRunCard organizationId={organizationId} factoryId={factoryId} appId={canvasId} run={run} />
-                </li>
-              ))}
-              {isFetchingNextPage ? (
-                <li className="px-2 py-2 text-center text-[12px] text-muted-foreground">Loading more…</li>
-              ) : null}
-            </>
-          )}
-        </ul>
-      </section>
+          <LineVelocityPanel intro="Run throughput for this automation." />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
 
-function AutomationRunCard({
+function AutomationRunRow({
   organizationId,
   factoryId,
   appId,
@@ -140,7 +157,7 @@ function AutomationRunCard({
       className="block w-full rounded-md border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-foreground/25 hover:bg-accent/40"
       data-testid={`automations-run-${run.runId}`}
     >
-      <div className="text-[13px] font-medium tracking-[-0.01em] text-foreground">{run.title}</div>
+      <div className="truncate text-[13px] font-medium tracking-[-0.01em] text-foreground">{run.title}</div>
       <div className="mt-1.5 flex items-center gap-1.5 text-[12px] text-muted-foreground">
         <StatusTick tick={run.tick} size="sm" />
         <span>

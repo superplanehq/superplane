@@ -6,8 +6,41 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FactoryApp } from "@/api-client";
 
-import { AutomationCard } from "./automationsPageParts";
+import { AutomationCard, AutomationDetail } from "./automationsPageParts";
 import { duplicateAutomationName } from "./automationCardActions";
+
+vi.mock("@/hooks/useCanvasData", () => ({
+  useInfiniteCanvasRuns: () => ({
+    data: {
+      pages: [
+        {
+          runs: [
+            {
+              id: "run-c1111111",
+              state: "STATE_STARTED",
+              updatedAt: "2026-08-13T10:00:00.000Z",
+              rootEvent: { customName: "Run c1111111" },
+            },
+            {
+              id: "run-c2222222",
+              state: "STATE_STARTED",
+              updatedAt: "2026-08-12T10:00:00.000Z",
+              rootEvent: { customName: "Run c2222222" },
+            },
+          ],
+        },
+      ],
+    },
+    isLoading: false,
+    fetchNextPage: vi.fn(),
+    hasNextPage: false,
+    isFetchingNextPage: false,
+  }),
+}));
+
+vi.mock("./LineVelocityPanel", () => ({
+  LineVelocityPanel: () => <div data-testid="line-velocity-panel">Velocity</div>,
+}));
 
 const app: FactoryApp = {
   id: "app-refund-planner",
@@ -85,5 +118,47 @@ describe("AutomationCard menu", () => {
 
     await user.click(screen.getByTestId("automations-card-edit"));
     expect(actions.onEdit).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("AutomationDetail tabs", () => {
+  const actions = {
+    onEdit: vi.fn(),
+    onDuplicate: vi.fn(),
+    onDelete: vi.fn(),
+    canEdit: true,
+    canDuplicate: true,
+    canDelete: true,
+  };
+
+  function renderDetail() {
+    return render(
+      <MemoryRouter>
+        <AutomationDetail organizationId="org-1" factoryId="factory-1" app={app} actions={actions} />
+      </MemoryRouter>,
+    );
+  }
+
+  it("shows Runs and Velocity tabs, with run rows as soft cards", () => {
+    renderDetail();
+
+    expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByRole("tab", { name: "Velocity" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Runs" })).not.toBeInTheDocument();
+
+    const run = screen.getByTestId("automations-run-run-c1111111");
+    expect(run).toHaveTextContent("Run c1111111");
+    expect(run.className).toMatch(/\bborder\b/);
+    expect(run.className).toMatch(/\brounded-md\b/);
+    expect(screen.getByTestId("automations-runs-scroll").className).toMatch(/\bgap-2\b/);
+    expect(screen.getByTestId("automations-runs-scroll").closest("section")).toBeNull();
+  });
+
+  it("opens the Velocity tab", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(screen.getByRole("tab", { name: "Velocity" }));
+    expect(screen.getByTestId("line-velocity-panel")).toBeInTheDocument();
   });
 });
