@@ -9,22 +9,8 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { SegmentedNav } from "@/ui/SegmentedNav";
-
-export type VelocityPeriodDays = 7 | 30 | 90;
-
-type VelocityPeriodStats = {
-  days: VelocityPeriodDays;
-  label: string;
-  runs: number;
-  succeeded: number;
-  failed: number;
-  /** Average tokens per completed run in the period. */
-  tokensPerRun: number;
-  /** Estimated token spend per completed run (USD). */
-  tokenSpendPerRun: number;
-  /** Estimated VM spend per completed run (USD). */
-  vmSpendPerRun: number;
-};
+import { buildDailyVelocity } from "./buildDailyVelocity";
+import { VELOCITY_BY_PERIOD, type VelocityPeriodDays, type VelocityPeriodStats } from "./lineVelocityMockData";
 
 const PERIOD_OPTIONS: { value: string; label: string; days: VelocityPeriodDays }[] = [
   { value: "7", label: "7d", days: 7 },
@@ -32,52 +18,11 @@ const PERIOD_OPTIONS: { value: string; label: string; days: VelocityPeriodDays }
   { value: "90", label: "90d", days: 90 },
 ];
 
-/** Storybook / UI mock stats by selected window. */
-export const VELOCITY_BY_PERIOD: Record<VelocityPeriodDays, VelocityPeriodStats> = {
-  7: {
-    days: 7,
-    label: "Last 7 days",
-    runs: 42,
-    succeeded: 28,
-    failed: 5,
-    tokensPerRun: 18400,
-    tokenSpendPerRun: 0.42,
-    vmSpendPerRun: 1.18,
-  },
-  30: {
-    days: 30,
-    label: "Last 30 days",
-    runs: 168,
-    succeeded: 121,
-    failed: 22,
-    tokensPerRun: 17200,
-    tokenSpendPerRun: 0.39,
-    vmSpendPerRun: 1.05,
-  },
-  90: {
-    days: 90,
-    label: "Last 90 days",
-    runs: 512,
-    succeeded: 381,
-    failed: 64,
-    tokensPerRun: 16900,
-    tokenSpendPerRun: 0.37,
-    vmSpendPerRun: 0.98,
-  },
-};
-
 const dailyVelocityChartConfig = {
   succeeded: { label: "Succeeded", color: "#10b981" },
   failed: { label: "Failed", color: "#ef4444" },
   inProgress: { label: "Still in progress", color: "#60a5fa" },
 } satisfies ChartConfig;
-
-type DailyVelocityPoint = {
-  day: string;
-  succeeded: number;
-  failed: number;
-  inProgress: number;
-};
 
 function formatTokens(value: number) {
   if (value >= 1000) {
@@ -94,139 +39,6 @@ function formatUsd(value: number) {
 function formatPct(part: number, whole: number) {
   if (whole <= 0) return "0%";
   return `${Math.round((part / whole) * 100)}%`;
-}
-
-function buildDayLabels(days: VelocityPeriodDays): string[] {
-  if (days === 7) return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-  const labels: string[] = [];
-  for (let index = 0; index < days; index += 1) {
-    const dayNumber = index + 1;
-    if (days === 30) {
-      labels.push(dayNumber % 5 === 1 || dayNumber === days ? String(dayNumber) : "");
-      continue;
-    }
-    labels.push(dayNumber % 15 === 1 || dayNumber === days ? String(dayNumber) : "");
-  }
-  return labels;
-}
-
-/**
- * Build stacked daily outcomes for the selected window.
- * Still-in-progress only on the last two days when the period has open work.
- */
-function buildDailyVelocity(stats: VelocityPeriodStats): DailyVelocityPoint[] {
-  const open = Math.max(0, stats.runs - stats.succeeded - stats.failed);
-  const dayCount = stats.days;
-  const labels = buildDayLabels(stats.days);
-
-  const intakeWeights = Array.from({ length: dayCount }, (_, index) => {
-    const wave = 0.85 + 0.3 * Math.sin((index / dayCount) * Math.PI * 2);
-    return wave;
-  });
-  const weightSum = intakeWeights.reduce((sum, weight) => sum + weight, 0);
-  const normalized = intakeWeights.map((weight) => weight / weightSum);
-
-  const distribute = (total: number) => {
-    const values = normalized.map((weight) => Math.round(total * weight));
-    const drift = total - values.reduce((sum, value) => sum + value, 0);
-    values[values.length - 1] = (values[values.length - 1] ?? 0) + drift;
-    return values.map((value) => Math.max(0, value));
-  };
-
-  const entered = distribute(stats.runs);
-  const closedTotal = stats.succeeded + stats.failed;
-  const successShareOfClosed = closedTotal > 0 ? stats.succeeded / closedTotal : 1;
-  const openDayIndexes = [dayCount - 2, dayCount - 1];
-
-  const points: DailyVelocityPoint[] = labels.map((day, index) => {
-    const dayEntered = entered[index] ?? 0;
-    const isOpenDay = open > 0 && openDayIndexes.includes(index);
-    let dayInProgress = isOpenDay ? Math.min(dayEntered, Math.round(dayEntered * (index === dayCount - 1 ? 0.55 : 0.35))) : 0;
-    let closed = dayEntered - dayInProgress;
-    let daySucceeded = Math.round(closed * successShareOfClosed);
-    let dayFailed = closed - daySucceeded;
-    if (dayFailed < 0) {
-      daySucceeded = closed;
-      dayFailed = 0;
-    }
-    const used = daySucceeded + dayFailed + dayInProgress;
-    if (used !== dayEntered) {
-      if (isOpenDay) dayInProgress = Math.max(0, dayInProgress + (dayEntered - used));
-      else daySucceeded = Math.max(0, daySucceeded + (dayEntered - used));
-    }
-    return {
-      day: day || "·",
-      succeeded: daySucceeded,
-      failed: dayFailed,
-      inProgress: dayInProgress,
-    };
-  });
-
-  const sum = (key: keyof Omit<DailyVelocityPoint, "day">) => points.reduce((total, point) => total + point[key], 0);
-
-  const shift = (
-    from: "succeeded" | "failed" | "inProgress",
-    to: "succeeded" | "failed" | "inProgress",
-    amount: number,
-    dayIndexes: number[],
-  ) => {
-    let remaining = amount;
-    for (const index of dayIndexes) {
-      if (remaining <= 0) break;
-      const point = points[index];
-      if (!point) continue;
-      const move = Math.min(remaining, point[from]);
-      if (move <= 0) continue;
-      point[from] -= move;
-      point[to] += move;
-      remaining -= move;
-    }
-  };
-
-  const closedDays = Array.from({ length: dayCount }, (_, index) => index).filter(
-    (index) => !openDayIndexes.includes(index),
-  );
-
-  let openDelta = open - sum("inProgress");
-  if (openDelta > 0) {
-    shift("succeeded", "inProgress", openDelta, openDayIndexes);
-    openDelta = open - sum("inProgress");
-    if (openDelta > 0) shift("failed", "inProgress", openDelta, openDayIndexes);
-  } else if (openDelta < 0) {
-    shift("inProgress", "succeeded", -openDelta, openDayIndexes);
-  }
-
-  for (const index of closedDays) {
-    const point = points[index];
-    if (!point || point.inProgress === 0) continue;
-    point.succeeded += point.inProgress;
-    point.inProgress = 0;
-  }
-
-  let successDelta = stats.succeeded - sum("succeeded");
-  if (successDelta > 0) shift("failed", "succeeded", successDelta, closedDays);
-  else if (successDelta < 0) shift("succeeded", "failed", -successDelta, closedDays);
-
-  if (open > 0) {
-    for (const index of openDayIndexes) {
-      const point = points[index];
-      if (!point || point.inProgress > 0) continue;
-      if (point.succeeded > 0) {
-        point.succeeded -= 1;
-        point.inProgress += 1;
-      } else if (point.failed > 0) {
-        point.failed -= 1;
-        point.inProgress += 1;
-      }
-    }
-  }
-
-  // Restore blank tick labels for sparse axes (chart still needs a stable key).
-  return points.map((point, index) => ({
-    ...point,
-    day: labels[index] || "",
-  }));
 }
 
 function DailyVelocityChart({ stats }: { stats: VelocityPeriodStats }) {
@@ -281,9 +93,7 @@ function OutcomeSplitBar({ stats }: { stats: VelocityPeriodStats }) {
       role="img"
       aria-label={`Succeeded ${formatPct(stats.succeeded, stats.runs)}, failed ${formatPct(stats.failed, stats.runs)}${open > 0 ? `, still in progress ${formatPct(open, stats.runs)}` : ""}`}
     >
-      {succeededPct > 0 ? (
-        <span className="h-full bg-[#10b981]" style={{ width: `${succeededPct}%` }} />
-      ) : null}
+      {succeededPct > 0 ? <span className="h-full bg-[#10b981]" style={{ width: `${succeededPct}%` }} /> : null}
       {failedPct > 0 ? <span className="h-full bg-[#ef4444]" style={{ width: `${failedPct}%` }} /> : null}
       {openPct > 0 ? <span className="h-full bg-[#60a5fa]" style={{ width: `${openPct}%` }} /> : null}
     </div>
@@ -323,14 +133,13 @@ function VelocityOverviewCard({ stats }: { stats: VelocityPeriodStats }) {
   const open = Math.max(0, stats.runs - stats.succeeded - stats.failed);
 
   return (
-    <section className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5 sm:py-5" data-testid="velocity-run-stats">
+    <section
+      className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5 sm:py-5"
+      data-testid="velocity-run-stats"
+    >
       <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
         <MetricCell value={String(stats.runs)} label="Runs" hint={stats.label} emphasize />
-        <MetricCell
-          value={String(stats.succeeded)}
-          label="Succeeded"
-          hint={formatPct(stats.succeeded, stats.runs)}
-        />
+        <MetricCell value={String(stats.succeeded)} label="Succeeded" hint={formatPct(stats.succeeded, stats.runs)} />
         <MetricCell value={String(stats.failed)} label="Failed" hint={formatPct(stats.failed, stats.runs)} />
         {open > 0 ? (
           <MetricCell value={String(open)} label="Still in progress" hint={formatPct(open, stats.runs)} />
