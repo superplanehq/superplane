@@ -29,7 +29,13 @@ const running = entry({
 
 const finished = entry({
   executions: [
-    { id: "e1", step: "plan", state: "STATE_FINISHED", result: "RESULT_PASSED", line: { id: "line-a", name: "review" } },
+    {
+      id: "e1",
+      step: "plan",
+      state: "STATE_FINISHED",
+      result: "RESULT_PASSED",
+      line: { id: "line-a", name: "review" },
+    },
   ],
 });
 
