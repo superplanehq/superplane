@@ -17,7 +17,7 @@ func TestFactoryWebSocketRequiresFactoriesFeature(t *testing.T) {
 	defer r.Close()
 	server, _, token := setupTestServer(r, t)
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, "ws-factory", "desc")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, "ws-factory", "desc", "")
 	require.NoError(t, err)
 
 	response := execRequest(server, requestParams{

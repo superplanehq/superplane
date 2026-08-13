@@ -45,7 +45,7 @@ const commonFlags = {
 export const Open: Story = {
   args: {
     orderTitle: "Reconcile duplicate refunds in ledger",
-    displayStatus: "open",
+    displayStatus: "waiting",
     isOpen: true,
     isDispatchable: true,
     isClosed: false,
@@ -110,7 +110,7 @@ export const ClosedFailed: Story = {
   name: "Closed (failed)",
   args: {
     orderTitle: "Failed: reconcile refund ledger for Q1 audit",
-    displayStatus: "closedFailed",
+    displayStatus: "failed",
     isOpen: false,
     isDispatchable: false,
     isClosed: true,
@@ -126,7 +126,7 @@ export const ReadOnly: Story = {
   name: "Read Only",
   args: {
     orderTitle: "Reconcile duplicate refunds in ledger",
-    displayStatus: "open",
+    displayStatus: "waiting",
     isOpen: true,
     isDispatchable: true,
     isClosed: false,

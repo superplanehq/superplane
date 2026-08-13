@@ -11,14 +11,15 @@ interface FactoriesNavProps {
   recentWorkOrders: FactoriesWorkOrder[];
 }
 
-const RECENT_STATUS_DOT_CLASS: Record<string, string> = {
-  draft: "bg-gray-400",
-  open: "bg-sky-500",
-  running: "bg-violet-500",
-  failed: "bg-red-500",
-  completed: "bg-emerald-500",
-  rejected: "bg-gray-400",
-  closedFailed: "bg-red-500",
+import type { WorkOrderDisplayStatus } from "../lib/workOrderProgress";
+
+const RECENT_STATUS_DOT_CLASS: Record<WorkOrderDisplayStatus, string> = {
+  draft: "bg-[color:var(--status-draft-dot)]",
+  waiting: "bg-[color:var(--status-waiting-dot)]",
+  running: "bg-[color:var(--status-running-dot)]",
+  failed: "bg-[color:var(--status-failed-dot)]",
+  completed: "bg-[color:var(--status-completed-dot)]",
+  cancelled: "bg-[color:var(--status-cancelled-dot)]",
 };
 
 export function FactoriesNav({ organizationId, factoryId, recentWorkOrders }: FactoriesNavProps) {
@@ -61,7 +62,7 @@ export function FactoriesNav({ organizationId, factoryId, recentWorkOrders }: Fa
               }
               const status = getWorkOrderDisplayStatus(order);
               const statusMeta = getWorkOrderDisplayStatusMeta(status);
-              const dotClass = RECENT_STATUS_DOT_CLASS[status] ?? "bg-gray-400";
+              const dotClass = RECENT_STATUS_DOT_CLASS[status];
               return (
                 <li key={order.id}>
                   <NavLink
