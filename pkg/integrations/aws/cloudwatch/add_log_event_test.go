@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -71,9 +72,41 @@ func TestAddLogEvent_Setup(t *testing.T) {
 		require.ErrorContains(t, err, "invalid timestamp")
 	})
 
+	t.Run("datetime-local timestamp from the UI picker -> no error", func(t *testing.T) {
+		config := validAddLogEventConfig()
+		config["timestamp"] = "2026-05-29T09:00"
+		err := component.Setup(core.SetupContext{Configuration: config})
+		require.NoError(t, err)
+	})
+
 	t.Run("valid configuration -> no error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{Configuration: validAddLogEventConfig()})
 		require.NoError(t, err)
+	})
+}
+
+func TestParseLogEventTimestamp(t *testing.T) {
+	t.Run("RFC3339 -> parsed as-is", func(t *testing.T) {
+		parsed, err := parseLogEventTimestamp("2026-05-29T09:00:00Z")
+		require.NoError(t, err)
+		assert.Equal(t, "2026-05-29T09:00:00Z", parsed.Format(time.RFC3339))
+	})
+
+	t.Run("datetime-local without seconds -> parsed as UTC", func(t *testing.T) {
+		parsed, err := parseLogEventTimestamp("2026-05-29T09:00")
+		require.NoError(t, err)
+		assert.Equal(t, "2026-05-29T09:00:00Z", parsed.Format(time.RFC3339))
+	})
+
+	t.Run("datetime-local with seconds -> parsed as UTC", func(t *testing.T) {
+		parsed, err := parseLogEventTimestamp("2026-05-29T09:00:30")
+		require.NoError(t, err)
+		assert.Equal(t, "2026-05-29T09:00:30Z", parsed.Format(time.RFC3339))
+	})
+
+	t.Run("garbage -> error", func(t *testing.T) {
+		_, err := parseLogEventTimestamp("not-a-date")
+		require.ErrorContains(t, err, "invalid timestamp")
 	})
 }
 
@@ -196,5 +229,24 @@ func TestAddLogEvent_Execute(t *testing.T) {
 		})
 
 		require.ErrorContains(t, err, "failed to put log event")
+	})
+
+	t.Run("put log events accepted but rejected -> error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				okResponse(""),
+				okResponse(`{"nextSequenceToken": "token-1", "rejectedLogEventsInfo": {"tooOldLogEventEndIndex": 0}}`),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  validAddLogEventConfig(),
+			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+			HTTP:           httpContext,
+			Integration:    &contexts.IntegrationContext{CurrentSecrets: credentialSecrets()},
+		})
+
+		require.ErrorContains(t, err, "failed to put log event")
+		require.ErrorContains(t, err, "older than 14 days")
 	})
 }
