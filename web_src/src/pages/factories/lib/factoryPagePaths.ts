@@ -28,11 +28,7 @@ export function createWorkOrderPath(organizationId: string, factoryKey: string) 
  * factory-scoped sequence number (`FactoriesWorkOrder.number`), not the
  * database id — see `legacyWorkOrderDetailPath` for the old id-based shape.
  */
-export function workOrderDetailPath(
-  organizationId: string,
-  factoryKey: string,
-  orderNumber: string | number,
-) {
+export function workOrderDetailPath(organizationId: string, factoryKey: string, orderNumber: string | number) {
   return `${factoryDetailPath(organizationId, factoryKey)}/work-order/${orderNumber}`;
 }
 

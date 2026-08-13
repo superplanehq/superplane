@@ -64,7 +64,9 @@ export function CreateWorkOrderPage() {
         description: description.trim(),
         assigneeIds,
       });
-      navigate(order.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, order.number) : workOrdersHref);
+      navigate(
+        order.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, order.number) : workOrdersHref,
+      );
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to create work order"));
     }

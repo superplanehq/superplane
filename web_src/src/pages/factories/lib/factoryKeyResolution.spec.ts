@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { FactoriesFactory } from "@/api-client";
-import { factoryRouteNeedsCanonicalRedirect, replaceFactoryKeySegment, resolveFactoryByKey } from "./factoryKeyResolution";
+import {
+  factoryRouteNeedsCanonicalRedirect,
+  replaceFactoryKeySegment,
+  resolveFactoryByKey,
+} from "./factoryKeyResolution";
 
 const FACTORIES: FactoriesFactory[] = [
   { id: "factory-1", key: "SP", name: "Superplane" },
@@ -66,9 +70,9 @@ describe("factoryRouteNeedsCanonicalRedirect", () => {
 
 describe("replaceFactoryKeySegment", () => {
   it("swaps the factory key segment and keeps the rest of the path", () => {
-    expect(replaceFactoryKeySegment("/org-1/workspaces/factory-2/work-orders/order-1", "org-1", "factory-2", "RF")).toBe(
-      "/org-1/workspaces/RF/work-orders/order-1",
-    );
+    expect(
+      replaceFactoryKeySegment("/org-1/workspaces/factory-2/work-orders/order-1", "org-1", "factory-2", "RF"),
+    ).toBe("/org-1/workspaces/RF/work-orders/order-1");
   });
 
   it("keeps the workspace root when there is no trailing path", () => {

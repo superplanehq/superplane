@@ -106,7 +106,12 @@ export function AutomationDetail({
             <>
               {runs.map((run) => (
                 <li key={run.runId}>
-                  <AutomationRunCard organizationId={organizationId} factoryKey={factoryKey} appId={canvasId} run={run} />
+                  <AutomationRunCard
+                    organizationId={organizationId}
+                    factoryKey={factoryKey}
+                    appId={canvasId}
+                    run={run}
+                  />
                 </li>
               ))}
               {isFetchingNextPage ? (

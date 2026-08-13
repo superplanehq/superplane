@@ -1,5 +1,11 @@
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactory, useFactoryWorkOrders, useWorkOrder, useWorkOrderArtifacts, useWorkOrderEvents } from "@/hooks/useFactoryData";
+import {
+  useFactory,
+  useFactoryWorkOrders,
+  useWorkOrder,
+  useWorkOrderArtifacts,
+  useWorkOrderEvents,
+} from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { useMemo } from "react";

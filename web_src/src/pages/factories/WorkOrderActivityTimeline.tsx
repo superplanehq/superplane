@@ -340,7 +340,9 @@ function CommentEventBody({
   const comment = event.comment;
   if (!comment) return null;
   const isAutomation = (comment.authorKind ?? "").toLowerCase() === "automation";
-  const runHref = getWorkOrderRunHref(organizationId, factoryKey, event.sourceAppId, event.sourceRunId, { orderNumber });
+  const runHref = getWorkOrderRunHref(organizationId, factoryKey, event.sourceAppId, event.sourceRunId, {
+    orderNumber,
+  });
 
   return (
     <>
@@ -446,7 +448,12 @@ function UserActionEventDescription({
             resolveUserDisplay={resolveUserDisplay}
           />
         ) : hasSourceRun ? (
-          <SourceRunAttribution event={event} organizationId={organizationId} factoryKey={factoryKey} orderNumber={orderNumber} />
+          <SourceRunAttribution
+            event={event}
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            orderNumber={orderNumber}
+          />
         ) : (
           <span>{event.title}</span>
         )}
@@ -473,7 +480,9 @@ function SourceRunAttribution({
   factoryKey: string;
   orderNumber?: string;
 }) {
-  const runHref = getWorkOrderRunHref(organizationId, factoryKey, event.sourceAppId, event.sourceRunId, { orderNumber });
+  const runHref = getWorkOrderRunHref(organizationId, factoryKey, event.sourceAppId, event.sourceRunId, {
+    orderNumber,
+  });
   const connector = event.kind === "created" ? "from" : "via";
   return (
     <span className="inline-flex flex-wrap items-baseline gap-x-1">

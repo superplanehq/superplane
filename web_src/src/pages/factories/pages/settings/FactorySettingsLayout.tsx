@@ -5,7 +5,11 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 import { Navigate, NavLink, Outlet, useLocation, useParams } from "react-router";
-import { factoryRouteNeedsCanonicalRedirect, replaceFactoryKeySegment, resolveFactoryByKey } from "../../lib/factoryKeyResolution";
+import {
+  factoryRouteNeedsCanonicalRedirect,
+  replaceFactoryKeySegment,
+  resolveFactoryByKey,
+} from "../../lib/factoryKeyResolution";
 import { factoryDetailPath, factoryListPath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { SidebarUserMenu } from "../../layout/SidebarUserMenu";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";

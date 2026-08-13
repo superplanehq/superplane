@@ -10,7 +10,11 @@ import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from "react-router";
 import { CreateFactoryDialog } from "../CreateFactoryDialog";
-import { factoryRouteNeedsCanonicalRedirect, replaceFactoryKeySegment, resolveFactoryByKey } from "../lib/factoryKeyResolution";
+import {
+  factoryRouteNeedsCanonicalRedirect,
+  replaceFactoryKeySegment,
+  resolveFactoryByKey,
+} from "../lib/factoryKeyResolution";
 import { factoryDetailPath, factoryListPath, factoryOnboardingPath } from "../lib/factoryPagePaths";
 import { clearLastVisitedFactory, recordLastVisitedFactory } from "../lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
