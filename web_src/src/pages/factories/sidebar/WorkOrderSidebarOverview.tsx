@@ -83,29 +83,27 @@ export function WorkOrderSidebarOverview({
   );
 }
 
-const STATUS_TEXT_CLASSNAME: Partial<Record<WorkOrderDisplayStatus, string>> = {
-  completed: "text-[color:var(--status-success)]",
-  running: "text-[color:var(--status-running)]",
-  failed: "text-[color:var(--status-danger)]",
-  closedFailed: "text-[color:var(--status-danger)]",
-  rejected: "text-muted-foreground",
-  open: "text-sky-700 dark:text-sky-300",
-  draft: "text-muted-foreground",
+const STATUS_TEXT_CLASSNAME: Record<WorkOrderDisplayStatus, string> = {
+  completed: "text-[color:var(--status-completed-fg)]",
+  running: "text-[color:var(--status-running-fg)]",
+  failed: "text-[color:var(--status-failed-fg)]",
+  cancelled: "text-[color:var(--status-cancelled-fg)]",
+  waiting: "text-[color:var(--status-waiting-fg)]",
+  draft: "text-[color:var(--status-draft-fg)]",
 };
 
-const STATUS_DOT_CLASSNAME: Partial<Record<WorkOrderDisplayStatus, string>> = {
-  completed: "bg-[var(--status-success-dot)]",
-  running: "bg-[var(--status-running-dot)]",
-  failed: "bg-[var(--status-danger-dot)]",
-  closedFailed: "bg-[var(--status-danger-dot)]",
-  rejected: "bg-gray-400",
-  open: "bg-sky-500",
-  draft: "bg-gray-400",
+const STATUS_DOT_CLASSNAME: Record<WorkOrderDisplayStatus, string> = {
+  completed: "bg-[color:var(--status-completed-dot)]",
+  running: "bg-[color:var(--status-running-dot)]",
+  failed: "bg-[color:var(--status-failed-dot)]",
+  cancelled: "bg-[color:var(--status-cancelled-dot)]",
+  waiting: "bg-[color:var(--status-waiting-dot)]",
+  draft: "bg-[color:var(--status-draft-dot)]",
 };
 
 function StatusValue({ displayStatus, label }: { displayStatus: WorkOrderDisplayStatus; label: string }) {
-  const textClass = STATUS_TEXT_CLASSNAME[displayStatus] ?? "text-foreground";
-  const dotClass = STATUS_DOT_CLASSNAME[displayStatus] ?? "bg-muted-foreground";
+  const textClass = STATUS_TEXT_CLASSNAME[displayStatus];
+  const dotClass = STATUS_DOT_CLASSNAME[displayStatus];
   return (
     <span className={cn("inline-flex items-center gap-1.5 text-[13px]", textClass)}>
       {displayStatus === "running" ? (

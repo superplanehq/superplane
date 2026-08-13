@@ -18,7 +18,7 @@ func Test__DeleteFactory(t *testing.T) {
 
 	t.Run("factory is soft deleted and hidden from list/describe", func(t *testing.T) {
 		originalName := support.RandomName("factory")
-		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, originalName, "desc")
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, originalName, "desc", "")
 		require.NoError(t, err)
 
 		_, err = DeleteFactory(context.Background(), r.Organization.ID.String(), factory.ID.String())
@@ -51,13 +51,13 @@ func Test__DeleteFactory(t *testing.T) {
 
 	t.Run("name can be reused after soft delete", func(t *testing.T) {
 		name := support.RandomName("reuse-factory")
-		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, name, "")
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, name, "", "")
 		require.NoError(t, err)
 
 		_, err = DeleteFactory(context.Background(), r.Organization.ID.String(), factory.ID.String())
 		require.NoError(t, err)
 
-		recreated, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, name, "new")
+		recreated, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, name, "new", "")
 		require.NoError(t, err)
 		assert.Equal(t, name, recreated.Name)
 		assert.NotEqual(t, factory.ID, recreated.ID)
@@ -71,7 +71,7 @@ func Test__DeleteFactory(t *testing.T) {
 	})
 
 	t.Run("already deleted -> not found", func(t *testing.T) {
-		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "")
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
 		_, err = DeleteFactory(context.Background(), r.Organization.ID.String(), factory.ID.String())
@@ -84,7 +84,7 @@ func Test__DeleteFactory(t *testing.T) {
 	})
 
 	t.Run("soft deletes factory apps", func(t *testing.T) {
-		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "")
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)

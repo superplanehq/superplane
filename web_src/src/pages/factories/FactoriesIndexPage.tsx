@@ -70,7 +70,7 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
 
   const canCreate = canAct("factories", "create");
 
-  const handleCreate = async (input: { name: string; description: string }) => {
+  const handleCreate = async (input: { name: string; description: string; key: string }) => {
     // Let CreateFactoryDialog catch failures so duplicate-name inline errors work.
     const factory = await createFactory.mutateAsync(input);
     setCreateOpen(false);
