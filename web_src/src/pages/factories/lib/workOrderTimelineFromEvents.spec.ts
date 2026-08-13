@@ -242,6 +242,48 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
         automation: { nodeName: "review-payload", appName: "Refund Diagnostics" },
       },
     });
+    expect(view.events[0]?.sourceRunId).toBeUndefined();
+    expect(view.events[0]?.sourceAppId).toBeUndefined();
+  });
+
+  it("carries the source run onto a top-level automation comment", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.comment.added",
+        event: {
+          body: "Investigating the failure.",
+          author: {
+            kind: "automation",
+            automation: { nodeName: "review-payload", appId: "app-1", appName: "Refund Diagnostics" },
+          },
+          run: { id: "run-99" },
+        },
+      },
+    ]);
+
+    expect(view.events[0]).toMatchObject({
+      kind: "commented",
+      sourceRunId: "run-99",
+      sourceAppId: "app-1",
+    });
+  });
+
+  it("does not attach a source run to a user comment", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.comment.added",
+        event: {
+          body: "Looks good to me.",
+          author: { kind: "user", userId: "user-1" },
+        },
+      },
+    ]);
+
+    expect(view.events[0]).toMatchObject({ kind: "commented" });
+    expect(view.events[0]?.sourceRunId).toBeUndefined();
+    expect(view.events[0]?.sourceAppId).toBeUndefined();
   });
 
   it("captures PR artifact metadata", () => {
@@ -414,6 +456,8 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
         },
       },
     });
+    expect(view.events[0]?.sourceRunId).toBeUndefined();
+    expect(view.events[0]?.sourceAppId).toBeUndefined();
   });
 
   it("groups an automation artifact into its dispatch step", () => {
@@ -506,7 +550,7 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
     expect(view.events.find((event) => event.kind === "artifactAdded")?.artifact?.id).toBe("artifact-1");
   });
 
-  it("groups an automation comment into its dispatch step", () => {
+  it("groups an automation comment into its dispatch step, labelled with the line name and linked to its run", () => {
     const view = buildWorkOrderTimelineViewFromEvents([
       stepExecutionEvent("step.execution.created", "2026-08-04T12:00:00.000Z", "started"),
       {
@@ -520,8 +564,10 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
               lineId: "line-1",
               lineName: "CI",
               stepName: "Build",
+              appId: "app-comment",
             },
           },
+          run: { id: "run-comment-1" },
         },
       },
     ]);
@@ -532,9 +578,70 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
       steps: [
         {
           stepName: "Build",
-          comments: [{ body: "Ready for review" }],
+          comments: [
+            {
+              body: "Ready for review",
+              label: "CI",
+              sourceRunId: "run-comment-1",
+              sourceAppId: "app-comment",
+            },
+          ],
         },
       ],
     });
+  });
+
+  it("labels a step comment with the line name even when the node name differs (regression)", () => {
+    // Guards against reintroducing the "node name" bug: the label shown in
+    // the timeline must be the automation (line) name, never the canvas
+    // node name, even though both are present on the author ref.
+    const view = buildWorkOrderTimelineViewFromEvents([
+      stepExecutionEvent("step.execution.created", "2026-08-04T12:00:00.000Z", "started"),
+      {
+        timestamp: "2026-08-04T12:01:00.000Z",
+        type: "order.comment.added",
+        event: {
+          body: "Ready for review",
+          author: {
+            kind: "automation",
+            automation: {
+              nodeId: "node-42",
+              nodeName: "review-payload",
+              lineId: "line-1",
+              lineName: "CI",
+              stepName: "Build",
+            },
+          },
+        },
+      },
+    ]);
+
+    const step = view.events[0]?.steps?.[0];
+    expect(step?.comments?.[0]?.label).toBe("CI");
+  });
+
+  it("falls back to a node/app label for a step comment with no resolvable line name", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      stepExecutionEvent("step.execution.created", "2026-08-04T12:00:00.000Z", "started"),
+      {
+        timestamp: "2026-08-04T12:01:00.000Z",
+        type: "order.comment.added",
+        event: {
+          body: "Ready for review",
+          author: {
+            kind: "automation",
+            automation: {
+              lineId: "line-1",
+              nodeName: "review-payload",
+              appName: "Refund Diagnostics",
+              stepName: "Build",
+            },
+          },
+        },
+      },
+    ]);
+
+    const step = view.events[0]?.steps?.[0];
+    expect(step?.comments?.[0]?.label).toBe("review-payload · Refund Diagnostics");
   });
 });

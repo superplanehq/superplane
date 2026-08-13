@@ -1,6 +1,7 @@
 import type { FactoriesWorkOrderEvent, FactoriesWorkOrderResult } from "@/api-client";
 import { formatWorkOrderResult } from "./workOrderPresentation";
 import { extractArtifactName, extractArtifactTitle, extractArtifactUrl } from "./workOrderArtifact";
+import { formatAutomationLabel } from "../timeline/authorLabels";
 import { UNKNOWN_ORG_USER_NAME } from "@/lib/orgUserDisplay";
 import type {
   UserNameLookup,
@@ -262,9 +263,13 @@ function appendCommentEvent(
 
   const author = payload.author ?? {};
   const automationActor = toAutomationActor(author.automation);
+  const sourceRunId = payload.run?.id;
+  const sourceAppId = automationActor?.appId ?? payload.app?.id;
   const stepComment: WorkOrderTimelineStepComment = {
     body,
-    label: automationActor?.nodeName,
+    label: describeCommentAutomationLabel(automationActor),
+    sourceRunId,
+    sourceAppId,
   };
   const step = findAutomationStep(state, automationActor);
   if (step) {
@@ -279,6 +284,8 @@ function appendCommentEvent(
     actorUserId: author.userId ?? payload.user?.id,
     actorName: resolveUserDisplayName(author.userId ?? payload.user?.id, resolveUserName),
     actorAutomation: automationActor,
+    sourceRunId,
+    sourceAppId,
     comment: {
       body,
       authorKind: author.kind,
@@ -286,6 +293,13 @@ function appendCommentEvent(
     },
     title: "commented",
   });
+}
+
+// Prefer the automation (line) name — matching how line completion notes are
+// attributed — falling back to a node/app label only when no line resolved
+// (e.g. ad-hoc automation runs outside a dispatched line).
+function describeCommentAutomationLabel(actor: WorkOrderTimelineAutomationActor | undefined): string | undefined {
+  return actor?.lineName || formatAutomationLabel(actor?.nodeName, actor?.appName);
 }
 
 function appendArtifactEvent(

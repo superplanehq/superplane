@@ -40,6 +40,9 @@ export interface WorkOrderTimelineStep {
 export interface WorkOrderTimelineStepComment {
   body: string;
   label?: string;
+  /** Run the comment was authored from, when the author is an automation. */
+  sourceRunId?: string;
+  sourceAppId?: string;
 }
 
 export interface WorkOrderTimelineAssigneeChange {
