@@ -265,6 +265,9 @@ message ListFactoriesResponse {
 message CreateFactoryRequest {
   string name = 1;
   string description = 2;
+  // Workspace key. 2 to 5 uppercase letters, unique per organization.
+  // Used with the sequence number to render identifiers such as `SP-1`.
+  string key = 3;
 }
 
 message CreateFactoryResponse {
@@ -283,6 +286,9 @@ message UpdateFactoryRequest {
   string id = 1;
   optional string name = 2;
   optional string description = 3;
+  // New workspace key. 2 to 5 uppercase letters, unique per organization.
+  // Updating this changes the identifier shown for every work order.
+  optional string key = 4;
 }
 
 message UpdateFactoryResponse {
@@ -308,6 +314,8 @@ message Factory {
   string name = 2;
   string description = 3;
   repeated FactoryLine lines = 4;
+  // Workspace key. 2 to 5 uppercase letters, unique per organization.
+  string key = 5;
 }
 
 message FactoryLine {
@@ -423,6 +431,13 @@ message WorkOrder {
   // Aggregate usage summed across executions. UI hides values that are zero.
   int64 total_tokens = 11;
   int64 total_cost_cents = 12;
+  // Immutable factory-scoped sequence number, allocated atomically at
+  // creation time. Combined with the parent factory's key to render the
+  // display identifier (for example `SP-42`).
+  int64 number = 13;
+  // Display identifier composed of the parent factory's key and this
+  // order's `number` (for example `SP-42`). Populated by the server.
+  string key = 14;
 }
 
 message WorkOrderCreator {

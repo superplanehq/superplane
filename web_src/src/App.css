@@ -426,12 +426,47 @@
   --sidebar-accent-foreground: #26251e;
   --status-success: #15803d;
   --status-success-dot: #16a34a;
-  --status-running: #6d28d9;
-  --status-running-dot: #8b5cf6;
+  --status-running: #1d4ed8;
+  --status-running-dot: #3b82f6;
   --status-warning: #b45309;
   --status-warning-dot: #f59e0b;
   --status-danger: #b91c1c;
   --status-danger-dot: #ef4444;
+
+  /* Semantic tokens driving the six work-order display statuses.
+     `-fg` is text/icon, `-bg` is the pill fill, `-border` is the pill
+     stroke, `-dot` is the small indicator dot on dense rows. */
+  --status-draft-fg: #52525b;
+  --status-draft-bg: #f4f4f5;
+  --status-draft-border: #e4e4e7;
+  --status-draft-dot: #a1a1aa;
+
+  --status-running-fg: #1d4ed8;
+  --status-running-bg: #eff6ff;
+  --status-running-border: #bfdbfe;
+  --status-running-lane-bg: #f5f9ff;
+
+  --status-waiting-fg: #b45309;
+  --status-waiting-bg: #fffbeb;
+  --status-waiting-border: #fde68a;
+  --status-waiting-dot: #f59e0b;
+
+  --status-completed-fg: #15803d;
+  --status-completed-bg: #ecfdf5;
+  --status-completed-border: #a7f3d0;
+  --status-completed-dot: #16a34a;
+
+  --status-failed-fg: #b91c1c;
+  --status-failed-bg: #fef2f2;
+  --status-failed-border: #fecaca;
+  --status-failed-dot: #ef4444;
+
+  --status-cancelled-fg: #52525b;
+  --status-cancelled-bg: #f4f4f5;
+  --status-cancelled-border: #e4e4e7;
+  --status-cancelled-dot: #a1a1aa;
+
+  --status-done-lane-bg: #f9fafb;
 
   font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -469,12 +504,44 @@
   --sidebar-accent-foreground: #edecec;
   --status-success: #86efac;
   --status-success-dot: #4ade80;
-  --status-running: #c4b5fd;
-  --status-running-dot: #a78bfa;
+  --status-running: #93c5fd;
+  --status-running-dot: #60a5fa;
   --status-warning: #fcd34d;
   --status-warning-dot: #f59e0b;
   --status-danger: #fca5a5;
   --status-danger-dot: #f87171;
+
+  --status-draft-fg: #a1a1aa;
+  --status-draft-bg: #26251e;
+  --status-draft-border: #33312b;
+  --status-draft-dot: #71717a;
+
+  --status-running-fg: #93c5fd;
+  --status-running-bg: rgba(29, 78, 216, 0.16);
+  --status-running-border: rgba(59, 130, 246, 0.4);
+  --status-running-lane-bg: rgba(29, 78, 216, 0.08);
+
+  --status-waiting-fg: #fcd34d;
+  --status-waiting-bg: rgba(180, 83, 9, 0.18);
+  --status-waiting-border: rgba(245, 158, 11, 0.4);
+  --status-waiting-dot: #f59e0b;
+
+  --status-completed-fg: #86efac;
+  --status-completed-bg: rgba(21, 128, 61, 0.18);
+  --status-completed-border: rgba(74, 222, 128, 0.35);
+  --status-completed-dot: #4ade80;
+
+  --status-failed-fg: #fca5a5;
+  --status-failed-bg: rgba(185, 28, 28, 0.18);
+  --status-failed-border: rgba(248, 113, 113, 0.35);
+  --status-failed-dot: #f87171;
+
+  --status-cancelled-fg: #a1a1aa;
+  --status-cancelled-bg: #26251e;
+  --status-cancelled-border: #33312b;
+  --status-cancelled-dot: #71717a;
+
+  --status-done-lane-bg: rgba(255, 255, 255, 0.02);
 }
 
 @layer components {
