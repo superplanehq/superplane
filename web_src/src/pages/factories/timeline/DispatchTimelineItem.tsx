@@ -12,7 +12,7 @@ import {
   type WorkOrderTimelineStep,
 } from "../lib/workOrderTimelineEvents";
 import { formatWorkOrderExecutionUsage } from "../lib/workOrderUsage";
-import { getWorkOrderExecutionRunHref } from "../lib/workOrderExecutions";
+import { getWorkOrderExecutionRunHref, getWorkOrderRunHref } from "../lib/workOrderExecutions";
 import { WorkOrderArtifactInline } from "../WorkOrderArtifactInline";
 import { TimelineMarker } from "./TimelineMarker";
 import { timelineActorClassName, timelineParagraphClassName, timelineTimeClassName } from "./timelineStyles";
@@ -137,6 +137,7 @@ function DispatchStepRow({
           key={`${comment.label ?? "comment"}-${index}`}
           label={comment.label ?? "Comment"}
           body={comment.body}
+          href={getWorkOrderRunHref(organizationId, factoryId, comment.sourceAppId, comment.sourceRunId, { orderId })}
         />
       ))}
     </li>
@@ -157,10 +158,23 @@ function StepName({ name, runHref }: { name: string; runHref: string | null }) {
   );
 }
 
-function StepDetail({ label, body }: { label: string; body: string }) {
+function StepDetail({ label, body, href }: { label: string; body: string; href?: string | null }) {
   return (
     <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-      <span className="font-medium text-foreground/80">{label}</span>: {body}
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-0.5 font-medium text-foreground/80 hover:underline"
+        >
+          {label}
+          <ExternalLink className="size-2.5 shrink-0 text-muted-foreground" aria-hidden />
+        </a>
+      ) : (
+        <span className="font-medium text-foreground/80">{label}</span>
+      )}
+      : {body}
     </p>
   );
 }
