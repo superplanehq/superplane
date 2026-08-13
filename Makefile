@@ -24,6 +24,7 @@ E2E_TEST_PACKAGES := ./test/e2e/...
 
 COMPOSE=docker compose -f docker-compose.dev.yml
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client api/swagger/superplane.swagger.json
+OPENAPI_GENERATOR_IMAGE := openapitools/openapi-generator-cli:v7.13.0
 
 #
 # Long sausage command to run tests with gotestsum
@@ -341,9 +342,10 @@ openapi.spec.gen: dev.test.is.running
 
 openapi.client.gen: dev.test.is.running
 	@rm -rf pkg/openapi_client
+	@./scripts/docker-pull-retry $(OPENAPI_GENERATOR_IMAGE)
 	@log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
 	if ! docker run --rm --user $(shell id -u):$(shell id -g) \
-		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
+		-v ${PWD}:/local $(OPENAPI_GENERATOR_IMAGE) generate \
 		-i /local/api/swagger/superplane.swagger.json \
 		-g go \
 		-o /local/pkg/openapi_client \
