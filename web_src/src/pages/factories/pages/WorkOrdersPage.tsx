@@ -1,5 +1,4 @@
 import { Icon } from "@/components/Icon";
-import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Heading } from "@/components/Heading/heading";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,6 @@ import { cn } from "@/lib/utils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useMemo, useState } from "react";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { createWorkOrderPath } from "../lib/factoryPagePaths";
 import {
   countActiveWorkOrders,
   filterWorkOrdersByOwner,
@@ -29,7 +27,7 @@ import {
 } from "./factoryPageLayoutStyles";
 
 export function WorkOrdersPage() {
-  const { organizationId, factoryId, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { data: me } = useMe(false);
 
@@ -89,11 +87,14 @@ export function WorkOrdersPage() {
           allowed={canCreate || permissionsLoading}
           message="You don't have permission to create work orders."
         >
-          <Button type="button" asChild disabled={!canCreate} data-testid="work-order-list-create-button">
-            <Link href={canCreate ? createWorkOrderPath(organizationId, factoryId) : "#"}>
-              <Icon name="plus" />
-              New Work Order
-            </Link>
+          <Button
+            type="button"
+            disabled={!canCreate}
+            onClick={() => openCreateWorkOrder()}
+            data-testid="work-order-list-create-button"
+          >
+            <Icon name="plus" />
+            New Work Order
           </Button>
         </PermissionTooltip>
       </header>

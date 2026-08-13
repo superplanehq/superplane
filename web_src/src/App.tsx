@@ -25,7 +25,7 @@ import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
 import {
   AutomationsPage,
-  CreateWorkOrderPage,
+  CreateWorkOrderComposeRedirect,
   FactoriesIndexPage,
   FactoriesLayout,
   FactoryAppCanvasPage,
@@ -172,7 +172,7 @@ function AppRouter() {
                     <Route path="velocity" element={<VelocityPage />} />
                     <Route path="work-orders">
                       <Route index element={<WorkOrdersPage />} />
-                      <Route path="new" element={<CreateWorkOrderPageGate />} />
+                      <Route path="new" element={<CreateWorkOrderComposeGate />} />
                       <Route path=":orderId" element={<WorkOrderDetailPage />} />
                     </Route>
                     <Route path="lines">
@@ -246,10 +246,10 @@ function OrganizationScope() {
   );
 }
 
-function CreateWorkOrderPageGate() {
+function CreateWorkOrderComposeGate() {
   return (
     <RequirePermission resource="work_orders" action="create">
-      <CreateWorkOrderPage />
+      <CreateWorkOrderComposeRedirect />
     </RequirePermission>
   );
 }

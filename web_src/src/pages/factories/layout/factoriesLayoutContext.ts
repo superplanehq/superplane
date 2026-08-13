@@ -6,6 +6,7 @@ export interface FactoriesLayoutContextValue {
   factoryId: string;
   factory: FactoriesFactory | null;
   factories: FactoriesFactory[];
+  openCreateWorkOrder: () => void;
 }
 
 export const FactoriesLayoutContext = createContext<FactoriesLayoutContextValue | null>(null);
