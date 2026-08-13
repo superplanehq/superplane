@@ -19,6 +19,25 @@
   --sp-append-handle-icon-hover: #d1d5db;
 }
 
+/* Factory canvases: Storybook WorkOrderCanvas edge weight + slate stroke. */
+.sp-canvas.sp-canvas-factory {
+  --xy-edge-stroke: #cbd5e1;
+  --xy-edge-stroke-selected: #94a3b8;
+  --xy-edge-stroke-width: 1.5;
+  --sp-handle-border: #e5e7eb;
+  --sp-handle-border-hover: #cbd5e1;
+  --sp-handle-highlight-border: #94a3b8;
+}
+
+.dark .sp-canvas.sp-canvas-factory {
+  --xy-edge-stroke: #4a4740;
+  --xy-edge-stroke-selected: #6b6560;
+  --xy-edge-stroke-width: 1.5;
+  --sp-handle-border: #4a4740;
+  --sp-handle-border-hover: #6b6560;
+  --sp-handle-highlight-border: #8a847c;
+}
+
 .sp-canvas .react-flow__node {
   background: none !important;
   border: none !important;
@@ -95,6 +114,19 @@
   stroke-dasharray: 8 4 !important;
 }
 
+/* Factory status edges — beat selected/hover flat stroke (Storybook indigo / red). */
+.sp-canvas.sp-canvas-factory .react-flow__edge.sp-edge-factory-running .react-flow__edge-path {
+  stroke: #818cf8 !important;
+}
+
+.sp-canvas.sp-canvas-factory .react-flow__edge.sp-edge-factory-failed .react-flow__edge-path {
+  stroke: #fca5a5 !important;
+}
+
+.dark .sp-canvas.sp-canvas-factory .react-flow__edge.sp-edge-factory-failed .react-flow__edge-path {
+  stroke: #f87171 !important;
+}
+
 .sp-canvas.sp-canvas-live .react-flow__edge,
 .sp-canvas.sp-canvas-live .react-flow__edge * {
   cursor: default !important;
@@ -108,6 +140,10 @@
   stroke: var(--sp-handle-border) !important;
   stroke-width: 3 !important;
   stroke-dasharray: 8 4 !important;
+}
+
+.sp-canvas.sp-canvas-factory .react-flow__connectionline path {
+  stroke-width: 1.5 !important;
 }
 
 .sp-canvas .react-flow__handle {
