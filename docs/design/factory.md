@@ -101,7 +101,7 @@ this vocabulary — six statuses that map to four board lanes:
 The Work Orders page puts everything on one title-bar row: the page title
 and the scope pills (**All** / **Active** / **My**) on the left, and the
 Filter menu, collapsible search, Display menu, and **New** button on the
-right. Filter adds one or more Status, Line, or Assignee conditions, each
+right. Filter adds one or more Status, Line, or Owner conditions, each
 of which appears as a removable chip below the title bar. Display holds
 the layout (Board / List / Table) and the ordering (Updated / Status /
 Spend / ID).
@@ -110,7 +110,7 @@ The page defaults to **Board**, **All**, and **Updated**, and persists the
 layout and ordering across sessions in `localStorage`. Scope, filters, and
 search are session-local. Three layouts render the same six statuses:
 Board groups by lane, List groups by lane with a dense row, Table shows
-Status, ID, Title, Line, Spend, Updated, and Assignee columns. `F` opens
+Status, ID, Title, Line, Spend, Updated, and Owner columns. `F` opens
 the Filter menu and `/` opens the search field.
 
 ## Comments and artifacts
@@ -174,8 +174,8 @@ When the flag is on:
 
 - **Home** — Factories section alongside Apps; link to full list.
 - **`/factories`** — list and create factories.
-- **Factory detail** — Work Orders page with **Board**, **List**, and **Table** layouts (see the Display status section above for the shared vocabulary and the title-bar behaviour). Inline assignee picker and lifecycle-safe Dispatch button on every row. Dispatch popover, factory apps sidebar, lines sidebar. The workspace badge on the nav counts active (`draft` + `running` + `waiting`) work orders.
-- **Work order detail** — status-aware action bar (`Draft`: Dispatch / Reject; `Open`: Dispatch / Back to Draft / Complete / Reject; `Closed`: Reopen; the `Back to Draft` button hides while a step execution is in flight, per the FSM guard). Inline **comment composer**, activity timeline (comments, status transitions, artifacts, dispatches) with line-centric automation attribution, assignees panel, and a read-only **Artifacts** sidebar.
+- **Factory detail** — Work Orders page with **Board**, **List**, and **Table** layouts (see the Display status section above for the shared vocabulary and the title-bar behaviour). Inline owner picker and lifecycle-safe Dispatch button on every row. Dispatch popover, factory apps sidebar, lines sidebar. The workspace badge on the nav counts active (`draft` + `running` + `waiting`) work orders.
+- **Work order detail** — status-aware action bar (`Draft`: Dispatch / Reject; `Open`: Dispatch / Back to Draft / Complete / Reject; `Closed`: Reopen; the `Back to Draft` button hides while a step execution is in flight, per the FSM guard). Inline **comment composer**, activity timeline (comments, status transitions, artifacts, dispatches) with line-centric automation attribution, owners panel, and a read-only **Artifacts** sidebar.
 - **Factory app canvas** — header link back to factory.
 
 When the flag is off, factories are hidden. The legacy **Setup Factory** starter on `/apps/new` (template install) remains for orgs without the flag.
