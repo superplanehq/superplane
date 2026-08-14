@@ -76,9 +76,7 @@ export function buildWorkOrderFilterChips(
       dimension: "assigneeIds" as const,
       value: assigneeId,
       label:
-        assigneeId === UNASSIGNED_FILTER_VALUE
-          ? "No Owner"
-          : `Owner is ${assigneeLabels.get(assigneeId) ?? "Unknown"}`,
+        assigneeId === UNASSIGNED_FILTER_VALUE ? "No Owner" : `Owner is ${assigneeLabels.get(assigneeId) ?? "Unknown"}`,
     })),
   ];
 }
