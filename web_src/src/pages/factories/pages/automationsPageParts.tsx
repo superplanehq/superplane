@@ -32,12 +32,12 @@ import { LineVelocityPanel } from "./LineVelocityPanel";
 
 export function AutomationDetail({
   organizationId,
-  factoryId,
+  factoryKey,
   app,
   actions,
 }: {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   app: FactoryApp;
   actions: AutomationCardActions;
 }) {
@@ -73,7 +73,7 @@ export function AutomationDetail({
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="automations-detail">
       <Link
-        href={automationsPath(organizationId, factoryId)}
+        href={automationsPath(organizationId, factoryKey)}
         className="mb-3 inline-flex shrink-0 items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
         data-testid="automations-detail-back"
       >
@@ -111,7 +111,7 @@ export function AutomationDetail({
                   <li key={run.runId}>
                     <AutomationRunRow
                       organizationId={organizationId}
-                      factoryId={factoryId}
+                      factoryKey={factoryKey}
                       appId={canvasId}
                       run={run}
                     />
@@ -137,16 +137,16 @@ export function AutomationDetail({
 
 function AutomationRunRow({
   organizationId,
-  factoryId,
+  factoryKey,
   appId,
   run,
 }: {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   appId: string;
   run: FactoryAutomationRunCard;
 }) {
-  const href = factoryAppRunPath(organizationId, factoryId, appId, run.runId, { from: "automations" });
+  const href = factoryAppRunPath(organizationId, factoryKey, appId, run.runId, { from: "automations" });
   const timestamp = run.updatedAt ?? run.finishedAt ?? run.createdAt;
   const timeLabel =
     run.tick === "queued" && !timestamp ? "next" : timestamp ? formatTimeAgo(new Date(timestamp), false) : null;
@@ -441,13 +441,13 @@ export function EmptyAutomationsState({ canCreate, onCreate }: { canCreate: bool
 
 export function AutomationsPageList({
   organizationId,
-  factoryId,
+  factoryKey,
   apps,
   workOrders,
   actionsForApp,
 }: {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   apps: FactoryApp[];
   workOrders: Parameters<typeof resolveFactoryAutomationStatus>[1];
   actionsForApp: (app: FactoryApp) => AutomationCardActions;
@@ -463,7 +463,7 @@ export function AutomationsPageList({
           <li key={app.id}>
             <AutomationCard
               app={app}
-              href={automationDetailPath(organizationId, factoryId, app.id)}
+              href={automationDetailPath(organizationId, factoryKey, app.id)}
               tick={status.tick}
               statusLabel={status.label}
               actions={actionsForApp(app)}

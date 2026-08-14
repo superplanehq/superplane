@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ComponentStoryShell } from "./__fixtures__/ComponentStoryShell";
 import {
   FACTORIES_ORGANIZATION_ID,
-  PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
   RUNNING_WORK_ORDER,
   CLOSED_WORK_ORDER,
 } from "./__fixtures__/factoryPageResponses";
@@ -35,7 +35,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
-    factoryId: PRIMARY_FACTORY_ID,
+    factoryKey: PRIMARY_FACTORY_KEY,
     executions: RUNNING_WORK_ORDER.executions,
     variant: "default",
   },
@@ -45,7 +45,7 @@ export const Default: Story = {
 export const Compact: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
-    factoryId: PRIMARY_FACTORY_ID,
+    factoryKey: PRIMARY_FACTORY_KEY,
     executions: CLOSED_WORK_ORDER.executions,
     variant: "compact",
   },
@@ -55,7 +55,7 @@ export const Compact: Story = {
 export const Inline: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
-    factoryId: PRIMARY_FACTORY_ID,
+    factoryKey: PRIMARY_FACTORY_KEY,
     executions: CLOSED_WORK_ORDER.executions,
     variant: "inline",
   },
@@ -65,7 +65,7 @@ export const Inline: Story = {
 export const Empty: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
-    factoryId: PRIMARY_FACTORY_ID,
+    factoryKey: PRIMARY_FACTORY_KEY,
     executions: [],
     variant: "default",
   },

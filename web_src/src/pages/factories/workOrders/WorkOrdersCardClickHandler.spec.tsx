@@ -13,12 +13,13 @@ import { WorkOrdersListView } from "./WorkOrdersListView";
 import { WorkOrdersTableView } from "./WorkOrdersTableView";
 
 const organizationId = "org-1";
-const factoryId = "factory-1";
-const factory: FactoriesFactory = { id: factoryId, name: "Refunds", key: "RF" };
+const factoryKey = "RF";
+const factory: FactoriesFactory = { id: "factory-1", name: "Refunds", key: factoryKey };
 
 const entry = buildWorkOrderListEntry(
   {
     id: "wo-1",
+    number: "1",
     title: "Reconcile refund batch",
     state: "STATE_OPEN",
     createdAt: "2024-06-01T00:00:00Z",
@@ -29,7 +30,7 @@ const entry = buildWorkOrderListEntry(
   factory,
 );
 
-const detailHref = workOrderDetailPath(organizationId, factoryId, entry.id);
+const detailHref = workOrderDetailPath(organizationId, factoryKey, "1");
 
 /**
  * Board and list views group entries into lanes based on display status.
@@ -75,7 +76,7 @@ function renderView(Component: (typeof views)[number]["Component"]) {
         <Component
           entries={[entry]}
           organizationId={organizationId}
-          factoryId={factoryId}
+          factoryKey={factoryKey}
           factoryLines={[]}
           canDispatch={true}
           canAssign={true}
