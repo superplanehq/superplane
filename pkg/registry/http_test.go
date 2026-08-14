@@ -113,25 +113,103 @@ func Test__HTTPContext__ValidateURL_AllowsNonBlockedHost(t *testing.T) {
 	require.NoError(t, ctx.validateURL(parsed))
 }
 
-func Test__HTTPContext__ValidateURL__BlockedHostSubdomains(t *testing.T) {
+// Every form below names the same host as the blocked entry it derives from:
+// hostnames are case-insensitive, subdomains inherit the block, and a trailing
+// dot only spells out the fully qualified form.
+func Test__HTTPContext__ValidateURL__BlockedHostEquivalentForms(t *testing.T) {
 	ctx, err := NewHTTPContext(defaultHTTPOptions())
 	require.NoError(t, err)
 
+	forms := []struct {
+		name  string
+		build func(host string) string
+	}{
+		{name: "subdomain", build: func(host string) string { return "sub." + host }},
+		{name: "fully qualified", build: func(host string) string { return host + "." }},
+		{name: "fully qualified subdomain", build: func(host string) string { return "sub." + host + "." }},
+		{name: "fully qualified uppercase", build: func(host string) string { return strings.ToUpper(host) + "." }},
+	}
+
+	for _, host := range blockedHostNames() {
+		for _, form := range forms {
+			t.Run(form.name+"/"+host, func(t *testing.T) {
+				blocked := form.build(host)
+				parsed, err := url.Parse("http://" + blocked)
+				require.NoError(t, err)
+
+				err = ctx.validateURL(parsed)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "access to "+blocked+" is not allowed")
+			})
+		}
+	}
+}
+
+// An IP literal also has a fully qualified form, and the private range check
+// only sees it once the hostname is normalized.
+func Test__HTTPContext__ValidateURL__IPLiteralFullyQualified(t *testing.T) {
+	ctx, err := NewHTTPContext(HTTPOptions{
+		PrivateIPRanges: []string{"127.0.0.0/8"},
+	})
+	require.NoError(t, err)
+
+	parsed, err := url.Parse("http://127.0.0.1./path")
+	require.NoError(t, err)
+
+	err = ctx.validateURL(parsed)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "access to private IP address 127.0.0.1 is not allowed")
+}
+
+// A blank entry must not act as a wildcard: the suffix comparison would append
+// it to a dot and block every host that a caller writes in fully qualified form.
+func Test__HTTPContext__ValidateURL__BlankBlockedHostsAreIgnored(t *testing.T) {
+	ctx, err := NewHTTPContext(HTTPOptions{
+		BlockedHosts: []string{"", "   ", ".", " example.com "},
+	})
+	require.NoError(t, err)
+
+	parsed, err := url.Parse("https://other.org.")
+	require.NoError(t, err)
+	require.NoError(t, ctx.validateURL(parsed))
+
+	parsed, err = url.Parse("https://example.com")
+	require.NoError(t, err)
+	require.Error(t, ctx.validateURL(parsed))
+}
+
+func Test__HTTPContext__ValidateURL__BlockedHostConfiguredAsFullyQualified(t *testing.T) {
+	ctx, err := NewHTTPContext(HTTPOptions{
+		BlockedHosts: []string{"Internal.Example.Com."},
+	})
+	require.NoError(t, err)
+
+	for _, rawURL := range []string{"https://internal.example.com", "https://internal.example.com.", "https://api.internal.example.com."} {
+		t.Run(rawURL, func(t *testing.T) {
+			parsed, err := url.Parse(rawURL)
+			require.NoError(t, err)
+			require.Error(t, ctx.validateURL(parsed))
+		})
+	}
+
+	parsed, err := url.Parse("https://internal.example.com.other.org")
+	require.NoError(t, err)
+	require.NoError(t, ctx.validateURL(parsed))
+}
+
+// blockedHostNames returns the default blocked hosts that are names, dropping
+// the entries that are IP literals and take no subdomain or trailing dot.
+func blockedHostNames() []string {
+	names := make([]string, 0, len(defaultHTTPOptions().BlockedHosts))
 	for _, host := range defaultHTTPOptions().BlockedHosts {
 		if strings.Contains(host, ":") || net.ParseIP(host) != nil {
 			continue
 		}
 
-		subdomain := "sub." + host
-		t.Run(subdomain, func(t *testing.T) {
-			parsed, err := url.Parse("http://" + subdomain)
-			require.NoError(t, err)
-
-			err = ctx.validateURL(parsed)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "access to "+subdomain+" is not allowed")
-		})
+		names = append(names, host)
 	}
+
+	return names
 }
 
 func Test__HTTPContext__ValidateIP_IPv4MappedIPv6(t *testing.T) {
@@ -164,6 +242,15 @@ func Test__HTTPContext__Do(t *testing.T) {
 		_, err = ctx.Do(req)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "access to example.com is not allowed")
+	})
+
+	t.Run("blocked host in fully qualified form", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, "http://example.com./path", nil)
+		require.NoError(t, err)
+
+		_, err = ctx.Do(req)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "access to example.com. is not allowed")
 	})
 
 	t.Run("private IP", func(t *testing.T) {
