@@ -7,6 +7,7 @@ import { Link, Navigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { workOrdersPath } from "../../lib/factoryPagePaths";
 import { applyWorkOrderOrdering, buildWorkOrderListEntries } from "../../lib/workOrderListModel";
+import { WorkOrdersErrorState } from "../../workOrders/WorkOrdersEmptyStates";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { factoryContentBodyClassName } from "../factoryPageLayoutStyles";
 import { OverviewRow, SidebarSectionHeading } from "../../sidebar/SidebarPrimitives";
@@ -24,7 +25,12 @@ export function MissionDetailPage() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const assignment = useOptionalMissionAssignment();
   const missions = assignment?.missions ?? SEEDED_MISSIONS;
-  const { data: workOrders = [], isLoading } = useFactoryWorkOrders(organizationId, factoryId);
+  const {
+    data: workOrders = [],
+    isLoading,
+    error: workOrdersError,
+    refetch,
+  } = useFactoryWorkOrders(organizationId, factoryId);
   const listHref = workOrdersPath(organizationId, factoryKey);
 
   if (!missionId) {
@@ -40,6 +46,14 @@ export function MissionDetailPage() {
         <Link to={listHref} className="mt-3 inline-flex text-[13px] font-medium text-foreground underline">
           Back to work orders
         </Link>
+      </div>
+    );
+  }
+
+  if (workOrdersError) {
+    return (
+      <div className={factoryContentBodyClassName} data-testid="mission-detail-error">
+        <WorkOrdersErrorState onRetry={() => void refetch()} />
       </div>
     );
   }
