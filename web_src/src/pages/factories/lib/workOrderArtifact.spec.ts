@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildLatestArtifactDataById,
   extractArtifactMarkdownBody,
   extractArtifactName,
   extractArtifactTitle,
   extractArtifactUrl,
   extractPrArtifactState,
   formatPrArtifactLabel,
+  overlayLiveArtifactData,
 } from "./workOrderArtifact";
 
 describe("formatPrArtifactLabel", () => {
@@ -109,5 +111,32 @@ describe("extractPrArtifactState", () => {
     expect(extractPrArtifactState({})).toBeUndefined();
     expect(extractPrArtifactState({ state: "" })).toBeUndefined();
     expect(extractPrArtifactState({ state: "in_review" })).toBeUndefined();
+  });
+});
+
+describe("buildLatestArtifactDataById", () => {
+  it("indexes artifacts that have both an id and data", () => {
+    const byId = buildLatestArtifactDataById([
+      { id: "art-1", data: { state: "merged" } },
+      { id: "art-2" },
+      { data: { state: "open" } },
+    ]);
+
+    expect(byId.get("art-1")).toEqual({ state: "merged" });
+    expect(byId.has("art-2")).toBe(false);
+  });
+});
+
+describe("overlayLiveArtifactData", () => {
+  it("replaces snapshot data when a matching live row exists", () => {
+    const snapshot = { id: "art-1", type: "pr", data: { state: "open" } };
+    const live = overlayLiveArtifactData(snapshot, new Map([["art-1", { state: "merged", title: "Done" }]]));
+
+    expect(live).toEqual({ id: "art-1", type: "pr", data: { state: "merged", title: "Done" } });
+  });
+
+  it("keeps the snapshot when the artifact is missing from the live list", () => {
+    const snapshot = { id: "art-1", data: { state: "open" } };
+    expect(overlayLiveArtifactData(snapshot, new Map())).toBe(snapshot);
   });
 });

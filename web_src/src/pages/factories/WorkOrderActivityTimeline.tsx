@@ -8,10 +8,12 @@ import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { useMemo, type ReactNode } from "react";
 import { FileText, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
+import { buildLatestArtifactDataById, overlayLiveArtifactData } from "./lib/workOrderArtifact";
 import {
   buildWorkOrderTimelineView,
   buildWorkOrderUserDisplayLookup,
   buildWorkOrderUserNameLookup,
+  findLatestDispatchIndex,
   type WorkOrderTimelineEvent,
   type WorkOrderTimelineEventKind,
 } from "./lib/workOrderTimelineEvents";
@@ -221,28 +223,6 @@ function TimelineActivityEmpty() {
   return <p className="text-sm text-muted-foreground">No activity yet.</p>;
 }
 
-function buildLatestArtifactDataById(
-  artifacts: FactoriesWorkOrderArtifact[] | undefined,
-): Map<string, Record<string, unknown>> {
-  const byId = new Map<string, Record<string, unknown>>();
-  for (const artifact of artifacts ?? []) {
-    if (artifact.id && artifact.data) {
-      byId.set(artifact.id, artifact.data);
-    }
-  }
-  return byId;
-}
-
-function findLatestDispatchIndex(events: WorkOrderTimelineEvent[]): number {
-  let idx = -1;
-  events.forEach((event, i) => {
-    if (event.kind === "dispatched") {
-      idx = i;
-    }
-  });
-  return idx;
-}
-
 // Kinds that render an avatar marker (when the actor is resolvable).
 const AVATAR_MARKER_KINDS: WorkOrderTimelineEventKind[] = [
   "created",
@@ -429,14 +409,7 @@ function ArtifactEventBody({
   const artifact = event.artifact;
   if (!artifact) return null;
 
-  // The event only carries the data snapshot captured at attach time
-  // (e.g. a PR's state when it was opened). Overlay the current row's
-  // data — already fetched via useWorkOrderArtifacts — so the chip
-  // reflects e.g. a later merge/close instead of going stale. Falls
-  // back to the snapshot when the artifact isn't in that list (very old
-  // events, or the artifact was since removed).
-  const liveData = artifact.id ? latestArtifactDataById.get(artifact.id) : undefined;
-  const displayArtifact = liveData ? { ...artifact, data: liveData } : artifact;
+  const displayArtifact = overlayLiveArtifactData(artifact, latestArtifactDataById);
 
   return (
     <p className={inlineParagraphClassName}>

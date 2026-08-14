@@ -64,6 +64,27 @@ export function extractPrArtifactState(data: ArtifactData): PrArtifactState | un
   return PR_ARTIFACT_STATES.find((state) => state === normalized);
 }
 
+export function buildLatestArtifactDataById(
+  artifacts: Array<{ id?: string; data?: Record<string, unknown> }> | undefined,
+): Map<string, Record<string, unknown>> {
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const artifact of artifacts ?? []) {
+    if (artifact.id && artifact.data) {
+      byId.set(artifact.id, artifact.data);
+    }
+  }
+  return byId;
+}
+
+/** Overlay current artifact data on an attach-time snapshot. Falls back to the snapshot when no match exists. */
+export function overlayLiveArtifactData<T extends { id?: string; data?: Record<string, unknown> }>(
+  artifact: T,
+  latestById: Map<string, Record<string, unknown>>,
+): T {
+  const liveData = artifact.id ? latestById.get(artifact.id) : undefined;
+  return liveData ? { ...artifact, data: liveData } : artifact;
+}
+
 function extractArtifactField(data: ArtifactData, key: string): string | undefined {
   if (!data) {
     return undefined;

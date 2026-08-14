@@ -38,7 +38,7 @@ function renderTimeline(artifacts?: FactoriesWorkOrderArtifact[]) {
     <MemoryRouter>
       <WorkOrderActivityTimeline
         organizationId="org-1"
-        factoryId="factory-1"
+        factoryKey="factory-1"
         order={ORDER}
         events={[ARTIFACT_ADDED_EVENT]}
         artifacts={artifacts}
