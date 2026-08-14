@@ -1,0 +1,77 @@
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
+import { describe, expect, it } from "vitest";
+
+import { WorkspacePageHeader } from "./WorkspacePageHeader";
+
+function renderHeader(ui: React.ReactElement) {
+  return render(<MemoryRouter>{ui}</MemoryRouter>);
+}
+
+describe("WorkspacePageHeader (section variant)", () => {
+  it("renders the title and optional subtitle", () => {
+    renderHeader(<WorkspacePageHeader title="Overview" subtitle="Your workspace at a glance." />);
+    expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent("Overview");
+    expect(screen.getByTestId("workspace-page-header-subtitle")).toHaveTextContent("Your workspace at a glance.");
+    expect(screen.queryByTestId("workspace-page-header-back")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-page-header-kicker")).not.toBeInTheDocument();
+  });
+
+  it("renders leading content next to the title", () => {
+    renderHeader(
+      <WorkspacePageHeader title="Work Orders" leading={<span data-testid="scope-pills">All | Active | My</span>} />,
+    );
+    expect(screen.getByTestId("scope-pills")).toBeInTheDocument();
+  });
+
+  it("renders trailing actions and belowRow content", () => {
+    renderHeader(
+      <WorkspacePageHeader
+        title="Work Orders"
+        actions={<button data-testid="new-button">New</button>}
+        belowRow={<div data-testid="filter-chips">chips</div>}
+      />,
+    );
+    expect(screen.getByTestId("workspace-page-header-actions")).toContainElement(screen.getByTestId("new-button"));
+    expect(screen.getByTestId("filter-chips")).toBeInTheDocument();
+  });
+});
+
+describe("WorkspacePageHeader (entity variant)", () => {
+  it("renders back link, kicker, title, and subtitle", () => {
+    renderHeader(
+      <WorkspacePageHeader
+        variant="entity"
+        title="Reconcile duplicate refunds"
+        kicker="SP-42"
+        subtitle="Ledger cleanup"
+        backHref="/org-1/workspaces/SP/work-orders"
+        backLabel="Work Orders"
+      />,
+    );
+    const back = screen.getByTestId("workspace-page-header-back");
+    expect(back).toHaveAttribute("href", "/org-1/workspaces/SP/work-orders");
+    expect(back).toHaveTextContent("Work Orders");
+    expect(screen.getByTestId("workspace-page-header-kicker")).toHaveTextContent("SP-42");
+    expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent("Reconcile duplicate refunds");
+    expect(screen.getByTestId("workspace-page-header-subtitle")).toHaveTextContent("Ledger cleanup");
+  });
+
+  it("omits the kicker when none is provided", () => {
+    renderHeader(<WorkspacePageHeader variant="entity" title="Refund line" backHref="/lines" backLabel="Lines" />);
+    expect(screen.queryByTestId("workspace-page-header-kicker")).not.toBeInTheDocument();
+  });
+
+  it("uses a custom back link test id when provided", () => {
+    renderHeader(
+      <WorkspacePageHeader
+        variant="entity"
+        title="Refund line"
+        backHref="/lines"
+        backLabel="Lines"
+        backTestId="lines-back"
+      />,
+    );
+    expect(screen.getByTestId("lines-back")).toBeInTheDocument();
+  });
+});
