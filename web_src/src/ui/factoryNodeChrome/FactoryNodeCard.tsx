@@ -1,12 +1,14 @@
 import React from "react";
 import type { DraftDiffStatus } from "@/lib/draftDiff";
+import type { EventStateMap } from "../componentBase/eventState";
 import type { MetadataItem } from "../metadataList";
 import { FactoryNodeCardShell } from "./FactoryNodeCardShell";
 import { NodeHoverActions } from "./NodeHoverActions";
 import { WarningBadge } from "./WarningBadge";
+import { resolveFactoryNodeCardTitles } from "./resolveFactoryNodeCardTitles";
 import { resolveFactoryNodeMetrics } from "./resolveFactoryNodeMetrics";
 import { shouldShowFactoryNodeStatusFooter } from "./shouldShowFactoryNodeStatusFooter";
-import { normalizeFactoryNodeStatus } from "./status";
+import { resolveFactoryRuntimeStatus } from "./status";
 import type { FactoryNodeStatus } from "./types";
 
 /** Minimal event slice — avoids importing ComponentBase (circular). */
@@ -20,6 +22,10 @@ export type FactoryNodeEventSlice = {
 
 export type FactoryNodeCardProps = {
   title: string;
+  /** Go Action.Label() — primary title on factory cards. */
+  componentLabel?: string;
+  /** User-given node name — gray subtitle on factory cards. */
+  nodeName?: string;
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
@@ -35,26 +41,19 @@ export type FactoryNodeCardProps = {
   onDelete?: () => void;
   onToggleView?: () => void;
   isCompactView?: boolean;
-  /** Edit mode hides the runtime status footer (no fake Pending). */
+  /** Edit mode shows a neutral "No run" footer instead of runtime status. */
   canvasMode?: "live" | "edit";
   /** False on factory Live without a selected run (topology only). */
   showRuntimeStatus?: boolean;
+  /**
+   * Run inspection: true while the selected run can still progress.
+   * False when finished — empty nodes become Did not run instead of Pending.
+   * Defaults true when unknown.
+   */
+  runIsActive?: boolean;
+  /** Mapper eventStateMap — same source the run sidebar uses for badge color. */
+  eventStateMap?: EventStateMap;
 };
-
-function resolveSubtitle(
-  metadata: MetadataItem[] | undefined,
-  eventSections: FactoryNodeEventSlice[] | undefined,
-): string | null {
-  const firstMeta = metadata?.[0]?.label;
-  if (typeof firstMeta === "string" && firstMeta.trim()) {
-    return firstMeta.trim();
-  }
-  const eventTitle = eventSections?.[0]?.eventTitle;
-  if (typeof eventTitle === "string" && eventTitle.trim()) {
-    return eventTitle.trim();
-  }
-  return null;
-}
 
 function useFactoryNodeMetrics(
   status: FactoryNodeStatus,
@@ -84,17 +83,49 @@ function useFactoryNodeMetrics(
   });
 }
 
+function resolveFactoryCardFooter({
+  canvasMode,
+  isCompactView,
+  showRuntimeStatus,
+  runtimeStatus,
+  runtimeMetrics,
+}: {
+  canvasMode: "live" | "edit";
+  isCompactView?: boolean;
+  showRuntimeStatus: boolean;
+  runtimeStatus: FactoryNodeStatus;
+  runtimeMetrics: React.ReactNode | null;
+}): {
+  status: FactoryNodeStatus;
+  metrics: React.ReactNode | null;
+  statusLabel: string | undefined;
+  showStatusFooter: boolean;
+} {
+  const isEditMode = canvasMode === "edit";
+  return {
+    status: isEditMode ? "pending" : runtimeStatus,
+    metrics: isEditMode ? null : runtimeMetrics,
+    statusLabel: isEditMode ? "No run" : undefined,
+    showStatusFooter: shouldShowFactoryNodeStatusFooter({
+      canvasMode,
+      isCompactView,
+      showRuntimeStatus,
+    }),
+  };
+}
+
 /**
  * Factory-app node chrome: white/token card + provider icon + tinted status footer.
  * Used only when `isFactoryApp` is set on ComponentBase (vertical factory canvases).
  */
 export function FactoryNodeCard({
   title,
+  componentLabel,
+  nodeName,
   iconSrc,
   iconSlug,
   iconColor,
   selected = false,
-  metadata,
   eventSections,
   error,
   warning,
@@ -107,16 +138,28 @@ export function FactoryNodeCard({
   isCompactView,
   canvasMode = "live",
   showRuntimeStatus = true,
+  runIsActive = true,
+  eventStateMap,
 }: FactoryNodeCardProps) {
   const primarySection = eventSections?.[0];
-  const status = normalizeFactoryNodeStatus(primarySection?.eventState);
-  const metrics = useFactoryNodeMetrics(status, primarySection);
-  const subtitle = resolveSubtitle(metadata, eventSections);
+  const runtimeStatus = resolveFactoryRuntimeStatus({
+    eventState: primarySection?.eventState,
+    runIsActive,
+    stateMap: eventStateMap,
+  });
+  const runtimeMetrics = useFactoryNodeMetrics(runtimeStatus, primarySection);
+  const { title: cardTitle, subtitle } = resolveFactoryNodeCardTitles({
+    componentLabel,
+    nodeName,
+    fallbackTitle: title,
+  });
   const badgeText = error?.trim() || warning?.trim() || "";
-  const showStatusFooter = shouldShowFactoryNodeStatusFooter({
+  const footer = resolveFactoryCardFooter({
     canvasMode,
     isCompactView,
     showRuntimeStatus,
+    runtimeStatus,
+    runtimeMetrics,
   });
 
   return (
@@ -130,18 +173,19 @@ export function FactoryNodeCard({
       />
       {badgeText ? <WarningBadge text={badgeText} /> : null}
       <FactoryNodeCardShell
-        title={title}
+        title={cardTitle}
         iconSrc={iconSrc}
         iconSlug={iconSlug}
         iconColor={iconColor}
         selected={selected}
         subtitle={subtitle}
-        status={status}
-        metrics={metrics}
+        status={footer.status}
+        metrics={footer.metrics}
+        statusLabel={footer.statusLabel}
         draftDiffStatus={draftDiffStatus}
         dimBodyBelowHeader={dimBodyBelowHeader}
         isCompactView={isCompactView}
-        showStatusFooter={showStatusFooter}
+        showStatusFooter={footer.showStatusFooter}
       />
     </div>
   );

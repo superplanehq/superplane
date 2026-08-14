@@ -16,7 +16,7 @@ import { SidebarSectionHeading } from "./SidebarPrimitives";
 
 interface WorkOrderSidebarFactoryLinesProps {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   executions: FactoriesWorkOrderExecution[];
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
@@ -28,7 +28,7 @@ interface WorkOrderSidebarFactoryLinesProps {
 
 export function WorkOrderSidebarFactoryLines({
   organizationId,
-  factoryId,
+  factoryKey,
   executions,
   factoryLines,
   canDispatch,
@@ -49,7 +49,7 @@ export function WorkOrderSidebarFactoryLines({
           <p className="text-[13px] text-muted-foreground">Not run on a line yet.</p>
         ) : (
           rows.map((row) => (
-            <FactoryLineRow key={row.lineId} row={row} organizationId={organizationId} factoryId={factoryId} />
+            <FactoryLineRow key={row.lineId} row={row} organizationId={organizationId} factoryKey={factoryKey} />
           ))
         )}
 
@@ -88,14 +88,14 @@ export function WorkOrderSidebarFactoryLines({
 function FactoryLineRow({
   row,
   organizationId,
-  factoryId,
+  factoryKey,
 }: {
   row: FactoryLineRowModel;
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
 }) {
   const href =
-    row.lineId && row.lineId !== "unknown" ? factoryLineDetailPath(organizationId, factoryId, row.lineId) : undefined;
+    row.lineId && row.lineId !== "unknown" ? factoryLineDetailPath(organizationId, factoryKey, row.lineId) : undefined;
   const inner = (
     <>
       <Sparkles className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />

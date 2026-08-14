@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export function FactoryLineEditPage() {
-  const { organizationId, factoryId, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const { canAct } = usePermissions();
   const { lineId } = useParams<{ lineId?: string }>();
 
@@ -34,8 +34,8 @@ export function FactoryLineEditPage() {
     return factory?.lines?.find((entry) => entry.id === lineId) ?? null;
   }, [factory?.lines, isCreate, lineId]);
 
-  const linesHref = linesPath(organizationId, factoryId);
-  const returnHref = line?.id ? factoryLineDetailPath(organizationId, factoryId, line.id) : linesHref;
+  const linesHref = linesPath(organizationId, factoryKey);
+  const returnHref = line?.id ? factoryLineDetailPath(organizationId, factoryKey, line.id) : linesHref;
   const actions = useFactoryLineEditActions(organizationId, factoryId, returnHref, isCreate, lineId);
 
   const pageTitleBase = resolvePageTitleBase(isCreate, line?.name);

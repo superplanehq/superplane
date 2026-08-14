@@ -20,7 +20,7 @@ function renderSidebar() {
     <MemoryRouter>
       <WorkOrderSidebarFactoryLines
         organizationId="org"
-        factoryId="factory"
+        factoryKey="factory"
         executions={EXECUTIONS}
         factoryLines={[]}
         canDispatch={false}
@@ -46,7 +46,7 @@ describe("WorkOrderSidebarFactoryLines", () => {
       <MemoryRouter>
         <WorkOrderSidebarFactoryLines
           organizationId="org"
-          factoryId="factory"
+          factoryKey="factory"
           executions={[{ id: "execution-2", state: "STATE_FINISHED", result: "RESULT_PASSED" }]}
           factoryLines={[]}
           canDispatch={false}

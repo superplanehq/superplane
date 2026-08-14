@@ -101,6 +101,14 @@ function buildOrderExample(): Record<string, unknown> {
         data: { url: "https://github.com/org/repo/pull/7", number: 7 },
       },
     ],
+    comments: [
+      {
+        id: "d4e5f6a7-b8c9-0123-defa-234567890123",
+        body: "Looks good, merging.",
+        author: { kind: "user", user_id: "e5f6a7b8-c9d0-1234-efab-345678901234" },
+        created_at: "2024-01-01T00:00:00Z",
+      },
+    ],
   };
 }
 
