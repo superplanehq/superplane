@@ -9,12 +9,10 @@ import type { OnboardingStorybookSeed } from "../pages/onboarding/onboardingMock
 import { StorybookOverviewPage } from "../pages/onboarding/StorybookOverviewPage";
 import { WikiWireframe } from "../pages/wiki/WikiWireframe";
 import { WIKI_DOCUMENTS_DEFAULT, WIKI_DOCUMENTS_REFRESHED } from "../pages/wiki/wikiMocks";
-import { FactoriesNavItemsContext } from "../layout/factoriesNavItems";
 import { defaultFactoriesFixture, FACTORIES_ORGANIZATION_ID, type FactoriesFixture } from "./factoryPageResponses";
 import { MissionAssignmentProvider } from "../pages/missionsPrototype/MissionAssignmentContext";
 import { WorkOrderMissionOverviewRow } from "../pages/missionsPrototype/WorkOrderMissionOverviewRow";
 import { WorkOrderOverviewMissionSlotContext } from "../sidebar/workOrderOverviewSlots";
-import { STORYBOOK_FACTORIES_NAV_ITEMS } from "./storybookNavItems";
 
 interface FactoriesHarnessProps {
   /** Path under the org. Defaults to `workspaces` (list page). */
@@ -84,16 +82,10 @@ export function FactoriesHarness({
     />
   );
 
-  const withNav = (
-    <FactoriesNavItemsContext.Provider value={STORYBOOK_FACTORIES_NAV_ITEMS}>
-      {harness}
-    </FactoriesNavItemsContext.Provider>
-  );
-
   const withMissions = (
     <MissionAssignmentProvider>
       <WorkOrderOverviewMissionSlotContext.Provider value={WorkOrderMissionOverviewRow}>
-        {withNav}
+        {harness}
       </WorkOrderOverviewMissionSlotContext.Provider>
     </MissionAssignmentProvider>
   );

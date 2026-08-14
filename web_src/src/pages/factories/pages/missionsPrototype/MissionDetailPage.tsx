@@ -7,6 +7,7 @@ import { Link, Navigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { workOrdersPath } from "../../lib/factoryPagePaths";
 import { applyWorkOrderOrdering, buildWorkOrderListEntries } from "../../lib/workOrderListModel";
+import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { factoryContentBodyClassName } from "../factoryPageLayoutStyles";
 import { OverviewRow, SidebarSectionHeading } from "../../sidebar/SidebarPrimitives";
 import { useOptionalMissionAssignment } from "./MissionAssignmentContext";
@@ -75,7 +76,6 @@ function MissionDetailLoadedView({
   mission: FactoryMission;
   workOrders: FactoriesWorkOrder[];
 }) {
-  const listHref = workOrdersPath(organizationId, factoryKey);
   const assignment = useOptionalMissionAssignment();
   const missionByWorkOrderId = assignment?.missionByWorkOrderId ?? seededAssignments;
   const closedByMissionId = assignment?.closedByMissionId ?? {};
@@ -91,7 +91,6 @@ function MissionDetailLoadedView({
     <div className={factoryContentBodyClassName} data-testid="mission-detail">
       <div className="grid gap-x-[var(--workspace-column-gap)] gap-y-0 lg:grid-cols-[minmax(0,1fr)_var(--workspace-detail-sidebar-width)]">
         <MissionDetailHeader
-          listHref={listHref}
           missionName={mission.name}
           status={status}
           isManuallyClosed={Boolean(closedByMissionId[mission.id])}
@@ -100,11 +99,9 @@ function MissionDetailLoadedView({
         />
 
         <div className="min-w-0">
-          {mission.description ? (
-            <p className="text-[13px] leading-relaxed text-foreground/80">{mission.description}</p>
-          ) : null}
+          {mission.description ? <WorkOrderDescription description={mission.description} /> : null}
 
-          <section className="mt-8" aria-label="Work orders in this mission">
+          <section className={mission.description ? "mt-10" : "mt-8"} aria-label="Work orders in this mission">
             <h2 className="workspace-section-label mb-1">Work orders</h2>
             {entries.length === 0 ? (
               <p className="py-2 text-[13px] text-muted-foreground">This mission has no work orders.</p>

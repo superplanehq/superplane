@@ -1,4 +1,3 @@
-import { createContext, useContext } from "react";
 import { BookOpen, ClipboardList, Gauge, Layers, LayoutDashboard, Workflow } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -10,7 +9,7 @@ import {
   workOrdersPath,
 } from "../lib/factoryPagePaths";
 
-export type FactoriesNavKind = "overview" | "work-orders" | "missions" | "lines" | "automations" | "wiki" | "velocity";
+export type FactoriesNavKind = "overview" | "work-orders" | "lines" | "automations" | "wiki" | "velocity";
 
 export interface FactoriesNavItem {
   id: FactoriesNavKind;
@@ -57,10 +56,3 @@ export const FACTORIES_NAV_ITEMS: FactoriesNavItem[] = [
     buildHref: factoryVelocityPath,
   },
 ];
-
-/** Storybook can replace this list. The live app keeps `FACTORIES_NAV_ITEMS`. */
-export const FactoriesNavItemsContext = createContext<readonly FactoriesNavItem[]>(FACTORIES_NAV_ITEMS);
-
-export function useFactoriesNavItems() {
-  return useContext(FactoriesNavItemsContext);
-}

@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { NavLink } from "react-router";
 import { workOrderDetailPath } from "../lib/factoryPagePaths";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
-import { useFactoriesNavItems } from "./factoriesNavItems";
+import { FACTORIES_NAV_ITEMS } from "./factoriesNavItems";
 
 interface FactoriesNavProps {
   organizationId: string;
@@ -23,11 +23,10 @@ const RECENT_STATUS_DOT_CLASS: Record<WorkOrderDisplayStatus, string> = {
 };
 
 export function FactoriesNav({ organizationId, factoryKey, recentWorkOrders }: FactoriesNavProps) {
-  const navItems = useFactoriesNavItems();
   return (
     <nav className="flex flex-1 flex-col gap-4 px-2 pt-2 pb-4" data-testid="factories-nav">
       <ul className="flex flex-col gap-0.5">
-        {navItems.map((item) => {
+        {FACTORIES_NAV_ITEMS.map((item) => {
           const Icon = item.Icon;
           const href = item.buildHref(organizationId, factoryKey);
 
