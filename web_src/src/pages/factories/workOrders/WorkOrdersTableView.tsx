@@ -11,7 +11,7 @@ import { AssigneeGroup, InlineDispatchButton } from "./WorkOrderRowActions";
 interface WorkOrdersTableViewProps {
   entries: WorkOrderListEntry[];
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
   canAssign: boolean;
@@ -36,7 +36,7 @@ export function WorkOrdersTableView(props: WorkOrdersTableViewProps) {
         <span className="hidden md:inline">Line</span>
         <span className="hidden lg:inline">Spend</span>
         <span className="hidden md:inline">Updated</span>
-        <span className="text-right">Assignee</span>
+        <span className="text-right">Owner</span>
       </div>
       <ul className="divide-y divide-border">
         {props.entries.map((entry) => (
@@ -52,7 +52,7 @@ export function WorkOrdersTableView(props: WorkOrdersTableViewProps) {
 function TableRow({
   entry,
   organizationId,
-  factoryId,
+  factoryKey,
   factoryLines,
   canDispatch,
   canAssign,
@@ -62,7 +62,8 @@ function TableRow({
   onAssigneesSave,
 }: WorkOrdersTableViewProps & { entry: WorkOrderListEntry }) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
-  const href = workOrderDetailPath(organizationId, factoryId, entry.id);
+  const href =
+    entry.order.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, entry.order.number) : "#";
   const timeLabel = entry.updatedAtMs > 0 ? formatTimeAgo(new Date(entry.updatedAtMs)) : "—";
   return (
     <article

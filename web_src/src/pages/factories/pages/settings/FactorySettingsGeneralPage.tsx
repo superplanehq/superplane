@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Textarea } from "@/components/ui/textarea";
+import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -13,7 +14,8 @@ import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
-import { factoryListPath } from "../../lib/factoryPagePaths";
+import { factoryListPath, factorySettingsGeneralPathAfterKeyChange } from "../../lib/factoryPagePaths";
+import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
 import {
   factoryCardClassName,
   factoryContentBodyClassName,
@@ -35,6 +37,7 @@ const MAX_DESCRIPTION_LENGTH = 500;
 
 export function FactorySettingsGeneralPage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
+  const { account } = useAccount();
   const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const updateFactory = useUpdateFactory(organizationId, factoryId);
@@ -74,12 +77,16 @@ export function FactorySettingsGeneralPage() {
       return;
     }
     try {
+      const nextSettingsPath = factorySettingsGeneralPathAfterKeyChange(organizationId, factory.key ?? "", key);
       await updateFactory.mutateAsync({
         name: trimmedName,
         description: description.trim(),
         key: key !== (factory.key ?? "") ? key : undefined,
       });
       showSuccessToast("Workspace updated.");
+      if (nextSettingsPath) {
+        navigate(nextSettingsPath, { replace: true });
+      }
     } catch (error) {
       const message = getApiErrorMessage(error, "Failed to update workspace");
       if (message.toLowerCase().includes("workspace key")) {
@@ -93,6 +100,7 @@ export function FactorySettingsGeneralPage() {
   const handleDelete = async () => {
     try {
       await deleteFactory.mutateAsync(factoryId);
+      clearLastVisitedFactory(account?.id ?? "", organizationId, factoryId);
       showSuccessToast("Workspace deleted.");
       navigate(factoryListPath(organizationId));
     } catch {

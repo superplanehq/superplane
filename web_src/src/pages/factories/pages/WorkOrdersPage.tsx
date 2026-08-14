@@ -21,7 +21,7 @@ import { Heading } from "@/components/Heading/heading";
  * loaded view can assume a populated payload.
  */
 export function WorkOrdersPage() {
-  const { organizationId, factoryId, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { data: me } = useMe(false);
 
@@ -56,9 +56,9 @@ export function WorkOrdersPage() {
   const handleAssigneesSave = async (orderId: string, assigneeIds: string[]) => {
     try {
       await updateAssignees.mutateAsync({ orderId, assigneeIds });
-      showSuccessToast("Assignees updated.");
+      showSuccessToast("Owners updated.");
     } catch {
-      showErrorToast("Failed to update assignees.");
+      showErrorToast("Failed to update owners.");
     }
   };
 
@@ -87,7 +87,7 @@ export function WorkOrdersPage() {
   return (
     <WorkOrdersLoadedView
       organizationId={organizationId}
-      factoryId={factoryId}
+      factoryKey={factoryKey}
       factory={factory}
       factoryLines={factory.lines ?? []}
       workOrders={workOrders}

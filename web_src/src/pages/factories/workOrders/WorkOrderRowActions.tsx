@@ -53,7 +53,7 @@ export function AssigneeGroup({
         "inline-flex items-center gap-1 rounded-full transition-colors",
         canAssign ? "hover:bg-accent" : "cursor-default",
       )}
-      aria-label="Change assignees"
+      aria-label="Change owners"
       data-testid={`work-order-row-assignees-${entry.id}`}
       disabled={!canAssign}
     >
@@ -81,7 +81,7 @@ export function AssigneeGroup({
           {hiddenCount > 0 ? (
             <span
               className="inline-flex items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground ring-2 ring-background"
-              aria-label={`${hiddenCount} more assignees`}
+              aria-label={`${hiddenCount} more owners`}
             >
               +{hiddenCount}
             </span>
@@ -96,7 +96,7 @@ export function AssigneeGroup({
   ) : (
     <Tooltip>
       <TooltipTrigger asChild>{stack}</TooltipTrigger>
-      <TooltipContent>You don't have permission to change assignees.</TooltipContent>
+      <TooltipContent>You don't have permission to update owners.</TooltipContent>
     </Tooltip>
   );
 
