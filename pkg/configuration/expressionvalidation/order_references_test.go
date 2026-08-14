@@ -34,3 +34,36 @@ func TestExpressionUsesOrderArtifacts(t *testing.T) {
 		})
 	}
 }
+
+func TestExpressionUsesOrderComments(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{name: "order only", raw: `order()`, want: false},
+		{name: "order id", raw: `order().id`, want: false},
+		{name: "order artifacts", raw: `order().artifacts`, want: false},
+		{name: "dot comments", raw: `order().comments`, want: true},
+		{name: "bracket comments", raw: `order()["comments"]`, want: true},
+		{name: "indexed", raw: `order().comments[0]`, want: true},
+		{name: "nested body", raw: `order().comments[0].body`, want: true},
+		{name: "mixed bracket", raw: `order()["comments"][0]["body"]`, want: true},
+		{name: "len", raw: `len(order().comments)`, want: true},
+		{name: "none predicate", raw: `none(order().comments, {#.author.kind == "automation"})`, want: true},
+		{name: "any predicate", raw: `any(order().comments, {#.author.kind == "automation"})`, want: true},
+		{name: "unrelated", raw: `root().data.work_order`, want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ExpressionUsesOrderComments(tc.raw)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
