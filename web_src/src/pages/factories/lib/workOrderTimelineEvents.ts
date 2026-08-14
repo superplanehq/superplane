@@ -39,7 +39,6 @@ export interface WorkOrderTimelineStep {
 
 export interface WorkOrderTimelineStepComment {
   body: string;
-  label?: string;
 }
 
 export interface WorkOrderTimelineAssigneeChange {

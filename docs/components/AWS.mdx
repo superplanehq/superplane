@@ -22,6 +22,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="CloudWatch • Create Alarm" href="#cloud-watch-•-create-alarm" description="Create a CloudWatch metric alarm for any metric" />
+  <LinkCard title="CloudWatch • Update Alarm" href="#cloud-watch-•-update-alarm" description="Update an existing CloudWatch metric alarm" />
   <LinkCard title="CodeArtifact • Copy Package Versions" href="#code-artifact-•-copy-package-versions" description="Copy package versions from one repository to another in the same domain" />
   <LinkCard title="CodeArtifact • Create Repository" href="#code-artifact-•-create-repository" description="Create an AWS CodeArtifact repository in a domain" />
   <LinkCard title="CodeArtifact • Delete Package Versions" href="#code-artifact-•-delete-package-versions" description="Permanently delete one or more package versions from a repository" />
@@ -35,7 +37,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="CodePipeline • Run Pipeline" href="#code-pipeline-•-run-pipeline" description="Start an AWS CodePipeline execution and wait for it to complete" />
   <LinkCard title="EC2 • Allocate Elastic IP" href="#ec2-•-allocate-elastic-ip" description="Allocate a new Elastic IP address in a VPC" />
   <LinkCard title="EC2 • Copy Image" href="#ec2-•-copy-image" description="Copy an EC2 AMI image to another region" />
-  <LinkCard title="EC2 • Create Alarm" href="#ec2-•-create-alarm" description="Create a CloudWatch metric alarm scoped to an EC2 instance" />
   <LinkCard title="EC2 • Create Image" href="#ec2-•-create-image" description="Create a new AMI image from an EC2 instance" />
   <LinkCard title="EC2 • Create Instance" href="#ec2-•-create-instance" description="Launch a new EC2 instance and wait for it to reach running state" />
   <LinkCard title="EC2 • Create Load Balancer" href="#ec2-•-create-load-balancer" description="Create an Application, Network, or Gateway Load Balancer and wait for it to become active" />
@@ -54,7 +55,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="EC2 • Manage Elastic IP" href="#ec2-•-manage-elastic-ip" description="Associate or disassociate an Elastic IP address with an EC2 instance" />
   <LinkCard title="EC2 • Manage Instance Power" href="#ec2-•-manage-instance-power" description="Perform power operations on an EC2 instance" />
   <LinkCard title="EC2 • Release Elastic IP" href="#ec2-•-release-elastic-ip" description="Release an Elastic IP address back to the AWS address pool" />
-  <LinkCard title="EC2 • Update Alarm" href="#ec2-•-update-alarm" description="Update an existing CloudWatch metric alarm for an EC2 instance" />
   <LinkCard title="EC2 • Update Instance" href="#ec2-•-update-instance" description="Resize an EC2 instance or update its security groups" />
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
@@ -574,6 +574,190 @@ During setup, SuperPlane creates a webhook endpoint for this trigger and subscri
   },
   "timestamp": "2026-01-10T10:00:02.000000000Z",
   "type": "aws.sns.topic.message"
+}
+```
+
+<a id="cloud-watch-•-create-alarm"></a>
+
+## CloudWatch • Create Alarm
+
+**Component key:** `aws.cloudwatch.createAlarm`
+
+The Create Alarm component creates a CloudWatch metric alarm on any metric published to CloudWatch.
+
+### Use Cases
+
+- **Proactive monitoring**: Add alarms for new services, queues, functions or instances as they are provisioned
+- **Auto-remediation**: Notify SNS topics that fan out to remediation workflows when a threshold is crossed
+- **Compliance**: Guarantee every workload has the required alarms configured automatically
+
+### Configuration
+
+- **Region**: AWS region where the metric lives and the alarm is created
+- **Alarm Name**: Unique alarm name within the region
+- **Namespace**: CloudWatch namespace of the metric (e.g. `AWS/EC2`, `AWS/Lambda`, or a custom namespace)
+- **Metric Name**: Metric to watch, listed from the selected namespace
+- **Dimensions**: Dimension set that identifies the metric. Leave empty to alarm on the namespace-wide aggregate
+- **Statistic**: Aggregation applied over each period (Average, Sum, Minimum, Maximum, SampleCount)
+- **Comparison Operator**: How the statistic is compared to the threshold
+- **Threshold**: Value the statistic is compared against
+- **Period**: Evaluation window in seconds (default: 300)
+- **Evaluation Periods**: Periods evaluated before the alarm changes state (default: 1)
+- **Datapoints To Alarm** *(toggleable)*: Breaching datapoints required within the evaluation periods ("M out of N")
+- **Alarm Description** *(toggleable)*: Free-text description
+- **Treat Missing Data** *(toggleable)*: Missing data handling (missing, ignore, breaching, notBreaching)
+- **Unit** *(toggleable)*: Metric unit. Leave unset unless the metric is published with several units
+- **Actions Enabled**: Whether alarm actions run on state changes (default: enabled)
+- **Alarm Actions** *(toggleable)*: SNS topics notified when the alarm enters ALARM
+- **EC2 Action** *(toggleable)*: EC2 automation CloudWatch runs when the alarm enters ALARM — Recover, Reboot, Stop or Terminate. Shown for `AWS/EC2` alarms, and requires an InstanceId dimension
+- **OK Actions** *(toggleable)*: SNS topics notified when the alarm returns to OK
+- **Insufficient Data Actions** *(toggleable)*: SNS topics notified when the alarm enters INSUFFICIENT_DATA
+
+### Output
+
+Emits the created alarm on the default output channel, including `alarmName`, `alarmArn`,
+`namespace`, `metricName`, `dimensions`, `statistic`, `threshold`,
+`comparisonOperator`, `stateValue`, the configured actions, and `consoleUrl`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "actionsEnabled": true,
+    "alarmActions": [
+      "arn:aws:sns:us-east-1:123456789012:ops-alerts"
+    ],
+    "alarmArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm:api-high-cpu",
+    "alarmConfigurationUpdatedTimestamp": "2026-06-03T16:36:13.412Z",
+    "alarmDescription": "API instances above 80% CPU",
+    "alarmName": "api-high-cpu",
+    "comparisonOperator": "GreaterThanThreshold",
+    "consoleUrl": "https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#alarmsV2:alarm/api-high-cpu",
+    "datapointsToAlarm": 2,
+    "dimensions": [
+      {
+        "name": "InstanceId",
+        "value": "i-1234567890abcdef0"
+      }
+    ],
+    "evaluateLowSampleCountPercentile": "",
+    "evaluationPeriods": 3,
+    "extendedStatistic": "",
+    "insufficientDataActions": [],
+    "metricName": "CPUUtilization",
+    "namespace": "AWS/EC2",
+    "okActions": [
+      "arn:aws:sns:us-east-1:123456789012:ops-alerts"
+    ],
+    "period": 300,
+    "region": "us-east-1",
+    "stateReason": "Unchecked: Initial alarm creation",
+    "stateReasonData": "",
+    "stateTransitionedTimestamp": "",
+    "stateUpdatedTimestamp": "2026-06-03T16:36:13.412Z",
+    "stateValue": "INSUFFICIENT_DATA",
+    "statistic": "Average",
+    "threshold": 80,
+    "thresholdMetricId": "",
+    "treatMissingData": "missing",
+    "unit": "Percent"
+  },
+  "timestamp": "2026-06-03T16:36:13.985915034Z",
+  "type": "aws.cloudwatch.alarm"
+}
+```
+
+<a id="cloud-watch-•-update-alarm"></a>
+
+## CloudWatch • Update Alarm
+
+**Component key:** `aws.cloudwatch.updateAlarm`
+
+The Update Alarm component modifies an existing CloudWatch metric alarm.
+
+Only the properties you enable are changed; everything else is read from the current alarm and
+sent back unchanged, because CloudWatch replaces the whole alarm configuration on every update.
+
+### Use Cases
+
+- **Threshold tuning**: Raise or lower thresholds without recreating the alarm
+- **Operational changes**: Adjust periods, statistics or missing-data handling as workloads change
+- **Notification updates**: Change which SNS topics are notified on each state transition
+- **Self-healing**: Attach or change an EC2 recover/reboot action on an existing alarm
+- **Maintenance windows**: Disable alarm actions during planned work and re-enable them afterwards
+
+### Configuration
+
+- **Region**: AWS region where the alarm lives
+- **Alarm**: CloudWatch alarm to update (`cloudwatch.alarm` resource picker)
+- **Threshold** *(toggleable)*: New threshold and comparison operator (both set together)
+- **Statistic** *(toggleable)*: Aggregation applied over each period
+- **Period** *(toggleable)*: Evaluation window in seconds
+- **Evaluation Periods** *(toggleable)*: Periods evaluated before the alarm changes state
+- **Datapoints To Alarm** *(toggleable)*: Breaching datapoints required within the evaluation periods
+- **Alarm Description** *(toggleable)*: Free-text description
+- **Treat Missing Data** *(toggleable)*: Missing data handling (missing, ignore, breaching, notBreaching)
+- **Unit** *(toggleable)*: Metric unit. Choose **No unit** to remove it, which is how you recover an alarm whose unit matches no datapoints. This is not the same as the literal **None** unit, which still filters datapoints
+- **Actions Enabled** *(toggleable)*: Whether alarm actions run on state changes
+- **Alarm Actions** *(toggleable)*: SNS topics notified when the alarm enters ALARM
+- **EC2 Action** *(toggleable)*: EC2 automation CloudWatch runs when the alarm enters ALARM. Only valid on an `AWS/EC2` alarm with an InstanceId dimension
+- **OK Actions** *(toggleable)*: SNS topics notified when the alarm returns to OK
+- **Insufficient Data Actions** *(toggleable)*: SNS topics notified when the alarm enters INSUFFICIENT_DATA
+
+At least one toggleable property must be enabled. Alarms built on metric math, anomaly detection or
+Metrics Insights queries cannot be updated by this component.
+
+### Output
+
+Emits the updated alarm on the default output channel, with the same fields as Create Alarm.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "actionsEnabled": true,
+    "alarmActions": [
+      "arn:aws:sns:us-east-1:123456789012:ops-alerts"
+    ],
+    "alarmArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm:api-high-cpu",
+    "alarmConfigurationUpdatedTimestamp": "2026-06-04T09:12:44.108Z",
+    "alarmDescription": "API instances above 90% CPU",
+    "alarmName": "api-high-cpu",
+    "comparisonOperator": "GreaterThanThreshold",
+    "consoleUrl": "https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#alarmsV2:alarm/api-high-cpu",
+    "datapointsToAlarm": 2,
+    "dimensions": [
+      {
+        "name": "InstanceId",
+        "value": "i-1234567890abcdef0"
+      }
+    ],
+    "evaluateLowSampleCountPercentile": "",
+    "evaluationPeriods": 3,
+    "extendedStatistic": "",
+    "insufficientDataActions": [],
+    "metricName": "CPUUtilization",
+    "namespace": "AWS/EC2",
+    "okActions": [
+      "arn:aws:sns:us-east-1:123456789012:ops-alerts"
+    ],
+    "period": 300,
+    "region": "us-east-1",
+    "stateReason": "Threshold Crossed: 1 datapoint [72.4 (04/06/26 09:07:00)] was not greater than the threshold (90.0).",
+    "stateReasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-06-04T09:12:44.101+0000\",\"statistic\":\"Average\",\"period\":300,\"recentDatapoints\":[72.4],\"threshold\":90.0}",
+    "stateTransitionedTimestamp": "2026-06-04T09:12:44.108Z",
+    "stateUpdatedTimestamp": "2026-06-04T09:12:44.108Z",
+    "stateValue": "OK",
+    "statistic": "Average",
+    "threshold": 90,
+    "thresholdMetricId": "",
+    "treatMissingData": "missing",
+    "unit": "Percent"
+  },
+  "timestamp": "2026-06-04T09:12:45.221408917Z",
+  "type": "aws.cloudwatch.alarm"
 }
 ```
 
@@ -1192,74 +1376,6 @@ The Copy Image component copies an AMI to another AWS region.
   },
   "timestamp": "2026-02-19T09:00:00Z",
   "type": "aws.ec2.image"
-}
-```
-
-<a id="ec2-•-create-alarm"></a>
-
-## EC2 • Create Alarm
-
-**Component key:** `aws.ec2.createAlarm`
-
-The Create Alarm component creates a CloudWatch metric alarm targeting a specific EC2 instance.
-
-### Use Cases
-
-- **Proactive monitoring**: Set up CPU or network alarms as part of an instance provisioning workflow
-- **Auto-remediation**: Create alarms that trigger downstream workflows when thresholds are crossed
-- **Compliance**: Ensure every new instance has required alarms configured automatically
-
-### Configuration
-
-- **Region**: AWS region where the EC2 instance and alarm reside
-- **Instance**: EC2 instance to monitor
-- **Alarm Name**: Unique name for the CloudWatch alarm
-- **Metric Name**: EC2 CloudWatch metric to monitor (CPU, disk, network, status checks)
-- **Statistic**: Aggregation function applied over the evaluation period (Average, Sum, Min, Max, SampleCount)
-- **Comparison Operator**: How the metric is compared to the threshold (e.g. GreaterThanThreshold)
-- **Threshold**: Numeric value to compare the metric against
-- **Period**: Evaluation window in seconds (default: 300)
-- **Evaluation Periods**: Number of consecutive periods that must breach the threshold before the alarm fires (default: 1)
-- **Alarm Description**: Optional free-text description
-- **Treat Missing Data**: How to treat missing data points (missing, ignore, breaching, notBreaching)
-- **Alarm Action** *(toggleable)*: EC2 automation action to execute when the alarm enters ALARM state — Recover, Reboot, Stop, or Terminate
-- **SNS Topic (on alarm)** *(toggleable)*: SNS topic ARN to publish a notification to when the alarm enters ALARM state
-
-### Output
-
-Emits the created alarm details on the default output channel:
-- `alarmName`, `alarmArn`, `namespace`, `metricName`
-- `statistic`, `threshold`, `comparisonOperator`, `stateValue`
-- `period`, `evaluationPeriods`, `dimensions`, `region`
-
-### Example Output
-
-```json
-{
-  "data": {
-    "alarmArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm:cpuUsage",
-    "alarmDescription": "Cpu alarm",
-    "alarmName": "cpuUsage",
-    "comparisonOperator": "GreaterThanThreshold",
-    "dimensions": [
-      {
-        "name": "InstanceId",
-        "value": "i-1234567890abcdef0"
-      }
-    ],
-    "evaluationPeriods": 1,
-    "metricName": "CPUUtilization",
-    "namespace": "AWS/EC2",
-    "period": 120,
-    "region": "us-east-1",
-    "stateReason": "Unchecked: Initial alarm creation",
-    "stateValue": "INSUFFICIENT_DATA",
-    "statistic": "Average",
-    "threshold": 80,
-    "treatMissingData": "ignore"
-  },
-  "timestamp": "2026-06-03T16:36:13.985915034Z",
-  "type": "aws.ec2.alarm"
 }
 ```
 
@@ -2127,70 +2243,6 @@ Emits a release confirmation on the default output channel:
   },
   "timestamp": "2026-05-21T12:02:00Z",
   "type": "aws.ec2.elastic-ip.released"
-}
-```
-
-<a id="ec2-•-update-alarm"></a>
-
-## EC2 • Update Alarm
-
-**Component key:** `aws.ec2.updateAlarm`
-
-The Update Alarm component modifies an existing CloudWatch metric alarm scoped to an EC2 instance.
-
-### Use Cases
-
-- **Threshold tuning**: Raise or lower alert thresholds without recreating the alarm
-- **Operational changes**: Adjust evaluation periods or comparison operators as workloads change
-- **Notification updates**: Add or change SNS topics and EC2 automation actions when an alarm fires
-
-### Configuration
-
-- **Region**: AWS region where the alarm resides
-- **Alarm**: CloudWatch alarm to update (`ec2.alarm` resource picker)
-- **Threshold** *(toggleable)*: New threshold and comparison operator (both must be set together)
-- **Statistic** *(toggleable)*: Aggregation function (Average, Sum, Min, Max, SampleCount)
-- **Period** *(toggleable)*: Evaluation window in seconds
-- **Evaluation Periods** *(toggleable)*: Consecutive breaching periods required before ALARM
-- **Alarm Description** *(toggleable)*: Free-text description
-- **Treat Missing Data** *(toggleable)*: Missing data handling (missing, ignore, breaching, notBreaching)
-- **Alarm Action** *(toggleable)*: EC2 automation action when the alarm enters ALARM state
-- **SNS Topic (on alarm)** *(toggleable)*: SNS topic ARN to notify when the alarm enters ALARM state
-
-At least one toggleable property must be enabled. Unspecified properties keep their current values.
-
-### Output
-
-Emits the updated alarm details on the default output channel (same fields as Get Alarm).
-
-### Example Output
-
-```json
-{
-  "data": {
-    "alarmArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm:cpuUsage",
-    "alarmDescription": "Cpu alarm",
-    "alarmName": "cpuUsage",
-    "comparisonOperator": "GreaterThanThreshold",
-    "dimensions": [
-      {
-        "name": "InstanceId",
-        "value": "i-1234567890abcdef0"
-      }
-    ],
-    "evaluationPeriods": 1,
-    "metricName": "CPUUtilization",
-    "namespace": "AWS/EC2",
-    "period": 120,
-    "region": "us-east-1",
-    "stateReason": "Threshold Crossed: 1 datapoint (85.3) was greater than the threshold (80.0).",
-    "stateValue": "ALARM",
-    "statistic": "Average",
-    "threshold": 90,
-    "treatMissingData": "ignore"
-  },
-  "timestamp": "2026-06-03T16:37:20.636935245Z",
-  "type": "aws.ec2.alarm"
 }
 ```
 

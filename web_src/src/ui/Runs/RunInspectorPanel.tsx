@@ -13,6 +13,8 @@ import { useCanvasVersion, useEventExecutions } from "@/hooks/useCanvasData";
 import { useMe } from "@/hooks/useMe";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
+import { FactorySidebarHeading } from "@/ui/factoryNodeChrome";
+import { FactorySidebarCloseButton, FactorySidebarCloseRow } from "./FactorySidebarClose";
 import { RunInspectorChrome } from "./RunInspectorChrome";
 import { RunInspectorHeader } from "./RunInspectorHeader";
 import { RunInspectorNodeActions } from "./RunInspectorNodeAccordion";
@@ -81,16 +83,17 @@ export function RunInspectorPanel(props: RunInspectorPanelProps) {
       aria-label="Run inspector"
     >
       <ResizeHandle onPointerDown={model.inspectorWidth.startResize} isResizing={model.inspectorWidth.isResizing} />
-      <RunInspectorChrome
-        runId={run.id}
-        newerRunId={runNavigation?.newerRunId}
-        olderRunId={runNavigation?.olderRunId}
-        canNavigateOlder={runNavigation?.canNavigateOlder}
-        onNavigateRun={onNavigateRun}
-        onNavigateOlder={onNavigateOlder}
-        onClose={onClose}
-        showRunNavigation={!factoryContext}
-      />
+      {!factoryContext ? (
+        <RunInspectorChrome
+          runId={run.id}
+          newerRunId={runNavigation?.newerRunId}
+          olderRunId={runNavigation?.olderRunId}
+          canNavigateOlder={runNavigation?.canNavigateOlder}
+          onNavigateRun={onNavigateRun}
+          onNavigateOlder={onNavigateOlder}
+          onClose={onClose}
+        />
+      ) : null}
       <RunInspectorPanelBody
         factoryContext={factoryContext}
         organizationId={organizationId}
@@ -98,6 +101,7 @@ export function RunInspectorPanel(props: RunInspectorPanelProps) {
         model={model}
         componentIconMap={componentIconMap}
         onEditNode={onEditNode}
+        onClose={onClose}
       />
     </aside>
   );
@@ -114,6 +118,7 @@ function RunInspectorPanelBody({
   model,
   componentIconMap,
   onEditNode,
+  onClose,
 }: {
   factoryContext: boolean;
   organizationId?: string;
@@ -121,6 +126,7 @@ function RunInspectorPanelBody({
   model: ReturnType<typeof useRunInspectorPanelModel>;
   componentIconMap: Record<string, string>;
   onEditNode?: (nodeId: string) => void;
+  onClose: () => void;
 }) {
   if (factoryContext) {
     return (
@@ -132,6 +138,7 @@ function RunInspectorPanelBody({
         componentIconMap={componentIconMap}
         canShowExpressionTemplates={model.hasRunVersionSpec}
         onEditNode={onEditNode}
+        onClose={onClose}
         actions={model.actions}
         currentUser={model.resolvedCurrentUser}
         errorScrollRequest={model.errorScrollRequest}
@@ -175,8 +182,8 @@ function RunInspectorPanelBody({
 }
 
 /**
- * Factory embed: Close chrome + node actions (approve / push through / …) +
- * that node's timeline only. No run header, node header, or Rerun.
+ * Factory embed: title row (label · name + Close) + node actions +
+ * that node's timeline only. No run chrome, run header, or Rerun.
  */
 function FactoryNodeDetailBody({
   organizationId,
@@ -186,6 +193,7 @@ function FactoryNodeDetailBody({
   componentIconMap,
   canShowExpressionTemplates,
   onEditNode,
+  onClose,
   actions,
   currentUser,
   errorScrollRequest,
@@ -198,6 +206,7 @@ function FactoryNodeDetailBody({
   componentIconMap: Record<string, string>;
   canShowExpressionTemplates: boolean;
   onEditNode?: (nodeId: string) => void;
+  onClose: () => void;
   actions: ReturnType<typeof useRunInspectorActions>;
   currentUser: RunInspectorCurrentUser | undefined;
   errorScrollRequest: { nodeId: string; requestId: number } | null;
@@ -207,17 +216,23 @@ function FactoryNodeDetailBody({
 
   if (isLoading && !selectedSection) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center gap-2 px-4 py-8 text-sm text-slate-500 dark:text-gray-400">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Loading run steps...
+      <div className="flex min-h-0 flex-1 flex-col" data-testid="factory-run-node-detail">
+        <FactorySidebarCloseRow onClose={onClose} />
+        <div className="flex min-h-0 flex-1 items-center justify-center gap-2 px-4 py-8 text-sm text-slate-500 dark:text-gray-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading run steps...
+        </div>
       </div>
     );
   }
 
   if (!selectedSection) {
     return (
-      <div className="px-4 py-8 text-sm text-slate-500 dark:text-gray-400" data-testid="factory-run-inspector-empty">
-        Select a node to inspect this run.
+      <div className="flex min-h-0 flex-1 flex-col" data-testid="factory-run-node-detail">
+        <FactorySidebarCloseRow onClose={onClose} />
+        <div className="px-4 py-8 text-sm text-slate-500 dark:text-gray-400" data-testid="factory-run-inspector-empty">
+          Select a node to inspect this run.
+        </div>
       </div>
     );
   }
@@ -225,12 +240,12 @@ function FactoryNodeDetailBody({
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="factory-run-node-detail">
       <div className="flex shrink-0 items-center gap-2 border-b border-slate-950/10 px-3 py-2.5 dark:border-gray-800">
-        <h2
-          className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-[-0.01em] text-slate-900 dark:text-gray-100"
-          data-testid="factory-run-node-title"
-        >
-          {selectedSection.nodeName}
-        </h2>
+        <FactorySidebarCloseButton onClose={onClose} />
+        <FactorySidebarHeading
+          componentLabel={selectedSection.componentLabel}
+          nodeName={selectedSection.nodeName}
+          testId="factory-run-node-title"
+        />
         <RunInspectorNodeActions
           section={selectedSection}
           actions={actions}

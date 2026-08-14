@@ -1,10 +1,11 @@
-import { Heading } from "@/components/Heading/heading";
 import { PermissionTooltip } from "@/components/PermissionGate";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Textarea } from "@/components/ui/textarea";
+import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -13,22 +14,24 @@ import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
-import { factoryListPath } from "../../lib/factoryPagePaths";
-import {
-  factoryCardClassName,
-  factoryContentBodyClassName,
-  factoryContentHeaderClassName,
-  factoryPageSubtitleClassName,
-  factoryPageTitleClassName,
-} from "../factoryPageLayoutStyles";
+import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
+import { factoryListPath, factorySettingsGeneralPathAfterKeyChange } from "../../lib/factoryPagePaths";
+import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
+import { factoryCardClassName, factoryContentBodyClassName } from "../factoryPageLayoutStyles";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
-import { cn } from "@/lib/utils";
+import {
+  WORKSPACE_KEY_MAX_LENGTH,
+  WORKSPACE_KEY_MIN_LENGTH,
+  isValidWorkspaceKey,
+  normalizeWorkspaceKey,
+} from "../../lib/workspaceKey";
 
 const MAX_NAME_LENGTH = 128;
 const MAX_DESCRIPTION_LENGTH = 500;
 
 export function FactorySettingsGeneralPage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
+  const { account } = useAccount();
   const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const updateFactory = useUpdateFactory(organizationId, factoryId);
@@ -36,19 +39,26 @@ export function FactorySettingsGeneralPage() {
 
   const [name, setName] = useState(factory.name ?? "");
   const [description, setDescription] = useState(factory.description ?? "");
+  const [key, setKey] = useState(factory.key ?? "");
   const [nameError, setNameError] = useState("");
+  const [keyError, setKeyError] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     setName(factory.name ?? "");
     setDescription(factory.description ?? "");
+    setKey(factory.key ?? "");
     setNameError("");
-  }, [factory.name, factory.description]);
+    setKeyError("");
+  }, [factory.name, factory.description, factory.key]);
 
   const canUpdate = canAct("factories", "update");
   const canDelete = canAct("factories", "delete");
 
-  const isDirty = name.trim() !== (factory.name ?? "") || description.trim() !== (factory.description ?? "");
+  const isDirty =
+    name.trim() !== (factory.name ?? "") ||
+    description.trim() !== (factory.description ?? "") ||
+    key !== (factory.key ?? "");
 
   const handleSave = async () => {
     const trimmedName = name.trim();
@@ -56,17 +66,35 @@ export function FactorySettingsGeneralPage() {
       setNameError("Name is required");
       return;
     }
+    if (!isValidWorkspaceKey(key)) {
+      setKeyError(`Use ${WORKSPACE_KEY_MIN_LENGTH} to ${WORKSPACE_KEY_MAX_LENGTH} uppercase letters.`);
+      return;
+    }
     try {
-      await updateFactory.mutateAsync({ name: trimmedName, description: description.trim() });
+      const nextSettingsPath = factorySettingsGeneralPathAfterKeyChange(organizationId, factory.key ?? "", key);
+      await updateFactory.mutateAsync({
+        name: trimmedName,
+        description: description.trim(),
+        key: key !== (factory.key ?? "") ? key : undefined,
+      });
       showSuccessToast("Workspace updated.");
+      if (nextSettingsPath) {
+        navigate(nextSettingsPath, { replace: true });
+      }
     } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to update workspace"));
+      const message = getApiErrorMessage(error, "Failed to update workspace");
+      if (message.toLowerCase().includes("workspace key")) {
+        setKeyError(message);
+        return;
+      }
+      showErrorToast(message);
     }
   };
 
   const handleDelete = async () => {
     try {
       await deleteFactory.mutateAsync(factoryId);
+      clearLastVisitedFactory(account?.id ?? "", organizationId, factoryId);
       showSuccessToast("Workspace deleted.");
       navigate(factoryListPath(organizationId));
     } catch {
@@ -77,23 +105,19 @@ export function FactorySettingsGeneralPage() {
 
   return (
     <>
-      <header className={factoryContentHeaderClassName}>
-        <div>
-          <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
-            General
-          </Heading>
-          <p className={cn("mt-1", factoryPageSubtitleClassName)}>
-            General workspace preferences. Content for this page comes next.
-          </p>
-        </div>
-      </header>
+      <WorkspacePageHeader
+        title="General"
+        subtitle="General workspace preferences. Content for this page comes next."
+      />
 
       <div className={factoryContentBodyClassName}>
         <div className="max-w-2xl space-y-6">
           <WorkspaceDetailsSection
             name={name}
             description={description}
+            factoryKey={key}
             nameError={nameError}
+            keyError={keyError}
             canUpdate={canUpdate}
             permissionsLoading={permissionsLoading}
             isSaving={updateFactory.isPending}
@@ -103,6 +127,10 @@ export function FactorySettingsGeneralPage() {
               if (nameError) setNameError("");
             }}
             onDescriptionChange={setDescription}
+            onKeyChange={(next) => {
+              setKey(normalizeWorkspaceKey(next));
+              if (keyError) setKeyError("");
+            }}
             onSave={handleSave}
           />
 
@@ -129,26 +157,32 @@ export function FactorySettingsGeneralPage() {
 interface WorkspaceDetailsSectionProps {
   name: string;
   description: string;
+  factoryKey: string;
   nameError: string;
+  keyError: string;
   canUpdate: boolean;
   permissionsLoading: boolean;
   isSaving: boolean;
   isDirty: boolean;
   onNameChange: (next: string) => void;
   onDescriptionChange: (next: string) => void;
+  onKeyChange: (next: string) => void;
   onSave: () => Promise<void> | void;
 }
 
 function WorkspaceDetailsSection({
   name,
   description,
+  factoryKey,
   nameError,
+  keyError,
   canUpdate,
   permissionsLoading,
   isSaving,
   isDirty,
   onNameChange,
   onDescriptionChange,
+  onKeyChange,
   onSave,
 }: WorkspaceDetailsSectionProps) {
   return (
@@ -170,6 +204,24 @@ function WorkspaceDetailsSection({
             disabled={!canUpdate}
           />
           {nameError ? <p className="text-[11px] text-destructive">{nameError}</p> : null}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="factory-settings-key">Workspace key</Label>
+          <Input
+            id="factory-settings-key"
+            data-testid="factory-settings-key"
+            value={factoryKey}
+            onChange={(event) => onKeyChange(event.target.value)}
+            maxLength={WORKSPACE_KEY_MAX_LENGTH}
+            disabled={!canUpdate}
+            className="uppercase tracking-wider"
+            autoComplete="off"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Changing the key updates every work order identifier for this workspace. IDs already shared elsewhere will
+            no longer resolve.
+          </p>
+          {keyError ? <p className="text-[11px] text-destructive">{keyError}</p> : null}
         </div>
         <div className="space-y-2">
           <Label htmlFor="factory-settings-description">Description</Label>
