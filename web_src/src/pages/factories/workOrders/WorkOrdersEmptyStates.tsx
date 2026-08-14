@@ -51,7 +51,7 @@ export function WorkOrdersTrueEmptyState({ createHref, canCreate, permissionsLoa
         allowed={canCreate || permissionsLoading}
         message="You don't have permission to create work orders."
       >
-        <Button type="button" asChild disabled={!canCreate} data-testid="work-orders-empty-create">
+        <Button type="button" size="sm" asChild disabled={!canCreate} data-testid="work-orders-empty-create">
           <Link href={canCreate ? createHref : "#"}>
             <Icon name="plus" />
             New work order

@@ -16,9 +16,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
-import { ArrowLeft, Copy, MoreHorizontal, Pencil, Plus, Trash2, Workflow } from "lucide-react";
+import { Copy, MoreHorizontal, Pencil, Plus, Trash2, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router";
+import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import {
   listFactoryAutomationRuns,
   resolveFactoryAutomationStatus,
@@ -70,22 +71,43 @@ export function AutomationDetail({
     loadMoreRunsIfNeeded(runsScrollRef.current);
   }, [runs.length, loadMoreRunsIfNeeded]);
 
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const automationName = app.name?.trim() || "Unnamed automation";
+  const description = app.description?.trim();
+  const subtitleParts = [status.label, description].filter(Boolean);
+  const subtitle = subtitleParts.length > 0 ? subtitleParts.join(" · ") : undefined;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="automations-detail">
-      <Link
-        href={automationsPath(organizationId, factoryKey)}
-        className="mb-3 inline-flex shrink-0 items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
-        data-testid="automations-detail-back"
+      <WorkspacePageHeader
+        variant="entity"
+        backHref={automationsPath(organizationId, factoryKey)}
+        backLabel="Automations"
+        backTestId="automations-detail-back"
+        title={automationName}
+        subtitle={subtitle}
+        actions={
+          <AutomationHeaderActions
+            name={automationName}
+            actions={actions}
+            onRequestDelete={() => setDeleteOpen(true)}
+          />
+        }
+      />
+
+      <DeleteAutomationDialog
+        open={deleteOpen}
+        name={automationName}
+        canDelete={actions.canDelete}
+        isDeleting={Boolean(actions.isDeleting)}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={actions.onDelete}
+      />
+
+      <Tabs
+        defaultValue="runs"
+        className="mt-6 flex min-h-0 min-w-0 flex-1 flex-col gap-3 px-[var(--workspace-page-gutter)]"
       >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
-        All automations
-      </Link>
-
-      <div className="shrink-0">
-        <AutomationCard app={app} tick={status.tick} statusLabel={status.label} emphasized actions={actions} />
-      </div>
-
-      <Tabs defaultValue="runs" className="mt-6 flex min-h-0 min-w-0 flex-1 flex-col gap-3">
         <TabsList>
           <TabsTrigger value="runs" data-testid="automations-tab-runs">
             Runs
@@ -263,6 +285,35 @@ const overflowMenuItemClassName = "cursor-pointer rounded-md px-2 py-1.5 text-[1
 const overflowMenuDestructiveItemClassName =
   "text-destructive focus:bg-destructive/10 focus:text-destructive dark:focus:bg-destructive/15";
 
+export function AutomationHeaderActions({
+  name,
+  actions,
+  onRequestDelete,
+}: {
+  name: string;
+  actions: AutomationCardActions;
+  onRequestDelete: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="text-muted-foreground hover:bg-accent hover:text-foreground"
+          disabled={actions.isDuplicating || actions.isDeleting}
+          aria-label={`${name} menu`}
+          data-testid="automations-detail-menu"
+        >
+          <MoreHorizontal className="size-3.5" aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <AutomationMenuItems actions={actions} onRequestDelete={onRequestDelete} testIdPrefix="automations-detail" />
+    </DropdownMenu>
+  );
+}
+
 function AutomationCardMenu({
   name,
   actions,
@@ -296,49 +347,63 @@ function AutomationCardMenu({
             <MoreHorizontal className="size-3.5" aria-hidden />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" sideOffset={6} className={overflowMenuContentClassName}>
-          <PermissionTooltip allowed={actions.canEdit} message="You don't have permission to edit this automation.">
-            <DropdownMenuItem
-              className={overflowMenuItemClassName}
-              onClick={actions.onEdit}
-              disabled={!actions.canEdit}
-              data-testid="automations-card-edit"
-            >
-              <Pencil aria-hidden />
-              Edit
-            </DropdownMenuItem>
-          </PermissionTooltip>
-          <PermissionTooltip
-            allowed={actions.canDuplicate}
-            message="You don't have permission to duplicate this automation."
-          >
-            <DropdownMenuItem
-              className={overflowMenuItemClassName}
-              onClick={() => {
-                void actions.onDuplicate();
-              }}
-              disabled={!actions.canDuplicate || actions.isDuplicating}
-              data-testid="automations-card-duplicate"
-            >
-              <Copy aria-hidden />
-              Duplicate
-            </DropdownMenuItem>
-          </PermissionTooltip>
-          <DropdownMenuSeparator />
-          <PermissionTooltip allowed={actions.canDelete} message="You don't have permission to delete this automation.">
-            <DropdownMenuItem
-              className={cn(overflowMenuItemClassName, overflowMenuDestructiveItemClassName)}
-              onClick={onRequestDelete}
-              disabled={!actions.canDelete || actions.isDeleting}
-              data-testid="automations-card-delete"
-            >
-              <Trash2 aria-hidden />
-              Delete
-            </DropdownMenuItem>
-          </PermissionTooltip>
-        </DropdownMenuContent>
+        <AutomationMenuItems actions={actions} onRequestDelete={onRequestDelete} testIdPrefix="automations-card" />
       </DropdownMenu>
     </div>
+  );
+}
+
+function AutomationMenuItems({
+  actions,
+  onRequestDelete,
+  testIdPrefix,
+}: {
+  actions: AutomationCardActions;
+  onRequestDelete: () => void;
+  testIdPrefix: string;
+}) {
+  return (
+    <DropdownMenuContent align="end" sideOffset={6} className={overflowMenuContentClassName}>
+      <PermissionTooltip allowed={actions.canEdit} message="You don't have permission to edit this automation.">
+        <DropdownMenuItem
+          className={overflowMenuItemClassName}
+          onClick={actions.onEdit}
+          disabled={!actions.canEdit}
+          data-testid={`${testIdPrefix}-edit`}
+        >
+          <Pencil aria-hidden />
+          Edit
+        </DropdownMenuItem>
+      </PermissionTooltip>
+      <PermissionTooltip
+        allowed={actions.canDuplicate}
+        message="You don't have permission to duplicate this automation."
+      >
+        <DropdownMenuItem
+          className={overflowMenuItemClassName}
+          onClick={() => {
+            void actions.onDuplicate();
+          }}
+          disabled={!actions.canDuplicate || actions.isDuplicating}
+          data-testid={`${testIdPrefix}-duplicate`}
+        >
+          <Copy aria-hidden />
+          Duplicate
+        </DropdownMenuItem>
+      </PermissionTooltip>
+      <DropdownMenuSeparator />
+      <PermissionTooltip allowed={actions.canDelete} message="You don't have permission to delete this automation.">
+        <DropdownMenuItem
+          className={cn(overflowMenuItemClassName, overflowMenuDestructiveItemClassName)}
+          onClick={onRequestDelete}
+          disabled={!actions.canDelete || actions.isDeleting}
+          data-testid={`${testIdPrefix}-delete`}
+        >
+          <Trash2 aria-hidden />
+          Delete
+        </DropdownMenuItem>
+      </PermissionTooltip>
+    </DropdownMenuContent>
   );
 }
 
@@ -431,9 +496,9 @@ export function EmptyAutomationsState({ canCreate, onCreate }: { canCreate: bool
       <p className="mt-1 max-w-md text-[13px] text-muted-foreground">
         Automations listen for triggers and run canvases that power line phases.
       </p>
-      <Button type="button" className="mt-6" disabled={!canCreate} onClick={onCreate}>
-        <Plus className="h-3.5 w-3.5" aria-hidden />
-        Add automation
+      <Button type="button" size="sm" className="mt-6" disabled={!canCreate} onClick={onCreate}>
+        <Plus className="size-3.5" aria-hidden />
+        New automation
       </Button>
     </div>
   );
