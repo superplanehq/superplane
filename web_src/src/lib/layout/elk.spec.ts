@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ActionsAction, CanvasesCanvas, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
+import { FACTORY_NODE_CARD_WIDTH } from "@/lib/factoryCanvasChrome";
 import { ElkLayoutEngine } from "@/lib/layout";
 import { resolveForwardLayoutEdges } from "./layoutGraph";
 
@@ -262,7 +263,11 @@ describe("ElkLayoutEngine", () => {
     const b1 = byId.get("component-b-1")!;
     const b2 = byId.get("component-b-2")!;
 
-    const componentAMaxX = Math.max(a1.position!.x! + 420, a2.position!.x! + 420);
+    // Vertical layout uses factory card width, not the classic 420px node width.
+    const componentAMaxX = Math.max(
+      a1.position!.x! + FACTORY_NODE_CARD_WIDTH,
+      a2.position!.x! + FACTORY_NODE_CARD_WIDTH,
+    );
     const componentBMinX = Math.min(b1.position!.x!, b2.position!.x!);
 
     expect(componentBMinX).toBeGreaterThan(componentAMaxX);
