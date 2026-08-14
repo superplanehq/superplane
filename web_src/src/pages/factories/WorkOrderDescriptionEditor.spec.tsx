@@ -233,6 +233,28 @@ describe("WorkOrderDescriptionEditor", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it("underlines selected text and stores it as ++markdown++", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(<WorkOrderDescriptionEditor value="Hello world" maxLength={5000} disabled={false} onChange={onChange} />);
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await user.click(input);
+    await user.keyboard("{Control>}a{/Control}");
+    await user.click(await screen.findByRole("button", { name: "Underline" }));
+
+    expect(input.querySelector("u")).toHaveTextContent("Hello world");
+    expect(onChange.mock.calls.at(-1)?.[0]).toContain("++Hello world++");
+  });
+
+  it("renders stored underline markdown when the editor opens", async () => {
+    render(<WorkOrderDescriptionEditor value="Hello ++world++" maxLength={5000} disabled={false} onChange={vi.fn()} />);
+
+    const input = await screen.findByTestId("work-order-description-input");
+    expect(input.querySelector("u")).toHaveTextContent("world");
+  });
+
   it("applies bold from the format toolbar with the keyboard", async () => {
     const user = userEvent.setup();
 

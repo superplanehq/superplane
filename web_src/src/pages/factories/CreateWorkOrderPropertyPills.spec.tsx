@@ -63,6 +63,33 @@ describe("CreateWorkOrderPropertyPills", () => {
     expect(screen.getByTestId("work-order-line-option-plan-and-implement")).toBeInTheDocument();
   });
 
+  it("keeps a long line list inside a scrollable panel", async () => {
+    const user = userEvent.setup();
+    const lines = Array.from({ length: 20 }, (_, index) => ({
+      id: `line-${index}`,
+      name: `line-${index}`,
+    }));
+
+    render(
+      <CreateWorkOrderPropertyPills
+        organizationId="org-1"
+        assigneeIds={[]}
+        lines={lines}
+        selectedLineName=""
+        isSaving={false}
+        onAssigneeChange={vi.fn()}
+        onLineSelect={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByTestId("work-order-line-button"));
+
+    const list = screen.getByTestId("work-order-line-picker-list");
+    expect(list.className).toContain("max-h-60");
+    expect(list.className).toContain("overflow-y-auto");
+    expect(screen.getByTestId("work-order-line-option-line-19")).toBeInTheDocument();
+  });
+
   it("does not open the line picker when the user cannot dispatch", async () => {
     const user = userEvent.setup();
     render(

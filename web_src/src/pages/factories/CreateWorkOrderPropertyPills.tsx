@@ -186,26 +186,28 @@ function LinePickerPanel({
       data-testid="work-order-line-picker-panel"
     >
       <p className="px-2 py-1.5 text-[11px] font-medium text-muted-foreground">Line</p>
-      {lines.map((line) => {
-        const name = line.name ?? "";
-        if (!name) {
-          return null;
-        }
-        const isSelected = name === selectedLineName;
-        return (
-          <Button
-            key={line.id ?? name}
-            type="button"
-            variant="ghost"
-            disabled={isSaving}
-            data-testid={`work-order-line-option-${name}`}
-            className={cn("h-8 w-full justify-start px-2 text-[13px] font-normal", isSelected && "bg-accent")}
-            onClick={() => onSelect(name)}
-          >
-            {name}
-          </Button>
-        );
-      })}
+      <div className="max-h-60 overflow-y-auto" data-testid="work-order-line-picker-list">
+        {lines.map((line) => {
+          const name = line.name ?? "";
+          if (!name) {
+            return null;
+          }
+          const isSelected = name === selectedLineName;
+          return (
+            <Button
+              key={line.id ?? name}
+              type="button"
+              variant="ghost"
+              disabled={isSaving}
+              data-testid={`work-order-line-option-${name}`}
+              className={cn("h-8 w-full justify-start px-2 text-[13px] font-normal", isSelected && "bg-accent")}
+              onClick={() => onSelect(name)}
+            >
+              {name}
+            </Button>
+          );
+        })}
+      </div>
     </PopoverContent>
   );
 }
