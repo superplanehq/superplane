@@ -2,6 +2,12 @@ import type { Edge, EdgeChange, Node, NodeChange, NodePositionChange } from "@xy
 import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CanvasPageProps } from ".";
+import { isFactoryAutoLayout } from "./layoutMode";
+import {
+  createLayoutNodeInterpolator,
+  easeOutQuadratic,
+  FACTORY_LAYOUT_ANIMATION_DURATION_MS,
+} from "./nodePositionAnimation";
 
 function areEdgeListsReferentiallyEqual(currentEdges: Edge[], nextEdges: Edge[]): boolean {
   if (currentEdges.length !== nextEdges.length) {
@@ -25,10 +31,66 @@ function getRoundedPosition(position: { x: number; y: number }): { x: number; y:
   };
 }
 
+function getLayoutTargetKey(nodes: Node[]): string {
+  return nodes
+    .map((node) => `${node.id}:${node.position.x}:${node.position.y}`)
+    .sort()
+    .join("\0");
+}
+
 type PendingNodePosition = {
   localPosition: { x: number; y: number };
   savedPosition: { x: number; y: number };
 };
+
+function buildSyncedNodes(
+  currentNodes: Node[],
+  initialNodes: Node[],
+  pendingNodePositions: Map<string, PendingNodePosition>,
+): Node[] {
+  const localOnlyNodes = currentNodes.filter((node) => node.data.isTemplate || node.data.isPendingConnection);
+  const currentById = new Map(currentNodes.map((node) => [node.id, node]));
+  const syncedNodeIds = new Set<string>();
+
+  const syncedNodes = initialNodes.map((newNode) => {
+    syncedNodeIds.add(newNode.id);
+    const existingNode = currentById.get(newNode.id);
+    const nodeData = { ...newNode.data };
+    const nodeType = nodeData.type as string;
+
+    if (existingNode && nodeType && nodeData[nodeType]) {
+      const existingType = existingNode.data.type as string;
+      const existingCollapsed = existingType && (existingNode.data[existingType] as { collapsed: boolean })?.collapsed;
+      nodeData[nodeType] = { ...nodeData[nodeType], collapsed: existingCollapsed };
+    }
+
+    const pendingPosition = pendingNodePositions.get(newNode.id);
+    let position = (existingNode?.dragging && existingNode.position) || newNode.position;
+    if (pendingPosition) {
+      if (arePositionsEqual(newNode.position, pendingPosition.savedPosition)) {
+        pendingNodePositions.delete(newNode.id);
+      } else {
+        position = pendingPosition.localPosition;
+      }
+    }
+
+    return {
+      ...newNode,
+      data: nodeData,
+      selected: existingNode?.selected ?? newNode.selected,
+      position,
+      dragging: existingNode?.dragging,
+    };
+  });
+
+  for (const nodeId of pendingNodePositions.keys()) {
+    if (!syncedNodeIds.has(nodeId)) {
+      pendingNodePositions.delete(nodeId);
+    }
+  }
+
+  return [...syncedNodes, ...localOnlyNodes];
+}
 
 export interface CanvasPageState {
   nodes: Node[];
@@ -57,6 +119,12 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
   const [nodes, setNodes] = useState<Node[]>(() => initialNodes ?? []);
   const [edges, setEdges] = useState<Edge[]>(() => initialEdges ?? []);
   const pendingNodePositionsRef = useRef<Map<string, PendingNodePosition>>(new Map());
+  const displayedNodesRef = useRef(nodes);
+  const animationFrameRef = useRef<number | null>(null);
+  const animationTargetKeyRef = useRef<string | null>(null);
+  const animationTargetNodesRef = useRef<Node[]>([]);
+  const animationEdgesRef = useRef<Edge[]>([]);
+  displayedNodesRef.current = nodes;
   const localOnlyNodeIdsKey = useMemo(
     () =>
       nodes
@@ -71,58 +139,69 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
   useEffect(() => {
     if (!initialNodes) return;
 
-    setNodes((currentNodes) => {
-      // Preserve locally-added template and pending connection nodes
-      const localOnlyNodes = currentNodes.filter((node) => node.data.isTemplate || node.data.isPendingConnection);
-      const syncedNodeIds = new Set<string>();
+    const currentNodes = displayedNodesRef.current;
+    const targetNodes = buildSyncedNodes(currentNodes, initialNodes, pendingNodePositionsRef.current);
+    const targetKey = getLayoutTargetKey(targetNodes);
+    const animationEnabled =
+      isFactoryAutoLayout(props.layoutMode) &&
+      !(typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    animationTargetNodesRef.current = targetNodes;
+    animationEdgesRef.current = initialEdges || [];
 
-      const syncedNodes = initialNodes.map((newNode) => {
-        syncedNodeIds.add(newNode.id);
-        const existingNode = currentNodes.find((n) => n.id === newNode.id);
-        const nodeData = { ...newNode.data };
-        const nodeType = nodeData.type as string;
+    if (animationEnabled && animationFrameRef.current !== null && animationTargetKeyRef.current === targetKey) {
+      return;
+    }
 
-        // Preserve collapsed state from existing node
-        if (existingNode && nodeType && nodeData[nodeType]) {
-          const existingType = existingNode.data.type as string;
-          const existingCollapsed =
-            existingType && (existingNode.data[existingType] as { collapsed: boolean })?.collapsed;
-          nodeData[nodeType] = {
-            ...nodeData[nodeType],
-            collapsed: existingCollapsed,
-          };
-        }
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
 
-        const pendingPosition = pendingNodePositionsRef.current.get(newNode.id);
-        let position = (existingNode?.dragging && existingNode.position) || newNode.position;
-        if (pendingPosition) {
-          if (arePositionsEqual(newNode.position, pendingPosition.savedPosition)) {
-            pendingNodePositionsRef.current.delete(newNode.id);
-          } else {
-            position = pendingPosition.localPosition;
-          }
-        }
-
-        // Preserve selected state and position of actively dragged nodes
-        return {
-          ...newNode,
-          data: nodeData,
-          selected: existingNode?.selected ?? newNode.selected,
-          position,
-          dragging: existingNode?.dragging,
-        };
+    const shouldAnimate =
+      animationEnabled &&
+      targetNodes.some((targetNode) => {
+        const currentNode = currentNodes.find((node) => node.id === targetNode.id);
+        return !currentNode || !arePositionsEqual(currentNode.position, targetNode.position);
       });
 
-      for (const nodeId of pendingNodePositionsRef.current.keys()) {
-        if (!syncedNodeIds.has(nodeId)) {
-          pendingNodePositionsRef.current.delete(nodeId);
-        }
+    if (!shouldAnimate) {
+      animationTargetKeyRef.current = null;
+      displayedNodesRef.current = targetNodes;
+      setNodes(targetNodes);
+      return;
+    }
+
+    animationTargetKeyRef.current = targetKey;
+    const startedAt = performance.now();
+    const interpolateNodes = createLayoutNodeInterpolator(currentNodes, animationEdgesRef.current);
+    const animate = (now: number) => {
+      const linearProgress = Math.min((now - startedAt) / FACTORY_LAYOUT_ANIMATION_DURATION_MS, 1);
+      const latestTargetNodes = animationTargetNodesRef.current;
+      if (linearProgress >= 1) {
+        displayedNodesRef.current = latestTargetNodes;
+        setNodes(latestTargetNodes);
+        animationFrameRef.current = null;
+        animationTargetKeyRef.current = null;
+        return;
       }
 
-      // Append local-only nodes at the end
-      return [...syncedNodes, ...localOnlyNodes];
-    });
-  }, [initialNodes]);
+      const animatedNodes = interpolateNodes(latestTargetNodes, easeOutQuadratic(linearProgress));
+      displayedNodesRef.current = animatedNodes;
+      setNodes(animatedNodes);
+      animationFrameRef.current = window.requestAnimationFrame(animate);
+    };
+
+    animationFrameRef.current = window.requestAnimationFrame(animate);
+  }, [initialEdges, initialNodes, props.layoutMode]);
+
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!initialEdges) return;

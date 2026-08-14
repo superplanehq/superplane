@@ -112,6 +112,7 @@ import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
 import { applyCanvasViewportCulling, useCanvasViewportCulling } from "./useCanvasViewportCulling";
 import type { TriggerActionModal } from "@/pages/app/mappers/types";
+import { isFactoryAutoLayout, type CanvasLayoutMode } from "./layoutMode";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -175,6 +176,7 @@ export interface NewNodeData {
 export interface CanvasPageProps {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
+  layoutMode?: CanvasLayoutMode;
 
   startCollapsed?: boolean;
   /** Display name for the canvas header (center title). */
@@ -194,6 +196,7 @@ export interface CanvasPageProps {
     diffCounts: { added: number; updated: number; removed: number };
     diffToggles: {
       showDeletedNodes: boolean;
+      showDeletedNodesControl?: boolean;
       toggleShowDeletedNodes: () => void;
       showEdgeDiff: boolean;
       toggleShowEdgeDiff: () => void;
@@ -1524,6 +1527,7 @@ function CanvasPage(props: CanvasPageProps) {
                   state={state}
                   factoryId={props.factoryId}
                   factoryEmbed={props.factoryEmbed}
+                  layoutMode={props.layoutMode}
                   onNodeDelete={handleNodeDelete}
                   onNodesDelete={handleNodesDelete}
                   onDuplicateNodes={props.onDuplicateNodes}
@@ -1972,6 +1976,7 @@ function CanvasContentHeader({
     diffCounts: { added: number; updated: number; removed: number };
     diffToggles: {
       showDeletedNodes: boolean;
+      showDeletedNodesControl?: boolean;
       toggleShowDeletedNodes: () => void;
       showEdgeDiff: boolean;
       toggleShowEdgeDiff: () => void;
@@ -2156,6 +2161,7 @@ function CanvasContent({
   state,
   factoryId,
   factoryEmbed = false,
+  layoutMode,
   onNodeDelete,
   onNodesDelete,
   onDuplicateNodes,
@@ -2209,6 +2215,7 @@ function CanvasContent({
   state: CanvasPageState;
   factoryId?: string;
   factoryEmbed?: boolean;
+  layoutMode?: CanvasLayoutMode;
   onNodeDelete?: (nodeId: string) => void;
   onNodesDelete?: (nodeIds: string[]) => void;
   onDuplicateNodes?: (nodeIds: string[]) => void;
@@ -2266,6 +2273,7 @@ function CanvasContent({
   canCreateIntegrations?: boolean;
 }) {
   const { fitView, screenToFlowPosition, getViewport, getInternalNode, getNodes, setViewport } = useReactFlow();
+  const factoryAutoLayout = isFactoryAutoLayout(layoutMode);
   const { zoom } = useViewport();
   const { resolvedTheme } = useTheme();
   const flowColorMode = resolvedTheme === "dark" ? "dark" : "light";
@@ -3272,7 +3280,7 @@ function CanvasContent({
             snapToGrid={isSnapToGridEnabled}
             snapGrid={[SNAP_GRID_STEP_PX, SNAP_GRID_STEP_PX]}
             panOnScrollSpeed={0.8}
-            nodesDraggable={!isReadOnly}
+            nodesDraggable={!isReadOnly && !factoryAutoLayout}
             nodesConnectable={isConnectionEditingEnabled}
             elementsSelectable={true}
             onNodesChange={handleNodesChange}
@@ -3317,8 +3325,10 @@ function CanvasContent({
                   className="!static !m-0"
                   isSnapToGridEnabled={isEditMode ? isSnapToGridEnabled : undefined}
                   onSnapToGridToggle={isEditMode ? handleSnapToGridToggle : undefined}
-                  isAutoLayoutOnUpdateEnabled={isEditMode ? isAutoLayoutOnUpdateEnabled : undefined}
-                  onAutoLayoutOnUpdateToggle={isEditMode ? onToggleAutoLayoutOnUpdate : undefined}
+                  isAutoLayoutOnUpdateEnabled={
+                    isEditMode && !factoryAutoLayout ? isAutoLayoutOnUpdateEnabled : undefined
+                  }
+                  onAutoLayoutOnUpdateToggle={isEditMode && !factoryAutoLayout ? onToggleAutoLayoutOnUpdate : undefined}
                   autoLayoutOnUpdateDisabled={isReadOnly || autoLayoutOnUpdateDisabled}
                   autoLayoutOnUpdateDisabledTooltip={
                     isReadOnly ? "You don't have permission to edit this canvas." : autoLayoutOnUpdateDisabledTooltip
