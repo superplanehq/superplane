@@ -1,13 +1,19 @@
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 
-import { runFactoryConfigureDiscard, runFactoryConfigureSave } from "./factoryConfigureActions";
+import {
+  runFactoryConfigureDiscard,
+  runFactoryConfigureSave,
+  type FactoryConfigureSaveOptions,
+} from "./factoryConfigureActions";
 import { useFactoryConfigureEnter } from "./useFactoryConfigureEnter";
 
 export type FactoryConfigureActions = {
-  save: () => void;
+  save: (options?: FactoryConfigureSaveOptions) => void;
   discard: () => void;
   busy: boolean;
+  /** True when Configure has graph/console/files changes to stage+commit. */
+  hasUncommittedChanges: boolean;
 };
 
 type UpdateCanvasVersionMutation = {
@@ -90,6 +96,7 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
   useFactoryConfigureEnter(options);
 
   const factoryConfigureBusy = commitStagingPending || resetStagingPending || factoryConfigureSavePending;
+  const hasUncommittedChanges = hasStagingChanges || hasUncommittedCanvasDraftChanges;
   useEffect(() => {
     if (!factoryConfigure || !onFactoryConfigureBusyChange) {
       return;
@@ -102,7 +109,8 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
       ? null
       : {
           busy: factoryConfigureBusy,
-          save: () => {
+          hasUncommittedChanges,
+          save: (saveOptions) => {
             if (factoryConfigureBusy) {
               return;
             }
@@ -120,6 +128,7 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
               setDraftCanvasSpec,
               setLastSavedWorkflowSnapshot,
               handleCommitStaging,
+              canvasName: saveOptions?.canvasName,
               onDone: () => onFactoryConfigureDoneRef.current?.(),
             });
           },

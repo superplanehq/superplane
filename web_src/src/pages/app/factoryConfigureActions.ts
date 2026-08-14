@@ -9,6 +9,11 @@ type UpdateCanvasVersionMutation = {
   mutateAsync: (input: { versionId: string; canvasYaml: string }) => Promise<unknown>;
 };
 
+export type FactoryConfigureSaveOptions = {
+  /** Overlay metadata.name before staging canvas.yaml (keeps YAML in sync after rename). */
+  canvasName?: string;
+};
+
 export type FactoryConfigureSaveDeps = {
   canStageCanvasVersion: boolean;
   activeCanvasVersionIdRef: MutableRefObject<string>;
@@ -24,6 +29,7 @@ export type FactoryConfigureSaveDeps = {
   setLastSavedWorkflowSnapshot: (workflow: CanvasesCanvas | null) => void;
   handleCommitStaging: (commitMessage: string, options?: { versionId?: string }) => Promise<boolean | void>;
   onDone?: () => void;
+  canvasName?: string;
 };
 
 export type FactoryConfigureDiscardDeps = {
@@ -34,6 +40,21 @@ export type FactoryConfigureDiscardDeps = {
   handleExitEditSession: () => void;
   onDone?: () => void;
 };
+
+/** Merge a renamed canvas name into the workflow snapshot used for canvas.yaml. */
+export function withCanvasMetadataName(workflow: CanvasesCanvas, canvasName?: string): CanvasesCanvas {
+  const name = canvasName?.trim();
+  if (!name || name === workflow.metadata?.name) {
+    return workflow;
+  }
+  return {
+    ...workflow,
+    metadata: {
+      ...workflow.metadata,
+      name,
+    },
+  };
+}
 
 export async function runFactoryConfigureSave(deps: FactoryConfigureSaveDeps): Promise<void> {
   if (!deps.canStageCanvasVersion) {
@@ -55,11 +76,12 @@ export async function runFactoryConfigureSave(deps: FactoryConfigureSaveDeps): P
     deps.setEditSessionActive(true);
   }
 
-  const workflow = deps.getCurrentWorkflowSnapshot();
-  if (!workflow?.spec) {
+  const snapshot = deps.getCurrentWorkflowSnapshot();
+  if (!snapshot?.spec) {
     showErrorToast("Nothing to save");
     return;
   }
+  const workflow = withCanvasMetadataName(snapshot, deps.canvasName);
 
   deps.setSavePending(true);
   try {
@@ -83,7 +105,7 @@ export async function runFactoryConfigureSave(deps: FactoryConfigureSaveDeps): P
 function applyStagedWorkflowSnapshot(
   deps: FactoryConfigureSaveDeps,
   savingVersionId: string,
-  workflow: NonNullable<ReturnType<FactoryConfigureSaveDeps["getCurrentWorkflowSnapshot"]>>,
+  workflow: CanvasesCanvas,
 ) {
   if (!workflow.spec) {
     return;
