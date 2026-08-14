@@ -36,7 +36,7 @@ import {
 } from "@/pages/factories";
 import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
 import { createFactoryLinePath, editFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
-import { MissionDetailPage } from "@/pages/factories/pages/missionsPrototype/MissionDetailPage";
+import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetailPage";
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
 import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
 import { HomePage } from "@/pages/home";
@@ -78,7 +78,7 @@ export interface OrgWorkspacePageOverrides {
   overview?: ComponentType;
   /** When set, mounts `/onboarding` and gates other factory pages while pending. */
   onboarding?: ComponentType;
-  /** Storybook-only Work Orders page (prototypes). Live app ignores this. */
+  /** Storybook-only Work Orders page. Live app ignores this. */
   workOrders?: ComponentType;
 }
 

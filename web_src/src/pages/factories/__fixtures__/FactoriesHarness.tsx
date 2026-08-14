@@ -10,8 +10,8 @@ import { StorybookOverviewPage } from "../pages/onboarding/StorybookOverviewPage
 import { WikiWireframe } from "../pages/wiki/WikiWireframe";
 import { WIKI_DOCUMENTS_DEFAULT, WIKI_DOCUMENTS_REFRESHED } from "../pages/wiki/wikiMocks";
 import { defaultFactoriesFixture, FACTORIES_ORGANIZATION_ID, type FactoriesFixture } from "./factoryPageResponses";
-import { MissionAssignmentProvider } from "../pages/missionsPrototype/MissionAssignmentContext";
-import { WorkOrderMissionOverviewRow } from "../pages/missionsPrototype/WorkOrderMissionOverviewRow";
+import { MissionAssignmentProvider } from "../pages/missions/MissionAssignmentContext";
+import { WorkOrderMissionOverviewRow } from "../pages/missions/WorkOrderMissionOverviewRow";
 import { WorkOrderOverviewMissionSlotContext } from "../sidebar/workOrderOverviewSlots";
 
 interface FactoriesHarnessProps {

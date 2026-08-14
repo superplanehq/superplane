@@ -7,8 +7,8 @@ import {
   defaultFactoriesFixture,
   emptyWorkOrdersFactoriesFixture,
 } from "../__fixtures__/factoryPageResponses";
-import { CHECKOUT_RELIABILITY_MISSION, REFUNDS_V2_MISSION } from "./missionsPrototype/missionMocks";
-import { MissionsWorkOrdersPage } from "./missionsPrototype/MissionsWorkOrdersPage";
+import { CHECKOUT_RELIABILITY_MISSION, REFUNDS_V2_MISSION } from "./missions/missionMocks";
+import { MissionsWorkOrdersPage } from "./missions/MissionsWorkOrdersPage";
 import { WorkOrdersPage } from "./WorkOrdersPage";
 
 /**
