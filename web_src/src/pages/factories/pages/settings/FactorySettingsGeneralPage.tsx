@@ -117,7 +117,7 @@ export function FactorySettingsGeneralPage() {
             General
           </Heading>
           <p className={cn("mt-1", factoryPageSubtitleClassName)}>
-            General workspace preferences. Content for this page comes next.
+            Set the workspace name, key, and description. The key is part of every work order ID.
           </p>
         </div>
       </header>

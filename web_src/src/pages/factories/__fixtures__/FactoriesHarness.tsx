@@ -7,9 +7,16 @@ import { OnboardingStorybookProvider } from "../pages/onboarding/OnboardingStory
 import { OnboardingWireframe } from "../pages/onboarding/OnboardingWireframe";
 import type { OnboardingStorybookSeed } from "../pages/onboarding/onboardingMocks";
 import { StorybookOverviewPage } from "../pages/onboarding/StorybookOverviewPage";
+import { STORYBOOK_FACTORY_SETTINGS_PAGES } from "../pages/settings/settingsStorybookPages";
 import { WikiWireframe } from "../pages/wiki/WikiWireframe";
 import { WIKI_DOCUMENTS_DEFAULT, WIKI_DOCUMENTS_REFRESHED } from "../pages/wiki/wikiMocks";
-import { defaultFactoriesFixture, FACTORIES_ORGANIZATION_ID, type FactoriesFixture } from "./factoryPageResponses";
+import { STORYBOOK_WORKSPACE_CONNECTIONS } from "../pages/settings/settingsPrototype/workspaceConnections";
+import {
+  defaultFactoriesFixture,
+  FACTORIES_ORGANIZATION_ID,
+  PRIMARY_FACTORY_ID,
+  type FactoriesFixture,
+} from "./factoryPageResponses";
 
 interface FactoriesHarnessProps {
   /** Path under the org. Defaults to `workspaces` (list page). */
@@ -23,6 +30,8 @@ interface FactoriesHarnessProps {
    * Wiki defaults to the wireframe so sidebar navigation shows it; pass
    * `pageOverrides={{ wiki: WikiPage }}` to keep Coming Soon.
    * Onboarding + Get started overview are enabled by default.
+   * Members, Integrations, and Secrets default to the org settings pages.
+   * Repositories and Models show the onboarding selections.
    */
   pageOverrides?: OrgWorkspacePageOverrides;
   /** Seed pending providers/repos/tips for onboarding stories. */
@@ -73,8 +82,13 @@ export function FactoriesHarness({
               overview: StorybookOverviewPage,
               onboarding: OnboardingWireframe,
               ...pageOverrides,
+              settings: { ...STORYBOOK_FACTORY_SETTINGS_PAGES, ...pageOverrides?.settings },
             }
-          : { wiki: DefaultWikiWireframe, ...pageOverrides }
+          : {
+              wiki: DefaultWikiWireframe,
+              ...pageOverrides,
+              settings: { ...STORYBOOK_FACTORY_SETTINGS_PAGES, ...pageOverrides?.settings },
+            }
       }
     />
   );
@@ -83,5 +97,23 @@ export function FactoriesHarness({
     return harness;
   }
 
-  return <OnboardingStorybookProvider initial={onboardingSeed}>{harness}</OnboardingStorybookProvider>;
+  return (
+    <OnboardingStorybookProvider initial={withDefaultWorkspaceConnections(onboardingSeed)}>
+      {harness}
+    </OnboardingStorybookProvider>
+  );
+}
+
+function withDefaultWorkspaceConnections(seed?: OnboardingStorybookSeed): OnboardingStorybookSeed {
+  return {
+    ...seed,
+    enabledReposByWorkspace: {
+      [PRIMARY_FACTORY_ID]: STORYBOOK_WORKSPACE_CONNECTIONS.repos,
+      ...seed?.enabledReposByWorkspace,
+    },
+    connectionsByWorkspace: {
+      [PRIMARY_FACTORY_ID]: STORYBOOK_WORKSPACE_CONNECTIONS,
+      ...seed?.connectionsByWorkspace,
+    },
+  };
 }

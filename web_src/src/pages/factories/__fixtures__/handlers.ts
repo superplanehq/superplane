@@ -1,6 +1,14 @@
-import { defaultFactoriesFixture, ORGANIZATION_USERS, type FactoriesFixture } from "./factoryPageResponses";
+import {
+  defaultFactoriesFixture,
+  FACTORIES_ORGANIZATION_ID,
+  OPERATOR_USER,
+  ORGANIZATION_USERS,
+  REVIEWER_USER,
+  STORYBOOK_ME_USER_ID,
+  type FactoriesFixture,
+} from "./factoryPageResponses";
 import type { FactoriesWorkOrder } from "@/api-client";
-import { fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
+import { fixtureResponse, type FixtureResult, type StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers";
 
 export type { FactoriesFixture };
 
@@ -276,16 +284,174 @@ export function matchFactoryPageFixture(
   return null;
 }
 
+const STORYBOOK_USER_ROLES: Record<string, { roleName: string; roleDisplayName: string }> = {
+  [STORYBOOK_ME_USER_ID]: { roleName: "org_owner", roleDisplayName: "Owner" },
+  [REVIEWER_USER.id]: { roleName: "org_admin", roleDisplayName: "Admin" },
+  [OPERATOR_USER.id]: { roleName: "org_member", roleDisplayName: "Member" },
+};
+
+const STORYBOOK_WORKSPACE_ROLES = [
+  { metadata: { name: "org_owner" }, spec: { displayName: "Owner" } },
+  { metadata: { name: "org_admin" }, spec: { displayName: "Admin" } },
+  { metadata: { name: "org_member" }, spec: { displayName: "Member" } },
+];
+
+const STORYBOOK_WORKSPACE_SECRETS = [
+  {
+    metadata: { id: "secret-openai", name: "openai" },
+    spec: { provider: "PROVIDER_LOCAL", local: { data: { OPENAI_API_KEY: "sk-storybook" } } },
+  },
+  {
+    metadata: { id: "secret-github", name: "github-app" },
+    spec: {
+      provider: "PROVIDER_LOCAL",
+      local: { data: { GITHUB_TOKEN: "ghs-storybook", APP_ID: "12345" } },
+    },
+  },
+];
+
+const STORYBOOK_INVITE_LINK = {
+  id: "storybook-invite",
+  organizationId: FACTORIES_ORGANIZATION_ID,
+  token: "storybook-invite-token",
+  enabled: true,
+};
+
+function catalogIntegration(name: string, label: string, description: string, options?: { legacySetupOnly?: boolean }) {
+  return {
+    name,
+    label,
+    icon: name,
+    description,
+    configuration: [],
+    instructions: "",
+    legacySetupOnly: options?.legacySetupOnly ?? true,
+  };
+}
+
+/** Same catalog the organization Integrations page lists in the live app. */
+export const STORYBOOK_WORKSPACE_INTEGRATION_CATALOG = [
+  catalogIntegration("github", "GitHub", "Manage and react to changes in your GitHub repositories", {
+    legacySetupOnly: false,
+  }),
+  catalogIntegration("gitlab", "GitLab", "Manage and react to changes in your GitLab repositories"),
+  catalogIntegration("bitbucket", "Bitbucket", "Manage and react to changes in your Bitbucket repositories"),
+  catalogIntegration("slack", "Slack", "Send and react to Slack messages and interactions"),
+  catalogIntegration("linear", "Linear", "Manage and react to issues in Linear"),
+  catalogIntegration("jira", "Jira", "Manage issues in Jira"),
+  catalogIntegration("claude", "Claude", "Use Claude models in workflows"),
+  catalogIntegration("openai", "OpenAI", "Generate text responses with OpenAI models"),
+  catalogIntegration("cursor", "Cursor", "Build workflows with Cursor AI Agents and track usage"),
+  catalogIntegration("semaphore", "Semaphore", "Run and react to your Semaphore workflows"),
+  catalogIntegration("circleci", "CircleCI", "Run and react to CircleCI pipelines"),
+  catalogIntegration("datadog", "Datadog", "Create events in Datadog"),
+  catalogIntegration("sentry", "Sentry", "React to issue events and manage issues and metric alerts in Sentry"),
+  catalogIntegration("pagerduty", "PagerDuty", "Manage and react to incidents in PagerDuty"),
+  catalogIntegration("grafana", "Grafana", "React to Grafana alerts and annotations"),
+  catalogIntegration("aws", "AWS", "Manage resources and execute AWS commands in workflows"),
+  catalogIntegration("gcp", "Google Cloud", "Manage and use Google Cloud resources in your workflows"),
+  catalogIntegration("azure", "Azure", "Manage Azure resources in workflows"),
+  catalogIntegration("digitalocean", "DigitalOcean", "Manage DigitalOcean resources in workflows"),
+  catalogIntegration("dockerhub", "DockerHub", "React to image pushes and manage Docker Hub repositories"),
+  catalogIntegration("cloudflare", "Cloudflare", "Manage Cloudflare resources and react to events"),
+  catalogIntegration("discord", "Discord", "Send and react to Discord messages"),
+  catalogIntegration("teams", "Microsoft Teams", "Send and react to Microsoft Teams messages"),
+  catalogIntegration("incident", "Incident.io", "Manage and react to incidents"),
+  catalogIntegration("rootly", "Rootly", "Manage and react to incidents in Rootly"),
+  catalogIntegration("firehydrant", "FireHydrant", "Manage and react to incidents in FireHydrant"),
+  catalogIntegration("launchdarkly", "LaunchDarkly", "Manage feature flags in LaunchDarkly"),
+  catalogIntegration("honeycomb", "Honeycomb", "React to Honeycomb triggers and burn alerts"),
+  catalogIntegration("newrelic", "New Relic", "React to New Relic alerts"),
+  catalogIntegration("elastic", "Elastic", "Search and react to Elastic events"),
+  catalogIntegration("statuspage", "Statuspage", "Update Statuspage incidents and components"),
+  catalogIntegration("sendgrid", "SendGrid", "Send email with SendGrid"),
+  catalogIntegration("smtp", "SMTP", "Send email through an SMTP server"),
+  catalogIntegration("perplexity", "Perplexity", "Use Perplexity models in workflows"),
+  catalogIntegration("daytona", "Daytona", "Create and manage Daytona sandboxes"),
+  catalogIntegration("dash0", "Dash0", "Query Dash0 and react to alerts"),
+  catalogIntegration("coolify", "Coolify", "Manage Coolify applications and deployments"),
+  catalogIntegration("cloudsmith", "Cloudsmith", "Manage Cloudsmith packages"),
+  catalogIntegration("harness", "Harness", "Run and react to Harness pipelines"),
+  catalogIntegration("hetzner", "Hetzner", "Manage Hetzner Cloud resources"),
+  catalogIntegration("oci", "OCI", "Manage Oracle Cloud resources"),
+  catalogIntegration("octopus", "Octopus Deploy", "Run and react to Octopus Deploy releases"),
+  catalogIntegration("prometheus", "Prometheus", "Query Prometheus and react to alerts"),
+  catalogIntegration("render", "Render", "Manage Render services and deploys"),
+  catalogIntegration("servicenow", "ServiceNow", "Create and update ServiceNow records"),
+  catalogIntegration("telegram", "Telegram", "Send and react to Telegram messages"),
+  catalogIntegration("logfire", "Logfire", "React to Logfire alerts"),
+  catalogIntegration("jfrogArtifactory", "JFrog Artifactory", "Manage JFrog Artifactory packages"),
+];
+
+export const STORYBOOK_CONNECTED_ORG_INTEGRATIONS: StorybookOrgIntegration[] = [
+  {
+    metadata: { id: "int-github-acme", name: "github", integrationName: "github" },
+    status: { state: "ready" },
+  },
+  {
+    metadata: { id: "int-claude-workspace", name: "claude", integrationName: "claude" },
+    status: { state: "ready" },
+  },
+];
+
 /** Response body for `GET /api/v1/users` (`useOrganizationUsers`). */
 export function factoriesOrganizationUsersResponse(): FixtureResult {
   return {
     json: {
-      users: ORGANIZATION_USERS.map((user) => ({
-        metadata: { id: user.id, email: user.email },
-        spec: { displayName: user.name },
-      })),
+      users: ORGANIZATION_USERS.map((user) => {
+        const role = STORYBOOK_USER_ROLES[user.id];
+        return {
+          metadata: { id: user.id, email: user.email },
+          spec: { displayName: user.name },
+          status: role
+            ? {
+                roles: [
+                  {
+                    roleName: role.roleName,
+                    roleDisplayName: role.roleDisplayName,
+                  },
+                ],
+              }
+            : {},
+        };
+      }),
     },
   };
+}
+
+/**
+ * Roles, secrets, and invite-link fixtures for Storybook workspace settings.
+ * Factory page routes stay factory-scoped; these org APIs back the reused
+ * Members / Integrations / Secrets pages.
+ */
+export function matchFactorySettingsFixture(url: URL, method: string): FixtureResult {
+  if (url.pathname === "/api/v1/integrations" && method === "GET") {
+    return { json: { integrations: STORYBOOK_WORKSPACE_INTEGRATION_CATALOG } };
+  }
+
+  if (/^\/api\/v1\/organizations\/[^/]+\/integrations$/.test(url.pathname) && method === "GET") {
+    return { json: { integrations: STORYBOOK_CONNECTED_ORG_INTEGRATIONS } };
+  }
+
+  if (url.pathname === "/api/v1/roles" && method === "GET") {
+    return { json: { roles: STORYBOOK_WORKSPACE_ROLES } };
+  }
+
+  if (url.pathname === "/api/v1/secrets" && method === "GET") {
+    return { json: { secrets: STORYBOOK_WORKSPACE_SECRETS } };
+  }
+
+  const secretMatch = /^\/api\/v1\/secrets\/([^/]+)$/.exec(url.pathname);
+  if (secretMatch && method === "GET") {
+    const secret = STORYBOOK_WORKSPACE_SECRETS.find((entry) => entry.metadata.id === secretMatch[1]);
+    return secret ? { json: { secret } } : { json: {} };
+  }
+
+  if (/^\/api\/v1\/organizations\/[^/]+\/invite-link$/.test(url.pathname)) {
+    return { json: { inviteLink: STORYBOOK_INVITE_LINK } };
+  }
+
+  return null;
 }
 
 /**
@@ -303,7 +469,10 @@ export async function fetchFactoryPageFixture(
     typeof options?.body === "string" && options.body.trim()
       ? (JSON.parse(options.body) as Record<string, unknown>)
       : null;
-  const result = matchFactoryPageFixture(url, method, body, fixture);
+  const result =
+    matchFactoryPageFixture(url, method, body, fixture) ??
+    (url.pathname === "/api/v1/users" && method === "GET" ? factoriesOrganizationUsersResponse() : null) ??
+    matchFactorySettingsFixture(url, method);
   if (!result) {
     return new Response(null, { status: 404 });
   }

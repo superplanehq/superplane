@@ -201,7 +201,7 @@ export function NameInviteStep({ setup }: { setup: OnboardingSetupApi }) {
   );
 }
 
-function RepositoryPicker({
+export function RepositoryPicker({
   host,
   repos,
   selectedRepo,

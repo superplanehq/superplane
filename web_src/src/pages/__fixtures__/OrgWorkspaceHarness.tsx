@@ -38,9 +38,15 @@ import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
 import { createFactoryLinePath, editFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
 import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
+import {
+  resolveFactorySettingsPage,
+  type FactorySettingsPageOverrides,
+} from "@/pages/factories/pages/settings/settingsStorybookPages";
 import { HomePage } from "@/pages/home";
 import { homePageIds, type HomePageFixture } from "@/pages/home/__fixtures__/handlers";
 import { NewAppPage } from "@/pages/home/NewAppPage";
+import { IntegrationDetailsRoute } from "@/pages/organization/settings/components/IntegrationDetailsRoute";
+import { SecretDetail } from "@/pages/organization/settings/SecretDetail";
 import type { AgentSuggestion } from "@/ui/CanvasPage";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -77,6 +83,8 @@ export interface OrgWorkspacePageOverrides {
   overview?: ComponentType;
   /** When set, mounts `/onboarding` and gates other factory pages while pending. */
   onboarding?: ComponentType;
+  /** Workspace settings sections. Live App routes stay Coming Soon. */
+  settings?: FactorySettingsPageOverrides;
 }
 
 export interface OrgWorkspaceHarnessProps {
@@ -189,6 +197,22 @@ function OptionalOnboardingGate({ enabled }: { enabled: boolean }) {
   return <OnboardingGate />;
 }
 
+function HarnessSecretDetailPage() {
+  const { organizationId } = useParams<{ organizationId: string }>();
+  if (!organizationId) {
+    return null;
+  }
+  return <SecretDetail organizationId={organizationId} />;
+}
+
+function HarnessIntegrationDetailsPage() {
+  const { organizationId } = useParams<{ organizationId: string }>();
+  if (!organizationId) {
+    return null;
+  }
+  return <IntegrationDetailsRoute organizationId={organizationId} />;
+}
+
 function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePageOverrides }) {
   const WikiRoutePage = pageOverrides?.wiki ?? WikiPage;
   const OverviewRoutePage = pageOverrides?.overview ?? OverviewPage;
@@ -244,25 +268,34 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
           <Route path=":factoryKey/settings" element={factoryRoute(<FactorySettingsLayout />)}>
             <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
             <Route path="general" element={<FactorySettingsGeneralPage />} />
-            {FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.id !== "general").map((item) => (
-              <Route
-                key={item.id}
-                path={item.id}
-                element={
-                  <FactorySettingsSoonPage
-                    title={item.label}
-                    description={`${item.label} settings for this workspace.`}
-                    Icon={item.Icon}
-                  />
-                }
-              />
-            ))}
+            {FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.id !== "general").map((item) => {
+              const OverridePage = resolveFactorySettingsPage(item.id, pageOverrides?.settings);
+              return (
+                <Route
+                  key={item.id}
+                  path={item.id}
+                  element={
+                    OverridePage ? (
+                      <OverridePage />
+                    ) : (
+                      <FactorySettingsSoonPage
+                        title={item.label}
+                        description={`${item.label} settings for this workspace.`}
+                        Icon={item.Icon}
+                      />
+                    )
+                  }
+                />
+              );
+            })}
           </Route>
         </Route>
         <Route
           path="settings/integrations/:integrationName/setup"
           element={<div data-testid="integration-setup-placeholder">Integration setup</div>}
         />
+        <Route path="settings/integrations/:integrationId" element={<HarnessIntegrationDetailsPage />} />
+        <Route path="settings/secrets/:secretId" element={<HarnessSecretDetailPage />} />
       </Route>
     </Routes>
   );
