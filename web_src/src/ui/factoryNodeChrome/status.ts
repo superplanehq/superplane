@@ -24,6 +24,18 @@ const CANCELLED_EVENT_STATES = new Set(["cancelled", "rejected"]);
 
 const UNSET_EVENT_STATES = new Set(["pending", "neutral"]);
 
+const ICON_TO_FACTORY_STATUS: Record<string, FactoryNodeStatus> = {
+  "circle-check": "passed",
+  "circle-x": "failed",
+  "triangle-alert": "error",
+  "refresh-cw": "running",
+  "loader-circle": "running",
+  "circle-slash-2": "cancelled",
+  "circle-slash": "cancelled",
+  "circle-stop": "cancelled",
+  "circle-dashed": "queued",
+};
+
 function isUnsetEventState(status: string | undefined): boolean {
   return status === undefined || UNSET_EVENT_STATES.has(status);
 }
@@ -63,7 +75,7 @@ export function normalizeFactoryNodeStatus(status: string | undefined, stateMap?
     return mappedStatus;
   }
 
-  // Mapper success aliases (buildActionStateRegistry) are not in the whitelist.
+  // No map entry: mapper success aliases (buildActionStateRegistry) are not in the whitelist.
   return "passed";
 }
 
@@ -97,7 +109,13 @@ function factoryStatusFromEventStyle(style: EventStateStyle | undefined): Factor
     }
   }
 
-  return undefined;
+  for (const [eventState, defaultStyle] of Object.entries(DEFAULT_EVENT_STATE_MAP)) {
+    if (style.badgeColor === defaultStyle.badgeColor) {
+      return normalizeFactoryNodeStatus(eventState);
+    }
+  }
+
+  return ICON_TO_FACTORY_STATUS[style.icon];
 }
 
 export function factoryNodeStatusLabel(status: FactoryNodeStatus): string {

@@ -50,6 +50,34 @@ describe("normalizeFactoryNodeStatus", () => {
     expect(normalizeFactoryNodeStatus("is running", stateMap)).toBe("running");
   });
 
+  it("maps custom cancelled styles such as GitHub workflow stopped", () => {
+    const stateMap = {
+      ...DEFAULT_EVENT_STATE_MAP,
+      stopped: {
+        icon: "circle-stop",
+        textColor: "text-gray-800",
+        backgroundColor: "bg-gray-100",
+        badgeColor: "bg-gray-500",
+      },
+    };
+
+    expect(normalizeFactoryNodeStatus("stopped", stateMap)).toBe("cancelled");
+  });
+
+  it("maps circle-stop icons even when the badge color is not a default", () => {
+    const stateMap = {
+      ...DEFAULT_EVENT_STATE_MAP,
+      stopped: {
+        icon: "circle-stop",
+        textColor: "text-gray-800",
+        backgroundColor: "bg-slate-100",
+        badgeColor: "bg-slate-500",
+      },
+    };
+
+    expect(normalizeFactoryNodeStatus("stopped", stateMap)).toBe("cancelled");
+  });
+
   it("treats unlisted mapper success aliases as Passed when no map is given", () => {
     expect(normalizeFactoryNodeStatus("marked ready")).toBe("passed");
   });
