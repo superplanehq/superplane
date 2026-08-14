@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -193,7 +194,7 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 
 	now := time.Now()
 	o.UpdatedAt = now
-	if err := tx.Model(o).Update("updated_at", now).Error; err != nil {
+	if err := tx.Model(o).Omit(clause.Associations).UpdateColumn("updated_at", now).Error; err != nil {
 		return err
 	}
 

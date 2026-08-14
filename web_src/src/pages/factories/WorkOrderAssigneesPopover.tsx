@@ -34,7 +34,11 @@ export function WorkOrderAssigneesPopover({
     if (open) {
       setDraftIds(selectedIds);
     }
-  }, [open, selectedIds]);
+    // Sync the draft only when the popover opens. While it is open, parent
+    // re-renders produce a fresh selectedIds reference and must not clobber
+    // the user's in-progress draft.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (isSaving) {

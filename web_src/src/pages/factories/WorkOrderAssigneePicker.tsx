@@ -41,8 +41,15 @@ export function WorkOrderAssigneePicker({
           display,
         };
       })
-      .sort((left, right) => left.label.localeCompare(right.label));
-  }, [users]);
+      .sort((left, right) => {
+        const leftSelected = selectedIds.includes(left.id);
+        const rightSelected = selectedIds.includes(right.id);
+        if (leftSelected !== rightSelected) {
+          return leftSelected ? -1 : 1;
+        }
+        return left.label.localeCompare(right.label);
+      });
+  }, [users, selectedIds]);
 
   const toggleUser = (userId: string, checked: boolean) => {
     if (disabled) {
