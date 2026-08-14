@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+#
+# Retry wrapper around `docker pull`.
+#
+# Pulling an image from a registry can fail on transient errors (5xx responses
+# such as "502 Bad Gateway", rate limits, TCP/DNS blips). Because
+# `docker run <image>` pulls implicitly, a single registry hiccup fails CI on an
+# otherwise healthy PR. This pulls the image up front in a short retry loop with
+# exponential backoff so those transient failures self-heal, and keeps the
+# subsequent `docker run` offline (image already present locally).
+#
+# Usage:
+#   scripts/docker-pull-retry <image>
+#
+# Tunable via environment:
+#   DOCKER_PULL_MAX_RETRIES    attempts before giving up (default 3)
+#   DOCKER_PULL_INITIAL_DELAY  seconds before the first retry (default 5)
+#   DOCKER_PULL_MAX_DELAY      cap on backoff delay in seconds (default 60)
+
+set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+  echo "usage: $0 <image>" >&2
+  exit 2
+fi
+
+IMAGE="$1"
+MAX_RETRIES="${DOCKER_PULL_MAX_RETRIES:-3}"
+DELAY="${DOCKER_PULL_INITIAL_DELAY:-5}"
+MAX_DELAY="${DOCKER_PULL_MAX_DELAY:-60}"
+
+attempt=1
+while true; do
+  if docker pull "$IMAGE"; then
+    exit 0
+  fi
+
+  if [ "$attempt" -ge "$MAX_RETRIES" ]; then
+    echo "docker pull ${IMAGE} failed after ${MAX_RETRIES} attempt(s)." >&2
+    exit 1
+  fi
+
+  echo "docker pull ${IMAGE} failed (attempt ${attempt}/${MAX_RETRIES}); retrying in ${DELAY}s..." >&2
+  sleep "$DELAY"
+
+  attempt=$((attempt + 1))
+  DELAY=$((DELAY * 2))
+  if [ "$DELAY" -gt "$MAX_DELAY" ]; then
+    DELAY="$MAX_DELAY"
+  fi
+done
