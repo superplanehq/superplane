@@ -16,68 +16,103 @@ type UseFactoryAppConfigureTitleArgs = {
   savedName?: string;
   configureBusy: boolean;
   configureActionsRef: MutableRefObject<FactoryConfigureActions | null>;
+  onDone: () => void;
 };
 
+export function resolveDraftTitleToPersist(draftTitle: string | null, savedTitle: string): string | null {
+  const nextName = (draftTitle ?? savedTitle).trim();
+  if (!nextName || nextName === savedTitle.trim()) {
+    return null;
+  }
+  return nextName;
+}
+
 export function useFactoryAppConfigureTitle(args: UseFactoryAppConfigureTitleArgs) {
-  const { organizationId, factoryId, appId, isConfigure, canRename, savedName, configureBusy, configureActionsRef } =
-    args;
+  const {
+    organizationId,
+    factoryId,
+    appId,
+    isConfigure,
+    canRename,
+    savedName,
+    configureBusy,
+    configureActionsRef,
+    onDone,
+  } = args;
   const queryClient = useQueryClient();
   const updateCanvas = useUpdateCanvas(organizationId, appId);
   const [draftTitle, setDraftTitle] = useState<string | null>(null);
-  const renamingRef = useRef(false);
+  const draftTitleRef = useRef<string | null>(null);
+  const savingRef = useRef(false);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
 
   const savedTitle = resolveFactoryAppCanvasTitle(savedName);
   const title = isConfigure && draftTitle != null ? draftTitle : savedTitle;
-  const busy = configureBusy || updateCanvas.isPending || renamingRef.current;
 
   useEffect(() => {
     if (!isConfigure) {
+      draftTitleRef.current = null;
       setDraftTitle(null);
     }
   }, [isConfigure]);
 
   const clearDraftTitle = useCallback(() => {
+    draftTitleRef.current = null;
     setDraftTitle(null);
   }, []);
 
   const handleDraftTitleChange = useCallback((name: string) => {
+    draftTitleRef.current = name;
     setDraftTitle(name);
   }, []);
 
-  const persistDraftTitleIfNeeded = useCallback(async () => {
-    const nextName = (draftTitle ?? savedTitle).trim();
-    if (!nextName || nextName === savedTitle.trim()) {
-      return true;
+  const persistDraftTitleIfNeeded = useCallback(async (): Promise<string | null> => {
+    const nextName = resolveDraftTitleToPersist(draftTitleRef.current, savedTitle);
+    if (!nextName) {
+      return null;
     }
     if (!canRename) {
       showErrorToast("You don't have permission to rename this automation.");
-      return false;
+      throw new Error("rename not allowed");
     }
-    try {
-      await updateCanvas.mutateAsync({ name: nextName });
-      void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
-      setDraftTitle(null);
-      return true;
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to rename automation"));
-      return false;
-    }
-  }, [canRename, draftTitle, factoryId, organizationId, queryClient, savedTitle, updateCanvas]);
+    await updateCanvas.mutateAsync({ name: nextName });
+    void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+    draftTitleRef.current = null;
+    setDraftTitle(null);
+    return nextName;
+  }, [canRename, factoryId, organizationId, queryClient, savedTitle, updateCanvas]);
 
   const handleConfigureSave = useCallback(() => {
-    if (configureBusy || updateCanvas.isPending) {
+    if (configureBusy || updateCanvas.isPending || savingRef.current) {
       return;
     }
-    renamingRef.current = true;
+    savingRef.current = true;
     void (async () => {
       try {
-        const renamed = await persistDraftTitleIfNeeded();
-        if (!renamed) {
+        let persistedName: string | null = null;
+        try {
+          persistedName = await persistDraftTitleIfNeeded();
+        } catch (error) {
+          if (error instanceof Error && error.message === "rename not allowed") {
+            return;
+          }
+          showErrorToast(getApiErrorMessage(error, "Failed to rename automation"));
           return;
         }
-        configureActionsRef.current?.save();
+
+        const actions = configureActionsRef.current;
+        const hasGraphChanges = Boolean(actions?.hasUncommittedChanges);
+        if (hasGraphChanges) {
+          // Pass the new name so canvas.yaml metadata matches the renamed record.
+          actions?.save({ canvasName: persistedName ?? undefined });
+          return;
+        }
+
+        // Title-only (or no-op) Save: skip stage/commit — empty staging fails commit.
+        onDoneRef.current();
       } finally {
-        renamingRef.current = false;
+        savingRef.current = false;
       }
     })();
   }, [configureActionsRef, configureBusy, persistDraftTitleIfNeeded, updateCanvas.isPending]);
@@ -92,7 +127,7 @@ export function useFactoryAppConfigureTitle(args: UseFactoryAppConfigureTitleArg
 
   return {
     title,
-    configureBusy: busy || updateCanvas.isPending,
+    configureBusy: configureBusy || updateCanvas.isPending,
     handleDraftTitleChange,
     handleConfigureSave,
     handleConfigureDiscard,

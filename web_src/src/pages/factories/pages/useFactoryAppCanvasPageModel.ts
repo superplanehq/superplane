@@ -49,24 +49,6 @@ export function useFactoryAppCanvasPageModel() {
   const isConfigure = isFactoryAppConfigureMode(searchParams);
   const lineName = useMemo(() => resolveFactoryLineName(factory?.lines, lineId), [factory?.lines, lineId]);
 
-  const {
-    title,
-    configureBusy: titleConfigureBusy,
-    handleDraftTitleChange,
-    handleConfigureSave,
-    handleConfigureDiscard,
-    clearDraftTitle,
-  } = useFactoryAppConfigureTitle({
-    organizationId,
-    factoryId,
-    appId,
-    isConfigure,
-    canRename,
-    savedName: canvas?.metadata?.name,
-    configureBusy,
-    configureActionsRef,
-  });
-
   // Reads the already-fetched work orders list (same query the sidebar's
   // "recent orders" section uses) rather than fetching this one order by id,
   // since all we need here is its title for the back-link label.
@@ -90,10 +72,33 @@ export function useFactoryAppCanvasPageModel() {
     [appId, canvas?.metadata?.name, factoryKey, from, lineId, lineName, order?.title, organizationId, orderNumber],
   );
 
+  const navigateDone = useCallback(() => {
+    navigate(back.href);
+  }, [back.href, navigate]);
+
+  const {
+    title,
+    configureBusy: titleConfigureBusy,
+    handleDraftTitleChange,
+    handleConfigureSave,
+    handleConfigureDiscard,
+    clearDraftTitle,
+  } = useFactoryAppConfigureTitle({
+    organizationId,
+    factoryId,
+    appId,
+    isConfigure,
+    canRename,
+    savedName: canvas?.metadata?.name,
+    configureBusy,
+    configureActionsRef,
+    onDone: navigateDone,
+  });
+
   const handleConfigureDone = useCallback(() => {
     clearDraftTitle();
-    navigate(back.href);
-  }, [back.href, clearDraftTitle, navigate]);
+    navigateDone();
+  }, [clearDraftTitle, navigateDone]);
 
   const handleConfigureBusyChange = useCallback((busy: boolean) => {
     setConfigureBusy(busy);
