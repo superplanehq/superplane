@@ -21,7 +21,7 @@ export function AutomationsPage() {
     return (
       <AutomationsLegacyRedirect
         organizationId={model.organizationId}
-        factoryId={model.factoryId}
+        factoryKey={model.factoryKey}
         factoryLoaded={Boolean(model.factory)}
         legacyLineId={model.legacyLineId}
       />
@@ -69,11 +69,13 @@ export function AutomationsPage() {
       >
         <AutomationsPageBody
           organizationId={model.organizationId}
-          factoryId={model.factoryId}
+          factoryKey={model.factoryKey}
           apps={model.apps}
           workOrders={model.workOrders}
           appsLoading={model.appsLoading}
           selectedApp={selectedApp}
+          selectedAppActions={model.selectedAppActions}
+          actionsForApp={model.actionsForApp}
           canCreate={model.canCreateApp || model.permissionsLoading}
           onCreate={() => model.setCreateOpen(true)}
         />

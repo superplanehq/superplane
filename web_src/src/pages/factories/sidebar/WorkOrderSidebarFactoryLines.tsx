@@ -16,7 +16,7 @@ import { SidebarSectionHeading } from "./SidebarPrimitives";
 
 interface WorkOrderSidebarFactoryLinesProps {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   canEditFactoryLines: boolean;
   executions: FactoriesWorkOrderExecution[];
   factoryLines: FactoriesFactoryLine[];
@@ -29,7 +29,7 @@ interface WorkOrderSidebarFactoryLinesProps {
 
 export function WorkOrderSidebarFactoryLines({
   organizationId,
-  factoryId,
+  factoryKey,
   canEditFactoryLines,
   executions,
   factoryLines,
@@ -55,7 +55,7 @@ export function WorkOrderSidebarFactoryLines({
               key={row.lineId}
               row={row}
               organizationId={organizationId}
-              factoryId={factoryId}
+              factoryKey={factoryKey}
               canEdit={canEditFactoryLines}
             />
           ))
@@ -96,15 +96,15 @@ export function WorkOrderSidebarFactoryLines({
 function FactoryLineRow({
   row,
   organizationId,
-  factoryId,
+  factoryKey,
   canEdit,
 }: {
   row: FactoryLineRowModel;
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   canEdit: boolean;
 }) {
-  const href = factoryLineDestinationPath({ lineId: row.lineId, organizationId, factoryId, canEdit });
+  const href = factoryLineDestinationPath({ lineId: row.lineId, organizationId, factoryKey, canEdit });
   const inner = (
     <>
       <Sparkles className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />

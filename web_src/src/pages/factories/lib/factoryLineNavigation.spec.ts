@@ -4,7 +4,7 @@ import { factoryLineDestinationPath } from "./factoryLineNavigation";
 
 const destination = {
   organizationId: "organization",
-  factoryId: "factory",
+  factoryKey: "factory",
   lineId: "line",
 };
 

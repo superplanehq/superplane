@@ -85,17 +85,33 @@ Guardrails:
 
 Every transition writes exactly one `order.status.updated` event (`fromState`, `toState`, `fromResult`, `toResult`) — the sole authoritative lifecycle event. When the transition is caused by a canvas run, the event also carries `automation` (line + step + node) and `run` + `app` refs so the timeline can attribute it back to the caller. On the first `draft → open`, the originating run/app snapshot from `SourceRunID` is included even when no automation is present.
 
-**Display status** in the UI derives both from `state` and from executions:
+**Display status** in the UI derives both from `state` and from executions.
+The workspace surfaces (Work Orders list, detail header, recent nav) share
+this vocabulary — six statuses that map to four board lanes:
 
-| Persisted state | Derived UI status | Notes |
-| --- | --- | --- |
-| `draft` | Draft | Being scoped. Dispatchable — the first dispatch promotes it to `open`. |
-| `open`, no active execution | Open | Idle between runs. |
-| `open`, active execution | Running | Line step in flight. |
-| `open`, last execution failed | Failed | Attention section. |
-| `closed`, `result=completed` | Completed | |
-| `closed`, `result=rejected` | Rejected | |
-| `closed`, `result=failed` | Failed (closed) | Same red styling as an in-flight failure. |
+| Persisted state | Derived UI status | Board lane | Notes |
+| --- | --- | --- | --- |
+| `draft` | Draft | Backlog | Being scoped. Dispatchable — the first dispatch promotes it to `open`. |
+| `open`, no active execution | Waiting | Review | Idle between runs. The row shows the last line and step separately from the pill. |
+| `open`, active execution | Running | Running | Line step in flight. |
+| `closed`, `result=completed` | Completed | Done | |
+| `closed`, `result=rejected` | Cancelled | Done | Abandoned before or during work. |
+| `closed`, `result=failed` | Failed | Done | Line execution did not pass. Same red styling as an in-flight failure. |
+
+The Work Orders page puts everything on one title-bar row: the page title
+and the scope pills (**All** / **Active** / **My**) on the left, and the
+Filter menu, collapsible search, Display menu, and **New** button on the
+right. Filter adds one or more Status, Line, or Owner conditions, each
+of which appears as a removable chip below the title bar. Display holds
+the layout (Board / List / Table) and the ordering (Updated / Status /
+Spend / ID).
+
+The page defaults to **Board**, **All**, and **Updated**, and persists the
+layout and ordering across sessions in `localStorage`. Scope, filters, and
+search are session-local. Three layouts render the same six statuses:
+Board groups by lane, List groups by lane with a dense row, Table shows
+Status, ID, Title, Line, Spend, Updated, and Owner columns. `F` opens
+the Filter menu and `/` opens the search field.
 
 ## Comments and artifacts
 
@@ -158,8 +174,8 @@ When the flag is on:
 
 - **Home** — Factories section alongside Apps; link to full list.
 - **`/factories`** — list and create factories.
-- **Factory detail** — work orders (owner pills: My Work / Unassigned / All; status pills: All / **Active (default: draft + open + running + failed)** / Draft / Open / Running / Failed / Completed / Rejected; the Failed pill also matches orders closed as failed; the "Work Orders" badge counts orders matching the default `Active` filter). Dispatch popover, factory apps sidebar, lines sidebar. The "failed" display status is derived from the **latest finished execution**: a passing retry supersedes an earlier failure, and failures older than `order.updatedAt` are treated as belonging to a previous attempt so reopening a closed order clears the failed pill until a new dispatch actually fails.
-- **Work order detail** — status-aware action bar (`Draft`: Dispatch / Reject; `Open`: Dispatch / Back to Draft / Complete / Reject; `Closed`: Reopen; the `Back to Draft` button hides while a step execution is in flight, per the FSM guard). Inline **comment composer**, activity timeline (comments, status transitions, artifacts, dispatches) with line-centric automation attribution, assignees panel, and a read-only **Artifacts** sidebar.
+- **Factory detail** — Work Orders page with **Board**, **List**, and **Table** layouts (see the Display status section above for the shared vocabulary and the title-bar behaviour). Inline owner picker and lifecycle-safe Dispatch button on every row. Dispatch popover, factory apps sidebar, lines sidebar. The workspace badge on the nav counts active (`draft` + `running` + `waiting`) work orders.
+- **Work order detail** — status-aware action bar (`Draft`: Dispatch / Reject; `Open`: Dispatch / Back to Draft / Complete / Reject; `Closed`: Reopen; the `Back to Draft` button hides while a step execution is in flight, per the FSM guard). Inline **comment composer**, activity timeline (comments, status transitions, artifacts, dispatches) with line-centric automation attribution, owners panel, and a read-only **Artifacts** sidebar.
 - **Factory app canvas** — header link back to factory.
 
 When the flag is off, factories are hidden. The legacy **Setup Factory** starter on `/apps/new` (template install) remains for orgs without the flag.

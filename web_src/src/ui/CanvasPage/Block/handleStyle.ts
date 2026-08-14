@@ -9,8 +9,11 @@ export const HANDLE_STYLE = {
   background: "transparent",
 } satisfies React.CSSProperties;
 
-/** Pull factory square ports outside the card (flush `0` sat on the border and disappeared). */
-export const FACTORY_HANDLE_OUTSET_PX = 12;
+/**
+ * Half the factory handle height/width so square ports sit half in / half out
+ * of the node edge (`bottom: -5` + height 10 → straddle border).
+ */
+export const FACTORY_HANDLE_OUTSET_PX = FACTORY_HANDLE_STYLE.height / 2;
 
 export function resolveHandleStyle(isFactoryApp: boolean): React.CSSProperties {
   return isFactoryApp ? FACTORY_HANDLE_STYLE : HANDLE_STYLE;

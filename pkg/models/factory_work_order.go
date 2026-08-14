@@ -61,6 +61,7 @@ type FactoryWorkOrder struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
 	FactoryID      uuid.UUID
+	Number         int64
 	Title          string
 	Description    string
 	State          string

@@ -6,6 +6,7 @@ import {
   defaultFactoriesFixture,
   FACTORIES_ORGANIZATION_ID,
   PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_APPS,
 } from "../__fixtures__/factoryPageResponses";
 import { FactoryAppCanvasPage } from "./FactoryAppCanvasPage";
@@ -53,7 +54,7 @@ export const FromAutomations: Story = {
   name: "From Automations",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/apps/${plannerApp.id}?from=automations`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${plannerApp.id}?from=automations`}
       factoriesFixture={defaultFactoriesFixture}
       appFixture={factoryOwnedCanvasFixture()}
     />
@@ -64,7 +65,7 @@ export const ConfigureEditMode: Story = {
   name: "Configure edit mode",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/apps/${plannerApp.id}?configure=1&from=automations`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${plannerApp.id}?configure=1&from=automations`}
       factoriesFixture={defaultFactoriesFixture}
       appFixture={factoryOwnedCanvasFixture()}
     />
@@ -75,7 +76,7 @@ export const WithRun: Story = {
   name: "With run query",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/apps/${plannerApp.id}?from=automations&run=${defaultCanvasAppFixture.publishedRunId ?? "run-1"}`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${plannerApp.id}?from=automations&run=${defaultCanvasAppFixture.publishedRunId ?? "run-1"}`}
       factoriesFixture={defaultFactoriesFixture}
       appFixture={factoryOwnedCanvasFixture()}
     />

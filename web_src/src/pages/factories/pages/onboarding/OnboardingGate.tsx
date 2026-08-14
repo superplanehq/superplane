@@ -1,5 +1,6 @@
-import { Navigate, Outlet, useLocation, useParams } from "react-router";
+import { Navigate, Outlet, useLocation } from "react-router";
 
+import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { factoryOnboardingPath } from "../../lib/factoryPagePaths";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
@@ -10,7 +11,7 @@ import { useOnboardingStorybook } from "./useOnboardingStorybook";
 export function OnboardingGate() {
   const onboarding = useOnboardingStorybook();
   const location = useLocation();
-  const { organizationId = "", factoryId = "" } = useParams<{ organizationId: string; factoryId: string }>();
+  const { organizationId, factoryId, factoryKey } = useFactoriesLayout();
 
   const pending = onboarding?.pending;
   if (!pending || pending.workspaceId !== factoryId) {
@@ -21,5 +22,5 @@ export function OnboardingGate() {
     return <Outlet />;
   }
 
-  return <Navigate to={factoryOnboardingPath(organizationId, pending.workspaceId)} replace />;
+  return <Navigate to={factoryOnboardingPath(organizationId, factoryKey)} replace />;
 }
