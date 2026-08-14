@@ -36,6 +36,7 @@ import {
 } from "@/pages/factories";
 import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
 import { createFactoryLinePath, editFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
+import { MissionDetailPage } from "@/pages/factories/pages/missionsPrototype/MissionDetailPage";
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
 import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
 import { HomePage } from "@/pages/home";
@@ -77,6 +78,8 @@ export interface OrgWorkspacePageOverrides {
   overview?: ComponentType;
   /** When set, mounts `/onboarding` and gates other factory pages while pending. */
   onboarding?: ComponentType;
+  /** Storybook-only Work Orders page (prototypes). Live app ignores this. */
+  workOrders?: ComponentType;
 }
 
 export interface OrgWorkspaceHarnessProps {
@@ -192,6 +195,7 @@ function OptionalOnboardingGate({ enabled }: { enabled: boolean }) {
 function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePageOverrides }) {
   const WikiRoutePage = pageOverrides?.wiki ?? WikiPage;
   const OverviewRoutePage = pageOverrides?.overview ?? OverviewPage;
+  const WorkOrdersRoutePage = pageOverrides?.workOrders ?? WorkOrdersPage;
   const OnboardingRoutePage = pageOverrides?.onboarding;
   const onboardingEnabled = Boolean(OnboardingRoutePage);
 
@@ -216,10 +220,11 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
               {OnboardingRoutePage ? <Route path="onboarding" element={<OnboardingRoutePage />} /> : null}
               <Route path="overview" element={<OverviewRoutePage />} />
               <Route path="missions" element={<MissionsPage />} />
+              <Route path="missions/:missionId" element={<MissionDetailPage />} />
               <Route path="wiki" element={<WikiRoutePage />} />
               <Route path="velocity" element={<VelocityPage />} />
               <Route path="work-orders">
-                <Route index element={<WorkOrdersPage />} />
+                <Route index element={<WorkOrdersRoutePage />} />
                 <Route path="new" element={<CreateWorkOrderPage />} />
                 <Route path=":orderId" element={<LegacyWorkOrderDetailRedirect />} />
               </Route>
