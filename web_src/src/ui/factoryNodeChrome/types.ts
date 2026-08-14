@@ -8,6 +8,7 @@ export type FactoryNodeStatus =
   | "failed"
   | "running"
   | "pending"
+  | "did_not_run"
   | "queued"
   | "cancelled"
   | "cancelling"

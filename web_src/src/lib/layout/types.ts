@@ -12,6 +12,6 @@ export type LayoutEngineApplyOptions = {
 };
 
 export interface LayoutEngine {
-  estimateNodeSize(node: SuperplaneComponentsNode): { width: number; height: number };
+  estimateNodeSize(node: SuperplaneComponentsNode, direction?: CanvasFlowDirection): { width: number; height: number };
   apply(workflow: CanvasesCanvas, options?: LayoutEngineApplyOptions): Promise<CanvasesCanvas>;
 }
