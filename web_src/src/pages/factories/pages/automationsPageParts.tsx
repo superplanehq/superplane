@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
+import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import {
@@ -42,6 +43,7 @@ export function AutomationDetail({
   actions: AutomationCardActions;
 }) {
   const canvasId = app.id ?? "";
+  useCanvasWebsocket(canvasId, organizationId);
   const {
     data: runsPages,
     isLoading: runsLoading,

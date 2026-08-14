@@ -38,6 +38,10 @@ vi.mock("@/hooks/useCanvasData", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useCanvasWebsocket", () => ({
+  useCanvasWebsocket: vi.fn(),
+}));
+
 vi.mock("./LineVelocityPanel", () => ({
   LineVelocityPanel: () => <div data-testid="line-velocity-panel">Velocity</div>,
 }));

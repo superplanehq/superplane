@@ -4,7 +4,9 @@ import (
 	"context"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
@@ -39,6 +41,10 @@ func CreateFactoryLine(ctx context.Context, organizationID string, req *pb.Creat
 	line, err := factory.CreateLine(db, name, steps)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory line")
+	}
+
+	if publishErr := messages.PublishFactoryUpdated(factory.ID.String(), "line.created"); publishErr != nil {
+		log.Errorf("failed to publish factory updated RabbitMQ message: %v", publishErr)
 	}
 
 	return &pb.CreateFactoryLineResponse{

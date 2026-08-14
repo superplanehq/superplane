@@ -94,6 +94,32 @@ describe("useFactoryWebsocket", () => {
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
 
+  it("invalidates apps on factory_app_updated", () => {
+    const { invalidateSpy } = renderFactoryWebsocket();
+    invalidateSpy.mockClear();
+    emit({
+      event: "factory_app_updated",
+      payload: { factoryId: "factory-1", appId: "app-1", reason: "app.created" },
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.apps("org-1", "factory-1"),
+    });
+  });
+
+  it("invalidates factory detail on factory_updated", () => {
+    const { invalidateSpy } = renderFactoryWebsocket();
+    invalidateSpy.mockClear();
+    emit({
+      event: "factory_updated",
+      payload: { factoryId: "factory-1", reason: "line.updated" },
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.detail("org-1", "factory-1"),
+    });
+  });
+
   it("skips invalidation on the first open and invalidates on reconnect", () => {
     const { invalidateSpy } = renderFactoryWebsocket();
     invalidateSpy.mockClear();
@@ -110,6 +136,12 @@ describe("useFactoryWebsocket", () => {
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: factoryQueryKeys.workOrders("org-1", "factory-1"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.apps("org-1", "factory-1"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.detail("org-1", "factory-1"),
     });
   });
 });

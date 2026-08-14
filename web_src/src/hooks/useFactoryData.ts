@@ -102,6 +102,8 @@ export function useFactory(organizationId: string, factoryId: string) {
       return response.data.factory;
     },
     enabled: Boolean(organizationId && factoryId),
+    // Live via websocket; remount must refetch instead of serving 5m global stale cache.
+    staleTime: 0,
   });
 }
 
@@ -461,6 +463,8 @@ export function useFactoryApps(organizationId: string, factoryId: string) {
       return response.data?.apps ?? [];
     },
     enabled: Boolean(organizationId && factoryId),
+    // Live via websocket; remount must refetch instead of serving 5m global stale cache.
+    staleTime: 0,
   });
 }
 

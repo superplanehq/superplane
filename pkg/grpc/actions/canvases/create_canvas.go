@@ -218,6 +218,11 @@ func CreateCanvasWithSeedFiles(
 	if publishErr := messages.NewCanvasCreatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishCreated(); publishErr != nil {
 		log.Errorf("failed to publish canvas created RabbitMQ message: %v", publishErr)
 	}
+	if canvas.FactoryID != nil {
+		if publishErr := messages.PublishFactoryAppUpdated(canvas.FactoryID.String(), canvas.ID.String(), "app.created"); publishErr != nil {
+			log.Errorf("failed to publish factory app updated RabbitMQ message: %v", publishErr)
+		}
+	}
 
 	var user *models.User
 	if canvas.CreatedBy != nil {
