@@ -1,13 +1,22 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, type Mock } from "vitest";
 
 import {
   consoleYamlHasContent,
   duplicateAutomationCanvas,
   rematerializeDuplicateConsoleYaml,
   rewriteSelfCanvasRefs,
+  type DuplicateAutomationCanvasDeps,
 } from "./duplicateAutomationCanvas";
 
-function baseDeps(overrides: Partial<Parameters<typeof duplicateAutomationCanvas>[0]> = {}) {
+type TestDuplicateDeps = DuplicateAutomationCanvasDeps & {
+  createCanvas: Mock;
+  describeCanvas?: Mock;
+  fetchConsoleYaml: Mock;
+  putCanvasStaging: Mock;
+  commitCanvasStaging: Mock;
+};
+
+function baseDeps(overrides: Partial<TestDuplicateDeps> = {}): TestDuplicateDeps {
   return {
     factoryId: "factory-1",
     app: { id: "canvas-source", name: "Refund Planner", description: "Plans refunds" },
