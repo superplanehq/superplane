@@ -186,7 +186,7 @@ func (c *GetMetricData) Configuration() []configuration.Field {
 			Name:     "rdsMetric",
 			Label:    "RDS Metric",
 			Type:     configuration.FieldTypeSelect,
-			Required: true,
+			Required: false,
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "service", Values: []string{metricDataServiceRDS}},
 			},
@@ -203,7 +203,7 @@ func (c *GetMetricData) Configuration() []configuration.Field {
 			Name:     "sqsMetric",
 			Label:    "SQS Metric",
 			Type:     configuration.FieldTypeSelect,
-			Required: true,
+			Required: false,
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "service", Values: []string{metricDataServiceSQS}},
 			},
@@ -220,7 +220,7 @@ func (c *GetMetricData) Configuration() []configuration.Field {
 			Name:        "dimensionsEcs",
 			Label:       "ECS Service",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
+			Required:    false,
 			Description: "ECS cluster/service to fetch CPU utilization for",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "service", Values: []string{metricDataServiceECS}},
@@ -243,7 +243,7 @@ func (c *GetMetricData) Configuration() []configuration.Field {
 			Name:        "dimensionsAlb",
 			Label:       "Load Balancer",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
+			Required:    false,
 			Description: "Application Load Balancer to fetch request count for",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "service", Values: []string{metricDataServiceALB}},
@@ -266,7 +266,7 @@ func (c *GetMetricData) Configuration() []configuration.Field {
 			Name:        "dimensionsRds",
 			Label:       "RDS Instance",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
+			Required:    false,
 			Description: "RDS instance to fetch the metric for",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "service", Values: []string{metricDataServiceRDS}},
@@ -290,7 +290,7 @@ func (c *GetMetricData) Configuration() []configuration.Field {
 			Name:        "dimensionsSqs",
 			Label:       "SQS Queue",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
+			Required:    false,
 			Description: "SQS queue to fetch the metric for",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "service", Values: []string{metricDataServiceSQS}},
