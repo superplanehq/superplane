@@ -24,7 +24,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="CloudWatch • Add Log Event" href="#cloud-watch-•-add-log-event" description="Write a log event to a CloudWatch Logs log stream" />
   <LinkCard title="CloudWatch • Create Alarm" href="#cloud-watch-•-create-alarm" description="Create a CloudWatch metric alarm for any metric" />
+  <LinkCard title="CloudWatch • Get Metric Data" href="#cloud-watch-•-get-metric-data" description="Fetch ECS, ALB, RDS, or SQS metrics from CloudWatch over a lookback window" />
   <LinkCard title="CloudWatch • Query Logs" href="#cloud-watch-•-query-logs" description="Run a CloudWatch Logs Insights query over one or more log groups and return structured rows" />
+  <LinkCard title="CloudWatch • Send Metric Data" href="#cloud-watch-•-send-metric-data" description="Publish a custom metric data point to CloudWatch from a workflow" />
   <LinkCard title="CloudWatch • Update Alarm" href="#cloud-watch-•-update-alarm" description="Update an existing CloudWatch metric alarm" />
   <LinkCard title="CodeArtifact • Copy Package Versions" href="#code-artifact-•-copy-package-versions" description="Copy package versions from one repository to another in the same domain" />
   <LinkCard title="CodeArtifact • Create Repository" href="#code-artifact-•-create-repository" description="Create an AWS CodeArtifact repository in a domain" />
@@ -716,6 +718,79 @@ Emits the created alarm on the default output channel, including `alarmName`, `a
 }
 ```
 
+<a id="cloud-watch-•-get-metric-data"></a>
+
+## CloudWatch • Get Metric Data
+
+**Component key:** `aws.cloudwatch.getMetricData`
+
+The Get Metric Data component retrieves a CloudWatch metric for an ECS service, an Application Load Balancer, an RDS instance, or an SQS queue over a configurable lookback window, the same way `aws.ec2.getInstanceMetrics` does for EC2 instances.
+
+### Use Cases
+
+- **Performance monitoring**: Sample ECS CPU or ALB request volume before scaling decisions
+- **Incident investigation**: Pull recent RDS or SQS metrics when responding to an alert
+- **Capacity planning**: Gather trend data to inform right-sizing
+
+### Configuration
+
+- **Region**: AWS region the resource runs in
+- **Service**: Which CloudWatch namespace to query — ECS Service CPU, ALB Request Count, RDS, or SQS
+- **RDS Metric** / **SQS Metric**: Shown only for the RDS/SQS services; picks the specific metric to fetch
+- **ECS Service / Load Balancer / RDS Instance / SQS Queue**: Dimension set to scope the metric to, discovered from what CloudWatch has actually recorded
+- **Lookback Period**: How far back to retrieve metrics — 1h, 6h, 24h, 7d, or 14d
+
+### Output
+
+- `service`, `namespace`, `metricName`, `statistic`, `region`, `lookbackPeriod`, `start`, `end`
+- `datapoints`: array of `{timestamp, value}` objects, one per period in the window
+- `aggregatedValue`: the average (for Average-statistic metrics) or total (for Sum-statistic metrics) across the window; `null` when CloudWatch returns no datapoints
+
+### Important Notes
+
+- Dimensions are discovered from metrics CloudWatch has already recorded; a resource with no recent activity will have no dimensions to pick from
+- All metric values are rounded to two decimal places
+
+### Example Output
+
+```json
+{
+  "data": {
+    "aggregatedValue": 42.17,
+    "datapoints": [
+      {
+        "timestamp": "2026-05-29T08:05:00Z",
+        "value": 38.42
+      },
+      {
+        "timestamp": "2026-05-29T08:10:00Z",
+        "value": 45.91
+      }
+    ],
+    "dimensions": [
+      {
+        "name": "ClusterName",
+        "value": "prod-cluster"
+      },
+      {
+        "name": "ServiceName",
+        "value": "checkout-api"
+      }
+    ],
+    "end": "2026-05-29T09:00:00Z",
+    "lookbackPeriod": "1h",
+    "metricName": "CPUUtilization",
+    "namespace": "AWS/ECS",
+    "region": "us-east-1",
+    "service": "ecs",
+    "start": "2026-05-29T08:00:00Z",
+    "statistic": "Average"
+  },
+  "timestamp": "2026-05-29T09:00:00.657831534Z",
+  "type": "aws.cloudwatch.metricData"
+}
+```
+
 <a id="cloud-watch-•-query-logs"></a>
 
 ## CloudWatch • Query Logs
@@ -786,6 +861,56 @@ The Query Logs component runs a CloudWatch Logs Insights query over one or more 
   },
   "timestamp": "2026-05-29T09:00:01.123456Z",
   "type": "aws.cloudwatch.queryResult"
+}
+```
+
+<a id="cloud-watch-•-send-metric-data"></a>
+
+## CloudWatch • Send Metric Data
+
+**Component key:** `aws.cloudwatch.sendMetricData`
+
+The Send Metric Data component publishes a single custom metric value to CloudWatch, creating the metric if it doesn't already exist.
+
+### Use Cases
+
+- **Workflow instrumentation**: Track business metrics (orders processed, jobs queued) alongside infrastructure metrics
+- **Custom alarming**: Publish a metric, then alarm on it with the Create Alarm component
+- **Cross-system correlation**: Emit values from external systems into CloudWatch for a unified view
+
+### Configuration
+
+- **Region**: AWS region to publish the metric to
+- **Namespace**: Custom namespace for the metric. Must not start with `AWS/`, which is reserved for AWS services
+- **Metric Name**: Name of the metric
+- **Value**: The value to publish
+- **Unit** *(toggleable)*: Metric unit. Defaults to None
+- **Dimensions** *(toggleable)*: Name/value pairs that further identify the metric
+- **Timestamp** *(toggleable)*: When the value occurred; defaults to now. Must be within the last 2 weeks and no more than 2 hours in the future
+
+### Output
+
+- `namespace`, `metricName`, `value`, `unit`, `dimensions`, `timestamp`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "dimensions": [
+      {
+        "name": "Environment",
+        "value": "production"
+      }
+    ],
+    "metricName": "OrdersProcessed",
+    "namespace": "MyApp/Orders",
+    "timestamp": "2026-05-29T09:00:00Z",
+    "unit": "Count",
+    "value": 42
+  },
+  "timestamp": "2026-05-29T09:00:00.657831534Z",
+  "type": "aws.cloudwatch.metricSent"
 }
 ```
 

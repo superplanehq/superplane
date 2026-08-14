@@ -506,6 +506,91 @@ func parseError(body []byte) *common.Error {
 	return &common.Error{Code: code, Message: message}
 }
 
+// GetMetricStatisticsInput describes a single-metric CloudWatch query.
+type GetMetricStatisticsInput struct {
+	Namespace  string
+	MetricName string
+	Dimensions []Dimension
+	StartTime  time.Time
+	EndTime    time.Time
+	Period     int
+	Statistic  string
+}
+
+// MetricDatapoint is one point returned by GetMetricStatistics.
+type MetricDatapoint struct {
+	Timestamp string
+	Average   float64
+	Sum       float64
+}
+
+func (c *Client) GetMetricStatistics(input GetMetricStatisticsInput) ([]MetricDatapoint, error) {
+	params := url.Values{}
+	params.Set("Namespace", input.Namespace)
+	params.Set("MetricName", input.MetricName)
+	for index, dimension := range input.Dimensions {
+		params.Set(fmt.Sprintf("Dimensions.member.%d.Name", index+1), dimension.Name)
+		params.Set(fmt.Sprintf("Dimensions.member.%d.Value", index+1), dimension.Value)
+	}
+	params.Set("StartTime", input.StartTime.UTC().Format(time.RFC3339))
+	params.Set("EndTime", input.EndTime.UTC().Format(time.RFC3339))
+	params.Set("Period", strconv.Itoa(input.Period))
+	params.Set("Statistics.member.1", input.Statistic)
+
+	response := getMetricStatisticsResponse{}
+	if err := c.postSignedForm("GetMetricStatistics", params, &response); err != nil {
+		return nil, err
+	}
+
+	points := make([]MetricDatapoint, 0, len(response.Datapoints))
+	for _, dp := range response.Datapoints {
+		points = append(points, MetricDatapoint{Timestamp: dp.Timestamp, Average: dp.Average, Sum: dp.Sum})
+	}
+
+	return points, nil
+}
+
+type getMetricStatisticsResponse struct {
+	Datapoints []xmlMetricDatapoint `xml:"GetMetricStatisticsResult>Datapoints>member"`
+}
+
+type xmlMetricDatapoint struct {
+	Timestamp string  `xml:"Timestamp"`
+	Average   float64 `xml:"Average"`
+	Sum       float64 `xml:"Sum"`
+}
+
+// MetricDatum is a single data point published through PutMetricData.
+type MetricDatum struct {
+	MetricName string
+	Value      float64
+	Unit       string
+	Timestamp  time.Time
+	Dimensions []Dimension
+}
+
+func (c *Client) PutMetricData(namespace string, datum MetricDatum) error {
+	params := url.Values{}
+	params.Set("Namespace", namespace)
+	params.Set("MetricData.member.1.MetricName", datum.MetricName)
+	params.Set("MetricData.member.1.Value", strconv.FormatFloat(datum.Value, 'f', -1, 64))
+
+	if unit := strings.TrimSpace(datum.Unit); unit != "" {
+		params.Set("MetricData.member.1.Unit", unit)
+	}
+
+	if !datum.Timestamp.IsZero() {
+		params.Set("MetricData.member.1.Timestamp", datum.Timestamp.UTC().Format(time.RFC3339))
+	}
+
+	for index, dimension := range datum.Dimensions {
+		params.Set(fmt.Sprintf("MetricData.member.1.Dimensions.member.%d.Name", index+1), dimension.Name)
+		params.Set(fmt.Sprintf("MetricData.member.1.Dimensions.member.%d.Value", index+1), dimension.Value)
+	}
+
+	return c.postSignedForm("PutMetricData", params, nil)
+}
+
 func (c *Client) postSignedForm(action string, params url.Values, out any) error {
 	if params == nil {
 		params = url.Values{}

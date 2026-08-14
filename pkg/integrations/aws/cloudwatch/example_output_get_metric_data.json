@@ -1,0 +1,23 @@
+{
+  "data": {
+    "aggregatedValue": 42.17,
+    "datapoints": [
+      { "timestamp": "2026-05-29T08:05:00Z", "value": 38.42 },
+      { "timestamp": "2026-05-29T08:10:00Z", "value": 45.91 }
+    ],
+    "dimensions": [
+      { "name": "ClusterName", "value": "prod-cluster" },
+      { "name": "ServiceName", "value": "checkout-api" }
+    ],
+    "end": "2026-05-29T09:00:00Z",
+    "lookbackPeriod": "1h",
+    "metricName": "CPUUtilization",
+    "namespace": "AWS/ECS",
+    "region": "us-east-1",
+    "service": "ecs",
+    "start": "2026-05-29T08:00:00Z",
+    "statistic": "Average"
+  },
+  "timestamp": "2026-05-29T09:00:00.657831534Z",
+  "type": "aws.cloudwatch.metricData"
+}

@@ -241,27 +241,5 @@ func validateAddLogEventConfiguration(config AddLogEventConfiguration) (time.Tim
 		return time.Now().UTC(), nil
 	}
 
-	return parseLogEventTimestamp(timestampStr)
-}
-
-// datetimeLocalLayouts covers the value shape produced by the "datetime" field's
-// HTML datetime-local input ("2006-01-02T15:04", with seconds if the user's
-// browser includes them), which carries no timezone and is treated as UTC.
-var datetimeLocalLayouts = []string{
-	"2006-01-02T15:04:05",
-	"2006-01-02T15:04",
-}
-
-func parseLogEventTimestamp(raw string) (time.Time, error) {
-	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
-		return parsed.UTC(), nil
-	}
-
-	for _, layout := range datetimeLocalLayouts {
-		if parsed, err := time.Parse(layout, raw); err == nil {
-			return parsed.UTC(), nil
-		}
-	}
-
-	return time.Time{}, fmt.Errorf("invalid timestamp %q: expected RFC3339 or YYYY-MM-DDTHH:MM", raw)
+	return parseTimestamp(timestampStr)
 }

@@ -56,3 +56,23 @@ var exampleOutputAddLogEvent map[string]any
 func (c *AddLogEvent) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddLogEventOnce, exampleOutputAddLogEventBytes, &exampleOutputAddLogEvent)
 }
+
+//go:embed example_output_get_metric_data.json
+var exampleOutputGetMetricDataBytes []byte
+
+var exampleOutputGetMetricDataOnce sync.Once
+var exampleOutputGetMetricData map[string]any
+
+func (c *GetMetricData) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetMetricDataOnce, exampleOutputGetMetricDataBytes, &exampleOutputGetMetricData)
+}
+
+//go:embed example_output_send_metric_data.json
+var exampleOutputSendMetricDataBytes []byte
+
+var exampleOutputSendMetricDataOnce sync.Once
+var exampleOutputSendMetricData map[string]any
+
+func (c *SendMetricData) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputSendMetricDataOnce, exampleOutputSendMetricDataBytes, &exampleOutputSendMetricData)
+}

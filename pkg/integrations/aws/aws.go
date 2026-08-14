@@ -141,6 +141,8 @@ func (a *AWS) Actions() []core.Action {
 		&cloudwatch.UpdateAlarm{},
 		&cloudwatch.QueryLogs{},
 		&cloudwatch.AddLogEvent{},
+		&cloudwatch.GetMetricData{},
+		&cloudwatch.SendMetricData{},
 		&codeartifact.CopyPackageVersions{},
 		&codeartifact.CreateRepository{},
 		&codeartifact.DeletePackageVersions{},
