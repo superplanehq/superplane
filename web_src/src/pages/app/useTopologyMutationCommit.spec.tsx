@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { CanvasesCanvas, SuperplaneComponentsNode } from "@/api-client";
 import { DefaultLayoutEngine } from "@/lib/layout";
+import { generateUniqueNodeName } from "./utils";
 import { appendWorkflowFragment, useTopologyMutationCommit } from "./useTopologyMutationCommit";
 
 function workflowWith(nodes: SuperplaneComponentsNode[] = []): CanvasesCanvas {
@@ -35,14 +36,31 @@ describe("useTopologyMutationCommit", () => {
         readOnly: false,
       }),
     );
-    const firstNode: SuperplaneComponentsNode = { id: "first", type: "TYPE_ACTION", component: "filter" };
-    const secondNode: SuperplaneComponentsNode = { id: "second", type: "TYPE_ACTION", component: "filter" };
+    const addNamedNode = (id: string) => (workflow: CanvasesCanvas) => {
+      const names = (workflow.spec?.nodes || []).map((node) => node.name || "").filter(Boolean);
+      const node: SuperplaneComponentsNode = {
+        id,
+        name: generateUniqueNodeName("filter", names),
+        type: "TYPE_ACTION",
+        component: "filter",
+      };
+      return {
+        workflow: appendWorkflowFragment(workflow, [node]),
+        options: { addedNodeId: id },
+      };
+    };
+    const firstNode: SuperplaneComponentsNode = {
+      id: "first",
+      name: "filter",
+      type: "TYPE_ACTION",
+      component: "filter",
+    };
 
     let firstCommit: Promise<CanvasesCanvas | null>;
     let secondCommit: Promise<CanvasesCanvas | null>;
     act(() => {
-      firstCommit = result.current((workflow) => appendWorkflowFragment(workflow, [firstNode]));
-      secondCommit = result.current((workflow) => appendWorkflowFragment(workflow, [secondNode]));
+      firstCommit = result.current(addNamedNode("first"));
+      secondCommit = result.current(addNamedNode("second"));
     });
 
     await act(async () => Promise.resolve());
@@ -53,6 +71,7 @@ describe("useTopologyMutationCommit", () => {
     });
 
     expect(currentWorkflow.spec?.nodes?.map((node) => node.id)).toEqual(["first", "second"]);
+    expect(currentWorkflow.spec?.nodes?.map((node) => node.name)).toEqual(["filter", "filter 2"]);
     expect(saveWorkflow).toHaveBeenCalledTimes(2);
     layoutSpy.mockRestore();
   });

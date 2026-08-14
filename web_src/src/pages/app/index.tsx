@@ -2505,73 +2505,67 @@ export function AppPage({
     async (newNodeData: NewNodeData): Promise<string> => {
       if (!canvas || !organizationId || !canvasId) return "";
 
-      const latestWorkflow = getCurrentWorkflowSnapshot();
-      if (!latestWorkflow) return "";
-
-      // Save snapshot before making changes
-
       const { buildingBlock, configuration, position, sourceConnection, integrationRef } = newNodeData;
 
       // Filter configuration to only include visible fields
       const filteredConfiguration = filterVisibleConfiguration(configuration, buildingBlock.configuration || []);
-
-      // Get existing node names for unique name generation
-      const existingNodeNames = (latestWorkflow.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
-
-      // Generate unique node name based on component name + ordinal
       const nameBase = newNodeData.nodeName || buildingBlock.name || "node";
-      const uniqueNodeName = generateUniqueNodeName(nameBase, existingNodeNames);
+      let newNodeId = "";
 
-      // Generate a unique node ID
-      const newNodeId = generateNodeId(buildingBlock.name || "node", uniqueNodeName);
+      await commitTopologyMutation((workflow) => {
+        const existingNodeNames = (workflow.spec?.nodes || []).map((node) => node.name || "").filter(Boolean);
+        const uniqueNodeName = generateUniqueNodeName(nameBase, existingNodeNames);
+        newNodeId = generateNodeId(buildingBlock.name || "node", uniqueNodeName);
 
-      // Create the new node
-      const newNode: ComponentsNode = {
-        id: newNodeId,
-        name: uniqueNodeName,
-        type:
-          buildingBlock.type === "trigger"
-            ? "TYPE_TRIGGER"
-            : buildingBlock.name === "annotation"
-              ? "TYPE_WIDGET"
-              : "TYPE_ACTION",
-        configuration: filteredConfiguration,
-        integration: integrationRef,
-        position: position
-          ? {
-              x: Math.round(position.x),
-              y: Math.round(position.y),
-            }
-          : {
-              x: (latestWorkflow?.spec?.nodes?.length || 0) * 250,
-              y: 100,
-            },
-      };
+        const newNode: ComponentsNode = {
+          id: newNodeId,
+          name: uniqueNodeName,
+          type:
+            buildingBlock.type === "trigger"
+              ? "TYPE_TRIGGER"
+              : buildingBlock.name === "annotation"
+                ? "TYPE_WIDGET"
+                : "TYPE_ACTION",
+          configuration: filteredConfiguration,
+          integration: integrationRef,
+          position: position
+            ? {
+                x: Math.round(position.x),
+                y: Math.round(position.y),
+              }
+            : {
+                x: (workflow.spec?.nodes?.length || 0) * 250,
+                y: 100,
+              },
+        };
 
-      // Add type-specific component reference
-      if (buildingBlock.name === "annotation") {
-        // Annotation nodes are now widgets
-        newNode.component = "annotation";
-        newNode.configuration = { text: "", color: "yellow" };
-      } else if (buildingBlock.type === "component") {
-        newNode.component = buildingBlock.name;
-      } else if (buildingBlock.type === "trigger") {
-        newNode.component = buildingBlock.name;
-      }
+        if (buildingBlock.name === "annotation") {
+          newNode.component = "annotation";
+          newNode.configuration = { text: "", color: "yellow" };
+        } else if (buildingBlock.type === "component" || buildingBlock.type === "trigger") {
+          newNode.component = buildingBlock.name;
+        }
 
-      // Track node addition
-      const { nodeType, integration, nodeRef } = getNodeAnalyticsProps(newNode, availableIntegrations);
-      analytics.nodeAdd(nodeType, integration, nodeRef, organizationId);
+        const { nodeType, integration, nodeRef } = getNodeAnalyticsProps(newNode, availableIntegrations);
+        analytics.nodeAdd(nodeType, integration, nodeRef, organizationId);
 
-      const newEdges: ComponentsEdge[] = sourceConnection
-        ? [{ sourceId: sourceConnection.nodeId, targetId: newNodeId, channel: sourceConnection.handleId || "default" }]
-        : [];
-      await commitTopologyMutation((workflow) => appendWorkflowFragment(workflow, [newNode], newEdges), {
-        addedNodeId: newNodeId,
+        const newEdges: ComponentsEdge[] = sourceConnection
+          ? [
+              {
+                sourceId: sourceConnection.nodeId,
+                targetId: newNodeId,
+                channel: sourceConnection.handleId || "default",
+              },
+            ]
+          : [];
+        return {
+          workflow: appendWorkflowFragment(workflow, [newNode], newEdges),
+          options: { addedNodeId: newNodeId },
+        };
       });
       return newNodeId;
     },
-    [canvas, organizationId, canvasId, getCurrentWorkflowSnapshot, availableIntegrations, commitTopologyMutation],
+    [canvas, organizationId, canvasId, availableIntegrations, commitTopologyMutation],
   );
 
   const handlePlaceholderAdd = useCallback(
@@ -2758,14 +2752,14 @@ export function AppPage({
     async (nodeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
 
-      const specNodes = canvas.spec?.nodes || [];
-      const { newNodes, nodeIdMap } = buildDuplicatedNodes(specNodes, nodeIds);
-      if (newNodes.length === 0) return;
+      await commitTopologyMutation((workflow) => {
+        const { newNodes, nodeIdMap } = buildDuplicatedNodes(workflow.spec?.nodes || [], nodeIds);
+        if (newNodes.length === 0) return workflow;
 
-      const duplicatedNodeIds = new Set(nodeIds);
-      const newEdges = buildDuplicatedEdges(canvas.spec?.edges || [], duplicatedNodeIds, nodeIdMap);
-
-      await commitTopologyMutation((workflow) => appendWorkflowFragment(workflow, newNodes, newEdges));
+        const duplicatedNodeIds = new Set(nodeIds);
+        const newEdges = buildDuplicatedEdges(workflow.spec?.edges || [], duplicatedNodeIds, nodeIdMap);
+        return appendWorkflowFragment(workflow, newNodes, newEdges);
+      });
     },
     [canvas, organizationId, canvasId, commitTopologyMutation],
   );
@@ -2904,44 +2898,37 @@ export function AppPage({
     async (nodeId: string) => {
       if (!canvas || !organizationId || !canvasId) return;
 
-      const nodeToDuplicate = canvas.spec?.nodes?.find((node) => node.id === nodeId);
-      if (!nodeToDuplicate) return;
+      await commitTopologyMutation((workflow) => {
+        const nodeToDuplicate = workflow.spec?.nodes?.find((node) => node.id === nodeId);
+        if (!nodeToDuplicate) return workflow;
 
-      const existingNodeNames = (canvas.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
-
-      let baseName = nodeToDuplicate.name?.trim() || "";
-      if (!baseName) {
-        if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.component) {
-          baseName = nodeToDuplicate.component;
-        } else if (nodeToDuplicate.type === "TYPE_ACTION" && nodeToDuplicate.component) {
-          baseName = nodeToDuplicate.component;
-        } else {
-          baseName = "node";
+        const existingNodeNames = (workflow.spec?.nodes || []).map((node) => node.name || "").filter(Boolean);
+        let baseName = nodeToDuplicate.name?.trim() || "";
+        if (!baseName) {
+          baseName =
+            (nodeToDuplicate.type === "TYPE_TRIGGER" || nodeToDuplicate.type === "TYPE_ACTION") &&
+            nodeToDuplicate.component
+              ? nodeToDuplicate.component
+              : "node";
         }
-      }
 
-      // Generate unique node name based on the existing node name + ordinal
-      const uniqueNodeName = generateUniqueNodeName(baseName, existingNodeNames);
+        const uniqueNodeName = generateUniqueNodeName(baseName, existingNodeNames);
+        const newNodeId = generateNodeId(baseName, uniqueNodeName);
+        const duplicateNode: ComponentsNode = {
+          ...nodeToDuplicate,
+          id: newNodeId,
+          name: uniqueNodeName,
+          position: {
+            x: (nodeToDuplicate.position?.x || 0) + 50,
+            y: (nodeToDuplicate.position?.y || 0) + 50,
+          },
+          isCollapsed: false,
+        };
 
-      const newNodeId = generateNodeId(baseName, uniqueNodeName);
-
-      const offsetX = 50;
-      const offsetY = 50;
-
-      const duplicateNode: ComponentsNode = {
-        ...nodeToDuplicate,
-        id: newNodeId,
-        name: uniqueNodeName,
-        position: {
-          x: (nodeToDuplicate.position?.x || 0) + offsetX,
-          y: (nodeToDuplicate.position?.y || 0) + offsetY,
-        },
-        // Reset collapsed state for the duplicate
-        isCollapsed: false,
-      };
-
-      await commitTopologyMutation((workflow) => appendWorkflowFragment(workflow, [duplicateNode]), {
-        addedNodeId: newNodeId,
+        return {
+          workflow: appendWorkflowFragment(workflow, [duplicateNode]),
+          options: { addedNodeId: newNodeId },
+        };
       });
     },
     [canvas, organizationId, canvasId, commitTopologyMutation],

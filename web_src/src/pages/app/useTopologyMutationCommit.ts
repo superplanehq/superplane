@@ -4,7 +4,16 @@ import { DefaultLayoutEngine } from "@/lib/layout";
 import { useCallback, useRef, type MutableRefObject } from "react";
 
 type CommitOptions = { addedNodeId?: string };
+type TopologyMutationResult = {
+  workflow: CanvasesCanvas;
+  options?: CommitOptions;
+};
 type EdgeIdentity = Pick<ComponentsEdge, "sourceId" | "targetId" | "channel">;
+
+function resolveMutationResult(result: CanvasesCanvas | TopologyMutationResult): TopologyMutationResult {
+  if ("workflow" in result) return result;
+  return { workflow: result };
+}
 
 export function appendWorkflowFragment(
   workflow: CanvasesCanvas,
@@ -103,13 +112,14 @@ export function useTopologyMutationCommit({
   );
 
   return useCallback(
-    (mutate: (workflow: CanvasesCanvas) => CanvasesCanvas, options?: CommitOptions) => {
+    (mutate: (workflow: CanvasesCanvas) => CanvasesCanvas | TopologyMutationResult, options?: CommitOptions) => {
       const requestedSaveSession = saveSessionRef.current;
       const run = async () => {
         if (saveSessionRef.current !== requestedSaveSession) return null;
         const workflow = getCurrentWorkflow();
         if (!workflow) return null;
-        const finalWorkflow = await applyRequiredLayout(mutate(workflow), options);
+        const mutation = resolveMutationResult(mutate(workflow));
+        const finalWorkflow = await applyRequiredLayout(mutation.workflow, mutation.options ?? options);
         if (saveSessionRef.current !== requestedSaveSession) return null;
 
         applyLocalWorkflow(finalWorkflow);
