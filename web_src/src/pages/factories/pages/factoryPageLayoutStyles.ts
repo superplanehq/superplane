@@ -2,10 +2,15 @@ import { cn } from "@/lib/utils";
 
 const contentColumn = "mx-auto w-full max-w-[var(--workspace-content-max-width)]";
 
+/**
+ * Shell for the workspace page header: gutter, max width, vertical rhythm.
+ * `WorkspacePageHeader` builds on this. Only reach for the class directly
+ * when you cannot use the component (very rare — most pages should not).
+ */
 export const factoryContentHeaderClassName = cn(
-  "bg-background px-[var(--workspace-page-gutter)] py-6",
+  "bg-background px-[var(--workspace-page-gutter)] pt-10 pb-6",
   contentColumn,
-  "flex flex-wrap items-center justify-between gap-3",
+  "flex flex-col gap-3",
 );
 
 /** The app shell owns vertical scrolling. */

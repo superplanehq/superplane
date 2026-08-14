@@ -6,6 +6,8 @@ import type {
   FactoriesWorkOrderResult,
   FactoriesWorkOrderState,
 } from "@/api-client";
+import { workOrdersPath } from "./lib/factoryPagePaths";
+import { getWorkOrderDisplayKey } from "./lib/workOrderProgress";
 import { factoryContentBodyClassName } from "./pages/factoryPageLayoutStyles";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
 import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
@@ -97,82 +99,86 @@ export function WorkOrderDetailLoadedView({
   onStatusChange,
   onAddComment,
 }: WorkOrderDetailLoadedViewProps) {
+  const identifier = getWorkOrderDisplayKey(order, factoryKey);
   return (
-    <div className={factoryContentBodyClassName}>
-      <div className="grid gap-x-[var(--workspace-column-gap)] gap-y-0 lg:grid-cols-[minmax(0,1fr)_var(--workspace-detail-sidebar-width)]">
-        <WorkOrderDetailHeader
-          orderTitle={order.title ?? "Work Order"}
-          displayStatus={displayStatus}
-          isOpen={isOpen}
-          isDispatchable={isDispatchable}
-          isClosed={isClosed}
-          canClose={canClose}
-          canManage={canManage}
-          isCompleting={isCompleting}
-          isRejecting={isRejecting}
-          isClosing={isClosing}
-          isUpdatingStatus={isUpdatingStatus}
-          onClose={onClose}
-          onStatusChange={onStatusChange}
-        />
+    <>
+      <WorkOrderDetailHeader
+        orderTitle={order.title ?? "Work Order"}
+        orderIdentifier={identifier === "—" ? undefined : identifier}
+        backHref={workOrdersPath(organizationId, factoryKey)}
+        displayStatus={displayStatus}
+        isOpen={isOpen}
+        isDispatchable={isDispatchable}
+        isClosed={isClosed}
+        canClose={canClose}
+        canManage={canManage}
+        isCompleting={isCompleting}
+        isRejecting={isRejecting}
+        isClosing={isClosing}
+        isUpdatingStatus={isUpdatingStatus}
+        onClose={onClose}
+        onStatusChange={onStatusChange}
+      />
+      <div className={factoryContentBodyClassName}>
+        <div className="grid gap-x-[var(--workspace-column-gap)] gap-y-0 lg:grid-cols-[minmax(0,1fr)_var(--workspace-detail-sidebar-width)]">
+          <div className="min-w-0">
+            {order.description ? <WorkOrderDescription description={order.description} /> : null}
 
-        <div className="min-w-0">
-          {order.description ? <WorkOrderDescription description={order.description} /> : null}
+            <section className={order.description ? "mt-10" : undefined}>
+              <h2 className="workspace-section-title">Activity</h2>
+              <p className="workspace-body-text mt-1 text-muted-foreground">
+                Actions and comments on the work order, plus factory line runs.
+              </p>
+              <div className="mt-4">
+                <WorkOrderActivityTimeline
+                  organizationId={organizationId}
+                  factoryKey={factoryKey}
+                  order={order}
+                  events={events}
+                  eventsError={eventsError}
+                  isLoading={isEventsLoading}
+                  hasMoreEvents={hasMoreEvents}
+                  isLoadingMoreEvents={isLoadingMoreEvents}
+                  onLoadMoreEvents={onLoadMoreEvents}
+                  onRetryEvents={onRetryEvents}
+                  footer={
+                    <WorkOrderCommentComposer
+                      canComment={canManage}
+                      isSubmitting={isAddingComment}
+                      onSubmit={onAddComment}
+                    />
+                  }
+                />
+              </div>
+            </section>
+          </div>
 
-          <section className={order.description ? "mt-10" : undefined}>
-            <h2 className="workspace-section-title">Activity</h2>
-            <p className="workspace-body-text mt-1 text-muted-foreground">
-              Actions and comments on the work order, plus factory line runs.
-            </p>
-            <div className="mt-4">
-              <WorkOrderActivityTimeline
-                organizationId={organizationId}
-                factoryKey={factoryKey}
-                order={order}
-                events={events}
-                eventsError={eventsError}
-                isLoading={isEventsLoading}
-                hasMoreEvents={hasMoreEvents}
-                isLoadingMoreEvents={isLoadingMoreEvents}
-                onLoadMoreEvents={onLoadMoreEvents}
-                onRetryEvents={onRetryEvents}
-                footer={
-                  <WorkOrderCommentComposer
-                    canComment={canManage}
-                    isSubmitting={isAddingComment}
-                    onSubmit={onAddComment}
-                  />
-                }
-              />
-            </div>
-          </section>
+          <aside className="mt-1 lg:sticky lg:top-16 lg:self-start">
+            <WorkOrderDetailSidebar
+              organizationId={organizationId}
+              factoryKey={factoryKey}
+              order={order}
+              artifacts={artifacts}
+              isArtifactsLoading={isArtifactsLoading}
+              artifactsError={artifactsError}
+              displayStatus={displayStatus}
+              statusMeta={statusMeta}
+              assigneeIds={assigneeIds}
+              assigneeNames={assigneeNames}
+              factoryLines={factoryLines}
+              canEditFactoryLines={canEditFactoryLines}
+              canAssign={canAssign}
+              canDispatch={canDispatch}
+              permissionsLoading={permissionsLoading}
+              isAssigneesSaving={isAssigneesSaving}
+              isDispatchable={isDispatchable}
+              isDispatching={isDispatching}
+              onAssigneesSave={onAssigneesSave}
+              onDispatch={onDispatch}
+            />
+          </aside>
         </div>
-
-        <aside className="mt-1 lg:sticky lg:top-16 lg:self-start">
-          <WorkOrderDetailSidebar
-            organizationId={organizationId}
-            factoryKey={factoryKey}
-            order={order}
-            artifacts={artifacts}
-            isArtifactsLoading={isArtifactsLoading}
-            artifactsError={artifactsError}
-            displayStatus={displayStatus}
-            statusMeta={statusMeta}
-            assigneeIds={assigneeIds}
-            assigneeNames={assigneeNames}
-            factoryLines={factoryLines}
-            canEditFactoryLines={canEditFactoryLines}
-            canAssign={canAssign}
-            canDispatch={canDispatch}
-            permissionsLoading={permissionsLoading}
-            isAssigneesSaving={isAssigneesSaving}
-            isDispatchable={isDispatchable}
-            isDispatching={isDispatching}
-            onAssigneesSave={onAssigneesSave}
-            onDispatch={onDispatch}
-          />
-        </aside>
       </div>
-    </div>
+    </>
   );
 }
