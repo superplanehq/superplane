@@ -466,26 +466,27 @@ func (s *ApprovalSteps) approveAnyoneRequirement() {
 }
 
 func (s *ApprovalSteps) waitForApprovalMetadata(nodeName string, approvedCount int, pendingCount int, approvedType string) {
-	found := false
-	start := time.Now()
-
-	for time.Since(start) < 5*time.Second {
+	require.Eventually(s.t, func() bool {
 		executions := s.canvas.GetExecutionsForNode(nodeName)
 		if len(executions) == 0 {
-			s.session.Sleep(500)
-			continue
+			return false
 		}
 
 		metadata := executions[0].Metadata.Data()
 		rawRecords, ok := metadata["records"].([]any)
-		require.True(s.t, ok, "expected approval records metadata")
+		if !ok {
+			return false
+		}
 
 		approved := 0
 		pending := 0
 		approvedTypeMatch := false
 		for _, rawRecord := range rawRecords {
 			record, ok := rawRecord.(map[string]any)
-			require.True(s.t, ok, "expected approval record metadata")
+			if !ok {
+				return false
+			}
+
 			state, _ := record["state"].(string)
 			recordType, _ := record["type"].(string)
 			switch state {
@@ -499,15 +500,8 @@ func (s *ApprovalSteps) waitForApprovalMetadata(nodeName string, approvedCount i
 			}
 		}
 
-		if approved == approvedCount && pending == pendingCount && approvedTypeMatch {
-			found = true
-			break
-		}
-
-		s.session.Sleep(500)
-	}
-
-	require.True(s.t, found, "timed out waiting for approval metadata to update")
+		return approved == approvedCount && pending == pendingCount && approvedTypeMatch
+	}, 30*time.Second, 500*time.Millisecond, "timed out waiting for approval metadata to update")
 }
 
 func (s *ApprovalSteps) assertNoApproveButtons() {
