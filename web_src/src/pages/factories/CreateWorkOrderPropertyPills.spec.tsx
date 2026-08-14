@@ -18,7 +18,7 @@ vi.mock("@/hooks/useOrganizationData", () => ({
 }));
 
 describe("CreateWorkOrderPropertyPills", () => {
-  it("shows the assignee picker inside the dialog when Assignee is clicked", async () => {
+  it("shows the owner picker inside the dialog when Owner is clicked", async () => {
     const user = userEvent.setup();
     render(
       <CreateWorkOrderPropertyPills

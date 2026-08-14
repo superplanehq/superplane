@@ -74,7 +74,7 @@ export function CreateWorkOrderPropertyPills({
             {assigneeIds.length === 0 ? (
               <>
                 <User className="size-3.5" aria-hidden />
-                Assignee
+                Owner
               </>
             ) : (
               <AssigneePillBody assigneeIds={assigneeIds} resolveUser={resolveUser} />

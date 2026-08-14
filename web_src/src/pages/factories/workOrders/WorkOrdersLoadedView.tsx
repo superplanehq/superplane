@@ -9,7 +9,7 @@ import {
   buildWorkOrderListEntries,
 } from "../lib/workOrderListModel";
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
-import { factoryContentBodyClassName, factoryContentHeaderClassName } from "../pages/factoryPageLayoutStyles";
+import { factoryContentBodyClassName } from "../pages/factoryPageLayoutStyles";
 import { WorkOrdersBoardView } from "./WorkOrdersBoardView";
 import {
   WorkOrdersFilteredEmptyState,
@@ -104,16 +104,14 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
 
   return (
     <>
-      <header className={factoryContentHeaderClassName}>
-        <WorkOrdersHeader
-          state={state}
-          entries={entries}
-          factoryLines={props.factoryLines}
-          onCreateWorkOrder={props.onCreateWorkOrder}
-          canCreate={props.canCreate}
-          permissionsLoading={props.permissionsLoading}
-        />
-      </header>
+      <WorkOrdersHeader
+        state={state}
+        entries={entries}
+        factoryLines={props.factoryLines}
+        onCreateWorkOrder={props.onCreateWorkOrder}
+        canCreate={props.canCreate}
+        permissionsLoading={props.permissionsLoading}
+      />
 
       <div className={cn(factoryContentBodyClassName, "flex flex-col gap-4")}>{body()}</div>
     </>

@@ -36,7 +36,7 @@ export function WorkOrdersTableView(props: WorkOrdersTableViewProps) {
         <span className="hidden md:inline">Line</span>
         <span className="hidden lg:inline">Spend</span>
         <span className="hidden md:inline">Updated</span>
-        <span className="text-right">Assignee</span>
+        <span className="text-right">Owner</span>
       </div>
       <ul className="divide-y divide-border">
         {props.entries.map((entry) => (
