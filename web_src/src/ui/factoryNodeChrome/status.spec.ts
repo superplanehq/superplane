@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_EVENT_STATE_MAP } from "../componentBase/defaultEventStateMap";
 import {
   factoryNodeStatusLabel,
   formatFactoryNodeDuration,
@@ -28,6 +29,72 @@ describe("normalizeFactoryNodeStatus", () => {
     expect(normalizeFactoryNodeStatus("waiting")).toBe("running");
     expect(normalizeFactoryNodeStatus("rejected")).toBe("cancelled");
   });
+
+  it("maps mapper success aliases from the eventStateMap success style", () => {
+    const stateMap = {
+      ...DEFAULT_EVENT_STATE_MAP,
+      "marked ready": DEFAULT_EVENT_STATE_MAP.success,
+      merged: DEFAULT_EVENT_STATE_MAP.success,
+    };
+
+    expect(normalizeFactoryNodeStatus("marked ready", stateMap)).toBe("passed");
+    expect(normalizeFactoryNodeStatus("merged", stateMap)).toBe("passed");
+  });
+
+  it("maps custom running styles instead of treating every alias as Passed", () => {
+    const stateMap = {
+      ...DEFAULT_EVENT_STATE_MAP,
+      "is running": DEFAULT_EVENT_STATE_MAP.running,
+    };
+
+    expect(normalizeFactoryNodeStatus("is running", stateMap)).toBe("running");
+  });
+
+  it("maps custom cancelled styles such as GitHub workflow stopped", () => {
+    const stateMap = {
+      ...DEFAULT_EVENT_STATE_MAP,
+      stopped: {
+        icon: "circle-stop",
+        textColor: "text-gray-800",
+        backgroundColor: "bg-gray-100",
+        badgeColor: "bg-gray-500",
+      },
+    };
+
+    expect(normalizeFactoryNodeStatus("stopped", stateMap)).toBe("cancelled");
+  });
+
+  it("maps circle-stop icons even when the badge color is not a default", () => {
+    const stateMap = {
+      ...DEFAULT_EVENT_STATE_MAP,
+      stopped: {
+        icon: "circle-stop",
+        textColor: "text-gray-800",
+        backgroundColor: "bg-slate-100",
+        badgeColor: "bg-slate-500",
+      },
+    };
+
+    expect(normalizeFactoryNodeStatus("stopped", stateMap)).toBe("cancelled");
+  });
+
+  it("does not classify success icons by badge color alone", () => {
+    const stateMap = {
+      ...DEFAULT_EVENT_STATE_MAP,
+      completed: {
+        icon: "circle-check",
+        textColor: "text-gray-800",
+        backgroundColor: "bg-gray-100",
+        badgeColor: "bg-gray-500",
+      },
+    };
+
+    expect(normalizeFactoryNodeStatus("completed", stateMap)).toBe("passed");
+  });
+
+  it("treats unlisted mapper success aliases as Passed when no map is given", () => {
+    expect(normalizeFactoryNodeStatus("marked ready")).toBe("passed");
+  });
 });
 
 describe("resolveFactoryRuntimeStatus", () => {
@@ -46,6 +113,15 @@ describe("resolveFactoryRuntimeStatus", () => {
     expect(resolveFactoryRuntimeStatus({ eventState: "true", runIsActive: false })).toBe("passed");
     expect(resolveFactoryRuntimeStatus({ eventState: "success", runIsActive: false })).toBe("passed");
     expect(resolveFactoryRuntimeStatus({ eventState: "failed", runIsActive: false })).toBe("failed");
+  });
+
+  it("maps mapper success aliases when the run has finished", () => {
+    const stateMap = {
+      ...DEFAULT_EVENT_STATE_MAP,
+      "marked ready": DEFAULT_EVENT_STATE_MAP.success,
+    };
+
+    expect(resolveFactoryRuntimeStatus({ eventState: "marked ready", runIsActive: false, stateMap })).toBe("passed");
   });
 
   it("defaults runIsActive to true when omitted", () => {
