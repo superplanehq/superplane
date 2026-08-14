@@ -9,7 +9,7 @@ import {
 import { useFactoryConfigureEnter } from "./useFactoryConfigureEnter";
 
 export type FactoryConfigureActions = {
-  save: (options?: FactoryConfigureSaveOptions) => void;
+  save: (options?: FactoryConfigureSaveOptions) => Promise<void>;
   discard: () => void;
   busy: boolean;
   /** True when Configure has graph/console/files changes to stage+commit. */
@@ -110,11 +110,11 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
       : {
           busy: factoryConfigureBusy,
           hasUncommittedChanges,
-          save: (saveOptions) => {
+          save: async (saveOptions) => {
             if (factoryConfigureBusy) {
               return;
             }
-            void runFactoryConfigureSave({
+            await runFactoryConfigureSave({
               canStageCanvasVersion,
               activeCanvasVersionIdRef,
               activeCanvasVersionId,

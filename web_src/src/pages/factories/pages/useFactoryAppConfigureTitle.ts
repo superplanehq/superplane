@@ -110,7 +110,8 @@ export function useFactoryAppConfigureTitle(args: UseFactoryAppConfigureTitleArg
         // Always stage through Configure Save. Trusting hasUncommittedChanges alone
         // can skip real graph edits while staging baselines are still loading.
         // Empty staging (no YAML diff) finishes cleanly inside runFactoryConfigureSave.
-        actions.save({ canvasName: persistedName ?? undefined });
+        // Await so savingRef stays locked until stage/commit finishes.
+        await actions.save({ canvasName: persistedName ?? undefined });
       } finally {
         savingRef.current = false;
       }

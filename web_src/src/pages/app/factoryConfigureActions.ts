@@ -85,7 +85,11 @@ function readStagingSummary(result: UpdateCanvasVersionResult | unknown): Stagin
   return data?.stagingSummary;
 }
 
-async function stageAndCommitFactoryConfigure(deps: FactoryConfigureSaveDeps, savingVersionId: string, workflow: CanvasesCanvas) {
+async function stageAndCommitFactoryConfigure(
+  deps: FactoryConfigureSaveDeps,
+  savingVersionId: string,
+  workflow: CanvasesCanvas,
+) {
   const stageResult = await deps.updateCanvasVersionMutation.mutateAsync({
     versionId: savingVersionId,
     canvasYaml: materializeCanvasSpec(workflow),

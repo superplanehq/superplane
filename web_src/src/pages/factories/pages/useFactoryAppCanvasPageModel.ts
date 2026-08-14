@@ -23,7 +23,7 @@ function resolveCanRenameAutomation(
   permissionsLoading: boolean,
   canAct: (resource: string, action: string) => boolean,
 ) {
-  return permissionsLoading || canAct("canvases", "update");
+  return !permissionsLoading && canAct("canvases", "update");
 }
 
 export function useFactoryAppCanvasPageModel() {
