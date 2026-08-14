@@ -31,7 +31,7 @@ export function buildLineFilterOptions(lines: FactoriesFactoryLine[]): WorkOrder
     .map((line) => ({ value: line.id, label: line.name?.trim() || "Untitled line" }));
 }
 
-/** People on at least one work order, sorted by name, with Unassigned first. */
+/** People on at least one work order, sorted by name, with No Owner first. */
 export function buildAssigneeFilterOptions(entries: WorkOrderListEntry[]): WorkOrderFilterOption[] {
   const byId = new Map<string, string>();
   for (const entry of entries) {
@@ -46,7 +46,7 @@ export function buildAssigneeFilterOptions(entries: WorkOrderListEntry[]): WorkO
     .map(([value, label]) => ({ value, label }))
     .sort((a, b) => a.label.localeCompare(b.label));
 
-  return [{ value: UNASSIGNED_FILTER_VALUE, label: "Unassigned" }, ...people];
+  return [{ value: UNASSIGNED_FILTER_VALUE, label: "No Owner" }, ...people];
 }
 
 /**
@@ -76,9 +76,7 @@ export function buildWorkOrderFilterChips(
       dimension: "assigneeIds" as const,
       value: assigneeId,
       label:
-        assigneeId === UNASSIGNED_FILTER_VALUE
-          ? "Assignee is unassigned"
-          : `Assignee is ${assigneeLabels.get(assigneeId) ?? "Unknown"}`,
+        assigneeId === UNASSIGNED_FILTER_VALUE ? "No Owner" : `Owner is ${assigneeLabels.get(assigneeId) ?? "Unknown"}`,
     })),
   ];
 }

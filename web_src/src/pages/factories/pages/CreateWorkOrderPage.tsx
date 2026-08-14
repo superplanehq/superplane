@@ -197,7 +197,7 @@ interface AssigneesFieldProps {
 function AssigneesField({ organizationId, assigneeIds, onChange, disabled, selectedLabels }: AssigneesFieldProps) {
   return (
     <div className="space-y-2">
-      <Label>Assignees</Label>
+      <Label>Owners</Label>
       <WorkOrderAssigneesPopover
         organizationId={organizationId}
         selectedIds={assigneeIds}
@@ -206,7 +206,7 @@ function AssigneesField({ organizationId, assigneeIds, onChange, disabled, selec
         align="start"
       >
         <Button type="button" variant="outline" data-testid="work-order-assignees-button">
-          {assigneeIds.length === 0 ? "Select assignees" : `${assigneeIds.length} selected`}
+          {assigneeIds.length === 0 ? "Select owners" : `${assigneeIds.length} selected`}
         </Button>
       </WorkOrderAssigneesPopover>
       {selectedLabels.length > 0 ? (
