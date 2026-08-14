@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/exprruntime"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/gorm"
 )
 
@@ -1012,7 +1013,8 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 
 // resolveOrderPayload exposes the work order driving this run via order().
 // Returns nil when the run is not attached to a factory work-order execution.
-// Artifacts are loaded only when the expression AST references order().artifacts.
+// Artifacts and comments are loaded only when the expression AST references
+// order().artifacts / order().comments.
 func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
 	if b.rootEventID == nil {
 		return nil, nil
@@ -1056,24 +1058,43 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	if err != nil {
 		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
 	}
-	if !usesArtifacts {
-		return payload, nil
-	}
-
-	artifacts, err := order.ListArtifacts(b.tx)
-	if err != nil {
-		return nil, fmt.Errorf("order() could not load artifacts: %w", err)
-	}
-
-	artifactPayloads := make([]any, 0, len(artifacts))
-	for i := range artifacts {
-		item, err := artifactExpressionPayload(&artifacts[i])
+	if usesArtifacts {
+		artifacts, err := order.ListArtifacts(b.tx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("order() could not load artifacts: %w", err)
 		}
-		artifactPayloads = append(artifactPayloads, item)
+
+		artifactPayloads := make([]any, 0, len(artifacts))
+		for i := range artifacts {
+			item, err := artifactExpressionPayload(&artifacts[i])
+			if err != nil {
+				return nil, err
+			}
+			artifactPayloads = append(artifactPayloads, item)
+		}
+		payload["artifacts"] = artifactPayloads
 	}
-	payload["artifacts"] = artifactPayloads
+
+	usesComments, err := expressionvalidation.ExpressionUsesOrderComments(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesComments {
+		comments, err := order.ListComments(b.tx)
+		if err != nil {
+			return nil, fmt.Errorf("order() could not load comments: %w", err)
+		}
+
+		commentPayloads := make([]any, 0, len(comments))
+		for i := range comments {
+			item, err := commentExpressionPayload(&comments[i])
+			if err != nil {
+				return nil, err
+			}
+			commentPayloads = append(commentPayloads, item)
+		}
+		payload["comments"] = commentPayloads
+	}
 
 	return payload, nil
 }
@@ -1113,6 +1134,72 @@ func artifactExpressionPayload(artifact *models.FactoryWorkOrderArtifact) (map[s
 		"type": artifact.Type,
 		"data": normalizeExpressionValue(data),
 	}, nil
+}
+
+func commentExpressionPayload(event *models.FactoryWorkOrderEvent) (map[string]any, error) {
+	var decoded factory.WorkOrderCommentAdded
+	if len(event.Data) > 0 {
+		if err := json.Unmarshal(event.Data, &decoded); err != nil {
+			return nil, fmt.Errorf("order() could not decode comment data: %w", err)
+		}
+	}
+
+	payload := map[string]any{
+		"id":         event.ID.String(),
+		"body":       decoded.Body,
+		"created_at": event.CreatedAt,
+	}
+
+	if decoded.Author != nil {
+		payload["author"] = commentAuthorExpressionPayload(decoded.Author)
+	}
+
+	if decoded.Run != nil {
+		payload["run"] = map[string]any{"id": decoded.Run.ID.String()}
+	}
+
+	return normalizeExpressionValue(payload).(map[string]any), nil
+}
+
+func commentAuthorExpressionPayload(author *factory.WorkOrderCommentAuthor) map[string]any {
+	authorPayload := map[string]any{
+		"kind": author.Kind,
+	}
+
+	if author.UserID != nil {
+		authorPayload["user_id"] = *author.UserID
+	}
+
+	if automation := author.Automation; automation != nil {
+		automationPayload := map[string]any{}
+		if automation.NodeID != "" {
+			automationPayload["node_id"] = automation.NodeID
+		}
+		if automation.NodeName != "" {
+			automationPayload["node_name"] = automation.NodeName
+		}
+		if automation.AppID != uuid.Nil {
+			automationPayload["app_id"] = automation.AppID.String()
+		}
+		if automation.AppName != "" {
+			automationPayload["app_name"] = automation.AppName
+		}
+		if automation.LineID != uuid.Nil {
+			automationPayload["line_id"] = automation.LineID.String()
+		}
+		if automation.LineName != "" {
+			automationPayload["line_name"] = automation.LineName
+		}
+		if automation.StepIndex != nil {
+			automationPayload["step_index"] = *automation.StepIndex
+		}
+		if automation.StepName != "" {
+			automationPayload["step_name"] = automation.StepName
+		}
+		authorPayload["automation"] = automationPayload
+	}
+
+	return authorPayload
 }
 
 func (b *NodeConfigurationBuilder) buildRunURL(run *models.CanvasRun) (string, error) {

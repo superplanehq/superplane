@@ -124,12 +124,14 @@ describe("getSuggestions", () => {
         id: "order-1",
         title: "Ship feature",
         artifacts: [{ type: "pr" }],
+        comments: [{ body: "Looks good" }],
       },
     });
     const labels = suggestions.map((item) => item.label);
     expect(labels).toContain("id");
     expect(labels).toContain("title");
     expect(labels).toContain("artifacts");
+    expect(labels).toContain("comments");
   });
 
   it("suggests previous(n) payload fields after dot", () => {

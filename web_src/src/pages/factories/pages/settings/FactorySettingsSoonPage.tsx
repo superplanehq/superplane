@@ -1,12 +1,6 @@
-import { Heading } from "@/components/Heading/heading";
-import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
-import {
-  factoryContentBodyClassName,
-  factoryContentHeaderClassName,
-  factoryPageSubtitleClassName,
-  factoryPageTitleClassName,
-} from "../factoryPageLayoutStyles";
+import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
+import { factoryContentBodyClassName } from "../factoryPageLayoutStyles";
 
 interface FactorySettingsSoonPageProps {
   title: string;
@@ -17,14 +11,7 @@ interface FactorySettingsSoonPageProps {
 export function FactorySettingsSoonPage({ title, description, Icon }: FactorySettingsSoonPageProps) {
   return (
     <>
-      <header className={factoryContentHeaderClassName}>
-        <div>
-          <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
-            {title}
-          </Heading>
-          <p className={cn("mt-1", factoryPageSubtitleClassName)}>{description}</p>
-        </div>
-      </header>
+      <WorkspacePageHeader title={title} subtitle={description} />
       <div className={factoryContentBodyClassName}>
         <div
           className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card px-8 py-16 text-center"

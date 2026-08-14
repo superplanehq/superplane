@@ -52,8 +52,11 @@ current run (`id`, `title`, `description`, `factory_id`, `state`, `result`,
 `source`) and returns `nil` when the run is not attached to a work order.
 `order().artifacts` is a list field loaded lazily only when the expression
 references it (e.g. `none(order().artifacts, {#.type == "pr"})`).
-`root().data.work_order` remains the onRun snapshot and does not include
-artifacts.
+`order().comments` is likewise a list field loaded lazily only when the
+expression references it (e.g. `len(order().comments)`), returning each
+comment as `{id, body, author, created_at, run}` decoded from the
+`order.comment.added` events. `root().data.work_order` remains the onRun
+snapshot and does not include artifacts or comments.
 
 ## Work order lifecycle
 

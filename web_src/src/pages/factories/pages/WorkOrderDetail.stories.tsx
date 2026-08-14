@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
+  DRAFT_WORK_ORDER,
   OPEN_WORK_ORDER,
   PRIMARY_FACTORY_KEY,
   RUNNING_WORK_ORDER,
@@ -12,7 +13,7 @@ import { WorkOrderDetailPage } from "./WorkOrderDetailPage";
 
 /**
  * Work Order Detail — full detail view inside the FactoriesLayout.
- * Uses the shared fixture so the sidebar and detail render together.
+ * Storybook Overview includes a Mission picker. The live page does not.
  */
 const meta = {
   title: "Factories/Pages/Work Order Detail",
@@ -41,5 +42,13 @@ export const Running: Story = {
 export const Closed: Story = {
   render: () => (
     <FactoriesHarness pathSuffix={detailPath(CLOSED_WORK_ORDER.number)} factoriesFixture={defaultFactoriesFixture} />
+  ),
+};
+
+/** Draft order with no mission — Overview shows Attach to mission. */
+export const NoMission: Story = {
+  name: "No mission",
+  render: () => (
+    <FactoriesHarness pathSuffix={detailPath(DRAFT_WORK_ORDER.number)} factoriesFixture={defaultFactoriesFixture} />
   ),
 };
