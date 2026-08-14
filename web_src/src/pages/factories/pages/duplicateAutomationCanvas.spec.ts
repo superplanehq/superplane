@@ -148,9 +148,11 @@ describe("duplicateAutomationCanvas", () => {
           },
         },
       }),
-      fetchConsoleYaml: vi.fn().mockResolvedValue(
-        "apiVersion: v1\nkind: Console\nmetadata:\n  name: Source\n  canvasId: canvas-source\nspec:\n  panels:\n    - id: p1\n      type: markdown\n      content:\n        body: hi\n  layout:\n    - i: p1\n      x: 0\n      'y': 0\n      w: 6\n      h: 4\n",
-      ),
+      fetchConsoleYaml: vi
+        .fn()
+        .mockResolvedValue(
+          "apiVersion: v1\nkind: Console\nmetadata:\n  name: Source\n  canvasId: canvas-source\nspec:\n  panels:\n    - id: p1\n      type: markdown\n      content:\n        body: hi\n  layout:\n    - i: p1\n      x: 0\n      'y': 0\n      w: 6\n      h: 4\n",
+        ),
     });
 
     await duplicateAutomationCanvas(deps);
@@ -240,6 +242,61 @@ describe("duplicateAutomationCanvas", () => {
     });
 
     await expect(duplicateAutomationCanvas(deps)).rejects.toThrow("stage failed");
-    expect(onCanvasCreated).toHaveBeenCalledWith("canvas-orphan");
+    expect(onCanvasCreated).toHaveBeenCalledWith("canvas-orphan", "Refund Planner copy");
+  });
+
+  it("picks a unique name when the copy name is already taken", async () => {
+    const createCanvas = vi.fn().mockResolvedValue({
+      data: { canvas: { metadata: { id: "canvas-new-2" } } },
+    });
+    const deps = baseDeps({
+      createCanvas,
+      existingCanvasNames: ["Refund Planner copy"],
+      describeCanvas: vi.fn().mockResolvedValue({
+        data: { canvas: { spec: { nodes: [], edges: [] } } },
+      }),
+    });
+
+    const canvasId = await duplicateAutomationCanvas(deps);
+
+    expect(canvasId).toBe("canvas-new-2");
+    expect(createCanvas).toHaveBeenCalledTimes(1);
+    expect(createCanvas).toHaveBeenCalledWith({
+      name: "Refund Planner copy (2)",
+      description: "Plans refunds",
+      factoryId: "factory-1",
+      method: "ui",
+    });
+  });
+
+  it("retries CreateCanvas when the server reports a name collision", async () => {
+    const createCanvas = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Canvas with the same name already exists"))
+      .mockResolvedValueOnce({
+        data: { canvas: { metadata: { id: "canvas-new-3" } } },
+      });
+    const deps = baseDeps({
+      createCanvas,
+      describeCanvas: vi.fn().mockResolvedValue({
+        data: { canvas: { spec: { nodes: [], edges: [] } } },
+      }),
+    });
+
+    const canvasId = await duplicateAutomationCanvas(deps);
+
+    expect(canvasId).toBe("canvas-new-3");
+    expect(createCanvas).toHaveBeenNthCalledWith(1, {
+      name: "Refund Planner copy",
+      description: "Plans refunds",
+      factoryId: "factory-1",
+      method: "ui",
+    });
+    expect(createCanvas).toHaveBeenNthCalledWith(2, {
+      name: "Refund Planner copy (2)",
+      description: "Plans refunds",
+      factoryId: "factory-1",
+      method: "ui",
+    });
   });
 });

@@ -1,3 +1,4 @@
+import { usePermissions } from "@/contexts/usePermissions";
 import { useCanvas } from "@/hooks/useCanvasData";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import type { FactoryConfigureActions } from "@/pages/app";
@@ -8,14 +9,21 @@ import { resolveFactoryAppBackNav } from "../lib/factoryAppNav";
 import {
   isFactoryAppConfigureMode,
   resolveFactoryAppCanvasSubtitle,
-  resolveFactoryAppCanvasTitle,
   resolveFactoryLineName,
 } from "../lib/factoryAppCanvasCopy";
 import { shouldRedirectFactoryAppCanvas } from "../lib/factoryAppCanvasRedirect";
 import { resolveWorkOrderByNumber } from "../lib/workOrderNumberResolution";
+import { useFactoryAppConfigureTitle } from "./useFactoryAppConfigureTitle";
 
 function readFactoryAppOrderRef(searchParams: URLSearchParams): string | null {
   return searchParams.get("orderNumber") ?? searchParams.get("orderId");
+}
+
+function resolveCanRenameAutomation(
+  permissionsLoading: boolean,
+  canAct: (resource: string, action: string) => boolean,
+) {
+  return permissionsLoading || canAct("canvases", "update");
 }
 
 export function useFactoryAppCanvasPageModel() {
@@ -23,6 +31,7 @@ export function useFactoryAppCanvasPageModel() {
   const { appId = "" } = useParams<{ appId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   const configureActionsRef = useRef<FactoryConfigureActions | null>(null);
   const [configureBusy, setConfigureBusy] = useState(false);
 
@@ -33,12 +42,30 @@ export function useFactoryAppCanvasPageModel() {
   } = useCanvas(organizationId, appId, {
     enabled: Boolean(appId),
   });
-
+  const canRename = resolveCanRenameAutomation(permissionsLoading, canAct);
   const from = searchParams.get("from");
   const lineId = searchParams.get("lineId");
   const orderNumber = readFactoryAppOrderRef(searchParams);
   const isConfigure = isFactoryAppConfigureMode(searchParams);
   const lineName = useMemo(() => resolveFactoryLineName(factory?.lines, lineId), [factory?.lines, lineId]);
+
+  const {
+    title,
+    configureBusy: titleConfigureBusy,
+    handleDraftTitleChange,
+    handleConfigureSave,
+    handleConfigureDiscard,
+    clearDraftTitle,
+  } = useFactoryAppConfigureTitle({
+    organizationId,
+    factoryId,
+    appId,
+    isConfigure,
+    canRename,
+    savedName: canvas?.metadata?.name,
+    configureBusy,
+    configureActionsRef,
+  });
 
   // Reads the already-fetched work orders list (same query the sidebar's
   // "recent orders" section uses) rather than fetching this one order by id,
@@ -64,21 +91,27 @@ export function useFactoryAppCanvasPageModel() {
   );
 
   const handleConfigureDone = useCallback(() => {
+    clearDraftTitle();
     navigate(back.href);
-  }, [back.href, navigate]);
+  }, [back.href, clearDraftTitle, navigate]);
 
   const handleConfigureBusyChange = useCallback((busy: boolean) => {
     setConfigureBusy(busy);
   }, []);
 
-  const canvasFactoryId = canvas?.metadata?.factoryId;
-  const belongsToFactory = canvasFactoryId === factoryId;
+  const belongsToFactory = canvas?.metadata?.factoryId === factoryId;
   const shouldRedirect = shouldRedirectFactoryAppCanvas({
     appId,
     canvasLoading,
     canvasError,
     belongsToFactory,
     hasCanvas: Boolean(canvas),
+  });
+
+  const subtitle = resolveFactoryAppCanvasSubtitle({
+    isConfigure,
+    description: canvas?.metadata?.description?.trim(),
+    factoryName: factory?.name,
   });
 
   return {
@@ -89,16 +122,16 @@ export function useFactoryAppCanvasPageModel() {
     canvas,
     canvasLoading,
     isConfigure,
-    configureBusy,
+    configureBusy: titleConfigureBusy,
     configureActionsRef,
     back,
-    title: resolveFactoryAppCanvasTitle(canvas?.metadata?.name),
-    subtitle: resolveFactoryAppCanvasSubtitle({
-      isConfigure,
-      description: canvas?.metadata?.description?.trim(),
-      factoryName: factory?.name,
-    }),
+    title,
+    subtitle,
     shouldRedirect,
+    canRename,
+    handleDraftTitleChange,
+    handleConfigureSave,
+    handleConfigureDiscard,
     handleConfigureDone,
     handleConfigureBusyChange,
   };

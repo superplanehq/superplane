@@ -11,9 +11,12 @@ import { fetchRepositorySpecFileContent } from "@/pages/app/lib/repository-spec-
 import { dematerializeConsoleSpec, materializeCanvasSpec } from "@/pages/app/lib/workflow-spec-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "@/pages/app/lib/workflow-spec-paths";
 import { isNotFoundError } from "@/pages/app/workflowPageHelpers";
+import { isCanvasNameAlreadyExistsError, uniqueCanvasName } from "@/pages/home/uniqueCanvasName";
 import * as yaml from "js-yaml";
 
 import { duplicateAutomationName } from "./automationCardActions";
+
+const MAX_NAME_RETRY_ATTEMPTS = 20;
 
 type CreateCanvasResult = {
   data?: {
@@ -38,10 +41,14 @@ export type DuplicateAutomationCanvasDeps = {
   factoryId: string;
   app: FactoryApp;
   createCanvas: (input: CreateCanvasInput) => Promise<CreateCanvasResult>;
+  /** Names already taken in the org (used to pick "X copy", "X copy (2)", …). */
+  existingCanvasNames?: Iterable<string>;
   /** When set, skip CreateCanvas and reuse this id (retry after failed stage/commit). */
   pendingCanvasId?: string;
+  /** Name already assigned to the pending canvas (keeps yaml metadata in sync on retry). */
+  pendingCanvasName?: string;
   /** Called once a new empty canvas is created, before stage/commit. */
-  onCanvasCreated?: (canvasId: string) => void;
+  onCanvasCreated?: (canvasId: string, canvasName: string) => void;
   describeCanvas?: (sourceCanvasId: string) => Promise<{ data?: { canvas?: CanvasesCanvas } }>;
   fetchConsoleYaml?: (sourceCanvasId: string) => Promise<string | undefined>;
   putCanvasStaging?: (canvasId: string, canvasYaml: string, consoleYaml?: string) => Promise<unknown>;
@@ -162,11 +169,7 @@ export function rewriteSelfCanvasRefs(
   });
 }
 
-export function rematerializeDuplicateConsoleYaml(
-  consoleYaml: string,
-  canvasId: string,
-  canvasName: string,
-): string {
+export function rematerializeDuplicateConsoleYaml(consoleYaml: string, canvasId: string, canvasName: string): string {
   const doc = yaml.load(consoleYaml) as { metadata?: Record<string, unknown>; [key: string]: unknown } | null;
   if (!doc || typeof doc !== "object" || Array.isArray(doc)) {
     return consoleYaml;
@@ -194,43 +197,62 @@ function buildDuplicateCanvasYaml(args: {
       description: args.description,
     },
     spec: {
-      nodes: rewriteSelfCanvasRefs(
-        args.sourceCanvas?.spec?.nodes,
-        args.sourceCanvasId,
-        args.canvasId,
-        args.name,
-      ),
+      nodes: rewriteSelfCanvasRefs(args.sourceCanvas?.spec?.nodes, args.sourceCanvasId, args.canvasId, args.name),
       edges: args.sourceCanvas?.spec?.edges ?? [],
     },
   });
 }
 
-async function createDuplicateCanvasShell(deps: DuplicateAutomationCanvasDeps, name: string, description: string) {
-  const created = await deps.createCanvas({
-    name,
-    description,
-    factoryId: deps.factoryId,
-    method: "ui",
-  });
-  const canvasId = created.data?.canvas?.metadata?.id;
-  if (!canvasId) {
-    throw new Error("Failed to create automation canvas");
+async function createDuplicateCanvasShell(
+  deps: DuplicateAutomationCanvasDeps,
+  preferredName: string,
+  description: string,
+): Promise<{ canvasId: string; name: string }> {
+  const taken = new Set(
+    [...(deps.existingCanvasNames ?? [])].map((name) => name.trim()).filter((name): name is string => Boolean(name)),
+  );
+  let canvasName = uniqueCanvasName(preferredName, taken);
+
+  for (let attempt = 0; attempt < MAX_NAME_RETRY_ATTEMPTS; attempt++) {
+    try {
+      const created = await deps.createCanvas({
+        name: canvasName,
+        description,
+        factoryId: deps.factoryId,
+        method: "ui",
+      });
+      const canvasId = created.data?.canvas?.metadata?.id;
+      if (!canvasId) {
+        throw new Error("Failed to create automation canvas");
+      }
+      return { canvasId, name: canvasName };
+    } catch (error) {
+      if (!isCanvasNameAlreadyExistsError(error)) {
+        throw error;
+      }
+      taken.add(canvasName);
+      canvasName = uniqueCanvasName(preferredName, taken);
+    }
   }
-  return canvasId;
+
+  throw new Error("Failed to create automation canvas");
 }
 
 async function ensureDuplicateCanvasId(
   deps: DuplicateAutomationCanvasDeps,
-  name: string,
+  preferredName: string,
   description: string,
-): Promise<string> {
+): Promise<{ canvasId: string; name: string }> {
   if (deps.pendingCanvasId) {
-    return deps.pendingCanvasId;
+    return {
+      canvasId: deps.pendingCanvasId,
+      name: deps.pendingCanvasName?.trim() || preferredName,
+    };
   }
 
-  const canvasId = await createDuplicateCanvasShell(deps, name, description);
-  deps.onCanvasCreated?.(canvasId);
-  return canvasId;
+  const created = await createDuplicateCanvasShell(deps, preferredName, description);
+  deps.onCanvasCreated?.(created.canvasId, created.name);
+  return created;
 }
 
 async function stageAndCommitDuplicateSpecs(
@@ -259,9 +281,9 @@ export async function duplicateAutomationCanvas(deps: DuplicateAutomationCanvasD
   const describeCanvas = deps.describeCanvas ?? defaultDescribeCanvas;
   const fetchConsoleYaml = deps.fetchConsoleYaml ?? defaultFetchConsoleYaml;
   const sourceCanvas = (await describeCanvas(sourceCanvasId)).data?.canvas;
-  const duplicateName = duplicateAutomationName(deps.app.name);
+  const preferredName = duplicateAutomationName(deps.app.name);
   const description = deps.app.description ?? sourceCanvas?.metadata?.description ?? "";
-  const canvasId = await ensureDuplicateCanvasId(deps, duplicateName, description);
+  const { canvasId, name: duplicateName } = await ensureDuplicateCanvasId(deps, preferredName, description);
 
   const sourceConsoleYaml = await fetchConsoleYaml(sourceCanvasId);
   const consoleYaml = sourceConsoleYaml
