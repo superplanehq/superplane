@@ -1,3 +1,5 @@
+import { DEFAULT_EVENT_STATE_MAP } from "../componentBase/defaultEventStateMap";
+import type { EventStateMap, EventStateStyle } from "../componentBase/eventState";
 import type { FactoryNodeStatus } from "./types";
 
 const PASSED_EVENT_STATES = new Set([
@@ -27,7 +29,7 @@ function isUnsetEventState(status: string | undefined): boolean {
 }
 
 /** Map classic ComponentBase / mapper eventState → factory footer status. */
-export function normalizeFactoryNodeStatus(status: string | undefined): FactoryNodeStatus {
+export function normalizeFactoryNodeStatus(status: string | undefined, stateMap?: EventStateMap): FactoryNodeStatus {
   if (status === undefined || UNSET_EVENT_STATES.has(status)) {
     return "pending";
   }
@@ -55,7 +57,14 @@ export function normalizeFactoryNodeStatus(status: string | undefined): FactoryN
   if (status === "triggered") {
     return "triggered";
   }
-  return "pending";
+
+  const mappedStatus = factoryStatusFromEventStyle(stateMap?.[status]);
+  if (mappedStatus !== undefined) {
+    return mappedStatus;
+  }
+
+  // Mapper success aliases (buildActionStateRegistry) are not in the whitelist.
+  return "passed";
 }
 
 /**
@@ -65,14 +74,30 @@ export function normalizeFactoryNodeStatus(status: string | undefined): FactoryN
 export function resolveFactoryRuntimeStatus({
   eventState,
   runIsActive = true,
+  stateMap,
 }: {
   eventState: string | undefined;
   runIsActive?: boolean;
+  stateMap?: EventStateMap;
 }): FactoryNodeStatus {
   if (isUnsetEventState(eventState)) {
     return runIsActive ? "pending" : "did_not_run";
   }
-  return normalizeFactoryNodeStatus(eventState);
+  return normalizeFactoryNodeStatus(eventState, stateMap);
+}
+
+function factoryStatusFromEventStyle(style: EventStateStyle | undefined): FactoryNodeStatus | undefined {
+  if (style === undefined) {
+    return undefined;
+  }
+
+  for (const [eventState, defaultStyle] of Object.entries(DEFAULT_EVENT_STATE_MAP)) {
+    if (style.icon === defaultStyle.icon && style.badgeColor === defaultStyle.badgeColor) {
+      return normalizeFactoryNodeStatus(eventState);
+    }
+  }
+
+  return undefined;
 }
 
 export function factoryNodeStatusLabel(status: FactoryNodeStatus): string {
