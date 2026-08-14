@@ -1,7 +1,6 @@
 import type { FactoriesFactoryLine, FactoriesWorkOrder, FactoryLineStep } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { Heading } from "@/components/Heading/heading";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
@@ -9,10 +8,11 @@ import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { ArrowLeft, Layers, MoreHorizontal, Pencil, Plus, Workflow } from "lucide-react";
+import { Layers, MoreHorizontal, Pencil, Plus, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import {
   buildLinePhaseBoard,
   LINE_PHASE_RUNS_PAGE_SIZE,
@@ -30,12 +30,7 @@ import {
   linesPath,
   workOrderDetailPath,
 } from "../lib/factoryPagePaths";
-import {
-  factoryContentBodyClassName,
-  factoryContentHeaderClassName,
-  factoryPageSubtitleClassName,
-  factoryPageTitleClassName,
-} from "./factoryPageLayoutStyles";
+import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
 
 export function LinesPage() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
@@ -56,30 +51,32 @@ export function LinesPage() {
 
   return (
     <>
-      <header className={factoryContentHeaderClassName}>
-        <div>
-          <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
-            Lines
-          </Heading>
-          <p className={cn("mt-1", factoryPageSubtitleClassName)}>
-            Factory lines specialize how work moves through the workspace. Each phase is backed by a canvas that runs
-            work orders.
-          </p>
-        </div>
-        {selectedLine == null ? (
-          <PermissionTooltip
-            allowed={canUpdate || permissionsLoading}
-            message="You don't have permission to create lines."
-          >
-            <Button type="button" variant="outline" asChild disabled={!canUpdate} data-testid="lines-create-button">
-              <Link href={canUpdate ? createFactoryLinePath(organizationId, factoryKey) : "#"}>
-                <Plus className="h-3.5 w-3.5" aria-hidden />
-                Add line
-              </Link>
-            </Button>
-          </PermissionTooltip>
-        ) : null}
-      </header>
+      {selectedLine == null ? (
+        <WorkspacePageHeader
+          title="Lines"
+          subtitle="Factory lines specialize how work moves through the workspace. Each phase is backed by a canvas that runs work orders."
+          actions={
+            <PermissionTooltip
+              allowed={canUpdate || permissionsLoading}
+              message="You don't have permission to create lines."
+            >
+              <Button type="button" size="sm" asChild disabled={!canUpdate} data-testid="lines-create-button">
+                <Link href={canUpdate ? createFactoryLinePath(organizationId, factoryKey) : "#"}>
+                  <Plus className="size-3.5" aria-hidden />
+                  New line
+                </Link>
+              </Button>
+            </PermissionTooltip>
+          }
+        />
+      ) : (
+        <LineDetailHeader
+          organizationId={organizationId}
+          factoryKey={factoryKey}
+          line={selectedLine}
+          canUpdate={canUpdate}
+        />
+      )}
 
       <div className={factoryContentBodyClassName}>
         {selectedLine ? (
@@ -88,7 +85,6 @@ export function LinesPage() {
             factoryKey={factoryKey}
             line={selectedLine}
             workOrders={workOrders}
-            canUpdate={canUpdate}
           />
         ) : lines.length === 0 ? (
           <EmptyLinesState
@@ -120,63 +116,59 @@ export function LinesPage() {
   );
 }
 
-function LineDetail({
+function LineDetailHeader({
   organizationId,
   factoryKey,
   line,
-  workOrders,
   canUpdate,
 }: {
   organizationId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
-  workOrders: FactoriesWorkOrder[];
   canUpdate: boolean;
 }) {
   const steps = line.steps ?? [];
   const editHref = line.id ? editFactoryLinePath(organizationId, factoryKey, line.id) : "#";
+  return (
+    <WorkspacePageHeader
+      variant="entity"
+      backHref={linesPath(organizationId, factoryKey)}
+      backLabel="Lines"
+      backTestId="lines-back-to-list"
+      title={line.name || "Unnamed line"}
+      subtitle={formatPhaseCount(steps.length)}
+      actions={
+        canUpdate ? (
+          <Button type="button" variant="outline" size="sm" asChild data-testid="lines-edit-button">
+            <Link href={editHref}>
+              <Pencil className="size-3.5" aria-hidden />
+              Edit
+            </Link>
+          </Button>
+        ) : undefined
+      }
+    />
+  );
+}
+
+function LineDetail({
+  organizationId,
+  factoryKey,
+  line,
+  workOrders,
+}: {
+  organizationId: string;
+  factoryKey: string;
+  line: FactoriesFactoryLine;
+  workOrders: FactoriesWorkOrder[];
+}) {
+  const steps = line.steps ?? [];
   const board = useMemo(() => buildLinePhaseBoard(line, workOrders ?? []), [line, workOrders]);
 
   return (
     <div data-testid="lines-detail">
-      <Link
-        href={linesPath(organizationId, factoryKey)}
-        className="mb-3 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
-        data-testid="lines-back-to-list"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-        All lines
-      </Link>
-
-      <section className={cn("w-full rounded-lg border border-foreground bg-background px-3.5 py-3")}>
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <Workflow className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden />
-              <h2 className="text-[13px] font-medium tracking-[-0.01em] text-foreground">
-                {line.name || "Unnamed line"}
-              </h2>
-            </div>
-            <p className="mt-1 text-[12px] leading-snug text-muted-foreground">{formatPhaseCount(steps.length)}</p>
-          </div>
-          {canUpdate ? (
-            <Link
-              href={editHref}
-              className="inline-flex shrink-0 items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
-              data-testid="lines-edit-button"
-            >
-              <Pencil className="h-3.5 w-3.5" aria-hidden />
-              Edit
-            </Link>
-          ) : null}
-        </div>
-        {steps.length > 0 ? <PhaseStrip steps={steps} ticks={board.map((column) => column.tick)} /> : null}
-      </section>
-
       {steps.length === 0 ? (
-        <p className="mt-6 text-[13px] text-muted-foreground">
-          No phases yet. Edit this line to add app-driven phases.
-        </p>
+        <p className="text-[13px] text-muted-foreground">No phases yet. Edit this line to add app-driven phases.</p>
       ) : (
         <PhaseBoard organizationId={organizationId} factoryKey={factoryKey} lineId={line.id} columns={board} />
       )}
@@ -455,10 +447,10 @@ function EmptyLinesState({
       <p className="mt-1 max-w-md text-[13px] text-muted-foreground">
         Lines define how work orders flow through your apps.
       </p>
-      <Button type="button" asChild className="mt-6" disabled={!canUpdate}>
+      <Button type="button" size="sm" asChild className="mt-6" disabled={!canUpdate}>
         <Link href={canUpdate ? createFactoryLinePath(organizationId, factoryKey) : "#"}>
-          <Plus className="h-3.5 w-3.5" aria-hidden />
-          Add line
+          <Plus className="size-3.5" aria-hidden />
+          New line
         </Link>
       </Button>
     </div>
