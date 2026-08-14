@@ -15,6 +15,7 @@ import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "../li
 import { OrgUserReference } from "../OrgUserReference";
 import { WorkOrderAssigneesPopover } from "../WorkOrderAssigneesPopover";
 import { OverviewRow, SidebarSectionHeading } from "./SidebarPrimitives";
+import { useWorkOrderOverviewMissionSlot } from "./workOrderOverviewSlots";
 
 interface WorkOrderSidebarOverviewProps {
   organizationId: string;
@@ -43,6 +44,7 @@ export function WorkOrderSidebarOverview({
   const totalTokens = parseWorkOrderMetric(order.totalTokens);
   const totalCostCents = parseWorkOrderMetric(order.totalCostCents);
   const showSpending = totalTokens > 0 || totalCostCents > 0;
+  const MissionSlot = useWorkOrderOverviewMissionSlot();
 
   return (
     <section>
@@ -64,6 +66,8 @@ export function WorkOrderSidebarOverview({
           isSaving={isAssigneesSaving}
           onSave={onAssigneesSave}
         />
+
+        {MissionSlot ? <MissionSlot workOrderId={order.id ?? ""} /> : null}
 
         {createdAt ? (
           <OverviewRow icon={<Calendar className="size-3.5" aria-hidden />} srLabel="Created">
