@@ -34,7 +34,6 @@ interface WorkOrderDetailLoadedViewProps {
   assigneeIds: string[];
   assigneeNames: string[];
   factoryLines: FactoriesFactoryLine[];
-  canEditFactoryLines: boolean;
   isOpen: boolean;
   isDispatchable: boolean;
   isClosed: boolean;
@@ -102,7 +101,6 @@ function WorkOrderDetailBody({
   assigneeIds,
   assigneeNames,
   factoryLines,
-  canEditFactoryLines,
   isDispatchable,
   canDispatch,
   canAssign,
@@ -163,7 +161,6 @@ function WorkOrderDetailBody({
             assigneeIds={assigneeIds}
             assigneeNames={assigneeNames}
             factoryLines={factoryLines}
-            canEditFactoryLines={canEditFactoryLines}
             canAssign={canAssign}
             canDispatch={canDispatch}
             permissionsLoading={permissionsLoading}
