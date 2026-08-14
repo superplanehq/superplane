@@ -19,10 +19,12 @@ interface CustomEdgeData {
   isHovered?: boolean;
   canDelete?: boolean;
   onDelete?: (edgeId: string) => void;
-  /** Factory run compact forks: original channel name (true/false/…). */
+  /** Factory run display: original channel name shown as an edge badge. */
   channelLabel?: string;
-  /** Factory run long/cross-column edges: route clear of node cards. */
+  /** Factory run long, cross-column, or feedback edge: route clear of node cards. */
   routeGutterX?: number;
+  /** Feedback-only Y stagger for adjacent return routes. */
+  routeOffsetY?: number;
   /** Factory run: this edge geometrically touches/crosses another. */
   touchesOtherEdge?: boolean;
   /** Factory run: longer edge in a touch pair — darker stroke + label border. */
@@ -133,6 +135,10 @@ function readCustomEdgeData(data: EdgeProps["data"]) {
     typeof edgeData?.routeGutterX === "number" && Number.isFinite(edgeData.routeGutterX)
       ? edgeData.routeGutterX
       : undefined;
+  const routeOffsetY =
+    typeof edgeData?.routeOffsetY === "number" && Number.isFinite(edgeData.routeOffsetY)
+      ? edgeData.routeOffsetY
+      : undefined;
   return {
     isHovered: edgeData?.isHovered === true,
     canDelete: edgeData?.canDelete === true,
@@ -141,6 +147,7 @@ function readCustomEdgeData(data: EdgeProps["data"]) {
     touchesOtherEdge: edgeData?.touchesOtherEdge === true,
     contrastStroke: edgeData?.contrastStroke === true,
     routeGutterX,
+    routeOffsetY,
   };
 }
 
@@ -182,8 +189,16 @@ export const CustomEdge = React.memo(function CustomEdge({
   const { setEdges } = useReactFlow();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
-  const { isHovered, canDelete, onDeleteEdge, channelLabel, touchesOtherEdge, contrastStroke, routeGutterX } =
-    readCustomEdgeData(data);
+  const {
+    isHovered,
+    canDelete,
+    onDeleteEdge,
+    channelLabel,
+    touchesOtherEdge,
+    contrastStroke,
+    routeGutterX,
+    routeOffsetY,
+  } = readCustomEdgeData(data);
 
   const [edgePath, labelX, labelY] = getCanvasEdgePath({
     sourceX,
@@ -193,6 +208,7 @@ export const CustomEdge = React.memo(function CustomEdge({
     targetY,
     targetPosition,
     routeGutterX,
+    routeOffsetY,
   });
 
   const pathLength = estimatePathLength(edgePath);

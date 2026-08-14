@@ -15,6 +15,97 @@ function expectNoOverlaps(positions: Map<string, { x: number; y: number }>, widt
 }
 
 describe("layoutFactoryRunLeafGraph", () => {
+  it("keeps multiple roots and their branches in separate saved-position lanes", () => {
+    const result = layoutFactoryRunLeafGraph(
+      [
+        { id: "merge", position: { x: 576, y: 978 } },
+        { id: "right-root", position: { x: 1044, y: 258 } },
+        { id: "left-root", position: { x: 576, y: 258 } },
+        { id: "right-filter", position: { x: 1044, y: 618 } },
+        { id: "left-filter", position: { x: 576, y: 618 } },
+      ],
+      [
+        { source: "right-root", target: "right-filter", sourceHandle: "default" },
+        { source: "left-root", target: "left-filter", sourceHandle: "default" },
+        { source: "right-filter", target: "merge", sourceHandle: "default" },
+        { source: "left-filter", target: "merge", sourceHandle: "default" },
+      ],
+    );
+
+    const leftRoot = result.positions.get("left-root")!;
+    const rightRoot = result.positions.get("right-root")!;
+    const leftFilter = result.positions.get("left-filter")!;
+    const rightFilter = result.positions.get("right-filter")!;
+    const merge = result.positions.get("merge")!;
+
+    expect(leftRoot.y).toBe(rightRoot.y);
+    expect(leftRoot.x).toBeLessThan(rightRoot.x);
+    expect(leftFilter.x).toBe(leftRoot.x);
+    expect(rightFilter.x).toBe(rightRoot.x);
+    expect(leftFilter.y).toBe(rightFilter.y);
+    expect(merge.x).toBe(leftFilter.x);
+    expect(merge.y).toBeGreaterThan(leftFilter.y);
+    expectNoOverlaps(result.positions);
+  });
+
+  it("assigns overlapping feedback edges to separate left gutters", () => {
+    const result = layoutFactoryRunLeafGraph(
+      [
+        { id: "trigger", position: { x: 768, y: 1848 } },
+        { id: "loop", position: { x: 769, y: 2064 } },
+        { id: "workflow", position: { x: 1104, y: 2304 } },
+        { id: "runner", position: { x: 1200, y: 2592 } },
+        { id: "done", position: { x: 699, y: 2424 } },
+      ],
+      [
+        { id: "trigger-loop", source: "trigger", target: "loop", sourceHandle: "default" },
+        { id: "loop-workflow", source: "loop", target: "workflow", sourceHandle: "next" },
+        { id: "workflow-loop", source: "workflow", target: "loop", sourceHandle: "passed" },
+        { id: "workflow-runner", source: "workflow", target: "runner", sourceHandle: "failed" },
+        { id: "runner-loop-passed", source: "runner", target: "loop", sourceHandle: "passed" },
+        { id: "runner-loop-failed", source: "runner", target: "loop", sourceHandle: "failed" },
+        { id: "loop-done", source: "loop", target: "done", sourceHandle: "done" },
+      ],
+    );
+
+    const feedbackKeys = [
+      factoryRunLeafEdgeKey("workflow", "loop", "passed"),
+      factoryRunLeafEdgeKey("runner", "loop", "passed"),
+      factoryRunLeafEdgeKey("runner", "loop", "failed"),
+    ];
+    const gutters = feedbackKeys.map((key) => result.edgeRouteGutters.get(key));
+    const yOffsets = feedbackKeys.map((key) => result.edgeRouteOffsetsY.get(key));
+    const graphLeft = Math.min(...[...result.positions.values()].map((position) => position.x));
+
+    expect(feedbackKeys.every((key) => result.feedbackEdgeKeys.has(key))).toBe(true);
+    expect(new Set(gutters).size).toBe(3);
+    expect(yOffsets).toEqual([0, 16, 32]);
+    expect(gutters.every((gutter) => gutter != null && gutter < graphLeft)).toBe(true);
+    expect(result.displaySourceNodeIds.has("runner")).toBe(true);
+    expect(result.spineSourceNodeIds.has("runner")).toBe(true);
+    expectNoOverlaps(result.positions);
+  });
+
+  it("reuses a feedback gutter when vertical intervals do not overlap", () => {
+    const result = layoutFactoryRunLeafGraph(
+      [{ id: "root" }, { id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }],
+      [
+        { source: "root", target: "a", sourceHandle: "default" },
+        { source: "a", target: "b", sourceHandle: "default" },
+        { source: "b", target: "a", sourceHandle: "repeat" },
+        { source: "b", target: "c", sourceHandle: "default" },
+        { source: "c", target: "d", sourceHandle: "default" },
+        { source: "d", target: "c", sourceHandle: "repeat" },
+      ],
+    );
+
+    const firstGutter = result.edgeRouteGutters.get(factoryRunLeafEdgeKey("b", "a", "repeat"));
+    const secondGutter = result.edgeRouteGutters.get(factoryRunLeafEdgeKey("d", "c", "repeat"));
+
+    expect(firstGutter).toBeDefined();
+    expect(secondGutter).toBe(firstGutter);
+  });
+
   it("keeps the longest non-leaf path on the spine and parks leaves to the right", () => {
     const result = layoutFactoryRunLeafGraph(
       [{ id: "a" }, { id: "b" }, { id: "leaf1" }, { id: "leaf2" }, { id: "d" }, { id: "e" }],
@@ -94,7 +185,7 @@ describe("layoutFactoryRunLeafGraph", () => {
     expect(s2.x).toBeGreaterThan(s1.x);
     expect(result.leafEdgeKeys.has(factoryRunLeafEdgeKey("router", "failed", "false"))).toBe(true);
     expect(result.leafEdgeKeys.has(factoryRunLeafEdgeKey("router", "success", "true"))).toBe(false);
-    expect(result.compactForkNodeIds.has("router")).toBe(true);
+    expect(result.displaySourceNodeIds.has("router")).toBe(true);
     expect(result.spineSourceNodeIds.has("router")).toBe(true);
     expect(result.spineEdgeKeys.has(factoryRunLeafEdgeKey("router", "success", "true"))).toBe(true);
     expectNoOverlaps(result.positions);

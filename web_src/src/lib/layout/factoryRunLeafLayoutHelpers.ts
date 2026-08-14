@@ -9,11 +9,11 @@ export const DEFAULT_NODE_WIDTH = FACTORY_NODE_CARD_WIDTH;
 export const DEFAULT_NODE_HEIGHT = FACTORY_NODE_CARD_HEIGHT;
 export const MAIN_X = 120;
 const SIDE_GAP = 96;
-const VERTICAL_GAP = 104;
+export const VERTICAL_GAP = 104;
 const SIDE_COLUMN_EXTRA_GAP = 88;
 export const COMPONENT_GAP_X = 120;
 export const GUTTER_PAD = 48;
-const SIDE_X_THRESHOLD = SIDE_GAP / 2;
+export const SIDE_X_THRESHOLD = SIDE_GAP / 2;
 
 const SPINE_CHANNEL_PRIORITY: Record<string, number> = {
   default: 0,
@@ -34,13 +34,13 @@ export function nodeSize(node: FactoryRunLayoutNode): { width: number; height: n
   };
 }
 
-function channelPriority(channel: string | null | undefined): number {
+export function factoryRunChannelPriority(channel: string | null | undefined): number {
   const key = (channel ?? "default").toLowerCase();
   return SPINE_CHANNEL_PRIORITY[key] ?? 50;
 }
 
 function compareChildEdges(a: FactoryRunLayoutEdge, b: FactoryRunLayoutEdge): number {
-  const byChannel = channelPriority(a.sourceHandle) - channelPriority(b.sourceHandle);
+  const byChannel = factoryRunChannelPriority(a.sourceHandle) - factoryRunChannelPriority(b.sourceHandle);
   if (byChannel !== 0) return byChannel;
   const handleA = a.sourceHandle ?? "default";
   const handleB = b.sourceHandle ?? "default";
@@ -67,8 +67,14 @@ function hasPath(
   return false;
 }
 
-export function resolveForwardEdges(edges: FactoryRunLayoutEdge[], nodeIds: Set<string>): FactoryRunLayoutEdge[] {
+export type FactoryRunEdgePartition = {
+  forwardEdges: FactoryRunLayoutEdge[];
+  feedbackEdges: FactoryRunLayoutEdge[];
+};
+
+export function partitionLayoutEdges(edges: FactoryRunLayoutEdge[], nodeIds: Set<string>): FactoryRunEdgePartition {
   const forward: FactoryRunLayoutEdge[] = [];
+  const feedback: FactoryRunLayoutEdge[] = [];
   const adjacency = new Map<string, string[]>();
 
   for (const edge of edges) {
@@ -76,13 +82,14 @@ export function resolveForwardEdges(edges: FactoryRunLayoutEdge[], nodeIds: Set<
       continue;
     }
     if (hasPath(adjacency, edge.target, edge.source)) {
+      feedback.push(edge);
       continue;
     }
     forward.push(edge);
     adjacency.set(edge.source, [...(adjacency.get(edge.source) ?? []), edge.target]);
   }
 
-  return forward;
+  return { forwardEdges: forward, feedbackEdges: feedback };
 }
 
 export function buildAdjacency(
@@ -261,42 +268,45 @@ export function computeComponentLayers(
   return layer;
 }
 
-export function computeComponentSpine(
+export function computeComponentSpineColumns(
   rootsForComponent: string[],
   componentSet: Set<string>,
   outgoing: Map<string, FactoryRunLayoutEdge[]>,
   pickMainChildEdge: SpinePickers["pickMainChildEdge"],
-): Set<string> {
-  const spine = new Set<string>();
-  for (const rootId of rootsForComponent) {
+): Map<string, number> {
+  const spineColumns = new Map<string, number>();
+  rootsForComponent.forEach((rootId, rootColumn) => {
     let current: string | null = rootId;
+    const visited = new Set<string>();
     while (current) {
-      spine.add(current);
+      const currentColumn = spineColumns.get(current);
+      if (currentColumn == null || rootColumn < currentColumn) {
+        spineColumns.set(current, rootColumn);
+      }
+      visited.add(current);
       const main = pickMainChildEdge((outgoing.get(current) ?? []).filter((e) => componentSet.has(e.target)));
       current = main?.target ?? null;
-      if (current && spine.has(current)) {
+      if (current && visited.has(current)) {
         break;
       }
     }
-  }
-  return spine;
+  });
+  return spineColumns;
 }
 
 type AssignComponentColumnsOptions = {
   component: string[];
   componentSet: Set<string>;
-  spine: Set<string>;
+  spineColumns: Map<string, number>;
+  firstSideColumn: number;
   layer: Map<string, number>;
   incoming: Map<string, FactoryRunLayoutEdge[]>;
   isMainSuccessor: SpinePickers["isMainSuccessor"];
 };
 
 export function assignComponentColumns(options: AssignComponentColumnsOptions): Map<string, number> {
-  const { component, componentSet, spine, layer, incoming, isMainSuccessor } = options;
-  const column = new Map<string, number>();
-  for (const id of spine) {
-    column.set(id, 0);
-  }
+  const { component, componentSet, spineColumns, firstSideColumn, layer, incoming, isMainSuccessor } = options;
+  const column = new Map(spineColumns);
 
   const byLayer = [...component].sort((a, b) => (layer.get(a) ?? 0) - (layer.get(b) ?? 0) || a.localeCompare(b));
   for (const id of byLayer) {
@@ -313,7 +323,7 @@ export function assignComponentColumns(options: AssignComponentColumnsOptions): 
     }
     const parentCol = parentCols[0];
     const parentId = parents[0].source;
-    column.set(id, isMainSuccessor(parentId, id) ? parentCol : parentCol + 1);
+    column.set(id, isMainSuccessor(parentId, id) ? parentCol : Math.max(parentCol + 1, firstSideColumn));
   }
   return column;
 }
@@ -351,12 +361,13 @@ type PlaceColumnNodeOptions = {
   componentSet: Set<string>;
   incoming: Map<string, FactoryRunLayoutEdge[]>;
   positions: Map<string, FactoryRunLayoutPosition>;
+  isSpineNode: boolean;
 };
 
 function placeOneColumnNode(options: PlaceColumnNodeOptions): { y: number; right: number } {
-  const { id, x, col, nextY, size, componentSet, incoming, positions } = options;
+  const { id, x, col, nextY, size, componentSet, incoming, positions, isSpineNode } = options;
   let preferredY = options.preferredY;
-  if (col > 0) {
+  if (col > 0 && !isSpineNode) {
     const parentYs = parentYsBeside(id, componentSet, incoming, positions);
     if (parentYs.length > 0) {
       preferredY = Math.min(...parentYs);
@@ -376,10 +387,12 @@ type PlaceComponentNodesOptions = {
   nodeById: Map<string, FactoryRunLayoutNode>;
   incoming: Map<string, FactoryRunLayoutEdge[]>;
   positions: Map<string, FactoryRunLayoutPosition>;
+  spineColumns: Map<string, number>;
 };
 
 export function placeComponentNodes(options: PlaceComponentNodesOptions): number {
-  const { component, componentSet, column, layer, componentOriginX, nodeById, incoming, positions } = options;
+  const { component, componentSet, column, layer, componentOriginX, nodeById, incoming, positions, spineColumns } =
+    options;
   let maxRight = componentOriginX;
   const strideY = DEFAULT_NODE_HEIGHT + VERTICAL_GAP;
   const strideX = DEFAULT_NODE_WIDTH + SIDE_GAP;
@@ -390,7 +403,8 @@ export function placeComponentNodes(options: PlaceComponentNodesOptions): number
     const ids = byColumn.get(col)!;
     ids.sort((a, b) => (layer.get(a) ?? 0) - (layer.get(b) ?? 0) || a.localeCompare(b));
     const x = componentOriginX + col * strideX;
-    const gapY = col > 0 ? VERTICAL_GAP + SIDE_COLUMN_EXTRA_GAP : VERTICAL_GAP;
+    const hasSpineNodes = ids.some((id) => spineColumns.has(id));
+    const gapY = hasSpineNodes ? VERTICAL_GAP : VERTICAL_GAP + SIDE_COLUMN_EXTRA_GAP;
     let nextY = 0;
     for (const id of ids) {
       const size = nodeSize(nodeById.get(id)!);
@@ -404,134 +418,11 @@ export function placeComponentNodes(options: PlaceComponentNodesOptions): number
         componentSet,
         incoming,
         positions,
+        isSpineNode: spineColumns.has(id),
       });
       maxRight = Math.max(maxRight, placed.right);
       nextY = placed.y + size.height + gapY;
     }
   }
   return maxRight;
-}
-
-type ResolveEdgeGutterOptions = {
-  key: string;
-  isSide: boolean;
-  sourcePos: FactoryRunLayoutPosition;
-  targetPos: FactoryRunLayoutPosition;
-  sourceLayer: number;
-  targetLayer: number;
-  sourceCol: number;
-  targetCol: number;
-  graphRight: number;
-  edgeRouteGutters: Map<string, number>;
-};
-
-export function resolveEdgeGutter(options: ResolveEdgeGutterOptions): void {
-  const {
-    key,
-    isSide,
-    sourcePos,
-    targetPos,
-    sourceLayer,
-    targetLayer,
-    sourceCol,
-    targetCol,
-    graphRight,
-    edgeRouteGutters,
-  } = options;
-  const layerSkip = targetLayer - sourceLayer > 1;
-  const crossColumn = Math.abs(sourceCol - targetCol) > 0;
-  if (isSide || (!layerSkip && !crossColumn)) return;
-
-  const leftwardMerge = sourcePos.x > targetPos.x + SIDE_X_THRESHOLD;
-  if (!leftwardMerge) {
-    edgeRouteGutters.set(key, graphRight);
-    return;
-  }
-
-  const nearby = targetPos.y - sourcePos.y < (DEFAULT_NODE_HEIGHT + VERTICAL_GAP) * 3;
-  if (!nearby) {
-    edgeRouteGutters.set(key, sourcePos.x + DEFAULT_NODE_WIDTH + GUTTER_PAD);
-  }
-}
-
-type ClassifyComponentEdgesOptions = {
-  componentEdges: FactoryRunLayoutEdge[];
-  positions: Map<string, FactoryRunLayoutPosition>;
-  layer: Map<string, number>;
-  column: Map<string, number>;
-  graphRight: number;
-  leafEdgeKeys: Set<string>;
-  spineEdgeKeys: Set<string>;
-  sideHandleNodeIds: Set<string>;
-  sideTargetNodeIds: Set<string>;
-  edgeRouteGutters: Map<string, number>;
-};
-
-export function classifyComponentEdges(options: ClassifyComponentEdgesOptions): void {
-  const {
-    componentEdges,
-    positions,
-    layer,
-    column,
-    graphRight,
-    leafEdgeKeys,
-    spineEdgeKeys,
-    sideHandleNodeIds,
-    sideTargetNodeIds,
-    edgeRouteGutters,
-  } = options;
-  for (const edge of componentEdges) {
-    const sourcePos = positions.get(edge.source);
-    const targetPos = positions.get(edge.target);
-    if (!sourcePos || !targetPos) continue;
-
-    const key = factoryRunLeafEdgeKey(edge.source, edge.target, edge.sourceHandle);
-    const isSide = targetPos.x >= sourcePos.x + SIDE_X_THRESHOLD;
-    if (isSide) {
-      leafEdgeKeys.add(key);
-      sideHandleNodeIds.add(edge.source);
-      sideTargetNodeIds.add(edge.target);
-    } else {
-      spineEdgeKeys.add(key);
-    }
-    resolveEdgeGutter({
-      key,
-      isSide,
-      sourcePos,
-      targetPos,
-      graphRight,
-      edgeRouteGutters,
-      sourceLayer: layer.get(edge.source) ?? 0,
-      targetLayer: layer.get(edge.target) ?? 0,
-      sourceCol: column.get(edge.source) ?? 0,
-      targetCol: column.get(edge.target) ?? 0,
-    });
-  }
-}
-
-type MarkCompactForkNodesOptions = {
-  component: string[];
-  outgoing: Map<string, FactoryRunLayoutEdge[]>;
-  leafEdgeKeys: Set<string>;
-  spineEdgeKeys: Set<string>;
-  compactForkNodeIds: Set<string>;
-  spineSourceNodeIds: Set<string>;
-};
-
-export function markCompactForkNodes(options: MarkCompactForkNodesOptions): void {
-  const { component, outgoing, leafEdgeKeys, spineEdgeKeys, compactForkNodeIds, spineSourceNodeIds } = options;
-  for (const id of component) {
-    const outs = outgoing.get(id) ?? [];
-    const hasSide = outs.some((edge) =>
-      leafEdgeKeys.has(factoryRunLeafEdgeKey(edge.source, edge.target, edge.sourceHandle)),
-    );
-    if (!hasSide) continue;
-    compactForkNodeIds.add(id);
-    const hasSpine = outs.some((edge) =>
-      spineEdgeKeys.has(factoryRunLeafEdgeKey(edge.source, edge.target, edge.sourceHandle)),
-    );
-    if (hasSpine) {
-      spineSourceNodeIds.add(id);
-    }
-  }
 }
