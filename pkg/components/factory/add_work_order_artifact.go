@@ -30,6 +30,7 @@ type AddWorkOrderArtifactConfiguration struct {
 	ArtifactType string              `json:"artifactType" mapstructure:"artifactType"`
 	URL          string              `json:"url" mapstructure:"url"`
 	Number       string              `json:"number" mapstructure:"number"`
+	State        string              `json:"state" mapstructure:"state"`
 	Title        string              `json:"title" mapstructure:"title"`
 	Body         string              `json:"body" mapstructure:"body"`
 	Name         string              `json:"name" mapstructure:"name"`
@@ -54,13 +55,15 @@ func (c *AddWorkOrderArtifact) Documentation() string {
 
 Supported types:
 
-- **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + ` and ` + "`title`" + `.
+- **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + `, ` + "`title`" + `, and ` + "`state`" + ` (` + "`open`" + `/` + "`draft`" + `/` + "`closed`" + `/` + "`merged`" + `, defaults to ` + "`open`" + `) which drives the icon/color of the artifact chip in the work order UI.
 - **Markdown note** (` + "`markdown`" + `): requires ` + "`body`" + `; optional ` + "`title`" + `.
 - **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` (the branch name); optional ` + "`url`" + ` to link to the branch on its provider (e.g. a GitHub tree URL).
 
 PR and markdown types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key.
 
 Set ` + "`artifactKey`" + ` to tag the artifact with a queryable key (e.g. the pull request's URL) so a later ` + "`findWorkOrder`" + ` (` + "`by: artifactKey`" + `) step can resolve this work order from it — useful in flows that aren't dispatched from a factory line, such as closing a work order from a ` + "`github.onPullRequest`" + ` merged event. Keys are unique per factory.
+
+A pull request's ` + "`state`" + ` normally changes after it's attached — set ` + "`artifactKey`" + ` at attach time, then use ` + "`updateWorkOrderArtifact`" + ` (targeting the same key) from a ` + "`github.onPullRequest`" + ` flow to keep it current as the PR is drafted, reopened, closed, or merged.
 
 ` + "`orderId`" + ` explicitly targets the work order — it defaults to ` + "`{{ order().id }}`" + `, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. ` + "`{{ previous().data.workOrder.id }}`" + `. This component can only be used in factory-owned apps.`
 }
@@ -85,6 +88,7 @@ func (c *AddWorkOrderArtifact) ExampleOutput() map[string]any {
 					"url":      "https://github.com/example/repo/pull/42",
 					"number":   "42",
 					"title":    "Draft implementation",
+					"state":    "open",
 					"provider": "github",
 				},
 			},
@@ -148,6 +152,25 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
 			VisibilityConditions: prOnly,
+		},
+		{
+			Name:                 "state",
+			Label:                "State",
+			Description:          "Pull request state — drives the artifact chip's icon/color. Update it later with updateWorkOrderArtifact as the PR progresses.",
+			Type:                 configuration.FieldTypeSelect,
+			Required:             false,
+			Default:              "open",
+			VisibilityConditions: prOnly,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Open", Value: "open"},
+						{Label: "Draft", Value: "draft"},
+						{Label: "Closed", Value: "closed"},
+						{Label: "Merged", Value: "merged"},
+					},
+				},
+			},
 		},
 		{
 			Name:                 "body",
@@ -275,6 +298,7 @@ func buildArtifactData(config AddWorkOrderArtifactConfiguration) map[string]any 
 	typed := map[string]string{
 		"url":    config.URL,
 		"number": config.Number,
+		"state":  config.State,
 		"title":  config.Title,
 		"body":   config.Body,
 		"name":   config.Name,

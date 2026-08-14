@@ -45,6 +45,13 @@ export function invalidateFactoryWorkOrderQueries(
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.workOrderEvents(organizationId, factoryId, orderId),
   });
+  // Artifact state (e.g. a PR flipping open/draft/closed/merged via
+  // updateWorkOrderArtifact) and new artifacts (addWorkOrderArtifact)
+  // both land here — without this, the sidebar artifact list and the
+  // timeline's live-data overlay silently go stale until a manual reload.
+  void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, orderId),
+  });
 }
 
 export function useFactoryWebsocket(organizationId: string, factoryId: string, enabled = true): void {
