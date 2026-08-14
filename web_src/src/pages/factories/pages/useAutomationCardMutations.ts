@@ -1,13 +1,14 @@
 import type { FactoryApp } from "@/api-client";
-import { useCreateCanvas, useDeleteCanvas } from "@/hooks/useCanvasData";
+import { canvasKeys, useCreateCanvas, useDeleteCanvas } from "@/hooks/useCanvasData";
 import { factoryAppsKey } from "@/hooks/useFactoryData";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { automationsPath, factoryAppConfigurePath } from "../lib/factoryPagePaths";
-import { duplicateAutomationName, type AutomationCardActions } from "./automationCardActions";
+import type { AutomationCardActions } from "./automationCardActions";
+import { duplicateAutomationCanvas } from "./duplicateAutomationCanvas";
 
 export function useAutomationCardMutations(args: {
   organizationId: string;
@@ -23,6 +24,9 @@ export function useAutomationCardMutations(args: {
   const queryClient = useQueryClient();
   const createCanvas = useCreateCanvas(organizationId);
   const deleteCanvas = useDeleteCanvas(organizationId);
+  const [isDuplicating, setIsDuplicating] = useState(false);
+  // Reuse a canvas created on a failed stage/commit so retry does not spawn empties.
+  const pendingDuplicateCanvasIds = useRef(new Map<string, string>());
 
   const invalidateFactoryApps = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
@@ -40,25 +44,41 @@ export function useAutomationCardMutations(args: {
 
   const handleDuplicateAutomation = useCallback(
     async (app: FactoryApp) => {
+      if (isDuplicating || !app.id) {
+        return;
+      }
+      setIsDuplicating(true);
       try {
-        const result = await createCanvas.mutateAsync({
-          name: duplicateAutomationName(app.name),
-          description: app.description ?? "",
+        const canvasId = await duplicateAutomationCanvas({
           factoryId,
-          method: "ui",
+          app,
+          createCanvas: createCanvas.mutateAsync,
+          pendingCanvasId: pendingDuplicateCanvasIds.current.get(app.id),
+          onCanvasCreated: (createdCanvasId) => {
+            pendingDuplicateCanvasIds.current.set(app.id!, createdCanvasId);
+          },
         });
-        const canvasId = result?.data?.canvas?.metadata?.id;
+        pendingDuplicateCanvasIds.current.delete(app.id);
         invalidateFactoryApps();
-        if (!canvasId) {
-          return;
-        }
+        queryClient.removeQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
         showSuccessToast("Automation duplicated.");
         navigate(factoryAppConfigurePath(organizationId, factoryKey, canvasId, { from: "automations" }));
       } catch (error) {
         showErrorToast(getUsageLimitToastMessage(error, "Failed to duplicate automation"));
+      } finally {
+        setIsDuplicating(false);
       }
     },
-    [createCanvas, factoryId, factoryKey, invalidateFactoryApps, navigate, organizationId],
+    [
+      createCanvas.mutateAsync,
+      factoryId,
+      factoryKey,
+      invalidateFactoryApps,
+      isDuplicating,
+      navigate,
+      organizationId,
+      queryClient,
+    ],
   );
 
   const handleDeleteAutomation = useCallback(
@@ -89,19 +109,19 @@ export function useAutomationCardMutations(args: {
       canEdit: canUpdateApp,
       canDuplicate: canCreateApp,
       canDelete: canDeleteApp,
-      isDuplicating: createCanvas.isPending,
+      isDuplicating,
       isDeleting: deleteCanvas.isPending && deleteCanvas.variables === app.id,
     }),
     [
       canCreateApp,
       canDeleteApp,
       canUpdateApp,
-      createCanvas.isPending,
       deleteCanvas.isPending,
       deleteCanvas.variables,
       handleDeleteAutomation,
       handleDuplicateAutomation,
       handleEditAutomation,
+      isDuplicating,
     ],
   );
 
