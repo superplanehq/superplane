@@ -23,6 +23,11 @@ func DeleteCanvas(ctx context.Context, db *gorm.DB, canvas *models.Canvas) (*pb.
 	if err := messages.NewCanvasDeletedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishDeleted(); err != nil {
 		log.Errorf("failed to publish canvas deleted RabbitMQ message: %v", err)
 	}
+	if canvas.FactoryID != nil {
+		if publishErr := messages.PublishFactoryAppUpdated(canvas.FactoryID.String(), canvas.ID.String(), "app.deleted"); publishErr != nil {
+			log.Errorf("failed to publish factory app updated RabbitMQ message: %v", publishErr)
+		}
+	}
 
 	return &pb.DeleteCanvasResponse{}, nil
 }

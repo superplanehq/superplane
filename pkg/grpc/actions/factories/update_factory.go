@@ -3,7 +3,9 @@ package factories
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
@@ -27,6 +29,10 @@ func UpdateFactory(ctx context.Context, organizationID string, req *pb.UpdateFac
 
 	if err := factory.Update(db, req.Name, req.Description, req.Key); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory")
+	}
+
+	if publishErr := messages.PublishFactoryUpdated(factory.ID.String(), "factory.updated"); publishErr != nil {
+		log.Errorf("failed to publish factory updated RabbitMQ message: %v", publishErr)
 	}
 
 	lines, err := factory.ListLines(db)

@@ -647,3 +647,18 @@ message FactoryWorkOrderUpdatedMessage {
   string reason = 3;
   google.protobuf.Timestamp timestamp = 4;
 }
+
+// Internal AMQP message for factory app (canvas) websocket fan-out.
+message FactoryAppUpdatedMessage {
+  string factory_id = 1;
+  string app_id = 2;
+  string reason = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+// Internal AMQP message for factory / line websocket fan-out.
+message FactoryUpdatedMessage {
+  string factory_id = 1;
+  string reason = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}

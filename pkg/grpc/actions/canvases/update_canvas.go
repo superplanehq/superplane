@@ -38,6 +38,11 @@ func UpdateCanvas(
 	if publishErr := messages.NewCanvasUpdatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishUpdated(); publishErr != nil {
 		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", publishErr)
 	}
+	if canvas.FactoryID != nil {
+		if publishErr := messages.PublishFactoryAppUpdated(canvas.FactoryID.String(), canvas.ID.String(), "app.updated"); publishErr != nil {
+			log.Errorf("failed to publish factory app updated RabbitMQ message: %v", publishErr)
+		}
+	}
 
 	refreshedCanvas, err := models.FindCanvasInTransaction(db, canvas.OrganizationID, canvas.ID)
 	if err != nil {

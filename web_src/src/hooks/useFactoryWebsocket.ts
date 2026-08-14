@@ -5,15 +5,16 @@ import { factoryQueryKeys } from "./useFactoryData";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/factories/`;
 
-type FactoryWorkOrderUpdatedPayload = {
+type FactoryWebsocketPayload = {
   factoryId?: string;
   orderId?: string;
+  appId?: string;
   reason?: string;
 };
 
 type FactoryWebsocketMessage = {
   event?: string;
-  payload?: FactoryWorkOrderUpdatedPayload;
+  payload?: FactoryWebsocketPayload;
 };
 
 function parseFactoryEvent(event: MessageEvent<unknown>): FactoryWebsocketMessage | null {
@@ -47,11 +48,31 @@ export function invalidateFactoryWorkOrderQueries(
   });
 }
 
+export function invalidateFactoryAppQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  organizationId: string,
+  factoryId: string,
+): void {
+  void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.apps(organizationId, factoryId),
+  });
+}
+
+export function invalidateFactoryDetailQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  organizationId: string,
+  factoryId: string,
+): void {
+  void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.detail(organizationId, factoryId),
+  });
+}
+
 export function useFactoryWebsocket(organizationId: string, factoryId: string, enabled = true): void {
   const queryClient = useQueryClient();
   const hasConnectedOnce = useRef(false);
 
-  const invalidate = useCallback(
+  const invalidateWorkOrders = useCallback(
     (orderId?: string) => {
       if (!organizationId || !factoryId) {
         return;
@@ -61,18 +82,45 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
     [queryClient, organizationId, factoryId],
   );
 
+  const invalidateApps = useCallback(() => {
+    if (!organizationId || !factoryId) {
+      return;
+    }
+    invalidateFactoryAppQueries(queryClient, organizationId, factoryId);
+  }, [queryClient, organizationId, factoryId]);
+
+  const invalidateDetail = useCallback(() => {
+    if (!organizationId || !factoryId) {
+      return;
+    }
+    invalidateFactoryDetailQueries(queryClient, organizationId, factoryId);
+  }, [queryClient, organizationId, factoryId]);
+
   const onMessage = useCallback(
     (event: MessageEvent<unknown>) => {
       const data = parseFactoryEvent(event);
-      if (!data || data.event !== "work_order_updated") {
+      if (!data?.event) {
         return;
       }
       if (data.payload?.factoryId && data.payload.factoryId !== factoryId) {
         return;
       }
-      invalidate(data.payload?.orderId);
+
+      switch (data.event) {
+        case "work_order_updated":
+          invalidateWorkOrders(data.payload?.orderId);
+          return;
+        case "factory_app_updated":
+          invalidateApps();
+          return;
+        case "factory_updated":
+          invalidateDetail();
+          return;
+        default:
+          return;
+      }
     },
-    [factoryId, invalidate],
+    [factoryId, invalidateApps, invalidateDetail, invalidateWorkOrders],
   );
 
   const onOpen = useCallback(() => {
@@ -82,8 +130,10 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
     }
 
     // Catch updates missed while disconnected; WS is the only push channel.
-    invalidate();
-  }, [invalidate]);
+    invalidateWorkOrders();
+    invalidateApps();
+    invalidateDetail();
+  }, [invalidateApps, invalidateDetail, invalidateWorkOrders]);
 
   const url = organizationId && factoryId ? `${SOCKET_SERVER_URL}${factoryId}?organization_id=${organizationId}` : null;
 
