@@ -23,13 +23,13 @@ export function AssigneeChangeDescription({
   if (unassignedUserIds.length > 0) {
     parts.push(
       <span key="unassigned" className="inline-flex flex-wrap items-center gap-x-1 gap-y-1">
-        unassigned <InlineUserList userIds={unassignedUserIds} resolveUserDisplay={resolveUserDisplay} />
+        removed <InlineUserList userIds={unassignedUserIds} resolveUserDisplay={resolveUserDisplay} /> as owner
       </span>,
     );
   }
 
   if (parts.length === 0) {
-    return <span>updated assignees</span>;
+    return <span>updated owners</span>;
   }
 
   return (
@@ -57,20 +57,21 @@ function buildAssignedChangeDescription(
   const selfAssigned = Boolean(actorUserId && assignedUserIds.includes(actorUserId));
 
   if (selfAssigned && assignedOthers.length === 0) {
-    return <span>self-assigned</span>;
+    return <span>took ownership</span>;
   }
 
   if (selfAssigned && assignedOthers.length > 0) {
     return (
       <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-1">
-        self-assigned and assigned <InlineUserList userIds={assignedOthers} resolveUserDisplay={resolveUserDisplay} />
+        took ownership and assigned <InlineUserList userIds={assignedOthers} resolveUserDisplay={resolveUserDisplay} />{" "}
+        as owner
       </span>
     );
   }
 
   return (
     <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-1">
-      assigned <InlineUserList userIds={assignedUserIds} resolveUserDisplay={resolveUserDisplay} />
+      assigned <InlineUserList userIds={assignedUserIds} resolveUserDisplay={resolveUserDisplay} /> as owner
     </span>
   );
 }

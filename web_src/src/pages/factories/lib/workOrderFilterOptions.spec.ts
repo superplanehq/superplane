@@ -55,7 +55,7 @@ describe("buildLineFilterOptions", () => {
 });
 
 describe("buildAssigneeFilterOptions", () => {
-  it("puts Unassigned first, then people sorted by name", () => {
+  it("puts No Owner first, then people sorted by name", () => {
     const entries = buildWorkOrderListEntries(
       [
         order({ id: "wo-1", assignees: [{ id: "u2", name: "Zoe" }] }),
@@ -72,7 +72,7 @@ describe("buildAssigneeFilterOptions", () => {
     );
 
     expect(buildAssigneeFilterOptions(entries)).toEqual([
-      { value: UNASSIGNED_FILTER_VALUE, label: "Unassigned" },
+      { value: UNASSIGNED_FILTER_VALUE, label: "No Owner" },
       { value: "u1", label: "Alex" },
       { value: "u2", label: "Zoe" },
     ]);
@@ -83,7 +83,7 @@ describe("buildWorkOrderFilterChips", () => {
   const options = {
     lines: [{ value: "line-a", label: "hotfix" }],
     assignees: [
-      { value: UNASSIGNED_FILTER_VALUE, label: "Unassigned" },
+      { value: UNASSIGNED_FILTER_VALUE, label: "No Owner" },
       { value: "u1", label: "Alex" },
     ],
   };
@@ -97,8 +97,8 @@ describe("buildWorkOrderFilterChips", () => {
     expect(chips.map((chip) => chip.label)).toEqual([
       "Status is Running",
       "Line is hotfix",
-      "Assignee is Alex",
-      "Assignee is unassigned",
+      "Owner is Alex",
+      "No Owner",
     ]);
   });
 
