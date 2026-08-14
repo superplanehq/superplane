@@ -23,7 +23,7 @@ type CanvasBlockNodeData = Record<string, unknown> & {
   _flowDirection?: ReturnType<typeof resolveCanvasFlowDirection>;
   _factorySideSource?: boolean;
   _factorySideTarget?: boolean;
-  _factoryCompactFork?: boolean;
+  _factoryRunDisplaySource?: boolean;
   _factorySpineSource?: boolean;
 };
 
@@ -86,14 +86,14 @@ function resolveFactoryLayoutFlags(
 ): {
   sideSource: boolean;
   sideTarget: boolean;
-  compactFork: boolean;
+  runDisplaySource: boolean;
   spineSource: boolean;
   overlayPosition: { x: number; y: number } | undefined;
 } {
   return {
     sideSource: layout?.sideHandleNodeIds.has(nodeId) ?? false,
     sideTarget: layout?.sideTargetNodeIds.has(nodeId) ?? false,
-    compactFork: layout?.compactForkNodeIds.has(nodeId) ?? false,
+    runDisplaySource: layout?.displaySourceNodeIds.has(nodeId) ?? false,
     spineSource: layout?.spineSourceNodeIds.has(nodeId) ?? false,
     overlayPosition: layout?.positions.get(nodeId),
   };
@@ -102,16 +102,16 @@ function resolveFactoryLayoutFlags(
 function buildFactoryLayoutDataFlags(flags: {
   sideSource: boolean;
   sideTarget: boolean;
-  compactFork: boolean;
+  runDisplaySource: boolean;
   spineSource: boolean;
 }): Pick<
   CanvasBlockNodeData,
-  "_factorySideSource" | "_factorySideTarget" | "_factoryCompactFork" | "_factorySpineSource"
+  "_factorySideSource" | "_factorySideTarget" | "_factoryRunDisplaySource" | "_factorySpineSource"
 > {
   return {
     _factorySideSource: flags.sideSource,
     _factorySideTarget: flags.sideTarget,
-    _factoryCompactFork: flags.compactFork,
+    _factoryRunDisplaySource: flags.runDisplaySource,
     _factorySpineSource: flags.spineSource,
   };
 }

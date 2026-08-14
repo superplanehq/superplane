@@ -2908,7 +2908,7 @@ function CanvasContent({
       return null;
     }
     return layoutFactoryRunLeafGraph(
-      state.nodes.map((node) => ({ id: node.id })),
+      state.nodes.map((node) => ({ id: node.id, position: node.position })),
       (state.edges ?? []).map((edge) => ({
         id: edge.id,
         source: edge.source,

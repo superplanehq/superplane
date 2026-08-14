@@ -54,9 +54,9 @@ export interface BlockInternalData {
   _factorySideSource?: boolean;
   /** Factory run-inspection leaf layout: use Left target handle. */
   _factorySideTarget?: boolean;
-  /** Suppress MultiBottom true/false stems; use center spine + side handles. */
-  _factoryCompactFork?: boolean;
-  /** Compact fork has a spine child — show centered `__factorySpine` bottom handle. */
+  /** Factory run display uses route-based ports instead of channel stems. */
+  _factoryRunDisplaySource?: boolean;
+  /** Factory run display source needs a centered `__factorySpine` bottom handle. */
   _factorySpineSource?: boolean;
   isTemplate?: boolean;
   isPendingConnection?: boolean;
