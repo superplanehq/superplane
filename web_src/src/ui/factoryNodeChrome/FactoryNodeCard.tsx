@@ -1,5 +1,6 @@
 import React from "react";
 import type { DraftDiffStatus } from "@/lib/draftDiff";
+import type { EventStateMap } from "../componentBase/eventState";
 import type { MetadataItem } from "../metadataList";
 import { FactoryNodeCardShell } from "./FactoryNodeCardShell";
 import { NodeHoverActions } from "./NodeHoverActions";
@@ -50,6 +51,8 @@ export type FactoryNodeCardProps = {
    * Defaults true when unknown.
    */
   runIsActive?: boolean;
+  /** Mapper eventStateMap — same source the run sidebar uses for badge color. */
+  eventStateMap?: EventStateMap;
 };
 
 function useFactoryNodeMetrics(
@@ -136,11 +139,13 @@ export function FactoryNodeCard({
   canvasMode = "live",
   showRuntimeStatus = true,
   runIsActive = true,
+  eventStateMap,
 }: FactoryNodeCardProps) {
   const primarySection = eventSections?.[0];
   const runtimeStatus = resolveFactoryRuntimeStatus({
     eventState: primarySection?.eventState,
     runIsActive,
+    stateMap: eventStateMap,
   });
   const runtimeMetrics = useFactoryNodeMetrics(runtimeStatus, primarySection);
   const { title: cardTitle, subtitle } = resolveFactoryNodeCardTitles({
