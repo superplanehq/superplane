@@ -127,6 +127,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = (props) => {
         canvasMode={props.canvasMode}
         showRuntimeStatus={props.showRuntimeStatus}
         runIsActive={props.runIsActive}
+        eventStateMap={props.eventStateMap}
       />
     );
   }
