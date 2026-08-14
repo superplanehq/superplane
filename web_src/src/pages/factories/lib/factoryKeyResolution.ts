@@ -1,5 +1,5 @@
 import type { FactoriesFactory } from "@/api-client";
-import { normalizeWorkspaceKey } from "./workspaceKey";
+import { isValidWorkspaceKey } from "./workspaceKey";
 
 export type FactoryResolutionStatus = "loading" | "found" | "not-found";
 
@@ -37,12 +37,12 @@ export function resolveFactoryByKey(
     return isLoading ? LOADING : NOT_FOUND;
   }
 
-  const normalizedRouteKey = normalizeWorkspaceKey(routeKey);
-  const byKey = normalizedRouteKey
-    ? factories.find((factory) => Boolean(factory.key) && normalizeWorkspaceKey(factory.key!) === normalizedRouteKey)
-    : undefined;
-  if (byKey) {
-    return { status: "found", factory: byKey, matchedBy: "key" };
+  const candidateKey = routeKey.toUpperCase();
+  if (isValidWorkspaceKey(candidateKey)) {
+    const byKey = factories.find((factory) => Boolean(factory.key) && factory.key!.toUpperCase() === candidateKey);
+    if (byKey) {
+      return { status: "found", factory: byKey, matchedBy: "key" };
+    }
   }
 
   const byId = factories.find((factory) => Boolean(factory.id) && factory.id === routeKey);

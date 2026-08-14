@@ -26,6 +26,8 @@ export function resolveFactoryAppBackNav(
     appName?: string | null;
     lineId?: string | null;
     orderNumber?: string | null;
+    /** Legacy app-canvas query param; used when `orderNumber` is absent. */
+    orderId?: string | null;
     lineName?: string | null;
     orderTitle?: string | null;
   },
@@ -53,10 +55,11 @@ export function resolveFactoryAppBackNav(
   }
 
   if (from === "work-order") {
-    if (options.orderNumber) {
+    const orderRef = options.orderNumber || options.orderId;
+    if (orderRef) {
       return {
         label: options.orderTitle?.trim() || "Work Orders",
-        href: workOrderDetailPath(organizationId, factoryKey, options.orderNumber),
+        href: workOrderDetailPath(organizationId, factoryKey, orderRef),
       };
     }
     return { label: "Work Orders", href: workOrdersPath(organizationId, factoryKey) };

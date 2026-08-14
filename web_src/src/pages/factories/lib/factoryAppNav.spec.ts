@@ -52,6 +52,29 @@ describe("resolveFactoryAppBackNav", () => {
       href: "/org/workspaces/fac/work-orders",
     });
   });
+
+  it("returns work order detail when only a legacy orderId is present", () => {
+    expect(
+      resolveFactoryAppBackNav("org", "fac", { from: "work-order", orderId: "order-2", orderTitle: "Ship things" }),
+    ).toEqual({
+      label: "Ship things",
+      href: "/org/workspaces/fac/work-order/order-2",
+    });
+  });
+
+  it("prefers orderNumber over a legacy orderId", () => {
+    expect(
+      resolveFactoryAppBackNav("org", "fac", {
+        from: "work-order",
+        orderNumber: "42",
+        orderId: "order-2",
+        orderTitle: "Fix things",
+      }),
+    ).toEqual({
+      label: "Fix things",
+      href: "/org/workspaces/fac/work-order/42",
+    });
+  });
 });
 
 describe("factoryAppPath", () => {

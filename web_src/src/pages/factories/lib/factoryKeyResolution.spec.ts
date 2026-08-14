@@ -29,6 +29,18 @@ describe("resolveFactoryByKey", () => {
     expect(resolution).toEqual({ status: "found", factory: FACTORIES[1], matchedBy: "id" });
   });
 
+  it("does not treat a UUID as a workspace key even when its letters match a key", () => {
+    const uuid = "abcde000-0000-4000-8000-000000000000";
+    const factories: FactoriesFactory[] = [
+      { id: "factory-letters", key: "ABCDE", name: "Letters" },
+      { id: uuid, key: "SP", name: "Superplane" },
+    ];
+
+    const resolution = resolveFactoryByKey(factories, uuid, false);
+
+    expect(resolution).toEqual({ status: "found", factory: factories[1], matchedBy: "id" });
+  });
+
   it("returns not-found once loaded and nothing matches", () => {
     expect(resolveFactoryByKey(FACTORIES, "nope", false)).toEqual({
       status: "not-found",

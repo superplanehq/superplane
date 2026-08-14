@@ -32,7 +32,7 @@ export function useFactoryAppCanvasPageModel() {
 
   const from = searchParams.get("from");
   const lineId = searchParams.get("lineId");
-  const orderNumber = searchParams.get("orderNumber");
+  const orderNumber = searchParams.get("orderNumber") ?? searchParams.get("orderId");
   const isConfigure = isFactoryAppConfigureMode(searchParams);
   const lineName = useMemo(() => resolveFactoryLineName(factory?.lines, lineId), [factory?.lines, lineId]);
 

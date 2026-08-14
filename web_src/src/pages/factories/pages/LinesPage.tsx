@@ -370,6 +370,23 @@ function PhaseColumn({
   );
 }
 
+function phaseRunCardHref(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string | undefined,
+  run: LinePhaseRunCard,
+): string {
+  const appId = run.execution.run?.appId;
+  const runId = run.execution.run?.id;
+  if (appId && runId) {
+    return factoryAppRunPath(organizationId, factoryKey, appId, runId, { from: "lines", lineId });
+  }
+  if (run.workOrderNumber !== undefined) {
+    return workOrderDetailPath(organizationId, factoryKey, run.workOrderNumber);
+  }
+  return linesPath(organizationId, factoryKey);
+}
+
 function PhaseRunCard({
   organizationId,
   factoryKey,
@@ -382,14 +399,7 @@ function PhaseRunCard({
   run: LinePhaseRunCard;
 }) {
   const status = resolvePhaseRunStatus(run.execution);
-  const appId = run.execution.run?.appId;
-  const runId = run.execution.run?.id;
-  const href =
-    appId && runId
-      ? factoryAppRunPath(organizationId, factoryKey, appId, runId, { from: "lines", lineId })
-      : run.workOrderNumber !== undefined
-        ? workOrderDetailPath(organizationId, factoryKey, run.workOrderNumber)
-        : linesPath(organizationId, factoryKey);
+  const href = phaseRunCardHref(organizationId, factoryKey, lineId, run);
   const timestamp = run.execution.updatedAt ?? run.execution.createdAt;
   const timeLabel = timestamp ? formatTimeAgo(new Date(timestamp), false) : null;
 
