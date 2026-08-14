@@ -26,8 +26,7 @@ export const General: Story = {
   ),
 };
 
-export const RepositoriesSoon: Story = {
-  name: "Repositories (Soon)",
+export const Repositories: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/repositories`}
@@ -36,11 +35,37 @@ export const RepositoriesSoon: Story = {
   ),
 };
 
-export const MembersSoon: Story = {
-  name: "Members (Soon)",
+export const Models: Story = {
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/models`}
+      factoriesFixture={defaultFactoriesFixture}
+    />
+  ),
+};
+
+export const Members: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/members`}
+      factoriesFixture={defaultFactoriesFixture}
+    />
+  ),
+};
+
+export const Integrations: Story = {
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/integrations`}
+      factoriesFixture={defaultFactoriesFixture}
+    />
+  ),
+};
+
+export const Secrets: Story = {
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/secrets`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),

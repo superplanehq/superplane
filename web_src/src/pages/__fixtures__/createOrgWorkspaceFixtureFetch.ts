@@ -7,6 +7,8 @@ import { matchCanvasAppFixture, type CanvasAppFixture } from "@/pages/app/__fixt
 import {
   factoriesOrganizationUsersResponse,
   matchFactoryPageFixture,
+  matchFactorySettingsFixture,
+  STORYBOOK_CONNECTED_ORG_INTEGRATIONS,
   type FactoriesFixture,
 } from "@/pages/factories/__fixtures__/handlers";
 import {
@@ -57,7 +59,9 @@ export function createOrgWorkspaceFixtureFetch(
   // would permanently alter the module-level `defaultFactoriesFixture` (and every
   // fixture that shares nested arrays with it).
   const factoriesFixture = options?.factoriesFixture ? structuredClone(options.factoriesFixture) : undefined;
-  const orgIntegrations: StorybookOrgIntegration[] = [];
+  const orgIntegrations: StorybookOrgIntegration[] = factoriesFixture
+    ? structuredClone(STORYBOOK_CONNECTED_ORG_INTEGRATIONS)
+    : [];
   const agentMessages = createStorybookAgentMessageStore(appFixture?.agentMessages?.messages);
 
   const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -115,7 +119,7 @@ function resolveFactoryFixtures(
   factoriesFixture: FactoriesFixture | undefined,
 ) {
   if (!factoriesFixture) {
-    return { factoryPagesResolved: null, factoryUsersResolved: null };
+    return { factoryPagesResolved: null, factoryUsersResolved: null, factorySettingsResolved: null };
   }
   const factoryPagesResolved = matchFactoryPageFixture(
     url,
@@ -125,7 +129,8 @@ function resolveFactoryFixtures(
   );
   const factoryUsersResolved =
     url.pathname === "/api/v1/users" && method === "GET" ? factoriesOrganizationUsersResponse() : null;
-  return { factoryPagesResolved, factoryUsersResolved };
+  const factorySettingsResolved = matchFactorySettingsFixture(url, method);
+  return { factoryPagesResolved, factoryUsersResolved, factorySettingsResolved };
 }
 
 async function resolveOrgWorkspaceFixture(args: {
@@ -144,7 +149,12 @@ async function resolveOrgWorkspaceFixture(args: {
   const homeResolved = matchHomePageFixture(url, method, homeFixture);
   const canvasResolved = matchCanvasAppFixture(url, appFixture, method, body);
   const factorySetupResolved = await matchFactorySetupFixture(url, method, input, init, orgIntegrations);
-  const { factoryPagesResolved, factoryUsersResolved } = resolveFactoryFixtures(url, method, body, factoriesFixture);
+  const { factoryPagesResolved, factoryUsersResolved, factorySettingsResolved } = resolveFactoryFixtures(
+    url,
+    method,
+    body,
+    factoriesFixture,
+  );
   // AppPageHarness always supplies `appFixture`, so canvas integrations win there.
   // HomePageHarness omits it, so factory GitHub/Claude stubs stay available for setup.
   if (url.pathname === "/api/v1/integrations" && method === "GET" && appFixture !== undefined) {
@@ -153,6 +163,7 @@ async function resolveOrgWorkspaceFixture(args: {
   return (
     factoryPagesResolved ??
     factoryUsersResolved ??
+    factorySettingsResolved ??
     factorySetupResolved ??
     homeResolved ??
     canvasResolved ??

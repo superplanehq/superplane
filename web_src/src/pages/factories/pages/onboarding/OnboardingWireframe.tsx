@@ -241,7 +241,11 @@ export function OnboardingWireframe() {
 
   const finishSetup = () => {
     if (onboarding && factoryId) {
-      onboarding.completeOnboarding(factoryId, onboardingReposFromSetup(setup.selectedRepo, setup.vcsHost));
+      onboarding.completeOnboarding(factoryId, onboardingReposFromSetup(setup.selectedRepo, setup.vcsHost), {
+        issuesChoice: setup.issuesChoice,
+        issuesRepo: setup.issuesRepo ?? setup.selectedRepo,
+        agent: setup.agent,
+      });
     }
     if (organizationId && factoryKey) {
       navigate(factoryOverviewPath(organizationId, factoryKey), { replace: true });

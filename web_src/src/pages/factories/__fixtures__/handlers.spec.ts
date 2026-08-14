@@ -29,4 +29,61 @@ describe("matchFactoryPageFixture", () => {
       apps: expect.arrayContaining([expect.objectContaining({ name: "Refund Planner" })]),
     });
   });
+
+  it("serves workspace settings members, roles, secrets, and invite link", async () => {
+    const users = await fetchFactoryPageFixture("/api/v1/users");
+    await expect(users.json()).resolves.toMatchObject({
+      users: expect.arrayContaining([
+        expect.objectContaining({
+          spec: { displayName: "Storybook User" },
+          status: { roles: [expect.objectContaining({ roleName: "org_owner", roleDisplayName: "Owner" })] },
+        }),
+      ]),
+    });
+
+    const roles = await fetchFactoryPageFixture("/api/v1/roles");
+    await expect(roles.json()).resolves.toMatchObject({
+      roles: expect.arrayContaining([expect.objectContaining({ metadata: { name: "org_admin" } })]),
+    });
+
+    const secrets = await fetchFactoryPageFixture("/api/v1/secrets");
+    await expect(secrets.json()).resolves.toMatchObject({
+      secrets: expect.arrayContaining([
+        expect.objectContaining({ metadata: expect.objectContaining({ name: "openai" }) }),
+      ]),
+    });
+
+    const secret = await fetchFactoryPageFixture("/api/v1/secrets/secret-openai");
+    await expect(secret.json()).resolves.toMatchObject({
+      secret: expect.objectContaining({ metadata: { id: "secret-openai", name: "openai" } }),
+    });
+
+    const invite = await fetchFactoryPageFixture("/api/v1/organizations/org-1/invite-link");
+    await expect(invite.json()).resolves.toMatchObject({
+      inviteLink: expect.objectContaining({ token: "storybook-invite-token", enabled: true }),
+    });
+  });
+
+  it("serves the organization integrations catalog and connected instances", async () => {
+    const catalog = await fetchFactoryPageFixture("/api/v1/integrations");
+    const catalogBody = (await catalog.json()) as { integrations: Array<{ name?: string; description?: string }> };
+    const names = catalogBody.integrations.map((entry) => entry.name);
+    expect(names).toEqual(
+      expect.arrayContaining(["github", "gitlab", "slack", "linear", "jira", "claude", "datadog", "aws"]),
+    );
+    expect(catalogBody.integrations.length).toBeGreaterThan(20);
+    expect(catalogBody.integrations.find((entry) => entry.name === "github")?.description).toBe(
+      "Manage and react to changes in your GitHub repositories",
+    );
+
+    const connected = await fetchFactoryPageFixture("/api/v1/organizations/org-1/integrations");
+    await expect(connected.json()).resolves.toMatchObject({
+      integrations: expect.arrayContaining([
+        expect.objectContaining({
+          metadata: expect.objectContaining({ integrationName: "github" }),
+          status: expect.objectContaining({ state: "ready" }),
+        }),
+      ]),
+    });
+  });
 });

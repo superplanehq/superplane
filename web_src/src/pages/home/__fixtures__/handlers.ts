@@ -21,6 +21,7 @@ function buildMeUser(orgId: string) {
       "secrets",
       "groups",
       "users",
+      "members",
       "roles",
       "organization",
       "agents",

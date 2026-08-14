@@ -1,3 +1,5 @@
+import type { AgentHarnessId, IssuesChoiceId } from "./onboardingFixtures";
+
 export type GitProvider = "github" | "gitlab";
 
 export type OnboardingRepo = {
@@ -29,8 +31,16 @@ export function providerLabel(provider: GitProvider) {
   return provider === "github" ? "GitHub" : "GitLab";
 }
 
+export type WorkspaceConnections = {
+  repos: OnboardingRepo[];
+  issuesChoice: IssuesChoiceId | null;
+  issuesRepo: string | null;
+  agent: AgentHarnessId | null;
+};
+
 export type OnboardingStorybookSeed = {
   pending?: PendingOnboarding | null;
   enabledReposByWorkspace?: Record<string, OnboardingRepo[]>;
+  connectionsByWorkspace?: Record<string, WorkspaceConnections>;
   overviewTipsWorkspaceId?: string | null;
 };
