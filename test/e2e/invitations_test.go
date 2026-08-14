@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"testing"
 
 	pw "github.com/mxschmitt/playwright-go"
@@ -139,25 +138,16 @@ func (s *invitationSteps) followInviteLinkToLogin(token string) {
 }
 
 func (s *invitationSteps) openSignupForm() {
-	page := s.session.Page()
+	// With magic code enabled, toggle to password login first
+	// so the "Create an account" link becomes visible.
+	toggle := s.session.Page().Locator("text=Sign in with password instead").First()
+	if err := toggle.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(3000)}); err == nil {
+		require.NoError(s.t, toggle.Click())
+	}
 
-	// Once the auth config finishes loading, the login page renders a link to
-	// the signup form. Its label depends on the configured primary login
-	// method: "Create an account" when password login is primary, or "Sign up"
-	// when magic-code login is primary. Both links lead to the same password
-	// signup form, so follow whichever the current config renders instead of
-	// relying on toggling between login methods first (which was racy: the
-	// toggle only appears after the config loads, so a slow page load could
-	// skip it and leave the "Create an account" link permanently hidden).
-	signupLink := page.Locator("a", pw.PageLocatorOptions{
-		HasText: regexp.MustCompile("Create an account|Sign up"),
-	}).First()
-	require.NoError(s.t, signupLink.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}))
-	require.NoError(s.t, signupLink.Click())
-
-	// Wait for the password signup form to render before it is filled in.
-	firstName := page.Locator(`input[placeholder="First name"]`)
-	require.NoError(s.t, firstName.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}))
+	button := s.session.Page().Locator("text=Create an account").First()
+	require.NoError(s.t, button.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}))
+	require.NoError(s.t, button.Click())
 }
 
 func (s *invitationSteps) fillSignupForm(firstName, lastName, email, password string) {
