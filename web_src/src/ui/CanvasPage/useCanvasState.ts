@@ -139,12 +139,23 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
   useEffect(() => {
     if (!initialNodes) return;
 
+    const factoryAutoLayout = isFactoryAutoLayout(props.layoutMode);
+    if (!factoryAutoLayout) {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      animationTargetKeyRef.current = null;
+      setNodes((currentNodes) => buildSyncedNodes(currentNodes, initialNodes, pendingNodePositionsRef.current));
+      return;
+    }
+
     const currentNodes = displayedNodesRef.current;
     const targetNodes = buildSyncedNodes(currentNodes, initialNodes, pendingNodePositionsRef.current);
     const targetKey = getLayoutTargetKey(targetNodes);
-    const animationEnabled =
-      isFactoryAutoLayout(props.layoutMode) &&
-      !(typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    const animationEnabled = !(
+      typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    );
     animationTargetNodesRef.current = targetNodes;
     animationEdgesRef.current = initialEdges || [];
 
