@@ -7,12 +7,12 @@ import {
   defaultFactoriesFixture,
   emptyWorkOrdersFactoriesFixture,
 } from "../__fixtures__/factoryPageResponses";
+import { CHECKOUT_RELIABILITY_MISSION, REFUNDS_V2_MISSION } from "./missions/missionMocks";
 import { WorkOrdersPage } from "./WorkOrdersPage";
 
 /**
- * Work Orders page. The shell renders `WorkOrdersLoadedView`, which owns
- * the title bar + Board/List/Table layouts, empty states, and the shared
- * inline actions.
+ * Work Orders page. Storybook uses the missions page from FactoriesHarness.
+ * The live app still renders `WorkOrdersPage`.
  */
 const meta = {
   title: "Factories/Pages/Work Orders",
@@ -42,4 +42,24 @@ export const OnlyClosedOrders: Story = {
 export const EmptyWorkspace: Story = {
   name: "Empty workspace",
   render: () => <FactoriesHarness pathSuffix={emptyWorkspacePath} factoriesFixture={defaultFactoriesFixture} />,
+};
+
+export const MissionDetailCheckout: Story = {
+  name: "Mission detail — Checkout reliability",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/missions/${CHECKOUT_RELIABILITY_MISSION.id}`}
+      factoriesFixture={defaultFactoriesFixture}
+    />
+  ),
+};
+
+export const MissionDetailRefunds: Story = {
+  name: "Mission detail — Refunds v2",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/missions/${REFUNDS_V2_MISSION.id}`}
+      factoriesFixture={defaultFactoriesFixture}
+    />
+  ),
 };
