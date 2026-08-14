@@ -56,7 +56,7 @@ Supported types:
 
 - **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + ` and ` + "`title`" + `.
 - **Markdown note** (` + "`markdown`" + `): requires ` + "`body`" + `; optional ` + "`title`" + `.
-- **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` (the branch name).
+- **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` (the branch name); optional ` + "`url`" + ` links to the branch.
 
 PR and markdown types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key.
 
@@ -98,6 +98,7 @@ func (c *AddWorkOrderArtifact) OutputChannels(configuration any) []core.OutputCh
 
 func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 	prOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr"}}}
+	prOrBranch := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "branch"}}}
 	markdownOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"markdown"}}}
 	branchOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"branch"}}}
 	bothTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}}
@@ -132,10 +133,10 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		{
 			Name:                 "url",
 			Label:                "URL",
-			Description:          "Link to the pull request (must be http or https)",
+			Description:          "Link to the pull request or branch (must be http or https)",
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
-			VisibilityConditions: prOnly,
+			VisibilityConditions: prOrBranch,
 			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "artifactType", Values: []string{"pr"}},
 			},
