@@ -12,7 +12,7 @@ import { MissionsWorkOrdersLoadedView } from "./MissionsWorkOrdersLoadedView";
 
 /** Storybook-only Work Orders page with a Missions rail. */
 export function MissionsWorkOrdersPage() {
-  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { data: me } = useMe(false);
   const state = useWorkOrderListState();
@@ -83,6 +83,7 @@ export function MissionsWorkOrdersPage() {
       state={state}
       currentUserId={me?.id}
       canCreate={canCreate}
+      onCreateWorkOrder={openCreateWorkOrder}
       canDispatch={canDispatch}
       canAssign={canAssign}
       permissionsLoading={permissionsLoading}
