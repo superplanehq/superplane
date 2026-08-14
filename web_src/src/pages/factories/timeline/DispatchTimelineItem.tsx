@@ -1,7 +1,7 @@
 import type { FactoriesWorkOrderExecution } from "@/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatDurationSeconds } from "@/lib/duration";
+import { formatDuration } from "@/lib/duration";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ExternalLink, Sparkles } from "lucide-react";
 import { useState } from "react";
@@ -233,5 +233,5 @@ function formatOverallDuration(steps: WorkOrderTimelineStep[]): string | null {
   }
 
   const durationMs = Date.parse(lastStep.finishedAt ?? lastStep.startedAt) - Date.parse(firstStep.startedAt);
-  return formatDurationSeconds(durationMs) || null;
+  return formatDuration(durationMs, { precision: "second" }) || null;
 }

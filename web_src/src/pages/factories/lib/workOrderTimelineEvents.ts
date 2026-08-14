@@ -4,7 +4,7 @@ import type {
   FactoriesWorkOrderExecution,
   SuperplaneUsersUser,
 } from "@/api-client";
-import { formatDurationSeconds } from "@/lib/duration";
+import { formatDuration } from "@/lib/duration";
 import {
   buildOrgUserDisplayMap,
   createOrgUserDisplayLookup,
@@ -146,7 +146,7 @@ export function formatStepExecutionDuration(step: WorkOrderTimelineStep): string
     return null;
   }
 
-  const formatted = formatDurationSeconds(durationMs);
+  const formatted = formatDuration(durationMs, { precision: "second" });
   return formatted || null;
 }
 
