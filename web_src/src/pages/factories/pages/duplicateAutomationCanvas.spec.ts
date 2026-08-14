@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  consoleYamlHasContent,
   duplicateAutomationCanvas,
   rematerializeDuplicateConsoleYaml,
   rewriteSelfCanvasRefs,
@@ -65,6 +66,24 @@ describe("rematerializeDuplicateConsoleYaml", () => {
   });
 });
 
+describe("consoleYamlHasContent", () => {
+  it("treats empty panels/layout console shells as absent", () => {
+    expect(
+      consoleYamlHasContent(
+        "apiVersion: v1\nkind: Console\nmetadata:\n  name: Source\n  canvasId: canvas-source\nspec:\n  panels: []\n  layout: []\n",
+      ),
+    ).toBe(false);
+  });
+
+  it("treats consoles with panels as present", () => {
+    expect(
+      consoleYamlHasContent(
+        "apiVersion: v1\nkind: Console\nmetadata:\n  name: Source\nspec:\n  panels:\n    - id: p1\n      type: markdown\n      content:\n        body: hi\n  layout:\n    - i: p1\n      x: 0\n      'y': 0\n      w: 6\n      h: 4\n",
+      ),
+    ).toBe(true);
+  });
+});
+
 describe("duplicateAutomationCanvas", () => {
   it("creates a canvas and stages the source live graph", async () => {
     const deps = baseDeps({
@@ -121,7 +140,7 @@ describe("duplicateAutomationCanvas", () => {
         },
       }),
       fetchConsoleYaml: vi.fn().mockResolvedValue(
-        "apiVersion: v1\nkind: Console\nmetadata:\n  name: Source\n  canvasId: canvas-source\nspec:\n  panels: []\n",
+        "apiVersion: v1\nkind: Console\nmetadata:\n  name: Source\n  canvasId: canvas-source\nspec:\n  panels:\n    - id: p1\n      type: markdown\n      content:\n        body: hi\n  layout:\n    - i: p1\n      x: 0\n      'y': 0\n      w: 6\n      h: 4\n",
       ),
     });
 

@@ -8,7 +8,7 @@ import {
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { encodeRepositoryFileContent } from "@/pages/app/files/lib/repository-files";
 import { fetchRepositorySpecFileContent } from "@/pages/app/lib/repository-spec-files";
-import { materializeCanvasSpec } from "@/pages/app/lib/workflow-spec-files";
+import { dematerializeConsoleSpec, materializeCanvasSpec } from "@/pages/app/lib/workflow-spec-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "@/pages/app/lib/workflow-spec-paths";
 import { isNotFoundError } from "@/pages/app/workflowPageHelpers";
 import * as yaml from "js-yaml";
@@ -59,13 +59,25 @@ async function defaultDescribeCanvas(sourceCanvasId: string) {
 async function defaultFetchConsoleYaml(sourceCanvasId: string): Promise<string | undefined> {
   try {
     const consoleYaml = await fetchRepositorySpecFileContent(sourceCanvasId, CONSOLE_YAML_PATH);
-    return consoleYaml.trim() ? consoleYaml : undefined;
+    return consoleYamlHasContent(consoleYaml) ? consoleYaml : undefined;
   } catch (error) {
     if (isNotFoundError(error) || (error instanceof Error && /404|not found/i.test(error.message))) {
       return undefined;
     }
     throw error;
   }
+}
+
+/** True when console.yaml has at least one panel or layout item (not the empty default shell). */
+export function consoleYamlHasContent(consoleYaml: string): boolean {
+  if (!consoleYaml.trim()) {
+    return false;
+  }
+  const parsed = dematerializeConsoleSpec(consoleYaml);
+  if (!parsed) {
+    return false;
+  }
+  return parsed.panels.length > 0 || parsed.layout.length > 0;
 }
 
 async function defaultPutCanvasStaging(canvasId: string, canvasYaml: string, consoleYaml?: string) {
