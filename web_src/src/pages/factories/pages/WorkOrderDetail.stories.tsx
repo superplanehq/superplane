@@ -4,7 +4,7 @@ import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
   OPEN_WORK_ORDER,
-  PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
   RUNNING_WORK_ORDER,
   CLOSED_WORK_ORDER,
 } from "../__fixtures__/factoryPageResponses";
@@ -24,8 +24,8 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-function detailPath(orderId?: string) {
-  return `workspaces/${PRIMARY_FACTORY_ID}/work-orders/${orderId ?? OPEN_WORK_ORDER.id}`;
+function detailPath(orderNumber?: string) {
+  return `workspaces/${PRIMARY_FACTORY_KEY}/work-order/${orderNumber ?? OPEN_WORK_ORDER.number}`;
 }
 
 export const Open: Story = {
@@ -34,12 +34,12 @@ export const Open: Story = {
 
 export const Running: Story = {
   render: () => (
-    <FactoriesHarness pathSuffix={detailPath(RUNNING_WORK_ORDER.id)} factoriesFixture={defaultFactoriesFixture} />
+    <FactoriesHarness pathSuffix={detailPath(RUNNING_WORK_ORDER.number)} factoriesFixture={defaultFactoriesFixture} />
   ),
 };
 
 export const Closed: Story = {
   render: () => (
-    <FactoriesHarness pathSuffix={detailPath(CLOSED_WORK_ORDER.id)} factoriesFixture={defaultFactoriesFixture} />
+    <FactoriesHarness pathSuffix={detailPath(CLOSED_WORK_ORDER.number)} factoriesFixture={defaultFactoriesFixture} />
   ),
 };

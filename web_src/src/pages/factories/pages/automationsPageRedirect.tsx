@@ -10,7 +10,7 @@ import {
 
 type AutomationsLegacyRedirectProps = {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   factoryLoaded: boolean;
   legacyLineId?: string;
 };
@@ -18,7 +18,7 @@ type AutomationsLegacyRedirectProps = {
 /** Redirect stale /automations/:lineId bookmarks once factory lines resolve. */
 export function AutomationsLegacyRedirect({
   organizationId,
-  factoryId,
+  factoryKey,
   factoryLoaded,
   legacyLineId,
 }: AutomationsLegacyRedirectProps) {
@@ -39,7 +39,7 @@ export function AutomationsLegacyRedirect({
     );
   }
   if (legacyLineId) {
-    return <Navigate to={factoryLineDetailPath(organizationId, factoryId, legacyLineId)} replace />;
+    return <Navigate to={factoryLineDetailPath(organizationId, factoryKey, legacyLineId)} replace />;
   }
-  return <Navigate to={automationsPath(organizationId, factoryId)} replace />;
+  return <Navigate to={automationsPath(organizationId, factoryKey)} replace />;
 }

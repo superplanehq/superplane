@@ -2,8 +2,8 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import {
-  EMPTY_FACTORY_ID,
-  PRIMARY_FACTORY_ID,
+  EMPTY_FACTORY_KEY,
+  PRIMARY_FACTORY_KEY,
   defaultFactoriesFixture,
   emptyWorkOrdersFactoriesFixture,
 } from "../__fixtures__/factoryPageResponses";
@@ -24,8 +24,8 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const workOrdersPath = `workspaces/${PRIMARY_FACTORY_ID}/work-orders`;
-const emptyWorkspacePath = `workspaces/${EMPTY_FACTORY_ID}/work-orders`;
+const workOrdersPath = `workspaces/${PRIMARY_FACTORY_KEY}/work-orders`;
+const emptyWorkspacePath = `workspaces/${EMPTY_FACTORY_KEY}/work-orders`;
 
 /** Populated dataset. Default layout is Board and default scope is All. */
 export const Populated: Story = {
