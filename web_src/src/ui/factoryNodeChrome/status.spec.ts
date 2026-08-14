@@ -92,8 +92,8 @@ describe("normalizeFactoryNodeStatus", () => {
     expect(normalizeFactoryNodeStatus("completed", stateMap)).toBe("passed");
   });
 
-  it("treats unlisted mapper success aliases as Passed when no map is given", () => {
-    expect(normalizeFactoryNodeStatus("marked ready")).toBe("passed");
+  it("keeps unlisted states Pending when the map does not classify them", () => {
+    expect(normalizeFactoryNodeStatus("marked ready")).toBe("pending");
   });
 });
 

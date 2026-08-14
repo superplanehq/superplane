@@ -75,8 +75,7 @@ export function normalizeFactoryNodeStatus(status: string | undefined, stateMap?
     return mappedStatus;
   }
 
-  // No map entry: mapper success aliases (buildActionStateRegistry) are not in the whitelist.
-  return "passed";
+  return "pending";
 }
 
 /**
