@@ -28,8 +28,10 @@ export function FactoryAppCanvasPage() {
         subtitle={model.subtitle}
         isConfigure={model.isConfigure}
         configureBusy={model.configureBusy}
-        onDiscard={() => model.configureActionsRef.current?.discard()}
-        onSave={() => model.configureActionsRef.current?.save()}
+        canRename={model.canRename}
+        onDraftTitleChange={model.isConfigure ? model.handleDraftTitleChange : undefined}
+        onDiscard={model.handleConfigureDiscard}
+        onSave={model.handleConfigureSave}
       />
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {model.canvasLoading && !model.canvas ? (
