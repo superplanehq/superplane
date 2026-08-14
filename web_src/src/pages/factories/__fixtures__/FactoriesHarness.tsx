@@ -11,6 +11,7 @@ import { WikiWireframe } from "../pages/wiki/WikiWireframe";
 import { WIKI_DOCUMENTS_DEFAULT, WIKI_DOCUMENTS_REFRESHED } from "../pages/wiki/wikiMocks";
 import { defaultFactoriesFixture, FACTORIES_ORGANIZATION_ID, type FactoriesFixture } from "./factoryPageResponses";
 import { MissionAssignmentProvider } from "../pages/missions/MissionAssignmentContext";
+import { MissionsWorkOrdersPage } from "../pages/missions/MissionsWorkOrdersPage";
 import { WorkOrderMissionOverviewRow } from "../pages/missions/WorkOrderMissionOverviewRow";
 import { WorkOrderOverviewMissionSlotContext } from "../sidebar/workOrderOverviewSlots";
 
@@ -25,6 +26,7 @@ interface FactoriesHarnessProps {
    * Storybook-only: replace selected factory page elements.
    * Wiki defaults to the wireframe so sidebar navigation shows it; pass
    * `pageOverrides={{ wiki: WikiPage }}` to keep Coming Soon.
+   * Work Orders defaults to the missions page so the sidebar keeps missions.
    * Onboarding + Get started overview are enabled by default.
    */
   pageOverrides?: OrgWorkspacePageOverrides;
@@ -75,9 +77,10 @@ export function FactoriesHarness({
               wiki: DefaultWikiWireframe,
               overview: StorybookOverviewPage,
               onboarding: OnboardingWireframe,
+              workOrders: MissionsWorkOrdersPage,
               ...pageOverrides,
             }
-          : { wiki: DefaultWikiWireframe, ...pageOverrides }
+          : { wiki: DefaultWikiWireframe, workOrders: MissionsWorkOrdersPage, ...pageOverrides }
       }
     />
   );
