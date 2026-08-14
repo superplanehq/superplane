@@ -7,6 +7,7 @@ type CommitOptions = { addedNodeId?: string };
 type TopologyMutationResult = {
   workflow: CanvasesCanvas;
   options?: CommitOptions;
+  changed?: boolean;
 };
 type EdgeIdentity = Pick<ComponentsEdge, "sourceId" | "targetId" | "channel">;
 
@@ -119,6 +120,7 @@ export function useTopologyMutationCommit({
         const workflow = getCurrentWorkflow();
         if (!workflow) return null;
         const mutation = resolveMutationResult(mutate(workflow));
+        if (mutation.changed === false) return mutation.workflow;
         const finalWorkflow = await applyRequiredLayout(mutation.workflow, mutation.options ?? options);
         if (saveSessionRef.current !== requestedSaveSession) return null;
 

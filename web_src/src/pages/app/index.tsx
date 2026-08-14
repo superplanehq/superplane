@@ -2754,7 +2754,7 @@ export function AppPage({
 
       await commitTopologyMutation((workflow) => {
         const { newNodes, nodeIdMap } = buildDuplicatedNodes(workflow.spec?.nodes || [], nodeIds);
-        if (newNodes.length === 0) return workflow;
+        if (newNodes.length === 0) return { workflow, changed: false };
 
         const duplicatedNodeIds = new Set(nodeIds);
         const newEdges = buildDuplicatedEdges(workflow.spec?.edges || [], duplicatedNodeIds, nodeIdMap);
@@ -2900,7 +2900,7 @@ export function AppPage({
 
       await commitTopologyMutation((workflow) => {
         const nodeToDuplicate = workflow.spec?.nodes?.find((node) => node.id === nodeId);
-        if (!nodeToDuplicate) return workflow;
+        if (!nodeToDuplicate) return { workflow, changed: false };
 
         const existingNodeNames = (workflow.spec?.nodes || []).map((node) => node.name || "").filter(Boolean);
         let baseName = nodeToDuplicate.name?.trim() || "";

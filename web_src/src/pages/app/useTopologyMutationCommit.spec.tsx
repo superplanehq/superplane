@@ -110,4 +110,34 @@ describe("useTopologyMutationCommit", () => {
     expect(saveWorkflow).not.toHaveBeenCalled();
     layoutSpy.mockRestore();
   });
+
+  it("does not layout or save a mutation with no changes", async () => {
+    const layoutSpy = vi.spyOn(DefaultLayoutEngine, "apply");
+    const currentWorkflow = workflowWith();
+    const applyLocalWorkflow = vi.fn();
+    const saveWorkflow = vi.fn(async () => undefined);
+    const { result } = renderHook(() =>
+      useTopologyMutationCommit({
+        factoryAutoLayout: true,
+        autoLayoutOnUpdate: false,
+        components: [],
+        getCurrentWorkflow: () => currentWorkflow,
+        applyLocalWorkflow,
+        saveWorkflow,
+        saveSessionRef: { current: 0 },
+        readOnly: false,
+      }),
+    );
+
+    let committedWorkflow: CanvasesCanvas | null = null;
+    await act(async () => {
+      committedWorkflow = await result.current((workflow) => ({ workflow, changed: false }));
+    });
+
+    expect(committedWorkflow).toBe(currentWorkflow);
+    expect(layoutSpy).not.toHaveBeenCalled();
+    expect(applyLocalWorkflow).not.toHaveBeenCalled();
+    expect(saveWorkflow).not.toHaveBeenCalled();
+    layoutSpy.mockRestore();
+  });
 });
