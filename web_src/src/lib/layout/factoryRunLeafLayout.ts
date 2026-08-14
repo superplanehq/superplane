@@ -16,16 +16,16 @@ import {
   MAIN_X,
   assignComponentColumns,
   buildAdjacency,
-  classifyComponentEdges,
   computeComponentLayers,
-  computeComponentSpine,
+  computeComponentSpineColumns,
   createSpinePickers,
   findWeakComponents,
-  markCompactForkNodes,
+  partitionLayoutEdges,
   placeComponentNodes,
-  resolveForwardEdges,
   type SpinePickers,
 } from "./factoryRunLeafLayoutHelpers";
+import { classifyComponentEdges, markDisplaySourceNodes } from "./factoryRunEdgeClassification";
+import { routeFeedbackEdges } from "./factoryRunFeedbackRouting";
 
 export { factoryRunLeafEdgeKey } from "./factoryRunLeafLayoutHelpers";
 
@@ -37,6 +37,7 @@ export type FactoryRunLayoutNode = {
   id: string;
   width?: number;
   height?: number;
+  position?: FactoryRunLayoutPosition;
 };
 
 export type FactoryRunLayoutEdge = {
@@ -52,9 +53,9 @@ export type FactoryRunLeafLayoutResult = {
   positions: Map<string, FactoryRunLayoutPosition>;
   /** Parents that need a Right side handle for off-spine fan-out. */
   sideHandleNodeIds: Set<string>;
-  /** Parents that use compact center+side chrome (no MultiBottom true/false stems). */
-  compactForkNodeIds: Set<string>;
-  /** Compact-fork parents that still have a spine child (centered bottom handle). */
+  /** Sources that use route-based display ports instead of channel stems. */
+  displaySourceNodeIds: Set<string>;
+  /** Display sources that need a centered bottom handle. */
   spineSourceNodeIds: Set<string>;
   /** Edge keys that route side→left. */
   leafEdgeKeys: Set<string>;
@@ -62,39 +63,71 @@ export type FactoryRunLeafLayoutResult = {
   spineEdgeKeys: Set<string>;
   /** Targets of side edges — use Left target handle. */
   sideTargetNodeIds: Set<string>;
-  /** Optional right-gutter X for long / cross-column edges (edge key → x). */
+  /** Optional vertical-gutter X for long, cross-column, and feedback edges. */
   edgeRouteGutters: Map<string, number>;
+  /** Small endpoint-turn Y stagger for feedback edges that use adjacent gutters. */
+  edgeRouteOffsetsY: Map<string, number>;
+  /** Edges removed from the DAG for ranking but preserved for display routing. */
+  feedbackEdgeKeys: Set<string>;
 };
 
 type ComponentLayoutContext = {
   outgoing: Map<string, FactoryRunLayoutEdge[]>;
   incoming: Map<string, FactoryRunLayoutEdge[]>;
   forwardEdges: FactoryRunLayoutEdge[];
+  feedbackEdges: FactoryRunLayoutEdge[];
   nodeById: Map<string, FactoryRunLayoutNode>;
   pickers: SpinePickers;
   positions: Map<string, FactoryRunLayoutPosition>;
   sideHandleNodeIds: Set<string>;
-  compactForkNodeIds: Set<string>;
+  displaySourceNodeIds: Set<string>;
   spineSourceNodeIds: Set<string>;
   leafEdgeKeys: Set<string>;
   spineEdgeKeys: Set<string>;
   sideTargetNodeIds: Set<string>;
   edgeRouteGutters: Map<string, number>;
+  edgeRouteOffsetsY: Map<string, number>;
+  feedbackEdgeKeys: Set<string>;
 };
+
+function savedCoordinate(value: number | undefined): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER;
+}
+
+function sortRootsBySavedPosition(roots: string[], nodeById: Map<string, FactoryRunLayoutNode>): string[] {
+  return [...roots].sort((a, b) => {
+    const positionA = nodeById.get(a)?.position;
+    const positionB = nodeById.get(b)?.position;
+    const byX = savedCoordinate(positionA?.x) - savedCoordinate(positionB?.x);
+    if (byX !== 0) return byX;
+    const byY = savedCoordinate(positionA?.y) - savedCoordinate(positionB?.y);
+    if (byY !== 0) return byY;
+    return a.localeCompare(b);
+  });
+}
 
 function layoutOneComponent(component: string[], componentOriginX: number, ctx: ComponentLayoutContext): number {
   const componentSet = new Set(component);
   const componentRoots = component.filter((id) =>
     (ctx.incoming.get(id) ?? []).every((e) => !componentSet.has(e.source)),
   );
-  const rootsForComponent = componentRoots.length > 0 ? componentRoots : [component[0]];
+  const rootsForComponent = sortRootsBySavedPosition(
+    componentRoots.length > 0 ? componentRoots : [component[0]],
+    ctx.nodeById,
+  );
 
   const layer = computeComponentLayers(component, componentSet, rootsForComponent, ctx.incoming);
-  const spine = computeComponentSpine(rootsForComponent, componentSet, ctx.outgoing, ctx.pickers.pickMainChildEdge);
+  const spineColumns = computeComponentSpineColumns(
+    rootsForComponent,
+    componentSet,
+    ctx.outgoing,
+    ctx.pickers.pickMainChildEdge,
+  );
   const column = assignComponentColumns({
     component,
     componentSet,
-    spine,
+    spineColumns,
+    firstSideColumn: rootsForComponent.length,
     layer,
     incoming: ctx.incoming,
     isMainSuccessor: ctx.pickers.isMainSuccessor,
@@ -109,11 +142,14 @@ function layoutOneComponent(component: string[], componentOriginX: number, ctx: 
     nodeById: ctx.nodeById,
     incoming: ctx.incoming,
     positions: ctx.positions,
+    spineColumns,
   });
 
-  const componentEdges = ctx.forwardEdges.filter((e) => componentSet.has(e.source) && componentSet.has(e.target));
+  const componentForwardEdges = ctx.forwardEdges.filter(
+    (edge) => componentSet.has(edge.source) && componentSet.has(edge.target),
+  );
   classifyComponentEdges({
-    componentEdges,
+    componentEdges: componentForwardEdges,
     positions: ctx.positions,
     layer,
     column,
@@ -125,12 +161,26 @@ function layoutOneComponent(component: string[], componentOriginX: number, ctx: 
     edgeRouteGutters: ctx.edgeRouteGutters,
   });
 
-  markCompactForkNodes({
-    component,
-    outgoing: ctx.outgoing,
+  const componentFeedbackEdges = ctx.feedbackEdges.filter(
+    (edge) => componentSet.has(edge.source) && componentSet.has(edge.target),
+  );
+  const graphLeft = Math.min(...component.map((id) => ctx.positions.get(id)?.x ?? componentOriginX));
+  routeFeedbackEdges({
+    feedbackEdges: componentFeedbackEdges,
+    positions: ctx.positions,
+    nodeById: ctx.nodeById,
+    graphLeft,
+    feedbackEdgeKeys: ctx.feedbackEdgeKeys,
+    spineEdgeKeys: ctx.spineEdgeKeys,
+    edgeRouteGutters: ctx.edgeRouteGutters,
+    edgeRouteOffsetsY: ctx.edgeRouteOffsetsY,
+  });
+
+  markDisplaySourceNodes({
+    componentEdges: [...componentForwardEdges, ...componentFeedbackEdges],
     leafEdgeKeys: ctx.leafEdgeKeys,
     spineEdgeKeys: ctx.spineEdgeKeys,
-    compactForkNodeIds: ctx.compactForkNodeIds,
+    displaySourceNodeIds: ctx.displaySourceNodeIds,
     spineSourceNodeIds: ctx.spineSourceNodeIds,
   });
 
@@ -141,12 +191,14 @@ function emptyFactoryRunLeafLayoutResult(): FactoryRunLeafLayoutResult {
   return {
     positions: new Map(),
     sideHandleNodeIds: new Set(),
-    compactForkNodeIds: new Set(),
+    displaySourceNodeIds: new Set(),
     spineSourceNodeIds: new Set(),
     leafEdgeKeys: new Set(),
     spineEdgeKeys: new Set(),
     sideTargetNodeIds: new Set(),
     edgeRouteGutters: new Map(),
+    edgeRouteOffsetsY: new Map(),
+    feedbackEdgeKeys: new Set(),
   };
 }
 
@@ -160,16 +212,18 @@ export function layoutFactoryRunLeafGraph(
 
   const positions = new Map<string, FactoryRunLayoutPosition>();
   const sideHandleNodeIds = new Set<string>();
-  const compactForkNodeIds = new Set<string>();
+  const displaySourceNodeIds = new Set<string>();
   const spineSourceNodeIds = new Set<string>();
   const leafEdgeKeys = new Set<string>();
   const spineEdgeKeys = new Set<string>();
   const sideTargetNodeIds = new Set<string>();
   const edgeRouteGutters = new Map<string, number>();
+  const edgeRouteOffsetsY = new Map<string, number>();
+  const feedbackEdgeKeys = new Set<string>();
 
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const nodeIds = new Set(nodes.map((node) => node.id));
-  const forwardEdges = resolveForwardEdges(edges, nodeIds);
+  const { forwardEdges, feedbackEdges } = partitionLayoutEdges(edges, nodeIds);
   const { outgoing, incoming } = buildAdjacency(nodes, forwardEdges);
   const pickers = createSpinePickers(outgoing);
   const components = findWeakComponents(nodes, forwardEdges, incoming);
@@ -178,16 +232,19 @@ export function layoutFactoryRunLeafGraph(
     outgoing,
     incoming,
     forwardEdges,
+    feedbackEdges,
     nodeById,
     pickers,
     positions,
     sideHandleNodeIds,
-    compactForkNodeIds,
+    displaySourceNodeIds,
     spineSourceNodeIds,
     leafEdgeKeys,
     spineEdgeKeys,
     sideTargetNodeIds,
     edgeRouteGutters,
+    edgeRouteOffsetsY,
+    feedbackEdgeKeys,
   };
 
   let componentOriginX = MAIN_X;
@@ -198,11 +255,13 @@ export function layoutFactoryRunLeafGraph(
   return {
     positions,
     sideHandleNodeIds,
-    compactForkNodeIds,
+    displaySourceNodeIds,
     spineSourceNodeIds,
     leafEdgeKeys,
     spineEdgeKeys,
     sideTargetNodeIds,
     edgeRouteGutters,
+    edgeRouteOffsetsY,
+    feedbackEdgeKeys,
   };
 }

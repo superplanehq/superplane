@@ -86,6 +86,7 @@ function buildOneFactoryEdgePathEntry(
   const sourceAnchor = factoryRunHandleAnchor(endpoints.sourcePos, sourceBox.width, sourceBox.height, sourceSide);
   const targetAnchor = factoryRunHandleAnchor(endpoints.targetPos, targetBox.width, targetBox.height, targetSide);
   const routeGutterX = layout.edgeRouteGutters.get(edgeKey);
+  const routeOffsetY = layout.edgeRouteOffsetsY.get(edgeKey);
   const [path] = getCanvasEdgePath({
     sourceX: sourceAnchor.x,
     sourceY: sourceAnchor.y,
@@ -94,6 +95,7 @@ function buildOneFactoryEdgePathEntry(
     sourcePosition: sourceSide,
     targetPosition: targetSide,
     ...(typeof routeGutterX === "number" ? { routeGutterX } : {}),
+    ...(typeof routeOffsetY === "number" ? { routeOffsetY } : {}),
   });
   return { id: edge.id, path, source: edge.source, target: edge.target };
 }
@@ -159,6 +161,7 @@ type FactoryEdgeRouting = {
   spineEdge: boolean;
   originalChannel: string | undefined;
   routeGutterX: number | undefined;
+  routeOffsetY: number | undefined;
 };
 
 function resolveFactoryEdgeRouting(
@@ -167,13 +170,14 @@ function resolveFactoryEdgeRouting(
 ): FactoryEdgeRouting {
   const edgeKey = factoryRunLeafEdgeKey(edge.source, edge.target, edge.sourceHandle);
   const leafEdge = layout != null && layout.leafEdgeKeys.has(edgeKey);
-  const spineEdge = layout != null && layout.spineEdgeKeys.has(edgeKey) && layout.compactForkNodeIds.has(edge.source);
+  const spineEdge = layout != null && layout.spineEdgeKeys.has(edgeKey);
   const originalChannel =
     typeof edge.sourceHandle === "string" && edge.sourceHandle.length > 0 && edge.sourceHandle !== "default"
       ? edge.sourceHandle
       : undefined;
   const routeGutterX = layout?.edgeRouteGutters.get(edgeKey);
-  return { leafEdge, spineEdge, originalChannel, routeGutterX };
+  const routeOffsetY = layout?.edgeRouteOffsetsY.get(edgeKey);
+  return { leafEdge, spineEdge, originalChannel, routeGutterX, routeOffsetY };
 }
 
 function resolveFactoryEdgeContrastFlags(
@@ -195,11 +199,7 @@ type FactoryEdgeHandlePatch = {
   targetPosition?: Position;
 };
 
-function factoryLeafSpineHandlePatch(
-  routing: FactoryEdgeRouting,
-  edge: CanvasEdge,
-  layout: FactoryRunLeafLayoutResult | null | undefined,
-): FactoryEdgeHandlePatch {
+function factoryRunHandlePatch(routing: FactoryEdgeRouting): FactoryEdgeHandlePatch {
   if (routing.leafEdge) {
     return {
       sourceHandle: FACTORY_SIDE_HANDLE_ID,
@@ -208,15 +208,6 @@ function factoryLeafSpineHandlePatch(
     };
   }
   if (routing.spineEdge) {
-    return {
-      sourceHandle: FACTORY_SPINE_HANDLE_ID,
-      sourcePosition: Position.Bottom,
-      targetPosition: Position.Top,
-    };
-  }
-  // Cycle edges are omitted from leaf/spine keys but compact forks only mount
-  // side/spine ports — remap loop-backs onto the spine handle so paths attach.
-  if (layout?.compactForkNodeIds.has(edge.source)) {
     return {
       sourceHandle: FACTORY_SPINE_HANDLE_ID,
       sourcePosition: Position.Bottom,
@@ -236,6 +227,7 @@ function buildStyledEdgeData(args: {
   layout: FactoryRunLeafLayoutResult | null | undefined;
   originalChannel: string | undefined;
   routeGutterX: number | undefined;
+  routeOffsetY: number | undefined;
   touchesOtherEdge: boolean;
   contrastStroke: boolean;
 }): CanvasEdge["data"] {
@@ -247,6 +239,7 @@ function buildStyledEdgeData(args: {
     onDelete: canMutate ? args.stableEdgeDelete : undefined,
     ...(args.layout && args.originalChannel ? { channelLabel: args.originalChannel } : {}),
     ...(typeof args.routeGutterX === "number" ? { routeGutterX: args.routeGutterX } : {}),
+    ...(typeof args.routeOffsetY === "number" ? { routeOffsetY: args.routeOffsetY } : {}),
     ...(args.touchesOtherEdge ? { touchesOtherEdge: true } : {}),
     ...(args.contrastStroke ? { contrastStroke: true } : {}),
   };
@@ -286,7 +279,7 @@ function styleOneCanvasEdge(args: {
   return {
     ...edge,
     ...args.edgeDefaults,
-    ...factoryLeafSpineHandlePatch(routing, edge, args.layout),
+    ...factoryRunHandlePatch(routing),
     animated: toneVisual.animated,
     className,
     style: { ...args.edgeDefaults.style, ...toneVisual.factoryToneStyle, ...diffStyle },
@@ -300,6 +293,7 @@ function styleOneCanvasEdge(args: {
       layout: args.layout,
       originalChannel: routing.originalChannel,
       routeGutterX: routing.routeGutterX,
+      routeOffsetY: routing.routeOffsetY,
       touchesOtherEdge: contrast.touchesOtherEdge,
       contrastStroke: contrast.contrastStroke,
     }),

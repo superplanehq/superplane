@@ -36,8 +36,10 @@ export type CanvasEdgePathParams = {
   targetX: number;
   targetY: number;
   targetPosition: Position;
-  /** When set, route via this X gutter (factory run long / cross-column edges). */
+  /** When set, route via this X gutter (factory run long, cross-column, or feedback edges). */
   routeGutterX?: number;
+  /** Feedback-only Y stagger for the horizontal turns beside shared endpoints. */
+  routeOffsetY?: number;
 };
 
 export function isVerticalFlowEdge({
@@ -273,14 +275,17 @@ function getHorizontalBackwardEdgePath(params: CanvasEdgePathParams): [path: str
 }
 
 /**
- * Exit down/right → travel vertical gutter → enter target.
- * Keeps long factory edges clear of node cards between columns.
+ * Exit from the source, travel through a vertical gutter, then enter the target.
+ * Keeps long and feedback factory edges clear of node cards.
  */
-export function getRightGutterEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
+export function getVerticalGutterEdgePath(
+  params: CanvasEdgePathParams,
+): [path: string, labelX: number, labelY: number] {
   const { sourceX, sourceY, targetX, targetY, routeGutterX } = params;
   const gutterX = routeGutterX ?? Math.max(sourceX, targetX) + BACKWARD_ROUTE_OFFSET;
-  const exitY = sourceY + HANDLE_OFFSET;
-  const entryY = targetY - HANDLE_OFFSET;
+  const routeOffsetY = params.routeOffsetY ?? 0;
+  const exitY = sourceY + HANDLE_OFFSET + routeOffsetY;
+  const entryY = targetY - HANDLE_OFFSET - routeOffsetY;
 
   const points: Point[] = [
     { x: sourceX, y: sourceY },
@@ -297,7 +302,7 @@ export function getRightGutterEdgePath(params: CanvasEdgePathParams): [path: str
 
 export function getCanvasEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
   if (typeof params.routeGutterX === "number" && Number.isFinite(params.routeGutterX)) {
-    return getRightGutterEdgePath(params);
+    return getVerticalGutterEdgePath(params);
   }
 
   // Factory (vertical) canvases use curvy bezier edges like WorkOrderCanvas Storybook.

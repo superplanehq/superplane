@@ -9,7 +9,7 @@ import {
   getCanvasEdgePath,
   getFlowArrowPoints,
   getPointAlongPath,
-  getRightGutterEdgePath,
+  getVerticalGutterEdgePath,
   getUpwardBackwardGutterY,
   isBackwardEdge,
   isVerticalFlowEdge,
@@ -203,7 +203,7 @@ describe("getCanvasEdgePath", () => {
   });
 
   it("keeps gutter paths clear of a blocking node between columns", () => {
-    const [path] = getRightGutterEdgePath({
+    const [path] = getVerticalGutterEdgePath({
       sourceX: 520,
       sourceY: 120,
       sourcePosition: Position.Bottom,
@@ -215,6 +215,39 @@ describe("getCanvasEdgePath", () => {
 
     const blockingNode = { x: 200, y: 250, width: 280, height: 104 };
     expect(doesEdgePathIntersectRect(path, blockingNode)).toBe(false);
+  });
+
+  it("uses a left gutter to keep feedback edges clear of intervening nodes", () => {
+    const [path] = getVerticalGutterEdgePath({
+      sourceX: 636,
+      sourceY: 520,
+      sourcePosition: Position.Bottom,
+      targetX: 260,
+      targetY: 208,
+      targetPosition: Position.Top,
+      routeGutterX: 72,
+    });
+
+    expect(path).toContain("72");
+    expect(doesEdgePathIntersectRect(path, { x: 120, y: 340, width: 280, height: 104 })).toBe(false);
+  });
+
+  it("staggers feedback turns vertically without moving their endpoints", () => {
+    const [path] = getVerticalGutterEdgePath({
+      sourceX: 636,
+      sourceY: 520,
+      sourcePosition: Position.Bottom,
+      targetX: 260,
+      targetY: 208,
+      targetPosition: Position.Top,
+      routeGutterX: 72,
+      routeOffsetY: 16,
+    });
+
+    expect(path).toContain("M 636 520");
+    expect(path).toContain("636,560");
+    expect(path).toContain("260,168");
+    expect(path).toContain("L 260 208");
   });
 
   it("keeps short vertical edges as bezier when no gutter is set", () => {
@@ -231,7 +264,7 @@ describe("getCanvasEdgePath", () => {
   });
 
   it("adds sparse flow chevrons on long edges and skips short ones", () => {
-    const [longPath] = getRightGutterEdgePath({
+    const [longPath] = getVerticalGutterEdgePath({
       sourceX: 520,
       sourceY: 120,
       sourcePosition: Position.Bottom,
@@ -284,7 +317,7 @@ describe("getCanvasEdgePath", () => {
   });
 
   it("marks both ids when a gutter path crosses a vertical fork", () => {
-    const [gutterPath] = getRightGutterEdgePath({
+    const [gutterPath] = getVerticalGutterEdgePath({
       sourceX: 520,
       sourceY: 100,
       sourcePosition: Position.Bottom,
@@ -308,7 +341,7 @@ describe("getCanvasEdgePath", () => {
   });
 
   it("darkens only the longer edge in a touch pair", () => {
-    const [gutterPath] = getRightGutterEdgePath({
+    const [gutterPath] = getVerticalGutterEdgePath({
       sourceX: 520,
       sourceY: 100,
       sourcePosition: Position.Bottom,

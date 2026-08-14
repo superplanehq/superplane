@@ -233,6 +233,39 @@ describe("Block fallback rendering", () => {
     expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-position", "bottom");
   });
 
+  it("hides channel stems when factory run display ports are active", () => {
+    render(
+      <Block
+        canvasMode="live"
+        nodeId="runner"
+        data={{
+          label: "Run Claude Code",
+          state: "pending",
+          type: "component",
+          outputChannels: ["passed", "failed"],
+          _flowDirection: "vertical",
+          _factoryRunDisplaySource: true,
+          _factorySpineSource: true,
+          component: {
+            title: "Run Claude Code",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _allEdges: [
+            { source: "runner", sourceHandle: "passed", target: "loop" },
+            { source: "runner", sourceHandle: "failed", target: "loop" },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.queryByText("passed")).not.toBeInTheDocument();
+    expect(screen.queryByText("failed")).not.toBeInTheDocument();
+    expect(screen.getByTestId("handle-source-__factorySpine")).toHaveAttribute("data-position", "bottom");
+    expect(screen.queryByTestId("handle-source-passed")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("handle-source-failed")).not.toBeInTheDocument();
+  });
+
   it("shows an append connector button for end nodes in edit mode", () => {
     const onAppendFromNode = vi.fn();
 
