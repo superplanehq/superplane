@@ -11,10 +11,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
+import { WorkspacePageHeader } from "./layout/WorkspacePageHeader";
 import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailHeaderProps {
   orderTitle: string;
+  /** Short identifier (e.g. `SP-42`). Rendered as a kicker above the title. */
+  orderIdentifier?: string;
+  /** Back link target (Work Orders list). */
+  backHref: string;
   displayStatus: WorkOrderDisplayStatus;
   isOpen: boolean;
   isDispatchable: boolean;
@@ -30,18 +35,21 @@ interface WorkOrderDetailHeaderProps {
 }
 
 export function WorkOrderDetailHeader(props: WorkOrderDetailHeaderProps) {
-  const { orderTitle } = props;
   return (
-    <header className="sticky top-0 z-10 col-span-full mx-[calc(var(--workspace-page-gutter)*-1)] mb-3 bg-background px-[var(--workspace-page-gutter)] py-3">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <h1 className="workspace-page-title min-w-0 flex-1">{orderTitle}</h1>
-
-        <div className="flex flex-wrap items-center gap-1">
+    <WorkspacePageHeader
+      variant="entity"
+      backHref={props.backHref}
+      backLabel="Work Orders"
+      backTestId="work-order-detail-back"
+      kicker={props.orderIdentifier}
+      title={props.orderTitle}
+      actions={
+        <>
           <CopyLinkButton />
           <HeaderOverflowMenu {...props} />
-        </div>
-      </div>
-    </header>
+        </>
+      }
+    />
   );
 }
 
@@ -63,13 +71,13 @@ function CopyLinkButton() {
     <Button
       type="button"
       variant="ghost"
-      size="icon"
+      size="icon-xs"
       onClick={() => void handleCopy()}
-      className="size-7 text-muted-foreground hover:bg-accent hover:text-foreground"
+      className="text-muted-foreground hover:bg-accent hover:text-foreground"
       aria-label="Copy link to work order"
       data-testid="work-order-copy-link-button"
     >
-      {copied ? <Check className="h-4 w-4" aria-hidden /> : <Link2 className="h-4 w-4" aria-hidden />}
+      {copied ? <Check className="size-3.5" aria-hidden /> : <Link2 className="size-3.5" aria-hidden />}
     </Button>
   );
 }
@@ -92,8 +100,8 @@ function HeaderOverflowMenu(props: WorkOrderDetailHeaderProps) {
           <Button
             type="button"
             variant="ghost"
-            size="icon"
-            className="size-7 text-muted-foreground hover:bg-accent hover:text-foreground"
+            size="icon-xs"
+            className="text-muted-foreground hover:bg-accent hover:text-foreground"
             disabled={disabled}
             aria-label="More actions"
             data-testid="work-order-actions-button"

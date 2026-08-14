@@ -1,5 +1,5 @@
-import { Heading } from "@/components/Heading/heading";
 import { PermissionTooltip } from "@/components/PermissionGate";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,17 +14,11 @@ import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
+import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import { factoryListPath, factorySettingsGeneralPathAfterKeyChange } from "../../lib/factoryPagePaths";
 import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
-import {
-  factoryCardClassName,
-  factoryContentBodyClassName,
-  factoryContentHeaderClassName,
-  factoryPageSubtitleClassName,
-  factoryPageTitleClassName,
-} from "../factoryPageLayoutStyles";
+import { factoryCardClassName, factoryContentBodyClassName } from "../factoryPageLayoutStyles";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
-import { cn } from "@/lib/utils";
 import {
   WORKSPACE_KEY_MAX_LENGTH,
   WORKSPACE_KEY_MIN_LENGTH,
@@ -111,16 +105,10 @@ export function FactorySettingsGeneralPage() {
 
   return (
     <>
-      <header className={factoryContentHeaderClassName}>
-        <div>
-          <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
-            General
-          </Heading>
-          <p className={cn("mt-1", factoryPageSubtitleClassName)}>
-            General workspace preferences. Content for this page comes next.
-          </p>
-        </div>
-      </header>
+      <WorkspacePageHeader
+        title="General"
+        subtitle="General workspace preferences. Content for this page comes next."
+      />
 
       <div className={factoryContentBodyClassName}>
         <div className="max-w-2xl space-y-6">
