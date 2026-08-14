@@ -5,7 +5,9 @@ import type { FactoriesWorkOrder } from "@/api-client";
 import {
   countActiveWorkOrders,
   filterWorkOrdersByStatus,
+  getWorkOrderDisplayKey,
   getWorkOrderDisplayStatus,
+  groupWorkOrdersByLane,
   type WorkOrderStatusFilter,
 } from "./workOrderProgress";
 
@@ -24,125 +26,119 @@ function idsFilteredBy(orders: FactoriesWorkOrder[], statusFilter: WorkOrderStat
   return filterWorkOrdersByStatus(orders, statusFilter).map((o) => o.id);
 }
 
+describe("getWorkOrderDisplayStatus", () => {
+  it("draft orders are draft", () => {
+    expect(getWorkOrderDisplayStatus(order({ state: "STATE_DRAFT" }))).toBe("draft");
+  });
+
+  it("open orders with an active execution are running", () => {
+    expect(
+      getWorkOrderDisplayStatus(
+        order({
+          state: "STATE_OPEN",
+          executions: [{ id: "e1", step: "s", state: "STATE_STARTED", result: "RESULT_UNKNOWN" }],
+        }),
+      ),
+    ).toBe("running");
+  });
+
+  it("open orders without an active execution are waiting", () => {
+    expect(getWorkOrderDisplayStatus(order({ state: "STATE_OPEN" }))).toBe("waiting");
+    // A previously failed step no longer changes the pill — the row shows
+    // the last line separately.
+    expect(
+      getWorkOrderDisplayStatus(
+        order({
+          state: "STATE_OPEN",
+          executions: [{ id: "e1", step: "s", state: "STATE_FINISHED", result: "RESULT_FAILED" }],
+        }),
+      ),
+    ).toBe("waiting");
+  });
+
+  it.each([
+    ["RESULT_COMPLETED", "completed"] as const,
+    ["RESULT_FAILED", "failed"] as const,
+    ["RESULT_REJECTED", "cancelled"] as const,
+  ])("closed orders with %s map to %s", (result, expected) => {
+    expect(getWorkOrderDisplayStatus(order({ state: "STATE_CLOSED", result }))).toBe(expected);
+  });
+});
+
 describe("filterWorkOrdersByStatus", () => {
   const draft = order({ state: "STATE_DRAFT" });
-  const open = order({ state: "STATE_OPEN" });
+  const waiting = order({ state: "STATE_OPEN" });
   const running = order({
     state: "STATE_OPEN",
     id: "wo-running",
     executions: [{ id: "e1", step: "s", state: "STATE_STARTED", result: "RESULT_UNKNOWN" }],
   });
-  const failed = order({
-    state: "STATE_OPEN",
-    id: "wo-failed",
-    executions: [{ id: "e1", step: "s", state: "STATE_FINISHED", result: "RESULT_FAILED" }],
-  });
   const closedCompleted = order({ state: "STATE_CLOSED", result: "RESULT_COMPLETED", id: "wo-completed" });
-  const closedRejected = order({ state: "STATE_CLOSED", result: "RESULT_REJECTED", id: "wo-rejected" });
-  const closedFailed = order({ state: "STATE_CLOSED", result: "RESULT_FAILED", id: "wo-closed-failed" });
+  const closedCancelled = order({ state: "STATE_CLOSED", result: "RESULT_REJECTED", id: "wo-cancelled" });
+  const closedFailed = order({ state: "STATE_CLOSED", result: "RESULT_FAILED", id: "wo-failed" });
 
-  const all = [draft, open, running, failed, closedCompleted, closedRejected, closedFailed];
+  const all = [draft, waiting, running, closedCompleted, closedCancelled, closedFailed];
 
-  it("`active` returns every non-closed order (draft/open/running/failed)", () => {
-    expect(idsFilteredBy(all, "active")).toEqual([draft.id, open.id, running.id, failed.id]);
-  });
-
-  it("`failed` includes both in-flight failed and closed-as-failed orders", () => {
-    expect(idsFilteredBy(all, "failed")).toEqual([failed.id, closedFailed.id]);
+  it("`active` returns every non-closed order", () => {
+    expect(idsFilteredBy(all, "active")).toEqual([draft.id, waiting.id, running.id]);
   });
 
   it("`all` returns everything", () => {
     expect(idsFilteredBy(all, "all")).toEqual(all.map((o) => o.id));
   });
 
-  it("specific display statuses (draft/completed/rejected) match by that status only", () => {
+  it("specific display statuses match by that status only", () => {
     expect(idsFilteredBy(all, "draft")).toEqual([draft.id]);
+    expect(idsFilteredBy(all, "waiting")).toEqual([waiting.id]);
+    expect(idsFilteredBy(all, "running")).toEqual([running.id]);
     expect(idsFilteredBy(all, "completed")).toEqual([closedCompleted.id]);
-    expect(idsFilteredBy(all, "rejected")).toEqual([closedRejected.id]);
+    expect(idsFilteredBy(all, "failed")).toEqual([closedFailed.id]);
+    expect(idsFilteredBy(all, "cancelled")).toEqual([closedCancelled.id]);
   });
 
   it("countActiveWorkOrders matches the size of the default `active` filter", () => {
     expect(countActiveWorkOrders(all)).toBe(filterWorkOrdersByStatus(all, "active").length);
-    expect(countActiveWorkOrders(all)).toBe(4);
+    expect(countActiveWorkOrders(all)).toBe(3);
   });
 });
 
-describe("getWorkOrderDisplayStatus", () => {
-  it("returns `failed` for an open order whose latest attempt failed", () => {
-    const failedAt = "2026-08-04T12:00:00.000Z";
-    const created = "2026-08-04T11:00:00.000Z";
-    const failedOpen: FactoriesWorkOrder = {
-      id: "wo-failed-current",
-      title: "current failure",
-      state: "STATE_OPEN",
-      result: "RESULT_UNSPECIFIED",
-      createdAt: created,
-      updatedAt: created,
-      executions: [
-        {
-          id: "e1",
-          step: "s",
-          state: "STATE_FINISHED",
-          result: "RESULT_FAILED",
-          updatedAt: failedAt,
-        },
-      ],
-    };
-    expect(getWorkOrderDisplayStatus(failedOpen)).toBe("failed");
+describe("groupWorkOrdersByLane", () => {
+  it("splits orders across the four board lanes", () => {
+    const orders = [
+      order({ id: "d", state: "STATE_DRAFT" }),
+      order({ id: "w", state: "STATE_OPEN" }),
+      order({
+        id: "r",
+        state: "STATE_OPEN",
+        executions: [{ id: "e1", step: "s", state: "STATE_STARTED", result: "RESULT_UNKNOWN" }],
+      }),
+      order({ id: "c", state: "STATE_CLOSED", result: "RESULT_COMPLETED" }),
+      order({ id: "f", state: "STATE_CLOSED", result: "RESULT_FAILED" }),
+      order({ id: "x", state: "STATE_CLOSED", result: "RESULT_REJECTED" }),
+    ];
+
+    const grouped = groupWorkOrdersByLane(orders);
+    const byLane = Object.fromEntries(grouped.map((entry) => [entry.lane.id, entry.orders.map((o) => o.id)]));
+
+    expect(byLane).toEqual({
+      backlog: ["d"],
+      running: ["r"],
+      review: ["w"],
+      done: ["c", "f", "x"],
+    });
+  });
+});
+
+describe("getWorkOrderDisplayKey", () => {
+  it("prefers the server-provided key", () => {
+    expect(getWorkOrderDisplayKey(order({ key: "SP-42" }))).toBe("SP-42");
   });
 
-  it("resets to `open` after a reopen (updatedAt bumped past the last failure)", () => {
-    const failedAt = "2026-08-04T12:00:00.000Z";
-    const reopenAt = "2026-08-04T13:00:00.000Z";
-    const reopened: FactoriesWorkOrder = {
-      id: "wo-reopened",
-      title: "reopened after failure",
-      state: "STATE_OPEN",
-      result: "RESULT_UNSPECIFIED",
-      createdAt: "2026-08-04T10:00:00.000Z",
-      updatedAt: reopenAt,
-      executions: [
-        {
-          id: "e1",
-          step: "s",
-          state: "STATE_FINISHED",
-          result: "RESULT_FAILED",
-          updatedAt: failedAt,
-        },
-      ],
-    };
-    expect(getWorkOrderDisplayStatus(reopened)).toBe("open");
+  it("composes the key from the factory key + number when the server did not send one", () => {
+    expect(getWorkOrderDisplayKey(order({ id: "abcdef1234567890", number: "7" }), "SP")).toBe("SP-7");
   });
 
-  it("clears the failed pill when a subsequent retry finishes successfully", () => {
-    // Latest passing execution supersedes an older failure.
-    const orderCreated = "2026-08-04T10:00:00.000Z";
-    const failedAt = "2026-08-04T11:00:00.000Z";
-    const passedAt = "2026-08-04T12:00:00.000Z";
-    const passedAfterFail: FactoriesWorkOrder = {
-      id: "wo-passed-after-fail",
-      title: "retry succeeded",
-      state: "STATE_OPEN",
-      result: "RESULT_UNSPECIFIED",
-      createdAt: orderCreated,
-      updatedAt: orderCreated,
-      executions: [
-        {
-          id: "e1",
-          step: "s",
-          state: "STATE_FINISHED",
-          result: "RESULT_FAILED",
-          updatedAt: failedAt,
-        },
-        {
-          id: "e2",
-          step: "s",
-          state: "STATE_FINISHED",
-          result: "RESULT_PASSED",
-          updatedAt: passedAt,
-        },
-      ],
-    };
-    expect(getWorkOrderDisplayStatus(passedAfterFail)).toBe("open");
+  it("falls back to a UUID prefix when nothing else is available", () => {
+    expect(getWorkOrderDisplayKey(order({ id: "abcdef1234567890" }))).toBe("abcdef12");
   });
 });

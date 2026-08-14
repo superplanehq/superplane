@@ -172,13 +172,14 @@ export function useCreateFactory(organizationId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { name: string; description: string }) => {
+    mutationFn: async (input: { name: string; description: string; key: string }) => {
       const response = await factoriesCreateFactory(
         withOrganizationHeader({
           organizationId,
           body: {
             name: input.name,
             description: input.description,
+            key: input.key,
           },
         }),
       );
@@ -197,7 +198,7 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { name?: string; description?: string }) => {
+    mutationFn: async (input: { name?: string; description?: string; key?: string }) => {
       const response = await factoriesUpdateFactory(
         withOrganizationHeader({
           organizationId,
@@ -205,6 +206,7 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
           body: {
             name: input.name,
             description: input.description,
+            key: input.key,
           },
         }),
       );
@@ -235,6 +237,9 @@ export function useDeleteFactory(organizationId: string) {
       return factoryId;
     },
     onSuccess: (factoryId) => {
+      queryClient.setQueryData<FactoriesFactory[]>(factoryListKey(organizationId), (current) =>
+        (current ?? []).filter((factory) => factory.id !== factoryId),
+      );
       queryClient.removeQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryListKey(organizationId) });
     },

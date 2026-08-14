@@ -1,4 +1,22 @@
 import { Position, getBezierPath, getSmoothStepPath } from "@xyflow/react";
+import { distance, type Point } from "./edgePathGeometry";
+
+export {
+  DEFAULT_FACTORY_EDGE_STROKE,
+  FACTORY_TOUCHING_EDGE_CLASS,
+  LONG_EDGE_PATH_LENGTH,
+  TOUCHING_EDGE_STROKE,
+  TOUCHING_EDGE_STROKE_DARK,
+  doesEdgePathIntersectRect,
+  estimatePathLength,
+  findTouchContrastEdgeIds,
+  findTouchingEdgeIds,
+  getFlowArrowPoints,
+  getPointAlongPath,
+  pathsTouch,
+} from "./edgePathGeometry";
+
+export type { PathSamplePoint, TouchContrastEdgeIds, TouchEdgePathEntry } from "./edgePathGeometry";
 
 const BACKWARD_ROUTE_OFFSET = 80;
 const BACKWARD_ROUTE_TARGET_BIAS = 0.75;
@@ -9,10 +27,7 @@ const SAME_ROW_TOLERANCE = 40;
 const SAME_COLUMN_TOLERANCE = 40;
 const TARGET_HANDLE_TOP_OFFSET = 18;
 const SMOOTH_STEP_BORDER_RADIUS = 16;
-const RECT_BORDER_RADIUS = 0;
 const HANDLE_OFFSET = 24;
-
-type Point = { x: number; y: number };
 
 export type CanvasEdgePathParams = {
   sourceX: number;
@@ -21,6 +36,10 @@ export type CanvasEdgePathParams = {
   targetX: number;
   targetY: number;
   targetPosition: Position;
+  /** When set, route via this X gutter (factory run long, cross-column, or feedback edges). */
+  routeGutterX?: number;
+  /** Feedback-only Y stagger for the horizontal turns beside shared endpoints. */
+  routeOffsetY?: number;
 };
 
 export function isVerticalFlowEdge({
@@ -58,10 +77,6 @@ export function isBackwardEdge({
   }
 
   return false;
-}
-
-function distance(a: Point, b: Point): number {
-  return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
 function getBend(a: Point, b: Point, c: Point, size: number): string {
@@ -173,8 +188,41 @@ function getLeftwardBackwardGutterX(sourceX: number, targetX: number): number {
   return targetLeft - BACKWARD_ROUTE_OFFSET;
 }
 
+/**
+ * Factory / vertical loop-back (source below target).
+ * - Side gutter clears the target node (not through its body).
+ * - Approaches the Top handle at handle Y — no U-hook above the node.
+ */
+function getVerticalUpwardLoopPath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
+  const { sourceX, sourceY, targetX, targetY } = params;
+  // Clear ~half default factory node (140) + pad so the riser sits outside the card.
+  const sideClearance = Math.max(BACKWARD_ROUTE_OFFSET * 2, 160);
+  const gutterX =
+    targetX <= sourceX + SAME_COLUMN_TOLERANCE
+      ? Math.min(sourceX, targetX) - sideClearance
+      : Math.max(sourceX, targetX) + sideClearance;
+
+  const exitY = sourceY + HANDLE_OFFSET;
+  // Horizontal into the Top handle — do not overshoot above targetY.
+  const points: Point[] = [
+    { x: sourceX, y: sourceY },
+    { x: sourceX, y: exitY },
+    { x: gutterX, y: exitY },
+    { x: gutterX, y: targetY },
+    { x: targetX, y: targetY },
+  ];
+
+  const path = buildOrthogonalPath(points, SMOOTH_STEP_BORDER_RADIUS);
+  return [path, gutterX, (exitY + targetY) / 2];
+}
+
 function getVerticalBackwardEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
   const { sourceX, sourceY, targetX, targetY } = params;
+
+  if (targetY < sourceY - SAME_ROW_TOLERANCE) {
+    return getVerticalUpwardLoopPath(params);
+  }
+
   const horizontalDelta = targetX - sourceX;
   const gutterX =
     Math.abs(horizontalDelta) <= SAME_COLUMN_TOLERANCE
@@ -195,7 +243,8 @@ function getVerticalBackwardEdgePath(params: CanvasEdgePathParams): [path: strin
     { x: targetX, y: targetY },
   ];
 
-  const path = buildOrthogonalPath(points, RECT_BORDER_RADIUS);
+  // Soft corners so factory loops read as curves, not sharp rectangles.
+  const path = buildOrthogonalPath(points, SMOOTH_STEP_BORDER_RADIUS);
 
   return [path, gutterX, (exitY + entryY) / 2];
 }
@@ -225,7 +274,37 @@ function getHorizontalBackwardEdgePath(params: CanvasEdgePathParams): [path: str
   return [path, labelX, labelY];
 }
 
+/**
+ * Exit from the source, travel through a vertical gutter, then enter the target.
+ * Keeps long and feedback factory edges clear of node cards.
+ */
+export function getVerticalGutterEdgePath(
+  params: CanvasEdgePathParams,
+): [path: string, labelX: number, labelY: number] {
+  const { sourceX, sourceY, targetX, targetY, routeGutterX } = params;
+  const gutterX = routeGutterX ?? Math.max(sourceX, targetX) + BACKWARD_ROUTE_OFFSET;
+  const routeOffsetY = params.routeOffsetY ?? 0;
+  const exitY = sourceY + HANDLE_OFFSET + routeOffsetY;
+  const entryY = targetY - HANDLE_OFFSET - routeOffsetY;
+
+  const points: Point[] = [
+    { x: sourceX, y: sourceY },
+    { x: sourceX, y: exitY },
+    { x: gutterX, y: exitY },
+    { x: gutterX, y: entryY },
+    { x: targetX, y: entryY },
+    { x: targetX, y: targetY },
+  ];
+
+  const path = buildOrthogonalPath(points, SMOOTH_STEP_BORDER_RADIUS);
+  return [path, gutterX, (exitY + entryY) / 2];
+}
+
 export function getCanvasEdgePath(params: CanvasEdgePathParams): [path: string, labelX: number, labelY: number] {
+  if (typeof params.routeGutterX === "number" && Number.isFinite(params.routeGutterX)) {
+    return getVerticalGutterEdgePath(params);
+  }
+
   // Factory (vertical) canvases use curvy bezier edges like WorkOrderCanvas Storybook.
   if (isVerticalFlowEdge(params)) {
     if (isBackwardEdge(params)) {

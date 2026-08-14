@@ -14,6 +14,11 @@ export const FACTORIES_ORGANIZATION_ID = "3ee1aa47-3a60-4c1f-b645-0b9859ab91f8";
 export const PRIMARY_FACTORY_ID = "factory-refunds";
 export const EMPTY_FACTORY_ID = "factory-payments";
 
+/** Workspace key for `PRIMARY_FACTORY_ID` — routes use this, not the raw id. */
+export const PRIMARY_FACTORY_KEY = "RF";
+/** Workspace key for `EMPTY_FACTORY_ID` — routes use this, not the raw id. */
+export const EMPTY_FACTORY_KEY = "PF";
+
 export const STORYBOOK_ME_USER_ID = "storybook-user";
 export const STORYBOOK_ME_USER_NAME = "Storybook User";
 export const STORYBOOK_ME_USER_EMAIL = "storybook@superplane.dev";
@@ -109,6 +114,7 @@ export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
 export const REFUND_FACTORY: FactoriesFactory = {
   id: PRIMARY_FACTORY_ID,
   name: "Refunds Factory",
+  key: "RF",
   description:
     "Handles reconciliation work: plan a change, implement across affected services, and verify with regression suites.",
   lines: REFUND_FACTORY_LINES,
@@ -117,6 +123,7 @@ export const REFUND_FACTORY: FactoriesFactory = {
 export const EMPTY_FACTORY: FactoriesFactory = {
   id: EMPTY_FACTORY_ID,
   name: "Payments Factory",
+  key: "PF",
   description: "New factory. No lines or work orders configured yet.",
   lines: [],
 };
@@ -144,6 +151,8 @@ function planLineExecution(
 
 export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-open-refunds",
+  number: "101",
+  key: "RF-101",
   title: "Reconcile duplicate refunds in ledger",
   description:
     "Users are seeing duplicate refund entries after retries. Reconcile the ledger, patch retry logic, and add a regression test.",
@@ -165,6 +174,8 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
  */
 export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
   id: "wo-open-refunds-schema",
+  number: "102",
+  key: "RF-102",
   title: "Add refund reason enum to schema",
   description: "Extend the refund ledger schema with a nullable reason enum so audit can categorize.",
   state: "STATE_OPEN",
@@ -179,6 +190,8 @@ export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
 // Storybook user is co-assigned so "mine + running" surfaces this order.
 export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-running-refunds",
+  number: "103",
+  key: "RF-103",
   title: "Add refund reconciliation test",
   description: "Cover the newly discovered duplicate refund case with a regression test running in CI.",
   state: "STATE_OPEN",
@@ -205,6 +218,8 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
 // Storybook user is co-assigned so "mine + failed" surfaces this order.
 export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-failed-refunds",
+  number: "104",
+  key: "RF-104",
   title: "Ship idempotent refund retries",
   description: "Retry logic should be idempotent so replays don't create duplicate refunds.",
   state: "STATE_OPEN",
@@ -227,6 +242,8 @@ export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
 
 export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-draft-refunds",
+  number: "105",
+  key: "RF-105",
   title: "Draft: rework refund telemetry",
   description: "Still scoping the metric shape and dashboards before we mark this ready.",
   state: "STATE_DRAFT",
@@ -240,6 +257,8 @@ export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
 
 export const CLOSED_FAILED_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-closed-failed-refunds",
+  number: "92",
+  key: "RF-92",
   title: "Failed: reconcile refund ledger for Q1 audit",
   description: "Line completed but validation flagged a mismatch; closed as failed for follow-up.",
   state: "STATE_CLOSED",
@@ -253,6 +272,8 @@ export const CLOSED_FAILED_WORK_ORDER: FactoriesWorkOrder = {
 
 export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-closed-refunds",
+  number: "87",
+  key: "RF-87",
   title: "Backfill refund audit trail",
   description: "Add historical audit entries so the reconciliation report has a full retroactive picture.",
   state: "STATE_CLOSED",
@@ -307,6 +328,7 @@ export const OPEN_WORK_ORDER_ARTIFACTS: FactoriesWorkOrderArtifact[] = [
     type: "TYPE_BRANCH",
     data: {
       name: "feature/refund-retry",
+      url: "https://github.com/example/ledger/tree/feature/refund-retry",
     },
     createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
     createdAt: HOUR_AGO,

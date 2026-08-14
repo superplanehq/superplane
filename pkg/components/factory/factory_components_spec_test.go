@@ -422,6 +422,50 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
+	t.Run("accepts branch with name and url", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
+			"url":          "https://github.com/example/repo/tree/feature/refund-retry",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("url field is visible for both pr and branch", func(t *testing.T) {
+		var urlField *configuration.Field
+		for i := range fields {
+			if fields[i].Name == "url" {
+				urlField = &fields[i]
+				break
+			}
+		}
+		if urlField == nil {
+			t.Fatal("expected a url field in configuration")
+		}
+		if len(urlField.VisibilityConditions) != 1 {
+			t.Fatalf("expected a single visibility condition for url, got %d", len(urlField.VisibilityConditions))
+		}
+		condition := urlField.VisibilityConditions[0]
+		if condition.Field != "artifactType" {
+			t.Fatalf("expected visibility condition on artifactType, got %q", condition.Field)
+		}
+		for _, want := range []string{"pr", "branch"} {
+			found := false
+			for _, got := range condition.Values {
+				if got == want {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Fatalf("expected url visibility to include %q, got %v", want, condition.Values)
+			}
+		}
+	})
+
 	t.Run("accepts pr with free-form data entries", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":      "{{ order().id }}",

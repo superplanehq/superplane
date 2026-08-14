@@ -57,7 +57,7 @@ Supported types:
 
 - **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + `, ` + "`title`" + `, and ` + "`state`" + ` (` + "`open`" + `/` + "`draft`" + `/` + "`closed`" + `/` + "`merged`" + `, defaults to ` + "`open`" + `) which drives the icon/color of the artifact chip in the work order UI.
 - **Markdown note** (` + "`markdown`" + `): requires ` + "`body`" + `; optional ` + "`title`" + `.
-- **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` (the branch name).
+- **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` (the branch name); optional ` + "`url`" + ` to link to the branch on its provider (e.g. a GitHub tree URL).
 
 PR and markdown types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key.
 
@@ -104,6 +104,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 	prOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr"}}}
 	markdownOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"markdown"}}}
 	branchOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"branch"}}}
+	linkableTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "branch"}}}
 	bothTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}}
 	withMetadata := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}}
 
@@ -136,10 +137,10 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		{
 			Name:                 "url",
 			Label:                "URL",
-			Description:          "Link to the pull request (must be http or https)",
+			Description:          "Link to the pull request or branch (must be http or https). Required for pull requests; optional for branches — e.g. a GitHub tree URL like https://github.com/{owner}/{repo}/tree/{branch}.",
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
-			VisibilityConditions: prOnly,
+			VisibilityConditions: linkableTypes,
 			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "artifactType", Values: []string{"pr"}},
 			},
