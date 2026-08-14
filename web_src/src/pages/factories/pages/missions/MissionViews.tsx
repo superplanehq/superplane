@@ -4,7 +4,7 @@ import { Link } from "react-router";
 
 import type { WorkOrderLayoutId, WorkOrderScope } from "../../lib/workOrderListModel";
 import { MissionAssignee } from "./MissionAssignee";
-import { useMissionAssignment } from "./MissionAssignmentContext";
+import { useMissionAssignment } from "./useMissionAssignment";
 import { applyMissionScope, visibleMissionItems, type MissionRailItem } from "./missionListModel";
 import { factoryMissionDetailPath } from "./missionPaths";
 import { MissionStatusValue } from "./MissionStatusValue";

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { ChevronDown, Crosshair } from "lucide-react";
 
 import { OverviewRow } from "../../sidebar/SidebarPrimitives";
-import { useMissionAssignment } from "./MissionAssignmentContext";
+import { useMissionAssignment } from "./useMissionAssignment";
 import { resolveMissionForWorkOrder } from "./missionListModel";
 import { WorkOrderMissionPopover } from "./WorkOrderMissionPopover";
 

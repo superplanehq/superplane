@@ -1,18 +1,8 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 
 import { assignWorkOrderToMission, type MissionCloseReason } from "./missionListModel";
-import { SEEDED_MISSIONS, missionByWorkOrderId as seededAssignments, type FactoryMission } from "./missionMocks";
-
-export interface MissionAssignmentContextValue {
-  missions: FactoryMission[];
-  missionByWorkOrderId: Record<string, string>;
-  assignMission: (workOrderId: string, missionId: string | null) => void;
-  closedByMissionId: Record<string, MissionCloseReason>;
-  closeMission: (missionId: string, reason: MissionCloseReason) => void;
-  reopenMission: (missionId: string) => void;
-}
-
-const MissionAssignmentContext = createContext<MissionAssignmentContextValue | null>(null);
+import { MissionAssignmentContext } from "./missionAssignmentContextValue";
+import { SEEDED_MISSIONS, missionByWorkOrderId as seededAssignments } from "./missionMocks";
 
 /** Storybook-only assignment store. The live work-order API does not receive this map. */
 export function MissionAssignmentProvider({ children }: { children: ReactNode }) {
@@ -50,16 +40,4 @@ export function MissionAssignmentProvider({ children }: { children: ReactNode })
   );
 
   return <MissionAssignmentContext.Provider value={value}>{children}</MissionAssignmentContext.Provider>;
-}
-
-export function useOptionalMissionAssignment() {
-  return useContext(MissionAssignmentContext);
-}
-
-export function useMissionAssignment() {
-  const value = useOptionalMissionAssignment();
-  if (!value) {
-    throw new Error("useMissionAssignment requires MissionAssignmentProvider");
-  }
-  return value;
 }

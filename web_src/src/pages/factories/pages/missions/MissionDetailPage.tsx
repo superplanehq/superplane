@@ -11,7 +11,7 @@ import { WorkOrdersErrorState } from "../../workOrders/WorkOrdersEmptyStates";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { factoryContentBodyClassName } from "../factoryPageLayoutStyles";
 import { OverviewRow, SidebarSectionHeading } from "../../sidebar/SidebarPrimitives";
-import { useOptionalMissionAssignment } from "./MissionAssignmentContext";
+import { useOptionalMissionAssignment } from "./useMissionAssignment";
 import {
   applyMissionFilter,
   findMissionById,

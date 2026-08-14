@@ -20,7 +20,7 @@ import { WorkOrdersBoardView } from "../../workOrders/WorkOrdersBoardView";
 import { WorkOrdersHeader } from "../../workOrders/header/WorkOrdersHeader";
 import { WorkOrdersListView } from "../../workOrders/WorkOrdersListView";
 import { WorkOrdersTableView } from "../../workOrders/WorkOrdersTableView";
-import { useMissionAssignment } from "./MissionAssignmentContext";
+import { useMissionAssignment } from "./useMissionAssignment";
 import { buildMissionRailItems } from "./missionListModel";
 import { MissionViews } from "./MissionViews";
 
