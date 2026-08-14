@@ -1,5 +1,4 @@
 import { Icon } from "@/components/Icon";
-import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, ClipboardList, Loader2 } from "lucide-react";
@@ -32,12 +31,16 @@ export function WorkOrdersErrorState({ onRetry }: { onRetry: () => void }) {
 }
 
 interface WorkOrdersTrueEmptyStateProps {
-  createHref: string;
+  onCreateWorkOrder: () => void;
   canCreate: boolean;
   permissionsLoading: boolean;
 }
 
-export function WorkOrdersTrueEmptyState({ createHref, canCreate, permissionsLoading }: WorkOrdersTrueEmptyStateProps) {
+export function WorkOrdersTrueEmptyState({
+  onCreateWorkOrder,
+  canCreate,
+  permissionsLoading,
+}: WorkOrdersTrueEmptyStateProps) {
   return (
     <div className={CARD_CLASSES} data-testid="work-orders-empty-state">
       <ClipboardList className="size-6 text-muted-foreground" aria-hidden />
@@ -51,11 +54,9 @@ export function WorkOrdersTrueEmptyState({ createHref, canCreate, permissionsLoa
         allowed={canCreate || permissionsLoading}
         message="You don't have permission to create work orders."
       >
-        <Button type="button" asChild disabled={!canCreate} data-testid="work-orders-empty-create">
-          <Link href={canCreate ? createHref : "#"}>
-            <Icon name="plus" />
-            New work order
-          </Link>
+        <Button type="button" disabled={!canCreate} onClick={onCreateWorkOrder} data-testid="work-orders-empty-create">
+          <Icon name="plus" />
+          New work order
         </Button>
       </PermissionTooltip>
     </div>

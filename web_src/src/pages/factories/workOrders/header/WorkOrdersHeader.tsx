@@ -1,5 +1,4 @@
 import type { FactoriesFactoryLine } from "@/api-client";
-import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -18,7 +17,7 @@ interface WorkOrdersHeaderProps {
   /** Every entry before scope/filters, used to build the assignee options. */
   entries: WorkOrderListEntry[];
   factoryLines: FactoriesFactoryLine[];
-  createHref: string;
+  onCreateWorkOrder: () => void;
   canCreate: boolean;
   permissionsLoading: boolean;
 }
@@ -36,7 +35,7 @@ export function WorkOrdersHeader({
   state,
   entries,
   factoryLines,
-  createHref,
+  onCreateWorkOrder,
   canCreate,
   permissionsLoading,
 }: WorkOrdersHeaderProps) {
@@ -70,15 +69,13 @@ export function WorkOrdersHeader({
             <Button
               type="button"
               size="sm"
-              asChild
               disabled={!canCreate}
+              onClick={onCreateWorkOrder}
               className="h-8 shrink-0 gap-1.5 px-2.5"
               data-testid="work-order-list-create-button"
             >
-              <Link href={canCreate ? createHref : "#"}>
-                <Plus className="size-3.5" aria-hidden />
-                New
-              </Link>
+              <Plus className="size-3.5" aria-hidden />
+              New
             </Button>
           </PermissionTooltip>
         </div>

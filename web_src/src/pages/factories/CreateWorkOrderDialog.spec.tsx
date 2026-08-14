@@ -5,8 +5,9 @@ import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY, REFUND_FACTORY } from "./__fix
 import { CreateWorkOrderDialog } from "./CreateWorkOrderDialog";
 import { FactoriesLayoutContext } from "./layout/factoriesLayoutContext";
 
-const { canAct } = vi.hoisted(() => ({
+const { canAct, permissions } = vi.hoisted(() => ({
   canAct: vi.fn((resource: string, action: string) => resource === "work_orders" && action === "create"),
+  permissions: { isLoading: false },
 }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
@@ -17,7 +18,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({
     canAct,
-    isLoading: false,
+    isLoading: permissions.isLoading,
   }),
 }));
 
@@ -48,6 +49,7 @@ function renderDialog() {
 
 describe("CreateWorkOrderDialog", () => {
   beforeEach(() => {
+    permissions.isLoading = false;
     canAct.mockImplementation((resource: string, action: string) => resource === "work_orders" && action === "create");
   });
 
@@ -59,6 +61,14 @@ describe("CreateWorkOrderDialog", () => {
   });
 
   it("disables Send to line when the user cannot dispatch work orders", () => {
+    renderDialog();
+
+    expect(screen.getByTestId("work-order-create-send-to-line").closest(".pointer-events-none")).toBeInTheDocument();
+  });
+
+  it("keeps Send to line closed while permissions load", () => {
+    permissions.isLoading = true;
+    canAct.mockReturnValue(false);
     renderDialog();
 
     expect(screen.getByTestId("work-order-create-send-to-line").closest(".pointer-events-none")).toBeInTheDocument();

@@ -2,10 +2,17 @@ import type { Editor } from "@tiptap/core";
 import "@tiptap/markdown";
 
 const MARKDOWN_BLOCK_START = /^(#{1,6}\s|[-*+]\s|\d+\.\s|>\s|```)/m;
-const MARKDOWN_INLINE = /(?:\*\*|__|`[^`]+`)/;
+const MARKDOWN_PAIRED_ASTERISKS = /\*\*[^*\n]+\*\*/;
+const MARKDOWN_CODE = /`[^`]+`/;
+const MARKDOWN_UNDERSCORE_EMPHASIS = /(?:^|\s)__[^_\n]+__(?:\s|$)/;
 
 export function looksLikeMarkdown(text: string): boolean {
-  return MARKDOWN_BLOCK_START.test(text) || MARKDOWN_INLINE.test(text);
+  return (
+    MARKDOWN_BLOCK_START.test(text) ||
+    MARKDOWN_PAIRED_ASTERISKS.test(text) ||
+    MARKDOWN_CODE.test(text) ||
+    MARKDOWN_UNDERSCORE_EMPHASIS.test(text)
+  );
 }
 
 export function pasteMarkdownFromClipboard(editor: Editor, event: ClipboardEvent): boolean {

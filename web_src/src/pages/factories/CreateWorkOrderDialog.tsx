@@ -37,11 +37,11 @@ function CreateWorkOrderDialogSession({
   onCreated: (orderNumber: string) => void;
 }) {
   const { organizationId, factoryId, factory } = useFactoriesLayout();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { canAct } = usePermissions();
   const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });
   const lines = factory?.lines ?? [];
   const [isExpanded, setIsExpanded] = useState(false);
-  const canDispatch = canAct("work_orders", "update") || permissionsLoading;
+  const canDispatch = canAct("work_orders", "update");
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
