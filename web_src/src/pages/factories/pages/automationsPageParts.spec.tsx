@@ -6,7 +6,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FactoryApp } from "@/api-client";
 
-import { AutomationCard, AutomationDetail } from "./automationsPageParts";
+import { AutomationDetail } from "./AutomationDetail";
+import { AutomationCard } from "./automationsPageParts";
 import { duplicateAutomationName } from "./automationCardActions";
 
 vi.mock("@/hooks/useCanvasData", () => ({
@@ -152,6 +153,9 @@ describe("AutomationDetail tabs", () => {
     expect(run.className).toMatch(/\brounded-md\b/);
     expect(screen.getByTestId("automations-runs-scroll").className).toMatch(/\bgap-2\b/);
     expect(screen.getByTestId("automations-runs-scroll").closest("section")).toBeNull();
+    expect(screen.getByTestId("automations-detail-body").className).toMatch(
+      /max-w-\[var\(--workspace-content-max-width\)\]/,
+    );
   });
 
   it("opens the Velocity tab", async () => {

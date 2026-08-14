@@ -4,15 +4,11 @@ import { useMe } from "@/hooks/useMe";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { useWorkOrderListState } from "../lib/useWorkOrderListState";
 import { WorkOrdersLoadedView } from "../workOrders/WorkOrdersLoadedView";
 import { WorkOrdersErrorState, WorkOrdersLoadingState } from "../workOrders/WorkOrdersEmptyStates";
-import {
-  factoryContentBodyClassName,
-  factoryContentHeaderClassName,
-  factoryPageTitleClassName,
-} from "./factoryPageLayoutStyles";
-import { Heading } from "@/components/Heading/heading";
+import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
 
 /**
  * Data + action shell for the Work Orders list. Fetches work orders and
@@ -107,11 +103,5 @@ export function WorkOrdersPage() {
 
 /** Title-only header shown while work orders load or fail to load. */
 function WorkOrdersHeaderStub() {
-  return (
-    <header className={factoryContentHeaderClassName}>
-      <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
-        Work Orders
-      </Heading>
-    </header>
-  );
+  return <WorkspacePageHeader title="Work Orders" />;
 }
