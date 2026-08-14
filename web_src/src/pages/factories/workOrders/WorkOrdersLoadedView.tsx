@@ -23,7 +23,7 @@ import { WorkOrdersTableView } from "./WorkOrdersTableView";
 
 interface WorkOrdersLoadedViewProps {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   factory: FactoriesFactory;
   factoryLines: FactoriesFactoryLine[];
   workOrders: FactoriesWorkOrder[];
@@ -57,7 +57,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   const ordered = useMemo(() => applyWorkOrderOrdering(searched, state.ordering), [searched, state.ordering]);
 
   const totalCount = entries.length;
-  const createHref = createWorkOrderPath(props.organizationId, props.factoryId);
+  const createHref = createWorkOrderPath(props.organizationId, props.factoryKey);
 
   const body = () => {
     if (totalCount === 0) {
@@ -84,7 +84,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
     const sharedProps = {
       entries: ordered,
       organizationId: props.organizationId,
-      factoryId: props.factoryId,
+      factoryKey: props.factoryKey,
       factoryLines: props.factoryLines,
       canDispatch: props.canDispatch,
       canAssign: props.canAssign,

@@ -4,7 +4,7 @@ import { AutomationDetail, AutomationsPageList, EmptyAutomationsState } from "./
 
 type AutomationsPageBodyProps = {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   apps: FactoryApp[];
   workOrders: Parameters<typeof AutomationsPageList>[0]["workOrders"];
   appsLoading: boolean;
@@ -17,7 +17,7 @@ type AutomationsPageBodyProps = {
 
 export function AutomationsPageBody({
   organizationId,
-  factoryId,
+  factoryKey,
   apps,
   workOrders,
   appsLoading,
@@ -34,7 +34,7 @@ export function AutomationsPageBody({
     return (
       <AutomationDetail
         organizationId={organizationId}
-        factoryId={factoryId}
+        factoryKey={factoryKey}
         app={selectedApp}
         actions={selectedAppActions}
       />
@@ -46,7 +46,7 @@ export function AutomationsPageBody({
   return (
     <AutomationsPageList
       organizationId={organizationId}
-      factoryId={factoryId}
+      factoryKey={factoryKey}
       apps={apps}
       workOrders={workOrders}
       actionsForApp={actionsForApp}

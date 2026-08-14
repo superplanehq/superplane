@@ -12,12 +12,13 @@ import { duplicateAutomationName, type AutomationCardActions } from "./automatio
 export function useAutomationCardMutations(args: {
   organizationId: string;
   factoryId: string;
+  factoryKey: string;
   canCreateApp: boolean;
   canUpdateApp: boolean;
   canDeleteApp: boolean;
   selectedAppId: string | undefined;
 }) {
-  const { organizationId, factoryId, canCreateApp, canUpdateApp, canDeleteApp, selectedAppId } = args;
+  const { organizationId, factoryId, factoryKey, canCreateApp, canUpdateApp, canDeleteApp, selectedAppId } = args;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const createCanvas = useCreateCanvas(organizationId);
@@ -32,9 +33,9 @@ export function useAutomationCardMutations(args: {
       if (!app.id) {
         return;
       }
-      navigate(factoryAppConfigurePath(organizationId, factoryId, app.id, { from: "automations" }));
+      navigate(factoryAppConfigurePath(organizationId, factoryKey, app.id, { from: "automations" }));
     },
-    [factoryId, navigate, organizationId],
+    [factoryKey, navigate, organizationId],
   );
 
   const handleDuplicateAutomation = useCallback(
@@ -52,12 +53,12 @@ export function useAutomationCardMutations(args: {
           return;
         }
         showSuccessToast("Automation duplicated.");
-        navigate(factoryAppConfigurePath(organizationId, factoryId, canvasId, { from: "automations" }));
+        navigate(factoryAppConfigurePath(organizationId, factoryKey, canvasId, { from: "automations" }));
       } catch (error) {
         showErrorToast(getUsageLimitToastMessage(error, "Failed to duplicate automation"));
       }
     },
-    [createCanvas, factoryId, invalidateFactoryApps, navigate, organizationId],
+    [createCanvas, factoryId, factoryKey, invalidateFactoryApps, navigate, organizationId],
   );
 
   const handleDeleteAutomation = useCallback(
@@ -70,14 +71,14 @@ export function useAutomationCardMutations(args: {
         invalidateFactoryApps();
         showSuccessToast("Automation deleted.");
         if (selectedAppId === app.id) {
-          navigate(automationsPath(organizationId, factoryId));
+          navigate(automationsPath(organizationId, factoryKey));
         }
       } catch (error) {
         showErrorToast("Failed to delete automation");
         throw error;
       }
     },
-    [deleteCanvas, factoryId, invalidateFactoryApps, navigate, organizationId, selectedAppId],
+    [deleteCanvas, factoryKey, invalidateFactoryApps, navigate, organizationId, selectedAppId],
   );
 
   const actionsForApp = useCallback(

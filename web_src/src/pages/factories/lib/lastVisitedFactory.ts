@@ -49,17 +49,30 @@ export function readLastVisitedFactory(accountId: string, organizationId: string
   return readAll()[accountId]?.[organizationId] ?? null;
 }
 
-export function pickInitialFactoryId(factories: { id?: string }[], lastVisitedFactoryId: string | null): string | null {
-  const knownIds = factories.map((factory) => factory.id).filter((id): id is string => Boolean(id));
-  if (knownIds.length === 0) {
+/**
+ * Picks which workspace to land on from the factories list, preferring the
+ * last-visited one (matched by the real `id`, which is what gets persisted —
+ * see `recordLastVisitedFactory`). Returns the whole factory (not just the
+ * id) so the caller can redirect to its `key`, the canonical routing
+ * identifier.
+ */
+export function pickInitialFactory<T extends { id?: string }>(
+  factories: T[],
+  lastVisitedFactoryId: string | null,
+): T | null {
+  const known = factories.filter((factory) => Boolean(factory.id));
+  if (known.length === 0) {
     return null;
   }
 
-  if (lastVisitedFactoryId && knownIds.includes(lastVisitedFactoryId)) {
-    return lastVisitedFactoryId;
+  if (lastVisitedFactoryId) {
+    const lastVisited = known.find((factory) => factory.id === lastVisitedFactoryId);
+    if (lastVisited) {
+      return lastVisited;
+    }
   }
 
-  return knownIds[0];
+  return known[0];
 }
 
 export function recordLastVisitedFactory(accountId: string, organizationId: string, factoryId: string): void {

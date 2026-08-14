@@ -22,7 +22,7 @@ func TestFactories(t *testing.T) {
 
 		steps.start()
 		factory := steps.givenFactoryExists(originalName, "original description")
-		steps.visitFactorySettings(factory.ID)
+		steps.visitFactorySettings(factory)
 		steps.fillFactorySettingsName(updatedName)
 		steps.fillFactorySettingsDescription("updated description")
 		steps.submitFactorySettings()
@@ -36,7 +36,7 @@ func TestFactories(t *testing.T) {
 
 		steps.start()
 		factory := steps.givenFactoryExists(name, "will be deleted")
-		steps.visitFactorySettings(factory.ID)
+		steps.visitFactorySettings(factory)
 		steps.clickDeleteFactory()
 		steps.confirmDeleteFactory()
 		steps.assertRedirectedToFactoriesList()
@@ -73,9 +73,9 @@ func (s *factorySteps) visitFactoriesList() {
 	s.session.Sleep(500)
 }
 
-func (s *factorySteps) visitFactorySettings(factoryID uuid.UUID) {
-	s.session.Visit("/" + s.session.OrgID.String() + "/workspaces/" + factoryID.String() + "/settings/general")
-	s.session.Sleep(500)
+func (s *factorySteps) visitFactorySettings(factory *models.Factory) {
+	s.session.Visit("/" + s.session.OrgID.String() + "/workspaces/" + factory.Key + "/settings/general")
+	s.session.AssertVisible(q.TestID("factory-settings-name"))
 }
 
 func (s *factorySteps) fillFactorySettingsName(name string) {
