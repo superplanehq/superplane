@@ -56,9 +56,9 @@ export function WorkOrdersPage() {
   const handleAssigneesSave = async (orderId: string, assigneeIds: string[]) => {
     try {
       await updateAssignees.mutateAsync({ orderId, assigneeIds });
-      showSuccessToast("Assignees updated.");
+      showSuccessToast("Owners updated.");
     } catch {
-      showErrorToast("Failed to update assignees.");
+      showErrorToast("Failed to update owners.");
     }
   };
 

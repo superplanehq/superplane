@@ -66,7 +66,7 @@ export function FilterMenu({ state, lineOptions, assigneeOptions }: FilterMenuPr
         />
 
         <FilterSubMenu
-          label="Assignee"
+          label="Owner"
           resetLabel="Anyone"
           dimension="assigneeIds"
           state={state}
