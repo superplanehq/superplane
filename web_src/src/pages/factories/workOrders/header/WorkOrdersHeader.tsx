@@ -3,6 +3,7 @@ import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import type { WorkOrderListState } from "../../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../../lib/useWorkOrdersHeaderShortcuts";
 import { buildAssigneeFilterOptions, buildLineFilterOptions } from "../../lib/workOrderFilterOptions";
@@ -24,10 +25,11 @@ interface WorkOrdersHeaderProps {
 }
 
 /**
- * Title bar for the Work Orders page. Everything lives on one row: the page
- * title and scope pills on the left, and the Filter menu, collapsible
- * search, Display menu, and New button on the right. Layout and ordering sit
- * inside Display rather than on the bar so the row stays quiet.
+ * Title bar for the Work Orders page. Uses the shared workspace page header,
+ * with scope pills next to the title and the Filter menu, collapsible
+ * search, Display menu, and New button in the trailing actions slot. Layout
+ * and ordering sit inside Display rather than on the bar so the row stays
+ * quiet.
  *
  * The Filter menu and the chip row read from one shared set of options, so
  * both always show the same labels.
@@ -45,14 +47,12 @@ export function WorkOrdersHeader({
   const assigneeOptions = buildAssigneeFilterOptions(entries);
 
   return (
-    <div className="flex w-full flex-col" data-testid="work-orders-header">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground">Work Orders</h1>
-          <ScopePills value={state.scope} onChange={state.setScope} />
-        </div>
-
-        <div className="flex items-center gap-1">
+    <WorkspacePageHeader
+      data-testid="work-orders-header"
+      title="Work Orders"
+      leading={<ScopePills value={state.scope} onChange={state.setScope} />}
+      actions={
+        <>
           <FilterMenu state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
           <SearchField
             inputRef={searchRef}
@@ -67,24 +67,20 @@ export function WorkOrdersHeader({
             allowed={canCreate || permissionsLoading}
             message="You don't have permission to create work orders."
           >
-            <Button
-              type="button"
-              size="sm"
-              asChild
-              disabled={!canCreate}
-              className="h-8 shrink-0 gap-1.5 px-2.5"
-              data-testid="work-order-list-create-button"
-            >
+            <Button type="button" size="sm" asChild disabled={!canCreate} data-testid="work-order-list-create-button">
               <Link href={canCreate ? createHref : "#"}>
                 <Plus className="size-3.5" aria-hidden />
-                New
+                New work order
               </Link>
             </Button>
           </PermissionTooltip>
-        </div>
-      </div>
-
-      <FilterChips state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
-    </div>
+        </>
+      }
+      belowRow={
+        state.filterCount > 0 ? (
+          <FilterChips state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
+        ) : undefined
+      }
+    />
   );
 }

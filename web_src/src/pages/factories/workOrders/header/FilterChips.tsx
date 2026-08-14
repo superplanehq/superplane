@@ -17,7 +17,7 @@ export function FilterChips({ state, lineOptions, assigneeOptions }: FilterChips
   const chips = buildWorkOrderFilterChips(state.filters, { lines: lineOptions, assignees: assigneeOptions });
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1.5" data-testid="work-orders-filter-chips">
+    <div className="flex flex-wrap items-center gap-1.5" data-testid="work-orders-filter-chips">
       {chips.map((chip) => (
         <span
           key={`${chip.dimension}:${chip.value}`}

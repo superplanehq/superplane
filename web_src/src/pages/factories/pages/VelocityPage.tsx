@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
-import { Heading } from "@/components/Heading/heading";
 import {
   ChartContainer,
   ChartLegend,
@@ -11,6 +10,7 @@ import {
 } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
 import { SegmentedNav } from "@/ui/SegmentedNav";
+import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import {
   FACTORY_VELOCITY_BY_PERIOD,
   FACTORY_VELOCITY_YESTERDAY,
@@ -18,12 +18,7 @@ import {
   type FactoryVelocityPeriodDays,
   type FactoryVelocityYesterday,
 } from "./factoryVelocityMockData";
-import {
-  factoryContentBodyClassName,
-  factoryContentHeaderClassName,
-  factoryPageSubtitleClassName,
-  factoryPageTitleClassName,
-} from "./factoryPageLayoutStyles";
+import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
 
 const PERIOD_OPTIONS: { value: string; label: string }[] = [
   { value: "7", label: "7d" },
@@ -291,20 +286,10 @@ export function VelocityPage() {
 
   return (
     <>
-      <header className={factoryContentHeaderClassName}>
-        <div>
-          <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
-            Velocity
-          </Heading>
-          <p className={cn("mt-1", factoryPageSubtitleClassName)}>
-            Merged pull requests from SuperPlane, waste, and cost.
-          </p>
-        </div>
-      </header>
-
-      <div className={cn(factoryContentBodyClassName, "space-y-6")} data-testid="factory-velocity-page">
-        <YesterdayCard snapshot={FACTORY_VELOCITY_YESTERDAY} />
-        <div className="flex justify-end">
+      <WorkspacePageHeader
+        title="Velocity"
+        subtitle="Merged pull requests from SuperPlane, waste, and cost."
+        actions={
           <SegmentedNav
             ariaLabel="Velocity period in days"
             size="xs"
@@ -315,7 +300,11 @@ export function VelocityPage() {
             }}
             options={PERIOD_OPTIONS}
           />
-        </div>
+        }
+      />
+
+      <div className={cn(factoryContentBodyClassName, "space-y-6")} data-testid="factory-velocity-page">
+        <YesterdayCard snapshot={FACTORY_VELOCITY_YESTERDAY} />
         <TrendCard periodDays={periodDays} />
         <SourceSplitCard periodDays={periodDays} />
       </div>

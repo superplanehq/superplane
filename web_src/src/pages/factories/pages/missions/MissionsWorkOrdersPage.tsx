@@ -1,16 +1,12 @@
-import { Heading } from "@/components/Heading/heading";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useDispatchWorkOrder, useFactoryWorkOrders, useUpdateWorkOrderAssignees } from "@/hooks/useFactoryData";
 import { useMe } from "@/hooks/useMe";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
+import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import { WorkOrdersErrorState, WorkOrdersLoadingState } from "../../workOrders/WorkOrdersEmptyStates";
-import {
-  factoryContentBodyClassName,
-  factoryContentHeaderClassName,
-  factoryPageTitleClassName,
-} from "../factoryPageLayoutStyles";
+import { factoryContentBodyClassName } from "../factoryPageLayoutStyles";
 import { useWorkOrderListState } from "../../lib/useWorkOrderListState";
 import { MissionsWorkOrdersLoadedView } from "./MissionsWorkOrdersLoadedView";
 
@@ -58,11 +54,7 @@ export function MissionsWorkOrdersPage() {
   if (workOrdersError) {
     return (
       <>
-        <header className={factoryContentHeaderClassName}>
-          <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
-            Work Orders
-          </Heading>
-        </header>
+        <WorkspacePageHeader title="Work Orders" />
         <div className={cn(factoryContentBodyClassName, "flex flex-col gap-4")}>
           <WorkOrdersErrorState onRetry={() => void refetch()} />
         </div>
@@ -73,11 +65,7 @@ export function MissionsWorkOrdersPage() {
   if (isOrdersLoading || !factory) {
     return (
       <>
-        <header className={factoryContentHeaderClassName}>
-          <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
-            Work Orders
-          </Heading>
-        </header>
+        <WorkspacePageHeader title="Work Orders" />
         <div className={cn(factoryContentBodyClassName, "flex flex-col gap-4")}>
           <WorkOrdersLoadingState />
         </div>

@@ -1,6 +1,7 @@
 import type { FactoryApp } from "@/api-client";
 import type { AutomationCardActions } from "./automationCardActions";
-import { AutomationDetail, AutomationsPageList, EmptyAutomationsState } from "./automationsPageParts";
+import { AutomationDetail } from "./AutomationDetail";
+import { AutomationsPageList, EmptyAutomationsState } from "./automationsPageParts";
 
 type AutomationsPageBodyProps = {
   organizationId: string;
