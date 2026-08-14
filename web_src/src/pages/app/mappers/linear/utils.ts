@@ -115,6 +115,23 @@ export function buildCommentDetails(execution: ExecutionInfo): Record<string, st
   return details;
 }
 
+/**
+ * Execution details for the updateIssueComment action: the comment rows plus the
+ * edit time, which Linear sets on the first edit and is the proof the update
+ * landed. Six rows at most, timestamp first.
+ */
+export function buildCommentUpdateDetails(execution: ExecutionInfo): Record<string, string> {
+  const details = buildCommentDetails(execution);
+
+  const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  const comment = outputs?.default?.[0]?.data as LinearComment | undefined;
+  if (comment?.editedAt) {
+    addDetail(details, "Edited At", new Date(comment.editedAt).toLocaleString());
+  }
+
+  return details;
+}
+
 /** Execution details for the createAttachment action, timestamp first, at most six rows. */
 export function buildAttachmentDetails(execution: ExecutionInfo): Record<string, string> {
   const details: Record<string, string> = {

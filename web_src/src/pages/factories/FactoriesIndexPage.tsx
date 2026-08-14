@@ -10,11 +10,12 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { Factory as FactoryIcon, Plus } from "lucide-react";
 import { useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router";
 import { CreateFactoryDialog } from "./CreateFactoryDialog";
-import { factoryDetailPath } from "./lib/factoryPagePaths";
-import { pickInitialFactoryId, readLastVisitedFactory } from "./lib/lastVisitedFactory";
+import { factoryDetailPath, factoryOnboardingPath } from "./lib/factoryPagePaths";
+import { pickInitialFactory, readLastVisitedFactory } from "./lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "./lib/useFactoriesThemeClass";
+import { useOnboardingStorybook } from "./pages/onboarding/useOnboardingStorybook";
 
 export function FactoriesIndexPage() {
   const { organizationId } = useParams<{ organizationId: string }>();
@@ -33,6 +34,7 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
   const [createOpen, setCreateOpen] = useState(false);
   const { data: factories = [], isLoading, error } = useFactories(organizationId);
   const createFactory = useCreateFactory(organizationId);
+  const storybookOnboarding = useOnboardingStorybook();
 
   useFactoriesThemeClass();
   usePageTitle(["Workspaces"]);
@@ -60,20 +62,30 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
   }
 
   const lastVisited = account?.id ? readLastVisitedFactory(account.id, organizationId) : null;
-  const targetFactoryId = pickInitialFactoryId(factories, lastVisited);
+  const targetFactory = pickInitialFactory(factories, lastVisited);
 
-  if (targetFactoryId) {
-    return <Navigate to={factoryDetailPath(organizationId, targetFactoryId)} replace />;
+  if (targetFactory?.key) {
+    return <Navigate to={factoryDetailPath(organizationId, targetFactory.key)} replace />;
   }
 
   const canCreate = canAct("factories", "create");
 
-  const handleCreate = async (input: { name: string; description: string }) => {
+  const handleCreate = async (input: { name: string; description: string; key: string }) => {
+    // Let CreateFactoryDialog catch failures so duplicate-name inline errors work.
     const factory = await createFactory.mutateAsync(input);
     setCreateOpen(false);
-    if (factory.id) {
-      navigate(factoryDetailPath(organizationId, factory.id));
+    if (!factory.key) {
+      return;
     }
+    if (storybookOnboarding && factory.id) {
+      storybookOnboarding.beginOnboarding({
+        workspaceId: factory.id,
+        workspaceName: factory.name || input.name,
+      });
+      navigate(factoryOnboardingPath(organizationId, factory.key));
+      return;
+    }
+    navigate(factoryDetailPath(organizationId, factory.key));
   };
 
   return (

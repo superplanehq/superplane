@@ -1,26 +1,20 @@
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
-import { Heading } from "@/components/Heading/heading";
 import { Badge } from "@/components/ui/badge";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date";
 import { ChevronRight, Loader2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { factoryLineDetailPath, workOrderDetailPath, workOrdersPath, automationsPath } from "../lib/factoryPagePaths";
+import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
+import { factoryLineDetailPath, linesPath, workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
-import {
-  factoryCardClassName,
-  factoryContentBodyClassName,
-  factoryContentHeaderClassName,
-  factoryPageSubtitleClassName,
-  factoryPageTitleClassName,
-} from "./factoryPageLayoutStyles";
+import { factoryCardClassName, factoryContentBodyClassName } from "./factoryPageLayoutStyles";
 
 const MAX_ROWS = 8;
 
 export function OverviewPage() {
-  const { organizationId, factoryId, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const {
     data: workOrders = [],
     isLoading: workOrdersLoading,
@@ -39,27 +33,18 @@ export function OverviewPage() {
 
   return (
     <>
-      <header className={factoryContentHeaderClassName}>
-        <div>
-          <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
-            Overview
-          </Heading>
-          <p className={cn("mt-1", factoryPageSubtitleClassName)}>
-            Your workspace at a glance. Content for this page comes next.
-          </p>
-        </div>
-      </header>
+      <WorkspacePageHeader title="Overview" subtitle="Your workspace at a glance. Content for this page comes next." />
 
       <div className={factoryContentBodyClassName}>
         <div className="grid gap-6 lg:grid-cols-2">
           <WorkOrdersOverviewCard
             organizationId={organizationId}
-            factoryId={factoryId}
+            factoryKey={factoryKey}
             orders={recentOrders}
             isLoading={workOrdersLoading}
             error={workOrdersError}
           />
-          <LinesOverviewCard organizationId={organizationId} factoryId={factoryId} lines={lines} />
+          <LinesOverviewCard organizationId={organizationId} factoryKey={factoryKey} lines={lines} />
         </div>
       </div>
     </>
@@ -68,13 +53,13 @@ export function OverviewPage() {
 
 function WorkOrdersOverviewCard({
   organizationId,
-  factoryId,
+  factoryKey,
   orders,
   isLoading,
   error,
 }: {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   orders: FactoriesWorkOrder[];
   isLoading: boolean;
   error: Error | null;
@@ -87,7 +72,7 @@ function WorkOrdersOverviewCard({
           <p className="text-[12px] text-muted-foreground">Recent activity by status.</p>
         </div>
         <Link
-          to={workOrdersPath(organizationId, factoryId)}
+          to={workOrdersPath(organizationId, factoryKey)}
           className="text-[12px] font-medium text-muted-foreground hover:text-foreground"
           data-testid="overview-work-orders-view-all"
         >
@@ -107,7 +92,8 @@ function WorkOrdersOverviewCard({
             {orders.map((order) => {
               const status = getWorkOrderDisplayStatus(order);
               const statusMeta = getWorkOrderDisplayStatusMeta(status);
-              const href = order.id ? workOrderDetailPath(organizationId, factoryId, order.id) : "#";
+              const href =
+                order.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, order.number) : "#";
               const updatedAt = order.updatedAt ?? order.createdAt;
               const timeLabel = updatedAt ? formatTimeAgo(new Date(updatedAt)) : "—";
               return (
@@ -150,11 +136,11 @@ function WorkOrdersOverviewCard({
 
 function LinesOverviewCard({
   organizationId,
-  factoryId,
+  factoryKey,
   lines,
 }: {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   lines: FactoriesFactoryLine[];
 }) {
   return (
@@ -165,7 +151,7 @@ function LinesOverviewCard({
           <p className="text-[12px] text-muted-foreground">Lines and their steps.</p>
         </div>
         <Link
-          to={automationsPath(organizationId, factoryId)}
+          to={linesPath(organizationId, factoryKey)}
           className="text-[12px] font-medium text-muted-foreground hover:text-foreground"
           data-testid="overview-lines-view-all"
         >
@@ -179,7 +165,7 @@ function LinesOverviewCard({
         <ul>
           {lines.map((line) => {
             const stepsCount = line.steps?.length ?? 0;
-            const href = line.id ? factoryLineDetailPath(organizationId, factoryId, line.id) : "#";
+            const href = line.id ? factoryLineDetailPath(organizationId, factoryKey, line.id) : "#";
             return (
               <li key={line.id ?? line.name} className="border-b border-border/60 last:border-b-0">
                 <Link

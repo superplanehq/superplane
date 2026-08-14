@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.11 (Ubuntu 17.11-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -350,7 +350,10 @@ CREATE TABLE public.factories (
     description text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    deleted_at timestamp with time zone
+    deleted_at timestamp with time zone,
+    key character varying(5) NOT NULL,
+    next_work_order_number bigint DEFAULT 1 NOT NULL,
+    CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text))
 );
 
 
@@ -381,7 +384,8 @@ CREATE TABLE public.factory_work_order_artifacts (
     type character varying(32) NOT NULL,
     data jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_by_id uuid,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    key character varying(512)
 );
 
 
@@ -426,7 +430,9 @@ CREATE TABLE public.factory_work_order_executions (
     result character varying(32) DEFAULT ''::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    finished_at timestamp with time zone
+    finished_at timestamp with time zone,
+    total_tokens bigint DEFAULT 0 NOT NULL,
+    cost_cents bigint DEFAULT 0 NOT NULL
 );
 
 
@@ -445,7 +451,9 @@ CREATE TABLE public.factory_work_orders (
     created_by_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    source_run_id uuid
+    source_run_id uuid,
+    number bigint NOT NULL,
+    CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
 
@@ -1424,6 +1432,20 @@ CREATE UNIQUE INDEX agent_sessions_user_canvas_idx ON public.agent_sessions USIN
 
 
 --
+-- Name: factories_organization_id_key_active_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX factories_organization_id_key_active_key ON public.factories USING btree (organization_id, key) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: factory_work_orders_factory_id_number_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX factory_work_orders_factory_id_number_key ON public.factory_work_orders USING btree (factory_id, number);
+
+
+--
 -- Name: idx_account_magic_codes_email; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1617,6 +1639,13 @@ CREATE INDEX idx_factory_lines_factory_id ON public.factory_lines USING btree (f
 --
 
 CREATE INDEX idx_factory_work_order_artifacts_factory_created ON public.factory_work_order_artifacts USING btree (factory_id, created_at DESC);
+
+
+--
+-- Name: idx_factory_work_order_artifacts_factory_key_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_work_order_artifacts_factory_key_unique ON public.factory_work_order_artifacts USING btree (factory_id, key) WHERE (key IS NOT NULL);
 
 
 --
@@ -2660,7 +2689,7 @@ ALTER TABLE ONLY public.workflows
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.11 (Ubuntu 17.11-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2679,7 +2708,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260805214133	f
+20260812184220	f
 \.
 
 
@@ -2696,7 +2725,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.11 (Ubuntu 17.11-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;

@@ -3,6 +3,7 @@ package linear
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -15,6 +16,10 @@ const (
 	ResourceTypeLabel         = "label"
 	ResourceTypeProject       = "project"
 	ResourceTypeAttachment    = "attachment"
+	ResourceTypeComment       = "comment"
+
+	// commentPreviewRunes caps how much of a comment body the picker shows.
+	commentPreviewRunes = 60
 )
 
 func (l *Linear) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -31,6 +36,8 @@ func (l *Linear) ListResources(resourceType string, ctx core.ListResourcesContex
 		return ListProjects(ctx)
 	case ResourceTypeAttachment:
 		return ListAttachments(ctx)
+	case ResourceTypeComment:
+		return ListComments(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -197,6 +204,67 @@ func ListAttachments(ctx core.ListResourcesContext) ([]core.IntegrationResource,
 	}
 
 	return resources, nil
+}
+
+// ListComments returns the comments on the issue selected in the sibling field.
+// It stays empty until an issue is chosen, and an issue set from an expression
+// cannot be resolved here, so the picker offers nothing in that case.
+func ListComments(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	issueID := ctx.Parameters["issue"]
+	if issueID == "" || strings.Contains(issueID, "{{") {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %v", err)
+	}
+
+	comments, err := client.ListIssueComments(issueID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list comments: %v", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(comments))
+	for _, comment := range comments {
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeComment,
+			Name: commentLabel(comment),
+			ID:   comment.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+// commentLabel identifies a comment in the picker by its author and the opening
+// of its body, since comments have no title of their own. The preview is cut on
+// a rune boundary, so an emoji or accented character at the limit survives whole.
+func commentLabel(comment Comment) string {
+	preview := strings.Join(strings.Fields(comment.Body), " ")
+	if utf8.RuneCountInString(preview) > commentPreviewRunes {
+		runes := []rune(preview)
+		preview = strings.TrimSpace(string(runes[:commentPreviewRunes])) + "…"
+	}
+
+	author := memberLabel(userOrEmpty(comment.User))
+	if author == "" {
+		return preview
+	}
+
+	if preview == "" {
+		return author
+	}
+
+	return fmt.Sprintf("%s: %s", author, preview)
+}
+
+func userOrEmpty(user *User) User {
+	if user == nil {
+		return User{}
+	}
+
+	return *user
 }
 
 func attachmentLabel(attachment Attachment) string {

@@ -3,8 +3,9 @@ import { Plus } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { CANVAS_CONNECTOR_COLOR } from "@/lib/canvasEdgeColors";
-import { HANDLE_STYLE } from "./handleStyle";
+import { resolveHandleStyle } from "./handleStyle";
 import type { BlockProps } from "./types";
+
 const APPEND_SOURCE_LINE_WIDTH = 42;
 const APPEND_SOURCE_BUTTON_LEFT = 54;
 const APPEND_HORIZONTAL_NUDGE = -4;
@@ -29,6 +30,7 @@ const APPEND_PREVIEW_DOT_BASE_STYLE: React.CSSProperties = {
 };
 
 export type AppendFromNodeHandler = NonNullable<BlockProps["onAppendFromNode"]>;
+export type AppendHandleOrientation = "horizontal" | "vertical";
 
 function getAppendSourceHandleClassName(isHighlighted: boolean | undefined, plusHovered: boolean) {
   if (isHighlighted && plusHovered) {
@@ -49,6 +51,7 @@ export function AppendSourceHandle({
   isHighlighted,
   onAppend,
   style,
+  orientation = "horizontal",
   lineWidth = APPEND_SOURCE_LINE_WIDTH,
   buttonLeft = APPEND_SOURCE_BUTTON_LEFT,
   buttonTop = -9,
@@ -58,14 +61,16 @@ export function AppendSourceHandle({
   isHighlighted: boolean | undefined;
   onAppend: () => void | Promise<void>;
   style: React.CSSProperties;
+  orientation?: AppendHandleOrientation;
   lineWidth?: number;
   buttonLeft?: number;
   buttonTop?: number;
 }) {
   const [plusHovered, setPlusHovered] = useState(false);
+  const isVertical = orientation === "vertical";
 
   const handleStyle: React.CSSProperties = {
-    ...HANDLE_STYLE,
+    ...resolveHandleStyle(isVertical),
     pointerEvents: "auto",
     zIndex: 12,
     ...style,
@@ -74,7 +79,7 @@ export function AppendSourceHandle({
   return (
     <Handle
       type="source"
-      position={Position.Right}
+      position={isVertical ? Position.Bottom : Position.Right}
       id={channel}
       className={getAppendSourceHandleClassName(isHighlighted, plusHovered)}
       onClick={(event) => {
@@ -86,27 +91,49 @@ export function AppendSourceHandle({
     >
       <span
         aria-hidden="true"
-        style={{
-          position: "absolute",
-          left: 12 + APPEND_HORIZONTAL_NUDGE,
-          top: "50%",
-          width: lineWidth,
-          height: 3,
-          transform: "translateY(-50%)",
-          backgroundColor: CANVAS_CONNECTOR_COLOR,
-          pointerEvents: "none",
-          zIndex: -1,
-        }}
+        style={
+          isVertical
+            ? {
+                position: "absolute",
+                left: "50%",
+                top: 12,
+                width: 3,
+                height: lineWidth,
+                transform: "translateX(-50%)",
+                backgroundColor: CANVAS_CONNECTOR_COLOR,
+                pointerEvents: "none",
+                zIndex: -1,
+              }
+            : {
+                position: "absolute",
+                left: 12 + APPEND_HORIZONTAL_NUDGE,
+                top: "50%",
+                width: lineWidth,
+                height: 3,
+                transform: "translateY(-50%)",
+                backgroundColor: CANVAS_CONNECTOR_COLOR,
+                pointerEvents: "none",
+                zIndex: -1,
+              }
+        }
       />
       <AppendHandleButton
         label={label}
         onClick={onAppend}
         onHoverChange={setPlusHovered}
-        style={{
-          left: buttonLeft + APPEND_HORIZONTAL_NUDGE,
-          top: buttonTop,
-          position: "absolute",
-        }}
+        style={
+          isVertical
+            ? {
+                left: buttonLeft,
+                top: buttonTop,
+                position: "absolute",
+              }
+            : {
+                left: buttonLeft + APPEND_HORIZONTAL_NUDGE,
+                top: buttonTop,
+                position: "absolute",
+              }
+        }
       />
     </Handle>
   );
@@ -147,19 +174,71 @@ export function AppendHandleButton({
 
 export function AppendHandlePreview({
   style,
+  orientation = "horizontal",
   connectorTop = "50%",
   containerOffsetY = 0,
 }: {
   style: React.CSSProperties;
+  orientation?: AppendHandleOrientation;
   connectorTop?: number | string;
   containerOffsetY?: number;
 }) {
   const previewStemLength = 44;
   const previewConnectorSize = 12;
   const previewContainerGap = 12;
-  const previewContainerLeft = previewStemLength + previewConnectorSize / 2 + previewContainerGap;
   const previewNudgeLeft = -2;
   const connectorTopValue = typeof connectorTop === "number" ? `${connectorTop}px` : connectorTop;
+
+  if (orientation === "vertical") {
+    const previewContainerTop = previewStemLength + previewConnectorSize / 2 + previewContainerGap;
+
+    return (
+      <div className="sp-append-source-preview" style={style}>
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: 0,
+            width: 3,
+            height: previewStemLength,
+            transform: "translateX(-50%)",
+            backgroundColor: CANVAS_CONNECTOR_COLOR,
+            borderRadius: 999,
+          }}
+        />
+        <div
+          style={{
+            ...APPEND_PREVIEW_DOT_BASE_STYLE,
+            border: `3px solid ${CANVAS_CONNECTOR_COLOR}`,
+            position: "absolute",
+            left: "50%",
+            top: previewStemLength + previewConnectorSize / 2,
+            transform: "translate(-50%, -50%)",
+            pointerEvents: "none",
+          }}
+        />
+        {/* Absolute + translateX(-50%): parent is already centered on the
+            stem; marginLeft:-halfWidth would double-offset and push the
+            ghost left (line hits the ghost's right edge). */}
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: previewContainerTop + containerOffsetY,
+            transform: "translateX(-50%)",
+            width: "23rem",
+            height: 96,
+            borderRadius: 8,
+            background: "white",
+            outline: "1px solid rgb(15 23 42 / 0.15)",
+            opacity: 0.6,
+          }}
+        />
+      </div>
+    );
+  }
+
+  const previewContainerLeft = previewStemLength + previewConnectorSize / 2 + previewContainerGap;
 
   return (
     <div className="sp-append-source-preview" style={style}>

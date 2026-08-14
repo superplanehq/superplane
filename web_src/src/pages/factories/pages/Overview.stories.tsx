@@ -4,7 +4,7 @@ import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
   emptyWorkOrdersFactoriesFixture,
-  PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
 } from "../__fixtures__/factoryPageResponses";
 import { OverviewPage } from "./OverviewPage";
 
@@ -22,7 +22,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const overviewPath = `workspaces/${PRIMARY_FACTORY_ID}/overview`;
+const overviewPath = `workspaces/${PRIMARY_FACTORY_KEY}/overview`;
 
 export const Populated: Story = {
   render: () => <FactoriesHarness pathSuffix={overviewPath} factoriesFixture={defaultFactoriesFixture} />,

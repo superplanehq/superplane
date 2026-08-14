@@ -27,6 +27,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Issue" href="#get-issue" description="Fetch a single issue from Linear" />
   <LinkCard title="Remove Issue Label" href="#remove-issue-label" description="Remove labels from an issue in Linear" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update an existing issue in Linear" />
+  <LinkCard title="Update Issue Comment" href="#update-issue-comment" description="Update an existing comment on an issue in Linear" />
 </CardGrid>
 
 ## Instructions
@@ -34,6 +35,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 SuperPlane connects to Linear with OAuth.
 
 1. Click the **Connect** button with client id and secret empty to start the setup wizard.
+
+The connection requests the **read**, **write** and **admin** scopes. Write covers creating and editing
+issues, comments, attachments and reactions; admin is needed because the triggers register webhooks,
+which Linear restricts to workspace admins.
+
+Components act as the user who authorizes the connection, so that user needs access to the teams you
+automate. Linear also lets only a comment's own author edit it, so **Update Issue Comment** can only
+change comments that this same connection posted.
 
 <a id="on-issue"></a>
 
@@ -1081,6 +1090,78 @@ connection includes the **write** scope, which covers updating issues.
   },
   "timestamp": "2026-03-27T14:05:52.238104773Z",
   "type": "linear.issue"
+}
+```
+
+<a id="update-issue-comment"></a>
+
+## Update Issue Comment
+
+**Component key:** `linear.updateIssueComment`
+
+The Update Issue Comment component edits an existing comment on a Linear issue.
+
+### Use Cases
+
+- **Living status**: Keep one comment up to date with the latest deployment or test results instead of
+  posting a new one on every run
+- **Progressive detail**: Start with a short note and append findings as a workflow discovers them
+- **Correct mistakes**: Fix a comment an earlier step posted with incomplete information
+
+### Configuration
+
+- **Issue** (optional): The issue whose comments fill the picker below. Only used to populate the
+  picker, so it can be left empty when the comment comes from an expression.
+- **Comment** (required): The comment to update. Pick one from the issue, or switch the field to an
+  expression to supply an ID resolved at run time.
+- **Body** (required): The new comment text, written in Markdown. It is the only field Linear lets a
+  comment update change, and it cannot be empty. Supports expressions.
+
+### Finding the comment ID
+
+Comments have no human-readable identifier, so this component needs the comment's UUID. Either pick it
+from the issue, or carry it through from a previous step: the **Add Issue Comment** output and the
+**On Issue Comment** trigger payload both expose `id`.
+
+### Output
+
+Returns the updated comment, including its `id`, `body`, `url`,
+`createdAt`, `updatedAt`, `editedAt`, the `user` who authored
+it, and the `issue` it belongs to. Linear sets `editedAt` on the first edit, so it
+marks the comment as edited from then on.
+
+### Permissions
+
+Linear only lets the comment's author edit it, so the user who authorized the Linear connection must be
+the one who posted the comment. SuperPlane's OAuth connection includes the **write** scope, which
+covers editing comments.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "body": "Deploy pipeline is green again — root cause was a flaky runner. Retried 3 times, all passing.",
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "editedAt": "2026-03-27T18:05:47.482Z",
+    "id": "d3f9b0a2-4c1e-4b6a-9f2e-8a1b2c3d4e5f",
+    "issue": {
+      "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+      "identifier": "ENG-142",
+      "title": "Deploy pipeline fails on retry",
+      "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+    },
+    "updatedAt": "2026-03-27T18:05:47.482Z",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry#comment-d3f9b0a2",
+    "user": {
+      "displayName": "ada",
+      "email": "ada@example.com",
+      "id": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "name": "Ada Lovelace"
+    }
+  },
+  "timestamp": "2026-03-27T18:05:47.482913204Z",
+  "type": "linear.comment"
 }
 ```
 

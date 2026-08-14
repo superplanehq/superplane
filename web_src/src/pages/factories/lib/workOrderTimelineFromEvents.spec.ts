@@ -1,28 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import type { FactoriesWorkOrderEvent } from "@/api-client";
-
+import { buildWorkOrderTimelineView } from "./workOrderTimelineEvents";
 import { buildWorkOrderTimelineViewFromEvents } from "./workOrderTimelineFromEvents";
+import { stepExecutionEvent } from "./workOrderTimelineFromEvents.testHelpers";
 
-function stepExecutionEvent(
-  type: "step.execution.created" | "step.execution.finished",
-  timestamp: string,
-  runState: string,
-  runResult?: string,
-): FactoriesWorkOrderEvent {
-  return {
-    timestamp,
-    type,
-    event: {
-      stepName: "Build",
-      line: { id: "line-1", name: "CI" },
-      run: { id: "run-1", state: runState, result: runResult },
-      app: { id: "app-1" },
-    },
-  };
-}
+describe("buildWorkOrderTimelineViewFromEvents: steps and lifecycle", () => {
+  it("hydrates timeline steps with execution usage", () => {
+    const view = buildWorkOrderTimelineView(
+      [stepExecutionEvent("step.execution.finished", "2026-08-04T12:00:00.000Z", "finished", "passed")],
+      undefined,
+      [{ id: "execution-1", run: { id: "run-1" }, totalTokens: "1200", costCents: "45" }],
+    );
 
-describe("buildWorkOrderTimelineViewFromEvents", () => {
+    expect(view.events[0]?.steps?.[0]?.execution).toMatchObject({
+      id: "execution-1",
+      run: { id: "run-1" },
+      totalTokens: "1200",
+      costCents: "45",
+    });
+  });
+
   it("keeps finished step state when created and finished share a timestamp", () => {
     const timestamp = "2026-08-04T12:00:00.000Z";
     const apiEvents = [
@@ -50,7 +47,7 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
       },
     ]);
 
-    expect(view.events[0]?.title).toBe("self-assigned");
+    expect(view.events[0]?.title).toBe("took ownership");
   });
 
   it("renders a draft→open transition as an open with source-run enrichment", () => {
@@ -199,203 +196,6 @@ describe("buildWorkOrderTimelineViewFromEvents", () => {
       actorUserId: "user-1",
       statusChange: { fromState: "closed", toState: "open", fromResult: "completed" },
       title: "reopened this work order",
-    });
-  });
-
-  it("carries a comment body and automation ref into the timeline", () => {
-    const view = buildWorkOrderTimelineViewFromEvents([
-      {
-        timestamp: "2026-08-04T12:00:00.000Z",
-        type: "order.comment.added",
-        event: {
-          body: "Please double-check the payload shape.",
-          author: {
-            kind: "automation",
-            automation: { nodeName: "review-payload", appName: "Refund Diagnostics" },
-          },
-        },
-      },
-    ]);
-
-    expect(view.events[0]).toMatchObject({
-      kind: "commented",
-      comment: {
-        body: "Please double-check the payload shape.",
-        authorKind: "automation",
-        automation: { nodeName: "review-payload", appName: "Refund Diagnostics" },
-      },
-    });
-  });
-
-  it("captures PR artifact metadata", () => {
-    const view = buildWorkOrderTimelineViewFromEvents([
-      {
-        timestamp: "2026-08-04T12:00:00.000Z",
-        type: "order.artifact.added",
-        event: {
-          artifact: {
-            id: "art-1",
-            type: "pr",
-            data: {
-              url: "https://github.com/example/repo/pull/1",
-              title: "Add checkout",
-            },
-          },
-        },
-      },
-    ]);
-
-    expect(view.events[0]).toMatchObject({
-      kind: "artifactAdded",
-      artifact: {
-        id: "art-1",
-        type: "pr",
-        data: {
-          url: "https://github.com/example/repo/pull/1",
-          title: "Add checkout",
-        },
-      },
-      title: "attached PR: Add checkout",
-    });
-  });
-
-  it("falls back to data.url when data.title is absent", () => {
-    const view = buildWorkOrderTimelineViewFromEvents([
-      {
-        timestamp: "2026-08-04T12:00:00.000Z",
-        type: "order.artifact.added",
-        event: {
-          artifact: {
-            id: "art-2",
-            type: "pr",
-            data: { url: "https://github.com/example/repo/pull/2" },
-          },
-        },
-      },
-    ]);
-
-    expect(view.events[0]?.title).toBe("attached PR: https://github.com/example/repo/pull/2");
-  });
-
-  it("attributes automation-driven status changes with the factory line", () => {
-    const view = buildWorkOrderTimelineViewFromEvents([
-      {
-        timestamp: "2026-08-04T12:00:00.000Z",
-        type: "order.status.updated",
-        event: {
-          automation: {
-            nodeName: "node-comment",
-            appName: "Factory-App",
-            lineName: "Plan",
-            stepName: "step-01",
-          },
-          fromState: "open",
-          toState: "draft",
-        },
-      },
-    ]);
-
-    expect(view.events[0]).toMatchObject({
-      kind: "statusChanged",
-      actorAutomation: {
-        lineName: "Plan",
-        stepName: "step-01",
-        nodeName: "node-comment",
-      },
-    });
-  });
-
-  it("attributes automation-driven closes with the factory line", () => {
-    const view = buildWorkOrderTimelineViewFromEvents([
-      {
-        timestamp: "2026-08-04T12:00:00.000Z",
-        type: "order.status.updated",
-        event: {
-          automation: {
-            nodeName: "node-comment",
-            appName: "Factory-App",
-            lineName: "Plan",
-            stepName: "step-01",
-          },
-          fromState: "open",
-          toState: "closed",
-          toResult: "completed",
-        },
-      },
-    ]);
-
-    expect(view.events[0]).toMatchObject({
-      kind: "closed",
-      actorAutomation: {
-        lineName: "Plan",
-        stepName: "step-01",
-        nodeName: "node-comment",
-      },
-      title: "closed as completed",
-    });
-  });
-
-  it("attributes automation-driven artifacts with the factory line", () => {
-    const view = buildWorkOrderTimelineViewFromEvents([
-      {
-        timestamp: "2026-08-04T12:00:00.000Z",
-        type: "order.artifact.added",
-        event: {
-          automation: {
-            nodeName: "attach-artifact",
-            appName: "Factory-App",
-            lineName: "Plan",
-            stepName: "step-01",
-          },
-          artifact: { id: "art-1", type: "pr", data: { url: "https://example.com/pull/1", title: "PR" } },
-        },
-      },
-    ]);
-
-    expect(view.events[0]).toMatchObject({
-      kind: "artifactAdded",
-      actorAutomation: {
-        lineName: "Plan",
-        stepName: "step-01",
-        nodeName: "attach-artifact",
-      },
-    });
-  });
-
-  it("propagates comment automation into actorAutomation for the timeline", () => {
-    const view = buildWorkOrderTimelineViewFromEvents([
-      {
-        timestamp: "2026-08-04T12:00:00.000Z",
-        type: "order.comment.added",
-        event: {
-          body: "Ready for review",
-          author: {
-            kind: "automation",
-            automation: {
-              nodeName: "node-comment",
-              appName: "Factory-App",
-              lineName: "Plan",
-              stepName: "step-01",
-            },
-          },
-        },
-      },
-    ]);
-
-    expect(view.events[0]).toMatchObject({
-      kind: "commented",
-      actorAutomation: {
-        lineName: "Plan",
-        stepName: "step-01",
-        nodeName: "node-comment",
-      },
-      comment: {
-        automation: {
-          lineName: "Plan",
-          stepName: "step-01",
-          nodeName: "node-comment",
-        },
-      },
     });
   });
 });

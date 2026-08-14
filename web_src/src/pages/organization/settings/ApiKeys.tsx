@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { KeyRound } from "lucide-react";
 import { CopyButton } from "@/ui/CopyButton";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useAPIKeys, useCreateAPIKey, useDeleteAPIKey } from "@/hooks/useApiKeys";
 import { useCanvases } from "@/hooks/useCanvasData";
 import { ApiKeysContent } from "./ApiKeysContent";

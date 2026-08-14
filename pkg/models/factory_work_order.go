@@ -61,6 +61,7 @@ type FactoryWorkOrder struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
 	FactoryID      uuid.UUID
+	Number         int64
 	Title          string
 	Description    string
 	State          string
@@ -126,6 +127,61 @@ func FindUnscopedWorkOrder(db *gorm.DB, id uuid.UUID) (*FactoryWorkOrder, error)
 		return nil, err
 	}
 	return &order, nil
+}
+
+func ResolveFactoryWorkOrderCreatorAutomations(
+	tx *gorm.DB,
+	orders []FactoryWorkOrder,
+) (map[uuid.UUID]*factory.AutomationRef, error) {
+	orderIDsByRunID := map[uuid.UUID][]uuid.UUID{}
+	runIDs := make([]uuid.UUID, 0, len(orders))
+	for i := range orders {
+		if orders[i].SourceRunID == nil {
+			continue
+		}
+
+		runID := *orders[i].SourceRunID
+		if _, exists := orderIDsByRunID[runID]; !exists {
+			runIDs = append(runIDs, runID)
+		}
+		orderIDsByRunID[runID] = append(orderIDsByRunID[runID], orders[i].ID)
+	}
+
+	if len(runIDs) == 0 {
+		return map[uuid.UUID]*factory.AutomationRef{}, nil
+	}
+
+	var runs []CanvasRun
+	if err := tx.Where("id IN ?", runIDs).Find(&runs).Error; err != nil {
+		return nil, err
+	}
+
+	canvasIDs, nodeKeys := collectCreatorAutomationKeys(runs)
+	canvasesByID, err := loadCreatorAutomationCanvases(tx, canvasIDs)
+	if err != nil {
+		return nil, err
+	}
+	nodesByKey, err := loadCreatorAutomationNodes(tx, canvasIDs, nodeKeys)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[uuid.UUID]*factory.AutomationRef, len(orders))
+	for i := range runs {
+		run := &runs[i]
+		ref := &factory.AutomationRef{
+			AppID:  run.WorkflowID,
+			NodeID: run.NodeID,
+		}
+		ref.AppName = canvasesByID[run.WorkflowID]
+		ref.NodeName = nodesByKey[creatorAutomationNodeKey{CanvasID: run.WorkflowID, NodeID: run.NodeID}]
+
+		for _, orderID := range orderIDsByRunID[run.ID] {
+			result[orderID] = ref
+		}
+	}
+
+	return result, nil
 }
 
 func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID, updatedBy uuid.UUID) error {
@@ -380,6 +436,25 @@ func (o *FactoryWorkOrder) ListEvents(tx *gorm.DB, limit int, before *time.Time)
 	return events, nil
 }
 
+// ListComments returns the work order's comment thread (`order.comment.added`
+// events), oldest first — unlike ListEvents (which is DESC for activity
+// feeds), a comment thread reads chronologically oldest→newest.
+func (o *FactoryWorkOrder) ListComments(tx *gorm.DB) ([]FactoryWorkOrderEvent, error) {
+	var events []FactoryWorkOrderEvent
+	err := tx.
+		Where("work_order_id = ?", o.ID).
+		Where("type = ?", factory.EventTypeOrderCommentAdded).
+		Order("created_at ASC").
+		Order("id ASC").
+		Find(&events).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
 func (o *FactoryWorkOrder) CountEvents(tx *gorm.DB) (int64, error) {
 	var count int64
 
@@ -551,4 +626,75 @@ func assigneeDiff(previousIDs, nextIDs []uuid.UUID) (assigned, unassigned []fact
 	}
 
 	return assigned, unassigned
+}
+
+type creatorAutomationNodeKey struct {
+	CanvasID uuid.UUID
+	NodeID   string
+}
+
+func collectCreatorAutomationKeys(runs []CanvasRun) ([]uuid.UUID, []creatorAutomationNodeKey) {
+	canvasSet := map[uuid.UUID]struct{}{}
+	nodeSet := map[creatorAutomationNodeKey]struct{}{}
+	for i := range runs {
+		canvasSet[runs[i].WorkflowID] = struct{}{}
+		if runs[i].NodeID != "" {
+			nodeSet[creatorAutomationNodeKey{CanvasID: runs[i].WorkflowID, NodeID: runs[i].NodeID}] = struct{}{}
+		}
+	}
+
+	canvasIDs := make([]uuid.UUID, 0, len(canvasSet))
+	for id := range canvasSet {
+		canvasIDs = append(canvasIDs, id)
+	}
+	nodeKeys := make([]creatorAutomationNodeKey, 0, len(nodeSet))
+	for key := range nodeSet {
+		nodeKeys = append(nodeKeys, key)
+	}
+	return canvasIDs, nodeKeys
+}
+
+func loadCreatorAutomationCanvases(tx *gorm.DB, canvasIDs []uuid.UUID) (map[uuid.UUID]string, error) {
+	var canvases []Canvas
+	if err := tx.Unscoped().Where("id IN ?", canvasIDs).Find(&canvases).Error; err != nil {
+		return nil, err
+	}
+
+	result := make(map[uuid.UUID]string, len(canvases))
+	for i := range canvases {
+		result[canvases[i].ID] = canvases[i].Name
+	}
+	return result, nil
+}
+
+func loadCreatorAutomationNodes(
+	tx *gorm.DB,
+	canvasIDs []uuid.UUID,
+	keys []creatorAutomationNodeKey,
+) (map[creatorAutomationNodeKey]string, error) {
+	if len(keys) == 0 {
+		return map[creatorAutomationNodeKey]string{}, nil
+	}
+
+	nodeIDs := make([]string, 0, len(keys))
+	for i := range keys {
+		nodeIDs = append(nodeIDs, keys[i].NodeID)
+	}
+
+	var nodes []CanvasNode
+	err := tx.
+		Where("workflow_nodes.workflow_id IN ?", canvasIDs).
+		Where("workflow_nodes.node_id IN ?", nodeIDs).
+		Find(&nodes).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[creatorAutomationNodeKey]string, len(nodes))
+	for i := range nodes {
+		key := creatorAutomationNodeKey{CanvasID: nodes[i].WorkflowID, NodeID: nodes[i].NodeID}
+		result[key] = nodes[i].Name
+	}
+	return result, nil
 }

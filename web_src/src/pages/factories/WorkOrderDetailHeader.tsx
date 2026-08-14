@@ -1,186 +1,185 @@
-import type { FactoriesFactoryLine, FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
-import { Badge } from "@/components/ui/badge";
+import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { cn } from "@/lib/utils";
-import { Forward, Loader2 } from "lucide-react";
-import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { Check, Ellipsis, Link2 } from "lucide-react";
+import { Fragment, useState } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdownMenu";
+import { WorkspacePageHeader } from "./layout/WorkspacePageHeader";
 import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailHeaderProps {
   orderTitle: string;
-  statusMeta: { label: string; className: string };
+  /** Short identifier (e.g. `SP-42`). Rendered as a kicker above the title. */
+  orderIdentifier?: string;
+  /** Back link target (Work Orders list). */
+  backHref: string;
   displayStatus: WorkOrderDisplayStatus;
   isOpen: boolean;
   isDispatchable: boolean;
   isClosed: boolean;
-  factoryLines: FactoriesFactoryLine[];
-  canDispatch: boolean;
   canClose: boolean;
   canManage: boolean;
-  permissionsLoading: boolean;
-  isDispatching: boolean;
   isCompleting: boolean;
   isRejecting: boolean;
   isClosing: boolean;
   isUpdatingStatus: boolean;
-  onDispatch: (lineName: string) => Promise<void>;
   onClose: (result: FactoriesWorkOrderResult) => void;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
 }
 
 export function WorkOrderDetailHeader(props: WorkOrderDetailHeaderProps) {
-  const { orderTitle, statusMeta, displayStatus } = props;
   return (
-    <header className="pb-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-          <Badge
-            variant="outline"
-            className={cn("inline-flex shrink-0 px-2.5 py-1 text-xs font-medium", statusMeta.className)}
-          >
-            {displayStatus === "running" ? <Loader2 className="mr-1 inline h-3 w-3 animate-spin" aria-hidden /> : null}
-            {statusMeta.label}
-          </Badge>
-          <h1 className="min-w-0 text-2xl font-semibold tracking-tight text-slate-900 dark:text-gray-100">
-            {orderTitle}
-          </h1>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <HeaderActions {...props} />
-        </div>
-      </div>
-    </header>
+    <WorkspacePageHeader
+      variant="entity"
+      backHref={props.backHref}
+      backLabel="Work Orders"
+      backTestId="work-order-detail-back"
+      kicker={props.orderIdentifier}
+      title={props.orderTitle}
+      actions={
+        <>
+          <CopyLinkButton />
+          <HeaderOverflowMenu {...props} />
+        </>
+      }
+    />
   );
 }
 
-function HeaderActions({
-  displayStatus,
-  isOpen,
-  isDispatchable,
-  isClosed,
-  factoryLines,
-  canDispatch,
-  canClose,
-  canManage,
-  permissionsLoading,
-  isDispatching,
-  isCompleting,
-  isRejecting,
-  isClosing,
-  isUpdatingStatus,
-  onDispatch,
-  onClose,
-  onStatusChange,
-}: WorkOrderDetailHeaderProps) {
-  // Draft is "dispatchable, not yet open, not closed" — the only lifecycle
-  // stage where an operator can abandon the order before any work runs.
-  const isDraft = isDispatchable && !isOpen && !isClosed;
+function CopyLinkButton() {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      showSuccessToast("Link copied to clipboard.");
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      showErrorToast("Failed to copy link.");
+    }
+  };
 
   return (
-    <>
-      {isDispatchable ? (
-        <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
-          <DispatchWorkOrderPopover
-            lines={factoryLines}
-            isSaving={isDispatching}
-            canDispatch={canDispatch || permissionsLoading}
-            onDispatch={onDispatch}
-          >
-            <Button
-              type="button"
-              disabled={!canDispatch || factoryLines.length === 0}
-              data-testid="work-order-dispatch-button"
-            >
-              Dispatch
-              <Forward className="ml-1.5 h-4 w-4" aria-hidden />
-            </Button>
-          </DispatchWorkOrderPopover>
-        </PermissionTooltip>
-      ) : null}
-
-      {isDraft ? (
-        <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
-          <LoadingButton
-            type="button"
-            variant="ghost"
-            disabled={!canClose || isClosing}
-            loading={isRejecting}
-            loadingText="Rejecting..."
-            onClick={() => void onClose("RESULT_REJECTED")}
-            data-testid="work-order-reject-draft-button"
-          >
-            Reject
-          </LoadingButton>
-        </PermissionTooltip>
-      ) : null}
-
-      {isOpen ? (
-        <>
-          {/* Back-to-draft hits the `open → draft` FSM guard, which rejects while a line execution is pending/running. */}
-          {displayStatus !== "running" ? (
-            <PermissionTooltip allowed={canManage} message="You don't have permission to update work orders.">
-              <LoadingButton
-                type="button"
-                variant="ghost"
-                disabled={!canManage || isUpdatingStatus}
-                loading={isUpdatingStatus}
-                loadingText="Moving to draft..."
-                onClick={() => void onStatusChange("STATE_DRAFT")}
-                data-testid="work-order-back-to-draft-button"
-              >
-                Back to draft
-              </LoadingButton>
-            </PermissionTooltip>
-          ) : null}
-
-          <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
-            <LoadingButton
-              type="button"
-              variant="ghost"
-              disabled={!canClose || isClosing}
-              loading={isCompleting}
-              loadingText="Completing..."
-              onClick={() => void onClose("RESULT_COMPLETED")}
-              data-testid="work-order-complete-button"
-            >
-              Complete
-            </LoadingButton>
-          </PermissionTooltip>
-
-          <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
-            <LoadingButton
-              type="button"
-              variant="ghost"
-              disabled={!canClose || isClosing}
-              loading={isRejecting}
-              loadingText="Rejecting..."
-              onClick={() => void onClose("RESULT_REJECTED")}
-              data-testid="work-order-reject-button"
-            >
-              Reject
-            </LoadingButton>
-          </PermissionTooltip>
-        </>
-      ) : null}
-
-      {isClosed ? (
-        <PermissionTooltip allowed={canManage} message="You don't have permission to reopen work orders.">
-          <LoadingButton
-            type="button"
-            variant="ghost"
-            disabled={!canManage || isUpdatingStatus}
-            loading={isUpdatingStatus}
-            loadingText="Reopening..."
-            onClick={() => void onStatusChange("STATE_OPEN")}
-            data-testid="work-order-reopen-open-button"
-          >
-            Reopen
-          </LoadingButton>
-        </PermissionTooltip>
-      ) : null}
-    </>
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      onClick={() => void handleCopy()}
+      className="text-muted-foreground hover:bg-accent hover:text-foreground"
+      aria-label="Copy link to work order"
+      data-testid="work-order-copy-link-button"
+    >
+      {copied ? <Check className="size-3.5" aria-hidden /> : <Link2 className="size-3.5" aria-hidden />}
+    </Button>
   );
+}
+
+function HeaderOverflowMenu(props: WorkOrderDetailHeaderProps) {
+  const actions = buildHeaderActions(props);
+  if (actions.length === 0) {
+    return null;
+  }
+
+  const disabled = props.isClosing || props.isUpdatingStatus || props.isCompleting || props.isRejecting;
+
+  return (
+    <DropdownMenu>
+      <PermissionTooltip
+        allowed={props.canClose || props.canManage}
+        message="You don't have permission to manage this work order."
+      >
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="text-muted-foreground hover:bg-accent hover:text-foreground"
+            disabled={disabled}
+            aria-label="More actions"
+            data-testid="work-order-actions-button"
+          >
+            <Ellipsis className="size-3.5" aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+      </PermissionTooltip>
+
+      <DropdownMenuContent align="end" className="w-48">
+        {actions.map((action) => (
+          <Fragment key={action.testId}>
+            {action.separatorBefore ? <DropdownMenuSeparator /> : null}
+            <DropdownMenuItem disabled={action.disabled} onSelect={action.onSelect} data-testid={action.testId}>
+              {action.label}
+            </DropdownMenuItem>
+          </Fragment>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+interface HeaderAction {
+  label: string;
+  testId: string;
+  disabled: boolean;
+  separatorBefore?: boolean;
+  onSelect: () => void;
+}
+
+function buildHeaderActions(props: WorkOrderDetailHeaderProps): HeaderAction[] {
+  const actions: HeaderAction[] = [];
+  const isDraft = props.isDispatchable && !props.isOpen && !props.isClosed;
+
+  if (props.isOpen) {
+    actions.push(
+      closeAction("Complete", "RESULT_COMPLETED", "work-order-complete-button", props),
+      closeAction("Reject", "RESULT_REJECTED", "work-order-reject-button", props),
+    );
+  }
+
+  if (props.isOpen && props.displayStatus !== "running") {
+    actions.push({
+      label: "Back to draft",
+      testId: "work-order-back-to-draft-button",
+      disabled: !props.canManage || props.isUpdatingStatus,
+      separatorBefore: true,
+      onSelect: () => void props.onStatusChange("STATE_DRAFT"),
+    });
+  }
+
+  if (isDraft) {
+    actions.push(closeAction("Reject", "RESULT_REJECTED", "work-order-reject-draft-button", props));
+  }
+
+  if (props.isClosed) {
+    actions.push({
+      label: "Reopen",
+      testId: "work-order-reopen-open-button",
+      disabled: !props.canManage || props.isUpdatingStatus,
+      onSelect: () => void props.onStatusChange("STATE_OPEN"),
+    });
+  }
+
+  return actions;
+}
+
+function closeAction(
+  label: string,
+  result: FactoriesWorkOrderResult,
+  testId: string,
+  props: WorkOrderDetailHeaderProps,
+): HeaderAction {
+  return {
+    label,
+    testId,
+    disabled: !props.canClose || props.isClosing,
+    onSelect: () => props.onClose(result),
+  };
 }

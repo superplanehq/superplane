@@ -1,8 +1,11 @@
 package linear
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -131,4 +134,91 @@ func Test__ListResources__Labels(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, resources, 1)
 	assert.Equal(t, "bug", resources[0].Name)
+}
+
+func Test__ListResources__Comments(t *testing.T) {
+	integration := &Linear{}
+
+	t.Run("labels comments by author and body preview", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"issue":{"comments":{"nodes":[{"id":"c1","body":"Deploy is green","user":{"id":"u1","name":"Jane Doe","displayName":"jane"}},{"id":"c2","body":"No author here"}]}}}}`),
+			},
+		}
+
+		resources, err := integration.ListResources(ResourceTypeComment, core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationWithTeam(),
+			Parameters:  map[string]string{"issue": "ENG-142"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, "c1", resources[0].ID)
+		assert.Equal(t, "Jane Doe (@jane): Deploy is green", resources[0].Name)
+		assert.Equal(t, "No author here", resources[1].Name)
+	})
+
+	t.Run("truncates a long body and collapses whitespace", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(`{"data":{"issue":{"comments":{"nodes":[{"id":"c1","body":"line one\nline two that keeps going on and on and on until it is far too long to show"}]}}}}`),
+			},
+		}
+
+		resources, err := integration.ListResources(ResourceTypeComment, core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationWithTeam(),
+			Parameters:  map[string]string{"issue": "ENG-142"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "line one line two that keeps going on and on and on until it…", resources[0].Name)
+	})
+
+	t.Run("cuts a multi-byte body on a rune boundary", func(t *testing.T) {
+		//
+		// 59 ASCII characters followed by an emoji, so a byte-indexed cut would
+		// land inside the emoji and corrupt the label.
+		//
+		body := strings.Repeat("a", 59) + "🚀 and more text after the limit"
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(fmt.Sprintf(`{"data":{"issue":{"comments":{"nodes":[{"id":"c1","body":%q}]}}}}`, body)),
+			},
+		}
+
+		resources, err := integration.ListResources(ResourceTypeComment, core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationWithTeam(),
+			Parameters:  map[string]string{"issue": "ENG-142"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, strings.Repeat("a", 59)+"🚀…", resources[0].Name)
+		assert.True(t, utf8.ValidString(resources[0].Name))
+		assert.NotContains(t, resources[0].Name, "�")
+	})
+
+	t.Run("stays empty without an issue", func(t *testing.T) {
+		resources, err := integration.ListResources(ResourceTypeComment, core.ListResourcesContext{
+			Integration: integrationWithTeam(),
+			Parameters:  map[string]string{},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+	})
+
+	t.Run("stays empty when the issue is an expression", func(t *testing.T) {
+		resources, err := integration.ListResources(ResourceTypeComment, core.ListResourcesContext{
+			Integration: integrationWithTeam(),
+			Parameters:  map[string]string{"issue": "{{ inputs.issue }}"},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+	})
 }

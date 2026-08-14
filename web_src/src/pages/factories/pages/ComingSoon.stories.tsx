@@ -1,13 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture, PRIMARY_FACTORY_ID } from "../__fixtures__/factoryPageResponses";
+import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 import { MissionsPage } from "./MissionsPage";
-import { VelocityPage } from "./VelocityPage";
 import { WikiPage } from "./WikiPage";
 
 /**
- * Missions/Wiki/Velocity landing pages — all render the ComingSoon placeholder.
+ * Missions/Wiki landing pages — ComingSoon placeholders.
  */
 const meta = {
   title: "Factories/Pages/Coming Soon",
@@ -21,7 +20,7 @@ type Story = StoryObj<typeof meta>;
 export const Missions: Story = {
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/missions`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/missions`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),
@@ -29,20 +28,14 @@ export const Missions: Story = {
 
 export const Wiki: Story = {
   render: () => (
-    <FactoriesHarness pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/wiki`} factoriesFixture={defaultFactoriesFixture} />
-  ),
-};
-
-export const Velocity: Story = {
-  render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/velocity`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/wiki`}
       factoriesFixture={defaultFactoriesFixture}
+      pageOverrides={{ wiki: WikiPage }}
     />
   ),
 };
 
 // Direct component references so Storybook's DevTools recognise them.
 void MissionsPage;
-void VelocityPage;
 void WikiPage;

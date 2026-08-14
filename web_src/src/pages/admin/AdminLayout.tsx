@@ -3,7 +3,7 @@ import { Text } from "@/components/Text/text";
 import { useAccount } from "@/contexts/useAccount";
 import { ArrowLeft, Building, Network, Shield, Terminal, Users } from "lucide-react";
 import React from "react";
-import { Link, Navigate, NavLink, Outlet } from "react-router-dom";
+import { Link, Navigate, NavLink, Outlet } from "react-router";
 
 const AdminLayout: React.FC = () => {
   const { account, loading } = useAccount();

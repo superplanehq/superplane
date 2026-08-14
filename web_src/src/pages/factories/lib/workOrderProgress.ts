@@ -1,110 +1,131 @@
 import type { FactoriesWorkOrder } from "@/api-client";
-import { hasActiveWorkOrderExecution, latestFinishedWorkOrderExecution } from "./workOrderExecutions";
+import { hasActiveWorkOrderExecution } from "./workOrderExecutions";
+import { formatWorkOrderIdentifier } from "./workspaceKey";
 
-export type WorkOrderDisplayStatus =
-  | "draft"
-  | "open"
-  | "running"
-  | "failed"
-  | "completed"
-  | "rejected"
-  | "closedFailed";
+/**
+ * Display vocabulary for the Work Orders workspace. Mirrors the six labels
+ * from the reference application: Draft, Running, Waiting, Completed,
+ * Failed, Cancelled. Persisted state + result columns in the database stay
+ * unchanged; this file is the single mapping layer.
+ */
+export type WorkOrderDisplayStatus = "draft" | "running" | "waiting" | "completed" | "failed" | "cancelled";
 
 const DISPLAY_STATUS_META: Record<
   WorkOrderDisplayStatus,
-  { label: string; filterLabel: string; summary: string; className: string }
+  { label: string; filterLabel: string; summary: string; className: string; dotClassName: string }
 > = {
   draft: {
     label: "Draft",
     filterLabel: "Draft",
-    summary: "Being scoped — not yet dispatched",
-    className: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300",
-  },
-  open: {
-    label: "Open",
-    filterLabel: "Open",
-    summary: "Ready to dispatch or between runs",
-    className: "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200",
+    summary: "Being scoped — not yet dispatched.",
+    className:
+      "border-[color:var(--status-draft-border)] bg-[color:var(--status-draft-bg)] text-[color:var(--status-draft-fg)]",
+    dotClassName: "bg-[color:var(--status-draft-dot)]",
   },
   running: {
     label: "Running",
     filterLabel: "Running",
-    summary: "Line execution in progress",
+    summary: "Line execution in progress.",
     className:
-      "border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200",
+      "border-[color:var(--status-running-border)] bg-[color:var(--status-running-bg)] text-[color:var(--status-running-fg)]",
+    dotClassName: "bg-[color:var(--status-running-dot)]",
   },
-  failed: {
-    label: "Failed",
-    filterLabel: "Failed",
-    summary: "A line step failed",
-    className: "border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200",
+  waiting: {
+    label: "Waiting",
+    filterLabel: "Waiting",
+    summary: "Waiting for review or the next dispatch.",
+    className:
+      "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)] text-[color:var(--status-waiting-fg)]",
+    dotClassName: "bg-[color:var(--status-waiting-dot)]",
   },
   completed: {
     label: "Completed",
     filterLabel: "Completed",
-    summary: "Work order completed",
+    summary: "Work order completed successfully.",
     className:
-      "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
+      "border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)] text-[color:var(--status-completed-fg)]",
+    dotClassName: "bg-[color:var(--status-completed-dot)]",
   },
-  rejected: {
-    label: "Rejected",
-    filterLabel: "Rejected",
-    summary: "Work order rejected",
-    className: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300",
-  },
-  closedFailed: {
+  failed: {
     label: "Failed",
     filterLabel: "Failed",
-    summary: "Work order closed as failed",
-    className: "border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200",
+    summary: "Closed as failed. Line execution did not pass.",
+    className:
+      "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)] text-[color:var(--status-failed-fg)]",
+    dotClassName: "bg-[color:var(--status-failed-dot)]",
+  },
+  cancelled: {
+    label: "Cancelled",
+    filterLabel: "Cancelled",
+    summary: "Closed as cancelled.",
+    className:
+      "border-[color:var(--status-cancelled-border)] bg-[color:var(--status-cancelled-bg)] text-[color:var(--status-cancelled-fg)]",
+    dotClassName: "bg-[color:var(--status-cancelled-dot)]",
   },
 };
 
-export type WorkOrderSectionId = "failed" | "running" | "open" | "draft" | "closed";
+export const WORK_ORDER_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = [
+  "draft",
+  "running",
+  "waiting",
+  "completed",
+  "failed",
+  "cancelled",
+];
 
-export interface WorkOrderSectionDefinition {
-  id: WorkOrderSectionId;
+/** Board lanes used across every layout. Order matters — Board renders them left-to-right. */
+export type WorkOrderBoardLaneId = "backlog" | "running" | "review" | "done";
+
+export interface WorkOrderBoardLaneDefinition {
+  id: WorkOrderBoardLaneId;
   title: string;
   description: string;
   statuses: WorkOrderDisplayStatus[];
-  tone?: "attention";
 }
 
-export const WORK_ORDER_SECTIONS: WorkOrderSectionDefinition[] = [
+export const WORK_ORDER_BOARD_LANES: WorkOrderBoardLaneDefinition[] = [
   {
-    id: "failed",
-    title: "Failed",
-    description: "Open work orders with a failed line step.",
-    statuses: ["failed"],
-    tone: "attention",
-  },
-  {
-    id: "running",
-    title: "Running",
-    description: "Work orders executing on a line.",
-    statuses: ["running"],
-  },
-  {
-    id: "open",
-    title: "Open",
-    description: "Work orders ready to dispatch or between runs.",
-    statuses: ["open"],
-  },
-  {
-    id: "draft",
-    title: "Draft",
+    id: "backlog",
+    title: "Backlog",
     description: "Being scoped — not yet dispatched.",
     statuses: ["draft"],
   },
   {
-    id: "closed",
-    title: "Closed",
-    description: "Completed, rejected, or failed work orders.",
-    statuses: ["completed", "rejected", "closedFailed"],
+    id: "running",
+    title: "Running",
+    description: "Executing on a line right now.",
+    statuses: ["running"],
+  },
+  {
+    id: "review",
+    title: "Review",
+    description: "Waiting for reviewers or the next dispatch.",
+    statuses: ["waiting"],
+  },
+  {
+    id: "done",
+    title: "Done",
+    description: "Completed, failed, or cancelled work.",
+    statuses: ["completed", "failed", "cancelled"],
   },
 ];
 
-export function getWorkOrderDisplayKey(order: FactoriesWorkOrder): string {
+/**
+ * Human-visible identifier: prefer the workspace-scoped `SP-42` key when
+ * the backend provides one, otherwise fall back to the shortened UUID we
+ * used before the workspace-key rollout.
+ *
+ * `factoryKey` is the parent factory's key; passing it lets callers render
+ * an identifier when only the immutable per-order `number` is available.
+ */
+export function getWorkOrderDisplayKey(order: FactoriesWorkOrder, factoryKey?: string | null): string {
+  if (order.key) {
+    return order.key;
+  }
+  const composed = formatWorkOrderIdentifier(factoryKey ?? undefined, order.number ?? undefined);
+  if (composed) {
+    return composed;
+  }
   if (order.id) {
     return order.id.slice(0, 8);
   }
@@ -114,10 +135,10 @@ export function getWorkOrderDisplayKey(order: FactoriesWorkOrder): string {
 export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderDisplayStatus {
   if (order.state === "STATE_CLOSED") {
     if (order.result === "RESULT_REJECTED") {
-      return "rejected";
+      return "cancelled";
     }
     if (order.result === "RESULT_FAILED") {
-      return "closedFailed";
+      return "failed";
     }
     return "completed";
   }
@@ -126,24 +147,11 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
     return "draft";
   }
 
-  const executions = order.executions ?? [];
-  if (hasActiveWorkOrderExecution(executions)) {
+  if (hasActiveWorkOrderExecution(order.executions ?? [])) {
     return "running";
   }
 
-  // "failed" only if the newest execution failed AND finished after
-  // the last write to the order (reopen / reassign / comment / artifact),
-  // so a fresh attempt or triage clears the pill until a new failure.
-  const latestFinished = latestFinishedWorkOrderExecution(executions);
-  if (latestFinished?.result === "RESULT_FAILED") {
-    const finishedAt = Date.parse(latestFinished.updatedAt ?? latestFinished.createdAt ?? "");
-    const orderUpdatedAt = Date.parse(order.updatedAt ?? "");
-    if (Number.isNaN(finishedAt) || Number.isNaN(orderUpdatedAt) || finishedAt >= orderUpdatedAt) {
-      return "failed";
-    }
-  }
-
-  return "open";
+  return "waiting";
 }
 
 export function getWorkOrderDisplayStatusMeta(status: WorkOrderDisplayStatus) {
@@ -175,34 +183,16 @@ export function filterMyWorkOrders(orders: FactoriesWorkOrder[], userId?: string
   return orders.filter((order) => isAssignedToUser(order, userId));
 }
 
-export function groupWorkOrdersBySection(
-  orders: FactoriesWorkOrder[],
-  sections: WorkOrderSectionDefinition[] = WORK_ORDER_SECTIONS,
-): Array<{ section: WorkOrderSectionDefinition; orders: FactoriesWorkOrder[] }> {
-  return sections
-    .map((section) => ({
-      section,
-      orders: orders.filter((order) => section.statuses.includes(getWorkOrderDisplayStatus(order))),
-    }))
-    .filter((entry) => entry.orders.length > 0);
-}
+// Active covers everything that is not yet closed. Kept for the badge in
+// the workspace navigation.
+const ACTIVE_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["draft", "running", "waiting"];
 
-// countActiveWorkOrders backs the "Work Orders" badge; it matches the
-// default `active` filter (draft + open + running + failed).
 export function countActiveWorkOrders(orders: FactoriesWorkOrder[]): number {
   return orders.filter((order) => ACTIVE_DISPLAY_STATUSES.includes(getWorkOrderDisplayStatus(order))).length;
 }
 
 export type WorkOrderOwnerFilter = "all" | "mine" | "unassigned";
-
 export type WorkOrderStatusFilter = "all" | "active" | WorkOrderDisplayStatus;
-
-// "Active" pill covers everything not yet closed (draft included, so
-// new orders aren't hidden behind the STATE_OPEN-only `Open` pill).
-const ACTIVE_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["draft", "open", "running", "failed"];
-
-// "Failed" pill unions in-flight failures with closed-as-failed orders.
-const FAILED_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["failed", "closedFailed"];
 
 export function filterWorkOrdersByOwner(
   orders: FactoriesWorkOrder[],
@@ -212,11 +202,9 @@ export function filterWorkOrdersByOwner(
   if (ownerFilter === "all") {
     return orders;
   }
-
   if (ownerFilter === "unassigned") {
     return orders.filter(isUnassignedWorkOrder);
   }
-
   return filterMyWorkOrders(orders, userId);
 }
 
@@ -230,10 +218,17 @@ export function filterWorkOrdersByStatus(
   if (statusFilter === "active") {
     return orders.filter((order) => ACTIVE_DISPLAY_STATUSES.includes(getWorkOrderDisplayStatus(order)));
   }
-  if (statusFilter === "failed") {
-    return orders.filter((order) => FAILED_DISPLAY_STATUSES.includes(getWorkOrderDisplayStatus(order)));
-  }
   return orders.filter((order) => getWorkOrderDisplayStatus(order) === statusFilter);
+}
+
+export function groupWorkOrdersByLane(
+  orders: FactoriesWorkOrder[],
+  lanes: WorkOrderBoardLaneDefinition[] = WORK_ORDER_BOARD_LANES,
+): Array<{ lane: WorkOrderBoardLaneDefinition; orders: FactoriesWorkOrder[] }> {
+  return lanes.map((lane) => ({
+    lane,
+    orders: orders.filter((order) => lane.statuses.includes(getWorkOrderDisplayStatus(order))),
+  }));
 }
 
 export function getWorkOrderDetailDerived(order: FactoriesWorkOrder | undefined) {

@@ -2,58 +2,164 @@ export function factoryListPath(organizationId: string) {
   return `/${organizationId}/workspaces`;
 }
 
-export function factoryDetailPath(organizationId: string, factoryId: string) {
-  return `${factoryListPath(organizationId)}/${factoryId}`;
+export function factoryDetailPath(organizationId: string, factoryKey: string) {
+  return `${factoryListPath(organizationId)}/${factoryKey}`;
 }
 
-export function factoryOverviewPath(organizationId: string, factoryId: string) {
-  return `${factoryDetailPath(organizationId, factoryId)}/overview`;
+export function factoryOverviewPath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/overview`;
 }
 
-export function workOrdersPath(organizationId: string, factoryId: string) {
-  return `${factoryDetailPath(organizationId, factoryId)}/work-orders`;
+export function factoryOnboardingPath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/onboarding`;
 }
 
-export function createWorkOrderPath(organizationId: string, factoryId: string) {
-  return `${workOrdersPath(organizationId, factoryId)}/new`;
+export function workOrdersPath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/work-orders`;
 }
 
-export function workOrderDetailPath(organizationId: string, factoryId: string, orderId: string) {
-  return `${workOrdersPath(organizationId, factoryId)}/${orderId}`;
+export function createWorkOrderPath(organizationId: string, factoryKey: string) {
+  return `${workOrdersPath(organizationId, factoryKey)}/new`;
 }
 
-export function automationsPath(organizationId: string, factoryId: string) {
-  return `${factoryDetailPath(organizationId, factoryId)}/automations`;
+/**
+ * Canonical work order permalink: `/{organizationId}/workspaces/{factoryKey}/work-order/{orderNumber}`
+ * (singular segment, sibling of `work-orders`). `orderNumber` is the
+ * factory-scoped sequence number (`FactoriesWorkOrder.number`), not the
+ * database id — see `legacyWorkOrderDetailPath` for the old id-based shape.
+ */
+export function workOrderDetailPath(organizationId: string, factoryKey: string, orderNumber: string | number) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/work-order/${orderNumber}`;
 }
 
-export function createFactoryLinePath(organizationId: string, factoryId: string) {
-  return `${automationsPath(organizationId, factoryId)}/new`;
+/**
+ * Old id-based work order URL shape, kept around only so the legacy
+ * redirect route can compare against it / build test fixtures. New code
+ * should always call `workOrderDetailPath`.
+ */
+export function legacyWorkOrderDetailPath(organizationId: string, factoryKey: string, orderId: string) {
+  return `${workOrdersPath(organizationId, factoryKey)}/${orderId}`;
 }
 
-export function factoryLineDetailPath(organizationId: string, factoryId: string, lineId: string) {
-  return `${automationsPath(organizationId, factoryId)}/${lineId}`;
+export function linesPath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/lines`;
 }
 
-export function editFactoryLinePath(organizationId: string, factoryId: string, lineId: string) {
-  return `${automationsPath(organizationId, factoryId)}/${lineId}/edit`;
+export function createFactoryLinePath(organizationId: string, factoryKey: string) {
+  return `${linesPath(organizationId, factoryKey)}/new`;
 }
 
-export function factorySettingsPath(organizationId: string, factoryId: string) {
-  return `${factoryDetailPath(organizationId, factoryId)}/settings`;
+export function factoryLineDetailPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${linesPath(organizationId, factoryKey)}/${lineId}`;
 }
 
-export function factorySettingsSectionPath(organizationId: string, factoryId: string, section: string) {
-  return `${factorySettingsPath(organizationId, factoryId)}/${section}`;
+export function editFactoryLinePath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${linesPath(organizationId, factoryKey)}/${lineId}/edit`;
 }
 
-export function factoryMissionsPath(organizationId: string, factoryId: string) {
-  return `${factoryDetailPath(organizationId, factoryId)}/missions`;
+export function automationsPath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/automations`;
 }
 
-export function factoryWikiPath(organizationId: string, factoryId: string) {
-  return `${factoryDetailPath(organizationId, factoryId)}/wiki`;
+export function automationDetailPath(organizationId: string, factoryKey: string, appId: string) {
+  return `${automationsPath(organizationId, factoryKey)}/${appId}`;
 }
 
-export function factoryVelocityPath(organizationId: string, factoryId: string) {
-  return `${factoryDetailPath(organizationId, factoryId)}/velocity`;
+export type FactoryAppNavFrom = "automations" | "lines" | "work-order" | "overview";
+
+export type FactoryAppNavOptions = {
+  from?: FactoryAppNavFrom;
+  lineId?: string;
+  /** Work order `number` (route identifier), not the database id. */
+  orderNumber?: string;
+  runId?: string;
+  /**
+   * Open factory-shell Configure chrome. Uses `configure=1` (not `edit=1`) so
+   * AppPage auto-edit cleanup does not tear down the Configure UI mid-bootstrap.
+   */
+  configure?: boolean;
+};
+
+function buildFactoryAppSearchParams(options?: FactoryAppNavOptions): string {
+  if (!options) {
+    return "";
+  }
+  const params = new URLSearchParams();
+  if (options.runId) {
+    params.set("run", options.runId);
+  }
+  if (options.configure) {
+    params.set("configure", "1");
+  }
+  if (options.from) {
+    params.set("from", options.from);
+  }
+  if (options.lineId) {
+    params.set("lineId", options.lineId);
+  }
+  if (options.orderNumber) {
+    params.set("orderNumber", options.orderNumber);
+  }
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+export function factoryAppConfigurePath(
+  organizationId: string,
+  factoryKey: string,
+  appId: string,
+  options?: Omit<FactoryAppNavOptions, "configure" | "runId">,
+) {
+  return factoryAppPath(organizationId, factoryKey, appId, { ...options, configure: true });
+}
+
+export function factoryAppPath(
+  organizationId: string,
+  factoryKey: string,
+  appId: string,
+  options?: FactoryAppNavOptions,
+) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/apps/${appId}${buildFactoryAppSearchParams(options)}`;
+}
+
+export function factoryAppRunPath(
+  organizationId: string,
+  factoryKey: string,
+  appId: string,
+  runId: string,
+  options?: Omit<FactoryAppNavOptions, "runId">,
+) {
+  return factoryAppPath(organizationId, factoryKey, appId, { ...options, runId });
+}
+
+export function factorySettingsPath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/settings`;
+}
+
+export function factorySettingsSectionPath(organizationId: string, factoryKey: string, section: string) {
+  return `${factorySettingsPath(organizationId, factoryKey)}/${section}`;
+}
+
+/** Settings General URL after a workspace key change, or `null` when the key did not change. */
+export function factorySettingsGeneralPathAfterKeyChange(
+  organizationId: string,
+  previousKey: string,
+  nextKey: string,
+): string | null {
+  if (!nextKey || nextKey === previousKey) {
+    return null;
+  }
+  return factorySettingsSectionPath(organizationId, nextKey, "general");
+}
+
+export function factoryMissionsPath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/missions`;
+}
+
+export function factoryWikiPath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/wiki`;
+}
+
+export function factoryVelocityPath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/velocity`;
 }

@@ -5,10 +5,10 @@ import { useFactoryApps } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { ArrowLeft } from "lucide-react";
 import { useMemo } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router";
 import { FactoryLineForm } from "../FactoryLineForm";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { automationsPath } from "../lib/factoryPagePaths";
+import { factoryLineDetailPath, linesPath } from "../lib/factoryPagePaths";
 import { useFactoryLineEditActions } from "../useFactoryLineEditActions";
 import {
   factoryCardClassName,
@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export function FactoryLineEditPage() {
-  const { organizationId, factoryId, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const { canAct } = usePermissions();
   const { lineId } = useParams<{ lineId?: string }>();
 
@@ -34,22 +34,22 @@ export function FactoryLineEditPage() {
     return factory?.lines?.find((entry) => entry.id === lineId) ?? null;
   }, [factory?.lines, isCreate, lineId]);
 
-  const automationsHref = automationsPath(organizationId, factoryId);
-  const returnHref = line?.id ? `${automationsHref}/${line.id}` : automationsHref;
+  const linesHref = linesPath(organizationId, factoryKey);
+  const returnHref = line?.id ? factoryLineDetailPath(organizationId, factoryKey, line.id) : linesHref;
   const actions = useFactoryLineEditActions(organizationId, factoryId, returnHref, isCreate, lineId);
 
   const pageTitleBase = resolvePageTitleBase(isCreate, line?.name);
   usePageTitle([pageTitleBase, factory?.name ?? "Workspace"]);
 
   if (!canUpdate) {
-    return <Navigate to={automationsHref} replace />;
+    return <Navigate to={linesHref} replace />;
   }
 
   // FactoriesLayout guarantees `factory` is loaded before rendering us, so a
   // missing line means the URL points at a line that doesn't exist — redirect
   // immediately instead of flashing an empty "Edit line" form.
   if (!isCreate && factory && !line) {
-    return <Navigate to={automationsHref} replace />;
+    return <Navigate to={linesHref} replace />;
   }
 
   // Show a loading state while apps are still fetching so the form isn't
@@ -65,7 +65,7 @@ export function FactoryLineEditPage() {
         className="mb-6 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden />
-        Automations
+        Lines
       </Link>
 
       {isInitialLoading ? (

@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -19,7 +20,7 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
@@ -133,7 +134,7 @@ func TestFactoryContext_UpdateWorkOrderStatus(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
@@ -144,7 +145,8 @@ func TestFactoryContext_UpdateWorkOrderStatus(t *testing.T) {
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
 	updated, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
-		State: models.FactoryWorkOrderStateOpen,
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateOpen,
 	})
 	require.NoError(t, err)
 	assert.True(t, changed)
@@ -166,7 +168,7 @@ func TestFactoryContext_UpdateWorkOrderStatus_NoopSkipsEmit(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
@@ -179,14 +181,16 @@ func TestFactoryContext_UpdateWorkOrderStatus_NoopSkipsEmit(t *testing.T) {
 		WithWorkOrderUpdated(func(_, _, _ string) { notifications++ })
 
 	_, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
-		State: models.FactoryWorkOrderStateOpen,
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateOpen,
 	})
 	require.NoError(t, err)
 	assert.True(t, changed)
 	assert.Equal(t, 1, notifications)
 
 	_, changed, err = ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
-		State: models.FactoryWorkOrderStateOpen,
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateOpen,
 	})
 	require.NoError(t, err)
 	assert.False(t, changed, "re-hitting the same state must report changed=false")
@@ -202,7 +206,7 @@ func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testi
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
@@ -218,8 +222,9 @@ func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testi
 
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 	updated, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
-		State:  models.FactoryWorkOrderStateClosed,
-		Result: models.FactoryWorkOrderResultCompleted,
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateClosed,
+		Result:  models.FactoryWorkOrderResultCompleted,
 	})
 	require.NoError(t, err)
 	assert.True(t, changed)
@@ -233,13 +238,15 @@ func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testi
 	assert.Equal(t, nodeExecution.NodeID, closedAutomation.NodeID)
 }
 
-func TestFactoryContext_UpdateWorkOrderStatus_RunNotAttached(t *testing.T) {
-	// A run with no work-order execution link must fail loudly rather
-	// than silently target some default order.
+// orderId is required and explicit at the FactoryContext level too — there
+// is no implicit fallback to "the work order driving the current run".
+// That behavior now lives entirely in the `{{ order().id }}` default on the
+// component field, resolved before Execute ever sees the configuration.
+func TestFactoryContext_UpdateWorkOrderStatus_EmptyOrderIDIsRejected(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
@@ -249,14 +256,224 @@ func TestFactoryContext_UpdateWorkOrderStatus_RunNotAttached(t *testing.T) {
 		State: models.FactoryWorkOrderStateOpen,
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not attached to a work order")
+	assert.EqualError(t, err, "orderId is required")
+}
+
+func TestFactoryContext_AddWorkOrderComment_EmptyOrderIDIsRejected(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+	err = ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
+		Body: "Ready for review",
+	})
+	require.Error(t, err)
+	assert.EqualError(t, err, "orderId is required")
+}
+
+func TestFactoryContext_AddWorkOrderArtifact_EmptyOrderIDIsRejected(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+	_, err = ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
+		Type: "pr",
+		Data: map[string]any{"url": "https://github.com/example/repo/pull/1"},
+	})
+	require.Error(t, err)
+	assert.EqualError(t, err, "orderId is required")
+}
+
+// Regression coverage for the github.onPullRequest -> close-work-order bug:
+// a run with no `factory_work_order_executions` row (e.g. one started by a
+// plain webhook trigger, not a factory line dispatch) must still be able to
+// target a work order explicitly via `orderId`.
+func TestFactoryContext_UpdateWorkOrderStatus_ExplicitOrderIDOnUnattachedRun(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Unattached target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	updated, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateOpen,
+	})
+	require.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, updated.State)
+
+	// Attribution still includes node/app but omits line/step (no
+	// dispatch happened) and must not panic.
+	statusEvent := findWorkOrderEvent(t, order, "order.status.updated")
+	statusAutomation := extractAutomationPayload(t, statusEvent)
+	assert.Equal(t, nodeExecution.NodeID, statusAutomation.NodeID)
+	assert.NotEmpty(t, statusAutomation.AppName)
+	assert.Empty(t, statusAutomation.LineName)
+	assert.Empty(t, statusAutomation.StepName)
+}
+
+func TestFactoryContext_UpdateWorkOrderStatus_ExplicitOrderIDNotFound(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	_, _, err = ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		OrderID: uuid.New().String(),
+		State:   models.FactoryWorkOrderStateOpen,
+	})
+	require.Error(t, err)
+}
+
+func TestFactoryContext_AddWorkOrderComment_ExplicitOrderIDOnUnattachedRun(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Unattached comment target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	require.NoError(t, ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
+		OrderID: order.ID.String(),
+		Body:    "Merged via PR",
+	}))
+
+	commentEvent := findWorkOrderEvent(t, order, "order.comment.added")
+	assert.NotNil(t, commentEvent)
+}
+
+func TestFactoryContext_AddWorkOrderArtifact_ExplicitOrderIDOnUnattachedRun(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Unattached artifact target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	artifact, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
+		OrderID: order.ID.String(),
+		Type:    "pr",
+		Data: map[string]any{
+			"url": "https://github.com/example/repo/pull/7",
+		},
+		Key: "https://github.com/example/repo/pull/7",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, artifact)
+	assert.Equal(t, order.ID.String(), artifact.WorkOrderID)
+}
+
+func TestFactoryContext_FindWorkOrder_ByID(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Find by id target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	t.Run("finds the order", func(t *testing.T) {
+		found, err := ctx.FindWorkOrder(core.FindWorkOrderParams{By: "id", OrderID: order.ID.String()})
+		require.NoError(t, err)
+		assert.Equal(t, order.ID.String(), found.ID)
+	})
+
+	t.Run("returns ErrWorkOrderNotFound for an unknown id", func(t *testing.T) {
+		_, err := ctx.FindWorkOrder(core.FindWorkOrderParams{By: "id", OrderID: uuid.New().String()})
+		assert.ErrorIs(t, err, core.ErrWorkOrderNotFound)
+	})
+
+	t.Run("returns a plain error for an invalid uuid", func(t *testing.T) {
+		_, err := ctx.FindWorkOrder(core.FindWorkOrderParams{By: "id", OrderID: "not-a-uuid"})
+		require.Error(t, err)
+		assert.False(t, errors.Is(err, core.ErrWorkOrderNotFound))
+	})
+
+	t.Run("rejects a non-factory app", func(t *testing.T) {
+		regularCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+		regularCtx := NewFactoryContext(database.Conn(), regularCanvas, nodeExecution)
+
+		_, err := regularCtx.FindWorkOrder(core.FindWorkOrderParams{By: "id", OrderID: order.ID.String()})
+		require.Error(t, err)
+		assert.EqualError(t, err, "app is not owned by a factory")
+	})
+}
+
+func TestFactoryContext_FindWorkOrder_ByArtifactKey(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Find by artifact key target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	_, err = order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
+		Type: "pr",
+		Data: map[string]any{"url": "https://github.com/example/repo/pull/99"},
+		Key:  "https://github.com/example/repo/pull/99",
+	})
+	require.NoError(t, err)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	t.Run("finds the order", func(t *testing.T) {
+		found, err := ctx.FindWorkOrder(core.FindWorkOrderParams{
+			By:          "artifactKey",
+			ArtifactKey: "https://github.com/example/repo/pull/99",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, order.ID.String(), found.ID)
+	})
+
+	t.Run("returns ErrWorkOrderNotFound for an unknown key", func(t *testing.T) {
+		_, err := ctx.FindWorkOrder(core.FindWorkOrderParams{By: "artifactKey", ArtifactKey: "no-such-key"})
+		assert.ErrorIs(t, err, core.ErrWorkOrderNotFound)
+	})
 }
 
 func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
@@ -267,7 +484,8 @@ func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
 	require.NoError(t, ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
-		Body: "Ready for review",
+		OrderID: order.ID.String(),
+		Body:    "Ready for review",
 	}))
 
 	commentEvent := findWorkOrderEvent(t, order, "order.comment.added")
@@ -295,7 +513,7 @@ func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
@@ -306,7 +524,8 @@ func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
 	artifact, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
-		Type: "pr",
+		OrderID: order.ID.String(),
+		Type:    "pr",
 		Data: map[string]any{
 			"url":    "https://github.com/example/repo/pull/1",
 			"title":  "Draft",

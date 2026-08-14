@@ -20,14 +20,14 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
   const handleAssigneesSave = async (nextAssigneeIds: string[]) => {
     try {
       await updateAssignees.mutateAsync({ orderId, assigneeIds: nextAssigneeIds });
-      showSuccessToast("Assignees updated.");
+      showSuccessToast("Owners updated.");
     } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to update assignees"));
+      showErrorToast(getApiErrorMessage(error, "Failed to update owners"));
       throw error;
     }
   };
 
-  const handleDispatch = async (lineName: string) => {
+  const handleDispatch = async ({ lineName }: { lineName: string }) => {
     await dispatchWorkOrder.mutateAsync({ orderId, lineName });
     showSuccessToast(`Dispatched to ${lineName}.`);
   };

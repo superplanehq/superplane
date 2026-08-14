@@ -63,7 +63,7 @@ function factoriesCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {
       const request = (body ?? {}) as RequestBody;
       const created = {
         id: `storybook-factory-${fixture.factories.length + 1}`,
-        name: stringOrEmpty(request.name) || "New Factory",
+        name: stringOrEmpty(request.name) || "New workspace",
         description: stringOrEmpty(request.description),
         lines: [],
       };
@@ -160,7 +160,7 @@ function createWorkOrderFromRequest(request: RequestBody, orderCount: number): F
     result: "RESULT_UNSPECIFIED",
     createdAt: nowIso,
     updatedAt: nowIso,
-    createdBy: { id: ORGANIZATION_USERS[0].id, name: ORGANIZATION_USERS[0].name },
+    createdBy: { user: { id: ORGANIZATION_USERS[0].id, name: ORGANIZATION_USERS[0].name } },
     assignees: findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids)),
     executions: [],
   };

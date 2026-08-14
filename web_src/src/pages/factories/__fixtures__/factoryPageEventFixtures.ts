@@ -35,6 +35,10 @@ interface CommentAuthorFixture {
     nodeName?: string;
     appId?: string;
     appName?: string;
+    lineId?: string;
+    lineName?: string;
+    stepIndex?: number;
+    stepName?: string;
   };
 }
 
@@ -56,7 +60,7 @@ function openedWorkOrderEvent(order: FactoriesWorkOrder, at: string): FactoriesW
   return statusUpdatedEvent(order, at, {
     fromState: "draft",
     toState: "open",
-    actor: { id: order.createdBy?.id ?? STORYBOOK_ME_USER_ID },
+    actor: { id: order.createdBy?.user?.id ?? STORYBOOK_ME_USER_ID },
   });
 }
 
@@ -132,6 +136,7 @@ function commentAddedEvent(
   at: string,
   body: string,
   author: CommentAuthorFixture,
+  run?: { id: string },
 ): FactoriesWorkOrderEvent {
   return {
     type: "order.comment.added",
@@ -140,6 +145,7 @@ function commentAddedEvent(
       order: { id: order.id, title: order.title },
       body,
       author,
+      ...(run ? { run } : {}),
     },
   };
 }
@@ -247,6 +253,28 @@ export const RUNNING_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     runId: "run-implement",
     appId: "app-refund-implementer",
   }),
+  // Automation-authored comment attached to the in-flight "implement" step.
+  // It is matched to the step by line id ("plan-and-implement"), not the
+  // canvas node name, and renders as plain text — the step's own title
+  // already names the line and links to its run.
+  commentAddedEvent(
+    RUNNING_WORK_ORDER,
+    HOUR_AGO,
+    "Applying the ledger fix now, will report back once tests pass.",
+    {
+      kind: "automation",
+      automation: {
+        nodeId: "node-implement",
+        nodeName: "node-implement",
+        appId: "app-refund-implementer",
+        appName: "Refund Implementer",
+        lineId: REFUND_LINE.id,
+        lineName: REFUND_LINE.name,
+        stepName: "implement",
+      },
+    },
+    { id: "run-implement" },
+  ),
 ];
 
 export const FAILED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
@@ -349,7 +377,13 @@ export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
   commentAddedEvent(
     OPEN_WORK_ORDER,
     HOUR_AGO,
-    "I re-ran the failing test locally and confirmed the duplicate entry appears only on retry #3.",
+    [
+      "**Blocked** on the ledger writer — reproduced on retry `#3`.",
+      "",
+      "Next steps:",
+      "- Confirm the idempotency window in staging",
+      "- Follow up on [PR #482](https://github.com/example/ledger/pull/482)",
+    ].join("\n"),
     {
       kind: "automation",
       automation: { nodeName: "reproduce-failure", appName: "Refund Diagnostics" },

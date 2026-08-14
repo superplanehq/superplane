@@ -32,7 +32,13 @@ export interface WorkOrderTimelineStep {
   at: string;
   startedAt: string;
   finishedAt?: string;
+  comments?: WorkOrderTimelineStepComment[];
+  artifacts?: WorkOrderTimelineArtifact[];
   execution: FactoriesWorkOrderExecution;
+}
+
+export interface WorkOrderTimelineStepComment {
+  body: string;
 }
 
 export interface WorkOrderTimelineAssigneeChange {
@@ -57,9 +63,6 @@ export interface WorkOrderTimelineAutomationActor {
   stepIndex?: number;
   stepName?: string;
 }
-
-/** @deprecated use WorkOrderTimelineAutomationActor */
-export type WorkOrderTimelineCommentAutomation = WorkOrderTimelineAutomationActor;
 
 export interface WorkOrderTimelineComment {
   body: string;
@@ -87,6 +90,7 @@ export interface WorkOrderTimelineEvent {
   comment?: WorkOrderTimelineComment;
   artifact?: WorkOrderTimelineArtifact;
   title: string;
+  lineId?: string;
   lineName?: string;
   steps?: WorkOrderTimelineStep[];
 }
@@ -112,8 +116,23 @@ export function buildWorkOrderUserDisplayLookup(
 export function buildWorkOrderTimelineView(
   apiEvents: FactoriesWorkOrderEvent[] | undefined,
   resolveUserName?: UserNameLookup,
+  executions: FactoriesWorkOrderExecution[] = [],
 ): WorkOrderTimelineViewModel {
-  return buildWorkOrderTimelineViewFromEvents(apiEvents ?? [], resolveUserName);
+  const timeline = buildWorkOrderTimelineViewFromEvents(apiEvents ?? [], resolveUserName);
+  const executionsByRunID = new Map(
+    executions.flatMap((execution) => (execution.run?.id ? [[execution.run.id, execution]] : [])),
+  );
+
+  for (const event of timeline.events) {
+    for (const step of event.steps ?? []) {
+      const execution = step.execution.id ? executionsByRunID.get(step.execution.id) : undefined;
+      if (execution) {
+        step.execution = { ...step.execution, ...execution };
+      }
+    }
+  }
+
+  return timeline;
 }
 
 export function formatStepExecutionDuration(step: WorkOrderTimelineStep): string | null {
@@ -131,7 +150,8 @@ export function formatStepExecutionDuration(step: WorkOrderTimelineStep): string
 }
 
 function addOrderFallbackNames(usersById: Map<string, OrgUserDisplay>, order: FactoriesWorkOrder): void {
-  registerOrderUserFallback(usersById, order.createdBy?.id, order.createdBy?.name);
+  const creator = order.createdBy?.user;
+  registerOrderUserFallback(usersById, creator?.id, creator?.name);
 
   for (const assignee of order.assignees ?? []) {
     registerOrderUserFallback(usersById, assignee.id, assignee.name);

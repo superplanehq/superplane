@@ -206,13 +206,15 @@ type Issue struct {
 }
 
 // Comment is a comment on an issue. user is the author and is null when Linear
-// attributes the comment to a bot or integration rather than a person.
+// attributes the comment to a bot or integration rather than a person. editedAt
+// stays null until the body is changed, so it doubles as an edited marker.
 type Comment struct {
 	ID        string        `json:"id"`
 	Body      string        `json:"body"`
 	URL       string        `json:"url"`
 	CreatedAt string        `json:"createdAt,omitempty"`
 	UpdatedAt string        `json:"updatedAt,omitempty"`
+	EditedAt  string        `json:"editedAt,omitempty"`
 	User      *User         `json:"user,omitempty"`
 	Issue     *CommentIssue `json:"issue,omitempty"`
 }
@@ -550,7 +552,7 @@ func (c *Client) UpdateIssue(id string, input map[string]any) (*Issue, error) {
 }
 
 const commentFields = `
-      id body url createdAt updatedAt
+      id body url createdAt updatedAt editedAt
       user { id name displayName email }
       issue { id identifier title url }`
 
@@ -582,6 +584,70 @@ func (c *Client) CreateComment(input map[string]any) (*Comment, error) {
 	}
 
 	return response.CommentCreate.Comment, nil
+}
+
+const updateCommentMutation = `
+mutation CommentUpdate($id: String!, $input: CommentUpdateInput!) {
+  commentUpdate(id: $id, input: $input) {
+    success
+    comment {` + commentFields + `
+    }
+  }
+}`
+
+// UpdateComment edits an existing comment. Unlike issues, comments are addressed
+// only by their UUID - there is no human-readable identifier for one.
+func (c *Client) UpdateComment(id string, input map[string]any) (*Comment, error) {
+	response := struct {
+		CommentUpdate struct {
+			Success bool     `json:"success"`
+			Comment *Comment `json:"comment"`
+		} `json:"commentUpdate"`
+	}{}
+
+	if err := c.execute(updateCommentMutation, map[string]any{"id": id, "input": input}, &response); err != nil {
+		return nil, err
+	}
+
+	if !response.CommentUpdate.Success || response.CommentUpdate.Comment == nil {
+		return nil, fmt.Errorf("linear reported the comment was not updated")
+	}
+
+	return response.CommentUpdate.Comment, nil
+}
+
+const issueCommentsQuery = `
+query IssueComments($id: String!) {
+  issue(id: $id) {
+    comments(first: 100) {
+      nodes {
+        id body
+        user { id name displayName email }
+      }
+    }
+  }
+}`
+
+// ListIssueComments returns the comments on a single issue, for the comment
+// picker. Issues carry few enough comments that one page is plenty.
+func (c *Client) ListIssueComments(issueID string) ([]Comment, error) {
+	response := struct {
+		Issue *struct {
+			Comments struct {
+				Nodes []Comment `json:"nodes"`
+			} `json:"comments"`
+		} `json:"issue"`
+	}{}
+
+	if err := c.execute(issueCommentsQuery, map[string]any{"id": issueID}, &response); err != nil {
+		return nil, err
+	}
+
+	if response.Issue == nil {
+		return nil, fmt.Errorf("issue %s not found", issueID)
+	}
+
+	return response.Issue.Comments.Nodes, nil
 }
 
 const attachmentFields = `

@@ -14,6 +14,12 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.AlreadyExists(err, "factory with the same name already exists")
 	case errors.Is(err, models.ErrFactoryNameRequired):
 		return grpcerrors.InvalidArgument(err, "factory name is required")
+	case errors.Is(err, models.ErrFactoryKeyRequired):
+		return grpcerrors.InvalidArgument(err, "workspace key is required")
+	case errors.Is(err, models.ErrFactoryKeyInvalid):
+		return grpcerrors.InvalidArgument(err, "workspace key must be 2 to 5 uppercase letters")
+	case errors.Is(err, models.ErrFactoryKeyAlreadyExists):
+		return grpcerrors.AlreadyExists(err, "workspace key already exists in this organization")
 	case errors.Is(err, models.ErrFactoryNotFound):
 		return grpcerrors.NotFound(err, "factory not found")
 	case errors.Is(err, models.ErrFactoryWorkOrderNotFound):

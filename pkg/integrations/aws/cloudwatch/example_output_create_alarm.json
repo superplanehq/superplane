@@ -1,0 +1,40 @@
+{
+  "data": {
+    "actionsEnabled": true,
+    "alarmActions": ["arn:aws:sns:us-east-1:123456789012:ops-alerts"],
+    "alarmArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm:api-high-cpu",
+    "alarmConfigurationUpdatedTimestamp": "2026-06-03T16:36:13.412Z",
+    "alarmDescription": "API instances above 80% CPU",
+    "alarmName": "api-high-cpu",
+    "comparisonOperator": "GreaterThanThreshold",
+    "consoleUrl": "https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#alarmsV2:alarm/api-high-cpu",
+    "datapointsToAlarm": 2,
+    "dimensions": [
+      {
+        "name": "InstanceId",
+        "value": "i-1234567890abcdef0"
+      }
+    ],
+    "evaluateLowSampleCountPercentile": "",
+    "evaluationPeriods": 3,
+    "extendedStatistic": "",
+    "insufficientDataActions": [],
+    "metricName": "CPUUtilization",
+    "namespace": "AWS/EC2",
+    "okActions": ["arn:aws:sns:us-east-1:123456789012:ops-alerts"],
+    "period": 300,
+    "region": "us-east-1",
+    "stateReason": "Unchecked: Initial alarm creation",
+    "stateReasonData": "",
+    "stateTransitionedTimestamp": "",
+    "stateUpdatedTimestamp": "2026-06-03T16:36:13.412Z",
+    "stateValue": "INSUFFICIENT_DATA",
+    "statistic": "Average",
+    "threshold": 80,
+    "thresholdMetricId": "",
+    "treatMissingData": "missing",
+    "unit": "Percent"
+  },
+  "timestamp": "2026-06-03T16:36:13.985915034Z",
+  "type": "aws.cloudwatch.alarm"
+}

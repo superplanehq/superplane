@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
-  PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
 } from "../__fixtures__/factoryPageResponses";
 import { FactoryLineEditPage } from "./FactoryLineEditPage";
@@ -26,7 +26,7 @@ export const NewLine: Story = {
   name: "New line",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/automations/new`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/new`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),
@@ -39,7 +39,7 @@ export const EditLine: Story = {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/automations/${line.id}/edit`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}/edit`}
         factoriesFixture={defaultFactoriesFixture}
       />
     );

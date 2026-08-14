@@ -3,7 +3,7 @@ import type {
   FactoriesWorkOrderExecutionResult,
   FactoriesWorkOrderExecutionState,
 } from "@/api-client";
-import { appRunPath } from "@/lib/appPaths";
+import { factoryAppRunPath } from "./factoryPagePaths";
 
 export interface WorkOrderExecutionDisplayMeta {
   label: string;
@@ -61,15 +61,36 @@ const EXECUTION_RESULT_META: Record<
   },
 };
 
-export function getWorkOrderExecutionRunHref(
+/**
+ * Build a link to the automation run that produced a piece of work-order
+ * timeline content (a step execution, a comment, a status change, ...).
+ * Centralizes the `appId` + `runId` → app-run-page URL construction so every
+ * timeline surface links to runs the same way.
+ */
+export function getWorkOrderRunHref(
   organizationId: string,
-  execution: FactoriesWorkOrderExecution,
+  factoryKey: string,
+  appId: string | undefined,
+  runId: string | undefined,
+  options?: { orderNumber?: string },
 ): string | null {
-  if (execution.run?.appId && execution.run.id) {
-    return appRunPath(organizationId, execution.run.appId, execution.run.id);
+  if (!appId || !runId) {
+    return null;
   }
 
-  return null;
+  return factoryAppRunPath(organizationId, factoryKey, appId, runId, {
+    from: "work-order",
+    orderNumber: options?.orderNumber,
+  });
+}
+
+export function getWorkOrderExecutionRunHref(
+  organizationId: string,
+  factoryKey: string,
+  execution: FactoriesWorkOrderExecution,
+  options?: { orderNumber?: string },
+): string | null {
+  return getWorkOrderRunHref(organizationId, factoryKey, execution.run?.appId, execution.run?.id, options);
 }
 
 export function getExecutionStepTimestamp(execution: FactoriesWorkOrderExecution): string {
