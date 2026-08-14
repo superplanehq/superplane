@@ -67,6 +67,7 @@ describe("buildAutocompleteExampleObj", () => {
         id: expect.any(String),
         title: "Ship feature",
         artifacts: expect.any(Array),
+        comments: expect.any(Array),
       }),
     });
     expect(
@@ -124,6 +125,7 @@ describe("buildAutocompleteExampleObj", () => {
         id: expect.any(String),
         title: "Ship feature",
         artifacts: expect.any(Array),
+        comments: expect.any(Array),
       }),
     });
     expect(evaluateExpr("root().data.check_run.name", autocompleteContext!)).toBe("Unit tests");
