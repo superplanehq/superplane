@@ -71,6 +71,56 @@ async function defaultCommitCanvasStaging(canvasId: string) {
   );
 }
 
+function sourceGraphIsEmpty(canvas: CanvasesCanvas | undefined): boolean {
+  const nodes = canvas?.spec?.nodes ?? [];
+  const edges = canvas?.spec?.edges ?? [];
+  return nodes.length === 0 && edges.length === 0;
+}
+
+function buildDuplicateCanvasYaml(args: {
+  canvasId: string;
+  name: string;
+  description: string;
+  sourceCanvas: CanvasesCanvas | undefined;
+}): string {
+  return materializeCanvasSpec({
+    metadata: {
+      id: args.canvasId,
+      name: args.name,
+      description: args.description,
+    },
+    spec: {
+      nodes: args.sourceCanvas?.spec?.nodes ?? [],
+      edges: args.sourceCanvas?.spec?.edges ?? [],
+    },
+  });
+}
+
+async function createDuplicateCanvasShell(deps: DuplicateAutomationCanvasDeps, name: string, description: string) {
+  const created = await deps.createCanvas({
+    name,
+    description,
+    factoryId: deps.factoryId,
+    method: "ui",
+  });
+  const canvasId = created.data?.canvas?.metadata?.id;
+  if (!canvasId) {
+    throw new Error("Failed to create automation canvas");
+  }
+  return canvasId;
+}
+
+async function stageAndCommitDuplicateGraph(
+  deps: DuplicateAutomationCanvasDeps,
+  canvasId: string,
+  canvasYaml: string,
+) {
+  const putCanvasStaging = deps.putCanvasStaging ?? defaultPutCanvasStaging;
+  const commitCanvasStaging = deps.commitCanvasStaging ?? defaultCommitCanvasStaging;
+  await putCanvasStaging(canvasId, canvasYaml);
+  await commitCanvasStaging(canvasId);
+}
+
 /**
  * Creates a factory automation clone: empty CreateCanvas, then stage+commit
  * the source live graph as canvas.yaml (same pattern as factory template install).
@@ -82,44 +132,24 @@ export async function duplicateAutomationCanvas(deps: DuplicateAutomationCanvasD
   }
 
   const describeCanvas = deps.describeCanvas ?? defaultDescribeCanvas;
-  const putCanvasStaging = deps.putCanvasStaging ?? defaultPutCanvasStaging;
-  const commitCanvasStaging = deps.commitCanvasStaging ?? defaultCommitCanvasStaging;
-
-  const sourceResponse = await describeCanvas(sourceCanvasId);
-  const sourceCanvas = sourceResponse.data?.canvas;
+  const sourceCanvas = (await describeCanvas(sourceCanvasId)).data?.canvas;
   const duplicateName = duplicateAutomationName(deps.app.name);
   const description = deps.app.description ?? sourceCanvas?.metadata?.description ?? "";
+  const canvasId = await createDuplicateCanvasShell(deps, duplicateName, description);
 
-  const created = await deps.createCanvas({
-    name: duplicateName,
-    description,
-    factoryId: deps.factoryId,
-    method: "ui",
-  });
-  const canvasId = created.data?.canvas?.metadata?.id;
-  if (!canvasId) {
-    throw new Error("Failed to create automation canvas");
-  }
-
-  const nodes = sourceCanvas?.spec?.nodes ?? [];
-  const edges = sourceCanvas?.spec?.edges ?? [];
-  if (nodes.length === 0 && edges.length === 0) {
+  if (sourceGraphIsEmpty(sourceCanvas)) {
     return canvasId;
   }
 
-  const canvasYaml = materializeCanvasSpec({
-    metadata: {
-      id: canvasId,
+  await stageAndCommitDuplicateGraph(
+    deps,
+    canvasId,
+    buildDuplicateCanvasYaml({
+      canvasId,
       name: duplicateName,
       description,
-    },
-    spec: {
-      nodes,
-      edges,
-    },
-  });
-
-  await putCanvasStaging(canvasId, canvasYaml);
-  await commitCanvasStaging(canvasId);
+      sourceCanvas,
+    }),
+  );
   return canvasId;
 }
