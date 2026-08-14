@@ -3,6 +3,7 @@ import {
   factoryAppConfigurePath,
   factoryAppPath,
   factoryDetailPath,
+  factorySettingsGeneralPathAfterKeyChange,
   legacyWorkOrderDetailPath,
   workOrderDetailPath,
   workOrdersPath,
@@ -39,6 +40,16 @@ describe("factoryAppPath", () => {
     expect(factoryAppPath("org-1", "SP", "app-1", { from: "work-order", orderNumber: "42" })).toBe(
       "/org-1/workspaces/SP/apps/app-1?from=work-order&orderNumber=42",
     );
+  });
+});
+
+describe("factorySettingsGeneralPathAfterKeyChange", () => {
+  it("returns the General settings URL when the key changes", () => {
+    expect(factorySettingsGeneralPathAfterKeyChange("org-1", "RF", "AB")).toBe("/org-1/workspaces/AB/settings/general");
+  });
+
+  it("returns null when the key does not change", () => {
+    expect(factorySettingsGeneralPathAfterKeyChange("org-1", "RF", "RF")).toBeNull();
   });
 });
 

@@ -13,7 +13,7 @@ import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
-import { factoryListPath } from "../../lib/factoryPagePaths";
+import { factoryListPath, factorySettingsGeneralPathAfterKeyChange } from "../../lib/factoryPagePaths";
 import {
   factoryCardClassName,
   factoryContentBodyClassName,
@@ -74,12 +74,16 @@ export function FactorySettingsGeneralPage() {
       return;
     }
     try {
+      const nextSettingsPath = factorySettingsGeneralPathAfterKeyChange(organizationId, factory.key ?? "", key);
       await updateFactory.mutateAsync({
         name: trimmedName,
         description: description.trim(),
         key: key !== (factory.key ?? "") ? key : undefined,
       });
       showSuccessToast("Workspace updated.");
+      if (nextSettingsPath) {
+        navigate(nextSettingsPath, { replace: true });
+      }
     } catch (error) {
       const message = getApiErrorMessage(error, "Failed to update workspace");
       if (message.toLowerCase().includes("workspace key")) {
