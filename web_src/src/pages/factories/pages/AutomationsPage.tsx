@@ -74,6 +74,8 @@ export function AutomationsPage() {
           workOrders={model.workOrders}
           appsLoading={model.appsLoading}
           selectedApp={selectedApp}
+          selectedAppActions={model.selectedAppActions}
+          actionsForApp={model.actionsForApp}
           canCreate={model.canCreateApp || model.permissionsLoading}
           onCreate={() => model.setCreateOpen(true)}
         />
