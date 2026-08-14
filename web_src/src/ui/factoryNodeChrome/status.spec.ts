@@ -78,6 +78,20 @@ describe("normalizeFactoryNodeStatus", () => {
     expect(normalizeFactoryNodeStatus("stopped", stateMap)).toBe("cancelled");
   });
 
+  it("does not classify success icons by badge color alone", () => {
+    const stateMap = {
+      ...DEFAULT_EVENT_STATE_MAP,
+      completed: {
+        icon: "circle-check",
+        textColor: "text-gray-800",
+        backgroundColor: "bg-gray-100",
+        badgeColor: "bg-gray-500",
+      },
+    };
+
+    expect(normalizeFactoryNodeStatus("completed", stateMap)).toBe("passed");
+  });
+
   it("treats unlisted mapper success aliases as Passed when no map is given", () => {
     expect(normalizeFactoryNodeStatus("marked ready")).toBe("passed");
   });

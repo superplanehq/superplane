@@ -109,12 +109,6 @@ function factoryStatusFromEventStyle(style: EventStateStyle | undefined): Factor
     }
   }
 
-  for (const [eventState, defaultStyle] of Object.entries(DEFAULT_EVENT_STATE_MAP)) {
-    if (style.badgeColor === defaultStyle.badgeColor) {
-      return normalizeFactoryNodeStatus(eventState);
-    }
-  }
-
   return ICON_TO_FACTORY_STATUS[style.icon];
 }
 
