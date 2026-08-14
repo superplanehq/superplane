@@ -65,7 +65,7 @@ describe("useCreateWorkOrderComposer", () => {
   });
 
   it("opens the new work order without closing to the list first", async () => {
-    createMutate.mockResolvedValue({ id: "order-1" });
+    createMutate.mockResolvedValue({ id: "order-1", number: "101" });
 
     const { result } = renderHook(() =>
       useCreateWorkOrderComposer({
@@ -84,7 +84,7 @@ describe("useCreateWorkOrderComposer", () => {
       await result.current.handleSaveDraft();
     });
 
-    expect(onCreated).toHaveBeenCalledWith("order-1");
+    expect(onCreated).toHaveBeenCalledWith("101");
     expect(onClose).not.toHaveBeenCalled();
   });
 

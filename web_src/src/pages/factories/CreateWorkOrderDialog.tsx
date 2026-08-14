@@ -18,7 +18,7 @@ import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
 interface CreateWorkOrderDialogProps {
   open: boolean;
   onClose: () => void;
-  onCreated: (orderId: string) => void;
+  onCreated: (orderNumber: string) => void;
 }
 
 export function CreateWorkOrderDialog({ open, onClose, onCreated }: CreateWorkOrderDialogProps) {
@@ -34,7 +34,7 @@ function CreateWorkOrderDialogSession({
   onCreated,
 }: {
   onClose: () => void;
-  onCreated: (orderId: string) => void;
+  onCreated: (orderNumber: string) => void;
 }) {
   const { organizationId, factoryId, factory } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();

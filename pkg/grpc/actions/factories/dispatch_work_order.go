@@ -46,16 +46,18 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		}
 	}
 
+	var factory *models.Factory
 	var order *models.FactoryWorkOrder
 	var pendingRun *models.CanvasRun
 	var logger *log.Entry
 
 	db := database.DB(ctx)
 	err = db.Transaction(func(tx *gorm.DB) error {
-		factory, err := models.FindFactory(tx, orgID, factoryID)
+		f, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
 			return err
 		}
+		factory = f
 
 		order, err = factory.FindWorkOrder(tx, orderID)
 		if err != nil {
@@ -117,7 +119,7 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
 	}
 
-	serialized, err := loadAndSerializeWorkOrder(ctx, order)
+	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}

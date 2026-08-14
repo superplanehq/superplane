@@ -33,7 +33,7 @@ export function WorkspaceSwitcher({
   onCreateFactory,
 }: WorkspaceSwitcherProps) {
   const navigate = useNavigate();
-  const settingsHref = factory.id ? factorySettingsPath(organizationId, factory.id) : "#";
+  const settingsHref = factory.key ? factorySettingsPath(organizationId, factory.key) : "#";
 
   return (
     <div className="flex items-center gap-0.5 px-2 pt-3 pb-1" data-testid="factories-workspace-switcher">
@@ -79,7 +79,7 @@ export function WorkspaceSwitcher({
           <DropdownMenuLabel>Switch workspace</DropdownMenuLabel>
           {factories.map((entry) => {
             const isCurrent = entry.id === factory.id;
-            const targetHref = entry.id ? factoryDetailPath(organizationId, entry.id) : "";
+            const targetHref = entry.key ? factoryDetailPath(organizationId, entry.key) : "";
             return (
               <DropdownMenuItem
                 key={entry.id}

@@ -8,9 +8,14 @@ import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Outlet, useNavigate, useParams } from "react-router";
+import { Navigate, Outlet, useLocation, useNavigate, useParams } from "react-router";
 import { CreateFactoryDialog } from "../CreateFactoryDialog";
 import { CreateWorkOrderDialog } from "../CreateWorkOrderDialog";
+import {
+  factoryRouteNeedsCanonicalRedirect,
+  replaceFactoryKeySegment,
+  resolveFactoryByKey,
+} from "../lib/factoryKeyResolution";
 import { factoryDetailPath, factoryListPath, factoryOnboardingPath } from "../lib/factoryPagePaths";
 import { clearLastVisitedFactory, recordLastVisitedFactory } from "../lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
@@ -28,25 +33,74 @@ function isOnboardingSidebarHidden(pendingWorkspaceId: string | undefined, facto
 }
 
 export function FactoriesLayout() {
-  const { organizationId, factoryId } = useParams<{ organizationId: string; factoryId: string }>();
+  const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
 
-  if (!organizationId || !factoryId) {
+  if (!organizationId || !factoryKey) {
     return null;
   }
 
-  return <FactoriesLayoutContent organizationId={organizationId} factoryId={factoryId} />;
+  return <FactoriesLayoutResolver organizationId={organizationId} factoryKey={factoryKey} />;
 }
 
-function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId: string; factoryId: string }) {
+/**
+ * Resolves the `:factoryKey` route segment to a real factory before handing
+ * off to `FactoriesLayoutContent`. Keeps the id/key resolution — and its
+ * loading/not-found/redirect states — out of the main layout body.
+ */
+function FactoriesLayoutResolver({ organizationId, factoryKey }: { organizationId: string; factoryKey: string }) {
+  const location = useLocation();
+  const {
+    data: factories = [],
+    isLoading: factoriesLoading,
+    isFetching: factoriesFetching,
+  } = useFactories(organizationId);
+  // `isFetching` (not just `isLoading`) so a just-created workspace — whose
+  // list invalidation is still in flight when we navigate to its new key —
+  // shows the loading state instead of flashing "workspace not found".
+  const resolution = resolveFactoryByKey(factories, factoryKey, factoriesLoading || factoriesFetching);
+
+  if (factoryRouteNeedsCanonicalRedirect(resolution, factoryKey)) {
+    const target = replaceFactoryKeySegment(location.pathname, organizationId, factoryKey, resolution.factory!.key!);
+    return <Navigate to={`${target}${location.search}`} replace />;
+  }
+
+  if (resolution.status === "not-found") {
+    return <FactoriesLayoutError organizationId={organizationId} />;
+  }
+
+  if (resolution.status === "loading" || !resolution.factory?.id) {
+    return <FactoriesLayoutLoading />;
+  }
+
+  return (
+    <FactoriesLayoutContent
+      organizationId={organizationId}
+      factoryId={resolution.factory.id}
+      factoryKey={resolution.factory.key ?? factoryKey}
+      factories={factories}
+    />
+  );
+}
+
+function FactoriesLayoutContent({
+  organizationId,
+  factoryId,
+  factoryKey,
+  factories,
+}: {
+  organizationId: string;
+  factoryId: string;
+  factoryKey: string;
+  factories: FactoriesFactory[];
+}) {
   useFactoriesThemeClass();
   const navigate = useNavigate();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [createFactoryOpen, setCreateFactoryOpen] = useState(false);
   const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
-    useCreateWorkOrderDialogState(organizationId, factoryId, canAct("work_orders", "create"));
+    useCreateWorkOrderDialogState(organizationId, factoryKey, canAct("work_orders", "create"));
 
-  const { data: factories = [] } = useFactories(organizationId);
   const { data: organization } = useOrganization(organizationId);
   const { data: factory, error: factoryError } = useFactory(organizationId, factoryId);
   useFactoryWebsocket(organizationId, factoryId);
@@ -79,29 +133,30 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
     () => ({
       organizationId,
       factoryId,
+      factoryKey,
       factory: factory ?? null,
       factories,
       openCreateWorkOrder,
     }),
-    [organizationId, factoryId, factory, factories, openCreateWorkOrder],
+    [organizationId, factoryId, factoryKey, factory, factories, openCreateWorkOrder],
   );
 
-  const handleCreateFactory = async (input: { name: string; description: string }) => {
+  const handleCreateFactory = async (input: { name: string; description: string; key: string }) => {
     // Let CreateFactoryDialog catch failures so duplicate-name inline errors work.
     const created = await createFactory.mutateAsync(input);
     setCreateFactoryOpen(false);
-    if (!created.id) {
+    if (!created.key) {
       return;
     }
-    if (storybookOnboarding) {
+    if (storybookOnboarding && created.id) {
       storybookOnboarding.beginOnboarding({
         workspaceId: created.id,
         workspaceName: created.name || input.name,
       });
-      navigate(factoryOnboardingPath(organizationId, created.id));
+      navigate(factoryOnboardingPath(organizationId, created.key));
       return;
     }
-    navigate(factoryDetailPath(organizationId, created.id));
+    navigate(factoryDetailPath(organizationId, created.key));
   };
 
   if (factoryError) {
@@ -118,7 +173,7 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
         {isOnboardingSidebarHidden(storybookOnboarding?.pending?.workspaceId, factoryId) ? null : (
           <FactoriesSidebar
             organizationId={organizationId}
-            factoryId={factoryId}
+            factoryKey={factoryKey}
             factory={factory}
             factories={factories}
             organizationName={organization?.metadata?.name ?? ""}
@@ -156,7 +211,7 @@ function FactoriesLayoutContent({ organizationId, factoryId }: { organizationId:
 
 interface FactoriesSidebarProps {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   factory: FactoriesFactory;
   factories: FactoriesFactory[];
   organizationName: string;
@@ -172,7 +227,7 @@ interface FactoriesSidebarProps {
 
 function FactoriesSidebar({
   organizationId,
-  factoryId,
+  factoryKey,
   factory,
   factories,
   organizationName,
@@ -200,7 +255,7 @@ function FactoriesSidebar({
         onCreateFactory={onOpenCreateFactory}
       />
       <div className="flex-1 overflow-y-auto">
-        <FactoriesNav organizationId={organizationId} factoryId={factoryId} recentWorkOrders={recentWorkOrders} />
+        <FactoriesNav organizationId={organizationId} factoryKey={factoryKey} recentWorkOrders={recentWorkOrders} />
       </div>
       <SidebarUserMenu
         organizationId={organizationId}

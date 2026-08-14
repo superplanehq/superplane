@@ -8,7 +8,7 @@ export { MissionsPage } from "./MissionsPage";
 export { OverviewPage } from "./OverviewPage";
 export { VelocityPage } from "./VelocityPage";
 export { WikiPage } from "./WikiPage";
-export { WorkOrderDetailPage } from "./WorkOrderDetailPage";
+export { LegacyWorkOrderDetailRedirect, WorkOrderDetailPage } from "./WorkOrderDetailPage";
 export { WorkOrdersPage } from "./WorkOrdersPage";
 export { FactorySettingsLayout } from "./settings/FactorySettingsLayout";
 export { FactorySettingsGeneralPage } from "./settings/FactorySettingsGeneralPage";

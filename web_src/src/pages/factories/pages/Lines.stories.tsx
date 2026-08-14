@@ -4,7 +4,7 @@ import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
   emptyFactoriesFixture,
-  PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
 } from "../__fixtures__/factoryPageResponses";
 import { LinesPage } from "./LinesPage";
@@ -22,7 +22,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const linesListPath = `workspaces/${PRIMARY_FACTORY_ID}/lines`;
+const linesListPath = `workspaces/${PRIMARY_FACTORY_KEY}/lines`;
 
 export const Populated: Story = {
   render: () => <FactoriesHarness pathSuffix={linesListPath} factoriesFixture={defaultFactoriesFixture} />,
@@ -39,7 +39,7 @@ export const LineDetail: Story = {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/lines/${line.id}`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
         factoriesFixture={defaultFactoriesFixture}
       />
     );

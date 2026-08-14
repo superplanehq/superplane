@@ -3,10 +3,10 @@ import { useLocation, useNavigate } from "react-router";
 
 import { createWorkOrderPath, workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
 
-export function useCreateWorkOrderDialogState(organizationId: string, factoryId: string, canCreate: boolean) {
+export function useCreateWorkOrderDialogState(organizationId: string, factoryKey: string, canCreate: boolean) {
   const navigate = useNavigate();
   const location = useLocation();
-  const isCreateWorkOrderRoute = location.pathname === createWorkOrderPath(organizationId, factoryId);
+  const isCreateWorkOrderRoute = location.pathname === createWorkOrderPath(organizationId, factoryKey);
   const [createWorkOrderOpen, setCreateWorkOrderOpen] = useState(false);
 
   const openCreateWorkOrder = useCallback(() => {
@@ -18,23 +18,23 @@ export function useCreateWorkOrderDialogState(organizationId: string, factoryId:
 
   useEffect(() => {
     setCreateWorkOrderOpen(canCreate && isCreateWorkOrderRoute);
-  }, [canCreate, factoryId, isCreateWorkOrderRoute, location.pathname]);
+  }, [canCreate, factoryKey, isCreateWorkOrderRoute, location.pathname]);
 
   const closeCreateWorkOrder = useCallback(() => {
     setCreateWorkOrderOpen(false);
     if (isCreateWorkOrderRoute) {
-      navigate(workOrdersPath(organizationId, factoryId), { replace: true });
+      navigate(workOrdersPath(organizationId, factoryKey), { replace: true });
     }
-  }, [factoryId, isCreateWorkOrderRoute, navigate, organizationId]);
+  }, [factoryKey, isCreateWorkOrderRoute, navigate, organizationId]);
 
   const completeCreateWorkOrder = useCallback(
-    (orderId: string) => {
+    (orderNumber: string) => {
       setCreateWorkOrderOpen(false);
-      navigate(workOrderDetailPath(organizationId, factoryId, orderId), {
+      navigate(workOrderDetailPath(organizationId, factoryKey, orderNumber), {
         replace: isCreateWorkOrderRoute,
       });
     },
-    [factoryId, isCreateWorkOrderRoute, navigate, organizationId],
+    [factoryKey, isCreateWorkOrderRoute, navigate, organizationId],
   );
 
   return { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder };

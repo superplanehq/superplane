@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
-  PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
 } from "../__fixtures__/factoryPageResponses";
 import { WorkOrderCanvas } from "./WorkOrderCanvas";
@@ -30,7 +30,7 @@ export const ConfigurePhase: Story = {
     return (
       <FactoriesHarness
         enableOnboarding={false}
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/lines/${line.id}/phases/${phase}/configure`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}/phases/${phase}/configure`}
         factoriesFixture={defaultFactoriesFixture}
       />
     );

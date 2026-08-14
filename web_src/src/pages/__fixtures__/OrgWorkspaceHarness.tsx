@@ -25,6 +25,7 @@ import {
   FactorySettingsLayout,
   FactorySettingsSoonPage,
   FACTORY_SETTINGS_NAV_ITEMS,
+  LegacyWorkOrderDetailRedirect,
   LinesPage,
   MissionsPage,
   OverviewPage,
@@ -162,23 +163,23 @@ function factoryRoute(element: React.ReactNode) {
 }
 
 function HarnessLegacyAutomationsNewLineRedirect() {
-  const { organizationId, factoryId } = useParams<{ organizationId: string; factoryId: string }>();
-  if (!organizationId || !factoryId) {
+  const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
+  if (!organizationId || !factoryKey) {
     return <Navigate to="/" replace />;
   }
-  return <Navigate to={createFactoryLinePath(organizationId, factoryId)} replace />;
+  return <Navigate to={createFactoryLinePath(organizationId, factoryKey)} replace />;
 }
 
 function HarnessLegacyAutomationsLineEditRedirect() {
-  const { organizationId, factoryId, lineId } = useParams<{
+  const { organizationId, factoryKey, lineId } = useParams<{
     organizationId: string;
-    factoryId: string;
+    factoryKey: string;
     lineId: string;
   }>();
-  if (!organizationId || !factoryId || !lineId) {
+  if (!organizationId || !factoryKey || !lineId) {
     return <Navigate to="/" replace />;
   }
-  return <Navigate to={editFactoryLinePath(organizationId, factoryId, lineId)} replace />;
+  return <Navigate to={editFactoryLinePath(organizationId, factoryKey, lineId)} replace />;
 }
 
 function OptionalOnboardingGate({ enabled }: { enabled: boolean }) {
@@ -209,7 +210,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
         <Route path="apps/:appId" element={<AppPage />} />
         <Route path="workspaces">
           <Route index element={factoryRoute(<FactoriesIndexPage />)} />
-          <Route path=":factoryId" element={factoryRoute(<FactoriesLayout />)}>
+          <Route path=":factoryKey" element={factoryRoute(<FactoriesLayout />)}>
             <Route element={<OptionalOnboardingGate enabled={onboardingEnabled} />}>
               <Route index element={<Navigate to="overview" replace />} />
               {OnboardingRoutePage ? <Route path="onboarding" element={<OnboardingRoutePage />} /> : null}
@@ -220,8 +221,9 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
               <Route path="work-orders">
                 <Route index element={<WorkOrdersPage />} />
                 <Route path="new" element={<CreateWorkOrderComposeRedirect />} />
-                <Route path=":orderId" element={<WorkOrderDetailPage />} />
+                <Route path=":orderId" element={<LegacyWorkOrderDetailRedirect />} />
               </Route>
+              <Route path="work-order/:orderNumber" element={<WorkOrderDetailPage />} />
               <Route path="lines">
                 <Route index element={<LinesPage />} />
                 <Route path="new" element={<FactoryLineEditPage />} />
@@ -239,7 +241,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
               <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
             </Route>
           </Route>
-          <Route path=":factoryId/settings" element={factoryRoute(<FactorySettingsLayout />)}>
+          <Route path=":factoryKey/settings" element={factoryRoute(<FactorySettingsLayout />)}>
             <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
             <Route path="general" element={<FactorySettingsGeneralPage />} />
             {FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.id !== "general").map((item) => (

@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { PRIMARY_FACTORY_ID, REFUND_FACTORY } from "./__fixtures__/factoryPageResponses";
+import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY, REFUND_FACTORY } from "./__fixtures__/factoryPageResponses";
 import { CreateWorkOrderDialog } from "./CreateWorkOrderDialog";
 import { FactoriesLayoutContext } from "./layout/factoriesLayoutContext";
 
@@ -35,6 +35,7 @@ function renderDialog() {
       value={{
         organizationId: "org-1",
         factoryId: PRIMARY_FACTORY_ID,
+        factoryKey: PRIMARY_FACTORY_KEY,
         factory: REFUND_FACTORY,
         factories: [REFUND_FACTORY],
         openCreateWorkOrder: vi.fn(),

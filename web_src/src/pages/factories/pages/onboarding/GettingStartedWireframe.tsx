@@ -12,7 +12,7 @@ import { useOnboardingStorybook } from "./useOnboardingStorybook";
  * Shown on overview when tips are active for the current workspace.
  */
 export function GettingStartedWireframe() {
-  const { organizationId, factoryId, openCreateWorkOrder } = useFactoriesLayout();
+  const { organizationId, factoryKey, openCreateWorkOrder } = useFactoriesLayout();
   const onboarding = useOnboardingStorybook();
 
   function handleCreateWorkOrder() {
@@ -81,7 +81,7 @@ export function GettingStartedWireframe() {
               Each work order runs through a line: intake, build, verify, and related phases you can configure later.
             </p>
             <Link
-              to={linesPath(organizationId, factoryId)}
+              to={linesPath(organizationId, factoryKey)}
               className={cn(
                 "mt-3 inline-flex h-8 items-center rounded-md border border-border px-3 text-[13px]",
                 "text-foreground transition-colors hover:bg-accent",

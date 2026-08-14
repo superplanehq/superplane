@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture, EMPTY_FACTORY_ID, PRIMARY_FACTORY_ID } from "../__fixtures__/factoryPageResponses";
+import { defaultFactoriesFixture, EMPTY_FACTORY_KEY, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 
 /**
  * Linear-style create dialog. `/work-orders/new` opens it over the list.
@@ -16,11 +16,11 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const createPath = (factoryId: string) => `workspaces/${factoryId}/work-orders/new`;
+const createPath = (factoryKey: string) => `workspaces/${factoryKey}/work-orders/new`;
 
 export const Empty: Story = {
   render: () => (
-    <FactoriesHarness pathSuffix={createPath(PRIMARY_FACTORY_ID)} factoriesFixture={defaultFactoriesFixture} />
+    <FactoriesHarness pathSuffix={createPath(PRIMARY_FACTORY_KEY)} factoriesFixture={defaultFactoriesFixture} />
   ),
 };
 
@@ -28,7 +28,7 @@ export const Assigned: Story = {
   name: "Assignees available",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/work-orders`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),
@@ -37,6 +37,6 @@ export const Assigned: Story = {
 export const NoLines: Story = {
   name: "No lines",
   render: () => (
-    <FactoriesHarness pathSuffix={createPath(EMPTY_FACTORY_ID)} factoriesFixture={defaultFactoriesFixture} />
+    <FactoriesHarness pathSuffix={createPath(EMPTY_FACTORY_KEY)} factoriesFixture={defaultFactoriesFixture} />
   ),
 };

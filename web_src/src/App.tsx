@@ -34,6 +34,7 @@ import {
   FactorySettingsLayout,
   FactorySettingsSoonPage,
   FACTORY_SETTINGS_NAV_ITEMS,
+  LegacyWorkOrderDetailRedirect,
   LinesPage,
   MissionsPage,
   OverviewPage,
@@ -162,7 +163,7 @@ function AppRouter() {
                     element={withAuthPermissionAndFactoriesFeature(FactoriesIndexPage, "factories", "read")}
                   />
                   <Route
-                    path=":factoryId"
+                    path=":factoryKey"
                     element={withAuthPermissionAndFactoriesFeature(FactoriesLayout, "factories", "read")}
                   >
                     <Route index element={<Navigate to="overview" replace />} />
@@ -173,8 +174,10 @@ function AppRouter() {
                     <Route path="work-orders">
                       <Route index element={<WorkOrdersPage />} />
                       <Route path="new" element={<CreateWorkOrderComposeGate />} />
-                      <Route path=":orderId" element={<WorkOrderDetailPage />} />
+                      {/* Legacy `/work-orders/:orderId` bookmark shape — redirects to `/work-order/:number`. */}
+                      <Route path=":orderId" element={<LegacyWorkOrderDetailRedirect />} />
                     </Route>
+                    <Route path="work-order/:orderNumber" element={<WorkOrderDetailPage />} />
                     <Route path="lines">
                       <Route index element={<LinesPage />} />
                       <Route path="new" element={<FactoryLineEditPageGate />} />
@@ -191,7 +194,7 @@ function AppRouter() {
                     <Route path="settings/*" element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
                   </Route>
                   <Route
-                    path=":factoryId/settings"
+                    path=":factoryKey/settings"
                     element={withAuthPermissionAndFactoriesFeature(FactorySettingsLayout, "factories", "read")}
                   >
                     <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
@@ -263,23 +266,23 @@ function FactoryLineEditPageGate() {
 }
 
 function LegacyAutomationsNewLineRedirect() {
-  const { organizationId, factoryId } = useParams<{ organizationId: string; factoryId: string }>();
-  if (!organizationId || !factoryId) {
+  const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
+  if (!organizationId || !factoryKey) {
     return <Navigate to="/" replace />;
   }
-  return <Navigate to={createFactoryLinePath(organizationId, factoryId)} replace />;
+  return <Navigate to={createFactoryLinePath(organizationId, factoryKey)} replace />;
 }
 
 function LegacyAutomationsLineEditRedirect() {
-  const { organizationId, factoryId, lineId } = useParams<{
+  const { organizationId, factoryKey, lineId } = useParams<{
     organizationId: string;
-    factoryId: string;
+    factoryKey: string;
     lineId: string;
   }>();
-  if (!organizationId || !factoryId || !lineId) {
+  if (!organizationId || !factoryKey || !lineId) {
     return <Navigate to="/" replace />;
   }
-  return <Navigate to={editFactoryLinePath(organizationId, factoryId, lineId)} replace />;
+  return <Navigate to={editFactoryLinePath(organizationId, factoryKey, lineId)} replace />;
 }
 
 function LegacyCanvasRedirect({ settings = false }: { settings?: boolean }) {

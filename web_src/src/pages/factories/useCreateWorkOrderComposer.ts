@@ -10,7 +10,7 @@ interface UseCreateWorkOrderComposerArgs {
   organizationId: string;
   factoryId: string;
   onClose: () => void;
-  onCreated: (orderId: string) => void;
+  onCreated: (orderNumber: string) => void;
 }
 
 export function useCreateWorkOrderComposer({
@@ -33,9 +33,9 @@ export function useCreateWorkOrderComposer({
   const canSaveDraft = Boolean(title.trim()) && !isSaving;
   const canSendToLine = canSaveDraft && Boolean(selectedLineName);
 
-  const goToOrder = (orderId: string | undefined) => {
-    if (orderId) {
-      onCreated(orderId);
+  const goToOrder = (order: { number?: string | number } | null) => {
+    if (order?.number !== undefined && order.number !== "") {
+      onCreated(String(order.number));
       return;
     }
     onClose();
@@ -65,7 +65,7 @@ export function useCreateWorkOrderComposer({
     try {
       const order = await saveOrder();
       if (order) {
-        goToOrder(order.id);
+        goToOrder(order);
       }
     } finally {
       setInFlightAction(null);
@@ -86,10 +86,10 @@ export function useCreateWorkOrderComposer({
 
       try {
         await dispatchWorkOrder.mutateAsync({ orderId: order.id, lineName: selectedLineName });
-        goToOrder(order.id);
+        goToOrder(order);
       } catch (error) {
         showErrorToast(getApiErrorMessage(error, "Failed to send work order to line"));
-        goToOrder(order.id);
+        goToOrder(order);
       }
     } finally {
       setInFlightAction(null);
