@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Retry wrapper around `docker pull`.
+# Ensure a Docker image is present locally. Pull with retries if it is missing.
 #
-# Pulling an image from a registry can fail on transient errors (5xx responses
-# such as "502 Bad Gateway", rate limits, TCP/DNS blips). Because
-# `docker run <image>` pulls implicitly, a single registry hiccup fails CI on an
-# otherwise healthy PR. This pulls the image up front in a short retry loop with
-# exponential backoff so those transient failures self-heal, and keeps the
-# subsequent `docker run` offline (image already present locally).
+# The OpenAPI generator tag is pinned, so a local copy is reused as-is. A
+# registry check on every run would add latency and fail on transient 5xx
+# responses even when the image is already available.
+#
+# When a pull is required, registry errors (5xx, rate limits, TCP/DNS blips)
+# are retried with exponential backoff so `docker run` can stay offline.
 #
 # Usage:
 #   scripts/docker-pull-retry <image>
@@ -28,6 +28,14 @@ IMAGE="$1"
 MAX_RETRIES="${DOCKER_PULL_MAX_RETRIES:-3}"
 DELAY="${DOCKER_PULL_INITIAL_DELAY:-5}"
 MAX_DELAY="${DOCKER_PULL_MAX_DELAY:-60}"
+
+image_is_local() {
+  docker image inspect "$1" >/dev/null 2>&1
+}
+
+if image_is_local "$IMAGE"; then
+  exit 0
+fi
 
 attempt=1
 while true; do
