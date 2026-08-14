@@ -1,11 +1,12 @@
 import type { FactoryRunLayoutEdge, FactoryRunLayoutNode, FactoryRunLayoutPosition } from "./factoryRunLeafLayout";
+import { FACTORY_NODE_CARD_HEIGHT, FACTORY_NODE_CARD_WIDTH } from "@/lib/factoryCanvasChrome";
 
 export function factoryRunLeafEdgeKey(source: string, target: string, sourceHandle?: string | null): string {
   return `${source}\0${target}\0${sourceHandle ?? "default"}`;
 }
 
-export const DEFAULT_NODE_WIDTH = 280;
-export const DEFAULT_NODE_HEIGHT = 104;
+export const DEFAULT_NODE_WIDTH = FACTORY_NODE_CARD_WIDTH;
+export const DEFAULT_NODE_HEIGHT = FACTORY_NODE_CARD_HEIGHT;
 export const MAIN_X = 120;
 const SIDE_GAP = 96;
 const VERTICAL_GAP = 104;

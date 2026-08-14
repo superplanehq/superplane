@@ -375,12 +375,11 @@ export function RightHandle({
   ) : null;
 
   // Run-inspection compact fork: centered spine + side — no MultiBottom S-stems.
+  // Always mount spine so cycle/loop-back edges (not leaf/spine classified) still attach.
   if (data._factoryCompactFork) {
     return (
       <>
-        {data._factorySpineSource ? (
-          <FactorySpineSourceHandle isConnectionInteractive={isConnectionInteractive} />
-        ) : null}
+        <FactorySpineSourceHandle isConnectionInteractive={isConnectionInteractive} />
         {sideSource}
       </>
     );

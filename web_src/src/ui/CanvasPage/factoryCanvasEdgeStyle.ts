@@ -1,6 +1,8 @@
 import { Position, type Edge as ReactFlowEdge, type Node as ReactFlowNode } from "@xyflow/react";
 
 import {
+  FACTORY_NODE_CARD_HEIGHT,
+  FACTORY_NODE_CARD_WIDTH,
   factoryEdgePalette,
   factoryEdgeToneClassName,
   primaryEventStateFromCanvasNodeData,
@@ -20,10 +22,6 @@ import {
   getCanvasEdgePath,
   type TouchEdgePathEntry,
 } from "@/ui/CanvasPage/edgePath";
-
-/** Match factoryRunLeafLayout defaults when measuring handles for touch detection. */
-const FACTORY_RUN_NODE_WIDTH = 280;
-const FACTORY_RUN_NODE_HEIGHT = 104;
 
 type CanvasEdge = ReactFlowEdge;
 type EdgeDefaults = {
@@ -51,8 +49,8 @@ function factoryRunHandleAnchor(
 }
 
 function nodeBoxSize(node: ReactFlowNode | undefined): { width: number; height: number } {
-  const width = node?.width && node.width > 0 ? node.width : FACTORY_RUN_NODE_WIDTH;
-  const height = node?.height && node.height > 0 ? node.height : FACTORY_RUN_NODE_HEIGHT;
+  const width = node?.width && node.width > 0 ? node.width : FACTORY_NODE_CARD_WIDTH;
+  const height = node?.height && node.height > 0 ? node.height : FACTORY_NODE_CARD_HEIGHT;
   return { width, height };
 }
 
@@ -197,7 +195,11 @@ type FactoryEdgeHandlePatch = {
   targetPosition?: Position;
 };
 
-function factoryLeafSpineHandlePatch(routing: FactoryEdgeRouting): FactoryEdgeHandlePatch {
+function factoryLeafSpineHandlePatch(
+  routing: FactoryEdgeRouting,
+  edge: CanvasEdge,
+  layout: FactoryRunLeafLayoutResult | null | undefined,
+): FactoryEdgeHandlePatch {
   if (routing.leafEdge) {
     return {
       sourceHandle: FACTORY_SIDE_HANDLE_ID,
@@ -206,6 +208,15 @@ function factoryLeafSpineHandlePatch(routing: FactoryEdgeRouting): FactoryEdgeHa
     };
   }
   if (routing.spineEdge) {
+    return {
+      sourceHandle: FACTORY_SPINE_HANDLE_ID,
+      sourcePosition: Position.Bottom,
+      targetPosition: Position.Top,
+    };
+  }
+  // Cycle edges are omitted from leaf/spine keys but compact forks only mount
+  // side/spine ports — remap loop-backs onto the spine handle so paths attach.
+  if (layout?.compactForkNodeIds.has(edge.source)) {
     return {
       sourceHandle: FACTORY_SPINE_HANDLE_ID,
       sourcePosition: Position.Bottom,
@@ -275,7 +286,7 @@ function styleOneCanvasEdge(args: {
   return {
     ...edge,
     ...args.edgeDefaults,
-    ...factoryLeafSpineHandlePatch(routing),
+    ...factoryLeafSpineHandlePatch(routing, edge, args.layout),
     animated: toneVisual.animated,
     className,
     style: { ...args.edgeDefaults.style, ...toneVisual.factoryToneStyle, ...diffStyle },
