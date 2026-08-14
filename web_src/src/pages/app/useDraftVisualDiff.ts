@@ -24,6 +24,7 @@ type UseDraftVisualDiffArgs = {
   allComponents: ActionsAction[];
   canvasId?: string;
   queryClient: QueryClient;
+  includeRemovedNodeGhosts?: boolean;
 };
 
 const edgeKey = (source: string, target: string, channel: string) => `${source}->${target}::${channel}`;
@@ -125,6 +126,7 @@ export function useDraftVisualDiff({
   allComponents,
   canvasId,
   queryClient,
+  includeRemovedNodeGhosts = true,
 }: UseDraftVisualDiffArgs) {
   const { visualDiffEnabled: enabled, toggleVisualDiff } = useVisualDiffToggle();
   const { showDeletedNodes, toggleShowDeletedNodes, showEdgeDiff, toggleShowEdgeDiff } = useDiffSubToggles();
@@ -146,6 +148,7 @@ export function useDraftVisualDiff({
     if (
       !enabled ||
       !showDeletedNodes ||
+      !includeRemovedNodeGhosts ||
       !draftDiffResult?.removedNodes.length ||
       !liveCanvasVersion?.spec?.nodes ||
       !canvasId
@@ -190,6 +193,7 @@ export function useDraftVisualDiff({
     draftDiffResult?.removedNodes,
     draftDiffResult?.statusMap,
     enabled,
+    includeRemovedNodeGhosts,
     liveCanvasVersion?.spec,
     preparedNodes,
     queryClient,
@@ -229,7 +233,13 @@ export function useDraftVisualDiff({
     diffCounts,
     visualDiffEnabled: enabled,
     toggleVisualDiff,
-    diffToggles: { showDeletedNodes, toggleShowDeletedNodes, showEdgeDiff, toggleShowEdgeDiff },
+    diffToggles: {
+      showDeletedNodes,
+      showDeletedNodesControl: includeRemovedNodeGhosts,
+      toggleShowDeletedNodes,
+      showEdgeDiff,
+      toggleShowEdgeDiff,
+    },
   };
 }
 
