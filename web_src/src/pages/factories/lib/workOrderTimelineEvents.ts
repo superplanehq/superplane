@@ -149,6 +149,16 @@ export function formatStepExecutionDuration(step: WorkOrderTimelineStep): string
   return formatted || null;
 }
 
+export function findLatestDispatchIndex(events: WorkOrderTimelineEvent[]): number {
+  let idx = -1;
+  events.forEach((event, i) => {
+    if (event.kind === "dispatched") {
+      idx = i;
+    }
+  });
+  return idx;
+}
+
 function addOrderFallbackNames(usersById: Map<string, OrgUserDisplay>, order: FactoriesWorkOrder): void {
   const creator = order.createdBy?.user;
   registerOrderUserFallback(usersById, creator?.id, creator?.name);
