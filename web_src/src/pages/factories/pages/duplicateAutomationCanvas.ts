@@ -124,6 +124,7 @@ async function stageAndCommitDuplicateGraph(
 /**
  * Creates a factory automation clone: empty CreateCanvas, then stage+commit
  * the source live graph as canvas.yaml (same pattern as factory template install).
+ * Secrets and run history are not copied.
  */
 export async function duplicateAutomationCanvas(deps: DuplicateAutomationCanvasDeps): Promise<string> {
   const sourceCanvasId = deps.app.id?.trim();
