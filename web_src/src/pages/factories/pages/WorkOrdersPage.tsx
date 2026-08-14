@@ -21,7 +21,7 @@ import { Heading } from "@/components/Heading/heading";
  * loaded view can assume a populated payload.
  */
 export function WorkOrdersPage() {
-  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { data: me } = useMe(false);
 
@@ -94,6 +94,7 @@ export function WorkOrdersPage() {
       state={state}
       currentUserId={me?.id}
       canCreate={canCreate}
+      onCreateWorkOrder={openCreateWorkOrder}
       canDispatch={canDispatch}
       canAssign={canAssign}
       permissionsLoading={permissionsLoading}
