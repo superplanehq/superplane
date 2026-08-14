@@ -78,4 +78,67 @@ describe("duplicateAutomationCanvas", () => {
       }),
     ).rejects.toThrow("source automation id is required");
   });
+
+  it("reuses pendingCanvasId on retry and skips CreateCanvas", async () => {
+    const createCanvas = vi.fn();
+    const onCanvasCreated = vi.fn();
+    const putCanvasStaging = vi.fn().mockResolvedValue({});
+    const commitCanvasStaging = vi.fn().mockResolvedValue({});
+
+    const canvasId = await duplicateAutomationCanvas({
+      factoryId: "factory-1",
+      app: { id: "canvas-source", name: "Refund Planner", description: "Plans refunds" },
+      createCanvas,
+      pendingCanvasId: "canvas-pending",
+      onCanvasCreated,
+      describeCanvas: vi.fn().mockResolvedValue({
+        data: {
+          canvas: {
+            spec: {
+              nodes: [{ id: "n1", name: "Node 1", component: "noop", type: "TYPE_ACTION" }],
+              edges: [],
+            },
+          },
+        },
+      }),
+      putCanvasStaging,
+      commitCanvasStaging,
+    });
+
+    expect(canvasId).toBe("canvas-pending");
+    expect(createCanvas).not.toHaveBeenCalled();
+    expect(onCanvasCreated).not.toHaveBeenCalled();
+    expect(putCanvasStaging.mock.calls[0]?.[0]).toBe("canvas-pending");
+    expect(commitCanvasStaging).toHaveBeenCalledWith("canvas-pending");
+  });
+
+  it("notifies onCanvasCreated before a stage/commit failure", async () => {
+    const onCanvasCreated = vi.fn();
+    const createCanvas = vi.fn().mockResolvedValue({
+      data: { canvas: { metadata: { id: "canvas-orphan" } } },
+    });
+
+    await expect(
+      duplicateAutomationCanvas({
+        factoryId: "factory-1",
+        app: { id: "canvas-source", name: "Refund Planner" },
+        createCanvas,
+        onCanvasCreated,
+        describeCanvas: vi.fn().mockResolvedValue({
+          data: {
+            canvas: {
+              spec: {
+                nodes: [{ id: "n1", name: "Node 1", component: "noop", type: "TYPE_ACTION" }],
+                edges: [],
+              },
+            },
+          },
+        }),
+        putCanvasStaging: vi.fn().mockRejectedValue(new Error("stage failed")),
+        commitCanvasStaging: vi.fn(),
+      }),
+    ).rejects.toThrow("stage failed");
+
+    expect(onCanvasCreated).toHaveBeenCalledWith("canvas-orphan");
+  });
 });

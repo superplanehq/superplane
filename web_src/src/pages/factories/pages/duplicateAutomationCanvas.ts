@@ -33,6 +33,10 @@ export type DuplicateAutomationCanvasDeps = {
   factoryId: string;
   app: FactoryApp;
   createCanvas: (input: CreateCanvasInput) => Promise<CreateCanvasResult>;
+  /** When set, skip CreateCanvas and reuse this id (retry after failed stage/commit). */
+  pendingCanvasId?: string;
+  /** Called once a new empty canvas is created, before stage/commit. */
+  onCanvasCreated?: (canvasId: string) => void;
   describeCanvas?: (sourceCanvasId: string) => Promise<{ data?: { canvas?: CanvasesCanvas } }>;
   putCanvasStaging?: (canvasId: string, canvasYaml: string) => Promise<unknown>;
   commitCanvasStaging?: (canvasId: string) => Promise<unknown>;
@@ -110,6 +114,20 @@ async function createDuplicateCanvasShell(deps: DuplicateAutomationCanvasDeps, n
   return canvasId;
 }
 
+async function ensureDuplicateCanvasId(
+  deps: DuplicateAutomationCanvasDeps,
+  name: string,
+  description: string,
+): Promise<string> {
+  if (deps.pendingCanvasId) {
+    return deps.pendingCanvasId;
+  }
+
+  const canvasId = await createDuplicateCanvasShell(deps, name, description);
+  deps.onCanvasCreated?.(canvasId);
+  return canvasId;
+}
+
 async function stageAndCommitDuplicateGraph(
   deps: DuplicateAutomationCanvasDeps,
   canvasId: string,
@@ -136,7 +154,7 @@ export async function duplicateAutomationCanvas(deps: DuplicateAutomationCanvasD
   const sourceCanvas = (await describeCanvas(sourceCanvasId)).data?.canvas;
   const duplicateName = duplicateAutomationName(deps.app.name);
   const description = deps.app.description ?? sourceCanvas?.metadata?.description ?? "";
-  const canvasId = await createDuplicateCanvasShell(deps, duplicateName, description);
+  const canvasId = await ensureDuplicateCanvasId(deps, duplicateName, description);
 
   if (sourceGraphIsEmpty(sourceCanvas)) {
     return canvasId;

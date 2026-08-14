@@ -134,7 +134,7 @@ describe("AutomationDetail tabs", () => {
   function renderDetail() {
     return render(
       <MemoryRouter>
-        <AutomationDetail organizationId="org-1" factoryId="factory-1" app={app} actions={actions} />
+        <AutomationDetail organizationId="org-1" factoryKey="SP" app={app} actions={actions} />
       </MemoryRouter>,
     );
   }

@@ -2,14 +2,14 @@ import { editFactoryLinePath, factoryLineDetailPath } from "./factoryPagePaths";
 
 interface FactoryLineDestination {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   lineId: string;
   canEdit: boolean;
 }
 
 export function factoryLineDestinationPath({
   organizationId,
-  factoryId,
+  factoryKey,
   lineId,
   canEdit,
 }: FactoryLineDestination): string | undefined {
@@ -17,7 +17,7 @@ export function factoryLineDestinationPath({
     return undefined;
   }
   if (canEdit) {
-    return editFactoryLinePath(organizationId, factoryId, lineId);
+    return editFactoryLinePath(organizationId, factoryKey, lineId);
   }
-  return factoryLineDetailPath(organizationId, factoryId, lineId);
+  return factoryLineDetailPath(organizationId, factoryKey, lineId);
 }

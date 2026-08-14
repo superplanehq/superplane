@@ -20,16 +20,16 @@ import { timelineActorClassName, timelineParagraphClassName, timelineTimeClassNa
 interface DispatchTimelineItemProps {
   event: WorkOrderTimelineEvent;
   organizationId: string;
-  factoryId: string;
-  orderId?: string;
+  factoryKey: string;
+  orderNumber?: string;
   isLatestDispatch: boolean;
 }
 
 export function DispatchTimelineItem({
   event,
   organizationId,
-  factoryId,
-  orderId,
+  factoryKey,
+  orderNumber,
   isLatestDispatch,
 }: DispatchTimelineItemProps) {
   const [isExpanded, setIsExpanded] = useState(isLatestDispatch);
@@ -87,8 +87,8 @@ export function DispatchTimelineItem({
                 <DispatchStepRow
                   key={step.id}
                   organizationId={organizationId}
-                  factoryId={factoryId}
-                  orderId={orderId}
+                  factoryKey={factoryKey}
+                  orderNumber={orderNumber}
                   step={step}
                 />
               ))}
@@ -102,16 +102,16 @@ export function DispatchTimelineItem({
 
 function DispatchStepRow({
   organizationId,
-  factoryId,
-  orderId,
+  factoryKey,
+  orderNumber,
   step,
 }: {
   organizationId: string;
-  factoryId: string;
-  orderId?: string;
+  factoryKey: string;
+  orderNumber?: string;
   step: WorkOrderTimelineStep;
 }) {
-  const runHref = getWorkOrderExecutionRunHref(organizationId, factoryId, step.execution, { orderId });
+  const runHref = getWorkOrderExecutionRunHref(organizationId, factoryKey, step.execution, { orderNumber });
   const duration = formatStepExecutionDuration(step);
   const status = executionStatus(step.execution);
 
