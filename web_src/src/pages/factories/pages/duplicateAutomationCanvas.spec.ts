@@ -1,94 +1,173 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { duplicateAutomationCanvas } from "./duplicateAutomationCanvas";
+import {
+  duplicateAutomationCanvas,
+  rematerializeDuplicateConsoleYaml,
+  rewriteSelfCanvasRefs,
+} from "./duplicateAutomationCanvas";
+
+function baseDeps(overrides: Partial<Parameters<typeof duplicateAutomationCanvas>[0]> = {}) {
+  return {
+    factoryId: "factory-1",
+    app: { id: "canvas-source", name: "Refund Planner", description: "Plans refunds" },
+    createCanvas: vi.fn().mockResolvedValue({
+      data: { canvas: { metadata: { id: "canvas-new" } } },
+    }),
+    fetchConsoleYaml: vi.fn().mockResolvedValue(undefined),
+    putCanvasStaging: vi.fn().mockResolvedValue({}),
+    commitCanvasStaging: vi.fn().mockResolvedValue({}),
+    ...overrides,
+  };
+}
+
+describe("rewriteSelfCanvasRefs", () => {
+  it("rewrites runApp configuration.app and metadata.app to the clone id", () => {
+    const rewritten = rewriteSelfCanvasRefs(
+      [
+        {
+          id: "run-self",
+          name: "Run Self",
+          component: "runApp",
+          configuration: { app: "canvas-source", node: "onrun-1" },
+          metadata: { app: { id: "canvas-source", name: "Refund Planner" } },
+        },
+        {
+          id: "run-other",
+          name: "Run Other",
+          component: "runApp",
+          configuration: { app: "other-canvas", node: "onrun-2" },
+          metadata: { app: { id: "other-canvas", name: "Other" } },
+        },
+      ],
+      "canvas-source",
+      "canvas-new",
+      "Refund Planner copy",
+    );
+
+    expect(rewritten[0]?.configuration).toEqual({ app: "canvas-new", node: "onrun-1" });
+    expect(rewritten[0]?.metadata).toEqual({
+      app: { id: "canvas-new", name: "Refund Planner copy" },
+    });
+    expect(rewritten[1]?.configuration).toEqual({ app: "other-canvas", node: "onrun-2" });
+  });
+});
+
+describe("rematerializeDuplicateConsoleYaml", () => {
+  it("rewrites console metadata name and canvasId", () => {
+    const next = rematerializeDuplicateConsoleYaml(
+      "apiVersion: v1\nkind: Console\nmetadata:\n  name: Source\n  canvasId: canvas-source\nspec:\n  panels: []\n",
+      "canvas-new",
+      "Refund Planner copy",
+    );
+    expect(next).toContain("name: Refund Planner copy");
+    expect(next).toContain("canvasId: canvas-new");
+    expect(next).not.toContain("canvas-source");
+  });
+});
 
 describe("duplicateAutomationCanvas", () => {
   it("creates a canvas and stages the source live graph", async () => {
-    const createCanvas = vi.fn().mockResolvedValue({
-      data: { canvas: { metadata: { id: "canvas-new" } } },
-    });
-    const describeCanvas = vi.fn().mockResolvedValue({
-      data: {
-        canvas: {
-          metadata: { description: "from source" },
-          spec: {
-            nodes: [{ id: "n1", name: "Node 1", component: "noop", type: "TYPE_ACTION" }],
-            edges: [{ sourceId: "n1", targetId: "n2", channel: "default" }],
+    const deps = baseDeps({
+      describeCanvas: vi.fn().mockResolvedValue({
+        data: {
+          canvas: {
+            metadata: { description: "from source" },
+            spec: {
+              nodes: [{ id: "n1", name: "Node 1", component: "noop", type: "TYPE_ACTION" }],
+              edges: [{ sourceId: "n1", targetId: "n2", channel: "default" }],
+            },
           },
         },
-      },
+      }),
     });
-    const putCanvasStaging = vi.fn().mockResolvedValue({});
-    const commitCanvasStaging = vi.fn().mockResolvedValue({});
 
-    const canvasId = await duplicateAutomationCanvas({
-      factoryId: "factory-1",
-      app: { id: "canvas-source", name: "Refund Planner", description: "Plans refunds" },
-      createCanvas,
-      describeCanvas,
-      putCanvasStaging,
-      commitCanvasStaging,
-    });
+    const canvasId = await duplicateAutomationCanvas(deps);
 
     expect(canvasId).toBe("canvas-new");
-    expect(describeCanvas).toHaveBeenCalledWith("canvas-source");
-    expect(createCanvas).toHaveBeenCalledWith({
+    expect(deps.describeCanvas).toHaveBeenCalledWith("canvas-source");
+    expect(deps.createCanvas).toHaveBeenCalledWith({
       name: "Refund Planner copy",
       description: "Plans refunds",
       factoryId: "factory-1",
       method: "ui",
     });
-    expect(putCanvasStaging).toHaveBeenCalledTimes(1);
-    expect(putCanvasStaging.mock.calls[0]?.[0]).toBe("canvas-new");
-    expect(String(putCanvasStaging.mock.calls[0]?.[1])).toContain("id: canvas-new");
-    expect(String(putCanvasStaging.mock.calls[0]?.[1])).toContain("name: Refund Planner copy");
-    expect(String(putCanvasStaging.mock.calls[0]?.[1])).toContain("n1");
-    expect(commitCanvasStaging).toHaveBeenCalledWith("canvas-new");
+    expect(deps.putCanvasStaging).toHaveBeenCalledTimes(1);
+    expect(deps.putCanvasStaging.mock.calls[0]?.[0]).toBe("canvas-new");
+    expect(String(deps.putCanvasStaging.mock.calls[0]?.[1])).toContain("id: canvas-new");
+    expect(String(deps.putCanvasStaging.mock.calls[0]?.[1])).toContain("name: Refund Planner copy");
+    expect(String(deps.putCanvasStaging.mock.calls[0]?.[1])).toContain("n1");
+    expect(deps.putCanvasStaging.mock.calls[0]?.[2]).toBeUndefined();
+    expect(deps.commitCanvasStaging).toHaveBeenCalledWith("canvas-new");
   });
 
-  it("skips staging when the source graph is empty", async () => {
-    const createCanvas = vi.fn().mockResolvedValue({
-      data: { canvas: { metadata: { id: "canvas-empty-copy" } } },
+  it("rewrites self canvas refs and stages console.yaml when present", async () => {
+    const deps = baseDeps({
+      describeCanvas: vi.fn().mockResolvedValue({
+        data: {
+          canvas: {
+            spec: {
+              nodes: [
+                {
+                  id: "run-self",
+                  name: "Run Self",
+                  component: "runApp",
+                  configuration: { app: "canvas-source", node: "onrun-1" },
+                  metadata: { app: { id: "canvas-source", name: "Refund Planner" } },
+                },
+              ],
+              edges: [],
+            },
+          },
+        },
+      }),
+      fetchConsoleYaml: vi.fn().mockResolvedValue(
+        "apiVersion: v1\nkind: Console\nmetadata:\n  name: Source\n  canvasId: canvas-source\nspec:\n  panels: []\n",
+      ),
     });
-    const putCanvasStaging = vi.fn();
-    const commitCanvasStaging = vi.fn();
 
-    const canvasId = await duplicateAutomationCanvas({
-      factoryId: "factory-1",
-      app: { id: "canvas-empty", name: "Empty" },
-      createCanvas,
+    await duplicateAutomationCanvas(deps);
+
+    const stagedCanvasYaml = String(deps.putCanvasStaging.mock.calls[0]?.[1]);
+    const stagedConsoleYaml = String(deps.putCanvasStaging.mock.calls[0]?.[2]);
+    expect(stagedCanvasYaml).toContain("app: canvas-new");
+    expect(stagedCanvasYaml).not.toContain("app: canvas-source");
+    expect(stagedConsoleYaml).toContain("canvasId: canvas-new");
+    expect(stagedConsoleYaml).toContain("name: Refund Planner copy");
+  });
+
+  it("skips staging when the source graph and console are empty", async () => {
+    const deps = baseDeps({
+      createCanvas: vi.fn().mockResolvedValue({
+        data: { canvas: { metadata: { id: "canvas-empty-copy" } } },
+      }),
       describeCanvas: vi.fn().mockResolvedValue({
         data: { canvas: { spec: { nodes: [], edges: [] } } },
       }),
-      putCanvasStaging,
-      commitCanvasStaging,
+      app: { id: "canvas-empty", name: "Empty" },
     });
 
+    const canvasId = await duplicateAutomationCanvas(deps);
+
     expect(canvasId).toBe("canvas-empty-copy");
-    expect(putCanvasStaging).not.toHaveBeenCalled();
-    expect(commitCanvasStaging).not.toHaveBeenCalled();
+    expect(deps.putCanvasStaging).not.toHaveBeenCalled();
+    expect(deps.commitCanvasStaging).not.toHaveBeenCalled();
   });
 
   it("rejects when the source automation id is missing", async () => {
     await expect(
-      duplicateAutomationCanvas({
-        factoryId: "factory-1",
-        app: { name: "No Id" },
-        createCanvas: vi.fn(),
-      }),
+      duplicateAutomationCanvas(
+        baseDeps({
+          app: { name: "No Id" },
+          createCanvas: vi.fn(),
+        }),
+      ),
     ).rejects.toThrow("source automation id is required");
   });
 
   it("reuses pendingCanvasId on retry and skips CreateCanvas", async () => {
-    const createCanvas = vi.fn();
     const onCanvasCreated = vi.fn();
-    const putCanvasStaging = vi.fn().mockResolvedValue({});
-    const commitCanvasStaging = vi.fn().mockResolvedValue({});
-
-    const canvasId = await duplicateAutomationCanvas({
-      factoryId: "factory-1",
-      app: { id: "canvas-source", name: "Refund Planner", description: "Plans refunds" },
-      createCanvas,
+    const deps = baseDeps({
+      createCanvas: vi.fn(),
       pendingCanvasId: "canvas-pending",
       onCanvasCreated,
       describeCanvas: vi.fn().mockResolvedValue({
@@ -101,44 +180,38 @@ describe("duplicateAutomationCanvas", () => {
           },
         },
       }),
-      putCanvasStaging,
-      commitCanvasStaging,
     });
 
+    const canvasId = await duplicateAutomationCanvas(deps);
+
     expect(canvasId).toBe("canvas-pending");
-    expect(createCanvas).not.toHaveBeenCalled();
+    expect(deps.createCanvas).not.toHaveBeenCalled();
     expect(onCanvasCreated).not.toHaveBeenCalled();
-    expect(putCanvasStaging.mock.calls[0]?.[0]).toBe("canvas-pending");
-    expect(commitCanvasStaging).toHaveBeenCalledWith("canvas-pending");
+    expect(deps.putCanvasStaging.mock.calls[0]?.[0]).toBe("canvas-pending");
+    expect(deps.commitCanvasStaging).toHaveBeenCalledWith("canvas-pending");
   });
 
   it("notifies onCanvasCreated before a stage/commit failure", async () => {
     const onCanvasCreated = vi.fn();
-    const createCanvas = vi.fn().mockResolvedValue({
-      data: { canvas: { metadata: { id: "canvas-orphan" } } },
-    });
-
-    await expect(
-      duplicateAutomationCanvas({
-        factoryId: "factory-1",
-        app: { id: "canvas-source", name: "Refund Planner" },
-        createCanvas,
-        onCanvasCreated,
-        describeCanvas: vi.fn().mockResolvedValue({
-          data: {
-            canvas: {
-              spec: {
-                nodes: [{ id: "n1", name: "Node 1", component: "noop", type: "TYPE_ACTION" }],
-                edges: [],
-              },
+    const deps = baseDeps({
+      createCanvas: vi.fn().mockResolvedValue({
+        data: { canvas: { metadata: { id: "canvas-orphan" } } },
+      }),
+      onCanvasCreated,
+      describeCanvas: vi.fn().mockResolvedValue({
+        data: {
+          canvas: {
+            spec: {
+              nodes: [{ id: "n1", name: "Node 1", component: "noop", type: "TYPE_ACTION" }],
+              edges: [],
             },
           },
-        }),
-        putCanvasStaging: vi.fn().mockRejectedValue(new Error("stage failed")),
-        commitCanvasStaging: vi.fn(),
+        },
       }),
-    ).rejects.toThrow("stage failed");
+      putCanvasStaging: vi.fn().mockRejectedValue(new Error("stage failed")),
+    });
 
+    await expect(duplicateAutomationCanvas(deps)).rejects.toThrow("stage failed");
     expect(onCanvasCreated).toHaveBeenCalledWith("canvas-orphan");
   });
 });
