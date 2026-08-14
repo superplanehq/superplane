@@ -30,6 +30,23 @@ const (
 
 const factoryWorkOrderArtifactKeyUniqueConstraint = "idx_factory_work_order_artifacts_factory_key_unique"
 
+// Valid values for a PR artifact's optional `data.state` field. Mirrors
+// GitHub's own pull request lifecycle states so the UI can render the
+// matching icon/color (see WorkOrderArtifactInline.tsx).
+const (
+	PrArtifactStateOpen   = "open"
+	PrArtifactStateDraft  = "draft"
+	PrArtifactStateClosed = "closed"
+	PrArtifactStateMerged = "merged"
+)
+
+var validPrArtifactStates = map[string]bool{
+	PrArtifactStateOpen:   true,
+	PrArtifactStateDraft:  true,
+	PrArtifactStateClosed: true,
+	PrArtifactStateMerged: true,
+}
+
 var (
 	ErrFactoryWorkOrderArtifactNotFound         = errors.New("factory work order artifact not found")
 	ErrFactoryWorkOrderArtifactInvalid          = errors.New("invalid work order artifact")
@@ -87,32 +104,8 @@ func (o *FactoryWorkOrder) CreateArtifact(
 ) (*FactoryWorkOrderArtifact, error) {
 	artifactType := strings.TrimSpace(params.Type)
 
-	switch artifactType {
-	case FactoryWorkOrderArtifactTypePR:
-		if extractArtifactString(params.Data, "url") == "" {
-			return nil, fmt.Errorf("%w: pull request artifacts require a url", ErrFactoryWorkOrderArtifactInvalid)
-		}
-	case FactoryWorkOrderArtifactTypeMarkdown:
-		if extractArtifactString(params.Data, "body") == "" {
-			return nil, fmt.Errorf("%w: markdown artifacts require data.body", ErrFactoryWorkOrderArtifactInvalid)
-		}
-	case FactoryWorkOrderArtifactTypeBranch:
-		if extractArtifactString(params.Data, "name") == "" {
-			return nil, fmt.Errorf("%w: branch artifacts require data.name", ErrFactoryWorkOrderArtifactInvalid)
-		}
-	default:
-		return nil, fmt.Errorf("%w: unknown artifact type %q", ErrFactoryWorkOrderArtifactInvalid, params.Type)
-	}
-
-	// `data.url` lands in a clickable `href` for every artifact type the
-	// UI knows about (extractArtifactUrl reads it unconditionally), so
-	// reject non-http(s) schemes here rather than only inside the PR
-	// branch — no caller should be able to smuggle `javascript:` past
-	// the model.
-	if artifactURL := extractArtifactString(params.Data, "url"); artifactURL != "" {
-		if !isSafeArtifactURL(artifactURL) {
-			return nil, fmt.Errorf("%w: artifact url must be http(s)", ErrFactoryWorkOrderArtifactInvalid)
-		}
+	if err := validateArtifactData(artifactType, params.Data); err != nil {
+		return nil, err
 	}
 
 	dataJSON, err := encodeArtifactData(params.Data)
@@ -176,6 +169,71 @@ func (o *FactoryWorkOrder) CreateArtifact(
 	return artifact, nil
 }
 
+// UpdateArtifactData resolves the artifact tagged with `key` under this
+// work order (the same key an earlier CreateArtifact call set via
+// FactoryWorkOrderArtifactParams.Key, typically the PR's URL), shallow-
+// merges `updates` into its existing `data` map, and re-saves it in
+// place. Unlike CreateArtifact, this does not append a new
+// `order.artifact.*` timeline event — a PR flipping open → draft →
+// merged should update the live chip, not spam the timeline with one
+// entry per transition. Callers still notify the websocket channel
+// (see FactoryContext.UpdateWorkOrderArtifact) so the UI refreshes.
+func (o *FactoryWorkOrder) UpdateArtifactData(
+	tx *gorm.DB,
+	key string,
+	updates map[string]any,
+) (*FactoryWorkOrderArtifact, error) {
+	trimmedKey := strings.TrimSpace(key)
+	if trimmedKey == "" {
+		return nil, fmt.Errorf("%w: artifact key is required", ErrFactoryWorkOrderArtifactInvalid)
+	}
+
+	var artifact FactoryWorkOrderArtifact
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND work_order_id = ? AND key = ?", o.OrganizationID, o.FactoryID, o.ID, trimmedKey).
+		First(&artifact).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryWorkOrderArtifactNotFound
+		}
+		return nil, err
+	}
+
+	merged := map[string]any{}
+	if len(artifact.Data) > 0 {
+		if err := json.Unmarshal(artifact.Data, &merged); err != nil {
+			return nil, err
+		}
+	}
+	for updateKey, value := range updates {
+		merged[updateKey] = value
+	}
+
+	if err := validateArtifactData(artifact.Type, merged); err != nil {
+		return nil, err
+	}
+
+	dataJSON, err := encodeArtifactData(merged)
+	if err != nil {
+		return nil, err
+	}
+	if len(dataJSON) > MaxFactoryWorkOrderArtifactDataBytes {
+		return nil, fmt.Errorf(
+			"%w: artifact data exceeds %d bytes",
+			ErrFactoryWorkOrderArtifactInvalid,
+			MaxFactoryWorkOrderArtifactDataBytes,
+		)
+	}
+
+	if err := tx.Model(&artifact).Update("data", dataJSON).Error; err != nil {
+		return nil, err
+	}
+	artifact.Data = dataJSON
+
+	return &artifact, nil
+}
+
 func (o *FactoryWorkOrder) ListArtifacts(tx *gorm.DB) ([]FactoryWorkOrderArtifact, error) {
 	var artifacts []FactoryWorkOrderArtifact
 	err := tx.
@@ -199,6 +257,49 @@ func IsValidWorkOrderArtifactType(t string) bool {
 		return true
 	}
 	return false
+}
+
+// validateArtifactData enforces the required-field rules for each
+// artifact type (shared by CreateArtifact and UpdateArtifactData so a
+// later merge can't drift from what a fresh attach requires) plus the
+// URL-scheme guard that applies regardless of type.
+func validateArtifactData(artifactType string, data map[string]any) error {
+	switch artifactType {
+	case FactoryWorkOrderArtifactTypePR:
+		if extractArtifactString(data, "url") == "" {
+			return fmt.Errorf("%w: pull request artifacts require a url", ErrFactoryWorkOrderArtifactInvalid)
+		}
+		if state := extractArtifactString(data, "state"); state != "" && !validPrArtifactStates[state] {
+			return fmt.Errorf(
+				"%w: invalid pull request state %q (want one of open, draft, closed, merged)",
+				ErrFactoryWorkOrderArtifactInvalid,
+				state,
+			)
+		}
+	case FactoryWorkOrderArtifactTypeMarkdown:
+		if extractArtifactString(data, "body") == "" {
+			return fmt.Errorf("%w: markdown artifacts require data.body", ErrFactoryWorkOrderArtifactInvalid)
+		}
+	case FactoryWorkOrderArtifactTypeBranch:
+		if extractArtifactString(data, "name") == "" {
+			return fmt.Errorf("%w: branch artifacts require data.name", ErrFactoryWorkOrderArtifactInvalid)
+		}
+	default:
+		return fmt.Errorf("%w: unknown artifact type %q", ErrFactoryWorkOrderArtifactInvalid, artifactType)
+	}
+
+	// `data.url` lands in a clickable `href` for every artifact type the
+	// UI knows about (extractArtifactUrl reads it unconditionally), so
+	// reject non-http(s) schemes here rather than only inside the PR
+	// branch — no caller should be able to smuggle `javascript:` past
+	// the model.
+	if artifactURL := extractArtifactString(data, "url"); artifactURL != "" {
+		if !isSafeArtifactURL(artifactURL) {
+			return fmt.Errorf("%w: artifact url must be http(s)", ErrFactoryWorkOrderArtifactInvalid)
+		}
+	}
+
+	return nil
 }
 
 // isSafeArtifactURL requires an absolute http(s) URL with a host —
