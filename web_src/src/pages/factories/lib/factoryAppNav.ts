@@ -19,12 +19,14 @@ export type FactoryAppBackNav = {
  */
 export function resolveFactoryAppBackNav(
   organizationId: string,
-  factoryId: string,
+  factoryKey: string,
   options: {
     from?: string | null;
     appId?: string | null;
     appName?: string | null;
     lineId?: string | null;
+    orderNumber?: string | null;
+    /** Legacy app-canvas query param; used when `orderNumber` is absent. */
     orderId?: string | null;
     lineName?: string | null;
     orderTitle?: string | null;
@@ -36,31 +38,32 @@ export function resolveFactoryAppBackNav(
     if (options.appId) {
       return {
         label: options.appName?.trim() || "Automations",
-        href: automationDetailPath(organizationId, factoryId, options.appId),
+        href: automationDetailPath(organizationId, factoryKey, options.appId),
       };
     }
-    return { label: "Automations", href: automationsPath(organizationId, factoryId) };
+    return { label: "Automations", href: automationsPath(organizationId, factoryKey) };
   }
 
   if (from === "lines") {
     if (options.lineId) {
       return {
         label: options.lineName?.trim() || "All lines",
-        href: factoryLineDetailPath(organizationId, factoryId, options.lineId),
+        href: factoryLineDetailPath(organizationId, factoryKey, options.lineId),
       };
     }
-    return { label: "All lines", href: linesPath(organizationId, factoryId) };
+    return { label: "All lines", href: linesPath(organizationId, factoryKey) };
   }
 
   if (from === "work-order") {
-    if (options.orderId) {
+    const orderRef = options.orderNumber || options.orderId;
+    if (orderRef) {
       return {
         label: options.orderTitle?.trim() || "Work Orders",
-        href: workOrderDetailPath(organizationId, factoryId, options.orderId),
+        href: workOrderDetailPath(organizationId, factoryKey, orderRef),
       };
     }
-    return { label: "Work Orders", href: workOrdersPath(organizationId, factoryId) };
+    return { label: "Work Orders", href: workOrdersPath(organizationId, factoryKey) };
   }
 
-  return { label: "Overview", href: factoryOverviewPath(organizationId, factoryId) };
+  return { label: "Overview", href: factoryOverviewPath(organizationId, factoryKey) };
 }

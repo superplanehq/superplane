@@ -14,6 +14,11 @@ import { isRecord } from "@/pages/app/mappers/safeMappers";
 import { isVerticalCanvasFlow } from "@/lib/canvasFlowDirection";
 
 function getCompactView(data: BlockProps["data"], isCompactView: BlockProps["isCompactView"]) {
+  // Factory nodes always render expanded — collapse chrome is disabled.
+  if (isVerticalCanvasFlow(data._flowDirection)) {
+    return false;
+  }
+
   if (isCompactView !== undefined) {
     return isCompactView;
   }
@@ -30,10 +35,14 @@ function getCompactView(data: BlockProps["data"], isCompactView: BlockProps["isC
   }
 }
 
-function getActionProps(compactView: boolean, props: Pick<BlockProps, ComponentActionKeys>) {
+function getActionProps(
+  compactView: boolean,
+  props: Pick<BlockProps, ComponentActionKeys>,
+  options?: { omitToggleView?: boolean },
+) {
   return {
     onDuplicate: props.onDuplicate,
-    onToggleView: props.onToggleView,
+    onToggleView: options?.omitToggleView ? undefined : props.onToggleView,
     onDelete: props.onDelete,
     isCompactView: compactView,
   };
@@ -46,17 +55,28 @@ function renderFallbackBlock(args: {
   showHeader: boolean | undefined;
   canvasMode: BlockProps["canvasMode"];
   showRuntimeStatus?: boolean;
+  runIsActive?: boolean;
   actionProps: ReturnType<typeof getActionProps>;
   dimBodyBelowHeader?: boolean;
 }) {
-  const { data, fallbackTitle, selected, showHeader, canvasMode, showRuntimeStatus, actionProps, dimBodyBelowHeader } =
-    args;
+  const {
+    data,
+    fallbackTitle,
+    selected,
+    showHeader,
+    canvasMode,
+    showRuntimeStatus,
+    runIsActive,
+    actionProps,
+    dimBodyBelowHeader,
+  } = args;
 
   return (
     <ComponentBase
       {...buildFallbackComponentProps(data, fallbackTitle)}
       canvasMode={canvasMode}
       showRuntimeStatus={showRuntimeStatus}
+      runIsActive={runIsActive}
       selected={selected}
       showHeader={showHeader}
       dimBodyBelowHeader={dimBodyBelowHeader}
@@ -74,6 +94,7 @@ function AnnotationBlockContent({
   showHeader,
   canvasMode,
   showRuntimeStatus,
+  runIsActive,
   onAnnotationUpdate,
   onAnnotationBlur,
   actionProps,
@@ -85,6 +106,7 @@ function AnnotationBlockContent({
   showHeader?: boolean;
   canvasMode?: BlockProps["canvasMode"];
   showRuntimeStatus?: boolean;
+  runIsActive?: boolean;
   onAnnotationUpdate?: BlockProps["onAnnotationUpdate"];
   onAnnotationBlur?: BlockProps["onAnnotationBlur"];
   actionProps: ReturnType<typeof getActionProps>;
@@ -112,6 +134,7 @@ function AnnotationBlockContent({
       showHeader,
       canvasMode,
       showRuntimeStatus,
+      runIsActive,
       actionProps,
       dimBodyBelowHeader,
     });
@@ -139,6 +162,7 @@ function renderBlockByType(args: {
   showHeader?: boolean;
   canvasMode?: BlockProps["canvasMode"];
   showRuntimeStatus?: boolean;
+  runIsActive?: boolean;
   onAnnotationUpdate?: BlockProps["onAnnotationUpdate"];
   onAnnotationBlur?: BlockProps["onAnnotationBlur"];
   actionProps: ReturnType<typeof getActionProps>;
@@ -151,6 +175,7 @@ function renderBlockByType(args: {
     showHeader,
     canvasMode,
     showRuntimeStatus,
+    runIsActive,
     onAnnotationUpdate,
     onAnnotationBlur,
     actionProps,
@@ -168,6 +193,7 @@ function renderBlockByType(args: {
           showHeader,
           canvasMode,
           showRuntimeStatus,
+          runIsActive,
           actionProps,
           dimBodyBelowHeader,
         });
@@ -177,6 +203,7 @@ function renderBlockByType(args: {
           {...getSafeTriggerProps(data)}
           canvasMode={canvasMode}
           showRuntimeStatus={showRuntimeStatus}
+          runIsActive={runIsActive}
           selected={selected}
           showHeader={showHeader}
           dimBodyBelowHeader={dimBodyBelowHeader}
@@ -192,6 +219,7 @@ function renderBlockByType(args: {
           {...safeComponentProps}
           canvasMode={canvasMode}
           showRuntimeStatus={showRuntimeStatus}
+          runIsActive={runIsActive}
           selected={selected}
           showHeader={showHeader}
           dimBodyBelowHeader={dimBodyBelowHeader}
@@ -207,6 +235,7 @@ function renderBlockByType(args: {
           {...getSafeCompositeProps(data)}
           canvasMode={canvasMode}
           showRuntimeStatus={showRuntimeStatus}
+          runIsActive={runIsActive}
           selected={selected}
           showHeader={showHeader}
           dimBodyBelowHeader={dimBodyBelowHeader}
@@ -224,6 +253,7 @@ function renderBlockByType(args: {
           showHeader={showHeader}
           canvasMode={canvasMode}
           showRuntimeStatus={showRuntimeStatus}
+          runIsActive={runIsActive}
           onAnnotationUpdate={onAnnotationUpdate}
           onAnnotationBlur={onAnnotationBlur}
           actionProps={actionProps}
@@ -238,6 +268,7 @@ function renderBlockByType(args: {
         showHeader,
         canvasMode,
         showRuntimeStatus,
+        runIsActive,
         actionProps,
         dimBodyBelowHeader,
       });
@@ -254,17 +285,23 @@ export function BlockContent({
   showHeader,
   canvasMode,
   showRuntimeStatus,
+  runIsActive,
   isCompactView,
   onAnnotationUpdate,
   onAnnotationBlur,
   dimBodyBelowHeader,
 }: BlockProps) {
+  const isFactoryApp = isVerticalCanvasFlow(data._flowDirection);
   const compactView = getCompactView(data, isCompactView);
-  const actionProps = getActionProps(compactView, {
-    onDuplicate,
-    onToggleView,
-    onDelete,
-  });
+  const actionProps = getActionProps(
+    compactView,
+    {
+      onDuplicate,
+      onToggleView,
+      onDelete,
+    },
+    { omitToggleView: isFactoryApp },
+  );
 
   return renderBlockByType({
     data,
@@ -273,6 +310,7 @@ export function BlockContent({
     showHeader,
     canvasMode,
     showRuntimeStatus,
+    runIsActive,
     onAnnotationUpdate,
     onAnnotationBlur,
     actionProps,
