@@ -14,6 +14,10 @@ import {
 import { shouldRedirectFactoryAppCanvas } from "../lib/factoryAppCanvasRedirect";
 import { resolveWorkOrderByNumber } from "../lib/workOrderNumberResolution";
 
+function readFactoryAppOrderRef(searchParams: URLSearchParams): string | null {
+  return searchParams.get("orderNumber") ?? searchParams.get("orderId");
+}
+
 export function useFactoryAppCanvasPageModel() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const { appId = "" } = useParams<{ appId: string }>();
@@ -32,7 +36,7 @@ export function useFactoryAppCanvasPageModel() {
 
   const from = searchParams.get("from");
   const lineId = searchParams.get("lineId");
-  const orderNumber = searchParams.get("orderNumber") ?? searchParams.get("orderId");
+  const orderNumber = readFactoryAppOrderRef(searchParams);
   const isConfigure = isFactoryAppConfigureMode(searchParams);
   const lineName = useMemo(() => resolveFactoryLineName(factory?.lines, lineId), [factory?.lines, lineId]);
 
