@@ -216,6 +216,7 @@ const FACTORY_BLOCK_NAMES = new Set([
   "updateWorkOrderStatus",
   "addWorkOrderComment",
   "addWorkOrderArtifact",
+  "updateWorkOrderArtifact",
 ]);
 
 function isSuperPlaneBlock(component: { name?: string }): boolean {
