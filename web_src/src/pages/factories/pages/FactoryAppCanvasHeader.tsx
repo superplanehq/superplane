@@ -1,6 +1,7 @@
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { FactoryAppCanvasTitleEditor } from "./FactoryAppCanvasTitleEditor";
 
 type FactoryAppCanvasHeaderProps = {
   backHref: string;
@@ -9,8 +10,11 @@ type FactoryAppCanvasHeaderProps = {
   subtitle: string;
   isConfigure: boolean;
   configureBusy: boolean;
+  canRename?: boolean;
   onDiscard: () => void;
   onSave: () => void;
+  /** Local draft only — persisted when the user clicks Save. */
+  onDraftTitleChange?: (name: string) => void;
 };
 
 export function FactoryAppCanvasHeader({
@@ -20,9 +24,13 @@ export function FactoryAppCanvasHeader({
   subtitle,
   isConfigure,
   configureBusy,
+  canRename = false,
   onDiscard,
   onSave,
+  onDraftTitleChange,
 }: FactoryAppCanvasHeaderProps) {
+  const renameEnabled = Boolean(isConfigure && canRename && onDraftTitleChange);
+
   return (
     <div
       className={
@@ -41,15 +49,21 @@ export function FactoryAppCanvasHeader({
           {backLabel}
         </Link>
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-foreground">{title}</h2>
-          {isConfigure ? (
-            <span
-              className="rounded-md bg-foreground px-1.5 py-0.5 text-[11px] font-medium text-primary-foreground"
-              data-testid="factory-app-edit-mode-badge"
+          {isConfigure && onDraftTitleChange ? (
+            <FactoryAppCanvasTitleEditor
+              title={title}
+              renameEnabled={renameEnabled}
+              configureBusy={configureBusy}
+              onDraftTitleChange={onDraftTitleChange}
+            />
+          ) : (
+            <h2
+              className="text-[15px] font-semibold tracking-[-0.01em] text-foreground"
+              data-testid="factory-app-canvas-title"
             >
-              Edit mode
-            </span>
-          ) : null}
+              {title}
+            </h2>
+          )}
         </div>
         <p
           className={
