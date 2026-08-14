@@ -12,7 +12,7 @@ import { WorkOrdersPage } from "./WorkOrdersPage";
 /**
  * Work Orders page. The shell renders `WorkOrdersLoadedView`, which owns
  * the title bar + Board/List/Table layouts, empty states, and the shared
- * inline actions.
+ * inline actions. New Work Order opens the create dialog.
  */
 const meta = {
   title: "Factories/Pages/Work Orders",

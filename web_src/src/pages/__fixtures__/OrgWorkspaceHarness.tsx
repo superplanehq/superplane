@@ -16,7 +16,7 @@ import { STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT } from "@/pages/app/__fixtures__
 import { canvasAppIds, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import {
   AutomationsPage,
-  CreateWorkOrderPage,
+  CreateWorkOrderComposeRedirect,
   FactoriesIndexPage,
   FactoriesLayout,
   FactoryAppCanvasPage,
@@ -220,7 +220,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
               <Route path="velocity" element={<VelocityPage />} />
               <Route path="work-orders">
                 <Route index element={<WorkOrdersPage />} />
-                <Route path="new" element={<CreateWorkOrderPage />} />
+                <Route path="new" element={<CreateWorkOrderComposeRedirect />} />
                 <Route path=":orderId" element={<LegacyWorkOrderDetailRedirect />} />
               </Route>
               <Route path="work-order/:orderNumber" element={<WorkOrderDetailPage />} />
