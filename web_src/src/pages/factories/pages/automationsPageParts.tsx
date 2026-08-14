@@ -169,6 +169,26 @@ function AutomationRunRow({
   );
 }
 
+function resolveAutomationCardNavigation(href: string | undefined, navigate: ReturnType<typeof useNavigate>) {
+  if (!href) {
+    return {
+      interactive: false,
+      onClick: undefined as (() => void) | undefined,
+      onKeyDown: undefined as ((event: { key: string; preventDefault: () => void }) => void) | undefined,
+    };
+  }
+  return {
+    interactive: true,
+    onClick: () => navigate(href),
+    onKeyDown: (event: { key: string; preventDefault: () => void }) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        navigate(href);
+      }
+    },
+  };
+}
+
 export function AutomationCard({
   app,
   href,
@@ -187,8 +207,8 @@ export function AutomationCard({
   const navigate = useNavigate();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const description = app.description?.trim() || "Factory automation canvas.";
-  const interactive = Boolean(href);
   const automationName = app.name?.trim() || "Unnamed automation";
+  const { interactive, onClick, onKeyDown } = resolveAutomationCardNavigation(href, navigate);
 
   return (
     <div
@@ -199,17 +219,8 @@ export function AutomationCard({
         emphasized ? "border-foreground bg-background" : "border-border bg-background",
         interactive && "cursor-pointer hover:border-foreground/25 hover:bg-accent/40",
       )}
-      onClick={interactive && href ? () => navigate(href) : undefined}
-      onKeyDown={
-        interactive && href
-          ? (event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                navigate(href);
-              }
-            }
-          : undefined
-      }
+      onClick={onClick}
+      onKeyDown={onKeyDown}
       data-testid={emphasized ? `automations-detail-card-${app.id}` : `automations-app-${app.id}`}
     >
       <div className="flex items-start gap-3">
