@@ -295,6 +295,58 @@ func TestDefaultAuthorizationRulesAreKeyedByHTTPRoute(t *testing.T) {
 	assert.Equal(t, []string{IDPathParam}, rule.ResourcePathParams)
 }
 
+func TestWidgetRoutesRequireOrgRead(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+	routes := []HTTPRoute{
+		{Method: http.MethodGet, Pattern: "/api/v1/widgets"},
+		{Method: http.MethodGet, Pattern: "/api/v1/widgets/{name}"},
+	}
+
+	for _, route := range routes {
+		rule, ok := rules[route]
+		require.True(t, ok, route.String())
+		assert.Equal(t, "org", rule.Resource, route.String())
+		assert.Equal(t, "read", rule.Action, route.String())
+		assert.Equal(t, models.DomainTypeOrganization, rule.DomainType, route.String())
+	}
+}
+
+func TestGatewayAuthorizerEnforcesAuthOnWidgetRoutes(t *testing.T) {
+	route := HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/widgets"}
+
+	t.Run("rejects request without identity headers", func(t *testing.T) {
+		authorizer := NewGatewayAuthorizer(allowingPermissionChecker{})
+		r := httptestRequest(t, nil)
+
+		_, err := authorizer.AuthorizeHTTP(context.Background(), r, route, nil)
+		require.Error(t, err)
+	})
+
+	t.Run("rejects user without org read permission", func(t *testing.T) {
+		authorizer := NewGatewayAuthorizer(actionPermissionChecker{"org:read": false})
+		r := httptestRequest(t, map[string]string{
+			"x-user-id":         "22222222-2222-4222-8222-222222222222",
+			"x-organization-id": "11111111-1111-4111-8111-111111111111",
+		})
+
+		_, err := authorizer.AuthorizeHTTP(context.Background(), r, route, nil)
+		require.Error(t, err)
+	})
+
+	t.Run("sets organization context for permitted user", func(t *testing.T) {
+		organizationID := "11111111-1111-4111-8111-111111111111"
+		authorizer := NewGatewayAuthorizer(actionPermissionChecker{"org:read": true})
+		r := httptestRequest(t, map[string]string{
+			"x-user-id":         "22222222-2222-4222-8222-222222222222",
+			"x-organization-id": organizationID,
+		})
+
+		ctx, err := authorizer.AuthorizeHTTP(context.Background(), r, route, nil)
+		require.NoError(t, err)
+		assert.Equal(t, organizationID, ctx.Value(OrganizationContextKey))
+	})
+}
+
 func httptestRequest(t *testing.T, headers map[string]string) *http.Request {
 	t.Helper()
 
