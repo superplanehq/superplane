@@ -44,7 +44,7 @@ export interface MissionsWorkOrdersLoadedViewProps {
 
 export function MissionsWorkOrdersLoadedView(props: MissionsWorkOrdersLoadedViewProps) {
   const { workOrders, factory, state, currentUserId } = props;
-  const { missions, missionByWorkOrderId } = useMissionAssignment();
+  const { missions, missionByWorkOrderId, closedByMissionId } = useMissionAssignment();
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [workOrders, factory]);
   const scoped = useMemo(
     () => applyWorkOrderScope(entries, state.scope, currentUserId),
@@ -54,8 +54,8 @@ export function MissionsWorkOrdersLoadedView(props: MissionsWorkOrdersLoadedView
   const searched = useMemo(() => applyWorkOrderSearch(filtered, state.search), [filtered, state.search]);
   const ordered = useMemo(() => applyWorkOrderOrdering(searched, state.ordering), [searched, state.ordering]);
   const railItems = useMemo(
-    () => buildMissionRailItems(missions, entries, missionByWorkOrderId),
-    [entries, missionByWorkOrderId, missions],
+    () => buildMissionRailItems(missions, entries, missionByWorkOrderId, closedByMissionId),
+    [closedByMissionId, entries, missionByWorkOrderId, missions],
   );
 
   const totalCount = entries.length;

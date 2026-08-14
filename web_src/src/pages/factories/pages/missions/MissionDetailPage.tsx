@@ -12,7 +12,13 @@ import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { factoryContentBodyClassName } from "../factoryPageLayoutStyles";
 import { OverviewRow, SidebarSectionHeading } from "../../sidebar/SidebarPrimitives";
 import { useOptionalMissionAssignment } from "./MissionAssignmentContext";
-import { applyMissionFilter, findMissionById, resolveMissionProgress, resolveMissionStatus } from "./missionListModel";
+import {
+  applyMissionFilter,
+  findMissionById,
+  resolveMissionDisplayStatus,
+  resolveMissionProgress,
+  resolveMissionStatus,
+} from "./missionListModel";
 import { SEEDED_MISSIONS, missionByWorkOrderId as seededAssignments, type FactoryMission } from "./missionMocks";
 import { MissionAssignee } from "./MissionAssignee";
 import { MissionDetailHeader } from "./MissionDetailHeader";
@@ -99,7 +105,10 @@ function MissionDetailLoadedView({
     return applyWorkOrderOrdering(inMission, "updated");
   }, [allEntries, mission.id, missionByWorkOrderId]);
   const progress = resolveMissionProgress(allEntries, mission.id, missionByWorkOrderId);
-  const status = resolveMissionStatus(allEntries, mission.id, missionByWorkOrderId);
+  const status = resolveMissionDisplayStatus(
+    resolveMissionStatus(allEntries, mission.id, missionByWorkOrderId),
+    closedByMissionId[mission.id],
+  );
 
   return (
     <div className={factoryContentBodyClassName} data-testid="mission-detail">

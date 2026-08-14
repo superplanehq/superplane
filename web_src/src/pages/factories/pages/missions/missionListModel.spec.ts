@@ -10,6 +10,7 @@ import {
   buildMissionRailItems,
   findMissionById,
   resolveMissionForWorkOrder,
+  resolveMissionDisplayStatus,
   resolveMissionProgress,
   resolveMissionStatus,
   visibleMissionItems,
@@ -111,6 +112,22 @@ describe("buildMissionRailItems", () => {
         status: "draft",
       },
     ]);
+  });
+
+  it("uses a manual complete or close as the card status", () => {
+    const entries = buildWorkOrderListEntries([order({ id: "wo-open-refunds" })], factory);
+
+    const items = buildMissionRailItems(
+      [CHECKOUT_RELIABILITY_MISSION, REFUNDS_V2_MISSION],
+      entries,
+      missionByWorkOrderId,
+      {
+        [CHECKOUT_RELIABILITY_MISSION.id]: "completed",
+        [REFUNDS_V2_MISSION.id]: "closed",
+      },
+    );
+
+    expect(items.map((item) => item.status)).toEqual(["completed", "closed"]);
   });
 });
 
@@ -256,6 +273,21 @@ describe("resolveMissionStatus", () => {
     );
 
     expect(resolveMissionStatus(entries, "mission-1", { "wo-a": "mission-1", "wo-b": "mission-1" })).toBe("completed");
+  });
+});
+
+describe("resolveMissionDisplayStatus", () => {
+  it("keeps the work-order status when the mission is not closed by hand", () => {
+    expect(resolveMissionDisplayStatus("active")).toBe("active");
+    expect(resolveMissionDisplayStatus("draft")).toBe("draft");
+  });
+
+  it("shows Completed after a manual complete, even when work is still open", () => {
+    expect(resolveMissionDisplayStatus("active", "completed")).toBe("completed");
+  });
+
+  it("shows Closed after a manual close, even when work is still open", () => {
+    expect(resolveMissionDisplayStatus("active", "closed")).toBe("closed");
   });
 });
 

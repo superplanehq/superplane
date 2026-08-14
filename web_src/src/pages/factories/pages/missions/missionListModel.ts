@@ -2,7 +2,7 @@ import type { WorkOrderListEntry, WorkOrderScope } from "../../lib/workOrderList
 import type { WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import type { FactoryMission } from "./missionMocks";
 
-export type MissionDisplayStatus = "draft" | "active" | "completed";
+export type MissionDisplayStatus = "draft" | "active" | "completed" | "closed";
 export type MissionCloseReason = "completed" | "closed";
 
 export interface MissionProgress {
@@ -44,6 +44,13 @@ export const MISSION_STATUS_META: Record<
     dotClass: "bg-[color:var(--status-completed-dot)]",
     className:
       "border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)] text-[color:var(--status-completed-fg)]",
+  },
+  closed: {
+    label: "Closed",
+    textClass: "text-[color:var(--status-cancelled-fg)]",
+    dotClass: "bg-[color:var(--status-cancelled-dot)]",
+    className:
+      "border-[color:var(--status-cancelled-border)] bg-[color:var(--status-cancelled-bg)] text-[color:var(--status-cancelled-fg)]",
   },
 };
 
@@ -133,11 +140,25 @@ export function resolveMissionStatus(
   return "active";
 }
 
+/** Manual complete or close wins over the work-order derived status. */
+export function resolveMissionDisplayStatus(
+  derived: MissionDisplayStatus,
+  closeReason?: MissionCloseReason,
+): MissionDisplayStatus {
+  if (closeReason === "completed") {
+    return "completed";
+  }
+  if (closeReason === "closed") {
+    return "closed";
+  }
+  return derived;
+}
+
 export function isMissionHiddenFromActive(
   item: MissionRailItem,
   closedByMissionId: Record<string, MissionCloseReason>,
 ): boolean {
-  return item.status === "completed" || Boolean(closedByMissionId[item.mission.id]);
+  return item.status === "completed" || item.status === "closed" || Boolean(closedByMissionId[item.mission.id]);
 }
 
 /** Follows the Work Orders page scope. Active hides finished missions. */
@@ -164,11 +185,15 @@ export function buildMissionRailItems(
   missions: FactoryMission[],
   entries: WorkOrderListEntry[],
   missionByWorkOrderId: Record<string, string>,
+  closedByMissionId: Record<string, MissionCloseReason> = {},
 ): MissionRailItem[] {
   return missions.map((mission) => ({
     mission,
     progress: resolveMissionProgress(entries, mission.id, missionByWorkOrderId),
-    status: resolveMissionStatus(entries, mission.id, missionByWorkOrderId),
+    status: resolveMissionDisplayStatus(
+      resolveMissionStatus(entries, mission.id, missionByWorkOrderId),
+      closedByMissionId[mission.id],
+    ),
   }));
 }
 

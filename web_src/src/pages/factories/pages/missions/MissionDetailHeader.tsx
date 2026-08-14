@@ -79,7 +79,7 @@ function HeaderOverflowMenu({
   onClose: (reason: MissionCloseReason) => void;
   onReopen: () => void;
 }) {
-  if (status === "completed") {
+  if (status === "completed" && !isManuallyClosed) {
     return null;
   }
 
