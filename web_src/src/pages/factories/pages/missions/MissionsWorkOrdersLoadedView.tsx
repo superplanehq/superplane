@@ -10,7 +10,7 @@ import {
   applyWorkOrderSearch,
   buildWorkOrderListEntries,
 } from "../../lib/workOrderListModel";
-import { factoryContentBodyClassName, factoryContentHeaderClassName } from "../factoryPageLayoutStyles";
+import { factoryContentBodyClassName } from "../factoryPageLayoutStyles";
 import {
   WorkOrdersFilteredEmptyState,
   WorkOrdersScopedEmptyState,
@@ -107,16 +107,14 @@ export function MissionsWorkOrdersLoadedView(props: MissionsWorkOrdersLoadedView
 
   return (
     <>
-      <header className={factoryContentHeaderClassName}>
-        <WorkOrdersHeader
-          state={state}
-          entries={entries}
-          factoryLines={props.factoryLines}
-          createHref={createHref}
-          canCreate={props.canCreate}
-          permissionsLoading={props.permissionsLoading}
-        />
-      </header>
+      <WorkOrdersHeader
+        state={state}
+        entries={entries}
+        factoryLines={props.factoryLines}
+        createHref={createHref}
+        canCreate={props.canCreate}
+        permissionsLoading={props.permissionsLoading}
+      />
 
       <div className={cn(factoryContentBodyClassName, "flex flex-col gap-4")}>
         {totalCount > 0 ? (
