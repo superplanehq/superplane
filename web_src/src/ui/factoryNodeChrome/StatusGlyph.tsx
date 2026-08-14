@@ -89,6 +89,7 @@ export function FactoryNodeStatusGlyph({ status, className }: { status: FactoryN
     );
   }
 
+  // pending + did_not_run share muted hollow circle; label carries the distinction.
   return (
     <Circle
       className={cn("size-3.5 shrink-0 text-[#a3a3a3] dark:text-muted-foreground", className)}

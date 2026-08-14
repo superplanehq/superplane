@@ -20,7 +20,7 @@ import {
 const MAX_ROWS = 8;
 
 export function OverviewPage() {
-  const { organizationId, factoryId, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const {
     data: workOrders = [],
     isLoading: workOrdersLoading,
@@ -54,12 +54,12 @@ export function OverviewPage() {
         <div className="grid gap-6 lg:grid-cols-2">
           <WorkOrdersOverviewCard
             organizationId={organizationId}
-            factoryId={factoryId}
+            factoryKey={factoryKey}
             orders={recentOrders}
             isLoading={workOrdersLoading}
             error={workOrdersError}
           />
-          <LinesOverviewCard organizationId={organizationId} factoryId={factoryId} lines={lines} />
+          <LinesOverviewCard organizationId={organizationId} factoryKey={factoryKey} lines={lines} />
         </div>
       </div>
     </>
@@ -68,13 +68,13 @@ export function OverviewPage() {
 
 function WorkOrdersOverviewCard({
   organizationId,
-  factoryId,
+  factoryKey,
   orders,
   isLoading,
   error,
 }: {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   orders: FactoriesWorkOrder[];
   isLoading: boolean;
   error: Error | null;
@@ -87,7 +87,7 @@ function WorkOrdersOverviewCard({
           <p className="text-[12px] text-muted-foreground">Recent activity by status.</p>
         </div>
         <Link
-          to={workOrdersPath(organizationId, factoryId)}
+          to={workOrdersPath(organizationId, factoryKey)}
           className="text-[12px] font-medium text-muted-foreground hover:text-foreground"
           data-testid="overview-work-orders-view-all"
         >
@@ -107,7 +107,8 @@ function WorkOrdersOverviewCard({
             {orders.map((order) => {
               const status = getWorkOrderDisplayStatus(order);
               const statusMeta = getWorkOrderDisplayStatusMeta(status);
-              const href = order.id ? workOrderDetailPath(organizationId, factoryId, order.id) : "#";
+              const href =
+                order.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, order.number) : "#";
               const updatedAt = order.updatedAt ?? order.createdAt;
               const timeLabel = updatedAt ? formatTimeAgo(new Date(updatedAt)) : "—";
               return (
@@ -150,11 +151,11 @@ function WorkOrdersOverviewCard({
 
 function LinesOverviewCard({
   organizationId,
-  factoryId,
+  factoryKey,
   lines,
 }: {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   lines: FactoriesFactoryLine[];
 }) {
   return (
@@ -165,7 +166,7 @@ function LinesOverviewCard({
           <p className="text-[12px] text-muted-foreground">Lines and their steps.</p>
         </div>
         <Link
-          to={linesPath(organizationId, factoryId)}
+          to={linesPath(organizationId, factoryKey)}
           className="text-[12px] font-medium text-muted-foreground hover:text-foreground"
           data-testid="overview-lines-view-all"
         >
@@ -179,7 +180,7 @@ function LinesOverviewCard({
         <ul>
           {lines.map((line) => {
             const stepsCount = line.steps?.length ?? 0;
-            const href = line.id ? factoryLineDetailPath(organizationId, factoryId, line.id) : "#";
+            const href = line.id ? factoryLineDetailPath(organizationId, factoryKey, line.id) : "#";
             return (
               <li key={line.id ?? line.name} className="border-b border-border/60 last:border-b-0">
                 <Link

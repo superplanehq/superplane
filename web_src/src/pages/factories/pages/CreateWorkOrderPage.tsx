@@ -28,7 +28,7 @@ const MAX_TITLE_LENGTH = 256;
 const MAX_DESCRIPTION_LENGTH = 5000;
 
 export function CreateWorkOrderPage() {
-  const { organizationId, factoryId, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const navigate = useNavigate();
   const createWorkOrder = useCreateWorkOrder(organizationId, factoryId);
   const { data: users = [] } = useOrganizationUsers(organizationId);
@@ -40,7 +40,7 @@ export function CreateWorkOrderPage() {
 
   usePageTitle(["New Work Order", factory?.name ?? "Workspace"]);
 
-  const workOrdersHref = workOrdersPath(organizationId, factoryId);
+  const workOrdersHref = workOrdersPath(organizationId, factoryKey);
 
   const selectedAssigneeLabels = useMemo(() => {
     const labelById = new Map(
@@ -64,7 +64,9 @@ export function CreateWorkOrderPage() {
         description: description.trim(),
         assigneeIds,
       });
-      navigate(order.id ? workOrderDetailPath(organizationId, factoryId, order.id) : workOrdersHref);
+      navigate(
+        order.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, order.number) : workOrdersHref,
+      );
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to create work order"));
     }

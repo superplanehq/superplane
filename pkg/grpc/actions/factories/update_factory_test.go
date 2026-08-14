@@ -18,7 +18,7 @@ func Test__UpdateFactory(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("empty name -> error", func(t *testing.T) {
-		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "desc")
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "desc", "")
 		require.NoError(t, err)
 
 		emptyName := "   "
@@ -32,7 +32,7 @@ func Test__UpdateFactory(t *testing.T) {
 	})
 
 	t.Run("updates factory metadata", func(t *testing.T) {
-		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "old desc")
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "old desc", "")
 		require.NoError(t, err)
 
 		newName := support.RandomName("updated-factory")
@@ -56,9 +56,9 @@ func Test__UpdateFactory(t *testing.T) {
 	})
 
 	t.Run("duplicate name -> error", func(t *testing.T) {
-		existing, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "")
+		existing, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
-		target, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "")
+		target, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
 		_, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
