@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
-import { AutomationDetail } from "./automationsPageParts";
+import { AutomationDetail } from "./AutomationDetail";
 import { AutomationsPageBody } from "./automationsPageBody";
 import { AutomationsLegacyRedirect } from "./automationsPageRedirect";
 import { useAutomationsPageModel } from "./useAutomationsPageModel";

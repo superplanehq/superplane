@@ -34,6 +34,12 @@ describe("WorkspacePageHeader (section variant)", () => {
     );
     expect(screen.getByTestId("workspace-page-header-actions")).toContainElement(screen.getByTestId("new-button"));
     expect(screen.getByTestId("filter-chips")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-page-header").children).toHaveLength(2);
+  });
+
+  it("does not add a below-row slot when belowRow is omitted", () => {
+    renderHeader(<WorkspacePageHeader title="Work Orders" />);
+    expect(screen.getByTestId("workspace-page-header").children).toHaveLength(1);
   });
 });
 

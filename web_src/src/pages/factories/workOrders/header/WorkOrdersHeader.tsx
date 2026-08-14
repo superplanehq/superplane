@@ -76,7 +76,11 @@ export function WorkOrdersHeader({
           </PermissionTooltip>
         </>
       }
-      belowRow={<FilterChips state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />}
+      belowRow={
+        state.filterCount > 0 ? (
+          <FilterChips state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
+        ) : undefined
+      }
     />
   );
 }

@@ -95,7 +95,7 @@ export function WorkspacePageHeader(props: WorkspacePageHeaderProps) {
           </div>
         ) : null}
       </div>
-      {props.belowRow ? <div className="w-full">{props.belowRow}</div> : null}
+      {props.belowRow}
     </header>
   );
 }
