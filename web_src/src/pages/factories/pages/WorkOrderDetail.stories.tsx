@@ -45,7 +45,7 @@ export const Closed: Story = {
   ),
 };
 
-/** Draft order with no mission — use Overview to assign one. */
+/** Draft order with no mission — Overview shows Attach to mission. */
 export const NoMission: Story = {
   name: "No mission",
   render: () => (
