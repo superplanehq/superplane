@@ -39,6 +39,8 @@ describe("createHomeFixtureFetch", () => {
       expect.arrayContaining([
         expect.objectContaining({ resource: "agents", action: "read" }),
         expect.objectContaining({ resource: "agents", action: "create" }),
+        expect.objectContaining({ resource: "work_orders", action: "create" }),
+        expect.objectContaining({ resource: "work_orders", action: "update" }),
       ]),
     );
   });

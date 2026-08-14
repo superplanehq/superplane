@@ -101,6 +101,25 @@ describe("MarkdownContent", () => {
     expect(screen.getByTestId("markdown-code").closest("pre")).toBeInTheDocument();
   });
 
+  it("renders underline HTML in workspace markdown", () => {
+    render(<MarkdownContent content={"Hello <u>world</u>"} variant="workspace" />);
+
+    expect(screen.getByText("world").tagName).toBe("U");
+  });
+
+  it("renders TipTap ++underline++ tokens in workspace markdown", () => {
+    render(<MarkdownContent content={"Hello ++world++"} variant="workspace" />);
+
+    expect(screen.getByText("world").tagName).toBe("U");
+  });
+
+  it("does not treat ++ inside workspace code as underline", () => {
+    render(<MarkdownContent content={"`score++` and ++done++"} variant="workspace" />);
+
+    expect(screen.getByTestId("markdown-code")).toHaveTextContent("score++");
+    expect(screen.getByText("done").tagName).toBe("U");
+  });
+
   it("renders bold markdown with semibold weight", () => {
     const { container } = render(<MarkdownContent content={"**Claude Managed Agent**"} />);
     expect(container.firstChild).toHaveClass("[&_strong]:font-semibold");

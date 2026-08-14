@@ -79,7 +79,7 @@ const WORKSPACE_MARKDOWN_HEADING_CLASSES = {
  */
 const MARKDOWN_SANITIZE_SCHEMA = {
   ...defaultSchema,
-  tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary"],
+  tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary", "u"],
   attributes: {
     ...(defaultSchema.attributes ?? {}),
     a: [...(defaultSchema.attributes?.a ?? []), "title"],
@@ -120,6 +120,7 @@ export function MarkdownContent({
 }: MarkdownContentProps) {
   const normalized = content.replace(/\r\n/g, "\n");
   if (!normalized.trim()) return null;
+  const markdown = variant === "workspace" ? workspaceUnderlineToHtml(normalized) : normalized;
   const contentClassName = variant === "workspace" ? WORKSPACE_MARKDOWN_CONTENT_CLASSES : MARKDOWN_CONTENT_CLASSES;
   const headingClassName = (level: keyof typeof WORKSPACE_MARKDOWN_HEADING_CLASSES) =>
     variant === "workspace" ? WORKSPACE_MARKDOWN_HEADING_CLASSES[level] : markdownHeadingClassName(level);
@@ -186,7 +187,7 @@ export function MarkdownContent({
           hr: MarkdownDivider,
         }}
       >
-        {normalized}
+        {markdown}
       </ReactMarkdown>
     </div>
   );
@@ -286,6 +287,19 @@ function hasLanguageCodeNode(node?: ExtraProps["node"]): boolean {
     (child): child is MarkdownElementChild => child.type === "element" && child.tagName === "code",
   );
   return getClassNames(codeNode?.properties?.className).some((className) => /^language-\w+$/.test(className));
+}
+
+/** TipTap stores underline as ++text++. Convert those tokens to <u> for workspace markdown. */
+function workspaceUnderlineToHtml(markdown: string): string {
+  return markdown.replace(
+    /(```[\s\S]*?```|`[^`]*`)|\+\+([^\n+]+)\+\+/g,
+    (match, code: string | undefined, inner: string | undefined) => {
+      if (code) {
+        return code;
+      }
+      return `<u>${inner}</u>`;
+    },
+  );
 }
 
 function getClassNames(className: unknown): string[] {
