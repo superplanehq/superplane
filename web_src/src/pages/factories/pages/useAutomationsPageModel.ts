@@ -9,7 +9,7 @@ import { factoryAppConfigurePath } from "../lib/factoryPagePaths";
 import { useAutomationCardMutations } from "./useAutomationCardMutations";
 
 export function useAutomationsPageModel() {
-  const { organizationId, factoryId, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const { appId: routeAppId } = useParams<{ appId: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { data: apps = [], isLoading: appsLoading } = useFactoryApps(organizationId, factoryId);
@@ -38,6 +38,7 @@ export function useAutomationsPageModel() {
   const { createCanvas, invalidateFactoryApps, actionsForApp } = useAutomationCardMutations({
     organizationId,
     factoryId,
+    factoryKey,
     canCreateApp,
     canUpdateApp,
     canDeleteApp,
@@ -59,7 +60,7 @@ export function useAutomationsPageModel() {
         return;
       }
       showSuccessToast("Automation created.");
-      navigate(factoryAppConfigurePath(organizationId, factoryId, canvasId, { from: "automations" }));
+      navigate(factoryAppConfigurePath(organizationId, factoryKey, canvasId, { from: "automations" }));
     } catch (error) {
       showErrorToast(getUsageLimitToastMessage(error, "Failed to create automation"));
       throw error;
@@ -72,6 +73,7 @@ export function useAutomationsPageModel() {
   return {
     organizationId,
     factoryId,
+    factoryKey,
     factory,
     apps,
     appsLoading,

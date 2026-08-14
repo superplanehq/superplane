@@ -15,7 +15,7 @@ export interface FactoriesNavItem {
   id: FactoriesNavKind;
   label: string;
   Icon: LucideIcon;
-  buildHref: (organizationId: string, factoryId: string) => string;
+  buildHref: (organizationId: string, factoryKey: string) => string;
 }
 
 export const FACTORIES_NAV_ITEMS: FactoriesNavItem[] = [

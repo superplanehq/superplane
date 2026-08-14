@@ -235,6 +235,9 @@ export function useDeleteFactory(organizationId: string) {
       return factoryId;
     },
     onSuccess: (factoryId) => {
+      queryClient.setQueryData<FactoriesFactory[]>(factoryListKey(organizationId), (current) =>
+        (current ?? []).filter((factory) => factory.id !== factoryId),
+      );
       queryClient.removeQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryListKey(organizationId) });
     },

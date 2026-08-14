@@ -16,7 +16,7 @@ import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailLoadedViewProps {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   order: FactoriesWorkOrder;
   events?: FactoriesWorkOrderEvent[];
   eventsError?: Error | null;
@@ -58,7 +58,7 @@ interface WorkOrderDetailLoadedViewProps {
 
 export function WorkOrderDetailLoadedView({
   organizationId,
-  factoryId,
+  factoryKey,
   order,
   events,
   eventsError,
@@ -127,7 +127,7 @@ export function WorkOrderDetailLoadedView({
             <div className="mt-4">
               <WorkOrderActivityTimeline
                 organizationId={organizationId}
-                factoryId={factoryId}
+                factoryKey={factoryKey}
                 order={order}
                 events={events}
                 eventsError={eventsError}
@@ -151,7 +151,7 @@ export function WorkOrderDetailLoadedView({
         <aside className="mt-1 lg:sticky lg:top-16 lg:self-start">
           <WorkOrderDetailSidebar
             organizationId={organizationId}
-            factoryId={factoryId}
+            factoryKey={factoryKey}
             order={order}
             artifacts={artifacts}
             isArtifactsLoading={isArtifactsLoading}

@@ -38,7 +38,7 @@ import {
 } from "./factoryPageLayoutStyles";
 
 export function LinesPage() {
-  const { organizationId, factoryId, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId } = useParams<{ lineId: string }>();
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
@@ -51,7 +51,7 @@ export function LinesPage() {
   );
 
   if (routeLineId && factory && !selectedLine) {
-    return <Navigate to={linesPath(organizationId, factoryId)} replace />;
+    return <Navigate to={linesPath(organizationId, factoryKey)} replace />;
   }
 
   return (
@@ -72,7 +72,7 @@ export function LinesPage() {
             message="You don't have permission to create lines."
           >
             <Button type="button" variant="outline" asChild disabled={!canUpdate} data-testid="lines-create-button">
-              <Link href={canUpdate ? createFactoryLinePath(organizationId, factoryId) : "#"}>
+              <Link href={canUpdate ? createFactoryLinePath(organizationId, factoryKey) : "#"}>
                 <Plus className="h-3.5 w-3.5" aria-hidden />
                 Add line
               </Link>
@@ -85,7 +85,7 @@ export function LinesPage() {
         {selectedLine ? (
           <LineDetail
             organizationId={organizationId}
-            factoryId={factoryId}
+            factoryKey={factoryKey}
             line={selectedLine}
             workOrders={workOrders}
             canUpdate={canUpdate}
@@ -93,7 +93,7 @@ export function LinesPage() {
         ) : lines.length === 0 ? (
           <EmptyLinesState
             organizationId={organizationId}
-            factoryId={factoryId}
+            factoryKey={factoryKey}
             canUpdate={canUpdate || permissionsLoading}
           />
         ) : (
@@ -107,7 +107,7 @@ export function LinesPage() {
                 <li key={line.id}>
                   <LineCard
                     line={line}
-                    href={factoryLineDetailPath(organizationId, factoryId, line.id)}
+                    href={factoryLineDetailPath(organizationId, factoryKey, line.id)}
                     ticks={board.map((column) => column.tick)}
                   />
                 </li>
@@ -122,25 +122,25 @@ export function LinesPage() {
 
 function LineDetail({
   organizationId,
-  factoryId,
+  factoryKey,
   line,
   workOrders,
   canUpdate,
 }: {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   line: FactoriesFactoryLine;
   workOrders: FactoriesWorkOrder[];
   canUpdate: boolean;
 }) {
   const steps = line.steps ?? [];
-  const editHref = line.id ? editFactoryLinePath(organizationId, factoryId, line.id) : "#";
+  const editHref = line.id ? editFactoryLinePath(organizationId, factoryKey, line.id) : "#";
   const board = useMemo(() => buildLinePhaseBoard(line, workOrders ?? []), [line, workOrders]);
 
   return (
     <div data-testid="lines-detail">
       <Link
-        href={linesPath(organizationId, factoryId)}
+        href={linesPath(organizationId, factoryKey)}
         className="mb-3 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
         data-testid="lines-back-to-list"
       >
@@ -178,7 +178,7 @@ function LineDetail({
           No phases yet. Edit this line to add app-driven phases.
         </p>
       ) : (
-        <PhaseBoard organizationId={organizationId} factoryId={factoryId} lineId={line.id} columns={board} />
+        <PhaseBoard organizationId={organizationId} factoryKey={factoryKey} lineId={line.id} columns={board} />
       )}
     </div>
   );
@@ -249,12 +249,12 @@ const MAX_PHASE_COLUMNS_PER_ROW = 3;
 
 function PhaseBoard({
   organizationId,
-  factoryId,
+  factoryKey,
   lineId,
   columns,
 }: {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   lineId?: string;
   columns: LinePhaseColumn[];
 }) {
@@ -270,7 +270,7 @@ function PhaseBoard({
         <PhaseColumn
           key={`${column.stepIndex}-${column.stepName}`}
           organizationId={organizationId}
-          factoryId={factoryId}
+          factoryKey={factoryKey}
           lineId={lineId}
           column={column}
         />
@@ -281,12 +281,12 @@ function PhaseBoard({
 
 function PhaseColumn({
   organizationId,
-  factoryId,
+  factoryKey,
   lineId,
   column,
 }: {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   lineId?: string;
   column: LinePhaseColumn;
 }) {
@@ -313,7 +313,7 @@ function PhaseColumn({
   const navigate = useNavigate();
   const visibleRuns = column.runs.slice(0, Math.min(visibleCount, totalRuns));
   const configureHref = column.appId
-    ? factoryAppConfigurePath(organizationId, factoryId, column.appId, { from: "lines", lineId })
+    ? factoryAppConfigurePath(organizationId, factoryKey, column.appId, { from: "lines", lineId })
     : null;
 
   return (
@@ -361,7 +361,7 @@ function PhaseColumn({
         ) : (
           visibleRuns.map((run) => (
             <li key={run.executionId}>
-              <PhaseRunCard organizationId={organizationId} factoryId={factoryId} lineId={lineId} run={run} />
+              <PhaseRunCard organizationId={organizationId} factoryKey={factoryKey} lineId={lineId} run={run} />
             </li>
           ))
         )}
@@ -370,24 +370,36 @@ function PhaseColumn({
   );
 }
 
+function phaseRunCardHref(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string | undefined,
+  run: LinePhaseRunCard,
+): string {
+  const appId = run.execution.run?.appId;
+  const runId = run.execution.run?.id;
+  if (appId && runId) {
+    return factoryAppRunPath(organizationId, factoryKey, appId, runId, { from: "lines", lineId });
+  }
+  if (run.workOrderNumber !== undefined) {
+    return workOrderDetailPath(organizationId, factoryKey, run.workOrderNumber);
+  }
+  return linesPath(organizationId, factoryKey);
+}
+
 function PhaseRunCard({
   organizationId,
-  factoryId,
+  factoryKey,
   lineId,
   run,
 }: {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   lineId?: string;
   run: LinePhaseRunCard;
 }) {
   const status = resolvePhaseRunStatus(run.execution);
-  const appId = run.execution.run?.appId;
-  const runId = run.execution.run?.id;
-  const href =
-    appId && runId
-      ? factoryAppRunPath(organizationId, factoryId, appId, runId, { from: "lines", lineId })
-      : workOrderDetailPath(organizationId, factoryId, run.workOrderId);
+  const href = phaseRunCardHref(organizationId, factoryKey, lineId, run);
   const timestamp = run.execution.updatedAt ?? run.execution.createdAt;
   const timeLabel = timestamp ? formatTimeAgo(new Date(timestamp), false) : null;
 
@@ -426,11 +438,11 @@ function PhaseTickDot({ tick }: { tick: LinePhaseTick }) {
 
 function EmptyLinesState({
   organizationId,
-  factoryId,
+  factoryKey,
   canUpdate,
 }: {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   canUpdate: boolean;
 }) {
   return (
@@ -444,7 +456,7 @@ function EmptyLinesState({
         Lines define how work orders flow through your apps.
       </p>
       <Button type="button" asChild className="mt-6" disabled={!canUpdate}>
-        <Link href={canUpdate ? createFactoryLinePath(organizationId, factoryId) : "#"}>
+        <Link href={canUpdate ? createFactoryLinePath(organizationId, factoryKey) : "#"}>
           <Plus className="h-3.5 w-3.5" aria-hidden />
           Add line
         </Link>

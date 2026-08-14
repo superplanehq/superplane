@@ -13,7 +13,7 @@ import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import { CreateFactoryDialog } from "./CreateFactoryDialog";
 import { factoryDetailPath, factoryOnboardingPath } from "./lib/factoryPagePaths";
-import { pickInitialFactoryId, readLastVisitedFactory } from "./lib/lastVisitedFactory";
+import { pickInitialFactory, readLastVisitedFactory } from "./lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "./lib/useFactoriesThemeClass";
 import { useOnboardingStorybook } from "./pages/onboarding/useOnboardingStorybook";
 
@@ -62,10 +62,10 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
   }
 
   const lastVisited = account?.id ? readLastVisitedFactory(account.id, organizationId) : null;
-  const targetFactoryId = pickInitialFactoryId(factories, lastVisited);
+  const targetFactory = pickInitialFactory(factories, lastVisited);
 
-  if (targetFactoryId) {
-    return <Navigate to={factoryDetailPath(organizationId, targetFactoryId)} replace />;
+  if (targetFactory?.key) {
+    return <Navigate to={factoryDetailPath(organizationId, targetFactory.key)} replace />;
   }
 
   const canCreate = canAct("factories", "create");
@@ -74,18 +74,18 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
     // Let CreateFactoryDialog catch failures so duplicate-name inline errors work.
     const factory = await createFactory.mutateAsync(input);
     setCreateOpen(false);
-    if (!factory.id) {
+    if (!factory.key) {
       return;
     }
-    if (storybookOnboarding) {
+    if (storybookOnboarding && factory.id) {
       storybookOnboarding.beginOnboarding({
         workspaceId: factory.id,
         workspaceName: factory.name || input.name,
       });
-      navigate(factoryOnboardingPath(organizationId, factory.id));
+      navigate(factoryOnboardingPath(organizationId, factory.key));
       return;
     }
-    navigate(factoryDetailPath(organizationId, factory.id));
+    navigate(factoryDetailPath(organizationId, factory.key));
   };
 
   return (

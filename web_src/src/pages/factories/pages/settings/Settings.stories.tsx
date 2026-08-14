@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture, PRIMARY_FACTORY_ID } from "../../__fixtures__/factoryPageResponses";
+import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
 
 /**
@@ -20,7 +20,7 @@ type Story = StoryObj<typeof meta>;
 export const General: Story = {
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/settings/general`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/general`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),
@@ -30,7 +30,7 @@ export const RepositoriesSoon: Story = {
   name: "Repositories (Soon)",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/settings/repositories`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/repositories`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),
@@ -40,7 +40,7 @@ export const MembersSoon: Story = {
   name: "Members (Soon)",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_ID}/settings/members`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/members`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),

@@ -21,7 +21,7 @@ export function AutomationsPage() {
     return (
       <AutomationsLegacyRedirect
         organizationId={model.organizationId}
-        factoryId={model.factoryId}
+        factoryKey={model.factoryKey}
         factoryLoaded={Boolean(model.factory)}
         legacyLineId={model.legacyLineId}
       />
@@ -69,7 +69,7 @@ export function AutomationsPage() {
       >
         <AutomationsPageBody
           organizationId={model.organizationId}
-          factoryId={model.factoryId}
+          factoryKey={model.factoryKey}
           apps={model.apps}
           workOrders={model.workOrders}
           appsLoading={model.appsLoading}
