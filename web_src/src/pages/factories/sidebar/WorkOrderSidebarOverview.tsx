@@ -4,7 +4,16 @@ import { Button } from "@/components/ui/button";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { appPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
-import { Calendar, ChevronDown, CircleDollarSign, CircleDot, Loader2, User, UserPlus } from "lucide-react";
+import {
+  Calendar,
+  ChevronDown,
+  CircleDollarSign,
+  CircleDot,
+  ExternalLink,
+  Loader2,
+  User,
+  UserPlus,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
@@ -15,6 +24,7 @@ import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "../li
 import { OrgUserReference } from "../OrgUserReference";
 import { WorkOrderAssigneesPopover } from "../WorkOrderAssigneesPopover";
 import { OverviewRow, SidebarSectionHeading } from "./SidebarPrimitives";
+import { useWorkOrderOverviewMissionSlot } from "./workOrderOverviewSlots";
 
 interface WorkOrderSidebarOverviewProps {
   organizationId: string;
@@ -43,6 +53,7 @@ export function WorkOrderSidebarOverview({
   const totalTokens = parseWorkOrderMetric(order.totalTokens);
   const totalCostCents = parseWorkOrderMetric(order.totalCostCents);
   const showSpending = totalTokens > 0 || totalCostCents > 0;
+  const MissionSlot = useWorkOrderOverviewMissionSlot();
 
   return (
     <section>
@@ -64,6 +75,8 @@ export function WorkOrderSidebarOverview({
           isSaving={isAssigneesSaving}
           onSave={onAssigneesSave}
         />
+
+        {MissionSlot ? <MissionSlot workOrderId={order.id ?? ""} /> : null}
 
         {createdAt ? (
           <OverviewRow icon={<Calendar className="size-3.5" aria-hidden />} srLabel="Created">
@@ -133,7 +146,7 @@ function isAutomationRefResolved(ref: FactoriesAutomationRef | undefined): ref i
   return Boolean(ref && (ref.nodeName || ref.appName));
 }
 
-function AutomationLink({
+export function AutomationLink({
   organizationId,
   automation,
 }: {
@@ -145,9 +158,10 @@ function AutomationLink({
     return (
       <Link
         to={appPath(organizationId, automation.appId)}
-        className="truncate text-foreground underline underline-offset-2 hover:no-underline"
+        className="inline-flex min-w-0 max-w-full items-center gap-1 text-foreground underline underline-offset-2 hover:no-underline"
       >
-        {label}
+        <span className="truncate">{label}</span>
+        <ExternalLink className="size-3 shrink-0 text-muted-foreground" aria-hidden />
       </Link>
     );
   }
