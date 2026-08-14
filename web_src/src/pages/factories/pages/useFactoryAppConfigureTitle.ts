@@ -102,15 +102,15 @@ export function useFactoryAppConfigureTitle(args: UseFactoryAppConfigureTitleArg
         }
 
         const actions = configureActionsRef.current;
-        const hasGraphChanges = Boolean(actions?.hasUncommittedChanges);
-        if (hasGraphChanges) {
-          // Pass the new name so canvas.yaml metadata matches the renamed record.
-          actions?.save({ canvasName: persistedName ?? undefined });
+        if (!actions) {
+          onDoneRef.current();
           return;
         }
 
-        // Title-only (or no-op) Save: skip stage/commit — empty staging fails commit.
-        onDoneRef.current();
+        // Always stage through Configure Save. Trusting hasUncommittedChanges alone
+        // can skip real graph edits while staging baselines are still loading.
+        // Empty staging (no YAML diff) finishes cleanly inside runFactoryConfigureSave.
+        actions.save({ canvasName: persistedName ?? undefined });
       } finally {
         savingRef.current = false;
       }
@@ -121,9 +121,9 @@ export function useFactoryAppConfigureTitle(args: UseFactoryAppConfigureTitleArg
     if (configureBusy || updateCanvas.isPending) {
       return;
     }
-    setDraftTitle(null);
+    clearDraftTitle();
     configureActionsRef.current?.discard();
-  }, [configureActionsRef, configureBusy, updateCanvas.isPending]);
+  }, [clearDraftTitle, configureActionsRef, configureBusy, updateCanvas.isPending]);
 
   return {
     title,

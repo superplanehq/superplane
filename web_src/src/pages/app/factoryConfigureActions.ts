@@ -5,8 +5,19 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 import { materializeCanvasSpec } from "./lib/workflow-spec-files";
 
+type StagingSummary = {
+  hasStaging?: boolean;
+  stagedPaths?: string[];
+};
+
+type UpdateCanvasVersionResult = {
+  data?: {
+    stagingSummary?: StagingSummary;
+  };
+};
+
 type UpdateCanvasVersionMutation = {
-  mutateAsync: (input: { versionId: string; canvasYaml: string }) => Promise<unknown>;
+  mutateAsync: (input: { versionId: string; canvasYaml: string }) => Promise<UpdateCanvasVersionResult | unknown>;
 };
 
 export type FactoryConfigureSaveOptions = {
@@ -56,6 +67,44 @@ export function withCanvasMetadataName(workflow: CanvasesCanvas, canvasName?: st
   };
 }
 
+export function stagingSummaryHasChanges(summary: StagingSummary | undefined): boolean {
+  if (!summary) {
+    return false;
+  }
+  if (summary.hasStaging) {
+    return true;
+  }
+  return (summary.stagedPaths?.length ?? 0) > 0;
+}
+
+function readStagingSummary(result: UpdateCanvasVersionResult | unknown): StagingSummary | undefined {
+  if (!result || typeof result !== "object") {
+    return undefined;
+  }
+  const data = (result as UpdateCanvasVersionResult).data;
+  return data?.stagingSummary;
+}
+
+async function stageAndCommitFactoryConfigure(deps: FactoryConfigureSaveDeps, savingVersionId: string, workflow: CanvasesCanvas) {
+  const stageResult = await deps.updateCanvasVersionMutation.mutateAsync({
+    versionId: savingVersionId,
+    canvasYaml: materializeCanvasSpec(workflow),
+  });
+  applyStagedWorkflowSnapshot(deps, savingVersionId, workflow);
+
+  // Matching YAML discards the staged path. Skip commit so title-only / no-op
+  // Saves do not fail with "no staged changes".
+  if (!stagingSummaryHasChanges(readStagingSummary(stageResult))) {
+    deps.onDone?.();
+    return;
+  }
+
+  const committed = await deps.handleCommitStaging("Update automation", { versionId: savingVersionId });
+  if (committed) {
+    deps.onDone?.();
+  }
+}
+
 export async function runFactoryConfigureSave(deps: FactoryConfigureSaveDeps): Promise<void> {
   if (!deps.canStageCanvasVersion) {
     showErrorToast("You don't have permission to edit this canvas.");
@@ -85,16 +134,7 @@ export async function runFactoryConfigureSave(deps: FactoryConfigureSaveDeps): P
 
   deps.setSavePending(true);
   try {
-    // Stage canvas.yaml directly — skip enqueueCanvasSave stale/session checks.
-    await deps.updateCanvasVersionMutation.mutateAsync({
-      versionId: savingVersionId,
-      canvasYaml: materializeCanvasSpec(workflow),
-    });
-    applyStagedWorkflowSnapshot(deps, savingVersionId, workflow);
-    const committed = await deps.handleCommitStaging("Update automation", { versionId: savingVersionId });
-    if (committed) {
-      deps.onDone?.();
-    }
+    await stageAndCommitFactoryConfigure(deps, savingVersionId, workflow);
   } catch (error) {
     showErrorToast(getApiErrorMessage(error, "Failed to stage canvas changes"));
   } finally {

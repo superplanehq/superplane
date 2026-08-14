@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { runFactoryConfigureSave, withCanvasMetadataName } from "./factoryConfigureActions";
+import { runFactoryConfigureSave, stagingSummaryHasChanges, withCanvasMetadataName } from "./factoryConfigureActions";
 
 describe("withCanvasMetadataName", () => {
   it("overlays metadata.name when a new name is provided", () => {
@@ -24,22 +24,20 @@ describe("withCanvasMetadataName", () => {
   });
 });
 
-describe("runFactoryConfigureSave", () => {
-  it("materializes canvas.yaml with the overlaid rename", async () => {
-    const updateCanvasVersionMutation = {
-      mutateAsync: vi.fn().mockResolvedValue({}),
-    };
-    const handleCommitStaging = vi.fn().mockResolvedValue(true);
-    const onDone = vi.fn();
-    const setSavePending = vi.fn();
-    const setDraftCanvasSpec = vi.fn();
-    const setLastSavedWorkflowSnapshot = vi.fn();
-    const draftCanvasSpecsRef = { current: new Map() };
-    const activeCanvasVersionIdRef = { current: "ver-1" };
+describe("stagingSummaryHasChanges", () => {
+  it("detects staged paths and hasStaging", () => {
+    expect(stagingSummaryHasChanges(undefined)).toBe(false);
+    expect(stagingSummaryHasChanges({ hasStaging: false, stagedPaths: [] })).toBe(false);
+    expect(stagingSummaryHasChanges({ hasStaging: true, stagedPaths: [] })).toBe(true);
+    expect(stagingSummaryHasChanges({ hasStaging: false, stagedPaths: ["canvas.yaml"] })).toBe(true);
+  });
+});
 
-    await runFactoryConfigureSave({
+describe("runFactoryConfigureSave", () => {
+  function baseDeps(overrides: Partial<Parameters<typeof runFactoryConfigureSave>[0]> = {}) {
+    return {
       canStageCanvasVersion: true,
-      activeCanvasVersionIdRef,
+      activeCanvasVersionIdRef: { current: "ver-1" },
       activeCanvasVersionId: "ver-1",
       editSessionActive: true,
       setEditSessionActive: vi.fn(),
@@ -47,24 +45,53 @@ describe("runFactoryConfigureSave", () => {
         metadata: { id: "c1", name: "Old" },
         spec: { nodes: [{ id: "n1", name: "Node", component: "noop", type: "TYPE_ACTION" }], edges: [] },
       }),
-      setSavePending,
-      updateCanvasVersionMutation,
-      draftCanvasSpecsRef,
-      setDraftCanvasSpec,
-      setLastSavedWorkflowSnapshot,
-      handleCommitStaging,
-      canvasName: "Renamed",
-      onDone,
-    });
+      setSavePending: vi.fn(),
+      updateCanvasVersionMutation: {
+        mutateAsync: vi.fn().mockResolvedValue({
+          data: { stagingSummary: { hasStaging: true, stagedPaths: ["canvas.yaml"] } },
+        }),
+      },
+      draftCanvasSpecsRef: { current: new Map() },
+      setDraftCanvasSpec: vi.fn(),
+      setLastSavedWorkflowSnapshot: vi.fn(),
+      handleCommitStaging: vi.fn().mockResolvedValue(true),
+      onDone: vi.fn(),
+      ...overrides,
+    } satisfies Parameters<typeof runFactoryConfigureSave>[0];
+  }
+
+  it("materializes canvas.yaml with the overlaid rename", async () => {
+    const updateCanvasVersionMutation = {
+      mutateAsync: vi.fn().mockResolvedValue({
+        data: { stagingSummary: { hasStaging: true, stagedPaths: ["canvas.yaml"] } },
+      }),
+    };
+    const deps = baseDeps({ updateCanvasVersionMutation, canvasName: "Renamed" });
+
+    await runFactoryConfigureSave(deps);
 
     expect(updateCanvasVersionMutation.mutateAsync).toHaveBeenCalledTimes(1);
     const stagedYaml = updateCanvasVersionMutation.mutateAsync.mock.calls[0]?.[0]?.canvasYaml as string;
     expect(stagedYaml).toContain("name: Renamed");
     expect(stagedYaml).not.toContain("name: Old");
-    expect(handleCommitStaging).toHaveBeenCalled();
-    expect(onDone).toHaveBeenCalled();
-    expect(setLastSavedWorkflowSnapshot).toHaveBeenCalledWith(
+    expect(deps.handleCommitStaging).toHaveBeenCalled();
+    expect(deps.onDone).toHaveBeenCalled();
+    expect(deps.setLastSavedWorkflowSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({ metadata: expect.objectContaining({ name: "Renamed" }) }),
     );
+  });
+
+  it("skips commit and finishes when staging is empty", async () => {
+    const updateCanvasVersionMutation = {
+      mutateAsync: vi.fn().mockResolvedValue({
+        data: { stagingSummary: { hasStaging: false, stagedPaths: [] } },
+      }),
+    };
+    const deps = baseDeps({ updateCanvasVersionMutation });
+
+    await runFactoryConfigureSave(deps);
+
+    expect(deps.handleCommitStaging).not.toHaveBeenCalled();
+    expect(deps.onDone).toHaveBeenCalled();
   });
 });
