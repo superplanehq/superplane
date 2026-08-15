@@ -25,6 +25,7 @@ interface HistoryQueuePageProps {
   ) => { map: EventStateMap; state: EventState };
   compact?: boolean;
   selectionNodeId?: string;
+  nodeNamesById?: Record<string, string>;
   resolveRunId?: (event: SidebarEvent) => string | null;
   fetchRunId?: (event: SidebarEvent) => Promise<string | null>;
   onSelectRun?: (runId: string, options?: { nodeId?: string }) => void;
@@ -48,6 +49,7 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
   getExecutionState,
   compact = false,
   selectionNodeId,
+  nodeNamesById,
   resolveRunId,
   fetchRunId,
   onSelectRun,
@@ -136,6 +138,8 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
                 onCancelExecution={onCancelExecution}
                 onReEmit={onReEmit}
                 getExecutionState={getExecutionState}
+                nodeNamesById={nodeNamesById}
+                onSelectRun={onSelectRun}
               />
             ))}
             {hasMoreItems && (
