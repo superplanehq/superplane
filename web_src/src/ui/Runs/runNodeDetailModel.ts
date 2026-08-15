@@ -7,6 +7,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
   TriggersTrigger,
 } from "@/api-client";
+import { receivedReplayInputSourceNodeIds } from "@/pages/app/lib/replay-input-node";
 import { getState, getStateMap } from "@/pages/app/mappers";
 import { buildExecutionInfo } from "@/pages/app/utils";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
@@ -359,7 +360,14 @@ function buildUpstreamSections({
   workflowEdges?: ComponentsEdge[];
   executionIndexByNodeId: Map<string, number>;
 }): RunInspectorUpstreamSection[] {
-  if (currentIndex <= 0) return [];
+  const replayInputSections = buildReplayInputSections({
+    nodeId: executionChain[currentIndex],
+    executions,
+    workflowNodes,
+    executionIndexByNodeId,
+  });
+
+  if (currentIndex <= 0) return replayInputSections;
 
   let orderedNodeIds: string[];
   if (!hasWorkflowEdges(workflowEdges)) {
@@ -372,7 +380,7 @@ function buildUpstreamSections({
     ).sort((left, right) => compareUpstreamCreatedAt(left, right, run, executions, executionRefs));
   }
 
-  return orderedNodeIds.map((nodeId) => {
+  const executedSections = orderedNodeIds.map((nodeId) => {
     const workflowNode = workflowNodes.find((node) => node.id === nodeId);
     const execution = executions.find((item) => item.nodeId === nodeId);
     const isTrigger = nodeId === run.rootEvent?.nodeId;
@@ -389,6 +397,43 @@ function buildUpstreamSections({
       output: isTrigger ? run.rootEvent?.data : normalizeExecutionOutputsForDisplay(execution?.outputs),
     };
   });
+
+  return [...executedSections, ...replayInputSections];
+}
+
+// A multi-input replay feeds an aggregating node one synthetic event per source,
+// and only the replayed node executes. Those sources therefore never enter the
+// execution chain, so the upstream walk above cannot reach them and the step
+// would report a single input where the node received several. The run exposes
+// one of the events as its root event; the rest are recoverable only from the
+// execution itself (pkg/models/canvas_node_replay.go).
+function buildReplayInputSections({
+  nodeId,
+  executions,
+  workflowNodes,
+  executionIndexByNodeId,
+}: {
+  nodeId: string;
+  executions: CanvasesCanvasNodeExecution[];
+  workflowNodes: ComponentsNode[];
+  executionIndexByNodeId: Map<string, number>;
+}): RunInspectorUpstreamSection[] {
+  const execution = executions.find((item) => item.nodeId === nodeId);
+  if (!execution) return [];
+
+  return receivedReplayInputSourceNodeIds(execution)
+    .filter((sourceNodeId) => !executionIndexByNodeId.has(sourceNodeId))
+    .map((sourceNodeId) => {
+      const workflowNode = workflowNodes.find((node) => node.id === sourceNodeId);
+
+      return {
+        nodeId: sourceNodeId,
+        nodeName: workflowNode?.name || sourceNodeId,
+        workflowNode,
+        badge: null,
+        output: execution.inputEvent?.nodeId === sourceNodeId ? execution.inputEvent.data : undefined,
+      };
+    });
 }
 
 function findPrimaryInputNodeId({

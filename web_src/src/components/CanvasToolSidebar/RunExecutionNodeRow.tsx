@@ -5,6 +5,20 @@ import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 import { eventBadgeForExecution, eventBadgeForTriggeredTrigger } from "@/ui/Runs/runNodeDetailModel";
 
+function ReplayLineage({ isReplay, sourceExecutionId }: { isReplay: boolean; sourceExecutionId?: string }) {
+  if (!isReplay) return null;
+
+  return (
+    <span
+      data-testid="replay-badge"
+      title={sourceExecutionId ? `Replay of execution ${sourceExecutionId}` : "Replay"}
+      className="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+    >
+      Replay
+    </span>
+  );
+}
+
 interface RunExecutionNodeRowProps {
   nodeId: string;
   workflowNode?: ComponentsNode;
@@ -33,6 +47,14 @@ export function RunExecutionNodeRow({
     : execution
       ? eventBadgeForExecution(workflowNode, execution)
       : null;
+
+  //
+  // Replay lineage lives on the run, but ListNodeExecutions surfaces it on every
+  // execution it serializes, so the row can render the badge without a second
+  // round trip. The source execution id is absent when the run that produced the
+  // replay predates the pinned reference, so the badge stands on its own then.
+  //
+  const isReplay = Boolean(execution?.isReplay);
 
   return (
     <div
@@ -63,6 +85,7 @@ export function RunExecutionNodeRow({
       <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-gray-800 dark:text-gray-100">
         {nodeName}
       </span>
+      <ReplayLineage isReplay={isReplay} sourceExecutionId={execution?.replaySourceExecutionId} />
       {badge ? <EventStatusBadge badgeColor={badge.badgeColor} label={badge.label} /> : null}
     </div>
   );
