@@ -14,11 +14,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// TestExecuteScriptDoesNotLeakTimeoutGoroutine guards against a regression
-// where the timeout enforcer was a fire-and-forget goroutine that slept for
-// the whole timeout even when the command finished first. Each fast command
-// with a long timeout stranded one goroutine (and its session) until the
-// timeout elapsed. The timer-based enforcer stops immediately on early return.
+// Ensures a finished command does not leave a timeout goroutine running.
 func TestExecuteScriptDoesNotLeakTimeoutGoroutine(t *testing.T) {
 	const (
 		username = "tester"
