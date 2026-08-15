@@ -24,7 +24,7 @@ func Test__UpdateWorkOrderAssignees(t *testing.T) {
 	userA := support.CreateUser(t, r, r.Organization.ID)
 	userB := support.CreateUser(t, r, r.Organization.ID)
 
-	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "")
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	t.Run("unassigning everyone clears all assignees", func(t *testing.T) {
