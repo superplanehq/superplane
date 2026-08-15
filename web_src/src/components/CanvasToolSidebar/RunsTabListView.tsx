@@ -28,6 +28,7 @@ interface RunsTabListViewProps {
   onRetry?: () => void;
   onClearFilters: () => void;
   hasAnyFilter: boolean;
+  hiddenReplayCount: number;
   selectedStatuses: Set<RunStatusFilter>;
   selectedTriggerIds: Set<string>;
   searchQuery: string;
@@ -37,6 +38,8 @@ interface RunsTabListViewProps {
   onToggleTrigger: (triggerId: string) => void;
   onClearTriggers: () => void;
   onSearchQueryChange: (query: string) => void;
+  showReplays: boolean;
+  onToggleShowReplays: () => void;
 }
 
 export function RunsTabListView({
@@ -54,6 +57,7 @@ export function RunsTabListView({
   onRetry,
   onClearFilters,
   hasAnyFilter,
+  hiddenReplayCount,
   selectedStatuses,
   selectedTriggerIds,
   searchQuery,
@@ -63,6 +67,8 @@ export function RunsTabListView({
   onToggleTrigger,
   onClearTriggers,
   onSearchQueryChange,
+  showReplays,
+  onToggleShowReplays,
 }: RunsTabListViewProps) {
   return (
     <div
@@ -80,6 +86,8 @@ export function RunsTabListView({
         onToggleTrigger={onToggleTrigger}
         onClearTriggers={onClearTriggers}
         onSearchQueryChange={onSearchQueryChange}
+        showReplays={showReplays}
+        onToggleShowReplays={onToggleShowReplays}
       />
 
       <div
@@ -102,18 +110,31 @@ export function RunsTabListView({
         />
       </div>
 
-      {hasAnyFilter && runs.length > 0 ? (
+      {(hasAnyFilter || hiddenReplayCount > 0) && runs.length > 0 ? (
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-950/15 bg-slate-50 px-3 py-1.5 text-[11px] text-gray-500 dark:border-gray-800/70 dark:bg-gray-900 dark:text-gray-400">
           <span>
             Showing {filteredRuns.length} of {runs.length} loaded
           </span>
-          <button
-            type="button"
-            onClick={onClearFilters}
-            className="shrink-0 text-sky-600 hover:text-sky-800 dark:text-indigo-300 dark:hover:text-indigo-200"
-          >
-            Clear filters
-          </button>
+          <span className="flex shrink-0 items-center gap-2">
+            {hiddenReplayCount > 0 ? (
+              <button
+                type="button"
+                onClick={onToggleShowReplays}
+                className="shrink-0 text-sky-600 hover:text-sky-800 dark:text-indigo-300 dark:hover:text-indigo-200"
+              >
+                Show {hiddenReplayCount} {hiddenReplayCount === 1 ? "replay" : "replays"}
+              </button>
+            ) : null}
+            {hasAnyFilter ? (
+              <button
+                type="button"
+                onClick={onClearFilters}
+                className="shrink-0 text-sky-600 hover:text-sky-800 dark:text-indigo-300 dark:hover:text-indigo-200"
+              >
+                Clear filters
+              </button>
+            ) : null}
+          </span>
         </div>
       ) : null}
     </div>

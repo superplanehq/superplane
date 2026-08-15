@@ -21,7 +21,13 @@ export function useRunSidebarNavigationState({
   componentIconMap,
   onStatusFiltersChange,
 }: UseRunSidebarNavigationStateParams) {
-  const runFilterState = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange });
+  const runFilterState = useRunFilters({
+    runs,
+    workflowNodes,
+    componentIconMap,
+    onStatusFiltersChange,
+    selectedRunId,
+  });
   const runNavigation = useMemo(
     () =>
       getRunSidebarNavigation(runFilterState.orderedRuns, selectedRunId, {
