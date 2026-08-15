@@ -8,13 +8,7 @@ import { useMemo } from "react";
 interface WorkOrderAssigneePickerProps {
   organizationId: string;
   selectedIds: string[];
-  /**
-   * Ids used purely to decide sort order (currently-assigned users are
-   * pinned to the top). Defaults to `selectedIds` when omitted. Callers
-   * that maintain a separate "live draft" vs. "last confirmed" selection
-   * (e.g. a save/cancel popover) should pass the confirmed set here so the
-   * list doesn't reorder while the user is actively toggling checkboxes.
-   */
+  /** Ids used to decide sort order (pinned to the top). Defaults to `selectedIds`. */
   pinnedIds?: string[];
   onChange: (assigneeIds: string[]) => void;
   disabled?: boolean;

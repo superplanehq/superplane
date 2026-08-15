@@ -49,8 +49,6 @@ describe("WorkOrderAssigneePicker", () => {
     renderPicker({ selectedIds: ["dan", "bob"], pinnedIds: ["dan", "bob"] });
 
     const names = renderedNames();
-    // Pinned users (bob, dan) come first, alphabetically among themselves,
-    // followed by the rest alphabetically.
     expect(names).toEqual([
       expect.stringContaining("Bob Brown"),
       expect.stringContaining("Dan Davis"),
@@ -78,9 +76,7 @@ describe("WorkOrderAssigneePicker", () => {
 
     expect(renderedNames()[0]).toContain("Bob Brown");
 
-    // Simulate the user unchecking "bob" mid-session: selectedIds changes,
-    // but pinnedIds (captured when the popover opened) stays the same, so
-    // the list order must not change.
+    // selectedIds changes but pinnedIds stays the same; order must not change.
     rerender(
       <WorkOrderAssigneePicker
         organizationId="org-1"

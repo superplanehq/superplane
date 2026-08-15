@@ -38,19 +38,13 @@ export function WorkOrderAssigneesPopover({
 }: WorkOrderAssigneesPopoverProps) {
   const [open, setOpen] = useState(false);
   const [draftIds, setDraftIds] = useState<string[]>(selectedIds);
-  // The set of assignees as they were when the popover was opened. Used only
-  // to keep already-assigned users pinned to the top of the list while it's
-  // open, so rows don't jump around as the user toggles checkboxes.
+  // Snapshot of the confirmed selection, used to keep assigned users pinned
+  // to the top of the list while the popover is open.
   const [pinnedIds, setPinnedIds] = useState<string[]>(selectedIds);
   const isSaveMode = Boolean(onSave);
 
-  // Note: `draftIds` is intentionally *not* resynced from `selectedIds` on
-  // every render where the popover happens to still be open. `selectedIds`
-  // is recomputed from the latest server data and can change identity (or
-  // even value, via websocket/refetch/window-refocus) while the user is
-  // mid-edit; resyncing here would silently discard their pending changes.
-  // We only ever want to snapshot the server-confirmed state at the moment
-  // the popover transitions from closed to open, which is handled below.
+  // `draftIds` is only synced from `selectedIds` when the popover opens, not
+  // on every render, so it doesn't discard pending edits.
   const handleOpenChange = (nextOpen: boolean) => {
     if (isSaving) {
       return;
@@ -83,8 +77,7 @@ export function WorkOrderAssigneesPopover({
     }
 
     if (haveSameIds(draftIds, selectedIds)) {
-      // Nothing actually changed (e.g. the user toggled a checkbox back to
-      // its original state) — avoid a pointless request and toast.
+      // No actual change; skip the request.
       setOpen(false);
       return;
     }

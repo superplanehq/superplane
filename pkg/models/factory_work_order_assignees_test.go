@@ -40,14 +40,8 @@ func TestAssigneeDiffNoChanges(t *testing.T) {
 	assert.Empty(t, unassigned)
 }
 
-// Regression test for "cannot unassign users": UpdateAssignees is normally
-// called on a *FactoryWorkOrder that still has its old `Assignees`
-// association preloaded from before the update (e.g. loaded via
-// Factory.FindWorkOrder). GORM's Update callbacks save has-many associations
-// present on the model by default, so a naive `tx.Model(o).Update(...)` for
-// an unrelated column (updated_at) would silently re-insert that stale,
-// preloaded assignee list right after ReplaceAssignees deleted it — making
-// it look like unassigning (or partially reassigning) never took effect.
+// Regression test for "cannot unassign users": UpdateAssignees must not
+// re-insert a stale preloaded `Assignees` association after clearing it.
 func TestFactoryWorkOrder_UpdateAssignees(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	_, userID, factoryModel := setupFactoryWithUser(t, "update-assignees")
@@ -62,9 +56,7 @@ func TestFactoryWorkOrder_UpdateAssignees(t *testing.T) {
 
 	require.NoError(t, order.UpdateAssignees(database.Conn(), []uuid.UUID{userID, secondUser.ID}, userID))
 
-	// Simulate the real call path: a fresh load with `Assignees` preloaded,
-	// then a call to UpdateAssignees on that (now slightly stale-by-the-time-
-	// it-writes) model.
+	// Simulate the real call path: a fresh load with `Assignees` preloaded.
 	loaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
 	require.NoError(t, err)
 	require.Len(t, loaded.Assignees, 2)
