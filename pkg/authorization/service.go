@@ -354,20 +354,15 @@ func (a *AuthService) RemoveUserFromGroup(domainID string, domainType string, us
 	return nil
 }
 
-// GroupWithDetails carries a group's resolved role and members, computed from
-// a single read enforcer by GetGroupsWithDetails.
+// GroupWithDetails is a group's role and members.
 type GroupWithDetails struct {
 	Name    string
 	Role    string
 	Members []string
 }
 
-// GetGroupsWithDetails returns every group in the domain together with its
-// role and members. It builds one read enforcer and derives all groups from
-// it in memory, rather than rebuilding an enforcer per group as calling
-// GetGroups + GetGroupRole + GetGroupUsers in a loop would. The per-group
-// derivation uses the same casbin calls as those methods, so the results are
-// identical.
+// GetGroupsWithDetails returns each group's role and members.
+// It uses one read enforcer instead of one per group.
 func (a *AuthService) GetGroupsWithDetails(ctx context.Context, domainID string, domainType string) ([]GroupWithDetails, error) {
 	domain := prefixDomain(domainType, domainID)
 

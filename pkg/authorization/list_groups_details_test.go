@@ -10,9 +10,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-// GetGroupsWithDetails builds a single read enforcer and derives every group
-// from it. This test locks it to the per-group GetGroupRole / GetGroupUsers
-// methods it replaces, so the batched path can never silently diverge.
+// Locks GetGroupsWithDetails to GetGroupRole and GetGroupUsers.
 func Test__AuthService_GetGroupsWithDetails_MatchesPerGroupMethods(t *testing.T) {
 	r := support.Setup(t)
 	ctx := context.Background()

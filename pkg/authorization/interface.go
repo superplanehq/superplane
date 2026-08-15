@@ -22,8 +22,6 @@ type GroupManager interface {
 	GetUserGroups(ctx context.Context, domainID string, domainType string, userID string) ([]string, error)
 	GetGroups(ctx context.Context, domainID string, domainType string) ([]string, error)
 	GetGroupRole(ctx context.Context, domainID string, domainType string, group string) (string, error)
-	// GetGroupsWithDetails returns every group's role and members using a
-	// single read enforcer, instead of rebuilding one per group.
 	GetGroupsWithDetails(ctx context.Context, domainID string, domainType string) ([]GroupWithDetails, error)
 }
 

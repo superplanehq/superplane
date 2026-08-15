@@ -13,9 +13,6 @@ import (
 )
 
 func ListGroups(ctx context.Context, domainType string, domainID string, authService authorization.Authorization) (*pb.ListGroupsResponse, error) {
-	// One read enforcer resolves every group's role and members. Metadata for
-	// all groups loads in a single query. Both replace per-group work that
-	// rebuilt the casbin enforcer twice and queried metadata once per group.
 	groupDetails, err := authService.GetGroupsWithDetails(ctx, domainID, domainType)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to get groups")
