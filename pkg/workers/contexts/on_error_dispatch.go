@@ -25,6 +25,21 @@ func DispatchOnError(tx *gorm.DB, execution *models.CanvasNodeExecution, onNewEv
 }
 
 func dispatchOnError(tx *gorm.DB, execution *models.CanvasNodeExecution, onNewEvents func([]models.CanvasEvent)) error {
+	//
+	// A replay is isolated from the graph: a failing replay must not notify the
+	// canvas' On Error nodes. Isolation covers graph edges and on-error dispatch
+	// only - everything else about the execution (canvas memory writes,
+	// integrations, ...) behaves as in production.
+	//
+	run, err := models.FindCanvasRunInTransaction(tx, execution.WorkflowID, execution.RunID)
+	if err != nil {
+		return err
+	}
+
+	if run.IsReplay {
+		return nil
+	}
+
 	nodes, err := models.FindCanvasNodesInTransaction(tx, execution.WorkflowID)
 	if err != nil {
 		return err
