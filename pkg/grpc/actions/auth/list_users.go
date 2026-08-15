@@ -58,10 +58,6 @@ func ListUsers(
 		return nil, grpcerrors.NotFound(err, "role not found")
 	}
 
-	//
-	// Resolve the users for every role with a single read enforcer, instead
-	// of rebuilding one per role.
-	//
 	usersByRole, err := authService.GetOrgUsersByRoles(ctx, domainID, roleNames)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to get users for roles")

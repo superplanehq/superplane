@@ -96,9 +96,7 @@ func FindGroupMetadata(groupName, domainType, domainID string) (*GroupMetadata, 
 }
 
 // FindGroupMetadataByNames loads metadata for several groups in one query.
-// Groups without a metadata row are simply absent from the returned map, so
-// callers fall back to defaults the same way FindGroupMetadata's not-found
-// path does. Mirrors FindRoleMetadataByNames.
+// Groups without a row are omitted so callers can use defaults.
 func FindGroupMetadataByNames(tx *gorm.DB, groupNames []string, domainType, domainID string) (map[string]*GroupMetadata, error) {
 	result := make(map[string]*GroupMetadata)
 	if len(groupNames) == 0 {

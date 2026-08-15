@@ -368,8 +368,6 @@ func (a *AuthService) GetGroupsWithDetails(ctx context.Context, domainID string,
 
 	var details []GroupWithDetails
 	err := a.withReadEnforcer(ctx, domainType, domainID, func(enforcer casbin.IEnforcer) error {
-		// Discover group names the same way GetGroups does: a group appears as
-		// the subject of a group->role grouping rule.
 		policies, err := enforcer.GetFilteredGroupingPolicy(2, domain)
 		if err != nil {
 			return fmt.Errorf("failed to get groups: %w", err)
@@ -393,7 +391,6 @@ func (a *AuthService) GetGroupsWithDetails(ctx context.Context, domainID string,
 		for _, groupName := range groupNames {
 			prefixedGroupName := prefixGroupName(groupName)
 
-			// Role: first /roles/ role, matching GetGroupRole.
 			role := ""
 			for _, r := range enforcer.GetRolesForUserInDomain(prefixedGroupName, domain) {
 				if strings.HasPrefix(r, "/roles/") {
@@ -402,7 +399,6 @@ func (a *AuthService) GetGroupsWithDetails(ctx context.Context, domainID string,
 				}
 			}
 
-			// Members: users assigned to the group, matching GetGroupUsers.
 			memberPolicies, err := enforcer.GetFilteredGroupingPolicy(1, prefixedGroupName, domain)
 			if err != nil {
 				return fmt.Errorf("failed to get group users: %w", err)
@@ -638,11 +634,9 @@ func (a *AuthService) RemoveRole(userID, role, domainID string, domainType strin
 	return nil
 }
 
-// GetOrgUsersByRoles resolves the users assigned to each of roleNames using a
-// single read enforcer, rather than rebuilding one per role as calling
-// GetOrgUsersForRole in a loop would. Each role's lookup uses the same casbin
-// call as GetOrgUsersForRole, so the results are identical. A role whose
-// lookup fails is skipped, matching the per-role method's tolerated errors.
+// GetOrgUsersByRoles returns the users for each role.
+// It uses one read enforcer instead of one per role.
+// A role whose lookup fails is skipped.
 func (a *AuthService) GetOrgUsersByRoles(ctx context.Context, orgID string, roleNames []string) (map[string][]string, error) {
 	orgDomain := prefixDomain(models.DomainTypeOrganization, orgID)
 

@@ -19,7 +19,6 @@ func Test__AuthService_GetGroupsWithDetails_MatchesPerGroupMethods(t *testing.T)
 
 	require.NoError(t, r.AuthService.CreateGroup(orgID, domainType, "admins", models.RoleOrgAdmin, "Admins", "Admin group"))
 	require.NoError(t, r.AuthService.CreateGroup(orgID, domainType, "viewers", models.RoleOrgViewer, "Viewers", "Viewer group"))
-	// A group with no members exercises the empty-members path.
 	require.NoError(t, r.AuthService.CreateGroup(orgID, domainType, "empty", models.RoleOrgViewer, "Empty", "No members"))
 
 	require.NoError(t, r.AuthService.AddUserToGroup(orgID, domainType, "user-a", "admins"))
@@ -29,7 +28,6 @@ func Test__AuthService_GetGroupsWithDetails_MatchesPerGroupMethods(t *testing.T)
 	details, err := r.AuthService.GetGroupsWithDetails(ctx, orgID, domainType)
 	require.NoError(t, err)
 
-	// Same set of groups as GetGroups.
 	expectedNames, err := r.AuthService.GetGroups(ctx, orgID, domainType)
 	require.NoError(t, err)
 	actualNames := make([]string, len(details))
@@ -38,7 +36,6 @@ func Test__AuthService_GetGroupsWithDetails_MatchesPerGroupMethods(t *testing.T)
 	}
 	assert.ElementsMatch(t, expectedNames, actualNames)
 
-	// Each group's role and members match the per-group methods exactly.
 	for _, detail := range details {
 		wantRole, err := r.AuthService.GetGroupRole(ctx, orgID, domainType, detail.Name)
 		require.NoError(t, err, "GetGroupRole(%s)", detail.Name)
@@ -49,7 +46,6 @@ func Test__AuthService_GetGroupsWithDetails_MatchesPerGroupMethods(t *testing.T)
 		assert.ElementsMatch(t, wantMembers, detail.Members, "members for group %s", detail.Name)
 	}
 
-	// Spot-check the concrete expectations so a bug in both paths can't hide.
 	byName := make(map[string]int)
 	for _, detail := range details {
 		byName[detail.Name] = len(detail.Members)
