@@ -27,6 +27,7 @@ import type { ReactNode } from "react";
 import { HistoryQueuePage, PageHeader } from "./pages";
 import { analytics } from "@/lib/analytics";
 import { FactorySidebarHeading } from "@/ui/factoryNodeChrome";
+import { buildNodeNamesById } from "@/lib/nodeNamesById";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 
 /** Optional create-dialog overrides per integration (two-step API + webhook flow). Key = integration name. */
@@ -480,6 +481,15 @@ export const ComponentSidebar = ({
     () => (nodeId ? workflowNodes.find((node) => node.id === nodeId) : undefined),
     [nodeId, workflowNodes],
   );
+  const nodeNamesById = useMemo(
+    () =>
+      buildNodeNamesById(
+        workflowNodes,
+        (node) => node.id,
+        (node) => node.name,
+      ),
+    [workflowNodes],
+  );
   const configurationHasError = Boolean(selectedWorkflowNode?.errorMessage);
 
   if (!isOpen) return null;
@@ -735,6 +745,7 @@ export const ComponentSidebar = ({
                     resolveRunId={resolveRunId}
                     fetchRunId={fetchRunId}
                     onSelectRun={onSelectRun}
+                    nodeNamesById={nodeNamesById}
                   />
                 </TabsContent>
               )}
@@ -807,6 +818,7 @@ export const ComponentSidebar = ({
                   onEventClick={onEventClick}
                   compact={isBottomLayout}
                   selectionNodeId={nodeId}
+                  nodeNamesById={nodeNamesById}
                   resolveRunId={resolveRunId}
                   fetchRunId={fetchRunId}
                   onSelectRun={onSelectRun}
