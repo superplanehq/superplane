@@ -44,6 +44,7 @@ export interface RunInspectorPanelProps {
   onClearSelectedNode?: () => void;
   onEditNode?: (nodeId: string) => void;
   onRerunCreated?: (eventId: string) => void | Promise<void>;
+  onReplayCreated?: (runId: string) => void;
   runNavigation?: { newerRunId?: string | null; olderRunId?: string | null; canNavigateOlder?: boolean } | null;
   onNavigateRun?: (runId: string) => void;
   onNavigateOlder?: () => void;
@@ -289,6 +290,7 @@ function useRunInspectorPanelModel({
   componentDefinitions,
   currentUser,
   onClearSelectedNode,
+  onReplayCreated,
   onRerunCreated,
   onSelectNode,
   organizationId,
@@ -336,6 +338,7 @@ function useRunInspectorPanelModel({
     sections,
     executionsLoading: executionsQuery.isLoading,
     onRerunCreated,
+    onReplayCreated,
   });
   const accordionValue = useMemo(
     () => resolveSelectedSectionValue(sections, selectedNodeId, selectedSectionValue),
