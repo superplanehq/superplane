@@ -120,6 +120,21 @@ describe("MarkdownContent", () => {
     expect(screen.getByText("done").tagName).toBe("U");
   });
 
+  it("does not treat increment operators as workspace underline", () => {
+    const { container } = render(<MarkdownContent content={"i++ then j++"} variant="workspace" />);
+
+    expect(container.querySelector("u")).toBeNull();
+    expect(container).toHaveTextContent("i++ then j++");
+  });
+
+  it("does not pair C++ with a later ++ span as underline", () => {
+    const { container } = render(<MarkdownContent content={"C++ … ++more++"} variant="workspace" />);
+
+    expect(container).toHaveTextContent("C++ … more");
+    expect(screen.getByText("more").tagName).toBe("U");
+    expect(container.textContent).toContain("C++");
+  });
+
   it("renders bold markdown with semibold weight", () => {
     const { container } = render(<MarkdownContent content={"**Claude Managed Agent**"} />);
     expect(container.firstChild).toHaveClass("[&_strong]:font-semibold");

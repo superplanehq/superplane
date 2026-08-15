@@ -289,15 +289,18 @@ function hasLanguageCodeNode(node?: ExtraProps["node"]): boolean {
   return getClassNames(codeNode?.properties?.className).some((className) => /^language-\w+$/.test(className));
 }
 
-/** TipTap stores underline as ++text++. Convert those tokens to <u> for workspace markdown. */
+/**
+ * TipTap stores underline as ++text++. Convert those tokens to <u> for workspace markdown.
+ * Require the same whitespace bounds as __ so increments like i++ then j++ stay plain.
+ */
 function workspaceUnderlineToHtml(markdown: string): string {
   return markdown.replace(
-    /(```[\s\S]*?```|`[^`]*`)|\+\+([^\n+]+)\+\+/g,
-    (match, code: string | undefined, inner: string | undefined) => {
+    /(```[\s\S]*?```|`[^`]*`)|(^|\s)\+\+([^\n+]+)\+\+(?=\s|$)/g,
+    (_match, code: string | undefined, boundary: string | undefined, inner: string | undefined) => {
       if (code) {
         return code;
       }
-      return `<u>${inner}</u>`;
+      return `${boundary}<u>${inner}</u>`;
     },
   );
 }
