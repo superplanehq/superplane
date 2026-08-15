@@ -154,6 +154,7 @@ function createWorkOrderFromRequest(request: RequestBody, orderCount: number): F
   const nowIso = new Date().toISOString();
   return {
     id: `storybook-work-order-${orderCount + 1}`,
+    number: String(200 + orderCount + 1),
     title: stringOrEmpty(request.title) || "New work order",
     description: stringOrEmpty(request.description),
     state: "STATE_OPEN",

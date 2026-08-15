@@ -1,10 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import { createWorkOrderPath, linesPath } from "../../lib/factoryPagePaths";
+import { linesPath } from "../../lib/factoryPagePaths";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
 /**
@@ -12,13 +12,12 @@ import { useOnboardingStorybook } from "./useOnboardingStorybook";
  * Shown on overview when tips are active for the current workspace.
  */
 export function GettingStartedWireframe() {
-  const navigate = useNavigate();
-  const { organizationId, factoryId } = useFactoriesLayout();
+  const { organizationId, factoryKey, openCreateWorkOrder } = useFactoriesLayout();
   const onboarding = useOnboardingStorybook();
 
   function handleCreateWorkOrder() {
     onboarding?.clearOverviewTips();
-    navigate(createWorkOrderPath(organizationId, factoryId));
+    openCreateWorkOrder();
   }
 
   return (
@@ -82,7 +81,7 @@ export function GettingStartedWireframe() {
               Each work order runs through a line: intake, build, verify, and related phases you can configure later.
             </p>
             <Link
-              to={linesPath(organizationId, factoryId)}
+              to={linesPath(organizationId, factoryKey)}
               className={cn(
                 "mt-3 inline-flex h-8 items-center rounded-md border border-border px-3 text-[13px]",
                 "text-foreground transition-colors hover:bg-accent",

@@ -52,8 +52,11 @@ current run (`id`, `title`, `description`, `factory_id`, `state`, `result`,
 `source`) and returns `nil` when the run is not attached to a work order.
 `order().artifacts` is a list field loaded lazily only when the expression
 references it (e.g. `none(order().artifacts, {#.type == "pr"})`).
-`root().data.work_order` remains the onRun snapshot and does not include
-artifacts.
+`order().comments` is likewise a list field loaded lazily only when the
+expression references it (e.g. `len(order().comments)`), returning each
+comment as `{id, body, author, created_at, run}` decoded from the
+`order.comment.added` events. `root().data.work_order` remains the onRun
+snapshot and does not include artifacts or comments.
 
 ## Work order lifecycle
 
@@ -85,17 +88,33 @@ Guardrails:
 
 Every transition writes exactly one `order.status.updated` event (`fromState`, `toState`, `fromResult`, `toResult`) — the sole authoritative lifecycle event. When the transition is caused by a canvas run, the event also carries `automation` (line + step + node) and `run` + `app` refs so the timeline can attribute it back to the caller. On the first `draft → open`, the originating run/app snapshot from `SourceRunID` is included even when no automation is present.
 
-**Display status** in the UI derives both from `state` and from executions:
+**Display status** in the UI derives both from `state` and from executions.
+The workspace surfaces (Work Orders list, detail header, recent nav) share
+this vocabulary — six statuses that map to four board lanes:
 
-| Persisted state | Derived UI status | Notes |
-| --- | --- | --- |
-| `draft` | Draft | Being scoped. Dispatchable — the first dispatch promotes it to `open`. |
-| `open`, no active execution | Open | Idle between runs. |
-| `open`, active execution | Running | Line step in flight. |
-| `open`, last execution failed | Failed | Attention section. |
-| `closed`, `result=completed` | Completed | |
-| `closed`, `result=rejected` | Rejected | |
-| `closed`, `result=failed` | Failed (closed) | Same red styling as an in-flight failure. |
+| Persisted state | Derived UI status | Board lane | Notes |
+| --- | --- | --- | --- |
+| `draft` | Draft | Backlog | Being scoped. Dispatchable — the first dispatch promotes it to `open`. |
+| `open`, no active execution | Waiting | Review | Idle between runs. The row shows the last line and step separately from the pill. |
+| `open`, active execution | Running | Running | Line step in flight. |
+| `closed`, `result=completed` | Completed | Done | |
+| `closed`, `result=rejected` | Cancelled | Done | Abandoned before or during work. |
+| `closed`, `result=failed` | Failed | Done | Line execution did not pass. Same red styling as an in-flight failure. |
+
+The Work Orders page puts everything on one title-bar row: the page title
+and the scope pills (**All** / **Active** / **My**) on the left, and the
+Filter menu, collapsible search, Display menu, and **New** button on the
+right. Filter adds one or more Status, Line, or Owner conditions, each
+of which appears as a removable chip below the title bar. Display holds
+the layout (Board / List / Table) and the ordering (Updated / Status /
+Spend / ID).
+
+The page defaults to **Board**, **All**, and **Updated**, and persists the
+layout and ordering across sessions in `localStorage`. Scope, filters, and
+search are session-local. Three layouts render the same six statuses:
+Board groups by lane, List groups by lane with a dense row, Table shows
+Status, ID, Title, Line, Spend, Updated, and Owner columns. `F` opens
+the Filter menu and `/` opens the search field.
 
 ## Comments and artifacts
 
@@ -158,8 +177,8 @@ When the flag is on:
 
 - **Home** — Factories section alongside Apps; link to full list.
 - **`/factories`** — list and create factories.
-- **Factory detail** — work orders (owner pills: My Work / Unassigned / All; status pills: All / **Active (default: draft + open + running + failed)** / Draft / Open / Running / Failed / Completed / Rejected; the Failed pill also matches orders closed as failed; the "Work Orders" badge counts orders matching the default `Active` filter). Dispatch popover, factory apps sidebar, lines sidebar. The "failed" display status is derived from the **latest finished execution**: a passing retry supersedes an earlier failure, and failures older than `order.updatedAt` are treated as belonging to a previous attempt so reopening a closed order clears the failed pill until a new dispatch actually fails.
-- **Work order detail** — status-aware action bar (`Draft`: Dispatch / Reject; `Open`: Dispatch / Back to Draft / Complete / Reject; `Closed`: Reopen; the `Back to Draft` button hides while a step execution is in flight, per the FSM guard). Inline **comment composer**, activity timeline (comments, status transitions, artifacts, dispatches) with line-centric automation attribution, assignees panel, and a read-only **Artifacts** sidebar.
+- **Factory detail** — Work Orders page with **Board**, **List**, and **Table** layouts (see the Display status section above for the shared vocabulary and the title-bar behaviour). Inline owner picker and lifecycle-safe Dispatch button on every row. Dispatch popover, factory apps sidebar, lines sidebar. The workspace badge on the nav counts active (`draft` + `running` + `waiting`) work orders.
+- **Work order detail** — status-aware action bar (`Draft`: Dispatch / Reject; `Open`: Dispatch / Back to Draft / Complete / Reject; `Closed`: Reopen; the `Back to Draft` button hides while a step execution is in flight, per the FSM guard). Inline **comment composer**, activity timeline (comments, status transitions, artifacts, dispatches) with line-centric automation attribution, owners panel, and a read-only **Artifacts** sidebar.
 - **Factory app canvas** — header link back to factory.
 
 When the flag is off, factories are hidden. The legacy **Setup Factory** starter on `/apps/new` (template install) remains for orgs without the flag.
@@ -226,12 +245,15 @@ superplane factory artifacts add \
 
 For markdown, provide `--body` or `-f` / `--file` (file contents become `data.body`).
 
-Read-only work order commands (`orders`/`order`), for listing and inspecting
-work orders:
+Work order commands (`orders`/`order`), for creating, dispatching, assigning,
+listing, and inspecting work orders:
 
 ```bash
 superplane factory orders list [flags]
 superplane factory orders describe --order <uuid> [flags]
+superplane factory orders create --title <title> [flags]
+superplane factory orders dispatch --order <uuid> --line <line-name>
+superplane factory orders assign --order <uuid> --assignee <id-or-email> [flags]
 ```
 
 `orders list` flags:
@@ -281,11 +303,61 @@ superplane factory orders describe --factory shipping --order "$OID"
 in one call; the event timeline is capped at the API's max page size (200)
 and `eventsTruncated` is `true` when there are more.
 
+`orders create` creates a work order in `draft` state:
+
+- `--factory` — factory name or UUID (default: active factory).
+- `--title` — work order title (required).
+- `--description` — description text (inline). Mutually exclusive with
+  `--file`.
+- `-f`/`--file` — read the description from a file, or `-` for stdin.
+  Mutually exclusive with `--description`.
+- `--assignee` — assignee user UUID or email, repeatable. When omitted
+  entirely, the work order is assigned to the user running the command
+  (the API itself does not default assignees; the CLI does).
+
+```bash
+superplane factory orders create --title "Ship the feature" --description "..."
+
+superplane factory orders create \
+  --title "Ship the feature" \
+  -f ./description.md \
+  --assignee alice@example.com \
+  --assignee bob@example.com
+```
+
+`orders dispatch` dispatches a work order to a factory line, starting its
+execution. A `draft` work order moves to `open` on its first dispatch;
+dispatching fails if the line doesn't exist, has no steps, or the order
+already has an active execution:
+
+- `--factory` — factory name or UUID (default: active factory).
+- `--order` — work order UUID (`--order-id` is accepted as a deprecated
+  alias).
+- `--line` — target factory line's name (required).
+
+```bash
+superplane factory orders dispatch --order "$OID" --line build
+```
+
+`orders assign` **sets** a work order's assignee list — it replaces the
+existing assignees with exactly the ones given, rather than adding to them
+(there is no additive assign/unassign endpoint):
+
+- `--factory` — factory name or UUID (default: active factory).
+- `--order` — work order UUID (`--order-id` is accepted as a deprecated
+  alias).
+- `--assignee` — assignee user UUID or email, repeatable; at least one is
+  required (clearing all assignees is out of scope for this command).
+
+```bash
+superplane factory orders assign --order "$OID" --assignee alice@example.com --assignee bob@example.com
+```
+
 ## Not implemented yet
 
-- Broader CLI mutation commands (`superplane factory` create/dispatch/close/
-  comment/assign — currently CLI-side only `artifacts add` and the new
-  `orders list`/`orders describe` read commands exist).
+- `superplane factory orders close`/`comment` and other work order status
+  transitions (backend RPCs exist; CLI-side `create`/`dispatch`/`assign`
+  are implemented, these are not yet).
 - Work orders sourced from external systems or factory-app components.
 - Full PRD approval flow (gated approvals on `open → closed`).
 - Auto-close work order when a line finishes all steps.

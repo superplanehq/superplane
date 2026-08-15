@@ -17,7 +17,7 @@ func Test__FactoryCleanupWorker_GracePeriod(t *testing.T) {
 
 	t.Run("skips cleanup while factory is still within grace period", func(t *testing.T) {
 		worker := NewFactoryCleanupWorker()
-		factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+		factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 		require.NoError(t, factory.SoftDelete(database.Conn()))
 
@@ -38,7 +38,7 @@ func Test__FactoryCleanupWorker_GracePeriod(t *testing.T) {
 
 	t.Run("hard deletes factory after grace when no apps remain", func(t *testing.T) {
 		worker := NewFactoryCleanupWorker()
-		factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+		factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
 		order, err := factory.CreateWorkOrder(database.Conn(), "Order", "", &r.User, nil, nil)
@@ -63,7 +63,7 @@ func Test__FactoryCleanupWorker_GracePeriod(t *testing.T) {
 
 	t.Run("waits while factory apps still exist", func(t *testing.T) {
 		worker := NewFactoryCleanupWorker()
-		factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+		factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
@@ -93,7 +93,7 @@ func Test__FactoryCleanupWorker_GracePeriod(t *testing.T) {
 func Test__OrganizationCleanupWorker_WaitsForFactories(t *testing.T) {
 	r := support.Setup(t)
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	_, err = factory.CreateWorkOrder(database.Conn(), "Order", "", &r.User, []uuid.UUID{r.User}, nil)
 	require.NoError(t, err)

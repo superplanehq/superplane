@@ -101,6 +101,26 @@ describe("MarkdownContent", () => {
     expect(screen.getByTestId("markdown-code").closest("pre")).toBeInTheDocument();
   });
 
+  it("renders underline HTML in workspace markdown", () => {
+    render(<MarkdownContent content={"Hello <u>world</u>"} variant="workspace" />);
+
+    expect(screen.getByText("world").tagName).toBe("U");
+  });
+
+  it("renders underline next to punctuation and nested marks", () => {
+    render(<MarkdownContent content={"See **<u>word</u>**."} variant="workspace" />);
+
+    expect(screen.getByText("word").tagName).toBe("U");
+    expect(screen.getByText("word").closest("strong")).toBeInTheDocument();
+  });
+
+  it("does not treat ++ as workspace underline", () => {
+    const { container } = render(<MarkdownContent content={"i++ then j++ and C++ … ++more++"} variant="workspace" />);
+
+    expect(container.querySelector("u")).toBeNull();
+    expect(container).toHaveTextContent("i++ then j++ and C++ … ++more++");
+  });
+
   it("renders bold markdown with semibold weight", () => {
     const { container } = render(<MarkdownContent content={"**Claude Managed Agent**"} />);
     expect(container.firstChild).toHaveClass("[&_strong]:font-semibold");

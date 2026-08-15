@@ -63,7 +63,7 @@ func Test__AppContext__Get__factoryOwnedApps(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	factoryID := factory.ID
 
@@ -110,7 +110,7 @@ func Test__AppContext__Get__rejectsFactoryAppsFromOrgApps(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	factoryID := factory.ID
 

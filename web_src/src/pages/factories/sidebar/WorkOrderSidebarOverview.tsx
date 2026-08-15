@@ -4,7 +4,16 @@ import { Button } from "@/components/ui/button";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { appPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
-import { Calendar, ChevronDown, CircleDollarSign, CircleDot, Loader2, User, UserPlus } from "lucide-react";
+import {
+  Calendar,
+  ChevronDown,
+  CircleDollarSign,
+  CircleDot,
+  ExternalLink,
+  Loader2,
+  User,
+  UserPlus,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
@@ -15,6 +24,7 @@ import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "../li
 import { OrgUserReference } from "../OrgUserReference";
 import { WorkOrderAssigneesPopover } from "../WorkOrderAssigneesPopover";
 import { OverviewRow, SidebarSectionHeading } from "./SidebarPrimitives";
+import { useWorkOrderOverviewMissionSlot } from "./workOrderOverviewSlots";
 
 interface WorkOrderSidebarOverviewProps {
   organizationId: string;
@@ -43,6 +53,7 @@ export function WorkOrderSidebarOverview({
   const totalTokens = parseWorkOrderMetric(order.totalTokens);
   const totalCostCents = parseWorkOrderMetric(order.totalCostCents);
   const showSpending = totalTokens > 0 || totalCostCents > 0;
+  const MissionSlot = useWorkOrderOverviewMissionSlot();
 
   return (
     <section>
@@ -65,6 +76,8 @@ export function WorkOrderSidebarOverview({
           onSave={onAssigneesSave}
         />
 
+        {MissionSlot ? <MissionSlot workOrderId={order.id ?? ""} /> : null}
+
         {createdAt ? (
           <OverviewRow icon={<Calendar className="size-3.5" aria-hidden />} srLabel="Created">
             <span title={createdAt.toLocaleString()}>{formatWorkOrderDateTime(createdAt)}</span>
@@ -83,29 +96,27 @@ export function WorkOrderSidebarOverview({
   );
 }
 
-const STATUS_TEXT_CLASSNAME: Partial<Record<WorkOrderDisplayStatus, string>> = {
-  completed: "text-[color:var(--status-success)]",
-  running: "text-[color:var(--status-running)]",
-  failed: "text-[color:var(--status-danger)]",
-  closedFailed: "text-[color:var(--status-danger)]",
-  rejected: "text-muted-foreground",
-  open: "text-sky-700 dark:text-sky-300",
-  draft: "text-muted-foreground",
+const STATUS_TEXT_CLASSNAME: Record<WorkOrderDisplayStatus, string> = {
+  completed: "text-[color:var(--status-completed-fg)]",
+  running: "text-[color:var(--status-running-fg)]",
+  failed: "text-[color:var(--status-failed-fg)]",
+  cancelled: "text-[color:var(--status-cancelled-fg)]",
+  waiting: "text-[color:var(--status-waiting-fg)]",
+  draft: "text-[color:var(--status-draft-fg)]",
 };
 
-const STATUS_DOT_CLASSNAME: Partial<Record<WorkOrderDisplayStatus, string>> = {
-  completed: "bg-[var(--status-success-dot)]",
-  running: "bg-[var(--status-running-dot)]",
-  failed: "bg-[var(--status-danger-dot)]",
-  closedFailed: "bg-[var(--status-danger-dot)]",
-  rejected: "bg-gray-400",
-  open: "bg-sky-500",
-  draft: "bg-gray-400",
+const STATUS_DOT_CLASSNAME: Record<WorkOrderDisplayStatus, string> = {
+  completed: "bg-[color:var(--status-completed-dot)]",
+  running: "bg-[color:var(--status-running-dot)]",
+  failed: "bg-[color:var(--status-failed-dot)]",
+  cancelled: "bg-[color:var(--status-cancelled-dot)]",
+  waiting: "bg-[color:var(--status-waiting-dot)]",
+  draft: "bg-[color:var(--status-draft-dot)]",
 };
 
 function StatusValue({ displayStatus, label }: { displayStatus: WorkOrderDisplayStatus; label: string }) {
-  const textClass = STATUS_TEXT_CLASSNAME[displayStatus] ?? "text-foreground";
-  const dotClass = STATUS_DOT_CLASSNAME[displayStatus] ?? "bg-muted-foreground";
+  const textClass = STATUS_TEXT_CLASSNAME[displayStatus];
+  const dotClass = STATUS_DOT_CLASSNAME[displayStatus];
   return (
     <span className={cn("inline-flex items-center gap-1.5 text-[13px]", textClass)}>
       {displayStatus === "running" ? (
@@ -135,7 +146,7 @@ function isAutomationRefResolved(ref: FactoriesAutomationRef | undefined): ref i
   return Boolean(ref && (ref.nodeName || ref.appName));
 }
 
-function AutomationLink({
+export function AutomationLink({
   organizationId,
   automation,
 }: {
@@ -147,9 +158,10 @@ function AutomationLink({
     return (
       <Link
         to={appPath(organizationId, automation.appId)}
-        className="truncate text-foreground underline underline-offset-2 hover:no-underline"
+        className="inline-flex min-w-0 max-w-full items-center gap-1 text-foreground underline underline-offset-2 hover:no-underline"
       >
-        {label}
+        <span className="truncate">{label}</span>
+        <ExternalLink className="size-3 shrink-0 text-muted-foreground" aria-hidden />
       </Link>
     );
   }
@@ -173,8 +185,8 @@ function AssigneeOverviewRow({
 }) {
   const { resolveUser } = useOrgUserLookup(organizationId);
   return (
-    <OverviewRow icon={<User className="size-3.5" aria-hidden />} srLabel="Assignee">
-      <PermissionTooltip allowed={canEdit} message="You don't have permission to update assignees.">
+    <OverviewRow icon={<User className="size-3.5" aria-hidden />} srLabel="Owner">
+      <PermissionTooltip allowed={canEdit} message="You don't have permission to update owners.">
         <WorkOrderAssigneesPopover
           organizationId={organizationId}
           selectedIds={assigneeIds}
@@ -187,9 +199,7 @@ function AssigneeOverviewRow({
             type="button"
             variant="ghost"
             disabled={!canEdit || isSaving}
-            aria-label={
-              assigneeIds.length > 0 ? `Assignee: ${assigneeNames.filter(Boolean).join(", ")}` : "Assign work order"
-            }
+            aria-label={assigneeIds.length > 0 ? `Owner: ${assigneeNames.filter(Boolean).join(", ")}` : "Assign owner"}
             className="-my-1.5 -mr-1.5 h-auto w-full min-w-0 justify-start gap-1.5 whitespace-normal rounded-md py-1.5 pr-1.5 pl-0 text-left text-[13px] tracking-[-0.01em] text-foreground hover:bg-accent/60 focus-visible:bg-accent/60"
             data-testid="work-order-edit-assignees"
           >

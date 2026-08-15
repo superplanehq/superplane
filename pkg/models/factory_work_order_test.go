@@ -327,6 +327,66 @@ func TestFactoryWorkOrder_RecordCommentAdded(t *testing.T) {
 	assert.Equal(t, factory.CommentAuthorKindUser, comment.Author.Kind)
 }
 
+func TestFactoryWorkOrder_ListComments(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "list-comments")
+
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "List comments target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	t.Run("no comments returns empty slice, not nil", func(t *testing.T) {
+		comments, err := order.ListComments(database.Conn())
+		require.NoError(t, err)
+		assert.NotNil(t, comments)
+		assert.Empty(t, comments)
+	})
+
+	userIDStr := userID.String()
+	require.NoError(t, order.RecordCommentAdded(database.Conn(), "First comment", factory.WorkOrderCommentAuthor{
+		Kind:   factory.CommentAuthorKindUser,
+		UserID: &userIDStr,
+	}, nil))
+
+	require.NoError(t, order.RecordCommentAdded(database.Conn(), "Second comment", factory.WorkOrderCommentAuthor{
+		Kind: factory.CommentAuthorKindAutomation,
+		Automation: &factory.AutomationRef{
+			NodeID:   "node-1",
+			NodeName: "Node One",
+		},
+	}, &factory.RunRef{ID: uuid.New(), State: "finished"}))
+
+	// A status update event should never show up in the comment thread.
+	require.NoError(t, order.RecordStatusUpdated(database.Conn(), statusUpdatedRecord{
+		FromState: FactoryWorkOrderStateDraft,
+		ToState:   FactoryWorkOrderStateOpen,
+	}))
+
+	comments, err := order.ListComments(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, comments, 2)
+
+	for _, e := range comments {
+		assert.Equal(t, factory.EventTypeOrderCommentAdded, e.Type)
+	}
+
+	var first, second factory.WorkOrderCommentAdded
+	require.NoError(t, json.Unmarshal(comments[0].Data, &first))
+	require.NoError(t, json.Unmarshal(comments[1].Data, &second))
+
+	// Oldest first — chronological reading order.
+	assert.Equal(t, "First comment", first.Body)
+	require.NotNil(t, first.Author)
+	assert.Equal(t, factory.CommentAuthorKindUser, first.Author.Kind)
+
+	assert.Equal(t, "Second comment", second.Body)
+	require.NotNil(t, second.Author)
+	assert.Equal(t, factory.CommentAuthorKindAutomation, second.Author.Kind)
+	require.NotNil(t, second.Author.Automation)
+	assert.Equal(t, "node-1", second.Author.Automation.NodeID)
+	require.NotNil(t, second.Run)
+}
+
 func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
@@ -667,6 +727,7 @@ func setupFactoryWithUser(t *testing.T, prefix string) (org *Organization, userI
 		database.Conn(),
 		organization.ID,
 		fmt.Sprintf("factory-%s-%d", prefix, nonce),
+		"",
 		"",
 	)
 	require.NoError(t, err)

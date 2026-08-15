@@ -6,6 +6,8 @@ export type LinePhaseTick = "running" | "waiting" | "queued" | "failed" | null;
 export type LinePhaseRunCard = {
   executionId: string;
   workOrderId: string;
+  /** Work order's factory-scoped sequence number, for building the permalink. */
+  workOrderNumber: string | undefined;
   title: string;
   execution: FactoriesWorkOrderExecution;
 };
@@ -128,6 +130,7 @@ function appendCurrentRunForOrder(
   const card: LinePhaseRunCard = {
     executionId: currentExecution.id ?? `${order.id}-${currentExecution.step}-${currentExecution.createdAt ?? ""}`,
     workOrderId: order.id,
+    workOrderNumber: order.number,
     title: order.title?.trim() || "Untitled work order",
     execution: currentExecution,
   };

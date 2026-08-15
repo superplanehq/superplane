@@ -20,7 +20,7 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
@@ -134,7 +134,7 @@ func TestFactoryContext_UpdateWorkOrderStatus(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
@@ -168,7 +168,7 @@ func TestFactoryContext_UpdateWorkOrderStatus_NoopSkipsEmit(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
@@ -206,7 +206,7 @@ func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testi
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
@@ -246,7 +246,7 @@ func TestFactoryContext_UpdateWorkOrderStatus_EmptyOrderIDIsRejected(t *testing.
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
@@ -263,7 +263,7 @@ func TestFactoryContext_AddWorkOrderComment_EmptyOrderIDIsRejected(t *testing.T)
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
@@ -280,7 +280,7 @@ func TestFactoryContext_AddWorkOrderArtifact_EmptyOrderIDIsRejected(t *testing.T
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
@@ -302,7 +302,7 @@ func TestFactoryContext_UpdateWorkOrderStatus_ExplicitOrderIDOnUnattachedRun(t *
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
@@ -333,7 +333,7 @@ func TestFactoryContext_UpdateWorkOrderStatus_ExplicitOrderIDNotFound(t *testing
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
@@ -350,7 +350,7 @@ func TestFactoryContext_AddWorkOrderComment_ExplicitOrderIDOnUnattachedRun(t *te
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
@@ -372,7 +372,7 @@ func TestFactoryContext_AddWorkOrderArtifact_ExplicitOrderIDOnUnattachedRun(t *t
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
@@ -398,7 +398,7 @@ func TestFactoryContext_FindWorkOrder_ByID(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
@@ -438,7 +438,7 @@ func TestFactoryContext_FindWorkOrder_ByArtifactKey(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
@@ -473,7 +473,7 @@ func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
@@ -513,7 +513,7 @@ func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)

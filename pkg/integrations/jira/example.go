@@ -97,6 +97,16 @@ func onIssueExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueOnce, exampleDataOnIssueBytes, &exampleDataOnIssue)
 }
 
+//go:embed example_data_on_incident.json
+var exampleDataOnIncidentBytes []byte
+
+var exampleDataOnIncidentOnce sync.Once
+var exampleDataOnIncident map[string]any
+
+func onIncidentExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIncidentOnce, exampleDataOnIncidentBytes, &exampleDataOnIncident)
+}
+
 //go:embed example_data_on_issue_comment.json
 var exampleDataOnIssueCommentBytes []byte
 
@@ -105,6 +115,16 @@ var exampleDataOnIssueComment map[string]any
 
 func onIssueCommentExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueCommentOnce, exampleDataOnIssueCommentBytes, &exampleDataOnIssueComment)
+}
+
+//go:embed example_data_on_alert.json
+var exampleDataOnAlertBytes []byte
+
+var exampleDataOnAlertOnce sync.Once
+var exampleDataOnAlert map[string]any
+
+func onAlertExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnAlertOnce, exampleDataOnAlertBytes, &exampleDataOnAlert)
 }
 
 //go:embed example_output_update_issue.json

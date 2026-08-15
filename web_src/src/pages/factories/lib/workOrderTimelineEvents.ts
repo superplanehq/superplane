@@ -40,7 +40,6 @@ export interface WorkOrderTimelineStep {
 
 export interface WorkOrderTimelineStepComment {
   body: string;
-  label?: string;
 }
 
 export interface WorkOrderTimelineAssigneeChange {
@@ -147,7 +146,7 @@ export function formatStepExecutionDuration(step: WorkOrderTimelineStep): string
     return null;
   }
 
-  const formatted = formatDuration(durationMs);
+  const formatted = formatDuration(durationMs, { precision: "second" });
   return formatted || null;
 }
 

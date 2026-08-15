@@ -286,10 +286,9 @@ function appendCommentEvent(
 
   const author = payload.author ?? {};
   const automationActor = toAutomationActor(author.automation);
-  const stepComment: WorkOrderTimelineStepComment = {
-    body,
-    label: automationActor?.nodeName,
-  };
+  const sourceRunId = payload.run?.id;
+  const sourceAppId = automationActor?.appId ?? payload.app?.id;
+  const stepComment: WorkOrderTimelineStepComment = { body };
   const step = findAutomationStep(state, automationActor);
   if (step) {
     step.comments = [...(step.comments ?? []), stepComment];
@@ -303,6 +302,8 @@ function appendCommentEvent(
     actorUserId: author.userId ?? payload.user?.id,
     actorName: resolveUserDisplayName(author.userId ?? payload.user?.id, resolveUserName),
     actorAutomation: automationActor,
+    sourceRunId,
+    sourceAppId,
     comment: {
       body,
       authorKind: author.kind,
@@ -452,26 +453,26 @@ function describeAssigneesUpdated(payload: EventPayload, resolveUserName?: UserN
   const parts: string[] = [];
 
   if (selfAssigned && assignedOthers.length === 0) {
-    parts.push("self-assigned");
+    parts.push("took ownership");
   } else if (selfAssigned && assignedOthers.length > 0) {
     const otherNames = formatEventUserNames(
       assignedOthers.map((id) => ({ id })),
       resolveUserName,
     );
-    parts.push(otherNames ? `self-assigned and assigned ${otherNames}` : "self-assigned");
+    parts.push(otherNames ? `took ownership and assigned ${otherNames} as owner` : "took ownership");
   } else {
     const assignedNames = formatEventUserNames(payload.assigned, resolveUserName);
     if (assignedNames) {
-      parts.push(`assigned ${assignedNames}`);
+      parts.push(`assigned ${assignedNames} as owner`);
     }
   }
 
   if (unassignedNames) {
-    parts.push(`unassigned ${unassignedNames}`);
+    parts.push(`removed ${unassignedNames} as owner`);
   }
 
   if (parts.length === 0) {
-    return "updated assignees";
+    return "updated owners";
   }
 
   return parts.join(" and ");

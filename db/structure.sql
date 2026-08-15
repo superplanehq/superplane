@@ -350,7 +350,10 @@ CREATE TABLE public.factories (
     description text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    deleted_at timestamp with time zone
+    deleted_at timestamp with time zone,
+    key character varying(5) NOT NULL,
+    next_work_order_number bigint DEFAULT 1 NOT NULL,
+    CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text))
 );
 
 
@@ -448,7 +451,9 @@ CREATE TABLE public.factory_work_orders (
     created_by_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    source_run_id uuid
+    source_run_id uuid,
+    number bigint NOT NULL,
+    CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
 
@@ -1449,6 +1454,20 @@ CREATE INDEX agent_sessions_provider_session_id_idx ON public.agent_sessions USI
 --
 
 CREATE UNIQUE INDEX agent_sessions_user_canvas_idx ON public.agent_sessions USING btree (organization_id, user_id, canvas_id);
+
+
+--
+-- Name: factories_organization_id_key_active_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX factories_organization_id_key_active_key ON public.factories USING btree (organization_id, key) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: factory_work_orders_factory_id_number_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX factory_work_orders_factory_id_number_key ON public.factory_work_orders USING btree (factory_id, number);
 
 
 --

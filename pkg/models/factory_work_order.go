@@ -61,6 +61,7 @@ type FactoryWorkOrder struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
 	FactoryID      uuid.UUID
+	Number         int64
 	Title          string
 	Description    string
 	State          string
@@ -427,6 +428,25 @@ func (o *FactoryWorkOrder) ListEvents(tx *gorm.DB, limit int, before *time.Time)
 	err := query.
 		Order("created_at DESC").
 		Order("id DESC").
+		Find(&events).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
+// ListComments returns the work order's comment thread (`order.comment.added`
+// events), oldest first — unlike ListEvents (which is DESC for activity
+// feeds), a comment thread reads chronologically oldest→newest.
+func (o *FactoryWorkOrder) ListComments(tx *gorm.DB) ([]FactoryWorkOrderEvent, error) {
+	var events []FactoryWorkOrderEvent
+	err := tx.
+		Where("work_order_id = ?", o.ID).
+		Where("type = ?", factory.EventTypeOrderCommentAdded).
+		Order("created_at ASC").
+		Order("id ASC").
 		Find(&events).
 		Error
 	if err != nil {

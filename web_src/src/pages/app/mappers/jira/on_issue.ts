@@ -29,7 +29,9 @@ const ACTION_LABELS: Record<string, string> = {
   deleted: "Deleted",
 };
 
-function actionLabel(action?: string): string {
+// actionLabel and issueFieldValues are shared with on_incident.ts - an incident is just an issue
+// on an incident-practice request type, so both triggers emit the same event shape.
+export function actionLabel(action?: string): string {
   if (!action) return "";
   return ACTION_LABELS[action] ?? action;
 }
@@ -40,7 +42,7 @@ function issueTitle(issue?: JiraIssue): string {
   return summary ? `${issue.key} - ${summary}` : issue.key || "Issue event";
 }
 
-function issueFieldValues(fields?: JiraIssueFields): Record<string, string> {
+export function issueFieldValues(fields?: JiraIssueFields): Record<string, string> {
   return {
     Summary: stringOrDash(fields?.summary),
     Status: stringOrDash(fields?.status?.name),

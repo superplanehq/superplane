@@ -18,7 +18,7 @@ import (
 func Test__ListDeletedFactories(t *testing.T) {
 	r := support.Setup(t)
 
-	factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	require.NoError(t, factory.SoftDelete(database.DB(t.Context())))
 
@@ -38,7 +38,7 @@ func Test__ListDeletedFactories(t *testing.T) {
 func Test__ListDeletedFactories__IncludesFactoriesInDeletedOrg(t *testing.T) {
 	r := support.Setup(t)
 
-	factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
@@ -68,7 +68,7 @@ func Test__ListDeletedFactories__UsesEarliestDeletedAt(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	require.NoError(t, factory.SoftDelete(db))
 
@@ -103,7 +103,7 @@ func Test__ListDeletedFactories__UsesEarliestDeletedAt(t *testing.T) {
 func Test__LockDeletedFactory__SkipLocked(t *testing.T) {
 	r := support.Setup(t)
 
-	factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	require.NoError(t, factory.SoftDelete(database.DB(t.Context())))
 
@@ -125,7 +125,7 @@ func Test__FactoryResourceCleaner__HardDeletesFactoryDomain(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, []uuid.UUID{r.User}, nil)
@@ -187,7 +187,7 @@ func Test__FactoryResourceCleaner__RespectsLimit(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	for i := 0; i < 3; i++ {
@@ -217,7 +217,7 @@ func Test__FactoryResourceCleaner__LargeFactoryStaysWithinBudget(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	const orderCount = 2000
@@ -230,6 +230,7 @@ func Test__FactoryResourceCleaner__LargeFactoryStaysWithinBudget(t *testing.T) {
 			ID:             uuid.New(),
 			OrganizationID: r.Organization.ID,
 			FactoryID:      factory.ID,
+			Number:         int64(i + 1),
 			Title:          support.RandomName("order"),
 			State:          models.FactoryWorkOrderStateOpen,
 			CreatedByID:    &r.User,
@@ -296,7 +297,7 @@ func Test__CanvasRun__DeleteChain__RemovesFactoryWorkOrderExecution(t *testing.T
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
 	require.NoError(t, err)
@@ -349,7 +350,7 @@ func Test__CanvasRun__DeleteChain__ClearsWorkOrderSourceRunID(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, _ := support.CreateCanvas(
@@ -391,7 +392,7 @@ func Test__FactoryWorkOrder__UpdateStatus__OpenToDraft__RejectsWhenExecutionActi
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
@@ -461,7 +462,7 @@ func Test__Factory__CreateWorkOrder__WithSourceRun__EnrichesInitialStatusEvent(t
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	canvas, _ := support.CreateCanvas(
@@ -497,7 +498,7 @@ func Test__Factory__CreateWorkOrder__WithoutSourceRun__OmitsRunAndApp(t *testing
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	order, err := factory.CreateWorkOrder(db, "Manual intake", "", &r.User, nil, nil)

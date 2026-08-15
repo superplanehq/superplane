@@ -2,13 +2,14 @@ export { FactoriesIndexPage } from "./FactoriesIndexPage";
 export { FactoriesLayout } from "./layout/FactoriesLayout";
 export {
   AutomationsPage,
-  CreateWorkOrderPage,
+  CreateWorkOrderComposeRedirect,
   FactoryAppCanvasPage,
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
   FactorySettingsSoonPage,
   FACTORY_SETTINGS_NAV_ITEMS,
+  LegacyWorkOrderDetailRedirect,
   LinesPage,
   MissionsPage,
   OverviewPage,

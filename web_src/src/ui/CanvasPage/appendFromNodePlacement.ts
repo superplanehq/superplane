@@ -1,3 +1,9 @@
+import {
+  FACTORY_NODE_CARD_HEIGHT,
+  FACTORY_NODE_CARD_WIDTH,
+  FACTORY_NODE_VERTICAL_GAP,
+} from "@/lib/factoryCanvasChrome";
+
 type FlowPoint = { x: number; y: number };
 type Viewport = { x: number; y: number; zoom: number };
 
@@ -35,10 +41,14 @@ export function computeAppendFromNodePlacement({
   canvasWidth,
   canvasHeight,
 }: AppendPlacementInput): AppendPlacementResult {
+  const gapY = isVerticalFlow ? FACTORY_NODE_VERTICAL_GAP : APPEND_GAP_Y;
+  const estimatedWidth = isVerticalFlow ? FACTORY_NODE_CARD_WIDTH : PLACEHOLDER_ESTIMATED_WIDTH;
+  const estimatedHeight = isVerticalFlow ? FACTORY_NODE_CARD_HEIGHT : PLACEHOLDER_ESTIMATED_HEIGHT;
+
   const placeholderPosition = isVerticalFlow
     ? {
         x: sourcePosition.x + APPEND_ALIGNMENT_X,
-        y: sourcePosition.y + sourceHeight + APPEND_GAP_Y,
+        y: sourcePosition.y + sourceHeight + gapY,
       }
     : {
         x: sourcePosition.x + sourceWidth + APPEND_GAP_X,
@@ -46,7 +56,7 @@ export function computeAppendFromNodePlacement({
       };
 
   if (!isVerticalFlow) {
-    const placeholderRightScreenX = (placeholderPosition.x + PLACEHOLDER_ESTIMATED_WIDTH) * viewport.zoom + viewport.x;
+    const placeholderRightScreenX = (placeholderPosition.x + estimatedWidth) * viewport.zoom + viewport.x;
     const maxVisibleScreenX = canvasWidth - RIGHT_SIDEBAR_SAFE_AREA - VIEWPORT_BUFFER;
     if (canvasWidth > 0 && placeholderRightScreenX > maxVisibleScreenX) {
       const overflow = placeholderRightScreenX - maxVisibleScreenX;
@@ -58,7 +68,7 @@ export function computeAppendFromNodePlacement({
     return { placeholderPosition, nextViewport: null };
   }
 
-  const placeholderBottomScreenY = (placeholderPosition.y + PLACEHOLDER_ESTIMATED_HEIGHT) * viewport.zoom + viewport.y;
+  const placeholderBottomScreenY = (placeholderPosition.y + estimatedHeight) * viewport.zoom + viewport.y;
   const maxVisibleScreenY = canvasHeight - BOTTOM_SAFE_AREA - VIEWPORT_BUFFER;
   if (canvasHeight > 0 && placeholderBottomScreenY > maxVisibleScreenY) {
     const overflow = placeholderBottomScreenY - maxVisibleScreenY;

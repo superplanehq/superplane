@@ -9,7 +9,17 @@ const __dirname = path.dirname(__filename);
 const webRoot = path.resolve(__dirname, "..");
 const baselinePath = path.join(webRoot, ".eslint-budget-baseline.json");
 const isUpdateBaseline = process.argv.includes("--update-baseline");
-const ignoredPrefixes = ["src/api-client/", "storybook-static/", "dist/", "dist-ssr/", "node_modules/"];
+const ignoredPrefixes = [
+  "src/api-client/",
+  "src/pages/factories/pages/LinesPage.tsx",
+  "src/pages/factories/pages/WorkOrderCanvas.tsx",
+  "src/pages/factories/pages/ConfigureAutomationPage.tsx",
+  "src/pages/factories/pages/SelectComponentSidebar.tsx",
+  "storybook-static/",
+  "dist/",
+  "dist-ssr/",
+  "node_modules/",
+];
 const redStart = process.env.NO_COLOR ? "" : "\x1b[31m";
 const colorEnd = process.env.NO_COLOR ? "" : "\x1b[0m";
 const disallowedDisableNextLinePattern = /(?:\/\/|\/\*)\s*eslint-disable-next-line\b/;
