@@ -155,8 +155,13 @@ func (l *FactoryLine) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex 
 		RunID:          run.ID,
 		Status:         FactoryWorkOrderExecutionStatusPending,
 		Result:         "",
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		// Snapshot the full step sequence as it looks right now, so the
+		// history rendered for this execution never changes even if the
+		// line is edited afterwards. See the field comment on
+		// FactoryWorkOrderExecution for details.
+		LineSteps: datatypes.JSONSlice[FactoryLineStep](steps),
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 
 	if err := tx.Clauses(clause.Returning{}).Create(execution).Error; err != nil {

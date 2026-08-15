@@ -531,6 +531,11 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return nil, nil
 	}
 
+	// This intentionally reads the *live* factory_lines.steps, not the
+	// finished execution's LineSteps snapshot: this is orchestration logic
+	// deciding what should run next, not history rendering, so it should
+	// reflect the line as it exists today. StartStep below takes its own
+	// fresh snapshot for the new execution it creates.
 	nextIndex := execution.StepIndex + 1
 	if nextIndex >= len(line.Steps) {
 		return nil, nil

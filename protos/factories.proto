@@ -490,8 +490,11 @@ message WorkOrderExecution {
   // Zero-based index of the step inside the containing line; matches the
   // position in `steps` so the UI can highlight the current step.
   int32 step_index = 9;
-  // Steps the run walks through, snapshotted from the line's step
-  // definitions. The current execution's `step_index` marks the active step.
+  // Steps the run walks through, captured once from the containing line's
+  // step definitions when this execution was created. This is a point-in-time
+  // snapshot: later edits to the line (renaming, reordering, adding/removing
+  // steps) do not change it, so already-rendered history stays accurate. The
+  // current execution's `step_index` marks the active step within it.
   repeated WorkOrderExecutionStep steps = 10;
   // Optional aggregate usage; UI hides zero values.
   int64 total_tokens = 11;
