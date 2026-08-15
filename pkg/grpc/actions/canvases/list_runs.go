@@ -215,17 +215,19 @@ func serializeCanvasRunWithQueueItemInputs(
 	}
 
 	serialized := &pb.CanvasRun{
-		Id:         run.ID.String(),
-		CanvasId:   run.WorkflowID.String(),
-		VersionId:  run.VersionID.String(),
-		RootEvent:  serializedRootEvent,
-		State:      RunStateToProto(run.State),
-		Result:     RunResultToProto(run.Result),
-		Executions: executionRefs,
-		QueueItems: serializedQueueItems,
-		Errors:     run.ErrorMessages(),
-		CreatedAt:  timestamppb.New(*run.CreatedAt),
-		UpdatedAt:  timestamppb.New(*run.UpdatedAt),
+		Id:                      run.ID.String(),
+		CanvasId:                run.WorkflowID.String(),
+		VersionId:               run.VersionID.String(),
+		RootEvent:               serializedRootEvent,
+		State:                   RunStateToProto(run.State),
+		Result:                  RunResultToProto(run.Result),
+		Executions:              executionRefs,
+		QueueItems:              serializedQueueItems,
+		Errors:                  run.ErrorMessages(),
+		CreatedAt:               timestamppb.New(*run.CreatedAt),
+		UpdatedAt:               timestamppb.New(*run.UpdatedAt),
+		IsReplay:                run.IsReplay,
+		ReplaySourceExecutionId: optionalUUIDString(run.ReplaySourceExecutionID),
 	}
 
 	if parentRun.ID != uuid.Nil {
@@ -416,6 +418,14 @@ func groupExecutionsByRunID(executions []models.CanvasNodeExecution, runCount in
 	}
 
 	return executionsByRunID
+}
+
+func optionalUUIDString(value *uuid.UUID) string {
+	if value == nil {
+		return ""
+	}
+
+	return value.String()
 }
 
 func getLastRunTimestamp(runs []models.CanvasRun) *timestamppb.Timestamp {

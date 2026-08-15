@@ -79,6 +79,7 @@ type NodeExecutionResources struct {
 	rootEventsByID            map[string]models.CanvasEvent
 	outputEventsByExecutionID map[string][]models.CanvasEvent
 	cancelledByUsersByID      map[uuid.UUID]models.User
+	runsByID                  map[uuid.UUID]models.CanvasRun
 }
 
 func LoadNodeExecutionResources(db *gorm.DB, executions []models.CanvasNodeExecution) (*NodeExecutionResources, error) {
@@ -86,13 +87,19 @@ func LoadNodeExecutionResources(db *gorm.DB, executions []models.CanvasNodeExecu
 	var rootEventsErr, outputEventsErr error
 	var cancelledByUsers []models.User
 	var cancelledByUsersErr error
+	var runs []models.CanvasRun
+	var runsErr error
 	var wg sync.WaitGroup
 
-	wg.Add(3)
+	wg.Add(4)
 
 	go func() {
 		defer wg.Done()
-		rootEvents, rootEventsErr = models.FindCanvasEvents(db, rootEventIDs(executions))
+		//
+		// Root events and input events are both CanvasEvent rows, so a single
+		// lookup keyed by id covers root_event and input_event alike.
+		//
+		rootEvents, rootEventsErr = models.FindCanvasEvents(db, eventIDsForExecutions(executions))
 	}()
 
 	go func() {
@@ -105,6 +112,11 @@ func LoadNodeExecutionResources(db *gorm.DB, executions []models.CanvasNodeExecu
 		cancelledByUsers, cancelledByUsersErr = models.FindMaybeDeletedUsersByIDs(db, cancelledByIDs(executions))
 	}()
 
+	go func() {
+		defer wg.Done()
+		runs, runsErr = models.FindCanvasRunsByKeys(db, runKeysForExecutions(executions))
+	}()
+
 	wg.Wait()
 
 	if rootEventsErr != nil {
@@ -115,6 +127,14 @@ func LoadNodeExecutionResources(db *gorm.DB, executions []models.CanvasNodeExecu
 	}
 	if cancelledByUsersErr != nil {
 		return nil, fmt.Errorf("error finding cancelled-by users: %w", cancelledByUsersErr)
+	}
+	if runsErr != nil {
+		return nil, fmt.Errorf("error finding runs: %w", runsErr)
+	}
+
+	runsByID := make(map[uuid.UUID]models.CanvasRun, len(runs))
+	for _, run := range runs {
+		runsByID[run.ID] = run
 	}
 
 	cancelledByUsersByID := make(map[uuid.UUID]models.User, len(cancelledByUsers))
@@ -140,6 +160,7 @@ func LoadNodeExecutionResources(db *gorm.DB, executions []models.CanvasNodeExecu
 		rootEventsByID:            rootEventsByID,
 		outputEventsByExecutionID: outputEventsByExecutionID,
 		cancelledByUsersByID:      cancelledByUsersByID,
+		runsByID:                  runsByID,
 	}, nil
 }
 
@@ -147,6 +168,11 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, resources 
 	result := make([]*pb.CanvasNodeExecution, 0, len(executions))
 	for _, execution := range executions {
 		rootEvent, err := getRootEventForExecution(execution, resources.rootEventsByID)
+		if err != nil {
+			return nil, err
+		}
+
+		inputEvent, err := getInputEventForExecution(execution, resources.rootEventsByID)
 		if err != nil {
 			return nil, err
 		}
@@ -167,28 +193,56 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, resources 
 			return nil, err
 		}
 
+		isReplay, replaySourceExecutionID := replayLineageForExecution(execution, resources.runsByID)
+
 		result = append(result, &pb.CanvasNodeExecution{
-			Id:                  execution.ID.String(),
-			CanvasId:            execution.WorkflowID.String(),
-			NodeId:              execution.NodeID,
-			PreviousExecutionId: execution.GetPreviousExecutionID(),
-			State:               NodeExecutionStateToProto(execution.State),
-			Result:              NodeExecutionResultToProto(execution.Result),
-			ResultReason:        NodeExecutionResultReasonToProto(execution.ResultReason),
-			ResultMessage:       execution.ResultMessage,
-			CreatedAt:           timestamppb.New(*execution.CreatedAt),
-			UpdatedAt:           timestamppb.New(*execution.UpdatedAt),
-			Metadata:            metadata,
-			Configuration:       configuration,
-			Outputs:             outputs,
-			RootEvent:           rootEvent,
-			CancelledBy:         cancelledByRef(execution.CancelledBy, resources.cancelledByUsersByID),
-			RunId:               uuidStringOrEmpty(execution.RunID),
-			CancelledAt:         optionalTimestamp(execution.CancelledAt),
+			Id:                      execution.ID.String(),
+			CanvasId:                execution.WorkflowID.String(),
+			NodeId:                  execution.NodeID,
+			PreviousExecutionId:     execution.GetPreviousExecutionID(),
+			State:                   NodeExecutionStateToProto(execution.State),
+			Result:                  NodeExecutionResultToProto(execution.Result),
+			ResultReason:            NodeExecutionResultReasonToProto(execution.ResultReason),
+			ResultMessage:           execution.ResultMessage,
+			CreatedAt:               timestamppb.New(*execution.CreatedAt),
+			UpdatedAt:               timestamppb.New(*execution.UpdatedAt),
+			Metadata:                metadata,
+			Configuration:           configuration,
+			Outputs:                 outputs,
+			RootEvent:               rootEvent,
+			CancelledBy:             cancelledByRef(execution.CancelledBy, resources.cancelledByUsersByID),
+			RunId:                   uuidStringOrEmpty(execution.RunID),
+			CancelledAt:             optionalTimestamp(execution.CancelledAt),
+			InputEvent:              inputEvent,
+			IsReplay:                isReplay,
+			ReplaySourceExecutionId: replaySourceExecutionID,
 		})
 	}
 
 	return result, nil
+}
+
+// replayLineageForExecution surfaces the run's replay fields on the execution
+// row so a client can render a replay badge with a link to the source
+// execution without a second round trip - see the run-not-loaded case (execution.RunID == uuid.Nil, or the
+// row is simply missing from resources.runsByID for any reason) as "not a
+// replay" rather than erroring, matching every other best-effort field in
+// this serializer (e.g. cancelledByRef).
+func replayLineageForExecution(execution models.CanvasNodeExecution, runsByID map[uuid.UUID]models.CanvasRun) (bool, string) {
+	if execution.RunID == uuid.Nil {
+		return false, ""
+	}
+
+	run, ok := runsByID[execution.RunID]
+	if !ok || !run.IsReplay {
+		return false, ""
+	}
+
+	if run.ReplaySourceExecutionID == nil {
+		return true, ""
+	}
+
+	return true, run.ReplaySourceExecutionID.String()
 }
 
 func validateExecutionStates(in []pb.CanvasNodeExecution_State) ([]string, error) {
@@ -331,6 +385,19 @@ func executionIDs(executions []models.CanvasNodeExecution) []string {
 	return ids
 }
 
+func runKeysForExecutions(executions []models.CanvasNodeExecution) []models.CanvasRunKey {
+	keys := make([]models.CanvasRunKey, 0, len(executions))
+	for _, execution := range executions {
+		if execution.RunID == uuid.Nil {
+			continue
+		}
+
+		keys = append(keys, models.CanvasRunKey{WorkflowID: execution.WorkflowID, RunID: execution.RunID})
+	}
+
+	return keys
+}
+
 func cancelledByIDs(executions []models.CanvasNodeExecution) []uuid.UUID {
 	idsMap := make(map[uuid.UUID]struct{})
 	for _, execution := range executions {
@@ -348,10 +415,18 @@ func cancelledByIDs(executions []models.CanvasNodeExecution) []uuid.UUID {
 	return ids
 }
 
-func rootEventIDs(executions []models.CanvasNodeExecution) []string {
-	ids := make([]string, len(executions))
-	for i, execution := range executions {
-		ids[i] = execution.RootEventID.String()
+func eventIDsForExecutions(executions []models.CanvasNodeExecution) []string {
+	idsMap := make(map[string]struct{}, len(executions)*2)
+	for _, execution := range executions {
+		idsMap[execution.RootEventID.String()] = struct{}{}
+		if execution.EventID != uuid.Nil {
+			idsMap[execution.EventID.String()] = struct{}{}
+		}
+	}
+
+	ids := make([]string, 0, len(idsMap))
+	for id := range idsMap {
+		ids = append(ids, id)
 	}
 
 	return ids
@@ -397,6 +472,45 @@ func getRootEventForExecution(execution models.CanvasNodeExecution, rootEvents m
 		CreatedAt:  timestamppb.New(*rootEvent.CreatedAt),
 		Root:       rootEvent.ExecutionID == nil,
 		RunId:      uuidStringOrEmpty(rootEvent.RunID),
+	}, nil
+}
+
+func getInputEventForExecution(execution models.CanvasNodeExecution, events map[string]models.CanvasEvent) (*pb.CanvasEvent, error) {
+	//
+	// Unlike the root event, the input event may legitimately be gone: retention
+	// nulls out CanvasNodeExecution.EventID when the event it points at is
+	// deleted (ON DELETE SET NULL). Treat both "no event id" and "event id set
+	// but the event itself is gone" as "no input event to show", not an error.
+	//
+	if execution.EventID == uuid.Nil {
+		return nil, nil
+	}
+
+	inputEvent, ok := events[execution.EventID.String()]
+	if !ok {
+		return nil, nil
+	}
+
+	data, ok := inputEvent.Data.Data().(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("event data is not a map[string]any")
+	}
+
+	s, err := newStructpbStruct(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.CanvasEvent{
+		Id:         inputEvent.ID.String(),
+		CanvasId:   inputEvent.WorkflowID.String(),
+		NodeId:     inputEvent.NodeID,
+		Channel:    inputEvent.Channel,
+		CustomName: valueOrEmpty(inputEvent.CustomName),
+		Data:       s,
+		CreatedAt:  timestamppb.New(*inputEvent.CreatedAt),
+		Root:       inputEvent.ExecutionID == nil,
+		RunId:      uuidStringOrEmpty(inputEvent.RunID),
 	}, nil
 }
 
