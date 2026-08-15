@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { RunStatusFilterSection, RunTriggerFilterSection, type TriggerOption } from "@/ui/Runs/RunFilterSections";
@@ -16,6 +17,8 @@ interface RunFiltersPopoverProps {
   onClearStatuses: () => void;
   onToggleTrigger: (triggerId: string) => void;
   onClearTriggers: () => void;
+  showReplays: boolean;
+  onToggleShowReplays: () => void;
 }
 
 export function RunFiltersPopover({
@@ -26,11 +29,13 @@ export function RunFiltersPopover({
   onClearStatuses,
   onToggleTrigger,
   onClearTriggers,
+  showReplays,
+  onToggleShowReplays,
 }: RunFiltersPopoverProps) {
   const [isOpen, setIsOpen] = useState(false);
   const hasStatusFilter = selectedStatuses.size > 0;
   const hasTriggerFilter = selectedTriggerIds.size > 0;
-  const totalFilters = selectedTriggerIds.size + selectedStatuses.size;
+  const totalFilters = selectedTriggerIds.size + selectedStatuses.size + (showReplays ? 1 : 0);
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -41,7 +46,7 @@ export function RunFiltersPopover({
           size="icon-xs"
           className={cn(
             "relative shrink-0 hover:bg-gray-100 dark:hover:bg-gray-800",
-            hasTriggerFilter || hasStatusFilter
+            hasTriggerFilter || hasStatusFilter || showReplays
               ? "text-sky-700 hover:bg-sky-100 dark:text-indigo-300 dark:hover:bg-gray-800"
               : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200",
           )}
@@ -73,6 +78,19 @@ export function RunFiltersPopover({
           onClearTriggers={onClearTriggers}
           headerClassName="border-t border-slate-950/10 dark:border-gray-800/70"
         />
+        <label
+          htmlFor="show-replays-filter"
+          className="flex cursor-pointer items-center gap-2 border-t border-slate-950/10 px-3 py-2 text-[13px] text-gray-700 dark:border-gray-800/70 dark:text-gray-200"
+        >
+          <Checkbox
+            id="show-replays-filter"
+            data-testid="show-replays-filter"
+            checked={showReplays}
+            onChange={onToggleShowReplays}
+            className="size-3.5"
+          />
+          <span className="min-w-0 truncate">Show replay runs</span>
+        </label>
       </PopoverContent>
     </Popover>
   );
