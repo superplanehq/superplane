@@ -12,7 +12,8 @@ import { WorkOrdersPage } from "./WorkOrdersPage";
 
 /**
  * Work Orders page. Storybook uses the missions page from FactoriesHarness.
- * The live app still renders `WorkOrdersPage`.
+ * The live app still renders `WorkOrdersPage`. New Work Order opens the
+ * create dialog.
  */
 const meta = {
   title: "Factories/Pages/Work Orders",

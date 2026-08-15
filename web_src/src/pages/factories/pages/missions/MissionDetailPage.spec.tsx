@@ -29,6 +29,7 @@ describe("MissionDetailPage", () => {
               factoryKey: PRIMARY_FACTORY_KEY,
               factory: REFUND_FACTORY,
               factories: [REFUND_FACTORY],
+              openCreateWorkOrder: vi.fn(),
             }}
           >
             <Routes>

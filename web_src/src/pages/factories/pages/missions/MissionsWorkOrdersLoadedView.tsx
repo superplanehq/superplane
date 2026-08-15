@@ -1,7 +1,6 @@
 import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
-import { createWorkOrderPath } from "../../lib/factoryPagePaths";
 import type { WorkOrderListState } from "../../lib/useWorkOrderListState";
 import {
   applyWorkOrderFilters,
@@ -33,6 +32,7 @@ export interface MissionsWorkOrdersLoadedViewProps {
   state: WorkOrderListState;
   currentUserId?: string;
   canCreate: boolean;
+  onCreateWorkOrder: () => void;
   canDispatch: boolean;
   canAssign: boolean;
   permissionsLoading: boolean;
@@ -59,13 +59,12 @@ export function MissionsWorkOrdersLoadedView(props: MissionsWorkOrdersLoadedView
   );
 
   const totalCount = entries.length;
-  const createHref = createWorkOrderPath(props.organizationId, props.factoryKey);
 
   const body = () => {
     if (totalCount === 0) {
       return (
         <WorkOrdersTrueEmptyState
-          createHref={createHref}
+          onCreateWorkOrder={props.onCreateWorkOrder}
           canCreate={props.canCreate}
           permissionsLoading={props.permissionsLoading}
         />
@@ -111,7 +110,7 @@ export function MissionsWorkOrdersLoadedView(props: MissionsWorkOrdersLoadedView
         state={state}
         entries={entries}
         factoryLines={props.factoryLines}
-        createHref={createHref}
+        onCreateWorkOrder={props.onCreateWorkOrder}
         canCreate={props.canCreate}
         permissionsLoading={props.permissionsLoading}
       />
