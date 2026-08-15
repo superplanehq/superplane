@@ -684,6 +684,7 @@ Run items have their own action menu separate from node actions. These actions o
 |--------|----------------|---------|
 | **Cancel** | When execution is running | Stop a running execution |
 | **Re-Emit** | On completed trigger events | Replay an event to re-trigger the workflow |
+| **Replay** | On executions that still have their input event | Re-run that one node against its past input, editable before launch, without cascading downstream |
 | **Push Through** | When component supports it (e.g., Wait) | Force a waiting execution to proceed immediately |
 
 ### Queue Item Actions
