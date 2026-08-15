@@ -25,7 +25,7 @@ type stepQueueFixture struct {
 func setupStepQueueLine(t *testing.T, r *support.ResourceRegistry, stepMaxParallelisms []*int) *stepQueueFixture {
 	t.Helper()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	line, err := factory.CreateLine(database.Conn(), support.RandomName("line"), nil)

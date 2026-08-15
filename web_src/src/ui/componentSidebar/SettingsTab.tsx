@@ -6,6 +6,7 @@ import type {
 } from "@/api-client";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -839,15 +840,19 @@ export function SettingsTab({
             </div>
             <div className="flex flex-col gap-2">
               <Label className="min-w-[100px] text-left">Queue key</Label>
-              <Input
+              <AutoCompleteInput
                 data-testid="node-queue-key-input"
-                type="text"
+                exampleObj={resolvedAutocompleteExampleObj ?? null}
                 value={queueDraft.key}
-                onChange={(e) => {
-                  const value = e.target.value;
+                onChange={(value) => {
                   setQueueDraft((prev) => ({ ...prev, key: value }));
                 }}
                 placeholder={"ci-{{ $.data.branch }}"}
+                startWord="{{"
+                prefix="{{ "
+                suffix=" }}"
+                inputSize="md"
+                quickTip="Tip: type `{{` to start an expression."
                 className="shadow-none"
               />
               <p className="text-xs text-gray-500">
