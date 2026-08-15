@@ -233,7 +233,7 @@ describe("WorkOrderDescriptionEditor", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it("underlines selected text and stores it as ++markdown++", async () => {
+  it("underlines selected text and stores it as HTML", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
 
@@ -245,14 +245,22 @@ describe("WorkOrderDescriptionEditor", () => {
     await user.click(await screen.findByRole("button", { name: "Underline" }));
 
     expect(input.querySelector("u")).toHaveTextContent("Hello world");
-    expect(onChange.mock.calls.at(-1)?.[0]).toContain("++Hello world++");
+    expect(onChange.mock.calls.at(-1)?.[0]).toContain("<u>Hello world</u>");
   });
 
-  it("renders stored underline markdown when the editor opens", async () => {
-    render(<WorkOrderDescriptionEditor value="Hello ++world++" maxLength={5000} disabled={false} onChange={vi.fn()} />);
+  it("renders stored underline HTML when the editor opens", async () => {
+    render(<WorkOrderDescriptionEditor value="Hello <u>world</u>." maxLength={5000} disabled={false} onChange={vi.fn()} />);
 
     const input = await screen.findByTestId("work-order-description-input");
     expect(input.querySelector("u")).toHaveTextContent("world");
+  });
+
+  it("does not treat increment operators as underline when the editor opens", async () => {
+    render(<WorkOrderDescriptionEditor value="i++ then j++" maxLength={5000} disabled={false} onChange={vi.fn()} />);
+
+    const input = await screen.findByTestId("work-order-description-input");
+    expect(input.querySelector("u")).toBeNull();
+    expect(input).toHaveTextContent("i++ then j++");
   });
 
   it("applies bold from the format toolbar with the keyboard", async () => {

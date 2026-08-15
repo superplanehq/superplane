@@ -20,7 +20,12 @@ describe("looksLikeMarkdown", () => {
   it("treats paired emphasis and headings as markdown", () => {
     expect(looksLikeMarkdown("this is **bold** text")).toBe(true);
     expect(looksLikeMarkdown("this is __important__ now")).toBe(true);
-    expect(looksLikeMarkdown("this is ++underlined++ text")).toBe(true);
+    expect(looksLikeMarkdown("this is <u>underlined</u> text")).toBe(true);
     expect(looksLikeMarkdown("## Title")).toBe(true);
+  });
+
+  it("does not treat ++ pairs as underline markdown", () => {
+    expect(looksLikeMarkdown("this is ++underlined++ text")).toBe(false);
+    expect(looksLikeMarkdown("++word++.")).toBe(false);
   });
 });

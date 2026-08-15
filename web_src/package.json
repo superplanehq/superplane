@@ -67,6 +67,7 @@
     "@tiptap/core": "^3.30.0",
     "@tiptap/extension-bubble-menu": "^3.30.0",
     "@tiptap/extension-placeholder": "^3.30.0",
+    "@tiptap/extension-underline": "^3.30.0",
     "@tiptap/markdown": "^3.30.0",
     "@tiptap/pm": "^3.30.0",
     "@tiptap/react": "^3.30.0",

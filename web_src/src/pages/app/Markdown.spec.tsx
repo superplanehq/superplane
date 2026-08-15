@@ -107,32 +107,20 @@ describe("MarkdownContent", () => {
     expect(screen.getByText("world").tagName).toBe("U");
   });
 
-  it("renders TipTap ++underline++ tokens in workspace markdown", () => {
-    render(<MarkdownContent content={"Hello ++world++"} variant="workspace" />);
+  it("renders underline next to punctuation and nested marks", () => {
+    render(<MarkdownContent content={"See **<u>word</u>**."} variant="workspace" />);
 
-    expect(screen.getByText("world").tagName).toBe("U");
+    expect(screen.getByText("word").tagName).toBe("U");
+    expect(screen.getByText("word").closest("strong")).toBeInTheDocument();
   });
 
-  it("does not treat ++ inside workspace code as underline", () => {
-    render(<MarkdownContent content={"`score++` and ++done++"} variant="workspace" />);
-
-    expect(screen.getByTestId("markdown-code")).toHaveTextContent("score++");
-    expect(screen.getByText("done").tagName).toBe("U");
-  });
-
-  it("does not treat increment operators as workspace underline", () => {
-    const { container } = render(<MarkdownContent content={"i++ then j++"} variant="workspace" />);
+  it("does not treat ++ as workspace underline", () => {
+    const { container } = render(
+      <MarkdownContent content={"i++ then j++ and C++ … ++more++"} variant="workspace" />,
+    );
 
     expect(container.querySelector("u")).toBeNull();
-    expect(container).toHaveTextContent("i++ then j++");
-  });
-
-  it("does not pair C++ with a later ++ span as underline", () => {
-    const { container } = render(<MarkdownContent content={"C++ … ++more++"} variant="workspace" />);
-
-    expect(container).toHaveTextContent("C++ … more");
-    expect(screen.getByText("more").tagName).toBe("U");
-    expect(container.textContent).toContain("C++");
+    expect(container).toHaveTextContent("i++ then j++ and C++ … ++more++");
   });
 
   it("renders bold markdown with semibold weight", () => {

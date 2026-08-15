@@ -120,7 +120,6 @@ export function MarkdownContent({
 }: MarkdownContentProps) {
   const normalized = content.replace(/\r\n/g, "\n");
   if (!normalized.trim()) return null;
-  const markdown = variant === "workspace" ? workspaceUnderlineToHtml(normalized) : normalized;
   const contentClassName = variant === "workspace" ? WORKSPACE_MARKDOWN_CONTENT_CLASSES : MARKDOWN_CONTENT_CLASSES;
   const headingClassName = (level: keyof typeof WORKSPACE_MARKDOWN_HEADING_CLASSES) =>
     variant === "workspace" ? WORKSPACE_MARKDOWN_HEADING_CLASSES[level] : markdownHeadingClassName(level);
@@ -187,7 +186,7 @@ export function MarkdownContent({
           hr: MarkdownDivider,
         }}
       >
-        {markdown}
+        {normalized}
       </ReactMarkdown>
     </div>
   );
@@ -287,22 +286,6 @@ function hasLanguageCodeNode(node?: ExtraProps["node"]): boolean {
     (child): child is MarkdownElementChild => child.type === "element" && child.tagName === "code",
   );
   return getClassNames(codeNode?.properties?.className).some((className) => /^language-\w+$/.test(className));
-}
-
-/**
- * TipTap stores underline as ++text++. Convert those tokens to <u> for workspace markdown.
- * Require the same whitespace bounds as __ so increments like i++ then j++ stay plain.
- */
-function workspaceUnderlineToHtml(markdown: string): string {
-  return markdown.replace(
-    /(```[\s\S]*?```|`[^`]*`)|(^|\s)\+\+([^\n+]+)\+\+(?=\s|$)/g,
-    (_match, code: string | undefined, boundary: string | undefined, inner: string | undefined) => {
-      if (code) {
-        return code;
-      }
-      return `${boundary}<u>${inner}</u>`;
-    },
-  );
 }
 
 function getClassNames(className: unknown): string[] {

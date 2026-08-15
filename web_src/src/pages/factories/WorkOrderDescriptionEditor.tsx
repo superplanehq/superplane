@@ -6,6 +6,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { useEffect, useRef } from "react";
 
 import { pasteMarkdownFromClipboard } from "./lib/workOrderDescriptionMarkdown";
+import { WorkspaceUnderline } from "./lib/workspaceUnderline";
 import { WorkOrderDescriptionFormatToolbar } from "./WorkOrderDescriptionFormatToolbar";
 
 interface WorkOrderDescriptionEditorProps {
@@ -44,7 +45,9 @@ export function WorkOrderDescriptionEditor({
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4] },
         link: { openOnClick: false, autolink: true },
+        underline: false,
       }),
+      WorkspaceUnderline,
       Markdown,
       Placeholder.configure({ placeholder: "Add description…" }),
     ],

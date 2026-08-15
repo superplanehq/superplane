@@ -5,8 +5,7 @@ const MARKDOWN_BLOCK_START = /^(#{1,6}\s|[-*+]\s|\d+\.\s|>\s|```)/m;
 const MARKDOWN_PAIRED_ASTERISKS = /\*\*[^*\n]+\*\*/;
 const MARKDOWN_CODE = /`[^`]+`/;
 const MARKDOWN_UNDERSCORE_EMPHASIS = /(?:^|\s)__[^_\n]+__(?:\s|$)/;
-// Same whitespace bounds as __ so increments like i++ then j++ stay plain text.
-const MARKDOWN_UNDERLINE = /(?:^|\s)\+\+[^\n+]+\+\+(?:\s|$)/;
+const MARKDOWN_UNDERLINE = /<u>[\s\S]+?<\/u>/i;
 
 export function looksLikeMarkdown(text: string): boolean {
   return (
