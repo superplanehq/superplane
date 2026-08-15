@@ -145,7 +145,7 @@ export function formatStepExecutionDuration(step: WorkOrderTimelineStep): string
     return null;
   }
 
-  const formatted = formatDuration(durationMs);
+  const formatted = formatDuration(durationMs, { precision: "second" });
   return formatted || null;
 }
 
