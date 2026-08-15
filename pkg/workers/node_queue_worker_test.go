@@ -866,3 +866,101 @@ func Test__NodeQueueWorker_SkipsConfigurationErrorQueueItemForCancellingRun(t *t
 	assert.False(t, queueConsumedConsumer.HasReceivedMessage())
 	assert.True(t, queueDeletedConsumer.HasReceivedMessage())
 }
+
+// A merge execution that consumes three events from three distinct sources
+// must have exactly three consumed-event rows recorded for it -
+// one per event - in the engine-level consumed-event link table.
+func Test__NodeQueueWorker_MergeExecutionRecordsConsumedEventsFromThreeSources(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	logger := log.NewEntry(log.New())
+
+	triggerNode := "trigger-1"
+	source1 := "source-1"
+	source2 := "source-2"
+	source3 := "source-3"
+	mergeNode := "merge-node"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: source1,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: source2,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: source3,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: mergeNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "merge"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: source1, Channel: "default"},
+			{SourceID: triggerNode, TargetID: source2, Channel: "default"},
+			{SourceID: triggerNode, TargetID: source3, Channel: "default"},
+			{SourceID: source1, TargetID: mergeNode, Channel: "default"},
+			{SourceID: source2, TargetID: mergeNode, Channel: "default"},
+			{SourceID: source3, TargetID: mergeNode, Channel: "default"},
+		},
+	)
+
+	//
+	// The root event drives the merge group key (RootEventID), so all three
+	// queue items below belong to the same merge execution.
+	//
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	event1 := support.EmitCanvasEventForNode(t, canvas.ID, source1, "default", nil)
+	event2 := support.EmitCanvasEventForNode(t, canvas.ID, source2, "default", nil)
+	event3 := support.EmitCanvasEventForNode(t, canvas.ID, source3, "default", nil)
+
+	support.CreateQueueItem(t, canvas.ID, mergeNode, rootEvent.ID, event1.ID)
+	support.CreateQueueItem(t, canvas.ID, mergeNode, rootEvent.ID, event2.ID)
+	support.CreateQueueItem(t, canvas.ID, mergeNode, rootEvent.ID, event3.ID)
+
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, mergeNode)
+	require.NoError(t, err)
+
+	//
+	// Process the three queue items one at a time, as the real worker loop does.
+	//
+	for i := 0; i < 3; i++ {
+		node, err = models.FindCanvasNode(database.Conn(), canvas.ID, mergeNode)
+		require.NoError(t, err)
+		err = worker.LockAndProcessNode(logger, *node, time.Now())
+		require.NoError(t, err)
+	}
+
+	//
+	// All three queue items should have fed the same merge execution.
+	//
+	executions, err := models.ListNodeExecutions(database.Conn(), canvas.ID, mergeNode, nil, nil, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, executions, 1)
+
+	consumed, err := models.ListConsumedEventsForExecution(database.Conn(), executions[0].ID)
+	require.NoError(t, err)
+	require.Len(t, consumed, 3)
+
+	consumedEventIDs := []uuid.UUID{*consumed[0].EventID, *consumed[1].EventID, *consumed[2].EventID}
+	assert.ElementsMatch(t, []uuid.UUID{event1.ID, event2.ID, event3.ID}, consumedEventIDs)
+}

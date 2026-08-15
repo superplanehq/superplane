@@ -351,6 +351,24 @@ func (w *EventRouter) processExecutionEvent(
 		return nil, nil
 	}
 
+	//
+	// A replay is isolated from the graph: its output events are stored and
+	// routed like any other, but they never fan out to downstream nodes, and
+	// they never dispatch to on-error nodes (see ExecutionStateContext.Fail).
+	// This is also what lets the replay run reach a terminal state - with no
+	// queue items created, the terminal-event publish below (and the
+	// execution-finished trigger from node_executor) let RunFinalizer close
+	// the run exactly like any other leaf event, with no changes needed in
+	// run_initializer.go/run_finalizer.go.
+	//
+	if run.IsReplay {
+		if err := event.RoutedInTransaction(tx); err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	}
+
 	now := time.Now()
 	logger = logging.WithExecution(logger, execution)
 	w.logger.Infof("Processing event")
