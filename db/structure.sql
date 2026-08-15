@@ -432,7 +432,8 @@ CREATE TABLE public.factory_work_order_executions (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     finished_at timestamp with time zone,
     total_tokens bigint DEFAULT 0 NOT NULL,
-    cost_cents bigint DEFAULT 0 NOT NULL
+    cost_cents bigint DEFAULT 0 NOT NULL,
+    line_steps jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -2708,7 +2709,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260812184220	f
+20260813090000	f
 \.
 
 

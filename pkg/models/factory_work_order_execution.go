@@ -38,9 +38,19 @@ type FactoryWorkOrderExecution struct {
 	// only surfaces non-zero values to the UI.
 	TotalTokens int64
 	CostCents   int64
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	FinishedAt  *time.Time
+	// LineSteps is a snapshot of the containing line's step definitions,
+	// captured once by FactoryLine.StartStep at the moment this execution
+	// was created. It intentionally does not track later edits to the line:
+	// once a step has run, its rendered history (the Intake -> Implement ->
+	// Verify sequence and which step_index was active) must stay stable even
+	// if the line is renamed, reordered, or has steps added/removed
+	// afterwards. Rows created before this column existed were backfilled
+	// from the line's definition at migration time, so they are only as
+	// accurate as the line looked then, not necessarily what actually ran.
+	LineSteps  datatypes.JSONSlice[FactoryLineStep] `gorm:"column:line_steps"`
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	FinishedAt *time.Time
 }
 
 func FindWorkOrderExecutionByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryWorkOrderExecution, error) {
@@ -146,9 +156,6 @@ type FactoryWorkOrderExecutionRecord struct {
 	CanvasName string
 	RunState   string
 	RunResult  string
-	// Steps snapshot the containing line's step definitions so the UI can
-	// render the Intake -> Implement -> Verify sequence without a separate lookup.
-	LineSteps datatypes.JSONSlice[FactoryLineStep] `gorm:"column:line_steps"`
 }
 
 func ListFactoryWorkOrderExecutionsByWorkOrderIDs(
@@ -166,7 +173,6 @@ func ListFactoryWorkOrderExecutionsByWorkOrderIDs(
 		Select(`
 			e.*,
 			l.name AS line_name,
-			l.steps AS line_steps,
 			c.id AS canvas_id,
 			c.name AS canvas_name,
 			r.state AS run_state,
