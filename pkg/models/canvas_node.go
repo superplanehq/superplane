@@ -14,10 +14,12 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+// Node states. The state column no longer acts as a dispatch mutex:
+// scheduling is derived from execution counts per queue. The error state
+// keeps its meaning (broken configuration blocks dispatch).
 const (
-	CanvasNodeStateReady      = "ready"
-	CanvasNodeStateProcessing = "processing"
-	CanvasNodeStateError      = "error"
+	CanvasNodeStateReady = "ready"
+	CanvasNodeStateError = "error"
 
 	NodeTypeTrigger   = "trigger"
 	NodeTypeComponent = "component"
@@ -33,6 +35,7 @@ type Node struct {
 	Metadata       map[string]any `json:"metadata"`
 	Position       Position       `json:"position"`
 	IsCollapsed    bool           `json:"isCollapsed"`
+	Queue          *QueueSpec     `json:"queue,omitempty"`
 	IntegrationID  *string        `json:"integrationId,omitempty"`
 	ErrorMessage   *string        `json:"errorMessage,omitempty"`
 	WarningMessage *string        `json:"warningMessage,omitempty"`
@@ -84,17 +87,31 @@ type Edge struct {
 }
 
 type CanvasNode struct {
-	WorkflowID        uuid.UUID `gorm:"primaryKey"`
-	NodeID            string    `gorm:"primaryKey"`
-	Name              string
-	State             string
-	StateReason       *string
-	Type              string
-	Position          datatypes.JSONType[Position]
-	Ref               datatypes.JSONType[NodeRef]
-	Configuration     datatypes.JSONType[map[string]any]
-	Metadata          datatypes.JSONType[map[string]any]
-	IsCollapsed       bool
+	WorkflowID    uuid.UUID `gorm:"primaryKey"`
+	NodeID        string    `gorm:"primaryKey"`
+	Name          string
+	State         string
+	StateReason   *string
+	Type          string
+	Position      datatypes.JSONType[Position]
+	Ref           datatypes.JSONType[NodeRef]
+	Configuration datatypes.JSONType[map[string]any]
+	Metadata      datatypes.JSONType[map[string]any]
+	IsCollapsed   bool
+
+	//
+	// Queue is the node's inline queue configuration. Nil means the node
+	// uses its implicit queue (named after the node ID, maxParallelism 1).
+	// The spec's key may contain {{ }} expressions resolved per queue item.
+	//
+	Queue *datatypes.JSONType[QueueSpec]
+
+	//
+	// GroupID is the group this node belongs to, materialized at publish
+	// time from the canvas spec's node groups. Nil means no group.
+	//
+	GroupID *string
+
 	WebhookID         *uuid.UUID
 	AppInstallationID *uuid.UUID
 	CreatedAt         *time.Time
@@ -109,6 +126,27 @@ type DeleteCanvasNodeResult struct {
 
 func (c *CanvasNode) TableName() string {
 	return "workflow_nodes"
+}
+
+// QueueSpec returns the node's inline queue configuration, or nil when
+// the node uses its implicit queue.
+func (c *CanvasNode) QueueSpec() *QueueSpec {
+	if c.Queue == nil {
+		return nil
+	}
+
+	spec := c.Queue.Data()
+	return &spec
+}
+
+// QueueSpecColumn converts a queue spec to its nullable jsonb column value.
+func QueueSpecColumn(spec *QueueSpec) *datatypes.JSONType[QueueSpec] {
+	if spec == nil {
+		return nil
+	}
+
+	column := datatypes.NewJSONType(*spec)
+	return &column
 }
 
 func (c *CanvasNode) ComponentName() string {
@@ -291,7 +329,7 @@ func ListCanvasNodesReady() ([]CanvasNode, error) {
 	query := database.Conn().
 		Distinct().
 		Joins("JOIN workflow_node_queue_items ON workflow_nodes.workflow_id = workflow_node_queue_items.workflow_id AND workflow_nodes.node_id = workflow_node_queue_items.node_id").
-		Where("workflow_nodes.state = ?", CanvasNodeStateReady).
+		Where("workflow_nodes.state <> ?", CanvasNodeStateError).
 		Where("workflow_nodes.type = ?", NodeTypeComponent).
 		Where("workflow_nodes.deleted_at IS NULL")
 
@@ -334,7 +372,7 @@ func LockCanvasNode(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (*CanvasNo
 		}).
 		Where("workflow_nodes.workflow_id = ?", workflowID).
 		Where("workflow_nodes.node_id = ?", nodeId).
-		Where("workflow_nodes.state = ?", CanvasNodeStateReady).
+		Where("workflow_nodes.state <> ?", CanvasNodeStateError).
 		Where("workflow_nodes.deleted_at IS NULL")
 
 	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
@@ -370,6 +408,26 @@ func (c *CanvasNode) UpdateState(tx *gorm.DB, state string) error {
 		Update("state", state).
 		Update("updated_at", time.Now()).
 		Error
+}
+
+// ListPendingQueueItems returns the node's backlog in FIFO order, up to
+// limit items. The dispatch loop scans this list and starts every item
+// whose queue still has capacity.
+func (c *CanvasNode) ListPendingQueueItems(tx *gorm.DB, limit int) ([]CanvasNodeQueueItem, error) {
+	var queueItems []CanvasNodeQueueItem
+	err := tx.
+		Where("workflow_id = ?", c.WorkflowID).
+		Where("node_id = ?", c.NodeID).
+		Order("created_at ASC").
+		Limit(limit).
+		Find(&queueItems).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return queueItems, nil
 }
 
 func (c *CanvasNode) FirstQueueItem(tx *gorm.DB) (*CanvasNodeQueueItem, error) {
@@ -424,6 +482,13 @@ type CanvasNodeQueueItem struct {
 	// which holds the input for this queue item.
 	//
 	EventID uuid.UUID
+
+	//
+	// The resolved queue name for this item. Nil until the queue worker
+	// touches the item for the first time; the resolution is persisted so
+	// name expressions are evaluated exactly once per item.
+	//
+	QueueName *string
 }
 
 func (i *CanvasNodeQueueItem) TableName() string {

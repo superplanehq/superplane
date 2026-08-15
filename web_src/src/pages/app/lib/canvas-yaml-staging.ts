@@ -1,5 +1,5 @@
 import * as yaml from "js-yaml";
-import type { CanvasesCanvas } from "@/api-client";
+import type { CanvasesCanvas, CanvasesNodeGroup } from "@/api-client";
 import type { ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 
 type ParsedCanvasYaml = {
@@ -13,6 +13,8 @@ type ParsedCanvasYaml = {
   spec?: {
     nodes?: ComponentsNode[];
     edges?: ComponentsEdge[];
+    // The canvas.yaml key is "groups"; the API spec calls them "nodeGroups".
+    groups?: CanvasesNodeGroup[];
   };
 };
 
@@ -66,6 +68,10 @@ export function parseCanvasYamlMetadata(text: string): ParsedCanvasYamlMetadata 
   };
 }
 
+function isMissingOrArray(value: unknown): boolean {
+  return value === undefined || Array.isArray(value);
+}
+
 export function parseCanvasYamlToSpec(text: string): CanvasesCanvas["spec"] | null {
   const parsed = loadCanvasYamlDocument(text);
   if (!parsed) {
@@ -78,17 +84,15 @@ export function parseCanvasYamlToSpec(text: string): CanvasesCanvas["spec"] | nu
 
   const spec = parsed.spec ?? {};
 
-  if (spec.nodes !== undefined && !Array.isArray(spec.nodes)) {
-    return null;
-  }
-
-  if (spec.edges !== undefined && !Array.isArray(spec.edges)) {
+  const listFields = [spec.nodes, spec.edges, spec.groups];
+  if (!listFields.every(isMissingOrArray)) {
     return null;
   }
 
   return {
     nodes: (spec.nodes ?? []).map(normalizeCanvasYamlNode),
     edges: spec.edges ?? [],
+    ...(spec.groups?.length ? { nodeGroups: spec.groups } : {}),
   };
 }
 
@@ -140,6 +144,19 @@ function quoteYamlPositionYKeys(text: string): string {
   return text.replace(/^(\s+)y: /gm, '$1"y": ');
 }
 
+// The canvas.yaml key for node groups is "groups"; the API spec calls
+// them "nodeGroups". The list is omitted when empty to match the
+// server-side serializer.
+function buildCanvasYamlSpec(spec: CanvasesCanvas["spec"]) {
+  const nodeGroups = spec?.nodeGroups ?? [];
+
+  return {
+    nodes: (spec?.nodes ?? []).map(normalizeCanvasYamlNode),
+    edges: spec?.edges ?? [],
+    ...(nodeGroups.length ? { groups: nodeGroups } : {}),
+  };
+}
+
 export function buildCanvasYamlFromWorkflow(workflow: CanvasesCanvas): string {
   const document = {
     apiVersion: "v1",
@@ -149,10 +166,7 @@ export function buildCanvasYamlFromWorkflow(workflow: CanvasesCanvas): string {
       name: workflow.metadata?.name || "Canvas",
       description: workflow.metadata?.description || "",
     },
-    spec: {
-      nodes: (workflow.spec?.nodes ?? []).map(normalizeCanvasYamlNode),
-      edges: workflow.spec?.edges ?? [],
-    },
+    spec: buildCanvasYamlSpec(workflow.spec),
   };
 
   return quoteYamlPositionYKeys(yaml.dump(document, { lineWidth: -1, noRefs: true }));

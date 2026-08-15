@@ -803,10 +803,47 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			Configuration:  node.Configuration.AsMap(),
 			Position:       ProtoToPosition(node.Position),
 			IsCollapsed:    node.IsCollapsed,
+			Queue:          ProtoToQueueSpec(node.Queue),
 			IntegrationID:  integrationID,
 			ErrorMessage:   errorMessage,
 			WarningMessage: warningMessage,
 		}
+	}
+
+	return result
+}
+
+func ProtoToQueueSpec(spec *componentpb.QueueSpec) *models.QueueSpec {
+	if spec == nil {
+		return nil
+	}
+
+	result := &models.QueueSpec{
+		Key:        spec.Key,
+		AutoCancel: spec.AutoCancel,
+	}
+
+	if spec.MaxParallelism != nil {
+		maxParallelism := int(*spec.MaxParallelism)
+		result.MaxParallelism = &maxParallelism
+	}
+
+	return result
+}
+
+func QueueSpecToProto(spec *models.QueueSpec) *componentpb.QueueSpec {
+	if spec == nil {
+		return nil
+	}
+
+	result := &componentpb.QueueSpec{
+		Key:        spec.Key,
+		AutoCancel: spec.AutoCancel,
+	}
+
+	if spec.MaxParallelism != nil {
+		maxParallelism := int32(*spec.MaxParallelism)
+		result.MaxParallelism = &maxParallelism
 	}
 
 	return result
@@ -846,6 +883,7 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 			Type:        NodeTypeToProto(node.Type),
 			Position:    PositionToProto(node.Position),
 			IsCollapsed: node.IsCollapsed,
+			Queue:       QueueSpecToProto(node.Queue),
 		}
 
 		if node.Ref.Component != nil {

@@ -580,6 +580,17 @@ message CanvasPreference {
   google.protobuf.Timestamp starred_at = 3;
 }
 
+// NodeGroup is a group of nodes that acts as a queue: a run acquires a
+// slot in the group when its first item dispatches into the group, and
+// holds it while it has work inside the group.
+message NodeGroup {
+  string id = 1;
+  repeated string nodes = 2;
+
+  // Maximum number of runs holding a slot at once. Absent means 1.
+  optional int32 max_parallelism = 3;
+}
+
 message Canvas {
   message Metadata {
     string id = 1;
@@ -598,6 +609,7 @@ message Canvas {
   message Spec {
     repeated Components.Node nodes = 1;
     repeated Components.Edge edges = 2;
+    repeated NodeGroup node_groups = 3;
   }
 
   message Status {

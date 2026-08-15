@@ -6,10 +6,12 @@
 > single first-class primitive: the **queue**. A queue attaches to a **node**
 > (slot per execution) or to a drawn **node group** (slot per run while the
 > run has work inside the group) — the attachment point *is* the scope.
-> Names may contain expressions resolved per event, and canvas-level
-> **rules** configure queues by matching their resolved names. Factory
-> line-step admission is the same primitive at the factory layer: a
-> whole-automation group with work orders as the waiters.
+> Configuration is inline on the attachment: a node's `queue` block carries
+> an optional partition `key` (an expression resolved per event),
+> `maxParallelism` (0 = unlimited), and `autoCancel`; a group carries
+> `maxParallelism`. Factory line-step admission is the same primitive at
+> the factory layer: a whole-automation group with work orders as the
+> waiters.
 
 ## Overview
 
@@ -36,18 +38,18 @@ serialization, deduplication, and section-level gating:
 All of these are queueing decisions. This PRD makes the queue a first-class
 citizen of the workflow engine, with a strict separation of concerns:
 
-1. **Nodes and groups name queues.** A queue attaches to a *node* — a slot is
-   held by one execution — or to a drawn *node group* — a slot is held by a
-   run while it has work inside the group. Scope is structural: what carries
-   the name determines what holds the slot, and both are visible on the
-   canvas. Names may contain expressions resolved against the incoming
-   event, so `ci-{{ $.data.branch }}` yields one independent queue per
-   branch. Unattached nodes get an implicit queue of their own, which
-   reproduces today's behavior exactly.
-2. **Rules configure queues.** A canvas-level ordered list of rules matches
-   resolved queue names by pattern and sets `maxParallelism` and
-   `autoCancel`. Queues matching no rule use defaults (limit 1, no
-   auto-cancel).
+1. **Nodes and groups carry queues.** A queue attaches to a *node* — a slot
+   is held by one execution — or to a drawn *node group* — a slot is held by
+   a run while it has work inside the group. Scope is structural: the
+   attachment determines what holds the slot, and both are visible on the
+   canvas. A node's queue may carry a partition `key` expression resolved
+   against the incoming event, so `ci-{{ $.data.branch }}` yields one
+   independent queue per branch. Unconfigured nodes get an implicit queue of
+   their own, which reproduces today's behavior exactly.
+2. **Configuration is inline.** The node's `queue` block sets
+   `maxParallelism` (default 1; 0 = unlimited, disabling queueing) and
+   `autoCancel`; a group sets `maxParallelism` (default 1). There is no
+   separate configuration layer to keep consistent with the attachment.
 3. **Factory line steps** get admission control (`maxParallelism`, default
    10): the same group semaphore with the whole automation as the group,
    acquired at run creation, with work orders as the waiters.
@@ -91,43 +93,47 @@ terminal state. Consequences:
 
 ## The Queue Primitive
 
-A queue is identified by its **resolved name**. A queue exists because work
-references it; there is no declaration step. What carries the name — a node
-or a group — determines what holds a slot; there is no configured "scope".
+A queue exists because an attachment carries it; there is no declaration
+step. What carries the queue — a node or a group — determines what holds a
+slot; there is no configured "scope". Configuration is inline on the
+attachment.
 
-**Nodes name queues** for per-execution semantics. The node-level `queue`
-field carries a name and nothing else. A slot is acquired when an item is
+**Node queues** provide per-execution semantics. A node's `queue` block
+carries an optional partition `key` (an expression resolved per event),
+`maxParallelism`, and `autoCancel`. A slot is acquired when an item is
 dispatched into an execution and released when that execution reaches a
-terminal state. Protects a node or a shared resource:
+terminal state. Node queues are private to their node:
 
 ```yaml
-# node A (notify): a queue per tenant
-queue: "notify-{{ $.data.tenant }}"
+# node A (notify): one queue per tenant, serial within a tenant
+queue:
+  key: "notify-{{ $.data.tenant }}"
 
-# node B (coding agent): a named queue for this node's work
-queue: agents
+# node B (coding agent): up to three concurrent executions
+queue:
+  maxParallelism: 3
 
-# node C: opt out entirely (unbounded, no queueing)
-queue: none
+# node C: opt out entirely (0 = unlimited — no queueing)
+queue:
+  maxParallelism: 0
 
 # node D: nothing specified — implicit queue with default settings
 #         (limit 1: today's behavior)
 ```
 
-**Groups name queues** for section semantics. A group is a drawn set of nodes
-on the canvas — part of the spec, visible as a boundary in the UI — and its
-queue gates *runs* through that section:
+**Group queues** provide section semantics. A group is a drawn set of nodes
+on the canvas — part of the spec, visible as a boundary in the UI — and it
+gates *runs* through that section:
 
 ```yaml
 groups:
   - id: staging-gate
     nodes: [deploy, test]
-    queue: "env-{{ $.data.environment }}"
+    # maxParallelism defaults to 1: one run at a time inside the section
 ```
 
 - The slot is acquired when a run's first item dispatches at any node inside
-  the group. The name expression is resolved from that acquiring item's
-  event and is fixed for the run's stay in the group.
+  the group.
 - The slot is held **while the run has pending items or running executions
   on the group's nodes**, and released the moment it has none (or the run
   reaches a terminal state — cancellation and failure release it too). In a
@@ -137,70 +143,58 @@ groups:
   re-acquires (and may wait behind other runs — visible, first-come order).
 - Runs wait for a group slot in FIFO order of their first acquisition
   attempt; waiting items stay in their node backlog, marked as waiting on
-  the queue.
+  the group.
 
-Each distinct resolved value is an independent queue with its own FIFO order
-and its own capacity: `ci-{{ $.data.branch }}` produces `ci-main`,
-`ci-feature-auth`, and so on. Attachments naming the same queue share its
-budget and its FIFO order. The implicit queue of an unattached node is
-internal (keyed by node ID), always uses default settings, and is not
-addressable by other attachments or by rules — to change a queue's behavior,
-name it.
+On a node queue, each distinct resolved `key` value is an independent queue
+with its own FIFO order and its own capacity: `ci-{{ $.data.branch }}`
+produces `ci-main`, `ci-feature-auth`, and so on, each admitting up to the
+node's `maxParallelism`. A node without a `key` has a single queue (named
+after the node ID). The implicit queue of an unconfigured node is the same
+thing with default settings.
 
-**Rules configure queues.** A canvas-level ordered list of rules, matched
-against resolved names, first match wins; no match means defaults:
+Queue settings:
 
-```yaml
-queues:
-  - match: agents          # exact name
-    maxParallelism: 3
-  - match: "docs-deploy"
-    autoCancel: queued
-  - match: "env-*"         # glob over resolved names
-    autoCancel: running
-```
+- `maxParallelism` (default 1) — concurrent slot holders (executions for a
+  node queue, runs for a group). On a node queue, **0 means unlimited**:
+  every item dispatches immediately and the node is effectively unqueued.
+  A group with unlimited parallelism would gate nothing, so 0 is rejected
+  on groups — delete the group instead.
+- `autoCancel` (`none` | `queued` | `running`, default `none`; node queues
+  only in this iteration) — whether newer items in the queue supersede older
+  work. `queued` supersedes older waiting items; `running` additionally
+  cancels in-flight executions. (Semantics match Semaphore's auto-cancel and
+  GitHub Actions' `concurrency.cancel-in-progress`.) Auto-cancel combined
+  with unlimited parallelism is rejected at commit time: it could never
+  trigger, since items never wait.
 
-Rule settings:
-
-- `maxParallelism` (default 1) — concurrent slot holders in the queue
-  (executions for a node queue, runs for a group queue).
-- `autoCancel` (`none` | `queued` | `running`, default `none`) — whether newer
-  items in the queue supersede older work. `queued` supersedes older waiting
-  items; `running` additionally cancels in-flight slot holders. (Semantics
-  match Semaphore's auto-cancel and GitHub Actions'
-  `concurrency.cancel-in-progress`.) On a node queue the superseded work is
-  queued items and running executions; on a group queue it is waiting *runs*
-  and, with `running`, the in-flight holder runs themselves — a new push to
-  a branch cancels that branch's in-flight CI run.
-
-Because configuration lives only in rules, two attachments can never disagree
-about a queue's settings — there is nothing to keep consistent. One queue per
-node and per group; naming multiple queues from one attachment is future
-work.
+Because configuration lives on the attachment, there is no cross-referencing
+layer to keep consistent, and everything that affects a node's dispatch is
+visible on the node itself. One queue per node and one gate per group;
+cross-node shared budgets are future work.
 
 **Reference configurations for the motivating examples.**
 
 - Monorepo CI, parallel across branches, serial per branch. Two readings:
   - A node that triggers an external CI provider:
-    `queue: "ci-{{ $.data.branch }}"` on that node — no rule needed; the
-    defaults (limit 1 per resolved name) are exactly the desired behavior,
-    since the constraint lives and dies with that node's execution.
+    `queue: { key: "ci-{{ $.data.branch }}" }` on that node — the default
+    limit of 1 per resolved key is exactly the desired behavior, since the
+    constraint lives and dies with that node's execution.
   - The canvas *is* the CI pipeline (build → test → publish as nodes): "one
     CI run per branch" is a statement about the whole pipeline, so a group
-    containing all the pipeline's nodes carries
-    `queue: "ci-{{ $.data.branch }}"` — no rule needed.
-- Coding agent, three concurrent work orders: `queue: agents` plus rule
-  `{ match: agents, maxParallelism: 3 }`.
-- Docs deploy, only the newest queued merge matters: `queue: docs-deploy`
-  plus rule `{ match: docs-deploy, autoCancel: queued }`.
-- CI where a newer push makes the running build pointless: the whole-canvas
-  group above plus rule `{ match: "ci-*", autoCancel: running }`.
+    containing all the pipeline's nodes gates it. (Per-branch group
+    partitioning is future work; today a group admits `maxParallelism` runs
+    regardless of branch.)
+- Coding agent, three concurrent work orders:
+  `queue: { maxParallelism: 3 }`.
+- Docs deploy, only the newest queued merge matters:
+  `queue: { autoCancel: queued }`.
+- CI where a newer push makes the running build pointless:
+  `queue: { key: "ci-{{ $.data.branch }}", autoCancel: running }` on the
+  node that triggers the build.
 - Deploy → tests on shared staging, with unrelated work after: a group over
-  `[deploy, test]` with `queue: "env-{{ $.data.environment }}"`. Run 2's
-  deploy dispatches as soon as run 1's test finishes — run 1's remaining
-  nodes (outside the group) do not hold the environment.
-- Max five concurrent calls to one API across the canvas: `queue: api` on
-  every node that calls it, plus rule `{ match: api, maxParallelism: 5 }`.
+  `[deploy, test]`. Run 2's deploy dispatches as soon as run 1's test
+  finishes — run 1's remaining nodes (outside the group) do not hold the
+  environment.
 
 ## Product Decisions
 
@@ -209,34 +203,35 @@ work.
    and rejected: queues attached to existing nodes and groups express the
    same semantics without inserting artificial nodes into the flow, and the
    kind axis (trigger/component/widget) is expensive to extend.
-2. Strict separation of concerns: **nodes and groups carry only a queue
-   name** (optionally an expression); **canvas-level rules carry all
-   configuration**, matched against resolved names (ordered, first match
-   wins, glob patterns); queues matching no rule use defaults. Inline
-   settings on attachments do not exist, so same-name consistency holds by
-   construction.
-3. **Scope is structural, not configured.** What carries the name determines
-   what holds a slot: a node queue's slot is one execution; a group queue's
-   slot is a run while it has work inside the group. There is no `scope`
-   rule setting. This keeps gating visible: everything a queue covers is a
-   drawn boundary on the canvas, never an invisible property of downstream
-   nodes. (An earlier draft configured `scope: run` in rules; it was
-   rejected because the gated span — from the naming node to run end — was
-   invisible in the UI, made downstream queue configuration misleading, and
-   over-held the slot through trailing nodes that needed no protection.)
-4. Queue identity is the resolved name. There is no key/partition concept:
-   `ci-main` and `ci-feature-auth` are simply two queues.
+2. **Configuration is inline on the attachment.** A node's `queue` block
+   carries `key`, `maxParallelism`, and `autoCancel`; a group carries
+   `maxParallelism`. (An earlier draft configured queues through
+   canvas-level pattern-matched rules; once groups made scope structural,
+   the indirection bought nothing — settings on the thing they govern are
+   simpler to author, read, and validate.)
+3. **Scope is structural, not configured.** The attachment determines what
+   holds a slot: a node queue's slot is one execution; a group's slot is a
+   run while it has work inside the group. This keeps gating visible:
+   everything a queue covers is a drawn boundary on the canvas, never an
+   invisible property of downstream nodes. (An earlier draft configured
+   `scope: run` in rules; it was rejected because the gated span — from the
+   naming node to run end — was invisible in the UI, made downstream queue
+   configuration misleading, and over-held the slot through trailing nodes
+   that needed no protection.)
+4. Node queues are **private to their node** and partitioned by the resolved
+   `key`: `ci-main` and `ci-feature-auth` are simply two queues of the same
+   node, each with the node's settings.
 5. The per-node mutex is removed from the engine; dispatch is governed by
    queue capacity.
-6. Every node waits in exactly one queue. Unattached nodes get an implicit
+6. Every node waits in exactly one queue. Unconfigured nodes get an implicit
    queue with default settings (`maxParallelism: 1`) — today's behavior,
-   preserved without any configuration change. Implicit queues are not
-   matchable by rules; to configure a queue, name it. `queue: none` opts a
-   node out of queueing entirely.
-7. Queue naming and rules are engine-level, not part of any component's
+   preserved without any configuration change. `maxParallelism: 0` means
+   unlimited and opts a node out of queueing entirely; there is no reserved
+   name or separate opt-out spelling.
+7. Queue configuration is engine-level, not part of any component's
    `Configuration()` schema. The engine evaluates them before the component's
    queue processing runs.
-8. There is no aggregate cap across the queues produced by one name
+8. There is no aggregate cap across the queues produced by one key
    expression. `ci-{{ branch }}` admits up to `maxParallelism` per branch;
    downstream systems are expected to have their own capacity controls.
    Revisit if needed.
@@ -249,13 +244,12 @@ work.
    on one path are fine — the run releases the first group before entering
    the second. Lifting the concurrent-hold restriction (ordered acquisition)
    is future work.
-10. A group queue's name expression is resolved once per run, from the event
-    of the item that acquires the slot, and stays fixed for the run's stay
-    in the group. Items of a run that already holds the group's slot proceed
-    under that slot without re-resolving.
+10. Groups are identified by their spec `id`; they carry no name expression
+    and no partitioning in this iteration. Items of a run that already holds
+    the group's slot proceed under that slot.
 11. Runs wait for a group slot in FIFO order of their first acquisition
     attempt. Waiting is visible: the item stays in the node backlog, marked
-    as waiting on the queue.
+    as waiting on the group.
 12. Components have one of two **dispatch modes**:
     - *Capacity-gated* (the default): the engine dispatches queue items only
       while the item's queue has capacity (and, for nodes inside a group,
@@ -295,56 +289,55 @@ work.
     must be processed.
 18. Queues are observable as first-class objects: per-queue depth, current
     holders, and waiters; node cards show backlog depth and running count;
-    nodes are badged with their queue name (template and resolved values);
-    groups are drawn as boundaries with their queue badge on the border;
-    the factory shows waiting work orders per step. The queue list is derived
-    from attachments, rules, and live runtime state — there is no static
+    nodes are badged with their queue settings (key template and resolved
+    values); groups are drawn as boundaries with their limit badge on the
+    border; the factory shows waiting work orders per step. The queue list
+    is derived from attachments and live runtime state — there is no static
     registry, and dispatch never depends on one. If the queue UI needs memory
     beyond the live snapshot — idle expression queues (`ci-main` after it
     drains), last activity, per-queue counters — the answer is a purely
     observational queue-state row, lazily upserted on first touch and subject
-    to retention (expression names have unbounded cardinality), never read by
+    to retention (key expressions have unbounded cardinality), never read by
     dispatch. Decide when building the queue UI (chunk 10).
 
 ## Goals
 
 1. Allow N concurrent executions of a single node.
 2. Allow parallelism across contexts with serialization within a context
-   (branch, environment, tenant), via event-derived queue names.
+   (branch, environment, tenant), via event-derived queue keys.
 3. Allow deduplication of redundant queued work (run only the latest) and,
    optionally, cancellation of in-flight work superseded by newer events.
 4. Allow gating a multi-node section of a flow as one unit: the next run
    enters the section only when the previous run's work *in that section*
    has finished — visible on the canvas as a drawn group.
-5. Allow multiple nodes to share one concurrency budget.
-6. Allow a factory line step to process up to N work orders concurrently, with
+5. Allow a factory line step to process up to N work orders concurrently, with
    the rest queued and visible.
-7. Preserve exact current behavior for existing canvases with no configuration
+6. Preserve exact current behavior for existing canvases with no configuration
    changes.
-8. Make `merge` and `loop` parallel across runs instead of hard-serialized per
+7. Make `merge` and `loop` parallel across runs instead of hard-serialized per
    node, without breaking their correlation and feedback contracts.
-9. Make queues explicit, named, and observable rather than a hidden side
-   effect of the engine.
+8. Make queues explicit, configurable, and observable rather than a hidden
+   side effect of the engine.
 
 ## Non-Goals
 
 - A queue *component* (node kind) on the canvas (decision 1).
-- A configured `scope` setting on rules (decision 3): scope is structural —
-  node or group.
-- Inline queue settings on attachments. Nodes and groups name queues; rules
-  configure them (decision 2). Declaring queue *names* at the canvas level
-  was also rejected: a per-node event expression in a canvas-level
-  declaration could resolve to different names at different nodes of the same
-  run, silently breaking the sharing the declaration implies.
-- Rules matching implicit (unnamed) queues. Implicit queues always use
-  defaults; configuring a queue requires naming it.
-- Multiple queues per node or group (single queue name in this iteration).
+- A configured `scope` setting (decision 3): scope is structural — node or
+  group.
+- Canvas-level queue configuration (rules or declarations). An earlier
+  draft configured queues through pattern-matched canvas-level rules; it
+  was dropped once groups made scope structural — inline settings on the
+  attachment are simpler and cannot disagree with it.
+- Cross-node shared queues and budgets ("max five concurrent calls to one
+  API across the canvas"). Node queues are private to their node in this
+  iteration; a shared budget needs an explicit shared entity, which is
+  future work.
+- Multiple queues per node (single queue block in this iteration).
 - Nested or overlapping groups; groups are disjoint sets of nodes
   (decision 9).
-- Groups carrying anything besides a queue (no group-level configuration,
-  retries, or permissions). A group is a queue attachment boundary in this
-  iteration.
-- An aggregate cap across queues produced by one name expression (decision 8).
+- Group-level `autoCancel` and group `key` partitioning. A group carries
+  only `maxParallelism` in this iteration.
+- An aggregate cap across queues produced by one key expression (decision 8).
 - Maximum queue or step-queue depth and overflow policies (reject,
   drop-oldest). Backlogs grow unbounded, exactly as node backlogs do today.
 - Per-organization or per-canvas global caps (for example, total concurrent
@@ -352,8 +345,8 @@ work.
   compute cost tracking.
 - Priority queues or reordering beyond FIFO-within-queue and auto-cancel.
 - Rate limiting (requests per time window) as opposed to concurrency limiting.
-- Cross-canvas or organization-shared queues. Queue names and rules scope to
-  a single canvas in this iteration.
+- Cross-canvas or organization-shared queues. Queues scope to a single
+  canvas in this iteration.
 - Changes to trigger semantics or event routing topology.
 - Autoscaling or scheduling of the workers themselves; worker-level throughput
   (the per-worker semaphores) is infrastructure and out of scope.
@@ -395,17 +388,18 @@ one open execution per run already.
 
 ### Dispatch
 
-At dispatch, the engine resolves the item's queue name (once, persisted), then
-finds the queue's settings: the first rule whose pattern matches the resolved
-name, or defaults. For capacity-gated components, an item is dispatchable when
-its queue has capacity:
+At dispatch, the engine resolves the item's queue name (once, persisted) —
+the node's `key` expression, or the node ID when no key is set — and reads
+the node's inline queue settings from the live spec. For capacity-gated
+components, an item is dispatchable when its queue has capacity:
 
-- Node queue: `activeExecutions(queueName) < maxParallelism`.
+- Node queue: `activeExecutions(nodeID, queueName) < maxParallelism`, or
+  `maxParallelism` is 0 (unlimited — no capacity check at all).
 - Node inside a group: the item's run already holds the group's slot, or
-  `holdingRuns(queueName) < maxParallelism` and the run acquires one (FIFO by
-  first attempt). A run whose dispatch would acquire a second group slot
-  while still holding one fails visibly (decision 9). A node inside a group
-  may also carry its own node queue; both gates must pass.
+  `holdingRuns(groupID) < group.maxParallelism` and the run acquires one
+  (FIFO by first attempt). A run whose dispatch would acquire a second group
+  slot while still holding one fails visibly (decision 9). A node inside a
+  group may also carry its own node queue; both gates must pass.
 
 For self-managed components, items are always dispatched (as they effectively
 are today, since these components keep the node `ready`); the component
@@ -415,13 +409,13 @@ context and enforces its own admission.
 ```mermaid
 flowchart LR
   E[Queue item created] --> K["Resolve queue name (once, persisted on item)"]
-  K --> R["Match rules (first match or defaults)"]
+  K --> R["Read node's inline queue settings"]
   R --> M{Dispatch mode}
   M -->|capacity gated| SC{Node in a group}
   SC -->|yes| RG{"Run holds or acquires group slot"}
   RG -->|no| WR[Item waits, run in FIFO wait list]
   RG -->|yes| D[Dispatch]
-  SC -->|no| G{"Active executions below maxParallelism"}
+  SC -->|no| G{"Active executions below maxParallelism (or unlimited)"}
   G -->|no| W[Item waits in queue]
   G -->|yes| P{autoCancel}
   P -->|none| O[Dispatch oldest in queue]
@@ -438,7 +432,7 @@ flowchart LR
 
 1. When an item is created or a slot is released, the engine dispatches
    waiting items per queue while capacity remains. A single wake-up may
-   dispatch multiple items, across nodes when a queue is shared.
+   dispatch multiple items.
 2. With `autoCancel: none`, dispatch takes the oldest item in the queue
    (FIFO). Dispatch order within a queue is FIFO; completion order is not
    guaranteed when `maxParallelism > 1`.
@@ -450,13 +444,11 @@ flowchart LR
    queue, the queue's in-flight executions are cancelled (through the existing
    cancellation path) so the newest item starts as soon as cancellation
    completes. Superseded waiting items are handled as in `queued`.
-5. On a group queue, auto-cancel operates on runs: `queued` supersedes
-   the runs of older waiting items (their gated items are removed and the
-   runs finalized as superseded); `running` additionally cancels the queue's
-   holder runs through the existing run-cancellation path. Cancellation is
-   asynchronous, so the slot frees — and the newest waiter dispatches — when
-   the cancelled run terminates (run end releases group slots
-   unconditionally).
+5. Group auto-cancel is deferred (non-goal in this iteration). When it
+   lands, it operates on runs: `queued` supersedes the runs of older waiting
+   items; `running` additionally cancels the holder runs through the
+   existing run-cancellation path, freeing the slot when the cancelled run
+   terminates (run end releases group slots unconditionally).
 6. The **queue name is resolved once per item** and persisted on the queue
    item, so capacity counting, FIFO selection, and supersede sweeps are plain
    SQL over the resolved name. Executions record the resolved name as well.
@@ -469,12 +461,12 @@ flowchart LR
    evaluation. An item with a still-null name has never been touched and
    always warrants a dispatch visit, so first-touch resolution stays
    compatible with that poll.
-7. **Rules are matched at dispatch time** against the resolved name (first
-   match in declaration order; glob patterns). Rule changes published to a
-   canvas therefore apply to the very next dispatch — no re-materialization
-   of pending items is needed. In-flight executions and held slots are
-   unaffected by rule changes; only new dispatch decisions see new settings.
-8. Name expression failures fail the item's run visibly, consistent with how
+7. **Settings are read at dispatch time** from the live spec's node and
+   group entries. Configuration changes published to a canvas therefore
+   apply to the very next dispatch — no re-materialization of pending items
+   is needed. In-flight executions and held slots are unaffected by
+   configuration changes; only new dispatch decisions see new settings.
+8. Key expression failures fail the item's run visibly, consistent with how
    configuration expression failures behave today. The resolved value is
    coerced to a string.
 9. Superseded items and cancelled-by-supersede executions carry a distinct
@@ -524,22 +516,18 @@ One new table, for group holders only:
 ```sql
 CREATE TABLE workflow_queue_slots (
     workflow_id uuid NOT NULL,
-    queue_name  varchar(256) NOT NULL,   -- resolved value
     group_id    varchar(128) NOT NULL,   -- group id from the spec
     run_id      uuid NOT NULL,
     acquired_at timestamp NOT NULL,
-    PRIMARY KEY (workflow_id, queue_name, run_id)
+    PRIMARY KEY (workflow_id, group_id, run_id)
 );
 ```
 
 Group holders need explicit rows because a run can hold its slot at a moment
 when it has zero running executions inside the group (after deploy finished,
 before tests dispatched) — "who holds staging" is not derivable from
-execution counts. The `group_id` records which boundary the hold is for, so
-the release check (does the run still have work on this group's nodes?) does
-not depend on re-deriving the group from the name. Two groups whose templates
-resolve to the same name share that queue's budget, like nodes sharing a
-name. Node queues need **no slot rows**: a slot *is* a running execution.
+execution counts. Node queues need **no slot rows**: a slot *is* a running
+execution.
 
 Column changes on existing tables:
 
@@ -548,31 +536,32 @@ Column changes on existing tables:
   indexed on `(workflow_id, queue_name, created_at)` so oldest/newest
   selection and supersede sweeps are single index scans.
 - `workflow_node_executions` + `queue_name` (resolved value), with a partial
-  index over non-terminal states, so node-queue capacity is
-  `COUNT(*)` per resolved name. Today's
+  index over non-terminal states scoped by node, so node-queue capacity is
+  `COUNT(*)` per `(node, resolved name)`. Today's
   `CountRunningExecutionsForNodeInTransaction` is the degenerate
   (implicit-queue) case of this query.
-- `workflow_nodes` + the queue name template (nullable; null = implicit
-  queue; a reserved value for `none`), materialized from the `Node` spec on
-  publish like other node-level attributes.
+- `workflow_nodes` + a nullable `queue` jsonb column carrying the inline
+  spec (`{ key, maxParallelism, autoCancel }`; null = implicit queue),
+  materialized from the `Node` spec on publish like other node-level
+  attributes, plus a `group_id` column for group membership.
 - `workflow_runs.result` gains a `superseded` value; superseded executions
   carry `result_reason = "superseded"`. No new audit tables — the existing
   records tell the story.
 
-Queue rules and groups live on the canvas spec (`workflow_versions`),
-alongside nodes and edges, and are read with the live spec at dispatch
-(behavior point 7) — they need no runtime table of their own. A group is
-`{ id, nodes, queue }`; group membership is also materialized per node at
-publish (like other node-level attributes) so dispatch answers "is this node
-in a group, and which" without walking the spec.
+Groups live on the canvas spec (`workflow_versions`), alongside nodes and
+edges, as `{ id, nodes, maxParallelism }`, and are read with the live spec
+at dispatch (behavior point 7) — they need no runtime table of their own.
+Group membership is also materialized per node at publish so dispatch
+answers "is this node in a group, and which" without walking the spec.
 
-API surface: an optional `queue` name field on the `Node` proto message, a
-`groups` list, and a `queue rules` list on the canvas spec message
-(`protos/components.proto`), flowing through the generated SDKs
-(`make pb.gen`) to the UI and CLI. Publish-time validation: rules are
-well-formed (known settings, valid patterns); groups reference existing
-nodes, are disjoint, and each carries a queue name (decision 9); the runtime
-guard covers concurrent second-slot acquisition.
+API surface: an optional `queue` message (`key`, `max_parallelism`,
+`auto_cancel`) on the `Node` proto and a `node_groups` list on the canvas
+spec message, flowing through the generated SDKs (`make pb.gen`) to the UI
+and CLI. Commit-time validation: queue specs are well-formed
+(non-negative `maxParallelism`, known `autoCancel` values, no auto-cancel
+on unlimited queues); groups reference existing nodes, are disjoint, and
+have `maxParallelism >= 1` (decision 9); the runtime guard covers
+concurrent second-slot acquisition.
 
 ### Session components: `merge` and `loop`
 
@@ -675,14 +664,13 @@ effective parallelism of the automation's bottleneck nodes, warn the author.
   through the staging deploy-and-test group," released as soon as the run's
   work leaves the boundary. They queue *runs*.
 - **Node queues** control node and resource throughput: how many executions
-  at once, across which contexts (name expressions), whether newer events
-  supersede older work, and shared across nodes by name. For `loop`,
-  `maxParallelism` bounds concurrent sessions.
+  at once, across which contexts (key expressions), and whether newer events
+  supersede older work. For `loop`, `maxParallelism` bounds concurrent
+  sessions.
 
-A typical factory setup: step "Implement" with `maxParallelism: 3`, the
-coding-agent node with `queue: agents`, and rule
-`{ match: agents, maxParallelism: 3 }` (or higher). A deploy pipeline draws a
-group around its deploy-and-verify nodes with an environment-named queue.
+A typical factory setup: step "Implement" with `maxParallelism: 3` and the
+coding-agent node with `queue: { maxParallelism: 3 }` (or higher). A deploy
+pipeline draws a group around its deploy-and-verify nodes.
 
 ## Migration and Rollout
 
@@ -707,18 +695,18 @@ group around its deploy-and-verify nodes with an environment-named queue.
 Before the full delivery, a POC validates the queue model end to end on a
 branch, with correctness over polish:
 
-- Scope: mutex removal plus a minimal queue implementation — implicit queues,
-  named node queues with name expressions, a minimal rules block
-  (`match` + `maxParallelism` + `autoCancel: queued`), and one statically
-  named group queue to prove acquisition, section-end release (the slot
-  frees when the run's work leaves the group, not at run end), and
-  run-terminal release.
+- Scope: mutex removal plus a minimal queue implementation — implicit
+  queues, inline node queue specs (`key`, `maxParallelism` including 0 =
+  unlimited, `autoCancel`), and one group to prove acquisition, section-end
+  release (the slot frees when the run's work leaves the group, not at run
+  end), and run-terminal release. YAML editing is the configuration surface
+  for manual verification.
 - Exercised against the motivating examples: parallel coding agents, monorepo
   branch serialization, docs-deploy dedup, and deploy → tests gating with
   trailing nodes outside the group.
-- Explicitly out of POC scope: UI, YAML/proto polish, the multi-execution
-  safety audit (POC accepts known rough edges), line-step admission, loop
-  parallel sessions, shared queues across nodes.
+- Explicitly out of POC scope: editor UI, the multi-execution safety audit
+  (POC accepts known rough edges), line-step admission, loop parallel
+  sessions.
 - Exit criteria: acceptance-criteria scenarios 1–5 and 13 below pass as E2E
   tests; learnings feed back into this PRD before the production chunks
   start.
@@ -733,10 +721,10 @@ chunk 3.
 ```mermaid
 flowchart LR
   C1[1 Retire node mutex] --> C2[2 Multi-execution safety audit]
-  C2 --> C3[3 Queue names and rules]
-  C3 --> C4[4 Name expressions]
+  C2 --> C3[3 Inline node queue specs]
+  C3 --> C4[4 Key expressions]
   C4 --> C5[5 Auto-cancel policies]
-  C3 --> C6[6 Group queues]
+  C3 --> C6[6 Groups]
   C5 --> C6
   C3 --> C7[7 Loop parallel sessions]
   C3 --> C10[10 Canvas queue UI]
@@ -771,19 +759,18 @@ hooks, webhook handling, cancellation, the execution terminator, and any
 UI-facing queries that assume at most one running execution per node. Each
 must key by execution ID. Ships before any parallelism is possible.
 
-**Chunk 3 — Queue names and rules.** The `queue` name field on the `Node`
-proto and the rules list on the canvas spec (`make pb.gen`), spec storage,
-publish materialization and validation, YAML support, glob matching at
-dispatch, the `queue_name` columns on items and executions, per-queue
-dispatch locking, static shared queues across nodes. First chunk where two
-executions can run concurrently; includes E2E tests for FIFO dispatch at
-capacity, shared budgets, rule matching (first match wins, defaults on no
-match), restart safety, and the default-of-1 regression check.
+**Chunk 3 — Inline node queue specs.** The `queue` message on the `Node`
+proto (`make pb.gen`), spec storage, publish materialization and commit-time
+validation, YAML support, the `queue_name` columns on items and executions,
+per-queue dispatch locking, `maxParallelism` (including 0 = unlimited).
+First chunk where two executions can run concurrently; includes E2E tests
+for FIFO dispatch at capacity, unlimited dispatch, restart safety, and the
+default-of-1 regression check.
 
-**Chunk 4 — Name expressions.** Expression resolution in queue names,
+**Chunk 4 — Key expressions.** Expression resolution in queue keys,
 once-per-item persistence, failure handling. E2E test: the monorepo case —
-two branches proceed in parallel, same-branch pushes serialize, with no rule
-required.
+two branches proceed in parallel, same-branch pushes serialize, with no
+extra configuration required.
 
 **Chunk 5 — Auto-cancel policies.** `queued` (dispatch newest, supersede older
 waiting) and `running` (also cancel in-flight on arrival); the "superseded"
@@ -791,21 +778,16 @@ disposition on items, executions, and runs; run finalization for superseded
 work. E2E tests: the docs-deploy case (three queued, one runs) and
 cancel-in-progress.
 
-**Chunk 6 — Group queues.** The `groups` list on the canvas spec
-(`make pb.gen`), publish materialization (per-node group membership) and
-validation (disjoint groups, existing nodes, queue name present); the
-`workflow_queue_slots` table; slot acquisition at first dispatch into the
-group with once-per-run name resolution; FIFO run wait list; section-end
-release (run has no pending items or running executions on the group's
-nodes) plus unconditional release at run terminal; the runtime second-slot
-guard. Group auto-cancel builds on chunk 5's superseded machinery: `queued`
-supersedes older waiting runs; `running` cancels holder runs through the
-run-cancellation path, freeing the slot when the cancelled run terminates.
-E2E tests: the deploy → tests case with trailing nodes outside the group
-(next run's deploy dispatches when the previous run's test finishes, not at
-its run end), and the CI-as-the-workflow case (a new push to a branch
-supersedes that branch's waiting and in-flight runs; other branches are
-unaffected).
+**Chunk 6 — Groups.** The `groups` list on the canvas spec (`make pb.gen`),
+publish materialization (per-node group membership) and validation (disjoint
+groups, existing nodes, `maxParallelism >= 1`); the `workflow_queue_slots`
+table keyed by group; slot acquisition at first dispatch into the group;
+FIFO run wait list; section-end release (run has no pending items or running
+executions on the group's nodes) plus unconditional release at run terminal;
+the runtime second-slot guard. Group auto-cancel is deferred; when built, it
+reuses chunk 5's superseded machinery on runs. E2E test: the deploy → tests
+case with trailing nodes outside the group (next run's deploy dispatches
+when the previous run's test finishes, not at its run end).
 
 **Chunk 7 — Loop parallel sessions.** Expose the queue's effective
 `maxParallelism` in the queue processing context; change the `startLoop` gate
@@ -827,37 +809,35 @@ position, "Queued at *step name*" on the work order page, and the queued /
 admitted events in the work order chronology.
 
 **Chunk 10 — Canvas queue UI.** Queues as first-class objects: a derived
-canvas-level queue list (from attachments, rules, and live runtime state)
-with depth, holders, and waiters per resolved name; queue-name badges on
-nodes; group boundaries drawn on the canvas with the queue badge on the
-border; backlog depth and running-execution count on node cards; and queue
-naming, group drawing, plus rules in the canvas editor (or YAML-only
-initially, per Open Questions).
+canvas-level queue list (from attachments and live runtime state) with
+depth, holders, and waiters per resolved name; queue badges on nodes; group
+boundaries drawn on the canvas with the limit badge on the border; backlog
+depth and running-execution count on node cards; and queue configuration
+plus group drawing in the canvas editor (or YAML-only initially, per Open
+Questions).
 
 ## Acceptance Criteria
 
-1. A node with `queue: agents` and rule `{ match: agents, maxParallelism: 3 }`
-   with five queued inputs runs exactly three executions concurrently; as
-   each finishes, the next input dispatches; dispatch order is FIFO.
+1. A node with `queue: { maxParallelism: 3 }` and five queued inputs runs
+   exactly three executions concurrently; as each finishes, the next input
+   dispatches; dispatch order is FIFO.
 2. A node with no `queue` field behaves byte-for-byte as today: one execution
    at a time, FIFO.
-3. Monorepo case: a node with `queue: "ci-{{ $.data.branch }}"` and no rules
+3. Monorepo case: a node with `queue: { key: "ci-{{ $.data.branch }}" }`
    receives pushes to `feature-auth` and `feature-cart`; both dispatch
    immediately in parallel. Two pushes to `feature-cart` run one after the
    other, FIFO.
-4. Docs-deploy case: a node whose queue matches an `autoCancel: queued` rule
-   has one execution running and three items waiting; when the execution
-   finishes, only the newest item dispatches, and the two older items (and
-   their runs) are recorded as superseded, not failed.
+4. Docs-deploy case: a node with `queue: { autoCancel: queued }` has one
+   execution running and three items waiting; when the execution finishes,
+   only the newest item dispatches, and the two older items (and their runs)
+   are recorded as superseded, not failed.
 5. `autoCancel: running`: a new item arriving in a queue cancels the queue's
    in-flight execution; the newest item dispatches after cancellation
-   completes; queues with other resolved names are unaffected.
-6. Shared budget: two nodes with `queue: api` and rule
-   `{ match: api, maxParallelism: 5 }` never exceed five concurrent
-   executions combined.
-7. Rule matching: the first matching rule in declaration order wins; a
-   resolved name matching no rule uses defaults; publishing a rule change
-   affects the next dispatch without touching in-flight work.
+   completes; other nodes' queues are unaffected.
+6. Unlimited: a node with `queue: { maxParallelism: 0 }` dispatches every
+   waiting item immediately, with no capacity check.
+7. Settings are read at dispatch time: publishing a queue configuration
+   change affects the next dispatch without touching in-flight work.
 8. Two merge executions for different runs proceed concurrently on the same
    merge node: sources arriving for run A are recorded while run B's merge is
    open, and each merge emits independently when its own sources complete.
@@ -874,42 +854,37 @@ initially, per Open Questions).
     and are admitted, oldest first, as runs finish (including failed and
     cancelled runs). A step with no explicit setting admits up to 10.
 13. Deploy → tests case: in a `build → [deploy → test] → rest` flow with a
-    group over `[deploy, test]` carrying `queue: staging`, run 2's deploy
-    does not dispatch while run 1 has work inside the group; it dispatches
-    as soon as run 1's test finishes — even though run 1's `rest` nodes are
-    still executing. A run that fails at deploy releases the slot without
-    running tests.
-14. Group auto-cancel: with a whole-canvas group carrying
-    `queue: "ci-{{ $.data.branch }}"` and rule
-    `{ match: "ci-*", autoCancel: running }`, a new push to `main` cancels
-    the in-flight run for `ci-main` and supersedes any waiting runs in it;
-    the newest run dispatches once the cancelled run terminates; runs in
-    `ci-feature-auth` are untouched. Superseded runs are recorded as
-    superseded, not failed.
-15. Engine restarts (workers going down mid-flight) do not over-admit any
+    group over `[deploy, test]` (default limit 1), run 2's deploy does not
+    dispatch while run 1 has work inside the group; it dispatches as soon as
+    run 1's test finishes — even though run 1's `rest` nodes are still
+    executing. A run that fails at deploy releases the slot without running
+    tests.
+14. Engine restarts (workers going down mid-flight) do not over-admit any
     queue or step; node-queue capacity is derived from execution counts, and
     group holders are rebuilt from `workflow_queue_slots`.
-16. Cancelling a run releases its line-step slot, any group slot it holds,
+15. Cancelling a run releases its line-step slot, any group slot it holds,
     and, for loop, terminates the session and frees the session slot.
-17. A canvas with overlapping groups, a group referencing a missing node, or
-    a group without a queue name is rejected at publish time; at runtime, a
-    run whose dispatch would acquire a second group slot while it still
-    holds one fails visibly with a clear error instead of waiting.
-18. Publishing a canvas leaves any node with a setup error in `state = error`
+16. A canvas with overlapping groups, a group referencing a missing node, a
+    group with `maxParallelism` below 1, a negative node `maxParallelism`,
+    or `autoCancel` on an unlimited node queue is rejected at commit time;
+    at runtime, a run whose dispatch would acquire a second group slot while
+    it still holds one fails visibly with a clear error instead of waiting.
+17. Publishing a canvas leaves any node with a setup error in `state = error`
     with the router skipping it, exactly as today.
 
 ## Open Questions
 
 1. UI sequencing for canvas queues: build the canvas editor experience (a
-   queue field on the node configuration panel, group drawing, and a rules
-   editor) together with the backend, or ship backend + YAML first and add
-   the editor UI later? Note this concerns canvas queues only — line-step `maxParallelism`
+   queue block on the node configuration panel and group drawing) together
+   with the backend, or ship backend + YAML first and add the editor UI
+   later? Note this concerns canvas queues only — line-step `maxParallelism`
    is a separate setting with its own UI in the factory experience and ships
    with its own chunk regardless.
-2. Multiple queues per attachment, and concurrent group-slot holds by one
-   run (parallel branches inside two groups): the initial restrictions avoid
-   hold-and-wait deadlocks. Is ordered acquisition an acceptable way to lift
-   them later, or are the restrictions fine in practice?
+2. Multiple queues per node, cross-node shared budgets, and concurrent
+   group-slot holds by one run (parallel branches inside two groups): the
+   initial restrictions avoid hold-and-wait deadlocks and keep configuration
+   local. Is ordered acquisition an acceptable way to lift them later, or
+   are the restrictions fine in practice?
 3. Should queues eventually span canvases (organization-level queues, for
    example "deploys to production" across all automations)? Out of scope now,
    and nothing in the design precludes it: identity is a string, capacity is

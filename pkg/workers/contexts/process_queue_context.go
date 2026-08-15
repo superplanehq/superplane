@@ -96,6 +96,7 @@ func BuildProcessQueueContext(
 			EventID:             event.ID,
 			PreviousExecutionID: event.ExecutionID,
 			State:               models.CanvasNodeExecutionStatePending,
+			QueueName:           queueItem.QueueName,
 			Configuration:       datatypes.NewJSONType(config),
 			CreatedAt:           &now,
 			UpdatedAt:           &now,
@@ -158,10 +159,6 @@ func BuildProcessQueueContext(
 		}
 
 		if err := ctx.DequeueItem(); err != nil {
-			return nil, err
-		}
-
-		if err := ctx.UpdateNodeState(models.CanvasNodeStateProcessing); err != nil {
 			return nil, err
 		}
 

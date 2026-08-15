@@ -713,7 +713,8 @@ CREATE TABLE public.workflow_node_executions (
     updated_at timestamp without time zone NOT NULL,
     cancelled_by uuid,
     run_id uuid NOT NULL,
-    cancelled_at timestamp without time zone
+    cancelled_at timestamp without time zone,
+    queue_name character varying(256)
 );
 
 
@@ -728,7 +729,8 @@ CREATE TABLE public.workflow_node_queue_items (
     root_event_id uuid,
     event_id uuid,
     created_at timestamp without time zone NOT NULL,
-    run_id uuid NOT NULL
+    run_id uuid NOT NULL,
+    queue_name character varying(256)
 );
 
 
@@ -770,7 +772,21 @@ CREATE TABLE public.workflow_nodes (
     is_collapsed boolean DEFAULT false NOT NULL,
     deleted_at timestamp with time zone,
     app_installation_id uuid,
-    state_reason text
+    state_reason text,
+    queue jsonb,
+    group_id character varying(128)
+);
+
+
+--
+-- Name: workflow_queue_slots; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_queue_slots (
+    workflow_id uuid NOT NULL,
+    group_id character varying(128) NOT NULL,
+    run_id uuid NOT NULL,
+    acquired_at timestamp without time zone NOT NULL
 );
 
 
@@ -831,7 +847,8 @@ CREATE TABLE public.workflow_versions (
     console_panels jsonb DEFAULT '[]'::jsonb NOT NULL,
     console_layout jsonb DEFAULT '[]'::jsonb NOT NULL,
     commit_sha character varying(40) DEFAULT ''::character varying NOT NULL,
-    commit_message text DEFAULT ''::text NOT NULL
+    commit_message text DEFAULT ''::text NOT NULL,
+    node_groups jsonb
 );
 
 
@@ -1351,6 +1368,14 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
+-- Name: workflow_queue_slots workflow_queue_slots_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_queue_slots
+    ADD CONSTRAINT workflow_queue_slots_pkey PRIMARY KEY (workflow_id, group_id, run_id);
+
+
+--
 -- Name: workflow_runs workflow_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1791,6 +1816,13 @@ CREATE INDEX idx_workflow_node_execution_kvs_workflow_node_key_value ON public.w
 
 
 --
+-- Name: idx_workflow_node_executions_active_queue; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_active_queue ON public.workflow_node_executions USING btree (workflow_id, node_id, queue_name) WHERE ((state)::text = ANY ((ARRAY['pending'::character varying, 'started'::character varying, 'cancelling'::character varying])::text[]));
+
+
+--
 -- Name: idx_workflow_node_executions_event_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1879,6 +1911,13 @@ CREATE INDEX idx_workflow_nodes_deleted_at ON public.workflow_nodes USING btree 
 --
 
 CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (state);
+
+
+--
+-- Name: idx_workflow_queue_slots_run; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_queue_slots_run ON public.workflow_queue_slots USING btree (workflow_id, run_id);
 
 
 --
@@ -2689,7 +2728,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260811235128	f
+20260814024454	f
 \.
 
 

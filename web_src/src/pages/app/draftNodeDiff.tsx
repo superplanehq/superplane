@@ -85,6 +85,7 @@ function comparableNode(node: Record<string, unknown>) {
     configuration: normalizeComparableValue(node.configuration),
     position: normalizeComparableValue(node.position),
     isCollapsed: node.isCollapsed || false,
+    queue: normalizeComparableValue(node.queue),
     integrationId: getComparableIntegrationId(node),
   };
 }

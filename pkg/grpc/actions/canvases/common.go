@@ -96,6 +96,14 @@ func publishCanvasVersionInTransaction(
 	}
 
 	if len(changeset.Changes) == 0 {
+		//
+		// Queue rules and node groups can change without any node or edge
+		// diff; group membership still has to be materialized on the nodes.
+		//
+		if err := models.SyncCanvasNodeGroupIDs(tx, canvas.ID, nextVersion.NodeGroups); err != nil {
+			return changesets.CanvasPublishResult{}, err
+		}
+
 		return changesets.CanvasPublishResult{}, mapCanvasNameUniqueConstraintError(
 			models.PromoteToLiveInTransaction(tx, nextVersion, nextVersion.Nodes, nextVersion.Edges),
 		)

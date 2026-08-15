@@ -19,9 +19,10 @@ const (
 	CanvasRunStateCancelling = "cancelling"
 	CanvasRunStateFinished   = "finished"
 
-	CanvasRunResultPassed    = core.RunResultPassed
-	CanvasRunResultFailed    = core.RunResultFailed
-	CanvasRunResultCancelled = core.RunResultCancelled
+	CanvasRunResultPassed     = core.RunResultPassed
+	CanvasRunResultFailed     = core.RunResultFailed
+	CanvasRunResultCancelled  = core.RunResultCancelled
+	CanvasRunResultSuperseded = core.RunResultSuperseded
 
 	// Used when locking rows to update non-key columns only, so concurrent child
 	// inserts referencing the row via FK are not blocked (PostgreSQL FOR NO KEY UPDATE).

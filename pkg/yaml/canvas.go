@@ -49,6 +49,18 @@ func (c *Canvas) Edges() []models.Edge {
 	return edges
 }
 
+func (c *Canvas) NodeGroups() []models.NodeGroup {
+	groups := make([]models.NodeGroup, len(c.Spec.Groups))
+	for i, group := range c.Spec.Groups {
+		groups[i] = models.NodeGroup{
+			ID:             group.ID,
+			Nodes:          append([]string(nil), group.Nodes...),
+			MaxParallelism: group.MaxParallelism,
+		}
+	}
+	return groups
+}
+
 type CanvasMetadata struct {
 	ID          string `json:"id" yaml:"id"`
 	Name        string `json:"name" yaml:"name"`
@@ -56,8 +68,27 @@ type CanvasMetadata struct {
 }
 
 type CanvasSpec struct {
-	Nodes []Node `json:"nodes" yaml:"nodes"`
-	Edges []Edge `json:"edges" yaml:"edges"`
+	Nodes  []Node      `json:"nodes" yaml:"nodes"`
+	Edges  []Edge      `json:"edges" yaml:"edges"`
+	Groups []NodeGroup `json:"groups,omitempty" yaml:"groups,omitempty"`
+}
+
+// QueueSpec is a node's inline queue configuration. maxParallelism is
+// presence-aware: absent means 1, and 0 means unlimited, which disables
+// queueing for the node entirely.
+type QueueSpec struct {
+	Key            string `json:"key,omitempty" yaml:"key,omitempty"`
+	MaxParallelism *int   `json:"maxParallelism,omitempty" yaml:"maxParallelism,omitempty"`
+	AutoCancel     string `json:"autoCancel,omitempty" yaml:"autoCancel,omitempty"`
+}
+
+// NodeGroup is a group of nodes that acts as a queue: a run acquires a
+// slot in the group when its first item dispatches into the group, and
+// holds it while it has work inside the group.
+type NodeGroup struct {
+	ID             string   `json:"id" yaml:"id"`
+	Nodes          []string `json:"nodes" yaml:"nodes"`
+	MaxParallelism *int     `json:"maxParallelism,omitempty" yaml:"maxParallelism,omitempty"`
 }
 
 type Edge struct {
@@ -82,6 +113,7 @@ type Node struct {
 	Configuration  map[string]any  `json:"configuration" yaml:"configuration"`
 	Position       Position        `json:"position" yaml:"position"`
 	IsCollapsed    bool            `json:"isCollapsed" yaml:"isCollapsed"`
+	Queue          *QueueSpec      `json:"queue,omitempty" yaml:"queue,omitempty"`
 	Metadata       map[string]any  `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Integration    *IntegrationRef `json:"integration,omitempty" yaml:"integration,omitempty"`
 	ErrorMessage   *string         `json:"errorMessage,omitempty" yaml:"errorMessage,omitempty"`
@@ -91,6 +123,30 @@ type Node struct {
 type IntegrationRef struct {
 	ID   string `json:"id" yaml:"id"`
 	Name string `json:"name" yaml:"name"`
+}
+
+func (q *QueueSpec) Model() *models.QueueSpec {
+	if q == nil {
+		return nil
+	}
+
+	return &models.QueueSpec{
+		Key:            q.Key,
+		MaxParallelism: q.MaxParallelism,
+		AutoCancel:     q.AutoCancel,
+	}
+}
+
+func queueSpecFromModel(spec *models.QueueSpec) *QueueSpec {
+	if spec == nil {
+		return nil
+	}
+
+	return &QueueSpec{
+		Key:            spec.Key,
+		MaxParallelism: spec.MaxParallelism,
+		AutoCancel:     spec.AutoCancel,
+	}
 }
 
 func (n *Node) NodeTypeForModel() string {
@@ -114,6 +170,7 @@ func (n *Node) Model() models.Node {
 		Configuration:  n.Configuration,
 		Metadata:       n.Metadata,
 		IsCollapsed:    n.IsCollapsed,
+		Queue:          n.Queue.Model(),
 		ErrorMessage:   n.ErrorMessage,
 		WarningMessage: n.WarningMessage,
 		Position: models.Position{
@@ -244,6 +301,7 @@ func VersionToCanvasYAML(name string, description string, canvasVersion *models.
 			Configuration:  node.Configuration,
 			Metadata:       node.Metadata,
 			IsCollapsed:    node.IsCollapsed,
+			Queue:          queueSpecFromModel(node.Queue),
 			ErrorMessage:   node.ErrorMessage,
 			WarningMessage: node.WarningMessage,
 			Position: Position{
@@ -266,6 +324,14 @@ func VersionToCanvasYAML(name string, description string, canvasVersion *models.
 			SourceID: edge.SourceID,
 			TargetID: edge.TargetID,
 			Channel:  edge.Channel,
+		})
+	}
+
+	for _, group := range canvasVersion.NodeGroups {
+		resource.Spec.Groups = append(resource.Spec.Groups, NodeGroup{
+			ID:             group.ID,
+			Nodes:          append([]string(nil), group.Nodes...),
+			MaxParallelism: group.MaxParallelism,
 		})
 	}
 
@@ -315,6 +381,9 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 		if len(c.Spec.Edges) > 0 {
 			return nil, nil, fmt.Errorf("canvas has edges but no nodes")
 		}
+		if len(c.Spec.Groups) > 0 {
+			return nil, nil, fmt.Errorf("canvas has groups but no nodes")
+		}
 		return []models.Node{}, []models.Edge{}, nil
 	}
 
@@ -335,6 +404,10 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 			return nil, nil, fmt.Errorf("node %s: duplicate node id", node.ID)
 		}
 
+		if err := validateNodeQueue(node); err != nil {
+			return nil, nil, err
+		}
+
 		if node.Type == "" {
 			return nil, nil, fmt.Errorf("node %s: type is required", node.ID)
 		}
@@ -348,6 +421,10 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 		if err := c.validateNodeRef(registry, orgID, node); err != nil {
 			nodeValidationErrors[node.ID] = err.Error()
 		}
+	}
+
+	if err := c.validateGroups(nodeIDs); err != nil {
+		return nil, nil, err
 	}
 
 	// Find shadowed names within connected components
@@ -442,6 +519,81 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 	}
 
 	return nodes, c.Edges(), nil
+}
+
+// validateNodeQueue enforces the inline queue spec invariants:
+// maxParallelism must not be negative, autoCancel must be a known policy,
+// and autoCancel combined with maxParallelism 0 (unlimited) is rejected
+// because it can never trigger.
+func validateNodeQueue(node Node) error {
+	queue := node.Queue
+	if queue == nil {
+		return nil
+	}
+
+	if queue.MaxParallelism != nil && *queue.MaxParallelism < 0 {
+		return fmt.Errorf("node %s: queue maxParallelism must not be negative", node.ID)
+	}
+
+	switch queue.AutoCancel {
+	case "", models.QueueAutoCancelQueued, models.QueueAutoCancelRunning:
+	default:
+		return fmt.Errorf(
+			"node %s: invalid queue autoCancel %q (must be %q or %q)",
+			node.ID, queue.AutoCancel, models.QueueAutoCancelQueued, models.QueueAutoCancelRunning,
+		)
+	}
+
+	if queue.AutoCancel != "" && queue.Model().Unlimited() {
+		return fmt.Errorf(
+			"node %s: queue autoCancel has no effect with maxParallelism 0 (unlimited)",
+			node.ID,
+		)
+	}
+
+	return nil
+}
+
+// validateGroups enforces the group invariants: every group needs an id
+// and nodes, groups reference existing nodes, maxParallelism is at least
+// 1 (an unlimited group gates nothing), and groups are disjoint (a node
+// belongs to at most one group) so a run can never need two group slots
+// at once.
+func (c *Canvas) validateGroups(nodeIDs map[string]bool) error {
+	groupIDs := make(map[string]bool, len(c.Spec.Groups))
+	groupByNode := make(map[string]string)
+
+	for i, group := range c.Spec.Groups {
+		if strings.TrimSpace(group.ID) == "" {
+			return fmt.Errorf("group %d: id is required", i)
+		}
+
+		if groupIDs[group.ID] {
+			return fmt.Errorf("group %s: duplicate group id", group.ID)
+		}
+		groupIDs[group.ID] = true
+
+		if group.MaxParallelism != nil && *group.MaxParallelism < 1 {
+			return fmt.Errorf("group %s: maxParallelism must be at least 1", group.ID)
+		}
+
+		if len(group.Nodes) == 0 {
+			return fmt.Errorf("group %s: nodes is required", group.ID)
+		}
+
+		for _, nodeID := range group.Nodes {
+			if !nodeIDs[nodeID] {
+				return fmt.Errorf("group %s: node %s not found", group.ID, nodeID)
+			}
+
+			if otherGroup, ok := groupByNode[nodeID]; ok {
+				return fmt.Errorf("node %s belongs to more than one group (%s, %s)", nodeID, otherGroup, group.ID)
+			}
+			groupByNode[nodeID] = group.ID
+		}
+	}
+
+	return nil
 }
 
 func (c *Canvas) validateNodeRef(registry *registry.Registry, organizationID string, node Node) error {

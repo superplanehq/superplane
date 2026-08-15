@@ -345,6 +345,17 @@ func CreateNextNodeExecution(
 }
 
 func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
+	return CreateCanvasWithNodeGroups(t, orgID, userID, nodes, edges, nil)
+}
+
+func CreateCanvasWithNodeGroups(
+	t require.TestingT,
+	orgID uuid.UUID,
+	userID uuid.UUID,
+	nodes []models.CanvasNode,
+	edges []models.Edge,
+	nodeGroups []models.NodeGroup,
+) (*models.Canvas, []models.CanvasNode) {
 	now := time.Now()
 	liveVersionID := uuid.New()
 
@@ -359,6 +370,14 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 			Metadata:      node.Metadata.Data(),
 			Position:      node.Position.Data(),
 			IsCollapsed:   node.IsCollapsed,
+			Queue:         node.QueueSpec(),
+		}
+	}
+
+	groupIDByNode := map[string]string{}
+	for _, group := range nodeGroups {
+		for _, nodeID := range group.Nodes {
+			groupIDByNode[nodeID] = group.ID
 		}
 	}
 
@@ -394,8 +413,13 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 				Position:      datatypes.NewJSONType(node.Position),
 				Metadata:      datatypes.NewJSONType(node.Metadata),
 				IsCollapsed:   node.IsCollapsed,
+				Queue:         models.QueueSpecColumn(node.Queue),
 				CreatedAt:     &now,
 				UpdatedAt:     &now,
+			}
+
+			if groupID, ok := groupIDByNode[node.ID]; ok {
+				canvasNode.GroupID = &groupID
 			}
 
 			if err := tx.Clauses(clause.Returning{}).Create(&canvasNode).Error; err != nil {
@@ -410,6 +434,7 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 			OwnerID:    &userID,
 			Nodes:      datatypes.NewJSONSlice(inputNodes),
 			Edges:      datatypes.NewJSONSlice(edges),
+			NodeGroups: datatypes.NewJSONSlice(nodeGroups),
 			CreatedAt:  &now,
 			UpdatedAt:  &now,
 		}

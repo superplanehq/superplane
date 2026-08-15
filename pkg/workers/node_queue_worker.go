@@ -225,13 +225,11 @@ func (w *NodeQueueWorker) tryProcessReadyNode(canvasID uuid.UUID, nodeID string,
 	}
 
 	//
-	// Node is not ready yet, skip it. For queue-item-created messages this happens
-	// when a new item arrives while the node is still executing. For
-	// execution-finished messages this can happen if another worker has already
-	// moved the node into a non-ready state.
+	// Nodes in error state have a broken configuration and never dispatch;
+	// items routed to them stay queued until the user fixes the node.
 	//
-	if node.State != models.CanvasNodeStateReady {
-		w.logger.Infof("Node %s is not ready, skipping", node.NodeID)
+	if node.State == models.CanvasNodeStateError {
+		w.logger.Infof("Node %s is in error state, skipping", node.NodeID)
 		telemetry.RecordQueueWorkerNodeProcessing(
 			context.Background(),
 			time.Since(attemptStart),
@@ -273,7 +271,7 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 			return nil
 		}
 
-		err = w.processNodeQueueItem(tx, logger, n, messageCollector)
+		err = w.processNodeQueueItems(tx, logger, n, messageCollector)
 		if err != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyProcessError(err)
@@ -291,42 +289,255 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 	return nil
 }
 
-func (w *NodeQueueWorker) processNodeQueueItem(tx *gorm.DB, logger *log.Entry, node *models.CanvasNode, collector *MessageCollector) error {
-	item, err := node.FirstQueueItem(tx)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
+// queueItemScanLimit bounds how much of a node's backlog a single dispatch
+// pass looks at. Items beyond the limit are picked up by later passes.
+const queueItemScanLimit = 100
 
+// processNodeQueueItems scans the node's backlog in FIFO order and starts
+// every item whose queue still has capacity. Items in a full queue block
+// later items of the same queue (per-queue FIFO), but items of other
+// queues can still dispatch.
+func (w *NodeQueueWorker) processNodeQueueItems(tx *gorm.DB, logger *log.Entry, node *models.CanvasNode, collector *MessageCollector) error {
+	items, err := node.ListPendingQueueItems(tx, queueItemScanLimit)
+	if err != nil {
 		return err
 	}
 
+	if len(items) == 0 {
+		return nil
+	}
+
+	spec := node.QueueSpec()
+
+	live, err := w.prepareQueueItems(tx, logger, node, items, collector)
+	if err != nil {
+		return err
+	}
+
+	remaining, err := w.supersedeStaleQueueItems(tx, logger, spec, live, collector)
+	if err != nil {
+		return err
+	}
+
+	blocked := map[string]bool{}
+	for _, item := range remaining {
+		queueName := *item.QueueName
+		if blocked[queueName] {
+			continue
+		}
+
+		//
+		// An unlimited queue (maxParallelism 0) never blocks: no capacity
+		// check applies. Group admission below still does.
+		//
+		if !spec.Unlimited() {
+			activeCount, err := models.CountActiveExecutionsInQueue(tx, node.WorkflowID, node.NodeID, queueName)
+			if err != nil {
+				return err
+			}
+
+			if activeCount >= int64(spec.EffectiveMaxParallelism()) {
+				//
+				// autoCancel: running frees the queue for the newest item by
+				// cancelling in-flight executions. The item dispatches on a
+				// later pass, once the cancelled executions terminate.
+				//
+				if spec.AutoCancelPolicy() == models.QueueAutoCancelRunning {
+					if err := w.cancelRunningExecutionsInQueue(tx, logger, node, queueName); err != nil {
+						return err
+					}
+				}
+
+				blocked[queueName] = true
+				continue
+			}
+		}
+
+		if node.GroupID != nil {
+			admitted, err := w.admitRunIntoGroup(tx, node, item.RunID)
+			if err != nil {
+				return err
+			}
+			if !admitted {
+				blocked[queueName] = true
+				continue
+			}
+		}
+
+		if err := w.dispatchQueueItem(tx, logger, node, item, collector); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// prepareQueueItems drops items for cancelling runs and resolves the queue
+// name of the rest. Items whose queue name expression fails to resolve get
+// the configuration-error treatment: failed execution, item deleted.
+func (w *NodeQueueWorker) prepareQueueItems(
+	tx *gorm.DB,
+	logger *log.Entry,
+	node *models.CanvasNode,
+	items []models.CanvasNodeQueueItem,
+	collector *MessageCollector,
+) ([]*models.CanvasNodeQueueItem, error) {
+	live := make([]*models.CanvasNodeQueueItem, 0, len(items))
+	for i := range items {
+		item := &items[i]
+
+		run, err := models.FindCanvasRunInTransaction(tx, item.WorkflowID, item.RunID)
+		if err != nil {
+			return nil, err
+		}
+
+		if run.State == models.CanvasRunStateCancelling {
+			if err := tx.Delete(item).Error; err != nil {
+				return nil, err
+			}
+
+			logger.Infof("Skipping queue item for cancelling run %s", item.RunID)
+			collector.AddQueueItemDeleted(item)
+			continue
+		}
+
+		if _, err := contexts.ResolveQueueName(tx, node, item); err != nil {
+			logger.Errorf("Error resolving queue name for item %s: %v", item.ID, err)
+			if err := w.handleQueueNameResolutionError(tx, node, item, err, collector); err != nil {
+				return nil, err
+			}
+			continue
+		}
+
+		live = append(live, item)
+	}
+
+	return live, nil
+}
+
+// supersedeStaleQueueItems applies autoCancel to the waiting backlog. When
+// the node's queue has an autoCancel policy, only the newest waiting item
+// per resolved queue name survives; older waiting items are superseded
+// (and their runs finished as superseded when empty).
+func (w *NodeQueueWorker) supersedeStaleQueueItems(
+	tx *gorm.DB,
+	logger *log.Entry,
+	spec *models.QueueSpec,
+	items []*models.CanvasNodeQueueItem,
+	collector *MessageCollector,
+) ([]*models.CanvasNodeQueueItem, error) {
+	policy := spec.AutoCancelPolicy()
+	if policy != models.QueueAutoCancelQueued && policy != models.QueueAutoCancelRunning {
+		return items, nil
+	}
+
+	newestByQueue := make(map[string]*models.CanvasNodeQueueItem, len(items))
+	for _, item := range items {
+		newestByQueue[*item.QueueName] = item
+	}
+
+	remaining := make([]*models.CanvasNodeQueueItem, 0, len(items))
+	for _, item := range items {
+		if newestByQueue[*item.QueueName] != item {
+			logger.Infof("Superseding queue item %s in queue %s", item.ID, *item.QueueName)
+			if err := models.SupersedeQueueItem(tx, item); err != nil {
+				return nil, err
+			}
+
+			collector.AddQueueItemDeleted(item)
+			continue
+		}
+
+		remaining = append(remaining, item)
+	}
+
+	return remaining, nil
+}
+
+// admitRunIntoGroup checks the group gate for a run entering a grouped
+// node. A run already holding the group's slot passes; a run holding a
+// slot in another group waits (a run holds at most one slot); otherwise a
+// slot is acquired when the group has capacity.
+func (w *NodeQueueWorker) admitRunIntoGroup(
+	tx *gorm.DB,
+	node *models.CanvasNode,
+	runID uuid.UUID,
+) (bool, error) {
+	groups, err := models.FindLiveCanvasNodeGroups(tx, node.WorkflowID)
+	if err != nil {
+		return false, err
+	}
+
+	group := findNodeGroup(groups, *node.GroupID)
+	if group == nil {
+		return true, nil
+	}
+
+	slot, err := models.FindQueueSlotForRun(tx, node.WorkflowID, runID)
+	if err != nil {
+		return false, err
+	}
+
+	if slot != nil {
+		return slot.GroupID == group.ID, nil
+	}
+
+	slotCount, err := models.CountQueueSlots(tx, node.WorkflowID, group.ID)
+	if err != nil {
+		return false, err
+	}
+
+	if slotCount >= int64(group.EffectiveMaxParallelism()) {
+		return false, nil
+	}
+
+	return true, models.AcquireQueueSlot(tx, node.WorkflowID, group.ID, runID)
+}
+
+func (w *NodeQueueWorker) cancelRunningExecutionsInQueue(tx *gorm.DB, logger *log.Entry, node *models.CanvasNode, queueName string) error {
+	executions, err := models.ListActiveExecutionsInQueue(tx, node.WorkflowID, node.NodeID, queueName)
+	if err != nil {
+		return err
+	}
+
+	for i := range executions {
+		execution := executions[i]
+		if execution.State == models.CanvasNodeExecutionStateCancelling {
+			continue
+		}
+
+		logger.Infof("Cancelling execution %s superseded in queue %s", execution.ID, queueName)
+		if err := execution.RequestCancellation(tx, nil); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func findNodeGroup(groups []models.NodeGroup, groupID string) *models.NodeGroup {
+	for i := range groups {
+		if groups[i].ID == groupID {
+			return &groups[i]
+		}
+	}
+
+	return nil
+}
+
+func (w *NodeQueueWorker) dispatchQueueItem(
+	tx *gorm.DB,
+	logger *log.Entry,
+	node *models.CanvasNode,
+	item *models.CanvasNodeQueueItem,
+	collector *MessageCollector,
+) error {
 	logger = logging.WithQueueItem(logger, *item)
 	logger.Info("Processing queue item")
 
 	configFields, err := w.configurationFieldsForNode(node)
 	if err != nil {
 		return err
-	}
-
-	//
-	// Check if the run is cancelling.
-	// If it is, we should not create new executions,
-	// and instead, delete the queue item and return.
-	//
-	run, err := models.FindCanvasRunInTransaction(tx, item.WorkflowID, item.RunID)
-	if err != nil {
-		return err
-	}
-
-	if run.State == models.CanvasRunStateCancelling {
-		if err := tx.Delete(item).Error; err != nil {
-			return err
-		}
-
-		logger.Infof("Skipping queue item for cancelling run %s", item.RunID)
-		collector.AddQueueItemDeleted(item)
-		return nil
 	}
 
 	ctx, err := contexts.BuildProcessQueueContext(
@@ -384,6 +595,30 @@ func (w *NodeQueueWorker) processNodeQueueItem(tx *gorm.DB, logger *log.Entry, n
 
 	collector.AddQueueItemConsumed(item)
 	return nil
+}
+
+// handleQueueNameResolutionError treats a failing queue name expression
+// like a configuration error: it will keep failing until the user fixes
+// the node, so the item is consumed and a failed execution records why.
+func (w *NodeQueueWorker) handleQueueNameResolutionError(
+	tx *gorm.DB,
+	node *models.CanvasNode,
+	item *models.CanvasNodeQueueItem,
+	resolutionErr error,
+	collector *MessageCollector,
+) error {
+	event, err := models.FindCanvasEventInTransaction(tx, item.EventID)
+	if err != nil {
+		return err
+	}
+
+	return w.handleNodeConfigurationError(tx, &contexts.ConfigurationBuildError{
+		Err:         resolutionErr,
+		QueueItem:   item,
+		Node:        node,
+		Event:       event,
+		RootEventID: item.RootEventID,
+	}, collector)
 }
 
 func (w *NodeQueueWorker) configurationFieldsForNode(node *models.CanvasNode) ([]configuration.Field, error) {

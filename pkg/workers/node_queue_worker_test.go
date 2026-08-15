@@ -83,8 +83,7 @@ func Test__NodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 
 	//
 	// Process the node and verify the happy path:
-	// - Pending execution is created
-	// - Node state is updated to processing
+	// - Pending execution is created, stamped with the implicit queue name
 	// - Queue item is deleted
 	//
 	err = worker.LockAndProcessNode(logger, *node, time.Now())
@@ -97,11 +96,13 @@ func Test__NodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	assert.Equal(t, models.CanvasNodeExecutionStatePending, executions[0].State)
 	assert.Equal(t, rootEvent.ID, executions[0].EventID)
 	assert.Equal(t, rootEvent.ID, executions[0].RootEventID)
+	require.NotNil(t, executions[0].QueueName)
+	assert.Equal(t, componentNode, *executions[0].QueueName)
 
-	// Verify node state was updated to processing
+	// Node state no longer flips to a processing state
 	node, err = models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
 	require.NoError(t, err)
-	assert.Equal(t, models.CanvasNodeStateProcessing, node.State)
+	assert.Equal(t, models.CanvasNodeStateReady, node.State)
 
 	// Verify queue item was deleted
 	queueItems, err = models.ListNodeQueueItems(database.Conn(), canvas.ID, componentNode, 10, nil)
@@ -586,10 +587,6 @@ func Test__NodeQueueWorker_ProcessesNextQueueItemOnExecutionFinished(t *testing.
 	require.Len(t, executions, 1)
 	require.Equal(t, oldEvent.ID, executions[0].EventID)
 	require.Equal(t, models.CanvasNodeExecutionStatePending, executions[0].State)
-
-	node, err = models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
-	require.NoError(t, err)
-	assert.Equal(t, models.CanvasNodeStateProcessing, node.State)
 
 	queueItems, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)

@@ -20,6 +20,7 @@ type CanvasVersion struct {
 	CommitMessage string
 	Nodes         datatypes.JSONSlice[Node]
 	Edges         datatypes.JSONSlice[Edge]
+	NodeGroups    datatypes.JSONSlice[NodeGroup]
 	ConsolePanels datatypes.JSONType[[]ConsolePanel]
 	ConsoleLayout datatypes.JSONType[[]ConsoleLayoutItem]
 	CommitSHA     string

@@ -434,6 +434,7 @@ func createNewCanvasVersionFromLive(
 		CommitMessage: strings.TrimSpace(commitMessage),
 		Nodes:         datatypes.NewJSONSlice(slices.Clone(liveVersion.Nodes)),
 		Edges:         datatypes.NewJSONSlice(slices.Clone(liveVersion.Edges)),
+		NodeGroups:    datatypes.NewJSONSlice(slices.Clone(liveVersion.NodeGroups)),
 		ConsolePanels: datatypes.NewJSONType(slices.Clone(liveVersion.ConsolePanels.Data())),
 		ConsoleLayout: datatypes.NewJSONType(slices.Clone(liveVersion.ConsoleLayout.Data())),
 		CreatedAt:     &now,
@@ -484,6 +485,7 @@ func createNewCanvasVersionFromLive(
 			newNodes := injectMetadataIntoNodes(liveVersion.Nodes, nodes)
 			newVersion.Nodes = datatypes.NewJSONSlice(slices.Clone(newNodes))
 			newVersion.Edges = datatypes.NewJSONSlice(slices.Clone(edges))
+			newVersion.NodeGroups = datatypes.NewJSONSlice(canvas.NodeGroups())
 		case ConsoleYAMLRepositoryPath:
 			console, err := yaml.ConsoleFromYML([]byte(content))
 			if err != nil {

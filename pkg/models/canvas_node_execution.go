@@ -64,6 +64,12 @@ type CanvasNodeExecution struct {
 	EventID uuid.UUID
 
 	//
+	// The resolved queue name this execution occupies a slot in.
+	// Node-queue capacity is a count of active executions per queue name.
+	//
+	QueueName *string
+
+	//
 	// State management fields.
 	//
 	State         string
@@ -487,21 +493,6 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 	}
 
 	//
-	// Update the workflow node state to ready.
-	//
-	node, err := FindCanvasNode(tx, e.WorkflowID, e.NodeID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-
-	if node != nil {
-		err = node.UpdateState(tx, CanvasNodeStateReady)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	//
 	// Update execution state
 	//
 	e.State = CanvasNodeExecutionStateFinished
@@ -520,6 +511,10 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 	}
 
 	if err := CompletePendingRequestsForExecution(tx, e.ID); err != nil {
+		return nil, err
+	}
+
+	if _, err := e.maybeReleaseGroupSlot(tx); err != nil {
 		return nil, err
 	}
 
@@ -557,18 +552,6 @@ func (e *CanvasNodeExecution) EmitOutputsInTransaction(tx *gorm.DB, channelOutpu
 		err := tx.Create(&events).Error
 		if err != nil {
 			return nil, fmt.Errorf("failed to create events: %w", err)
-		}
-	}
-
-	node, err := FindCanvasNode(tx, e.WorkflowID, e.NodeID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-
-	if node != nil {
-		err = node.UpdateState(tx, CanvasNodeStateReady)
-		if err != nil {
-			return nil, err
 		}
 	}
 
@@ -619,19 +602,8 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 		return false, err
 	}
 
-	//
-	// Update the workflow node state to ready.
-	//
-	node, err := FindCanvasNode(tx, e.WorkflowID, e.NodeID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	if _, err := e.maybeReleaseGroupSlot(tx); err != nil {
 		return false, err
-	}
-
-	if node != nil {
-		err := node.UpdateState(tx, CanvasNodeStateReady)
-		if err != nil {
-			return false, err
-		}
 	}
 
 	return true, CompletePendingRequestsForExecution(tx, e.ID)
@@ -699,16 +671,8 @@ func (e *CanvasNodeExecution) CancelInTransaction(tx *gorm.DB, cancelledBy *uuid
 		return err
 	}
 
-	node, err := FindCanvasNode(tx, e.WorkflowID, e.NodeID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	if _, err := e.maybeReleaseGroupSlot(tx); err != nil {
 		return err
-	}
-
-	if node != nil {
-		err := node.UpdateState(tx, CanvasNodeStateReady)
-		if err != nil {
-			return err
-		}
 	}
 
 	return CompletePendingRequestsForExecution(tx, e.ID)
@@ -758,6 +722,26 @@ func (e *CanvasNodeExecution) IsFinished(tx *gorm.DB) (bool, error) {
 	}
 
 	return state == CanvasNodeExecutionStateFinished, nil
+}
+
+// maybeReleaseGroupSlot frees the group-queue slot held by this execution's
+// run when the execution's node belongs to a group and the run has no work
+// left inside that group. Called whenever an execution reaches a terminal
+// state.
+func (e *CanvasNodeExecution) maybeReleaseGroupSlot(tx *gorm.DB) (*CanvasQueueSlot, error) {
+	node, err := FindCanvasNode(tx, e.WorkflowID, e.NodeID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if node.GroupID == nil {
+		return nil, nil
+	}
+
+	return ReleaseQueueSlotIfGroupIdle(tx, e.WorkflowID, *node.GroupID, e.RunID)
 }
 
 func (e *CanvasNodeExecution) findState(tx *gorm.DB) (string, error) {

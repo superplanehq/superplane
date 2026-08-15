@@ -463,6 +463,15 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 		return false, "", err
 	}
 
+	//
+	// Run-terminal release: a finished run cannot hold group-queue slots.
+	// This is a safety net; slots are normally released when the run's
+	// work leaves the group (section-end release).
+	//
+	if err := models.DeleteQueueSlotsForRun(tx, run.WorkflowID, run.ID); err != nil {
+		return false, "", err
+	}
+
 	err = NewRunCallbackDispatcher(tx, w.registry, run).
 		WithEventCollector(eventCollector).
 		WithExecutionCollector(executionCollector).
