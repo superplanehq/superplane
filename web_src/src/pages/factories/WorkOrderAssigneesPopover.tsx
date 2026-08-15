@@ -96,7 +96,7 @@ export function WorkOrderAssigneesPopover({
   return (
     <Popover open={open} onOpenChange={handleOpenChange} modal={false}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent align={align} className="w-72 p-3" sideOffset={8}>
+      <PopoverContent align={align} className="z-[70] w-72 p-3" sideOffset={8}>
         <div className="space-y-3">
           <WorkOrderAssigneePicker
             organizationId={organizationId}
