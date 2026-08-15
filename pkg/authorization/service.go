@@ -354,6 +354,85 @@ func (a *AuthService) RemoveUserFromGroup(domainID string, domainType string, us
 	return nil
 }
 
+// GroupWithDetails carries a group's resolved role and members, computed from
+// a single read enforcer by GetGroupsWithDetails.
+type GroupWithDetails struct {
+	Name    string
+	Role    string
+	Members []string
+}
+
+// GetGroupsWithDetails returns every group in the domain together with its
+// role and members. It builds one read enforcer and derives all groups from
+// it in memory, rather than rebuilding an enforcer per group as calling
+// GetGroups + GetGroupRole + GetGroupUsers in a loop would. The per-group
+// derivation uses the same casbin calls as those methods, so the results are
+// identical.
+func (a *AuthService) GetGroupsWithDetails(ctx context.Context, domainID string, domainType string) ([]GroupWithDetails, error) {
+	domain := prefixDomain(domainType, domainID)
+
+	var details []GroupWithDetails
+	err := a.withReadEnforcer(ctx, domainType, domainID, func(enforcer casbin.IEnforcer) error {
+		// Discover group names the same way GetGroups does: a group appears as
+		// the subject of a group->role grouping rule.
+		policies, err := enforcer.GetFilteredGroupingPolicy(2, domain)
+		if err != nil {
+			return fmt.Errorf("failed to get groups: %w", err)
+		}
+
+		groupNames := make([]string, 0)
+		seen := make(map[string]bool)
+		for _, policy := range policies {
+			if !strings.HasPrefix(policy[0], "/groups/") {
+				continue
+			}
+			groupName := policy[0][len("/groups/"):]
+			if seen[groupName] {
+				continue
+			}
+			seen[groupName] = true
+			groupNames = append(groupNames, groupName)
+		}
+
+		details = make([]GroupWithDetails, 0, len(groupNames))
+		for _, groupName := range groupNames {
+			prefixedGroupName := prefixGroupName(groupName)
+
+			// Role: first /roles/ role, matching GetGroupRole.
+			role := ""
+			for _, r := range enforcer.GetRolesForUserInDomain(prefixedGroupName, domain) {
+				if strings.HasPrefix(r, "/roles/") {
+					role = strings.TrimPrefix(r, "/roles/")
+					break
+				}
+			}
+
+			// Members: users assigned to the group, matching GetGroupUsers.
+			memberPolicies, err := enforcer.GetFilteredGroupingPolicy(1, prefixedGroupName, domain)
+			if err != nil {
+				return fmt.Errorf("failed to get group users: %w", err)
+			}
+			members := make([]string, 0, len(memberPolicies))
+			for _, policy := range memberPolicies {
+				members = append(members, strings.TrimPrefix(policy[0], "/users/"))
+			}
+
+			details = append(details, GroupWithDetails{
+				Name:    groupName,
+				Role:    role,
+				Members: members,
+			})
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return details, nil
+}
+
 func (a *AuthService) GetGroupUsers(ctx context.Context, domainID string, domainType string, group string) ([]string, error) {
 	domain := prefixDomain(domainType, domainID)
 	prefixedGroupName := prefixGroupName(group)
