@@ -240,6 +240,64 @@ func (s *CanvasService) ReemitTriggerEvent(ctx context.Context, req *pb.ReemitTr
 	return canvases.ReemitTriggerEvent(ctx, db, canvas, req.NodeId, eventID)
 }
 
+func (s *CanvasService) ReplayNode(ctx context.Context, req *pb.ReplayNodeRequest) (*pb.ReplayNodeResponse, error) {
+	db := database.DB(ctx)
+	canvas, err := s.findCanvas(ctx, db, req.CanvasId)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.NodeId == "" {
+		return nil, status.Error(codes.InvalidArgument, "node_id is required")
+	}
+
+	var sourceExecutionID *uuid.UUID
+	if req.SourceExecutionId != "" {
+		id, err := uuid.Parse(req.SourceExecutionId)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, "invalid source_execution_id")
+		}
+		sourceExecutionID = &id
+	}
+
+	var sourceNodeID *string
+	if req.SourceNodeId != "" {
+		sourceNodeID = &req.SourceNodeId
+	}
+
+	// req.Inputs is the multi-input replay contract: when present it wins
+	// over the legacy payload/source_node_id pair (see canvases.ReplayNode's
+	// own priority-rule comment).
+	explicitInputs := make([]models.ReplayInput, len(req.Inputs))
+	for i, input := range req.Inputs {
+		explicitInputs[i] = models.ReplayInput{Payload: input.Payload.AsMap()}
+		if input.SourceNodeId != "" {
+			explicitInputs[i].SourceNodeID = &input.SourceNodeId
+		}
+	}
+
+	return canvases.ReplayNode(ctx, db, canvas, req.NodeId, sourceExecutionID, req.Payload.AsMap(), sourceNodeID, explicitInputs)
+}
+
+func (s *CanvasService) ResolveReplayInputs(ctx context.Context, req *pb.ResolveReplayInputsRequest) (*pb.ResolveReplayInputsResponse, error) {
+	db := database.DB(ctx)
+	canvas, err := s.findCanvas(ctx, db, req.CanvasId)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.NodeId == "" {
+		return nil, status.Error(codes.InvalidArgument, "node_id is required")
+	}
+
+	sourceExecutionID, err := uuid.Parse(req.SourceExecutionId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid source_execution_id")
+	}
+
+	return canvases.ResolveReplayInputs(ctx, db, canvas, req.NodeId, sourceExecutionID)
+}
+
 func (s *CanvasService) InvokeNodeExecutionHook(ctx context.Context, req *pb.InvokeNodeExecutionHookRequest) (*pb.InvokeNodeExecutionHookResponse, error) {
 	db := database.DB(ctx)
 	canvas, err := s.findCanvas(ctx, db, req.CanvasId)
