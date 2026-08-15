@@ -106,11 +106,59 @@ func listRootEventsForRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID,
 		return nil, err
 	}
 
+	rootedOn, err := rootEventIDsForRuns(db, canvasID, runIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, event := range events {
-		eventsByRunID[event.RunID.String()] = event
+		runID := event.RunID.String()
+		_, taken := eventsByRunID[runID]
+		if taken && !rootedOn[event.ID] {
+			continue
+		}
+
+		eventsByRunID[runID] = event
 	}
 
 	return eventsByRunID, nil
+}
+
+// A multi-input replay leaves N events on the run with no execution of their
+// own, and its queue items and executions are rooted on exactly one of them.
+// Without this the run would name an arbitrary one, and ListEventExecutions -
+// which matches on root_event_id - would answer empty for the whole run.
+func rootEventIDsForRuns(db *gorm.DB, canvasID uuid.UUID, runIDs []uuid.UUID) (map[uuid.UUID]bool, error) {
+	var ids []uuid.UUID
+	err := db.
+		Model(&models.CanvasNodeExecution{}).
+		Where("workflow_id = ?", canvasID).
+		Where("run_id IN ?", runIDs).
+		Distinct().
+		Pluck("root_event_id", &ids).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	var queueItemIDs []uuid.UUID
+	err = db.
+		Model(&models.CanvasNodeQueueItem{}).
+		Where("workflow_id = ?", canvasID).
+		Where("run_id IN ?", runIDs).
+		Distinct().
+		Pluck("root_event_id", &queueItemIDs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	rootedOn := make(map[uuid.UUID]bool, len(ids)+len(queueItemIDs))
+	for _, id := range append(ids, queueItemIDs...) {
+		rootedOn[id] = true
+	}
+
+	return rootedOn, nil
 }
 
 func SerializeCanvasRuns(
@@ -203,17 +251,19 @@ func serializeCanvasRunWithQueueItemInputs(
 	}
 
 	serialized := &pb.CanvasRun{
-		Id:         run.ID.String(),
-		CanvasId:   run.WorkflowID.String(),
-		VersionId:  run.VersionID.String(),
-		RootEvent:  serializedRootEvent,
-		State:      RunStateToProto(run.State),
-		Result:     RunResultToProto(run.Result),
-		Executions: executionRefs,
-		QueueItems: serializedQueueItems,
-		Errors:     run.ErrorMessages(),
-		CreatedAt:  timestamppb.New(*run.CreatedAt),
-		UpdatedAt:  timestamppb.New(*run.UpdatedAt),
+		Id:                      run.ID.String(),
+		CanvasId:                run.WorkflowID.String(),
+		VersionId:               run.VersionID.String(),
+		RootEvent:               serializedRootEvent,
+		State:                   RunStateToProto(run.State),
+		Result:                  RunResultToProto(run.Result),
+		Executions:              executionRefs,
+		QueueItems:              serializedQueueItems,
+		Errors:                  run.ErrorMessages(),
+		CreatedAt:               timestamppb.New(*run.CreatedAt),
+		UpdatedAt:               timestamppb.New(*run.UpdatedAt),
+		IsReplay:                run.IsReplay,
+		ReplaySourceExecutionId: optionalUUIDString(run.ReplaySourceExecutionID),
 	}
 
 	if parentRun.ID != uuid.Nil {
@@ -400,6 +450,14 @@ func groupExecutionsByRunID(executions []models.CanvasNodeExecution, runCount in
 	}
 
 	return executionsByRunID
+}
+
+func optionalUUIDString(value *uuid.UUID) string {
+	if value == nil {
+		return ""
+	}
+
+	return value.String()
 }
 
 func getLastRunTimestamp(runs []models.CanvasRun) *timestamppb.Timestamp {
