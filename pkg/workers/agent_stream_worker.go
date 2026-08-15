@@ -41,6 +41,9 @@ const (
 var errCustomToolResultsRequired = errors.New("custom tool results required")
 var errAgentStreamAlreadyLocked = errors.New("agent stream already in progress")
 var errSessionAlreadyReset = errors.New("agent session no longer streaming")
+var errWorkerShutdown = errors.New("agent stream worker interrupted")
+
+var errTurnDeadlineExpired = fmt.Errorf("provider turn did not complete within %v", agentStreamTimeout)
 
 var publishAgentRunFinished = func(session *models.AgentSession, evt agents.ProviderEvent, idempotencyKey string) error {
 	return messages.NewAgentRunFinishedMessage(
@@ -387,6 +390,14 @@ func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages
 		streamErr := w.streamProviderTurn(parentCtx, session, publish)
 		closeOpenTools(sessionID, publish)
 
+		if errors.Is(streamErr, errWorkerShutdown) {
+			// Leave the row streaming: FailStuckStreamingSessions (or
+			// another replica) reclaims it once the heartbeat goes stale.
+			// Marking it failed here would burst failures on every deploy.
+			log.WithField("session_id", sessionID).Info("agent stream: worker interrupted mid-turn, leaving session streaming for cleanup")
+			return nil
+		}
+
 		if streamErr != nil {
 			// Conditional on turnStartedAt so a stream that errors out
 			// after the user already hit Stop (InterruptSession bumps
@@ -459,14 +470,36 @@ func (w *AgentStreamWorker) streamProviderTurn(
 		if errors.Is(err, errSessionAlreadyReset) {
 			return nil
 		}
-		if streamErr == nil && err != nil && !isContextCancel(err) {
-			streamErr = err
+		if err != nil && parentCtx.Err() != nil {
+			// Worker shutdown: the turn has no outcome. Report it so the
+			// caller leaves the row streaming for stuck-session cleanup.
+			return errWorkerShutdown
+		}
+		if streamErr == nil && err != nil {
+			switch {
+			case errors.Is(err, context.DeadlineExceeded):
+				// The turn hit agentStreamTimeout. Partial output is not a
+				// completed turn; fail the session so the UI unblocks.
+				streamErr = errTurnDeadlineExpired
+			case errors.Is(err, context.Canceled):
+				// A cancellation that is not the worker's own shutdown has
+				// no known producer; keep the previous behavior and end
+				// the turn without an error.
+			default:
+				streamErr = err
+			}
 		}
 		if streamErr != nil || !customTools.resultsRequired {
 			return streamErr
 		}
 
 		if err := w.executeAndSendCustomToolResults(ctx, session, customTools, publish); err != nil {
+			if parentCtx.Err() != nil {
+				return errWorkerShutdown
+			}
+			if errors.Is(err, context.DeadlineExceeded) {
+				return errTurnDeadlineExpired
+			}
 			return err
 		}
 	}
@@ -1124,11 +1157,4 @@ func runStreamHeartbeat(ctx context.Context, sessionID uuid.UUID) {
 			}
 		}
 	}
-}
-
-func isContextCancel(err error) bool {
-	if err == nil {
-		return false
-	}
-	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
