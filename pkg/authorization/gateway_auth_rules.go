@@ -145,6 +145,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
 		},
+		{Method: "GET", Pattern: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/replay/inputs"}: {
+			Resource:           "canvases",
+			Action:             "read",
+			DomainType:         models.DomainTypeOrganization,
+			ResourcePathParams: []string{CanvasIDPathParam},
+		},
 		{Method: "GET", Pattern: "/api/v1/canvases/{canvas_id}/repository"}: {
 			Resource:           "canvases",
 			Action:             "read",
@@ -524,6 +530,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			ResourcePathParams: []string{CanvasIDPathParam},
 		},
 		{Method: "POST", Pattern: "/api/v1/canvases/{canvas_id}/triggers/{node_id}/events/{event_id}/reemit"}: {
+			Resource:           "canvases",
+			Action:             "update",
+			DomainType:         models.DomainTypeOrganization,
+			ResourcePathParams: []string{CanvasIDPathParam},
+		},
+		{Method: "POST", Pattern: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/replay"}: {
 			Resource:           "canvases",
 			Action:             "update",
 			DomainType:         models.DomainTypeOrganization,

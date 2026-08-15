@@ -241,6 +241,29 @@ service Canvases {
     };
   }
 
+  rpc ReplayNode(ReplayNodeRequest) returns (ReplayNodeResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/replay"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Replay a node";
+      description: "Replays a single canvas node in isolation from the graph, either from a hand-written payload or from a previous execution's history";
+      tags: "CanvasNode";
+    };
+  }
+
+  rpc ResolveReplayInputs(ResolveReplayInputsRequest) returns (ResolveReplayInputsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/replay/inputs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Resolve replay inputs";
+      description: "Resolves the inputs a node's replay would use for a given source execution, labelling each as recovered, missing, or detached";
+      tags: "CanvasNode";
+    };
+  }
+
   rpc InvokeNodeExecutionHook(InvokeNodeExecutionHookRequest) returns (InvokeNodeExecutionHookResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id}/executions/{execution_id}/hooks/{hook_name}"
@@ -648,6 +671,63 @@ message ReemitTriggerEventResponse {
   string event_id = 1;
 }
 
+// ReplayInput is one of the N inputs a multi-input replay can pin, each
+// attributed to the incoming source node it stands in for.
+message ReplayInput {
+  google.protobuf.Struct payload = 1;
+  string source_node_id = 2;
+}
+
+message ReplayNodeRequest {
+  string canvas_id = 1;
+  string node_id = 2;
+  // payload/source_node_id are the legacy single-input shape and stay for
+  // backward compatibility. When inputs is non-empty it always wins over
+  // both this pair and source_execution_id-based history resolution;
+  // source_execution_id itself is still honored for lineage (the created
+  // run's replay_source_execution_id) even when inputs is set.
+  google.protobuf.Struct payload = 3;
+  string source_node_id = 4;
+  string source_execution_id = 5;
+  repeated ReplayInput inputs = 6;
+}
+
+message ReplayNodeResponse {
+  string run_id = 1;
+  repeated string queue_item_ids = 2;
+}
+
+message ResolveReplayInputsRequest {
+  string canvas_id = 1;
+  string node_id = 2;
+  string source_execution_id = 3;
+}
+
+// ResolvedReplayInput is one input a replay would use, honestly labelled with
+// where it came from: recovered (a surviving consumed event attributed to a
+// currently-live incoming source), missing (a live incoming source that never
+// fed the replayed execution - payload is empty), expired (the execution did
+// consume inputs that retention has since erased, so this empty slot cannot
+// reproduce the original run), or detached (a recovered payload whose source
+// node no longer feeds this node - never sent on replay).
+message ResolvedReplayInput {
+  enum Status {
+    STATUS_UNKNOWN = 0;
+    STATUS_RECOVERED = 1;
+    STATUS_MISSING = 2;
+    STATUS_DETACHED = 3;
+    STATUS_EXPIRED = 4;
+  }
+
+  string source_node_id = 1;
+  google.protobuf.Struct payload = 2;
+  Status status = 3;
+}
+
+message ResolveReplayInputsResponse {
+  repeated ResolvedReplayInput inputs = 1;
+}
+
 message ListNodeQueueItemsRequest {
   string canvas_id = 1;
   string node_id = 2;
@@ -746,6 +826,9 @@ message CanvasNodeExecution {
   UserRef cancelled_by = 15;
   string run_id = 16;
   google.protobuf.Timestamp cancelled_at = 17;
+  CanvasEvent input_event = 18;
+  bool is_replay = 19;
+  string replay_source_execution_id = 20;
 }
 
 message CanvasNodeQueueItem {
@@ -905,6 +988,8 @@ message CanvasRun {
   google.protobuf.Timestamp cancelled_at = 12;
   CanvasRunRef parent = 13;
   repeated string errors = 14;
+  bool is_replay = 15;
+  string replay_source_execution_id = 16;
 }
 
 message CanvasRunRef {
