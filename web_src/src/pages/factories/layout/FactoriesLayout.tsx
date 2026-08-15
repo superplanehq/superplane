@@ -10,6 +10,7 @@ import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from "react-router";
 import { CreateFactoryDialog } from "../CreateFactoryDialog";
+import { CreateWorkOrderDialog } from "../CreateWorkOrderDialog";
 import {
   factoryRouteNeedsCanonicalRedirect,
   replaceFactoryKeySegment,
@@ -22,9 +23,14 @@ import { useOnboardingStorybook } from "../pages/onboarding/useOnboardingStorybo
 import { FactoriesLayoutContext } from "./factoriesLayoutContext";
 import { FactoriesNav } from "./FactoriesNav";
 import { SidebarUserMenu } from "./SidebarUserMenu";
+import { useCreateWorkOrderDialogState } from "./useCreateWorkOrderDialogState";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 const MAX_RECENT_WORK_ORDERS = 5;
+
+function isOnboardingSidebarHidden(pendingWorkspaceId: string | undefined, factoryId: string) {
+  return Boolean(pendingWorkspaceId && pendingWorkspaceId === factoryId);
+}
 
 export function FactoriesLayout() {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
@@ -92,6 +98,8 @@ function FactoriesLayoutContent({
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [createFactoryOpen, setCreateFactoryOpen] = useState(false);
+  const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
+    useCreateWorkOrderDialogState(organizationId, factoryKey, canAct("work_orders", "create"));
 
   const { data: organization } = useOrganization(organizationId);
   const { data: factory, error: factoryError } = useFactory(organizationId, factoryId);
@@ -128,8 +136,9 @@ function FactoriesLayoutContent({
       factoryKey,
       factory: factory ?? null,
       factories,
+      openCreateWorkOrder,
     }),
-    [organizationId, factoryId, factoryKey, factory, factories],
+    [organizationId, factoryId, factoryKey, factory, factories, openCreateWorkOrder],
   );
 
   const handleCreateFactory = async (input: { name: string; description: string; key: string }) => {
@@ -158,15 +167,10 @@ function FactoriesLayoutContent({
     return <FactoriesLayoutLoading />;
   }
 
-  // Storybook onboarding: hide the product shell only on the pending workspace.
-  const hideSidebar = Boolean(
-    storybookOnboarding?.pending?.workspaceId && storybookOnboarding.pending.workspaceId === factoryId,
-  );
-
   return (
     <FactoriesLayoutContext.Provider value={layoutContextValue}>
       <div className="flex h-screen w-full bg-background text-foreground" data-testid="factories-layout">
-        {hideSidebar ? null : (
+        {isOnboardingSidebarHidden(storybookOnboarding?.pending?.workspaceId, factoryId) ? null : (
           <FactoriesSidebar
             organizationId={organizationId}
             factoryKey={factoryKey}
@@ -194,6 +198,13 @@ function FactoriesLayoutContent({
         onClose={() => setCreateFactoryOpen(false)}
         onCreate={handleCreateFactory}
       />
+      {canAct("work_orders", "create") ? (
+        <CreateWorkOrderDialog
+          open={createWorkOrderOpen}
+          onClose={closeCreateWorkOrder}
+          onCreated={completeCreateWorkOrder}
+        />
+      ) : null}
     </FactoriesLayoutContext.Provider>
   );
 }
