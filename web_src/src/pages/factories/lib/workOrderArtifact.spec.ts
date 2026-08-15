@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildLatestArtifactDataById,
   extractArtifactMarkdownBody,
   extractArtifactName,
   extractArtifactTitle,
   extractArtifactUrl,
+  extractPrArtifactState,
   formatPrArtifactLabel,
+  overlayLiveArtifactData,
 } from "./workOrderArtifact";
 
 describe("formatPrArtifactLabel", () => {
@@ -87,5 +90,53 @@ describe("extractArtifactName", () => {
     expect(extractArtifactName({})).toBeUndefined();
     expect(extractArtifactName({ name: "" })).toBeUndefined();
     expect(extractArtifactName({ name: "  " })).toBeUndefined();
+  });
+});
+
+describe("extractPrArtifactState", () => {
+  it("returns each known state as-is", () => {
+    expect(extractPrArtifactState({ state: "open" })).toBe("open");
+    expect(extractPrArtifactState({ state: "draft" })).toBe("draft");
+    expect(extractPrArtifactState({ state: "closed" })).toBe("closed");
+    expect(extractPrArtifactState({ state: "merged" })).toBe("merged");
+  });
+
+  it("normalizes case", () => {
+    expect(extractPrArtifactState({ state: "MERGED" })).toBe("merged");
+    expect(extractPrArtifactState({ state: "Draft" })).toBe("draft");
+  });
+
+  it("returns undefined for missing, blank, or unrecognized values (back-compat default)", () => {
+    expect(extractPrArtifactState(undefined)).toBeUndefined();
+    expect(extractPrArtifactState({})).toBeUndefined();
+    expect(extractPrArtifactState({ state: "" })).toBeUndefined();
+    expect(extractPrArtifactState({ state: "in_review" })).toBeUndefined();
+  });
+});
+
+describe("buildLatestArtifactDataById", () => {
+  it("indexes artifacts that have both an id and data", () => {
+    const byId = buildLatestArtifactDataById([
+      { id: "art-1", data: { state: "merged" } },
+      { id: "art-2" },
+      { data: { state: "open" } },
+    ]);
+
+    expect(byId.get("art-1")).toEqual({ state: "merged" });
+    expect(byId.has("art-2")).toBe(false);
+  });
+});
+
+describe("overlayLiveArtifactData", () => {
+  it("replaces snapshot data when a matching live row exists", () => {
+    const snapshot = { id: "art-1", type: "pr", data: { state: "open" } };
+    const live = overlayLiveArtifactData(snapshot, new Map([["art-1", { state: "merged", title: "Done" }]]));
+
+    expect(live).toEqual({ id: "art-1", type: "pr", data: { state: "merged", title: "Done" } });
+  });
+
+  it("keeps the snapshot when the artifact is missing from the live list", () => {
+    const snapshot = { id: "art-1", data: { state: "open" } };
+    expect(overlayLiveArtifactData(snapshot, new Map())).toBe(snapshot);
   });
 });
