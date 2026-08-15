@@ -249,7 +249,9 @@ describe("WorkOrderDescriptionEditor", () => {
   });
 
   it("renders stored underline HTML when the editor opens", async () => {
-    render(<WorkOrderDescriptionEditor value="Hello <u>world</u>." maxLength={5000} disabled={false} onChange={vi.fn()} />);
+    render(
+      <WorkOrderDescriptionEditor value="Hello <u>world</u>." maxLength={5000} disabled={false} onChange={vi.fn()} />,
+    );
 
     const input = await screen.findByTestId("work-order-description-input");
     expect(input.querySelector("u")).toHaveTextContent("world");

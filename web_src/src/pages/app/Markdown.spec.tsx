@@ -115,9 +115,7 @@ describe("MarkdownContent", () => {
   });
 
   it("does not treat ++ as workspace underline", () => {
-    const { container } = render(
-      <MarkdownContent content={"i++ then j++ and C++ … ++more++"} variant="workspace" />,
-    );
+    const { container } = render(<MarkdownContent content={"i++ then j++ and C++ … ++more++"} variant="workspace" />);
 
     expect(container.querySelector("u")).toBeNull();
     expect(container).toHaveTextContent("i++ then j++ and C++ … ++more++");

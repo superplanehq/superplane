@@ -23,7 +23,9 @@ function hasMark(node: { marks?: { type: string }[]; content?: unknown[] }, type
   if (node.marks?.some((mark) => mark.type === type)) {
     return true;
   }
-  return (node.content ?? []).some((child) => hasMark(child as { marks?: { type: string }[]; content?: unknown[] }, type));
+  return (node.content ?? []).some((child) =>
+    hasMark(child as { marks?: { type: string }[]; content?: unknown[] }, type),
+  );
 }
 
 describe("WorkspaceUnderline", () => {
