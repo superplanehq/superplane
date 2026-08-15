@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
@@ -209,7 +210,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "")
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	sourceCanvas, _ := support.CreateCanvas(
@@ -245,9 +246,9 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 	sourceExecution.RunID = sourceRun.ID
 	require.NoError(t, database.Conn().Save(sourceExecution).Error)
 
-	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factoryModel.ID)
 
-	order, err := factory.CreateWorkOrder(
+	order, err := factoryModel.CreateWorkOrder(
 		database.Conn(),
 		"Ship feature",
 		"Implement and open PR",
@@ -256,7 +257,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		&sourceRun.ID,
 	)
 	require.NoError(t, err)
-	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+	linkRunToWorkOrder(t, r, factoryModel, order.ID, run.ID)
 
 	markdownArtifact, err := order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
 		Type: models.FactoryWorkOrderArtifactTypeMarkdown,
@@ -269,6 +270,19 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		Data: map[string]any{"url": "https://github.com/org/repo/pull/7", "number": 7},
 	})
 	require.NoError(t, err)
+
+	userIDStr := r.User.String()
+	require.NoError(t, order.RecordCommentAdded(database.Conn(), "Kicking this off", factory.WorkOrderCommentAuthor{
+		Kind:   factory.CommentAuthorKindUser,
+		UserID: &userIDStr,
+	}, nil))
+	require.NoError(t, order.RecordCommentAdded(database.Conn(), "Opened the PR", factory.WorkOrderCommentAuthor{
+		Kind: factory.CommentAuthorKindAutomation,
+		Automation: &factory.AutomationRef{
+			NodeID:   "implement",
+			NodeName: "Implement",
+		},
+	}, &factory.RunRef{ID: run.ID, State: "running"}))
 
 	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithRootEvent(&nodeExecution.RootEventID).
@@ -284,10 +298,11 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, order.ID.String(), payload["id"])
 		assert.Equal(t, "Ship feature", payload["title"])
 		assert.Equal(t, "Implement and open PR", payload["description"])
-		assert.Equal(t, factory.ID.String(), payload["factory_id"])
+		assert.Equal(t, factoryModel.ID.String(), payload["factory_id"])
 		assert.Equal(t, models.FactoryWorkOrderStateDraft, payload["state"])
 		assert.Equal(t, "", payload["result"])
 		assert.NotContains(t, payload, "artifacts")
+		assert.NotContains(t, payload, "comments")
 
 		source, ok := payload["source"].(map[string]any)
 		require.True(t, ok)
@@ -361,6 +376,47 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, markdownArtifact.ID.String(), mustResolveString(t, builder, `order().artifacts[1].id`))
 	})
 
+	t.Run("comments equivalents", func(t *testing.T) {
+		// ListComments orders created_at ASC, id ASC — oldest first.
+		full, err := builder.ResolveExpression(`order().comments`)
+		require.NoError(t, err)
+		comments, ok := full.([]any)
+		require.True(t, ok)
+		require.Len(t, comments, 2)
+
+		bracket, err := builder.ResolveExpression(`order()["comments"]`)
+		require.NoError(t, err)
+		assert.Equal(t, full, bracket)
+
+		count, err := builder.ResolveExpression(`len(order().comments)`)
+		require.NoError(t, err)
+		assert.Equal(t, 2, count)
+
+		firstBody, err := builder.ResolveExpression(`order().comments[0].body`)
+		require.NoError(t, err)
+		assert.Equal(t, "Kicking this off", firstBody)
+
+		firstAuthorKind, err := builder.ResolveExpression(`order().comments[0].author.kind`)
+		require.NoError(t, err)
+		assert.Equal(t, factory.CommentAuthorKindUser, firstAuthorKind)
+
+		bracketBody, err := builder.ResolveExpression(`order()["comments"][0]["body"]`)
+		require.NoError(t, err)
+		assert.Equal(t, "Kicking this off", bracketBody)
+
+		secondAuthorKind, err := builder.ResolveExpression(`order().comments[1].author.kind`)
+		require.NoError(t, err)
+		assert.Equal(t, factory.CommentAuthorKindAutomation, secondAuthorKind)
+
+		secondAutomationNodeID, err := builder.ResolveExpression(`order().comments[1].author.automation.node_id`)
+		require.NoError(t, err)
+		assert.Equal(t, "implement", secondAutomationNodeID)
+
+		secondRunID, err := builder.ResolveExpression(`order().comments[1].run.id`)
+		require.NoError(t, err)
+		assert.Equal(t, run.ID.String(), secondRunID)
+	})
+
 	t.Run("none and any over artifact types", func(t *testing.T) {
 		hasNoPR, err := builder.ResolveExpression(`none(order().artifacts, {#.type == "pr"})`)
 		require.NoError(t, err)
@@ -370,7 +426,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, true, hasPR)
 
-		orderWithoutPR, err := factory.CreateWorkOrder(database.Conn(), "No PR yet", "", &r.User, nil, nil)
+		orderWithoutPR, err := factoryModel.CreateWorkOrder(database.Conn(), "No PR yet", "", &r.User, nil, nil)
 		require.NoError(t, err)
 		_, err = orderWithoutPR.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
 			Type: models.FactoryWorkOrderArtifactTypeMarkdown,
@@ -378,14 +434,20 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		canvas2, nodeExecution2, run2 := setupFactoryAppExecution(t, r, factory.ID)
-		linkRunToWorkOrder(t, r, factory, orderWithoutPR.ID, run2.ID)
+		canvas2, nodeExecution2, run2 := setupFactoryAppExecution(t, r, factoryModel.ID)
+		linkRunToWorkOrder(t, r, factoryModel, orderWithoutPR.ID, run2.ID)
 		builderNoPR := NewNodeConfigurationBuilder(database.Conn(), canvas2.ID).
 			WithRootEvent(&nodeExecution2.RootEventID)
 
 		nonePR, err := builderNoPR.ResolveExpression(`none(order().artifacts, {#.type == "pr"})`)
 		require.NoError(t, err)
 		assert.Equal(t, true, nonePR)
+
+		// A work order with no comments should still resolve order().comments
+		// as an empty list, not nil, matching artifacts' behavior.
+		noComments, err := builderNoPR.ResolveExpression(`order().comments`)
+		require.NoError(t, err)
+		assert.Equal(t, []any{}, noComments)
 	})
 }
 

@@ -86,7 +86,7 @@ func UpdateWorkOrderAssignees(
 		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
 	}
 
-	serialized, err := loadAndSerializeWorkOrder(ctx, order)
+	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
 	}

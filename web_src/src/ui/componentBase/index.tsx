@@ -94,6 +94,12 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   isFactoryApp?: boolean;
   /** False on factory Live without a selected run (topology only). */
   showRuntimeStatus?: boolean;
+  /** Factory run inspection: selected run still active (default true). */
+  runIsActive?: boolean;
+  /** Go Action.Label() — factory card primary title. */
+  componentLabel?: string;
+  /** User-given node name — factory card gray subtitle. */
+  nodeName?: string;
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = (props) => {
@@ -101,6 +107,8 @@ export const ComponentBase: React.FC<ComponentBaseProps> = (props) => {
     return (
       <FactoryNodeCard
         title={props.title}
+        componentLabel={props.componentLabel}
+        nodeName={props.nodeName}
         iconSrc={props.iconSrc}
         iconSlug={props.iconSlug}
         iconColor={props.iconColor}
@@ -118,6 +126,8 @@ export const ComponentBase: React.FC<ComponentBaseProps> = (props) => {
         isCompactView={props.isCompactView}
         canvasMode={props.canvasMode}
         showRuntimeStatus={props.showRuntimeStatus}
+        runIsActive={props.runIsActive}
+        eventStateMap={props.eventStateMap}
       />
     );
   }

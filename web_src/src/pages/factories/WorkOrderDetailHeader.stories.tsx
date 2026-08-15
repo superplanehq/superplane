@@ -1,20 +1,23 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { ComponentStoryShell } from "./__fixtures__/ComponentStoryShell";
+import { withFactoriesTheme } from "./__fixtures__/factoriesStoryTheme";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
 
 /**
- * Header for the work order detail page: title on the left, Copy link + a
- * kebab menu of lifecycle actions on the right. Status and dispatch live in
- * the sidebar, so the header stays minimal.
+ * Header for the work order detail page: back link + `SP-42` identifier +
+ * title on the left, Copy link + kebab menu of lifecycle actions on the
+ * right. Status and dispatch live in the sidebar, so the header stays
+ * minimal.
  */
 const meta = {
   title: "Factories/Components/WorkOrderDetailHeader",
   component: WorkOrderDetailHeader,
-  parameters: { layout: "padded" },
+  parameters: { layout: "fullscreen" },
   decorators: [
+    withFactoriesTheme,
     (Story) => (
-      <ComponentStoryShell className="min-h-[220px] max-w-5xl bg-white p-6 dark:bg-gray-900">
+      <ComponentStoryShell className="min-h-[220px] bg-background">
         <Story />
       </ComponentStoryShell>
     ),
@@ -39,13 +42,15 @@ const commonFlags = {
   isRejecting: false,
   isClosing: false,
   isUpdatingStatus: false,
+  backHref: "/org-1/workspaces/SP/work-orders",
+  orderIdentifier: "SP-42",
 };
 
 /** Open — Back to draft, Complete, Reject all available in the kebab. */
 export const Open: Story = {
   args: {
     orderTitle: "Reconcile duplicate refunds in ledger",
-    displayStatus: "open",
+    displayStatus: "waiting",
     isOpen: true,
     isDispatchable: true,
     isClosed: false,
@@ -110,7 +115,7 @@ export const ClosedFailed: Story = {
   name: "Closed (failed)",
   args: {
     orderTitle: "Failed: reconcile refund ledger for Q1 audit",
-    displayStatus: "closedFailed",
+    displayStatus: "failed",
     isOpen: false,
     isDispatchable: false,
     isClosed: true,
@@ -126,7 +131,7 @@ export const ReadOnly: Story = {
   name: "Read Only",
   args: {
     orderTitle: "Reconcile duplicate refunds in ledger",
-    displayStatus: "open",
+    displayStatus: "waiting",
     isOpen: true,
     isDispatchable: true,
     isClosed: false,

@@ -7,7 +7,7 @@ import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailSidebarProps {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   order: FactoriesWorkOrder;
   artifacts: FactoriesWorkOrderArtifact[];
   isArtifactsLoading: boolean;
@@ -17,7 +17,6 @@ interface WorkOrderDetailSidebarProps {
   assigneeIds: string[];
   assigneeNames: string[];
   factoryLines: FactoriesFactoryLine[];
-  canEditFactoryLines: boolean;
   canAssign: boolean;
   canDispatch: boolean;
   permissionsLoading: boolean;
@@ -31,7 +30,7 @@ interface WorkOrderDetailSidebarProps {
 /** Work order overview, factory lines, and artifacts. */
 export function WorkOrderDetailSidebar({
   organizationId,
-  factoryId,
+  factoryKey,
   order,
   artifacts,
   isArtifactsLoading,
@@ -41,7 +40,6 @@ export function WorkOrderDetailSidebar({
   assigneeIds,
   assigneeNames,
   factoryLines,
-  canEditFactoryLines,
   canAssign,
   canDispatch,
   permissionsLoading,
@@ -67,8 +65,7 @@ export function WorkOrderDetailSidebar({
 
       <WorkOrderSidebarFactoryLines
         organizationId={organizationId}
-        factoryId={factoryId}
-        canEditFactoryLines={canEditFactoryLines}
+        factoryKey={factoryKey}
         executions={order.executions ?? []}
         factoryLines={factoryLines}
         canDispatch={canDispatch}
