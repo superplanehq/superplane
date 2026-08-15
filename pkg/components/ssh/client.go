@@ -167,11 +167,15 @@ func (c *Client) ExecuteScript(command string, stdin io.Reader, timeout time.Dur
 		session.Stdin = stdin
 	}
 
+	// Enforce the deadline with a stoppable timer instead of a parked
+	// goroutine. When Run returns before the timeout (the common case), the
+	// deferred Stop cancels the pending close so nothing keeps the session
+	// and its output buffers alive for the remainder of the timeout.
 	if timeout > 0 {
-		go func() {
-			time.Sleep(timeout)
+		timer := time.AfterFunc(timeout, func() {
 			_ = session.Close()
-		}()
+		})
+		defer timer.Stop()
 	}
 
 	err = session.Run(command)
