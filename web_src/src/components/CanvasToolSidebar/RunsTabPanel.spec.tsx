@@ -183,6 +183,46 @@ describe("RunsTabPanel", () => {
     expect(screen.queryByText("Healthy deploy")).not.toBeInTheDocument();
   });
 
+  it("reports the replay runs it is hiding and reveals them on demand", () => {
+    render(
+      <RunsTabPanel
+        runs={[
+          makeRun({ id: "run-normal", rootEvent: { ...makeRun().rootEvent, customName: "Normal deploy" } }),
+          makeRun({
+            id: "run-replay",
+            isReplay: true,
+            rootEvent: { ...makeRun().rootEvent, customName: "Replayed deploy" },
+          }),
+        ]}
+        selectedRunId={null}
+        {...baseProps}
+      />,
+      { wrapper: routerWrapper },
+    );
+
+    expect(screen.queryByText("Replayed deploy")).not.toBeInTheDocument();
+    expect(screen.getByText("Showing 1 of 2 loaded")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show 1 replay" }));
+
+    expect(screen.getByText("Replayed deploy")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Show \d+ replay/ })).not.toBeInTheDocument();
+  });
+
+  it("stays quiet when nothing is hidden (boundary)", () => {
+    render(
+      <RunsTabPanel
+        runs={[makeRun({ id: "run-normal", rootEvent: { ...makeRun().rootEvent, customName: "Normal deploy" } })]}
+        selectedRunId={null}
+        {...baseProps}
+      />,
+      { wrapper: routerWrapper },
+    );
+
+    expect(screen.queryByText(/Showing \d+ of \d+ loaded/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Show \d+ replay/ })).not.toBeInTheDocument();
+  });
+
   it("loads more runs when the sidebar scroll reaches the end", () => {
     const onLoadMore = vi.fn();
     const runs = Array.from({ length: 25 }, (_, index) =>

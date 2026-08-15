@@ -47,7 +47,7 @@ export function RunsTabPanel({
   componentIconMap = {},
   onStatusFiltersChange,
 }: RunsTabPanelProps) {
-  const filterState = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange });
+  const filterState = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange, selectedRunId });
 
   return (
     <RunsTabPanelContent
@@ -146,6 +146,7 @@ export function RunsTabPanelContent({
           onRetry={onRetry}
           onClearFilters={filterState.clearFilters}
           hasAnyFilter={filterState.hasAnyFilter}
+          hiddenReplayCount={filterState.hiddenReplayCount}
           selectedStatuses={filterState.selectedStatuses}
           selectedTriggerIds={filterState.selectedTriggerIds}
           searchQuery={filterState.searchQuery}
@@ -155,6 +156,8 @@ export function RunsTabPanelContent({
           onToggleTrigger={filterState.toggleTrigger}
           onClearTriggers={filterState.clearTriggers}
           onSearchQueryChange={filterState.setSearchQuery}
+          showReplays={filterState.showReplays}
+          onToggleShowReplays={filterState.toggleShowReplays}
         />
       </div>
     </div>

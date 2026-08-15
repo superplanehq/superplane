@@ -12,6 +12,7 @@ import type {
 import type { CanvasEdge, CanvasNode } from "@/ui/CanvasPage";
 import { hydrateRunExecution, prepareData } from "./workflowPageHelpers";
 import { stripCanvasNodeSetupWarningsForRunsView } from "./lib/node-integrations";
+import { annotateReplayInputSourceNodes, collectReplayInputSourceNodeIds } from "./lib/replay-input-node";
 
 type UseRunCanvasDataParams = {
   isRunInspectionMode: boolean;
@@ -149,6 +150,15 @@ export function useRunCanvasData({
         ),
       );
     }
+    const replayInputSourceNodeIds = collectReplayInputSourceNodeIds({
+      isReplay: !!selectedRun.isReplay,
+      rootEventNodeId: selectedRun.rootEvent?.nodeId,
+      executions: Object.values(nodeExecutionsMap).flat(),
+      executedNodeIds: new Set(Object.keys(nodeExecutionsMap)),
+    });
+    for (const nodeId of replayInputSourceNodeIds) {
+      runNodeIds.add(nodeId);
+    }
     const prepared = prepareData(
       selectedRunCanvas,
       allTriggers,
@@ -162,7 +172,10 @@ export function useRunCanvasData({
       "live",
     );
     return {
-      nodes: stripCanvasNodeSetupWarningsForRunsView(prepared.nodes),
+      nodes: annotateReplayInputSourceNodes(
+        stripCanvasNodeSetupWarningsForRunsView(prepared.nodes),
+        replayInputSourceNodeIds,
+      ),
       edges: prepared.edges,
       participantNodeIds: Array.from(runNodeIds),
     };
