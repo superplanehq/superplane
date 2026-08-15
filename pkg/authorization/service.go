@@ -638,6 +638,41 @@ func (a *AuthService) RemoveRole(userID, role, domainID string, domainType strin
 	return nil
 }
 
+// GetOrgUsersByRoles resolves the users assigned to each of roleNames using a
+// single read enforcer, rather than rebuilding one per role as calling
+// GetOrgUsersForRole in a loop would. Each role's lookup uses the same casbin
+// call as GetOrgUsersForRole, so the results are identical. A role whose
+// lookup fails is skipped, matching the per-role method's tolerated errors.
+func (a *AuthService) GetOrgUsersByRoles(ctx context.Context, orgID string, roleNames []string) (map[string][]string, error) {
+	orgDomain := prefixDomain(models.DomainTypeOrganization, orgID)
+
+	usersByRole := make(map[string][]string, len(roleNames))
+	err := a.withReadEnforcer(ctx, models.DomainTypeOrganization, orgID, func(enforcer casbin.IEnforcer) error {
+		for _, role := range roleNames {
+			prefixedRole := prefixRoleName(role)
+			users, err := enforcer.GetUsersForRole(prefixedRole, orgDomain)
+			if err != nil {
+				continue
+			}
+
+			unprefixedUsers := make([]string, 0, len(users))
+			for _, user := range users {
+				if strings.HasPrefix(user, "/users/") {
+					unprefixedUsers = append(unprefixedUsers, strings.TrimPrefix(user, "/users/"))
+				}
+			}
+			usersByRole[role] = unprefixedUsers
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return usersByRole, nil
+}
+
 func (a *AuthService) GetOrgUsersForRole(ctx context.Context, role string, orgID string) ([]string, error) {
 	prefixedRole := prefixRoleName(role)
 	orgDomain := prefixDomain(models.DomainTypeOrganization, orgID)

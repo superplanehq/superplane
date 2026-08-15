@@ -59,13 +59,16 @@ func ListUsers(
 	}
 
 	//
-	// For each role, get all users for it
+	// Resolve the users for every role with a single read enforcer, instead
+	// of rebuilding one per role.
 	//
+	usersByRole, err := authService.GetOrgUsersByRoles(ctx, domainID, roleNames)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to get users for roles")
+	}
+
 	for _, roleDef := range roleDefinitions {
-		userIDs, err := authService.GetOrgUsersForRole(ctx, roleDef.Name, domainID)
-		if err != nil {
-			continue
-		}
+		userIDs := usersByRole[roleDef.Name]
 
 		roleMetadata := roleMetadataMap[roleDef.Name]
 		roleAssignment := &pb.RoleAssignment{

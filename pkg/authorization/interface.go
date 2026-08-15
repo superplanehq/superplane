@@ -30,6 +30,9 @@ type RoleManager interface {
 	AssignRole(userID, role, domainID string, domainType string) error
 	RemoveRole(userID, role, domainID string, domainType string) error
 	GetOrgUsersForRole(ctx context.Context, role string, orgID string) ([]string, error)
+	// GetOrgUsersByRoles resolves the users for several roles using a single
+	// read enforcer, instead of rebuilding one per role.
+	GetOrgUsersByRoles(ctx context.Context, orgID string, roleNames []string) (map[string][]string, error)
 }
 
 // Setup and initialization interface
