@@ -79,7 +79,7 @@ const WORKSPACE_MARKDOWN_HEADING_CLASSES = {
  */
 const MARKDOWN_SANITIZE_SCHEMA = {
   ...defaultSchema,
-  tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary"],
+  tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary", "u"],
   attributes: {
     ...(defaultSchema.attributes ?? {}),
     a: [...(defaultSchema.attributes?.a ?? []), "title"],
