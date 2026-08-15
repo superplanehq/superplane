@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   canvasesCancelExecution,
   canvasesCancelRun,
@@ -8,9 +8,41 @@ import {
   canvasesReemitTriggerEvent,
   type CanvasesCanvasRun,
 } from "@/api-client";
+import { buildNodeNamesById } from "@/lib/nodeNamesById";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { RunInspectorNodeSection } from "./types";
+
+export type RunInspectorReplayTarget = {
+  canvasId: string;
+  nodeId: string;
+  payload: unknown;
+  sourceNodeId?: string;
+  sourceExecutionId?: string;
+};
+
+//
+// A replay reruns this one node against the input it already consumed, so it
+// needs that past input: the trigger has none (it is replayed by Rerun), a
+// queued step has not consumed one yet, and retention can null out an
+// execution's input event long after the fact.
+//
+export function canReplaySection(section: RunInspectorNodeSection): boolean {
+  return !section.isTrigger && !section.isQueued && Boolean(section.execution?.inputEvent);
+}
+
+function toReplayTarget(canvasId: string, section: RunInspectorNodeSection): RunInspectorReplayTarget | null {
+  const inputEvent = section.execution?.inputEvent;
+  if (!inputEvent) return null;
+
+  return {
+    canvasId,
+    nodeId: section.nodeId,
+    payload: inputEvent.data,
+    sourceNodeId: inputEvent.nodeId,
+    sourceExecutionId: section.execution?.id,
+  };
+}
 
 export function useRunInspectorActions({
   canvasId,
@@ -18,12 +50,14 @@ export function useRunInspectorActions({
   sections,
   executionsLoading,
   onRerunCreated,
+  onReplayCreated,
 }: {
   canvasId: string;
   run: CanvasesCanvasRun;
   sections: RunInspectorNodeSection[];
   executionsLoading: boolean;
   onRerunCreated?: (eventId: string) => void | Promise<void>;
+  onReplayCreated?: (runId: string) => void;
 }) {
   const queryClient = useQueryClient();
   const runningExecutionIds = useMemo(() => {
@@ -68,8 +102,28 @@ export function useRunInspectorActions({
   const stopNodeMutation = useStopNodeMutation({ canvasId, refreshRunQueries });
   const executionHookMutation = useExecutionHookMutation({ canvasId, refreshRunQueries });
   const cancelQueuedItemMutation = useCancelQueuedItemMutation({ canvasId, refreshRunQueries });
+  const [replaySection, setReplaySection] = useState<RunInspectorNodeSection | null>(null);
+  // The steps list only ever knows nodes that appear as sections in this run, so a
+  // source outside it (e.g. never executed here) falls back to its raw id in the modal.
+  const nodeNamesById = useMemo(
+    () =>
+      buildNodeNamesById(
+        sections,
+        (section) => section.nodeId,
+        (section) => section.nodeName,
+      ),
+    [sections],
+  );
 
   return {
+    replayTarget: replaySection ? toReplayTarget(canvasId, replaySection) : null,
+    nodeNamesById,
+    openReplay: (section: RunInspectorNodeSection) => {
+      if (!canReplaySection(section)) return;
+      setReplaySection(section);
+    },
+    closeReplay: () => setReplaySection(null),
+    onReplayCreated,
     rerun: () => rerunMutation.mutate(),
     rerunPending: rerunMutation.isPending,
     stop: () => stopMutation.mutate(),

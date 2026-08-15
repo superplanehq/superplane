@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
 import { Accordion } from "@/ui/accordion";
+import { ReplayNodeModal } from "@/ui/ReplayNode/ReplayNodeModal";
 import { RunErrorsCard } from "./RunErrorsCard";
 import { RunInspectorErrorSummaryCard } from "./RunInspectorErrorSummaryCard";
 import { RunInspectorNodeAccordion } from "./RunInspectorNodeAccordion";
@@ -98,6 +99,19 @@ export function RunInspectorStepsList({
           ))}
         </Accordion>
       )}
+
+      {actions.replayTarget ? (
+        <ReplayNodeModal
+          onClose={actions.closeReplay}
+          canvasId={actions.replayTarget.canvasId}
+          nodeId={actions.replayTarget.nodeId}
+          originalPayload={actions.replayTarget.payload}
+          sourceNodeId={actions.replayTarget.sourceNodeId}
+          sourceExecutionId={actions.replayTarget.sourceExecutionId}
+          nodeNamesById={actions.nodeNamesById}
+          onReplayed={actions.onReplayCreated}
+        />
+      ) : null}
     </div>
   );
 }
