@@ -314,9 +314,20 @@ func (w *NodeQueueWorker) processNodeQueueItems(tx *gorm.DB, logger *log.Entry, 
 		return err
 	}
 
-	remaining, err := w.supersedeStaleQueueItems(tx, logger, spec, live, collector)
-	if err != nil {
-		return err
+	//
+	// Components with their own queue item processor (merge, loop) keep
+	// executions open while waiting for more queue items, so their items
+	// are never gated on capacity and never superseded: the component
+	// decides admission in ProcessQueueItem.
+	//
+	selfManaged := w.queueItemProcessorForNode(node) != nil
+
+	remaining := live
+	if !selfManaged {
+		remaining, err = w.supersedeStaleQueueItems(tx, logger, spec, live, collector)
+		if err != nil {
+			return err
+		}
 	}
 
 	blocked := map[string]bool{}
@@ -330,7 +341,7 @@ func (w *NodeQueueWorker) processNodeQueueItems(tx *gorm.DB, logger *log.Entry, 
 		// An unlimited queue (maxParallelism 0) never blocks: no capacity
 		// check applies. Group admission below still does.
 		//
-		if !spec.Unlimited() {
+		if !selfManaged && !spec.Unlimited() {
 			activeCount, err := models.CountActiveExecutionsInQueue(tx, node.WorkflowID, node.NodeID, queueName)
 			if err != nil {
 				return err
@@ -621,6 +632,38 @@ func (w *NodeQueueWorker) handleQueueNameResolutionError(
 	}, collector)
 }
 
+// queueItemProcessorForNode returns the component's self-managed queue
+// item processor, or nil when the engine's default processing applies.
+// Implementing core.QueueItemProcessor also means the node's queue items
+// are never gated on queue capacity.
+func (w *NodeQueueWorker) queueItemProcessorForNode(node *models.CanvasNode) core.QueueItemProcessor {
+	ref := node.Ref.Data()
+	if ref.Component == nil || ref.Component.Name == "" {
+		return nil
+	}
+
+	action, err := w.registry.GetAction(ref.Component.Name)
+	if err != nil {
+		return nil
+	}
+
+	return queueItemProcessorFor(action)
+}
+
+// queueItemProcessorFor extracts an action's core.QueueItemProcessor,
+// looking through the registry's panic-recovery wrapper.
+func queueItemProcessorFor(action core.Action) core.QueueItemProcessor {
+	if wrapped, ok := action.(*registry.PanicableAction); ok {
+		return wrapped.QueueItemProcessor()
+	}
+
+	if processor, ok := action.(core.QueueItemProcessor); ok {
+		return processor
+	}
+
+	return nil
+}
+
 func (w *NodeQueueWorker) configurationFieldsForNode(node *models.CanvasNode) ([]configuration.Field, error) {
 	ref := node.Ref.Data()
 	switch node.Type {
@@ -652,13 +695,33 @@ func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, no
 		return fmt.Errorf("action %s not found: %w", ref.Component.Name, err)
 	}
 
-	executionID, err := action.ProcessQueueItem(*ctx)
+	executionID, err := w.processQueueItem(ctx, action)
 	if err != nil {
 		return err
 	}
 
 	collector.AddExecutionID(executionID)
 	return nil
+}
+
+// processQueueItem delegates to the component's own queue item processor
+// when it has one; otherwise it runs the engine's default processing:
+// create the execution, consume the item.
+func (w *NodeQueueWorker) processQueueItem(ctx *core.ProcessQueueContext, action core.Action) (*uuid.UUID, error) {
+	if processor := queueItemProcessorFor(action); processor != nil {
+		return processor.ProcessQueueItem(*ctx)
+	}
+
+	executionCtx, err := ctx.CreateExecution()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := ctx.DequeueItem(); err != nil {
+		return nil, err
+	}
+
+	return &executionCtx.ID, nil
 }
 
 func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, configErr *contexts.ConfigurationBuildError, collector *MessageCollector) error {

@@ -618,6 +618,93 @@ func Test__Queueing_GroupQueueGatesSectionAcrossRuns(t *testing.T) {
 	assert.Equal(t, deployExecution3.RunID, slots[0].RunID)
 }
 
+// Self-managed components must never be capacity-gated. A merge keeps its
+// execution open while waiting for the remaining sources; counting that
+// execution against the implicit limit of 1 would block the second
+// source's queue item forever and deadlock the merge.
+func Test__Queueing_SelfManagedMergeIsNotCapacityGated(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	worker := queueWorkerForTest(r)
+	router := NewEventRouter(amqpURL)
+	logger := log.NewEntry(log.New())
+
+	mergeNode := "merge-node"
+
+	canvas, _ := support.CreateCanvas(
+		t, r.Organization.ID, r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "trigger-1",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: "branch-a",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: "branch-b",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: mergeNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "merge"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: "trigger-1", TargetID: "branch-a", Channel: "default"},
+			{SourceID: "trigger-1", TargetID: "branch-b", Channel: "default"},
+			{SourceID: "branch-a", TargetID: mergeNode, Channel: "default"},
+			{SourceID: "branch-b", TargetID: mergeNode, Channel: "default"},
+		},
+	)
+
+	routeEvent := func(event *models.CanvasEvent) {
+		t.Helper()
+		require.NoError(t, router.LockAndProcessEvent(logger, *event, time.Now()))
+	}
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger-1", "default", nil)
+	routeEvent(rootEvent)
+
+	//
+	// Both branches run and route their outputs into the merge node.
+	//
+	for _, branch := range []string{"branch-a", "branch-b"} {
+		processQueueNode(t, worker, canvas.ID, branch)
+		executions := listNodeExecutionsForTest(t, canvas.ID, branch)
+		require.Len(t, executions, 1)
+		require.NoError(t, executions[0].Start())
+		events, err := executions[0].Pass(map[string][]any{"default": {map[string]any{"ok": true}}})
+		require.NoError(t, err)
+		for i := range events {
+			routeEvent(&events[i])
+		}
+	}
+
+	require.Len(t, listQueueItemsForTest(t, canvas.ID, mergeNode), 2)
+
+	//
+	// One pass consumes both source items: the first opens the merge
+	// execution, the second completes it. Capacity-gating the second item
+	// against the open execution would deadlock here.
+	//
+	processQueueNode(t, worker, canvas.ID, mergeNode)
+
+	assert.Empty(t, listQueueItemsForTest(t, canvas.ID, mergeNode))
+
+	executions := listNodeExecutionsForTest(t, canvas.ID, mergeNode)
+	require.Len(t, executions, 1)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, executions[0].State)
+	assert.Equal(t, models.CanvasNodeExecutionResultPassed, executions[0].Result)
+}
+
 func findExecutionByEvent(t *testing.T, canvasID uuid.UUID, nodeID string, eventID uuid.UUID) *models.CanvasNodeExecution {
 	t.Helper()
 	executions := listNodeExecutionsForTest(t, canvasID, nodeID)

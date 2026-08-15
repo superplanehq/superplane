@@ -66,13 +66,6 @@ type Action interface {
 	Setup(ctx SetupContext) error
 
 	/*
-	 * ProcessQueueItem is called when a queue item for this component's node
-	 * is ready to be processed. Implementations should create the appropriate
-	 * execution or handle the item synchronously using the provided context.
-	 */
-	ProcessQueueItem(ctx ProcessQueueContext) (*uuid.UUID, error)
-
-	/*
 	 * Passes full execution control to the component.
 	 *
 	 * Component execution has full control over the execution state,
@@ -106,6 +99,28 @@ type Action interface {
 	 * Default behavior does nothing. Components can override to perform cleanup.
 	 */
 	Cleanup(ctx SetupContext) error
+}
+
+/*
+ * QueueItemProcessor is implemented by actions that process their node's
+ * queue items themselves (merge, loop) instead of the engine's default
+ * processing, which creates an execution and dequeues the item.
+ *
+ * Implementing this interface also means the engine always dispatches
+ * the component's queue items instead of gating them on queue capacity:
+ * these components keep executions open while waiting for more queue
+ * items — later source events for merge, feedback events for loop — so
+ * capacity-gating their items would starve the very items needed to
+ * finish those executions. Queue capacity and autoCancel do not apply.
+ */
+type QueueItemProcessor interface {
+	/*
+	 * ProcessQueueItem is called when a queue item for this component's
+	 * node is ready to be processed. Implementations should create the
+	 * appropriate execution or handle the item synchronously using the
+	 * provided context.
+	 */
+	ProcessQueueItem(ctx ProcessQueueContext) (*uuid.UUID, error)
 }
 
 type OutputChannel struct {

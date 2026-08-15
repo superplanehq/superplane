@@ -152,19 +152,6 @@ func BuildProcessQueueContext(
 		return node.UpdateState(tx, state)
 	}
 
-	ctx.DefaultProcessing = func() (*uuid.UUID, error) {
-		executionCtx, err := ctx.CreateExecution()
-		if err != nil {
-			return nil, err
-		}
-
-		if err := ctx.DequeueItem(); err != nil {
-			return nil, err
-		}
-
-		return &executionCtx.ID, nil
-	}
-
 	ctx.DistinctIncomingSources = func() ([]core.Node, error) {
 		wf, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, node.WorkflowID)
 		if err != nil {

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -187,10 +186,6 @@ func toSlice(v any) ([]any, error) {
 		result[i] = rv.Index(i).Interface()
 	}
 	return result, nil
-}
-
-func (c *ForEach) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *ForEach) Cancel(ctx core.ExecutionContext) error {

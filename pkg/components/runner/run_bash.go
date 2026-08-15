@@ -3,7 +3,6 @@ package runner
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -288,10 +287,6 @@ func (c *RunBash) Setup(ctx core.SetupContext) error {
 
 	_, err = ctx.Webhook.Setup()
 	return err
-}
-
-func (c *RunBash) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *RunBash) Execute(ctx core.ExecutionContext) error {

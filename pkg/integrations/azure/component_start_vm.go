@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -122,10 +121,6 @@ func (c *StartVMComponent) Setup(ctx core.SetupContext) error {
 	}
 
 	return nil
-}
-
-func (c *StartVMComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *StartVMComponent) Execute(ctx core.ExecutionContext) error {

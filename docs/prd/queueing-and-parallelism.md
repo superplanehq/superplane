@@ -298,7 +298,7 @@ cross-node shared budgets are future work.
     drains), last activity, per-queue counters — the answer is a purely
     observational queue-state row, lazily upserted on first touch and subject
     to retention (key expressions have unbounded cardinality), never read by
-    dispatch. Decide when building the queue UI (chunk 10).
+    dispatch. Decide when building the queue UI (chunk 9).
 
 ## Goals
 
@@ -710,56 +710,144 @@ branch, with correctness over polish:
 - Exit criteria: acceptance-criteria scenarios 1–5 and 13 below pass as E2E
   tests; learnings feed back into this PRD before the production chunks
   start.
+- The POC intentionally goes further than the first production chunks: it
+  includes key expressions, auto-cancel, and groups, which the delivery plan
+  defers behind the factory chunks. They stay in the POC because they are
+  the riskiest semantics and de-risking them is what the POC is for. The POC
+  already produced one plan-level finding: capacity-gating self-managed
+  components (`merge`, `loop`) deadlocks them, fixed by making
+  `ProcessQueueItem` an optional capability (`core.QueueItemProcessor`;
+  see chunk 1).
 
 ## Delivery Plan
 
-The work splits into ten independently reviewable and shippable chunks.
-Chunks 1–2 are behavior-neutral by design and are validated by the existing
+### Multi-execution safety audit (done)
+
+Before splitting the work, we audited every code path suspected of
+assuming "the node's one execution", since any of them becomes a latent
+bug once a node can run N executions concurrently. Most paths were
+already keyed by execution ID and need no changes: the execution
+terminator lists and cancels each cancelling execution individually,
+cancellation flows carry the execution ID end to end, and hooks resolve
+via an execution ID from the API (`InvokeNodeExecutionHook`) or via
+execution-scoped `CanvasNodeRequest` rows. The audit produced two real
+findings, both fixed on the POC branch:
+
+- **Self-managed dispatch for `merge`/`loop`** — capacity-gating their
+  queue items deadlocks them; see chunk 1, where the production port
+  ships.
+- **Webhook execution correlation** (`FirstNodeExecutionByKV`) is scoped
+  to `(workflow, node, key, value)` and silently returned the oldest match
+  when values collide. Verified: every component that stores a lookup KV
+  uses a value that is unique per execution by construction — merge keys
+  by root event, loop by session root event, the runner by task ID, and
+  all integrations by external IDs returned from the create call itself
+  (GitHub's `workflow_run_id` comes from `ReturnRunDetails: true` on the
+  dispatch, not from polling). The lookup now counts distinct matching
+  executions and logs an error on a collision while still returning the
+  oldest, so a component that breaks the contract is observable instead
+  of silently misrouting webhooks.
+
+Two audited items intentionally carry no action here:
+`HasRunningExecutions` (node-scoped "any running") has exactly one
+consumer — loop's session gate — and changes deliberately in the loop
+chunk; `FindLastExecutionPerNode` powers node cards showing one
+execution's state, which with N running shows only the most recent — not
+wrong data, but it misrepresents concurrency — and moves to the canvas UI
+chunk as a display concern.
+
+### Chunks
+
+The work splits into nine independently reviewable and shippable chunks.
+Chunk 1 is behavior-neutral by design and is validated by the existing
 test suite plus new regression tests; nothing user-visible changes until
-chunk 3.
+chunk 2. The factory chunks (3–4) come right after inline specs because
+line-step parallelism is the primary motivating use case; key
+expressions, auto-cancel, and groups follow.
 
 ```mermaid
 flowchart LR
-  C1[1 Retire node mutex] --> C2[2 Multi-execution safety audit]
-  C2 --> C3[3 Inline node queue specs]
-  C3 --> C4[4 Key expressions]
-  C4 --> C5[5 Auto-cancel policies]
-  C3 --> C6[6 Groups]
-  C5 --> C6
-  C3 --> C7[7 Loop parallel sessions]
-  C3 --> C10[10 Canvas queue UI]
-  C8[8 Step admission control backend] --> C9[9 Factory step queue UI]
+  C1[1 Retire node mutex] --> C2[2 Inline node queue specs]
+  C2 --> C3[3 Step admission control backend]
+  C3 --> C4[4 Factory step queue UI]
+  C2 --> C5[5 Key expressions]
+  C5 --> C6[6 Auto-cancel policies]
+  C2 --> C7[7 Groups]
+  C6 --> C7
+  C2 --> C8[8 Loop parallel sessions]
+  C2 --> C9[9 Canvas queue UI]
 ```
 
-**Chunk 1 — Retire the node mutex (engine, behavior-neutral).** Introduce the
-dispatch-mode declaration on `core.Action` and registry plumbing; rework
-`NodeQueueWorker` and `DefaultProcessing` to dispatch on slot capacity with
-the implicit limit hardcoded to 1; stop branching on `ready`/`processing` for
-scheduling (the `processing → ready` migration lands here); change
-pass/fail/cancel to release capacity instead of resetting node state;
-structure dispatch as a loop so one wake-up can dispatch multiple items
-(capped at 1 for now). The safety-net poll drops its `state = ready` filter:
-the join with `workflow_node_queue_items` remains the scan bound (only nodes
-with backlog are listed), and at-capacity nodes now cost one indexed
-capacity count per poll instead of being filtered by the column — acceptable
-at the once-a-minute poll rate, and necessary, since a stored flag cannot
-express "has free slots at limit N". If busy-with-backlog node counts ever
-make this loop expensive, the poll query can be made capacity-aware (join
-pending items to running-execution counts per resolved `queue_name` and
-return only actionable nodes) without schema changes. Add regression tests
-that lock in current `merge`
-behavior (concurrent executions across runs, same-run item integrity) and
-`loop` behavior as explicit contracts. This is the highest-risk chunk and
-deliberately contains no new configuration: correctness is proven by zero
-behavioral delta.
+**Chunk 1 — Retire the node mutex (engine, behavior-neutral).** Rework
+`NodeQueueWorker` to dispatch on slot capacity with the implicit limit
+hardcoded to 1; stop branching on `ready`/`processing` for scheduling (the
+`processing → ready` migration lands here); change pass/fail/cancel to
+release capacity instead of resetting node state; structure dispatch as a
+loop so one wake-up can dispatch multiple items (capped at 1 for now).
 
-**Chunk 2 — Multi-execution safety audit (behavior-neutral).** Find and fix
-every code path that resolves "the node's execution" by node ID alone —
-hooks, webhook handling, cancellation, the execution terminator, and any
-UI-facing queries that assume at most one running execution per node. Each
-must key by execution ID. Ships before any parallelism is possible.
+Two pieces the POC validated land here. First, **self-managed dispatch**:
+`merge` and `loop` keep executions open while waiting for more queue items
+(later source events, feedback events), so gating their items on
+active-execution counts starves the very items needed to finish those
+executions — a deadlock the old mutex avoided only because these components
+reset node state to `ready` immediately. `ProcessQueueItem` moves off the
+required `core.Action` interface into the optional `core.QueueItemProcessor`
+interface (forwarded through the registry's `PanicableAction` wrapper):
+implementing it is itself the self-managed signal, `merge` and `loop` are
+its only implementers, and the ~490 components that only ever called
+`ctx.DefaultProcessing()` lose the boilerplate — the engine now creates the
+execution and consumes the item itself. For self-managed components the
+engine always dispatches their items and applies neither capacity nor
+`autoCancel`. Regression tests must drive `merge` and `loop` through
+`NodeQueueWorker`, not call the components directly — the POC deadlock was
+invisible to the direct-call tests.
 
-**Chunk 3 — Inline node queue specs.** The `queue` message on the `Node`
+Second, the **capacity-aware safety-net poll**. The poll drops its
+`state = ready` filter, and instead of listing every node with backlog and
+re-checking capacity per node in Go, the query returns only actionable
+nodes. False positives are fine (the worker re-checks under the per-node
+lock); false negatives are forbidden. Sketch:
+
+```sql
+SELECT DISTINCT n.workflow_id, n.node_id
+FROM workflow_nodes n
+JOIN workflow_node_queue_items i
+  ON i.workflow_id = n.workflow_id AND i.node_id = n.node_id
+WHERE n.state <> 'error'
+  AND n.type = 'component'
+  AND n.deleted_at IS NULL
+  AND (
+    i.queue_name IS NULL                                  -- unresolved item: always visit
+    OR COALESCE((n.queue->>'maxParallelism')::int, 1) = 0 -- unlimited
+    OR n.queue->>'autoCancel' IS NOT NULL                 -- policy work possible at capacity
+    OR n.group_id IS NOT NULL                             -- group admission is per run
+    OR n.node_id = ANY (@self_managed_node_ids)           -- merge/loop: always visit
+    OR (
+      SELECT count(*)
+      FROM workflow_node_executions e
+      WHERE e.workflow_id = i.workflow_id
+        AND e.node_id = i.node_id
+        AND e.queue_name = i.queue_name
+        AND e.state IN ('pending', 'started', 'cancelling')
+    ) < COALESCE((n.queue->>'maxParallelism')::int, 1)
+  );
+```
+
+The join with `workflow_node_queue_items` bounds the scan to nodes with
+backlog; the correlated count is served by the partial index on
+`workflow_node_executions (workflow_id, node_id, queue_name)` over
+non-terminal states. The self-managed node list comes from the worker
+(which knows the registry), not from SQL inspecting component refs. In
+chunk 1 only the `queue_name IS NULL` and count-vs-1 arms are live; the
+other arms activate as chunks 2–7 land, without schema changes.
+
+The webhook-KV collision detection from the safety audit (see above)
+also ports here, alongside the self-managed dispatch mechanism.
+
+This is the highest-risk chunk and deliberately contains no new
+configuration: correctness is proven by zero behavioral delta.
+
+**Chunk 2 — Inline node queue specs.** The `queue` message on the `Node`
 proto (`make pb.gen`), spec storage, publish materialization and commit-time
 validation, YAML support, the `queue_name` columns on items and executions,
 per-queue dispatch locking, `maxParallelism` (including 0 = unlimited).
@@ -767,48 +855,48 @@ First chunk where two executions can run concurrently; includes E2E tests
 for FIFO dispatch at capacity, unlimited dispatch, restart safety, and the
 default-of-1 regression check.
 
-**Chunk 4 — Key expressions.** Expression resolution in queue keys,
+**Chunk 3 — Line-step admission control (backend).** `FactoryLineStep`
+`maxParallelism` with default 10; the waiting state for work orders per step,
+ordered by readiness time; admission on run start and on terminal runs
+(including failed and cancelled); work order events for queued/admitted;
+atomic per-step admission. Independent of the engine chunks at the code
+level — it gates run creation at the factory layer, not engine dispatch —
+but it needs chunk 2 to pay off: bottleneck nodes inside the step's canvas
+must be able to run in parallel for step-level parallelism to mean anything.
+
+**Chunk 4 — Factory step queue UI.** Waiting work orders per step with
+position, "Queued at *step name*" on the work order page, and the queued /
+admitted events in the work order chronology.
+
+**Chunk 5 — Key expressions.** Expression resolution in queue keys,
 once-per-item persistence, failure handling. E2E test: the monorepo case —
 two branches proceed in parallel, same-branch pushes serialize, with no
 extra configuration required.
 
-**Chunk 5 — Auto-cancel policies.** `queued` (dispatch newest, supersede older
+**Chunk 6 — Auto-cancel policies.** `queued` (dispatch newest, supersede older
 waiting) and `running` (also cancel in-flight on arrival); the "superseded"
 disposition on items, executions, and runs; run finalization for superseded
 work. E2E tests: the docs-deploy case (three queued, one runs) and
 cancel-in-progress.
 
-**Chunk 6 — Groups.** The `groups` list on the canvas spec (`make pb.gen`),
+**Chunk 7 — Groups.** The `groups` list on the canvas spec (`make pb.gen`),
 publish materialization (per-node group membership) and validation (disjoint
 groups, existing nodes, `maxParallelism >= 1`); the `workflow_queue_slots`
 table keyed by group; slot acquisition at first dispatch into the group;
 FIFO run wait list; section-end release (run has no pending items or running
 executions on the group's nodes) plus unconditional release at run terminal;
 the runtime second-slot guard. Group auto-cancel is deferred; when built, it
-reuses chunk 5's superseded machinery on runs. E2E test: the deploy → tests
+reuses chunk 6's superseded machinery on runs. E2E test: the deploy → tests
 case with trailing nodes outside the group (next run's deploy dispatches
 when the previous run's test finishes, not at its run end).
 
-**Chunk 7 — Loop parallel sessions.** Expose the queue's effective
+**Chunk 8 — Loop parallel sessions.** Expose the queue's effective
 `maxParallelism` in the queue processing context; change the `startLoop` gate
 from "any active session" to "sessions at limit"; tests for concurrent
 sessions with correct feedback routing, deferral of starts beyond the limit,
 and the no-deadlock criterion (feedback processed at capacity).
 
-**Chunk 8 — Line-step admission control (backend).** `FactoryLineStep`
-`maxParallelism` with default 10; the waiting state for work orders per step,
-ordered by readiness time; admission on run start and on terminal runs
-(including failed and cancelled); work order events for queued/admitted;
-atomic per-step admission; shared slot model with chunk 6 where practical.
-Independent of chunks 1–7 at the code level — it gates run creation at the
-factory layer, not engine dispatch — so it can be built in parallel, though
-it only pays off fully once bottleneck nodes have parallelism.
-
-**Chunk 9 — Factory step queue UI.** Waiting work orders per step with
-position, "Queued at *step name*" on the work order page, and the queued /
-admitted events in the work order chronology.
-
-**Chunk 10 — Canvas queue UI.** Queues as first-class objects: a derived
+**Chunk 9 — Canvas queue UI.** Queues as first-class objects: a derived
 canvas-level queue list (from attachments and live runtime state) with
 depth, holders, and waiters per resolved name; queue badges on nodes; group
 boundaries drawn on the canvas with the limit badge on the border; backlog
