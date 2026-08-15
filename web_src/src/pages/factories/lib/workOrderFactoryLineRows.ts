@@ -30,6 +30,7 @@ export function deriveFactoryLineRows(executions: FactoriesWorkOrderExecution[])
 function executionTone(execution: FactoriesWorkOrderExecution): FactoryLineRowTone {
   if (execution.result === "RESULT_FAILED") return "danger";
   if (
+    execution.state === "STATE_QUEUED" ||
     execution.state === "STATE_PENDING" ||
     execution.state === "STATE_STARTED" ||
     execution.state === "STATE_CANCELLING"

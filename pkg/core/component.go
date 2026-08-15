@@ -187,10 +187,18 @@ type ProcessQueueContext struct {
 	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
 
 	//
-	// HasRunningExecutions reports whether this node currently has any
-	// unfinished (running) executions.
+	// QueueMaxParallelism is the node queue's effective maxParallelism
+	// (0 means unlimited). Self-managed components use it to gate how
+	// much concurrent work they start, since the queue worker does not
+	// capacity-gate their queue items.
 	//
-	HasRunningExecutions func() (bool, error)
+	QueueMaxParallelism int
+
+	//
+	// CountRunningExecutions returns how many unfinished (running)
+	// executions this node currently has.
+	//
+	CountRunningExecutions func() (int64, error)
 
 	//
 	// DistinctIncomingSources returns the distinct upstream

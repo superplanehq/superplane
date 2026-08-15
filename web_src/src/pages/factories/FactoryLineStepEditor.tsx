@@ -90,6 +90,20 @@ export function FactoryLineStepEditor({
             </p>
           ) : null}
         </div>
+
+        <div className={cn("space-y-2", stepFieldClassName)}>
+          <Label htmlFor={`factory-line-step-max-parallelism-${index}`}>Max parallel runs</Label>
+          <Input
+            id={`factory-line-step-max-parallelism-${index}`}
+            className={stepFieldClassName}
+            type="number"
+            min={0}
+            value={step.maxParallelism}
+            onChange={(event) => onChange({ ...step, maxParallelism: event.target.value })}
+            placeholder="10"
+          />
+          <p className="text-xs text-muted-foreground">Work above this limit waits in the step queue. 0 = no limit.</p>
+        </div>
       </div>
     </LineStepEditorShell>
   );

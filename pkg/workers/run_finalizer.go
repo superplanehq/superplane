@@ -354,7 +354,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	}
 
 	var finalized bool
-	var nextFactoryLineRun *factoryLinePendingRun
+	var nextFactoryLineRuns []factoryLinePendingRun
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var skipReason string
 		var err error
@@ -370,7 +370,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 			return nil
 		}
 
-		nextFactoryLineRun, err = w.executeNextFactoryLineStep(tx, runID)
+		nextFactoryLineRuns, err = w.executeNextFactoryLineStep(tx, runID)
 		return err
 	})
 
@@ -403,9 +403,9 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		}
 	}
 
-	if nextFactoryLineRun != nil {
-		if err := messages.NewCanvasRunMessage(nextFactoryLineRun.workflowID.String(), nextFactoryLineRun.runID.String()).PublishPending(); err != nil {
-			w.logger.WithError(err).Warnf("Failed to publish pending run message for run %s", nextFactoryLineRun.runID)
+	for _, pendingRun := range nextFactoryLineRuns {
+		if err := messages.NewCanvasRunMessage(pendingRun.workflowID.String(), pendingRun.runID.String()).PublishPending(); err != nil {
+			w.logger.WithError(err).Warnf("Failed to publish pending run message for run %s", pendingRun.runID)
 			return err
 		}
 	}
@@ -489,7 +489,7 @@ type factoryLinePendingRun struct {
 	runID      uuid.UUID
 }
 
-func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) (*factoryLinePendingRun, error) {
+func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) ([]factoryLinePendingRun, error) {
 	//
 	// Finish current factory work order execution.
 	//
@@ -514,13 +514,6 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return nil, err
 	}
 
-	if run.Result != models.CanvasRunResultPassed {
-		return nil, nil
-	}
-
-	//
-	// Start next step in the factory line.
-	//
 	factory, err := models.FindFactory(tx, execution.OrganizationID, execution.FactoryID)
 	if err != nil {
 		return nil, err
@@ -531,27 +524,57 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return nil, err
 	}
 
+	var pendingRuns []factoryLinePendingRun
+
+	//
+	// The finished run freed a slot at its step: admit the oldest waiting
+	// work order, if any. Cancelled and failed runs free their slot the
+	// same way successful runs do.
+	//
+	admitted, err := line.AdmitNextWaitingForStep(tx, execution.StepIndex)
+	if err != nil {
+		return nil, err
+	}
+
+	if admitted != nil && admitted.Run != nil {
+		pendingRuns = append(pendingRuns, factoryLinePendingRun{
+			workflowID: admitted.Run.WorkflowID,
+			runID:      admitted.Run.ID,
+		})
+	}
+
+	if run.Result != models.CanvasRunResultPassed {
+		return pendingRuns, nil
+	}
+
+	//
+	// Start (or queue) the next step in the factory line.
+	//
 	workOrder, err := factory.FindWorkOrder(tx, execution.WorkOrderID)
 	if err != nil {
 		return nil, err
 	}
 
 	if !workOrder.IsOpen() {
-		return nil, nil
+		return pendingRuns, nil
 	}
 
 	nextIndex := execution.StepIndex + 1
 	if nextIndex >= len(line.Steps) {
-		return nil, nil
+		return pendingRuns, nil
 	}
 
-	result, err := line.StartStep(tx, workOrder, nextIndex)
+	result, err := line.EnqueueOrStartStep(tx, workOrder, nextIndex)
 	if err != nil {
 		return nil, err
 	}
 
-	return &factoryLinePendingRun{
-		workflowID: result.Run.WorkflowID,
-		runID:      result.Run.ID,
-	}, nil
+	if result.Run != nil {
+		pendingRuns = append(pendingRuns, factoryLinePendingRun{
+			workflowID: result.Run.WorkflowID,
+			runID:      result.Run.ID,
+		})
+	}
+
+	return pendingRuns, nil
 }

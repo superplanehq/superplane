@@ -422,7 +422,7 @@ CREATE TABLE public.factory_work_order_executions (
     line_id uuid NOT NULL,
     step_index integer NOT NULL,
     step_name text NOT NULL,
-    run_id uuid NOT NULL,
+    run_id uuid,
     status character varying(32) DEFAULT 'pending'::character varying NOT NULL,
     result character varying(32) DEFAULT ''::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -2728,7 +2728,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260814024454	f
+20260815144545	f
 \.
 
 

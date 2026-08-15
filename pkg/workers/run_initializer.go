@@ -304,5 +304,25 @@ func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runI
 		return err
 	}
 
-	return execution.MarkFinished(tx, result)
+	if err := execution.MarkFinished(tx, result); err != nil {
+		return err
+	}
+
+	//
+	// The finished execution freed a step slot: admit the oldest waiting
+	// work order, if any. No pending-run message is published here; the
+	// pending-run sweep picks the admitted run up within a minute.
+	//
+	factory, err := models.FindFactory(tx, execution.OrganizationID, execution.FactoryID)
+	if err != nil {
+		return err
+	}
+
+	line, err := factory.FindLine(tx, execution.LineID)
+	if err != nil {
+		return err
+	}
+
+	_, err = line.AdmitNextWaitingForStep(tx, execution.StepIndex)
+	return err
 }

@@ -297,14 +297,16 @@ func (c *Loop) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error
 
 func (c *Loop) startLoop(ctx core.ProcessQueueContext, spec Spec) (*uuid.UUID, error) {
 	//
-	// Only one loop run per node may be active at a time. If another run is
-	// still looping, push this start to the back of the queue and try later.
+	// The node queue's maxParallelism caps concurrent loop runs (sessions)
+	// on this node. If the node is at its limit, push this start to the
+	// back of the queue and try later. Feedback for in-progress sessions
+	// is never gated here, so sessions always make progress.
 	//
-	active, err := c.hasActiveSession(ctx)
+	atLimit, err := c.sessionsAtLimit(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if active {
+	if atLimit {
 		if ctx.DeferQueueItem != nil {
 			if err := ctx.DeferQueueItem(); err != nil {
 				return nil, fmt.Errorf("failed to defer queue item: %w", err)
@@ -352,20 +354,21 @@ func (c *Loop) startLoop(ctx core.ProcessQueueContext, spec Spec) (*uuid.UUID, e
 	)
 }
 
-// hasActiveSession reports whether this node already has a loop run in progress.
-// A session execution stays unfinished for the whole loop and only finishes on
-// done/fail, so an active run is simply a running execution on the node.
-func (c *Loop) hasActiveSession(ctx core.ProcessQueueContext) (bool, error) {
-	if ctx.HasRunningExecutions == nil {
+// sessionsAtLimit reports whether this node already has as many loop runs in
+// progress as the node queue's maxParallelism allows (0 means unlimited). A
+// session execution stays unfinished for the whole loop and only finishes on
+// done/fail, so active sessions are simply running executions on the node.
+func (c *Loop) sessionsAtLimit(ctx core.ProcessQueueContext) (bool, error) {
+	if ctx.QueueMaxParallelism == 0 || ctx.CountRunningExecutions == nil {
 		return false, nil
 	}
 
-	active, err := ctx.HasRunningExecutions()
+	running, err := ctx.CountRunningExecutions()
 	if err != nil {
-		return false, fmt.Errorf("failed to check for active loop session: %w", err)
+		return false, fmt.Errorf("failed to count active loop sessions: %w", err)
 	}
 
-	return active, nil
+	return running >= int64(ctx.QueueMaxParallelism), nil
 }
 
 func (c *Loop) handleFeedback(ctx core.ProcessQueueContext, spec Spec, session *core.ExecutionContext) (*uuid.UUID, error) {

@@ -17,6 +17,7 @@ import { buildWorkOrderTimelineViewFromEvents } from "./workOrderTimelineFromEve
 export type WorkOrderTimelineEventKind =
   | "created"
   | "dispatched"
+  | "queued"
   | "assigned"
   | "statusChanged"
   | "commented"

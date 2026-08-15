@@ -209,12 +209,9 @@ func BuildProcessQueueContext(
 		}, nil
 	}
 
-	ctx.HasRunningExecutions = func() (bool, error) {
-		count, err := models.CountRunningExecutionsForNodeInTransaction(tx, node.WorkflowID, node.NodeID)
-		if err != nil {
-			return false, err
-		}
-		return count > 0, nil
+	ctx.QueueMaxParallelism = node.QueueSpec().EffectiveMaxParallelism()
+	ctx.CountRunningExecutions = func() (int64, error) {
+		return models.CountRunningExecutionsForNodeInTransaction(tx, node.WorkflowID, node.NodeID)
 	}
 
 	return ctx, nil

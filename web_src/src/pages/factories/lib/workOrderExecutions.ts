@@ -19,6 +19,10 @@ const EXECUTION_STATE_META: Record<
     label: "Unknown",
     className: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300",
   },
+  STATE_QUEUED: {
+    label: "Queued",
+    className: "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200",
+  },
   STATE_PENDING: {
     label: "Pending",
     className:
@@ -92,7 +96,10 @@ export function getExecutionStepTimestamp(execution: FactoriesWorkOrderExecution
 
 export function isActiveWorkOrderExecution(execution: FactoriesWorkOrderExecution): boolean {
   return (
-    execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED" || execution.state === "STATE_CANCELLING"
+    execution.state === "STATE_QUEUED" ||
+    execution.state === "STATE_PENDING" ||
+    execution.state === "STATE_STARTED" ||
+    execution.state === "STATE_CANCELLING"
   );
 }
 

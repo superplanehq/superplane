@@ -2,7 +2,7 @@ import type { FactoriesWorkOrderExecution } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
-import { Check, CircleDashed, Loader2, MinusCircle, XCircle } from "lucide-react";
+import { Check, CircleDashed, Clock, Loader2, MinusCircle, XCircle } from "lucide-react";
 import {
   getExecutionStepTimestamp,
   getWorkOrderExecutionDisplayMeta,
@@ -251,6 +251,10 @@ function ExecutionStatusIcon({
 
   if (execution.result === "RESULT_FAILED") {
     return <XCircle className={cn(iconClassName, "text-red-500")} aria-label="Failed" />;
+  }
+
+  if (execution.state === "STATE_QUEUED") {
+    return <Clock className={cn(iconClassName, "text-sky-500")} aria-label="Queued" />;
   }
 
   if (meta.isActive) {

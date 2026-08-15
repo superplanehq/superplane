@@ -48,6 +48,7 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 
 	var order *models.FactoryWorkOrder
 	var pendingRun *models.CanvasRun
+	var queued bool
 	var logger *log.Entry
 
 	db := database.DB(ctx)
@@ -90,12 +91,13 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return err
 		}
 
-		result, err := line.StartStep(tx, order, 0)
+		result, err := line.EnqueueOrStartStep(tx, order, 0)
 		if err != nil {
 			return err
 		}
 
 		pendingRun = result.Run
+		queued = pendingRun == nil
 		return nil
 	})
 
@@ -109,10 +111,15 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		}
 	}
 
+	updateType := factoryevents.EventTypeLineStepExecutionCreated
+	if queued {
+		updateType = factoryevents.EventTypeLineStepExecutionQueued
+	}
+
 	if err := messages.PublishFactoryWorkOrderUpdated(
 		factoryID.String(),
 		order.ID.String(),
-		factoryevents.EventTypeLineStepExecutionCreated,
+		updateType,
 	); err != nil {
 		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
 	}

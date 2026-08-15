@@ -20,6 +20,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
   ComponentsIntegrationRef,
+  ComponentsQueueSpec,
 } from "@/api-client";
 import type { EventState, EventStateMap } from "../componentBase";
 import type { ReactNode } from "react";
@@ -137,7 +138,10 @@ interface ComponentSidebarProps {
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
     integrationRef?: ComponentsIntegrationRef,
+    queue?: ComponentsQueueSpec,
   ) => void | Promise<void>;
+  showNodeQueue?: boolean;
+  nodeQueue?: ComponentsQueueSpec;
   onNodeConfigCancel?: () => void;
   domainId?: string;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
@@ -198,6 +202,8 @@ export const ComponentSidebar = ({
   nodeConfiguration = {},
   nodeConfigurationFields = [],
   onNodeConfigSave,
+  showNodeQueue = false,
+  nodeQueue,
   onNodeConfigCancel,
   domainId,
   customField,
@@ -713,6 +719,8 @@ export const ComponentSidebar = ({
                     configuration={nodeConfiguration}
                     configurationFields={nodeConfigurationFields}
                     onSave={onNodeConfigSave || (() => {})}
+                    showQueue={showNodeQueue}
+                    queue={nodeQueue}
                     onCancel={onNodeConfigCancel}
                     domainId={domainId}
                     customField={customField}

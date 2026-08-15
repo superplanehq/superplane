@@ -315,6 +315,9 @@ message FactoryLine {
     string name = 1;
     string type = 2;
     optional AppStep app = 3;
+    // Maximum number of in-flight runs for this step. Unset means the
+    // default of 10; 0 means unlimited.
+    optional int32 max_parallelism = 4;
   }
 
   message AppStep {
@@ -444,6 +447,9 @@ message WorkOrderExecution {
     STATE_STARTED = 2;
     STATE_CANCELLING = 3;
     STATE_FINISHED = 4;
+    // Waiting for step admission: the step is at its max parallelism and
+    // no run exists yet.
+    STATE_QUEUED = 5;
   }
 
   enum Result {

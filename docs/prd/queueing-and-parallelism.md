@@ -699,14 +699,30 @@ branch, with correctness over polish:
   queues, inline node queue specs (`key`, `maxParallelism` including 0 =
   unlimited, `autoCancel`), and one group to prove acquisition, section-end
   release (the slot frees when the run's work leaves the group, not at run
-  end), and run-terminal release. YAML editing is the configuration surface
-  for manual verification.
+  end), and run-terminal release. Node queue specs are configured in the
+  node settings sidebar (max parallel executions, queue key, auto-cancel);
+  groups are configured through YAML editing.
+- Loop parallel sessions are in the POC: the queue's effective
+  `maxParallelism` is exposed in the queue-processing context and loop's
+  start gate changed from "any running session" to "running sessions at
+  limit", so a loop node with `queue: { maxParallelism: N }` runs N
+  concurrent sessions. Feedback routing was already per-session (keyed by
+  root event).
+- Line-step admission control (chunks 3–4) is also in the POC, backend and
+  UI, so factory concurrency can be verified end to end: step
+  `maxParallelism` (default 10, 0 = unlimited) on the line editor, the
+  `waiting` execution status (nullable `run_id`), atomic per-step admission
+  serialized on the line row, admission of the oldest waiting order on any
+  terminal run (closed orders are skipped and cancelled), the
+  `step.execution.queued` work order event, and the Queued state in the
+  executions list and work order timeline.
 - Exercised against the motivating examples: parallel coding agents, monorepo
   branch serialization, docs-deploy dedup, and deploy → tests gating with
   trailing nodes outside the group.
-- Explicitly out of POC scope: editor UI, the multi-execution safety audit
-  (POC accepts known rough edges), line-step admission, loop parallel
-  sessions.
+- Explicitly out of POC scope: group drawing in the visual editor and the
+  derived canvas-level queue list with badges (chunk 9 observability), and
+  step-queue position numbers in the factory UI (showing "3rd of 5" for a
+  waiting work order instead of only "Queued").
 - Exit criteria: acceptance-criteria scenarios 1–5 and 13 below pass as E2E
   tests; learnings feed back into this PRD before the production chunks
   start.
@@ -749,9 +765,11 @@ findings, both fixed on the POC branch:
   of silently misrouting webhooks.
 
 Two audited items intentionally carry no action here:
-`HasRunningExecutions` (node-scoped "any running") has exactly one
-consumer — loop's session gate — and changes deliberately in the loop
-chunk; `FindLastExecutionPerNode` powers node cards showing one
+`HasRunningExecutions` (node-scoped "any running") had exactly one
+consumer — loop's session gate — and became `CountRunningExecutions`
+when the loop gate changed to a capacity check (validated on the POC
+branch; the production port ships in the loop chunk);
+`FindLastExecutionPerNode` powers node cards showing one
 execution's state, which with N running shows only the most recent — not
 wrong data, but it misrepresents concurrency — and moves to the canvas UI
 chunk as a display concern.

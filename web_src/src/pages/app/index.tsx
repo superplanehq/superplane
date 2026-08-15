@@ -17,6 +17,7 @@ import type {
   ActionsAction,
   ComponentsEdge,
   ComponentsIntegrationRef,
+  ComponentsQueueSpec,
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
 } from "@/api-client";
@@ -2004,6 +2005,8 @@ export function AppPage({
         integrationLabel,
         blockName,
         integrationRef: node.integration,
+        queue: node.queue,
+        supportsQueue: node.type === "TYPE_ACTION",
       };
     },
     [
@@ -2171,6 +2174,7 @@ export function AppPage({
       updatedConfiguration: Record<string, any>,
       updatedNodeName: string,
       integrationRef?: ComponentsIntegrationRef,
+      queue?: ComponentsQueueSpec,
     ) => {
       if (!canvas || !organizationId || !canvasId) return;
 
@@ -2202,6 +2206,7 @@ export function AppPage({
             configuration: updatedConfiguration,
             name: updatedNodeName,
             integration: integrationRef,
+            queue,
           };
         }
         return node;

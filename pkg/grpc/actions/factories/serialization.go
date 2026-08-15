@@ -65,6 +65,10 @@ func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 				Entrypoint: step.Entrypoint,
 			},
 		}
+		if step.MaxParallelism != nil {
+			maxParallelism := int32(*step.MaxParallelism)
+			steps[i].MaxParallelism = &maxParallelism
+		}
 	}
 
 	return &pb.FactoryLine{
@@ -181,11 +185,13 @@ func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecor
 			Id:   execution.LineID.String(),
 			Name: execution.LineName,
 		},
-		Run: &pb.WorkOrderExecution_RunRef{
+	}
+	if execution.RunID != nil && execution.CanvasID != nil {
+		item.Run = &pb.WorkOrderExecution_RunRef{
 			Id:      execution.RunID.String(),
 			AppId:   execution.CanvasID.String(),
 			AppName: execution.CanvasName,
-		},
+		}
 	}
 	if execution.FinishedAt != nil {
 		item.FinishedAt = timestamppb.New(*execution.FinishedAt)
@@ -213,6 +219,8 @@ func serializeWorkOrderExecutionState(status, runState string) pb.WorkOrderExecu
 	}
 
 	switch status {
+	case models.FactoryWorkOrderExecutionStatusWaiting:
+		return pb.WorkOrderExecution_STATE_QUEUED
 	case models.FactoryWorkOrderExecutionStatusPending:
 		return pb.WorkOrderExecution_STATE_PENDING
 	case models.FactoryWorkOrderExecutionStatusRunning:

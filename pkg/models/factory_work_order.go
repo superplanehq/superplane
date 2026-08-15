@@ -376,6 +376,7 @@ func (o *FactoryWorkOrder) FindActiveExecution(tx *gorm.DB) (*FactoryWorkOrderEx
 	err := tx.
 		Where("work_order_id = ?", o.ID).
 		Where("status IN ?", []string{
+			FactoryWorkOrderExecutionStatusWaiting,
 			FactoryWorkOrderExecutionStatusPending,
 			FactoryWorkOrderExecutionStatusRunning,
 		}).

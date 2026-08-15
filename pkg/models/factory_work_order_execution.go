@@ -12,6 +12,9 @@ import (
 )
 
 const (
+	// waiting: the work order is ready for the step, but the step is at its
+	// maxParallelism; no run exists yet (RunID is nil).
+	FactoryWorkOrderExecutionStatusWaiting  = "waiting"
 	FactoryWorkOrderExecutionStatusPending  = "pending"
 	FactoryWorkOrderExecutionStatusRunning  = "running"
 	FactoryWorkOrderExecutionStatusFinished = "finished"
@@ -31,9 +34,10 @@ type FactoryWorkOrderExecution struct {
 	LineID         uuid.UUID
 	StepIndex      int
 	StepName       string
-	RunID          uuid.UUID
-	Status         string
-	Result         string
+	// RunID is nil while the execution is waiting for step admission.
+	RunID  *uuid.UUID
+	Status string
+	Result string
 	// Aggregate usage populated by runners. Both default to zero; the API
 	// only surfaces non-zero values to the UI.
 	TotalTokens int64
@@ -110,7 +114,11 @@ func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) e
 		return err
 	}
 
-	run, err := LockCanvasRunInTransaction(tx, e.RunID)
+	if e.RunID == nil {
+		return e.recordFinishedWithoutRun(tx, f, line, order, result)
+	}
+
+	run, err := LockCanvasRunInTransaction(tx, *e.RunID)
 	if err != nil {
 		return err
 	}
@@ -139,10 +147,53 @@ func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) e
 	return tx.Create(event).Error
 }
 
+// recordFinishedWithoutRun records the finished event for an execution
+// that never got a run — a waiting execution whose work order closed
+// before the step admitted it.
+func (e *FactoryWorkOrderExecution) recordFinishedWithoutRun(tx *gorm.DB, f *Factory, line *FactoryLine, order *FactoryWorkOrder, result string) error {
+	data := factory.LineStepExecutionFinished{
+		StepName: e.StepName,
+		Order:    order.Ref(),
+		Line:     &factory.LineRef{ID: line.ID, Name: line.Name},
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	event := &FactoryWorkOrderEvent{
+		ID:          uuid.New(),
+		WorkOrderID: e.WorkOrderID,
+		Type:        factory.EventTypeLineStepExecutionFinished,
+		Data:        datatypes.JSON(jsonData),
+		CreatedAt:   time.Now(),
+	}
+
+	return tx.Create(event).Error
+}
+
+// AttachRun admits a waiting execution: the step run now exists, so the
+// execution leaves the step queue and becomes pending.
+func (e *FactoryWorkOrderExecution) AttachRun(tx *gorm.DB, run *CanvasRun) error {
+	now := time.Now()
+	e.RunID = &run.ID
+	e.Status = FactoryWorkOrderExecutionStatusPending
+	e.UpdatedAt = now
+
+	return tx.Model(e).Updates(map[string]any{
+		"run_id":     &run.ID,
+		"status":     FactoryWorkOrderExecutionStatusPending,
+		"updated_at": now,
+	}).Error
+}
+
 type FactoryWorkOrderExecutionRecord struct {
 	FactoryWorkOrderExecution
-	LineName   string
-	CanvasID   uuid.UUID
+	LineName string
+	// Run-derived fields are nil/empty for waiting executions, which have
+	// no run yet.
+	CanvasID   *uuid.UUID
 	CanvasName string
 	RunState   string
 	RunResult  string
@@ -168,13 +219,13 @@ func ListFactoryWorkOrderExecutionsByWorkOrderIDs(
 			l.name AS line_name,
 			l.steps AS line_steps,
 			c.id AS canvas_id,
-			c.name AS canvas_name,
-			r.state AS run_state,
-			r.result AS run_result
+			COALESCE(c.name, '') AS canvas_name,
+			COALESCE(r.state, '') AS run_state,
+			COALESCE(r.result, '') AS run_result
 		`).
 		Joins("JOIN factory_lines l ON l.id = e.line_id").
-		Joins("JOIN workflow_runs r ON r.id = e.run_id").
-		Joins("JOIN workflows c ON c.id = r.workflow_id").
+		Joins("LEFT JOIN workflow_runs r ON r.id = e.run_id").
+		Joins("LEFT JOIN workflows c ON c.id = r.workflow_id").
 		Where("e.work_order_id IN ?", workOrderIDs).
 		Order("e.created_at ASC").
 		Order("e.id ASC").

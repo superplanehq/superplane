@@ -46,6 +46,7 @@ import type {
   ActionsAction,
   ComponentsEdge,
   ComponentsIntegrationRef,
+  ComponentsQueueSpec,
   SuperplaneComponentsNode as ComponentsNode,
   ConfigurationField,
   OrganizationsIntegration,
@@ -152,6 +153,9 @@ export interface NodeEditData {
   integrationLabel?: string;
   blockName?: string;
   integrationRef?: ComponentsIntegrationRef;
+  /** Inline queue configuration; only action nodes support a queue. */
+  queue?: ComponentsQueueSpec;
+  supportsQueue?: boolean;
 }
 
 export interface NewNodeData {
@@ -287,6 +291,7 @@ export interface CanvasPageProps {
     configuration: Record<string, unknown>,
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
+    queue?: ComponentsQueueSpec,
   ) => void | Promise<void>;
   onAnnotationUpdate?: (
     nodeId: string,
@@ -1201,11 +1206,16 @@ function CanvasPage(props: CanvasPageProps) {
 
   const onNodeConfigurationSave = props.onNodeConfigurationSave;
   const handleSaveConfiguration = useCallback(
-    (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
+    (
+      configuration: Record<string, unknown>,
+      nodeName: string,
+      integrationRef?: ComponentsIntegrationRef,
+      queue?: ComponentsQueueSpec,
+    ) => {
       if (!editingNodeData?.nodeId || !onNodeConfigurationSave) {
         return;
       }
-      return onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
+      return onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef, queue);
     },
     [editingNodeData?.nodeId, onNodeConfigurationSave],
   );
@@ -1753,6 +1763,7 @@ function Sidebar({
     configuration: Record<string, unknown>,
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
+    queue?: ComponentsQueueSpec,
   ) => void | Promise<void>;
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
@@ -1898,6 +1909,8 @@ function Sidebar({
       nodeConfiguration={editingNodeData?.configuration || {}}
       nodeConfigurationFields={editingNodeData?.configurationFields ?? []}
       onNodeConfigSave={onSaveConfiguration}
+      showNodeQueue={editingNodeData?.supportsQueue ?? false}
+      nodeQueue={editingNodeData?.queue}
       onNodeConfigCancel={undefined}
       domainId={organizationId}
       customField={
