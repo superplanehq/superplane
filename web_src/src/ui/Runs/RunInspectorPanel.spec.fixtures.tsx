@@ -79,6 +79,7 @@ export function renderInspector({
   onClose = vi.fn(),
   onEditNode,
   onRerunCreated,
+  onReplayCreated,
   runNavigation,
   onNavigateRun,
   onNavigateOlder,
@@ -94,6 +95,7 @@ export function renderInspector({
   onClose?: () => void;
   onEditNode?: (nodeId: string) => void;
   onRerunCreated?: (eventId: string) => void | Promise<void>;
+  onReplayCreated?: (runId: string) => void;
   runNavigation?: { newerRunId?: string | null; olderRunId?: string | null; canNavigateOlder?: boolean } | null;
   onNavigateRun?: (runId: string) => void;
   onNavigateOlder?: () => void;
@@ -146,6 +148,7 @@ export function renderInspector({
             onSelectNode={onSelectNode}
             onEditNode={onEditNode}
             onRerunCreated={onRerunCreated}
+            onReplayCreated={onReplayCreated}
             runNavigation={runNavigation}
             onNavigateRun={onNavigateRun}
             onNavigateOlder={onNavigateOlder}
