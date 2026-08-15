@@ -9,6 +9,8 @@ import { SimpleTooltip } from "../SimpleTooltip";
 import type { EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
+import { useCanvasId } from "@/hooks/useCanvasId";
+import { ReplayNodeModal } from "@/ui/ReplayNode/ReplayNodeModal";
 
 export interface TabData {
   current?: Record<string, any>;
@@ -32,6 +34,8 @@ interface SidebarEventItemProps {
     nodeId: string,
     execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
+  nodeNamesById?: Record<string, string>;
+  onSelectRun?: (runId: string, options?: { nodeId?: string }) => void;
 }
 
 export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
@@ -46,6 +50,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   onCancelExecution,
   onReEmit,
   getExecutionState,
+  nodeNamesById,
+  onSelectRun,
 }) => {
   // Determine default active tab based on available data
   const getDefaultActiveTab = useCallback((): "current" | "root" | "payload" => {
@@ -62,6 +68,11 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const [payloadCopied, setPayloadCopied] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isReplayModalOpen, setIsReplayModalOpen] = useState(false);
+  const canvasId = useCanvasId();
+
+  const replayInputEvent = event.kind === "execution" ? event.originalExecution?.inputEvent : undefined;
+  const canReplay = Boolean(replayInputEvent?.data);
 
   const eventStateStyle: EventStateStyle = useMemo(() => {
     if (!getExecutionState) return DEFAULT_EVENT_STATE_MAP["neutral"];
@@ -118,7 +129,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
   const showCancel = (event.kind === "queue" && isQueued) || (event.kind === "execution" && (isRunning || isWaiting));
   const showReEmit = event.kind === "trigger";
-  const showActionsMenu = showCancel || showReEmit;
+  const showActionsMenu = showCancel || showReEmit || canReplay;
 
   return (
     <div
@@ -180,10 +191,24 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                 if (["queue", "execution"].includes(event.kind || "")) return;
                 onReEmit?.(event.nodeId || "", event.id);
               }}
+              onReplay={canReplay ? () => setIsReplayModalOpen(true) : undefined}
               onOpenChange={setIsDropdownOpen}
             />
           </div>
         </div>
+      )}
+
+      {isReplayModalOpen && (
+        <ReplayNodeModal
+          onClose={() => setIsReplayModalOpen(false)}
+          canvasId={canvasId}
+          nodeId={event.nodeId || ""}
+          originalPayload={replayInputEvent?.data}
+          sourceNodeId={replayInputEvent?.nodeId}
+          sourceExecutionId={event.originalExecution?.id}
+          nodeNamesById={nodeNamesById}
+          onReplayed={onSelectRun}
+        />
       )}
 
       {isOpen && ((event.values && Object.entries(event.values).length > 0) || tabData) && (
