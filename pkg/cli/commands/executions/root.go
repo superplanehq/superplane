@@ -1,6 +1,8 @@
 package executions
 
 import (
+	"time"
+
 	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
@@ -12,6 +14,8 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	var runID string
 	var limit int64
 	var before string
+	var replayTimeout time.Duration
+	var replayPollInterval time.Duration
 
 	root := &cobra.Command{
 		Use:     "executions",
@@ -67,9 +71,30 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Limit:       &limit,
 	}, options)
 
+	replayCmd := &cobra.Command{
+		Use:   "replay",
+		Short: "Replay a canvas node from a source execution",
+		Args:  cobra.NoArgs,
+	}
+	core.BindAppIDFlag(replayCmd, &appID, "app ID")
+	replayCmd.Flags().StringVar(&nodeID, "node-id", "", "node ID to replay")
+	replayCmd.Flags().StringVar(&executionID, "execution-id", "", "source execution ID to replay from")
+	replayCmd.Flags().DurationVar(&replayTimeout, "timeout", 30*time.Second, "how long to wait for the replay's execution to appear before reporting it as queued")
+	replayCmd.Flags().DurationVar(&replayPollInterval, "poll-interval", 500*time.Millisecond, "how often to poll for the replay's execution while waiting")
+	_ = replayCmd.MarkFlagRequired("node-id")
+	_ = replayCmd.MarkFlagRequired("execution-id")
+	core.Bind(replayCmd, &ReplayCommand{
+		CanvasID:     &appID,
+		NodeID:       &nodeID,
+		ExecutionID:  &executionID,
+		PollTimeout:  &replayTimeout,
+		PollInterval: &replayPollInterval,
+	}, options)
+
 	root.AddCommand(listCmd)
 	root.AddCommand(cancelCmd)
 	root.AddCommand(logsCmd)
+	root.AddCommand(replayCmd)
 
 	return root
 }
