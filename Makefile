@@ -34,7 +34,7 @@ OPENAPI_GENERATOR_IMAGE := openapitools/openapi-generator-cli:v7.13.0
 # - exports junit report
 # - sets parallelism to 1
 #
-GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test -v "$(PWD)/tmp/screenshots:/app/test/screenshots" app gotestsum --format short --junitfile junit-report.xml
+GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test -v "$(CURDIR)/tmp/screenshots:/app/test/screenshots" app gotestsum --format short --junitfile junit-report.xml
 
 #
 # Targets for test environment
@@ -77,7 +77,7 @@ test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
 test.shell:
-	$(COMPOSE) run --rm -e DB_NAME=superplane_test -v "$(PWD)/tmp/screenshots:/app/test/screenshots" app /bin/bash
+	$(COMPOSE) run --rm -e DB_NAME=superplane_test -v "$(CURDIR)/tmp/screenshots:/app/test/screenshots" app /bin/bash
 
 #
 # Code formatting
@@ -345,7 +345,7 @@ openapi.client.gen: dev.test.is.running
 	@./scripts/docker-pull-retry $(OPENAPI_GENERATOR_IMAGE)
 	@log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
 	if ! docker run --rm --user $(shell id -u):$(shell id -g) \
-		-v "$(PWD):/local" $(OPENAPI_GENERATOR_IMAGE) generate \
+		-v "$(CURDIR):/local" $(OPENAPI_GENERATOR_IMAGE) generate \
 		-i /local/api/swagger/superplane.swagger.json \
 		-g go \
 		-o /local/pkg/openapi_client \
