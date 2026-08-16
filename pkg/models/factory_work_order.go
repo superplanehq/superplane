@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -191,10 +192,19 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 		return err
 	}
 
+	// Omit associations: `o.Assignees` is stale after ReplaceAssignees, and
+	// GORM would otherwise re-save it as part of this update, reverting the
+	// change we just made.
 	now := time.Now()
 	o.UpdatedAt = now
-	if err := tx.Model(o).Update("updated_at", now).Error; err != nil {
+	if err := tx.Model(o).Omit(clause.Associations).Update("updated_at", now).Error; err != nil {
 		return err
+	}
+
+	// Keep the in-memory association in sync with what was just written.
+	o.Assignees = make([]FactoryWorkOrderAssignee, 0, len(assigneeIDs))
+	for _, assigneeID := range assigneeIDs {
+		o.Assignees = append(o.Assignees, FactoryWorkOrderAssignee{WorkOrderID: o.ID, UserID: assigneeID})
 	}
 
 	assigned, unassigned := assigneeDiff(previousAssignees, assigneeIDs)
