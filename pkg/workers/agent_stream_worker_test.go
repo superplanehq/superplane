@@ -649,7 +649,7 @@ func TestAgentStreamWorker_MarksFailedWhenTurnDeadlineExpires(t *testing.T) {
 	refreshed, err := models.FindAgentSession(session.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.AgentSessionStatusFailed, refreshed.Status,
-		"a turn cut short by its deadline must fail the session, not read as a completed turn")
+		"a deadline error from the provider must fail the session, not read as a completed turn")
 }
 
 func TestAgentStreamWorker_LeavesSessionStreamingOnWorkerShutdown(t *testing.T) {
@@ -671,21 +671,41 @@ func TestAgentStreamWorker_LeavesSessionStreamingOnWorkerShutdown(t *testing.T) 
 		SessionID: session.ID.String(),
 	})
 
+	// Production rows always carry a heartbeat (dispatch starts one before
+	// handling); seed it so the reclaim assertion below exercises the
+	// heartbeat branch of FailStuckStreamingSessions, not the legacy one.
+	require.NoError(t, models.TouchAgentSessionHeartbeat(session.ID))
+
 	parentCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan error, 1)
 	go func() {
 		done <- w.Handle(parentCtx, body)
 	}()
-	<-provider.streamReady
+	select {
+	case <-provider.streamReady:
+	case <-time.After(10 * time.Second):
+		t.Fatal("worker never reached StreamEvents")
+	}
 
 	cancel()
-	require.NoError(t, <-done)
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("Handle did not return after parent context cancel")
+	}
 
 	refreshed, err := models.FindAgentSession(session.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status,
 		"a turn interrupted by worker shutdown has no outcome; the row must stay streaming so cleanup can reclaim it")
+
+	// The abandoned row must be reclaimable through the heartbeat branch.
+	reclaimed, err := models.FailStuckStreamingSessions(time.Now().Add(time.Minute), time.Now().Add(-time.Hour))
+	require.NoError(t, err)
+	require.Len(t, reclaimed, 1)
+	assert.Equal(t, session.ID, reclaimed[0].ID)
 }
 
 func TestAgentStreamWorker_SkipsUnknownProvider(t *testing.T) {
