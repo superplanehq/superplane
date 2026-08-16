@@ -1,6 +1,6 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { WorkOrderAssigneePicker } from "./WorkOrderAssigneePicker";
 
 interface WorkOrderAssigneesPopoverProps {
@@ -30,22 +30,17 @@ export function WorkOrderAssigneesPopover({
   const [draftIds, setDraftIds] = useState<string[]>(selectedIds);
   const isSaveMode = Boolean(onSave);
 
-  useEffect(() => {
-    if (open) {
-      setDraftIds(selectedIds);
-    }
-  }, [open, selectedIds]);
-
   const handleOpenChange = (nextOpen: boolean) => {
     if (isSaving) {
       return;
     }
 
+    // Seed the draft when the popover opens and reset it when it closes. The
+    // draft must not follow `selectedIds` while the popover stays open: the
+    // work order refetches on websocket events, which rebuilds the assignee
+    // array and would discard the edit in progress.
+    setDraftIds(selectedIds);
     setOpen(nextOpen);
-
-    if (!nextOpen && isSaveMode) {
-      setDraftIds(selectedIds);
-    }
   };
 
   const handleChange = (nextIds: string[]) => {

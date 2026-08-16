@@ -3,7 +3,7 @@ import { Avatar } from "@/components/Avatar/avatar";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { buildOrgUserDisplayMap, getUserInitials, resolveOrgUserDisplay } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 interface WorkOrderAssigneePickerProps {
   organizationId: string;
@@ -21,6 +21,8 @@ export function WorkOrderAssigneePicker({
   variant = "default",
 }: WorkOrderAssigneePickerProps) {
   const { data: users = [], isLoading } = useOrganizationUsers(organizationId);
+
+  const [assignedOnOpen] = useState(() => new Set(selectedIds));
 
   const userOptions = useMemo(() => {
     const usersById = buildOrgUserDisplayMap(users);
@@ -41,8 +43,16 @@ export function WorkOrderAssigneePicker({
           display,
         };
       })
-      .sort((left, right) => left.label.localeCompare(right.label));
-  }, [users]);
+      .sort((left, right) => {
+        const leftAssigned = assignedOnOpen.has(left.id);
+        const rightAssigned = assignedOnOpen.has(right.id);
+        if (leftAssigned !== rightAssigned) {
+          return leftAssigned ? -1 : 1;
+        }
+
+        return left.label.localeCompare(right.label);
+      });
+  }, [assignedOnOpen, users]);
 
   const toggleUser = (userId: string, checked: boolean) => {
     if (disabled) {
