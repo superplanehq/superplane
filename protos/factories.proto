@@ -424,26 +424,24 @@ message WorkOrder {
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
   repeated UserRef assignees = 8;
-  reserved 9;
-  reserved "executions";
   // Author of the work order: either a member (`user`) or the canvas
   // automation (`automation`) that opened the order from a source run.
-  WorkOrderCreator created_by = 10;
+  WorkOrderCreator created_by = 9;
   // Aggregate usage summed across all step executions of all line
   // dispatches. UI hides values that are zero.
-  int64 total_tokens = 11;
-  int64 total_cost_cents = 12;
+  int64 total_tokens = 10;
+  int64 total_cost_cents = 11;
   // Immutable factory-scoped sequence number, allocated atomically at
   // creation time. Combined with the parent factory's key to render the
   // display identifier (for example `SP-42`).
-  int64 number = 13;
+  int64 number = 12;
   // Display identifier composed of the parent factory's key and this
   // order's `number` (for example `SP-42`). Populated by the server.
-  string key = 14;
+  string key = 13;
   // Every traversal of this work order through a factory line, oldest
   // first. A line dispatched twice (e.g. a failed traversal re-dispatched)
   // produces two separate entries here, each with its own step executions.
-  repeated WorkOrderLineDispatch line_dispatches = 15;
+  repeated WorkOrderLineDispatch line_dispatches = 14;
 }
 
 message WorkOrderCreator {
@@ -519,25 +517,22 @@ message WorkOrderExecution {
     string app_name = 3;
   }
 
-  reserved 2, 10;
-  reserved "line", "steps";
-
   string id = 1;
-  string step = 3;
-  State state = 4;
-  Result result = 5;
-  google.protobuf.Timestamp created_at = 6;
-  google.protobuf.Timestamp updated_at = 7;
-  RunRef run = 8;
+  string step = 2;
+  State state = 3;
+  Result result = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  RunRef run = 7;
   // Zero-based index of the step inside the parent WorkOrderLineDispatch's
   // `steps` snapshot; matches the position there so the UI can highlight
   // the active step.
-  int32 step_index = 9;
+  int32 step_index = 8;
   // Optional aggregate usage; UI hides zero values.
-  int64 total_tokens = 11;
-  int64 cost_cents = 12;
+  int64 total_tokens = 9;
+  int64 cost_cents = 10;
   // When the execution finished (set for finished executions only).
-  google.protobuf.Timestamp finished_at = 13;
+  google.protobuf.Timestamp finished_at = 11;
 }
 
 message WorkOrderExecutionStep {
