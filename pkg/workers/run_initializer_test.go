@@ -143,6 +143,8 @@ func Test__RunInitializer__FinishesFactoryWorkOrderExecutionWhenInitializationFa
 	line, err := factory.CreateLine(database.Conn(), "ship", nil)
 	require.NoError(t, err)
 
+	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factory.ID, order.ID, line.ID, line.Name, nil)
+
 	now := time.Now()
 	execution := models.FactoryWorkOrderExecution{
 		ID:             uuid.New(),
@@ -150,6 +152,7 @@ func Test__RunInitializer__FinishesFactoryWorkOrderExecutionWhenInitializationFa
 		FactoryID:      factory.ID,
 		WorkOrderID:    order.ID,
 		LineID:         line.ID,
+		LineDispatchID: dispatch.ID,
 		StepIndex:      0,
 		StepName:       "step-one",
 		RunID:          run.ID,
@@ -173,7 +176,12 @@ func Test__RunInitializer__FinishesFactoryWorkOrderExecutionWhenInitializationFa
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, updatedExecution.Status)
 	assert.Equal(t, models.CanvasRunResultFailed, updatedExecution.Result)
 
-	_, err = order.FindActiveExecution(database.Conn())
+	reloadedDispatch, err := models.FindWorkOrderLineDispatch(database.Conn(), dispatch.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateFinished, reloadedDispatch.State)
+	assert.Equal(t, models.CanvasRunResultFailed, reloadedDispatch.Result)
+
+	_, err = order.FindActiveLineDispatch(database.Conn())
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 

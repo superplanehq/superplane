@@ -32,8 +32,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "work order cannot be dispatched in its current state")
 	case errors.Is(err, models.ErrFactoryWorkOrderInvalidState):
 		return grpcerrors.FailedPrecondition(err, err.Error())
-	case errors.Is(err, models.ErrFactoryWorkOrderExecutionActive):
-		return grpcerrors.FailedPrecondition(err, "work order already has an active execution")
+	case errors.Is(err, models.ErrFactoryWorkOrderLineDispatchActive):
+		return grpcerrors.FailedPrecondition(err, "work order already has an active line dispatch")
 	case errors.Is(err, models.ErrFactoryLineHasNoSteps):
 		return grpcerrors.FailedPrecondition(err, "factory line has no steps")
 	case errors.Is(err, models.ErrFactoryLineStepNotOnRun):

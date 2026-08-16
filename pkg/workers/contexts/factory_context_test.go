@@ -107,6 +107,8 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		existingOrder, err := factory.CreateWorkOrder(database.Conn(), "Existing", "", &r.User, nil, nil)
 		require.NoError(t, err)
 
+		dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factory.ID, existingOrder.ID, line.ID, line.Name, nil)
+
 		now := time.Now()
 		workOrderExecution := models.FactoryWorkOrderExecution{
 			ID:             uuid.New(),
@@ -114,6 +116,7 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 			FactoryID:      factory.ID,
 			WorkOrderID:    existingOrder.ID,
 			LineID:         line.ID,
+			LineDispatchID: dispatch.ID,
 			StepIndex:      0,
 			StepName:       "step-one",
 			RunID:          run.ID,
@@ -615,6 +618,8 @@ func linkRunToWorkOrder(
 	line, err := factory.CreateLine(database.Conn(), support.RandomName("line"), nil)
 	require.NoError(t, err)
 
+	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factory.ID, workOrderID, line.ID, line.Name, nil)
+
 	now := time.Now()
 	execution := models.FactoryWorkOrderExecution{
 		ID:             uuid.New(),
@@ -622,6 +627,7 @@ func linkRunToWorkOrder(
 		FactoryID:      factory.ID,
 		WorkOrderID:    workOrderID,
 		LineID:         line.ID,
+		LineDispatchID: dispatch.ID,
 		StepIndex:      0,
 		StepName:       "component-under-test",
 		RunID:          runID,

@@ -32,7 +32,7 @@ function order(overrides: Partial<FactoriesWorkOrder> = {}): FactoriesWorkOrder 
     state: "STATE_OPEN",
     createdAt: "2024-06-01T00:00:00Z",
     updatedAt: "2024-06-02T00:00:00Z",
-    executions: [],
+    lineDispatches: [],
     ...overrides,
   };
 }
@@ -244,7 +244,13 @@ describe("resolveMissionStatus", () => {
         order({
           id: "wo-a",
           state: "STATE_OPEN",
-          executions: [{ id: "exec-1", state: "STATE_STARTED", step: "plan" }],
+          lineDispatches: [
+            {
+              id: "dispatch-1",
+              state: "STATE_ACTIVE",
+              stepExecutions: [{ id: "exec-1", state: "STATE_STARTED", step: "plan" }],
+            },
+          ],
         }),
         order({ id: "wo-b", state: "STATE_CLOSED", result: "RESULT_COMPLETED" }),
       ],

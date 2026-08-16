@@ -1,4 +1,5 @@
 import type {
+  FactoriesWorkOrder,
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderExecutionResult,
   FactoriesWorkOrderExecutionState,
@@ -129,86 +130,11 @@ export function getWorkOrderExecutionDisplayMeta(
   };
 }
 
-export interface WorkOrderExecutionLineGroup {
-  lineId: string;
-  lineName: string;
-  executions: FactoriesWorkOrderExecution[];
-}
-
-export function groupWorkOrderExecutionsByLine(
-  executions: FactoriesWorkOrderExecution[] | undefined,
-): WorkOrderExecutionLineGroup[] {
-  if (!executions?.length) {
-    return [];
-  }
-
-  const groups = new Map<string, WorkOrderExecutionLineGroup>();
-  for (const execution of executions) {
-    const lineId = execution.line?.id ?? "unknown";
-    const lineName = execution.line?.name?.trim() || "Unnamed line";
-    const existing = groups.get(lineId);
-    if (existing) {
-      existing.executions.push(execution);
-      continue;
-    }
-
-    groups.set(lineId, {
-      lineId,
-      lineName,
-      executions: [execution],
-    });
-  }
-
-  return [...groups.values()].map((group) => ({
-    ...group,
-    executions: [...group.executions].sort(compareExecutionsChronologically),
-  }));
-}
-
-function compareExecutionsChronologically(
-  left: FactoriesWorkOrderExecution,
-  right: FactoriesWorkOrderExecution,
-): number {
-  const leftTime = Date.parse(left.createdAt ?? "") || 0;
-  const rightTime = Date.parse(right.createdAt ?? "") || 0;
-  if (leftTime !== rightTime) {
-    return leftTime - rightTime;
-  }
-
-  return (left.id ?? "").localeCompare(right.id ?? "");
-}
-
-export function hasFailedWorkOrderExecution(executions: FactoriesWorkOrderExecution[] | undefined): boolean {
-  return (executions ?? []).some((execution) => execution.result === "RESULT_FAILED");
-}
-
-function executionTimestamp(execution: FactoriesWorkOrderExecution): number {
-  return Date.parse(execution.updatedAt ?? execution.createdAt ?? "") || 0;
-}
-
-// Most recent finished execution (by `updatedAt`, fallback `createdAt`).
-// Callers fence against `order.updatedAt` to handle reopens.
-export function latestFinishedWorkOrderExecution(
-  executions: FactoriesWorkOrderExecution[] | undefined,
-): FactoriesWorkOrderExecution | null {
-  let latest: FactoriesWorkOrderExecution | null = null;
-  let latestAt = -Infinity;
-  for (const execution of executions ?? []) {
-    if (execution.state !== "STATE_FINISHED") {
-      continue;
-    }
-    if (!execution.result || execution.result === "RESULT_UNKNOWN") {
-      continue;
-    }
-    const at = executionTimestamp(execution);
-    if (at >= latestAt) {
-      latest = execution;
-      latestAt = at;
-    }
-  }
-  return latest;
-}
-
-export function hasActiveWorkOrderExecution(executions: FactoriesWorkOrderExecution[] | undefined): boolean {
-  return (executions ?? []).some(isActiveWorkOrderExecution);
+/**
+ * Flattens every step execution across every line dispatch on a work
+ * order, for callers (like the event-driven timeline) that just need "all
+ * step executions", not the structural per-traversal grouping.
+ */
+export function flattenWorkOrderExecutions(order: FactoriesWorkOrder): FactoriesWorkOrderExecution[] {
+  return (order.lineDispatches ?? []).flatMap((dispatch) => dispatch.stepExecutions ?? []);
 }

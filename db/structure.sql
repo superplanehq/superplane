@@ -432,7 +432,28 @@ CREATE TABLE public.factory_work_order_executions (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     finished_at timestamp with time zone,
     total_tokens bigint DEFAULT 0 NOT NULL,
-    cost_cents bigint DEFAULT 0 NOT NULL
+    cost_cents bigint DEFAULT 0 NOT NULL,
+    line_dispatch_id uuid NOT NULL
+);
+
+
+--
+-- Name: factory_work_order_line_dispatches; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_work_order_line_dispatches (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    work_order_id uuid NOT NULL,
+    line_id uuid NOT NULL,
+    line_name text NOT NULL,
+    steps jsonb DEFAULT '[]'::jsonb NOT NULL,
+    state character varying(32) DEFAULT 'active'::character varying NOT NULL,
+    result character varying(32) DEFAULT ''::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    finished_at timestamp with time zone
 );
 
 
@@ -1132,6 +1153,14 @@ ALTER TABLE ONLY public.factory_work_order_executions
 
 
 --
+-- Name: factory_work_order_line_dispatches factory_work_order_line_dispatches_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_line_dispatches
+    ADD CONSTRAINT factory_work_order_line_dispatches_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: factory_work_orders factory_work_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1677,6 +1706,13 @@ CREATE INDEX idx_factory_work_order_executions_factory_id ON public.factory_work
 
 
 --
+-- Name: idx_factory_work_order_executions_line_dispatch; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_executions_line_dispatch ON public.factory_work_order_executions USING btree (line_dispatch_id);
+
+
+--
 -- Name: idx_factory_work_order_executions_work_order_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1688,6 +1724,27 @@ CREATE INDEX idx_factory_work_order_executions_work_order_created ON public.fact
 --
 
 CREATE INDEX idx_factory_work_order_executions_work_order_line_active ON public.factory_work_order_executions USING btree (work_order_id, line_id) WHERE ((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying])::text[]));
+
+
+--
+-- Name: idx_factory_work_order_line_dispatches_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_line_dispatches_active ON public.factory_work_order_line_dispatches USING btree (work_order_id) WHERE ((state)::text = 'active'::text);
+
+
+--
+-- Name: idx_factory_work_order_line_dispatches_factory_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_line_dispatches_factory_id ON public.factory_work_order_line_dispatches USING btree (factory_id);
+
+
+--
+-- Name: idx_factory_work_order_line_dispatches_work_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_line_dispatches_work_order ON public.factory_work_order_line_dispatches USING btree (work_order_id);
 
 
 --
@@ -2213,6 +2270,14 @@ ALTER TABLE ONLY public.factory_work_order_executions
 
 
 --
+-- Name: factory_work_order_executions factory_work_order_executions_line_dispatch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_executions
+    ADD CONSTRAINT factory_work_order_executions_line_dispatch_id_fkey FOREIGN KEY (line_dispatch_id) REFERENCES public.factory_work_order_line_dispatches(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: factory_work_order_executions factory_work_order_executions_line_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2234,6 +2299,30 @@ ALTER TABLE ONLY public.factory_work_order_executions
 
 ALTER TABLE ONLY public.factory_work_order_executions
     ADD CONSTRAINT factory_work_order_executions_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_order_line_dispatches factory_work_order_line_dispatches_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_line_dispatches
+    ADD CONSTRAINT factory_work_order_line_dispatches_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_order_line_dispatches factory_work_order_line_dispatches_line_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_line_dispatches
+    ADD CONSTRAINT factory_work_order_line_dispatches_line_id_fkey FOREIGN KEY (line_id) REFERENCES public.factory_lines(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_order_line_dispatches factory_work_order_line_dispatches_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_line_dispatches
+    ADD CONSTRAINT factory_work_order_line_dispatches_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
 
 
 --
@@ -2708,7 +2797,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260812184220	f
+20260816120000	f
 \.
 
 
