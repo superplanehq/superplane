@@ -7,6 +7,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
+//go:embed payloads/compare_commits.json
+var exampleOutputCompareCommitsBytes []byte
+
 //go:embed payloads/create_release.json
 var exampleOutputCreateReleaseBytes []byte
 
@@ -31,6 +34,9 @@ var exampleDataOnTagCreatedBytes []byte
 //go:embed payloads/on_branch_created.json
 var exampleDataOnBranchCreatedBytes []byte
 
+var exampleOutputCompareCommitsOnce sync.Once
+var exampleOutputCompareCommits map[string]any
+
 var exampleOutputCreateReleaseOnce sync.Once
 var exampleOutputCreateRelease map[string]any
 
@@ -54,6 +60,14 @@ var exampleDataOnTagCreated map[string]any
 
 var exampleDataOnBranchCreatedOnce sync.Once
 var exampleDataOnBranchCreated map[string]any
+
+func (c *CompareCommits) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputCompareCommitsOnce,
+		exampleOutputCompareCommitsBytes,
+		&exampleOutputCompareCommits,
+	)
+}
 
 func (c *CreateRelease) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateReleaseOnce, exampleOutputCreateReleaseBytes, &exampleOutputCreateRelease)

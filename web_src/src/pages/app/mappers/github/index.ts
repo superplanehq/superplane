@@ -34,6 +34,7 @@ import { labelsMapper } from "./labels";
 import { addReactionMapper } from "./add_reaction";
 import { getCombinedCommitStatusMapper } from "./get_combined_commit_status";
 import { listCheckRunsForRefMapper } from "./list_check_runs_for_ref";
+import { compareCommitsMapper } from "./compare_commits";
 import { buildActionStateRegistry } from "../utils";
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
@@ -60,6 +61,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getWorkflowUsage: buildActionStateRegistry("retrieved"),
   getCombinedCommitStatus: buildActionStateRegistry("retrieved"),
   listCheckRunsForRef: buildActionStateRegistry("retrieved"),
+  compareCommits: buildActionStateRegistry("compared"),
   addIssueLabel: buildActionStateRegistry("added"),
   removeIssueLabel: buildActionStateRegistry("removed"),
   addIssueAssignee: buildActionStateRegistry("added"),
@@ -91,6 +93,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getWorkflowUsage: getWorkflowUsageMapper,
   getCombinedCommitStatus: getCombinedCommitStatusMapper,
   listCheckRunsForRef: listCheckRunsForRefMapper,
+  compareCommits: compareCommitsMapper,
   addIssueLabel: labelsMapper,
   removeIssueLabel: labelsMapper,
   addIssueAssignee: baseIssueMapper,
