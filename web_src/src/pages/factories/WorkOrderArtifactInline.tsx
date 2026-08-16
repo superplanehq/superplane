@@ -1,6 +1,15 @@
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
-import { ExternalLink, FileText, GitBranch, GitPullRequest, Link as LinkIcon } from "lucide-react";
+import {
+  ExternalLink,
+  FileText,
+  GitBranch,
+  GitMerge,
+  GitPullRequest,
+  GitPullRequestClosed,
+  GitPullRequestDraft,
+  Link as LinkIcon,
+} from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -8,7 +17,9 @@ import {
   extractArtifactName,
   extractArtifactTitle,
   extractArtifactUrl,
+  extractPrArtifactState,
   formatPrArtifactLabel,
+  type PrArtifactState,
 } from "./lib/workOrderArtifact";
 import { WorkOrderMarkdownArtifactDialog } from "./WorkOrderMarkdownArtifactDialog";
 
@@ -34,10 +45,10 @@ export function WorkOrderArtifactInline({ artifact, className }: WorkOrderArtifa
     return <MarkdownArtifactInline artifact={artifact} className={className} />;
   }
 
-  const { icon: Icon, label } = artifactLinkPresentation(kind, artifact);
+  const { icon: Icon, label, iconClassName } = artifactLinkPresentation(kind, artifact);
   const content = (
     <>
-      <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      <Icon className={cn("size-3.5 shrink-0", iconClassName ?? "text-muted-foreground")} aria-hidden />
       <span className="truncate">{label}</span>
       {safeUrl ? <ExternalLink className="size-3 shrink-0 text-muted-foreground" aria-hidden /> : null}
     </>
@@ -85,20 +96,33 @@ function MarkdownArtifactInline({
   );
 }
 
+// GitHub-style icon + color per PR lifecycle state. `open` is also the
+// back-compat default for artifacts attached before `state` existed (or
+// carrying an unrecognized value) — same look as today, zero regression.
+const PR_STATE_PRESENTATION: Record<PrArtifactState, { icon: typeof GitPullRequest; className: string }> = {
+  open: { icon: GitPullRequest, className: "text-emerald-600 dark:text-emerald-400" },
+  draft: { icon: GitPullRequestDraft, className: "text-muted-foreground" },
+  closed: { icon: GitPullRequestClosed, className: "text-red-600 dark:text-red-400" },
+  merged: { icon: GitMerge, className: "text-purple-600 dark:text-purple-400" },
+};
+
 function artifactLinkPresentation(
   kind: string,
   artifact: WorkOrderArtifactPresentation,
-): { icon: typeof FileText; label: string } {
+): { icon: typeof FileText; label: string; iconClassName?: string } {
   const title = extractArtifactTitle(artifact.data);
   const name = extractArtifactName(artifact.data);
   const url = extractArtifactUrl(artifact.data);
 
   switch (kind) {
-    case "pr":
+    case "pr": {
+      const { icon, className } = PR_STATE_PRESENTATION[extractPrArtifactState(artifact.data) ?? "open"];
       return {
-        icon: GitPullRequest,
+        icon,
+        iconClassName: className,
         label: firstLabel(formatPrArtifactLabel(artifact.data), title, name, compactUrlLabel(url), "Pull request"),
       };
+    }
     case "branch":
       return { icon: GitBranch, label: firstLabel(name, title, compactUrlLabel(url), "Branch") };
     case "link":

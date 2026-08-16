@@ -153,6 +153,21 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 	return artifactToCore(artifact)
 }
 
+func (c *FactoryContext) UpdateWorkOrderArtifact(params core.UpdateWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
+	order, err := c.resolveWorkOrder(params.OrderID)
+	if err != nil {
+		return nil, err
+	}
+
+	artifact, err := order.UpdateArtifactData(c.tx, params.Key, params.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactUpdated)
+	return artifactToCore(artifact)
+}
+
 // FindWorkOrder resolves a work order by id or by an artifact key,
 // independent of the current run's `factory_work_order_executions` row.
 // This is what lets a plain webhook-triggered run (e.g. github.onPullRequest)
