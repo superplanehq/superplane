@@ -6,9 +6,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/datatypes"
 
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
 func TestSerializeWorkOrderCreator_UserBranch(t *testing.T) {
@@ -76,4 +78,65 @@ func TestSerializeExecutionSteps_SnapshotsLineSteps(t *testing.T) {
 func TestSerializeExecutionSteps_EmptyReturnsNil(t *testing.T) {
 	assert.Nil(t, serializeExecutionSteps(nil))
 	assert.Nil(t, serializeExecutionSteps([]models.FactoryLineStep{}))
+}
+
+func TestSerializeWorkOrder_LineDispatchesReplaceFlatExecutions(t *testing.T) {
+	lineID := uuid.New()
+	dispatchID := uuid.New()
+	runID := uuid.New()
+	canvasID := uuid.New()
+
+	dispatches := []models.FactoryWorkOrderLineDispatchRecord{
+		{
+			FactoryWorkOrderLineDispatch: models.FactoryWorkOrderLineDispatch{
+				ID:       dispatchID,
+				LineID:   lineID,
+				LineName: "ship",
+				Steps: datatypes.NewJSONSlice([]models.FactoryLineStep{
+					{Name: "step-one"},
+					{Name: "step-two"},
+				}),
+				State: models.FactoryWorkOrderLineDispatchStateActive,
+			},
+			Executions: []models.FactoryWorkOrderExecutionRecord{
+				{
+					FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{
+						ID:          uuid.New(),
+						StepIndex:   0,
+						StepName:    "step-one",
+						RunID:       runID,
+						Status:      models.FactoryWorkOrderExecutionStatusFinished,
+						Result:      models.CanvasRunResultPassed,
+						TotalTokens: 10,
+						CostCents:   5,
+					},
+					CanvasID:   canvasID,
+					CanvasName: "step-one-app",
+				},
+			},
+		},
+	}
+
+	order := &models.FactoryWorkOrder{ID: uuid.New()}
+	serialized := serializeWorkOrder(nil, order, dispatches, nil)
+
+	require.Len(t, serialized.LineDispatches, 1)
+	dispatch := serialized.LineDispatches[0]
+	assert.Equal(t, dispatchID.String(), dispatch.Id)
+	assert.Equal(t, lineID.String(), dispatch.Line.Id)
+	assert.Equal(t, "ship", dispatch.Line.Name)
+	assert.Equal(t, pb.WorkOrderLineDispatch_STATE_ACTIVE, dispatch.State)
+	require.Len(t, dispatch.Steps, 2)
+	assert.Equal(t, "step-one", dispatch.Steps[0].Name)
+	assert.Equal(t, "step-two", dispatch.Steps[1].Name)
+
+	require.Len(t, dispatch.StepExecutions, 1)
+	execution := dispatch.StepExecutions[0]
+	assert.Equal(t, "step-one", execution.Step)
+	assert.Equal(t, pb.WorkOrderExecution_STATE_FINISHED, execution.State)
+	assert.Equal(t, pb.WorkOrderExecution_RESULT_PASSED, execution.Result)
+
+	// Aggregate usage sums across every dispatch's step executions.
+	assert.EqualValues(t, 10, serialized.TotalTokens)
+	assert.EqualValues(t, 5, serialized.TotalCostCents)
 }

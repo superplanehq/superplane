@@ -295,6 +295,12 @@ func (w *RunInitializer) markFactoryWorkOrderExecutionRunning(tx *gorm.DB, runID
 	return execution.MarkRunning(tx)
 }
 
+// finishFactoryWorkOrderExecutionForRun marks the step execution finished
+// and — since it's only ever called with a terminal (non-passed) result,
+// from failRun — also finishes the parent line dispatch, matching the
+// finishing run_finalizer.executeNextFactoryLineStep does for the normal
+// advancement path. Without this, a run that fails before it ever starts
+// would leave its traversal stuck `active` forever.
 func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runID uuid.UUID, result string) error {
 	execution, err := models.FindWorkOrderExecutionByRunID(tx, runID)
 	if err != nil {
@@ -304,5 +310,14 @@ func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runI
 		return err
 	}
 
-	return execution.MarkFinished(tx, result)
+	if err := execution.MarkFinished(tx, result); err != nil {
+		return err
+	}
+
+	dispatch, err := models.FindWorkOrderLineDispatch(tx, execution.LineDispatchID)
+	if err != nil {
+		return err
+	}
+
+	return dispatch.Finish(tx, result)
 }
