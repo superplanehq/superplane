@@ -11,7 +11,7 @@ import (
 
 func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, order *models.FactoryWorkOrder) (*pb.WorkOrder, error) {
 	db := database.DB(ctx)
-	executionsByOrderID, err := models.ListFactoryWorkOrderExecutionsByWorkOrderIDs(db, []uuid.UUID{order.ID})
+	dispatchesByOrderID, err := models.ListWorkOrderLineDispatchesByWorkOrderIDs(db, []uuid.UUID{order.ID})
 	if err != nil {
 		return nil, err
 	}
@@ -24,7 +24,7 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 	return serializeWorkOrder(
 		factory,
 		order,
-		executionsByOrderID[order.ID],
+		dispatchesByOrderID[order.ID],
 		creatorAutomations[order.ID],
 	), nil
 }
@@ -40,7 +40,7 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 	}
 
 	db := database.DB(ctx)
-	executionsByOrderID, err := models.ListFactoryWorkOrderExecutionsByWorkOrderIDs(db, workOrderIDs)
+	dispatchesByOrderID, err := models.ListWorkOrderLineDispatchesByWorkOrderIDs(db, workOrderIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 		result[i] = serializeWorkOrder(
 			factory,
 			&orders[i],
-			executionsByOrderID[orders[i].ID],
+			dispatchesByOrderID[orders[i].ID],
 			creatorAutomations[orders[i].ID],
 		)
 	}

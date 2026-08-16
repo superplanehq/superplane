@@ -89,15 +89,17 @@ func serializeFactories(factories []models.Factory) []*pb.Factory {
 func serializeWorkOrder(
 	f *models.Factory,
 	order *models.FactoryWorkOrder,
-	executions []models.FactoryWorkOrderExecutionRecord,
+	dispatches []models.FactoryWorkOrderLineDispatchRecord,
 	createdByAutomation *factory.AutomationRef,
 ) *pb.WorkOrder {
-	serializedExecutions := serializeWorkOrderExecutions(executions)
+	serializedDispatches := serializeWorkOrderLineDispatches(dispatches)
 
 	var totalTokens, totalCostCents int64
-	for _, e := range executions {
-		totalTokens += e.TotalTokens
-		totalCostCents += e.CostCents
+	for _, d := range dispatches {
+		for _, e := range d.Executions {
+			totalTokens += e.TotalTokens
+			totalCostCents += e.CostCents
+		}
 	}
 
 	displayKey := ""
@@ -116,7 +118,7 @@ func serializeWorkOrder(
 		CreatedAt:      timestamppb.New(order.CreatedAt),
 		UpdatedAt:      timestamppb.New(order.UpdatedAt),
 		Assignees:      serializeWorkOrderAssignees(order.Assignees),
-		Executions:     serializedExecutions,
+		LineDispatches: serializedDispatches,
 		CreatedBy:      serializeWorkOrderCreator(order, createdByAutomation),
 		TotalTokens:    totalTokens,
 		TotalCostCents: totalCostCents,
@@ -167,6 +169,57 @@ func serializeWorkOrderCreator(
 	}
 }
 
+func serializeWorkOrderLineDispatches(dispatches []models.FactoryWorkOrderLineDispatchRecord) []*pb.WorkOrderLineDispatch {
+	result := make([]*pb.WorkOrderLineDispatch, 0, len(dispatches))
+	for _, dispatch := range dispatches {
+		result = append(result, serializeWorkOrderLineDispatch(dispatch))
+	}
+	return result
+}
+
+func serializeWorkOrderLineDispatch(dispatch models.FactoryWorkOrderLineDispatchRecord) *pb.WorkOrderLineDispatch {
+	item := &pb.WorkOrderLineDispatch{
+		Id: dispatch.ID.String(),
+		Line: &pb.LineRef{
+			Id:   dispatch.LineID.String(),
+			Name: dispatch.LineName,
+		},
+		Steps:          serializeExecutionSteps(dispatch.Steps),
+		State:          serializeLineDispatchState(dispatch.State),
+		Result:         serializeLineDispatchResult(dispatch.Result),
+		CreatedAt:      timestamppb.New(dispatch.CreatedAt),
+		StepExecutions: serializeWorkOrderExecutions(dispatch.Executions),
+	}
+	if dispatch.FinishedAt != nil {
+		item.FinishedAt = timestamppb.New(*dispatch.FinishedAt)
+	}
+	return item
+}
+
+func serializeLineDispatchState(state string) pb.WorkOrderLineDispatch_State {
+	switch state {
+	case models.FactoryWorkOrderLineDispatchStateActive:
+		return pb.WorkOrderLineDispatch_STATE_ACTIVE
+	case models.FactoryWorkOrderLineDispatchStateFinished:
+		return pb.WorkOrderLineDispatch_STATE_FINISHED
+	default:
+		return pb.WorkOrderLineDispatch_STATE_UNKNOWN
+	}
+}
+
+func serializeLineDispatchResult(result string) pb.WorkOrderLineDispatch_Result {
+	switch result {
+	case models.CanvasRunResultPassed:
+		return pb.WorkOrderLineDispatch_RESULT_PASSED
+	case models.CanvasRunResultFailed:
+		return pb.WorkOrderLineDispatch_RESULT_FAILED
+	case models.CanvasRunResultCancelled:
+		return pb.WorkOrderLineDispatch_RESULT_CANCELLED
+	default:
+		return pb.WorkOrderLineDispatch_RESULT_UNKNOWN
+	}
+}
+
 func serializeWorkOrderExecutions(executions []models.FactoryWorkOrderExecutionRecord) []*pb.WorkOrderExecution {
 	result := make([]*pb.WorkOrderExecution, 0, len(executions))
 	for _, execution := range executions {
@@ -186,11 +239,6 @@ func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecor
 		UpdatedAt:   timestamppb.New(execution.UpdatedAt),
 		TotalTokens: execution.TotalTokens,
 		CostCents:   execution.CostCents,
-		Steps:       serializeExecutionSteps(execution.LineSteps),
-		Line: &pb.WorkOrderExecution_LineRef{
-			Id:   execution.LineID.String(),
-			Name: execution.LineName,
-		},
 		Run: &pb.WorkOrderExecution_RunRef{
 			Id:      execution.RunID.String(),
 			AppId:   execution.CanvasID.String(),
