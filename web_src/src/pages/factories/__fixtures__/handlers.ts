@@ -1,5 +1,5 @@
 import { defaultFactoriesFixture, ORGANIZATION_USERS, type FactoriesFixture } from "./factoryPageResponses";
-import type { FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesFactoryLine, FactoriesWorkOrder, FactoriesWorkOrderLineDispatch } from "@/api-client";
 import { fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
 
 export type { FactoriesFixture };
@@ -163,7 +163,7 @@ function createWorkOrderFromRequest(request: RequestBody, orderCount: number): F
     updatedAt: nowIso,
     createdBy: { user: { id: ORGANIZATION_USERS[0].id, name: ORGANIZATION_USERS[0].name } },
     assignees: findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids)),
-    executions: [],
+    lineDispatches: [],
   };
 }
 
@@ -172,25 +172,43 @@ function findOrder(fixture: FactoriesFixture, factoryId: string, orderId: string
   return orders.find((entry) => entry.id === orderId);
 }
 
+function buildDispatchedLineDispatch(
+  line: FactoriesFactoryLine | undefined,
+  lineName: string,
+  now: string,
+): FactoriesWorkOrderLineDispatch {
+  return {
+    id: `dispatch-${Date.now()}`,
+    line: line ? { id: line.id, name: line.name } : { id: "line-unknown", name: lineName },
+    steps: (line?.steps ?? []).map((step, index) => ({ name: step.name, stepIndex: index })),
+    state: "STATE_ACTIVE",
+    result: "RESULT_UNKNOWN",
+    createdAt: now,
+    stepExecutions: [
+      {
+        id: `exec-${Date.now()}`,
+        step: line?.steps?.[0]?.name ?? "start",
+        stepIndex: 0,
+        state: "STATE_STARTED",
+        result: "RESULT_UNKNOWN",
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+  };
+}
+
 function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: string, request: RequestBody) {
   const order = findOrder(fixture, factoryId, orderId);
   if (!order) return { json: {} };
   const factory = fixture.factories.find((entry) => entry.id === factoryId);
   const lineName = stringOrEmpty(request.lineName ?? request.line_name);
   const line = factory?.lines?.find((entry) => entry.name === lineName) ?? factory?.lines?.[0];
-  order.updatedAt = new Date().toISOString();
-  order.executions = [
-    ...(order.executions ?? []),
-    {
-      id: `dispatch-${Date.now()}`,
-      line: line ? { id: line.id, name: line.name } : { id: "line-unknown", name: lineName },
-      step: line?.steps?.[0]?.name ?? "start",
-      state: "STATE_STARTED",
-      result: "RESULT_UNKNOWN",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ];
+  const now = new Date().toISOString();
+  order.updatedAt = now;
+
+  const newDispatch = buildDispatchedLineDispatch(line, lineName, now);
+  order.lineDispatches = [...(order.lineDispatches ?? []), newDispatch];
   return { json: { order } };
 }
 

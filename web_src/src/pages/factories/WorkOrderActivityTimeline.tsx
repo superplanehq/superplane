@@ -16,7 +16,7 @@ import {
   type WorkOrderTimelineEventKind,
 } from "./lib/workOrderTimelineEvents";
 import { formatWorkOrderDateTime as formatTimelineDate } from "./lib/workOrderDateTime";
-import { getWorkOrderRunHref } from "./lib/workOrderExecutions";
+import { flattenWorkOrderExecutions, getWorkOrderRunHref } from "./lib/workOrderExecutions";
 import { DispatchTimelineItem } from "./timeline/DispatchTimelineItem";
 import { TimelineAutomationActor } from "./timeline";
 import { TimelineMarker } from "./timeline/TimelineMarker";
@@ -63,7 +63,7 @@ export function WorkOrderActivityTimeline({
   const pendingView = renderTimelinePendingView({ events, eventsError, isLoading, onRetryEvents });
   const timeline = pendingView
     ? { events: [] as WorkOrderTimelineEvent[] }
-    : buildWorkOrderTimelineView(events, resolveUserName, order.executions);
+    : buildWorkOrderTimelineView(events, resolveUserName, flattenWorkOrderExecutions(order));
 
   // Without a footer, keep the historical "single message" layout: the
   // pending/empty state occupies the whole slot on its own.

@@ -258,10 +258,10 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 	now := time.Now()
 
 	err := db.Transaction(func(tx *gorm.DB) error {
-		// Reverting `open → draft` while a step is still pending/running would
+		// Reverting `open → draft` while a line dispatch is still active would
 		// desync the FSM from the executor. Mirror the dispatch guard here.
 		if fromState == FactoryWorkOrderStateOpen && toState == FactoryWorkOrderStateDraft {
-			if err := o.ensureNoActiveExecution(tx); err != nil {
+			if err := o.ensureNoActiveLineDispatch(tx); err != nil {
 				return err
 			}
 		}
@@ -367,37 +367,6 @@ func (o *FactoryWorkOrder) TransitionOnDispatch(tx *gorm.DB, actor *uuid.UUID) e
 		Actor:   actor,
 	})
 	return err
-}
-
-// ensureNoActiveExecution returns ErrFactoryWorkOrderExecutionActive if a
-// pending/running execution exists, nil otherwise.
-func (o *FactoryWorkOrder) ensureNoActiveExecution(tx *gorm.DB) error {
-	_, err := o.FindActiveExecution(tx)
-	if err == nil {
-		return ErrFactoryWorkOrderExecutionActive
-	}
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil
-	}
-	return err
-}
-
-func (o *FactoryWorkOrder) FindActiveExecution(tx *gorm.DB) (*FactoryWorkOrderExecution, error) {
-	var execution FactoryWorkOrderExecution
-	err := tx.
-		Where("work_order_id = ?", o.ID).
-		Where("status IN ?", []string{
-			FactoryWorkOrderExecutionStatusPending,
-			FactoryWorkOrderExecutionStatusRunning,
-		}).
-		First(&execution).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &execution, nil
 }
 
 func (o *FactoryWorkOrder) ReplaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID) error {

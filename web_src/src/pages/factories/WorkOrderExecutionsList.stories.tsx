@@ -36,7 +36,7 @@ export const Default: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
     factoryKey: PRIMARY_FACTORY_KEY,
-    executions: RUNNING_WORK_ORDER.executions,
+    dispatches: RUNNING_WORK_ORDER.lineDispatches,
     variant: "default",
   },
 };
@@ -46,7 +46,7 @@ export const Compact: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
     factoryKey: PRIMARY_FACTORY_KEY,
-    executions: CLOSED_WORK_ORDER.executions,
+    dispatches: CLOSED_WORK_ORDER.lineDispatches,
     variant: "compact",
   },
 };
@@ -56,7 +56,7 @@ export const Inline: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
     factoryKey: PRIMARY_FACTORY_KEY,
-    executions: CLOSED_WORK_ORDER.executions,
+    dispatches: CLOSED_WORK_ORDER.lineDispatches,
     variant: "inline",
   },
 };
@@ -66,7 +66,7 @@ export const Empty: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
     factoryKey: PRIMARY_FACTORY_KEY,
-    executions: [],
+    dispatches: [],
     variant: "default",
   },
 };

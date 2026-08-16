@@ -1,4 +1,10 @@
-import type { FactoriesFactory, FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
+import type {
+  FactoriesFactory,
+  FactoriesLineRef,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderExecution,
+  FactoriesWorkOrderLineDispatch,
+} from "@/api-client";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "./workOrderUsage";
 import {
@@ -54,17 +60,21 @@ export function buildWorkOrderListEntry(
   order: FactoriesWorkOrder,
   factory: FactoriesFactory | null | undefined,
 ): WorkOrderListEntry {
-  const executions = order.executions ?? [];
-  const latestExecution = findLatestExecution(executions);
-  const lines = collectLines(executions);
-  const { totalTokens, totalCostCents } = sumUsage(order, executions);
+  const dispatches = order.lineDispatches ?? [];
+  const pairs = flattenDispatchExecutions(dispatches);
+  const latestPair = findLatestExecution(pairs);
+  const lines = collectLines(dispatches);
+  const { totalTokens, totalCostCents } = sumUsage(
+    order,
+    pairs.map((pair) => pair.execution),
+  );
   const { assigneeIds, assigneeNames } = collectAssignees(order);
 
   const createdAtMs = parseTimestamp(order.createdAt);
   const displayKey = getWorkOrderDisplayKey(order, factory?.key ?? null);
   const title = trimOrNull(order.title) ?? "Untitled work order";
-  const latestLineName = trimOrNull(latestExecution?.line?.name);
-  const latestStepName = trimOrNull(latestExecution?.step);
+  const latestLineName = trimOrNull(latestPair?.line?.name);
+  const latestStepName = trimOrNull(latestPair?.execution.step);
 
   return {
     order,
@@ -73,7 +83,7 @@ export function buildWorkOrderListEntry(
     displayNumber: parseIdentifierNumber(displayKey),
     title,
     displayStatus: getWorkOrderDisplayStatus(order),
-    latestExecution,
+    latestExecution: latestPair?.execution ?? null,
     latestLineName,
     latestStepName,
     lineStepLabel: buildLineStepLabel(latestLineName, latestStepName, lines.ids.length),
@@ -135,16 +145,34 @@ function buildLineStepLabel(lineName: string | null, stepName: string | null, di
   return `${label} · +${otherLines} more line${otherLines === 1 ? "" : "s"}`;
 }
 
-/** Distinct lines the order has run on, in first-seen order. */
-function collectLines(executions: FactoriesWorkOrderExecution[]): { ids: string[]; names: string[] } {
+/** One step execution paired with the line ref of its parent dispatch —
+ * `FactoriesWorkOrderExecution` no longer carries its own `line`, that
+ * moved to the parent `FactoriesWorkOrderLineDispatch`. */
+interface ExecutionWithLine {
+  execution: FactoriesWorkOrderExecution;
+  line?: FactoriesLineRef;
+}
+
+function flattenDispatchExecutions(dispatches: FactoriesWorkOrderLineDispatch[]): ExecutionWithLine[] {
+  const pairs: ExecutionWithLine[] = [];
+  for (const dispatch of dispatches) {
+    for (const execution of dispatch.stepExecutions ?? []) {
+      pairs.push({ execution, line: dispatch.line });
+    }
+  }
+  return pairs;
+}
+
+/** Distinct lines the order has run on (one or more dispatches), in first-seen order. */
+function collectLines(dispatches: FactoriesWorkOrderLineDispatch[]): { ids: string[]; names: string[] } {
   const ids = new Set<string>();
   const names = new Set<string>();
-  for (const execution of executions) {
-    const id = execution.line?.id?.trim();
+  for (const dispatch of dispatches) {
+    const id = dispatch.line?.id?.trim();
     if (id) {
       ids.add(id);
     }
-    const name = execution.line?.name?.trim();
+    const name = dispatch.line?.name?.trim();
     if (name) {
       names.add(name);
     }
@@ -190,22 +218,22 @@ export function buildWorkOrderListEntries(
 }
 
 /**
- * Latest execution across every line, ordered by `updatedAt` then `createdAt`.
- * An active execution wins ties so an in-flight step surfaces over a stale
- * finished one that happens to share a timestamp. "Active" must match the
- * predicate behind the Running display status, or a tie can show a line and
- * step that disagree with the status pill.
+ * Latest execution across every line dispatch, ordered by `updatedAt` then
+ * `createdAt`. An active execution wins ties so an in-flight step surfaces
+ * over a stale finished one that happens to share a timestamp. "Active"
+ * must match the predicate behind the Running display status, or a tie can
+ * show a line and step that disagree with the status pill.
  */
-function findLatestExecution(executions: FactoriesWorkOrderExecution[]): FactoriesWorkOrderExecution | null {
-  if (executions.length === 0) {
+function findLatestExecution(pairs: ExecutionWithLine[]): ExecutionWithLine | null {
+  if (pairs.length === 0) {
     return null;
   }
-  let winner: FactoriesWorkOrderExecution | null = null;
+  let winner: ExecutionWithLine | null = null;
   let winnerAt = -Infinity;
-  for (const execution of executions) {
-    const at = Date.parse(execution.updatedAt ?? execution.createdAt ?? "") || 0;
-    if (at > winnerAt || (at === winnerAt && isActiveWorkOrderExecution(execution))) {
-      winner = execution;
+  for (const pair of pairs) {
+    const at = Date.parse(pair.execution.updatedAt ?? pair.execution.createdAt ?? "") || 0;
+    if (at > winnerAt || (at === winnerAt && isActiveWorkOrderExecution(pair.execution))) {
+      winner = pair;
       winnerAt = at;
     }
   }
