@@ -1,4 +1,9 @@
-import type { FactoriesFactoryLine, FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
+import type {
+  FactoriesFactoryLine,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderExecution,
+  FactoriesWorkOrderLineDispatch,
+} from "@/api-client";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 
 export type LinePhaseTick = "running" | "waiting" | "queued" | "failed" | null;
@@ -112,8 +117,17 @@ function appendCurrentRunForOrder(
     return;
   }
 
-  const lineExecutions = (order.executions ?? []).filter(
-    (execution) => execution.line?.id === lineId && execution.step != null && stepIndexByName.has(execution.step),
+  // A line can have more than one dispatch (traversal) for this order; the
+  // board is a compact status summary, so it shows the most recent one —
+  // the full history of every dispatch lives in WorkOrderExecutionsList.
+  const dispatchesForLine = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
+  if (dispatchesForLine.length === 0) {
+    return;
+  }
+  const currentDispatch = pickMostRecentDispatch(dispatchesForLine);
+
+  const lineExecutions = (currentDispatch.stepExecutions ?? []).filter(
+    (execution) => execution.step != null && stepIndexByName.has(execution.step),
   );
   if (lineExecutions.length === 0) {
     return;
@@ -137,6 +151,14 @@ function appendCurrentRunForOrder(
     return;
   }
   runsByStep.set(currentExecution.step, [card]);
+}
+
+function pickMostRecentDispatch(dispatches: FactoriesWorkOrderLineDispatch[]): FactoriesWorkOrderLineDispatch {
+  return dispatches.reduce((latest, candidate) => {
+    const latestAt = Date.parse(latest.createdAt ?? "") || 0;
+    const candidateAt = Date.parse(candidate.createdAt ?? "") || 0;
+    return candidateAt >= latestAt ? candidate : latest;
+  });
 }
 
 function executionTimestamp(execution: FactoriesWorkOrderExecution): number {
