@@ -49,6 +49,19 @@ func (c *FactoryResourceCleaner) Run() (deleted int64, complete bool, err error)
 		return deleted, false, nil
 	}
 
+	// Line dispatches are the parent of executions (line_dispatch_id is a
+	// RESTRICT FK), so they're only safe to delete once their executions
+	// are gone.
+	count, err = deleteRowsLimited(c.tx, &FactoryWorkOrderLineDispatch{}, remaining, "factory_id = ?", c.factory.ID)
+	if err != nil {
+		return deleted, false, fmt.Errorf("delete factory work order line dispatches: %w", err)
+	}
+	deleted += count
+	remaining -= int(count)
+	if remaining <= 0 {
+		return deleted, false, nil
+	}
+
 	count, err = deleteRowsLimited(
 		c.tx,
 		&FactoryWorkOrderEvent{},
@@ -109,8 +122,11 @@ func (c *FactoryResourceCleaner) Run() (deleted int64, complete bool, err error)
 }
 
 func (c *FactoryResourceCleaner) factoryDomainEmpty() (bool, error) {
-	var executions, orders, lines int64
+	var executions, dispatches, orders, lines int64
 	if err := c.tx.Model(&FactoryWorkOrderExecution{}).Where("factory_id = ?", c.factory.ID).Limit(1).Count(&executions).Error; err != nil {
+		return false, err
+	}
+	if err := c.tx.Model(&FactoryWorkOrderLineDispatch{}).Where("factory_id = ?", c.factory.ID).Limit(1).Count(&dispatches).Error; err != nil {
 		return false, err
 	}
 	if err := c.tx.Model(&FactoryWorkOrder{}).Where("factory_id = ?", c.factory.ID).Limit(1).Count(&orders).Error; err != nil {
@@ -119,7 +135,7 @@ func (c *FactoryResourceCleaner) factoryDomainEmpty() (bool, error) {
 	if err := c.tx.Model(&FactoryLine{}).Where("factory_id = ?", c.factory.ID).Limit(1).Count(&lines).Error; err != nil {
 		return false, err
 	}
-	return executions == 0 && orders == 0 && lines == 0, nil
+	return executions == 0 && dispatches == 0 && orders == 0 && lines == 0, nil
 }
 
 func deleteFactoryAssigneesLimited(tx *gorm.DB, factoryID uuid.UUID, limit int) (int64, error) {
@@ -170,6 +186,11 @@ func deleteOrphanFactoryWorkOrdersLimited(tx *gorm.DB, factoryID uuid.UUID, limi
 			NOT EXISTS (
 				SELECT 1 FROM factory_work_order_executions
 				WHERE factory_work_order_executions.work_order_id = factory_work_orders.id
+			)`).
+		Where(`
+			NOT EXISTS (
+				SELECT 1 FROM factory_work_order_line_dispatches
+				WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
 			)`).
 		Limit(limit)
 
