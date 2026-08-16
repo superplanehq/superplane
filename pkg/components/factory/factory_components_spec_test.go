@@ -27,6 +27,11 @@ type fakeFactoryContext struct {
 	findParams core.FindWorkOrderParams
 	findOrder  *core.WorkOrder
 	findErr    error
+
+	updateArtifactCalls  int
+	updateArtifactParams core.UpdateWorkOrderArtifactParams
+	updateArtifactResult *core.WorkOrderArtifact
+	updateArtifactErr    error
 }
 
 func (f *fakeFactoryContext) CreateWorkOrder(_ core.WorkOrderParams) (*core.WorkOrder, error) {
@@ -51,6 +56,12 @@ func (f *fakeFactoryContext) AddWorkOrderComment(_ core.AddWorkOrderCommentParam
 
 func (f *fakeFactoryContext) AddWorkOrderArtifact(_ core.AddWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
 	return nil, nil
+}
+
+func (f *fakeFactoryContext) UpdateWorkOrderArtifact(params core.UpdateWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
+	f.updateArtifactCalls++
+	f.updateArtifactParams = params
+	return f.updateArtifactResult, f.updateArtifactErr
 }
 
 func TestUpdateWorkOrderStatus_Execute(t *testing.T) {
@@ -470,6 +481,105 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 	})
 }
 
+func TestUpdateWorkOrderArtifact_Execute(t *testing.T) {
+	component := &UpdateWorkOrderArtifact{}
+	artifact := &core.WorkOrderArtifact{ID: "art-1", WorkOrderID: "wo-1", Type: "pr", Data: map[string]any{
+		"url":   "https://github.com/example/repo/pull/1",
+		"state": "merged",
+	}}
+
+	t.Run("merges state and title into the artifact resolved by key", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{updateArtifactResult: artifact}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":     "wo-1",
+				"artifactKey": "https://github.com/example/repo/pull/1",
+				"state":       "merged",
+				"title":       "Retitled PR",
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 1, factoryCtx.updateArtifactCalls)
+		assert.Equal(t, "wo-1", factoryCtx.updateArtifactParams.OrderID)
+		assert.Equal(t, "https://github.com/example/repo/pull/1", factoryCtx.updateArtifactParams.Key)
+		assert.Equal(t, map[string]any{"state": "merged", "title": "Retitled PR"}, factoryCtx.updateArtifactParams.Data)
+		assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
+		assert.Equal(t, "workOrder.artifactUpdated", stateCtx.Type)
+		assert.Len(t, stateCtx.Payloads, 1)
+	})
+
+	t.Run("omits blank fields from the merge so they're left untouched", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{updateArtifactResult: artifact}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":     "wo-1",
+				"artifactKey": "https://github.com/example/repo/pull/1",
+				"state":       "draft",
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{"state": "draft"}, factoryCtx.updateArtifactParams.Data)
+	})
+
+	t.Run("propagates errors from the factory context", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{updateArtifactErr: errors.New("boom")}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":     "wo-1",
+				"artifactKey": "https://github.com/example/repo/pull/1",
+				"state":       "open",
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.Error(t, err)
+	})
+}
+
+func TestUpdateWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
+	c := &UpdateWorkOrderArtifact{}
+	fields := c.Configuration()
+
+	t.Run("requires orderId", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"artifactKey": "https://github.com/example/repo/pull/1",
+		})
+		if err == nil {
+			t.Fatal("expected error for missing orderId")
+		}
+	})
+
+	t.Run("requires artifactKey", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId": "{{ order().id }}",
+		})
+		if err == nil {
+			t.Fatal("expected error for missing artifactKey")
+		}
+	})
+
+	t.Run("accepts orderId, artifactKey, and state", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":     "{{ order().id }}",
+			"artifactKey": "https://github.com/example/repo/pull/1",
+			"state":       "merged",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+}
+
 func TestArtifactDataToMap_FlattensEntries(t *testing.T) {
 	entries := []ArtifactDataEntry{
 		{Name: "number", Value: "482"},
@@ -517,6 +627,18 @@ func TestBuildArtifactData_TypedFieldsWinOverFreeForm(t *testing.T) {
 	}
 }
 
+func TestBuildArtifactData_IncludesPrState(t *testing.T) {
+	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
+		ArtifactType: "pr",
+		URL:          "https://github.com/example/repo/pull/9",
+		State:        "draft",
+	})
+
+	if got := data["state"]; got != "draft" {
+		t.Fatalf("expected state=draft, got %v", got)
+	}
+}
+
 func TestBuildArtifactData_SkipsBlankTypedInputs(t *testing.T) {
 	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
 		ArtifactType: "markdown",
@@ -531,5 +653,8 @@ func TestBuildArtifactData_SkipsBlankTypedInputs(t *testing.T) {
 	}
 	if _, ok := data["url"]; ok {
 		t.Fatal("expected blank url to be skipped")
+	}
+	if _, ok := data["state"]; ok {
+		t.Fatal("expected blank state to be skipped")
 	}
 }

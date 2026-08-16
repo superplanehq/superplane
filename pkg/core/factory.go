@@ -20,6 +20,12 @@ type FactoryContext interface {
 	UpdateWorkOrderStatus(params UpdateWorkOrderStatusParams) (order *WorkOrder, changed bool, err error)
 	AddWorkOrderComment(params AddWorkOrderCommentParams) error
 	AddWorkOrderArtifact(params AddWorkOrderArtifactParams) (*WorkOrderArtifact, error)
+	// UpdateWorkOrderArtifact merges Data into an artifact already
+	// attached to the work order, resolved by the key it was given at
+	// attach time (AddWorkOrderArtifactParams.Key). This is how a
+	// PR artifact's `state` stays in sync with GitHub after the initial
+	// attach — see the updateWorkOrderArtifact component.
+	UpdateWorkOrderArtifact(params UpdateWorkOrderArtifactParams) (*WorkOrderArtifact, error)
 }
 
 type WorkOrderParams struct {
@@ -62,6 +68,21 @@ type AddWorkOrderArtifactParams struct {
 	// Key optionally tags the artifact with a queryable key so a later
 	// FindWorkOrder(by: artifactKey) can resolve the work order from it.
 	Key string
+}
+
+// UpdateWorkOrderArtifactParams targets an existing artifact by the key
+// it was attached with, rather than by id — the same key
+// FindWorkOrder(by: artifactKey) uses, typically a pull request's URL.
+// Data is shallow-merged into the artifact's existing data, not
+// replaced wholesale, so e.g. sending only `{"state": "merged"}` leaves
+// `title`/`number` untouched.
+type UpdateWorkOrderArtifactParams struct {
+	// OrderID identifies the work order to target; see
+	// UpdateWorkOrderStatusParams.OrderID.
+	OrderID string
+	// Key is required: the artifactKey the artifact was attached with.
+	Key  string
+	Data map[string]any
 }
 
 type WorkOrder struct {
