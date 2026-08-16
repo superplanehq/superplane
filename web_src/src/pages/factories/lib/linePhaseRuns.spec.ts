@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
+import type {
+  FactoriesFactoryLine,
+  FactoriesLineRef,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderExecution,
+  FactoriesWorkOrderLineDispatch,
+} from "@/api-client";
 import { buildLinePhaseBoard, resolvePhaseRunStatus } from "./linePhaseRuns";
 
 const LINE: FactoriesFactoryLine = {
@@ -8,8 +14,30 @@ const LINE: FactoriesFactoryLine = {
   steps: [{ name: "plan" }, { name: "build" }, { name: "demo" }],
 };
 
-function order(id: string, title: string, executions: FactoriesWorkOrder["executions"]): FactoriesWorkOrder {
-  return { id, title, state: "STATE_OPEN", executions };
+/** Fixture-only shape: a step execution plus which line it ran on, before
+ * it's grouped into a dispatch by `order()` below. */
+type TestExecution = FactoriesWorkOrderExecution & { line?: FactoriesLineRef };
+
+// Groups the given step executions into one dispatch per distinct line
+// (matching what the real API returns), so test cases can list executions
+// with an inline `line` ref without hand-building the nested shape.
+function order(id: string, title: string, executions: TestExecution[]): FactoriesWorkOrder {
+  const dispatchesByLineId = new Map<string, FactoriesWorkOrderLineDispatch>();
+  for (const { line, ...execution } of executions) {
+    const lineId = line?.id ?? "unknown";
+    const dispatch = dispatchesByLineId.get(lineId);
+    if (dispatch) {
+      dispatch.stepExecutions = [...(dispatch.stepExecutions ?? []), execution];
+      continue;
+    }
+    dispatchesByLineId.set(lineId, {
+      id: `dispatch-${id}-${lineId}`,
+      line,
+      createdAt: execution.createdAt,
+      stepExecutions: [execution],
+    });
+  }
+  return { id, title, state: "STATE_OPEN", lineDispatches: [...dispatchesByLineId.values()] };
 }
 
 function workOrderIds(board: ReturnType<typeof buildLinePhaseBoard>): string[] {

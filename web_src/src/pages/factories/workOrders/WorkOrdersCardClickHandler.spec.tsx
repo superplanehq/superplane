@@ -24,7 +24,14 @@ const entry = buildWorkOrderListEntry(
     state: "STATE_OPEN",
     createdAt: "2024-06-01T00:00:00Z",
     updatedAt: "2024-06-02T00:00:00Z",
-    executions: [{ id: "e1", step: "verify", state: "STATE_STARTED", line: { id: "line-a", name: "hotfix" } }],
+    lineDispatches: [
+      {
+        id: "dispatch-1",
+        line: { id: "line-a", name: "hotfix" },
+        state: "STATE_ACTIVE",
+        stepExecutions: [{ id: "e1", step: "verify", state: "STATE_STARTED" }],
+      },
+    ],
     assignees: [{ id: "user-1", name: "Ada Lovelace" }],
   } satisfies FactoriesWorkOrder,
   factory,
