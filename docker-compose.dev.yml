@@ -19,6 +19,9 @@ services:
       DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT: ${DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT:-30s}
       POSTGRES_DB_SSL: "false"
       APP_ENV: development
+      # Opt into the SetupProvider wizard (GitHub multi-step setup). Set to
+      # anything other than "yes" to use the legacy IntegrationCreateDialog.
+      NEW_INTEGRATION_SETUP_FLOW: ${NEW_INTEGRATION_SETUP_FLOW:-yes}
       APPLICATION_NAME: "superplane"
       DB_PASSWORD: "the-cake-is-a-lie"
       RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"

@@ -26,7 +26,7 @@ func Test__UpdateIntegrationCapabilities(t *testing.T) {
 	//
 	// Register dummy integration and setup provider
 	//
-	r.Registry.AppEnv = "development"
+	r.Registry.NewIntegrationSetupFlowEnabled = true
 	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
 	r.Registry.SetupProviders["dummy"] = impl.NewDummyIntegrationSetupProvider(impl.DummyIntegrationSetupProviderOptions{
 		CapabilityGroups: []core.CapabilityGroup{{Capabilities: []core.Capability{{Name: "feat"}}}},

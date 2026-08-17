@@ -37,9 +37,9 @@ export function useHomeIntegrationConnectActions({
 
   /**
    * Two GitHub setup paths (see registry.SupportsNewSetupFlow):
-   * - SetupProvider enabled (APP_ENV=development): definition.legacySetupOnly === false →
+   * - NEW_INTEGRATION_SETUP_FLOW=yes: definition.legacySetupOnly === false →
    *   multi-step wizard at /settings/integrations/:name/setup
-   * - SetupProvider disabled / non-dev: legacySetupOnly === true →
+   * - flag unset/no: legacySetupOnly === true →
    *   IntegrationCreateDialog + Sync browserAction (Continue on GitHub in the modal)
    */
   const openConnectDialog = (integrationName: string) => {

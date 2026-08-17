@@ -21,7 +21,7 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	r.Registry.AppEnv = "development"
+	r.Registry.NewIntegrationSetupFlowEnabled = true
 	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
 	r.Registry.SetupProviders["dummy"] = impl.NewDummyIntegrationSetupProvider(impl.DummyIntegrationSetupProviderOptions{
 		CapabilityGroups: []core.CapabilityGroup{{Capabilities: []core.Capability{{Name: "feat"}}}},
@@ -97,7 +97,7 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 		ctx4 := authentication.SetUserIdInMetadata(context.Background(), r4.User.String())
 		onStepSubmitCalled := false
 
-		r4.Registry.AppEnv = "development"
+		r4.Registry.NewIntegrationSetupFlowEnabled = true
 		r4.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
 		r4.Registry.SetupProviders["dummy"] = impl.NewDummyIntegrationSetupProvider(impl.DummyIntegrationSetupProviderOptions{
 			CapabilityGroups: []core.CapabilityGroup{{Capabilities: []core.Capability{{Name: "feat"}}}},
@@ -142,7 +142,7 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 		r3 := support.Setup(t)
 		ctx3 := authentication.SetUserIdInMetadata(context.Background(), r3.User.String())
 
-		r3.Registry.AppEnv = "development"
+		r3.Registry.NewIntegrationSetupFlowEnabled = true
 		r3.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
 		r3.Registry.SetupProviders["dummy"] = impl.NewDummyIntegrationSetupProvider(impl.DummyIntegrationSetupProviderOptions{
 			FirstStep: func(ctx core.SetupStepContext) core.SetupStep {

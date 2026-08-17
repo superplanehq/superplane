@@ -2,6 +2,7 @@ package registry
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -81,7 +82,10 @@ type IntegrationRegistration struct {
 type Registry struct {
 	httpCtx   *HTTPContext
 	Encryptor crypto.Encryptor
-	AppEnv    string
+	// NewIntegrationSetupFlowEnabled gates SetupProvider-based integration create/setup
+	// (for example the GitHub multi-step wizard). When false, callers use the
+	// legacy IntegrationCreateDialog path.
+	NewIntegrationSetupFlowEnabled bool
 
 	Integrations    map[string]core.Integration
 	WebhookHandlers map[string]core.WebhookHandler
@@ -93,9 +97,9 @@ type Registry struct {
 }
 
 type RegistryOptions struct {
-	Encryptor crypto.Encryptor
-	HTTP      HTTPOptions
-	AppEnv    string
+	Encryptor                      crypto.Encryptor
+	HTTP                           HTTPOptions
+	NewIntegrationSetupFlowEnabled bool
 }
 
 func NewRegistryWithOptions(options RegistryOptions) (*Registry, error) {
@@ -105,15 +109,15 @@ func NewRegistryWithOptions(options RegistryOptions) (*Registry, error) {
 	}
 
 	r := &Registry{
-		Encryptor:       options.Encryptor,
-		AppEnv:          options.AppEnv,
-		httpCtx:         httpCtx,
-		Actions:         map[string]core.Action{},
-		Triggers:        map[string]core.Trigger{},
-		Integrations:    map[string]core.Integration{},
-		WebhookHandlers: map[string]core.WebhookHandler{},
-		SetupProviders:  map[string]core.IntegrationSetupProvider{},
-		Widgets:         map[string]core.Widget{},
+		Encryptor:                      options.Encryptor,
+		NewIntegrationSetupFlowEnabled: options.NewIntegrationSetupFlowEnabled,
+		httpCtx:                        httpCtx,
+		Actions:                        map[string]core.Action{},
+		Triggers:                       map[string]core.Trigger{},
+		Integrations:                   map[string]core.Integration{},
+		WebhookHandlers:                map[string]core.WebhookHandler{},
+		SetupProviders:                 map[string]core.IntegrationSetupProvider{},
+		Widgets:                        map[string]core.Widget{},
 	}
 
 	r.Init()
@@ -128,14 +132,15 @@ func NewRegistry(encryptor crypto.Encryptor, httpOptions HTTPOptions) (*Registry
 	}
 
 	r := &Registry{
-		Encryptor:       encryptor,
-		httpCtx:         httpCtx,
-		Actions:         map[string]core.Action{},
-		Triggers:        map[string]core.Trigger{},
-		Integrations:    map[string]core.Integration{},
-		WebhookHandlers: map[string]core.WebhookHandler{},
-		SetupProviders:  map[string]core.IntegrationSetupProvider{},
-		Widgets:         map[string]core.Widget{},
+		Encryptor:                      encryptor,
+		NewIntegrationSetupFlowEnabled: NewIntegrationSetupFlowEnabledFromEnv(),
+		httpCtx:                        httpCtx,
+		Actions:                        map[string]core.Action{},
+		Triggers:                       map[string]core.Trigger{},
+		Integrations:                   map[string]core.Integration{},
+		WebhookHandlers:                map[string]core.WebhookHandler{},
+		SetupProviders:                 map[string]core.IntegrationSetupProvider{},
+		Widgets:                        map[string]core.Widget{},
 	}
 
 	r.Init()
@@ -316,15 +321,17 @@ func (r *Registry) GetIntegration(name string) (core.Integration, error) {
 	return integration, nil
 }
 
+// NewIntegrationSetupFlowEnabledFromEnv reports whether NEW_INTEGRATION_SETUP_FLOW=yes.
+// Unset or any other value keeps the legacy create dialog.
+func NewIntegrationSetupFlowEnabledFromEnv() bool {
+	return os.Getenv("NEW_INTEGRATION_SETUP_FLOW") == "yes"
+}
+
 func (r *Registry) SupportsNewSetupFlow(integrationName string) bool {
-	//
-	// For now, the new setup flow should only be available in development.
-	// We do not want to allow users to use it in production yet.
-	// We will remove this once we are more confident the new setup flow
-	// won't have any major changes.
-	//
+	// Opt-in via NEW_INTEGRATION_SETUP_FLOW. Keep the legacy dialog as the
+	// default until the SetupProvider wizard is ready for all environments.
 	setupProvider, _ := r.GetSetupProvider(integrationName)
-	return setupProvider != nil && r.AppEnv == "development"
+	return setupProvider != nil && r.NewIntegrationSetupFlowEnabled
 }
 
 func (r *Registry) GetSetupProvider(name string) (core.IntegrationSetupProvider, error) {

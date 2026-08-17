@@ -594,7 +594,6 @@ func Start() {
 		panic("OIDC_KEYS_PATH must be set")
 	}
 
-	appEnv := os.Getenv("APP_ENV")
 	jwtSigner := jwt.NewSigner(jwtSecret)
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
 	oidcProvider, err := oidc.NewProviderFromKeyDir(webhooksBaseURL, oidcKeysPath)
@@ -609,8 +608,8 @@ func Start() {
 	}
 
 	registry, err := registry.NewRegistryWithOptions(registry.RegistryOptions{
-		Encryptor: encryptorInstance,
-		AppEnv:    appEnv,
+		Encryptor:                      encryptorInstance,
+		NewIntegrationSetupFlowEnabled: registry.NewIntegrationSetupFlowEnabledFromEnv(),
 		HTTP: registry.HTTPOptions{
 			MaxResponseBytes: DefaultMaxHTTPResponseBytes,
 			PolicyResolver: func() (registry.HTTPPolicy, error) {

@@ -260,7 +260,7 @@ const STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS = [
         togglable: false,
       },
     ],
-    // Dev compose sets APP_ENV=development → GitHub SetupProvider path is on.
+    // Dev compose sets NEW_INTEGRATION_SETUP_FLOW=yes → GitHub SetupProvider path is on.
     { legacySetupOnly: false },
   ),
   storybookIntegrationDefinition("claude", "Claude", "Use Claude models in workflows", [
@@ -312,7 +312,7 @@ function storybookIntegrationDefinition(
     configuration,
     instructions: "",
     // Mirrors API LegacySetupOnly (!registry.SupportsNewSetupFlow).
-    // SupportsNewSetupFlow = SetupProvider registered AND APP_ENV == "development".
+    // SupportsNewSetupFlow = SetupProvider registered AND NEW_INTEGRATION_SETUP_FLOW=yes.
     legacySetupOnly: options?.legacySetupOnly ?? true,
   };
 }

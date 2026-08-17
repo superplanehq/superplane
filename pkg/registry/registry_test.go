@@ -466,28 +466,45 @@ func TestRegistry_ComponentType(t *testing.T) {
 
 func TestRegistry_SupportsNewSetupFlow(t *testing.T) {
 	stub := impl.NewDummyIntegrationSetupProvider(impl.DummyIntegrationSetupProviderOptions{})
-	t.Run("true when provider exists and app env is development", func(t *testing.T) {
+	t.Run("true when provider exists and flag is enabled", func(t *testing.T) {
 		r := &registry.Registry{
-			AppEnv:         "development",
-			SetupProviders: map[string]core.IntegrationSetupProvider{"acme": stub},
+			NewIntegrationSetupFlowEnabled: true,
+			SetupProviders:                 map[string]core.IntegrationSetupProvider{"acme": stub},
 		}
 		assert.True(t, r.SupportsNewSetupFlow("acme"))
 	})
 
-	t.Run("false when app env is not development", func(t *testing.T) {
+	t.Run("false when flag is disabled", func(t *testing.T) {
 		r := &registry.Registry{
-			AppEnv:         "production",
-			SetupProviders: map[string]core.IntegrationSetupProvider{"acme": stub},
+			NewIntegrationSetupFlowEnabled: false,
+			SetupProviders:                 map[string]core.IntegrationSetupProvider{"acme": stub},
 		}
 		assert.False(t, r.SupportsNewSetupFlow("acme"))
 	})
 
 	t.Run("false when setup provider is missing", func(t *testing.T) {
 		r := &registry.Registry{
-			AppEnv:         "development",
-			SetupProviders: map[string]core.IntegrationSetupProvider{},
+			NewIntegrationSetupFlowEnabled: true,
+			SetupProviders:                 map[string]core.IntegrationSetupProvider{},
 		}
 		assert.False(t, r.SupportsNewSetupFlow("missing"))
+	})
+}
+
+func TestNewIntegrationSetupFlowEnabledFromEnv(t *testing.T) {
+	t.Run("true when NEW_INTEGRATION_SETUP_FLOW is yes", func(t *testing.T) {
+		t.Setenv("NEW_INTEGRATION_SETUP_FLOW", "yes")
+		assert.True(t, registry.NewIntegrationSetupFlowEnabledFromEnv())
+	})
+
+	t.Run("false when unset", func(t *testing.T) {
+		t.Setenv("NEW_INTEGRATION_SETUP_FLOW", "")
+		assert.False(t, registry.NewIntegrationSetupFlowEnabledFromEnv())
+	})
+
+	t.Run("false when set to no", func(t *testing.T) {
+		t.Setenv("NEW_INTEGRATION_SETUP_FLOW", "no")
+		assert.False(t, registry.NewIntegrationSetupFlowEnabledFromEnv())
 	})
 }
 
