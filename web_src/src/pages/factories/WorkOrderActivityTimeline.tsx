@@ -8,7 +8,9 @@ import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { useMemo, type ReactNode } from "react";
 import { FileText, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
+import type { WorkOrderArtifactLike } from "./lib/workOrderArtifact";
 import { buildLatestArtifactDataById, overlayLiveArtifactData } from "./lib/workOrderArtifact";
+import { toWorkOrderArtifactLikes } from "./lib/workOrderArtifactRelated";
 import {
   buildWorkOrderTimelineView,
   buildWorkOrderUserDisplayLookup,
@@ -73,6 +75,10 @@ export function WorkOrderActivityTimeline({
   const resolveUserName = useMemo(() => buildWorkOrderUserNameLookup(users, order), [users, order]);
   const resolveUserDisplay = useMemo(() => buildWorkOrderUserDisplayLookup(users, order), [users, order]);
   const latestArtifactDataById = useMemo(() => buildLatestArtifactDataById(artifacts), [artifacts]);
+  // Work-order-wide sibling list. A branch chip in a dispatch step can
+  // look up the PR attached in a *different* step to build its tree URL,
+  // so pass the whole list through instead of only that step's artifacts.
+  const relatedArtifacts = useMemo(() => toWorkOrderArtifactLikes(artifacts), [artifacts]);
   const pendingView = renderTimelinePendingView({ events, eventsError, isLoading, onRetryEvents });
   const timeline = pendingView
     ? { events: [] as WorkOrderTimelineEvent[] }
@@ -99,6 +105,7 @@ export function WorkOrderActivityTimeline({
           events={timeline.events}
           resolveUserDisplay={resolveUserDisplay}
           latestArtifactDataById={latestArtifactDataById}
+          relatedArtifacts={relatedArtifacts}
           hasMoreEvents={hasMoreEvents}
           isLoadingMoreEvents={isLoadingMoreEvents}
           onLoadMoreEvents={onLoadMoreEvents}
@@ -121,6 +128,7 @@ interface TimelineEventsListProps {
   events: WorkOrderTimelineEvent[];
   resolveUserDisplay: OrgUserDisplayLookup;
   latestArtifactDataById: Map<string, Record<string, unknown>>;
+  relatedArtifacts: readonly WorkOrderArtifactLike[];
   hasMoreEvents: boolean;
   isLoadingMoreEvents: boolean;
   onLoadMoreEvents?: () => void;
@@ -133,6 +141,7 @@ function TimelineEventsList({
   events,
   resolveUserDisplay,
   latestArtifactDataById,
+  relatedArtifacts,
   hasMoreEvents,
   isLoadingMoreEvents,
   onLoadMoreEvents,
@@ -166,6 +175,7 @@ function TimelineEventsList({
               orderNumber={orderNumber}
               resolveUserDisplay={resolveUserDisplay}
               latestArtifactDataById={latestArtifactDataById}
+              relatedArtifacts={relatedArtifacts}
               isLatestDispatch={index === latestDispatchIndex}
             />
           ))}
@@ -240,6 +250,7 @@ function TimelineItem({
   orderNumber,
   resolveUserDisplay,
   latestArtifactDataById,
+  relatedArtifacts,
   isLatestDispatch,
 }: {
   event: WorkOrderTimelineEvent;
@@ -248,6 +259,7 @@ function TimelineItem({
   orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   latestArtifactDataById: Map<string, Record<string, unknown>>;
+  relatedArtifacts: readonly WorkOrderArtifactLike[];
   isLatestDispatch: boolean;
 }) {
   if (event.kind === "dispatched") {
@@ -258,6 +270,7 @@ function TimelineItem({
         factoryKey={factoryKey}
         orderNumber={orderNumber}
         isLatestDispatch={isLatestDispatch}
+        relatedArtifacts={relatedArtifacts}
       />
     );
   }
@@ -280,6 +293,7 @@ function TimelineItem({
             orderNumber={orderNumber}
             resolveUserDisplay={resolveUserDisplay}
             latestArtifactDataById={latestArtifactDataById}
+            relatedArtifacts={relatedArtifacts}
           />
         </div>
       </div>
@@ -294,6 +308,7 @@ function TimelineItemBody({
   orderNumber,
   resolveUserDisplay,
   latestArtifactDataById,
+  relatedArtifacts,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
@@ -301,6 +316,7 @@ function TimelineItemBody({
   orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   latestArtifactDataById: Map<string, Record<string, unknown>>;
+  relatedArtifacts: readonly WorkOrderArtifactLike[];
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
   const timeLabel = formatTimelineDate(new Date(event.at));
@@ -325,6 +341,7 @@ function TimelineItemBody({
         actorDisplay={actorDisplay}
         timeLabel={timeLabel}
         latestArtifactDataById={latestArtifactDataById}
+        relatedArtifacts={relatedArtifacts}
       />
     );
   }
@@ -400,11 +417,13 @@ function ArtifactEventBody({
   actorDisplay,
   timeLabel,
   latestArtifactDataById,
+  relatedArtifacts,
 }: {
   event: WorkOrderTimelineEvent;
   actorDisplay: OrgUserDisplay | null;
   timeLabel: string;
   latestArtifactDataById: Map<string, Record<string, unknown>>;
+  relatedArtifacts: readonly WorkOrderArtifactLike[];
 }) {
   const artifact = event.artifact;
   if (!artifact) return null;
@@ -420,7 +439,12 @@ function ArtifactEventBody({
       ) : (
         <span className={inlineActorClassName}>Someone</span>
       )}{" "}
-      attached <WorkOrderArtifactInline artifact={displayArtifact} className="align-baseline" />
+      attached{" "}
+      <WorkOrderArtifactInline
+        artifact={displayArtifact}
+        relatedArtifacts={relatedArtifacts}
+        className="align-baseline"
+      />
       <span className={inlineTimeClassName}>
         {" · "}
         {timeLabel}

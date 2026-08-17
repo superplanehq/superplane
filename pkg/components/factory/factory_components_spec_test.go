@@ -544,6 +544,46 @@ func TestUpdateWorkOrderArtifact_Execute(t *testing.T) {
 		})
 		require.Error(t, err)
 	})
+
+	// A `github.onPullRequest` merged event carries `{ state: "closed",
+	// merged: true }`; the update must resolve to SuperPlane's `merged`
+	// so the chip flips to purple without an if-node in the flow.
+	t.Run("resolves merged=true (with state=closed) to SuperPlane state=merged", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{updateArtifactResult: artifact}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":     "wo-1",
+				"artifactKey": "https://github.com/example/repo/pull/1",
+				"state":       "closed",
+				"merged":      true,
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{"state": "merged"}, factoryCtx.updateArtifactParams.Data)
+	})
+
+	// Flow templates resolve values to strings, so `merged: "true"` must
+	// work the same as a native bool.
+	t.Run("accepts a stringified merged flag from a templated input", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{updateArtifactResult: artifact}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":     "wo-1",
+				"artifactKey": "https://github.com/example/repo/pull/1",
+				"merged":      "true",
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{"state": "merged"}, factoryCtx.updateArtifactParams.Data)
+	})
 }
 
 func TestUpdateWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
@@ -636,6 +676,99 @@ func TestBuildArtifactData_IncludesPrState(t *testing.T) {
 
 	if got := data["state"]; got != "draft" {
 		t.Fatalf("expected state=draft, got %v", got)
+	}
+}
+
+// A `github.onPullRequest` merged event carries `{ state: "closed",
+// merged: true }`; the artifact must persist as merged so the chip
+// renders purple, not red.
+func TestBuildArtifactData_MergedFlagWinsOverStateClosed(t *testing.T) {
+	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
+		ArtifactType: "pr",
+		URL:          "https://github.com/example/repo/pull/9",
+		State:        "closed",
+		Merged:       true,
+	})
+
+	if got := data["state"]; got != "merged" {
+		t.Fatalf("expected state=merged, got %v", got)
+	}
+}
+
+// Flow templates resolve values to strings; the `Merged` field must
+// accept "true" so a caller doesn't need a boolean cast in the expression.
+func TestBuildArtifactData_MergedFlagAcceptsStringTrue(t *testing.T) {
+	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
+		ArtifactType: "pr",
+		URL:          "https://github.com/example/repo/pull/9",
+		Merged:       "true",
+	})
+
+	if got := data["state"]; got != "merged" {
+		t.Fatalf("expected state=merged when merged=\"true\", got %v", got)
+	}
+}
+
+// GitHub draft PRs stay `state: "open"`; without picking up the `draft`
+// flag the chip would render green.
+func TestBuildArtifactData_DraftFlagRendersAsDraftWhenNotMerged(t *testing.T) {
+	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
+		ArtifactType: "pr",
+		URL:          "https://github.com/example/repo/pull/9",
+		State:        "open",
+		Draft:        true,
+	})
+
+	if got := data["state"]; got != "draft" {
+		t.Fatalf("expected state=draft, got %v", got)
+	}
+}
+
+// A merged PR that once was a draft must not flip back to draft on the
+// next redisplay.
+func TestBuildArtifactData_MergedBeatsDraft(t *testing.T) {
+	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
+		ArtifactType: "pr",
+		URL:          "https://github.com/example/repo/pull/9",
+		Merged:       true,
+		Draft:        true,
+	})
+
+	if got := data["state"]; got != "merged" {
+		t.Fatalf("expected merged to beat draft, got %v", got)
+	}
+}
+
+// resolvePrArtifactState is the small state-machine both the add and the
+// update components rely on; test it directly so intent is unambiguous
+// and doesn't drift from the frontend's `extractPrArtifactState`.
+func TestResolvePrArtifactState_Precedence(t *testing.T) {
+	cases := []struct {
+		name   string
+		state  any
+		merged any
+		draft  any
+		want   string
+	}{
+		{"empty inputs stay empty", nil, nil, nil, ""},
+		{"explicit open passes through", "open", nil, nil, "open"},
+		{"case-insensitive", "MERGED", nil, nil, "merged"},
+		{"trimmed whitespace", "  draft  ", nil, nil, "draft"},
+		{"merged bool wins over closed state", "closed", true, nil, "merged"},
+		{"merged bool wins over open state", "open", true, nil, "merged"},
+		{"merged string wins", nil, "true", nil, "merged"},
+		{"draft bool sets draft when not merged", "open", nil, true, "draft"},
+		{"draft bool ignored when merged", nil, true, true, "merged"},
+		{"non-string state is treated as absent", 42, nil, nil, ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := resolvePrArtifactState(tc.state, tc.merged, tc.draft)
+			if got != tc.want {
+				t.Fatalf("resolvePrArtifactState(%v,%v,%v) = %q, want %q", tc.state, tc.merged, tc.draft, got, tc.want)
+			}
+		})
 	}
 }
 

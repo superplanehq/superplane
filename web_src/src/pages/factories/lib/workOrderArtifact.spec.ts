@@ -8,7 +8,9 @@ import {
   extractArtifactUrl,
   extractPrArtifactState,
   formatPrArtifactLabel,
+  normalizeArtifactKind,
   overlayLiveArtifactData,
+  resolveBranchArtifactUrl,
 } from "./workOrderArtifact";
 
 describe("formatPrArtifactLabel", () => {
@@ -56,6 +58,21 @@ describe("extractArtifactMarkdownBody", () => {
 describe("extractArtifactUrl", () => {
   it("returns data.url when present", () => {
     expect(extractArtifactUrl({ url: "https://example.com/pr/1" })).toBe("https://example.com/pr/1");
+  });
+
+  it("falls back to data.html_url when data.url is missing (GitHub payload shape)", () => {
+    expect(extractArtifactUrl({ html_url: "https://github.com/example/repo/pull/1" })).toBe(
+      "https://github.com/example/repo/pull/1",
+    );
+  });
+
+  it("prefers data.url when both fields are set", () => {
+    expect(
+      extractArtifactUrl({
+        url: "https://superplane.example/pr/1",
+        html_url: "https://github.com/example/repo/pull/1",
+      }),
+    ).toBe("https://superplane.example/pr/1");
   });
 
   it("returns undefined for missing / blank / non-string urls", () => {
@@ -111,6 +128,129 @@ describe("extractPrArtifactState", () => {
     expect(extractPrArtifactState({})).toBeUndefined();
     expect(extractPrArtifactState({ state: "" })).toBeUndefined();
     expect(extractPrArtifactState({ state: "in_review" })).toBeUndefined();
+  });
+
+  it("treats a GitHub-style `merged: true` as merged, even when state is closed", () => {
+    // GitHub's own payload for a merged PR: `{ state: "closed", merged: true }`.
+    // Rendering that as closed (red) would misrepresent every merged PR the
+    // flow attached via the raw github.onPullRequest payload.
+    expect(extractPrArtifactState({ state: "closed", merged: true })).toBe("merged");
+  });
+
+  it("treats a GitHub-style `merged: true` as merged, even when state is still open", () => {
+    // Some flows attach a PR eagerly with state:"open" and only later flip
+    // merged:true — before this fix the chip stayed green forever.
+    expect(extractPrArtifactState({ state: "open", merged: true })).toBe("merged");
+  });
+
+  it('accepts a stringified merged flag ("true"/"false") so templated inputs work', () => {
+    expect(extractPrArtifactState({ state: "closed", merged: "true" })).toBe("merged");
+    expect(extractPrArtifactState({ state: "closed", merged: "TRUE" })).toBe("merged");
+    expect(extractPrArtifactState({ state: "closed", merged: "false" })).toBe("closed");
+  });
+
+  it("treats a GitHub-style `draft: true` as draft when the PR is not merged", () => {
+    // GitHub draft PRs are `{ state: "open", draft: true }`. Without this,
+    // the chip renders as open (green) instead of the muted draft look.
+    expect(extractPrArtifactState({ state: "open", draft: true })).toBe("draft");
+    expect(extractPrArtifactState({ draft: "true" })).toBe("draft");
+  });
+
+  it("keeps a merged PR merged even when draft:true is also set", () => {
+    // Defensive: merged is the strongest signal; a merged PR that once was
+    // a draft should not flip back to draft on redisplay.
+    expect(extractPrArtifactState({ merged: true, draft: true })).toBe("merged");
+  });
+
+  it("keeps an explicit non-open state over a GitHub `draft: true` flag", () => {
+    expect(extractPrArtifactState({ state: "closed", draft: true })).toBe("closed");
+  });
+});
+
+describe("resolveBranchArtifactUrl", () => {
+  it("returns the branch's own url when it has one", () => {
+    expect(
+      resolveBranchArtifactUrl(
+        { name: "feature/refund-retry", url: "https://github.com/example/repo/tree/feature/refund-retry" },
+        [],
+      ),
+    ).toBe("https://github.com/example/repo/tree/feature/refund-retry");
+  });
+
+  it("falls back to data.html_url on the branch itself", () => {
+    expect(
+      resolveBranchArtifactUrl({
+        name: "feature/refund-retry",
+        html_url: "https://github.com/example/repo/tree/feature/refund-retry",
+      }),
+    ).toBe("https://github.com/example/repo/tree/feature/refund-retry");
+  });
+
+  it("derives a GitHub tree URL from a sibling PR's URL", () => {
+    // Common ordering: the flow creates the branch (attached with just a
+    // name), then opens the PR later. This is what makes the branch chip
+    // clickable without every flow author remembering to set `url`.
+    expect(
+      resolveBranchArtifactUrl({ name: "feature/refund-retry" }, [
+        { type: "TYPE_PR", data: { url: "https://github.com/example/repo/pull/42" } },
+      ]),
+    ).toBe("https://github.com/example/repo/tree/feature/refund-retry");
+  });
+
+  it("accepts a sibling PR that only has html_url (GitHub payload shape)", () => {
+    expect(
+      resolveBranchArtifactUrl({ name: "hotfix/urgent" }, [
+        { type: "pr", data: { html_url: "https://github.com/example/repo/pull/7" } },
+      ]),
+    ).toBe("https://github.com/example/repo/tree/hotfix/urgent");
+  });
+
+  it("percent-encodes each path segment of the branch name but keeps slashes", () => {
+    // Branch names can contain characters the URL parser would otherwise
+    // eat (e.g. `feat/#42-fix`); each segment must be encoded, but the
+    // segment separator must remain a real `/`.
+    expect(
+      resolveBranchArtifactUrl({ name: "feat/#42-fix" }, [
+        { type: "TYPE_PR", data: { url: "https://github.com/example/repo/pull/42" } },
+      ]),
+    ).toBe("https://github.com/example/repo/tree/feat/%2342-fix");
+  });
+
+  it("does not derive a URL for non-GitHub-style sibling URLs", () => {
+    // GitLab / Bitbucket use different path prefixes (e.g. `/-/merge_requests`).
+    // Building a `tree/` URL for those would ship a broken link.
+    expect(
+      resolveBranchArtifactUrl({ name: "feature/refund-retry" }, [
+        { type: "TYPE_PR", data: { url: "https://gitlab.example.com/example/repo/-/merge_requests/1" } },
+      ]),
+    ).toBeUndefined();
+  });
+
+  it("ignores sibling artifacts that are not PRs", () => {
+    expect(
+      resolveBranchArtifactUrl({ name: "feature/refund-retry" }, [
+        { type: "TYPE_MARKDOWN", data: { url: "https://github.com/example/repo/pull/42" } },
+      ]),
+    ).toBeUndefined();
+  });
+
+  it("returns undefined when the branch has neither a url nor a name", () => {
+    expect(resolveBranchArtifactUrl({})).toBeUndefined();
+    expect(resolveBranchArtifactUrl(undefined)).toBeUndefined();
+  });
+
+  it("returns undefined when there is no sibling PR at all", () => {
+    expect(resolveBranchArtifactUrl({ name: "feature/refund-retry" }, [])).toBeUndefined();
+    expect(resolveBranchArtifactUrl({ name: "feature/refund-retry" }, undefined)).toBeUndefined();
+  });
+});
+
+describe("normalizeArtifactKind", () => {
+  it("strips the TYPE_ proto prefix and lower-cases the value", () => {
+    expect(normalizeArtifactKind("TYPE_PR")).toBe("pr");
+    expect(normalizeArtifactKind("TYPE_BRANCH")).toBe("branch");
+    expect(normalizeArtifactKind("branch")).toBe("branch");
+    expect(normalizeArtifactKind("")).toBe("");
   });
 });
 

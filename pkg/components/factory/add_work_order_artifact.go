@@ -2,6 +2,7 @@ package factory
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -29,12 +30,17 @@ type AddWorkOrderArtifactConfiguration struct {
 	ArtifactType string              `json:"artifactType" mapstructure:"artifactType"`
 	URL          string              `json:"url" mapstructure:"url"`
 	Number       string              `json:"number" mapstructure:"number"`
-	State        string              `json:"state" mapstructure:"state"`
-	Title        string              `json:"title" mapstructure:"title"`
-	Body         string              `json:"body" mapstructure:"body"`
-	Name         string              `json:"name" mapstructure:"name"`
-	ArtifactKey  string              `json:"artifactKey" mapstructure:"artifactKey"`
-	Data         []ArtifactDataEntry `json:"data" mapstructure:"data"`
+	// State / Merged / Draft accept expressions, so a flow can wire
+	// them directly to a `github.onPullRequest` payload. `any` because
+	// after resolution the value may be a bool, string, or number.
+	State       any                 `json:"state,omitempty" mapstructure:"state,omitempty"`
+	Merged      any                 `json:"merged,omitempty" mapstructure:"merged,omitempty"`
+	Draft       any                 `json:"draft,omitempty" mapstructure:"draft,omitempty"`
+	Title       string              `json:"title" mapstructure:"title"`
+	Body        string              `json:"body" mapstructure:"body"`
+	Name        string              `json:"name" mapstructure:"name"`
+	ArtifactKey string              `json:"artifactKey" mapstructure:"artifactKey"`
+	Data        []ArtifactDataEntry `json:"data" mapstructure:"data"`
 }
 
 func (c *AddWorkOrderArtifact) Name() string {
@@ -54,9 +60,9 @@ func (c *AddWorkOrderArtifact) Documentation() string {
 
 Supported types:
 
-- **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + `, ` + "`title`" + `, and ` + "`state`" + ` (` + "`open`" + `/` + "`draft`" + `/` + "`closed`" + `/` + "`merged`" + `, defaults to ` + "`open`" + `) which drives the icon/color of the artifact chip in the work order UI.
+- **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + `, ` + "`title`" + `, ` + "`state`" + `, ` + "`merged`" + `, and ` + "`draft`" + `. The ` + "`state`" + ` field (` + "`open`" + `/` + "`draft`" + `/` + "`closed`" + `/` + "`merged`" + `, defaults to ` + "`open`" + `) drives the icon/color of the artifact chip in the work order UI. ` + "`state`" + `, ` + "`merged`" + `, and ` + "`draft`" + ` all accept expressions, so a flow can wire them straight to a ` + "`github.onPullRequest`" + ` payload: a GitHub-shaped ` + "`state: \"closed\"`" + ` + ` + "`merged: true`" + ` folds into SuperPlane's ` + "`state: \"merged\"`" + ` before it hits the artifact.
 - **Markdown note** (` + "`markdown`" + `): requires ` + "`body`" + `; optional ` + "`title`" + `.
-- **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` (the branch name); optional ` + "`url`" + ` to link to the branch on its provider (e.g. a GitHub tree URL).
+- **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` (the branch name); optional ` + "`url`" + ` to link to the branch on its provider. When you leave ` + "`url`" + ` blank, the work order UI derives a repository tree URL from a sibling pull request artifact on the same order, so the branch chip stays clickable even if you attach the branch before opening the PR.
 
 PR and markdown types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key.
 
@@ -155,21 +161,32 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		{
 			Name:                 "state",
 			Label:                "State",
-			Description:          "Pull request state — drives the artifact chip's icon/color. Update it later with updateWorkOrderArtifact as the PR progresses.",
-			Type:                 configuration.FieldTypeSelect,
+			Description:          "Pull request state — drives the artifact chip's icon/color. One of `open`, `draft`, `closed`, `merged`. Accepts an expression, so a flow can pass it in from a webhook (e.g. `{{ root().data.pull_request.state }}`). Leave blank to keep the default `open` look. Update it later with `updateWorkOrderArtifact` as the PR progresses.",
+			Placeholder:          "open",
+			Type:                 configuration.FieldTypeString,
 			Required:             false,
 			Default:              "open",
 			VisibilityConditions: prOnly,
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Open", Value: "open"},
-						{Label: "Draft", Value: "draft"},
-						{Label: "Closed", Value: "closed"},
-						{Label: "Merged", Value: "merged"},
-					},
-				},
-			},
+		},
+		{
+			Name:                 "merged",
+			Label:                "Merged",
+			Description:          "GitHub-native `pull_request.merged` flag. When it resolves to a truthy value, the chip renders as merged even if `state` is blank or still says `open`. Accepts an expression (e.g. `{{ root().data.pull_request.merged }}`).",
+			Placeholder:          "{{ root().data.pull_request.merged }}",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			Togglable:            true,
+			VisibilityConditions: prOnly,
+		},
+		{
+			Name:                 "draft",
+			Label:                "Draft",
+			Description:          "GitHub-native `pull_request.draft` flag. When it resolves to a truthy value and the PR is not merged, the chip renders as draft. Accepts an expression (e.g. `{{ root().data.pull_request.draft }}`).",
+			Placeholder:          "{{ root().data.pull_request.draft }}",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			Togglable:            true,
+			VisibilityConditions: prOnly,
 		},
 		{
 			Name:                 "body",
@@ -293,7 +310,6 @@ func buildArtifactData(config AddWorkOrderArtifactConfiguration) map[string]any 
 	typed := map[string]string{
 		"url":    config.URL,
 		"number": config.Number,
-		"state":  config.State,
 		"title":  config.Title,
 		"body":   config.Body,
 		"name":   config.Name,
@@ -309,7 +325,72 @@ func buildArtifactData(config AddWorkOrderArtifactConfiguration) map[string]any 
 		data[key] = value
 	}
 
+	if state := resolvePrArtifactState(config.State, config.Merged, config.Draft); state != "" {
+		if data == nil {
+			data = map[string]any{}
+		}
+		data["state"] = state
+	}
+
 	return data
+}
+
+// resolvePrArtifactState folds the caller-supplied SuperPlane `state`
+// together with GitHub-native `merged` / `draft` flags into the single
+// value the UI reads. Mirrors the frontend's `extractPrArtifactState`
+// precedence so a chip renders the same before and after a page reload:
+//
+//   1. `merged` truthy → "merged" (GitHub reports merged PRs as
+//      `{ state: "closed", merged: true }`, so this must win over
+//      `state: closed` and any leftover `state: open`).
+//   2. Explicit non-"open" SuperPlane `state` (draft/closed/merged).
+//   3. `draft` truthy → "draft" (GitHub draft PRs stay `state: "open"`).
+//   4. Explicit "open" `state`, otherwise empty (defer to defaults).
+//
+// The model still validates the resolved value against the known
+// state vocabulary, so an unknown `state` value fails the write.
+func resolvePrArtifactState(state, merged, draft any) string {
+	if isTruthyConfigValue(merged) {
+		return "merged"
+	}
+
+	explicit := normalizePrArtifactStateValue(state)
+	if explicit != "" && explicit != "open" {
+		return explicit
+	}
+
+	if isTruthyConfigValue(draft) {
+		return "draft"
+	}
+
+	return explicit
+}
+
+// normalizePrArtifactStateValue trims and lower-cases a caller-supplied
+// state value. Non-string types (e.g. a resolved bool) are treated as
+// absent so a stray `state: {{ pr.merged }}` doesn't overwrite a real
+// value with "true".
+func normalizePrArtifactStateValue(value any) string {
+	raw, ok := value.(string)
+	if !ok {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(raw))
+}
+
+// isTruthyConfigValue accepts both real booleans (from CEL / native
+// resolution) and their string representations ("true"/"false") because
+// templated flow inputs almost always arrive as strings.
+func isTruthyConfigValue(value any) bool {
+	switch v := value.(type) {
+	case nil:
+		return false
+	case bool:
+		return v
+	case string:
+		return strings.EqualFold(strings.TrimSpace(v), "true")
+	}
+	return false
 }
 
 // artifactDataToMap flattens the list into a map; blank names are
