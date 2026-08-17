@@ -422,6 +422,53 @@ func (o *FactoryWorkOrder) ReplaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID
 	return tx.Create(&assignees).Error
 }
 
+// AddReaction records that userID reacted to the work order with content.
+// Idempotent: reacting twice with the same (user, content) pair is a no-op
+// and reports added=false so callers can skip the websocket notification.
+func (o *FactoryWorkOrder) AddReaction(tx *gorm.DB, userID uuid.UUID, content string) (bool, error) {
+	result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&FactoryWorkOrderReaction{
+		WorkOrderID: o.ID,
+		UserID:      userID,
+		Content:     content,
+		CreatedAt:   time.Now(),
+	})
+	if result.Error != nil {
+		return false, result.Error
+	}
+
+	return result.RowsAffected > 0, nil
+}
+
+// RemoveReaction deletes userID's content reaction from the work order, if
+// present. Reports removed=false when there was nothing to remove.
+func (o *FactoryWorkOrder) RemoveReaction(tx *gorm.DB, userID uuid.UUID, content string) (bool, error) {
+	result := tx.
+		Where("work_order_id = ? AND user_id = ? AND content = ?", o.ID, userID, content).
+		Delete(&FactoryWorkOrderReaction{})
+	if result.Error != nil {
+		return false, result.Error
+	}
+
+	return result.RowsAffected > 0, nil
+}
+
+// ListReactions returns every reaction row on the work order. Reaction
+// counts per order are expected to be small, so callers aggregate/derive
+// "reacted by me" in Go rather than issuing a second GROUP BY query.
+func (o *FactoryWorkOrder) ListReactions(tx *gorm.DB) ([]FactoryWorkOrderReaction, error) {
+	var reactions []FactoryWorkOrderReaction
+	err := tx.
+		Where("work_order_id = ?", o.ID).
+		Order("created_at ASC").
+		Find(&reactions).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return reactions, nil
+}
+
 func (o *FactoryWorkOrder) ListEvents(tx *gorm.DB, limit int, before *time.Time) ([]FactoryWorkOrderEvent, error) {
 	query := tx.Where("work_order_id = ?", o.ID)
 

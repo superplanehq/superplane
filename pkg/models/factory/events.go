@@ -19,6 +19,12 @@ const (
 	// merged transition; the row is updated in place and this reason
 	// just tells the frontend which query to invalidate.
 	EventTypeOrderArtifactUpdated = "order.artifact.updated"
+	// EventTypeOrderReactionUpdated is a websocket-only notification
+	// reason for reaction add/remove — like EventTypeOrderArtifactUpdated,
+	// reactions are current-state (not history), so they don't back a
+	// timeline event/struct; this reason just tells the frontend which
+	// query to invalidate.
+	EventTypeOrderReactionUpdated = "order.reaction.updated"
 
 	// Factory line events
 	EventTypeLineStepExecutionCreated  = "step.execution.created"

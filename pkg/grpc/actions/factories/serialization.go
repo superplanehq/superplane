@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -86,11 +87,18 @@ func serializeFactories(factories []models.Factory) []*pb.Factory {
 	return result
 }
 
+// serializeWorkOrder builds the wire representation of a work order.
+// `reactions` is the raw reaction rows for the order and `currentUserID` is
+// the caller, used to compute each reaction's `reacted_by_me`; pass a nil
+// slice and `uuid.Nil` from callers that don't load reactions (e.g. list
+// endpoints, to avoid an extra join per row).
 func serializeWorkOrder(
 	f *models.Factory,
 	order *models.FactoryWorkOrder,
 	executions []models.FactoryWorkOrderExecutionRecord,
 	createdByAutomation *factory.AutomationRef,
+	reactions []models.FactoryWorkOrderReaction,
+	currentUserID uuid.UUID,
 ) *pb.WorkOrder {
 	serializedExecutions := serializeWorkOrderExecutions(executions)
 
@@ -120,7 +128,46 @@ func serializeWorkOrder(
 		CreatedBy:      serializeWorkOrderCreator(order, createdByAutomation),
 		TotalTokens:    totalTokens,
 		TotalCostCents: totalCostCents,
+		Reactions:      serializeWorkOrderReactions(reactions, currentUserID),
 	}
+}
+
+// serializeWorkOrderReactions groups raw reaction rows by content into the
+// per-emoji rollup the API exposes: a count and whether currentUserID is
+// one of the reactors. Order follows first-seen content to keep the
+// response stable across requests when the underlying rows are returned in
+// `created_at` order.
+func serializeWorkOrderReactions(
+	reactions []models.FactoryWorkOrderReaction,
+	currentUserID uuid.UUID,
+) []*pb.WorkOrderReaction {
+	if len(reactions) == 0 {
+		return nil
+	}
+
+	order := make([]string, 0, len(reactions))
+	byContent := make(map[string]*pb.WorkOrderReaction, len(reactions))
+
+	for _, reaction := range reactions {
+		summary, ok := byContent[reaction.Content]
+		if !ok {
+			summary = &pb.WorkOrderReaction{Content: reaction.Content}
+			byContent[reaction.Content] = summary
+			order = append(order, reaction.Content)
+		}
+
+		summary.Count++
+		if currentUserID != uuid.Nil && reaction.UserID == currentUserID {
+			summary.ReactedByMe = true
+		}
+	}
+
+	result := make([]*pb.WorkOrderReaction, 0, len(order))
+	for _, content := range order {
+		result = append(result, byContent[content])
+	}
+
+	return result
 }
 
 func serializeAutomationRef(ref *factory.AutomationRef) *pb.AutomationRef {

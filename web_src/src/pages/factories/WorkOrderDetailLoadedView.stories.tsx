@@ -105,6 +105,10 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     onAddComment: async (body: string) => {
       console.log("comment", body);
     },
+    isTogglingReaction: false,
+    onToggleReaction: (content: string, reactedByMe: boolean) => {
+      console.log("toggle reaction", content, reactedByMe);
+    },
   };
 }
 

@@ -113,3 +113,13 @@ func (s *FactoryService) CreateWorkOrderArtifact(ctx context.Context, req *pb.Cr
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.CreateWorkOrderArtifact(ctx, organizationID, req)
 }
+
+func (s *FactoryService) AddWorkOrderReaction(ctx context.Context, req *pb.AddWorkOrderReactionRequest) (*pb.AddWorkOrderReactionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.AddWorkOrderReaction(ctx, organizationID, req)
+}
+
+func (s *FactoryService) RemoveWorkOrderReaction(ctx context.Context, req *pb.RemoveWorkOrderReactionRequest) (*pb.RemoveWorkOrderReactionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RemoveWorkOrderReaction(ctx, organizationID, req)
+}

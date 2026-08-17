@@ -166,6 +166,10 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
     { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
   ],
   executions: [],
+  reactions: [
+    { content: "+1", count: 2, reactedByMe: true },
+    { content: "eyes", count: 1, reactedByMe: false },
+  ],
 };
 
 /**
