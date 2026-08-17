@@ -342,6 +342,10 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	log.Println("Starting Magic Code Email Consumer")
 	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
 	go magicCodeEmailConsumer.Start()
+
+	log.Println("Starting Factory Notification Consumer")
+	factoryNotificationConsumer := workers.NewFactoryNotificationConsumer(rabbitMQURL, emailService, baseURL)
+	go factoryNotificationConsumer.Start()
 }
 
 func buildGRPCServices(
