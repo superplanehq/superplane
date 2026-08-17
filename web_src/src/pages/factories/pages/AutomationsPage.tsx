@@ -4,7 +4,7 @@ import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { Plus } from "lucide-react";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
-import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import { factorySectionBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
 import { AutomationDetail } from "./AutomationDetail";
 import { AutomationsPageBody } from "./automationsPageBody";
 import { AutomationsLegacyRedirect } from "./automationsPageRedirect";
@@ -54,6 +54,7 @@ export function AutomationsPage() {
   return (
     <div data-testid="automations-list-page">
       <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
         title="Automations"
         subtitle="Automations are one-step lines. Each one listens for a trigger and runs a canvas when it fires."
         actions={
@@ -75,7 +76,7 @@ export function AutomationsPage() {
         }
       />
 
-      <div className={factoryContentBodyClassName}>
+      <div className={factorySectionBodyClassName}>
         <AutomationsPageBody
           organizationId={model.organizationId}
           factoryKey={model.factoryKey}

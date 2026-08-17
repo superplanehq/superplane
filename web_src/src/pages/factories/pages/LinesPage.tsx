@@ -41,9 +41,10 @@ import {
 } from "../lib/factoryPagePaths";
 import { formatLinePhaseDescription, humanizeLineName } from "../lib/humanizeLineName";
 import {
-  factoryContentBodyClassName,
-  factoryKanbanBodyClassName,
   factoryKanbanPageClassName,
+  factorySectionBodyClassName,
+  factorySectionHeaderClassName,
+  factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
 import { PhaseGlyph } from "./linePhaseGlyph";
 
@@ -80,7 +81,7 @@ export function LinesPage() {
           />
         </div>
 
-        <div className={factoryKanbanBodyClassName}>
+        <div className={factoryWorkOrdersBodyClassName}>
           <LineDetail
             organizationId={organizationId}
             factoryKey={factoryKey}
@@ -103,6 +104,7 @@ export function LinesPage() {
   return (
     <>
       <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
         title="Lines"
         subtitle="Factory lines specialize how work moves through the workspace. Each phase is backed by a canvas that runs work orders."
         actions={
@@ -120,7 +122,7 @@ export function LinesPage() {
         }
       />
 
-      <div className={factoryContentBodyClassName}>
+      <div className={factorySectionBodyClassName}>
         {lines.length === 0 ? (
           <EmptyLinesState
             organizationId={organizationId}
@@ -165,6 +167,7 @@ function LineDetailHeader({
   const editHref = line.id ? editFactoryLinePath(organizationId, factoryKey, line.id) : "#";
   return (
     <WorkspacePageHeader
+      className={factorySectionHeaderClassName}
       variant="entity"
       backHref={linesPath(organizationId, factoryKey)}
       backLabel="Lines"

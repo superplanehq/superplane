@@ -4,7 +4,7 @@ import { Copy, Ellipsis, Funnel, Pencil, Plus, RefreshCw, Search, Settings2 } fr
 import { Button } from "@/components/ui/button";
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "../__fixtures__/factoriesStoryTheme";
-import { factoryWorkOrdersHeaderClassName } from "../pages/factoryPageLayoutStyles";
+import { factorySectionHeaderClassName } from "../pages/factoryPageLayoutStyles";
 import { WorkspacePageHeader } from "./WorkspacePageHeader";
 
 const meta = {
@@ -54,7 +54,7 @@ export const SectionWithPrimaryAction: Story = {
 
 export const SectionWithToolbarAndChips: Story = {
   args: {
-    className: factoryWorkOrdersHeaderClassName,
+    className: factorySectionHeaderClassName,
     title: "Work Orders",
     leading: (
       <>

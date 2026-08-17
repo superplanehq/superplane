@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import type { WorkOrderListState } from "../../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../../lib/useWorkOrdersHeaderShortcuts";
-import { factoryWorkOrdersHeaderClassName } from "../../pages/factoryPageLayoutStyles";
+import { factorySectionHeaderClassName } from "../../pages/factoryPageLayoutStyles";
 import { buildAssigneeFilterOptions, buildLineFilterOptions } from "../../lib/workOrderFilterOptions";
 import type { WorkOrderListEntry } from "../../lib/workOrderListModel";
 import { DisplayMenu } from "./DisplayMenu";
@@ -45,7 +45,7 @@ export function WorkOrdersHeader({
 
   return (
     <WorkspacePageHeader
-      className={factoryWorkOrdersHeaderClassName}
+      className={factorySectionHeaderClassName}
       data-testid="work-orders-header"
       title="Work Orders"
       leading={

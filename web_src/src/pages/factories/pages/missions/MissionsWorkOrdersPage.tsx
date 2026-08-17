@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import { WorkOrdersErrorState, WorkOrdersLoadingState } from "../../workOrders/WorkOrdersEmptyStates";
-import { factoryContentBodyClassName, factoryWorkOrdersHeaderClassName } from "../factoryPageLayoutStyles";
+import { factoryContentBodyClassName, factorySectionHeaderClassName } from "../factoryPageLayoutStyles";
 import { useWorkOrderListState } from "../../lib/useWorkOrderListState";
 import { MissionsWorkOrdersLoadedView } from "./MissionsWorkOrdersLoadedView";
 
@@ -54,7 +54,7 @@ export function MissionsWorkOrdersPage() {
   if (workOrdersError) {
     return (
       <>
-        <WorkspacePageHeader className={factoryWorkOrdersHeaderClassName} title="Work Orders" />
+        <WorkspacePageHeader className={factorySectionHeaderClassName} title="Work Orders" />
         <div className={cn(factoryContentBodyClassName, "flex flex-col gap-4")}>
           <WorkOrdersErrorState onRetry={() => void refetch()} />
         </div>
@@ -65,7 +65,7 @@ export function MissionsWorkOrdersPage() {
   if (isOrdersLoading || !factory) {
     return (
       <>
-        <WorkspacePageHeader className={factoryWorkOrdersHeaderClassName} title="Work Orders" />
+        <WorkspacePageHeader className={factorySectionHeaderClassName} title="Work Orders" />
         <div className={cn(factoryContentBodyClassName, "flex flex-col gap-4")}>
           <WorkOrdersLoadingState />
         </div>
