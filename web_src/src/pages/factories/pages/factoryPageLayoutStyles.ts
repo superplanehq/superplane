@@ -32,9 +32,9 @@ export const factoryWorkOrdersHeaderClassName = cn(
 
 /** Work Orders body: same gutter as the header, no extra left inset. */
 export const factoryWorkOrdersBodyClassName = cn(
-  "mx-0 max-w-none pt-0 pb-3 text-foreground",
+  "mx-0 max-w-full pt-0 pb-3 text-foreground",
   workOrdersPaneGutter,
-  "flex min-h-0 flex-1 flex-col",
+  "flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden",
 );
 
 /** The app shell owns vertical scrolling. */
@@ -44,7 +44,7 @@ export const factoryContentBodyClassName = cn(
 );
 
 /** Full-pane shell for a GitHub-Projects-style kanban (no page scroll). */
-export const factoryKanbanPageClassName = "flex h-full min-h-0 flex-col overflow-hidden";
+export const factoryKanbanPageClassName = "flex h-full min-h-0 min-w-0 w-full max-w-full flex-col overflow-hidden";
 
 /** Gutter + remaining height, no max-width, so lanes can grow to the right. */
 export const factoryKanbanBodyClassName = cn(

@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { shouldRedirectWheelToHorizontalScroll } from "./kanbanBoardWheel";
 
 /**
  * Lane chrome for every board in the workspace. The Work Orders board and
@@ -17,7 +18,10 @@ const LANE_TONE_CLASSNAME: Record<BoardLaneTone, string> = {
 
 /** Shared card list inside a lane: fill leftover height, scroll cards. */
 export const workOrderKanbanLaneScrollClassName =
-  "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain [scrollbar-width:thin]";
+  "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto [scrollbar-width:thin]";
+
+/** Lane width: grow when there is room, never shrink below 18rem — extra lanes scroll on x. */
+export const workOrderKanbanLaneSizeClassName = "min-w-72 basis-72 grow shrink-0";
 
 interface WorkOrderKanbanBoardProps {
   children: ReactNode;
@@ -26,9 +30,28 @@ interface WorkOrderKanbanBoardProps {
 
 /** One horizontal row of lanes. Extra columns grow right and scroll on x. */
 export function WorkOrderKanbanBoard({ children, testId }: WorkOrderKanbanBoardProps) {
+  const boardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board) {
+      return;
+    }
+    const onWheel = (event: WheelEvent) => {
+      if (!shouldRedirectWheelToHorizontalScroll(event, board)) {
+        return;
+      }
+      board.scrollLeft += event.deltaY;
+      event.preventDefault();
+    };
+    board.addEventListener("wheel", onWheel, { passive: false });
+    return () => board.removeEventListener("wheel", onWheel);
+  }, []);
+
   return (
     <div
-      className="flex h-full min-h-0 min-w-0 flex-1 gap-3 overflow-x-auto overflow-y-hidden [scrollbar-width:thin]"
+      ref={boardRef}
+      className="flex min-h-0 min-w-0 w-full flex-1 items-stretch gap-3 overflow-x-auto overflow-y-hidden [scrollbar-gutter:stable] [scrollbar-width:thin]"
       data-testid={testId}
     >
       {children}
@@ -67,7 +90,8 @@ export function WorkOrderBoardLane({
     <section
       aria-label={label ?? title}
       className={cn(
-        "flex h-full min-h-0 min-w-72 flex-1 flex-col rounded-lg border border-border/70 p-2",
+        "flex min-h-0 flex-col self-stretch rounded-lg border border-border/70 p-2",
+        workOrderKanbanLaneSizeClassName,
         LANE_TONE_CLASSNAME[tone],
       )}
       data-testid={testId}

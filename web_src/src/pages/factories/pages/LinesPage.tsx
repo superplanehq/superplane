@@ -28,6 +28,7 @@ import {
   WorkOrderBoardLane,
   WorkOrderKanbanBoard,
   workOrderKanbanLaneScrollClassName,
+  workOrderKanbanLaneSizeClassName,
   type BoardLaneTone,
 } from "../workOrders/WorkOrderBoardChrome";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
@@ -294,7 +295,10 @@ function PhaseBoard({
   return (
     <WorkOrderKanbanBoard testId="lines-phase-board">
       {columns.map((column, index) => (
-        <div key={`${column.stepIndex}-${column.stepName}`} className="relative flex h-full min-h-0 min-w-72 flex-1">
+        <div
+          key={`${column.stepIndex}-${column.stepName}`}
+          className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}
+        >
           {index < columns.length - 1 ? (
             <span className="absolute top-[21px] left-full z-[1] h-px w-3 bg-border" aria-hidden />
           ) : null}
