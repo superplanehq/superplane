@@ -2,6 +2,11 @@ export function factoryListPath(organizationId: string) {
   return `/${organizationId}/workspaces`;
 }
 
+/** Setup wizard for a workspace that does not exist yet. */
+export function newFactoryPath(organizationId: string) {
+  return `${factoryListPath(organizationId)}/new`;
+}
+
 export function factoryDetailPath(organizationId: string, factoryKey: string) {
   return `${factoryListPath(organizationId)}/${factoryKey}`;
 }

@@ -11,8 +11,9 @@ import { useOrganizationInviteLink } from "@/hooks/useOrganizationData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
+import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory, type InstallFactoryInput } from "@/pages/home/useInstallFactory";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { factoryOverviewPath } from "../../lib/factoryPagePaths";
@@ -24,6 +25,7 @@ import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardin
 
 const WORK_ORDER_ENTRYPOINT = "work-order-dispatch";
 const DEFAULT_LINE_NAME = "Software delivery";
+const ONBOARDING_INTEGRATIONS = ["github", "claude"];
 
 function initialSelections(onboarding: FactoriesFactory["onboarding"]): IntegrationSelections {
   const selections: IntegrationSelections = {};
@@ -44,10 +46,12 @@ function initialSelections(onboarding: FactoriesFactory["onboarding"]): Integrat
   return selections;
 }
 
+// The workspace already has a name when this page opens, so setup resumes at
+// the first section that still needs an answer.
 function initialSection(onboarding: FactoriesFactory["onboarding"]): SectionId {
   if (onboarding?.agentHarness || onboarding?.issuesSource) return "agent";
   if (onboarding?.appRepository) return "issues";
-  return "name";
+  return "repo";
 }
 
 function localIssuesSource(source?: string): IssuesChoiceId | null {
@@ -78,15 +82,7 @@ function useIntegrationSelections(onboarding: FactoriesFactory["onboarding"]) {
     if (selections.claude?.ready) ready.add("claude");
     return ready;
   }, [selections]);
-  const updateSelection = useCallback((name: "github" | "claude", next: IntegrationSelections) => {
-    setSelections((current) => {
-      const updated = { ...current };
-      if (next[name]) updated[name] = next[name];
-      else delete updated[name];
-      return updated;
-    });
-  }, []);
-  return { selections, connected, updateSelection };
+  return { selections, connected, setSelections };
 }
 
 function useRestoreSetup(
@@ -297,6 +293,12 @@ export function useOnboardingPageModel(args: {
   const { canAct } = usePermissions();
   const onboarding = args.factory?.onboarding;
   const integrations = useIntegrationSelections(onboarding);
+  const connect = useIntegrationConnectDialog({
+    organizationId: args.organizationId,
+    integrationNames: ONBOARDING_INTEGRATIONS,
+    selections: integrations.selections,
+    onSelectionsChange: integrations.setSelections,
+  });
   const setup = useOnboardingSetupState(args.factory?.name ?? "", {
     connected: integrations.connected,
     simulateDiscovery: false,
@@ -344,8 +346,8 @@ export function useOnboardingPageModel(args: {
     setup,
     openSection,
     setOpenSection,
-    selections: integrations.selections,
-    updateSelection: integrations.updateSelection,
+    requestConnect: connect.requestConnect,
+    integrationDialogs: connect.dialogs,
     repositories,
     repositoriesLoading: resources.isLoading,
     repositoriesError: resources.error,

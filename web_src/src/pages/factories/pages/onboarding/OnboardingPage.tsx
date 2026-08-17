@@ -1,5 +1,4 @@
 import { getApiErrorMessage } from "@/lib/errors";
-import { IntegrationsSection } from "@/pages/home/InstallIntegrationsSection";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { SetupSections } from "./OnboardingWireframe";
@@ -27,7 +26,8 @@ export function OnboardingPage() {
       <div className="mx-auto w-full max-w-3xl px-6 py-8 lg:px-8">
         <h1 className="text-[22px] font-semibold tracking-[-0.02em]">Set up your workspace</h1>
         <p className="mt-1.5 max-w-2xl text-[13px] text-muted-foreground">
-          Connect your repositories and coding agent. SuperPlane will create an app and a line for work orders.
+          Hand off small engineering work to AI. SuperPlane finds candidate work in your app and backlog, then a coding
+          agent opens pull requests. Finish one section to unlock the next.
         </p>
 
         {model.repositoriesLoading ? (
@@ -44,7 +44,7 @@ export function OnboardingPage() {
             setup={model.setup}
             openSection={model.openSection}
             setOpenSection={model.setOpenSection}
-            requestConnect={() => undefined}
+            requestConnect={model.requestConnect}
             onContinueName={model.saveName}
             onContinueRepo={model.saveRepository}
             onContinueIssues={model.saveIssues}
@@ -53,28 +53,11 @@ export function OnboardingPage() {
             inviteLoading={model.inviteLoading}
             canInvite={model.canInvite}
             repos={model.repositories}
-            vcsIntegrationControls={
-              <IntegrationsSection
-                integrations={["github"]}
-                organizationId={layout.organizationId}
-                selections={model.selections}
-                onSelectionsChange={(next) => model.updateSelection("github", next)}
-              />
-            }
-            agentIntegrationControls={
-              <IntegrationsSection
-                integrations={["claude"]}
-                organizationId={layout.organizationId}
-                selections={model.selections}
-                onSelectionsChange={(next) => model.updateSelection("claude", next)}
-              />
-            }
-            showExternalTrackers={false}
-            allowIssueSkip={false}
             saving={model.saving}
           />
         </div>
       </div>
+      {model.integrationDialogs}
     </div>
   );
 }

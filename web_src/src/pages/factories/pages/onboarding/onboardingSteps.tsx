@@ -280,12 +280,10 @@ export function RepoStep({
   setup,
   onRequestConnect,
   repos,
-  integrationControls,
 }: {
   setup: OnboardingSetupApi;
   onRequestConnect: (id: IntegrationId) => void;
   repos?: string[];
-  integrationControls?: ReactNode;
 }) {
   const host = setup.vcsHost;
   const hostConnected = host ? setup.connected.has(host) : false;
@@ -293,29 +291,27 @@ export function RepoStep({
 
   return (
     <div className="space-y-4">
-      {integrationControls ?? (
-        <div className="grid gap-2">
-          {VCS_OPTIONS.map((option) => {
-            const optionId = option.id as VcsHostId;
-            const connected = setup.connected.has(optionId);
-            const selected = setup.vcsHost === optionId;
-            return (
-              <ConnectOptionRow
-                key={option.id}
-                icon={<IntegrationChoiceIcon name={option.id} />}
-                title={option.label}
-                detail={option.detail}
-                selected={selected}
-                connectLabel={vcsLabel(optionId)}
-                connected={connected}
-                soon={option.soon}
-                onSelect={() => setup.selectVcsHost(optionId)}
-                onConnect={() => onRequestConnect(optionId)}
-              />
-            );
-          })}
-        </div>
-      )}
+      <div className="grid gap-2">
+        {VCS_OPTIONS.map((option) => {
+          const optionId = option.id as VcsHostId;
+          const connected = setup.connected.has(optionId);
+          const selected = setup.vcsHost === optionId;
+          return (
+            <ConnectOptionRow
+              key={option.id}
+              icon={<IntegrationChoiceIcon name={option.id} />}
+              title={option.label}
+              detail={option.detail}
+              selected={selected}
+              connectLabel={vcsLabel(optionId)}
+              connected={connected}
+              soon={option.soon}
+              onSelect={() => setup.selectVcsHost(optionId)}
+              onConnect={() => onRequestConnect(optionId)}
+            />
+          );
+        })}
+      </div>
 
       {host && hostConnected ? (
         <RepositoryPicker
@@ -334,15 +330,11 @@ export function IssuesStep({
   onRequestConnect,
   autoDiscover,
   repos,
-  showExternalTrackers = true,
-  allowSkip = true,
 }: {
   setup: OnboardingSetupApi;
   onRequestConnect: (id: IntegrationId) => void;
   autoDiscover?: boolean;
   repos?: string[];
-  showExternalTrackers?: boolean;
-  allowSkip?: boolean;
 }) {
   const {
     selectedRepo,
@@ -438,41 +430,35 @@ export function IssuesStep({
               connected
               onSelect={() => setup.setIssuesChoice("vcs")}
             />
-            {showExternalTrackers ? (
-              <>
-                <ConnectOptionRow
-                  icon={<IntegrationChoiceIcon name="linear" />}
-                  title="Linear"
-                  detail="Find agent-ready work in your Linear backlog."
-                  selected={setup.issuesChoice === "linear"}
-                  connectLabel="Linear"
-                  connected={setup.connected.has("linear")}
-                  soon
-                  onSelect={() => setup.setIssuesChoice("linear")}
-                  onConnect={() => onRequestConnect("linear")}
-                />
-                <ConnectOptionRow
-                  icon={<IntegrationChoiceIcon name="jira" />}
-                  title="Jira"
-                  detail="Find agent-ready work in your Jira backlog."
-                  selected={setup.issuesChoice === "jira"}
-                  connectLabel="Jira"
-                  connected={setup.connected.has("jira")}
-                  soon
-                  onSelect={() => setup.setIssuesChoice("jira")}
-                  onConnect={() => onRequestConnect("jira")}
-                />
-              </>
-            ) : null}
-            {allowSkip ? (
-              <ConnectOptionRow
-                icon={<ListTodo className="size-5 text-muted-foreground" aria-hidden />}
-                title="Skip for now"
-                detail="Do not import a backlog. Create work orders yourself for selected tasks."
-                selected={setup.issuesChoice === "skip"}
-                onSelect={() => setup.setIssuesChoice("skip")}
-              />
-            ) : null}
+            <ConnectOptionRow
+              icon={<IntegrationChoiceIcon name="linear" />}
+              title="Linear"
+              detail="Find agent-ready work in your Linear backlog."
+              selected={setup.issuesChoice === "linear"}
+              connectLabel="Linear"
+              connected={setup.connected.has("linear")}
+              soon
+              onSelect={() => setup.setIssuesChoice("linear")}
+              onConnect={() => onRequestConnect("linear")}
+            />
+            <ConnectOptionRow
+              icon={<IntegrationChoiceIcon name="jira" />}
+              title="Jira"
+              detail="Find agent-ready work in your Jira backlog."
+              selected={setup.issuesChoice === "jira"}
+              connectLabel="Jira"
+              connected={setup.connected.has("jira")}
+              soon
+              onSelect={() => setup.setIssuesChoice("jira")}
+              onConnect={() => onRequestConnect("jira")}
+            />
+            <ConnectOptionRow
+              icon={<ListTodo className="size-5 text-muted-foreground" aria-hidden />}
+              title="Skip for now"
+              detail="Do not import a backlog. Create work orders yourself for selected tasks."
+              selected={setup.issuesChoice === "skip"}
+              onSelect={() => setup.setIssuesChoice("skip")}
+            />
           </div>
         </>
       ) : null}

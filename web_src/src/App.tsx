@@ -37,6 +37,7 @@ import {
   LegacyWorkOrderDetailRedirect,
   LinesPage,
   MissionsPage,
+  NewWorkspacePage,
   OnboardingGate,
   OnboardingPage,
   VelocityPage,
@@ -163,6 +164,10 @@ function AppRouter() {
                   <Route
                     index
                     element={withAuthPermissionAndFactoriesFeature(FactoriesIndexPage, "factories", "read")}
+                  />
+                  <Route
+                    path="new"
+                    element={withAuthPermissionAndFactoriesFeature(NewWorkspacePage, "factories", "create")}
                   />
                   <Route
                     path=":factoryKey"

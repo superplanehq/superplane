@@ -8,6 +8,7 @@ export { MissionsPage } from "./MissionsPage";
 export { OverviewPage } from "./OverviewPage";
 export { OnboardingGate } from "./onboarding/OnboardingGate";
 export { OnboardingPage } from "./onboarding/OnboardingPage";
+export { NewWorkspacePage } from "./onboarding/NewWorkspacePage";
 export { WorkspaceOverviewPage } from "./onboarding/WorkspaceOverviewPage";
 export { VelocityPage } from "./VelocityPage";
 export { WikiPage } from "./WikiPage";

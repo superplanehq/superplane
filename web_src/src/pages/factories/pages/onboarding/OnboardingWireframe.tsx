@@ -122,8 +122,8 @@ function NameAndRepoSections({
   inviteLoading,
   canInvite,
   repos,
-  vcsIntegrationControls,
   saving,
+  lockAfterName,
   continueName,
   continueRepo,
 }: {
@@ -135,8 +135,8 @@ function NameAndRepoSections({
   inviteLoading?: boolean;
   canInvite?: boolean;
   repos?: string[];
-  vcsIntegrationControls?: ReactNode;
   saving: boolean;
+  lockAfterName?: boolean;
   continueName: () => void;
   continueRepo: () => void;
 }) {
@@ -165,18 +165,85 @@ function NameAndRepoSections({
         summary={setup.selectedRepo ?? undefined}
         open={openSection === "repo"}
         complete={setup.repoReady}
-        locked={!setup.nameReady}
+        locked={!setup.nameReady || lockAfterName}
         onOpen={setOpenSection}
       >
-        <RepoStep
-          setup={setup}
-          onRequestConnect={requestConnect}
-          repos={repos}
-          integrationControls={vcsIntegrationControls}
-        />
+        <RepoStep setup={setup} onRequestConnect={requestConnect} repos={repos} />
         <div className="mt-4">
           <Button type="button" size="sm" disabled={!setup.repoReady || saving} onClick={continueRepo}>
             Continue to issues
+          </Button>
+        </div>
+      </Section>
+    </>
+  );
+}
+
+function IssuesAndAgentSections({
+  setup,
+  openSection,
+  setOpenSection,
+  requestConnect,
+  repos,
+  saving,
+  continueIssues,
+  onFinish,
+}: {
+  setup: OnboardingSetupApi;
+  openSection: SectionId;
+  setOpenSection: (id: SectionId) => void;
+  requestConnect: (id: IntegrationId) => void;
+  repos?: string[];
+  saving: boolean;
+  continueIssues: () => void;
+  onFinish: () => void | Promise<void>;
+}) {
+  return (
+    <>
+      <Section
+        id="issues"
+        title="Issues"
+        purpose="Optional. Point SuperPlane at a backlog so it can find small work that agents can solve. Or skip and create work orders yourself."
+        summary={issuesSectionSummary(setup)}
+        open={openSection === "issues"}
+        complete={setup.issuesReady}
+        locked={!setup.repoReady}
+        onOpen={(id) => {
+          if (id === "issues" && setup.repoReady) {
+            setup.commitRepoStep();
+          }
+          setOpenSection(id);
+        }}
+      >
+        <IssuesStep setup={setup} onRequestConnect={requestConnect} autoDiscover repos={repos} />
+        <div className="mt-4">
+          <Button type="button" size="sm" disabled={!setup.issuesReady || saving} onClick={continueIssues}>
+            Continue to coding agent
+          </Button>
+        </div>
+      </Section>
+
+      <Section
+        id="agent"
+        title="Coding agent"
+        purpose="Connect a cloud coding agent. It works issues in the app repository and opens pull requests without engineers watching each run."
+        summary={
+          setup.agentReady ? (AGENT_OPTIONS.find((option) => option.id === setup.agent)?.label ?? undefined) : undefined
+        }
+        open={openSection === "agent"}
+        complete={setup.agentReady}
+        locked={!setup.issuesReady}
+        onOpen={(id) => {
+          if (id === "agent" && setup.issuesReady) {
+            setup.commitIssuesStep();
+          }
+          setOpenSection(id);
+        }}
+      >
+        <AgentStep setup={setup} onRequestConnect={requestConnect} />
+        <div className="mt-4">
+          <Button type="button" size="sm" disabled={!setup.canFinish || saving} onClick={() => void onFinish()}>
+            Finish setup
           </Button>
         </div>
       </Section>
@@ -206,11 +273,8 @@ export function SetupSections({
   inviteLoading,
   canInvite,
   repos,
-  vcsIntegrationControls,
-  agentIntegrationControls,
-  showExternalTrackers,
-  allowIssueSkip,
   saving = false,
+  lockAfterName,
 }: {
   setup: OnboardingSetupApi;
   openSection: SectionId;
@@ -224,11 +288,9 @@ export function SetupSections({
   inviteLoading?: boolean;
   canInvite?: boolean;
   repos?: string[];
-  vcsIntegrationControls?: ReactNode;
-  agentIntegrationControls?: ReactNode;
-  showExternalTrackers?: boolean;
-  allowIssueSkip?: boolean;
   saving?: boolean;
+  /** The workspace does not exist yet: keep every section after the name locked. */
+  lockAfterName?: boolean;
 }) {
   return (
     <div className="space-y-3">
@@ -241,8 +303,8 @@ export function SetupSections({
         inviteLoading={inviteLoading}
         canInvite={canInvite}
         repos={repos}
-        vcsIntegrationControls={vcsIntegrationControls}
         saving={saving}
+        lockAfterName={lockAfterName}
         continueName={() => void continueToSection(onContinueName, "repo", setOpenSection)}
         continueRepo={() => {
           setup.commitRepoStep();
@@ -250,68 +312,19 @@ export function SetupSections({
         }}
       />
 
-      <Section
-        id="issues"
-        title="Issues"
-        purpose="Optional. Point SuperPlane at a backlog so it can find small work that agents can solve. Or skip and create work orders yourself."
-        summary={issuesSectionSummary(setup)}
-        open={openSection === "issues"}
-        complete={setup.issuesReady}
-        locked={!setup.repoReady}
-        onOpen={(id) => {
-          if (id === "issues" && setup.repoReady) {
-            setup.commitRepoStep();
-          }
-          setOpenSection(id);
+      <IssuesAndAgentSections
+        setup={setup}
+        openSection={openSection}
+        setOpenSection={setOpenSection}
+        requestConnect={requestConnect}
+        repos={repos}
+        saving={saving}
+        continueIssues={() => {
+          setup.commitIssuesStep();
+          void continueToSection(onContinueIssues, "agent", setOpenSection);
         }}
-      >
-        <IssuesStep
-          setup={setup}
-          onRequestConnect={requestConnect}
-          autoDiscover
-          repos={repos}
-          showExternalTrackers={showExternalTrackers}
-          allowSkip={allowIssueSkip}
-        />
-        <div className="mt-4">
-          <Button
-            type="button"
-            size="sm"
-            disabled={!setup.issuesReady || saving}
-            onClick={() => {
-              setup.commitIssuesStep();
-              void continueToSection(onContinueIssues, "agent", setOpenSection);
-            }}
-          >
-            Continue to coding agent
-          </Button>
-        </div>
-      </Section>
-
-      <Section
-        id="agent"
-        title="Coding agent"
-        purpose="Connect a cloud coding agent. It works issues in the app repository and opens pull requests without engineers watching each run."
-        summary={
-          setup.agentReady ? (AGENT_OPTIONS.find((option) => option.id === setup.agent)?.label ?? undefined) : undefined
-        }
-        open={openSection === "agent"}
-        complete={setup.agentReady}
-        locked={!setup.issuesReady}
-        onOpen={(id) => {
-          if (id === "agent" && setup.issuesReady) {
-            setup.commitIssuesStep();
-          }
-          setOpenSection(id);
-        }}
-      >
-        <AgentStep setup={setup} onRequestConnect={requestConnect} integrationControls={agentIntegrationControls} />
-        <div className="mt-4">
-          <Button type="button" size="sm" disabled={!setup.canFinish || saving} onClick={() => void onFinish()}>
-            Finish setup
-          </Button>
-        </div>
-      </Section>
+        onFinish={onFinish}
+      />
     </div>
   );
 }

@@ -2,21 +2,20 @@ import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useCreateFactory, useFactories, useFactory, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactories, useFactory, useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { AlertTriangle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from "react-router";
-import { CreateFactoryDialog } from "../CreateFactoryDialog";
 import { CreateWorkOrderDialog } from "../CreateWorkOrderDialog";
 import {
   factoryRouteNeedsCanonicalRedirect,
   replaceFactoryKeySegment,
   resolveFactoryByKey,
 } from "../lib/factoryKeyResolution";
-import { factoryListPath, factoryOnboardingPath } from "../lib/factoryPagePaths";
+import { factoryListPath, newFactoryPath } from "../lib/factoryPagePaths";
 import { clearLastVisitedFactory, recordLastVisitedFactory } from "../lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
 import { useOnboardingStorybook } from "../pages/onboarding/useOnboardingStorybook";
@@ -31,6 +30,24 @@ const MAX_RECENT_WORK_ORDERS = 5;
 
 function isOnboardingSidebarHidden(pendingWorkspaceId: string | undefined, factoryId: string) {
   return Boolean(pendingWorkspaceId && pendingWorkspaceId === factoryId);
+}
+
+/**
+ * Hide workspace chrome while onboarding runs so the setup wizard matches the
+ * onboarding design. Storybook uses its pending pointer; production checks the
+ * server-backed onboarding state for admins who run setup.
+ */
+function shouldHideOnboardingSidebar(args: {
+  storybookPendingWorkspaceId: string | undefined;
+  hasStorybookOnboarding: boolean;
+  factoryId: string;
+  canConfigure: boolean;
+  factory: FactoriesFactory | null;
+}): boolean {
+  if (isOnboardingSidebarHidden(args.storybookPendingWorkspaceId, args.factoryId)) {
+    return true;
+  }
+  return !args.hasStorybookOnboarding && args.canConfigure && !isFactoryOnboardingComplete(args.factory);
 }
 
 export function FactoriesLayout() {
@@ -98,7 +115,6 @@ function FactoriesLayoutContent({
   const navigate = useNavigate();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const [createFactoryOpen, setCreateFactoryOpen] = useState(false);
   const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
     useCreateWorkOrderDialogState(organizationId, factoryKey, canAct("work_orders", "create"));
 
@@ -107,7 +123,6 @@ function FactoriesLayoutContent({
   useFactoryWebsocket(organizationId, factoryId);
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
 
-  const createFactory = useCreateFactory(organizationId);
   const storybookOnboarding = useOnboardingStorybook();
 
   const pageTitle = useMemo(() => (factory?.name ? [factory.name] : ["Workspaces"]), [factory?.name]);
@@ -142,22 +157,6 @@ function FactoriesLayoutContent({
     [organizationId, factoryId, factoryKey, factory, factories, openCreateWorkOrder],
   );
 
-  const handleCreateFactory = async (input: { name: string; description: string; key: string }) => {
-    // Let CreateFactoryDialog catch failures so duplicate-name inline errors work.
-    const created = await createFactory.mutateAsync(input);
-    setCreateFactoryOpen(false);
-    if (!created.key) {
-      return;
-    }
-    if (storybookOnboarding && created.id) {
-      storybookOnboarding.beginOnboarding({
-        workspaceId: created.id,
-        workspaceName: created.name || input.name,
-      });
-    }
-    navigate(factoryOnboardingPath(organizationId, created.key));
-  };
-
   if (factoryError) {
     return <FactoriesLayoutError organizationId={organizationId} />;
   }
@@ -166,39 +165,41 @@ function FactoriesLayoutContent({
     return <FactoriesLayoutLoading />;
   }
 
+  // Incomplete workspaces show only the setup wizard, without workspace
+  // chrome, so the production flow matches the onboarding design.
+  const hideSidebar = shouldHideOnboardingSidebar({
+    storybookPendingWorkspaceId: storybookOnboarding?.pending?.workspaceId,
+    hasStorybookOnboarding: Boolean(storybookOnboarding),
+    factoryId,
+    canConfigure: canAct("factories", "update"),
+    factory,
+  });
+
   return (
     <FactoriesLayoutContext.Provider value={layoutContextValue}>
       <div className="flex h-screen w-full bg-background text-foreground" data-testid="factories-layout">
-        <FactoriesSidebar
-          organizationId={organizationId}
-          factoryKey={factoryKey}
-          factory={factory}
-          factories={factories}
-          organizationName={organization?.metadata?.name ?? ""}
-          accountName={account?.name}
-          accountEmail={account?.email}
-          accountAvatarUrl={account?.avatar_url}
-          canOpenSettings={canAct("factories", "update")}
-          canCreateFactory={canAct("factories", "create")}
-          permissionsLoading={permissionsLoading}
-          recentWorkOrders={recentWorkOrders}
-          onOpenCreateFactory={() => setCreateFactoryOpen(true)}
-          hideWorkspaceNavigation={
-            isOnboardingSidebarHidden(storybookOnboarding?.pending?.workspaceId, factoryId) ||
-            (!storybookOnboarding && canAct("factories", "update") && !isFactoryOnboardingComplete(factory))
-          }
-        />
+        {hideSidebar ? null : (
+          <FactoriesSidebar
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            factory={factory}
+            factories={factories}
+            organizationName={organization?.metadata?.name ?? ""}
+            accountName={account?.name}
+            accountEmail={account?.email}
+            accountAvatarUrl={account?.avatar_url}
+            canOpenSettings={canAct("factories", "update")}
+            canCreateFactory={canAct("factories", "create")}
+            permissionsLoading={permissionsLoading}
+            recentWorkOrders={recentWorkOrders}
+            onOpenCreateFactory={() => navigate(newFactoryPath(organizationId))}
+          />
+        )}
         <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
           <Outlet />
         </main>
       </div>
 
-      <CreateFactoryDialog
-        open={createFactoryOpen}
-        isSaving={createFactory.isPending}
-        onClose={() => setCreateFactoryOpen(false)}
-        onCreate={handleCreateFactory}
-      />
       {canAct("work_orders", "create") ? (
         <CreateWorkOrderDialog
           open={createWorkOrderOpen}
@@ -224,7 +225,6 @@ interface FactoriesSidebarProps {
   permissionsLoading: boolean;
   recentWorkOrders: FactoriesWorkOrder[];
   onOpenCreateFactory: () => void;
-  hideWorkspaceNavigation?: boolean;
 }
 
 function FactoriesSidebar({
@@ -241,7 +241,6 @@ function FactoriesSidebar({
   permissionsLoading,
   recentWorkOrders,
   onOpenCreateFactory,
-  hideWorkspaceNavigation,
 }: FactoriesSidebarProps) {
   return (
     <aside
@@ -257,13 +256,9 @@ function FactoriesSidebar({
         permissionsLoading={permissionsLoading}
         onCreateFactory={onOpenCreateFactory}
       />
-      {hideWorkspaceNavigation ? (
-        <div className="flex-1" />
-      ) : (
-        <div className="flex-1 overflow-y-auto">
-          <FactoriesNav organizationId={organizationId} factoryKey={factoryKey} recentWorkOrders={recentWorkOrders} />
-        </div>
-      )}
+      <div className="flex-1 overflow-y-auto">
+        <FactoriesNav organizationId={organizationId} factoryKey={factoryKey} recentWorkOrders={recentWorkOrders} />
+      </div>
       <SidebarUserMenu
         organizationId={organizationId}
         userName={accountName ?? "You"}

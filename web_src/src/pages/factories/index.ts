@@ -12,6 +12,7 @@ export {
   LegacyWorkOrderDetailRedirect,
   LinesPage,
   MissionsPage,
+  NewWorkspacePage,
   OnboardingGate,
   OnboardingPage,
   OverviewPage,

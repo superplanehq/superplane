@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 import { AGENT_OPTIONS, integrationLabel, type AgentHarnessId, type IntegrationId } from "./onboardingFixtures";
 import { ConnectOptionRow, IntegrationChoiceIcon } from "./onboardingSteps";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -7,14 +5,10 @@ import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 export function AgentStep({
   setup,
   onRequestConnect,
-  integrationControls,
 }: {
   setup: OnboardingSetupApi;
   onRequestConnect: (id: IntegrationId) => void;
-  integrationControls?: ReactNode;
 }) {
-  if (integrationControls) return integrationControls;
-
   return (
     <div className="grid gap-2">
       {AGENT_OPTIONS.map((option) => (
