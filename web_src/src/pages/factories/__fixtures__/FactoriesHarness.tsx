@@ -14,7 +14,10 @@ import { refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
 import { MissionAssignmentProvider } from "../pages/missions/MissionAssignmentContext";
 import { MissionsWorkOrdersPage } from "../pages/missions/MissionsWorkOrdersPage";
 import { WorkOrderMissionOverviewRow } from "../pages/missions/WorkOrderMissionOverviewRow";
+import { WorkOrderReactionsBar } from "../pages/reactions/WorkOrderReactionsBar";
+import { WorkOrderReactionsProvider } from "../pages/reactions/WorkOrderReactionsProvider";
 import { WorkOrderOverviewMissionSlotContext } from "../sidebar/workOrderOverviewSlots";
+import { WorkOrderReactionsSlotContext } from "../workOrderReactionsSlot";
 
 interface FactoriesHarnessProps {
   /** Path under the org. Defaults to `workspaces` (list page). */
@@ -90,9 +93,13 @@ export function FactoriesHarness({
 
   const withMissions = (
     <MissionAssignmentProvider>
-      <WorkOrderOverviewMissionSlotContext.Provider value={WorkOrderMissionOverviewRow}>
-        {harness}
-      </WorkOrderOverviewMissionSlotContext.Provider>
+      <WorkOrderReactionsProvider>
+        <WorkOrderOverviewMissionSlotContext.Provider value={WorkOrderMissionOverviewRow}>
+          <WorkOrderReactionsSlotContext.Provider value={WorkOrderReactionsBar}>
+            {harness}
+          </WorkOrderReactionsSlotContext.Provider>
+        </WorkOrderOverviewMissionSlotContext.Provider>
+      </WorkOrderReactionsProvider>
     </MissionAssignmentProvider>
   );
 

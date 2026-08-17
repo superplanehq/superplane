@@ -13,11 +13,14 @@ import {
 } from "@/ui/dropdownMenu";
 import { WorkspacePageHeader } from "./layout/WorkspacePageHeader";
 import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
+import { useWorkOrderReactionsSlot } from "./workOrderReactionsSlot";
 
 interface WorkOrderDetailHeaderProps {
   orderTitle: string;
   /** Short identifier (e.g. `SP-42`). Rendered as a kicker above the title. */
   orderIdentifier?: string;
+  /** Work order id, passed to the Storybook-only reactions slot. */
+  orderId: string;
   /** Back link target (Work Orders list). */
   backHref: string;
   displayStatus: WorkOrderDisplayStatus;
@@ -35,6 +38,8 @@ interface WorkOrderDetailHeaderProps {
 }
 
 export function WorkOrderDetailHeader(props: WorkOrderDetailHeaderProps) {
+  const ReactionsSlot = useWorkOrderReactionsSlot();
+
   return (
     <WorkspacePageHeader
       variant="entity"
@@ -48,6 +53,13 @@ export function WorkOrderDetailHeader(props: WorkOrderDetailHeaderProps) {
           <CopyLinkButton />
           <HeaderOverflowMenu {...props} />
         </>
+      }
+      belowRow={
+        ReactionsSlot ? (
+          <div className="mt-3" data-testid="work-order-reactions-slot">
+            <ReactionsSlot workOrderId={props.orderId} />
+          </div>
+        ) : null
       }
     />
   );
