@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import type { OrgUserDisplay, OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
-import { MarkdownContent } from "@/pages/app/Markdown";
 import { useMemo, type ReactNode } from "react";
 import { FileText, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
 import { buildLatestArtifactDataById, overlayLiveArtifactData } from "./lib/workOrderArtifact";
@@ -20,7 +19,7 @@ import {
 import { formatWorkOrderDateTime as formatTimelineDate } from "./lib/workOrderDateTime";
 import { getWorkOrderRunHref } from "./lib/workOrderExecutions";
 import { DispatchTimelineItem } from "./timeline/DispatchTimelineItem";
-import { TimelineAutomationActor } from "./timeline";
+import { CommentEventBody, TimelineAutomationActor } from "./timeline";
 import { TimelineMarker } from "./timeline/TimelineMarker";
 import {
   timelineActorClassName as inlineActorClassName,
@@ -53,6 +52,14 @@ interface WorkOrderTimelineProps {
   artifacts?: FactoriesWorkOrderArtifact[];
   /** Optional trailing timeline content, such as the comment composer. */
   footer?: ReactNode;
+  /**
+   * Same permission tier as commenting (see WorkOrderCommentComposer):
+   * whether the current viewer can add/remove their own reaction on a
+   * comment. Reaction pills still render read-only when false.
+   */
+  canReactToComments?: boolean;
+  onAddCommentReaction?: (commentId: string, emoji: string) => void;
+  onRemoveCommentReaction?: (commentId: string, emoji: string) => void;
 }
 
 export function WorkOrderActivityTimeline({
@@ -68,6 +75,9 @@ export function WorkOrderActivityTimeline({
   onRetryEvents,
   artifacts,
   footer,
+  canReactToComments = false,
+  onAddCommentReaction,
+  onRemoveCommentReaction,
 }: WorkOrderTimelineProps) {
   const { data: users = [] } = useOrganizationUsers(organizationId);
   const resolveUserName = useMemo(() => buildWorkOrderUserNameLookup(users, order), [users, order]);
@@ -102,6 +112,9 @@ export function WorkOrderActivityTimeline({
           hasMoreEvents={hasMoreEvents}
           isLoadingMoreEvents={isLoadingMoreEvents}
           onLoadMoreEvents={onLoadMoreEvents}
+          canReactToComments={canReactToComments}
+          onAddCommentReaction={onAddCommentReaction}
+          onRemoveCommentReaction={onRemoveCommentReaction}
         />
       )}
       {footer ? (
@@ -124,6 +137,9 @@ interface TimelineEventsListProps {
   hasMoreEvents: boolean;
   isLoadingMoreEvents: boolean;
   onLoadMoreEvents?: () => void;
+  canReactToComments: boolean;
+  onAddCommentReaction?: (commentId: string, emoji: string) => void;
+  onRemoveCommentReaction?: (commentId: string, emoji: string) => void;
 }
 
 function TimelineEventsList({
@@ -136,6 +152,9 @@ function TimelineEventsList({
   hasMoreEvents,
   isLoadingMoreEvents,
   onLoadMoreEvents,
+  canReactToComments,
+  onAddCommentReaction,
+  onRemoveCommentReaction,
 }: TimelineEventsListProps) {
   const latestDispatchIndex = findLatestDispatchIndex(events);
   return (
@@ -167,6 +186,9 @@ function TimelineEventsList({
               resolveUserDisplay={resolveUserDisplay}
               latestArtifactDataById={latestArtifactDataById}
               isLatestDispatch={index === latestDispatchIndex}
+              canReactToComments={canReactToComments}
+              onAddCommentReaction={onAddCommentReaction}
+              onRemoveCommentReaction={onRemoveCommentReaction}
             />
           ))}
         </ul>
@@ -241,6 +263,9 @@ function TimelineItem({
   resolveUserDisplay,
   latestArtifactDataById,
   isLatestDispatch,
+  canReactToComments,
+  onAddCommentReaction,
+  onRemoveCommentReaction,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
@@ -249,6 +274,9 @@ function TimelineItem({
   resolveUserDisplay: OrgUserDisplayLookup;
   latestArtifactDataById: Map<string, Record<string, unknown>>;
   isLatestDispatch: boolean;
+  canReactToComments: boolean;
+  onAddCommentReaction?: (commentId: string, emoji: string) => void;
+  onRemoveCommentReaction?: (commentId: string, emoji: string) => void;
 }) {
   if (event.kind === "dispatched") {
     return (
@@ -280,6 +308,9 @@ function TimelineItem({
             orderNumber={orderNumber}
             resolveUserDisplay={resolveUserDisplay}
             latestArtifactDataById={latestArtifactDataById}
+            canReactToComments={canReactToComments}
+            onAddCommentReaction={onAddCommentReaction}
+            onRemoveCommentReaction={onRemoveCommentReaction}
           />
         </div>
       </div>
@@ -294,6 +325,9 @@ function TimelineItemBody({
   orderNumber,
   resolveUserDisplay,
   latestArtifactDataById,
+  canReactToComments,
+  onAddCommentReaction,
+  onRemoveCommentReaction,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
@@ -301,6 +335,9 @@ function TimelineItemBody({
   orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   latestArtifactDataById: Map<string, Record<string, unknown>>;
+  canReactToComments: boolean;
+  onAddCommentReaction?: (commentId: string, emoji: string) => void;
+  onRemoveCommentReaction?: (commentId: string, emoji: string) => void;
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
   const timeLabel = formatTimelineDate(new Date(event.at));
@@ -314,6 +351,9 @@ function TimelineItemBody({
         organizationId={organizationId}
         factoryKey={factoryKey}
         orderNumber={orderNumber}
+        canReactToComments={canReactToComments}
+        onAddCommentReaction={onAddCommentReaction}
+        onRemoveCommentReaction={onRemoveCommentReaction}
       />
     );
   }
@@ -338,60 +378,6 @@ function TimelineItemBody({
       resolveUserDisplay={resolveUserDisplay}
       timeLabel={timeLabel}
     />
-  );
-}
-
-function CommentEventBody({
-  event,
-  actorDisplay,
-  timeLabel,
-  organizationId,
-  factoryKey,
-  orderNumber,
-}: {
-  event: WorkOrderTimelineEvent;
-  actorDisplay: OrgUserDisplay | null;
-  timeLabel: string;
-  organizationId: string;
-  factoryKey: string;
-  orderNumber?: string;
-}) {
-  const comment = event.comment;
-  if (!comment) return null;
-  const isAutomation = (comment.authorKind ?? "").toLowerCase() === "automation";
-  const runHref = getWorkOrderRunHref(organizationId, factoryKey, event.sourceAppId, event.sourceRunId, {
-    orderNumber,
-  });
-
-  return (
-    <>
-      <p className={inlineParagraphClassName}>
-        {isAutomation && (event.actorAutomation || comment.automation) ? (
-          <TimelineAutomationActor actor={event.actorAutomation ?? comment.automation!} fallbackLabel="Automation" />
-        ) : actorDisplay ? (
-          <span className={inlineActorClassName}>{actorDisplay.name}</span>
-        ) : (
-          <span className={inlineActorClassName}>Someone</span>
-        )}{" "}
-        commented
-        {isAutomation && runHref ? (
-          <>
-            {" "}
-            via{" "}
-            <Link href={runHref} className={inlineLinkClassName}>
-              run
-            </Link>
-          </>
-        ) : null}
-        <span className={inlineTimeClassName}>
-          {" · "}
-          {timeLabel}
-        </span>
-      </p>
-      <div className="mt-1" data-testid="work-order-timeline-comment-body">
-        <MarkdownContent content={comment.body} variant="workspace" />
-      </div>
-    </>
   );
 }
 

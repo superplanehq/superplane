@@ -30,6 +30,63 @@ describe("buildWorkOrderTimelineViewFromEvents: comments, artifacts, and attribu
     expect(view.events[0]?.sourceAppId).toBeUndefined();
   });
 
+  it("uses the API event's own id as the comment id, and passes through reactions", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        id: "event-42",
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.comment.added",
+        event: {
+          body: "Nice work!",
+          author: { kind: "user", userId: "user-1" },
+          reactions: [
+            { emoji: "+1", count: 2, reactedByMe: true },
+            { emoji: "eyes", count: 1, reactedByMe: false },
+          ],
+        },
+      },
+    ]);
+
+    expect(view.events[0]?.comment).toMatchObject({
+      id: "event-42",
+      reactions: [
+        { emoji: "+1", count: 2, reactedByMe: true },
+        { emoji: "eyes", count: 1, reactedByMe: false },
+      ],
+    });
+  });
+
+  it("defaults to an empty reactions array when the API omits the field", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        id: "event-43",
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.comment.added",
+        event: {
+          body: "Looks good.",
+          author: { kind: "user", userId: "user-1" },
+        },
+      },
+    ]);
+
+    expect(view.events[0]?.comment?.reactions).toEqual([]);
+  });
+
+  it("falls back to a synthetic id when the API event has none", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.comment.added",
+        event: {
+          body: "Looks good.",
+          author: { kind: "user", userId: "user-1" },
+        },
+      },
+    ]);
+
+    expect(view.events[0]?.comment?.id).toBe("comment-0");
+  });
+
   it("carries the source run onto a top-level automation comment", () => {
     const view = buildWorkOrderTimelineViewFromEvents([
       {

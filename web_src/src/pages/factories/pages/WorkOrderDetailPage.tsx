@@ -241,6 +241,8 @@ function LoadedWorkOrderDetail({
       onAssigneesSave={actions.handleAssigneesSave}
       onStatusChange={actions.handleStatusChange}
       onAddComment={actions.handleAddComment}
+      onAddCommentReaction={actions.handleAddCommentReaction}
+      onRemoveCommentReaction={actions.handleRemoveCommentReaction}
     />
   );
 }

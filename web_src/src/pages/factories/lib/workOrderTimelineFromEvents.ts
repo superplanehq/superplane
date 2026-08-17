@@ -5,6 +5,7 @@ import { UNKNOWN_ORG_USER_NAME } from "@/lib/orgUserDisplay";
 import type {
   UserNameLookup,
   WorkOrderTimelineAutomationActor,
+  WorkOrderTimelineCommentReaction,
   WorkOrderTimelineEvent,
   WorkOrderTimelineEventKind,
   WorkOrderTimelineStep,
@@ -46,6 +47,12 @@ interface EventArtifactPayload {
   data?: Record<string, unknown>;
 }
 
+interface EventCommentReactionPayload {
+  emoji?: string;
+  count?: number;
+  reactedByMe?: boolean;
+}
+
 interface EventPayload extends LineStepExecutionPayload {
   user?: EventUserRef;
   automation?: EventAutomationRefPayload;
@@ -62,6 +69,7 @@ interface EventPayload extends LineStepExecutionPayload {
   body?: string;
   author?: EventCommentAuthorPayload;
   artifact?: EventArtifactPayload;
+  reactions?: EventCommentReactionPayload[];
 }
 
 interface TimelineBuildState {
@@ -138,7 +146,7 @@ function applyApiEventToTimeline(
       appendStepExecutionEvent(toDispatchBatchContext(state), payload, at, "step.execution.finished");
       return;
     case "order.comment.added":
-      appendCommentEvent(state, index, payload, at, resolveUserName);
+      appendCommentEvent(state, { index, payload, at, resolveUserName, apiEventId: apiEvent.id });
       return;
     case "order.artifact.added":
       appendArtifactEvent(state, index, payload, at, resolveUserName);
@@ -248,13 +256,16 @@ function humanizeState(state: string): string {
   }
 }
 
-function appendCommentEvent(
-  state: TimelineBuildState,
-  index: number,
-  payload: EventPayload,
-  at: string,
-  resolveUserName?: UserNameLookup,
-): void {
+interface AppendCommentEventContext {
+  index: number;
+  payload: EventPayload;
+  at: string;
+  resolveUserName?: UserNameLookup;
+  apiEventId?: string;
+}
+
+function appendCommentEvent(state: TimelineBuildState, context: AppendCommentEventContext): void {
+  const { index, payload, at, resolveUserName, apiEventId } = context;
   const body = (payload.body ?? "").trim();
   if (!body) {
     return;
@@ -271,6 +282,11 @@ function appendCommentEvent(
     return;
   }
 
+  // The event's own id is the comment's public id — reactions key off
+  // it. Fall back to the synthetic per-render id only for events from a
+  // backend response that predates the `id` field.
+  const commentId = apiEventId || `comment-${index}`;
+
   state.events.push({
     id: `comment-${index}`,
     kind: "commented",
@@ -281,12 +297,28 @@ function appendCommentEvent(
     sourceRunId,
     sourceAppId,
     comment: {
+      id: commentId,
       body,
       authorKind: author.kind,
       automation: automationActor,
+      reactions: toCommentReactions(payload.reactions),
     },
     title: "commented",
   });
+}
+
+function toCommentReactions(reactions: EventCommentReactionPayload[] | undefined): WorkOrderTimelineCommentReaction[] {
+  if (!reactions?.length) {
+    return [];
+  }
+
+  return reactions
+    .filter((reaction): reaction is EventCommentReactionPayload & { emoji: string } => Boolean(reaction.emoji))
+    .map((reaction) => ({
+      emoji: reaction.emoji,
+      count: reaction.count ?? 0,
+      reactedByMe: reaction.reactedByMe ?? false,
+    }));
 }
 
 function appendArtifactEvent(

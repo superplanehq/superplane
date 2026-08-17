@@ -105,6 +105,12 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     onAddComment: async (body: string) => {
       console.log("comment", body);
     },
+    onAddCommentReaction: (commentId: string, emoji: string) => {
+      console.log("add reaction", commentId, emoji);
+    },
+    onRemoveCommentReaction: (commentId: string, emoji: string) => {
+      console.log("remove reaction", commentId, emoji);
+    },
   };
 }
 

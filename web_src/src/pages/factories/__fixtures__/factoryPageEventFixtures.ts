@@ -131,14 +131,29 @@ function statusUpdatedEvent(
   };
 }
 
+interface CommentReactionFixture {
+  emoji: string;
+  count: number;
+  reactedByMe: boolean;
+}
+
+interface CommentAddedEventOptions {
+  run?: { id: string };
+  reactions?: CommentReactionFixture[];
+}
+
 function commentAddedEvent(
   order: FactoriesWorkOrder,
   at: string,
   body: string,
   author: CommentAuthorFixture,
-  run?: { id: string },
+  options: CommentAddedEventOptions = {},
 ): FactoriesWorkOrderEvent {
+  const { run, reactions } = options;
   return {
+    // A stable, deterministic id — mirrors the real API's event id, which
+    // reactions key off (see WorkOrderCommentReactionSummary).
+    id: `comment-${order.id}-${at}`,
     type: "order.comment.added",
     timestamp: at,
     event: {
@@ -146,6 +161,7 @@ function commentAddedEvent(
       body,
       author,
       ...(run ? { run } : {}),
+      reactions: reactions ?? [],
     },
   };
 }
@@ -203,6 +219,12 @@ export const DRAFT_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     HOUR_AGO,
     "Scoping notes: need product sign-off on metric names before moving to ready.",
     { kind: "user", userId: STORYBOOK_ME_USER_ID },
+    {
+      reactions: [
+        { emoji: "+1", count: 2, reactedByMe: true },
+        { emoji: "eyes", count: 1, reactedByMe: false },
+      ],
+    },
   ),
 ];
 
@@ -273,7 +295,7 @@ export const RUNNING_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
         stepName: "implement",
       },
     },
-    { id: "run-implement" },
+    { run: { id: "run-implement" } },
   ),
 ];
 
