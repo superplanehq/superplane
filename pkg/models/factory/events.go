@@ -19,6 +19,13 @@ const (
 	// merged transition; the row is updated in place and this reason
 	// just tells the frontend which query to invalidate.
 	EventTypeOrderArtifactUpdated = "order.artifact.updated"
+	// EventTypeOrderCommentReactionUpdated is a websocket-only
+	// notification reason, mirroring EventTypeOrderArtifactUpdated: a
+	// comment's reaction summary changed. It never backs a timeline
+	// event/struct — the mutation's own response already carries the
+	// fresh summary, and this reason just tells other viewers'
+	// frontends which query to invalidate.
+	EventTypeOrderCommentReactionUpdated = "order.comment.reaction.updated"
 
 	// Factory line events
 	EventTypeLineStepExecutionCreated  = "step.execution.created"
