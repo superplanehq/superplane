@@ -17,6 +17,7 @@ export function useAutomationsPageModel() {
   const canCreateApp = canAct("canvases", "create");
   const canUpdateApp = canAct("canvases", "update");
   const canDeleteApp = canAct("canvases", "delete");
+  const canUpdateWorkOrders = canAct("work_orders", "update");
 
   const [createOpen, setCreateOpen] = useState(false);
   const navigate = useNavigate();
@@ -79,6 +80,7 @@ export function useAutomationsPageModel() {
     appsLoading,
     workOrders,
     canCreateApp,
+    canUpdateWorkOrders,
     permissionsLoading,
     createOpen,
     setCreateOpen,

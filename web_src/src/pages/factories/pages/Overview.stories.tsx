@@ -11,6 +11,8 @@ import { OverviewPage } from "./OverviewPage";
 /**
  * Overview page: compact work orders + lines snapshot inside the FactoriesLayout.
  * Mounted through the real router so the sidebar (nav + recent) appears.
+ * Canvas clicks stay on FactoryAppCanvasPage because FactoriesHarness serves
+ * a factory-owned canvas by default.
  */
 const meta = {
   title: "Factories/Pages/Overview",
