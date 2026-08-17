@@ -19,6 +19,15 @@ export const factoryContentBodyClassName = cn(
   contentColumn,
 );
 
+/** Full-pane shell for a GitHub-Projects-style kanban (no page scroll). */
+export const factoryKanbanPageClassName = "flex h-full min-h-0 flex-col overflow-hidden";
+
+/** Gutter + remaining height, no max-width, so lanes can grow to the right. */
+export const factoryKanbanBodyClassName = cn(
+  "px-[var(--workspace-page-gutter)] py-[var(--workspace-page-padding-block)] text-foreground",
+  "flex min-h-0 flex-1 flex-col",
+);
+
 export const factoryCardClassName = "rounded-lg border border-border bg-card";
 
 export const factoryPageTitleClassName = "workspace-page-title";
