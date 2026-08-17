@@ -6,16 +6,7 @@
  * web_src/src/pages/app/mappers/github/add_reaction.ts, which map the same
  * content values for canvas-automation "add reaction" nodes).
  */
-export const REACTION_CONTENTS = [
-  "+1",
-  "-1",
-  "laugh",
-  "hooray",
-  "confused",
-  "heart",
-  "rocket",
-  "eyes",
-] as const;
+export const REACTION_CONTENTS = ["+1", "-1", "laugh", "hooray", "confused", "heart", "rocket", "eyes"] as const;
 
 export type ReactionContent = (typeof REACTION_CONTENTS)[number];
 
