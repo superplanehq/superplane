@@ -14,7 +14,12 @@ import { useWorkOrderMentionToast } from "./useWorkOrderMentionToast";
 const CURRENT_USER_ID = "user-me";
 const AUTHOR_ID = "user-author";
 
-function commentEvent(body: string, authorId: string, mentionIds: string[], timestamp: string): FactoriesWorkOrderEvent {
+function commentEvent(
+  body: string,
+  authorId: string,
+  mentionIds: string[],
+  timestamp: string,
+): FactoriesWorkOrderEvent {
   return {
     type: "order.comment.added",
     timestamp,
@@ -51,7 +56,10 @@ describe("useWorkOrderMentionToast", () => {
 
     expect(showInfoToastMock).not.toHaveBeenCalled();
 
-    const nextEvents = [...initialEvents, commentEvent("take a look @[Me](user:x)", AUTHOR_ID, [CURRENT_USER_ID], "t2")];
+    const nextEvents = [
+      ...initialEvents,
+      commentEvent("take a look @[Me](user:x)", AUTHOR_ID, [CURRENT_USER_ID], "t2"),
+    ];
     rerender({ events: nextEvents });
 
     expect(showInfoToastMock).toHaveBeenCalledWith("Alex Reviewer mentioned you in Work order #1.");

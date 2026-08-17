@@ -31,7 +31,13 @@ async function findMentionOption(name: string) {
 function renderComposer(overrides: Partial<Parameters<typeof WorkOrderCommentComposer>[0]> = {}) {
   const onSubmit = vi.fn().mockResolvedValue(undefined);
   render(
-    <WorkOrderCommentComposer organizationId="org-1" canComment isSubmitting={false} onSubmit={onSubmit} {...overrides} />,
+    <WorkOrderCommentComposer
+      organizationId="org-1"
+      canComment
+      isSubmitting={false}
+      onSubmit={onSubmit}
+      {...overrides}
+    />,
   );
   return { onSubmit };
 }
@@ -74,10 +80,7 @@ describe("WorkOrderCommentComposer", () => {
     await userEvent.type(textarea, "please take a look");
     await userEvent.click(screen.getByTestId("work-order-comment-submit"));
 
-    expect(onSubmit).toHaveBeenCalledWith(
-      `hey @[Alice Anderson](user:${ALICE_ID}) please take a look`,
-      [ALICE_ID],
-    );
+    expect(onSubmit).toHaveBeenCalledWith(`hey @[Alice Anderson](user:${ALICE_ID}) please take a look`, [ALICE_ID]);
   });
 
   it("selects a highlighted option with the keyboard (arrow + Enter)", async () => {
