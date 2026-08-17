@@ -3,6 +3,8 @@ package integrations
 import (
 	"context"
 
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -15,13 +17,26 @@ import (
 
 func ListIntegrations(ctx context.Context, registry *registry.Registry) (*pb.ListIntegrationsResponse, error) {
 	integrations := registry.ListIntegrations()
+	orgID := organizationIDFromContext(ctx)
 
 	return &pb.ListIntegrationsResponse{
-		Integrations: serializeIntegrations(registry, integrations),
+		Integrations: serializeIntegrations(registry, orgID, integrations),
 	}, nil
 }
 
-func serializeIntegrations(registry *registry.Registry, in []core.Integration) []*pb.IntegrationDefinition {
+func organizationIDFromContext(ctx context.Context) uuid.UUID {
+	raw, ok := authentication.GetOrganizationIdFromMetadata(ctx)
+	if !ok {
+		return uuid.Nil
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return uuid.Nil
+	}
+	return id
+}
+
+func serializeIntegrations(registry *registry.Registry, orgID uuid.UUID, in []core.Integration) []*pb.IntegrationDefinition {
 	out := make([]*pb.IntegrationDefinition, len(in))
 	for i, integration := range in {
 		configFields := integration.Configuration()
@@ -30,6 +45,7 @@ func serializeIntegrations(registry *registry.Registry, in []core.Integration) [
 			configuration[j] = actions.ConfigurationFieldToProto(field)
 		}
 
+		useNewFlow := orgID != uuid.Nil && registry.UseNewSetupFlow(orgID, integration.Name())
 		out[i] = &pb.IntegrationDefinition{
 			Name:             integration.Name(),
 			Label:            integration.Label(),
@@ -39,7 +55,7 @@ func serializeIntegrations(registry *registry.Registry, in []core.Integration) [
 			Configuration:    configuration,
 			Capabilities:     serializeCapabilities(registry, integration),
 			CapabilityGroups: serializeCapabilityGroups(registry, integration),
-			LegacySetupOnly:  !registry.SupportsNewSetupFlow(integration.Name()),
+			LegacySetupOnly:  !useNewFlow,
 		}
 	}
 	return out
