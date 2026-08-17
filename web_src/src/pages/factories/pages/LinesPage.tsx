@@ -24,7 +24,12 @@ import {
   type PhaseGlyphKind,
 } from "../lib/linePhaseRuns";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
-import { WorkOrderBoardLane, type BoardLaneTone } from "../workOrders/WorkOrderBoardChrome";
+import {
+  WorkOrderBoardLane,
+  WorkOrderKanbanBoard,
+  workOrderKanbanLaneScrollClassName,
+  type BoardLaneTone,
+} from "../workOrders/WorkOrderBoardChrome";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import {
   createFactoryLinePath,
@@ -34,7 +39,11 @@ import {
   linesPath,
 } from "../lib/factoryPagePaths";
 import { formatLinePhaseDescription, humanizeLineName } from "../lib/humanizeLineName";
-import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import {
+  factoryContentBodyClassName,
+  factoryKanbanBodyClassName,
+  factoryKanbanPageClassName,
+} from "./factoryPageLayoutStyles";
 import { PhaseGlyph } from "./linePhaseGlyph";
 
 export function LinesPage() {
@@ -60,15 +69,17 @@ export function LinesPage() {
   // the lanes read as columns rather than as boxes around their cards.
   if (selectedLine) {
     return (
-      <div className="flex min-h-full flex-col" data-testid="lines-detail-page">
-        <LineDetailHeader
-          organizationId={organizationId}
-          factoryKey={factoryKey}
-          line={selectedLine}
-          canUpdate={canUpdate}
-        />
+      <div className={factoryKanbanPageClassName} data-testid="lines-detail-page">
+        <div className="shrink-0">
+          <LineDetailHeader
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            line={selectedLine}
+            canUpdate={canUpdate}
+          />
+        </div>
 
-        <div className={cn(factoryContentBodyClassName, "flex min-h-0 flex-1 flex-col")}>
+        <div className={factoryKanbanBodyClassName}>
           <LineDetail
             organizationId={organizationId}
             factoryKey={factoryKey}
@@ -267,9 +278,6 @@ function PhaseStrip({ steps, ticks }: { steps: FactoryLineStep[]; ticks: LinePha
   );
 }
 
-/** Max phase boxes per row; extra steps wrap to the next row. */
-const MAX_PHASE_COLUMNS_PER_ROW = 3;
-
 function PhaseBoard({
   organizationId,
   factoryKey,
@@ -283,37 +291,23 @@ function PhaseBoard({
   columns: LinePhaseColumn[];
   workOrderCardContext: WorkOrderCardContext;
 }) {
-  const columnsPerRow = Math.min(columns.length, MAX_PHASE_COLUMNS_PER_ROW) || 1;
-
   return (
-    <div
-      className="grid min-h-0 w-full flex-1 gap-3"
-      style={{ gridTemplateColumns: `repeat(${columnsPerRow}, minmax(0, 1fr))` }}
-      data-testid="lines-phase-board"
-    >
-      {columns.map((column, index) => {
-        // Draw the connecting rail into the trailing gap, except after the last
-        // column in a visual row (its neighbour wraps to the next line).
-        const isRowEnd = index % columnsPerRow === columnsPerRow - 1;
-        const isLast = index === columns.length - 1;
-        return (
-          // A single-cell grid stretches the lane to the row height, so the
-          // wrapper the rail is positioned against does not shrink the lane.
-          <div key={`${column.stepIndex}-${column.stepName}`} className="relative grid min-w-0">
-            {!isRowEnd && !isLast ? (
-              <span className="absolute top-[21px] left-full z-[1] h-px w-3 bg-border" aria-hidden />
-            ) : null}
-            <PhaseColumn
-              organizationId={organizationId}
-              factoryKey={factoryKey}
-              lineId={lineId}
-              column={column}
-              workOrderCardContext={workOrderCardContext}
-            />
-          </div>
-        );
-      })}
-    </div>
+    <WorkOrderKanbanBoard testId="lines-phase-board">
+      {columns.map((column, index) => (
+        <div key={`${column.stepIndex}-${column.stepName}`} className="relative flex h-full min-h-0 min-w-72 flex-1">
+          {index < columns.length - 1 ? (
+            <span className="absolute top-[21px] left-full z-[1] h-px w-3 bg-border" aria-hidden />
+          ) : null}
+          <PhaseColumn
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            lineId={lineId}
+            column={column}
+            workOrderCardContext={workOrderCardContext}
+          />
+        </div>
+      ))}
+    </WorkOrderKanbanBoard>
   );
 }
 
@@ -404,7 +398,7 @@ function PhaseColumn({
     >
       <ul
         ref={scrollRef}
-        className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain [scrollbar-width:thin]"
+        className={workOrderKanbanLaneScrollClassName}
         onScroll={(event) => loadMoreIfNeeded(event.currentTarget)}
         data-testid={`lines-phase-column-scroll-${column.stepIndex}`}
       >

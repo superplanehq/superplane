@@ -10,6 +10,7 @@ import {
 } from "../__fixtures__/factoryOwnedCanvasFixture";
 import {
   defaultFactoriesFixture,
+  LINE_RUN_IMPLEMENT_FAILED_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
 } from "../__fixtures__/factoryPageResponses";
@@ -48,7 +49,7 @@ export const FromLines: Story = {
   name: "From Lines",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${implementerAppId}?run=run-implement-2&from=lines&lineId=${planAndImplementLineId}`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${implementerAppId}?run=${LINE_RUN_IMPLEMENT_FAILED_ID}&from=lines&lineId=${planAndImplementLineId}`}
       factoriesFixture={defaultFactoriesFixture}
       appFixture={refundLineCanvasFixture()}
     />

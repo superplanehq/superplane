@@ -15,6 +15,27 @@ const LANE_TONE_CLASSNAME: Record<BoardLaneTone, string> = {
   done: "bg-[color:var(--status-done-lane-bg)]",
 };
 
+/** Shared card list inside a lane: fill leftover height, scroll cards. */
+export const workOrderKanbanLaneScrollClassName =
+  "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain [scrollbar-width:thin]";
+
+interface WorkOrderKanbanBoardProps {
+  children: ReactNode;
+  testId: string;
+}
+
+/** One horizontal row of lanes. Extra columns grow right and scroll on x. */
+export function WorkOrderKanbanBoard({ children, testId }: WorkOrderKanbanBoardProps) {
+  return (
+    <div
+      className="flex h-full min-h-0 min-w-0 flex-1 gap-3 overflow-x-auto overflow-y-hidden [scrollbar-width:thin]"
+      data-testid={testId}
+    >
+      {children}
+    </div>
+  );
+}
+
 interface WorkOrderBoardLaneProps {
   title: string;
   count: number;
@@ -46,12 +67,12 @@ export function WorkOrderBoardLane({
     <section
       aria-label={label ?? title}
       className={cn(
-        "flex min-h-[160px] min-w-0 flex-col rounded-lg border border-border/70 p-2",
+        "flex h-full min-h-0 min-w-72 flex-1 flex-col rounded-lg border border-border/70 p-2",
         LANE_TONE_CLASSNAME[tone],
       )}
       data-testid={testId}
     >
-      <header className="flex items-center justify-between gap-2 px-2 pb-2">
+      <header className="flex shrink-0 items-center justify-between gap-2 px-2 pb-2">
         <div className="inline-flex min-w-0 items-center gap-2">
           {leading}
           <h2 className="truncate text-[12px] font-semibold uppercase tracking-[0.06em] text-foreground/80">{title}</h2>
@@ -63,7 +84,7 @@ export function WorkOrderBoardLane({
       </header>
 
       {count === 0 ? (
-        <p className="mt-2 rounded-md border border-dashed border-border/60 px-3 py-6 text-center text-[12px] text-muted-foreground">
+        <p className="mt-2 flex-1 rounded-md border border-dashed border-border/60 px-3 py-6 text-center text-[12px] text-muted-foreground">
           {emptyDescription}
         </p>
       ) : (
