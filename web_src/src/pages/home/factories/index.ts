@@ -11,6 +11,7 @@ export {
   buildFactoryRunParameters,
   materializeFactoryCanvas,
   materializeFactoryConsole,
+  normalizeFactoryInstallParams,
   substituteInstallParams,
   wireFactoryIntegrations,
 } from "./materializeFactoryTemplate";

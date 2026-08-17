@@ -12,9 +12,12 @@ export {
   LegacyWorkOrderDetailRedirect,
   LinesPage,
   MissionsPage,
+  OnboardingGate,
+  OnboardingPage,
   OverviewPage,
   VelocityPage,
   WikiPage,
   WorkOrderDetailPage,
   WorkOrdersPage,
+  WorkspaceOverviewPage,
 } from "./pages";

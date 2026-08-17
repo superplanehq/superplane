@@ -16,10 +16,11 @@ import {
   replaceFactoryKeySegment,
   resolveFactoryByKey,
 } from "../lib/factoryKeyResolution";
-import { factoryDetailPath, factoryListPath, factoryOnboardingPath } from "../lib/factoryPagePaths";
+import { factoryListPath, factoryOnboardingPath } from "../lib/factoryPagePaths";
 import { clearLastVisitedFactory, recordLastVisitedFactory } from "../lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
 import { useOnboardingStorybook } from "../pages/onboarding/useOnboardingStorybook";
+import { isFactoryOnboardingComplete } from "../pages/onboarding/onboardingStatus";
 import { FactoriesLayoutContext } from "./factoriesLayoutContext";
 import { FactoriesNav } from "./FactoriesNav";
 import { SidebarUserMenu } from "./SidebarUserMenu";
@@ -153,10 +154,8 @@ function FactoriesLayoutContent({
         workspaceId: created.id,
         workspaceName: created.name || input.name,
       });
-      navigate(factoryOnboardingPath(organizationId, created.key));
-      return;
     }
-    navigate(factoryDetailPath(organizationId, created.key));
+    navigate(factoryOnboardingPath(organizationId, created.key));
   };
 
   if (factoryError) {
@@ -170,23 +169,25 @@ function FactoriesLayoutContent({
   return (
     <FactoriesLayoutContext.Provider value={layoutContextValue}>
       <div className="flex h-screen w-full bg-background text-foreground" data-testid="factories-layout">
-        {isOnboardingSidebarHidden(storybookOnboarding?.pending?.workspaceId, factoryId) ? null : (
-          <FactoriesSidebar
-            organizationId={organizationId}
-            factoryKey={factoryKey}
-            factory={factory}
-            factories={factories}
-            organizationName={organization?.metadata?.name ?? ""}
-            accountName={account?.name}
-            accountEmail={account?.email}
-            accountAvatarUrl={account?.avatar_url}
-            canOpenSettings={canAct("factories", "update")}
-            canCreateFactory={canAct("factories", "create")}
-            permissionsLoading={permissionsLoading}
-            recentWorkOrders={recentWorkOrders}
-            onOpenCreateFactory={() => setCreateFactoryOpen(true)}
-          />
-        )}
+        <FactoriesSidebar
+          organizationId={organizationId}
+          factoryKey={factoryKey}
+          factory={factory}
+          factories={factories}
+          organizationName={organization?.metadata?.name ?? ""}
+          accountName={account?.name}
+          accountEmail={account?.email}
+          accountAvatarUrl={account?.avatar_url}
+          canOpenSettings={canAct("factories", "update")}
+          canCreateFactory={canAct("factories", "create")}
+          permissionsLoading={permissionsLoading}
+          recentWorkOrders={recentWorkOrders}
+          onOpenCreateFactory={() => setCreateFactoryOpen(true)}
+          hideWorkspaceNavigation={
+            isOnboardingSidebarHidden(storybookOnboarding?.pending?.workspaceId, factoryId) ||
+            (!storybookOnboarding && canAct("factories", "update") && !isFactoryOnboardingComplete(factory))
+          }
+        />
         <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
           <Outlet />
         </main>
@@ -223,6 +224,7 @@ interface FactoriesSidebarProps {
   permissionsLoading: boolean;
   recentWorkOrders: FactoriesWorkOrder[];
   onOpenCreateFactory: () => void;
+  hideWorkspaceNavigation?: boolean;
 }
 
 function FactoriesSidebar({
@@ -239,6 +241,7 @@ function FactoriesSidebar({
   permissionsLoading,
   recentWorkOrders,
   onOpenCreateFactory,
+  hideWorkspaceNavigation,
 }: FactoriesSidebarProps) {
   return (
     <aside
@@ -254,9 +257,13 @@ function FactoriesSidebar({
         permissionsLoading={permissionsLoading}
         onCreateFactory={onOpenCreateFactory}
       />
-      <div className="flex-1 overflow-y-auto">
-        <FactoriesNav organizationId={organizationId} factoryKey={factoryKey} recentWorkOrders={recentWorkOrders} />
-      </div>
+      {hideWorkspaceNavigation ? (
+        <div className="flex-1" />
+      ) : (
+        <div className="flex-1 overflow-y-auto">
+          <FactoriesNav organizationId={organizationId} factoryKey={factoryKey} recentWorkOrders={recentWorkOrders} />
+        </div>
+      )}
       <SidebarUserMenu
         organizationId={organizationId}
         userName={accountName ?? "You"}

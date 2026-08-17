@@ -6,15 +6,18 @@ import { useNavigate } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { factoryOverviewPath } from "../../lib/factoryPagePaths";
+import { AgentStep } from "./AgentStep";
 import type { OnboardingRepo } from "./onboardingMocks";
 import { AnalysisSidePanel } from "./AnalysisSidePanel";
+import { DonePanel } from "./DonePanel";
+import { Shell } from "./OnboardingShell";
 import { AGENT_OPTIONS, type IntegrationId, type VcsHostId } from "./onboardingFixtures";
-import { AgentStep, DonePanel, IssuesStep, NameInviteStep, RepoStep, Shell } from "./onboardingSteps";
+import { IssuesStep, NameInviteStep, RepoStep } from "./onboardingSteps";
 import { useConnectDialog } from "./useConnectDialog";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
-type SectionId = "name" | "repo" | "issues" | "agent";
+export type SectionId = "name" | "repo" | "issues" | "agent";
 
 function issuesSectionSummary(setup: OnboardingSetupApi): string | undefined {
   if (setup.issuesChoice === "skip") {
@@ -110,21 +113,35 @@ function Section({
   );
 }
 
-function SetupSections({
+function NameAndRepoSections({
   setup,
   openSection,
   setOpenSection,
   requestConnect,
-  onFinish,
+  inviteUrl,
+  inviteLoading,
+  canInvite,
+  repos,
+  vcsIntegrationControls,
+  saving,
+  continueName,
+  continueRepo,
 }: {
   setup: OnboardingSetupApi;
   openSection: SectionId;
   setOpenSection: (id: SectionId) => void;
   requestConnect: (id: IntegrationId) => void;
-  onFinish: () => void;
+  inviteUrl?: string | null;
+  inviteLoading?: boolean;
+  canInvite?: boolean;
+  repos?: string[];
+  vcsIntegrationControls?: ReactNode;
+  saving: boolean;
+  continueName: () => void;
+  continueRepo: () => void;
 }) {
   return (
-    <div className="space-y-3">
+    <>
       <Section
         id="name"
         title="Name and invite"
@@ -134,14 +151,13 @@ function SetupSections({
         complete={setup.nameReady}
         onOpen={setOpenSection}
       >
-        <NameInviteStep setup={setup} />
+        <NameInviteStep setup={setup} inviteUrl={inviteUrl} inviteLoading={inviteLoading} canInvite={canInvite} />
         <div className="mt-4">
-          <Button type="button" size="sm" disabled={!setup.nameReady} onClick={() => setOpenSection("repo")}>
+          <Button type="button" size="sm" disabled={!setup.nameReady || saving} onClick={continueName}>
             Continue to version control
           </Button>
         </div>
       </Section>
-
       <Section
         id="repo"
         title="Version control"
@@ -152,21 +168,87 @@ function SetupSections({
         locked={!setup.nameReady}
         onOpen={setOpenSection}
       >
-        <RepoStep setup={setup} onRequestConnect={requestConnect} />
+        <RepoStep
+          setup={setup}
+          onRequestConnect={requestConnect}
+          repos={repos}
+          integrationControls={vcsIntegrationControls}
+        />
         <div className="mt-4">
-          <Button
-            type="button"
-            size="sm"
-            disabled={!setup.repoReady}
-            onClick={() => {
-              setup.commitRepoStep();
-              setOpenSection("issues");
-            }}
-          >
+          <Button type="button" size="sm" disabled={!setup.repoReady || saving} onClick={continueRepo}>
             Continue to issues
           </Button>
         </div>
       </Section>
+    </>
+  );
+}
+
+async function continueToSection(
+  save: (() => Promise<boolean>) | undefined,
+  section: SectionId,
+  setOpenSection: (id: SectionId) => void,
+) {
+  if (save && !(await save())) return;
+  setOpenSection(section);
+}
+
+export function SetupSections({
+  setup,
+  openSection,
+  setOpenSection,
+  requestConnect,
+  onFinish,
+  onContinueName,
+  onContinueRepo,
+  onContinueIssues,
+  inviteUrl,
+  inviteLoading,
+  canInvite,
+  repos,
+  vcsIntegrationControls,
+  agentIntegrationControls,
+  showExternalTrackers,
+  allowIssueSkip,
+  saving = false,
+}: {
+  setup: OnboardingSetupApi;
+  openSection: SectionId;
+  setOpenSection: (id: SectionId) => void;
+  requestConnect: (id: IntegrationId) => void;
+  onFinish: () => void | Promise<void>;
+  onContinueName?: () => Promise<boolean>;
+  onContinueRepo?: () => Promise<boolean>;
+  onContinueIssues?: () => Promise<boolean>;
+  inviteUrl?: string | null;
+  inviteLoading?: boolean;
+  canInvite?: boolean;
+  repos?: string[];
+  vcsIntegrationControls?: ReactNode;
+  agentIntegrationControls?: ReactNode;
+  showExternalTrackers?: boolean;
+  allowIssueSkip?: boolean;
+  saving?: boolean;
+}) {
+  return (
+    <div className="space-y-3">
+      <NameAndRepoSections
+        setup={setup}
+        openSection={openSection}
+        setOpenSection={setOpenSection}
+        requestConnect={requestConnect}
+        inviteUrl={inviteUrl}
+        inviteLoading={inviteLoading}
+        canInvite={canInvite}
+        repos={repos}
+        vcsIntegrationControls={vcsIntegrationControls}
+        saving={saving}
+        continueName={() => void continueToSection(onContinueName, "repo", setOpenSection)}
+        continueRepo={() => {
+          setup.commitRepoStep();
+          void continueToSection(onContinueRepo, "issues", setOpenSection);
+        }}
+      />
 
       <Section
         id="issues"
@@ -183,15 +265,22 @@ function SetupSections({
           setOpenSection(id);
         }}
       >
-        <IssuesStep setup={setup} onRequestConnect={requestConnect} autoDiscover />
+        <IssuesStep
+          setup={setup}
+          onRequestConnect={requestConnect}
+          autoDiscover
+          repos={repos}
+          showExternalTrackers={showExternalTrackers}
+          allowSkip={allowIssueSkip}
+        />
         <div className="mt-4">
           <Button
             type="button"
             size="sm"
-            disabled={!setup.issuesReady}
+            disabled={!setup.issuesReady || saving}
             onClick={() => {
               setup.commitIssuesStep();
-              setOpenSection("agent");
+              void continueToSection(onContinueIssues, "agent", setOpenSection);
             }}
           >
             Continue to coding agent
@@ -216,9 +305,9 @@ function SetupSections({
           setOpenSection(id);
         }}
       >
-        <AgentStep setup={setup} onRequestConnect={requestConnect} />
+        <AgentStep setup={setup} onRequestConnect={requestConnect} integrationControls={agentIntegrationControls} />
         <div className="mt-4">
-          <Button type="button" size="sm" disabled={!setup.canFinish} onClick={onFinish}>
+          <Button type="button" size="sm" disabled={!setup.canFinish || saving} onClick={() => void onFinish()}>
             Finish setup
           </Button>
         </div>

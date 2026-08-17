@@ -82,10 +82,8 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
         workspaceId: factory.id,
         workspaceName: factory.name || input.name,
       });
-      navigate(factoryOnboardingPath(organizationId, factory.key));
-      return;
     }
-    navigate(factoryDetailPath(organizationId, factory.key));
+    navigate(factoryOnboardingPath(organizationId, factory.key));
   };
 
   return (

@@ -1,24 +1,31 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import { factoryOnboardingPath } from "../../lib/factoryPagePaths";
+import { factoryOnboardingPath, factoryOverviewPath } from "../../lib/factoryPagePaths";
+import { isFactoryOnboardingComplete } from "./onboardingStatus";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
 /**
- * Storybook-only: while setup is pending for the current workspace, keep the
- * user on that workspace's setup route. Other workspaces stay browsable.
+ * Keeps incomplete workspaces on setup while other workspaces stay browsable.
+ * Storybook can override the server-backed state with its onboarding context.
  */
 export function OnboardingGate() {
   const onboarding = useOnboardingStorybook();
   const location = useLocation();
-  const { organizationId, factoryId, factoryKey } = useFactoriesLayout();
+  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
 
-  const pending = onboarding?.pending;
-  if (!pending || pending.workspaceId !== factoryId) {
+  const storybookPending = onboarding?.pending;
+  const isOnboardingRoute = location.pathname.endsWith("/onboarding");
+  const isIncomplete = onboarding ? storybookPending?.workspaceId === factoryId : !isFactoryOnboardingComplete(factory);
+
+  if (!isIncomplete) {
+    if (isOnboardingRoute) {
+      return <Navigate to={factoryOverviewPath(organizationId, factoryKey)} replace />;
+    }
     return <Outlet />;
   }
 
-  if (location.pathname.endsWith("/onboarding")) {
+  if (isOnboardingRoute) {
     return <Outlet />;
   }
 
