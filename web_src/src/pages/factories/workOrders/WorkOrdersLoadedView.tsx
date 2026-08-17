@@ -116,9 +116,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
         />
       </div>
 
-      <div className={cn(factoryWorkOrdersBodyClassName, "flex flex-col gap-4")}>
-        {body()}
-      </div>
+      <div className={cn(factoryWorkOrdersBodyClassName, "flex flex-col gap-4")}>{body()}</div>
     </div>
   );
 }
