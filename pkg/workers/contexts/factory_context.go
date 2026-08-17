@@ -124,7 +124,10 @@ func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentPara
 		Automation: c.automationRef(),
 	}
 
-	if err := order.RecordCommentAdded(c.tx, body, author, c.runRef()); err != nil {
+	// Automation-authored comments don't support `@` mentions yet (no UI
+	// surface to pick recipients from a canvas component); mentions are
+	// only ever set by the interactive comment endpoint.
+	if err := order.RecordCommentAdded(c.tx, body, author, nil, c.runRef()); err != nil {
 		return err
 	}
 

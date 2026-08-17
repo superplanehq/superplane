@@ -36,21 +36,31 @@ func parseOrderID(orderID string) (uuid.UUID, error) {
 	return id, nil
 }
 
-func parseAssigneeIDs(tx *gorm.DB, organizationID uuid.UUID, assigneeIDs []string) ([]uuid.UUID, error) {
-	if len(assigneeIDs) == 0 {
+// parseUserIDs validates that every id in `userIDs` is a well-formed UUID
+// belonging to an active member of the organization, deduping repeats while
+// preserving first-seen order. `label` is used in the invalid-argument error
+// message (e.g. "assignee", "mentioned user") so callers get a precise error.
+func parseUserIDs(tx *gorm.DB, organizationID uuid.UUID, userIDs []string, label string) ([]uuid.UUID, error) {
+	if len(userIDs) == 0 {
 		return nil, nil
 	}
 
-	parsed := make([]uuid.UUID, 0, len(assigneeIDs))
-	for _, assigneeID := range assigneeIDs {
-		userID, err := uuid.Parse(assigneeID)
+	seen := make(map[uuid.UUID]struct{}, len(userIDs))
+	parsed := make([]uuid.UUID, 0, len(userIDs))
+	for _, rawID := range userIDs {
+		userID, err := uuid.Parse(rawID)
 		if err != nil {
-			return nil, invalidArgument("invalid assignee id")
+			return nil, invalidArgument(fmt.Sprintf("invalid %s id", label))
 		}
+
+		if _, ok := seen[userID]; ok {
+			continue
+		}
+		seen[userID] = struct{}{}
 
 		if _, err := models.FindActiveUserByIDInTransaction(tx, organizationID.String(), userID.String()); err != nil {
 			if err == gorm.ErrRecordNotFound {
-				return nil, invalidArgument(fmt.Sprintf("assignee %s not found", assigneeID))
+				return nil, invalidArgument(fmt.Sprintf("%s %s not found", label, rawID))
 			}
 			return nil, err
 		}
@@ -59,6 +69,10 @@ func parseAssigneeIDs(tx *gorm.DB, organizationID uuid.UUID, assigneeIDs []strin
 	}
 
 	return parsed, nil
+}
+
+func parseAssigneeIDs(tx *gorm.DB, organizationID uuid.UUID, assigneeIDs []string) ([]uuid.UUID, error) {
+	return parseUserIDs(tx, organizationID, assigneeIDs, "assignee")
 }
 
 func listWorkOrderFilters(req *pb.ListWorkOrdersRequest) models.ListFactoryWorkOrdersFilters {

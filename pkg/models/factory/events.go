@@ -86,10 +86,11 @@ type WorkOrderCommentAuthor struct {
 }
 
 type WorkOrderCommentAdded struct {
-	Order  *WorkOrderRef           `json:"order,omitempty"`
-	Body   string                  `json:"body"`
-	Author *WorkOrderCommentAuthor `json:"author,omitempty"`
-	Run    *RunRef                 `json:"run,omitempty"`
+	Order    *WorkOrderRef           `json:"order,omitempty"`
+	Body     string                  `json:"body"`
+	Author   *WorkOrderCommentAuthor `json:"author,omitempty"`
+	Run      *RunRef                 `json:"run,omitempty"`
+	Mentions []UserRef               `json:"mentions,omitempty"`
 }
 
 type WorkOrderArtifactAdded struct {

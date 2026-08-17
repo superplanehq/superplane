@@ -571,6 +571,11 @@ message AddWorkOrderCommentRequest {
   string factory_id = 1;
   string order_id = 2;
   string body = 3;
+  // Ids of organization members explicitly `@` mentioned in `body`. Sent
+  // alongside the rendered text rather than parsed out of the markdown so
+  // the server can validate/authorize each mention independently of the
+  // client's formatting.
+  repeated string mentioned_user_ids = 4;
 }
 
 message AddWorkOrderCommentResponse {
@@ -582,6 +587,8 @@ message WorkOrderComment {
   string body = 2;
   WorkOrderCommentAuthor author = 3;
   google.protobuf.Timestamp created_at = 4;
+  // Organization members `@` mentioned in this comment.
+  repeated UserRef mentions = 5;
 }
 
 message WorkOrderCommentAuthor {
