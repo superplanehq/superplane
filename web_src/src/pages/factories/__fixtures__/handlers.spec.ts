@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { fetchFactoryPageFixture } from "./handlers";
-import { CLOSED_WORK_ORDER, OPEN_WORK_ORDER, PRIMARY_FACTORY_ID, RUNNING_WORK_ORDER } from "./factoryPageResponses";
+import {
+  CLOSED_WORK_ORDER,
+  EMPTY_FACTORY_ID,
+  OPEN_WORK_ORDER,
+  PRIMARY_FACTORY_ID,
+  REFUND_LINE_PLAN_METRICS,
+  RUNNING_WORK_ORDER,
+} from "./factoryPageResponses";
 
 describe("matchFactoryPageFixture", () => {
   it("lists factories and returns the primary factory by id", async () => {
@@ -28,5 +35,15 @@ describe("matchFactoryPageFixture", () => {
     await expect(apps.json()).resolves.toMatchObject({
       apps: expect.arrayContaining([expect.objectContaining({ name: "Refund Planner" })]),
     });
+  });
+
+  it("serves line metrics ahead of the generic lines/:id route", async () => {
+    const response = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/lines/metrics`);
+    await expect(response.json()).resolves.toEqual({ metrics: [REFUND_LINE_PLAN_METRICS] });
+  });
+
+  it("returns an empty metrics list for a factory with no line metrics", async () => {
+    const response = await fetchFactoryPageFixture(`/api/v1/factories/${EMPTY_FACTORY_ID}/lines/metrics`);
+    await expect(response.json()).resolves.toEqual({ metrics: [] });
   });
 });

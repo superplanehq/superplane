@@ -1,9 +1,10 @@
-import type { FactoriesFactoryLine, FactoriesWorkOrder, FactoryLineStep } from "@/api-client";
+import type { FactoriesFactoryLine, FactoriesLineMetrics, FactoriesWorkOrder, FactoryLineStep } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryLineMetrics } from "@/hooks/useFactoryLineMetrics";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
@@ -41,6 +42,12 @@ import {
 } from "../lib/factoryPagePaths";
 import { formatLinePhaseDescription, humanizeLineName } from "../lib/humanizeLineName";
 import {
+  formatCostPerSuccess,
+  formatReworkRate,
+  formatSuccessRate,
+  formatThroughput,
+} from "../lib/lineListMetricsFormat";
+import {
   factoryKanbanPageClassName,
   factorySectionBodyClassName,
   factorySectionHeaderClassName,
@@ -53,6 +60,7 @@ export function LinesPage() {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId } = useParams<{ lineId: string }>();
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
+  const { data: lineMetrics } = useFactoryLineMetrics(organizationId, factoryId);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
 
   const canUpdate = canAct("factories", "update");
@@ -106,7 +114,7 @@ export function LinesPage() {
       <WorkspacePageHeader
         className={factorySectionHeaderClassName}
         title="Lines"
-        subtitle="Factory lines specialize how work moves through the workspace. Each phase is backed by a canvas that runs work orders."
+        subtitle="Last 30 days. Success rate, completions per day, rework, and cost per merged work order."
         actions={
           <PermissionTooltip
             allowed={canUpdate || permissionsLoading}
@@ -142,6 +150,7 @@ export function LinesPage() {
                     line={line}
                     href={factoryLineDetailPath(organizationId, factoryKey, line.id)}
                     ticks={board.map((column) => column.tick)}
+                    metrics={lineMetrics?.[line.id] ?? null}
                   />
                 </li>
               );
@@ -221,7 +230,17 @@ function LineDetail({
   );
 }
 
-function LineCard({ line, href, ticks }: { line: FactoriesFactoryLine; href: string; ticks: LinePhaseTick[] }) {
+function LineCard({
+  line,
+  href,
+  ticks,
+  metrics,
+}: {
+  line: FactoriesFactoryLine;
+  href: string;
+  ticks: LinePhaseTick[];
+  metrics: FactoriesLineMetrics | null;
+}) {
   const navigate = useNavigate();
   const steps = line.steps ?? [];
   const description = formatLinePhaseDescription(steps);
@@ -255,7 +274,29 @@ function LineCard({ line, href, ticks }: { line: FactoriesFactoryLine; href: str
         </div>
       </div>
       {steps.length > 0 ? <PhaseStrip steps={steps} ticks={ticks} /> : null}
+      <LineMetricsSummary metrics={metrics} />
     </div>
+  );
+}
+
+/** Success rate, completions/day, rework, and cost-per-success for the trailing window. Dashes when there's no data yet (loading, error, or the line had no closed work orders in the window). */
+function LineMetricsSummary({ metrics }: { metrics: FactoriesLineMetrics | null }) {
+  const stats: Array<{ label: string; value: string }> = [
+    { label: "Success rate", value: formatSuccessRate(metrics) },
+    { label: "Completions/day", value: formatThroughput(metrics) },
+    { label: "Rework", value: formatReworkRate(metrics) },
+    { label: "Cost/success", value: formatCostPerSuccess(metrics) },
+  ];
+
+  return (
+    <dl className="mt-3.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-border/60 pt-2.5" data-testid="lines-card-metrics">
+      {stats.map((stat) => (
+        <div key={stat.label} className="flex items-baseline gap-1.5">
+          <dt className="text-[11px] text-muted-foreground">{stat.label}</dt>
+          <dd className="text-[12px] font-medium tabular-nums text-foreground">{stat.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
