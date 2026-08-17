@@ -403,16 +403,16 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 			return nil, nil, fmt.Errorf("node %s: duplicate node id", node.ID)
 		}
 
-		if err := validateNodeConcurrency(node); err != nil {
-			return nil, nil, err
-		}
-
 		if node.Type == "" {
 			return nil, nil, fmt.Errorf("node %s: type is required", node.ID)
 		}
 
 		if node.Type != NodeTypeTrigger && node.Type != NodeTypeWidget && node.Type != NodeTypeAction {
 			return nil, nil, fmt.Errorf("node %s: invalid type %q", node.ID, node.Type)
+		}
+
+		if err := validateNodeConcurrency(node); err != nil {
+			return nil, nil, err
 		}
 
 		nodeIDs[node.ID] = true
@@ -521,12 +521,36 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 }
 
 // validateNodeConcurrency enforces the inline concurrency spec
-// invariants: max must be at least 1 when set, and autoCancel must be a
-// known policy.
+// invariants: only action nodes take a spec, max must be at least 1 when
+// set, autoCancel must be a known policy, and the fields must apply to
+// the node's component. Merge admits every run's queue item into the
+// run's session, so its throughput is inherently unbounded and no
+// concurrency field applies. Loop honors max as its parallel-session
+// cap, but its backlog mixes session starts with feedback for running
+// sessions, so partitioning (key) or superseding (autoCancel) it would
+// break the sessions.
 func validateNodeConcurrency(node Node) error {
 	concurrency := node.Concurrency
 	if concurrency == nil {
 		return nil
+	}
+
+	if node.Type != NodeTypeAction {
+		return fmt.Errorf("node %s: concurrency is only supported on action nodes", node.ID)
+	}
+
+	if node.Component == "merge" {
+		return fmt.Errorf("node %s: the merge component does not support concurrency", node.ID)
+	}
+
+	if node.Component == "loop" {
+		if concurrency.Key != "" {
+			return fmt.Errorf("node %s: the loop component does not support concurrency key", node.ID)
+		}
+
+		if concurrency.AutoCancel != "" {
+			return fmt.Errorf("node %s: the loop component does not support concurrency autoCancel", node.ID)
+		}
 	}
 
 	if concurrency.Max != nil && *concurrency.Max < 1 {

@@ -32,11 +32,6 @@ type NodeQueueWorker struct {
 	semaphore   *semaphore.Weighted
 	logger      *log.Entry
 
-	// selfManagedComponents names the components that implement
-	// core.QueueItemProcessor. Their queue items are never gated on
-	// capacity, so the poll query must always return their nodes.
-	selfManagedComponents []string
-
 	rabbitMQURL               string
 	queueItemConsumer         *tackle.Consumer
 	executionFinishedConsumer *tackle.Consumer
@@ -57,21 +52,9 @@ func NewNodeQueueWorker(registry *registry.Registry, gitProvider gitprovider.Pro
 		rabbitMQURL:               rabbitMQURL,
 		semaphore:                 semaphore.NewWeighted(25),
 		logger:                    logger,
-		selfManagedComponents:     selfManagedComponentNames(registry),
 		queueItemConsumer:         queueItemConsumer,
 		executionFinishedConsumer: executionFinishedConsumer,
 	}
-}
-
-func selfManagedComponentNames(registry *registry.Registry) []string {
-	names := []string{}
-	for _, action := range registry.ListActions() {
-		if queueItemProcessorFor(action) != nil {
-			names = append(names, action.Name())
-		}
-	}
-
-	return names
 }
 
 func (w *NodeQueueWorker) Name() string {
@@ -109,7 +92,7 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			tickStart := time.Now()
-			nodes, err := models.ListCanvasNodesReady(database.Conn(), w.selfManagedComponents)
+			nodes, err := models.ListCanvasNodesReady(database.Conn())
 			if err != nil {
 				w.logger.Errorf("Error finding canvas nodes ready to be processed: %v", err)
 			}
@@ -326,18 +309,20 @@ func (w *NodeQueueWorker) processNodeQueueItems(tx *gorm.DB, logger *log.Entry, 
 
 	spec := node.ConcurrencySpec()
 
-	live, err := w.prepareQueueItems(tx, logger, node, items, collector)
-	if err != nil {
-		return err
-	}
-
 	//
 	// Components with their own queue item processor (merge, loop) keep
 	// executions open while waiting for more queue items, so their items
 	// are never gated on capacity and never superseded: the component
-	// decides admission in ProcessQueueItem.
+	// decides admission in ProcessQueueItem. Their items keep a NULL
+	// queue name, which is also what keeps their nodes in the safety-net
+	// poll (see ListCanvasNodesReady).
 	//
 	selfManaged := w.queueItemProcessorForNode(node) != nil
+
+	live, err := w.prepareQueueItems(tx, logger, node, items, selfManaged, collector)
+	if err != nil {
+		return err
+	}
 
 	remaining := live
 	if !selfManaged {
@@ -349,7 +334,15 @@ func (w *NodeQueueWorker) processNodeQueueItems(tx *gorm.DB, logger *log.Entry, 
 
 	blocked := map[string]bool{}
 	for _, item := range remaining {
-		queueName := *item.QueueName
+		//
+		// Self-managed items have no queue name; key them by node so a
+		// group-blocked item still blocks the rest of the backlog (FIFO).
+		//
+		queueName := node.NodeID
+		if item.QueueName != nil {
+			queueName = *item.QueueName
+		}
+
 		if blocked[queueName] {
 			continue
 		}
@@ -399,11 +392,15 @@ func (w *NodeQueueWorker) processNodeQueueItems(tx *gorm.DB, logger *log.Entry, 
 // prepareQueueItems drops items for cancelling runs and resolves the queue
 // name of the rest. Items whose queue name expression fails to resolve get
 // the configuration-error treatment: failed execution, item deleted.
+// Self-managed nodes skip resolution: their items are not in any
+// capacity-gated queue, and the persisted NULL marks them as always
+// actionable for the safety-net poll.
 func (w *NodeQueueWorker) prepareQueueItems(
 	tx *gorm.DB,
 	logger *log.Entry,
 	node *models.CanvasNode,
 	items []models.CanvasNodeQueueItem,
+	selfManaged bool,
 	collector *MessageCollector,
 ) ([]*models.CanvasNodeQueueItem, error) {
 	live := make([]*models.CanvasNodeQueueItem, 0, len(items))
@@ -425,12 +422,14 @@ func (w *NodeQueueWorker) prepareQueueItems(
 			continue
 		}
 
-		if _, err := contexts.ResolveQueueName(tx, node, item); err != nil {
-			logger.Errorf("Error resolving queue name for item %s: %v", item.ID, err)
-			if err := w.handleQueueNameResolutionError(tx, node, item, err, collector); err != nil {
-				return nil, err
+		if !selfManaged {
+			if _, err := contexts.ResolveQueueName(tx, node, item); err != nil {
+				logger.Errorf("Error resolving queue name for item %s: %v", item.ID, err)
+				if err := w.handleQueueNameResolutionError(tx, node, item, err, collector); err != nil {
+					return nil, err
+				}
+				continue
 			}
-			continue
 		}
 
 		live = append(live, item)

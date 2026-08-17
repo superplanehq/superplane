@@ -125,7 +125,7 @@ spec:
 func TestCanvas_ValidateNodeConcurrency(t *testing.T) {
 	limit := func(v int) *int { return &v }
 	nodeWithConcurrency := func(concurrency *ConcurrencySpec) Node {
-		return Node{ID: "deploy", Concurrency: concurrency}
+		return Node{ID: "deploy", Type: NodeTypeAction, Component: "http", Concurrency: concurrency}
 	}
 
 	t.Run("valid specs pass", func(t *testing.T) {
@@ -145,6 +145,34 @@ func TestCanvas_ValidateNodeConcurrency(t *testing.T) {
 	t.Run("autoCancel must be queued or running", func(t *testing.T) {
 		err := validateNodeConcurrency(nodeWithConcurrency(&ConcurrencySpec{AutoCancel: "sometimes"}))
 		assert.ErrorContains(t, err, "invalid concurrency autoCancel")
+	})
+
+	t.Run("only action nodes take a spec", func(t *testing.T) {
+		node := Node{ID: "on-push", Type: NodeTypeTrigger, Component: "github.onPush", Concurrency: &ConcurrencySpec{Max: limit(2)}}
+		err := validateNodeConcurrency(node)
+		assert.ErrorContains(t, err, "only supported on action nodes")
+	})
+
+	t.Run("merge does not support concurrency", func(t *testing.T) {
+		node := Node{ID: "merge", Type: NodeTypeAction, Component: "merge", Concurrency: &ConcurrencySpec{Max: limit(2)}}
+		err := validateNodeConcurrency(node)
+		assert.ErrorContains(t, err, "merge component does not support concurrency")
+
+		node.Concurrency = nil
+		assert.NoError(t, validateNodeConcurrency(node))
+	})
+
+	t.Run("loop supports max only", func(t *testing.T) {
+		node := Node{ID: "loop", Type: NodeTypeAction, Component: "loop", Concurrency: &ConcurrencySpec{Max: limit(2)}}
+		assert.NoError(t, validateNodeConcurrency(node))
+
+		node.Concurrency = &ConcurrencySpec{Key: "{{ root().data.branch }}"}
+		err := validateNodeConcurrency(node)
+		assert.ErrorContains(t, err, "loop component does not support concurrency key")
+
+		node.Concurrency = &ConcurrencySpec{AutoCancel: "queued"}
+		err = validateNodeConcurrency(node)
+		assert.ErrorContains(t, err, "loop component does not support concurrency autoCancel")
 	})
 }
 

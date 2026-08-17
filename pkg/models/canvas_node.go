@@ -388,9 +388,9 @@ func FindCanvasNodesByIDs(tx *gorm.DB, canvasID uuid.UUID, nodeIDs []string) ([]
 // actionable pending queue item, i.e. the nodes a dispatch pass can make
 // progress on. A pending item is actionable when any of these holds:
 //
-//   - its queue name is not resolved yet (capacity is unknown until then);
-//   - the node's component manages its own queue items (never
-//     capacity-gated), which callers declare via selfManagedComponents;
+//   - it has no queue name: either not resolved yet (capacity is unknown
+//     until then) or the node's component manages its own queue items
+//     (never capacity-gated, never resolved — merge, loop);
 //   - the node has an autoCancel policy (a full queue still needs a pass
 //     to supersede waiting items or cancel running executions);
 //   - the item's queue has fewer active executions than the node's
@@ -399,7 +399,7 @@ func FindCanvasNodesByIDs(tx *gorm.DB, canvasID uuid.UUID, nodeIDs []string) ([]
 // Nodes whose entire backlog waits on full queues are excluded: they
 // become actionable again when an execution leaves an active state, so
 // the next poll returns them.
-func ListCanvasNodesReady(tx *gorm.DB, selfManagedComponents []string) ([]CanvasNode, error) {
+func ListCanvasNodesReady(tx *gorm.DB) ([]CanvasNode, error) {
 	var nodes []CanvasNode
 	err := tx.
 		Raw(`
@@ -419,7 +419,6 @@ func ListCanvasNodesReady(tx *gorm.DB, selfManagedComponents []string) ([]Canvas
 			      AND qi.node_id = wn.node_id
 			      AND (
 			        qi.queue_name IS NULL
-			        OR wn.ref->'component'->>'name' IN ?
 			        OR wn.concurrency_auto_cancel IS NOT NULL
 			        OR (
 			          SELECT COUNT(*)
@@ -434,7 +433,6 @@ func ListCanvasNodesReady(tx *gorm.DB, selfManagedComponents []string) ([]Canvas
 		`,
 			CanvasNodeStateError,
 			NodeTypeComponent,
-			selfManagedComponents,
 			CanvasNodeExecutionActiveStates,
 			DefaultConcurrencyMax,
 		).

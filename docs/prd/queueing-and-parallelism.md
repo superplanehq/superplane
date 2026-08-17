@@ -461,9 +461,10 @@ flowchart LR
    suggests the latter. Either way the resolved name must be persisted on
    first contact: it is what lets capacity counting — and the
    capacity-aware safety-net poll — run as plain SQL with no expression
-   evaluation. An item with a still-null name has never been touched and
-   always warrants a dispatch visit, so first-touch resolution stays
-   compatible with that poll.
+   evaluation. An item with a null name is in no capacity-gated queue —
+   either untouched, or belonging to a self-managed component, whose items
+   never get a name — and always warrants a dispatch visit, so first-touch
+   resolution stays compatible with that poll.
 7. **Settings are read at dispatch time** from the materialized node
    columns and group rows (`workflow_nodes`, `workflow_node_groups`),
    which publish keeps in sync with the live spec. Configuration changes
@@ -591,11 +592,16 @@ event (`merge_group` = root event ID in
 (`loop_session` = root event ID in `pkg/components/loop/loop.go`). That
 correlation is the same primitive as a per-run queue name, applied with
 component-specific semantics — which is why these components stay
-self-managed rather than adopting the generic dispatch path. Queue naming and
-auto-cancel do not apply to them in this iteration; the effective
-concurrency `max` is the one setting they honor.
+self-managed rather than adopting the generic dispatch path. Their items
+and executions keep a NULL `queue_name` (the marker the safety-net poll
+uses to always visit them).
 
-**`merge` — parallel across runs, no capacity limit.**
+Concurrency fields these components do not honor are rejected at commit
+time and hidden in the UI, so a spec can never silently do nothing:
+`merge` takes no `concurrency` block at all, and `loop` takes only `max`.
+
+**`merge` — parallel across runs, no capacity limit, no `concurrency`
+block.**
 
 - Merge already maintains one open execution per run, and executions for
   different runs coexist today. No engine clamp and no behavior change to its
@@ -605,12 +611,13 @@ concurrency `max` is the one setting they honor.
   run: the find-or-create-execution step and the metadata read-modify-write
   (recording received sources and event IDs) would race otherwise. Per-node
   serial item handling (behavior point 15 above) covers this conservatively.
-- Concurrency `max` has no effect on the number of open merge executions
-  (one per run, unbounded, as today). Merge is self-managed and must keep
-  receiving items regardless of how many merge executions are open —
-  otherwise late sources for open merges would starve.
+- Merge is inherently unbounded: it must keep receiving items regardless of
+  how many merge executions are open — otherwise late sources for open
+  merges would starve. A `max` could not be honored, so no concurrency
+  field applies and the whole block is rejected on merge nodes.
 
-**`loop` — up to `max` concurrent sessions.**
+**`loop` — up to `max` concurrent sessions; `key` and `autoCancel`
+rejected.**
 
 - The current gate in `startLoop` — defer any new loop start while *any*
   session is running on the node — is replaced by: defer while
@@ -628,6 +635,10 @@ concurrency `max` is the one setting they honor.
 - Feedback for the same session remains serialized by per-node item handling
   (two concurrent feedback items for one session would race on the iteration
   counter).
+- `key` and `autoCancel` are rejected on loop nodes: the backlog mixes
+  session starts with feedback for running sessions, so partitioning it
+  into queues or superseding waiting items would break the sessions the
+  feedback belongs to.
 
 ### Factory lines — per-step max parallelism
 
@@ -848,8 +859,7 @@ lock); false negatives are forbidden. A node is returned when it has a
 pending queue item for which any of these holds:
 
 ```sql
-i.queue_name IS NULL                                  -- unresolved item: always visit
-OR wn.ref->'component'->>'name' IN (@self_managed)    -- merge/loop: always visit
+i.queue_name IS NULL                                  -- no queue: always visit
 OR wn.concurrency_auto_cancel IS NOT NULL             -- policy work possible at capacity
 OR (
   SELECT count(*)
@@ -863,9 +873,15 @@ OR (
 
 The `EXISTS` over `workflow_node_queue_items` bounds the scan to nodes with
 backlog; the correlated count is served by the partial index
-`idx_workflow_node_executions_active_queue` over non-terminal states. The
-self-managed component names come from the worker, which computes them from
-the registry (components implementing `core.QueueItemProcessor`).
+`idx_workflow_node_executions_active_queue` over non-terminal states.
+
+A NULL `queue_name` means the item is in no capacity-gated queue, which is
+true in two cases the poll treats identically (always visit): the item has
+not been touched by the worker yet (the name resolves on first contact),
+or the node's component manages its own queue items (`merge`, `loop` —
+implementing `core.QueueItemProcessor`). The worker never resolves queue
+names for self-managed items, so the query needs no knowledge of which
+components are self-managed.
 
 Group-blocked nodes need no dedicated arm: group admission happens before
 an execution is created, so a node waiting on a group slot has no active

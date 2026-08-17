@@ -160,6 +160,8 @@ export interface NodeEditData {
   /** Inline concurrency configuration; only action nodes support it. */
   concurrency?: ComponentsConcurrencySpec;
   supportsConcurrency?: boolean;
+  /** Loop only honors max (its parallel-session cap); hides key and auto-cancel. */
+  concurrencyMaxOnly?: boolean;
 }
 
 export interface NewNodeData {
@@ -1883,6 +1885,7 @@ function Sidebar({
       onNodeConfigSave={onSaveConfiguration}
       showNodeConcurrency={editingNodeData?.supportsConcurrency ?? false}
       nodeConcurrency={editingNodeData?.concurrency}
+      nodeConcurrencyMaxOnly={editingNodeData?.concurrencyMaxOnly ?? false}
       onNodeConfigCancel={undefined}
       domainId={organizationId}
       customField={

@@ -148,7 +148,7 @@ func Test__NodeQueueWorker_DoesNotProcessQueueForSoftDeletedOrganization(t *test
 
 	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
 
-	nodes, err := models.ListCanvasNodesReady(database.Conn(), worker.selfManagedComponents)
+	nodes, err := models.ListCanvasNodesReady(database.Conn())
 	require.NoError(t, err)
 	for _, node := range nodes {
 		assert.False(t, node.WorkflowID == canvas.ID && node.NodeID == componentNode)

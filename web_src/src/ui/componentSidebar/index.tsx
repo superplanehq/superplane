@@ -145,6 +145,7 @@ interface ComponentSidebarProps {
   ) => void | Promise<void>;
   showNodeConcurrency?: boolean;
   nodeConcurrency?: ComponentsConcurrencySpec;
+  nodeConcurrencyMaxOnly?: boolean;
   onNodeConfigCancel?: () => void;
   domainId?: string;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
@@ -208,6 +209,7 @@ export const ComponentSidebar = ({
   onNodeConfigSave,
   showNodeConcurrency = false,
   nodeConcurrency,
+  nodeConcurrencyMaxOnly = false,
   onNodeConfigCancel,
   domainId,
   customField,
@@ -752,6 +754,7 @@ export const ComponentSidebar = ({
                     onSave={onNodeConfigSave || (() => {})}
                     showConcurrency={showNodeConcurrency}
                     concurrency={nodeConcurrency}
+                    concurrencyMaxOnly={nodeConcurrencyMaxOnly}
                     onCancel={onNodeConfigCancel}
                     domainId={domainId}
                     customField={customField}

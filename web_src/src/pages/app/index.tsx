@@ -2023,7 +2023,11 @@ export function AppPage({
         blockName,
         integrationRef: node.integration,
         concurrency: node.concurrency,
-        supportsConcurrency: node.type === "TYPE_ACTION",
+        // Merge admits every run's queue item, so it is inherently
+        // unbounded and takes no concurrency configuration. Loop only
+        // honors max, as its parallel-session cap.
+        supportsConcurrency: node.type === "TYPE_ACTION" && node.component !== "merge",
+        concurrencyMaxOnly: node.component === "loop",
       };
     },
     [

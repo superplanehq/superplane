@@ -44,9 +44,13 @@ interface SettingsTabProps {
     integrationRef?: ComponentsIntegrationRef,
     concurrency?: ComponentsConcurrencySpec,
   ) => void | Promise<void>;
-  // Concurrency section: rendered only when showConcurrency is true (action nodes).
+  // Concurrency section: rendered only when showConcurrency is true
+  // (action nodes except merge, which is inherently unbounded).
   showConcurrency?: boolean;
   concurrency?: ComponentsConcurrencySpec;
+  // Loop only honors max (its parallel-session cap): key and
+  // auto-cancel are hidden and never saved.
+  concurrencyMaxOnly?: boolean;
   onCancel?: () => void;
   domainId?: string;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
@@ -85,11 +89,12 @@ function draftMax(draft: ConcurrencyDraft): number | undefined {
 }
 
 // An all-default draft maps to no concurrency spec, so the node keeps
-// the default behavior instead of storing an empty object.
-function concurrencyDraftToSpec(draft: ConcurrencyDraft): ComponentsConcurrencySpec | undefined {
-  const key = draft.key.trim();
+// the default behavior instead of storing an empty object. With maxOnly,
+// key and autoCancel are dropped even if present in the loaded spec.
+function concurrencyDraftToSpec(draft: ConcurrencyDraft, maxOnly: boolean): ComponentsConcurrencySpec | undefined {
+  const key = maxOnly ? "" : draft.key.trim();
   const max = draftMax(draft);
-  const autoCancel = draft.autoCancel;
+  const autoCancel = maxOnly ? "" : draft.autoCancel;
 
   if (key === "" && autoCancel === "" && max === undefined) {
     return undefined;
@@ -144,6 +149,7 @@ export function SettingsTab({
   canUpdateIntegrations,
   showConcurrency = false,
   concurrency,
+  concurrencyMaxOnly = false,
 }: SettingsTabProps) {
   const CONNECT_ANOTHER_INSTANCE_VALUE = "__connect_another_instance__";
   const isReadOnly = readOnly ?? false;
@@ -158,7 +164,10 @@ export function SettingsTab({
   const [concurrencyDraft, setConcurrencyDraft] = useState<ConcurrencyDraft>(() =>
     concurrencyDraftFromSpec(concurrency),
   );
-  const concurrencySpec = useMemo(() => concurrencyDraftToSpec(concurrencyDraft), [concurrencyDraft]);
+  const concurrencySpec = useMemo(
+    () => concurrencyDraftToSpec(concurrencyDraft, concurrencyMaxOnly),
+    [concurrencyDraft, concurrencyMaxOnly],
+  );
   const savingRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
   const autosaveBaselineSnapshotRef = useRef(
@@ -844,47 +853,51 @@ export function SettingsTab({
                 Executions above this limit wait in the queue. Default: one execution at a time.
               </p>
             </div>
-            <div className="flex flex-col gap-2">
-              <Label className="min-w-[100px] text-left">Key</Label>
-              <AutoCompleteInput
-                data-testid="node-concurrency-key-input"
-                exampleObj={resolvedAutocompleteExampleObj ?? null}
-                value={concurrencyDraft.key}
-                onChange={(value) => {
-                  setConcurrencyDraft((prev) => ({ ...prev, key: value }));
-                }}
-                placeholder={"ci-{{ $.data.branch }}"}
-                startWord="{{"
-                prefix="{{ "
-                suffix=" }}"
-                inputSize="md"
-                quickTip="Tip: type `{{` to start an expression."
-                className="shadow-none"
-              />
-              <p className="text-xs text-gray-500">
-                Optional expression that splits the backlog. Each value is a separate queue.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label className="min-w-[100px] text-left">Auto-cancel</Label>
-              <Select
-                value={concurrencyDraft.autoCancel === "" ? "off" : concurrencyDraft.autoCancel}
-                onValueChange={(value) => {
-                  setConcurrencyDraft((prev) => ({ ...prev, autoCancel: value === "off" ? "" : value }));
-                  requestAutosave();
-                }}
-              >
-                <SelectTrigger data-testid="node-concurrency-auto-cancel-select" className="w-full shadow-none">
-                  <SelectValue placeholder="Off" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="off">Off</SelectItem>
-                  <SelectItem value="queued">Queued items</SelectItem>
-                  <SelectItem value="running">Queued items and running executions</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-500">When a new item arrives, cancel older work in the same queue.</p>
-            </div>
+            {!concurrencyMaxOnly && (
+              <div className="flex flex-col gap-2">
+                <Label className="min-w-[100px] text-left">Key</Label>
+                <AutoCompleteInput
+                  data-testid="node-concurrency-key-input"
+                  exampleObj={resolvedAutocompleteExampleObj ?? null}
+                  value={concurrencyDraft.key}
+                  onChange={(value) => {
+                    setConcurrencyDraft((prev) => ({ ...prev, key: value }));
+                  }}
+                  placeholder={"ci-{{ $.data.branch }}"}
+                  startWord="{{"
+                  prefix="{{ "
+                  suffix=" }}"
+                  inputSize="md"
+                  quickTip="Tip: type `{{` to start an expression."
+                  className="shadow-none"
+                />
+                <p className="text-xs text-gray-500">
+                  Optional expression that splits the backlog. Each value is a separate queue.
+                </p>
+              </div>
+            )}
+            {!concurrencyMaxOnly && (
+              <div className="flex flex-col gap-2">
+                <Label className="min-w-[100px] text-left">Auto-cancel</Label>
+                <Select
+                  value={concurrencyDraft.autoCancel === "" ? "off" : concurrencyDraft.autoCancel}
+                  onValueChange={(value) => {
+                    setConcurrencyDraft((prev) => ({ ...prev, autoCancel: value === "off" ? "" : value }));
+                    requestAutosave();
+                  }}
+                >
+                  <SelectTrigger data-testid="node-concurrency-auto-cancel-select" className="w-full shadow-none">
+                    <SelectValue placeholder="Off" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="off">Off</SelectItem>
+                    <SelectItem value="queued">Queued items</SelectItem>
+                    <SelectItem value="running">Queued items and running executions</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">When a new item arrives, cancel older work in the same queue.</p>
+              </div>
+            )}
           </div>
         )}
 

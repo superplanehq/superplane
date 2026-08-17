@@ -641,13 +641,8 @@ func Test__Queueing_SelfManagedMergeIsNotCapacityGated(t *testing.T) {
 		require.NoError(t, router.LockAndProcessEvent(logger, *event, time.Now()))
 	}
 
-	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger-1", "default", nil)
-	routeEvent(rootEvent)
-
-	//
-	// Both branches run and route their outputs into the merge node.
-	//
-	for _, branch := range []string{"branch-a", "branch-b"} {
+	runBranch := func(branch string) {
+		t.Helper()
 		processQueueNode(t, worker, canvas.ID, branch)
 		executions := listNodeExecutionsForTest(t, canvas.ID, branch)
 		require.Len(t, executions, 1)
@@ -659,12 +654,32 @@ func Test__Queueing_SelfManagedMergeIsNotCapacityGated(t *testing.T) {
 		}
 	}
 
-	require.Len(t, listQueueItemsForTest(t, canvas.ID, mergeNode), 2)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger-1", "default", nil)
+	routeEvent(rootEvent)
 
 	//
-	// One pass consumes both source items: the first opens the merge
-	// execution, the second completes it. Capacity-gating the second item
-	// against the open execution would deadlock here.
+	// The first branch's item opens the merge execution, which stays open
+	// waiting for the second input.
+	//
+	runBranch("branch-a")
+	processQueueNode(t, worker, canvas.ID, mergeNode)
+	require.Len(t, listActiveNodeExecutionsForTest(t, canvas.ID, mergeNode), 1)
+
+	//
+	// The second input arrives while the execution is open. Self-managed
+	// items keep a NULL queue name, which is what keeps the node in the
+	// poll set: capacity-gating this item against the open execution
+	// (implicit max 1) would deadlock the merge.
+	//
+	runBranch("branch-b")
+	items := listQueueItemsForTest(t, canvas.ID, mergeNode)
+	require.Len(t, items, 1)
+	assert.Nil(t, items[0].QueueName)
+	assert.True(t, pollReturnsNode(t, canvas.ID, mergeNode))
+
+	//
+	// The next pass hands the item to the component, completing the merge.
+	// The execution never entered a named queue.
 	//
 	processQueueNode(t, worker, canvas.ID, mergeNode)
 
@@ -674,6 +689,7 @@ func Test__Queueing_SelfManagedMergeIsNotCapacityGated(t *testing.T) {
 	require.Len(t, executions, 1)
 	assert.Equal(t, models.CanvasNodeExecutionStateFinished, executions[0].State)
 	assert.Equal(t, models.CanvasNodeExecutionResultPassed, executions[0].Result)
+	assert.Nil(t, executions[0].QueueName)
 }
 
 func findExecutionByEvent(t *testing.T, canvasID uuid.UUID, nodeID string, eventID uuid.UUID) *models.CanvasNodeExecution {
@@ -687,9 +703,9 @@ func findExecutionByEvent(t *testing.T, canvasID uuid.UUID, nodeID string, event
 	return nil
 }
 
-func pollReturnsNode(t *testing.T, worker *NodeQueueWorker, canvasID uuid.UUID, nodeID string) bool {
+func pollReturnsNode(t *testing.T, canvasID uuid.UUID, nodeID string) bool {
 	t.Helper()
-	nodes, err := models.ListCanvasNodesReady(database.Conn(), worker.selfManagedComponents)
+	nodes, err := models.ListCanvasNodesReady(database.Conn())
 	require.NoError(t, err)
 	return containsCanvasNode(nodes, canvasID, nodeID)
 }
@@ -702,8 +718,9 @@ func containsCanvasNode(nodes []models.CanvasNode, canvasID uuid.UUID, nodeID st
 
 // The safety-net poll only returns nodes a dispatch pass can make progress
 // on. A node whose whole backlog waits on full queues is skipped until an
-// execution finishes; unresolved items and self-managed components keep a
-// node in the poll set.
+// execution finishes; items without a queue name (unresolved, or
+// self-managed components' items, which never get one) keep a node in the
+// poll set.
 func Test__Queueing_PollSkipsNodesWithoutActionableBacklog(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -728,7 +745,7 @@ func Test__Queueing_PollSkipsNodesWithoutActionableBacklog(t *testing.T) {
 	// An unresolved backlog is always actionable: queue names are only
 	// known once the worker touches the items.
 	//
-	assert.True(t, pollReturnsNode(t, worker, canvas.ID, componentNode))
+	assert.True(t, pollReturnsNode(t, canvas.ID, componentNode))
 
 	//
 	// One pass dispatches the first item (default max 1) and resolves the
@@ -741,25 +758,17 @@ func Test__Queueing_PollSkipsNodesWithoutActionableBacklog(t *testing.T) {
 	require.Len(t, items, 1)
 	require.NotNil(t, items[0].QueueName)
 
-	assert.False(t, pollReturnsNode(t, worker, canvas.ID, componentNode))
-
-	//
-	// The same node stays in the poll set when its component manages its
-	// own queue items: those are never capacity-gated.
-	//
-	nodes, err := models.ListCanvasNodesReady(database.Conn(), []string{"noop"})
-	require.NoError(t, err)
-	assert.True(t, containsCanvasNode(nodes, canvas.ID, componentNode))
+	assert.False(t, pollReturnsNode(t, canvas.ID, componentNode))
 
 	//
 	// Finishing the execution frees the queue: the node is actionable again.
 	//
 	execution := findExecutionByEvent(t, canvas.ID, componentNode, events[0].ID)
 	require.NoError(t, execution.Start())
-	_, err = execution.Pass(nil)
+	_, err := execution.Pass(nil)
 	require.NoError(t, err)
 
-	assert.True(t, pollReturnsNode(t, worker, canvas.ID, componentNode))
+	assert.True(t, pollReturnsNode(t, canvas.ID, componentNode))
 }
 
 // A full queue with an autoCancel policy still needs dispatch passes: they
@@ -796,5 +805,5 @@ func Test__Queueing_PollKeepsFullNodesWithAutoCancel(t *testing.T) {
 	require.Len(t, items, 1)
 	require.NotNil(t, items[0].QueueName)
 
-	assert.True(t, pollReturnsNode(t, worker, canvas.ID, componentNode))
+	assert.True(t, pollReturnsNode(t, canvas.ID, componentNode))
 }
