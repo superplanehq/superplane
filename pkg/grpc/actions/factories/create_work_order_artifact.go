@@ -85,6 +85,18 @@ func CreateWorkOrderArtifact(
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", orderID)
 	}
 
+	notification := messages.FactoryWorkOrderNotificationMessage{
+		OrganizationID: orgID.String(),
+		FactoryID:      factoryID.String(),
+		OrderID:        orderID.String(),
+		EventType:      factory.EventTypeOrderArtifactAdded,
+		ActorUserID:    userIDStr,
+		ArtifactType:   artifactType,
+	}
+	if err := notification.Publish(); err != nil {
+		log.WithError(err).Warnf("Failed to publish work order notification for order %s", orderID)
+	}
+
 	serialized, err := serializeArtifact(artifact)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order artifact")

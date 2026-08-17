@@ -1,8 +1,9 @@
 import type { LucideIcon } from "lucide-react";
-import { BarChart3, Blocks, Box, Cpu, Grid3x3, Key, Plug, Users } from "lucide-react";
+import { BarChart3, Bell, Blocks, Box, Cpu, Grid3x3, Key, Plug, Users } from "lucide-react";
 
 export type FactorySettingsSection =
   | "general"
+  | "notifications"
   | "repositories"
   | "environments"
   | "models"
@@ -20,6 +21,7 @@ export interface FactorySettingsNavItem {
 
 export const FACTORY_SETTINGS_NAV_ITEMS: FactorySettingsNavItem[] = [
   { id: "general", label: "General", Icon: Grid3x3, group: "workspace" },
+  { id: "notifications", label: "Notifications", Icon: Bell, group: "workspace" },
   { id: "repositories", label: "Repositories", Icon: Blocks, group: "workspace" },
   { id: "environments", label: "Environments", Icon: Box, group: "workspace" },
   { id: "models", label: "Models", Icon: Cpu, group: "workspace" },
