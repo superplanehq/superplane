@@ -64,10 +64,25 @@ export interface WorkOrderTimelineAutomationActor {
   stepName?: string;
 }
 
+export interface WorkOrderTimelineCommentReaction {
+  emoji: string;
+  count: number;
+  reactedByMe: boolean;
+}
+
 export interface WorkOrderTimelineComment {
+  /**
+   * Stable id of the underlying `order.comment.added` event — the same
+   * id `AddWorkOrderCommentReaction` / `RemoveWorkOrderCommentReaction`
+   * key off. Falls back to the synthetic timeline id for events from an
+   * API response that predates this field (shouldn't happen once every
+   * backend serves it, but keeps old cached responses from crashing).
+   */
+  id: string;
   body: string;
   authorKind?: string;
   automation?: WorkOrderTimelineAutomationActor;
+  reactions: WorkOrderTimelineCommentReaction[];
 }
 
 export interface WorkOrderTimelineArtifact {

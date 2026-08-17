@@ -516,15 +516,20 @@ func (o *FactoryWorkOrder) RecordStatusUpdated(tx *gorm.DB, r statusUpdatedRecor
 		data.User = &factory.UserRef{ID: *r.Actor}
 	}
 
-	return o.recordEvent(tx, factory.EventTypeOrderStatusUpdated, data)
+	_, err := o.recordEvent(tx, factory.EventTypeOrderStatusUpdated, data)
+	return err
 }
 
+// RecordCommentAdded appends the `order.comment.added` event and returns
+// the created event row: its ID doubles as the comment's public id (there
+// is no separate comments table — see FactoryWorkOrderCommentReaction),
+// which callers need to expose on the API response / attach reactions to.
 func (o *FactoryWorkOrder) RecordCommentAdded(
 	tx *gorm.DB,
 	body string,
 	author factory.WorkOrderCommentAuthor,
 	run *factory.RunRef,
-) error {
+) (*FactoryWorkOrderEvent, error) {
 	data := factory.WorkOrderCommentAdded{
 		Order:  o.Ref(),
 		Body:   body,
@@ -552,7 +557,8 @@ func (o *FactoryWorkOrder) RecordArtifactAdded(
 		data.User = &factory.UserRef{ID: *actor}
 	}
 
-	return o.recordEvent(tx, factory.EventTypeOrderArtifactAdded, data)
+	_, err := o.recordEvent(tx, factory.EventTypeOrderArtifactAdded, data)
+	return err
 }
 
 func (o *FactoryWorkOrder) RecordAssigneesUpdated(
@@ -572,7 +578,8 @@ func (o *FactoryWorkOrder) RecordAssigneesUpdated(
 		Unassigned: unassigned,
 	}
 
-	return o.recordEvent(tx, factory.EventTypeOrderAssigneesUpdated, data)
+	_, err := o.recordEvent(tx, factory.EventTypeOrderAssigneesUpdated, data)
+	return err
 }
 
 func (o *FactoryWorkOrder) AssigneeIDs() []uuid.UUID {
@@ -584,10 +591,10 @@ func (o *FactoryWorkOrder) AssigneeIDs() []uuid.UUID {
 	return ids
 }
 
-func (o *FactoryWorkOrder) recordEvent(tx *gorm.DB, eventType string, payload any) error {
+func (o *FactoryWorkOrder) recordEvent(tx *gorm.DB, eventType string, payload any) (*FactoryWorkOrderEvent, error) {
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	event := &FactoryWorkOrderEvent{
@@ -598,7 +605,11 @@ func (o *FactoryWorkOrder) recordEvent(tx *gorm.DB, eventType string, payload an
 		CreatedAt:   time.Now(),
 	}
 
-	return tx.Create(event).Error
+	if err := tx.Create(event).Error; err != nil {
+		return nil, err
+	}
+
+	return event, nil
 }
 
 // IsValidWorkOrderCommentAuthorKind reports whether the given author kind is

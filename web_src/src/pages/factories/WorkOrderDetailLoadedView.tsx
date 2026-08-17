@@ -54,6 +54,8 @@ interface WorkOrderDetailLoadedViewProps {
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
   onAddComment: (body: string) => Promise<void>;
+  onAddCommentReaction: (commentId: string, emoji: string) => void;
+  onRemoveCommentReaction: (commentId: string, emoji: string) => void;
 }
 
 export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps) {
@@ -112,6 +114,8 @@ function WorkOrderDetailBody({
   onDispatch,
   onAssigneesSave,
   onAddComment,
+  onAddCommentReaction,
+  onRemoveCommentReaction,
 }: WorkOrderDetailLoadedViewProps) {
   return (
     <div className={factoryContentBodyClassName}>
@@ -137,6 +141,9 @@ function WorkOrderDetailBody({
                 onLoadMoreEvents={onLoadMoreEvents}
                 onRetryEvents={onRetryEvents}
                 artifacts={artifacts}
+                canReactToComments={canManage}
+                onAddCommentReaction={onAddCommentReaction}
+                onRemoveCommentReaction={onRemoveCommentReaction}
                 footer={
                   <WorkOrderCommentComposer
                     canComment={canManage}

@@ -6,6 +6,10 @@ import {
   useUpdateWorkOrderAssignees,
   useUpdateWorkOrderStatus,
 } from "@/hooks/useFactoryData";
+import {
+  useAddWorkOrderCommentReaction,
+  useRemoveWorkOrderCommentReaction,
+} from "@/hooks/useWorkOrderCommentReactions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { formatWorkOrderResult, formatWorkOrderState } from "./lib/workOrderPresentation";
@@ -16,6 +20,8 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
   const updateAssignees = useUpdateWorkOrderAssignees(organizationId, factoryId);
   const updateStatus = useUpdateWorkOrderStatus(organizationId, factoryId);
   const addComment = useAddWorkOrderComment(organizationId, factoryId);
+  const addCommentReaction = useAddWorkOrderCommentReaction(organizationId, factoryId);
+  const removeCommentReaction = useRemoveWorkOrderCommentReaction(organizationId, factoryId);
 
   const handleAssigneesSave = async (nextAssigneeIds: string[]) => {
     try {
@@ -61,6 +67,23 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     }
   };
 
+  // Reaction toggles are a lightweight, best-effort interaction — surface
+  // failures via toast but don't rethrow (nothing pending for the caller
+  // to roll back; the reaction pill just doesn't change).
+  const handleAddCommentReaction = (commentId: string, emoji: string) => {
+    addCommentReaction.mutate(
+      { orderId, commentId, emoji },
+      { onError: (error) => showErrorToast(getApiErrorMessage(error, "Failed to add reaction")) },
+    );
+  };
+
+  const handleRemoveCommentReaction = (commentId: string, emoji: string) => {
+    removeCommentReaction.mutate(
+      { orderId, commentId, emoji },
+      { onError: (error) => showErrorToast(getApiErrorMessage(error, "Failed to remove reaction")) },
+    );
+  };
+
   const isCompleting = closeWorkOrder.isPending && closeWorkOrder.variables?.result === "RESULT_COMPLETED";
   const isRejecting = closeWorkOrder.isPending && closeWorkOrder.variables?.result === "RESULT_REJECTED";
 
@@ -70,6 +93,8 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     handleClose,
     handleStatusChange,
     handleAddComment,
+    handleAddCommentReaction,
+    handleRemoveCommentReaction,
     isDispatching: dispatchWorkOrder.isPending,
     isCompleting,
     isRejecting,

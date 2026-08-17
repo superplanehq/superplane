@@ -124,7 +124,7 @@ func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentPara
 		Automation: c.automationRef(),
 	}
 
-	if err := order.RecordCommentAdded(c.tx, body, author, c.runRef()); err != nil {
+	if _, err := order.RecordCommentAdded(c.tx, body, author, c.runRef()); err != nil {
 		return err
 	}
 
