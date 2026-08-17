@@ -9,7 +9,11 @@ import {
   applyWorkOrderSearch,
   buildWorkOrderListEntries,
 } from "../../lib/workOrderListModel";
-import { factoryContentBodyClassName } from "../factoryPageLayoutStyles";
+import {
+  factoryContentBodyClassName,
+  factoryKanbanBodyClassName,
+  factoryKanbanPageClassName,
+} from "../factoryPageLayoutStyles";
 import {
   WorkOrdersFilteredEmptyState,
   WorkOrdersScopedEmptyState,
@@ -59,6 +63,7 @@ export function MissionsWorkOrdersLoadedView(props: MissionsWorkOrdersLoadedView
   );
 
   const totalCount = entries.length;
+  const showKanbanBoard = state.layout === "board" && totalCount > 0 && ordered.length > 0;
 
   const body = () => {
     if (totalCount === 0) {
@@ -105,29 +110,38 @@ export function MissionsWorkOrdersLoadedView(props: MissionsWorkOrdersLoadedView
   };
 
   return (
-    <>
-      <WorkOrdersHeader
-        state={state}
-        entries={entries}
-        factoryLines={props.factoryLines}
-        onCreateWorkOrder={props.onCreateWorkOrder}
-        canCreate={props.canCreate}
-        permissionsLoading={props.permissionsLoading}
-      />
+    <div className={showKanbanBoard ? factoryKanbanPageClassName : undefined}>
+      <div className="shrink-0">
+        <WorkOrdersHeader
+          state={state}
+          entries={entries}
+          factoryLines={props.factoryLines}
+          onCreateWorkOrder={props.onCreateWorkOrder}
+          canCreate={props.canCreate}
+          permissionsLoading={props.permissionsLoading}
+        />
+      </div>
 
-      <div className={cn(factoryContentBodyClassName, "flex flex-col gap-4")}>
+      <div
+        className={cn(
+          showKanbanBoard ? factoryKanbanBodyClassName : factoryContentBodyClassName,
+          "flex flex-col gap-4",
+        )}
+      >
         {totalCount > 0 ? (
-          <MissionViews
-            items={railItems}
-            layout={state.layout}
-            scope={state.scope}
-            currentUserId={currentUserId}
-            organizationId={props.organizationId}
-            factoryKey={props.factoryKey}
-          />
+          <div className="shrink-0">
+            <MissionViews
+              items={railItems}
+              layout={state.layout}
+              scope={state.scope}
+              currentUserId={currentUserId}
+              organizationId={props.organizationId}
+              factoryKey={props.factoryKey}
+            />
+          </div>
         ) : null}
         {body()}
       </div>
-    </>
+    </div>
   );
 }
