@@ -1,14 +1,17 @@
 import type { FactoriesFactoryLine, FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
+import { factoryAppPath, factoryAppRunPath, linesPath } from "./factoryPagePaths";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 
 export type LinePhaseTick = "running" | "waiting" | "queued" | "failed" | null;
 
+/** Phase status expressed with a distinct glyph shape, not colour alone. */
+export type PhaseGlyphKind = "running" | "waiting" | "queued" | "failed" | "passed" | "pending";
+
 export type LinePhaseRunCard = {
   executionId: string;
   workOrderId: string;
-  /** Work order's factory-scoped sequence number, for building the permalink. */
-  workOrderNumber: string | undefined;
-  title: string;
+  /** Raw work order, so the board can build the shared work order card model. */
+  order: FactoriesWorkOrder;
   execution: FactoriesWorkOrderExecution;
 };
 
@@ -23,6 +26,28 @@ export type LinePhaseColumn = {
 
 /** Initial / step size for the scrollable phase-column run list. */
 export const LINE_PHASE_RUNS_PAGE_SIZE = 3;
+
+/**
+ * Destination for a phase-board card: the canvas run for this phase.
+ * Never the work order page — that destination stays on the Work Orders list.
+ */
+export function linePhaseRunHref(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string | undefined,
+  run: LinePhaseRunCard,
+  stepAppId?: string,
+): string {
+  const appId = run.execution.run?.appId || stepAppId;
+  const runId = run.execution.run?.id;
+  if (appId && runId) {
+    return factoryAppRunPath(organizationId, factoryKey, appId, runId, { from: "lines", lineId });
+  }
+  if (appId) {
+    return factoryAppPath(organizationId, factoryKey, appId, { from: "lines", lineId });
+  }
+  return linesPath(organizationId, factoryKey);
+}
 
 /**
  * Builds the Lines detail board: one column per line step. Each work order
@@ -80,6 +105,23 @@ export function resolvePhaseRunStatus(execution: FactoriesWorkOrderExecution): {
   return { kind: "idle", label: "Unknown" };
 }
 
+/** Board-level status for a phase column header. */
+export function resolveColumnGlyph(column: LinePhaseColumn): PhaseGlyphKind {
+  if (column.tick) {
+    return column.tick;
+  }
+  return column.runs.length > 0 ? "passed" : "pending";
+}
+
+/** Row-level status for a single run card. */
+export function resolveRunGlyph(run: LinePhaseRunCard): PhaseGlyphKind {
+  const { kind, label } = resolvePhaseRunStatus(run.execution);
+  if (kind === "idle") {
+    return label === "Passed" ? "passed" : "pending";
+  }
+  return kind;
+}
+
 function collectCurrentRunsByStep(
   lineId: string,
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
@@ -127,8 +169,7 @@ function appendCurrentRunForOrder(
   const card: LinePhaseRunCard = {
     executionId: currentExecution.id ?? `${order.id}-${currentExecution.step}-${currentExecution.createdAt ?? ""}`,
     workOrderId: order.id,
-    workOrderNumber: order.number,
-    title: order.title?.trim() || "Untitled work order",
+    order,
     execution: currentExecution,
   };
   const existing = runsByStep.get(currentExecution.step);

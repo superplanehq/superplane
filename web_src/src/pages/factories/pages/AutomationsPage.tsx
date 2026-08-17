@@ -1,5 +1,6 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
+import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { Plus } from "lucide-react";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
@@ -11,6 +12,7 @@ import { useAutomationsPageModel } from "./useAutomationsPageModel";
 
 export function AutomationsPage() {
   const model = useAutomationsPageModel();
+  const cardActions = useWorkOrderCardActions(model.organizationId, model.factoryId);
 
   if (model.showLegacyRedirect) {
     return (
@@ -24,6 +26,14 @@ export function AutomationsPage() {
   }
 
   const selectedApp = model.selectedApp;
+  const workOrderCardContext = {
+    organizationId: model.organizationId,
+    factoryKey: model.factoryKey,
+    factoryLines: model.factory?.lines ?? [],
+    canDispatch: model.canUpdateWorkOrders,
+    canAssign: model.canUpdateWorkOrders,
+    ...cardActions,
+  };
 
   if (selectedApp && model.selectedAppActions) {
     return (
@@ -33,6 +43,9 @@ export function AutomationsPage() {
           factoryKey={model.factoryKey}
           app={selectedApp}
           actions={model.selectedAppActions}
+          factory={model.factory}
+          workOrders={model.workOrders}
+          workOrderCardContext={workOrderCardContext}
         />
       </div>
     );
@@ -69,8 +82,6 @@ export function AutomationsPage() {
           apps={model.apps}
           workOrders={model.workOrders}
           appsLoading={model.appsLoading}
-          selectedApp={null}
-          selectedAppActions={null}
           actionsForApp={model.actionsForApp}
           canCreate={model.canCreateApp || model.permissionsLoading}
           onCreate={() => model.setCreateOpen(true)}

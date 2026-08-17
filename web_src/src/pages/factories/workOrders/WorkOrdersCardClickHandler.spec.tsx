@@ -105,6 +105,15 @@ function renderView(Component: (typeof views)[number]["Component"]) {
   return { router, onDispatch, onAssigneesSave, row };
 }
 
+describe("WorkOrdersBoardView layout", () => {
+  it("uses a horizontal kanban row", () => {
+    renderView(WorkOrdersBoardView);
+
+    expect(screen.getByTestId("work-orders-board").className).toContain("overflow-x-auto");
+    expect(screen.getByTestId("work-orders-board-lane-running").className).toContain("min-w-72");
+  });
+});
+
 describe.each(views)("$name click handling", ({ Component }) => {
   it("lets clicks on the title and status badge pass through to the overlay link", () => {
     const { row } = renderView(Component);
