@@ -2,7 +2,6 @@ package factories
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/google/uuid"
@@ -79,13 +78,12 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return models.ErrFactoryLineHasNoSteps
 		}
 
-		_, err = order.FindActiveExecution(tx)
-		if err == nil {
-			return models.ErrFactoryWorkOrderExecutionActive
-		}
-
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
+		active, err := order.HasActiveStepWork(tx)
+		if err != nil {
 			return err
+		}
+		if active {
+			return models.ErrFactoryWorkOrderExecutionActive
 		}
 
 		// Promote draft → open before the first step; no-op if already open.

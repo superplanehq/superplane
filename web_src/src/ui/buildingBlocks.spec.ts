@@ -11,6 +11,7 @@ const components = [
   { name: "broadcastMessage", label: "Broadcast Message" },
   { name: "runApp", label: "Run App" },
   { name: "createWorkOrder", label: "Create Work Order" },
+  { name: "updateWorkOrderArtifact", label: "Update Work Order Artifact" },
   { name: "runnerJS", label: "Run JavaScript" },
   { name: "runnerBash", label: "Run Bash" },
   { name: "runnerPython", label: "Run Python" },
@@ -58,6 +59,7 @@ describe("buildBuildingBlockCategories", () => {
       "broadcastMessage",
       "createWorkOrder",
       "runApp",
+      "updateWorkOrderArtifact",
     ]);
   });
 });

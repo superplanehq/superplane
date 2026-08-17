@@ -1,5 +1,5 @@
 import { Text } from "@/components/Text/text";
-import type { FactoriesWorkOrder, FactoriesWorkOrderEvent } from "@/api-client";
+import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact, FactoriesWorkOrderEvent } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
@@ -8,10 +8,12 @@ import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { useMemo, type ReactNode } from "react";
 import { Clock, FileText, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
+import { buildLatestArtifactDataById, overlayLiveArtifactData } from "./lib/workOrderArtifact";
 import {
   buildWorkOrderTimelineView,
   buildWorkOrderUserDisplayLookup,
   buildWorkOrderUserNameLookup,
+  findLatestDispatchIndex,
   type WorkOrderTimelineEvent,
   type WorkOrderTimelineEventKind,
 } from "./lib/workOrderTimelineEvents";
@@ -40,6 +42,15 @@ interface WorkOrderTimelineProps {
   isLoadingMoreEvents?: boolean;
   onLoadMoreEvents?: () => void;
   onRetryEvents?: () => void;
+  /**
+   * Current artifacts list (from useWorkOrderArtifacts), used to overlay
+   * live data — e.g. a PR's current `state` — on top of each
+   * `artifactAdded` event's data snapshot, so the "attached" chip in the
+   * timeline doesn't go stale the moment the PR changes state. Falls
+   * back to the event's own snapshot when an artifact isn't found here
+   * (very old events beyond the artifacts list, or a deleted artifact).
+   */
+  artifacts?: FactoriesWorkOrderArtifact[];
   /** Optional trailing timeline content, such as the comment composer. */
   footer?: ReactNode;
 }
@@ -55,11 +66,13 @@ export function WorkOrderActivityTimeline({
   isLoadingMoreEvents = false,
   onLoadMoreEvents,
   onRetryEvents,
+  artifacts,
   footer,
 }: WorkOrderTimelineProps) {
   const { data: users = [] } = useOrganizationUsers(organizationId);
   const resolveUserName = useMemo(() => buildWorkOrderUserNameLookup(users, order), [users, order]);
   const resolveUserDisplay = useMemo(() => buildWorkOrderUserDisplayLookup(users, order), [users, order]);
+  const latestArtifactDataById = useMemo(() => buildLatestArtifactDataById(artifacts), [artifacts]);
   const pendingView = renderTimelinePendingView({ events, eventsError, isLoading, onRetryEvents });
   const timeline = pendingView
     ? { events: [] as WorkOrderTimelineEvent[] }
@@ -85,6 +98,7 @@ export function WorkOrderActivityTimeline({
           orderNumber={order.number}
           events={timeline.events}
           resolveUserDisplay={resolveUserDisplay}
+          latestArtifactDataById={latestArtifactDataById}
           hasMoreEvents={hasMoreEvents}
           isLoadingMoreEvents={isLoadingMoreEvents}
           onLoadMoreEvents={onLoadMoreEvents}
@@ -106,6 +120,7 @@ interface TimelineEventsListProps {
   orderNumber?: string;
   events: WorkOrderTimelineEvent[];
   resolveUserDisplay: OrgUserDisplayLookup;
+  latestArtifactDataById: Map<string, Record<string, unknown>>;
   hasMoreEvents: boolean;
   isLoadingMoreEvents: boolean;
   onLoadMoreEvents?: () => void;
@@ -117,6 +132,7 @@ function TimelineEventsList({
   orderNumber,
   events,
   resolveUserDisplay,
+  latestArtifactDataById,
   hasMoreEvents,
   isLoadingMoreEvents,
   onLoadMoreEvents,
@@ -149,6 +165,7 @@ function TimelineEventsList({
               factoryKey={factoryKey}
               orderNumber={orderNumber}
               resolveUserDisplay={resolveUserDisplay}
+              latestArtifactDataById={latestArtifactDataById}
               isLatestDispatch={index === latestDispatchIndex}
             />
           ))}
@@ -206,16 +223,6 @@ function TimelineActivityEmpty() {
   return <p className="text-sm text-muted-foreground">No activity yet.</p>;
 }
 
-function findLatestDispatchIndex(events: WorkOrderTimelineEvent[]): number {
-  let idx = -1;
-  events.forEach((event, i) => {
-    if (event.kind === "dispatched") {
-      idx = i;
-    }
-  });
-  return idx;
-}
-
 // Kinds that render an avatar marker (when the actor is resolvable).
 const AVATAR_MARKER_KINDS: WorkOrderTimelineEventKind[] = [
   "created",
@@ -232,6 +239,7 @@ function TimelineItem({
   factoryKey,
   orderNumber,
   resolveUserDisplay,
+  latestArtifactDataById,
   isLatestDispatch,
 }: {
   event: WorkOrderTimelineEvent;
@@ -239,6 +247,7 @@ function TimelineItem({
   factoryKey: string;
   orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
+  latestArtifactDataById: Map<string, Record<string, unknown>>;
   isLatestDispatch: boolean;
 }) {
   if (event.kind === "dispatched") {
@@ -270,6 +279,7 @@ function TimelineItem({
             factoryKey={factoryKey}
             orderNumber={orderNumber}
             resolveUserDisplay={resolveUserDisplay}
+            latestArtifactDataById={latestArtifactDataById}
           />
         </div>
       </div>
@@ -283,12 +293,14 @@ function TimelineItemBody({
   factoryKey,
   orderNumber,
   resolveUserDisplay,
+  latestArtifactDataById,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
   factoryKey: string;
   orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
+  latestArtifactDataById: Map<string, Record<string, unknown>>;
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
   const timeLabel = formatTimelineDate(new Date(event.at));
@@ -307,7 +319,14 @@ function TimelineItemBody({
   }
 
   if (event.kind === "artifactAdded") {
-    return <ArtifactEventBody event={event} actorDisplay={actorDisplay} timeLabel={timeLabel} />;
+    return (
+      <ArtifactEventBody
+        event={event}
+        actorDisplay={actorDisplay}
+        timeLabel={timeLabel}
+        latestArtifactDataById={latestArtifactDataById}
+      />
+    );
   }
 
   return (
@@ -380,13 +399,17 @@ function ArtifactEventBody({
   event,
   actorDisplay,
   timeLabel,
+  latestArtifactDataById,
 }: {
   event: WorkOrderTimelineEvent;
   actorDisplay: OrgUserDisplay | null;
   timeLabel: string;
+  latestArtifactDataById: Map<string, Record<string, unknown>>;
 }) {
   const artifact = event.artifact;
   if (!artifact) return null;
+
+  const displayArtifact = overlayLiveArtifactData(artifact, latestArtifactDataById);
 
   return (
     <p className={inlineParagraphClassName}>
@@ -397,7 +420,7 @@ function ArtifactEventBody({
       ) : (
         <span className={inlineActorClassName}>Someone</span>
       )}{" "}
-      attached <WorkOrderArtifactInline artifact={artifact} className="align-baseline" />
+      attached <WorkOrderArtifactInline artifact={displayArtifact} className="align-baseline" />
       <span className={inlineTimeClassName}>
         {" · "}
         {timeLabel}

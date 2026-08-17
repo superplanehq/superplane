@@ -118,7 +118,9 @@ function WorkOrderDetailPageContent({
   const artifactsQuery = useWorkOrderArtifacts(organizationId, factoryId, orderId);
 
   const actions = useWorkOrderDetailActions(organizationId, factoryId, orderId);
-  const derived = getWorkOrderDetailDerived(order);
+  // Memoize so derived arrays (e.g. `assigneeIds`) keep a stable reference
+  // across re-renders/refetches that don't actually change `order`.
+  const derived = useMemo(() => getWorkOrderDetailDerived(order), [order]);
 
   usePageTitle([order?.title ?? "Work Order", factory?.name ?? "Workspace"]);
 

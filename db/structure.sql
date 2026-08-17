@@ -425,7 +425,7 @@ CREATE TABLE public.factory_work_order_executions (
     line_id uuid NOT NULL,
     step_index integer NOT NULL,
     step_name text NOT NULL,
-    run_id uuid,
+    run_id uuid NOT NULL,
     status character varying(32) DEFAULT 'pending'::character varying NOT NULL,
     result character varying(32) DEFAULT ''::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -433,6 +433,22 @@ CREATE TABLE public.factory_work_order_executions (
     finished_at timestamp with time zone,
     total_tokens bigint DEFAULT 0 NOT NULL,
     cost_cents bigint DEFAULT 0 NOT NULL
+);
+
+
+--
+-- Name: factory_work_order_queue_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_work_order_queue_items (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    work_order_id uuid NOT NULL,
+    line_id uuid NOT NULL,
+    step_index integer NOT NULL,
+    step_name text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1149,6 +1165,14 @@ ALTER TABLE ONLY public.factory_work_order_executions
 
 
 --
+-- Name: factory_work_order_queue_items factory_work_order_queue_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_queue_items
+    ADD CONSTRAINT factory_work_order_queue_items_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: factory_work_orders factory_work_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1713,6 +1737,20 @@ CREATE INDEX idx_factory_work_order_executions_work_order_created ON public.fact
 --
 
 CREATE INDEX idx_factory_work_order_executions_work_order_line_active ON public.factory_work_order_executions USING btree (work_order_id, line_id) WHERE ((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying])::text[]));
+
+
+--
+-- Name: idx_factory_work_order_queue_items_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_queue_items_order ON public.factory_work_order_queue_items USING btree (work_order_id);
+
+
+--
+-- Name: idx_factory_work_order_queue_items_step; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_queue_items_step ON public.factory_work_order_queue_items USING btree (line_id, step_index, created_at);
 
 
 --

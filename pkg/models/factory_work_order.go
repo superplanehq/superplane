@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -191,10 +192,19 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 		return err
 	}
 
+	// Omit associations: `o.Assignees` is stale after ReplaceAssignees, and
+	// GORM would otherwise re-save it as part of this update, reverting the
+	// change we just made.
 	now := time.Now()
 	o.UpdatedAt = now
-	if err := tx.Model(o).Update("updated_at", now).Error; err != nil {
+	if err := tx.Model(o).Omit(clause.Associations).Update("updated_at", now).Error; err != nil {
 		return err
+	}
+
+	// Keep the in-memory association in sync with what was just written.
+	o.Assignees = make([]FactoryWorkOrderAssignee, 0, len(assigneeIDs))
+	for _, assigneeID := range assigneeIDs {
+		o.Assignees = append(o.Assignees, FactoryWorkOrderAssignee{WorkOrderID: o.ID, UserID: assigneeID})
 	}
 
 	assigned, unassigned := assigneeDiff(previousAssignees, assigneeIDs)
@@ -359,17 +369,44 @@ func (o *FactoryWorkOrder) TransitionOnDispatch(tx *gorm.DB, actor *uuid.UUID) e
 	return err
 }
 
-// ensureNoActiveExecution returns ErrFactoryWorkOrderExecutionActive if a
-// pending/running execution exists, nil otherwise.
+// ensureNoActiveExecution returns ErrFactoryWorkOrderExecutionActive if the
+// order is queued for a step or has a pending/running execution, nil
+// otherwise.
 func (o *FactoryWorkOrder) ensureNoActiveExecution(tx *gorm.DB) error {
-	_, err := o.FindActiveExecution(tx)
-	if err == nil {
+	active, err := o.HasActiveStepWork(tx)
+	if err != nil {
+		return err
+	}
+	if active {
 		return ErrFactoryWorkOrderExecutionActive
 	}
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil
+	return nil
+}
+
+// HasActiveStepWork reports whether the order occupies a line step: it is
+// waiting in a step's queue, or has a pending/running execution.
+func (o *FactoryWorkOrder) HasActiveStepWork(tx *gorm.DB) (bool, error) {
+	var queued int64
+	err := tx.
+		Model(&FactoryWorkOrderQueueItem{}).
+		Where("work_order_id = ?", o.ID).
+		Count(&queued).
+		Error
+	if err != nil {
+		return false, err
 	}
-	return err
+	if queued > 0 {
+		return true, nil
+	}
+
+	_, err = o.FindActiveExecution(tx)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	return false, err
 }
 
 func (o *FactoryWorkOrder) FindActiveExecution(tx *gorm.DB) (*FactoryWorkOrderExecution, error) {
@@ -377,7 +414,6 @@ func (o *FactoryWorkOrder) FindActiveExecution(tx *gorm.DB) (*FactoryWorkOrderEx
 	err := tx.
 		Where("work_order_id = ?", o.ID).
 		Where("status IN ?", []string{
-			FactoryWorkOrderExecutionStatusWaiting,
 			FactoryWorkOrderExecutionStatusPending,
 			FactoryWorkOrderExecutionStatusRunning,
 		}).

@@ -309,7 +309,7 @@ func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runI
 	}
 
 	//
-	// The finished execution freed a step slot: admit the oldest waiting
+	// The finished execution freed a step slot: admit the oldest queued
 	// work order, if any. No pending-run message is published here; the
 	// pending-run sweep picks the admitted run up within a minute.
 	//
@@ -323,6 +323,6 @@ func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runI
 		return err
 	}
 
-	_, err = line.AdmitNextWaitingForStep(tx, execution.StepIndex)
+	_, err = line.AdmitNextQueuedForStep(tx, execution.StepIndex)
 	return err
 }

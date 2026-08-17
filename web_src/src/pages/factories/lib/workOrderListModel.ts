@@ -1,5 +1,5 @@
-import type { FactoriesFactory, FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
-import { isActiveWorkOrderExecution } from "./workOrderExecutions";
+import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import { isActiveWorkOrderExecution, workOrderStepRows, type WorkOrderStepRow } from "./workOrderExecutions";
 import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "./workOrderUsage";
 import {
   WORK_ORDER_BOARD_LANES,
@@ -29,7 +29,7 @@ export interface WorkOrderListEntry {
   displayNumber: number;
   title: string;
   displayStatus: WorkOrderDisplayStatus;
-  latestExecution: FactoriesWorkOrderExecution | null;
+  latestExecution: WorkOrderStepRow | null;
   latestLineName: string | null;
   latestStepName: string | null;
   /** Caption every layout shows under the title, empty when nothing ran yet. */
@@ -54,7 +54,7 @@ export function buildWorkOrderListEntry(
   order: FactoriesWorkOrder,
   factory: FactoriesFactory | null | undefined,
 ): WorkOrderListEntry {
-  const executions = order.executions ?? [];
+  const executions = workOrderStepRows(order.executions, order.queueItems);
   const latestExecution = findLatestExecution(executions);
   const lines = collectLines(executions);
   const { totalTokens, totalCostCents } = sumUsage(order, executions);
@@ -136,7 +136,7 @@ function buildLineStepLabel(lineName: string | null, stepName: string | null, di
 }
 
 /** Distinct lines the order has run on, in first-seen order. */
-function collectLines(executions: FactoriesWorkOrderExecution[]): { ids: string[]; names: string[] } {
+function collectLines(executions: WorkOrderStepRow[]): { ids: string[]; names: string[] } {
   const ids = new Set<string>();
   const names = new Set<string>();
   for (const execution of executions) {
@@ -158,7 +158,7 @@ function collectLines(executions: FactoriesWorkOrderExecution[]): { ids: string[
  */
 function sumUsage(
   order: FactoriesWorkOrder,
-  executions: FactoriesWorkOrderExecution[],
+  executions: WorkOrderStepRow[],
 ): { totalTokens: number; totalCostCents: number } {
   const totalTokens = parseWorkOrderMetric(order.totalTokens);
   const totalCostCents = parseWorkOrderMetric(order.totalCostCents);
@@ -196,11 +196,11 @@ export function buildWorkOrderListEntries(
  * predicate behind the Running display status, or a tie can show a line and
  * step that disagree with the status pill.
  */
-function findLatestExecution(executions: FactoriesWorkOrderExecution[]): FactoriesWorkOrderExecution | null {
+function findLatestExecution(executions: WorkOrderStepRow[]): WorkOrderStepRow | null {
   if (executions.length === 0) {
     return null;
   }
-  let winner: FactoriesWorkOrderExecution | null = null;
+  let winner: WorkOrderStepRow | null = null;
   let winnerAt = -Infinity;
   for (const execution of executions) {
     const at = Date.parse(execution.updatedAt ?? execution.createdAt ?? "") || 0;

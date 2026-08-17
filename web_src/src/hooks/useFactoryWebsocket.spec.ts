@@ -82,6 +82,9 @@ describe("useFactoryWebsocket", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: factoryQueryKeys.workOrderEvents("org-1", "factory-1", "order-1"),
     });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.workOrderArtifacts("org-1", "factory-1", "order-1"),
+    });
   });
 
   it("ignores events for a different factory", () => {

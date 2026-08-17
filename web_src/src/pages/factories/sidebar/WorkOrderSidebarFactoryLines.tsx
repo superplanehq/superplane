@@ -1,4 +1,4 @@
-import type { FactoriesFactoryLine, FactoriesWorkOrderExecution } from "@/api-client";
+import type { FactoriesFactoryLine } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -12,12 +12,13 @@ import {
   FACTORY_LINE_TONE_DOT_CLASS,
   type FactoryLineRowModel,
 } from "../lib/workOrderFactoryLineRows";
+import type { WorkOrderStepRow } from "../lib/workOrderExecutions";
 import { SidebarSectionHeading } from "./SidebarPrimitives";
 
 interface WorkOrderSidebarFactoryLinesProps {
   organizationId: string;
   factoryKey: string;
-  executions: FactoriesWorkOrderExecution[];
+  executions: WorkOrderStepRow[];
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
   permissionsLoading: boolean;

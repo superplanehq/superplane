@@ -96,6 +96,25 @@ func advanceFactoryLine(t *testing.T, r *support.ResourceRegistry, runID uuid.UU
 	return pending
 }
 
+func queueItemsForOrder(t *testing.T, orderID uuid.UUID) []models.FactoryWorkOrderQueueItemRecord {
+	t.Helper()
+
+	byOrder, err := models.ListFactoryWorkOrderQueueItemsByWorkOrderIDs(database.Conn(), []uuid.UUID{orderID})
+	require.NoError(t, err)
+	return byOrder[orderID]
+}
+
+func executionsForOrder(t *testing.T, orderID uuid.UUID) []models.FactoryWorkOrderExecution {
+	t.Helper()
+
+	var executions []models.FactoryWorkOrderExecution
+	require.NoError(t, database.Conn().
+		Where("work_order_id = ?", orderID).
+		Order("created_at ASC").
+		Find(&executions).Error)
+	return executions
+}
+
 func Test__StepQueue_WorkOrderWaitsWhenStepAtCapacity(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -111,8 +130,15 @@ func Test__StepQueue_WorkOrderWaitsWhenStepAtCapacity(t *testing.T) {
 
 	secondResult := fixture.enqueueOrStartStep(t, second, 0)
 	assert.Nil(t, secondResult.Run)
-	assert.Equal(t, models.FactoryWorkOrderExecutionStatusWaiting, secondResult.Execution.Status)
-	assert.Nil(t, secondResult.Execution.RunID)
+	assert.Nil(t, secondResult.Execution)
+	require.NotNil(t, secondResult.QueueItem)
+	assert.Equal(t, second.ID, secondResult.QueueItem.WorkOrderID)
+
+	// A queued order has a queue item and no execution yet.
+	items := queueItemsForOrder(t, second.ID)
+	require.Len(t, items, 1)
+	assert.Equal(t, 1, items[0].Position)
+	assert.Empty(t, executionsForOrder(t, second.ID))
 
 	// The queued decision is recorded as a work order event.
 	var queuedEvents int64
@@ -136,7 +162,7 @@ func Test__StepQueue_UnlimitedStepAlwaysStarts(t *testing.T) {
 	}
 }
 
-func Test__StepQueue_TerminalRunAdmitsOldestWaitingWorkOrder(t *testing.T) {
+func Test__StepQueue_TerminalRunAdmitsOldestQueuedWorkOrder(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -150,10 +176,18 @@ func Test__StepQueue_TerminalRunAdmitsOldestWaitingWorkOrder(t *testing.T) {
 	require.NotNil(t, firstResult.Run)
 
 	secondResult := fixture.enqueueOrStartStep(t, second, 0)
-	require.Nil(t, secondResult.Run)
+	require.NotNil(t, secondResult.QueueItem)
 
 	thirdResult := fixture.enqueueOrStartStep(t, third, 0)
-	require.Nil(t, thirdResult.Run)
+	require.NotNil(t, thirdResult.QueueItem)
+
+	// Queue positions follow enqueue order.
+	secondItems := queueItemsForOrder(t, second.ID)
+	require.Len(t, secondItems, 1)
+	assert.Equal(t, 1, secondItems[0].Position)
+	thirdItems := queueItemsForOrder(t, third.ID)
+	require.Len(t, thirdItems, 1)
+	assert.Equal(t, 2, thirdItems[0].Position)
 
 	// A failed run frees its slot the same way a passed run does.
 	finishRun(t, firstResult.Run, models.CanvasRunResultFailed)
@@ -161,16 +195,18 @@ func Test__StepQueue_TerminalRunAdmitsOldestWaitingWorkOrder(t *testing.T) {
 
 	require.Len(t, pending, 1)
 
-	var admitted models.FactoryWorkOrderExecution
-	require.NoError(t, database.Conn().Where("id = ?", secondResult.Execution.ID).First(&admitted).Error)
-	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, admitted.Status)
-	require.NotNil(t, admitted.RunID)
-	assert.Equal(t, pending[0].runID, *admitted.RunID)
+	// Second was admitted: its queue item is gone, an execution exists.
+	assert.Empty(t, queueItemsForOrder(t, second.ID))
+	admitted := executionsForOrder(t, second.ID)
+	require.Len(t, admitted, 1)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, admitted[0].Status)
+	assert.Equal(t, pending[0].runID, admitted[0].RunID)
 
-	// Third is still waiting: only one slot was freed.
-	var stillWaiting models.FactoryWorkOrderExecution
-	require.NoError(t, database.Conn().Where("id = ?", thirdResult.Execution.ID).First(&stillWaiting).Error)
-	assert.Equal(t, models.FactoryWorkOrderExecutionStatusWaiting, stillWaiting.Status)
+	// Third is still queued, now first in line: only one slot was freed.
+	thirdItems = queueItemsForOrder(t, third.ID)
+	require.Len(t, thirdItems, 1)
+	assert.Equal(t, 1, thirdItems[0].Position)
+	assert.Empty(t, executionsForOrder(t, third.ID))
 }
 
 func Test__StepQueue_ClosedWorkOrderIsSkippedAtAdmission(t *testing.T) {
@@ -187,10 +223,10 @@ func Test__StepQueue_ClosedWorkOrderIsSkippedAtAdmission(t *testing.T) {
 	require.NotNil(t, firstResult.Run)
 
 	secondResult := fixture.enqueueOrStartStep(t, second, 0)
-	require.Nil(t, secondResult.Run)
+	require.NotNil(t, secondResult.QueueItem)
 
 	thirdResult := fixture.enqueueOrStartStep(t, third, 0)
-	require.Nil(t, thirdResult.Run)
+	require.NotNil(t, thirdResult.QueueItem)
 
 	// Close the second order while it waits in the step queue.
 	_, err := second.Close(database.Conn(), models.FactoryWorkOrderResultRejected, &r.User)
@@ -200,19 +236,16 @@ func Test__StepQueue_ClosedWorkOrderIsSkippedAtAdmission(t *testing.T) {
 	pending := advanceFactoryLine(t, r, firstResult.Run.ID)
 	require.Len(t, pending, 1)
 
-	// The closed order's waiting entry is finished as cancelled...
-	var skipped models.FactoryWorkOrderExecution
-	require.NoError(t, database.Conn().Where("id = ?", secondResult.Execution.ID).First(&skipped).Error)
-	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, skipped.Status)
-	assert.Equal(t, models.CanvasRunResultCancelled, skipped.Result)
-	assert.Nil(t, skipped.RunID)
+	// The closed order's queue item is dropped without an execution...
+	assert.Empty(t, queueItemsForOrder(t, second.ID))
+	assert.Empty(t, executionsForOrder(t, second.ID))
 
 	// ...and the next open order is admitted instead.
-	var admitted models.FactoryWorkOrderExecution
-	require.NoError(t, database.Conn().Where("id = ?", thirdResult.Execution.ID).First(&admitted).Error)
-	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, admitted.Status)
-	require.NotNil(t, admitted.RunID)
-	assert.Equal(t, pending[0].runID, *admitted.RunID)
+	assert.Empty(t, queueItemsForOrder(t, third.ID))
+	admitted := executionsForOrder(t, third.ID)
+	require.Len(t, admitted, 1)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, admitted[0].Status)
+	assert.Equal(t, pending[0].runID, admitted[0].RunID)
 }
 
 func Test__StepQueue_AdvancementQueuesWhenNextStepAtCapacity(t *testing.T) {
@@ -235,16 +268,15 @@ func Test__StepQueue_AdvancementQueuesWhenNextStepAtCapacity(t *testing.T) {
 	firstPending := advanceFactoryLine(t, r, firstStepOne.Run.ID)
 	require.Len(t, firstPending, 1)
 
-	// Second order passes step one; step two is full, so it waits.
+	// Second order passes step one; step two is full, so it queues.
 	finishRun(t, secondStepOne.Run, models.CanvasRunResultPassed)
 	secondPending := advanceFactoryLine(t, r, secondStepOne.Run.ID)
 	assert.Empty(t, secondPending)
 
-	var waiting models.FactoryWorkOrderExecution
-	require.NoError(t, database.Conn().
-		Where("work_order_id = ? AND step_index = 1", second.ID).
-		First(&waiting).Error)
-	assert.Equal(t, models.FactoryWorkOrderExecutionStatusWaiting, waiting.Status)
+	queued := queueItemsForOrder(t, second.ID)
+	require.Len(t, queued, 1)
+	assert.Equal(t, 1, queued[0].StepIndex)
+	assert.Equal(t, 1, queued[0].Position)
 
 	// When the first order's step-two run finishes, the second is admitted.
 	var firstStepTwoRun models.CanvasRun
@@ -253,8 +285,12 @@ func Test__StepQueue_AdvancementQueuesWhenNextStepAtCapacity(t *testing.T) {
 	thirdPending := advanceFactoryLine(t, r, firstStepTwoRun.ID)
 	require.Len(t, thirdPending, 1)
 
-	require.NoError(t, database.Conn().Where("id = ?", waiting.ID).First(&waiting).Error)
-	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, waiting.Status)
-	require.NotNil(t, waiting.RunID)
-	assert.Equal(t, thirdPending[0].runID, *waiting.RunID)
+	assert.Empty(t, queueItemsForOrder(t, second.ID))
+
+	var admitted models.FactoryWorkOrderExecution
+	require.NoError(t, database.Conn().
+		Where("work_order_id = ? AND step_index = 1", second.ID).
+		First(&admitted).Error)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, admitted.Status)
+	assert.Equal(t, thirdPending[0].runID, admitted.RunID)
 }

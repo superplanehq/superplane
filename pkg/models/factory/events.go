@@ -12,6 +12,13 @@ const (
 	EventTypeOrderStatusUpdated    = "order.status.updated"
 	EventTypeOrderCommentAdded     = "order.comment.added"
 	EventTypeOrderArtifactAdded    = "order.artifact.added"
+	// EventTypeOrderArtifactUpdated is a websocket-only notification
+	// reason (see FactoryContext.UpdateWorkOrderArtifact) — it does not
+	// back a timeline event/struct. Flipping a PR artifact's state
+	// shouldn't spam the timeline with one entry per open/draft/closed/
+	// merged transition; the row is updated in place and this reason
+	// just tells the frontend which query to invalidate.
+	EventTypeOrderArtifactUpdated = "order.artifact.updated"
 
 	// Factory line events
 	EventTypeLineStepExecutionQueued   = "step.execution.queued"

@@ -527,11 +527,11 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	var pendingRuns []factoryLinePendingRun
 
 	//
-	// The finished run freed a slot at its step: admit the oldest waiting
+	// The finished run freed a slot at its step: admit the oldest queued
 	// work order, if any. Cancelled and failed runs free their slot the
 	// same way successful runs do.
 	//
-	admitted, err := line.AdmitNextWaitingForStep(tx, execution.StepIndex)
+	admitted, err := line.AdmitNextQueuedForStep(tx, execution.StepIndex)
 	if err != nil {
 		return nil, err
 	}

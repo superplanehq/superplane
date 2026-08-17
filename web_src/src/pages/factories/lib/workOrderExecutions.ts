@@ -2,14 +2,56 @@ import type {
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderExecutionResult,
   FactoriesWorkOrderExecutionState,
+  FactoriesWorkOrderQueueItem,
 } from "@/api-client";
 import { factoryAppRunPath } from "./factoryPagePaths";
+
+/**
+ * One row in a work order's step activity: either a real execution or a
+ * queue item projected into the same shape. `queuePosition` is set only
+ * for queued rows (1 is next to be admitted).
+ */
+export type WorkOrderStepRow = FactoriesWorkOrderExecution & {
+  queuePosition?: number;
+};
+
+export function isQueuedStepRow(row: WorkOrderStepRow): boolean {
+  return row.queuePosition !== undefined;
+}
+
+export function queueItemToStepRow(item: FactoriesWorkOrderQueueItem): WorkOrderStepRow {
+  return {
+    id: item.id,
+    step: item.step,
+    stepIndex: item.stepIndex,
+    steps: item.steps,
+    line: item.line,
+    createdAt: item.createdAt,
+    queuePosition: item.position ?? 0,
+  };
+}
+
+/**
+ * Folds a work order's queue items into its executions list, so every
+ * consumer renders one chronological list of step activity.
+ */
+export function workOrderStepRows(
+  executions: FactoriesWorkOrderExecution[] | undefined,
+  queueItems: FactoriesWorkOrderQueueItem[] | undefined,
+): WorkOrderStepRow[] {
+  return [...(executions ?? []), ...(queueItems ?? []).map(queueItemToStepRow)];
+}
 
 export interface WorkOrderExecutionDisplayMeta {
   label: string;
   className: string;
   isActive: boolean;
 }
+
+const QUEUED_STATE_META: Omit<WorkOrderExecutionDisplayMeta, "isActive"> = {
+  label: "Queued",
+  className: "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200",
+};
 
 const EXECUTION_STATE_META: Record<
   FactoriesWorkOrderExecutionState,
@@ -18,10 +60,6 @@ const EXECUTION_STATE_META: Record<
   STATE_UNKNOWN: {
     label: "Unknown",
     className: "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300",
-  },
-  STATE_QUEUED: {
-    label: "Queued",
-    className: "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200",
   },
   STATE_PENDING: {
     label: "Pending",
@@ -110,18 +148,20 @@ export function getExecutionStepTimestamp(execution: FactoriesWorkOrderExecution
   return execution.createdAt ?? execution.updatedAt ?? "";
 }
 
-export function isActiveWorkOrderExecution(execution: FactoriesWorkOrderExecution): boolean {
+export function isActiveWorkOrderExecution(execution: WorkOrderStepRow): boolean {
   return (
-    execution.state === "STATE_QUEUED" ||
+    isQueuedStepRow(execution) ||
     execution.state === "STATE_PENDING" ||
     execution.state === "STATE_STARTED" ||
     execution.state === "STATE_CANCELLING"
   );
 }
 
-export function getWorkOrderExecutionDisplayMeta(
-  execution: FactoriesWorkOrderExecution,
-): WorkOrderExecutionDisplayMeta {
+export function getWorkOrderExecutionDisplayMeta(execution: WorkOrderStepRow): WorkOrderExecutionDisplayMeta {
+  if (isQueuedStepRow(execution)) {
+    return { ...QUEUED_STATE_META, isActive: true };
+  }
+
   if (execution.state === "STATE_FINISHED" && execution.result && execution.result !== "RESULT_UNKNOWN") {
     return {
       ...EXECUTION_RESULT_META[execution.result],
@@ -139,11 +179,11 @@ export function getWorkOrderExecutionDisplayMeta(
 export interface WorkOrderExecutionLineGroup {
   lineId: string;
   lineName: string;
-  executions: FactoriesWorkOrderExecution[];
+  executions: WorkOrderStepRow[];
 }
 
 export function groupWorkOrderExecutionsByLine(
-  executions: FactoriesWorkOrderExecution[] | undefined,
+  executions: WorkOrderStepRow[] | undefined,
 ): WorkOrderExecutionLineGroup[] {
   if (!executions?.length) {
     return [];
@@ -172,10 +212,7 @@ export function groupWorkOrderExecutionsByLine(
   }));
 }
 
-function compareExecutionsChronologically(
-  left: FactoriesWorkOrderExecution,
-  right: FactoriesWorkOrderExecution,
-): number {
+function compareExecutionsChronologically(left: WorkOrderStepRow, right: WorkOrderStepRow): number {
   const leftTime = Date.parse(left.createdAt ?? "") || 0;
   const rightTime = Date.parse(right.createdAt ?? "") || 0;
   if (leftTime !== rightTime) {
@@ -216,6 +253,6 @@ export function latestFinishedWorkOrderExecution(
   return latest;
 }
 
-export function hasActiveWorkOrderExecution(executions: FactoriesWorkOrderExecution[] | undefined): boolean {
+export function hasActiveWorkOrderExecution(executions: WorkOrderStepRow[] | undefined): boolean {
   return (executions ?? []).some(isActiveWorkOrderExecution);
 }

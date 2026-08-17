@@ -1,4 +1,4 @@
-import type { FactoriesWorkOrderExecution } from "@/api-client";
+import type { FactoriesWorkOrderQueueItem } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
@@ -8,14 +8,18 @@ import {
   getWorkOrderExecutionDisplayMeta,
   getWorkOrderExecutionRunHref,
   groupWorkOrderExecutionsByLine,
+  isQueuedStepRow,
+  workOrderStepRows,
   type WorkOrderExecutionLineGroup,
+  type WorkOrderStepRow,
 } from "./lib/workOrderExecutions";
 
 interface WorkOrderExecutionsListProps {
   organizationId: string;
   factoryKey: string;
   orderNumber?: string;
-  executions?: FactoriesWorkOrderExecution[];
+  executions?: WorkOrderStepRow[];
+  queueItems?: FactoriesWorkOrderQueueItem[];
   variant?: "default" | "compact" | "inline";
   emptyMessage?: string;
 }
@@ -25,10 +29,11 @@ export function WorkOrderExecutionsList({
   factoryKey,
   orderNumber,
   executions,
+  queueItems,
   variant = "default",
   emptyMessage = "No line runs yet. Dispatch this work order to a line to start execution.",
 }: WorkOrderExecutionsListProps) {
-  const groups = groupWorkOrderExecutionsByLine(executions);
+  const groups = groupWorkOrderExecutionsByLine(workOrderStepRows(executions, queueItems));
 
   if (groups.length === 0) {
     return variant === "compact" || variant === "inline" ? null : (
@@ -132,7 +137,7 @@ function CompactExecutionRow({
   organizationId: string;
   factoryKey: string;
   orderNumber?: string;
-  execution: FactoriesWorkOrderExecution;
+  execution: WorkOrderStepRow;
 }) {
   const meta = getWorkOrderExecutionDisplayMeta(execution);
   const stepLabel = execution.step?.trim() || "Unnamed step";
@@ -154,7 +159,7 @@ function ExecutionRow({
   organizationId: string;
   factoryKey: string;
   orderNumber?: string;
-  execution: FactoriesWorkOrderExecution;
+  execution: WorkOrderStepRow;
 }) {
   const meta = getWorkOrderExecutionDisplayMeta(execution);
   const stepLabel = execution.step?.trim() || "Unnamed step";
@@ -185,7 +190,7 @@ function ExecutionStepMeta({
   size = "sm",
   stepClassName = "text-gray-700 dark:text-gray-300",
 }: {
-  execution: FactoriesWorkOrderExecution;
+  execution: WorkOrderStepRow;
   stepLabel: string;
   meta: ReturnType<typeof getWorkOrderExecutionDisplayMeta>;
   runHref?: string | null;
@@ -194,9 +199,16 @@ function ExecutionStepMeta({
   stepClassName?: string;
 }) {
   const stepAt = showTimestamp ? getExecutionStepTimestamp(execution) : "";
+  const queuePosition = execution.queuePosition ?? 0;
   const stepLabelContent = (
     <span className={cn("min-w-0 font-medium", !showTimestamp && "truncate")}>
       {stepLabel}
+      {queuePosition > 0 ? (
+        <>
+          {" "}
+          <span className="text-xs font-normal text-sky-600 dark:text-sky-300">#{queuePosition} in queue</span>
+        </>
+      ) : null}
       {stepAt ? (
         <>
           {" "}
@@ -239,7 +251,7 @@ function ExecutionStatusIcon({
   meta,
   size = "sm",
 }: {
-  execution: FactoriesWorkOrderExecution;
+  execution: WorkOrderStepRow;
   meta: ReturnType<typeof getWorkOrderExecutionDisplayMeta>;
   size?: "sm" | "md";
 }) {
@@ -253,7 +265,7 @@ function ExecutionStatusIcon({
     return <XCircle className={cn(iconClassName, "text-red-500")} aria-label="Failed" />;
   }
 
-  if (execution.state === "STATE_QUEUED") {
+  if (isQueuedStepRow(execution)) {
     return <Clock className={cn(iconClassName, "text-sky-500")} aria-label="Queued" />;
   }
 

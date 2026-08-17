@@ -628,21 +628,24 @@ where practical rather than building two semaphore mechanisms.
 2. When a work order becomes ready for a step, the factory checks the number
    of in-flight runs for that step (in-flight = the step's
    `FactoryWorkOrderExecution` records whose runs are not terminal). If below
-   the limit, the run starts immediately. Otherwise the work order enters the
-   step's queue in `waiting` state, ordered by the time it became ready for
-   the step.
+   the limit, the run starts immediately. Otherwise a
+   `FactoryWorkOrderQueueItem` is created for the step, ordered by the time
+   the work order became ready. No run or execution exists while the work
+   order is queued — executions mirror the node engine's split between queue
+   items and executions, and always have a run.
 3. When a step run reaches a terminal state, the step admits the oldest
-   waiting work order, if any. Cancelled or failed runs free their slot the
-   same way successful runs do.
+   queue item, if any: the item is deleted and the run plus execution are
+   created. Cancelled or failed runs free their slot the same way successful
+   runs do. Queue items whose work order closed while queued are deleted and
+   skipped at admission.
 4. Admission decisions are atomic per step, with the same lock-and-count
    discipline as queue dispatch, so concurrent completions cannot over-admit.
 5. Auto-cancel does not apply: work orders are never superseded by newer work
    orders. Every admitted work order runs.
-6. Waiting is a durable, queryable state: the factory UI shows, per step, the
-   work orders waiting and their position; each waiting work order's page
-   shows "Queued at *step name*" with its position. Queueing and admission are
-   recorded as work order events (append-only history, consistent with the
-   Software Factory PRD).
+6. Queued is a durable, queryable state: work orders expose `queue_items`
+   with a 1-based position per step queue, and the UI shows queued steps with
+   their position. Queueing and admission are recorded as work order events
+   (append-only history, consistent with the Software Factory PRD).
 
 **Interaction with node queues.** Step-level `maxParallelism` controls how
 many runs of the step's automation exist concurrently. For those runs to
@@ -710,19 +713,18 @@ branch, with correctness over polish:
   root event).
 - Line-step admission control (chunks 3–4) is also in the POC, backend and
   UI, so factory concurrency can be verified end to end: step
-  `maxParallelism` (default 10, 0 = unlimited) on the line editor, the
-  `waiting` execution status (nullable `run_id`), atomic per-step admission
-  serialized on the line row, admission of the oldest waiting order on any
-  terminal run (closed orders are skipped and cancelled), the
-  `step.execution.queued` work order event, and the Queued state in the
-  executions list and work order timeline.
+  `maxParallelism` (default 10, 0 = unlimited) on the line editor, a
+  dedicated `factory_work_order_queue_items` table (executions keep a
+  NOT NULL `run_id`; queued work has no run or execution yet), atomic
+  per-step admission serialized on the line row, admission of the oldest
+  queued order on any terminal run (closed orders are dropped and skipped),
+  the `step.execution.queued` work order event, and the Queued state with
+  1-based queue positions in the work order API (`queue_items`) and UI.
 - Exercised against the motivating examples: parallel coding agents, monorepo
   branch serialization, docs-deploy dedup, and deploy → tests gating with
   trailing nodes outside the group.
 - Explicitly out of POC scope: group drawing in the visual editor and the
-  derived canvas-level queue list with badges (chunk 9 observability), and
-  step-queue position numbers in the factory UI (showing "3rd of 5" for a
-  waiting work order instead of only "Queued").
+  derived canvas-level queue list with badges (chunk 9 observability).
 - Exit criteria: acceptance-criteria scenarios 1–5 and 13 below pass as E2E
   tests; learnings feed back into this PRD before the production chunks
   start.

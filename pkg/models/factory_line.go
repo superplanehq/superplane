@@ -102,6 +102,9 @@ func (f *Factory) CreateLine(tx *gorm.DB, name string, steps []FactoryLineStep) 
 type FactoryLineStepResult struct {
 	Run       *CanvasRun
 	Execution *FactoryWorkOrderExecution
+	// QueueItem is set instead of Run/Execution when the step was at its
+	// maxParallelism and the work order was queued.
+	QueueItem *FactoryWorkOrderQueueItem
 }
 
 const onRunTriggerName = "onRun"
@@ -129,7 +132,7 @@ func (l *FactoryLine) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex 
 		LineID:         l.ID,
 		StepIndex:      stepIndex,
 		StepName:       step.Name,
-		RunID:          &run.ID,
+		RunID:          run.ID,
 		Status:         FactoryWorkOrderExecutionStatusPending,
 		Result:         "",
 		CreatedAt:      now,
@@ -151,9 +154,9 @@ func (l *FactoryLine) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex 
 }
 
 // EnqueueOrStartStep starts the step when it is below its maxParallelism,
-// and otherwise records the work order as waiting in the step's queue
-// (result.Run is nil). Admission is serialized on the line row lock so
-// concurrent dispatches and completions cannot over-admit.
+// and otherwise puts the work order in the step's queue (result.Run is
+// nil and result.QueueItem is set). Admission is serialized on the line
+// row lock so concurrent dispatches and completions cannot over-admit.
 func (l *FactoryLine) EnqueueOrStartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int) (*FactoryLineStepResult, error) {
 	if err := l.lockForAdmission(tx); err != nil {
 		return nil, err
@@ -173,8 +176,7 @@ func (l *FactoryLine) EnqueueOrStartStep(tx *gorm.DB, order *FactoryWorkOrder, s
 		return l.StartStep(tx, order, stepIndex)
 	}
 
-	now := time.Now()
-	execution := &FactoryWorkOrderExecution{
+	item := &FactoryWorkOrderQueueItem{
 		ID:             uuid.New(),
 		OrganizationID: l.OrganizationID,
 		FactoryID:      l.FactoryID,
@@ -182,13 +184,10 @@ func (l *FactoryLine) EnqueueOrStartStep(tx *gorm.DB, order *FactoryWorkOrder, s
 		LineID:         l.ID,
 		StepIndex:      stepIndex,
 		StepName:       step.Name,
-		Status:         FactoryWorkOrderExecutionStatusWaiting,
-		Result:         "",
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		CreatedAt:      time.Now(),
 	}
 
-	if err := tx.Clauses(clause.Returning{}).Create(execution).Error; err != nil {
+	if err := tx.Clauses(clause.Returning{}).Create(item).Error; err != nil {
 		return nil, err
 	}
 
@@ -196,14 +195,14 @@ func (l *FactoryLine) EnqueueOrStartStep(tx *gorm.DB, order *FactoryWorkOrder, s
 		return nil, err
 	}
 
-	return &FactoryLineStepResult{Execution: execution}, nil
+	return &FactoryLineStepResult{QueueItem: item}, nil
 }
 
-// AdmitNextWaitingForStep starts the oldest waiting work order for the
-// step if the step has capacity. Waiting entries whose work order is no
-// longer open are finished as cancelled and skipped. Returns nil when
-// nothing was admitted.
-func (l *FactoryLine) AdmitNextWaitingForStep(tx *gorm.DB, stepIndex int) (*FactoryLineStepResult, error) {
+// AdmitNextQueuedForStep starts the oldest queued work order for the
+// step if the step has capacity. Queue items whose work order is no
+// longer open are deleted and skipped. Returns nil when nothing was
+// admitted.
+func (l *FactoryLine) AdmitNextQueuedForStep(tx *gorm.DB, stepIndex int) (*FactoryLineStepResult, error) {
 	//
 	// Line steps can change after executions were created; a stale step
 	// index means there is no step queue to admit from.
@@ -230,47 +229,32 @@ func (l *FactoryLine) AdmitNextWaitingForStep(tx *gorm.DB, stepIndex int) (*Fact
 			return nil, nil
 		}
 
-		execution, err := l.findOldestWaitingExecution(tx, stepIndex)
+		item, err := findOldestFactoryWorkOrderQueueItem(tx, l.ID, stepIndex)
 		if err != nil {
 			return nil, err
 		}
-		if execution == nil {
+		if item == nil {
 			return nil, nil
 		}
 
 		var order FactoryWorkOrder
 		err = tx.
-			Where("organization_id = ? AND factory_id = ? AND id = ?", l.OrganizationID, l.FactoryID, execution.WorkOrderID).
+			Where("organization_id = ? AND factory_id = ? AND id = ?", l.OrganizationID, l.FactoryID, item.WorkOrderID).
 			First(&order).
 			Error
 		if err != nil {
 			return nil, err
 		}
 
+		if err := item.Delete(tx); err != nil {
+			return nil, err
+		}
+
 		if !order.IsOpen() {
-			if err := execution.MarkFinished(tx, CanvasRunResultCancelled); err != nil {
-				return nil, err
-			}
 			continue
 		}
 
-		run, err := l.createStepRun(tx, &order, step)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := execution.AttachRun(tx, run); err != nil {
-			return nil, err
-		}
-
-		if err := l.RecordStepExecutionCreated(tx, &order, execution, step, run); err != nil {
-			return nil, err
-		}
-
-		return &FactoryLineStepResult{
-			Run:       run,
-			Execution: execution,
-		}, nil
+		return l.StartStep(tx, &order, stepIndex)
 	}
 }
 
@@ -312,25 +296,6 @@ func (l *FactoryLine) stepHasCapacity(tx *gorm.DB, stepIndex int, step *FactoryL
 	}
 
 	return inFlight < int64(step.EffectiveMaxParallelism()), nil
-}
-
-func (l *FactoryLine) findOldestWaitingExecution(tx *gorm.DB, stepIndex int) (*FactoryWorkOrderExecution, error) {
-	var execution FactoryWorkOrderExecution
-	err := tx.
-		Where("line_id = ? AND step_index = ?", l.ID, stepIndex).
-		Where("status = ?", FactoryWorkOrderExecutionStatusWaiting).
-		Order("created_at ASC").
-		Order("id ASC").
-		First(&execution).
-		Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	return &execution, nil
 }
 
 // createStepRun validates the step's entrypoint and creates the pending
