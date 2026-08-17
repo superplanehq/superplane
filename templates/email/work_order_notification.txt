@@ -1,0 +1,13 @@
+{{.Summary}}
+
+{{.WorkOrderKey}} — {{.WorkOrderTitle}}
+{{if .Detail}}
+{{.Detail}}
+{{end}}
+Open the work order in SuperPlane:
+{{.WorkOrderLink}}
+
+You receive this email because of your notification settings in SuperPlane. To change them, open your workspace settings and select Notifications.
+
+Best regards,
+The SuperPlane Team

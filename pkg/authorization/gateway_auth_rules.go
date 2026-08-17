@@ -205,6 +205,15 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		// Self-scoped notification settings: any member can read their
+		// own settings, so the route only requires the factories read
+		// permission.
+		{Method: "GET", Pattern: "/api/v1/factory-notification-settings"}: {
+			Resource:                     "factories",
+			Action:                       "read",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
 		{Method: "GET", Pattern: "/api/v1/factories/{id}"}: {
 			Resource:                     "factories",
 			Action:                       "read",
@@ -594,6 +603,14 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		{Method: "PUT", Pattern: "/api/v1/factories/{id}"}: {
 			Resource:                     "factories",
 			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		// Self-scoped: users only write their own notification settings,
+		// so the update route requires the factories read permission.
+		{Method: "PUT", Pattern: "/api/v1/factory-notification-settings"}: {
+			Resource:                     "factories",
+			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},

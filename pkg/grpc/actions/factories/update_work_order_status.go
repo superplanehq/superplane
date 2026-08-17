@@ -60,6 +60,8 @@ func UpdateWorkOrderStatus(
 
 	db := database.DB(ctx)
 	var order *models.FactoryWorkOrder
+	var fromState string
+	var changed bool
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
@@ -71,7 +73,8 @@ func UpdateWorkOrderStatus(
 			return err
 		}
 
-		_, err = order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
+		fromState = order.State
+		changed, err = order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
 			ToState: toState,
 			Result:  result,
 			Actor:   &actor,
@@ -98,6 +101,22 @@ func UpdateWorkOrderStatus(
 		factoryevents.EventTypeOrderStatusUpdated,
 	); err != nil {
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
+	}
+
+	if changed {
+		notification := messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID: orgID.String(),
+			FactoryID:      factory.ID.String(),
+			OrderID:        order.ID.String(),
+			EventType:      factoryevents.EventTypeOrderStatusUpdated,
+			ActorUserID:    actor.String(),
+			FromState:      fromState,
+			ToState:        toState,
+			Result:         result,
+		}
+		if err := notification.Publish(); err != nil {
+			log.WithError(err).Warnf("Failed to publish work order notification for order %s", order.ID)
+		}
 	}
 
 	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
