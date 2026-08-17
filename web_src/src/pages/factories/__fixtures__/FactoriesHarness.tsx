@@ -14,6 +14,8 @@ import { refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
 import { MissionAssignmentProvider } from "../pages/missions/MissionAssignmentContext";
 import { MissionsWorkOrdersPage } from "../pages/missions/MissionsWorkOrdersPage";
 import { WorkOrderMissionOverviewRow } from "../pages/missions/WorkOrderMissionOverviewRow";
+import { OverviewMetricsScorecardRowPopulated } from "../pages/OverviewMetricsScorecardRow";
+import { OverviewMetricsSlotContext, type OverviewMetricsSlot } from "../pages/overviewMetricsSlots";
 import { WorkOrderOverviewMissionSlotContext } from "../sidebar/workOrderOverviewSlots";
 
 interface FactoriesHarnessProps {
@@ -35,6 +37,13 @@ interface FactoriesHarnessProps {
   onboardingSeed?: OnboardingStorybookSeed;
   /** When false, skip onboarding provider/routes (app-like create → overview). */
   enableOnboarding?: boolean;
+  /**
+   * Storybook-only: fills the Overview velocity scorecard row via
+   * `OverviewMetricsSlotContext`. Defaults to the populated prototype row;
+   * pass `OverviewMetricsScorecardRowEmpty` to see the no-data state on the
+   * full Overview page.
+   */
+  overviewMetricsSlot?: OverviewMetricsSlot;
 }
 
 function DefaultWikiWireframe() {
@@ -55,6 +64,7 @@ export function FactoriesHarness({
   pageOverrides,
   onboardingSeed,
   enableOnboarding = true,
+  overviewMetricsSlot = OverviewMetricsScorecardRowPopulated,
 }: FactoriesHarnessProps) {
   const homeFixture: HomePageFixture = {
     ...defaultHomePageFixture,
@@ -91,7 +101,7 @@ export function FactoriesHarness({
   const withMissions = (
     <MissionAssignmentProvider>
       <WorkOrderOverviewMissionSlotContext.Provider value={WorkOrderMissionOverviewRow}>
-        {harness}
+        <OverviewMetricsSlotContext.Provider value={overviewMetricsSlot}>{harness}</OverviewMetricsSlotContext.Provider>
       </WorkOrderOverviewMissionSlotContext.Provider>
     </MissionAssignmentProvider>
   );

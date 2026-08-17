@@ -14,6 +14,7 @@ import {
   factorySectionBodyClassName,
   factorySectionHeaderClassName,
 } from "./factoryPageLayoutStyles";
+import { useOverviewMetricsSlot } from "./overviewMetricsSlots";
 
 const MAX_ROWS = 8;
 
@@ -24,6 +25,7 @@ export function OverviewPage() {
     isLoading: workOrdersLoading,
     error: workOrdersError,
   } = useFactoryWorkOrders(organizationId, factoryId);
+  const MetricsSlot = useOverviewMetricsSlot();
 
   const recentOrders = [...workOrders]
     .sort((a, b) => {
@@ -35,6 +37,16 @@ export function OverviewPage() {
 
   const lines = factory?.lines ?? [];
 
+  const workOrdersCard = (
+    <WorkOrdersOverviewCard
+      organizationId={organizationId}
+      factoryKey={factoryKey}
+      orders={recentOrders}
+      isLoading={workOrdersLoading}
+      error={workOrdersError}
+    />
+  );
+
   return (
     <>
       <WorkspacePageHeader
@@ -44,16 +56,17 @@ export function OverviewPage() {
       />
 
       <div className={factorySectionBodyClassName}>
-        <div className="grid gap-6 lg:grid-cols-2">
-          <WorkOrdersOverviewCard
-            organizationId={organizationId}
-            factoryKey={factoryKey}
-            orders={recentOrders}
-            isLoading={workOrdersLoading}
-            error={workOrdersError}
-          />
-          <LinesOverviewCard organizationId={organizationId} factoryKey={factoryKey} lines={lines} />
-        </div>
+        {MetricsSlot ? (
+          <div className="space-y-6">
+            <MetricsSlot organizationId={organizationId} factoryKey={factoryKey} />
+            {workOrdersCard}
+          </div>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-2">
+            {workOrdersCard}
+            <LinesOverviewCard organizationId={organizationId} factoryKey={factoryKey} lines={lines} />
+          </div>
+        )}
       </div>
     </>
   );
