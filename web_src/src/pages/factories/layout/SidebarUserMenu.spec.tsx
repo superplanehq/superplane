@@ -30,9 +30,9 @@ describe("SidebarUserMenu", () => {
     const user = userEvent.setup();
     renderMenu();
 
-    const trigger = screen.getByTestId("factories-sidebar-user-menu-trigger");
-    expect(trigger).toHaveTextContent("Ada Lovelace");
-    expect(trigger).toHaveTextContent("SuperPlane");
+    const trigger = screen.getByRole("button", { name: /Ada Lovelace/ });
+    expect(trigger).toHaveAccessibleName(/Ada Lovelace.*SuperPlane/s);
+    expect(trigger).toHaveAttribute("data-testid", "factories-sidebar-user-menu-trigger");
     expect(within(trigger).queryByRole("button")).not.toBeInTheDocument();
 
     await user.click(trigger);

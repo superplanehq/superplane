@@ -77,7 +77,6 @@ export function SidebarUserMenu({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            aria-label={`Open user menu for ${userName}`}
             data-testid="factories-sidebar-user-menu-trigger"
             className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:bg-sidebar-accent"
           >
@@ -133,7 +132,10 @@ function AppearanceMenuItem() {
 
   return (
     <DropdownMenuSub>
-      <DropdownMenuSubTrigger className="py-1 text-[13px] [&_svg]:size-3.5" data-testid="factories-sidebar-appearance">
+      <DropdownMenuSubTrigger
+        className="py-1 text-[13px] [&_svg]:size-3.5 [&>svg:last-child]:ml-0"
+        data-testid="factories-sidebar-appearance"
+      >
         <SunMoon aria-hidden />
         Appearance
         <span className="ml-auto text-[11px] text-muted-foreground">{labelForTheme(preference)}</span>
