@@ -25,6 +25,22 @@ vi.mock("@/components/AgentSidebar/widgets/NodeChip", () => ({
   ),
 }));
 
+vi.mock("@/components/MentionChip/MentionChip", () => ({
+  MentionChipFromLink: ({
+    userId,
+    rawLabel,
+    organizationId,
+  }: {
+    userId: string;
+    rawLabel?: string;
+    organizationId: string;
+  }) => (
+    <button type="button" data-testid="mention-chip">
+      {rawLabel}:{userId}:{organizationId}
+    </button>
+  ),
+}));
+
 vi.mock("@/components/AgentSidebar/widgets/IntegrationButton", () => ({
   IntegrationButton: ({ integrationRef, label }: { integrationRef: string; label?: string }) => (
     <button type="button" data-testid="integration-chip">
@@ -277,5 +293,28 @@ describe("MarkdownContent", () => {
 
     expect(screen.queryByTestId("markdown-section")).not.toBeInTheDocument();
     expect(document.querySelector("blockquote")).toBeTruthy();
+  });
+});
+
+// Kept as its own top-level `describe` (rather than folded into the block
+// above) purely to stay under this file's statement-count lint budget.
+describe("MarkdownContent user mention links", () => {
+  it("renders as chips when organization context is available", () => {
+    render(
+      <MarkdownContent
+        content={"Hey @[Ada Lovelace](user:11111111-1111-1111-1111-111111111111), take a look."}
+        organizationId="org-1"
+      />,
+    );
+
+    expect(screen.getByTestId("mention-chip")).toHaveTextContent(
+      "Ada Lovelace:11111111-1111-1111-1111-111111111111:org-1",
+    );
+  });
+
+  it("does not render a chip without organization context", () => {
+    render(<MarkdownContent content={"Hey @[Ada Lovelace](user:11111111-1111-1111-1111-111111111111)."} />);
+
+    expect(screen.queryByTestId("mention-chip")).not.toBeInTheDocument();
   });
 });

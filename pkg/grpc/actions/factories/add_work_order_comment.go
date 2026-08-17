@@ -46,7 +46,8 @@ func AddWorkOrderComment(
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
-	if _, err := uuid.Parse(userIDStr); err != nil {
+	authorID, err := uuid.Parse(userIDStr)
+	if err != nil {
 		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to add work order comment")
 	}
 
@@ -58,6 +59,7 @@ func AddWorkOrderComment(
 	}
 
 	db := database.DB(ctx)
+	var mentions []factory.UserRef
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factoryModel, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
@@ -69,7 +71,21 @@ func AddWorkOrderComment(
 			return err
 		}
 
-		return order.RecordCommentAdded(tx, body, author, nil)
+		mentionIDs, err := parseUserIDs(tx, orgID, req.GetMentionedUserIds(), "mentioned user")
+		if err != nil {
+			return err
+		}
+
+		for _, mentionID := range mentionIDs {
+			// A self-mention isn't meaningful (no one to notify) and would
+			// otherwise show up as a no-op chip in the author's own comment.
+			if mentionID == authorID {
+				continue
+			}
+			mentions = append(mentions, factory.UserRef{ID: mentionID})
+		}
+
+		return order.RecordCommentAdded(tx, body, author, mentions, nil)
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to add work order comment")
@@ -88,8 +104,21 @@ func AddWorkOrderComment(
 			Body:      body,
 			Author:    serializeCommentAuthor(author),
 			CreatedAt: timestamppb.Now(),
+			Mentions:  serializeMentions(mentions),
 		},
 	}, nil
+}
+
+func serializeMentions(mentions []factory.UserRef) []*pb.UserRef {
+	if len(mentions) == 0 {
+		return nil
+	}
+
+	result := make([]*pb.UserRef, 0, len(mentions))
+	for _, mention := range mentions {
+		result = append(result, &pb.UserRef{Id: mention.ID.String()})
+	}
+	return result
 }
 
 func serializeCommentAuthor(author factory.WorkOrderCommentAuthor) *pb.WorkOrderCommentAuthor {

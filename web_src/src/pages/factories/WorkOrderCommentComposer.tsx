@@ -3,29 +3,37 @@ import { Textarea } from "@/components/ui/textarea";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { cn } from "@/lib/utils";
 import { ArrowUp, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useWorkOrderCommentComposer } from "./useWorkOrderCommentComposer";
+import { WorkOrderMentionMenu } from "./WorkOrderMentionMenu";
 
 interface WorkOrderCommentComposerProps {
+  organizationId: string;
   canComment: boolean;
   isSubmitting: boolean;
-  onSubmit: (body: string) => Promise<void>;
+  onSubmit: (body: string, mentionedUserIds: string[]) => Promise<void>;
 }
 
-export function WorkOrderCommentComposer({ canComment, isSubmitting, onSubmit }: WorkOrderCommentComposerProps) {
-  const [body, setBody] = useState("");
-  const canSubmit = canComment && Boolean(body.trim()) && !isSubmitting;
-
-  const handleSubmit = async () => {
-    const trimmed = body.trim();
-    if (!trimmed) return;
-
-    try {
-      await onSubmit(trimmed);
-      setBody("");
-    } catch {
-      // Toast surfaced from the action hook.
-    }
-  };
+export function WorkOrderCommentComposer({
+  organizationId,
+  canComment,
+  isSubmitting,
+  onSubmit,
+}: WorkOrderCommentComposerProps) {
+  const {
+    textareaRef,
+    body,
+    canSubmit,
+    showMenu,
+    menuPosition,
+    mentionOptions,
+    highlightedIndex,
+    setHighlightedIndex,
+    selectMentionOption,
+    handleChange,
+    handleKeyDown,
+    handleSubmit,
+    syncCursor,
+  } = useWorkOrderCommentComposer({ organizationId, canComment, isSubmitting, onSubmit });
 
   return (
     <div
@@ -37,19 +45,30 @@ export function WorkOrderCommentComposer({ canComment, isSubmitting, onSubmit }:
       </label>
       <Textarea
         id="work-order-comment"
+        ref={textareaRef}
         value={body}
-        onChange={(event) => setBody(event.target.value)}
-        onKeyDown={(event) => {
-          if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && canSubmit) {
-            event.preventDefault();
-            void handleSubmit();
-          }
-        }}
+        role="combobox"
+        aria-expanded={showMenu}
+        aria-haspopup="listbox"
+        aria-controls={showMenu ? "work-order-mention-menu" : undefined}
+        onChange={handleChange}
+        onClick={(event) => syncCursor(event.currentTarget)}
+        onKeyUp={(event) => syncCursor(event.currentTarget)}
+        onKeyDown={handleKeyDown}
         rows={2}
-        placeholder="Add a comment…"
+        placeholder="Add a comment… (@ to mention someone)"
         disabled={!canComment || isSubmitting}
         className="min-h-[66px] resize-none border-0 bg-transparent px-3 pt-2.5 pb-8 text-[13px] leading-5 shadow-none focus-visible:ring-0"
       />
+      {showMenu && menuPosition && (
+        <WorkOrderMentionMenu
+          options={mentionOptions}
+          position={menuPosition}
+          highlightedIndex={highlightedIndex}
+          onHighlightChange={setHighlightedIndex}
+          onSelect={selectMentionOption}
+        />
+      )}
       <div className="absolute right-1.5 bottom-1.5 flex items-center gap-1">
         <PermissionTooltip allowed={canComment} message="You don't have permission to comment.">
           <Button

@@ -275,14 +275,14 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 	require.NoError(t, order.RecordCommentAdded(database.Conn(), "Kicking this off", factory.WorkOrderCommentAuthor{
 		Kind:   factory.CommentAuthorKindUser,
 		UserID: &userIDStr,
-	}, nil))
+	}, nil, nil))
 	require.NoError(t, order.RecordCommentAdded(database.Conn(), "Opened the PR", factory.WorkOrderCommentAuthor{
 		Kind: factory.CommentAuthorKindAutomation,
 		Automation: &factory.AutomationRef{
 			NodeID:   "implement",
 			NodeName: "Implement",
 		},
-	}, &factory.RunRef{ID: run.ID, State: "running"}))
+	}, nil, &factory.RunRef{ID: run.ID, State: "running"}))
 
 	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithRootEvent(&nodeExecution.RootEventID).

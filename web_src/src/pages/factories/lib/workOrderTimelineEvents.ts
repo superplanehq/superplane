@@ -68,6 +68,14 @@ export interface WorkOrderTimelineComment {
   body: string;
   authorKind?: string;
   automation?: WorkOrderTimelineAutomationActor;
+  /**
+   * Ids of organization members `@` mentioned in this comment, from the
+   * event payload's `mentions` field. Kept alongside the raw `body` markdown
+   * — which already carries `@[Name](user:id)` tokens the timeline renders
+   * as chips — as a defensive fallback/for "you were mentioned" checks
+   * without re-parsing markdown (see `useWorkOrderMentionToast`).
+   */
+  mentionedUserIds?: string[];
 }
 
 export interface WorkOrderTimelineArtifact {

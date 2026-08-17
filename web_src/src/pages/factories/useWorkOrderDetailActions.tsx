@@ -51,9 +51,9 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     }
   };
 
-  const handleAddComment = async (body: string) => {
+  const handleAddComment = async (body: string, mentionedUserIds: string[] = []) => {
     try {
-      await addComment.mutateAsync({ orderId, body });
+      await addComment.mutateAsync({ orderId, body, mentionedUserIds });
       showSuccessToast("Comment added.");
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to add comment"));

@@ -523,13 +523,15 @@ func (o *FactoryWorkOrder) RecordCommentAdded(
 	tx *gorm.DB,
 	body string,
 	author factory.WorkOrderCommentAuthor,
+	mentions []factory.UserRef,
 	run *factory.RunRef,
 ) error {
 	data := factory.WorkOrderCommentAdded{
-		Order:  o.Ref(),
-		Body:   body,
-		Author: &author,
-		Run:    run,
+		Order:    o.Ref(),
+		Body:     body,
+		Author:   &author,
+		Run:      run,
+		Mentions: mentions,
 	}
 
 	return o.recordEvent(tx, factory.EventTypeOrderCommentAdded, data)

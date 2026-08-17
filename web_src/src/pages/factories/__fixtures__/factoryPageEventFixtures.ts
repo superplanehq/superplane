@@ -136,7 +136,7 @@ function commentAddedEvent(
   at: string,
   body: string,
   author: CommentAuthorFixture,
-  run?: { id: string },
+  extra?: { run?: { id: string }; mentions?: { id: string }[] },
 ): FactoriesWorkOrderEvent {
   return {
     type: "order.comment.added",
@@ -145,7 +145,8 @@ function commentAddedEvent(
       order: { id: order.id, title: order.title },
       body,
       author,
-      ...(run ? { run } : {}),
+      ...(extra?.run ? { run: extra.run } : {}),
+      ...(extra?.mentions?.length ? { mentions: extra.mentions } : {}),
     },
   };
 }
@@ -273,7 +274,7 @@ export const RUNNING_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
         stepName: "implement",
       },
     },
-    { id: "run-implement" },
+    { run: { id: "run-implement" } },
   ),
 ];
 
@@ -371,8 +372,9 @@ export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
   commentAddedEvent(
     OPEN_WORK_ORDER,
     TWO_HOURS_AGO,
-    "Kicked off — starting with the ledger diff, will attach a repro PR shortly.",
+    `Kicked off — starting with the ledger diff. @[${OPERATOR_USER.name}](user:${OPERATOR_USER.id}) can you take a look at the retry policy while I dig into the diff?`,
     { kind: "user", userId: REVIEWER_USER.id },
+    { mentions: [{ id: OPERATOR_USER.id }] },
   ),
   commentAddedEvent(
     OPEN_WORK_ORDER,

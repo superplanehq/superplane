@@ -307,10 +307,11 @@ func TestFactoryWorkOrder_RecordCommentAdded(t *testing.T) {
 	require.NoError(t, err)
 
 	userIDStr := userID.String()
+	mentionedID := uuid.New()
 	require.NoError(t, order.RecordCommentAdded(database.Conn(), "Hello there", factory.WorkOrderCommentAuthor{
 		Kind:   factory.CommentAuthorKindUser,
 		UserID: &userIDStr,
-	}, nil))
+	}, []factory.UserRef{{ID: mentionedID}}, nil))
 
 	events, err := order.ListEvents(database.Conn(), 10, nil)
 	require.NoError(t, err)
@@ -325,6 +326,8 @@ func TestFactoryWorkOrder_RecordCommentAdded(t *testing.T) {
 	assert.Equal(t, "Hello there", comment.Body)
 	require.NotNil(t, comment.Author)
 	assert.Equal(t, factory.CommentAuthorKindUser, comment.Author.Kind)
+	require.Len(t, comment.Mentions, 1)
+	assert.Equal(t, mentionedID, comment.Mentions[0].ID)
 }
 
 func TestFactoryWorkOrder_ListComments(t *testing.T) {
@@ -346,7 +349,7 @@ func TestFactoryWorkOrder_ListComments(t *testing.T) {
 	require.NoError(t, order.RecordCommentAdded(database.Conn(), "First comment", factory.WorkOrderCommentAuthor{
 		Kind:   factory.CommentAuthorKindUser,
 		UserID: &userIDStr,
-	}, nil))
+	}, nil, nil))
 
 	require.NoError(t, order.RecordCommentAdded(database.Conn(), "Second comment", factory.WorkOrderCommentAuthor{
 		Kind: factory.CommentAuthorKindAutomation,
@@ -354,7 +357,7 @@ func TestFactoryWorkOrder_ListComments(t *testing.T) {
 			NodeID:   "node-1",
 			NodeName: "Node One",
 		},
-	}, &factory.RunRef{ID: uuid.New(), State: "finished"}))
+	}, nil, &factory.RunRef{ID: uuid.New(), State: "finished"}))
 
 	// A status update event should never show up in the comment thread.
 	require.NoError(t, order.RecordStatusUpdated(database.Conn(), statusUpdatedRecord{
