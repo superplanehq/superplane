@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -75,10 +74,6 @@ func (c *CreateRecord) Setup(ctx core.SetupContext) error {
 
 	config = c.normalizeConfig(config)
 	return validateRecordConfiguration(config.HostedZoneID, config.RecordName, config.RecordType, config.Values)
-}
-
-func (c *CreateRecord) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateRecord) Execute(ctx core.ExecutionContext) error {

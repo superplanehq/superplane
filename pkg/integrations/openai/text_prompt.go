@@ -9,7 +9,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/attachments"
@@ -379,10 +378,6 @@ func cleanupFiles(client *Client, fileIDs []string) {
 
 func (c *CreateResponse) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *CreateResponse) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateResponse) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

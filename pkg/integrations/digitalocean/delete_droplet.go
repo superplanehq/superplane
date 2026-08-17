@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -145,10 +144,6 @@ func (d *DeleteDroplet) Execute(ctx core.ExecutionContext) error {
 
 func (d *DeleteDroplet) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (d *DeleteDroplet) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (d *DeleteDroplet) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

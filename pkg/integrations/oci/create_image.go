@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -292,10 +291,6 @@ func (c *CreateImage) Setup(ctx core.SetupContext) error {
 		InstanceID:    config.Instance,
 		SourceType:    config.SourceType,
 	}))
-}
-
-func (c *CreateImage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return defaultProcessQueue(ctx)
 }
 
 func (c *CreateImage) Execute(ctx core.ExecutionContext) error {

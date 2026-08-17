@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -231,10 +230,6 @@ func (c *UpdatePackageVersionsStatus) Setup(ctx core.SetupContext) error {
 	}
 
 	return nil
-}
-
-func (c *UpdatePackageVersionsStatus) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *UpdatePackageVersionsStatus) Execute(ctx core.ExecutionContext) error {

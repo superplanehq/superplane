@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -460,10 +459,6 @@ func (u *UpdateApp) Execute(ctx core.ExecutionContext) error {
 
 func (u *UpdateApp) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (u *UpdateApp) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (u *UpdateApp) Hooks() []core.Hook {
