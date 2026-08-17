@@ -12,5 +12,6 @@ export { LegacyWorkOrderDetailRedirect, WorkOrderDetailPage } from "./WorkOrderD
 export { WorkOrdersPage } from "./WorkOrdersPage";
 export { FactorySettingsLayout } from "./settings/FactorySettingsLayout";
 export { FactorySettingsGeneralPage } from "./settings/FactorySettingsGeneralPage";
+export { FactorySettingsNotificationsPage } from "./settings/FactorySettingsNotificationsPage";
 export { FactorySettingsSoonPage } from "./settings/FactorySettingsSoonPage";
 export { FACTORY_SETTINGS_NAV_ITEMS } from "./settings/settingsNavItems";

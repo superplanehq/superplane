@@ -193,6 +193,49 @@ func TestSMTPEmailService_SendMagicCodeEmail(t *testing.T) {
 	assert.True(t, strings.Contains(message, "<p>Code 123456</p>"))
 }
 
+func TestSMTPEmailService_SendWorkOrderNotificationEmail(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeWorkOrderNotificationTemplates(t, tmpDir)
+
+	settings := &SMTPSettings{
+		Host:      "smtp.example.com",
+		Port:      587,
+		Username:  "user",
+		Password:  "pass",
+		FromName:  "SuperPlane",
+		FromEmail: "noreply@example.com",
+		UseTLS:    true,
+	}
+
+	provider := &fakeSettingsProvider{settings: settings}
+	service := NewSMTPEmailService(provider, tmpDir)
+
+	fakeClient := &fakeSMTPClient{extensions: map[string]bool{"STARTTLS": true}}
+	originalDial := smtpDial
+	smtpDial = func(addr string) (smtpClient, error) {
+		assert.Equal(t, "smtp.example.com:587", addr)
+		return fakeClient, nil
+	}
+	t.Cleanup(func() {
+		smtpDial = originalDial
+	})
+
+	err := service.SendWorkOrderNotificationEmail("user@example.com", "[SP-42] New comment", WorkOrderNotificationTemplateData{
+		Summary:        "Ana commented on SP-42.",
+		WorkOrderKey:   "SP-42",
+		WorkOrderTitle: "Fix login",
+		Detail:         "Looks good",
+		WorkOrderLink:  "https://app.superplane.com/org/workspaces/sp/work-order/42",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"user@example.com"}, fakeClient.rcpt)
+	message := fakeClient.message.String()
+	assert.Contains(t, message, "Subject: [SP-42] New comment")
+	assert.Contains(t, message, "Ana commented on SP-42.")
+	assert.Contains(t, message, "Looks good")
+}
+
 func TestRenderEmailTemplate(t *testing.T) {
 	tmpDir := t.TempDir()
 	templateDir := filepath.Join(tmpDir, "email")
@@ -235,6 +278,9 @@ func TestNoopEmailService(t *testing.T) {
 	service := NewNoopEmailService()
 
 	require.NoError(t, service.SendMagicCodeEmail("user@example.com", "123456", "https://example.com"))
+	require.NoError(t, service.SendWorkOrderNotificationEmail("owner@example.com", "[SP-1] New comment", WorkOrderNotificationTemplateData{
+		Summary: "A comment was added.",
+	}))
 
 	emails := service.SentMagicCodeEmails()
 	require.Len(t, emails, 1)
@@ -244,11 +290,17 @@ func TestNoopEmailService(t *testing.T) {
 		MagicLink: "https://example.com",
 	}, emails[0])
 
+	notifications := service.SentWorkOrderNotificationEmails()
+	require.Len(t, notifications, 1)
+	assert.Equal(t, "owner@example.com", notifications[0].ToEmail)
+	assert.Equal(t, "[SP-1] New comment", notifications[0].Subject)
+
 	emails[0].Code = "mutated"
 	assert.Equal(t, "123456", service.SentMagicCodeEmails()[0].Code)
 
 	service.Reset()
 	assert.Empty(t, service.SentMagicCodeEmails())
+	assert.Empty(t, service.SentWorkOrderNotificationEmails())
 }
 
 func writeMagicCodeTemplates(t *testing.T, root string) {
@@ -258,4 +310,13 @@ func writeMagicCodeTemplates(t *testing.T, root string) {
 	require.NoError(t, os.MkdirAll(templateDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "magic_code.txt"), []byte("Code {{.Code}}\n{{.MagicLink}}"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "magic_code.html"), []byte("<p>Code {{.Code}}</p><a href=\"{{.MagicLink}}\">Open</a>"), 0o644))
+}
+
+func writeWorkOrderNotificationTemplates(t *testing.T, root string) {
+	t.Helper()
+
+	templateDir := filepath.Join(root, "email")
+	require.NoError(t, os.MkdirAll(templateDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "work_order_notification.txt"), []byte("{{.Summary}}\n{{.Detail}}"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "work_order_notification.html"), []byte("<p>{{.Summary}}</p><p>{{.Detail}}</p>"), 0o644))
 }
