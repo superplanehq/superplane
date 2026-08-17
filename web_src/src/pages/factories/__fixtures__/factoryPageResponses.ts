@@ -1,6 +1,7 @@
 import type {
   FactoriesFactory,
   FactoriesFactoryLine,
+  FactoriesNotificationSettings,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderExecution,
@@ -365,6 +366,8 @@ export interface FactoriesFixture {
   factories: FactoriesFactory[];
   workOrdersByFactoryId: Record<string, FactoriesWorkOrder[]>;
   appsByFactoryId: Record<string, FactoryApp[]>;
+  /** Per-user notification settings backing `/api/v1/factory-notification-settings`. */
+  notificationSettings?: FactoriesNotificationSettings;
 }
 
 export const defaultFactoriesFixture: FactoriesFixture = {
