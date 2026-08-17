@@ -13,6 +13,30 @@ export const factoryContentHeaderClassName = cn(
   "flex flex-col gap-3",
 );
 
+/** Shared left/right inset so the Work Orders title and board share one edge. */
+const workOrdersPaneGutter = "px-3";
+
+/**
+ * Compact Work Orders list header. Title size matches the sidebar workspace
+ * name (13–15px, medium). Top inset matches the workspace switcher (`pt-3`).
+ * Full pane width, same gutter as the board — not the centered content column.
+ */
+export const factoryWorkOrdersHeaderClassName = cn(
+  "mx-0 max-w-none pt-3 pb-3",
+  workOrdersPaneGutter,
+  "[--workspace-page-title-size:var(--workspace-section-title-size)]",
+  "[--workspace-page-title-line-height:var(--workspace-section-title-line-height)]",
+  "[--workspace-page-title-tracking:var(--workspace-section-title-tracking)]",
+  "[&_.workspace-page-title]:font-medium",
+);
+
+/** Work Orders body: same gutter as the header, no extra left inset. */
+export const factoryWorkOrdersBodyClassName = cn(
+  "mx-0 max-w-none pt-0 pb-3 text-foreground",
+  workOrdersPaneGutter,
+  "flex min-h-0 flex-1 flex-col",
+);
+
 /** The app shell owns vertical scrolling. */
 export const factoryContentBodyClassName = cn(
   "px-[var(--workspace-page-gutter)] py-[var(--workspace-page-padding-block)] text-foreground",

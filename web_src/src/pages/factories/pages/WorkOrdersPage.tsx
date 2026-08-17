@@ -8,7 +8,7 @@ import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { useWorkOrderListState } from "../lib/useWorkOrderListState";
 import { WorkOrdersLoadedView } from "../workOrders/WorkOrdersLoadedView";
 import { WorkOrdersErrorState, WorkOrdersLoadingState } from "../workOrders/WorkOrdersEmptyStates";
-import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import { factoryContentBodyClassName, factoryWorkOrdersHeaderClassName } from "./factoryPageLayoutStyles";
 
 /**
  * Data + action shell for the Work Orders list. Fetches work orders and
@@ -82,5 +82,5 @@ export function WorkOrdersPage() {
 
 /** Title-only header shown while work orders load or fail to load. */
 function WorkOrdersHeaderStub() {
-  return <WorkspacePageHeader title="Work Orders" />;
+  return <WorkspacePageHeader className={factoryWorkOrdersHeaderClassName} title="Work Orders" />;
 }
