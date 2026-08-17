@@ -1,14 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import type { CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
-
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
+import { factoryOwnedCanvasFixture } from "../__fixtures__/factoryOwnedCanvasFixture";
 import {
   defaultFactoriesFixture,
   emptyFactoriesFixture,
-  FACTORIES_ORGANIZATION_ID,
   HOUR_AGO,
   LAST_WEEK,
+  PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_APPS,
   TWO_HOURS_AGO,
@@ -29,11 +28,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const automationsPath = `workspaces/${PRIMARY_FACTORY_KEY}/automations`;
-const implementerAppId = REFUND_FACTORY_APPS[1]?.id ?? "app-refund-implementer";
+const implementerApp = REFUND_FACTORY_APPS[1];
+const implementerAppId = implementerApp?.id ?? "app-refund-implementer";
 
-const implementerCanvasRunsFixture: CanvasAppFixture = {
-  canvasId: implementerAppId,
-  organizationId: FACTORIES_ORGANIZATION_ID,
+const implementerCanvasRunsFixture = factoryOwnedCanvasFixture(implementerApp, PRIMARY_FACTORY_ID, {
   runs: {
     runs: [
       {
@@ -66,7 +64,7 @@ const implementerCanvasRunsFixture: CanvasAppFixture = {
     totalCount: 3,
     hasNextPage: false,
   },
-};
+});
 
 export const Populated: Story = {
   render: () => <FactoriesHarness pathSuffix={automationsPath} factoriesFixture={defaultFactoriesFixture} />,
