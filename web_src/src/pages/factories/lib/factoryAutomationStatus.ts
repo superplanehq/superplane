@@ -174,3 +174,19 @@ function compareRunsNewestFirst(left: FactoryAutomationRunCard, right: FactoryAu
   }
   return right.runId.localeCompare(left.runId);
 }
+
+/**
+ * Finds the work order that produced this canvas run, if any.
+ * Trigger-only runs have no work order. Match on run id alone: ids are unique
+ * and Storybook ListRuns is shared across automations.
+ */
+export function findWorkOrderForAutomationRun(
+  workOrders: FactoriesWorkOrder[],
+  runId: string,
+): FactoriesWorkOrder | undefined {
+  if (!runId) {
+    return undefined;
+  }
+
+  return workOrders.find((order) => (order.executions ?? []).some((execution) => execution.run?.id === runId));
+}

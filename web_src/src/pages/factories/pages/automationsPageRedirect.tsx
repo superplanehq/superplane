@@ -1,7 +1,7 @@
 import { Navigate } from "react-router";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { automationsPath, factoryLineDetailPath } from "../lib/factoryPagePaths";
-import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import { factorySectionBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
 
 type AutomationsLegacyRedirectProps = {
   organizationId: string;
@@ -20,8 +20,8 @@ export function AutomationsLegacyRedirect({
   if (!factoryLoaded) {
     return (
       <>
-        <WorkspacePageHeader title="Automations" />
-        <div className={factoryContentBodyClassName}>
+        <WorkspacePageHeader className={factorySectionHeaderClassName} title="Automations" />
+        <div className={factorySectionBodyClassName}>
           <p className="text-[13px] text-muted-foreground">Loading…</p>
         </div>
       </>

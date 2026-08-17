@@ -17,7 +17,7 @@ type PanicableAction struct {
 	underlying core.Action
 }
 
-func NewPanicableAction(a core.Action) core.Action {
+func NewPanicableAction(a core.Action) *PanicableAction {
 	return &PanicableAction{underlying: a}
 }
 
@@ -66,6 +66,33 @@ func (s *PanicableAction) OutputChannels(config any) []core.OutputChannel {
 }
 
 /*
+ * QueueItemProcessor returns the underlying action's self-managed queue
+ * item processor wrapped with panic recovery, or nil when the action
+ * relies on the engine's default queue item processing.
+ */
+func (s *PanicableAction) QueueItemProcessor() core.QueueItemProcessor {
+	processor, ok := s.underlying.(core.QueueItemProcessor)
+	if !ok {
+		return nil
+	}
+
+	return &panicableQueueItemProcessor{underlying: processor}
+}
+
+type panicableQueueItemProcessor struct {
+	underlying core.QueueItemProcessor
+}
+
+func (p *panicableQueueItemProcessor) ProcessQueueItem(ctx core.ProcessQueueContext) (id *uuid.UUID, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("action panicked in ProcessQueueItem(): %v", r)
+		}
+	}()
+	return p.underlying.ProcessQueueItem(ctx)
+}
+
+/*
  * Panicking methods.
  * These are where the action logic is implemented,
  * so they could panic, and if they do, the system shouldn't crash.
@@ -92,15 +119,6 @@ func (s *PanicableAction) Execute(ctx core.ExecutionContext) (err error) {
 		}
 	}()
 	return s.underlying.Execute(ctx)
-}
-
-func (s *PanicableAction) ProcessQueueItem(ctx core.ProcessQueueContext) (id *uuid.UUID, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("action panicked in ProcessQueueItem(): %v", r)
-		}
-	}()
-	return s.underlying.ProcessQueueItem(ctx)
 }
 
 func (s *PanicableAction) HandleHook(ctx core.ActionHookContext) (err error) {

@@ -3,7 +3,6 @@ package components
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -110,10 +109,6 @@ func (c *GetPipeline) Execute(ctx core.ExecutionContext) error {
 		"semaphore.pipeline",
 		[]any{pipeline},
 	)
-}
-
-func (c *GetPipeline) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *GetPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

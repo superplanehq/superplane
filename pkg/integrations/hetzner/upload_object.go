@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -124,10 +123,6 @@ func (c *UploadObject) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("content is required")
 	}
 	return nil
-}
-
-func (c *UploadObject) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *UploadObject) Execute(ctx core.ExecutionContext) error {

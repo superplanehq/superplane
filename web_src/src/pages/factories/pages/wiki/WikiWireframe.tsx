@@ -8,6 +8,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
+import { factorySectionHeaderClassName } from "../factoryPageLayoutStyles";
 import { buildWikiTree, wikiFolderPaths, type WikiDocument, type WikiTreeNode } from "./wikiMocks";
 
 export type WikiWireframeProps = {
@@ -212,6 +213,7 @@ function WikiWireframeHeader({ refreshing, onRefresh }: { refreshing: boolean; o
   return (
     <div className="shrink-0">
       <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
         title="Wiki"
         subtitle="Shared product context — intent, architecture, and delivery notes for people and Planner."
         actions={

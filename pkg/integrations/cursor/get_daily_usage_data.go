@@ -2,7 +2,6 @@ package cursor
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -139,10 +138,6 @@ func (c *GetDailyUsageData) Configuration() []configuration.Field {
 
 func (c *GetDailyUsageData) Setup(ctx core.SetupContext) error {
 	return nil
-}
-
-func (c *GetDailyUsageData) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *GetDailyUsageData) Execute(ctx core.ExecutionContext) error {

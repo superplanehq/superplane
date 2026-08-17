@@ -4,13 +4,16 @@ import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
   emptyFactoriesFixture,
+  fiveStepLineFactoriesFixture,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
 } from "../__fixtures__/factoryPageResponses";
 import { LinesPage } from "./LinesPage";
 
 /**
- * Lines page: card list → line detail with phase strip + per-step run board.
+ * Lines page: card list → line detail with phase board.
+ * FactoriesHarness supplies a factory-owned canvas so a run-card click opens
+ * the automation run instead of Overview.
  */
 const meta = {
   title: "Factories/Pages/Lines",
@@ -41,6 +44,19 @@ export const LineDetail: Story = {
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
         factoriesFixture={defaultFactoriesFixture}
+      />
+    );
+  },
+};
+
+export const LineDetailFivePhases: Story = {
+  name: "Line detail — five phases",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={fiveStepLineFactoriesFixture}
       />
     );
   },

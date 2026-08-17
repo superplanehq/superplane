@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -242,10 +241,6 @@ func normalizeUpdateIssueConfiguration(config *UpdateIssueConfiguration) {
 	config.Status = strings.TrimSpace(config.Status)
 	config.Priority = strings.TrimSpace(config.Priority)
 	config.AssignedTo = strings.TrimSpace(config.AssignedTo)
-}
-
-func (c *UpdateIssue) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {

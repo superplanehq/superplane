@@ -1,14 +1,14 @@
 import { usePermissions } from "@/contexts/usePermissions";
-import { useDispatchWorkOrder, useFactoryWorkOrders, useUpdateWorkOrderAssignees } from "@/hooks/useFactoryData";
+import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { useMe } from "@/hooks/useMe";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { useWorkOrderListState } from "../lib/useWorkOrderListState";
 import { WorkOrdersLoadedView } from "../workOrders/WorkOrdersLoadedView";
 import { WorkOrdersErrorState, WorkOrdersLoadingState } from "../workOrders/WorkOrdersEmptyStates";
-import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import { factoryContentBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
 
 /**
  * Data + action shell for the Work Orders list. Fetches work orders and
@@ -31,32 +31,13 @@ export function WorkOrdersPage() {
     refetch,
   } = useFactoryWorkOrders(organizationId, factoryId);
 
-  const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);
-  const updateAssignees = useUpdateWorkOrderAssignees(organizationId, factoryId);
+  const cardActions = useWorkOrderCardActions(organizationId, factoryId);
 
   const canCreate = canAct("work_orders", "create");
   const canDispatch = canAct("work_orders", "update");
   const canAssign = canAct("work_orders", "update");
 
   const isOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
-
-  const handleDispatch = async (orderId: string, input: { lineName: string }) => {
-    try {
-      await dispatchWorkOrder.mutateAsync({ orderId, lineName: input.lineName });
-      showSuccessToast(`Dispatched to ${input.lineName}.`);
-    } catch {
-      showErrorToast("Failed to dispatch work order.");
-    }
-  };
-
-  const handleAssigneesSave = async (orderId: string, assigneeIds: string[]) => {
-    try {
-      await updateAssignees.mutateAsync({ orderId, assigneeIds });
-      showSuccessToast("Owners updated.");
-    } catch {
-      showErrorToast("Failed to update owners.");
-    }
-  };
 
   if (workOrdersError) {
     return (
@@ -94,15 +75,12 @@ export function WorkOrdersPage() {
       canDispatch={canDispatch}
       canAssign={canAssign}
       permissionsLoading={permissionsLoading}
-      isDispatching={dispatchWorkOrder.isPending}
-      isAssigneesSaving={updateAssignees.isPending}
-      onDispatch={handleDispatch}
-      onAssigneesSave={handleAssigneesSave}
+      {...cardActions}
     />
   );
 }
 
 /** Title-only header shown while work orders load or fail to load. */
 function WorkOrdersHeaderStub() {
-  return <WorkspacePageHeader title="Work Orders" />;
+  return <WorkspacePageHeader className={factorySectionHeaderClassName} title="Work Orders" />;
 }

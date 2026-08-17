@@ -10,6 +10,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/impl"
 )
 
 // panickingAction is an action that panics in all panicable methods
@@ -69,17 +70,26 @@ func TestPanicableAction_Execute_CatchesPanic(t *testing.T) {
 	assert.Contains(t, err.Error(), "execute panic")
 }
 
-func TestPanicableAction_ProcessQueueItem_CatchesPanic(t *testing.T) {
+func TestPanicableAction_QueueItemProcessor_CatchesPanic(t *testing.T) {
 	action := &panickingAction{name: "panicking-action"}
 	panicable := NewPanicableAction(action)
 	ctx := core.ProcessQueueContext{}
 
-	id, err := panicable.ProcessQueueItem(ctx)
+	processor := panicable.QueueItemProcessor()
+	require.NotNil(t, processor)
+
+	id, err := processor.ProcessQueueItem(ctx)
 
 	require.Error(t, err)
 	assert.Nil(t, id)
 	assert.Contains(t, err.Error(), "action panicked in ProcessQueueItem()")
 	assert.Contains(t, err.Error(), "process queue item panic")
+}
+
+func TestPanicableAction_QueueItemProcessor_NilWithoutImplementation(t *testing.T) {
+	panicable := NewPanicableAction(impl.NewDummyAction(impl.DummyActionOptions{}))
+
+	assert.Nil(t, panicable.QueueItemProcessor())
 }
 
 func TestPanicableAction_HandleHook_CatchesPanic(t *testing.T) {

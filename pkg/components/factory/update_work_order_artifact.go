@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -154,10 +153,6 @@ func (c *UpdateWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 			"artifact": artifact,
 		}},
 	)
-}
-
-func (c *UpdateWorkOrderArtifact) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *UpdateWorkOrderArtifact) Setup(ctx core.SetupContext) error {
