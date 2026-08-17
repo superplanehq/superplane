@@ -122,6 +122,17 @@ service Factories {
     };
   }
 
+  rpc ListLineMetrics(ListLineMetricsRequest) returns (ListLineMetricsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/lines/metrics"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory line metrics";
+      description: "Returns trailing-window success/rework/cost/throughput metrics per line";
+      tags: "Factory";
+    };
+  }
+
   // Work orders APIs
 
   rpc ListWorkOrders(ListWorkOrdersRequest) returns (ListWorkOrdersResponse) {
@@ -364,6 +375,36 @@ message ListFactoryAppsRequest {
 
 message ListFactoryAppsResponse {
   repeated Factory.App apps = 1;
+}
+
+// Line metrics
+
+message ListLineMetricsRequest {
+  string factory_id = 1;
+  // Window size in days. Optional; server defaults to 30.
+  optional int32 window_days = 2;
+}
+
+message ListLineMetricsResponse {
+  // One entry per line with at least one closed work order in the window.
+  // Lines with none are simply absent — the client treats a missing line_id
+  // as "no data" (renders dashes).
+  repeated LineMetrics metrics = 1;
+}
+
+message LineMetrics {
+  string line_id = 1;
+  double success_rate_pct = 2;
+  int64 merged_count = 3;
+  int64 total_closed_count = 4;
+  double rework_per_work_order = 5;
+  int64 cost_per_success_cents = 6;
+  repeated double success_trend_pct = 7;
+  double success_delta_pts = 8;
+  double rework_delta = 9;
+  int64 cost_delta_cents = 10;
+  double throughput_per_day = 11;
+  repeated double throughput_trend = 12;
 }
 
 // Work orders

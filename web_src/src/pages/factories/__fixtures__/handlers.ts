@@ -132,6 +132,14 @@ function factoryLinesRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         return { json: { line } };
       },
     },
+    // Must come before the generic `/lines/([^/]+)` pattern below: that
+    // pattern would otherwise treat "metrics" as a line id and win first
+    // (the matcher returns on the first pattern match, regardless of what
+    // its resolver returns).
+    {
+      pattern: re("/api/v1/factories/([^/]+)/lines/metrics"),
+      resolve: (match) => ({ json: { metrics: fixture.lineMetricsByFactoryId[match[1]] ?? [] } }),
+    },
     {
       pattern: re("/api/v1/factories/([^/]+)/lines/([^/]+)"),
       resolve: (match, method, body) => {

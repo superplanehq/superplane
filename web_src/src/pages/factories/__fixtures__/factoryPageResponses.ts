@@ -1,6 +1,7 @@
 import type {
   FactoriesFactory,
   FactoriesFactoryLine,
+  FactoriesLineMetrics,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderExecution,
@@ -360,11 +361,28 @@ export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
   CLOSED_FAILED_WORK_ORDER,
 ];
 
+/** Plan-and-implement has real throughput; hotfix is left out to exercise the "no data yet" dashes state. */
+export const REFUND_LINE_PLAN_METRICS: FactoriesLineMetrics = {
+  lineId: REFUND_LINE_PLAN_ID,
+  successRatePct: 87,
+  mergedCount: "20",
+  totalClosedCount: "23",
+  reworkPerWorkOrder: 1.3,
+  costPerSuccessCents: "842",
+  successTrendPct: [72, 75, 78, 80, 82, 84, 85, 86, 87, 87],
+  successDeltaPts: 5,
+  reworkDelta: -0.4,
+  costDeltaCents: "-63",
+  throughputPerDay: 0.67,
+  throughputTrend: [1, 1, 2, 2, 2, 3, 2, 3, 2, 2],
+};
+
 export interface FactoriesFixture {
   organizationId: string;
   factories: FactoriesFactory[];
   workOrdersByFactoryId: Record<string, FactoriesWorkOrder[]>;
   appsByFactoryId: Record<string, FactoryApp[]>;
+  lineMetricsByFactoryId: Record<string, FactoriesLineMetrics[]>;
 }
 
 export const defaultFactoriesFixture: FactoriesFixture = {
@@ -378,6 +396,10 @@ export const defaultFactoriesFixture: FactoriesFixture = {
     [PRIMARY_FACTORY_ID]: REFUND_FACTORY_APPS,
     [EMPTY_FACTORY_ID]: [],
   },
+  lineMetricsByFactoryId: {
+    [PRIMARY_FACTORY_ID]: [REFUND_LINE_PLAN_METRICS],
+    [EMPTY_FACTORY_ID]: [],
+  },
 };
 
 export const emptyFactoriesFixture: FactoriesFixture = {
@@ -385,6 +407,7 @@ export const emptyFactoriesFixture: FactoriesFixture = {
   factories: [],
   workOrdersByFactoryId: {},
   appsByFactoryId: {},
+  lineMetricsByFactoryId: {},
 };
 
 /** Same shape as {@link defaultFactoriesFixture} but with only closed orders in the primary factory. */
