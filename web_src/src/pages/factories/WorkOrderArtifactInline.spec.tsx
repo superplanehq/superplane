@@ -99,3 +99,55 @@ describe("WorkOrderArtifactInline (PR state icons)", () => {
     expect(svg).toHaveClass("text-muted-foreground");
   });
 });
+
+describe("WorkOrderArtifactInline (link artifacts)", () => {
+  it("renders a link artifact with a url as a clickable link, titled from data.title", () => {
+    render(
+      <WorkOrderArtifactInline
+        artifact={{
+          id: "link-with-title",
+          type: "TYPE_LINK",
+          data: {
+            url: "https://preview.example.com/pr-42",
+            title: "Preview",
+          },
+        }}
+      />,
+    );
+
+    const link = screen.getByRole("link");
+    expect(link).toHaveAttribute("href", "https://preview.example.com/pr-42");
+    expect(link).toHaveTextContent("Preview");
+    expect(renderedIcon()).toHaveClass("text-muted-foreground");
+  });
+
+  it("falls back to a compact url label when a link artifact has no title", () => {
+    render(
+      <WorkOrderArtifactInline
+        artifact={{
+          id: "link-without-title",
+          type: "TYPE_LINK",
+          data: { url: "https://preview.example.com/pr-42" },
+        }}
+      />,
+    );
+
+    const link = screen.getByRole("link");
+    expect(link).toHaveTextContent("pr-42");
+  });
+
+  it("renders a link artifact without a url as plain text, not a link", () => {
+    render(
+      <WorkOrderArtifactInline
+        artifact={{
+          id: "link-without-url",
+          type: "TYPE_LINK",
+          data: { title: "Preview" },
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByText("Preview")).toBeInTheDocument();
+  });
+});
