@@ -1,41 +1,20 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { defaultCanvasAppFixture, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
+import { defaultCanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
+import { factoryOwnedCanvasFixture } from "../__fixtures__/factoryOwnedCanvasFixture";
 import {
   defaultFactoriesFixture,
-  FACTORIES_ORGANIZATION_ID,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_APPS,
+  REFUND_FACTORY_LINES,
 } from "../__fixtures__/factoryPageResponses";
 import { FactoryAppCanvasPage } from "./FactoryAppCanvasPage";
 
 const plannerApp = REFUND_FACTORY_APPS[0];
-
-function factoryOwnedCanvasFixture(): CanvasAppFixture {
-  const baseCanvas = defaultCanvasAppFixture.canvas?.canvas as
-    | { metadata?: Record<string, unknown>; spec?: unknown }
-    | undefined;
-
-  return {
-    ...defaultCanvasAppFixture,
-    organizationId: FACTORIES_ORGANIZATION_ID,
-    canvasId: plannerApp.id ?? "app-refund-planner",
-    canvas: {
-      canvas: {
-        ...baseCanvas,
-        metadata: {
-          ...(baseCanvas?.metadata ?? {}),
-          id: plannerApp.id,
-          name: plannerApp.name,
-          description: plannerApp.description,
-          factoryId: PRIMARY_FACTORY_ID,
-        },
-      },
-    },
-  };
-}
+const plannerCanvas = factoryOwnedCanvasFixture(plannerApp, PRIMARY_FACTORY_ID);
+const plannerLine = REFUND_FACTORY_LINES[0];
 
 /**
  * Factory-embedded canvas: view mode (read-only) or Configure (?configure=1) edit mode.
@@ -56,7 +35,7 @@ export const FromAutomations: Story = {
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${plannerApp.id}?from=automations`}
       factoriesFixture={defaultFactoriesFixture}
-      appFixture={factoryOwnedCanvasFixture()}
+      appFixture={plannerCanvas}
     />
   ),
 };
@@ -67,7 +46,18 @@ export const ConfigureEditMode: Story = {
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${plannerApp.id}?configure=1&from=automations`}
       factoriesFixture={defaultFactoriesFixture}
-      appFixture={factoryOwnedCanvasFixture()}
+      appFixture={plannerCanvas}
+    />
+  ),
+};
+
+export const FromLines: Story = {
+  name: "From Lines configure",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${plannerApp.id}?configure=1&from=lines&lineId=${plannerLine.id}`}
+      factoriesFixture={defaultFactoriesFixture}
+      appFixture={plannerCanvas}
     />
   ),
 };
@@ -78,7 +68,7 @@ export const WithRun: Story = {
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${plannerApp.id}?from=automations&run=${defaultCanvasAppFixture.publishedRunId ?? "run-1"}`}
       factoriesFixture={defaultFactoriesFixture}
-      appFixture={factoryOwnedCanvasFixture()}
+      appFixture={plannerCanvas}
     />
   ),
 };
