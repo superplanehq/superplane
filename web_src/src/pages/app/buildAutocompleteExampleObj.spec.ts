@@ -66,6 +66,7 @@ describe("buildAutocompleteExampleObj", () => {
       __order: expect.objectContaining({
         id: expect.any(String),
         title: "Ship feature",
+        url: expect.any(String),
         artifacts: expect.any(Array),
         comments: expect.any(Array),
       }),
@@ -124,6 +125,7 @@ describe("buildAutocompleteExampleObj", () => {
       __order: expect.objectContaining({
         id: expect.any(String),
         title: "Ship feature",
+        url: expect.any(String),
         artifacts: expect.any(Array),
         comments: expect.any(Array),
       }),

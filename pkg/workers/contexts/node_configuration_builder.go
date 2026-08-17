@@ -1041,6 +1041,11 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		return nil, fmt.Errorf("order() could not resolve the work order: %w", err)
 	}
 
+	factory, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not resolve the factory: %w", err)
+	}
+
 	payload := map[string]any{
 		"id":          order.ID.String(),
 		"title":       order.Title,
@@ -1048,6 +1053,13 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		"factory_id":  order.FactoryID.String(),
 		"state":       order.State,
 		"result":      order.Result,
+		"url": fmt.Sprintf(
+			"%s/%s/workspaces/%s/work-order/%d",
+			uiBaseURL(),
+			order.OrganizationID.String(),
+			factory.Key,
+			order.Number,
+		),
 	}
 
 	if err := attachOrderSource(b.tx, order, payload); err != nil {
