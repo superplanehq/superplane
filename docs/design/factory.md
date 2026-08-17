@@ -128,7 +128,7 @@ the Filter menu and `/` opens the search field.
 REST gateway on `protos/factories.proto`:
 
 - Factories: list, create, describe (includes lines).
-- Lines: create, update.
+- Lines: create, update, **metrics**.
 - Apps: list factory-owned canvases.
 - Work orders: list (filters: state, result, assignees, unassigned), create, describe, update assignees, dispatch, close, **update status**, **add comment**, **list artifacts**, **create artifact**, list events.
 
@@ -140,9 +140,29 @@ New RPCs (all under `/api/v1/factories/{factoryId}/orders/{orderId}/…`):
 | `AddWorkOrderComment` | `POST …/comments` | `work_orders:update` |
 | `ListWorkOrderArtifacts` | `GET …/artifacts` | `work_orders:read` |
 | `CreateWorkOrderArtifact` | `POST …/artifacts` | `work_orders:update` |
+| `ListLineMetrics` | `GET /api/v1/factories/{factoryId}/lines/metrics` | `work_orders:read` |
 
 Factory structure (create/update/delete factory + lines) uses the `factories` resource.
 Work-order lifecycle (create/list/describe orders, status, assignees, dispatch, close, comments, artifacts, events) uses the separate `work_orders` resource (`read`, `create`, `update`). That lets limited tokens (runners/agents) mutate work orders without `factories:update`. All endpoints stay behind the `factories` experimental feature flag.
+
+### Line metrics
+
+`ListLineMetrics` returns trailing-window success/rework/cost/throughput numbers per line, computed from the existing `factory_work_orders` / `factory_work_order_executions` / `factory_work_order_events` tables — no new schema. It backs the metric cards on the Lines list. Two proxies drive the math, since neither concept exists literally on `WorkOrder` today:
+
+- **Line attribution.** A work order is attributed to the line of its **most recent execution** (`factory_work_order_executions`, latest `created_at`/`id`). This is the same convention the Work Orders table's "Line" column/filter already uses. Work orders with **zero executions** (e.g. abandoned straight from `draft`) are excluded from every line's metrics — there's nothing to attribute them to.
+- **"Merged" / success.** There's no separate merged flag; `result = completed` on a closed work order is the closest proxy (a `completed` close is expected to be driven by a PR-merged webhook via `updateWorkOrderStatus`, see above). The numerator ("merged") is closed work orders with `result = completed`; the denominator is **all** closed work orders (`completed` + `rejected` + `failed`) on that line.
+
+Formulas, all computed in Go over one raw SQL query's worth of rows (`Factory.ListClosedWorkOrderMetricsRows` → `aggregateLineMetrics`), so the arithmetic is unit-testable without a database:
+
+- **Window.** Trailing `window_days` (request-optional, defaults to 30) by `closed_at`, approximated as `factory_work_orders.updated_at` at the time `state` became `closed`. This is a known simplification: `updated_at` can move again later for unrelated reasons (e.g. assignee changes after close); acceptable drift for v1. The prior-period delta compares against the preceding window of the same length (days `window_days+1`–`2*window_days` back).
+- **Rework per work order** — average, per closed work order in the window, of: `order.comment.added` events authored by a user (`data.author.kind == "user"`, "steering comments") + `order.status.updated` events with `toState == "draft"` ("tweaks", sent back to draft) + restarts (`count(executions with step_index = 0) - 1`, floored at 0 — re-dispatches from the top of the line after a failure/reject).
+- **Cost per success** — `sum(cost_cents)` across **all** executions of **all** closed work orders in the window (not just merged ones — failed/reworked runs still cost compute) ÷ `mergedCount`, in cents. Zero when `mergedCount` is zero (no baseline to divide by).
+- **Throughput** — `mergedCount / windowDays`.
+- **Trend arrays** (`success_trend_pct`, `throughput_trend`) — the window is bucketed into 10 equal-width buckets (not one bucket per day) so low-volume lines don't show a jagged/empty-day sparkline. `success_trend_pct` is a rate per bucket; an empty bucket carries forward the previous bucket's rate (the first bucket defaults to 0 if it has no data). `throughput_trend` is a raw count of merged orders per bucket — a sum, so an empty bucket is legitimately 0, not carried forward.
+- **Deltas** (`success_delta_pts`, `rework_delta`, `cost_delta_cents`) — current-window value minus prior-window value. If the prior window has zero closed orders, the delta is reported as `0` rather than a misleading swing from having no baseline.
+- Lines with **zero closed work orders in the current window** are omitted from the response entirely — the frontend renders dashes for a line id absent from the response.
+
+No new DB index: `idx_factory_work_orders_factory_state (factory_id, state)` and `idx_factory_work_order_executions_work_order_created (work_order_id, created_at DESC)` keep this reasonably cheap at current scale. If a factory accumulates a very large number of closed work orders, `(factory_id, state, updated_at)` would be the natural follow-up index.
 
 ## Canvas components
 

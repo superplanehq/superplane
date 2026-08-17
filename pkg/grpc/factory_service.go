@@ -56,6 +56,11 @@ func (s *FactoryService) ListFactoryApps(ctx context.Context, req *pb.ListFactor
 	return actions.ListFactoryApps(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ListLineMetrics(ctx context.Context, req *pb.ListLineMetricsRequest) (*pb.ListLineMetricsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListLineMetrics(ctx, organizationID, req)
+}
+
 func (s *FactoryService) ListWorkOrders(ctx context.Context, req *pb.ListWorkOrdersRequest) (*pb.ListWorkOrdersResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListWorkOrders(ctx, organizationID, req)
