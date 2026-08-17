@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -59,10 +58,6 @@ func (c *UpdateImage) Setup(ctx core.SetupContext) error {
 		return err
 	}
 	return ctx.Metadata.Set(resolveImageNodeMetadata(ctx, imageNodeMetadata{ImageID: config.ImageID, DisplayName: config.DisplayName}))
-}
-
-func (c *UpdateImage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return defaultProcessQueue(ctx)
 }
 
 func (c *UpdateImage) Execute(ctx core.ExecutionContext) error {

@@ -193,13 +193,6 @@ type ProcessQueueContext struct {
 	HasRunningExecutions func() (bool, error)
 
 	//
-	// DefaultProcessing performs the default processing for the queue item.
-	// Convenience method to avoid boilerplate in components that just want default behavior,
-	// where an execution is created and the item is dequeued.
-	//
-	DefaultProcessing func() (*uuid.UUID, error)
-
-	//
 	// DistinctIncomingSources returns the distinct upstream
 	// source nodes connected to this node (ignoring multiple channels from the
 	// same source)

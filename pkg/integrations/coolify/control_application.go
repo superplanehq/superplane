@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -80,10 +79,6 @@ func (c *ControlApplication) Configuration() []configuration.Field {
 func (c *ControlApplication) Setup(ctx core.SetupContext) error {
 	_, err := decodeControlApplicationSpec(ctx.Configuration)
 	return err
-}
-
-func (c *ControlApplication) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *ControlApplication) Execute(ctx core.ExecutionContext) error {

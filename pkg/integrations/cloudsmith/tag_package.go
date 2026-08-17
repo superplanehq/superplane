@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -154,10 +153,6 @@ func (t *TagPackage) Execute(ctx core.ExecutionContext) error {
 
 func (t *TagPackage) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (t *TagPackage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return defaultProcessQueueItem(ctx)
 }
 
 func (t *TagPackage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

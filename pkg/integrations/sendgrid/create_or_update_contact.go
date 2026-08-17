@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -168,10 +167,6 @@ func (c *CreateOrUpdateContact) Setup(ctx core.SetupContext) error {
 
 	metadata := CreateOrUpdateContactMetadata{Email: config.Email}
 	return ctx.Metadata.Set(metadata)
-}
-
-func (c *CreateOrUpdateContact) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateOrUpdateContact) Execute(ctx core.ExecutionContext) error {

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -82,10 +81,6 @@ func (c *UpdateRuleGroupNamespace) Setup(ctx core.SetupContext) error {
 		Region:      config.Region,
 		WorkspaceID: config.WorkspaceID,
 	}))
-}
-
-func (c *UpdateRuleGroupNamespace) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *UpdateRuleGroupNamespace) Execute(ctx core.ExecutionContext) error {

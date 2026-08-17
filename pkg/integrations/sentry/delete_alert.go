@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -136,10 +135,6 @@ func (c *DeleteAlert) Setup(ctx core.SetupContext) error {
 		Project:   project,
 		AlertName: displayAlertRuleLabel(*alertRule),
 	})
-}
-
-func (c *DeleteAlert) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *DeleteAlert) Execute(ctx core.ExecutionContext) error {

@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -209,10 +208,6 @@ func normalizeLinkGitHubIssueConfiguration(config *LinkGitHubIssueConfiguration)
 	config.Repo = strings.TrimSpace(config.Repo)
 	config.ExternalIssue = strings.TrimSpace(config.ExternalIssue)
 	config.Comment = strings.TrimSpace(config.Comment)
-}
-
-func (c *LinkGitHubIssue) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *LinkGitHubIssue) Execute(ctx core.ExecutionContext) error {
