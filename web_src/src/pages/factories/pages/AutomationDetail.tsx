@@ -18,7 +18,7 @@ import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { type AutomationCardActions } from "./automationCardActions";
 import { AutomationHeaderActions, DeleteAutomationDialog, StatusTick } from "./automationsPageParts";
-import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import { factorySectionBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
 import { LineVelocityPanel } from "./LineVelocityPanel";
 
 export function AutomationDetail({
@@ -76,6 +76,7 @@ export function AutomationDetail({
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="automations-detail">
       <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
         variant="entity"
         backHref={automationsPath(organizationId, factoryKey)}
         backLabel="Automations"
@@ -101,7 +102,7 @@ export function AutomationDetail({
       />
 
       <div
-        className={cn(factoryContentBodyClassName, "flex min-h-0 flex-1 flex-col overflow-hidden")}
+        className={cn(factorySectionBodyClassName, "flex min-h-0 flex-1 flex-col overflow-hidden")}
         data-testid="automations-detail-body"
       >
         <AutomationDetailTabs

@@ -19,7 +19,7 @@ import {
   type FactoryVelocityPeriodDays,
   type FactoryVelocityYesterday,
 } from "./factoryVelocityMockData";
-import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import { factorySectionBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
 
 const PERIOD_OPTIONS: { value: string; label: string }[] = [
   { value: "7", label: "7d" },
@@ -429,6 +429,7 @@ export function VelocityPage({ includeWorkOrderFlow = false }: VelocityPageProps
   return (
     <>
       <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
         title="Velocity"
         subtitle={
           includeWorkOrderFlow
@@ -449,7 +450,7 @@ export function VelocityPage({ includeWorkOrderFlow = false }: VelocityPageProps
         }
       />
 
-      <div className={cn(factoryContentBodyClassName, "space-y-6")} data-testid="factory-velocity-page">
+      <div className={cn(factorySectionBodyClassName, "space-y-6")} data-testid="factory-velocity-page">
         <YesterdayCard snapshot={FACTORY_VELOCITY_YESTERDAY} />
         <TrendCard periodDays={periodDays} />
         <SourceSplitCard periodDays={periodDays} />
