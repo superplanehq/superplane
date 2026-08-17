@@ -11,7 +11,7 @@ const meta = {
   parameters: { layout: "padded" },
   decorators: [
     (Story) => (
-      <ComponentStoryShell className="w-[240px] border-r border-sidebar-border bg-sidebar">
+      <ComponentStoryShell className="flex min-h-[380px] w-[240px] flex-col justify-end border-r border-sidebar-border bg-sidebar">
         <Story />
       </ComponentStoryShell>
     ),
@@ -23,12 +23,21 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+const defaultArgs = {
+  organizationId: FACTORIES_ORGANIZATION_ID,
+  userName: "Storybook User",
+  userEmail: "storybook@superplane.dev",
+  userAvatarUrl: null,
+  organizationName: "SuperPlane",
+};
+
 export const Default: Story = {
+  args: defaultArgs,
+};
+
+export const Open: Story = {
   args: {
-    organizationId: FACTORIES_ORGANIZATION_ID,
-    userName: "Storybook User",
-    userEmail: "storybook@superplane.dev",
-    userAvatarUrl: null,
-    organizationName: "SuperPlane",
+    ...defaultArgs,
+    defaultOpen: true,
   },
 };
