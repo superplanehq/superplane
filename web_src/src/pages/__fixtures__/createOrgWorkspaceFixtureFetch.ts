@@ -4,6 +4,7 @@ import {
   matchStorybookAgentMessageRoute,
 } from "@/pages/app/__fixtures__/agentChatResponses";
 import { matchCanvasAppFixture, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
+import { resolveFactoryCanvasAppFixture } from "@/pages/factories/__fixtures__/factoryOwnedCanvasFixture";
 import {
   factoriesOrganizationUsersResponse,
   matchFactoryPageFixture,
@@ -140,9 +141,16 @@ async function resolveOrgWorkspaceFixture(args: {
   orgIntegrations: StorybookOrgIntegration[];
 }) {
   const { url, method, input, init, body, homeFixture, appFixture, factoriesFixture, orgIntegrations } = args;
-  // Omit `appFixture` when unset so matchCanvasAppFixture uses its Software Factory default.
+  // Explicit appFixture wins. Otherwise factory app canvas ids get a factory-owned
+  // spec so FactoryAppCanvasPage does not redirect to Overview. Home Software
+  // Factory ids stay on the default fixture (no factoryId).
   const homeResolved = matchHomePageFixture(url, method, homeFixture);
-  const canvasResolved = matchCanvasAppFixture(url, appFixture, method, body);
+  const canvasResolved = matchCanvasAppFixture(
+    url,
+    resolveFactoryCanvasAppFixture(url.pathname, appFixture, factoriesFixture),
+    method,
+    body,
+  );
   const factorySetupResolved = await matchFactorySetupFixture(url, method, input, init, orgIntegrations);
   const { factoryPagesResolved, factoryUsersResolved } = resolveFactoryFixtures(url, method, body, factoriesFixture);
   // AppPageHarness always supplies `appFixture`, so canvas integrations win there.

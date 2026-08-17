@@ -37,7 +37,6 @@ import {
 import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
 import { createFactoryLinePath, editFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
 import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetailPage";
-import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
 import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
 import { HomePage } from "@/pages/home";
 import { homePageIds, type HomePageFixture } from "@/pages/home/__fixtures__/handlers";
@@ -237,8 +236,6 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 <Route path="new" element={<FactoryLineEditPage />} />
                 <Route path=":lineId" element={<LinesPage />} />
                 <Route path=":lineId/edit" element={<FactoryLineEditPage />} />
-                {/* Storybook design preview: factory WorkOrderCanvas node chrome */}
-                <Route path=":lineId/phases/:phaseId/configure" element={<ConfigureAutomationPage />} />
               </Route>
               <Route path="automations">
                 <Route index element={<AutomationsPage />} />
