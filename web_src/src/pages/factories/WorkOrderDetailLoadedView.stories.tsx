@@ -102,8 +102,8 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     onStatusChange: async (state: string, result?: string) => {
       console.log("status change", state, result);
     },
-    onAddComment: async (body: string) => {
-      console.log("comment", body);
+    onAddComment: async (body: string, mentionedUserIds?: string[]) => {
+      console.log("comment", body, mentionedUserIds);
     },
   };
 }

@@ -6,6 +6,8 @@ import {
   useWorkOrderArtifacts,
   useWorkOrderEvents,
 } from "@/hooks/useFactoryData";
+import { useMe } from "@/hooks/useMe";
+import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { useMemo } from "react";
@@ -14,6 +16,8 @@ import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
 import { flattenWorkOrderEventsPages } from "../lib/workOrderEventsPagination";
 import { getWorkOrderDetailDerived } from "../lib/workOrderProgress";
+import { buildWorkOrderUserNameLookup } from "../lib/workOrderTimelineEvents";
+import { useWorkOrderMentionToast } from "../lib/useWorkOrderMentionToast";
 import {
   resolveWorkOrderByNumber,
   workOrderRouteNeedsCanonicalRedirect,
@@ -121,6 +125,14 @@ function WorkOrderDetailPageContent({
   // Memoize so derived arrays (e.g. `assigneeIds`) keep a stable reference
   // across re-renders/refetches that don't actually change `order`.
   const derived = useMemo(() => getWorkOrderDetailDerived(order), [order]);
+
+  const { data: me } = useMe();
+  const { data: organizationUsers = [] } = useOrganizationUsers(organizationId);
+  const resolveUserName = useMemo(
+    () => (order ? buildWorkOrderUserNameLookup(organizationUsers, order) : () => undefined),
+    [organizationUsers, order],
+  );
+  useWorkOrderMentionToast(events, me?.id, resolveUserName, order?.title || "this work order");
 
   usePageTitle([order?.title ?? "Work Order", factory?.name ?? "Workspace"]);
 

@@ -40,6 +40,10 @@ interface EventCommentAuthorPayload {
   automation?: EventAutomationRefPayload;
 }
 
+interface EventMentionRef {
+  id?: string;
+}
+
 interface EventArtifactPayload {
   id?: string;
   type?: string;
@@ -62,6 +66,7 @@ interface EventPayload extends LineStepExecutionPayload {
   body?: string;
   author?: EventCommentAuthorPayload;
   artifact?: EventArtifactPayload;
+  mentions?: EventMentionRef[];
 }
 
 interface TimelineBuildState {
@@ -284,6 +289,7 @@ function appendCommentEvent(
       body,
       authorKind: author.kind,
       automation: automationActor,
+      mentionedUserIds: (payload.mentions ?? []).map((mention) => mention.id).filter((id): id is string => Boolean(id)),
     },
     title: "commented",
   });

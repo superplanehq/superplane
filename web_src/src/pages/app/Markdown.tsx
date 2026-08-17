@@ -12,6 +12,7 @@ import { IntegrationButton } from "@/components/AgentSidebar/widgets/Integration
 import { MarkdownCode } from "@/components/AgentSidebar/widgets/MarkdownCode";
 import { MermaidWidget } from "@/components/AgentSidebar/widgets/MermaidWidget";
 import { NodeChipFromLink } from "@/components/AgentSidebar/widgets/NodeChip";
+import { MentionChipFromLink } from "@/components/MentionChip/MentionChip";
 import { cn } from "@/lib/utils";
 
 import { CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES } from "./console/consoleCodeStyles";
@@ -87,7 +88,7 @@ const MARKDOWN_SANITIZE_SCHEMA = {
   },
   protocols: {
     ...(defaultSchema.protocols ?? {}),
-    href: [...(defaultSchema.protocols?.href ?? []), "node", "integration"],
+    href: [...(defaultSchema.protocols?.href ?? []), "node", "integration", "user"],
   },
 };
 
@@ -265,6 +266,11 @@ function MarkdownLink({
     );
   }
 
+  const userMatch = href?.match(/^user:(.+)$/);
+  if (userMatch && organizationId) {
+    return <MentionChipFromLink userId={userMatch[1]} rawLabel={label} organizationId={organizationId} />;
+  }
+
   return (
     <a href={href} {...props}>
       {children}
@@ -273,7 +279,7 @@ function MarkdownLink({
 }
 
 function isSpecialMarkdownLink(url: string): boolean {
-  return url.startsWith("node:") || url.startsWith("integration:");
+  return url.startsWith("node:") || url.startsWith("integration:") || url.startsWith("user:");
 }
 
 function hasLanguageCodeChild(children: ReactNode): boolean {

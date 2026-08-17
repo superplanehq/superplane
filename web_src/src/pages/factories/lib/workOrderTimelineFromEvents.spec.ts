@@ -198,4 +198,35 @@ describe("buildWorkOrderTimelineViewFromEvents: steps and lifecycle", () => {
       title: "reopened this work order",
     });
   });
+
+  it("carries a comment's mentioned user ids onto the timeline event", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.comment.added",
+        event: {
+          body: "Hey @[Jamie Operator](user:user-jamie), can you check this?",
+          author: { kind: "user", userId: "user-reviewer" },
+          mentions: [{ id: "user-jamie" }],
+        },
+      },
+    ]);
+
+    expect(view.events[0]?.comment?.mentionedUserIds).toEqual(["user-jamie"]);
+  });
+
+  it("defaults a comment's mentioned user ids to an empty list when absent", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.comment.added",
+        event: {
+          body: "No mentions here.",
+          author: { kind: "user", userId: "user-reviewer" },
+        },
+      },
+    ]);
+
+    expect(view.events[0]?.comment?.mentionedUserIds).toEqual([]);
+  });
 });

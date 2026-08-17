@@ -389,7 +389,7 @@ function CommentEventBody({
         </span>
       </p>
       <div className="mt-1" data-testid="work-order-timeline-comment-body">
-        <MarkdownContent content={comment.body} variant="workspace" />
+        <MarkdownContent content={comment.body} variant="workspace" organizationId={organizationId} />
       </div>
     </>
   );
