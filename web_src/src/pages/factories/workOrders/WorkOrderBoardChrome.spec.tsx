@@ -18,6 +18,7 @@ describe("WorkOrderKanbanBoard", () => {
 
     expect(screen.getByTestId("kanban-board").className).toContain("overflow-x-auto");
     expect(screen.getByTestId("lane-plan").className).toContain("min-w-72");
+    expect(screen.getByTestId("lane-plan").className).toContain("shrink-0");
   });
 
   it("keeps empty-lane copy and stretches the empty body", () => {

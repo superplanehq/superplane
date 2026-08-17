@@ -9,8 +9,10 @@ interface WorkspacePageHeaderBaseProps {
   className?: string;
   /** Optional test id on the outer header element. */
   "data-testid"?: string;
-  /** Trailing actions, right-aligned. */
+  /** Trailing actions. Default is right-aligned; `start` keeps them in the title row. */
   actions?: ReactNode;
+  /** Where to place `actions` in the title row. */
+  actionsAlign?: "start" | "end";
   /** Optional content stacked below the title/actions row (filter chips, tabs, etc.). */
   belowRow?: ReactNode;
 }
@@ -60,14 +62,21 @@ export type WorkspacePageHeaderProps = WorkspaceSectionHeaderProps | WorkspaceEn
 export function WorkspacePageHeader(props: WorkspacePageHeaderProps) {
   const isEntity = props.variant === "entity";
   const hasSubtitle = Boolean(props.subtitle);
+  const actionsAlign = props.actionsAlign ?? "end";
   const alignItems = hasSubtitle || isEntity ? "items-start" : "items-center";
   return (
     <header
       className={cn(factoryContentHeaderClassName, props.className)}
       data-testid={props["data-testid"] ?? "workspace-page-header"}
     >
-      <div className={cn("flex w-full flex-wrap justify-between gap-3", alignItems)}>
-        <div className="min-w-0 flex-1">
+      <div
+        className={cn(
+          "flex w-full flex-wrap gap-x-4 gap-y-2",
+          actionsAlign === "start" ? "justify-start" : "justify-between",
+          alignItems,
+        )}
+      >
+        <div className={cn("min-w-0", actionsAlign === "start" ? "shrink-0" : "flex-1")}>
           {isEntity ? <BackLink href={props.backHref} label={props.backLabel} testId={props.backTestId} /> : null}
           {isEntity && props.kicker ? (
             <p

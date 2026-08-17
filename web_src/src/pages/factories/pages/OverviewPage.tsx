@@ -9,7 +9,11 @@ import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { factoryLineDetailPath, linesPath, workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
-import { factoryCardClassName, factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import {
+  factoryCardClassName,
+  factorySectionBodyClassName,
+  factorySectionHeaderClassName,
+} from "./factoryPageLayoutStyles";
 
 const MAX_ROWS = 8;
 
@@ -33,9 +37,13 @@ export function OverviewPage() {
 
   return (
     <>
-      <WorkspacePageHeader title="Overview" subtitle="Your workspace at a glance. Content for this page comes next." />
+      <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
+        title="Overview"
+        subtitle="Your workspace at a glance. Content for this page comes next."
+      />
 
-      <div className={factoryContentBodyClassName}>
+      <div className={factorySectionBodyClassName}>
         <div className="grid gap-6 lg:grid-cols-2">
           <WorkOrdersOverviewCard
             organizationId={organizationId}

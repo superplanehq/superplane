@@ -200,9 +200,7 @@ describe("AutomationDetail tabs", () => {
     expect(run.className).toMatch(/\brounded-md\b/);
     expect(screen.getByTestId("automations-runs-scroll").className).toMatch(/\bgap-2\b/);
     expect(screen.getByTestId("automations-runs-scroll").closest("section")).toBeNull();
-    expect(screen.getByTestId("automations-detail-body").className).toMatch(
-      /max-w-\[var\(--workspace-content-max-width\)\]/,
-    );
+    expect(screen.getByTestId("automations-detail-body").className).toMatch(/\bmax-w-none\b/);
   });
 
   it("renders the work order card when the run belongs to a work order", () => {
