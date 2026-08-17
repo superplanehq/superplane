@@ -1,6 +1,6 @@
 import type {
   ComponentsIntegrationRef,
-  ComponentsQueueSpec,
+  ComponentsConcurrencySpec,
   ConfigurationField,
   OrganizationsIntegration,
 } from "@/api-client";
@@ -42,11 +42,11 @@ interface SettingsTabProps {
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
     integrationRef?: ComponentsIntegrationRef,
-    queue?: ComponentsQueueSpec,
+    concurrency?: ComponentsConcurrencySpec,
   ) => void | Promise<void>;
-  // Queue section: rendered only when showQueue is true (action nodes).
-  showQueue?: boolean;
-  queue?: ComponentsQueueSpec;
+  // Concurrency section: rendered only when showConcurrency is true (action nodes).
+  showConcurrency?: boolean;
+  concurrency?: ComponentsConcurrencySpec;
   onCancel?: () => void;
   domainId?: string;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
@@ -63,39 +63,41 @@ interface SettingsTabProps {
   canUpdateIntegrations?: boolean;
 }
 
-// Queue form state: strings, so inputs can be empty while typing.
-interface QueueDraft {
+// Concurrency form state: strings, so inputs can be empty while typing.
+interface ConcurrencyDraft {
   key: string;
-  maxParallelism: string;
+  max: string;
   autoCancel: string;
 }
 
-function queueDraftFromSpec(spec?: ComponentsQueueSpec): QueueDraft {
+function concurrencyDraftFromSpec(spec?: ComponentsConcurrencySpec): ConcurrencyDraft {
   return {
     key: spec?.key ?? "",
-    maxParallelism:
-      spec?.maxParallelism === undefined || spec?.maxParallelism === null ? "" : String(spec.maxParallelism),
+    max: spec?.max ? String(spec.max) : "",
     autoCancel: spec?.autoCancel ?? "",
   };
 }
 
-// An all-default draft maps to no queue spec, so the node keeps its
-// implicit queue instead of storing an empty object.
-function queueDraftToSpec(draft: QueueDraft): ComponentsQueueSpec | undefined {
-  const key = draft.key.trim();
-  const autoCancel = draft.autoCancel;
-  const rawMaxParallelism = draft.maxParallelism.trim();
-  const maxParallelism = rawMaxParallelism === "" ? undefined : Number.parseInt(rawMaxParallelism, 10);
-  const validMaxParallelism =
-    maxParallelism !== undefined && Number.isFinite(maxParallelism) && maxParallelism >= 0 ? maxParallelism : undefined;
+// Empty or invalid input keeps the implicit default (1).
+function draftMax(draft: ConcurrencyDraft): number | undefined {
+  const parsed = Number.parseInt(draft.max.trim(), 10);
+  return Number.isFinite(parsed) && parsed >= 1 ? parsed : undefined;
+}
 
-  if (key === "" && autoCancel === "" && validMaxParallelism === undefined) {
+// An all-default draft maps to no concurrency spec, so the node keeps
+// the default behavior instead of storing an empty object.
+function concurrencyDraftToSpec(draft: ConcurrencyDraft): ComponentsConcurrencySpec | undefined {
+  const key = draft.key.trim();
+  const max = draftMax(draft);
+  const autoCancel = draft.autoCancel;
+
+  if (key === "" && autoCancel === "" && max === undefined) {
     return undefined;
   }
 
-  const spec: ComponentsQueueSpec = {};
+  const spec: ComponentsConcurrencySpec = {};
   if (key !== "") spec.key = key;
-  if (validMaxParallelism !== undefined) spec.maxParallelism = validMaxParallelism;
+  if (max !== undefined) spec.max = max;
   if (autoCancel !== "") spec.autoCancel = autoCancel;
   return spec;
 }
@@ -104,7 +106,7 @@ function buildAutosaveSnapshot(
   configuration: Record<string, unknown>,
   nodeName: string,
   integrationRef?: ComponentsIntegrationRef,
-  queue?: ComponentsQueueSpec,
+  concurrency?: ComponentsConcurrencySpec,
 ): string {
   return JSON.stringify({
     configuration,
@@ -115,7 +117,7 @@ function buildAutosaveSnapshot(
           name: integrationRef.name || "",
         }
       : null,
-    queue: queue ?? null,
+    concurrency: concurrency ?? null,
   });
 }
 
@@ -140,8 +142,8 @@ export function SettingsTab({
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
-  showQueue = false,
-  queue,
+  showConcurrency = false,
+  concurrency,
 }: SettingsTabProps) {
   const CONNECT_ANOTHER_INSTANCE_VALUE = "__connect_another_instance__";
   const isReadOnly = readOnly ?? false;
@@ -153,12 +155,14 @@ export function SettingsTab({
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
-  const [queueDraft, setQueueDraft] = useState<QueueDraft>(() => queueDraftFromSpec(queue));
-  const queueSpec = useMemo(() => queueDraftToSpec(queueDraft), [queueDraft]);
+  const [concurrencyDraft, setConcurrencyDraft] = useState<ConcurrencyDraft>(() =>
+    concurrencyDraftFromSpec(concurrency),
+  );
+  const concurrencySpec = useMemo(() => concurrencyDraftToSpec(concurrencyDraft), [concurrencyDraft]);
   const savingRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
   const autosaveBaselineSnapshotRef = useRef(
-    buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef, queue),
+    buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef, concurrency),
   );
   const pendingAutosaveSnapshotRef = useRef<string | null>(null);
   // Use autocompleteExampleObj directly - current node is already filtered out
@@ -295,15 +299,15 @@ export function SettingsTab({
     }
 
     const filteredConfig = filterVisibleFields(newConfig);
-    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(filteredConfig, nodeName, integrationRef, queue);
+    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(filteredConfig, nodeName, integrationRef, concurrency);
     pendingAutosaveSnapshotRef.current = null;
     setNodeConfiguration(filteredConfig);
     setCurrentNodeName(nodeName);
     setSelectedIntegration(integrationRef);
-    setQueueDraft(queueDraftFromSpec(queue));
+    setConcurrencyDraft(concurrencyDraftFromSpec(concurrency));
     setValidationErrors(new Set());
     setShowValidation(false);
-  }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, integrationRef, queue]);
+  }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, integrationRef, concurrency]);
 
   // Auto-select the first installation if none is selected or selection is invalid
   useEffect(() => {
@@ -317,7 +321,7 @@ export function SettingsTab({
           nodeConfiguration,
           currentNodeName,
           undefined,
-          queueSpec,
+          concurrencySpec,
         );
         setSelectedIntegration(undefined);
       }
@@ -341,13 +345,13 @@ export function SettingsTab({
       nodeConfiguration,
       currentNodeName,
       nextIntegration,
-      queueSpec,
+      concurrencySpec,
     );
     setSelectedIntegration({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     });
-  }, [integrationsOfType, isReadOnly, selectedIntegration, nodeConfiguration, currentNodeName, queueSpec]);
+  }, [integrationsOfType, isReadOnly, selectedIntegration, nodeConfiguration, currentNodeName, concurrencySpec]);
 
   const shouldShowConfiguration = true;
   const shouldAutosaveOnChangeByFieldType = useCallback((fieldType: ConfigurationField["type"] | undefined) => {
@@ -398,7 +402,7 @@ export function SettingsTab({
       return;
     }
 
-    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration, queueSpec);
+    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration, concurrencySpec);
     if (snapshot === autosaveBaselineSnapshotRef.current) {
       pendingAutosaveSnapshotRef.current = null;
       return;
@@ -414,7 +418,7 @@ export function SettingsTab({
       return;
     }
 
-    const result = onSave(nodeConfiguration, currentNodeName, selectedIntegration, queueSpec);
+    const result = onSave(nodeConfiguration, currentNodeName, selectedIntegration, concurrencySpec);
     if (!(result instanceof Promise)) {
       updateAutosaveBaseline(snapshot);
       return;
@@ -434,7 +438,7 @@ export function SettingsTab({
     currentNodeName,
     selectedIntegration,
     nodeConfiguration,
-    queueSpec,
+    concurrencySpec,
     onSave,
     queuePendingAutosave,
     updateAutosaveBaseline,
@@ -484,7 +488,7 @@ export function SettingsTab({
     if (isReadOnly) {
       return;
     }
-    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration, queueSpec);
+    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration, concurrencySpec);
     if (snapshot === autosaveBaselineSnapshotRef.current) {
       return;
     }
@@ -500,7 +504,7 @@ export function SettingsTab({
     return () => {
       window.clearTimeout(fallbackTimer);
     };
-  }, [isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration, queueSpec]);
+  }, [isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration, concurrencySpec]);
 
   const configurationDisplayModel = useMemo(
     () =>
@@ -818,34 +822,36 @@ export function SettingsTab({
           </div>
         )}
 
-        {/* Queue section */}
-        {showQueue && (
+        {/* Concurrency section */}
+        {showConcurrency && (
           <div className={cn(SETTINGS_TAB_DIVIDER_CLASS, "space-y-4")}>
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Queue</h3>
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Concurrency</h3>
             <div className="flex flex-col gap-2">
               <Label className="min-w-[100px] text-left">Max parallel executions</Label>
               <Input
-                data-testid="node-queue-max-parallelism-input"
+                data-testid="node-concurrency-max-input"
                 type="number"
-                min={0}
-                value={queueDraft.maxParallelism}
+                min={1}
+                value={concurrencyDraft.max}
                 onChange={(e) => {
                   const value = e.target.value;
-                  setQueueDraft((prev) => ({ ...prev, maxParallelism: value }));
+                  setConcurrencyDraft((prev) => ({ ...prev, max: value }));
                 }}
                 placeholder="1"
                 className="shadow-none"
               />
-              <p className="text-xs text-gray-500">Empty means 1. Set 0 to remove the limit.</p>
+              <p className="text-xs text-gray-500">
+                Executions above this limit wait in the queue. Default: one execution at a time.
+              </p>
             </div>
             <div className="flex flex-col gap-2">
-              <Label className="min-w-[100px] text-left">Queue key</Label>
+              <Label className="min-w-[100px] text-left">Key</Label>
               <AutoCompleteInput
-                data-testid="node-queue-key-input"
+                data-testid="node-concurrency-key-input"
                 exampleObj={resolvedAutocompleteExampleObj ?? null}
-                value={queueDraft.key}
+                value={concurrencyDraft.key}
                 onChange={(value) => {
-                  setQueueDraft((prev) => ({ ...prev, key: value }));
+                  setConcurrencyDraft((prev) => ({ ...prev, key: value }));
                 }}
                 placeholder={"ci-{{ $.data.branch }}"}
                 startWord="{{"
@@ -862,13 +868,13 @@ export function SettingsTab({
             <div className="flex flex-col gap-2">
               <Label className="min-w-[100px] text-left">Auto-cancel</Label>
               <Select
-                value={queueDraft.autoCancel === "" ? "off" : queueDraft.autoCancel}
+                value={concurrencyDraft.autoCancel === "" ? "off" : concurrencyDraft.autoCancel}
                 onValueChange={(value) => {
-                  setQueueDraft((prev) => ({ ...prev, autoCancel: value === "off" ? "" : value }));
+                  setConcurrencyDraft((prev) => ({ ...prev, autoCancel: value === "off" ? "" : value }));
                   requestAutosave();
                 }}
               >
-                <SelectTrigger data-testid="node-queue-auto-cancel-select" className="w-full shadow-none">
+                <SelectTrigger data-testid="node-concurrency-auto-cancel-select" className="w-full shadow-none">
                   <SelectValue placeholder="Off" />
                 </SelectTrigger>
                 <SelectContent>

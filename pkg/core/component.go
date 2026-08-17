@@ -187,12 +187,12 @@ type ProcessQueueContext struct {
 	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
 
 	//
-	// QueueMaxParallelism is the node queue's effective maxParallelism
-	// (0 means unlimited). Self-managed components use it to gate how
-	// much concurrent work they start, since the queue worker does not
-	// capacity-gate their queue items.
+	// MaxConcurrency is the node's effective concurrency max.
+	// Self-managed components use it to gate how much concurrent work
+	// they start, since the queue worker does not capacity-gate their
+	// queue items.
 	//
-	QueueMaxParallelism int
+	MaxConcurrency int
 
 	//
 	// CountRunningExecutions returns how many unfinished (running)

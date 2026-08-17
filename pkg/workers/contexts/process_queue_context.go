@@ -3,6 +3,7 @@ package contexts
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -209,12 +210,34 @@ func BuildProcessQueueContext(
 		}, nil
 	}
 
-	ctx.QueueMaxParallelism = node.QueueSpec().EffectiveMaxParallelism()
+	ctx.MaxConcurrency = node.ConcurrencySpec().EffectiveMax()
 	ctx.CountRunningExecutions = func() (int64, error) {
 		return models.CountRunningExecutionsForNodeInTransaction(tx, node.WorkflowID, node.NodeID)
 	}
 
 	return ctx, nil
+}
+
+// ResolveQueueName returns the resolved queue name for a queue item and
+// persists it on the item, so key expressions are evaluated exactly once.
+// A node without a concurrency key uses its implicit queue, named after
+// the node ID.
+func ResolveQueueName(tx *gorm.DB, node *models.CanvasNode, item *models.CanvasNodeQueueItem) (string, error) {
+	if item.QueueName != nil {
+		return *item.QueueName, nil
+	}
+
+	name, err := resolveQueueNameTemplate(tx, node, item)
+	if err != nil {
+		return "", err
+	}
+
+	if err := tx.Model(item).Update("queue_name", name).Error; err != nil {
+		return "", err
+	}
+
+	item.QueueName = &name
+	return name, nil
 }
 
 func uniqueSourceNodes(nodes []core.Node) []core.Node {
@@ -225,4 +248,47 @@ func uniqueSourceNodes(nodes []core.Node) []core.Node {
 		}
 	}
 	return unique
+}
+
+func resolveQueueNameTemplate(tx *gorm.DB, node *models.CanvasNode, item *models.CanvasNodeQueueItem) (string, error) {
+	spec := node.ConcurrencySpec()
+	if spec == nil || strings.TrimSpace(spec.Key) == "" {
+		return node.NodeID, nil
+	}
+
+	template := strings.TrimSpace(spec.Key)
+	if !strings.Contains(template, "{{") {
+		return template, nil
+	}
+
+	event, err := models.FindCanvasEventInTransaction(tx, item.EventID)
+	if err != nil {
+		return "", err
+	}
+
+	builder := NewNodeConfigurationBuilder(tx, item.WorkflowID).
+		WithNodeID(node.NodeID).
+		WithRootEvent(&item.RootEventID).
+		WithIncomingEventID(&event.ID).
+		WithInput(map[string]any{event.NodeID: event.Data.Data()})
+	if event.ExecutionID != nil {
+		builder = builder.WithPreviousExecution(event.ExecutionID)
+	}
+
+	resolved, err := builder.ResolveTemplateExpressions(template)
+	if err != nil {
+		return "", fmt.Errorf("error resolving queue key %q: %w", template, err)
+	}
+
+	name, ok := resolved.(string)
+	if !ok {
+		name = fmt.Sprintf("%v", resolved)
+	}
+
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", fmt.Errorf("queue key %q resolved to an empty string", template)
+	}
+
+	return name, nil
 }

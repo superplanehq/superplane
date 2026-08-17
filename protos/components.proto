@@ -25,25 +25,25 @@ message Node {
   optional string error_message = 10;
   optional string warning_message = 11;
 
-  // Inline queue configuration for this node. Absent means the node uses
-  // its implicit queue (named after the node ID, maxParallelism 1).
-  optional QueueSpec queue = 12;
+  // Inline concurrency configuration for this node. Absent means the
+  // node runs one execution at a time.
+  optional ConcurrencySpec concurrency = 12;
 }
 
-// QueueSpec is a node's inline queue configuration.
-message QueueSpec {
+// ConcurrencySpec is a node's inline concurrency configuration.
+message ConcurrencySpec {
   // Optional template expression that partitions the node's backlog:
   // each resolved value is an independent queue. May contain {{ }}
   // expressions resolved per queue item.
-  string key = 1;
+  optional string key = 1;
 
-  // Maximum number of concurrent executions per queue. Absent means 1.
-  // 0 means unlimited, which disables queueing for the node entirely.
-  optional int32 max_parallelism = 2;
+  // Maximum number of concurrent executions per key value. Absent
+  // means 1. Must be 1 or greater when set.
+  optional int32 max = 2;
 
   // "queued" keeps only the newest waiting item per queue; "running"
   // additionally cancels in-flight executions to free capacity.
-  string auto_cancel = 3;
+  optional string auto_cancel = 3;
 }
 
 message Position {

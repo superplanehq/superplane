@@ -20,7 +20,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
   ComponentsIntegrationRef,
-  ComponentsQueueSpec,
+  ComponentsConcurrencySpec,
 } from "@/api-client";
 import type { EventState, EventStateMap } from "../componentBase";
 import type { ReactNode } from "react";
@@ -141,10 +141,10 @@ interface ComponentSidebarProps {
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
     integrationRef?: ComponentsIntegrationRef,
-    queue?: ComponentsQueueSpec,
+    concurrency?: ComponentsConcurrencySpec,
   ) => void | Promise<void>;
-  showNodeQueue?: boolean;
-  nodeQueue?: ComponentsQueueSpec;
+  showNodeConcurrency?: boolean;
+  nodeConcurrency?: ComponentsConcurrencySpec;
   onNodeConfigCancel?: () => void;
   domainId?: string;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
@@ -206,8 +206,8 @@ export const ComponentSidebar = ({
   nodeConfiguration = {},
   nodeConfigurationFields = [],
   onNodeConfigSave,
-  showNodeQueue = false,
-  nodeQueue,
+  showNodeConcurrency = false,
+  nodeConcurrency,
   onNodeConfigCancel,
   domainId,
   customField,
@@ -750,8 +750,8 @@ export const ComponentSidebar = ({
                     configuration={nodeConfiguration}
                     configurationFields={nodeConfigurationFields}
                     onSave={onNodeConfigSave || (() => {})}
-                    showQueue={showNodeQueue}
-                    queue={nodeQueue}
+                    showConcurrency={showNodeConcurrency}
+                    concurrency={nodeConcurrency}
                     onCancel={onNodeConfigCancel}
                     domainId={domainId}
                     customField={customField}

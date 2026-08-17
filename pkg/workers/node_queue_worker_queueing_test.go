@@ -69,11 +69,11 @@ func createQueueItemAt(t *testing.T, canvasID uuid.UUID, nodeID string, event *m
 	return &item
 }
 
-func maxParallelism(limit int) *int {
+func concurrencyMax(limit int) *int {
 	return &limit
 }
 
-func triggerAndComponent(componentNodeID string, queue *models.QueueSpec) []models.CanvasNode {
+func triggerAndComponent(componentNodeID string, concurrency *models.ConcurrencySpec) []models.CanvasNode {
 	return []models.CanvasNode{
 		{
 			NodeID: "trigger-1",
@@ -81,10 +81,10 @@ func triggerAndComponent(componentNodeID string, queue *models.QueueSpec) []mode
 			Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
 		},
 		{
-			NodeID: componentNodeID,
-			Type:   models.NodeTypeComponent,
-			Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
-			Queue:  models.QueueSpecColumn(queue),
+			NodeID:      componentNodeID,
+			Type:        models.NodeTypeComponent,
+			Ref:         datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			Concurrency: models.ConcurrencySpecColumn(concurrency),
 		},
 	}
 }
@@ -95,10 +95,10 @@ func triggerToComponentEdge(componentNodeID string) []models.Edge {
 	}
 }
 
-// Scenario 1: a node with queue { maxParallelism: 3 } and five queued
+// Scenario 1: a node with concurrency { max: 3 } and five queued
 // inputs runs exactly three executions concurrently, FIFO; as one
 // finishes, the next dispatches.
-func Test__Queueing_NodeQueueRunsUpToMaxParallelism(t *testing.T) {
+func Test__Queueing_NodeQueueRunsUpToConcurrencyMax(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -107,7 +107,7 @@ func Test__Queueing_NodeQueueRunsUpToMaxParallelism(t *testing.T) {
 
 	canvas, _ := support.CreateCanvas(
 		t, r.Organization.ID, r.User,
-		triggerAndComponent(componentNode, &models.QueueSpec{MaxParallelism: maxParallelism(3)}),
+		triggerAndComponent(componentNode, &models.ConcurrencySpec{Max: concurrencyMax(3)}),
 		triggerToComponentEdge(componentNode),
 	)
 
@@ -156,41 +156,7 @@ func Test__Queueing_NodeQueueRunsUpToMaxParallelism(t *testing.T) {
 	assert.Len(t, listQueueItemsForTest(t, canvas.ID, componentNode), 1)
 }
 
-// A node with queue { maxParallelism: 0 } is unlimited, which means no
-// queueing at all: every waiting item dispatches in a single pass.
-func Test__Queueing_UnlimitedQueueDispatchesEverythingImmediately(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	worker := queueWorkerForTest(r)
-	componentNode := "unqueued-node"
-
-	canvas, _ := support.CreateCanvas(
-		t, r.Organization.ID, r.User,
-		triggerAndComponent(componentNode, &models.QueueSpec{MaxParallelism: maxParallelism(0)}),
-		triggerToComponentEdge(componentNode),
-	)
-
-	base := time.Now().Add(-10 * time.Minute)
-	events := make([]*models.CanvasEvent, 5)
-	for i := range events {
-		events[i] = support.EmitCanvasEventForNode(t, canvas.ID, "trigger-1", "default", nil)
-		createQueueItemAt(t, canvas.ID, componentNode, events[i], base.Add(time.Duration(i)*time.Minute))
-	}
-
-	processQueueNode(t, worker, canvas.ID, componentNode)
-
-	executions := listNodeExecutionsForTest(t, canvas.ID, componentNode)
-	require.Len(t, executions, 5)
-	for _, execution := range executions {
-		require.NotNil(t, execution.QueueName)
-		assert.Equal(t, componentNode, *execution.QueueName)
-	}
-
-	assert.Empty(t, listQueueItemsForTest(t, canvas.ID, componentNode))
-}
-
-// Scenario 2: a node with no queue field behaves as today: one execution
+// Scenario 2: a node with no concurrency field behaves as today: one execution
 // at a time, FIFO, next item only after the previous execution finishes.
 func Test__Queueing_ImplicitQueueSerializesNode(t *testing.T) {
 	r := support.Setup(t)
@@ -252,7 +218,7 @@ func Test__Queueing_ExpressionKeyPartitionsByBranch(t *testing.T) {
 
 	canvas, _ := support.CreateCanvas(
 		t, r.Organization.ID, r.User,
-		triggerAndComponent(componentNode, &models.QueueSpec{Key: "ci-{{ root().branch }}"}),
+		triggerAndComponent(componentNode, &models.ConcurrencySpec{Key: "ci-{{ root().branch }}"}),
 		triggerToComponentEdge(componentNode),
 	)
 
@@ -312,7 +278,7 @@ func Test__Queueing_AutoCancelQueuedSupersedesOlderItems(t *testing.T) {
 
 	canvas, _ := support.CreateCanvas(
 		t, r.Organization.ID, r.User,
-		triggerAndComponent(componentNode, &models.QueueSpec{AutoCancel: models.QueueAutoCancelQueued}),
+		triggerAndComponent(componentNode, &models.ConcurrencySpec{AutoCancel: models.QueueAutoCancelQueued}),
 		triggerToComponentEdge(componentNode),
 	)
 
@@ -391,10 +357,10 @@ func Test__Queueing_AutoCancelRunningCancelsInFlightExecution(t *testing.T) {
 				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
 			},
 			{
-				NodeID: apiNode,
-				Type:   models.NodeTypeComponent,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
-				Queue:  models.QueueSpecColumn(&models.QueueSpec{AutoCancel: models.QueueAutoCancelRunning}),
+				NodeID:      apiNode,
+				Type:        models.NodeTypeComponent,
+				Ref:         datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+				Concurrency: models.ConcurrencySpecColumn(&models.ConcurrencySpec{AutoCancel: models.QueueAutoCancelRunning}),
 			},
 			{
 				NodeID: otherNode,
@@ -460,7 +426,7 @@ func Test__Queueing_AutoCancelRunningCancelsInFlightExecution(t *testing.T) {
 }
 
 // Scenario 13: deploy → tests gating. A group over [deploy, test] admits
-// one run at a time (default maxParallelism 1); the slot is released when
+// one run at a time (default max 1); the slot is released when
 // the run's work leaves the group (section-end), not when the run
 // finishes, and a run failing at deploy releases the slot without running
 // tests.

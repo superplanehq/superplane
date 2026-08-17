@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"regexp"
@@ -26,19 +27,56 @@ const (
 	NodeTypeWidget    = "widget"
 )
 
+const (
+	QueueAutoCancelQueued  = "queued"
+	QueueAutoCancelRunning = "running"
+
+	DefaultConcurrencyMax = 1
+)
+
+// ConcurrencySpec is a node's inline concurrency configuration. A node
+// without a spec runs one execution at a time.
+type ConcurrencySpec struct {
+	// Key is an optional template expression that partitions the node's
+	// backlog: each resolved value is an independent queue.
+	Key string `json:"key,omitempty"`
+
+	// Max is presence-aware: nil means the default (1). Must be 1 or
+	// greater when set.
+	Max *int `json:"max,omitempty"`
+
+	AutoCancel string `json:"autoCancel,omitempty"`
+}
+
+// EffectiveMax returns the configured limit, defaulting to 1 when the
+// spec or the field is absent.
+func (s *ConcurrencySpec) EffectiveMax() int {
+	if s == nil || s.Max == nil {
+		return DefaultConcurrencyMax
+	}
+	return *s.Max
+}
+
+func (s *ConcurrencySpec) AutoCancelPolicy() string {
+	if s == nil {
+		return ""
+	}
+	return s.AutoCancel
+}
+
 type Node struct {
-	ID             string         `json:"id"`
-	Name           string         `json:"name"`
-	Type           string         `json:"type"`
-	Ref            NodeRef        `json:"ref"`
-	Configuration  map[string]any `json:"configuration"`
-	Metadata       map[string]any `json:"metadata"`
-	Position       Position       `json:"position"`
-	IsCollapsed    bool           `json:"isCollapsed"`
-	Queue          *QueueSpec     `json:"queue,omitempty"`
-	IntegrationID  *string        `json:"integrationId,omitempty"`
-	ErrorMessage   *string        `json:"errorMessage,omitempty"`
-	WarningMessage *string        `json:"warningMessage,omitempty"`
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	Type           string           `json:"type"`
+	Ref            NodeRef          `json:"ref"`
+	Configuration  map[string]any   `json:"configuration"`
+	Metadata       map[string]any   `json:"metadata"`
+	Position       Position         `json:"position"`
+	IsCollapsed    bool             `json:"isCollapsed"`
+	Concurrency    *ConcurrencySpec `json:"concurrency,omitempty"`
+	IntegrationID  *string          `json:"integrationId,omitempty"`
+	ErrorMessage   *string          `json:"errorMessage,omitempty"`
+	WarningMessage *string          `json:"warningMessage,omitempty"`
 }
 
 func (c *Node) ComponentName() string {
@@ -100,11 +138,11 @@ type CanvasNode struct {
 	IsCollapsed   bool
 
 	//
-	// Queue is the node's inline queue configuration. Nil means the node
-	// uses its implicit queue (named after the node ID, maxParallelism 1).
-	// The spec's key may contain {{ }} expressions resolved per queue item.
+	// Concurrency is the node's inline concurrency configuration. Nil
+	// means the node runs one execution at a time. The spec's key may
+	// contain {{ }} expressions resolved per queue item.
 	//
-	Queue *datatypes.JSONType[QueueSpec]
+	Concurrency *datatypes.JSONType[ConcurrencySpec]
 
 	//
 	// GroupID is the group this node belongs to, materialized at publish
@@ -128,19 +166,20 @@ func (c *CanvasNode) TableName() string {
 	return "workflow_nodes"
 }
 
-// QueueSpec returns the node's inline queue configuration, or nil when
-// the node uses its implicit queue.
-func (c *CanvasNode) QueueSpec() *QueueSpec {
-	if c.Queue == nil {
+// ConcurrencySpec returns the node's inline concurrency configuration,
+// or nil when the node uses the default (one execution at a time).
+func (c *CanvasNode) ConcurrencySpec() *ConcurrencySpec {
+	if c.Concurrency == nil {
 		return nil
 	}
 
-	spec := c.Queue.Data()
+	spec := c.Concurrency.Data()
 	return &spec
 }
 
-// QueueSpecColumn converts a queue spec to its nullable jsonb column value.
-func QueueSpecColumn(spec *QueueSpec) *datatypes.JSONType[QueueSpec] {
+// ConcurrencySpecColumn converts a concurrency spec to its nullable
+// jsonb column value.
+func ConcurrencySpecColumn(spec *ConcurrencySpec) *datatypes.JSONType[ConcurrencySpec] {
 	if spec == nil {
 		return nil
 	}
@@ -511,6 +550,51 @@ func (i *CanvasNodeQueueItem) BeforeCreate(tx *gorm.DB) error {
 
 func (i *CanvasNodeQueueItem) Delete(tx *gorm.DB) error {
 	return tx.Delete(i).Error
+}
+
+// SupersedeQueueItem removes a queue item that was replaced by a newer
+// item in a queue with autoCancel: queued. When the item was the run's
+// only remaining work, the run finishes with the superseded result.
+func SupersedeQueueItem(tx *gorm.DB, item *CanvasNodeQueueItem) error {
+	if err := tx.Delete(item).Error; err != nil {
+		return err
+	}
+
+	run, err := FindCanvasRunInTransaction(tx, item.WorkflowID, item.RunID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	if run.State == CanvasRunStateFinished {
+		return nil
+	}
+
+	openWork, err := run.FindOpenWork(tx)
+	if err != nil {
+		return err
+	}
+
+	if openWork.HasActiveExecutions || openWork.HasQueueItems || openWork.HasPendingEvents {
+		return nil
+	}
+
+	now := time.Now()
+	err = tx.Model(run).
+		Updates(map[string]any{
+			"state":       CanvasRunStateFinished,
+			"result":      CanvasRunResultSuperseded,
+			"updated_at":  &now,
+			"finished_at": &now,
+		}).
+		Error
+	if err != nil {
+		return err
+	}
+
+	return DeleteQueueSlotsForRun(tx, run.WorkflowID, run.ID)
 }
 
 func ListNodeQueueItems(db *gorm.DB, workflowID uuid.UUID, nodeID string, limit int, beforeTime *time.Time) ([]CanvasNodeQueueItem, error) {

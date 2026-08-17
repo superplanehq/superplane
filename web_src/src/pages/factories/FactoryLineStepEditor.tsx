@@ -6,10 +6,21 @@ import { useCanvas } from "@/hooks/useCanvasData";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import { listTriggerNodes } from "./lib/factoryCanvasTriggers";
-import type { DraftStep } from "./lib/factoryLineFormShared";
+import type { DraftParallelism, DraftStep } from "./lib/factoryLineFormShared";
 import { LineStepEditorShell } from "./FactoryLineStepFlow";
 
 const stepFieldClassName = "w-full min-w-0";
+
+function parallelismHelpText(parallelism: DraftParallelism): string {
+  switch (parallelism) {
+    case "limited":
+      return "Work above this limit waits in the step queue.";
+    case "unlimited":
+      return "All runs start immediately.";
+    default:
+      return "Default: 10 parallel runs.";
+  }
+}
 
 interface FactoryLineStepEditorProps {
   organizationId: string;
@@ -92,17 +103,34 @@ export function FactoryLineStepEditor({
         </div>
 
         <div className={cn("space-y-2", stepFieldClassName)}>
-          <Label htmlFor={`factory-line-step-max-parallelism-${index}`}>Max parallel runs</Label>
-          <Input
-            id={`factory-line-step-max-parallelism-${index}`}
-            className={stepFieldClassName}
-            type="number"
-            min={0}
-            value={step.maxParallelism}
-            onChange={(event) => onChange({ ...step, maxParallelism: event.target.value })}
-            placeholder="10"
-          />
-          <p className="text-xs text-muted-foreground">Work above this limit waits in the step queue. 0 = no limit.</p>
+          <Label htmlFor={`factory-line-step-parallelism-${index}`}>Max parallel runs</Label>
+          <Select
+            value={step.parallelism === "" ? "default" : step.parallelism}
+            onValueChange={(value) =>
+              onChange({ ...step, parallelism: value === "default" ? "" : (value as DraftParallelism) })
+            }
+          >
+            <SelectTrigger id={`factory-line-step-parallelism-${index}`} className={stepFieldClassName}>
+              <SelectValue placeholder="Not configured" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Not configured</SelectItem>
+              <SelectItem value="limited">Limited</SelectItem>
+              <SelectItem value="unlimited">Unlimited</SelectItem>
+            </SelectContent>
+          </Select>
+          {step.parallelism === "limited" ? (
+            <Input
+              id={`factory-line-step-max-parallelism-${index}`}
+              className={stepFieldClassName}
+              type="number"
+              min={1}
+              value={step.maxParallelism}
+              onChange={(event) => onChange({ ...step, maxParallelism: event.target.value })}
+              placeholder="10"
+            />
+          ) : null}
+          <p className="text-xs text-muted-foreground">{parallelismHelpText(step.parallelism)}</p>
         </div>
       </div>
     </LineStepEditorShell>

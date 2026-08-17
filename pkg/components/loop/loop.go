@@ -297,7 +297,7 @@ func (c *Loop) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error
 
 func (c *Loop) startLoop(ctx core.ProcessQueueContext, spec Spec) (*uuid.UUID, error) {
 	//
-	// The node queue's maxParallelism caps concurrent loop runs (sessions)
+	// The node's concurrency max caps concurrent loop runs (sessions)
 	// on this node. If the node is at its limit, push this start to the
 	// back of the queue and try later. Feedback for in-progress sessions
 	// is never gated here, so sessions always make progress.
@@ -355,11 +355,11 @@ func (c *Loop) startLoop(ctx core.ProcessQueueContext, spec Spec) (*uuid.UUID, e
 }
 
 // sessionsAtLimit reports whether this node already has as many loop runs in
-// progress as the node queue's maxParallelism allows (0 means unlimited). A
-// session execution stays unfinished for the whole loop and only finishes on
-// done/fail, so active sessions are simply running executions on the node.
+// progress as the node's concurrency max allows. A session execution stays
+// unfinished for the whole loop and only finishes on done/fail, so active
+// sessions are simply running executions on the node.
 func (c *Loop) sessionsAtLimit(ctx core.ProcessQueueContext) (bool, error) {
-	if ctx.QueueMaxParallelism == 0 || ctx.CountRunningExecutions == nil {
+	if ctx.MaxConcurrency == 0 || ctx.CountRunningExecutions == nil {
 		return false, nil
 	}
 
@@ -368,7 +368,7 @@ func (c *Loop) sessionsAtLimit(ctx core.ProcessQueueContext) (bool, error) {
 		return false, fmt.Errorf("failed to count active loop sessions: %w", err)
 	}
 
-	return running >= int64(ctx.QueueMaxParallelism), nil
+	return running >= int64(ctx.MaxConcurrency), nil
 }
 
 func (c *Loop) handleFeedback(ctx core.ProcessQueueContext, spec Spec, session *core.ExecutionContext) (*uuid.UUID, error) {

@@ -370,7 +370,7 @@ func CreateCanvasWithNodeGroups(
 			Metadata:      node.Metadata.Data(),
 			Position:      node.Position.Data(),
 			IsCollapsed:   node.IsCollapsed,
-			Queue:         node.QueueSpec(),
+			Concurrency:   node.ConcurrencySpec(),
 		}
 	}
 
@@ -413,7 +413,7 @@ func CreateCanvasWithNodeGroups(
 				Position:      datatypes.NewJSONType(node.Position),
 				Metadata:      datatypes.NewJSONType(node.Metadata),
 				IsCollapsed:   node.IsCollapsed,
-				Queue:         models.QueueSpecColumn(node.Queue),
+				Concurrency:   models.ConcurrencySpecColumn(node.Concurrency),
 				CreatedAt:     &now,
 				UpdatedAt:     &now,
 			}

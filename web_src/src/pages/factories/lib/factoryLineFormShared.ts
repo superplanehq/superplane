@@ -2,16 +2,21 @@ import type { FactoryLineStep } from "@/api-client";
 
 export const RUN_APP_TYPE = "runApp";
 
+// How the step limits parallel runs. "" keeps the server default (10),
+// "limited" uses the maxParallelism value, "unlimited" stores 0.
+export type DraftParallelism = "" | "limited" | "unlimited";
+
 export type DraftStep = {
   name: string;
   appId: string;
   entrypoint: string;
-  // Text form value; empty means the server default (10), "0" means unlimited.
+  parallelism: DraftParallelism;
+  // Text form value; only meaningful while parallelism is "limited".
   maxParallelism: string;
 };
 
 export function emptyStep(): DraftStep {
-  return { name: "", appId: "", entrypoint: "", maxParallelism: "" };
+  return { name: "", appId: "", entrypoint: "", parallelism: "", maxParallelism: "" };
 }
 
 export function draftStepsFromLine(steps: FactoryLineStep[] | undefined): DraftStep[] {
@@ -23,7 +28,8 @@ export function draftStepsFromLine(steps: FactoryLineStep[] | undefined): DraftS
     name: step.name ?? "",
     appId: step.app?.app ?? "",
     entrypoint: step.app?.entrypoint ?? "",
-    maxParallelism: step.maxParallelism != null ? String(step.maxParallelism) : "",
+    parallelism: step.maxParallelism == null ? "" : step.maxParallelism === 0 ? "unlimited" : "limited",
+    maxParallelism: step.maxParallelism != null && step.maxParallelism !== 0 ? String(step.maxParallelism) : "",
   }));
 }
 
@@ -38,7 +44,7 @@ export function draftStepsToProto(steps: DraftStep[]): FactoryLineStep[] {
       },
     };
 
-    const maxParallelism = parseMaxParallelism(step.maxParallelism);
+    const maxParallelism = draftMaxParallelism(step);
     if (maxParallelism != null) {
       proto.maxParallelism = maxParallelism;
     }
@@ -47,14 +53,18 @@ export function draftStepsToProto(steps: DraftStep[]): FactoryLineStep[] {
   });
 }
 
-function parseMaxParallelism(value: string): number | null {
-  const trimmed = value.trim();
-  if (!trimmed) {
+// 0 means unlimited on the wire; null keeps the server default.
+function draftMaxParallelism(step: DraftStep): number | null {
+  if (step.parallelism === "unlimited") {
+    return 0;
+  }
+
+  if (step.parallelism !== "limited") {
     return null;
   }
 
-  const parsed = Number.parseInt(trimmed, 10);
-  if (Number.isNaN(parsed) || parsed < 0) {
+  const parsed = Number.parseInt(step.maxParallelism.trim(), 10);
+  if (Number.isNaN(parsed) || parsed < 1) {
     return null;
   }
 

@@ -46,7 +46,7 @@ import type {
   ActionsAction,
   ComponentsEdge,
   ComponentsIntegrationRef,
-  ComponentsQueueSpec,
+  ComponentsConcurrencySpec,
   SuperplaneComponentsNode as ComponentsNode,
   ConfigurationField,
   OrganizationsIntegration,
@@ -157,9 +157,9 @@ export interface NodeEditData {
   integrationLabel?: string;
   blockName?: string;
   integrationRef?: ComponentsIntegrationRef;
-  /** Inline queue configuration; only action nodes support a queue. */
-  queue?: ComponentsQueueSpec;
-  supportsQueue?: boolean;
+  /** Inline concurrency configuration; only action nodes support it. */
+  concurrency?: ComponentsConcurrencySpec;
+  supportsConcurrency?: boolean;
 }
 
 export interface NewNodeData {
@@ -297,7 +297,7 @@ export interface CanvasPageProps {
     configuration: Record<string, unknown>,
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
-    queue?: ComponentsQueueSpec,
+    concurrency?: ComponentsConcurrencySpec,
   ) => void | Promise<void>;
   onAnnotationUpdate?: (
     nodeId: string,
@@ -1172,12 +1172,12 @@ function CanvasPage(props: CanvasPageProps) {
       configuration: Record<string, unknown>,
       nodeName: string,
       integrationRef?: ComponentsIntegrationRef,
-      queue?: ComponentsQueueSpec,
+      concurrency?: ComponentsConcurrencySpec,
     ) => {
       if (!editingNodeData?.nodeId || !onNodeConfigurationSave) {
         return;
       }
-      return onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef, queue);
+      return onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef, concurrency);
     },
     [editingNodeData?.nodeId, onNodeConfigurationSave],
   );
@@ -1734,7 +1734,7 @@ function Sidebar({
     configuration: Record<string, unknown>,
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
-    queue?: ComponentsQueueSpec,
+    concurrency?: ComponentsConcurrencySpec,
   ) => void | Promise<void>;
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
@@ -1881,8 +1881,8 @@ function Sidebar({
       nodeConfiguration={editingNodeData?.configuration || {}}
       nodeConfigurationFields={editingNodeData?.configurationFields ?? []}
       onNodeConfigSave={onSaveConfiguration}
-      showNodeQueue={editingNodeData?.supportsQueue ?? false}
-      nodeQueue={editingNodeData?.queue}
+      showNodeConcurrency={editingNodeData?.supportsConcurrency ?? false}
+      nodeConcurrency={editingNodeData?.concurrency}
       onNodeConfigCancel={undefined}
       domainId={organizationId}
       customField={

@@ -814,3 +814,40 @@ func FindLastExecutionPerNode(tx *gorm.DB, workflowID uuid.UUID) ([]CanvasNodeEx
 
 	return executions, nil
 }
+
+// CountActiveExecutionsInQueue counts the executions occupying slots in a
+// node's queue. Queues are private to a node, so capacity is scoped by
+// (workflow, node, resolved queue name).
+func CountActiveExecutionsInQueue(tx *gorm.DB, workflowID uuid.UUID, nodeID, queueName string) (int64, error) {
+	var count int64
+	err := tx.
+		Model(&CanvasNodeExecution{}).
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		Where("queue_name = ?", queueName).
+		Where("state IN ?", CanvasNodeExecutionActiveStates).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func ListActiveExecutionsInQueue(tx *gorm.DB, workflowID uuid.UUID, nodeID, queueName string) ([]CanvasNodeExecution, error) {
+	var executions []CanvasNodeExecution
+	err := tx.
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		Where("queue_name = ?", queueName).
+		Where("state IN ?", CanvasNodeExecutionActiveStates).
+		Order("created_at ASC").
+		Find(&executions).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
+}

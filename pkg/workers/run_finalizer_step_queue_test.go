@@ -20,6 +20,10 @@ type stepQueueFixture struct {
 	steps   []models.FactoryLineStep
 }
 
+func stepMaxParallelism(limit int) *int {
+	return &limit
+}
+
 // setupStepQueueLine creates a factory line whose steps use the given
 // maxParallelism values, one app per step.
 func setupStepQueueLine(t *testing.T, r *support.ResourceRegistry, stepMaxParallelisms []*int) *stepQueueFixture {
@@ -119,7 +123,7 @@ func Test__StepQueue_WorkOrderWaitsWhenStepAtCapacity(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	fixture := setupStepQueueLine(t, r, []*int{maxParallelism(1)})
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(1)})
 
 	first := fixture.createOpenWorkOrder(t, r, "First")
 	second := fixture.createOpenWorkOrder(t, r, "Second")
@@ -153,7 +157,7 @@ func Test__StepQueue_UnlimitedStepAlwaysStarts(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	fixture := setupStepQueueLine(t, r, []*int{maxParallelism(0)})
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(0)})
 
 	for _, title := range []string{"One", "Two", "Three"} {
 		order := fixture.createOpenWorkOrder(t, r, title)
@@ -166,7 +170,7 @@ func Test__StepQueue_TerminalRunAdmitsOldestQueuedWorkOrder(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	fixture := setupStepQueueLine(t, r, []*int{maxParallelism(1)})
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(1)})
 
 	first := fixture.createOpenWorkOrder(t, r, "First")
 	second := fixture.createOpenWorkOrder(t, r, "Second")
@@ -213,7 +217,7 @@ func Test__StepQueue_ClosedWorkOrderIsSkippedAtAdmission(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	fixture := setupStepQueueLine(t, r, []*int{maxParallelism(1)})
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(1)})
 
 	first := fixture.createOpenWorkOrder(t, r, "First")
 	second := fixture.createOpenWorkOrder(t, r, "Second")
@@ -252,7 +256,7 @@ func Test__StepQueue_AdvancementQueuesWhenNextStepAtCapacity(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	fixture := setupStepQueueLine(t, r, []*int{maxParallelism(2), maxParallelism(1)})
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(2), stepMaxParallelism(1)})
 
 	first := fixture.createOpenWorkOrder(t, r, "First")
 	second := fixture.createOpenWorkOrder(t, r, "Second")

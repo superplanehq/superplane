@@ -141,7 +141,7 @@ spec:
     expect(rebuilt).not.toContain("is_collapsed:");
   });
 
-  it("round-trips node queue and groups", () => {
+  it("round-trips node concurrency and groups", () => {
     const workflow: CanvasesCanvas = {
       ...sampleWorkflow,
       spec: {
@@ -151,7 +151,7 @@ spec:
             name: "Deploy",
             type: "TYPE_ACTION",
             component: "deploy",
-            queue: { key: "ci-{{ root().data.branch }}", maxParallelism: 3, autoCancel: "queued" },
+            concurrency: { key: "ci-{{ root().data.branch }}", max: 3, autoCancel: "queued" },
           },
           {
             id: "test-1",
@@ -161,7 +161,7 @@ spec:
           },
         ],
         edges: [{ sourceId: "deploy-1", targetId: "test-1" }],
-        nodeGroups: [{ id: "staging-section", nodes: ["deploy-1", "test-1"], maxParallelism: 2 }],
+        nodeGroups: [{ id: "staging-section", nodes: ["deploy-1", "test-1"], max: 2 }],
       },
     };
 
@@ -170,13 +170,13 @@ spec:
     expect(yamlText).not.toContain("nodeGroups:");
 
     const spec = parseCanvasYamlToSpec(yamlText);
-    expect(spec?.nodes?.[0]?.queue).toEqual({
+    expect(spec?.nodes?.[0]?.concurrency).toEqual({
       key: "ci-{{ root().data.branch }}",
-      maxParallelism: 3,
+      max: 3,
       autoCancel: "queued",
     });
-    expect(spec?.nodes?.[1]?.queue).toBeUndefined();
-    expect(spec?.nodeGroups).toEqual([{ id: "staging-section", nodes: ["deploy-1", "test-1"], maxParallelism: 2 }]);
+    expect(spec?.nodes?.[1]?.concurrency).toBeUndefined();
+    expect(spec?.nodeGroups).toEqual([{ id: "staging-section", nodes: ["deploy-1", "test-1"], max: 2 }]);
   });
 
   it("omits the groups key when empty", () => {

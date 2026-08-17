@@ -265,7 +265,7 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *Change) error {
 		Metadata:          datatypes.NewJSONType(node.Metadata),
 		Position:          datatypes.NewJSONType(node.Position),
 		IsCollapsed:       node.IsCollapsed,
-		Queue:             models.QueueSpecColumn(node.Queue),
+		Concurrency:       models.ConcurrencySpecColumn(node.Concurrency),
 		AppInstallationID: appInstallationID,
 		CreatedAt:         &now,
 		UpdatedAt:         &now,
@@ -364,7 +364,7 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error 
 	existingNode.Configuration = datatypes.NewJSONType(updatedNode.Configuration)
 	existingNode.Position = datatypes.NewJSONType(updatedNode.Position)
 	existingNode.IsCollapsed = updatedNode.IsCollapsed
-	existingNode.Queue = models.QueueSpecColumn(updatedNode.Queue)
+	existingNode.Concurrency = models.ConcurrencySpecColumn(updatedNode.Concurrency)
 	existingNode.AppInstallationID = appInstallationID
 	existingNode.UpdatedAt = &now
 

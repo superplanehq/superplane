@@ -165,7 +165,7 @@ func TestLoopStartDeferredWhenSessionsAtLimit(t *testing.T) {
 		FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 			return nil, nil
 		},
-		QueueMaxParallelism: 2,
+		MaxConcurrency: 2,
 		CountRunningExecutions: func() (int64, error) {
 			return 2, nil
 		},
@@ -201,7 +201,7 @@ func TestLoopStartsParallelSessionBelowLimit(t *testing.T) {
 		FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 			return nil, nil
 		},
-		QueueMaxParallelism: 3,
+		MaxConcurrency: 3,
 		CountRunningExecutions: func() (int64, error) {
 			return 2, nil
 		},

@@ -8,48 +8,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	QueueAutoCancelQueued  = "queued"
-	QueueAutoCancelRunning = "running"
-
-	DefaultQueueMaxParallelism = 1
-)
-
-// QueueSpec is a node's inline queue configuration. A node without a
-// spec uses its implicit queue: named after the node ID, maxParallelism 1.
-type QueueSpec struct {
-	// Key is an optional template expression that partitions the node's
-	// backlog: each resolved value is an independent queue.
-	Key string `json:"key,omitempty"`
-
-	// MaxParallelism is presence-aware: nil means the default (1), and 0
-	// means unlimited, which disables queueing for the node entirely.
-	MaxParallelism *int `json:"maxParallelism,omitempty"`
-
-	AutoCancel string `json:"autoCancel,omitempty"`
-}
-
-// EffectiveMaxParallelism returns the configured limit, defaulting to 1
-// when the spec or the field is absent. 0 means unlimited.
-func (s *QueueSpec) EffectiveMaxParallelism() int {
-	if s == nil || s.MaxParallelism == nil {
-		return DefaultQueueMaxParallelism
-	}
-	return *s.MaxParallelism
-}
-
-// Unlimited reports whether the spec disables queueing (maxParallelism 0).
-func (s *QueueSpec) Unlimited() bool {
-	return s.EffectiveMaxParallelism() == 0
-}
-
-func (s *QueueSpec) AutoCancelPolicy() string {
-	if s == nil {
-		return ""
-	}
-	return s.AutoCancel
-}
-
 // NodeGroup is a drawn group of nodes on the canvas that acts as a queue.
 // A run acquires a slot in the group when its first item dispatches into
 // the group, and holds it while it has work inside.
@@ -57,16 +15,8 @@ type NodeGroup struct {
 	ID    string   `json:"id"`
 	Nodes []string `json:"nodes"`
 
-	// MaxParallelism is presence-aware: nil means the default (1).
-	MaxParallelism *int `json:"maxParallelism,omitempty"`
-}
-
-// EffectiveMaxParallelism returns the configured limit, defaulting to 1.
-func (g *NodeGroup) EffectiveMaxParallelism() int {
-	if g == nil || g.MaxParallelism == nil {
-		return DefaultQueueMaxParallelism
-	}
-	return *g.MaxParallelism
+	// Max is presence-aware: nil means the default (1).
+	Max *int `json:"max,omitempty"`
 }
 
 // CanvasQueueSlot records a run holding a slot in a group.
@@ -79,8 +29,30 @@ type CanvasQueueSlot struct {
 	AcquiredAt *time.Time
 }
 
+// EffectiveMax returns the configured limit, defaulting to 1.
+func (g *NodeGroup) EffectiveMax() int {
+	if g == nil || g.Max == nil {
+		return DefaultConcurrencyMax
+	}
+	return *g.Max
+}
+
 func (s *CanvasQueueSlot) TableName() string {
 	return "workflow_queue_slots"
+}
+
+// FindLiveCanvasNodeGroups loads the node groups from the live canvas
+// version. A canvas without a live version has no groups.
+func FindLiveCanvasNodeGroups(tx *gorm.DB, workflowID uuid.UUID) ([]NodeGroup, error) {
+	version, err := FindLiveCanvasVersionInTransaction(tx, workflowID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return append([]NodeGroup(nil), version.NodeGroups...), nil
 }
 
 // SyncCanvasNodeGroupIDs materializes node groups onto
@@ -109,43 +81,6 @@ func SyncCanvasNodeGroupIDs(tx *gorm.DB, workflowID uuid.UUID, groups []NodeGrou
 	}
 
 	return query.Update("group_id", nil).Error
-}
-
-// CountActiveExecutionsInQueue counts the executions occupying slots in a
-// node's queue. Queues are private to a node, so capacity is scoped by
-// (workflow, node, resolved queue name).
-func CountActiveExecutionsInQueue(tx *gorm.DB, workflowID uuid.UUID, nodeID, queueName string) (int64, error) {
-	var count int64
-	err := tx.
-		Model(&CanvasNodeExecution{}).
-		Where("workflow_id = ?", workflowID).
-		Where("node_id = ?", nodeID).
-		Where("queue_name = ?", queueName).
-		Where("state IN ?", CanvasNodeExecutionActiveStates).
-		Count(&count).
-		Error
-	if err != nil {
-		return 0, err
-	}
-
-	return count, nil
-}
-
-func ListActiveExecutionsInQueue(tx *gorm.DB, workflowID uuid.UUID, nodeID, queueName string) ([]CanvasNodeExecution, error) {
-	var executions []CanvasNodeExecution
-	err := tx.
-		Where("workflow_id = ?", workflowID).
-		Where("node_id = ?", nodeID).
-		Where("queue_name = ?", queueName).
-		Where("state IN ?", CanvasNodeExecutionActiveStates).
-		Order("created_at ASC").
-		Find(&executions).
-		Error
-	if err != nil {
-		return nil, err
-	}
-
-	return executions, nil
 }
 
 // FindQueueSlotForRun returns the group-queue slot held by a run, or nil
@@ -213,7 +148,7 @@ func ReleaseQueueSlotIfGroupIdle(tx *gorm.DB, workflowID uuid.UUID, groupID stri
 		First(&slot).
 		Error
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
@@ -290,65 +225,6 @@ func ReleaseQueueSlotIfGroupIdle(tx *gorm.DB, workflowID uuid.UUID, groupID stri
 	}
 
 	return &slot, nil
-}
-
-// FindLiveCanvasNodeGroups loads the node groups from the live canvas
-// version. A canvas without a live version has no groups.
-func FindLiveCanvasNodeGroups(tx *gorm.DB, workflowID uuid.UUID) ([]NodeGroup, error) {
-	version, err := FindLiveCanvasVersionInTransaction(tx, workflowID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	return append([]NodeGroup(nil), version.NodeGroups...), nil
-}
-
-// SupersedeQueueItem removes a queue item that was replaced by a newer
-// item in a queue with autoCancel: queued. When the item was the run's
-// only remaining work, the run finishes with the superseded result.
-func SupersedeQueueItem(tx *gorm.DB, item *CanvasNodeQueueItem) error {
-	if err := tx.Delete(item).Error; err != nil {
-		return err
-	}
-
-	run, err := FindCanvasRunInTransaction(tx, item.WorkflowID, item.RunID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
-		return err
-	}
-
-	if run.State == CanvasRunStateFinished {
-		return nil
-	}
-
-	openWork, err := run.FindOpenWork(tx)
-	if err != nil {
-		return err
-	}
-
-	if openWork.HasActiveExecutions || openWork.HasQueueItems || openWork.HasPendingEvents {
-		return nil
-	}
-
-	now := time.Now()
-	err = tx.Model(run).
-		Updates(map[string]any{
-			"state":       CanvasRunStateFinished,
-			"result":      CanvasRunResultSuperseded,
-			"updated_at":  &now,
-			"finished_at": &now,
-		}).
-		Error
-	if err != nil {
-		return err
-	}
-
-	return DeleteQueueSlotsForRun(tx, run.WorkflowID, run.ID)
 }
 
 // ListWaitingQueueItemsForGroup returns the oldest waiting queue item per

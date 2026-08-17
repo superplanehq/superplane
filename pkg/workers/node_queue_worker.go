@@ -307,7 +307,7 @@ func (w *NodeQueueWorker) processNodeQueueItems(tx *gorm.DB, logger *log.Entry, 
 		return nil
 	}
 
-	spec := node.QueueSpec()
+	spec := node.ConcurrencySpec()
 
 	live, err := w.prepareQueueItems(tx, logger, node, items, collector)
 	if err != nil {
@@ -337,17 +337,13 @@ func (w *NodeQueueWorker) processNodeQueueItems(tx *gorm.DB, logger *log.Entry, 
 			continue
 		}
 
-		//
-		// An unlimited queue (maxParallelism 0) never blocks: no capacity
-		// check applies. Group admission below still does.
-		//
-		if !selfManaged && !spec.Unlimited() {
+		if !selfManaged {
 			activeCount, err := models.CountActiveExecutionsInQueue(tx, node.WorkflowID, node.NodeID, queueName)
 			if err != nil {
 				return err
 			}
 
-			if activeCount >= int64(spec.EffectiveMaxParallelism()) {
+			if activeCount >= int64(spec.EffectiveMax()) {
 				//
 				// autoCancel: running frees the queue for the newest item by
 				// cancelling in-flight executions. The item dispatches on a
@@ -433,7 +429,7 @@ func (w *NodeQueueWorker) prepareQueueItems(
 func (w *NodeQueueWorker) supersedeStaleQueueItems(
 	tx *gorm.DB,
 	logger *log.Entry,
-	spec *models.QueueSpec,
+	spec *models.ConcurrencySpec,
 	items []*models.CanvasNodeQueueItem,
 	collector *MessageCollector,
 ) ([]*models.CanvasNodeQueueItem, error) {
@@ -498,7 +494,7 @@ func (w *NodeQueueWorker) admitRunIntoGroup(
 		return false, err
 	}
 
-	if slotCount >= int64(group.EffectiveMaxParallelism()) {
+	if slotCount >= int64(group.EffectiveMax()) {
 		return false, nil
 	}
 

@@ -1,6 +1,6 @@
 --
--- Inline queue configuration for a node, as a QueueSpec object
--- ({ key, maxParallelism, autoCancel }). NULL means the node uses its
--- implicit queue: named after the node ID, maxParallelism 1.
+-- Inline concurrency configuration for a node, as a ConcurrencySpec
+-- object ({ key, max, autoCancel }). NULL means the node uses its
+-- implicit queue: named after the node ID, max 1.
 --
-ALTER TABLE workflow_nodes ADD COLUMN queue jsonb;
+ALTER TABLE workflow_nodes ADD COLUMN concurrency jsonb;

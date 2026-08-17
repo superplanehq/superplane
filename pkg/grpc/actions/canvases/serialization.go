@@ -67,9 +67,9 @@ func NodeGroupsToProto(groups []models.NodeGroup) []*pb.NodeGroup {
 			Nodes: append([]string(nil), group.Nodes...),
 		}
 
-		if group.MaxParallelism != nil {
-			maxParallelism := int32(*group.MaxParallelism)
-			result[i].MaxParallelism = &maxParallelism
+		if group.Max != nil {
+			max := int32(*group.Max)
+			result[i].Max = &max
 		}
 	}
 	return result

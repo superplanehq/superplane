@@ -794,7 +794,7 @@ CREATE TABLE public.workflow_nodes (
     deleted_at timestamp with time zone,
     app_installation_id uuid,
     state_reason text,
-    queue jsonb,
+    concurrency jsonb,
     group_id character varying(128)
 );
 

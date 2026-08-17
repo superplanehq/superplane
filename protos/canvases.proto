@@ -588,7 +588,8 @@ message NodeGroup {
   repeated string nodes = 2;
 
   // Maximum number of runs holding a slot at once. Absent means 1.
-  optional int32 max_parallelism = 3;
+  // Must be 1 or greater when set.
+  optional int32 max = 3;
 }
 
 message Canvas {

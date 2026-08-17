@@ -803,7 +803,7 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			Configuration:  node.Configuration.AsMap(),
 			Position:       ProtoToPosition(node.Position),
 			IsCollapsed:    node.IsCollapsed,
-			Queue:          ProtoToQueueSpec(node.Queue),
+			Concurrency:    ProtoToConcurrencySpec(node.Concurrency),
 			IntegrationID:  integrationID,
 			ErrorMessage:   errorMessage,
 			WarningMessage: warningMessage,
@@ -813,37 +813,41 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 	return result
 }
 
-func ProtoToQueueSpec(spec *componentpb.QueueSpec) *models.QueueSpec {
+func ProtoToConcurrencySpec(spec *componentpb.ConcurrencySpec) *models.ConcurrencySpec {
 	if spec == nil {
 		return nil
 	}
 
-	result := &models.QueueSpec{
-		Key:        spec.Key,
-		AutoCancel: spec.AutoCancel,
+	result := &models.ConcurrencySpec{
+		Key:        spec.GetKey(),
+		AutoCancel: spec.GetAutoCancel(),
 	}
 
-	if spec.MaxParallelism != nil {
-		maxParallelism := int(*spec.MaxParallelism)
-		result.MaxParallelism = &maxParallelism
+	if spec.Max != nil {
+		max := int(*spec.Max)
+		result.Max = &max
 	}
 
 	return result
 }
 
-func QueueSpecToProto(spec *models.QueueSpec) *componentpb.QueueSpec {
+func ConcurrencySpecToProto(spec *models.ConcurrencySpec) *componentpb.ConcurrencySpec {
 	if spec == nil {
 		return nil
 	}
 
-	result := &componentpb.QueueSpec{
-		Key:        spec.Key,
-		AutoCancel: spec.AutoCancel,
+	result := &componentpb.ConcurrencySpec{}
+	if spec.Key != "" {
+		result.Key = &spec.Key
 	}
 
-	if spec.MaxParallelism != nil {
-		maxParallelism := int32(*spec.MaxParallelism)
-		result.MaxParallelism = &maxParallelism
+	if spec.AutoCancel != "" {
+		result.AutoCancel = &spec.AutoCancel
+	}
+
+	if spec.Max != nil {
+		max := int32(*spec.Max)
+		result.Max = &max
 	}
 
 	return result
@@ -883,7 +887,7 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 			Type:        NodeTypeToProto(node.Type),
 			Position:    PositionToProto(node.Position),
 			IsCollapsed: node.IsCollapsed,
-			Queue:       QueueSpecToProto(node.Queue),
+			Concurrency: ConcurrencySpecToProto(node.Concurrency),
 		}
 
 		if node.Ref.Component != nil {
