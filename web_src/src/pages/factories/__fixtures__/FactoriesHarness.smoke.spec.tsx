@@ -11,7 +11,7 @@ describe("FactoriesHarness work orders", () => {
     client.setConfig({ baseUrl: "http://localhost" });
   });
 
-  it("shows missions when Work Orders opens from the factory sidebar", async () => {
+  it("shows the Work Orders board when Work Orders opens from the factory sidebar", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
@@ -19,7 +19,8 @@ describe("FactoriesHarness work orders", () => {
       />,
     );
 
-    expect(await screen.findByTestId("mission-views", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByTestId("work-orders-header", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("mission-views")).not.toBeInTheDocument();
   }, 10000);
 
   it("serves a factory-owned canvas so app clicks do not bounce to Overview", async () => {

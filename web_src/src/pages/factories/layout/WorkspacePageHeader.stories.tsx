@@ -4,6 +4,7 @@ import { Copy, Ellipsis, Funnel, Pencil, Plus, RefreshCw, Search, Settings2 } fr
 import { Button } from "@/components/ui/button";
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "../__fixtures__/factoriesStoryTheme";
+import { factorySectionHeaderClassName } from "../pages/factoryPageLayoutStyles";
 import { WorkspacePageHeader } from "./WorkspacePageHeader";
 
 const meta = {
@@ -53,26 +54,29 @@ export const SectionWithPrimaryAction: Story = {
 
 export const SectionWithToolbarAndChips: Story = {
   args: {
+    className: factorySectionHeaderClassName,
     title: "Work Orders",
     leading: (
-      <div className="flex items-center rounded-md border border-border p-0.5" role="group" aria-label="Scope">
-        <span className="inline-flex h-7 items-center rounded-[5px] bg-accent px-2.5 text-[12px] font-medium text-foreground">
-          All
-        </span>
-        <span className="inline-flex h-7 items-center rounded-[5px] px-2.5 text-[12px] font-medium text-muted-foreground">
-          Active
-        </span>
-        <span className="inline-flex h-7 items-center rounded-[5px] px-2.5 text-[12px] font-medium text-muted-foreground">
-          My
-        </span>
-      </div>
-    ),
-    actions: (
       <>
+        <div className="flex items-center rounded-md border border-border p-0.5" role="group" aria-label="Scope">
+          <span className="inline-flex h-7 items-center rounded-[5px] bg-accent px-2.5 text-[12px] font-medium text-foreground">
+            All
+          </span>
+          <span className="inline-flex h-7 items-center rounded-[5px] px-2.5 text-[12px] font-medium text-muted-foreground">
+            Active
+          </span>
+          <span className="inline-flex h-7 items-center rounded-[5px] px-2.5 text-[12px] font-medium text-muted-foreground">
+            My
+          </span>
+        </div>
         <Button type="button" variant="ghost" size="sm" className="text-muted-foreground">
           <Funnel className="size-3.5" aria-hidden />
           Filter
         </Button>
+      </>
+    ),
+    actions: (
+      <>
         <Button type="button" variant="ghost" size="icon-xs" aria-label="Search work orders">
           <Search className="size-3.5" aria-hidden />
         </Button>

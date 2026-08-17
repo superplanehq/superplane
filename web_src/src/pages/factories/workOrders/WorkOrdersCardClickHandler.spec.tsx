@@ -111,6 +111,7 @@ describe("WorkOrdersBoardView layout", () => {
 
     expect(screen.getByTestId("work-orders-board").className).toContain("overflow-x-auto");
     expect(screen.getByTestId("work-orders-board-lane-running").className).toContain("min-w-72");
+    expect(screen.getByTestId("work-orders-board-lane-running").className).toContain("shrink-0");
   });
 });
 
