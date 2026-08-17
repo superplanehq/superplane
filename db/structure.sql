@@ -740,6 +740,18 @@ CREATE TABLE public.workflow_node_executions (
 
 
 --
+-- Name: workflow_node_groups; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_node_groups (
+    workflow_id uuid NOT NULL,
+    group_id character varying(128) NOT NULL,
+    max integer,
+    CONSTRAINT workflow_node_groups_max_check CHECK ((max >= 1))
+);
+
+
+--
 -- Name: workflow_node_queue_items; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -794,8 +806,12 @@ CREATE TABLE public.workflow_nodes (
     deleted_at timestamp with time zone,
     app_installation_id uuid,
     state_reason text,
-    concurrency jsonb,
-    group_id character varying(128)
+    concurrency_key text,
+    concurrency_max integer,
+    concurrency_auto_cancel character varying(16),
+    group_id character varying(128),
+    CONSTRAINT workflow_nodes_concurrency_auto_cancel_check CHECK (((concurrency_auto_cancel)::text = ANY ((ARRAY['queued'::character varying, 'running'::character varying])::text[]))),
+    CONSTRAINT workflow_nodes_concurrency_max_check CHECK ((concurrency_max >= 1))
 );
 
 
@@ -1378,6 +1394,14 @@ ALTER TABLE ONLY public.workflow_node_requests
 
 ALTER TABLE ONLY public.workflow_node_executions
     ADD CONSTRAINT workflow_node_executions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_node_groups workflow_node_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_groups
+    ADD CONSTRAINT workflow_node_groups_pkey PRIMARY KEY (workflow_id, group_id);
 
 
 --
@@ -2631,6 +2655,14 @@ ALTER TABLE ONLY public.workflow_nodes
 
 ALTER TABLE ONLY public.workflow_nodes
     ADD CONSTRAINT workflow_nodes_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
+
+
+--
+-- Name: workflow_queue_slots workflow_queue_slots_workflow_id_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_queue_slots
+    ADD CONSTRAINT workflow_queue_slots_workflow_id_group_id_fkey FOREIGN KEY (workflow_id, group_id) REFERENCES public.workflow_node_groups(workflow_id, group_id) ON DELETE CASCADE;
 
 
 --

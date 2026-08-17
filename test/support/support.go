@@ -401,6 +401,17 @@ func CreateCanvasWithNodeGroups(
 			return err
 		}
 
+		for _, group := range nodeGroups {
+			row := models.CanvasNodeGroup{
+				WorkflowID: workflow.ID,
+				GroupID:    group.ID,
+				Max:        group.Max,
+			}
+			if err := tx.Create(&row).Error; err != nil {
+				return err
+			}
+		}
+
 		for _, node := range inputNodes {
 			canvasNode := models.CanvasNode{
 				WorkflowID:    workflow.ID,
@@ -413,10 +424,10 @@ func CreateCanvasWithNodeGroups(
 				Position:      datatypes.NewJSONType(node.Position),
 				Metadata:      datatypes.NewJSONType(node.Metadata),
 				IsCollapsed:   node.IsCollapsed,
-				Concurrency:   models.ConcurrencySpecColumn(node.Concurrency),
 				CreatedAt:     &now,
 				UpdatedAt:     &now,
 			}
+			canvasNode.SetConcurrencySpec(node.Concurrency)
 
 			if groupID, ok := groupIDByNode[node.ID]; ok {
 				canvasNode.GroupID = &groupID

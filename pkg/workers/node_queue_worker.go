@@ -32,6 +32,11 @@ type NodeQueueWorker struct {
 	semaphore   *semaphore.Weighted
 	logger      *log.Entry
 
+	// selfManagedComponents names the components that implement
+	// core.QueueItemProcessor. Their queue items are never gated on
+	// capacity, so the poll query must always return their nodes.
+	selfManagedComponents []string
+
 	rabbitMQURL               string
 	queueItemConsumer         *tackle.Consumer
 	executionFinishedConsumer *tackle.Consumer
@@ -52,9 +57,21 @@ func NewNodeQueueWorker(registry *registry.Registry, gitProvider gitprovider.Pro
 		rabbitMQURL:               rabbitMQURL,
 		semaphore:                 semaphore.NewWeighted(25),
 		logger:                    logger,
+		selfManagedComponents:     selfManagedComponentNames(registry),
 		queueItemConsumer:         queueItemConsumer,
 		executionFinishedConsumer: executionFinishedConsumer,
 	}
+}
+
+func selfManagedComponentNames(registry *registry.Registry) []string {
+	names := []string{}
+	for _, action := range registry.ListActions() {
+		if queueItemProcessorFor(action) != nil {
+			names = append(names, action.Name())
+		}
+	}
+
+	return names
 }
 
 func (w *NodeQueueWorker) Name() string {
@@ -92,7 +109,7 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			tickStart := time.Now()
-			nodes, err := models.ListCanvasNodesReady()
+			nodes, err := models.ListCanvasNodesReady(database.Conn(), w.selfManagedComponents)
 			if err != nil {
 				w.logger.Errorf("Error finding canvas nodes ready to be processed: %v", err)
 			}
@@ -470,12 +487,11 @@ func (w *NodeQueueWorker) admitRunIntoGroup(
 	node *models.CanvasNode,
 	runID uuid.UUID,
 ) (bool, error) {
-	groups, err := models.FindLiveCanvasNodeGroups(tx, node.WorkflowID)
+	group, err := models.FindCanvasNodeGroup(tx, node.WorkflowID, *node.GroupID)
 	if err != nil {
 		return false, err
 	}
 
-	group := findNodeGroup(groups, *node.GroupID)
 	if group == nil {
 		return true, nil
 	}
@@ -486,10 +502,10 @@ func (w *NodeQueueWorker) admitRunIntoGroup(
 	}
 
 	if slot != nil {
-		return slot.GroupID == group.ID, nil
+		return slot.GroupID == group.GroupID, nil
 	}
 
-	slotCount, err := models.CountQueueSlots(tx, node.WorkflowID, group.ID)
+	slotCount, err := models.CountQueueSlots(tx, node.WorkflowID, group.GroupID)
 	if err != nil {
 		return false, err
 	}
@@ -498,7 +514,7 @@ func (w *NodeQueueWorker) admitRunIntoGroup(
 		return false, nil
 	}
 
-	return true, models.AcquireQueueSlot(tx, node.WorkflowID, group.ID, runID)
+	return true, models.AcquireQueueSlot(tx, node.WorkflowID, group.GroupID, runID)
 }
 
 func (w *NodeQueueWorker) cancelRunningExecutionsInQueue(tx *gorm.DB, logger *log.Entry, node *models.CanvasNode, queueName string) error {
@@ -516,16 +532,6 @@ func (w *NodeQueueWorker) cancelRunningExecutionsInQueue(tx *gorm.DB, logger *lo
 		logger.Infof("Cancelling execution %s superseded in queue %s", execution.ID, queueName)
 		if err := execution.RequestCancellation(tx, nil); err != nil {
 			return err
-		}
-	}
-
-	return nil
-}
-
-func findNodeGroup(groups []models.NodeGroup, groupID string) *models.NodeGroup {
-	for i := range groups {
-		if groups[i].ID == groupID {
-			return &groups[i]
 		}
 	}
 

@@ -97,10 +97,10 @@ func publishCanvasVersionInTransaction(
 
 	if len(changeset.Changes) == 0 {
 		//
-		// Queue rules and node groups can change without any node or edge
-		// diff; group membership still has to be materialized on the nodes.
+		// Node groups can change without any node or edge diff; the group
+		// rows and membership still have to be materialized.
 		//
-		if err := models.SyncCanvasNodeGroupIDs(tx, canvas.ID, nextVersion.NodeGroups); err != nil {
+		if err := models.SyncCanvasNodeGroups(tx, canvas.ID, nextVersion.NodeGroups); err != nil {
 			return changesets.CanvasPublishResult{}, err
 		}
 

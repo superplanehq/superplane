@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -74,18 +75,20 @@ func concurrencyMax(limit int) *int {
 }
 
 func triggerAndComponent(componentNodeID string, concurrency *models.ConcurrencySpec) []models.CanvasNode {
+	component := models.CanvasNode{
+		NodeID: componentNodeID,
+		Type:   models.NodeTypeComponent,
+		Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+	}
+	component.SetConcurrencySpec(concurrency)
+
 	return []models.CanvasNode{
 		{
 			NodeID: "trigger-1",
 			Type:   models.NodeTypeTrigger,
 			Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
 		},
-		{
-			NodeID:      componentNodeID,
-			Type:        models.NodeTypeComponent,
-			Ref:         datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
-			Concurrency: models.ConcurrencySpecColumn(concurrency),
-		},
+		component,
 	}
 }
 
@@ -348,6 +351,13 @@ func Test__Queueing_AutoCancelRunningCancelsInFlightExecution(t *testing.T) {
 	apiNode := "api-node"
 	otherNode := "other-node"
 
+	apiCanvasNode := models.CanvasNode{
+		NodeID: apiNode,
+		Type:   models.NodeTypeComponent,
+		Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+	}
+	apiCanvasNode.SetConcurrencySpec(&models.ConcurrencySpec{AutoCancel: models.QueueAutoCancelRunning})
+
 	canvas, _ := support.CreateCanvas(
 		t, r.Organization.ID, r.User,
 		[]models.CanvasNode{
@@ -356,12 +366,7 @@ func Test__Queueing_AutoCancelRunningCancelsInFlightExecution(t *testing.T) {
 				Type:   models.NodeTypeTrigger,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
 			},
-			{
-				NodeID:      apiNode,
-				Type:        models.NodeTypeComponent,
-				Ref:         datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
-				Concurrency: models.ConcurrencySpecColumn(&models.ConcurrencySpec{AutoCancel: models.QueueAutoCancelRunning}),
-			},
+			apiCanvasNode,
 			{
 				NodeID: otherNode,
 				Type:   models.NodeTypeComponent,
@@ -680,4 +685,116 @@ func findExecutionByEvent(t *testing.T, canvasID uuid.UUID, nodeID string, event
 		}
 	}
 	return nil
+}
+
+func pollReturnsNode(t *testing.T, worker *NodeQueueWorker, canvasID uuid.UUID, nodeID string) bool {
+	t.Helper()
+	nodes, err := models.ListCanvasNodesReady(database.Conn(), worker.selfManagedComponents)
+	require.NoError(t, err)
+	return containsCanvasNode(nodes, canvasID, nodeID)
+}
+
+func containsCanvasNode(nodes []models.CanvasNode, canvasID uuid.UUID, nodeID string) bool {
+	return slices.ContainsFunc(nodes, func(n models.CanvasNode) bool {
+		return n.WorkflowID == canvasID && n.NodeID == nodeID
+	})
+}
+
+// The safety-net poll only returns nodes a dispatch pass can make progress
+// on. A node whose whole backlog waits on full queues is skipped until an
+// execution finishes; unresolved items and self-managed components keep a
+// node in the poll set.
+func Test__Queueing_PollSkipsNodesWithoutActionableBacklog(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := queueWorkerForTest(r)
+	componentNode := "poll-node"
+
+	canvas, _ := support.CreateCanvas(
+		t, r.Organization.ID, r.User,
+		triggerAndComponent(componentNode, nil),
+		triggerToComponentEdge(componentNode),
+	)
+
+	base := time.Now().Add(-10 * time.Minute)
+	events := make([]*models.CanvasEvent, 2)
+	for i := range events {
+		events[i] = support.EmitCanvasEventForNode(t, canvas.ID, "trigger-1", "default", nil)
+		createQueueItemAt(t, canvas.ID, componentNode, events[i], base.Add(time.Duration(i)*time.Minute))
+	}
+
+	//
+	// An unresolved backlog is always actionable: queue names are only
+	// known once the worker touches the items.
+	//
+	assert.True(t, pollReturnsNode(t, worker, canvas.ID, componentNode))
+
+	//
+	// One pass dispatches the first item (default max 1) and resolves the
+	// queue name of the second. The backlog now waits on a full queue, so
+	// the poll skips the node.
+	//
+	processQueueNode(t, worker, canvas.ID, componentNode)
+	require.Len(t, listActiveNodeExecutionsForTest(t, canvas.ID, componentNode), 1)
+	items := listQueueItemsForTest(t, canvas.ID, componentNode)
+	require.Len(t, items, 1)
+	require.NotNil(t, items[0].QueueName)
+
+	assert.False(t, pollReturnsNode(t, worker, canvas.ID, componentNode))
+
+	//
+	// The same node stays in the poll set when its component manages its
+	// own queue items: those are never capacity-gated.
+	//
+	nodes, err := models.ListCanvasNodesReady(database.Conn(), []string{"noop"})
+	require.NoError(t, err)
+	assert.True(t, containsCanvasNode(nodes, canvas.ID, componentNode))
+
+	//
+	// Finishing the execution frees the queue: the node is actionable again.
+	//
+	execution := findExecutionByEvent(t, canvas.ID, componentNode, events[0].ID)
+	require.NoError(t, execution.Start())
+	_, err = execution.Pass(nil)
+	require.NoError(t, err)
+
+	assert.True(t, pollReturnsNode(t, worker, canvas.ID, componentNode))
+}
+
+// A full queue with an autoCancel policy still needs dispatch passes: they
+// supersede stale waiting items and cancel running executions. The poll
+// must keep returning such nodes.
+func Test__Queueing_PollKeepsFullNodesWithAutoCancel(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := queueWorkerForTest(r)
+	componentNode := "auto-cancel-poll-node"
+
+	canvas, _ := support.CreateCanvas(
+		t, r.Organization.ID, r.User,
+		triggerAndComponent(componentNode, &models.ConcurrencySpec{AutoCancel: models.QueueAutoCancelQueued}),
+		triggerToComponentEdge(componentNode),
+	)
+
+	base := time.Now().Add(-10 * time.Minute)
+	first := support.EmitCanvasEventForNode(t, canvas.ID, "trigger-1", "default", nil)
+	createQueueItemAt(t, canvas.ID, componentNode, first, base)
+	processQueueNode(t, worker, canvas.ID, componentNode)
+	require.Len(t, listActiveNodeExecutionsForTest(t, canvas.ID, componentNode), 1)
+
+	//
+	// A second item arrives while the queue is full. The pass resolves its
+	// queue name but cannot dispatch it.
+	//
+	second := support.EmitCanvasEventForNode(t, canvas.ID, "trigger-1", "default", nil)
+	createQueueItemAt(t, canvas.ID, componentNode, second, base.Add(time.Minute))
+	processQueueNode(t, worker, canvas.ID, componentNode)
+
+	items := listQueueItemsForTest(t, canvas.ID, componentNode)
+	require.Len(t, items, 1)
+	require.NotNil(t, items[0].QueueName)
+
+	assert.True(t, pollReturnsNode(t, worker, canvas.ID, componentNode))
 }

@@ -393,9 +393,9 @@ one open execution per run already.
 
 At dispatch, the engine resolves the item's queue name (once, persisted) —
 the node's `key` expression, or the node ID when no key is set — and reads
-the node's inline concurrency settings from the live spec. For
-capacity-gated components, an item is dispatchable when its queue has
-capacity:
+the node's inline concurrency settings from the materialized
+`workflow_nodes` columns. For capacity-gated components, an item is
+dispatchable when its queue has capacity:
 
 - Node queue: `activeExecutions(nodeID, queueName) < max`.
 - Node inside a group: the item's run already holds the group's slot, or
@@ -459,16 +459,18 @@ flowchart LR
    worker on first touch is an implementation choice; expression evaluation
    currently lives in the queue worker's configuration builder, which
    suggests the latter. Either way the resolved name must be persisted on
-   first contact: it is what lets capacity counting — and, if ever needed, a
+   first contact: it is what lets capacity counting — and the
    capacity-aware safety-net poll — run as plain SQL with no expression
    evaluation. An item with a still-null name has never been touched and
    always warrants a dispatch visit, so first-touch resolution stays
    compatible with that poll.
-7. **Settings are read at dispatch time** from the live spec's node and
-   group entries. Configuration changes published to a canvas therefore
-   apply to the very next dispatch — no re-materialization of pending items
-   is needed. In-flight executions and held slots are unaffected by
-   configuration changes; only new dispatch decisions see new settings.
+7. **Settings are read at dispatch time** from the materialized node
+   columns and group rows (`workflow_nodes`, `workflow_node_groups`),
+   which publish keeps in sync with the live spec. Configuration changes
+   published to a canvas therefore apply to the very next dispatch — no
+   re-materialization of pending items is needed. In-flight executions and
+   held slots are unaffected by configuration changes; only new dispatch
+   decisions see new settings.
 8. Key expression failures fail the item's run visibly, consistent with how
    configuration expression failures behave today. The resolved value is
    coerced to a string.
@@ -514,15 +516,25 @@ the router; `processing` is retired with a one-line migration flipping any
 `processing` rows to `ready`. No engine logic branches on `state` for
 dispatch.
 
-One new table, for group holders only:
+Two new tables: materialized groups, and group slot holders.
 
 ```sql
-CREATE TABLE workflow_queue_slots (
+CREATE TABLE workflow_node_groups (
     workflow_id uuid NOT NULL,
     group_id    varchar(128) NOT NULL,   -- group id from the spec
+    max         integer,                 -- NULL = default (1)
+    PRIMARY KEY (workflow_id, group_id),
+    CHECK (max >= 1)
+);
+
+CREATE TABLE workflow_queue_slots (
+    workflow_id uuid NOT NULL,
+    group_id    varchar(128) NOT NULL,
     run_id      uuid NOT NULL,
     acquired_at timestamp NOT NULL,
-    PRIMARY KEY (workflow_id, group_id, run_id)
+    PRIMARY KEY (workflow_id, group_id, run_id),
+    FOREIGN KEY (workflow_id, group_id)
+        REFERENCES workflow_node_groups ON DELETE CASCADE
 );
 ```
 
@@ -543,19 +555,25 @@ Column changes on existing tables:
   `COUNT(*)` per `(node, resolved name)`. Today's
   `CountRunningExecutionsForNodeInTransaction` is the degenerate
   (implicit-queue) case of this query.
-- `workflow_nodes` + a nullable `concurrency` jsonb column carrying the
-  inline spec (`{ key, max, autoCancel }`; null = implicit queue),
-  materialized from the `Node` spec on publish like other node-level
-  attributes, plus a `group_id` column for group membership.
+- `workflow_nodes` + three nullable typed columns carrying the inline
+  spec — `concurrency_key text`, `concurrency_max integer` (CHECK
+  `>= 1`), `concurrency_auto_cancel varchar(16)` (CHECK
+  `queued`/`running`); all NULL = implicit queue — materialized from the
+  `Node` spec on publish like other node-level attributes, plus a
+  `group_id` column for group membership. Typed columns instead of a
+  jsonb blob: the CHECKs enforce the invariants at the storage layer, and
+  the dispatch queries read the fields directly instead of `->>`
+  extraction.
 - `workflow_runs.result` gains a `superseded` value; superseded executions
   carry `result_reason = "superseded"`. No new audit tables — the existing
   records tell the story.
 
 Groups live on the canvas spec (`workflow_versions`), alongside nodes and
-edges, as `{ id, nodes, max }`, and are read with the live spec
-at dispatch (behavior point 7) — they need no runtime table of their own.
-Group membership is also materialized per node at publish so dispatch
-answers "is this node in a group, and which" without walking the spec.
+edges, as `{ id, nodes, max }`. Publish materializes them into
+`workflow_node_groups` rows and stamps `group_id` on the member nodes, so
+dispatch answers "is this node in a group, and what is the group's limit"
+without loading the canvas version. Removing a group on publish cascades
+away its held slots.
 
 API surface: an optional `concurrency` message (`key`, `max`,
 `auto_cancel`) on the `Node` proto and a `node_groups` list on the canvas
@@ -822,43 +840,39 @@ engine always dispatches their items and applies neither capacity nor
 `NodeQueueWorker`, not call the components directly — the POC deadlock was
 invisible to the direct-call tests.
 
-Second, the **capacity-aware safety-net poll**. The poll drops its
-`state = ready` filter, and instead of listing every node with backlog and
-re-checking capacity per node in Go, the query returns only actionable
+Second, the **capacity-aware safety-net poll** (implemented as
+`models.ListCanvasNodesReady`). Instead of listing every node with backlog
+and re-checking capacity per node in Go, the query returns only actionable
 nodes. False positives are fine (the worker re-checks under the per-node
-lock); false negatives are forbidden. Sketch:
+lock); false negatives are forbidden. A node is returned when it has a
+pending queue item for which any of these holds:
 
 ```sql
-SELECT DISTINCT n.workflow_id, n.node_id
-FROM workflow_nodes n
-JOIN workflow_node_queue_items i
-  ON i.workflow_id = n.workflow_id AND i.node_id = n.node_id
-WHERE n.state <> 'error'
-  AND n.type = 'component'
-  AND n.deleted_at IS NULL
-  AND (
-    i.queue_name IS NULL                                  -- unresolved item: always visit
-    OR n.concurrency->>'autoCancel' IS NOT NULL           -- policy work possible at capacity
-    OR n.group_id IS NOT NULL                             -- group admission is per run
-    OR n.node_id = ANY (@self_managed_node_ids)           -- merge/loop: always visit
-    OR (
-      SELECT count(*)
-      FROM workflow_node_executions e
-      WHERE e.workflow_id = i.workflow_id
-        AND e.node_id = i.node_id
-        AND e.queue_name = i.queue_name
-        AND e.state IN ('pending', 'started', 'cancelling')
-    ) < COALESCE((n.concurrency->>'max')::int, 1)
-  );
+i.queue_name IS NULL                                  -- unresolved item: always visit
+OR wn.ref->'component'->>'name' IN (@self_managed)    -- merge/loop: always visit
+OR wn.concurrency_auto_cancel IS NOT NULL             -- policy work possible at capacity
+OR (
+  SELECT count(*)
+  FROM workflow_node_executions e
+  WHERE e.workflow_id = i.workflow_id
+    AND e.node_id = i.node_id
+    AND e.queue_name = i.queue_name
+    AND e.state IN ('pending', 'started', 'cancelling')
+) < COALESCE(wn.concurrency_max, 1)                   -- queue has capacity
 ```
 
-The join with `workflow_node_queue_items` bounds the scan to nodes with
-backlog; the correlated count is served by the partial index on
-`workflow_node_executions (workflow_id, node_id, queue_name)` over
-non-terminal states. The self-managed node list comes from the worker
-(which knows the registry), not from SQL inspecting component refs. In
-chunk 1 only the `queue_name IS NULL` and count-vs-1 arms are live; the
-other arms activate as chunks 2–7 land, without schema changes.
+The `EXISTS` over `workflow_node_queue_items` bounds the scan to nodes with
+backlog; the correlated count is served by the partial index
+`idx_workflow_node_executions_active_queue` over non-terminal states. The
+self-managed component names come from the worker, which computes them from
+the registry (components implementing `core.QueueItemProcessor`).
+
+Group-blocked nodes need no dedicated arm: group admission happens before
+an execution is created, so a node waiting on a group slot has no active
+executions in the blocked queue and the capacity arm returns it. A node
+whose whole backlog waits on full queues becomes actionable again as soon
+as an execution leaves an active state, so the next tick returns it — the
+poll stays a complete safety net even when RabbitMQ messages are lost.
 
 The webhook-KV collision detection from the safety audit (see above)
 also ports here, alongside the self-managed dispatch mechanism.

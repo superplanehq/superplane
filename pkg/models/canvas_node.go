@@ -138,11 +138,14 @@ type CanvasNode struct {
 	IsCollapsed   bool
 
 	//
-	// Concurrency is the node's inline concurrency configuration. Nil
-	// means the node runs one execution at a time. The spec's key may
-	// contain {{ }} expressions resolved per queue item.
+	// The node's inline concurrency configuration. Each field defaults
+	// independently, so all-NULL means the default behavior: one
+	// execution at a time in the node's implicit queue, no auto-cancel.
+	// The key may contain {{ }} expressions resolved per queue item.
 	//
-	Concurrency *datatypes.JSONType[ConcurrencySpec]
+	ConcurrencyKey        *string
+	ConcurrencyMax        *int
+	ConcurrencyAutoCancel *string
 
 	//
 	// GroupID is the group this node belongs to, materialized at publish
@@ -169,23 +172,41 @@ func (c *CanvasNode) TableName() string {
 // ConcurrencySpec returns the node's inline concurrency configuration,
 // or nil when the node uses the default (one execution at a time).
 func (c *CanvasNode) ConcurrencySpec() *ConcurrencySpec {
-	if c.Concurrency == nil {
+	if c.ConcurrencyKey == nil && c.ConcurrencyMax == nil && c.ConcurrencyAutoCancel == nil {
 		return nil
 	}
 
-	spec := c.Concurrency.Data()
-	return &spec
+	spec := &ConcurrencySpec{Max: c.ConcurrencyMax}
+	if c.ConcurrencyKey != nil {
+		spec.Key = *c.ConcurrencyKey
+	}
+
+	if c.ConcurrencyAutoCancel != nil {
+		spec.AutoCancel = *c.ConcurrencyAutoCancel
+	}
+
+	return spec
 }
 
-// ConcurrencySpecColumn converts a concurrency spec to its nullable
-// jsonb column value.
-func ConcurrencySpecColumn(spec *ConcurrencySpec) *datatypes.JSONType[ConcurrencySpec] {
+// SetConcurrencySpec stores a concurrency spec on the node's columns.
+// Empty fields are stored as NULL, so an absent spec and a spec with
+// all fields empty are the same (default) configuration.
+func (c *CanvasNode) SetConcurrencySpec(spec *ConcurrencySpec) {
+	c.ConcurrencyKey = nil
+	c.ConcurrencyMax = nil
+	c.ConcurrencyAutoCancel = nil
 	if spec == nil {
-		return nil
+		return
 	}
 
-	column := datatypes.NewJSONType(*spec)
-	return &column
+	if spec.Key != "" {
+		c.ConcurrencyKey = &spec.Key
+	}
+
+	c.ConcurrencyMax = spec.Max
+	if spec.AutoCancel != "" {
+		c.ConcurrencyAutoCancel = &spec.AutoCancel
+	}
 }
 
 func (c *CanvasNode) ComponentName() string {
@@ -363,17 +384,61 @@ func FindCanvasNodesByIDs(tx *gorm.DB, canvasID uuid.UUID, nodeIDs []string) ([]
 	return nodes, nil
 }
 
-func ListCanvasNodesReady() ([]CanvasNode, error) {
+// ListCanvasNodesReady returns the component nodes with at least one
+// actionable pending queue item, i.e. the nodes a dispatch pass can make
+// progress on. A pending item is actionable when any of these holds:
+//
+//   - its queue name is not resolved yet (capacity is unknown until then);
+//   - the node's component manages its own queue items (never
+//     capacity-gated), which callers declare via selfManagedComponents;
+//   - the node has an autoCancel policy (a full queue still needs a pass
+//     to supersede waiting items or cancel running executions);
+//   - the item's queue has fewer active executions than the node's
+//     concurrency max.
+//
+// Nodes whose entire backlog waits on full queues are excluded: they
+// become actionable again when an execution leaves an active state, so
+// the next poll returns them.
+func ListCanvasNodesReady(tx *gorm.DB, selfManagedComponents []string) ([]CanvasNode, error) {
 	var nodes []CanvasNode
-	query := database.Conn().
-		Distinct().
-		Joins("JOIN workflow_node_queue_items ON workflow_nodes.workflow_id = workflow_node_queue_items.workflow_id AND workflow_nodes.node_id = workflow_node_queue_items.node_id").
-		Where("workflow_nodes.state <> ?", CanvasNodeStateError).
-		Where("workflow_nodes.type = ?", NodeTypeComponent).
-		Where("workflow_nodes.deleted_at IS NULL")
-
-	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
-		Find(&nodes).
+	err := tx.
+		Raw(`
+			SELECT wn.*
+			FROM workflow_nodes wn
+			JOIN workflows w ON w.id = wn.workflow_id
+			JOIN organizations o ON o.id = w.organization_id
+			WHERE wn.state <> ?
+			  AND wn.type = ?
+			  AND wn.deleted_at IS NULL
+			  AND w.deleted_at IS NULL
+			  AND o.deleted_at IS NULL
+			  AND EXISTS (
+			    SELECT 1
+			    FROM workflow_node_queue_items qi
+			    WHERE qi.workflow_id = wn.workflow_id
+			      AND qi.node_id = wn.node_id
+			      AND (
+			        qi.queue_name IS NULL
+			        OR wn.ref->'component'->>'name' IN ?
+			        OR wn.concurrency_auto_cancel IS NOT NULL
+			        OR (
+			          SELECT COUNT(*)
+			          FROM workflow_node_executions e
+			          WHERE e.workflow_id = qi.workflow_id
+			            AND e.node_id = qi.node_id
+			            AND e.queue_name = qi.queue_name
+			            AND e.state IN ?
+			        ) < COALESCE(wn.concurrency_max, ?)
+			      )
+			  )
+		`,
+			CanvasNodeStateError,
+			NodeTypeComponent,
+			selfManagedComponents,
+			CanvasNodeExecutionActiveStates,
+			DefaultConcurrencyMax,
+		).
+		Scan(&nodes).
 		Error
 
 	if err != nil {

@@ -114,7 +114,8 @@ spec:
 	require.Len(t, groups, 1)
 	assert.Equal(t, "staging-section", groups[0].ID)
 	assert.Equal(t, []string{"deploy", "test"}, groups[0].Nodes)
-	assert.Equal(t, 2, groups[0].EffectiveMax())
+	require.NotNil(t, groups[0].Max)
+	assert.Equal(t, 2, *groups[0].Max)
 
 	nodes := resource.Nodes()
 	require.NotNil(t, nodes[0].Concurrency)

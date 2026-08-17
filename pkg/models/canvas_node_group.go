@@ -6,17 +6,30 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // NodeGroup is a drawn group of nodes on the canvas that acts as a queue.
 // A run acquires a slot in the group when its first item dispatches into
-// the group, and holds it while it has work inside.
+// the group, and holds it while it has work inside. This is the canvas
+// version's document form; publish materializes it into
+// workflow_node_groups rows (CanvasNodeGroup) and workflow_nodes.group_id.
 type NodeGroup struct {
 	ID    string   `json:"id"`
 	Nodes []string `json:"nodes"`
 
 	// Max is presence-aware: nil means the default (1).
 	Max *int `json:"max,omitempty"`
+}
+
+// CanvasNodeGroup is a node group materialized at publish time, so the
+// queue worker can gate dispatch without loading the canvas version.
+type CanvasNodeGroup struct {
+	WorkflowID uuid.UUID `gorm:"primaryKey"`
+	GroupID    string    `gorm:"primaryKey"`
+
+	// Max is presence-aware: nil means the default (1).
+	Max *int
 }
 
 // CanvasQueueSlot records a run holding a slot in a group.
@@ -29,8 +42,12 @@ type CanvasQueueSlot struct {
 	AcquiredAt *time.Time
 }
 
+func (g *CanvasNodeGroup) TableName() string {
+	return "workflow_node_groups"
+}
+
 // EffectiveMax returns the configured limit, defaulting to 1.
-func (g *NodeGroup) EffectiveMax() int {
+func (g *CanvasNodeGroup) EffectiveMax() int {
 	if g == nil || g.Max == nil {
 		return DefaultConcurrencyMax
 	}
@@ -41,10 +58,15 @@ func (s *CanvasQueueSlot) TableName() string {
 	return "workflow_queue_slots"
 }
 
-// FindLiveCanvasNodeGroups loads the node groups from the live canvas
-// version. A canvas without a live version has no groups.
-func FindLiveCanvasNodeGroups(tx *gorm.DB, workflowID uuid.UUID) ([]NodeGroup, error) {
-	version, err := FindLiveCanvasVersionInTransaction(tx, workflowID)
+// FindCanvasNodeGroup returns a materialized node group, or nil when the
+// group does not exist (e.g. it was removed by a later publish).
+func FindCanvasNodeGroup(tx *gorm.DB, workflowID uuid.UUID, groupID string) (*CanvasNodeGroup, error) {
+	var group CanvasNodeGroup
+	err := tx.
+		Where("workflow_id = ?", workflowID).
+		Where("group_id = ?", groupID).
+		First(&group).
+		Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -52,13 +74,54 @@ func FindLiveCanvasNodeGroups(tx *gorm.DB, workflowID uuid.UUID) ([]NodeGroup, e
 		return nil, err
 	}
 
-	return append([]NodeGroup(nil), version.NodeGroups...), nil
+	return &group, nil
 }
 
-// SyncCanvasNodeGroupIDs materializes node groups onto
-// workflow_nodes.group_id, so the queue worker can gate dispatch without
-// loading the canvas version.
-func SyncCanvasNodeGroupIDs(tx *gorm.DB, workflowID uuid.UUID, groups []NodeGroup) error {
+// SyncCanvasNodeGroups materializes a version's node groups: one
+// workflow_node_groups row per group, and the group_id stamped on member
+// nodes. Removing a group also drops its held queue slots (FK cascade).
+func SyncCanvasNodeGroups(tx *gorm.DB, workflowID uuid.UUID, groups []NodeGroup) error {
+	if err := SyncCanvasNodeGroupRows(tx, workflowID, groups); err != nil {
+		return err
+	}
+
+	return syncCanvasNodeGroupMembership(tx, workflowID, groups)
+}
+
+// SyncCanvasNodeGroupRows upserts one workflow_node_groups row per group
+// and deletes rows for groups no longer in the spec.
+func SyncCanvasNodeGroupRows(tx *gorm.DB, workflowID uuid.UUID, groups []NodeGroup) error {
+	groupIDs := make([]string, 0, len(groups))
+	for _, group := range groups {
+		row := CanvasNodeGroup{
+			WorkflowID: workflowID,
+			GroupID:    group.ID,
+			Max:        group.Max,
+		}
+
+		err := tx.
+			Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "workflow_id"}, {Name: "group_id"}},
+				DoUpdates: clause.AssignmentColumns([]string{"max"}),
+			}).
+			Create(&row).
+			Error
+		if err != nil {
+			return err
+		}
+
+		groupIDs = append(groupIDs, group.ID)
+	}
+
+	query := tx.Where("workflow_id = ?", workflowID)
+	if len(groupIDs) > 0 {
+		query = query.Where("group_id NOT IN ?", groupIDs)
+	}
+
+	return query.Delete(&CanvasNodeGroup{}).Error
+}
+
+func syncCanvasNodeGroupMembership(tx *gorm.DB, workflowID uuid.UUID, groups []NodeGroup) error {
 	groupedNodeIDs := make([]string, 0)
 	for _, group := range groups {
 		err := tx.Model(&CanvasNode{}).

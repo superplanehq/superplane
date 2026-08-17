@@ -265,11 +265,11 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *Change) error {
 		Metadata:          datatypes.NewJSONType(node.Metadata),
 		Position:          datatypes.NewJSONType(node.Position),
 		IsCollapsed:       node.IsCollapsed,
-		Concurrency:       models.ConcurrencySpecColumn(node.Concurrency),
 		AppInstallationID: appInstallationID,
 		CreatedAt:         &now,
 		UpdatedAt:         &now,
 	}
+	newNode.SetConcurrencySpec(node.Concurrency)
 
 	//
 	// If node update led to an error, set the node to error state.
@@ -364,7 +364,7 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error 
 	existingNode.Configuration = datatypes.NewJSONType(updatedNode.Configuration)
 	existingNode.Position = datatypes.NewJSONType(updatedNode.Position)
 	existingNode.IsCollapsed = updatedNode.IsCollapsed
-	existingNode.Concurrency = models.ConcurrencySpecColumn(updatedNode.Concurrency)
+	existingNode.SetConcurrencySpec(updatedNode.Concurrency)
 	existingNode.AppInstallationID = appInstallationID
 	existingNode.UpdatedAt = &now
 
@@ -420,10 +420,15 @@ func (p *CanvasPublisher) runPendingSetups(ctx context.Context) error {
 	return nil
 }
 
-// syncNodeGroupMembership materializes the draft's node groups onto
-// workflow_nodes.group_id, so the queue worker can gate dispatch without
-// loading the canvas version.
+// syncNodeGroupMembership materializes the draft's node groups: one
+// workflow_node_groups row per group, and workflow_nodes.group_id on the
+// members, so the queue worker can gate dispatch without loading the
+// canvas version.
 func (p *CanvasPublisher) syncNodeGroupMembership() error {
+	if err := models.SyncCanvasNodeGroupRows(p.tx, p.live.WorkflowID, p.draft.NodeGroups); err != nil {
+		return err
+	}
+
 	groupByNode := map[string]string{}
 	for _, group := range p.draft.NodeGroups {
 		for _, nodeID := range group.Nodes {
