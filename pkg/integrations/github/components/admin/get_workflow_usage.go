@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	gh "github.com/google/go-github/v84/github"
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -194,10 +193,6 @@ func (g *GetWorkflowUsage) Execute(ctx core.ExecutionContext) error {
 		"github.workflowUsage",
 		[]any{result},
 	)
-}
-
-func (g *GetWorkflowUsage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (g *GetWorkflowUsage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

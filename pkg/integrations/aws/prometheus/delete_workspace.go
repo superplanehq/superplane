@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -64,10 +63,6 @@ func (c *DeleteWorkspace) Setup(ctx core.SetupContext) error {
 	}
 
 	return setWorkspaceNodeMetadata(ctx, resolveWorkspaceNodeMetadata(ctx, config))
-}
-
-func (c *DeleteWorkspace) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *DeleteWorkspace) Execute(ctx core.ExecutionContext) error {

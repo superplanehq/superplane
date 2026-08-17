@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -112,10 +111,6 @@ func (c *Query) Execute(ctx core.ExecutionContext) error {
 		"prometheus.query",
 		[]any{payload},
 	)
-}
-
-func (c *Query) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *Query) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

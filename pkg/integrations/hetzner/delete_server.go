@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -77,10 +76,6 @@ func (c *DeleteServer) Configuration() []configuration.Field {
 			Description: "Server to delete",
 		},
 	}
-}
-
-func (c *DeleteServer) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *DeleteServer) Setup(ctx core.SetupContext) error {

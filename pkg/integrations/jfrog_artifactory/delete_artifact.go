@@ -3,7 +3,6 @@ package jfrogartifactory
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -90,10 +89,6 @@ func (d *DeleteArtifact) Configuration() []configuration.Field {
 			Placeholder: "e.g. path/to/file.jar",
 		},
 	}
-}
-
-func (d *DeleteArtifact) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (d *DeleteArtifact) Setup(ctx core.SetupContext) error {
