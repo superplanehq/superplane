@@ -9,7 +9,8 @@ import {
 import { OverviewPage } from "./OverviewPage";
 
 /**
- * Overview page: compact work orders + lines snapshot inside the FactoriesLayout.
+ * Overview page: compact section header aligned with the sidebar workspace
+ * name, plus work orders and lines snapshot inside FactoriesLayout.
  * Mounted through the real router so the sidebar (nav + recent) appears.
  * Canvas clicks stay on FactoryAppCanvasPage because FactoriesHarness serves
  * a factory-owned canvas by default.

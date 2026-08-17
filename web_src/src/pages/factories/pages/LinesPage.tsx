@@ -28,6 +28,7 @@ import {
   WorkOrderBoardLane,
   WorkOrderKanbanBoard,
   workOrderKanbanLaneScrollClassName,
+  workOrderKanbanLaneSizeClassName,
   type BoardLaneTone,
 } from "../workOrders/WorkOrderBoardChrome";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
@@ -40,9 +41,10 @@ import {
 } from "../lib/factoryPagePaths";
 import { formatLinePhaseDescription, humanizeLineName } from "../lib/humanizeLineName";
 import {
-  factoryContentBodyClassName,
-  factoryKanbanBodyClassName,
   factoryKanbanPageClassName,
+  factorySectionBodyClassName,
+  factorySectionHeaderClassName,
+  factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
 import { PhaseGlyph } from "./linePhaseGlyph";
 
@@ -79,7 +81,7 @@ export function LinesPage() {
           />
         </div>
 
-        <div className={factoryKanbanBodyClassName}>
+        <div className={factoryWorkOrdersBodyClassName}>
           <LineDetail
             organizationId={organizationId}
             factoryKey={factoryKey}
@@ -102,6 +104,7 @@ export function LinesPage() {
   return (
     <>
       <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
         title="Lines"
         subtitle="Factory lines specialize how work moves through the workspace. Each phase is backed by a canvas that runs work orders."
         actions={
@@ -119,7 +122,7 @@ export function LinesPage() {
         }
       />
 
-      <div className={factoryContentBodyClassName}>
+      <div className={factorySectionBodyClassName}>
         {lines.length === 0 ? (
           <EmptyLinesState
             organizationId={organizationId}
@@ -164,6 +167,7 @@ function LineDetailHeader({
   const editHref = line.id ? editFactoryLinePath(organizationId, factoryKey, line.id) : "#";
   return (
     <WorkspacePageHeader
+      className={factorySectionHeaderClassName}
       variant="entity"
       backHref={linesPath(organizationId, factoryKey)}
       backLabel="Lines"
@@ -294,7 +298,10 @@ function PhaseBoard({
   return (
     <WorkOrderKanbanBoard testId="lines-phase-board">
       {columns.map((column, index) => (
-        <div key={`${column.stepIndex}-${column.stepName}`} className="relative flex h-full min-h-0 min-w-72 flex-1">
+        <div
+          key={`${column.stepIndex}-${column.stepName}`}
+          className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}
+        >
           {index < columns.length - 1 ? (
             <span className="absolute top-[21px] left-full z-[1] h-px w-3 bg-border" aria-hidden />
           ) : null}
