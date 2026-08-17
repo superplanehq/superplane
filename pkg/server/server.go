@@ -608,8 +608,7 @@ func Start() {
 	}
 
 	registry, err := registry.NewRegistryWithOptions(registry.RegistryOptions{
-		Encryptor:                      encryptorInstance,
-		NewIntegrationSetupFlowEnabled: registry.NewIntegrationSetupFlowEnabledFromEnv(),
+		Encryptor: encryptorInstance,
 		HTTP: registry.HTTPOptions{
 			MaxResponseBytes: DefaultMaxHTTPResponseBytes,
 			PolicyResolver: func() (registry.HTTPPolicy, error) {
