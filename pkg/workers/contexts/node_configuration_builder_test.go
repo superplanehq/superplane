@@ -304,6 +304,9 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.NotContains(t, payload, "artifacts")
 		assert.NotContains(t, payload, "comments")
 
+		expectedURLSuffix := fmt.Sprintf("/%s/workspaces/%s/work-order/%d", r.Organization.ID.String(), factoryModel.Key, order.Number)
+		assert.Contains(t, payload["url"], expectedURLSuffix)
+
 		source, ok := payload["source"].(map[string]any)
 		require.True(t, ok)
 		issue, ok := source["issue"].(map[string]any)
@@ -325,13 +328,19 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, float64(42), issueNumber)
 
+		url, err := builder.ResolveExpression(`order().url`)
+		require.NoError(t, err)
+		assert.Contains(t, url, fmt.Sprintf("/%s/workspaces/%s/work-order/%d", r.Organization.ID.String(), factoryModel.Key, order.Number))
+
 		built, err := builder.Build(map[string]any{
-			"orderID": "{{ order().id }}",
-			"title":   "{{ order().title }}",
+			"orderID":  "{{ order().id }}",
+			"title":    "{{ order().title }}",
+			"orderURL": "{{ order().url }}",
 		})
 		require.NoError(t, err)
 		assert.Equal(t, order.ID.String(), built["orderID"])
 		assert.Equal(t, "Ship feature", built["title"])
+		assert.Contains(t, built["orderURL"], fmt.Sprintf("/%s/workspaces/%s/work-order/%d", r.Organization.ID.String(), factoryModel.Key, order.Number))
 	})
 
 	t.Run("artifacts equivalents", func(t *testing.T) {
