@@ -10,6 +10,7 @@ import { StorybookOverviewPage } from "../pages/onboarding/StorybookOverviewPage
 import { WikiWireframe } from "../pages/wiki/WikiWireframe";
 import { WIKI_DOCUMENTS_DEFAULT, WIKI_DOCUMENTS_REFRESHED } from "../pages/wiki/wikiMocks";
 import { defaultFactoriesFixture, FACTORIES_ORGANIZATION_ID, type FactoriesFixture } from "./factoryPageResponses";
+import { refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
 import { MissionAssignmentProvider } from "../pages/missions/MissionAssignmentContext";
 import { MissionsWorkOrdersPage } from "../pages/missions/MissionsWorkOrdersPage";
 import { WorkOrderMissionOverviewRow } from "../pages/missions/WorkOrderMissionOverviewRow";
@@ -20,7 +21,7 @@ interface FactoriesHarnessProps {
   pathSuffix?: string;
   /** Fixture backing the factories API. Defaults to the populated Refunds Factory dataset. */
   factoriesFixture?: FactoriesFixture;
-  /** Optional canvas fixture for factory-embedded AppPage routes. */
+  /** Canvas fixture for factory-embedded AppPage routes. Defaults to a factory-owned canvas so in-story clicks do not redirect to Overview. */
   appFixture?: CanvasAppFixture;
   /**
    * Storybook-only: replace selected factory page elements.
@@ -40,6 +41,8 @@ function DefaultWikiWireframe() {
   return <WikiWireframe initialDocuments={WIKI_DOCUMENTS_DEFAULT} refreshedDocuments={WIKI_DOCUMENTS_REFRESHED} />;
 }
 
+const defaultFactoryAppFixture = refundLineCanvasFixture();
+
 /**
  * Mounts the org home routes with the factories feature enabled and a fixture
  * backend for factory list/detail/orders/lines/apps endpoints. Shares the same
@@ -48,7 +51,7 @@ function DefaultWikiWireframe() {
 export function FactoriesHarness({
   pathSuffix = "workspaces",
   factoriesFixture = defaultFactoriesFixture,
-  appFixture,
+  appFixture = defaultFactoryAppFixture,
   pageOverrides,
   onboardingSeed,
   enableOnboarding = true,
