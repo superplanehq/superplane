@@ -44,6 +44,13 @@ func UpdateNotificationSettings(
 		return nil, factoryErrorToStatus(err, "failed to update notification settings")
 	}
 
+	if requested.GetEnabled() && scope == models.NotificationWorkspaceScopeSelected && len(factoryIDs) == 0 {
+		return nil, factoryErrorToStatus(
+			invalidArgument("select at least one workspace or use the all workspaces scope"),
+			"failed to update notification settings",
+		)
+	}
+
 	params := models.UserNotificationSettingsParams{
 		Enabled:        requested.GetEnabled(),
 		WorkspaceScope: scope,
@@ -75,15 +82,12 @@ func UpdateNotificationSettings(
 	}, nil
 }
 
-// notificationFactoryIDs parses the requested workspace list. A `selected`
-// scope requires at least one workspace; an `all` scope ignores the list.
+// notificationFactoryIDs parses the requested workspace list. An `all`
+// scope ignores the list. An empty `selected` list is allowed when
+// notifications are off; the caller rejects it when they are on.
 func notificationFactoryIDs(scope string, requestedIDs []string) ([]uuid.UUID, error) {
 	if scope != models.NotificationWorkspaceScopeSelected {
 		return nil, nil
-	}
-
-	if len(requestedIDs) == 0 {
-		return nil, invalidArgument("select at least one workspace or use the all workspaces scope")
 	}
 
 	seen := map[uuid.UUID]struct{}{}

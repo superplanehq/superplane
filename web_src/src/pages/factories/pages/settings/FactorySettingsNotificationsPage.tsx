@@ -158,7 +158,7 @@ export function FactorySettingsNotificationsPage() {
               </label>
             </div>
 
-            <div className={cn("mt-6 space-y-6", !form.enabled && "pointer-events-none opacity-50")}>
+            <div className={cn("mt-6 space-y-6", !form.enabled && "opacity-50")}>
               <WorkspaceScopeSection
                 scope={form.scope}
                 selectedFactoryIds={form.selectedFactoryIds}
