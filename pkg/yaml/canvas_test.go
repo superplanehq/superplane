@@ -8,6 +8,7 @@ import (
 	ghodssyaml "github.com/ghodss/yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 func TestCanvasFromYAML_ReadsUnquotedPositionY(t *testing.T) {
@@ -67,6 +68,38 @@ spec:
 	require.Len(t, resource.Spec.Nodes, 1)
 	assert.Equal(t, 100, resource.Spec.Nodes[0].Position.X)
 	assert.Equal(t, 200, resource.Spec.Nodes[0].Position.Y)
+}
+
+func TestVersionToCanvasYAML_OmitsEmptyIntegrationName(t *testing.T) {
+	integrationID := "11111111-1111-1111-1111-111111111111"
+	version := &models.CanvasVersion{
+		Nodes: []models.Node{
+			{
+				ID:            "node-1",
+				Name:          "Deploy",
+				Type:          models.NodeTypeComponent,
+				Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
+				IntegrationID: &integrationID,
+			},
+		},
+	}
+
+	out, err := VersionToCanvasYAML("canvas", "", version)
+	require.NoError(t, err)
+
+	// The integration reference should carry only its ID; the backend does not
+	// track an integration name, so an empty `name:` must not be emitted.
+	assert.Contains(t, out, "id: "+integrationID)
+	assert.NotContains(t, out, "name: \"\"")
+	assert.NotContains(t, out, "name: ''")
+
+	// The re-serialized YAML must still round-trip through the parser.
+	parsed, err := CanvasFromYAML([]byte(out))
+	require.NoError(t, err)
+	require.Len(t, parsed.Spec.Nodes, 1)
+	require.NotNil(t, parsed.Spec.Nodes[0].Integration)
+	assert.Equal(t, integrationID, parsed.Spec.Nodes[0].Integration.ID)
+	assert.Equal(t, "", parsed.Spec.Nodes[0].Integration.Name)
 }
 
 func TestNormalizeYAML1YKey(t *testing.T) {

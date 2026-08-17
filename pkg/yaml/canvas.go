@@ -89,8 +89,12 @@ type Node struct {
 }
 
 type IntegrationRef struct {
-	ID   string `json:"id" yaml:"id"`
-	Name string `json:"name" yaml:"name"`
+	ID string `json:"id" yaml:"id"`
+	// Name is optional and is not persisted by the backend, which only tracks
+	// the integration ID. It is marked omitempty so serialized canvas YAML does
+	// not emit a spurious empty `name:` line for every integration-backed node,
+	// which previously polluted the Live vs Draft diff shown by the agent.
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 }
 
 func (n *Node) NodeTypeForModel() string {

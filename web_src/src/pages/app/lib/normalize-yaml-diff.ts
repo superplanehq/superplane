@@ -52,11 +52,34 @@ function sortDiffSequences(value: unknown): unknown {
     const sortKey = SEQUENCE_SORT_KEYS[key];
     if (sortKey && Array.isArray(entry)) {
       result[key] = entry.map(sortDiffSequences).sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+    } else if (key === "integration") {
+      result[key] = normalizeIntegrationRef(entry);
     } else {
       result[key] = sortDiffSequences(entry);
     }
   }
   return result;
+}
+
+// normalizeIntegrationRef drops a blank `name` from a node's integration
+// reference. The backend only persists the integration id, so historically it
+// serialized `integration: { id, name: "" }` while the frontend serialized
+// `integration: { id }`. That mismatch surfaced a spurious `name: ""` line in
+// the Live vs Draft diff for every integration-backed node. Treating the empty
+// name as absent keeps the diff focused on real changes, including for content
+// that was committed before the backend stopped emitting the empty name.
+function normalizeIntegrationRef(value: unknown): unknown {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return sortDiffSequences(value);
+  }
+
+  const ref = value as Record<string, unknown>;
+  if (!("name" in ref) || (ref.name !== "" && ref.name !== null && ref.name !== undefined)) {
+    return sortDiffSequences(value);
+  }
+
+  const { name: _blankName, ...rest } = ref;
+  return sortDiffSequences(rest);
 }
 
 // SEQUENCE_SORT_KEYS maps a mapping key to the identity used to order its

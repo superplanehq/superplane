@@ -49,6 +49,20 @@ describe("normalizeYamlForDiff", () => {
     expect(normalizeYamlForDiff(live)).not.toBe(normalizeYamlForDiff(draft));
   });
 
+  it("treats a blank integration name as absent so it does not pollute the diff", () => {
+    const withEmptyName = "integration:\n  id: abc\n  name: ''\nname: deploy\n";
+    const withoutName = "name: deploy\nintegration:\n  id: abc\n";
+
+    expect(normalizeYamlForDiff(withEmptyName)).toBe(normalizeYamlForDiff(withoutName));
+    expect(normalizeYamlForDiff(withEmptyName)).not.toContain('name: ""');
+  });
+
+  it("keeps a non-empty integration name in the diff", () => {
+    const withName = "integration:\n  id: abc\n  name: prod\n";
+
+    expect(normalizeYamlForDiff(withName)).toContain("name: prod");
+  });
+
   it("returns the original text for empty input", () => {
     expect(normalizeYamlForDiff("")).toBe("");
     expect(normalizeYamlForDiff("   \n")).toBe("   \n");
