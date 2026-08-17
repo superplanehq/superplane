@@ -13,7 +13,8 @@ import { WorkOrderDetailPage } from "./WorkOrderDetailPage";
 
 /**
  * Work Order Detail — full detail view inside the FactoriesLayout.
- * Storybook Overview includes a Mission picker. The live page does not.
+ * Storybook Overview includes a Mission picker, and the header shows a
+ * reaction bar backed by an in-memory store. The live page has neither.
  */
 const meta = {
   title: "Factories/Pages/Work Order Detail",

@@ -63,6 +63,7 @@ export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps)
       <WorkOrderDetailHeader
         orderTitle={props.order.title ?? "Work Order"}
         orderIdentifier={identifier === "—" ? undefined : identifier}
+        orderId={props.order.id ?? ""}
         backHref={workOrdersPath(props.organizationId, props.factoryKey)}
         displayStatus={props.displayStatus}
         isOpen={props.isOpen}

@@ -8,7 +8,8 @@ import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
  * Header for the work order detail page: back link + `SP-42` identifier +
  * title on the left, Copy link + kebab menu of lifecycle actions on the
  * right. Status and dispatch live in the sidebar, so the header stays
- * minimal.
+ * minimal. The reactions slot is empty here (no provider) — see
+ * `Factories/Pages/Work Order Detail` for the wired prototype.
  */
 const meta = {
   title: "Factories/Components/WorkOrderDetailHeader",
@@ -44,6 +45,7 @@ const commonFlags = {
   isUpdatingStatus: false,
   backHref: "/org-1/workspaces/SP/work-orders",
   orderIdentifier: "SP-42",
+  orderId: "wo-open-refunds",
 };
 
 /** Open — Back to draft, Complete, Reject all available in the kebab. */
