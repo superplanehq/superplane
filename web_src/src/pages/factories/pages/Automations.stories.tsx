@@ -23,7 +23,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const automationsPath = `workspaces/${PRIMARY_FACTORY_KEY}/automations`;
-const implementerAppId = REFUND_FACTORY_APPS[1]?.id ?? "app-refund-implementer";
+const plannerAppId = REFUND_FACTORY_APPS[0]?.id ?? "app-refund-planner";
 
 export const Populated: Story = {
   render: () => <FactoriesHarness pathSuffix={automationsPath} factoriesFixture={defaultFactoriesFixture} />,
@@ -32,10 +32,7 @@ export const Populated: Story = {
 export const DetailWithRuns: Story = {
   name: "Detail with runs",
   render: () => (
-    <FactoriesHarness
-      pathSuffix={`${automationsPath}/${implementerAppId}`}
-      factoriesFixture={defaultFactoriesFixture}
-    />
+    <FactoriesHarness pathSuffix={`${automationsPath}/${plannerAppId}`} factoriesFixture={defaultFactoriesFixture} />
   ),
 };
 

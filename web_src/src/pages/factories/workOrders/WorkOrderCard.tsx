@@ -54,7 +54,7 @@ export function WorkOrderCard({
 
   return (
     <article
-      className="group relative rounded-md border border-border bg-card p-2.5 shadow-sm transition hover:border-foreground/20 hover:shadow"
+      className="group relative w-full rounded-md border border-border bg-card p-2.5 shadow-sm transition hover:border-foreground/20 hover:shadow"
       data-testid={`work-order-card-${entry.id}`}
     >
       <Link to={destination} className="absolute inset-0 z-0 rounded-md" aria-label={`Open ${entry.title}`} />
