@@ -3,7 +3,6 @@ package claude
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -337,10 +336,6 @@ func (c *RunClaudeCode) Setup(ctx core.SetupContext) error {
 
 	_, err = ctx.Webhook.Setup()
 	return err
-}
-
-func (c *RunClaudeCode) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {

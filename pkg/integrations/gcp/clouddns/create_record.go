@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -174,9 +173,6 @@ func (c *CreateRecord) HandleWebhook(_ core.WebhookRequestContext) (int, *core.W
 
 func (c *CreateRecord) Cancel(_ core.ExecutionContext) error { return nil }
 func (c *CreateRecord) Cleanup(_ core.SetupContext) error    { return nil }
-func (c *CreateRecord) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
 
 func buildChangeOutput(change *ChangeInfo, recordName, recordType string) map[string]any {
 	return map[string]any{

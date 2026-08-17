@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -720,10 +719,6 @@ func (e *HTTP) Configuration() []configuration.Field {
 			},
 		},
 	}
-}
-
-func (e *HTTP) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (e *HTTP) Execute(ctx core.ExecutionContext) error {

@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -269,10 +268,6 @@ func (a *RunAgent) Setup(ctx core.SetupContext) error {
 	}
 
 	return nil
-}
-
-func (a *RunAgent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (a *RunAgent) Execute(ctx core.ExecutionContext) error {

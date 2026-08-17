@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -109,10 +108,6 @@ func (c *GetIssue) Setup(ctx core.SetupContext) error {
 	return ctx.Metadata.Set(GetIssueNodeMetadata{
 		IssueTitle: displayIssueLabel(issue.ShortID, issue.Title),
 	})
-}
-
-func (c *GetIssue) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *GetIssue) Execute(ctx core.ExecutionContext) error {
