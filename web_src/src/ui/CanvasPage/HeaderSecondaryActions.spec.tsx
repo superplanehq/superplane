@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
@@ -23,6 +24,82 @@ const versionsSidebarState = {
 } satisfies CanvasVersionsSidebarState;
 
 describe("SecondaryHeaderActions", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("asks for confirmation before resetting staged changes, and skips reset when declined", async () => {
+    const user = userEvent.setup();
+    const onResetStaging = vi.fn();
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    render(
+      <SecondaryHeaderActions
+        canvasName="Canvas"
+        mode="version-live"
+        isEditing
+        hasStagingChanges
+        onResetStaging={onResetStaging}
+        toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
+        versionsSidebarState={versionsSidebarState}
+      />,
+    );
+
+    await user.click(screen.getByTestId("canvas-reset-staging-button"));
+
+    expect(window.confirm).toHaveBeenCalledOnce();
+    expect(onResetStaging).not.toHaveBeenCalled();
+  });
+
+  it("resets staged changes once the user confirms", async () => {
+    const user = userEvent.setup();
+    const onResetStaging = vi.fn();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(
+      <SecondaryHeaderActions
+        canvasName="Canvas"
+        mode="version-live"
+        isEditing
+        hasStagingChanges
+        onResetStaging={onResetStaging}
+        toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
+        versionsSidebarState={versionsSidebarState}
+      />,
+    );
+
+    await user.click(screen.getByTestId("canvas-reset-staging-button"));
+
+    expect(onResetStaging).toHaveBeenCalledOnce();
+  });
+
+  it("asks for confirmation before discarding stale staged changes", async () => {
+    const user = userEvent.setup();
+    const onDiscardStaleStaging = vi.fn();
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    render(
+      <SecondaryHeaderActions
+        canvasName="Canvas"
+        mode="version-live"
+        isEditing
+        hasStagingChanges
+        stagingStale
+        onDiscardStaleStaging={onDiscardStaleStaging}
+        toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
+        versionsSidebarState={versionsSidebarState}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+
+    expect(window.confirm).toHaveBeenCalledOnce();
+    expect(onDiscardStaleStaging).not.toHaveBeenCalled();
+  });
+
   it("shows the console diff badge while editing console changes", () => {
     render(
       <SecondaryHeaderActions
