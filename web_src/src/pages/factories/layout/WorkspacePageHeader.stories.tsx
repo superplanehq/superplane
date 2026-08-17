@@ -2,10 +2,19 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Copy, Ellipsis, Funnel, Pencil, Plus, RefreshCw, Search, Settings2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { SegmentedNav } from "@/ui/SegmentedNav";
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "../__fixtures__/factoriesStoryTheme";
+import {
+  EMPTY_FACTORY,
+  FACTORIES_ORGANIZATION_ID,
+  PRIMARY_FACTORY_KEY,
+  REFUND_FACTORY,
+} from "../__fixtures__/factoryPageResponses";
 import { factorySectionHeaderClassName } from "../pages/factoryPageLayoutStyles";
+import { FactoriesNav } from "./FactoriesNav";
 import { WorkspacePageHeader } from "./WorkspacePageHeader";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 const meta = {
   title: "Factories/Layout/WorkspacePageHeader",
@@ -25,21 +34,26 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+const sectionHeader = { className: factorySectionHeaderClassName };
+
 export const SectionTitleOnly: Story = {
   args: {
+    ...sectionHeader,
     title: "Overview",
   },
 };
 
 export const SectionWithSubtitle: Story = {
   args: {
+    ...sectionHeader,
     title: "Overview",
-    subtitle: "Your workspace at a glance.",
+    subtitle: "Your workspace at a glance. Content for this page comes next.",
   },
 };
 
 export const SectionWithPrimaryAction: Story = {
   args: {
+    ...sectionHeader,
     title: "Lines",
     subtitle:
       "Factory lines specialize how work moves through the workspace. Each phase is backed by a canvas that runs work orders.",
@@ -52,9 +66,29 @@ export const SectionWithPrimaryAction: Story = {
   },
 };
 
+export const SectionWithPeriodPills: Story = {
+  args: {
+    ...sectionHeader,
+    title: "Velocity",
+    subtitle: "Merged pull requests from SuperPlane, waste, and cost.",
+    actions: (
+      <SegmentedNav
+        ariaLabel="Velocity period in days"
+        size="xs"
+        value="7"
+        onValueChange={() => undefined}
+        options={[
+          { value: "7", label: "7d" },
+          { value: "30", label: "30d" },
+        ]}
+      />
+    ),
+  },
+};
+
 export const SectionWithToolbarAndChips: Story = {
   args: {
-    className: factorySectionHeaderClassName,
+    ...sectionHeader,
     title: "Work Orders",
     leading: (
       <>
@@ -105,8 +139,9 @@ export const SectionWithToolbarAndChips: Story = {
 
 export const SectionWithSecondaryAction: Story = {
   args: {
+    ...sectionHeader,
     title: "Wiki",
-    subtitle: "Shared product context — intent, architecture, and delivery notes.",
+    subtitle: "Shared product context — intent, architecture, and delivery notes for people and Planner.",
     actions: (
       <Button type="button" variant="outline" size="sm">
         <RefreshCw className="size-3.5" aria-hidden />
@@ -116,7 +151,36 @@ export const SectionWithSecondaryAction: Story = {
   },
 };
 
-export const EntityWithKicker: Story = {
+/**
+ * Settings and some entity pages still use the large centered title.
+ * Section pages (Overview, Work Orders, Lines, Automations, Wiki, Velocity)
+ * use the compact class instead.
+ */
+export const SettingsLargeTitle: Story = {
+  args: {
+    title: "General",
+    subtitle: "Workspace name, key, and description.",
+  },
+};
+
+export const EntityLineDetail: Story = {
+  args: {
+    ...sectionHeader,
+    variant: "entity",
+    backHref: "#",
+    backLabel: "Lines",
+    title: "Plan and Implement",
+    subtitle: "3 phases",
+    actions: (
+      <Button type="button" variant="outline" size="sm">
+        <Pencil className="size-3.5" aria-hidden />
+        Edit
+      </Button>
+    ),
+  },
+};
+
+export const EntityWorkOrder: Story = {
   args: {
     variant: "entity",
     backHref: "#",
@@ -136,18 +200,34 @@ export const EntityWithKicker: Story = {
   },
 };
 
-export const EntityWithSubtitleAndAction: Story = {
-  args: {
-    variant: "entity",
-    backHref: "#",
-    backLabel: "Lines",
-    title: "Refunds daily sweep",
-    subtitle: "3 phases",
-    actions: (
-      <Button type="button" variant="outline" size="sm">
-        <Pencil className="size-3.5" aria-hidden />
-        Edit
-      </Button>
-    ),
-  },
+/** Compact section title lines up with the sidebar workspace name. */
+export const AlignedWithSidebar: Story = {
+  name: "Aligned with sidebar",
+  render: () => (
+    <div className="flex min-h-screen bg-background">
+      <aside className="flex w-[var(--workspace-navigation-width)] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+        <WorkspaceSwitcher
+          organizationId={FACTORIES_ORGANIZATION_ID}
+          factory={REFUND_FACTORY}
+          factories={[REFUND_FACTORY, EMPTY_FACTORY]}
+          canOpenSettings
+          canCreateFactory
+          permissionsLoading={false}
+          onCreateFactory={() => console.log("create workspace")}
+        />
+        <FactoriesNav
+          organizationId={FACTORIES_ORGANIZATION_ID}
+          factoryKey={PRIMARY_FACTORY_KEY}
+          recentWorkOrders={[]}
+        />
+      </aside>
+      <div className="min-w-0 flex-1">
+        <WorkspacePageHeader
+          className={factorySectionHeaderClassName}
+          title="Overview"
+          subtitle="Your workspace at a glance. Content for this page comes next."
+        />
+      </div>
+    </div>
+  ),
 };
