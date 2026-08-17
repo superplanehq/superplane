@@ -1,6 +1,6 @@
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
 
-import { toArtifactDataRecord, toWorkOrderArtifactLikes } from "./lib/workOrderArtifactRelated";
+import { toArtifactDataRecord, toWorkOrderArtifactLikes } from "./lib/workOrderArtifact";
 import { WorkOrderArtifactInline } from "./WorkOrderArtifactInline";
 
 interface WorkOrderArtifactsListProps {

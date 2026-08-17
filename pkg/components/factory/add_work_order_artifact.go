@@ -2,7 +2,6 @@ package factory
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -26,10 +25,10 @@ type ArtifactDataEntry struct {
 }
 
 type AddWorkOrderArtifactConfiguration struct {
-	OrderID      string              `json:"orderId" mapstructure:"orderId"`
-	ArtifactType string              `json:"artifactType" mapstructure:"artifactType"`
-	URL          string              `json:"url" mapstructure:"url"`
-	Number       string              `json:"number" mapstructure:"number"`
+	OrderID      string `json:"orderId" mapstructure:"orderId"`
+	ArtifactType string `json:"artifactType" mapstructure:"artifactType"`
+	URL          string `json:"url" mapstructure:"url"`
+	Number       string `json:"number" mapstructure:"number"`
 	// State / Merged / Draft accept expressions, so a flow can wire
 	// them directly to a `github.onPullRequest` payload. `any` because
 	// after resolution the value may be a bool, string, or number.
@@ -113,7 +112,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 	bothTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}}
 	withMetadata := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}}
 
-	return []configuration.Field{
+	fields := []configuration.Field{
 		{
 			Name:        "orderId",
 			Label:       "Work Order ID",
@@ -158,37 +157,15 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			Required:             false,
 			VisibilityConditions: prOnly,
 		},
-		{
-			Name:                 "state",
-			Label:                "State",
-			Description:          "Pull request state — drives the artifact chip's icon/color. One of `open`, `draft`, `closed`, `merged`. Accepts an expression, so a flow can pass it in from a webhook (e.g. `{{ root().data.pull_request.state }}`). Leave blank to keep the default `open` look. Update it later with `updateWorkOrderArtifact` as the PR progresses.",
-			Placeholder:          "open",
-			Type:                 configuration.FieldTypeString,
-			Required:             false,
-			Default:              "open",
-			VisibilityConditions: prOnly,
-		},
-		{
-			Name:                 "merged",
-			Label:                "Merged",
-			Description:          "GitHub-native `pull_request.merged` flag. When it resolves to a truthy value, the chip renders as merged even if `state` is blank or still says `open`. Accepts an expression (e.g. `{{ root().data.pull_request.merged }}`).",
-			Placeholder:          "{{ root().data.pull_request.merged }}",
-			Type:                 configuration.FieldTypeString,
-			Required:             false,
-			Togglable:            true,
-			VisibilityConditions: prOnly,
-		},
-		{
-			Name:                 "draft",
-			Label:                "Draft",
-			Description:          "GitHub-native `pull_request.draft` flag. When it resolves to a truthy value and the PR is not merged, the chip renders as draft. Accepts an expression (e.g. `{{ root().data.pull_request.draft }}`).",
-			Placeholder:          "{{ root().data.pull_request.draft }}",
-			Type:                 configuration.FieldTypeString,
-			Required:             false,
-			Togglable:            true,
-			VisibilityConditions: prOnly,
-		},
-		{
+	}
+
+	fields = append(fields, prArtifactLifecycleFields(prArtifactLifecycleFieldOptions{
+		Visibility:   prOnly,
+		StateDefault: "open",
+	})...)
+
+	return append(fields,
+		configuration.Field{
 			Name:                 "body",
 			Label:                "Body",
 			Description:          "Markdown note body — rendered inline in the work order timeline",
@@ -199,7 +176,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 				{Field: "artifactType", Values: []string{"markdown"}},
 			},
 		},
-		{
+		configuration.Field{
 			Name:                 "name",
 			Label:                "Name",
 			Description:          "Branch name (e.g. feature/refund-retry)",
@@ -210,7 +187,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 				{Field: "artifactType", Values: []string{"branch"}},
 			},
 		},
-		{
+		configuration.Field{
 			Name:                 "title",
 			Label:                "Title",
 			Description:          "Optional artifact title",
@@ -218,7 +195,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			Required:             false,
 			VisibilityConditions: bothTypes,
 		},
-		{
+		configuration.Field{
 			Name:        "artifactKey",
 			Label:       "Artifact Key",
 			Description: "Optional queryable key for this artifact (e.g. a pull request's URL), unique per factory. Lets findWorkOrder (by: artifactKey) resolve this work order later.",
@@ -227,7 +204,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			Togglable:   true,
 			Default:     "",
 		},
-		{
+		configuration.Field{
 			Name:                 "data",
 			Label:                "Metadata",
 			Description:          "Extra name/value pairs merged into the artifact's data map (typed fields above take precedence on name collisions)",
@@ -247,7 +224,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 				},
 			},
 		},
-	}
+	)
 }
 
 func (c *AddWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
@@ -256,7 +233,10 @@ func (c *AddWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	data := buildArtifactData(config)
+	data, err := buildArtifactData(config)
+	if err != nil {
+		return err
+	}
 
 	artifact, err := ctx.Factory.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
 		OrderID: config.OrderID,
@@ -304,7 +284,7 @@ func (c *AddWorkOrderArtifact) HandleHook(ctx core.ActionHookContext) error {
 // buildArtifactData folds the free-form list into a map and layers the
 // typed inputs on top, so a user who defines both `url` and a `url`
 // row still ends up with the typed value on the wire.
-func buildArtifactData(config AddWorkOrderArtifactConfiguration) map[string]any {
+func buildArtifactData(config AddWorkOrderArtifactConfiguration) (map[string]any, error) {
 	data := artifactDataToMap(config.Data)
 
 	typed := map[string]string{
@@ -325,72 +305,20 @@ func buildArtifactData(config AddWorkOrderArtifactConfiguration) map[string]any 
 		data[key] = value
 	}
 
-	if state := resolvePrArtifactState(config.State, config.Merged, config.Draft); state != "" {
+	updates, err := prArtifactStateUpdates(config.State, config.Merged, config.Draft)
+	if err != nil {
+		return nil, err
+	}
+	if len(updates) > 0 {
 		if data == nil {
 			data = map[string]any{}
 		}
-		data["state"] = state
+		for key, value := range updates {
+			data[key] = value
+		}
 	}
 
-	return data
-}
-
-// resolvePrArtifactState folds the caller-supplied SuperPlane `state`
-// together with GitHub-native `merged` / `draft` flags into the single
-// value the UI reads. Mirrors the frontend's `extractPrArtifactState`
-// precedence so a chip renders the same before and after a page reload:
-//
-//   1. `merged` truthy → "merged" (GitHub reports merged PRs as
-//      `{ state: "closed", merged: true }`, so this must win over
-//      `state: closed` and any leftover `state: open`).
-//   2. Explicit non-"open" SuperPlane `state` (draft/closed/merged).
-//   3. `draft` truthy → "draft" (GitHub draft PRs stay `state: "open"`).
-//   4. Explicit "open" `state`, otherwise empty (defer to defaults).
-//
-// The model still validates the resolved value against the known
-// state vocabulary, so an unknown `state` value fails the write.
-func resolvePrArtifactState(state, merged, draft any) string {
-	if isTruthyConfigValue(merged) {
-		return "merged"
-	}
-
-	explicit := normalizePrArtifactStateValue(state)
-	if explicit != "" && explicit != "open" {
-		return explicit
-	}
-
-	if isTruthyConfigValue(draft) {
-		return "draft"
-	}
-
-	return explicit
-}
-
-// normalizePrArtifactStateValue trims and lower-cases a caller-supplied
-// state value. Non-string types (e.g. a resolved bool) are treated as
-// absent so a stray `state: {{ pr.merged }}` doesn't overwrite a real
-// value with "true".
-func normalizePrArtifactStateValue(value any) string {
-	raw, ok := value.(string)
-	if !ok {
-		return ""
-	}
-	return strings.ToLower(strings.TrimSpace(raw))
-}
-
-// isTruthyConfigValue accepts both real booleans (from CEL / native
-// resolution) and their string representations ("true"/"false") because
-// templated flow inputs almost always arrive as strings.
-func isTruthyConfigValue(value any) bool {
-	switch v := value.(type) {
-	case nil:
-		return false
-	case bool:
-		return v
-	case string:
-		return strings.EqualFold(strings.TrimSpace(v), "true")
-	}
-	return false
+	return data, nil
 }
 
 // artifactDataToMap flattens the list into a map; blank names are

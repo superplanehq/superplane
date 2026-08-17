@@ -15,8 +15,14 @@ const PR_NUMBER_KEYS = ["number", "prNumber"] as const;
 // timeline events, dispatch steps). We only need the type + free-form
 // data; consumers should not have to build a full presentation object.
 export interface WorkOrderArtifactLike {
+  id?: string;
   type?: string;
   data?: Record<string, unknown>;
+}
+
+/** Chip/list presentation: same as a sibling artifact, with a required type. */
+export interface WorkOrderArtifactPresentation extends WorkOrderArtifactLike {
+  type: string;
 }
 
 /**
@@ -226,6 +232,27 @@ function buildTreeUrlFromPullRequestUrl(pullUrl: string, branchName: string): st
     .join("/");
 
   return `${parsed.origin}/${owner}/${repo}/tree/${encodedBranch}`;
+}
+
+/**
+ * Narrows the API's `data?: unknown` into the string-keyed shape every
+ * artifact consumer expects, without lying about non-object payloads.
+ */
+export function toArtifactDataRecord(data: unknown): Record<string, unknown> | undefined {
+  return data && typeof data === "object" ? (data as Record<string, unknown>) : undefined;
+}
+
+// The API and timeline both carry artifacts with `data` typed as
+// `unknown`, but the resolver only needs `{ type, data }`. Do the
+// narrowing once at the call site so consumers can pass the array
+// straight through.
+export function toWorkOrderArtifactLikes(
+  artifacts: ReadonlyArray<{ type?: string | null; data?: unknown }> | undefined,
+): WorkOrderArtifactLike[] {
+  return (artifacts ?? []).map((artifact) => ({
+    type: artifact.type ?? undefined,
+    data: toArtifactDataRecord(artifact.data),
+  }));
 }
 
 function extractArtifactField(data: ArtifactData, key: string): string | undefined {

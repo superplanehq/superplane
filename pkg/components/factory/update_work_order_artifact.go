@@ -89,7 +89,7 @@ func (c *UpdateWorkOrderArtifact) OutputChannels(configuration any) []core.Outpu
 }
 
 func (c *UpdateWorkOrderArtifact) Configuration() []configuration.Field {
-	return []configuration.Field{
+	fields := []configuration.Field{
 		{
 			Name:        "orderId",
 			Label:       "Work Order ID",
@@ -105,42 +105,20 @@ func (c *UpdateWorkOrderArtifact) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 		},
-		{
-			Name:        "state",
-			Label:       "State",
-			Description: "New pull request state — drives the artifact chip's icon/color. One of `open`, `draft`, `closed`, `merged`. Accepts an expression (e.g. `{{ root().data.pull_request.state }}`). Leave blank to update only the other fields.",
-			Placeholder: "open",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Togglable:   true,
-		},
-		{
-			Name:        "merged",
-			Label:       "Merged",
-			Description: "GitHub-native `pull_request.merged` flag. When truthy, the artifact is stored as merged even if `state` is blank or says `open`. Accepts an expression (e.g. `{{ root().data.pull_request.merged }}`).",
-			Placeholder: "{{ root().data.pull_request.merged }}",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Togglable:   true,
-		},
-		{
-			Name:        "draft",
-			Label:       "Draft",
-			Description: "GitHub-native `pull_request.draft` flag. When truthy and the PR is not merged, the artifact is stored as draft. Accepts an expression (e.g. `{{ root().data.pull_request.draft }}`).",
-			Placeholder: "{{ root().data.pull_request.draft }}",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Togglable:   true,
-		},
-		{
-			Name:        "title",
-			Label:       "Title",
-			Description: "New title, in case the pull request was retitled. Leave unset to keep the existing title.",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Togglable:   true,
-		},
 	}
+
+	fields = append(fields, prArtifactLifecycleFields(prArtifactLifecycleFieldOptions{
+		StateTogglable: true,
+	})...)
+
+	return append(fields, configuration.Field{
+		Name:        "title",
+		Label:       "Title",
+		Description: "New title, in case the pull request was retitled. Leave unset to keep the existing title.",
+		Type:        configuration.FieldTypeString,
+		Required:    false,
+		Togglable:   true,
+	})
 }
 
 func (c *UpdateWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
@@ -149,9 +127,9 @@ func (c *UpdateWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	data := map[string]any{}
-	if state := resolvePrArtifactState(config.State, config.Merged, config.Draft); state != "" {
-		data["state"] = state
+	data, err := prArtifactStateUpdates(config.State, config.Merged, config.Draft)
+	if err != nil {
+		return err
 	}
 	if config.Title != "" {
 		data["title"] = config.Title

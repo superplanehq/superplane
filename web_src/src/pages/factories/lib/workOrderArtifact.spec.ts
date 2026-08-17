@@ -11,6 +11,8 @@ import {
   normalizeArtifactKind,
   overlayLiveArtifactData,
   resolveBranchArtifactUrl,
+  toArtifactDataRecord,
+  toWorkOrderArtifactLikes,
 } from "./workOrderArtifact";
 
 describe("formatPrArtifactLabel", () => {
@@ -278,5 +280,27 @@ describe("overlayLiveArtifactData", () => {
   it("keeps the snapshot when the artifact is missing from the live list", () => {
     const snapshot = { id: "art-1", data: { state: "open" } };
     expect(overlayLiveArtifactData(snapshot, new Map())).toBe(snapshot);
+  });
+});
+
+describe("toArtifactDataRecord", () => {
+  it("returns a record for object payloads and undefined otherwise", () => {
+    expect(toArtifactDataRecord({ url: "https://example.com" })).toEqual({ url: "https://example.com" });
+    expect(toArtifactDataRecord(undefined)).toBeUndefined();
+    expect(toArtifactDataRecord("https://example.com")).toBeUndefined();
+  });
+});
+
+describe("toWorkOrderArtifactLikes", () => {
+  it("narrows API artifacts to the sibling-lookup shape", () => {
+    expect(
+      toWorkOrderArtifactLikes([
+        { type: "TYPE_PR", data: { url: "https://github.com/example/repo/pull/1" } },
+        { type: null, data: undefined },
+      ]),
+    ).toEqual([
+      { type: "TYPE_PR", data: { url: "https://github.com/example/repo/pull/1" } },
+      { type: undefined, data: undefined },
+    ]);
   });
 });

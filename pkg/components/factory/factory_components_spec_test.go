@@ -506,7 +506,7 @@ func TestUpdateWorkOrderArtifact_Execute(t *testing.T) {
 		assert.Equal(t, 1, factoryCtx.updateArtifactCalls)
 		assert.Equal(t, "wo-1", factoryCtx.updateArtifactParams.OrderID)
 		assert.Equal(t, "https://github.com/example/repo/pull/1", factoryCtx.updateArtifactParams.Key)
-		assert.Equal(t, map[string]any{"state": "merged", "title": "Retitled PR"}, factoryCtx.updateArtifactParams.Data)
+		assert.Equal(t, map[string]any{"state": "merged", "merged": true, "draft": false, "title": "Retitled PR"}, factoryCtx.updateArtifactParams.Data)
 		assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
 		assert.Equal(t, "workOrder.artifactUpdated", stateCtx.Type)
 		assert.Len(t, stateCtx.Payloads, 1)
@@ -526,7 +526,7 @@ func TestUpdateWorkOrderArtifact_Execute(t *testing.T) {
 			Factory:        factoryCtx,
 		})
 		require.NoError(t, err)
-		assert.Equal(t, map[string]any{"state": "draft"}, factoryCtx.updateArtifactParams.Data)
+		assert.Equal(t, map[string]any{"state": "draft", "merged": false, "draft": true}, factoryCtx.updateArtifactParams.Data)
 	})
 
 	t.Run("propagates errors from the factory context", func(t *testing.T) {
@@ -563,7 +563,7 @@ func TestUpdateWorkOrderArtifact_Execute(t *testing.T) {
 			Factory:        factoryCtx,
 		})
 		require.NoError(t, err)
-		assert.Equal(t, map[string]any{"state": "merged"}, factoryCtx.updateArtifactParams.Data)
+		assert.Equal(t, map[string]any{"state": "merged", "merged": true, "draft": false}, factoryCtx.updateArtifactParams.Data)
 	})
 
 	// Flow templates resolve values to strings, so `merged: "true"` must
@@ -582,7 +582,7 @@ func TestUpdateWorkOrderArtifact_Execute(t *testing.T) {
 			Factory:        factoryCtx,
 		})
 		require.NoError(t, err)
-		assert.Equal(t, map[string]any{"state": "merged"}, factoryCtx.updateArtifactParams.Data)
+		assert.Equal(t, map[string]any{"state": "merged", "merged": true, "draft": false}, factoryCtx.updateArtifactParams.Data)
 	})
 }
 
@@ -642,7 +642,7 @@ func TestArtifactDataToMap_FlattensEntries(t *testing.T) {
 }
 
 func TestBuildArtifactData_TypedFieldsWinOverFreeForm(t *testing.T) {
-	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
 		ArtifactType: "pr",
 		URL:          "https://github.com/example/repo/pull/9",
 		Number:       "9",
@@ -668,7 +668,7 @@ func TestBuildArtifactData_TypedFieldsWinOverFreeForm(t *testing.T) {
 }
 
 func TestBuildArtifactData_IncludesPrState(t *testing.T) {
-	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
 		ArtifactType: "pr",
 		URL:          "https://github.com/example/repo/pull/9",
 		State:        "draft",
@@ -677,13 +677,19 @@ func TestBuildArtifactData_IncludesPrState(t *testing.T) {
 	if got := data["state"]; got != "draft" {
 		t.Fatalf("expected state=draft, got %v", got)
 	}
+	if got := data["merged"]; got != false {
+		t.Fatalf("expected merged=false when state is draft, got %v", got)
+	}
+	if got := data["draft"]; got != true {
+		t.Fatalf("expected draft=true when state is draft, got %v", got)
+	}
 }
 
 // A `github.onPullRequest` merged event carries `{ state: "closed",
 // merged: true }`; the artifact must persist as merged so the chip
 // renders purple, not red.
 func TestBuildArtifactData_MergedFlagWinsOverStateClosed(t *testing.T) {
-	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
 		ArtifactType: "pr",
 		URL:          "https://github.com/example/repo/pull/9",
 		State:        "closed",
@@ -698,7 +704,7 @@ func TestBuildArtifactData_MergedFlagWinsOverStateClosed(t *testing.T) {
 // Flow templates resolve values to strings; the `Merged` field must
 // accept "true" so a caller doesn't need a boolean cast in the expression.
 func TestBuildArtifactData_MergedFlagAcceptsStringTrue(t *testing.T) {
-	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
 		ArtifactType: "pr",
 		URL:          "https://github.com/example/repo/pull/9",
 		Merged:       "true",
@@ -712,7 +718,7 @@ func TestBuildArtifactData_MergedFlagAcceptsStringTrue(t *testing.T) {
 // GitHub draft PRs stay `state: "open"`; without picking up the `draft`
 // flag the chip would render green.
 func TestBuildArtifactData_DraftFlagRendersAsDraftWhenNotMerged(t *testing.T) {
-	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
 		ArtifactType: "pr",
 		URL:          "https://github.com/example/repo/pull/9",
 		State:        "open",
@@ -727,7 +733,7 @@ func TestBuildArtifactData_DraftFlagRendersAsDraftWhenNotMerged(t *testing.T) {
 // A merged PR that once was a draft must not flip back to draft on the
 // next redisplay.
 func TestBuildArtifactData_MergedBeatsDraft(t *testing.T) {
-	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
 		ArtifactType: "pr",
 		URL:          "https://github.com/example/repo/pull/9",
 		Merged:       true,
@@ -773,7 +779,7 @@ func TestResolvePrArtifactState_Precedence(t *testing.T) {
 }
 
 func TestBuildArtifactData_SkipsBlankTypedInputs(t *testing.T) {
-	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
 		ArtifactType: "markdown",
 		Body:         "note body",
 	})
@@ -790,4 +796,75 @@ func TestBuildArtifactData_SkipsBlankTypedInputs(t *testing.T) {
 	if _, ok := data["state"]; ok {
 		t.Fatal("expected blank state to be skipped")
 	}
+}
+
+func mustBuildArtifactData(t *testing.T, config AddWorkOrderArtifactConfiguration) map[string]any {
+	t.Helper()
+	data, err := buildArtifactData(config)
+	require.NoError(t, err)
+	return data
+}
+
+func TestBuildArtifactData_RejectsInvalidResolvedState(t *testing.T) {
+	_, err := buildArtifactData(AddWorkOrderArtifactConfiguration{
+		ArtifactType: "pr",
+		URL:          "https://github.com/example/repo/pull/9",
+		State:        "in_review",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid pull request state")
+}
+
+func TestBuildArtifactData_CanonicalFlagsOverwriteFreeFormMerged(t *testing.T) {
+	// A leftover `merged: true` in free-form metadata must not outrank
+	// an explicit SuperPlane `state: open` after resolve — otherwise the
+	// chip stays purple on the next page load.
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
+		ArtifactType: "pr",
+		URL:          "https://github.com/example/repo/pull/9",
+		State:        "open",
+		Data:         []ArtifactDataEntry{{Name: "merged", Value: "true"}},
+	})
+
+	assert.Equal(t, "open", data["state"])
+	assert.Equal(t, false, data["merged"])
+	assert.Equal(t, false, data["draft"])
+}
+
+func TestPrArtifactStateUpdates_ClearsStaleMergedFlag(t *testing.T) {
+	updates, err := prArtifactStateUpdates(nil, false, nil)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"merged": false}, updates)
+}
+
+func TestUpdateWorkOrderArtifact_Execute_RejectsInvalidState(t *testing.T) {
+	component := &UpdateWorkOrderArtifact{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"orderId":     "wo-1",
+			"artifactKey": "https://github.com/example/repo/pull/1",
+			"state":       "in_review",
+		},
+		ExecutionState: &contexts.ExecutionStateContext{},
+		Factory:        &fakeFactoryContext{},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid pull request state")
+}
+
+func TestPrArtifactLifecycleFields_SharedByAddAndUpdate(t *testing.T) {
+	addNames := fieldNames((&AddWorkOrderArtifact{}).Configuration())
+	updateNames := fieldNames((&UpdateWorkOrderArtifact{}).Configuration())
+	for _, name := range []string{"state", "merged", "draft"} {
+		assert.Contains(t, addNames, name)
+		assert.Contains(t, updateNames, name)
+	}
+}
+
+func fieldNames(fields []configuration.Field) []string {
+	names := make([]string, 0, len(fields))
+	for _, field := range fields {
+		names = append(names, field.Name)
+	}
+	return names
 }

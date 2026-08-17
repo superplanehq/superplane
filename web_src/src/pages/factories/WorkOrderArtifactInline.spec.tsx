@@ -69,9 +69,7 @@ describe("WorkOrderArtifactInline", () => {
           type: "TYPE_BRANCH",
           data: { name: "feature/refund-retry" },
         }}
-        relatedArtifacts={[
-          { type: "TYPE_PR", data: { url: "https://github.com/example/repo/pull/42" } },
-        ]}
+        relatedArtifacts={[{ type: "TYPE_PR", data: { url: "https://github.com/example/repo/pull/42" } }]}
       />,
     );
 

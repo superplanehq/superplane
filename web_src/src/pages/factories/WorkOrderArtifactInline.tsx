@@ -23,14 +23,9 @@ import {
   resolveBranchArtifactUrl,
   type PrArtifactState,
   type WorkOrderArtifactLike,
+  type WorkOrderArtifactPresentation,
 } from "./lib/workOrderArtifact";
 import { WorkOrderMarkdownArtifactDialog } from "./WorkOrderMarkdownArtifactDialog";
-
-export interface WorkOrderArtifactPresentation {
-  id?: string;
-  type: string;
-  data?: Record<string, unknown>;
-}
 
 interface WorkOrderArtifactInlineProps {
   artifact: WorkOrderArtifactPresentation;
