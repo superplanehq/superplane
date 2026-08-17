@@ -11,6 +11,22 @@ import { LineStepEditorShell } from "./FactoryLineStepFlow";
 
 const stepFieldClassName = "w-full min-w-0";
 
+function getTriggerMessage(state: {
+  appId: string;
+  appName: string;
+  canvasLoading: boolean;
+  canvasLoadFailed: boolean;
+  triggerCount: number;
+  selectedTriggerMissing: boolean;
+}): string | null {
+  const { appId, appName, canvasLoading, canvasLoadFailed, triggerCount, selectedTriggerMissing } = state;
+  if (!appId) return null;
+  if (canvasLoadFailed) return "Failed to load triggers for this app.";
+  if (!canvasLoading && triggerCount === 0) return `${appName} has no triggers yet.`;
+  if (selectedTriggerMissing) return "The selected trigger is no longer available. Choose another trigger.";
+  return null;
+}
+
 interface FactoryLineStepEditorProps {
   organizationId: string;
   index: number;
@@ -28,10 +44,27 @@ export function FactoryLineStepEditor({
   appById,
   onChange,
 }: FactoryLineStepEditorProps) {
-  const { data: canvas, isLoading: canvasLoading } = useCanvas(organizationId, step.appId, {
+  const {
+    data: canvas,
+    isLoading: canvasLoading,
+    error: canvasError,
+  } = useCanvas(organizationId, step.appId, {
     enabled: Boolean(step.appId),
   });
   const triggers = useMemo(() => listTriggerNodes(canvas), [canvas]);
+
+  const canvasLoadFailed = Boolean(canvasError && !canvas);
+  const selectedTriggerMissing = Boolean(
+    canvas && step.entrypoint && !triggers.some((trigger) => trigger.id === step.entrypoint),
+  );
+  const triggerMessage = getTriggerMessage({
+    appId: step.appId,
+    appName: appById.get(step.appId)?.name ?? "This app",
+    canvasLoading,
+    canvasLoadFailed,
+    triggerCount: triggers.length,
+    selectedTriggerMissing,
+  });
 
   return (
     <LineStepEditorShell>
@@ -71,7 +104,7 @@ export function FactoryLineStepEditor({
           <Select
             value={step.entrypoint || undefined}
             onValueChange={(entrypoint) => onChange({ ...step, entrypoint })}
-            disabled={!step.appId || canvasLoading}
+            disabled={!step.appId || canvasLoading || canvasLoadFailed}
           >
             <SelectTrigger id={`factory-line-step-entrypoint-${index}`} className={stepFieldClassName}>
               <SelectValue placeholder={canvasLoading ? "Loading triggers…" : "Select trigger"} />
@@ -84,11 +117,7 @@ export function FactoryLineStepEditor({
               ))}
             </SelectContent>
           </Select>
-          {step.appId && !canvasLoading && triggers.length === 0 ? (
-            <p className="text-xs text-amber-700 dark:text-amber-300">
-              {appById.get(step.appId)?.name ?? "This app"} has no triggers yet.
-            </p>
-          ) : null}
+          {triggerMessage ? <p className="text-xs text-amber-700 dark:text-amber-300">{triggerMessage}</p> : null}
         </div>
       </div>
     </LineStepEditorShell>
