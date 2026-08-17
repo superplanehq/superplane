@@ -6,7 +6,6 @@ import {
   factoriesCreateWorkOrder,
   factoriesDeleteFactory,
   factoriesDescribeFactory,
-  factoriesDescribeNotificationSettings,
   factoriesDescribeWorkOrder,
   factoriesDispatchWorkOrder,
   factoriesListFactories,
@@ -16,14 +15,12 @@ import {
   factoriesListWorkOrders,
   factoriesUpdateFactory,
   factoriesUpdateFactoryLine,
-  factoriesUpdateNotificationSettings,
   factoriesUpdateWorkOrderAssignees,
   factoriesUpdateWorkOrderStatus,
 } from "@/api-client";
 import type {
   FactoriesFactory,
   FactoriesFactoryLine,
-  FactoriesNotificationSettings,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderResult,
@@ -50,7 +47,6 @@ export const factoryQueryKeys = {
   workOrderArtifacts: (organizationId: string, factoryId: string, orderId: string) =>
     ["factories", organizationId, factoryId, "work-orders", orderId, "artifacts"] as const,
   apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
-  notificationSettings: (organizationId: string) => ["factories", organizationId, "notification-settings"] as const,
 };
 
 function factoryListKey(organizationId: string) {
@@ -522,37 +518,4 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
   });
 }
 
-export function useNotificationSettings(organizationId: string) {
-  return useQuery({
-    queryKey: factoryQueryKeys.notificationSettings(organizationId),
-    queryFn: async (): Promise<FactoriesNotificationSettings> => {
-      const response = await factoriesDescribeNotificationSettings(withOrganizationHeader({ organizationId }));
-      return response.data?.settings ?? {};
-    },
-    enabled: Boolean(organizationId),
-  });
-}
-
-export function useUpdateNotificationSettings(organizationId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (settings: FactoriesNotificationSettings) => {
-      const response = await factoriesUpdateNotificationSettings(
-        withOrganizationHeader({
-          organizationId,
-          body: { settings },
-        }),
-      );
-      if (!response.data?.settings) {
-        throw new Error("Failed to update notification settings");
-      }
-      return response.data.settings;
-    },
-    onSuccess: (settings) => {
-      queryClient.setQueryData(factoryQueryKeys.notificationSettings(organizationId), settings);
-    },
-  });
-}
-
-export type { FactoriesNotificationSettings, FactoryApp, FactoriesFactoryLine, FactoryLineStep };
+export type { FactoryApp, FactoriesFactoryLine, FactoryLineStep };
