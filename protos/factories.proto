@@ -252,6 +252,29 @@ service Factories {
     };
   }
 
+  rpc AddWorkOrderReaction(AddWorkOrderReactionRequest) returns (AddWorkOrderReactionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/reactions"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Add work order reaction";
+      description: "Adds the caller's emoji reaction to a work order";
+      tags: "Factory";
+    };
+  }
+
+  rpc RemoveWorkOrderReaction(RemoveWorkOrderReactionRequest) returns (RemoveWorkOrderReactionResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/orders/{order_id}/reactions/{content}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Remove work order reaction";
+      description: "Removes the caller's emoji reaction from a work order";
+      tags: "Factory";
+    };
+  }
+
 }
 
 // Factories
@@ -438,6 +461,11 @@ message WorkOrder {
   // Display identifier composed of the parent factory's key and this
   // order's `number` (for example `SP-42`). Populated by the server.
   string key = 14;
+  // Emoji reactions on the work order itself (GitHub-style, fixed
+  // vocabulary). Only populated on single-order responses (describe,
+  // create, dispatch, close, status/assignee updates); omitted from
+  // `ListWorkOrders` to avoid an extra join per row on list endpoints.
+  repeated WorkOrderReaction reactions = 15;
 }
 
 message WorkOrderCreator {
@@ -638,6 +666,39 @@ message WorkOrderArtifact {
   google.protobuf.Struct data = 3;
   UserRef created_by = 4;
   google.protobuf.Timestamp created_at = 5;
+}
+
+message AddWorkOrderReactionRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  // One of: +1, -1, laugh, confused, heart, hooray, rocket, eyes.
+  string content = 3;
+}
+
+message AddWorkOrderReactionResponse {
+  // Full updated reaction rollup for the order.
+  repeated WorkOrderReaction reactions = 1;
+}
+
+message RemoveWorkOrderReactionRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  // One of: +1, -1, laugh, confused, heart, hooray, rocket, eyes.
+  string content = 3;
+}
+
+message RemoveWorkOrderReactionResponse {
+  // Full updated reaction rollup for the order.
+  repeated WorkOrderReaction reactions = 1;
+}
+
+// WorkOrderReaction is an aggregate of every reaction with the same
+// `content` on a work order: a count and whether the calling user is one
+// of the reactors.
+message WorkOrderReaction {
+  string content = 1;
+  int32 count = 2;
+  bool reacted_by_me = 3;
 }
 
 // Internal AMQP message for factory work-order websocket fan-out.

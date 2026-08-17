@@ -43,6 +43,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		{Method: "DELETE", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/reactions/{content}"}: {
+			Resource:                     "work_orders",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
 		{Method: "DELETE", Pattern: "/api/v1/groups/{group_name}"}: {
 			Resource:   "groups",
 			Action:     "delete",
@@ -518,6 +524,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/artifacts"}: {
+			Resource:                     "work_orders",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/reactions"}: {
 			Resource:                     "work_orders",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,

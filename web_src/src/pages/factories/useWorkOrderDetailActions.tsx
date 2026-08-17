@@ -6,6 +6,7 @@ import {
   useUpdateWorkOrderAssignees,
   useUpdateWorkOrderStatus,
 } from "@/hooks/useFactoryData";
+import { useAddWorkOrderReaction, useRemoveWorkOrderReaction } from "@/hooks/useWorkOrderReactions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { formatWorkOrderResult, formatWorkOrderState } from "./lib/workOrderPresentation";
@@ -16,6 +17,8 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
   const updateAssignees = useUpdateWorkOrderAssignees(organizationId, factoryId);
   const updateStatus = useUpdateWorkOrderStatus(organizationId, factoryId);
   const addComment = useAddWorkOrderComment(organizationId, factoryId);
+  const addReaction = useAddWorkOrderReaction(organizationId, factoryId);
+  const removeReaction = useRemoveWorkOrderReaction(organizationId, factoryId);
 
   const handleAssigneesSave = async (nextAssigneeIds: string[]) => {
     try {
@@ -61,6 +64,21 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     }
   };
 
+  // Toggles the caller's own reaction: `reactedByMe` reflects the state
+  // *before* the click, so a highlighted pill removes the reaction and an
+  // unhighlighted one adds it.
+  const handleToggleReaction = async (content: string, reactedByMe: boolean) => {
+    try {
+      if (reactedByMe) {
+        await removeReaction.mutateAsync({ orderId, content });
+      } else {
+        await addReaction.mutateAsync({ orderId, content });
+      }
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to update reaction"));
+    }
+  };
+
   const isCompleting = closeWorkOrder.isPending && closeWorkOrder.variables?.result === "RESULT_COMPLETED";
   const isRejecting = closeWorkOrder.isPending && closeWorkOrder.variables?.result === "RESULT_REJECTED";
 
@@ -70,6 +88,7 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     handleClose,
     handleStatusChange,
     handleAddComment,
+    handleToggleReaction,
     isDispatching: dispatchWorkOrder.isPending,
     isCompleting,
     isRejecting,
@@ -77,5 +96,6 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     isAssigneesSaving: updateAssignees.isPending,
     isUpdatingStatus: updateStatus.isPending,
     isAddingComment: addComment.isPending,
+    isTogglingReaction: addReaction.isPending || removeReaction.isPending,
   };
 }

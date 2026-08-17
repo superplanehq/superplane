@@ -14,6 +14,7 @@ import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
 import { WorkOrderDescription } from "./WorkOrderDescription";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
 import { WorkOrderDetailSidebar } from "./WorkOrderDetailSidebar";
+import { WorkOrderReactionBar } from "./WorkOrderReactionBar";
 
 interface WorkOrderDetailLoadedViewProps {
   organizationId: string;
@@ -49,11 +50,13 @@ interface WorkOrderDetailLoadedViewProps {
   isAssigneesSaving: boolean;
   isUpdatingStatus: boolean;
   isAddingComment: boolean;
+  isTogglingReaction?: boolean;
   onDispatch: (input: { lineName: string }) => Promise<void>;
   onClose: (result: FactoriesWorkOrderResult) => void;
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
   onAddComment: (body: string) => Promise<void>;
+  onToggleReaction?: (content: string, reactedByMe: boolean) => void;
 }
 
 export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps) {
@@ -109,15 +112,27 @@ function WorkOrderDetailBody({
   isDispatching,
   isAssigneesSaving,
   isAddingComment,
+  isTogglingReaction,
   onDispatch,
   onAssigneesSave,
   onAddComment,
+  onToggleReaction,
 }: WorkOrderDetailLoadedViewProps) {
   return (
     <div className={factoryContentBodyClassName}>
       <div className="grid gap-x-[var(--workspace-column-gap)] gap-y-0 lg:grid-cols-[minmax(0,1fr)_var(--workspace-detail-sidebar-width)]">
         <div className="min-w-0">
           {order.description ? <WorkOrderDescription description={order.description} /> : null}
+
+          {onToggleReaction ? (
+            <WorkOrderReactionBar
+              className="mt-3"
+              reactions={order.reactions ?? []}
+              canReact={canManage}
+              isSubmitting={isTogglingReaction}
+              onToggleReaction={onToggleReaction}
+            />
+          ) : null}
 
           <section className={order.description ? "mt-10" : undefined}>
             <h2 className="workspace-section-title">Activity</h2>

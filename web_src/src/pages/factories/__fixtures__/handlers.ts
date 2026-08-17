@@ -1,5 +1,5 @@
 import { defaultFactoriesFixture, ORGANIZATION_USERS, type FactoriesFixture } from "./factoryPageResponses";
-import type { FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesWorkOrder, FactoriesWorkOrderReaction } from "@/api-client";
 import { fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
 
 export type { FactoriesFixture };
@@ -25,6 +25,35 @@ interface RequestBody {
   line_name?: unknown;
   result?: unknown;
   steps?: unknown;
+  content?: unknown;
+}
+
+/**
+ * Toggles the storybook user's reaction on an order and returns the
+ * refreshed rollup, mirroring the backend's add/remove-then-reload shape.
+ */
+function toggleReaction(order: FactoriesWorkOrder, content: string, add: boolean): FactoriesWorkOrderReaction[] {
+  const reactions = [...(order.reactions ?? [])];
+  const index = reactions.findIndex((reaction) => reaction.content === content);
+
+  if (add) {
+    if (index === -1) {
+      reactions.push({ content, count: 1, reactedByMe: true });
+    } else if (!reactions[index].reactedByMe) {
+      reactions[index] = { ...reactions[index], count: (reactions[index].count ?? 0) + 1, reactedByMe: true };
+    }
+  } else if (index !== -1 && reactions[index].reactedByMe) {
+    const nextCount = (reactions[index].count ?? 1) - 1;
+    if (nextCount <= 0) {
+      reactions.splice(index, 1);
+    } else {
+      reactions[index] = { ...reactions[index], count: nextCount, reactedByMe: false };
+    }
+  }
+
+  order.reactions = reactions;
+  order.updatedAt = new Date().toISOString();
+  return reactions;
 }
 
 function stringOrEmpty(value: unknown): string {
@@ -223,6 +252,25 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         order.assignees = findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids));
         order.updatedAt = new Date().toISOString();
         return { json: { order } };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/reactions"),
+      resolve: (match, method, body) => {
+        if (method !== "POST") return null;
+        const order = findOrder(fixture, match[1], match[2]);
+        if (!order) return { json: {} };
+        const content = stringOrEmpty((body as RequestBody | null)?.content);
+        return { json: { reactions: toggleReaction(order, content, true) } };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/reactions/([^/]+)"),
+      resolve: (match, method) => {
+        if (method !== "DELETE") return null;
+        const order = findOrder(fixture, match[1], match[2]);
+        if (!order) return { json: {} };
+        return { json: { reactions: toggleReaction(order, decodeURIComponent(match[3]), false) } };
       },
     },
     {

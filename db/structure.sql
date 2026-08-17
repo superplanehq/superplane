@@ -437,6 +437,18 @@ CREATE TABLE public.factory_work_order_executions (
 
 
 --
+-- Name: factory_work_order_reactions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_work_order_reactions (
+    work_order_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    content character varying(16) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_work_orders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1132,6 +1144,14 @@ ALTER TABLE ONLY public.factory_work_order_executions
 
 
 --
+-- Name: factory_work_order_reactions factory_work_order_reactions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_reactions
+    ADD CONSTRAINT factory_work_order_reactions_pkey PRIMARY KEY (work_order_id, user_id, content);
+
+
+--
 -- Name: factory_work_orders factory_work_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1691,6 +1711,13 @@ CREATE INDEX idx_factory_work_order_executions_work_order_line_active ON public.
 
 
 --
+-- Name: idx_factory_work_order_reactions_work_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_reactions_work_order_id ON public.factory_work_order_reactions USING btree (work_order_id);
+
+
+--
 -- Name: idx_factory_work_orders_factory_state; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2237,6 +2264,22 @@ ALTER TABLE ONLY public.factory_work_order_executions
 
 
 --
+-- Name: factory_work_order_reactions factory_work_order_reactions_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_reactions
+    ADD CONSTRAINT factory_work_order_reactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_order_reactions factory_work_order_reactions_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_reactions
+    ADD CONSTRAINT factory_work_order_reactions_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: factory_work_orders factory_work_orders_created_by_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2708,7 +2751,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260812184220	f
+20260817075053	f
 \.
 
 
