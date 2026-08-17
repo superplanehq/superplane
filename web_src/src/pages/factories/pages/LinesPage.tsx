@@ -4,7 +4,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
-import { formatTimeAgo } from "@/lib/date";
+import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
@@ -16,29 +16,36 @@ import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import {
   buildLinePhaseBoard,
   LINE_PHASE_RUNS_PAGE_SIZE,
-  resolvePhaseRunStatus,
+  linePhaseRunHref,
+  resolveColumnGlyph,
   type LinePhaseColumn,
   type LinePhaseRunCard,
   type LinePhaseTick,
+  type PhaseGlyphKind,
 } from "../lib/linePhaseRuns";
+import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
+import { WorkOrderBoardLane, type BoardLaneTone } from "../workOrders/WorkOrderBoardChrome";
+import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import {
   createFactoryLinePath,
   editFactoryLinePath,
   factoryAppConfigurePath,
-  factoryAppRunPath,
   factoryLineDetailPath,
   linesPath,
-  workOrderDetailPath,
 } from "../lib/factoryPagePaths";
+import { formatLinePhaseDescription, humanizeLineName } from "../lib/humanizeLineName";
 import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import { PhaseGlyph } from "./linePhaseGlyph";
 
 export function LinesPage() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId } = useParams<{ lineId: string }>();
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
+  const cardActions = useWorkOrderCardActions(organizationId, factoryId);
 
   const canUpdate = canAct("factories", "update");
+  const canUpdateWorkOrders = canAct("work_orders", "update");
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const selectedLine = useMemo(
     () => (routeLineId ? (lines.find((line) => line.id === routeLineId) ?? null) : null),
@@ -49,44 +56,60 @@ export function LinesPage() {
     return <Navigate to={linesPath(organizationId, factoryKey)} replace />;
   }
 
-  return (
-    <>
-      {selectedLine == null ? (
-        <WorkspacePageHeader
-          title="Lines"
-          subtitle="Factory lines specialize how work moves through the workspace. Each phase is backed by a canvas that runs work orders."
-          actions={
-            <PermissionTooltip
-              allowed={canUpdate || permissionsLoading}
-              message="You don't have permission to create lines."
-            >
-              <Button type="button" size="sm" asChild disabled={!canUpdate} data-testid="lines-create-button">
-                <Link href={canUpdate ? createFactoryLinePath(organizationId, factoryKey) : "#"}>
-                  <Plus className="size-3.5" aria-hidden />
-                  New line
-                </Link>
-              </Button>
-            </PermissionTooltip>
-          }
-        />
-      ) : (
+  // The phase board is a Kanban surface: it claims the full viewport height so
+  // the lanes read as columns rather than as boxes around their cards.
+  if (selectedLine) {
+    return (
+      <div className="flex min-h-full flex-col" data-testid="lines-detail-page">
         <LineDetailHeader
           organizationId={organizationId}
           factoryKey={factoryKey}
           line={selectedLine}
           canUpdate={canUpdate}
         />
-      )}
 
-      <div className={factoryContentBodyClassName}>
-        {selectedLine ? (
+        <div className={cn(factoryContentBodyClassName, "flex min-h-0 flex-1 flex-col")}>
           <LineDetail
             organizationId={organizationId}
             factoryKey={factoryKey}
             line={selectedLine}
             workOrders={workOrders}
+            workOrderCardContext={{
+              organizationId,
+              factoryKey,
+              factoryLines: lines,
+              canDispatch: canUpdateWorkOrders,
+              canAssign: canUpdateWorkOrders,
+              ...cardActions,
+            }}
           />
-        ) : lines.length === 0 ? (
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <WorkspacePageHeader
+        title="Lines"
+        subtitle="Factory lines specialize how work moves through the workspace. Each phase is backed by a canvas that runs work orders."
+        actions={
+          <PermissionTooltip
+            allowed={canUpdate || permissionsLoading}
+            message="You don't have permission to create lines."
+          >
+            <Button type="button" size="sm" asChild disabled={!canUpdate} data-testid="lines-create-button">
+              <Link href={canUpdate ? createFactoryLinePath(organizationId, factoryKey) : "#"}>
+                <Plus className="size-3.5" aria-hidden />
+                New line
+              </Link>
+            </Button>
+          </PermissionTooltip>
+        }
+      />
+
+      <div className={factoryContentBodyClassName}>
+        {lines.length === 0 ? (
           <EmptyLinesState
             organizationId={organizationId}
             factoryKey={factoryKey}
@@ -127,7 +150,6 @@ function LineDetailHeader({
   line: FactoriesFactoryLine;
   canUpdate: boolean;
 }) {
-  const steps = line.steps ?? [];
   const editHref = line.id ? editFactoryLinePath(organizationId, factoryKey, line.id) : "#";
   return (
     <WorkspacePageHeader
@@ -135,8 +157,8 @@ function LineDetailHeader({
       backHref={linesPath(organizationId, factoryKey)}
       backLabel="Lines"
       backTestId="lines-back-to-list"
-      title={line.name || "Unnamed line"}
-      subtitle={formatPhaseCount(steps.length)}
+      title={humanizeLineName(line.name)}
+      subtitle={formatLinePhaseDescription(line.steps)}
       actions={
         canUpdate ? (
           <Button type="button" variant="outline" size="sm" asChild data-testid="lines-edit-button">
@@ -156,21 +178,29 @@ function LineDetail({
   factoryKey,
   line,
   workOrders,
+  workOrderCardContext,
 }: {
   organizationId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
   workOrders: FactoriesWorkOrder[];
+  workOrderCardContext: WorkOrderCardContext;
 }) {
   const steps = line.steps ?? [];
   const board = useMemo(() => buildLinePhaseBoard(line, workOrders ?? []), [line, workOrders]);
 
   return (
-    <div data-testid="lines-detail">
+    <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
       {steps.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">No phases yet. Edit this line to add app-driven phases.</p>
       ) : (
-        <PhaseBoard organizationId={organizationId} factoryKey={factoryKey} lineId={line.id} columns={board} />
+        <PhaseBoard
+          organizationId={organizationId}
+          factoryKey={factoryKey}
+          lineId={line.id}
+          columns={board}
+          workOrderCardContext={workOrderCardContext}
+        />
       )}
     </div>
   );
@@ -179,6 +209,7 @@ function LineDetail({
 function LineCard({ line, href, ticks }: { line: FactoriesFactoryLine; href: string; ticks: LinePhaseTick[] }) {
   const navigate = useNavigate();
   const steps = line.steps ?? [];
+  const description = formatLinePhaseDescription(steps);
 
   return (
     <div
@@ -202,10 +233,10 @@ function LineCard({ line, href, ticks }: { line: FactoriesFactoryLine; href: str
           <div className="flex flex-wrap items-center gap-2">
             <Workflow className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden />
             <span className="text-[13px] font-medium tracking-[-0.01em] text-foreground">
-              {line.name || "Unnamed line"}
+              {humanizeLineName(line.name)}
             </span>
           </div>
-          <p className="mt-1 text-[12px] leading-snug text-muted-foreground">{formatPhaseCount(steps.length)}</p>
+          {description ? <p className="mt-1 text-[12px] leading-snug text-muted-foreground">{description}</p> : null}
         </div>
       </div>
       {steps.length > 0 ? <PhaseStrip steps={steps} ticks={ticks} /> : null}
@@ -244,43 +275,70 @@ function PhaseBoard({
   factoryKey,
   lineId,
   columns,
+  workOrderCardContext,
 }: {
   organizationId: string;
   factoryKey: string;
   lineId?: string;
   columns: LinePhaseColumn[];
+  workOrderCardContext: WorkOrderCardContext;
 }) {
   const columnsPerRow = Math.min(columns.length, MAX_PHASE_COLUMNS_PER_ROW) || 1;
 
   return (
     <div
-      className="mt-6 grid w-full gap-3"
+      className="grid min-h-0 w-full flex-1 gap-3"
       style={{ gridTemplateColumns: `repeat(${columnsPerRow}, minmax(0, 1fr))` }}
       data-testid="lines-phase-board"
     >
-      {columns.map((column) => (
-        <PhaseColumn
-          key={`${column.stepIndex}-${column.stepName}`}
-          organizationId={organizationId}
-          factoryKey={factoryKey}
-          lineId={lineId}
-          column={column}
-        />
-      ))}
+      {columns.map((column, index) => {
+        // Draw the connecting rail into the trailing gap, except after the last
+        // column in a visual row (its neighbour wraps to the next line).
+        const isRowEnd = index % columnsPerRow === columnsPerRow - 1;
+        const isLast = index === columns.length - 1;
+        return (
+          // A single-cell grid stretches the lane to the row height, so the
+          // wrapper the rail is positioned against does not shrink the lane.
+          <div key={`${column.stepIndex}-${column.stepName}`} className="relative grid min-w-0">
+            {!isRowEnd && !isLast ? (
+              <span className="absolute top-[21px] left-full z-[1] h-px w-3 bg-border" aria-hidden />
+            ) : null}
+            <PhaseColumn
+              organizationId={organizationId}
+              factoryKey={factoryKey}
+              lineId={lineId}
+              column={column}
+              workOrderCardContext={workOrderCardContext}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
+
+/** Phase lanes borrow the Work Orders lane tints: blue in flight, grey once closed. */
+const PHASE_LANE_TONE: Record<PhaseGlyphKind, BoardLaneTone> = {
+  running: "running",
+  waiting: "running",
+  queued: "running",
+  failed: "done",
+  passed: "done",
+  pending: "neutral",
+};
 
 function PhaseColumn({
   organizationId,
   factoryKey,
   lineId,
   column,
+  workOrderCardContext,
 }: {
   organizationId: string;
   factoryKey: string;
   lineId?: string;
   column: LinePhaseColumn;
+  workOrderCardContext: WorkOrderCardContext;
 }) {
   const scrollRef = useRef<HTMLUListElement>(null);
   const [visibleCount, setVisibleCount] = useState(LINE_PHASE_RUNS_PAGE_SIZE);
@@ -307,18 +365,19 @@ function PhaseColumn({
   const configureHref = column.appId
     ? factoryAppConfigurePath(organizationId, factoryKey, column.appId, { from: "lines", lineId })
     : null;
+  const glyph = resolveColumnGlyph(column);
 
   return (
-    <section
-      className="flex min-w-0 flex-col rounded-lg border border-border bg-background"
-      aria-label={`${column.stepName} stage`}
-      data-testid={`lines-phase-column-${column.stepIndex}`}
-    >
-      <div className="flex h-9 items-center justify-between gap-2 border-b border-border px-3">
-        <h3 className="min-w-0 truncate text-[12px] font-medium tracking-[-0.01em] text-foreground">
-          {column.stepName}
-        </h3>
-        {configureHref ? (
+    <WorkOrderBoardLane
+      title={humanizeLineName(column.stepName)}
+      label={`${column.stepName} phase`}
+      count={totalRuns}
+      tone={PHASE_LANE_TONE[glyph]}
+      emptyDescription="No work orders in this phase."
+      leading={<PhaseGlyph kind={glyph} />}
+      testId={`lines-phase-column-${column.stepIndex}`}
+      actions={
+        configureHref ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -340,77 +399,51 @@ function PhaseColumn({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        ) : null}
-      </div>
+        ) : null
+      }
+    >
       <ul
         ref={scrollRef}
-        className="flex max-h-[14rem] min-h-[120px] flex-col gap-2 overflow-y-auto overscroll-contain p-2 [scrollbar-width:thin]"
+        className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain [scrollbar-width:thin]"
         onScroll={(event) => loadMoreIfNeeded(event.currentTarget)}
         data-testid={`lines-phase-column-scroll-${column.stepIndex}`}
       >
-        {totalRuns === 0 ? (
-          <li className="px-2 py-4 text-[12px] text-muted-foreground">No work orders</li>
-        ) : (
-          visibleRuns.map((run) => (
-            <li key={run.executionId}>
-              <PhaseRunCard organizationId={organizationId} factoryKey={factoryKey} lineId={lineId} run={run} />
-            </li>
-          ))
-        )}
+        {visibleRuns.map((run) => (
+          <li key={run.executionId}>
+            <PhaseRunCard
+              run={run}
+              lineId={lineId}
+              stepAppId={column.appId}
+              workOrderCardContext={workOrderCardContext}
+            />
+          </li>
+        ))}
       </ul>
-    </section>
+    </WorkOrderBoardLane>
   );
-}
-
-function phaseRunCardHref(
-  organizationId: string,
-  factoryKey: string,
-  lineId: string | undefined,
-  run: LinePhaseRunCard,
-): string {
-  const appId = run.execution.run?.appId;
-  const runId = run.execution.run?.id;
-  if (appId && runId) {
-    return factoryAppRunPath(organizationId, factoryKey, appId, runId, { from: "lines", lineId });
-  }
-  if (run.workOrderNumber !== undefined) {
-    return workOrderDetailPath(organizationId, factoryKey, run.workOrderNumber);
-  }
-  return linesPath(organizationId, factoryKey);
 }
 
 function PhaseRunCard({
-  organizationId,
-  factoryKey,
-  lineId,
   run,
+  lineId,
+  stepAppId,
+  workOrderCardContext,
 }: {
-  organizationId: string;
-  factoryKey: string;
-  lineId?: string;
   run: LinePhaseRunCard;
+  lineId?: string;
+  stepAppId?: string;
+  workOrderCardContext: WorkOrderCardContext;
 }) {
-  const status = resolvePhaseRunStatus(run.execution);
-  const href = phaseRunCardHref(organizationId, factoryKey, lineId, run);
-  const timestamp = run.execution.updatedAt ?? run.execution.createdAt;
-  const timeLabel = timestamp ? formatTimeAgo(new Date(timestamp), false) : null;
-
-  return (
-    <Link
-      href={href}
-      className="block w-full rounded-md border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-foreground/25 hover:bg-accent/40"
-      data-testid={`lines-phase-run-${run.executionId}`}
-    >
-      <div className="text-[13px] font-medium tracking-[-0.01em] text-foreground">{run.title}</div>
-      <div className="mt-1.5 flex items-center gap-1.5 text-[12px] text-muted-foreground">
-        <PhaseTickDot tick={status.kind === "idle" ? null : status.kind} />
-        <span>
-          {status.label}
-          {timeLabel ? ` · ${timeLabel}` : ""}
-        </span>
-      </div>
-    </Link>
+  const { factory } = useFactoriesLayout();
+  const entry = useMemo(() => buildWorkOrderListEntry(run.order, factory), [run.order, factory]);
+  const href = linePhaseRunHref(
+    workOrderCardContext.organizationId,
+    workOrderCardContext.factoryKey,
+    lineId,
+    run,
+    stepAppId,
   );
+  return <WorkOrderCard {...workOrderCardContext} entry={entry} href={href} />;
 }
 
 function PhaseTickDot({ tick }: { tick: LinePhaseTick }) {
@@ -455,8 +488,4 @@ function EmptyLinesState({
       </Button>
     </div>
   );
-}
-
-function formatPhaseCount(count: number) {
-  return `${count} ${count === 1 ? "phase" : "phases"}`;
 }
