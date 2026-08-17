@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
 
 import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact, FactoriesWorkOrderEvent } from "@/api-client";
 
@@ -11,8 +12,10 @@ import {
   FAILED_WORK_ORDER,
   OPEN_WORK_ORDER,
   OPEN_WORK_ORDER_ARTIFACTS,
+  OPERATOR_USER,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
+  REVIEWER_USER,
   RUNNING_WORK_ORDER,
 } from "./__fixtures__/factoryPageResponses";
 import {
@@ -25,6 +28,7 @@ import {
   RUNNING_WORK_ORDER_EVENTS,
 } from "./__fixtures__/factoryPageEventFixtures";
 import { WorkOrderDetailLoadedView } from "./WorkOrderDetailLoadedView";
+import { WorkOrderReactions, type WorkOrderReactionSummary } from "./WorkOrderReactions";
 import { getWorkOrderDetailDerived } from "./lib/workOrderProgress";
 
 /**
@@ -157,5 +161,56 @@ export const ReadOnly: Story = {
     canClose: false,
     canAssign: false,
     canManage: false,
+  },
+};
+
+/** Owns local reaction state so the strip actually toggles inside the story. */
+function ReactionsSlot() {
+  const [reactions, setReactions] = useState<WorkOrderReactionSummary[]>([
+    { emoji: "👍", count: 3, reactedByMe: true, reactorNames: ["You", REVIEWER_USER.name, OPERATOR_USER.name] },
+    { emoji: "✅", count: 1, reactedByMe: false, reactorNames: [REVIEWER_USER.name] },
+  ]);
+
+  const handleToggle = (emoji: string) => {
+    setReactions((current) =>
+      current
+        .map((reaction) =>
+          reaction.emoji === emoji
+            ? {
+                ...reaction,
+                count: reaction.reactedByMe ? reaction.count - 1 : reaction.count + 1,
+                reactedByMe: !reaction.reactedByMe,
+                reactorNames: reaction.reactedByMe
+                  ? reaction.reactorNames.filter((name) => name !== "You")
+                  : ["You", ...reaction.reactorNames],
+              }
+            : reaction,
+        )
+        .filter((reaction) => reaction.count > 0),
+    );
+  };
+
+  const handlePickNew = (emoji: string) => {
+    setReactions((current) => {
+      if (current.some((reaction) => reaction.emoji === emoji)) {
+        return current;
+      }
+      return [...current, { emoji, count: 1, reactedByMe: true, reactorNames: ["You"] }];
+    });
+  };
+
+  return <WorkOrderReactions reactions={reactions} canReact onToggle={handleToggle} onPickNew={handlePickNew} />;
+}
+
+/**
+ * Reactions strip in full page context — sits directly below the header,
+ * above the description. `reactions` is a Storybook-only slot on the loaded
+ * view/header; it stays `undefined` (and renders nothing) on the real page.
+ */
+export const WithReactions: Story = {
+  name: "With Reactions (prototype)",
+  args: {
+    ...buildLoadedViewArgs(OPEN_WORK_ORDER, { events: OPEN_WORK_ORDER_EVENTS }),
+    reactions: <ReactionsSlot />,
   },
 };

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type {
   FactoriesFactoryLine,
   FactoriesWorkOrder,
@@ -54,6 +55,12 @@ interface WorkOrderDetailLoadedViewProps {
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
   onAddComment: (body: string) => Promise<void>;
+  /**
+   * Storybook-only slot for the emoji reactions strip (see
+   * `WorkOrderReactions`), rendered directly below the header. Left
+   * `undefined` in production, so it renders nothing there.
+   */
+  reactions?: ReactNode;
 }
 
 export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps) {
@@ -76,6 +83,7 @@ export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps)
         isUpdatingStatus={props.isUpdatingStatus}
         onClose={props.onClose}
         onStatusChange={props.onStatusChange}
+        reactions={props.reactions}
       />
       <WorkOrderDetailBody {...props} />
     </>

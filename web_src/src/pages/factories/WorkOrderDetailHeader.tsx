@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Check, Ellipsis, Link2 } from "lucide-react";
-import { Fragment, useState } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +32,12 @@ interface WorkOrderDetailHeaderProps {
   isUpdatingStatus: boolean;
   onClose: (result: FactoriesWorkOrderResult) => void;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
+  /**
+   * Storybook-only slot for the emoji reactions strip (see
+   * `WorkOrderReactions`). Left `undefined` in production, so it renders
+   * nothing there — reserved for wiring up once reactions ship for real.
+   */
+  reactions?: ReactNode;
 }
 
 export function WorkOrderDetailHeader(props: WorkOrderDetailHeaderProps) {
@@ -49,6 +55,7 @@ export function WorkOrderDetailHeader(props: WorkOrderDetailHeaderProps) {
           <HeaderOverflowMenu {...props} />
         </>
       }
+      belowRow={props.reactions}
     />
   );
 }
