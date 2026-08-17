@@ -48,8 +48,8 @@ interface SettingsTabProps {
   // (action nodes except merge, which is inherently unbounded).
   showConcurrency?: boolean;
   concurrency?: ComponentsConcurrencySpec;
-  // Loop only honors max (its parallel-session cap): key and
-  // auto-cancel are hidden and never saved.
+  // Loop only honors max (its parallel-session cap): key is hidden
+  // and never saved.
   concurrencyMaxOnly?: boolean;
   onCancel?: () => void;
   domainId?: string;
@@ -71,14 +71,12 @@ interface SettingsTabProps {
 interface ConcurrencyDraft {
   key: string;
   max: string;
-  autoCancel: string;
 }
 
 function concurrencyDraftFromSpec(spec?: ComponentsConcurrencySpec): ConcurrencyDraft {
   return {
     key: spec?.key ?? "",
     max: spec?.max ? String(spec.max) : "",
-    autoCancel: spec?.autoCancel ?? "",
   };
 }
 
@@ -90,20 +88,18 @@ function draftMax(draft: ConcurrencyDraft): number | undefined {
 
 // An all-default draft maps to no concurrency spec, so the node keeps
 // the default behavior instead of storing an empty object. With maxOnly,
-// key and autoCancel are dropped even if present in the loaded spec.
+// key is dropped even if present in the loaded spec.
 function concurrencyDraftToSpec(draft: ConcurrencyDraft, maxOnly: boolean): ComponentsConcurrencySpec | undefined {
   const key = maxOnly ? "" : draft.key.trim();
   const max = draftMax(draft);
-  const autoCancel = maxOnly ? "" : draft.autoCancel;
 
-  if (key === "" && autoCancel === "" && max === undefined) {
+  if (key === "" && max === undefined) {
     return undefined;
   }
 
   const spec: ComponentsConcurrencySpec = {};
   if (key !== "") spec.key = key;
   if (max !== undefined) spec.max = max;
-  if (autoCancel !== "") spec.autoCancel = autoCancel;
   return spec;
 }
 
@@ -874,28 +870,6 @@ export function SettingsTab({
                 <p className="text-xs text-gray-500">
                   Optional expression that splits the backlog. Each value is a separate queue.
                 </p>
-              </div>
-            )}
-            {!concurrencyMaxOnly && (
-              <div className="flex flex-col gap-2">
-                <Label className="min-w-[100px] text-left">Auto-cancel</Label>
-                <Select
-                  value={concurrencyDraft.autoCancel === "" ? "off" : concurrencyDraft.autoCancel}
-                  onValueChange={(value) => {
-                    setConcurrencyDraft((prev) => ({ ...prev, autoCancel: value === "off" ? "" : value }));
-                    requestAutosave();
-                  }}
-                >
-                  <SelectTrigger data-testid="node-concurrency-auto-cancel-select" className="w-full shadow-none">
-                    <SelectValue placeholder="Off" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="off">Off</SelectItem>
-                    <SelectItem value="queued">Queued items</SelectItem>
-                    <SelectItem value="running">Queued items and running executions</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-gray-500">When a new item arrives, cancel older work in the same queue.</p>
               </div>
             )}
           </div>

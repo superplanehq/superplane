@@ -51,28 +51,11 @@ func SerializeCanvas(
 			DismissedAgentSuggestionIds: append([]string(nil), canvas.DismissedAgentSuggestionIDs...),
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes:      actions.NodesToProto(liveVersion.Nodes),
-			Edges:      actions.EdgesToProto(liveVersion.Edges),
-			NodeGroups: NodeGroupsToProto(liveVersion.NodeGroups),
+			Nodes: actions.NodesToProto(liveVersion.Nodes),
+			Edges: actions.EdgesToProto(liveVersion.Edges),
 		},
 		Status: status,
 	}, nil
-}
-
-func NodeGroupsToProto(groups []models.NodeGroup) []*pb.NodeGroup {
-	result := make([]*pb.NodeGroup, len(groups))
-	for i, group := range groups {
-		result[i] = &pb.NodeGroup{
-			Id:    group.ID,
-			Nodes: append([]string(nil), group.Nodes...),
-		}
-
-		if group.Max != nil {
-			max := int32(*group.Max)
-			result[i].Max = &max
-		}
-	}
-	return result
 }
 
 func serializeCanvas(

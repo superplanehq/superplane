@@ -312,10 +312,10 @@ func (w *NodeQueueWorker) processNodeQueueItems(tx *gorm.DB, logger *log.Entry, 
 	//
 	// Components with their own queue item processor (merge, loop) keep
 	// executions open while waiting for more queue items, so their items
-	// are never gated on capacity and never superseded: the component
-	// decides admission in ProcessQueueItem. Their items keep a NULL
-	// queue name, which is also what keeps their nodes in the safety-net
-	// poll (see ListCanvasNodesReady).
+	// are never gated on capacity: the component decides admission in
+	// ProcessQueueItem. Their items keep a NULL queue name, which is also
+	// what keeps their nodes in the safety-net poll (see
+	// ListCanvasNodesReady).
 	//
 	selfManaged := w.queueItemProcessorForNode(node) != nil
 
@@ -324,19 +324,10 @@ func (w *NodeQueueWorker) processNodeQueueItems(tx *gorm.DB, logger *log.Entry, 
 		return err
 	}
 
-	remaining := live
-	if !selfManaged {
-		remaining, err = w.supersedeStaleQueueItems(tx, logger, spec, live, collector)
-		if err != nil {
-			return err
-		}
-	}
-
 	blocked := map[string]bool{}
-	for _, item := range remaining {
+	for _, item := range live {
 		//
-		// Self-managed items have no queue name; key them by node so a
-		// group-blocked item still blocks the rest of the backlog (FIFO).
+		// Self-managed items have no queue name; key them by node.
 		//
 		queueName := node.NodeID
 		if item.QueueName != nil {
@@ -354,28 +345,6 @@ func (w *NodeQueueWorker) processNodeQueueItems(tx *gorm.DB, logger *log.Entry, 
 			}
 
 			if activeCount >= int64(spec.EffectiveMax()) {
-				//
-				// autoCancel: running frees the queue for the newest item by
-				// cancelling in-flight executions. The item dispatches on a
-				// later pass, once the cancelled executions terminate.
-				//
-				if spec.AutoCancelPolicy() == models.QueueAutoCancelRunning {
-					if err := w.cancelRunningExecutionsInQueue(tx, logger, node, queueName); err != nil {
-						return err
-					}
-				}
-
-				blocked[queueName] = true
-				continue
-			}
-		}
-
-		if node.GroupID != nil {
-			admitted, err := w.admitRunIntoGroup(tx, node, item.RunID)
-			if err != nil {
-				return err
-			}
-			if !admitted {
 				blocked[queueName] = true
 				continue
 			}
@@ -436,105 +405,6 @@ func (w *NodeQueueWorker) prepareQueueItems(
 	}
 
 	return live, nil
-}
-
-// supersedeStaleQueueItems applies autoCancel to the waiting backlog. When
-// the node's queue has an autoCancel policy, only the newest waiting item
-// per resolved queue name survives; older waiting items are superseded
-// (and their runs finished as superseded when empty).
-func (w *NodeQueueWorker) supersedeStaleQueueItems(
-	tx *gorm.DB,
-	logger *log.Entry,
-	spec *models.ConcurrencySpec,
-	items []*models.CanvasNodeQueueItem,
-	collector *MessageCollector,
-) ([]*models.CanvasNodeQueueItem, error) {
-	policy := spec.AutoCancelPolicy()
-	if policy != models.QueueAutoCancelQueued && policy != models.QueueAutoCancelRunning {
-		return items, nil
-	}
-
-	newestByQueue := make(map[string]*models.CanvasNodeQueueItem, len(items))
-	for _, item := range items {
-		newestByQueue[*item.QueueName] = item
-	}
-
-	remaining := make([]*models.CanvasNodeQueueItem, 0, len(items))
-	for _, item := range items {
-		if newestByQueue[*item.QueueName] != item {
-			logger.Infof("Superseding queue item %s in queue %s", item.ID, *item.QueueName)
-			if err := models.SupersedeQueueItem(tx, item); err != nil {
-				return nil, err
-			}
-
-			collector.AddQueueItemDeleted(item)
-			continue
-		}
-
-		remaining = append(remaining, item)
-	}
-
-	return remaining, nil
-}
-
-// admitRunIntoGroup checks the group gate for a run entering a grouped
-// node. A run already holding the group's slot passes; a run holding a
-// slot in another group waits (a run holds at most one slot); otherwise a
-// slot is acquired when the group has capacity.
-func (w *NodeQueueWorker) admitRunIntoGroup(
-	tx *gorm.DB,
-	node *models.CanvasNode,
-	runID uuid.UUID,
-) (bool, error) {
-	group, err := models.FindCanvasNodeGroup(tx, node.WorkflowID, *node.GroupID)
-	if err != nil {
-		return false, err
-	}
-
-	if group == nil {
-		return true, nil
-	}
-
-	slot, err := models.FindQueueSlotForRun(tx, node.WorkflowID, runID)
-	if err != nil {
-		return false, err
-	}
-
-	if slot != nil {
-		return slot.GroupID == group.GroupID, nil
-	}
-
-	slotCount, err := models.CountQueueSlots(tx, node.WorkflowID, group.GroupID)
-	if err != nil {
-		return false, err
-	}
-
-	if slotCount >= int64(group.EffectiveMax()) {
-		return false, nil
-	}
-
-	return true, models.AcquireQueueSlot(tx, node.WorkflowID, group.GroupID, runID)
-}
-
-func (w *NodeQueueWorker) cancelRunningExecutionsInQueue(tx *gorm.DB, logger *log.Entry, node *models.CanvasNode, queueName string) error {
-	executions, err := models.ListActiveExecutionsInQueue(tx, node.WorkflowID, node.NodeID, queueName)
-	if err != nil {
-		return err
-	}
-
-	for i := range executions {
-		execution := executions[i]
-		if execution.State == models.CanvasNodeExecutionStateCancelling {
-			continue
-		}
-
-		logger.Infof("Cancelling execution %s superseded in queue %s", execution.ID, queueName)
-		if err := execution.RequestCancellation(tx, nil); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (w *NodeQueueWorker) dispatchQueueItem(

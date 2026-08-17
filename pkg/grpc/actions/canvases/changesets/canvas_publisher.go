@@ -161,10 +161,6 @@ func (p *CanvasPublisher) Publish(ctx context.Context) error {
 		return err
 	}
 
-	if err := p.syncNodeGroupMembership(); err != nil {
-		return err
-	}
-
 	finalNodes := make([]models.Node, 0, len(p.finalNodes))
 	for _, node := range p.finalNodes {
 		finalNodes = append(finalNodes, node)
@@ -418,64 +414,6 @@ func (p *CanvasPublisher) runPendingSetups(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-// syncNodeGroupMembership materializes the draft's node groups: one
-// workflow_node_groups row per group, and workflow_nodes.group_id on the
-// members, so the queue worker can gate dispatch without loading the
-// canvas version.
-func (p *CanvasPublisher) syncNodeGroupMembership() error {
-	if err := models.SyncCanvasNodeGroupRows(p.tx, p.live.WorkflowID, p.draft.NodeGroups); err != nil {
-		return err
-	}
-
-	groupByNode := map[string]string{}
-	for _, group := range p.draft.NodeGroups {
-		for _, nodeID := range group.Nodes {
-			if renamed, ok := p.renamedIDs[nodeID]; ok {
-				nodeID = renamed
-			}
-			groupByNode[nodeID] = group.ID
-		}
-	}
-
-	for nodeID := range p.finalNodes {
-		node, ok := p.allNodes[nodeID]
-		if !ok {
-			// Widget nodes have no workflow_nodes row.
-			continue
-		}
-
-		var groupID *string
-		if id, ok := groupByNode[nodeID]; ok {
-			groupID = &id
-		}
-
-		if equalStringPointers(node.GroupID, groupID) {
-			continue
-		}
-
-		err := p.tx.Model(&models.CanvasNode{}).
-			Where("workflow_id = ?", node.WorkflowID).
-			Where("node_id = ?", node.NodeID).
-			Update("group_id", groupID).
-			Error
-		if err != nil {
-			return err
-		}
-
-		node.GroupID = groupID
-		p.allNodes[nodeID] = node
-	}
-
-	return nil
-}
-
-func equalStringPointers(a, b *string) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-	return *a == *b
 }
 
 func (p *CanvasPublisher) deleteNode(change *Change) error {

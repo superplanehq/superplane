@@ -16,11 +16,6 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 		return nil, err
 	}
 
-	queueItemsByOrderID, err := models.ListFactoryWorkOrderQueueItemsByWorkOrderIDs(db, []uuid.UUID{order.ID})
-	if err != nil {
-		return nil, err
-	}
-
 	creatorAutomations, err := models.ResolveFactoryWorkOrderCreatorAutomations(db, []models.FactoryWorkOrder{*order})
 	if err != nil {
 		return nil, err
@@ -30,7 +25,6 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 		factory,
 		order,
 		executionsByOrderID[order.ID],
-		queueItemsByOrderID[order.ID],
 		creatorAutomations[order.ID],
 	), nil
 }
@@ -51,11 +45,6 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 		return nil, err
 	}
 
-	queueItemsByOrderID, err := models.ListFactoryWorkOrderQueueItemsByWorkOrderIDs(db, workOrderIDs)
-	if err != nil {
-		return nil, err
-	}
-
 	creatorAutomations, err := models.ResolveFactoryWorkOrderCreatorAutomations(db, orders)
 	if err != nil {
 		return nil, err
@@ -67,7 +56,6 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 			factory,
 			&orders[i],
 			executionsByOrderID[orders[i].ID],
-			queueItemsByOrderID[orders[i].ID],
 			creatorAutomations[orders[i].ID],
 		)
 	}

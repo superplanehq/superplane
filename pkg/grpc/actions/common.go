@@ -819,8 +819,7 @@ func ProtoToConcurrencySpec(spec *componentpb.ConcurrencySpec) *models.Concurren
 	}
 
 	result := &models.ConcurrencySpec{
-		Key:        spec.GetKey(),
-		AutoCancel: spec.GetAutoCancel(),
+		Key: spec.GetKey(),
 	}
 
 	if spec.Max != nil {
@@ -839,10 +838,6 @@ func ConcurrencySpecToProto(spec *models.ConcurrencySpec) *componentpb.Concurren
 	result := &componentpb.ConcurrencySpec{}
 	if spec.Key != "" {
 		result.Key = &spec.Key
-	}
-
-	if spec.AutoCancel != "" {
-		result.AutoCancel = &spec.AutoCancel
 	}
 
 	if spec.Max != nil {

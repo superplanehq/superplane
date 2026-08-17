@@ -11,10 +11,6 @@ const (
 	RunResultPassed    = "passed"
 	RunResultFailed    = "failed"
 	RunResultCancelled = "cancelled"
-
-	// RunResultSuperseded marks runs whose queued work was replaced by a
-	// newer item in a queue with autoCancel: queued.
-	RunResultSuperseded = "superseded"
 )
 
 type RunExecutionContext interface {

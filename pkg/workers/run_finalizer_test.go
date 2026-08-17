@@ -593,22 +593,22 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 
 	amqpURL, _ := config.RabbitMQURL()
 	finalizer := NewRunFinalizer(amqpURL, r.Registry)
-	var pending []factoryLinePendingRun
+	var pending *factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
 		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, firstResult.Run.ID)
 		return advanceErr
 	}))
 
-	require.Len(t, pending, 1)
-	assert.Equal(t, secondApp.ID, pending[0].workflowID)
+	require.NotNil(t, pending)
+	assert.Equal(t, secondApp.ID, pending.workflowID)
 
 	firstExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), firstResult.Run.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, firstExecution.Status)
 	assert.Equal(t, models.CanvasRunResultPassed, firstExecution.Result)
 
-	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), pending[0].runID)
+	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), pending.runID)
 	require.NoError(t, err)
 	assert.Equal(t, 1, secondExecution.StepIndex)
 	assert.Equal(t, "step-two", secondExecution.StepName)

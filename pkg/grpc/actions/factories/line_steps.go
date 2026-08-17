@@ -102,23 +102,11 @@ func parseLineStep(
 		)
 	}
 
-	var maxParallelism *int
-	if step.MaxParallelism != nil {
-		if *step.MaxParallelism < 0 {
-			return models.FactoryLineStep{}, invalidArgument(
-				fmt.Sprintf("step %q: max_parallelism must be non-negative (0 means unlimited)", name),
-			)
-		}
-		value := int(*step.MaxParallelism)
-		maxParallelism = &value
-	}
-
 	return models.FactoryLineStep{
-		Name:           name,
-		Type:           models.FactoryLineStepTypeRunApp,
-		AppID:          canvas.ID,
-		Entrypoint:     entrypoint,
-		MaxParallelism: maxParallelism,
+		Name:       name,
+		Type:       models.FactoryLineStepTypeRunApp,
+		AppID:      canvas.ID,
+		Entrypoint: entrypoint,
 	}, nil
 }
 

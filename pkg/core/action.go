@@ -111,7 +111,7 @@ type Action interface {
  * these components keep executions open while waiting for more queue
  * items — later source events for merge, feedback events for loop — so
  * capacity-gating their items would starve the very items needed to
- * finish those executions. Queue capacity and autoCancel do not apply.
+ * finish those executions. Queue capacity does not apply.
  */
 type QueueItemProcessor interface {
 	/*

@@ -2,7 +2,6 @@ package workers
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -170,7 +169,6 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	}()
 
 	var createdQueueItems []models.CanvasNodeQueueItem
-	var wakeQueueItems []models.CanvasNodeQueueItem
 	var runID uuid.UUID
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		lockedEvent, err := models.LockCanvasEvent(tx, event.ID)
@@ -182,13 +180,6 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 		}
 
 		createdQueueItems, runID, err = w.processEvent(tx, logger, lockedEvent)
-		if err != nil {
-			outcome = executorOutcomeFailed
-			reason = classifyProcessError(err)
-			return err
-		}
-
-		wakeQueueItems, err = w.releaseGroupSlotIfRunLeftGroup(tx, lockedEvent)
 		if err != nil {
 			outcome = executorOutcomeFailed
 			reason = classifyProcessError(err)
@@ -210,14 +201,6 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 		for _, queueItem := range createdQueueItems {
 			messages.NewCanvasQueueItemMessage(queueItem).PublishCreated()
 		}
-	}
-
-	//
-	// A released group slot may unblock runs waiting to enter the group.
-	// Re-announce their waiting items so the queue worker retries them.
-	//
-	for _, queueItem := range wakeQueueItems {
-		messages.NewCanvasQueueItemMessage(queueItem).PublishCreated()
 	}
 
 	// Root events start a run; execution output events belong to a run that is
@@ -405,37 +388,4 @@ func (w *EventRouter) processExecutionEvent(
 	}
 
 	return createdQueueItems, nil
-}
-
-// releaseGroupSlotIfRunLeftGroup runs after an execution event was routed.
-// When the event's source node is in a group and the run has no work left
-// inside that group, the run's group-queue slot is released. Waiting items
-// on the group's nodes are returned so the caller can wake them up.
-func (w *EventRouter) releaseGroupSlotIfRunLeftGroup(tx *gorm.DB, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, error) {
-	if event.ExecutionID == nil || event.RunID == uuid.Nil {
-		return nil, nil
-	}
-
-	sourceNode, err := models.FindCanvasNode(tx, event.WorkflowID, event.NodeID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	if sourceNode.GroupID == nil {
-		return nil, nil
-	}
-
-	released, err := models.ReleaseQueueSlotIfGroupIdle(tx, event.WorkflowID, *sourceNode.GroupID, event.RunID)
-	if err != nil {
-		return nil, err
-	}
-
-	if released == nil {
-		return nil, nil
-	}
-
-	return models.ListWaitingQueueItemsForGroup(tx, event.WorkflowID, *sourceNode.GroupID)
 }

@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/google/uuid"
@@ -48,7 +49,6 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 	var factory *models.Factory
 	var order *models.FactoryWorkOrder
 	var pendingRun *models.CanvasRun
-	var queued bool
 	var logger *log.Entry
 
 	db := database.DB(ctx)
@@ -78,12 +78,13 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return models.ErrFactoryLineHasNoSteps
 		}
 
-		active, err := order.HasActiveStepWork(tx)
-		if err != nil {
-			return err
-		}
-		if active {
+		_, err = order.FindActiveExecution(tx)
+		if err == nil {
 			return models.ErrFactoryWorkOrderExecutionActive
+		}
+
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
 		}
 
 		// Promote draft → open before the first step; no-op if already open.
@@ -91,13 +92,12 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return err
 		}
 
-		result, err := line.EnqueueOrStartStep(tx, order, 0)
+		result, err := line.StartStep(tx, order, 0)
 		if err != nil {
 			return err
 		}
 
 		pendingRun = result.Run
-		queued = pendingRun == nil
 		return nil
 	})
 
@@ -111,15 +111,10 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		}
 	}
 
-	updateType := factoryevents.EventTypeLineStepExecutionCreated
-	if queued {
-		updateType = factoryevents.EventTypeLineStepExecutionQueued
-	}
-
 	if err := messages.PublishFactoryWorkOrderUpdated(
 		factoryID.String(),
 		order.ID.String(),
-		updateType,
+		factoryevents.EventTypeLineStepExecutionCreated,
 	); err != nil {
 		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
 	}

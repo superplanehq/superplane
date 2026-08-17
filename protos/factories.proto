@@ -323,9 +323,6 @@ message FactoryLine {
     string name = 1;
     string type = 2;
     optional AppStep app = 3;
-    // Maximum number of in-flight runs for this step. Unset means the
-    // default of 10; 0 means unlimited.
-    optional int32 max_parallelism = 4;
   }
 
   message AppStep {
@@ -441,9 +438,6 @@ message WorkOrder {
   // Display identifier composed of the parent factory's key and this
   // order's `number` (for example `SP-42`). Populated by the server.
   string key = 14;
-  // Steps where the order waits for admission because the step is at its
-  // max parallelism. No run or execution exists for a queued step yet.
-  repeated WorkOrderQueueItem queue_items = 15;
 }
 
 message WorkOrderCreator {
@@ -509,23 +503,6 @@ message WorkOrderExecution {
 message WorkOrderExecutionStep {
   string name = 1;
   int32 step_index = 2;
-}
-
-// A work order waiting in a line step's queue. The step admits queued
-// orders oldest-first as running work frees capacity; on admission the
-// queue item becomes a WorkOrderExecution with a run.
-message WorkOrderQueueItem {
-  string id = 1;
-  WorkOrderExecution.LineRef line = 2;
-  string step = 3;
-  // Zero-based index of the step inside the containing line.
-  int32 step_index = 4;
-  // One-based position in the step's queue; 1 is next to be admitted.
-  int32 position = 5;
-  google.protobuf.Timestamp created_at = 6;
-  // Steps snapshotted from the line's step definitions, so the UI can
-  // render the sequence with `step_index` marking the queued step.
-  repeated WorkOrderExecutionStep steps = 7;
 }
 
 message DescribeWorkOrderRequest {

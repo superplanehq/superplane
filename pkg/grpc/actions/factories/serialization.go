@@ -67,10 +67,6 @@ func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 				Entrypoint: step.Entrypoint,
 			},
 		}
-		if step.MaxParallelism != nil {
-			maxParallelism := int32(*step.MaxParallelism)
-			steps[i].MaxParallelism = &maxParallelism
-		}
 	}
 
 	return &pb.FactoryLine{
@@ -94,7 +90,6 @@ func serializeWorkOrder(
 	f *models.Factory,
 	order *models.FactoryWorkOrder,
 	executions []models.FactoryWorkOrderExecutionRecord,
-	queueItems []models.FactoryWorkOrderQueueItemRecord,
 	createdByAutomation *factory.AutomationRef,
 ) *pb.WorkOrder {
 	serializedExecutions := serializeWorkOrderExecutions(executions)
@@ -122,7 +117,6 @@ func serializeWorkOrder(
 		UpdatedAt:      timestamppb.New(order.UpdatedAt),
 		Assignees:      serializeWorkOrderAssignees(order.Assignees),
 		Executions:     serializedExecutions,
-		QueueItems:     serializeWorkOrderQueueItems(queueItems),
 		CreatedBy:      serializeWorkOrderCreator(order, createdByAutomation),
 		TotalTokens:    totalTokens,
 		TotalCostCents: totalCostCents,
@@ -197,35 +191,16 @@ func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecor
 			Id:   execution.LineID.String(),
 			Name: execution.LineName,
 		},
-	}
-	item.Run = &pb.WorkOrderExecution_RunRef{
-		Id:      execution.RunID.String(),
-		AppId:   execution.CanvasID.String(),
-		AppName: execution.CanvasName,
+		Run: &pb.WorkOrderExecution_RunRef{
+			Id:      execution.RunID.String(),
+			AppId:   execution.CanvasID.String(),
+			AppName: execution.CanvasName,
+		},
 	}
 	if execution.FinishedAt != nil {
 		item.FinishedAt = timestamppb.New(*execution.FinishedAt)
 	}
 	return item
-}
-
-func serializeWorkOrderQueueItems(items []models.FactoryWorkOrderQueueItemRecord) []*pb.WorkOrderQueueItem {
-	result := make([]*pb.WorkOrderQueueItem, 0, len(items))
-	for _, item := range items {
-		result = append(result, &pb.WorkOrderQueueItem{
-			Id:        item.ID.String(),
-			Step:      item.StepName,
-			StepIndex: int32(item.StepIndex),
-			Position:  int32(item.Position),
-			CreatedAt: timestamppb.New(item.CreatedAt),
-			Steps:     serializeExecutionSteps(item.LineSteps),
-			Line: &pb.WorkOrderExecution_LineRef{
-				Id:   item.LineID.String(),
-				Name: item.LineName,
-			},
-		})
-	}
-	return result
 }
 
 func serializeExecutionSteps(steps []models.FactoryLineStep) []*pb.WorkOrderExecutionStep {

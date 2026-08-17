@@ -160,7 +160,7 @@ export interface NodeEditData {
   /** Inline concurrency configuration; only action nodes support it. */
   concurrency?: ComponentsConcurrencySpec;
   supportsConcurrency?: boolean;
-  /** Loop only honors max (its parallel-session cap); hides key and auto-cancel. */
+  /** Loop only honors max (its parallel-session cap); hides key. */
   concurrencyMaxOnly?: boolean;
 }
 

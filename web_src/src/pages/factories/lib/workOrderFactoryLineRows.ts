@@ -1,4 +1,4 @@
-import { isQueuedStepRow, type WorkOrderStepRow } from "./workOrderExecutions";
+import type { FactoriesWorkOrderExecution } from "@/api-client";
 
 export type FactoryLineRowTone = "success" | "warning" | "danger" | "muted";
 
@@ -8,10 +8,10 @@ export interface FactoryLineRowModel {
   tone: FactoryLineRowTone;
 }
 
-// Groups a work order's step rows (executions and queued steps) by factory
-// line, collapsing multiple runs on the same line into the worst tone so
-// the sidebar surfaces failures over successes.
-export function deriveFactoryLineRows(executions: WorkOrderStepRow[]): FactoryLineRowModel[] {
+// Groups a work order's executions by factory line, collapsing multiple runs
+// on the same line into the worst tone so the sidebar surfaces failures over
+// successes.
+export function deriveFactoryLineRows(executions: FactoriesWorkOrderExecution[]): FactoryLineRowModel[] {
   const map = new Map<string, FactoryLineRowModel>();
   for (const execution of executions) {
     const lineId = execution.line?.id ?? "unknown";
@@ -27,10 +27,9 @@ export function deriveFactoryLineRows(executions: WorkOrderStepRow[]): FactoryLi
   return [...map.values()];
 }
 
-function executionTone(execution: WorkOrderStepRow): FactoryLineRowTone {
+function executionTone(execution: FactoriesWorkOrderExecution): FactoryLineRowTone {
   if (execution.result === "RESULT_FAILED") return "danger";
   if (
-    isQueuedStepRow(execution) ||
     execution.state === "STATE_PENDING" ||
     execution.state === "STATE_STARTED" ||
     execution.state === "STATE_CANCELLING"

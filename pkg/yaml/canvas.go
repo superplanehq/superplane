@@ -49,18 +49,6 @@ func (c *Canvas) Edges() []models.Edge {
 	return edges
 }
 
-func (c *Canvas) NodeGroups() []models.NodeGroup {
-	groups := make([]models.NodeGroup, len(c.Spec.Groups))
-	for i, group := range c.Spec.Groups {
-		groups[i] = models.NodeGroup{
-			ID:    group.ID,
-			Nodes: append([]string(nil), group.Nodes...),
-			Max:   group.Max,
-		}
-	}
-	return groups
-}
-
 type CanvasMetadata struct {
 	ID          string `json:"id" yaml:"id"`
 	Name        string `json:"name" yaml:"name"`
@@ -68,26 +56,15 @@ type CanvasMetadata struct {
 }
 
 type CanvasSpec struct {
-	Nodes  []Node      `json:"nodes" yaml:"nodes"`
-	Edges  []Edge      `json:"edges" yaml:"edges"`
-	Groups []NodeGroup `json:"groups,omitempty" yaml:"groups,omitempty"`
+	Nodes []Node `json:"nodes" yaml:"nodes"`
+	Edges []Edge `json:"edges" yaml:"edges"`
 }
 
 // ConcurrencySpec is a node's inline concurrency configuration. max is
 // presence-aware: absent means 1, and must be 1 or greater when set.
 type ConcurrencySpec struct {
-	Key        string `json:"key,omitempty" yaml:"key,omitempty"`
-	Max        *int   `json:"max,omitempty" yaml:"max,omitempty"`
-	AutoCancel string `json:"autoCancel,omitempty" yaml:"autoCancel,omitempty"`
-}
-
-// NodeGroup is a group of nodes that acts as a queue: a run acquires a
-// slot in the group when its first item dispatches into the group, and
-// holds it while it has work inside the group.
-type NodeGroup struct {
-	ID    string   `json:"id" yaml:"id"`
-	Nodes []string `json:"nodes" yaml:"nodes"`
-	Max   *int     `json:"max,omitempty" yaml:"max,omitempty"`
+	Key string `json:"key,omitempty" yaml:"key,omitempty"`
+	Max *int   `json:"max,omitempty" yaml:"max,omitempty"`
 }
 
 type Edge struct {
@@ -130,9 +107,8 @@ func (c *ConcurrencySpec) Model() *models.ConcurrencySpec {
 	}
 
 	return &models.ConcurrencySpec{
-		Key:        c.Key,
-		Max:        c.Max,
-		AutoCancel: c.AutoCancel,
+		Key: c.Key,
+		Max: c.Max,
 	}
 }
 
@@ -142,9 +118,8 @@ func concurrencySpecFromModel(spec *models.ConcurrencySpec) *ConcurrencySpec {
 	}
 
 	return &ConcurrencySpec{
-		Key:        spec.Key,
-		Max:        spec.Max,
-		AutoCancel: spec.AutoCancel,
+		Key: spec.Key,
+		Max: spec.Max,
 	}
 }
 
@@ -326,14 +301,6 @@ func VersionToCanvasYAML(name string, description string, canvasVersion *models.
 		})
 	}
 
-	for _, group := range canvasVersion.NodeGroups {
-		resource.Spec.Groups = append(resource.Spec.Groups, NodeGroup{
-			ID:    group.ID,
-			Nodes: append([]string(nil), group.Nodes...),
-			Max:   group.Max,
-		})
-	}
-
 	jsonBytes, err := json.Marshal(resource)
 	if err != nil {
 		return "", fmt.Errorf("failed to serialize canvas: %w", err)
@@ -380,9 +347,6 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 		if len(c.Spec.Edges) > 0 {
 			return nil, nil, fmt.Errorf("canvas has edges but no nodes")
 		}
-		if len(c.Spec.Groups) > 0 {
-			return nil, nil, fmt.Errorf("canvas has groups but no nodes")
-		}
 		return []models.Node{}, []models.Edge{}, nil
 	}
 
@@ -420,10 +384,6 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 		if err := c.validateNodeRef(registry, orgID, node); err != nil {
 			nodeValidationErrors[node.ID] = err.Error()
 		}
-	}
-
-	if err := c.validateGroups(nodeIDs); err != nil {
-		return nil, nil, err
 	}
 
 	// Find shadowed names within connected components
@@ -522,13 +482,12 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 
 // validateNodeConcurrency enforces the inline concurrency spec
 // invariants: only action nodes take a spec, max must be at least 1 when
-// set, autoCancel must be a known policy, and the fields must apply to
-// the node's component. Merge admits every run's queue item into the
-// run's session, so its throughput is inherently unbounded and no
-// concurrency field applies. Loop honors max as its parallel-session
-// cap, but its backlog mixes session starts with feedback for running
-// sessions, so partitioning (key) or superseding (autoCancel) it would
-// break the sessions.
+// set, and the fields must apply to the node's component. Merge admits
+// every run's queue item into the run's session, so its throughput is
+// inherently unbounded and no concurrency field applies. Loop honors max
+// as its parallel-session cap, but its backlog mixes session starts with
+// feedback for running sessions, so partitioning (key) it would break
+// the sessions.
 func validateNodeConcurrency(node Node) error {
 	concurrency := node.Concurrency
 	if concurrency == nil {
@@ -543,69 +502,12 @@ func validateNodeConcurrency(node Node) error {
 		return fmt.Errorf("node %s: the merge component does not support concurrency", node.ID)
 	}
 
-	if node.Component == "loop" {
-		if concurrency.Key != "" {
-			return fmt.Errorf("node %s: the loop component does not support concurrency key", node.ID)
-		}
-
-		if concurrency.AutoCancel != "" {
-			return fmt.Errorf("node %s: the loop component does not support concurrency autoCancel", node.ID)
-		}
+	if node.Component == "loop" && concurrency.Key != "" {
+		return fmt.Errorf("node %s: the loop component does not support concurrency key", node.ID)
 	}
 
 	if concurrency.Max != nil && *concurrency.Max < 1 {
 		return fmt.Errorf("node %s: concurrency max must be at least 1", node.ID)
-	}
-
-	switch concurrency.AutoCancel {
-	case "", models.QueueAutoCancelQueued, models.QueueAutoCancelRunning:
-	default:
-		return fmt.Errorf(
-			"node %s: invalid concurrency autoCancel %q (must be %q or %q)",
-			node.ID, concurrency.AutoCancel, models.QueueAutoCancelQueued, models.QueueAutoCancelRunning,
-		)
-	}
-
-	return nil
-}
-
-// validateGroups enforces the group invariants: every group needs an id
-// and nodes, groups reference existing nodes, max is at least 1 (an
-// unlimited group gates nothing), and groups are disjoint (a node
-// belongs to at most one group) so a run can never need two group slots
-// at once.
-func (c *Canvas) validateGroups(nodeIDs map[string]bool) error {
-	groupIDs := make(map[string]bool, len(c.Spec.Groups))
-	groupByNode := make(map[string]string)
-
-	for i, group := range c.Spec.Groups {
-		if strings.TrimSpace(group.ID) == "" {
-			return fmt.Errorf("group %d: id is required", i)
-		}
-
-		if groupIDs[group.ID] {
-			return fmt.Errorf("group %s: duplicate group id", group.ID)
-		}
-		groupIDs[group.ID] = true
-
-		if group.Max != nil && *group.Max < 1 {
-			return fmt.Errorf("group %s: max must be at least 1", group.ID)
-		}
-
-		if len(group.Nodes) == 0 {
-			return fmt.Errorf("group %s: nodes is required", group.ID)
-		}
-
-		for _, nodeID := range group.Nodes {
-			if !nodeIDs[nodeID] {
-				return fmt.Errorf("group %s: node %s not found", group.ID, nodeID)
-			}
-
-			if otherGroup, ok := groupByNode[nodeID]; ok {
-				return fmt.Errorf("node %s belongs to more than one group (%s, %s)", nodeID, otherGroup, group.ID)
-			}
-			groupByNode[nodeID] = group.ID
-		}
 	}
 
 	return nil

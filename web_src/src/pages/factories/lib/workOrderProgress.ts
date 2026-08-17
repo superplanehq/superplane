@@ -1,5 +1,5 @@
 import type { FactoriesWorkOrder } from "@/api-client";
-import { hasActiveWorkOrderExecution, workOrderStepRows } from "./workOrderExecutions";
+import { hasActiveWorkOrderExecution } from "./workOrderExecutions";
 import { formatWorkOrderIdentifier } from "./workspaceKey";
 
 /**
@@ -147,7 +147,7 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
     return "draft";
   }
 
-  if (hasActiveWorkOrderExecution(workOrderStepRows(order.executions, order.queueItems))) {
+  if (hasActiveWorkOrderExecution(order.executions ?? [])) {
     return "running";
   }
 

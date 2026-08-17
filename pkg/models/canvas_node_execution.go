@@ -1,7 +1,6 @@
 package models
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -514,10 +513,6 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 		return nil, err
 	}
 
-	if _, err := e.maybeReleaseGroupSlot(tx); err != nil {
-		return nil, err
-	}
-
 	//
 	// If execution produced events, we know for sure that the run is not finished yet.
 	// If the events produced are terminal, the EventRouter will handle the run finalization.
@@ -602,10 +597,6 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 		return false, err
 	}
 
-	if _, err := e.maybeReleaseGroupSlot(tx); err != nil {
-		return false, err
-	}
-
 	return true, CompletePendingRequestsForExecution(tx, e.ID)
 }
 
@@ -671,10 +662,6 @@ func (e *CanvasNodeExecution) CancelInTransaction(tx *gorm.DB, cancelledBy *uuid
 		return err
 	}
 
-	if _, err := e.maybeReleaseGroupSlot(tx); err != nil {
-		return err
-	}
-
 	return CompletePendingRequestsForExecution(tx, e.ID)
 }
 
@@ -722,26 +709,6 @@ func (e *CanvasNodeExecution) IsFinished(tx *gorm.DB) (bool, error) {
 	}
 
 	return state == CanvasNodeExecutionStateFinished, nil
-}
-
-// maybeReleaseGroupSlot frees the group-queue slot held by this execution's
-// run when the execution's node belongs to a group and the run has no work
-// left inside that group. Called whenever an execution reaches a terminal
-// state.
-func (e *CanvasNodeExecution) maybeReleaseGroupSlot(tx *gorm.DB) (*CanvasQueueSlot, error) {
-	node, err := FindCanvasNode(tx, e.WorkflowID, e.NodeID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	if node.GroupID == nil {
-		return nil, nil
-	}
-
-	return ReleaseQueueSlotIfGroupIdle(tx, e.WorkflowID, *node.GroupID, e.RunID)
 }
 
 func (e *CanvasNodeExecution) findState(tx *gorm.DB) (string, error) {
@@ -833,21 +800,4 @@ func CountActiveExecutionsInQueue(tx *gorm.DB, workflowID uuid.UUID, nodeID, que
 	}
 
 	return count, nil
-}
-
-func ListActiveExecutionsInQueue(tx *gorm.DB, workflowID uuid.UUID, nodeID, queueName string) ([]CanvasNodeExecution, error) {
-	var executions []CanvasNodeExecution
-	err := tx.
-		Where("workflow_id = ?", workflowID).
-		Where("node_id = ?", nodeID).
-		Where("queue_name = ?", queueName).
-		Where("state IN ?", CanvasNodeExecutionActiveStates).
-		Order("created_at ASC").
-		Find(&executions).
-		Error
-	if err != nil {
-		return nil, err
-	}
-
-	return executions, nil
 }

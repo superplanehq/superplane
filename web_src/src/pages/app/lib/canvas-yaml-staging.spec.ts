@@ -141,7 +141,7 @@ spec:
     expect(rebuilt).not.toContain("is_collapsed:");
   });
 
-  it("round-trips node concurrency and groups", () => {
+  it("round-trips node concurrency", () => {
     const workflow: CanvasesCanvas = {
       ...sampleWorkflow,
       spec: {
@@ -151,7 +151,7 @@ spec:
             name: "Deploy",
             type: "TYPE_ACTION",
             component: "deploy",
-            concurrency: { key: "ci-{{ root().data.branch }}", max: 3, autoCancel: "queued" },
+            concurrency: { key: "ci-{{ root().data.branch }}", max: 3 },
           },
           {
             id: "test-1",
@@ -161,31 +161,17 @@ spec:
           },
         ],
         edges: [{ sourceId: "deploy-1", targetId: "test-1" }],
-        nodeGroups: [{ id: "staging-section", nodes: ["deploy-1", "test-1"], max: 2 }],
       },
     };
 
     const yamlText = buildCanvasYamlFromWorkflow(workflow);
-    expect(yamlText).toContain("groups:");
-    expect(yamlText).not.toContain("nodeGroups:");
 
     const spec = parseCanvasYamlToSpec(yamlText);
     expect(spec?.nodes?.[0]?.concurrency).toEqual({
       key: "ci-{{ root().data.branch }}",
       max: 3,
-      autoCancel: "queued",
     });
     expect(spec?.nodes?.[1]?.concurrency).toBeUndefined();
-    expect(spec?.nodeGroups).toEqual([{ id: "staging-section", nodes: ["deploy-1", "test-1"], max: 2 }]);
-  });
-
-  it("omits the groups key when empty", () => {
-    const yamlText = buildCanvasYamlFromWorkflow(sampleWorkflow);
-    expect(yamlText).not.toContain("groups:");
-
-    const spec = parseCanvasYamlToSpec(yamlText);
-    expect(spec).not.toBeNull();
-    expect(spec && "nodeGroups" in spec).toBe(false);
   });
 
   it("does not accept snake_case edge field aliases", () => {

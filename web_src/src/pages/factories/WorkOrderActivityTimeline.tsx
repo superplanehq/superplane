@@ -7,7 +7,7 @@ import type { OrgUserDisplay, OrgUserDisplayLookup } from "@/lib/orgUserDisplay"
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { useMemo, type ReactNode } from "react";
-import { Clock, FileText, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
+import { FileText, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
 import { buildLatestArtifactDataById, overlayLiveArtifactData } from "./lib/workOrderArtifact";
 import {
   buildWorkOrderTimelineView,
@@ -526,8 +526,6 @@ function getFallbackMarkerIcon(kind: WorkOrderTimelineEventKind): LucideIcon {
   switch (kind) {
     case "artifactAdded":
       return FileText;
-    case "queued":
-      return Clock;
     case "statusChanged":
     case "closed":
       return Play;

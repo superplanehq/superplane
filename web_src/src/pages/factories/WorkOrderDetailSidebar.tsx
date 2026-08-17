@@ -3,7 +3,6 @@ import type { FactoriesFactoryLine, FactoriesWorkOrder, FactoriesWorkOrderArtifa
 import { WorkOrderSidebarFactoryLines } from "./sidebar/WorkOrderSidebarFactoryLines";
 import { WorkOrderSidebarOverview } from "./sidebar/WorkOrderSidebarOverview";
 import { WorkOrderArtifactsList } from "./WorkOrderArtifactsList";
-import { workOrderStepRows } from "./lib/workOrderExecutions";
 import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailSidebarProps {
@@ -67,7 +66,7 @@ export function WorkOrderDetailSidebar({
       <WorkOrderSidebarFactoryLines
         organizationId={organizationId}
         factoryKey={factoryKey}
-        executions={workOrderStepRows(order.executions, order.queueItems)}
+        executions={order.executions ?? []}
         factoryLines={factoryLines}
         canDispatch={canDispatch}
         permissionsLoading={permissionsLoading}

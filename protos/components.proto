@@ -40,10 +40,6 @@ message ConcurrencySpec {
   // Maximum number of concurrent executions per key value. Absent
   // means 1. Must be 1 or greater when set.
   optional int32 max = 2;
-
-  // "queued" keeps only the newest waiting item per queue; "running"
-  // additionally cancels in-flight executions to free capacity.
-  optional string auto_cancel = 3;
 }
 
 message Position {

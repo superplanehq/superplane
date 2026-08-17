@@ -437,22 +437,6 @@ CREATE TABLE public.factory_work_order_executions (
 
 
 --
--- Name: factory_work_order_queue_items; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.factory_work_order_queue_items (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    organization_id uuid NOT NULL,
-    factory_id uuid NOT NULL,
-    work_order_id uuid NOT NULL,
-    line_id uuid NOT NULL,
-    step_index integer NOT NULL,
-    step_name text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
 -- Name: factory_work_orders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -740,18 +724,6 @@ CREATE TABLE public.workflow_node_executions (
 
 
 --
--- Name: workflow_node_groups; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.workflow_node_groups (
-    workflow_id uuid NOT NULL,
-    group_id character varying(128) NOT NULL,
-    max integer,
-    CONSTRAINT workflow_node_groups_max_check CHECK ((max >= 1))
-);
-
-
---
 -- Name: workflow_node_queue_items; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -808,22 +780,7 @@ CREATE TABLE public.workflow_nodes (
     state_reason text,
     concurrency_key text,
     concurrency_max integer,
-    concurrency_auto_cancel character varying(16),
-    group_id character varying(128),
-    CONSTRAINT workflow_nodes_concurrency_auto_cancel_check CHECK (((concurrency_auto_cancel)::text = ANY ((ARRAY['queued'::character varying, 'running'::character varying])::text[]))),
     CONSTRAINT workflow_nodes_concurrency_max_check CHECK ((concurrency_max >= 1))
-);
-
-
---
--- Name: workflow_queue_slots; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.workflow_queue_slots (
-    workflow_id uuid NOT NULL,
-    group_id character varying(128) NOT NULL,
-    run_id uuid NOT NULL,
-    acquired_at timestamp without time zone NOT NULL
 );
 
 
@@ -884,8 +841,7 @@ CREATE TABLE public.workflow_versions (
     console_panels jsonb DEFAULT '[]'::jsonb NOT NULL,
     console_layout jsonb DEFAULT '[]'::jsonb NOT NULL,
     commit_sha character varying(40) DEFAULT ''::character varying NOT NULL,
-    commit_message text DEFAULT ''::text NOT NULL,
-    node_groups jsonb
+    commit_message text DEFAULT ''::text NOT NULL
 );
 
 
@@ -1181,14 +1137,6 @@ ALTER TABLE ONLY public.factory_work_order_executions
 
 
 --
--- Name: factory_work_order_queue_items factory_work_order_queue_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_work_order_queue_items
-    ADD CONSTRAINT factory_work_order_queue_items_pkey PRIMARY KEY (id);
-
-
---
 -- Name: factory_work_orders factory_work_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1397,14 +1345,6 @@ ALTER TABLE ONLY public.workflow_node_executions
 
 
 --
--- Name: workflow_node_groups workflow_node_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_node_groups
-    ADD CONSTRAINT workflow_node_groups_pkey PRIMARY KEY (workflow_id, group_id);
-
-
---
 -- Name: workflow_node_queue_items workflow_node_queue_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1418,14 +1358,6 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 
 ALTER TABLE ONLY public.workflow_nodes
     ADD CONSTRAINT workflow_nodes_pkey PRIMARY KEY (workflow_id, node_id);
-
-
---
--- Name: workflow_queue_slots workflow_queue_slots_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_queue_slots
-    ADD CONSTRAINT workflow_queue_slots_pkey PRIMARY KEY (workflow_id, group_id, run_id);
 
 
 --
@@ -1764,20 +1696,6 @@ CREATE INDEX idx_factory_work_order_executions_work_order_line_active ON public.
 
 
 --
--- Name: idx_factory_work_order_queue_items_order; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_factory_work_order_queue_items_order ON public.factory_work_order_queue_items USING btree (work_order_id);
-
-
---
--- Name: idx_factory_work_order_queue_items_step; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_factory_work_order_queue_items_step ON public.factory_work_order_queue_items USING btree (line_id, step_index, created_at);
-
-
---
 -- Name: idx_factory_work_orders_factory_state; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1992,13 +1910,6 @@ CREATE INDEX idx_workflow_nodes_deleted_at ON public.workflow_nodes USING btree 
 --
 
 CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (state);
-
-
---
--- Name: idx_workflow_queue_slots_run; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_queue_slots_run ON public.workflow_queue_slots USING btree (workflow_id, run_id);
 
 
 --
@@ -2658,14 +2569,6 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
--- Name: workflow_queue_slots workflow_queue_slots_workflow_id_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_queue_slots
-    ADD CONSTRAINT workflow_queue_slots_workflow_id_group_id_fkey FOREIGN KEY (workflow_id, group_id) REFERENCES public.workflow_node_groups(workflow_id, group_id) ON DELETE CASCADE;
-
-
---
 -- Name: workflow_runs workflow_runs_cancelled_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2817,7 +2720,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260815144545	f
+20260815144533	f
 \.
 
 

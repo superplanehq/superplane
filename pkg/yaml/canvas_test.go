@@ -85,7 +85,6 @@ spec:
       concurrency:
         key: "ci-{{ root().data.branch }}"
         max: 3
-        autoCancel: queued
     - id: test
       name: Test
       type: TYPE_ACTION
@@ -93,10 +92,6 @@ spec:
   edges:
     - sourceId: deploy
       targetId: test
-  groups:
-    - id: staging-section
-      nodes: [deploy, test]
-      max: 2
 `)
 
 	resource, err := CanvasFromYAML(raw)
@@ -107,15 +102,7 @@ spec:
 	assert.Equal(t, "ci-{{ root().data.branch }}", concurrency.Key)
 	require.NotNil(t, concurrency.Max)
 	assert.Equal(t, 3, *concurrency.Max)
-	assert.Equal(t, "queued", concurrency.AutoCancel)
 	assert.Nil(t, resource.Spec.Nodes[1].Concurrency)
-
-	groups := resource.NodeGroups()
-	require.Len(t, groups, 1)
-	assert.Equal(t, "staging-section", groups[0].ID)
-	assert.Equal(t, []string{"deploy", "test"}, groups[0].Nodes)
-	require.NotNil(t, groups[0].Max)
-	assert.Equal(t, 2, *groups[0].Max)
 
 	nodes := resource.Nodes()
 	require.NotNil(t, nodes[0].Concurrency)
@@ -131,7 +118,7 @@ func TestCanvas_ValidateNodeConcurrency(t *testing.T) {
 	t.Run("valid specs pass", func(t *testing.T) {
 		assert.NoError(t, validateNodeConcurrency(nodeWithConcurrency(nil)))
 		assert.NoError(t, validateNodeConcurrency(nodeWithConcurrency(&ConcurrencySpec{Key: "ci-{{ root().data.branch }}"})))
-		assert.NoError(t, validateNodeConcurrency(nodeWithConcurrency(&ConcurrencySpec{Max: limit(3), AutoCancel: "queued"})))
+		assert.NoError(t, validateNodeConcurrency(nodeWithConcurrency(&ConcurrencySpec{Max: limit(3)})))
 	})
 
 	t.Run("max must be at least 1", func(t *testing.T) {
@@ -140,11 +127,6 @@ func TestCanvas_ValidateNodeConcurrency(t *testing.T) {
 
 		err = validateNodeConcurrency(nodeWithConcurrency(&ConcurrencySpec{Max: limit(-1)}))
 		assert.ErrorContains(t, err, "must be at least 1")
-	})
-
-	t.Run("autoCancel must be queued or running", func(t *testing.T) {
-		err := validateNodeConcurrency(nodeWithConcurrency(&ConcurrencySpec{AutoCancel: "sometimes"}))
-		assert.ErrorContains(t, err, "invalid concurrency autoCancel")
 	})
 
 	t.Run("only action nodes take a spec", func(t *testing.T) {
@@ -169,62 +151,6 @@ func TestCanvas_ValidateNodeConcurrency(t *testing.T) {
 		node.Concurrency = &ConcurrencySpec{Key: "{{ root().data.branch }}"}
 		err := validateNodeConcurrency(node)
 		assert.ErrorContains(t, err, "loop component does not support concurrency key")
-
-		node.Concurrency = &ConcurrencySpec{AutoCancel: "queued"}
-		err = validateNodeConcurrency(node)
-		assert.ErrorContains(t, err, "loop component does not support concurrency autoCancel")
-	})
-}
-
-func TestCanvas_ValidateGroups(t *testing.T) {
-	limit := func(v int) *int { return &v }
-	nodeIDs := map[string]bool{"deploy": true, "test": true, "notify": true}
-	canvasWithGroups := func(groups ...NodeGroup) *Canvas {
-		return &Canvas{Spec: &CanvasSpec{Groups: groups}}
-	}
-
-	t.Run("valid groups pass", func(t *testing.T) {
-		err := canvasWithGroups(
-			NodeGroup{ID: "staging", Nodes: []string{"deploy", "test"}, Max: limit(2)},
-			NodeGroup{ID: "post", Nodes: []string{"notify"}},
-		).validateGroups(nodeIDs)
-		assert.NoError(t, err)
-	})
-
-	t.Run("id is required", func(t *testing.T) {
-		err := canvasWithGroups(NodeGroup{Nodes: []string{"deploy"}}).validateGroups(nodeIDs)
-		assert.ErrorContains(t, err, "id is required")
-	})
-
-	t.Run("duplicate group ids are rejected", func(t *testing.T) {
-		err := canvasWithGroups(
-			NodeGroup{ID: "staging", Nodes: []string{"deploy"}},
-			NodeGroup{ID: "staging", Nodes: []string{"test"}},
-		).validateGroups(nodeIDs)
-		assert.ErrorContains(t, err, "duplicate group id")
-	})
-
-	t.Run("max must be at least 1", func(t *testing.T) {
-		err := canvasWithGroups(NodeGroup{ID: "staging", Nodes: []string{"deploy"}, Max: limit(0)}).validateGroups(nodeIDs)
-		assert.ErrorContains(t, err, "must be at least 1")
-	})
-
-	t.Run("nodes are required", func(t *testing.T) {
-		err := canvasWithGroups(NodeGroup{ID: "staging"}).validateGroups(nodeIDs)
-		assert.ErrorContains(t, err, "nodes is required")
-	})
-
-	t.Run("unknown nodes are rejected", func(t *testing.T) {
-		err := canvasWithGroups(NodeGroup{ID: "staging", Nodes: []string{"missing"}}).validateGroups(nodeIDs)
-		assert.ErrorContains(t, err, "node missing not found")
-	})
-
-	t.Run("groups must be disjoint", func(t *testing.T) {
-		err := canvasWithGroups(
-			NodeGroup{ID: "staging", Nodes: []string{"deploy"}},
-			NodeGroup{ID: "other", Nodes: []string{"deploy"}},
-		).validateGroups(nodeIDs)
-		assert.ErrorContains(t, err, "more than one group")
 	})
 }
 
@@ -238,16 +164,12 @@ func TestVersionToCanvasYAML_IncludesConcurrencyConfig(t *testing.T) {
 				Type: models.NodeTypeComponent,
 				Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
 				Concurrency: &models.ConcurrencySpec{
-					Key:        "ci-{{ root().data.branch }}",
-					Max:        limit(3),
-					AutoCancel: "queued",
+					Key: "ci-{{ root().data.branch }}",
+					Max: limit(3),
 				},
 			},
 		}),
 		Edges: datatypes.NewJSONSlice([]models.Edge{}),
-		NodeGroups: datatypes.NewJSONSlice([]models.NodeGroup{
-			{ID: "staging-section", Nodes: []string{"deploy"}, Max: limit(2)},
-		}),
 	}
 
 	out, err := VersionToCanvasYAML("test", "", version)
@@ -261,10 +183,6 @@ func TestVersionToCanvasYAML_IncludesConcurrencyConfig(t *testing.T) {
 	assert.Equal(t, "ci-{{ root().data.branch }}", concurrency.Key)
 	require.NotNil(t, concurrency.Max)
 	assert.Equal(t, 3, *concurrency.Max)
-	assert.Equal(t, "queued", concurrency.AutoCancel)
-
-	require.Len(t, roundTripped.Spec.Groups, 1)
-	assert.Equal(t, NodeGroup{ID: "staging-section", Nodes: []string{"deploy"}, Max: limit(2)}, roundTripped.Spec.Groups[0])
 }
 
 func TestNormalizeYAML1YKey(t *testing.T) {

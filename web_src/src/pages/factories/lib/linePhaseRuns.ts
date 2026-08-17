@@ -1,10 +1,5 @@
-import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
-import {
-  isActiveWorkOrderExecution,
-  isQueuedStepRow,
-  workOrderStepRows,
-  type WorkOrderStepRow,
-} from "./workOrderExecutions";
+import type { FactoriesFactoryLine, FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
+import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 
 export type LinePhaseTick = "running" | "waiting" | "queued" | "failed" | null;
 
@@ -14,7 +9,7 @@ export type LinePhaseRunCard = {
   /** Work order's factory-scoped sequence number, for building the permalink. */
   workOrderNumber: string | undefined;
   title: string;
-  execution: WorkOrderStepRow;
+  execution: FactoriesWorkOrderExecution;
 };
 
 export type LinePhaseColumn = {
@@ -57,14 +52,10 @@ export function buildLinePhaseBoard(line: FactoriesFactoryLine, workOrders: Fact
   });
 }
 
-export function resolvePhaseRunStatus(execution: WorkOrderStepRow): {
+export function resolvePhaseRunStatus(execution: FactoriesWorkOrderExecution): {
   kind: "running" | "waiting" | "queued" | "failed" | "idle";
   label: string;
 } {
-  if (isQueuedStepRow(execution)) {
-    const position = execution.queuePosition ?? 0;
-    return { kind: "queued", label: position > 0 ? `Queued #${position}` : "Queued" };
-  }
   if (execution.state === "STATE_STARTED") {
     return { kind: "running", label: "Executing" };
   }
@@ -121,7 +112,7 @@ function appendCurrentRunForOrder(
     return;
   }
 
-  const lineExecutions = workOrderStepRows(order.executions, order.queueItems).filter(
+  const lineExecutions = (order.executions ?? []).filter(
     (execution) => execution.line?.id === lineId && execution.step != null && stepIndexByName.has(execution.step),
   );
   if (lineExecutions.length === 0) {
@@ -148,13 +139,13 @@ function appendCurrentRunForOrder(
   runsByStep.set(currentExecution.step, [card]);
 }
 
-function executionTimestamp(execution: WorkOrderStepRow): number {
+function executionTimestamp(execution: FactoriesWorkOrderExecution): number {
   return Date.parse(execution.updatedAt ?? execution.createdAt ?? "") || 0;
 }
 
 function isPreferableCurrentExecution(
-  candidate: WorkOrderStepRow,
-  incumbent: WorkOrderStepRow,
+  candidate: FactoriesWorkOrderExecution,
+  incumbent: FactoriesWorkOrderExecution,
   stepIndexByName: Map<string, number>,
 ): boolean {
   const candidateStep = stepIndexByName.get(candidate.step ?? "") ?? -1;
@@ -171,12 +162,12 @@ function isPreferableCurrentExecution(
 }
 
 function pickCurrentLineExecution(
-  executions: WorkOrderStepRow[],
+  executions: FactoriesWorkOrderExecution[],
   stepIndexByName: Map<string, number>,
-): WorkOrderStepRow | null {
+): FactoriesWorkOrderExecution | null {
   const active = executions.filter(isActiveWorkOrderExecution);
   const candidates = active.length > 0 ? active : executions;
-  let best: WorkOrderStepRow | null = null;
+  let best: FactoriesWorkOrderExecution | null = null;
 
   for (const execution of candidates) {
     const stepIndex = stepIndexByName.get(execution.step ?? "") ?? -1;

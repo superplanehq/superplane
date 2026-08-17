@@ -1,7 +1,6 @@
 package models
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"regexp"
@@ -27,12 +26,7 @@ const (
 	NodeTypeWidget    = "widget"
 )
 
-const (
-	QueueAutoCancelQueued  = "queued"
-	QueueAutoCancelRunning = "running"
-
-	DefaultConcurrencyMax = 1
-)
+const DefaultConcurrencyMax = 1
 
 // ConcurrencySpec is a node's inline concurrency configuration. A node
 // without a spec runs one execution at a time.
@@ -44,8 +38,6 @@ type ConcurrencySpec struct {
 	// Max is presence-aware: nil means the default (1). Must be 1 or
 	// greater when set.
 	Max *int `json:"max,omitempty"`
-
-	AutoCancel string `json:"autoCancel,omitempty"`
 }
 
 // EffectiveMax returns the configured limit, defaulting to 1 when the
@@ -55,13 +47,6 @@ func (s *ConcurrencySpec) EffectiveMax() int {
 		return DefaultConcurrencyMax
 	}
 	return *s.Max
-}
-
-func (s *ConcurrencySpec) AutoCancelPolicy() string {
-	if s == nil {
-		return ""
-	}
-	return s.AutoCancel
 }
 
 type Node struct {
@@ -140,18 +125,11 @@ type CanvasNode struct {
 	//
 	// The node's inline concurrency configuration. Each field defaults
 	// independently, so all-NULL means the default behavior: one
-	// execution at a time in the node's implicit queue, no auto-cancel.
-	// The key may contain {{ }} expressions resolved per queue item.
+	// execution at a time in the node's implicit queue. The key may
+	// contain {{ }} expressions resolved per queue item.
 	//
-	ConcurrencyKey        *string
-	ConcurrencyMax        *int
-	ConcurrencyAutoCancel *string
-
-	//
-	// GroupID is the group this node belongs to, materialized at publish
-	// time from the canvas spec's node groups. Nil means no group.
-	//
-	GroupID *string
+	ConcurrencyKey *string
+	ConcurrencyMax *int
 
 	WebhookID         *uuid.UUID
 	AppInstallationID *uuid.UUID
@@ -172,17 +150,13 @@ func (c *CanvasNode) TableName() string {
 // ConcurrencySpec returns the node's inline concurrency configuration,
 // or nil when the node uses the default (one execution at a time).
 func (c *CanvasNode) ConcurrencySpec() *ConcurrencySpec {
-	if c.ConcurrencyKey == nil && c.ConcurrencyMax == nil && c.ConcurrencyAutoCancel == nil {
+	if c.ConcurrencyKey == nil && c.ConcurrencyMax == nil {
 		return nil
 	}
 
 	spec := &ConcurrencySpec{Max: c.ConcurrencyMax}
 	if c.ConcurrencyKey != nil {
 		spec.Key = *c.ConcurrencyKey
-	}
-
-	if c.ConcurrencyAutoCancel != nil {
-		spec.AutoCancel = *c.ConcurrencyAutoCancel
 	}
 
 	return spec
@@ -194,7 +168,6 @@ func (c *CanvasNode) ConcurrencySpec() *ConcurrencySpec {
 func (c *CanvasNode) SetConcurrencySpec(spec *ConcurrencySpec) {
 	c.ConcurrencyKey = nil
 	c.ConcurrencyMax = nil
-	c.ConcurrencyAutoCancel = nil
 	if spec == nil {
 		return
 	}
@@ -204,9 +177,6 @@ func (c *CanvasNode) SetConcurrencySpec(spec *ConcurrencySpec) {
 	}
 
 	c.ConcurrencyMax = spec.Max
-	if spec.AutoCancel != "" {
-		c.ConcurrencyAutoCancel = &spec.AutoCancel
-	}
 }
 
 func (c *CanvasNode) ComponentName() string {
@@ -391,8 +361,6 @@ func FindCanvasNodesByIDs(tx *gorm.DB, canvasID uuid.UUID, nodeIDs []string) ([]
 //   - it has no queue name: either not resolved yet (capacity is unknown
 //     until then) or the node's component manages its own queue items
 //     (never capacity-gated, never resolved — merge, loop);
-//   - the node has an autoCancel policy (a full queue still needs a pass
-//     to supersede waiting items or cancel running executions);
 //   - the item's queue has fewer active executions than the node's
 //     concurrency max.
 //
@@ -419,7 +387,6 @@ func ListCanvasNodesReady(tx *gorm.DB) ([]CanvasNode, error) {
 			      AND qi.node_id = wn.node_id
 			      AND (
 			        qi.queue_name IS NULL
-			        OR wn.concurrency_auto_cancel IS NOT NULL
 			        OR (
 			          SELECT COUNT(*)
 			          FROM workflow_node_executions e
@@ -613,51 +580,6 @@ func (i *CanvasNodeQueueItem) BeforeCreate(tx *gorm.DB) error {
 
 func (i *CanvasNodeQueueItem) Delete(tx *gorm.DB) error {
 	return tx.Delete(i).Error
-}
-
-// SupersedeQueueItem removes a queue item that was replaced by a newer
-// item in a queue with autoCancel: queued. When the item was the run's
-// only remaining work, the run finishes with the superseded result.
-func SupersedeQueueItem(tx *gorm.DB, item *CanvasNodeQueueItem) error {
-	if err := tx.Delete(item).Error; err != nil {
-		return err
-	}
-
-	run, err := FindCanvasRunInTransaction(tx, item.WorkflowID, item.RunID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
-		return err
-	}
-
-	if run.State == CanvasRunStateFinished {
-		return nil
-	}
-
-	openWork, err := run.FindOpenWork(tx)
-	if err != nil {
-		return err
-	}
-
-	if openWork.HasActiveExecutions || openWork.HasQueueItems || openWork.HasPendingEvents {
-		return nil
-	}
-
-	now := time.Now()
-	err = tx.Model(run).
-		Updates(map[string]any{
-			"state":       CanvasRunStateFinished,
-			"result":      CanvasRunResultSuperseded,
-			"updated_at":  &now,
-			"finished_at": &now,
-		}).
-		Error
-	if err != nil {
-		return err
-	}
-
-	return DeleteQueueSlotsForRun(tx, run.WorkflowID, run.ID)
 }
 
 func ListNodeQueueItems(db *gorm.DB, workflowID uuid.UUID, nodeID string, limit int, beforeTime *time.Time) ([]CanvasNodeQueueItem, error) {

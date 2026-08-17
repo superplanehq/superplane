@@ -21,7 +21,6 @@ const (
 	EventTypeOrderArtifactUpdated = "order.artifact.updated"
 
 	// Factory line events
-	EventTypeLineStepExecutionQueued   = "step.execution.queued"
 	EventTypeLineStepExecutionCreated  = "step.execution.created"
 	EventTypeLineStepExecutionFinished = "step.execution.finished"
 )
@@ -99,16 +98,6 @@ type WorkOrderArtifactAdded struct {
 	User       *UserRef       `json:"user,omitempty"`
 	Automation *AutomationRef `json:"automation,omitempty"`
 	Run        *RunRef        `json:"run,omitempty"`
-}
-
-// LineStepExecutionQueued is recorded when a work order becomes ready for
-// a step that is at its maxParallelism, so the work order waits in the
-// step's queue instead of starting a run.
-type LineStepExecutionQueued struct {
-	StepName string        `json:"stepName"`
-	Order    *WorkOrderRef `json:"order,omitempty"`
-	Line     *LineRef      `json:"line,omitempty"`
-	App      *AppRef       `json:"app,omitempty"`
 }
 
 type LineStepExecutionCreated struct {

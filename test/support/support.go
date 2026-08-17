@@ -345,17 +345,6 @@ func CreateNextNodeExecution(
 }
 
 func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
-	return CreateCanvasWithNodeGroups(t, orgID, userID, nodes, edges, nil)
-}
-
-func CreateCanvasWithNodeGroups(
-	t require.TestingT,
-	orgID uuid.UUID,
-	userID uuid.UUID,
-	nodes []models.CanvasNode,
-	edges []models.Edge,
-	nodeGroups []models.NodeGroup,
-) (*models.Canvas, []models.CanvasNode) {
 	now := time.Now()
 	liveVersionID := uuid.New()
 
@@ -371,13 +360,6 @@ func CreateCanvasWithNodeGroups(
 			Position:      node.Position.Data(),
 			IsCollapsed:   node.IsCollapsed,
 			Concurrency:   node.ConcurrencySpec(),
-		}
-	}
-
-	groupIDByNode := map[string]string{}
-	for _, group := range nodeGroups {
-		for _, nodeID := range group.Nodes {
-			groupIDByNode[nodeID] = group.ID
 		}
 	}
 
@@ -401,17 +383,6 @@ func CreateCanvasWithNodeGroups(
 			return err
 		}
 
-		for _, group := range nodeGroups {
-			row := models.CanvasNodeGroup{
-				WorkflowID: workflow.ID,
-				GroupID:    group.ID,
-				Max:        group.Max,
-			}
-			if err := tx.Create(&row).Error; err != nil {
-				return err
-			}
-		}
-
 		for _, node := range inputNodes {
 			canvasNode := models.CanvasNode{
 				WorkflowID:    workflow.ID,
@@ -429,10 +400,6 @@ func CreateCanvasWithNodeGroups(
 			}
 			canvasNode.SetConcurrencySpec(node.Concurrency)
 
-			if groupID, ok := groupIDByNode[node.ID]; ok {
-				canvasNode.GroupID = &groupID
-			}
-
 			if err := tx.Clauses(clause.Returning{}).Create(&canvasNode).Error; err != nil {
 				return err
 			}
@@ -445,7 +412,6 @@ func CreateCanvasWithNodeGroups(
 			OwnerID:    &userID,
 			Nodes:      datatypes.NewJSONSlice(inputNodes),
 			Edges:      datatypes.NewJSONSlice(edges),
-			NodeGroups: datatypes.NewJSONSlice(nodeGroups),
 			CreatedAt:  &now,
 			UpdatedAt:  &now,
 		}
