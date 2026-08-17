@@ -80,6 +80,8 @@ export interface OrgWorkspacePageOverrides {
   onboarding?: ComponentType;
   /** Storybook-only Work Orders page. Live app ignores this. */
   workOrders?: ComponentType;
+  /** Storybook-only Velocity page (e.g. work-order flow prototype). */
+  velocity?: ComponentType;
 }
 
 export interface OrgWorkspaceHarnessProps {
@@ -196,6 +198,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
   const WikiRoutePage = pageOverrides?.wiki ?? WikiPage;
   const OverviewRoutePage = pageOverrides?.overview ?? OverviewPage;
   const WorkOrdersRoutePage = pageOverrides?.workOrders ?? WorkOrdersPage;
+  const VelocityRoutePage = pageOverrides?.velocity ?? VelocityPage;
   const OnboardingRoutePage = pageOverrides?.onboarding;
   const onboardingEnabled = Boolean(OnboardingRoutePage);
 
@@ -222,7 +225,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
               <Route path="missions" element={<MissionsPage />} />
               <Route path="missions/:missionId" element={<MissionDetailPage />} />
               <Route path="wiki" element={<WikiRoutePage />} />
-              <Route path="velocity" element={<VelocityPage />} />
+              <Route path="velocity" element={<VelocityRoutePage />} />
               <Route path="work-orders">
                 <Route index element={<WorkOrdersRoutePage />} />
                 <Route path="new" element={<CreateWorkOrderComposeRedirect />} />
