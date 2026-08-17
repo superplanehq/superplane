@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
 
 import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact, FactoriesWorkOrderEvent } from "@/api-client";
 
@@ -14,6 +15,7 @@ import {
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
   RUNNING_WORK_ORDER,
+  STORYBOOK_ME_USER_ID,
 } from "./__fixtures__/factoryPageResponses";
 import {
   CLOSED_FAILED_WORK_ORDER_EVENTS,
@@ -25,6 +27,7 @@ import {
   RUNNING_WORK_ORDER_EVENTS,
 } from "./__fixtures__/factoryPageEventFixtures";
 import { WorkOrderDetailLoadedView } from "./WorkOrderDetailLoadedView";
+import { WorkOrderReactionBar, type WorkOrderReactionGroup } from "./WorkOrderReactionBar";
 import { getWorkOrderDetailDerived } from "./lib/workOrderProgress";
 
 /**
@@ -158,4 +161,78 @@ export const ReadOnly: Story = {
     canAssign: false,
     canManage: false,
   },
+};
+
+// --- Reaction bar prototype (issue #6680) ---------------------------------
+//
+// `reactionBar` is a Storybook-only slot on `WorkOrderDetailLoadedView` — it
+// stays `undefined` on the live page (see `WorkOrderDetailPage.tsx`), so
+// nothing below touches production rendering.
+
+const DEMO_REACTIONS: WorkOrderReactionGroup[] = [
+  {
+    emoji: "👍",
+    users: [
+      { id: STORYBOOK_ME_USER_ID, name: "Storybook User" },
+      { id: "user-alex", name: "Alex Chen" },
+    ],
+  },
+  { emoji: "👀", users: [{ id: "user-priya", name: "Priya Patel" }] },
+];
+
+/** Local, interactive stand-in for the reaction bar's future data source. */
+function ReactionBarDemo({ canReact }: { canReact: boolean }) {
+  const [reactions, setReactions] = useState<WorkOrderReactionGroup[]>(DEMO_REACTIONS);
+
+  const onToggleReaction = (emoji: string) => {
+    setReactions((current) => {
+      const group = current.find((item) => item.emoji === emoji);
+      const hasMine = group?.users.some((user) => user.id === STORYBOOK_ME_USER_ID) ?? false;
+
+      if (hasMine) {
+        return current
+          .map((item) =>
+            item.emoji === emoji
+              ? { ...item, users: item.users.filter((user) => user.id !== STORYBOOK_ME_USER_ID) }
+              : item,
+          )
+          .filter((item) => item.users.length > 0);
+      }
+
+      const me = { id: STORYBOOK_ME_USER_ID, name: "Storybook User" };
+      return group
+        ? current.map((item) => (item.emoji === emoji ? { ...item, users: [...item.users, me] } : item))
+        : [...current, { emoji, users: [me] }];
+    });
+  };
+
+  return (
+    <WorkOrderReactionBar
+      reactions={reactions}
+      currentUserId={STORYBOOK_ME_USER_ID}
+      canReact={canReact}
+      onToggleReaction={onToggleReaction}
+    />
+  );
+}
+
+/** Open — reaction bar sits below the description, above Activity; try toggling a pill. */
+export const WithReactionsOpen: Story = {
+  name: "With Reactions (Open)",
+  args: buildLoadedViewArgs(OPEN_WORK_ORDER, { events: OPEN_WORK_ORDER_EVENTS }),
+  render: (args) => <WorkOrderDetailLoadedView {...args} reactionBar={<ReactionBarDemo canReact />} />,
+};
+
+/** Running — same reaction bar composed alongside the in-progress status badge. */
+export const WithReactionsRunning: Story = {
+  name: "With Reactions (Running)",
+  args: buildLoadedViewArgs(RUNNING_WORK_ORDER, { events: RUNNING_WORK_ORDER_EVENTS }),
+  render: (args) => <WorkOrderDetailLoadedView {...args} reactionBar={<ReactionBarDemo canReact />} />,
+};
+
+/** Closed — read-only order; the "+" trigger is disabled with a permission tooltip. */
+export const WithReactionsClosed: Story = {
+  name: "With Reactions (Closed)",
+  args: buildLoadedViewArgs(CLOSED_WORK_ORDER, { events: CLOSED_WORK_ORDER_EVENTS }),
+  render: (args) => <WorkOrderDetailLoadedView {...args} reactionBar={<ReactionBarDemo canReact={false} />} />,
 };

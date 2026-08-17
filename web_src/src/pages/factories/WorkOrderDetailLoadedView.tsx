@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import type {
   FactoriesFactoryLine,
   FactoriesWorkOrder,
@@ -49,6 +51,13 @@ interface WorkOrderDetailLoadedViewProps {
   isAssigneesSaving: boolean;
   isUpdatingStatus: boolean;
   isAddingComment: boolean;
+  /**
+   * Storybook-only slot for the emoji reaction bar prototype, rendered
+   * below the description and above Activity. Left unset (`undefined`)
+   * on the live page, so production rendering is unaffected until the
+   * reaction feature ships. See `WorkOrderReactionBar`.
+   */
+  reactionBar?: ReactNode;
   onDispatch: (input: { lineName: string }) => Promise<void>;
   onClose: (result: FactoriesWorkOrderResult) => void;
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
@@ -109,17 +118,22 @@ function WorkOrderDetailBody({
   isDispatching,
   isAssigneesSaving,
   isAddingComment,
+  reactionBar,
   onDispatch,
   onAssigneesSave,
   onAddComment,
 }: WorkOrderDetailLoadedViewProps) {
+  const hasLeadIn = Boolean(order.description) || Boolean(reactionBar);
+
   return (
     <div className={factoryContentBodyClassName}>
       <div className="grid gap-x-[var(--workspace-column-gap)] gap-y-0 lg:grid-cols-[minmax(0,1fr)_var(--workspace-detail-sidebar-width)]">
         <div className="min-w-0">
           {order.description ? <WorkOrderDescription description={order.description} /> : null}
 
-          <section className={order.description ? "mt-10" : undefined}>
+          {reactionBar ? <div className={order.description ? "mt-4" : undefined}>{reactionBar}</div> : null}
+
+          <section className={hasLeadIn ? "mt-10" : undefined}>
             <h2 className="workspace-section-title">Activity</h2>
             <p className="workspace-body-text mt-1 text-muted-foreground">
               Actions and comments on the work order, plus factory line runs.
