@@ -401,6 +401,22 @@ CREATE TABLE public.factory_work_order_assignees (
 
 
 --
+-- Name: factory_work_order_comment_reactions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_work_order_comment_reactions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    work_order_id uuid NOT NULL,
+    comment_id uuid NOT NULL,
+    emoji character varying(16) NOT NULL,
+    user_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_work_order_events; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1108,6 +1124,14 @@ ALTER TABLE ONLY public.factory_work_order_assignees
 
 
 --
+-- Name: factory_work_order_comment_reactions factory_work_order_comment_reactions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_comment_reactions
+    ADD CONSTRAINT factory_work_order_comment_reactions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: factory_work_order_events factory_work_order_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1663,6 +1687,20 @@ CREATE INDEX idx_factory_work_order_assignees_user_id ON public.factory_work_ord
 
 
 --
+-- Name: idx_factory_work_order_comment_reactions_comment; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_comment_reactions_comment ON public.factory_work_order_comment_reactions USING btree (comment_id);
+
+
+--
+-- Name: idx_factory_work_order_comment_reactions_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_work_order_comment_reactions_unique ON public.factory_work_order_comment_reactions USING btree (comment_id, user_id, emoji);
+
+
+--
 -- Name: idx_factory_work_order_events_work_order_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2197,6 +2235,38 @@ ALTER TABLE ONLY public.factory_work_order_assignees
 
 
 --
+-- Name: factory_work_order_comment_reactions factory_work_order_comment_reactions_comment_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_comment_reactions
+    ADD CONSTRAINT factory_work_order_comment_reactions_comment_id_fkey FOREIGN KEY (comment_id) REFERENCES public.factory_work_order_events(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_order_comment_reactions factory_work_order_comment_reactions_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_comment_reactions
+    ADD CONSTRAINT factory_work_order_comment_reactions_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_order_comment_reactions factory_work_order_comment_reactions_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_comment_reactions
+    ADD CONSTRAINT factory_work_order_comment_reactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_order_comment_reactions factory_work_order_comment_reactions_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_comment_reactions
+    ADD CONSTRAINT factory_work_order_comment_reactions_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: factory_work_order_events factory_work_order_events_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2708,7 +2778,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260812184220	f
+20260817083259	f
 \.
 
 

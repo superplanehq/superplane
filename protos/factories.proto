@@ -252,6 +252,29 @@ service Factories {
     };
   }
 
+  rpc AddWorkOrderCommentReaction(AddWorkOrderCommentReactionRequest) returns (AddWorkOrderCommentReactionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/comments/{comment_id}/reactions"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Add a reaction to a work order comment";
+      description: "Adds the caller's emoji reaction to a work order comment";
+      tags: "Factory";
+    };
+  }
+
+  rpc RemoveWorkOrderCommentReaction(RemoveWorkOrderCommentReactionRequest) returns (RemoveWorkOrderCommentReactionResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/orders/{order_id}/comments/{comment_id}/reactions/{emoji}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Remove a reaction from a work order comment";
+      description: "Removes the caller's emoji reaction from a work order comment";
+      tags: "Factory";
+    };
+  }
+
 }
 
 // Factories
@@ -552,6 +575,10 @@ message WorkOrderEvent {
   google.protobuf.Timestamp timestamp = 1;
   string type = 2;
   google.protobuf.Struct event = 3;
+  // Stable id of the underlying event row. For `order.comment.added`
+  // events this is also the comment's public id — the one reactions are
+  // keyed off (see AddWorkOrderCommentReactionRequest.comment_id).
+  string id = 4;
 }
 
 // Status / comments / artifacts
@@ -603,6 +630,37 @@ message AutomationRef {
   string node_name = 2;
   string app_id = 3;
   string app_name = 4;
+}
+
+message AddWorkOrderCommentReactionRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  string comment_id = 3;
+  // One of the fixed reaction values: +1, -1, laugh, hooray, confused,
+  // heart, rocket, eyes.
+  string emoji = 4;
+}
+
+message AddWorkOrderCommentReactionResponse {
+  repeated WorkOrderCommentReactionSummary reactions = 1;
+}
+
+message RemoveWorkOrderCommentReactionRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  string comment_id = 3;
+  string emoji = 4;
+}
+
+message RemoveWorkOrderCommentReactionResponse {
+  repeated WorkOrderCommentReactionSummary reactions = 1;
+}
+
+message WorkOrderCommentReactionSummary {
+  string emoji = 1;
+  int32 count = 2;
+  // Whether the caller has reacted to the comment with this emoji.
+  bool reacted_by_me = 3;
 }
 
 message ListWorkOrderArtifactsRequest {

@@ -57,6 +57,7 @@ func AddWorkOrderComment(
 		UserID: &userIDStr,
 	}
 
+	var commentEvent *models.FactoryWorkOrderEvent
 	db := database.DB(ctx)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factoryModel, err := models.FindFactory(tx, orgID, factoryID)
@@ -69,7 +70,8 @@ func AddWorkOrderComment(
 			return err
 		}
 
-		return order.RecordCommentAdded(tx, body, author, nil)
+		commentEvent, err = order.RecordCommentAdded(tx, body, author, nil)
+		return err
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to add work order comment")
@@ -85,9 +87,10 @@ func AddWorkOrderComment(
 
 	return &pb.AddWorkOrderCommentResponse{
 		Comment: &pb.WorkOrderComment{
+			Id:        commentEvent.ID.String(),
 			Body:      body,
 			Author:    serializeCommentAuthor(author),
-			CreatedAt: timestamppb.Now(),
+			CreatedAt: timestamppb.New(commentEvent.CreatedAt),
 		},
 	}, nil
 }
