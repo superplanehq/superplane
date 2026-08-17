@@ -289,7 +289,10 @@ function LineMetricsSummary({ metrics }: { metrics: FactoriesLineMetrics | null 
   ];
 
   return (
-    <dl className="mt-3.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-border/60 pt-2.5" data-testid="lines-card-metrics">
+    <dl
+      className="mt-3.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-border/60 pt-2.5"
+      data-testid="lines-card-metrics"
+    >
       {stats.map((stat) => (
         <div key={stat.label} className="flex items-baseline gap-1.5">
           <dt className="text-[11px] text-muted-foreground">{stat.label}</dt>

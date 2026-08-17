@@ -14,7 +14,10 @@ import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { LinesPage } from "./LinesPage";
 
 const { lineMetricsQuery, workOrdersQuery } = vi.hoisted(() => ({
-  lineMetricsQuery: { data: undefined as Record<string, FactoriesLineMetrics> | undefined, error: null as Error | null },
+  lineMetricsQuery: {
+    data: undefined as Record<string, FactoriesLineMetrics> | undefined,
+    error: null as Error | null,
+  },
   workOrdersQuery: { data: [] as unknown[] },
 }));
 
