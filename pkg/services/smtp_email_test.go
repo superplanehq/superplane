@@ -236,6 +236,31 @@ func TestSMTPEmailService_SendWorkOrderNotificationEmail(t *testing.T) {
 	assert.Contains(t, message, "Looks good")
 }
 
+func TestResendEmailService_SendWorkOrderNotificationEmail_MissingTemplates(t *testing.T) {
+	t.Run("missing plain text template", func(t *testing.T) {
+		service := NewResendEmailService("re_test", "SuperPlane", "noreply@example.com", t.TempDir())
+		err := service.SendWorkOrderNotificationEmail("user@example.com", "[SP-1] Update", WorkOrderNotificationTemplateData{
+			Summary: "A work order changed.",
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "plain text template")
+	})
+
+	t.Run("missing html template", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		templateDir := filepath.Join(tmpDir, "email")
+		require.NoError(t, os.MkdirAll(templateDir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(templateDir, "work_order_notification.txt"), []byte("{{.Summary}}"), 0o644))
+
+		service := NewResendEmailService("re_test", "SuperPlane", "noreply@example.com", tmpDir)
+		err := service.SendWorkOrderNotificationEmail("user@example.com", "[SP-1] Update", WorkOrderNotificationTemplateData{
+			Summary: "A work order changed.",
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "HTML template")
+	})
+}
+
 func TestRenderEmailTemplate(t *testing.T) {
 	tmpDir := t.TempDir()
 	templateDir := filepath.Join(tmpDir, "email")
@@ -252,6 +277,21 @@ func TestRenderEmailTemplate(t *testing.T) {
 	html, err := renderEmailTemplate(tmpDir, "magic_code.html", data)
 	require.NoError(t, err)
 	assert.Contains(t, html, "token=a&amp;next=b")
+
+	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "work_order_notification.txt"), []byte("{{.Summary}} {{.WorkOrderLink}}"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "work_order_notification.html"), []byte("<a href=\"{{.WorkOrderLink}}\">{{.Summary}}</a>"), 0o644))
+
+	workOrder := WorkOrderNotificationTemplateData{
+		Summary:       "Ana commented",
+		WorkOrderLink: "https://app.superplane.com/org/workspaces/sp/work-order/42?tab=activity",
+	}
+	text, err = renderEmailTemplate(tmpDir, "work_order_notification.txt", workOrder)
+	require.NoError(t, err)
+	assert.Contains(t, text, "tab=activity")
+
+	html, err = renderEmailTemplate(tmpDir, "work_order_notification.html", workOrder)
+	require.NoError(t, err)
+	assert.Contains(t, html, "tab=activity")
 }
 
 func TestBuildEmailService(t *testing.T) {
