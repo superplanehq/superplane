@@ -3814,6 +3814,8 @@ export function AppPage({
             canvasNodesLoading: canvasLoading,
             nodeStatuses: consoleNodeStatuses,
             onTriggerNode: handleConsoleTriggerNode,
+            // Same gate as the runs sidebar: live version, outside an edit session.
+            onSelectRun: runLookupEnabled ? handleSelectRun : undefined,
             visualDiff: {
               enabled: draftVisualDiff.visualDiffEnabled && isEditSessionUiReady,
               summary: canvasConsoleVersionDiff.draftConsoleDiffSummary,
