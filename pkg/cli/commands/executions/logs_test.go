@@ -45,6 +45,193 @@ func TestLogsCommandReturnsExecutionLogsJSON(t *testing.T) {
 	require.Equal(t, "hello", output[0].Records[0].Text)
 }
 
+// newFollowExecutionLogBroker serves one live-log stream whose body is
+// written incrementally over time, so that --follow prints each record as
+// it arrives, then closes the stream to end the fetch.
+func newFollowExecutionLogBroker(t *testing.T, records []string) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/v1/tasks/task-001/live-logs", r.URL.Path)
+		require.Equal(t, "Bearer token-001", r.Header.Get("Authorization"))
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		flusher := w.(http.Flusher)
+		for _, record := range records {
+			_, _ = w.Write([]byte(record + "\n"))
+			flusher.Flush()
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func TestLogsCommandFollowPrintsRecordsAsTheyArrive(t *testing.T) {
+	broker := newFollowExecutionLogBroker(t, []string{
+		`{"type":"line","text":"first"}`,
+		`{"type":"line","text":"second"}`,
+		`{"type":"line","text":"third"}`,
+	})
+	server := newExecutionLogsServer(t, broker.URL)
+	ctx, stdout := newExecutionsCommandContext(t, server, "text")
+	canvasID := "canvas-001"
+	executionID := "exec-001"
+	empty := ""
+	limit := int64(5)
+	follow := true
+
+	cmd := &LogsCommand{
+		CanvasID:    &canvasID,
+		ExecutionID: &executionID,
+		RunID:       &empty,
+		NodeID:      &empty,
+		Limit:       &limit,
+		Follow:      &follow,
+	}
+
+	require.NoError(t, cmd.Execute(ctx))
+
+	raw := stdout.String()
+	require.Contains(t, raw, "Execution")
+	require.Contains(t, raw, "exec-001")
+	require.Contains(t, raw, "first")
+	require.Contains(t, raw, "second")
+	require.Contains(t, raw, "third")
+	require.NotContains(t, raw, "truncated")
+}
+
+func TestLogsCommandFollowReportsTruncatedLimit(t *testing.T) {
+	broker := newFollowExecutionLogBroker(t, []string{
+		`{"type":"line","text":"first"}`,
+		`{"type":"line","text":"second"}`,
+		`{"type":"line","text":"third"}`,
+		`{"type":"line","text":"fourth"}`,
+	})
+	server := newExecutionLogsServer(t, broker.URL)
+	ctx, stdout := newExecutionsCommandContext(t, server, "text")
+	canvasID := "canvas-001"
+	executionID := "exec-001"
+	empty := ""
+	limit := int64(2)
+	follow := true
+
+	cmd := &LogsCommand{
+		CanvasID:    &canvasID,
+		ExecutionID: &executionID,
+		RunID:       &empty,
+		NodeID:      &empty,
+		Limit:       &limit,
+		Follow:      &follow,
+	}
+
+	require.NoError(t, cmd.Execute(ctx))
+
+	raw := stdout.String()
+	require.Contains(t, raw, "first")
+	require.Contains(t, raw, "second")
+	require.Contains(t, raw, "truncated")
+	require.NotContains(t, raw, "fourth")
+}
+
+func TestLogsCommandFollowRequiresTextOutput(t *testing.T) {
+	broker := newExecutionLogBroker(t)
+	server := newExecutionLogsServer(t, broker.URL)
+	ctx, _ := newExecutionsCommandContext(t, server, "json")
+	canvasID := "canvas-001"
+	executionID := "exec-001"
+	empty := ""
+	limit := int64(5)
+	follow := true
+
+	cmd := &LogsCommand{
+		CanvasID:    &canvasID,
+		ExecutionID: &executionID,
+		RunID:       &empty,
+		NodeID:      &empty,
+		Limit:       &limit,
+		Follow:      &follow,
+	}
+
+	err := cmd.Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "text output")
+}
+
+func TestLogsCommandFollowRefusesMultiTargetRun(t *testing.T) {
+	ctx := newTwoRunnerExecutionContext(t, "canvas-001", "run-001")
+	canvasID := "canvas-001"
+	empty := ""
+	runID := "run-001"
+	limit := int64(5)
+	follow := true
+
+	cmd := &LogsCommand{
+		CanvasID:    &canvasID,
+		ExecutionID: &empty,
+		RunID:       &runID,
+		NodeID:      &empty,
+		Limit:       &limit,
+		Follow:      &follow,
+	}
+
+	err := cmd.Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "exactly one execution")
+}
+
+// newTwoRunnerExecutionContext builds a command context against a fake
+// server where run "run-001" has two runner-node executions, for the
+// multi-target --follow rejection test.
+func newTwoRunnerExecutionContext(t *testing.T, canvasID, runID string) core.CommandContext {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/v1/canvases/"+canvasID+"/runs/"):
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"run":{
+					"id":"` + runID + `",
+					"canvasId":"` + canvasID + `",
+					"executions":[
+						{"id":"exec-001","nodeId":"node-001","state":"STATE_FINISHED"},
+						{"id":"exec-002","nodeId":"node-002","state":"STATE_FINISHED"}
+					]
+				}
+			}`))
+		case r.URL.Path == "/api/v1/canvases/"+canvasID:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"canvas":{
+					"spec":{
+						"nodes":[
+							{"id":"node-001","component":"runner"},
+							{"id":"node-002","component":"runner"}
+						]
+					}
+				}
+			}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	stdout := bytes.NewBuffer(nil)
+	renderer, err := core.NewRenderer("text", stdout)
+	require.NoError(t, err)
+
+	config := openapi_client.NewConfiguration()
+	config.Servers = openapi_client.ServerConfigurations{{URL: server.URL}}
+
+	cobraCmd := &cobra.Command{}
+	cobraCmd.SetOut(stdout)
+
+	return core.CommandContext{
+		Context:  context.Background(),
+		Cmd:      cobraCmd,
+		API:      openapi_client.NewAPIClient(config),
+		Renderer: renderer,
+	}
+}
+
 func TestLogsCommandResolvesLatestNodeExecution(t *testing.T) {
 	broker := newExecutionLogBroker(t)
 	server := newExecutionLogsServer(t, broker.URL)

@@ -31,6 +31,12 @@ type LiveLogFetchOptions struct {
 	HTTPClient  *http.Client
 	Now         time.Time
 	IdleTimeout time.Duration
+	// OnRecord, when set, is invoked synchronously for each record as it is
+	// read, in addition to the record being included in the returned result.
+	// It lets a caller (e.g. a CLI --follow flag) print records live while
+	// the fetch is still reading the stream, instead of waiting for the
+	// whole fetch to finish.
+	OnRecord func(LiveLogRecord)
 }
 
 type LiveLogFetchResult struct {
@@ -78,9 +84,9 @@ func FetchLiveLogSessionRecords(ctx context.Context, session LiveLogSession, opt
 	}
 
 	if opts.IdleTimeout > 0 {
-		return readLiveLogRecordsUntilIdle(ctx, response.Body, limit, opts.IdleTimeout)
+		return readLiveLogRecordsUntilIdle(ctx, response.Body, limit, opts.IdleTimeout, opts.OnRecord)
 	}
-	return readLiveLogRecords(response.Body, limit)
+	return readLiveLogRecords(response.Body, limit, opts.OnRecord)
 }
 
 func normalizeLiveLogRecordLimit(limit int) int {
@@ -100,7 +106,7 @@ func liveLogHTTPClient(client *http.Client) *http.Client {
 	return &http.Client{Timeout: 30 * time.Second}
 }
 
-func readLiveLogRecords(reader io.Reader, limit int) (*LiveLogFetchResult, error) {
+func readLiveLogRecords(reader io.Reader, limit int, onRecord func(LiveLogRecord)) (*LiveLogFetchResult, error) {
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
@@ -121,6 +127,9 @@ func readLiveLogRecords(reader io.Reader, limit int) (*LiveLogFetchResult, error
 		}
 
 		records = append(records, record)
+		if onRecord != nil {
+			onRecord(record)
+		}
 		if len(records) >= limit {
 			return &LiveLogFetchResult{Records: records, Truncated: true}, nil
 		}
@@ -142,6 +151,7 @@ func readLiveLogRecordsUntilIdle(
 	reader io.Reader,
 	limit int,
 	idleTimeout time.Duration,
+	onRecord func(LiveLogRecord),
 ) (*LiveLogFetchResult, error) {
 	done := make(chan struct{})
 	events := make(chan liveLogReadEvent)
@@ -164,7 +174,7 @@ func readLiveLogRecordsUntilIdle(
 	for {
 		select {
 		case event := <-events:
-			result, complete, err := applyLiveLogReadEvent(records, event, limit)
+			result, complete, err := applyLiveLogReadEvent(records, event, limit, onRecord)
 			if err != nil {
 				return nil, err
 			}
@@ -174,7 +184,7 @@ func readLiveLogRecordsUntilIdle(
 			}
 			resetLiveLogIdleTimer(idle, idleTimeout)
 		case <-idle.C:
-			result, complete, err := drainReadyLiveLogReadEvents(records, events, limit)
+			result, complete, err := drainReadyLiveLogReadEvents(records, events, limit, onRecord)
 			if err != nil {
 				return nil, err
 			}
@@ -197,13 +207,14 @@ func drainReadyLiveLogReadEvents(
 	records []LiveLogRecord,
 	events <-chan liveLogReadEvent,
 	limit int,
+	onRecord func(LiveLogRecord),
 ) (*LiveLogFetchResult, bool, error) {
 	result := &LiveLogFetchResult{Records: records}
 
 	for {
 		select {
 		case event := <-events:
-			next, complete, err := applyLiveLogReadEvent(result.Records, event, limit)
+			next, complete, err := applyLiveLogReadEvent(result.Records, event, limit, onRecord)
 			if err != nil {
 				return nil, false, err
 			}
@@ -221,6 +232,7 @@ func applyLiveLogReadEvent(
 	records []LiveLogRecord,
 	event liveLogReadEvent,
 	limit int,
+	onRecord func(LiveLogRecord),
 ) (*LiveLogFetchResult, bool, error) {
 	if event.err != nil {
 		return nil, false, fmt.Errorf("read live logs: %w", event.err)
@@ -230,6 +242,9 @@ func applyLiveLogReadEvent(
 	}
 
 	records = append(records, event.record)
+	if onRecord != nil {
+		onRecord(event.record)
+	}
 	if len(records) >= limit {
 		return &LiveLogFetchResult{Records: records, Truncated: true}, true, nil
 	}
