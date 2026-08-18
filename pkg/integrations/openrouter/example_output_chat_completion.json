@@ -1,0 +1,69 @@
+{
+    "type": "openrouter.chatCompletion.result",
+    "data": {
+        "id": "gen-1755000000-AbCdEfGhIjKlMnOp",
+        "model": "openai/gpt-4o-mini",
+        "provider": "OpenAI",
+        "text": "Hello, world!",
+        "reasoning": "The user greeted me, so a short greeting back is enough.",
+        "finishReason": "stop",
+        "usage": {
+            "prompt_tokens": 14,
+            "completion_tokens": 9,
+            "total_tokens": 23,
+            "cost": 0.0000075,
+            "cost_details": {
+                "upstream_inference_cost": 0.0000075,
+                "upstream_inference_prompt_cost": 0.0000021,
+                "upstream_inference_completions_cost": 0.0000054
+            },
+            "prompt_tokens_details": {
+                "cached_tokens": 0,
+                "audio_tokens": 0
+            },
+            "completion_tokens_details": {
+                "reasoning_tokens": 0,
+                "audio_tokens": 0
+            }
+        },
+        "response": {
+            "id": "gen-1755000000-AbCdEfGhIjKlMnOp",
+            "object": "chat.completion",
+            "created": 1755000000,
+            "model": "openai/gpt-4o-mini",
+            "provider": "OpenAI",
+            "choices": [
+                {
+                    "index": 0,
+                    "finish_reason": "stop",
+                    "native_finish_reason": "stop",
+                    "message": {
+                        "role": "assistant",
+                        "content": "Hello, world!",
+                        "reasoning": "The user greeted me, so a short greeting back is enough."
+                    }
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 14,
+                "completion_tokens": 9,
+                "total_tokens": 23,
+                "cost": 0.0000075,
+                "cost_details": {
+                    "upstream_inference_cost": 0.0000075,
+                    "upstream_inference_prompt_cost": 0.0000021,
+                    "upstream_inference_completions_cost": 0.0000054
+                },
+                "prompt_tokens_details": {
+                    "cached_tokens": 0,
+                    "audio_tokens": 0
+                },
+                "completion_tokens_details": {
+                    "reasoning_tokens": 0,
+                    "audio_tokens": 0
+                }
+            }
+        }
+    },
+    "timestamp": "2026-08-18T12:00:00Z"
+}
