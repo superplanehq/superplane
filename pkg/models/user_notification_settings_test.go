@@ -23,7 +23,7 @@ func Test__UserNotificationSettings(t *testing.T) {
 	})
 
 	t.Run("upsert creates and then updates the same row", func(t *testing.T) {
-		userID := uuid.New()
+		userID := support.CreateUser(t, r, r.Organization.ID).ID
 
 		created, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, userID, models.UserNotificationSettingsParams{
 			Enabled:        true,
@@ -49,7 +49,7 @@ func Test__UserNotificationSettings(t *testing.T) {
 	})
 
 	t.Run("upsert rejects invalid workspace scope", func(t *testing.T) {
-		_, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, uuid.New(), models.UserNotificationSettingsParams{
+		_, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, r.User, models.UserNotificationSettingsParams{
 			Enabled:        true,
 			WorkspaceScope: "everywhere",
 		})
@@ -57,8 +57,8 @@ func Test__UserNotificationSettings(t *testing.T) {
 	})
 
 	t.Run("batch find returns only users with a row", func(t *testing.T) {
-		withRow := uuid.New()
-		withoutRow := uuid.New()
+		withRow := support.CreateUser(t, r, r.Organization.ID).ID
+		withoutRow := support.CreateUser(t, r, r.Organization.ID).ID
 
 		_, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, withRow, models.UserNotificationSettingsParams{
 			Enabled:        true,
