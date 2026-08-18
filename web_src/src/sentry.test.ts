@@ -17,6 +17,14 @@ describe("isIgnoredConsoleMessage", () => {
     ).toBe(true);
   });
 
+  it("ignores the LocatorJS unsupported React renderer warning", () => {
+    expect(
+      isIgnoredConsoleMessage(
+        "[locatorjs]: loading: Unsupported React renderer, only bundle type 1 (development) is supported but 0 (production) is found",
+      ),
+    ).toBe(true);
+  });
+
   it("keeps genuine application console messages", () => {
     expect(isIgnoredConsoleMessage("Something actually broke")).toBe(false);
     expect(isIgnoredConsoleMessage("Unexpected token in JSON")).toBe(false);
