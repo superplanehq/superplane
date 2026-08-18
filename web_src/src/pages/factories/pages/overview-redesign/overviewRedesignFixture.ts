@@ -1,9 +1,10 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderResult } from "@/api-client";
+import type { FactoriesWorkOrder, FactoriesWorkOrderEvent, FactoriesWorkOrderResult } from "@/api-client";
 
 import {
   defaultFactoriesFixture,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
+  STORYBOOK_ME_USER_ID,
   type FactoriesFixture,
 } from "../../__fixtures__/factoryPageResponses";
 
@@ -102,6 +103,20 @@ const OVERVIEW_ORDERS: FactoriesWorkOrder[] = [
   }),
 ];
 
+/** Minimal timeline so a click-through from the overview never shows an empty Activity. */
+function openedEvent(order: FactoriesWorkOrder): FactoriesWorkOrderEvent {
+  return {
+    type: "order.status.updated",
+    timestamp: order.createdAt,
+    event: {
+      user: { id: STORYBOOK_ME_USER_ID },
+      order: { id: order.id, title: order.title },
+      fromState: "draft",
+      toState: "open",
+    },
+  };
+}
+
 /** Default fixture plus a backing order for every Overview redesign row. */
 export const overviewRedesignFixture: FactoriesFixture = {
   ...defaultFactoriesFixture,
@@ -112,4 +127,5 @@ export const overviewRedesignFixture: FactoriesFixture = {
       ...(defaultFactoriesFixture.workOrdersByFactoryId[PRIMARY_FACTORY_ID] ?? []),
     ],
   },
+  eventsByOrderId: Object.fromEntries(OVERVIEW_ORDERS.map((order) => [order.id!, [openedEvent(order)]])),
 };
