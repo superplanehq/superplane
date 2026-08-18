@@ -2,11 +2,9 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
-import { VelocityPage, VelocityPrototypePage } from "./VelocityPage";
+import { VelocityPage } from "./VelocityPage";
+import { VelocityPrototypePage } from "./VelocityPrototypePage";
 
-/**
- * Velocity page: PR output plus Storybook work-order time (cycle and Waiting).
- */
 const meta = {
   title: "Factories/Pages/Velocity",
   component: VelocityPage,
