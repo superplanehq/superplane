@@ -211,23 +211,7 @@ function AppRouter() {
                     path=":factoryKey/settings"
                     element={withAuthPermissionAndFactoriesFeature(FactorySettingsLayout, "factories", "read")}
                   >
-                    <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
-                    <Route path="general" element={<FactorySettingsGeneralPage />} />
-                    <Route path="profile" element={<FactorySettingsProfilePage />} />
-                    <Route path="notifications" element={<FactorySettingsNotificationsPage />} />
-                    {FACTORY_SETTINGS_NAV_ITEMS.filter(isFactorySettingsComingSoon).map((item) => (
-                      <Route
-                        key={item.id}
-                        path={item.id}
-                        element={
-                          <FactorySettingsSoonPage
-                            title={item.label}
-                            description={`${item.label} settings for this workspace.`}
-                            Icon={item.Icon}
-                          />
-                        }
-                      />
-                    ))}
+                    {factorySettingsSectionRoutes()}
                   </Route>
                 </Route>
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
@@ -278,6 +262,30 @@ function FactoryLineEditPageGate() {
     <RequirePermission resource="factories" action="update">
       <FactoryLineEditPage />
     </RequirePermission>
+  );
+}
+
+function factorySettingsSectionRoutes() {
+  return (
+    <>
+      <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
+      <Route path="general" element={<FactorySettingsGeneralPage />} />
+      <Route path="profile" element={<FactorySettingsProfilePage />} />
+      <Route path="notifications" element={<FactorySettingsNotificationsPage />} />
+      {FACTORY_SETTINGS_NAV_ITEMS.filter(isFactorySettingsComingSoon).map((item) => (
+        <Route
+          key={item.id}
+          path={item.id}
+          element={
+            <FactorySettingsSoonPage
+              title={item.label}
+              description={`${item.label} settings for this workspace.`}
+              Icon={item.Icon}
+            />
+          }
+        />
+      ))}
+    </>
   );
 }
 
