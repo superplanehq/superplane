@@ -30,6 +30,7 @@ func Test__DescribeNotificationSettings(t *testing.T) {
 		assert.True(t, notificationTypeToggleEnabled(resp.Settings, pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_CREATED))
 		assert.True(t, notificationTypeToggleEnabled(resp.Settings, pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_OWNED))
 		assert.True(t, notificationTypeToggleEnabled(resp.Settings, pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED))
+		assert.True(t, notificationTypeToggleEnabled(resp.Settings, pb.NotificationSettings_TYPE_WORK_ORDER_MENTIONED))
 	})
 
 	t.Run("unauthenticated", func(t *testing.T) {
@@ -58,6 +59,7 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 					notificationTypeToggle(pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_CREATED, true),
 					notificationTypeToggle(pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_OWNED, true),
 					notificationTypeToggle(pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED, false),
+					notificationTypeToggle(pb.NotificationSettings_TYPE_WORK_ORDER_MENTIONED, true),
 				},
 			},
 		})
@@ -66,6 +68,7 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_ALL, resp.Settings.WorkspaceScope)
 		assert.False(t, notificationTypeToggleEnabled(resp.Settings, pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED))
 		assert.False(t, notificationTypeToggleEnabled(resp.Settings, pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED))
+		assert.True(t, notificationTypeToggleEnabled(resp.Settings, pb.NotificationSettings_TYPE_WORK_ORDER_MENTIONED))
 
 		described, err := DescribeNotificationSettings(ctx)
 		require.NoError(t, err)

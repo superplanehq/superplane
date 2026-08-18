@@ -53,7 +53,7 @@ interface WorkOrderDetailLoadedViewProps {
   onClose: (result: FactoriesWorkOrderResult) => void;
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
-  onAddComment: (body: string) => Promise<void>;
+  onAddComment: (body: string, mentionedUserIds: string[]) => Promise<void>;
 }
 
 export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps) {
@@ -139,6 +139,7 @@ function WorkOrderDetailBody({
                 artifacts={artifacts}
                 footer={
                   <WorkOrderCommentComposer
+                    organizationId={organizationId}
                     canComment={canManage}
                     isSubmitting={isAddingComment}
                     onSubmit={onAddComment}
