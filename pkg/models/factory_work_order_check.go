@@ -132,6 +132,42 @@ func (o *FactoryWorkOrder) ReportCheck(
 	return check, nil
 }
 
+func (o *FactoryWorkOrder) ListChecks(tx *gorm.DB) ([]FactoryWorkOrderCheck, error) {
+	var checks []FactoryWorkOrderCheck
+	err := tx.
+		Where("work_order_id = ?", o.ID).
+		Order("created_at ASC").
+		Order("id ASC").
+		Find(&checks).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return checks, nil
+}
+
+// IsValidWorkOrderCheckLevel reports whether ReportCheck accepts the level.
+func IsValidWorkOrderCheckLevel(level string) bool {
+	switch level {
+	case FactoryWorkOrderCheckLevelPositive,
+		FactoryWorkOrderCheckLevelNeutral,
+		FactoryWorkOrderCheckLevelCaution,
+		FactoryWorkOrderCheckLevelCritical:
+		return true
+	}
+	return false
+}
+
+// IsValidWorkOrderCheckFormat reports whether ReportCheck accepts the format.
+func IsValidWorkOrderCheckFormat(format string) bool {
+	switch format {
+	case FactoryWorkOrderCheckFormatFraction, FactoryWorkOrderCheckFormatPercent:
+		return true
+	}
+	return false
+}
+
 func (o *FactoryWorkOrder) reportCheck(
 	db *gorm.DB,
 	normalized FactoryWorkOrderCheckParams,
@@ -195,42 +231,6 @@ func (o *FactoryWorkOrder) reportCheck(
 	}
 
 	return check, nil
-}
-
-func (o *FactoryWorkOrder) ListChecks(tx *gorm.DB) ([]FactoryWorkOrderCheck, error) {
-	var checks []FactoryWorkOrderCheck
-	err := tx.
-		Where("work_order_id = ?", o.ID).
-		Order("created_at ASC").
-		Order("id ASC").
-		Find(&checks).
-		Error
-	if err != nil {
-		return nil, err
-	}
-
-	return checks, nil
-}
-
-// IsValidWorkOrderCheckLevel reports whether ReportCheck accepts the level.
-func IsValidWorkOrderCheckLevel(level string) bool {
-	switch level {
-	case FactoryWorkOrderCheckLevelPositive,
-		FactoryWorkOrderCheckLevelNeutral,
-		FactoryWorkOrderCheckLevelCaution,
-		FactoryWorkOrderCheckLevelCritical:
-		return true
-	}
-	return false
-}
-
-// IsValidWorkOrderCheckFormat reports whether ReportCheck accepts the format.
-func IsValidWorkOrderCheckFormat(format string) bool {
-	switch format {
-	case FactoryWorkOrderCheckFormatFraction, FactoryWorkOrderCheckFormatPercent:
-		return true
-	}
-	return false
 }
 
 func (o *FactoryWorkOrder) findCheckByKey(tx *gorm.DB, key string) (*FactoryWorkOrderCheck, error) {
