@@ -22,6 +22,8 @@ type UpdateWorkOrderArtifactConfiguration struct {
 	ArtifactKey string `json:"artifactKey" mapstructure:"artifactKey"`
 	State       string `json:"state" mapstructure:"state"`
 	Title       string `json:"title" mapstructure:"title"`
+	MergedAt    string `json:"mergedAt" mapstructure:"mergedAt"`
+	ClosedAt    string `json:"closedAt" mapstructure:"closedAt"`
 }
 
 func (c *UpdateWorkOrderArtifact) Name() string {
@@ -120,6 +122,22 @@ func (c *UpdateWorkOrderArtifact) Configuration() []configuration.Field {
 			Required:    false,
 			Togglable:   true,
 		},
+		{
+			Name:        "mergedAt",
+			Label:       "Merged At",
+			Description: "Optional RFC3339 merge timestamp — usually {{ event.data.pull_request.merged_at }}. Set with state = merged so Velocity attributes the merge to the real day; unset falls back to now.",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+		},
+		{
+			Name:        "closedAt",
+			Label:       "Closed At",
+			Description: "Optional RFC3339 close timestamp — usually {{ event.data.pull_request.closed_at }}. Set with state = closed so Velocity waste attributes it to the real day.",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+		},
 	}
 }
 
@@ -135,6 +153,12 @@ func (c *UpdateWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 	}
 	if config.Title != "" {
 		data["title"] = config.Title
+	}
+	if config.MergedAt != "" {
+		data["mergedAt"] = config.MergedAt
+	}
+	if config.ClosedAt != "" {
+		data["closedAt"] = config.ClosedAt
 	}
 
 	artifact, err := ctx.Factory.UpdateWorkOrderArtifact(core.UpdateWorkOrderArtifactParams{

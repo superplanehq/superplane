@@ -61,8 +61,11 @@ type FactoryWorkOrderArtifact struct {
 	Type           string
 	Data           datatypes.JSON
 	Key            *string
-	CreatedByID    *uuid.UUID
-	CreatedAt      time.Time
+	// MergedAt / ClosedAt are append-only. A later reopen does not clear them.
+	MergedAt    *time.Time
+	ClosedAt    *time.Time
+	CreatedByID *uuid.UUID
+	CreatedAt   time.Time
 
 	CreatedBy *User `gorm:"foreignKey:CreatedByID"`
 }
@@ -136,6 +139,10 @@ func (o *FactoryWorkOrder) CreateArtifact(
 	}
 
 	now := time.Now()
+	mergedAt, closedAt, err := extractPrLifecycleTimestamps(artifactType, params.Data, now, nil, nil)
+	if err != nil {
+		return nil, err
+	}
 	artifact := &FactoryWorkOrderArtifact{
 		ID:             uuid.New(),
 		OrganizationID: o.OrganizationID,
@@ -144,6 +151,8 @@ func (o *FactoryWorkOrder) CreateArtifact(
 		Type:           artifactType,
 		Data:           dataJSON,
 		Key:            key,
+		MergedAt:       mergedAt,
+		ClosedAt:       closedAt,
 		CreatedByID:    params.CreatedBy,
 		CreatedAt:      now,
 	}
@@ -226,7 +235,22 @@ func (o *FactoryWorkOrder) UpdateArtifactData(
 		)
 	}
 
-	if err := tx.Model(&artifact).Update("data", dataJSON).Error; err != nil {
+	mergedAt, closedAt, err := extractPrLifecycleTimestamps(artifact.Type, merged, time.Now(), artifact.MergedAt, artifact.ClosedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	columnUpdates := map[string]any{"data": dataJSON}
+	if mergedAt != nil && artifact.MergedAt == nil {
+		columnUpdates["merged_at"] = mergedAt
+		artifact.MergedAt = mergedAt
+	}
+	if closedAt != nil && artifact.ClosedAt == nil {
+		columnUpdates["closed_at"] = closedAt
+		artifact.ClosedAt = closedAt
+	}
+
+	if err := tx.Model(&artifact).Updates(columnUpdates).Error; err != nil {
 		return nil, err
 	}
 	artifact.Data = dataJSON
@@ -247,6 +271,56 @@ func (o *FactoryWorkOrder) ListArtifacts(tx *gorm.DB) ([]FactoryWorkOrderArtifac
 		return nil, err
 	}
 
+	return artifacts, nil
+}
+
+type FactoryPRArtifactFilter struct {
+	MergedFrom *time.Time
+	MergedTo   *time.Time
+	ClosedFrom *time.Time
+	ClosedTo   *time.Time
+	State      string
+}
+
+func ListFactoryPRArtifacts(tx *gorm.DB, factoryID uuid.UUID, filter FactoryPRArtifactFilter) ([]FactoryWorkOrderArtifact, error) {
+	query := tx.
+		Where("factory_id = ? AND type = ?", factoryID, FactoryWorkOrderArtifactTypePR)
+
+	if filter.State != "" {
+		if _, ok := validPrArtifactStates[filter.State]; !ok {
+			return nil, fmt.Errorf("%w: invalid state filter %q", ErrFactoryWorkOrderArtifactInvalid, filter.State)
+		}
+	}
+
+	switch filter.State {
+	case PrArtifactStateMerged:
+		query = query.Where("merged_at IS NOT NULL")
+	case PrArtifactStateClosed:
+		query = query.Where("closed_at IS NOT NULL AND merged_at IS NULL")
+	}
+
+	if filter.MergedFrom != nil {
+		query = query.Where("merged_at >= ?", *filter.MergedFrom)
+	}
+	if filter.MergedTo != nil {
+		query = query.Where("merged_at < ?", *filter.MergedTo)
+	}
+	if filter.ClosedFrom != nil {
+		query = query.Where("closed_at >= ?", *filter.ClosedFrom)
+	}
+	if filter.ClosedTo != nil {
+		query = query.Where("closed_at < ?", *filter.ClosedTo)
+	}
+
+	var artifacts []FactoryWorkOrderArtifact
+	err := query.
+		Order("merged_at DESC NULLS LAST").
+		Order("closed_at DESC NULLS LAST").
+		Find(&artifacts).
+		Error
+	if err != nil {
+		return nil, err
+	}
 	return artifacts, nil
 }
 
@@ -275,6 +349,12 @@ func validateArtifactData(artifactType string, data map[string]any) error {
 				ErrFactoryWorkOrderArtifactInvalid,
 				state,
 			)
+		}
+		if err := validateOptionalTimestamp(data, "mergedAt"); err != nil {
+			return err
+		}
+		if err := validateOptionalTimestamp(data, "closedAt"); err != nil {
+			return err
 		}
 	case FactoryWorkOrderArtifactTypeMarkdown:
 		if extractArtifactString(data, "body") == "" {
@@ -348,4 +428,55 @@ func extractArtifactString(data map[string]any, key string) string {
 	}
 
 	return strings.TrimSpace(value)
+}
+
+func validateOptionalTimestamp(data map[string]any, key string) error {
+	raw := extractArtifactString(data, key)
+	if raw == "" {
+		return nil
+	}
+	if _, err := time.Parse(time.RFC3339, raw); err != nil {
+		return fmt.Errorf("%w: %s must be RFC3339 (got %q)", ErrFactoryWorkOrderArtifactInvalid, key, raw)
+	}
+	return nil
+}
+
+func extractPrLifecycleTimestamps(
+	artifactType string,
+	data map[string]any,
+	now time.Time,
+	existingMerged, existingClosed *time.Time,
+) (mergedAt *time.Time, closedAt *time.Time, err error) {
+	if artifactType != FactoryWorkOrderArtifactTypePR {
+		return nil, nil, nil
+	}
+
+	state := extractArtifactString(data, "state")
+
+	if state == PrArtifactStateMerged && existingMerged == nil {
+		mergedAt, err = pickTimestamp(data, "mergedAt", now)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	if state == PrArtifactStateClosed && existingClosed == nil {
+		closedAt, err = pickTimestamp(data, "closedAt", now)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	return mergedAt, closedAt, nil
+}
+
+func pickTimestamp(data map[string]any, key string, fallback time.Time) (*time.Time, error) {
+	raw := extractArtifactString(data, key)
+	if raw == "" {
+		t := fallback
+		return &t, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s must be RFC3339 (got %q)", ErrFactoryWorkOrderArtifactInvalid, key, raw)
+	}
+	return &parsed, nil
 }
