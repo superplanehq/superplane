@@ -1,6 +1,6 @@
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
 
-import { toArtifactDataRecord, toWorkOrderArtifactLikes } from "./lib/workOrderArtifact";
+import { toArtifactDataRecord } from "./lib/workOrderArtifact";
 import { WorkOrderArtifactInline } from "./WorkOrderArtifactInline";
 
 interface WorkOrderArtifactsListProps {
@@ -10,11 +10,6 @@ interface WorkOrderArtifactsListProps {
 }
 
 export function WorkOrderArtifactsList({ artifacts, isLoading, error }: WorkOrderArtifactsListProps) {
-  // Every row can look at every other artifact on the same work order,
-  // so a branch chip can borrow the sibling PR's owner/repo/host and
-  // render as a clickable tree link.
-  const relatedArtifacts = toWorkOrderArtifactLikes(artifacts);
-
   return (
     <section>
       <h3 className="workspace-section-label">Artifacts</h3>
@@ -39,7 +34,6 @@ export function WorkOrderArtifactsList({ artifacts, isLoading, error }: WorkOrde
                     type: artifact.type ?? "TYPE_UNSPECIFIED",
                     data: toArtifactDataRecord(artifact.data),
                   }}
-                  relatedArtifacts={relatedArtifacts}
                 />
               </li>
             ))}

@@ -42,7 +42,7 @@ describe("WorkOrderArtifactInline", () => {
     expect(link).toHaveTextContent("feature/refund-retry");
   });
 
-  it("renders a branch artifact without a url and no siblings as plain text", () => {
+  it("renders a branch artifact without a url as plain text", () => {
     render(
       <WorkOrderArtifactInline
         artifact={{
@@ -50,51 +50,6 @@ describe("WorkOrderArtifactInline", () => {
           type: "TYPE_BRANCH",
           data: { name: "feature/refund-retry" },
         }}
-      />,
-    );
-
-    expect(screen.queryByRole("link")).not.toBeInTheDocument();
-    expect(screen.getByText("feature/refund-retry")).toBeInTheDocument();
-  });
-
-  it("makes a nameless-url branch clickable when a sibling PR points at the same repo", () => {
-    // A branch is normally attached before the PR opens, so `data.url` is
-    // usually missing. We derive a repo tree URL from the sibling PR so
-    // the chip is clickable without the flow author remembering to pass
-    // `url` at attach time.
-    render(
-      <WorkOrderArtifactInline
-        artifact={{
-          id: "branch",
-          type: "TYPE_BRANCH",
-          data: { name: "feature/refund-retry" },
-        }}
-        relatedArtifacts={[{ type: "TYPE_PR", data: { url: "https://github.com/example/repo/pull/42" } }]}
-      />,
-    );
-
-    const link = screen.getByRole("link");
-    expect(link).toHaveAttribute("href", "https://github.com/example/repo/tree/feature/refund-retry");
-    expect(link).toHaveTextContent("feature/refund-retry");
-  });
-
-  it("does not derive a link from a non-GitHub-style sibling URL", () => {
-    // We only synthesize tree URLs for GitHub `/pull/{n}` shapes; GitLab
-    // and Bitbucket use different path prefixes and would produce a
-    // broken link.
-    render(
-      <WorkOrderArtifactInline
-        artifact={{
-          id: "branch",
-          type: "TYPE_BRANCH",
-          data: { name: "feature/refund-retry" },
-        }}
-        relatedArtifacts={[
-          {
-            type: "TYPE_PR",
-            data: { url: "https://gitlab.example.com/example/repo/-/merge_requests/7" },
-          },
-        ]}
       />,
     );
 

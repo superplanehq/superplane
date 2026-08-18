@@ -1,6 +1,6 @@
 import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 
-import { overlayLiveArtifactData, type WorkOrderArtifactLike } from "../lib/workOrderArtifact";
+import { overlayLiveArtifactData } from "../lib/workOrderArtifact";
 import { WorkOrderArtifactInline } from "../WorkOrderArtifactInline";
 import type { WorkOrderTimelineEvent } from "../lib/workOrderTimelineEvents";
 import { TimelineAutomationActor } from "./TimelineAutomationActor";
@@ -11,13 +11,11 @@ export function ArtifactEventBody({
   actorDisplay,
   timeLabel,
   latestArtifactDataById,
-  relatedArtifacts,
 }: {
   event: WorkOrderTimelineEvent;
   actorDisplay: OrgUserDisplay | null;
   timeLabel: string;
   latestArtifactDataById: Map<string, Record<string, unknown>>;
-  relatedArtifacts: readonly WorkOrderArtifactLike[];
 }) {
   const artifact = event.artifact;
   if (!artifact) return null;
@@ -34,11 +32,7 @@ export function ArtifactEventBody({
         <span className={timelineActorClassName}>Someone</span>
       )}{" "}
       attached{" "}
-      <WorkOrderArtifactInline
-        artifact={displayArtifact}
-        relatedArtifacts={relatedArtifacts}
-        className="align-baseline"
-      />
+      <WorkOrderArtifactInline artifact={displayArtifact} className="align-baseline" />
       <span className={timelineTimeClassName}>
         {" · "}
         {timeLabel}

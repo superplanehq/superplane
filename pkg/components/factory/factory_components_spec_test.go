@@ -434,6 +434,41 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
+	t.Run("accepts branch with name and repository", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
+			"repository":   "example/repo",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("repository field is visible only for branch", func(t *testing.T) {
+		var repositoryField *configuration.Field
+		for i := range fields {
+			if fields[i].Name == "repository" {
+				repositoryField = &fields[i]
+				break
+			}
+		}
+		if repositoryField == nil {
+			t.Fatal("expected a repository field in configuration")
+		}
+		if len(repositoryField.VisibilityConditions) != 1 {
+			t.Fatalf("expected a single visibility condition for repository, got %d", len(repositoryField.VisibilityConditions))
+		}
+		condition := repositoryField.VisibilityConditions[0]
+		if condition.Field != "artifactType" {
+			t.Fatalf("expected visibility condition on artifactType, got %q", condition.Field)
+		}
+		if len(condition.Values) != 1 || condition.Values[0] != "branch" {
+			t.Fatalf("expected repository visibility to be branch-only, got %v", condition.Values)
+		}
+	})
+
 	t.Run("url field is visible for both pr and branch", func(t *testing.T) {
 		var urlField *configuration.Field
 		for i := range fields {

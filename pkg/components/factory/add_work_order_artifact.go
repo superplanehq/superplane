@@ -38,6 +38,7 @@ type AddWorkOrderArtifactConfiguration struct {
 	Title       string              `json:"title" mapstructure:"title"`
 	Body        string              `json:"body" mapstructure:"body"`
 	Name        string              `json:"name" mapstructure:"name"`
+	Repository  string              `json:"repository" mapstructure:"repository"`
 	ArtifactKey string              `json:"artifactKey" mapstructure:"artifactKey"`
 	Data        []ArtifactDataEntry `json:"data" mapstructure:"data"`
 }
@@ -61,7 +62,7 @@ Supported types:
 
 - **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + `, ` + "`title`" + `, ` + "`state`" + `, ` + "`merged`" + `, and ` + "`draft`" + `. The ` + "`state`" + ` field (` + "`open`" + `/` + "`draft`" + `/` + "`closed`" + `/` + "`merged`" + `, defaults to ` + "`open`" + `) drives the icon/color of the artifact chip in the work order UI. ` + "`state`" + `, ` + "`merged`" + `, and ` + "`draft`" + ` all accept expressions, so a flow can wire them straight to a ` + "`github.onPullRequest`" + ` payload: a GitHub-shaped ` + "`state: \"closed\"`" + ` + ` + "`merged: true`" + ` folds into SuperPlane's ` + "`state: \"merged\"`" + ` before it hits the artifact.
 - **Markdown note** (` + "`markdown`" + `): requires ` + "`body`" + `; optional ` + "`title`" + `.
-- **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` (the branch name); optional ` + "`url`" + ` to link to the branch on its provider. When you leave ` + "`url`" + ` blank, the work order UI derives a repository tree URL from a sibling pull request artifact on the same order, so the branch chip stays clickable even if you attach the branch before opening the PR.
+- **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` (the branch name). Set ` + "`url`" + ` when you attach the branch — SuperPlane does not wait for a pull request. If you set ` + "`repository`" + ` (` + "`owner/repo`" + ` or a repository http(s) URL) and leave ` + "`url`" + ` blank, SuperPlane writes a GitHub tree URL from that repository and the branch name.
 
 PR and markdown types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key.
 
@@ -141,7 +142,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		{
 			Name:                 "url",
 			Label:                "URL",
-			Description:          "Link to the pull request or branch (must be http or https). Required for pull requests; optional for branches — e.g. a GitHub tree URL like https://github.com/{owner}/{repo}/tree/{branch}.",
+			Description:          "Link to the pull request or branch (must be http or https). Required for pull requests. For branches, set this when you attach the branch — SuperPlane does not wait for a pull request. Example: https://github.com/{owner}/{repo}/tree/{branch}.",
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
 			VisibilityConditions: linkableTypes,
@@ -186,6 +187,14 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "artifactType", Values: []string{"branch"}},
 			},
+		},
+		configuration.Field{
+			Name:                 "repository",
+			Label:                "Repository",
+			Description:          "Repository that owns the branch (`owner/repo` or the repository https URL). When URL is empty, SuperPlane writes a GitHub tree URL from this value and the branch name.",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			VisibilityConditions: branchOnly,
 		},
 		configuration.Field{
 			Name:                 "title",
@@ -304,6 +313,8 @@ func buildArtifactData(config AddWorkOrderArtifactConfiguration) (map[string]any
 		}
 		data[key] = value
 	}
+
+	data = applyBranchTreeURL(config, data)
 
 	updates, err := prArtifactStateUpdates(config.State, config.Merged, config.Draft)
 	if err != nil {

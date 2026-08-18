@@ -11,20 +11,6 @@ const PR_ARTIFACT_STATES: readonly PrArtifactState[] = ["open", "draft", "closed
 // regardless of which convention was used.
 const PR_NUMBER_KEYS = ["number", "prNumber"] as const;
 
-// Shape common to every place we look at sibling artifacts (sidebar,
-// timeline events, dispatch steps). We only need the type + free-form
-// data; consumers should not have to build a full presentation object.
-export interface WorkOrderArtifactLike {
-  id?: string;
-  type?: string;
-  data?: Record<string, unknown>;
-}
-
-/** Chip/list presentation: same as a sibling artifact, with a required type. */
-export interface WorkOrderArtifactPresentation extends WorkOrderArtifactLike {
-  type: string;
-}
-
 /**
  * Returns `#<n>` when the free-form artifact data carries a PR number,
  * otherwise undefined so callers can fall back to title / URL / a generic
@@ -110,74 +96,6 @@ export function extractPrArtifactState(data: ArtifactData): PrArtifactState | un
   return explicit;
 }
 
-/**
- * Returns a safe-looking external URL for a branch artifact, or undefined
- * when we can't produce one.
- *
- * Branches usually get attached before the PR exists, so `data.url` is
- * frequently missing. When a sibling PR artifact carries a GitHub-style
- * pull request URL (`https://{host}/{owner}/{repo}/pull/{n}`), we build
- * `https://{host}/{owner}/{repo}/tree/{branch}` from it and make the
- * chip clickable. Non-GitHub-style URLs are ignored so we don't ship a
- * broken link for GitLab / Bitbucket, which use different path prefixes.
- *
- * The caller still passes the result through `safeExternalUrl` before
- * putting it into an `href`.
- */
-export function resolveBranchArtifactUrl(
-  branchData: ArtifactData,
-  relatedArtifacts?: readonly WorkOrderArtifactLike[],
-): string | undefined {
-  const direct = extractArtifactUrl(branchData);
-  if (direct) {
-    return direct;
-  }
-
-  const branchName = extractArtifactName(branchData);
-  if (!branchName) {
-    return undefined;
-  }
-
-  const candidates: Array<{ treeUrl: string; headRef?: string }> = [];
-  for (const related of relatedArtifacts ?? []) {
-    if (normalizeArtifactKind(related.type ?? "") !== "pr") {
-      continue;
-    }
-    const siblingUrl = extractArtifactUrl(related.data);
-    if (!siblingUrl) {
-      continue;
-    }
-
-    const treeUrl = buildTreeUrlFromPullRequestUrl(siblingUrl, branchName);
-    if (treeUrl) {
-      candidates.push({ treeUrl, headRef: extractPrHeadRef(related.data) });
-    }
-  }
-
-  const matching = candidates.filter((candidate) => candidate.headRef === branchName);
-  if (matching.length > 0) {
-    return matching[0].treeUrl;
-  }
-
-  // One GitHub PR on the work order: safe to assume it is the same repo.
-  // Two or more with no head-ref match: do not guess the repository.
-  if (candidates.length === 1) {
-    return candidates[0].treeUrl;
-  }
-
-  return undefined;
-}
-
-/**
- * Strips the `TYPE_` proto prefix and lower-cases the artifact type so
- * every consumer branches on the same set of strings ("pr", "branch",
- * "markdown", ...). Exported because sibling-lookup logic outside this
- * file also needs it.
- */
-export function normalizeArtifactKind(type: string): string {
-  return type.replace(/^TYPE_/i, "").toLowerCase();
-}
-
 export function buildLatestArtifactDataById(
   artifacts: Array<{ id?: string; data?: Record<string, unknown> }> | undefined,
 ): Map<string, Record<string, unknown>> {
@@ -208,28 +126,6 @@ function readPrArtifactStateField(data: ArtifactData): PrArtifactState | undefin
   return PR_ARTIFACT_STATES.find((state) => state === normalized);
 }
 
-function extractPrHeadRef(data: ArtifactData): string | undefined {
-  const fromField =
-    extractArtifactField(data, "head_ref") ??
-    extractArtifactField(data, "headRef") ??
-    extractArtifactField(data, "branch");
-  if (fromField) {
-    return fromField;
-  }
-  if (!data) {
-    return undefined;
-  }
-
-  const head = data.head;
-  if (head && typeof head === "object" && !Array.isArray(head)) {
-    const ref = (head as Record<string, unknown>).ref;
-    if (typeof ref === "string" && ref.trim() !== "") {
-      return ref.trim();
-    }
-  }
-  return undefined;
-}
-
 // GitHub payloads carry real booleans; templated flow inputs almost
 // always arrive as the strings "true" / "false". Tolerate both so a
 // PR chip can pick up the state without an if-node in the flow.
@@ -249,53 +145,12 @@ function extractArtifactBoolean(data: ArtifactData, key: string): boolean | unde
   return undefined;
 }
 
-function buildTreeUrlFromPullRequestUrl(pullUrl: string, branchName: string): string | undefined {
-  let parsed: URL;
-  try {
-    parsed = new URL(pullUrl);
-  } catch {
-    return undefined;
-  }
-
-  const segments = parsed.pathname.split("/").filter(Boolean);
-  const pullIndex = segments.findIndex((segment) => segment.toLowerCase() === "pull");
-  if (pullIndex < 2) {
-    return undefined;
-  }
-
-  const owner = segments[pullIndex - 2];
-  const repo = segments[pullIndex - 1];
-  if (!owner || !repo) {
-    return undefined;
-  }
-
-  const encodedBranch = branchName
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-
-  return `${parsed.origin}/${owner}/${repo}/tree/${encodedBranch}`;
-}
-
 /**
  * Narrows the API's `data?: unknown` into the string-keyed shape every
  * artifact consumer expects, without lying about non-object payloads.
  */
 export function toArtifactDataRecord(data: unknown): Record<string, unknown> | undefined {
   return data && typeof data === "object" ? (data as Record<string, unknown>) : undefined;
-}
-
-// The API and timeline both carry artifacts with `data` typed as
-// `unknown`, but the resolver only needs `{ type, data }`. Do the
-// narrowing once at the call site so consumers can pass the array
-// straight through.
-export function toWorkOrderArtifactLikes(
-  artifacts: ReadonlyArray<{ type?: string | null; data?: unknown }> | undefined,
-): WorkOrderArtifactLike[] {
-  return (artifacts ?? []).map((artifact) => ({
-    type: artifact.type ?? undefined,
-    data: toArtifactDataRecord(artifact.data),
-  }));
 }
 
 function extractArtifactField(data: ArtifactData, key: string): string | undefined {

@@ -8,11 +8,8 @@ import {
   extractArtifactUrl,
   extractPrArtifactState,
   formatPrArtifactLabel,
-  normalizeArtifactKind,
   overlayLiveArtifactData,
-  resolveBranchArtifactUrl,
   toArtifactDataRecord,
-  toWorkOrderArtifactLikes,
 } from "./workOrderArtifact";
 
 describe("formatPrArtifactLabel", () => {
@@ -184,116 +181,6 @@ describe("extractPrArtifactState", () => {
   });
 });
 
-describe("resolveBranchArtifactUrl", () => {
-  it("returns the branch's own url when it has one", () => {
-    expect(
-      resolveBranchArtifactUrl(
-        { name: "feature/refund-retry", url: "https://github.com/example/repo/tree/feature/refund-retry" },
-        [],
-      ),
-    ).toBe("https://github.com/example/repo/tree/feature/refund-retry");
-  });
-
-  it("falls back to data.html_url on the branch itself", () => {
-    expect(
-      resolveBranchArtifactUrl({
-        name: "feature/refund-retry",
-        html_url: "https://github.com/example/repo/tree/feature/refund-retry",
-      }),
-    ).toBe("https://github.com/example/repo/tree/feature/refund-retry");
-  });
-
-  it("derives a GitHub tree URL from a sibling PR's URL", () => {
-    // Common ordering: the flow creates the branch (attached with just a
-    // name), then opens the PR later. This is what makes the branch chip
-    // clickable without every flow author remembering to set `url`.
-    expect(
-      resolveBranchArtifactUrl({ name: "feature/refund-retry" }, [
-        { type: "TYPE_PR", data: { url: "https://github.com/example/repo/pull/42" } },
-      ]),
-    ).toBe("https://github.com/example/repo/tree/feature/refund-retry");
-  });
-
-  it("accepts a sibling PR that only has html_url (GitHub payload shape)", () => {
-    expect(
-      resolveBranchArtifactUrl({ name: "hotfix/urgent" }, [
-        { type: "pr", data: { html_url: "https://github.com/example/repo/pull/7" } },
-      ]),
-    ).toBe("https://github.com/example/repo/tree/hotfix/urgent");
-  });
-
-  it("percent-encodes each path segment of the branch name but keeps slashes", () => {
-    // Branch names can contain characters the URL parser would otherwise
-    // eat (e.g. `feat/#42-fix`); each segment must be encoded, but the
-    // segment separator must remain a real `/`.
-    expect(
-      resolveBranchArtifactUrl({ name: "feat/#42-fix" }, [
-        { type: "TYPE_PR", data: { url: "https://github.com/example/repo/pull/42" } },
-      ]),
-    ).toBe("https://github.com/example/repo/tree/feat/%2342-fix");
-  });
-
-  it("does not derive a URL for non-GitHub-style sibling URLs", () => {
-    // GitLab / Bitbucket use different path prefixes (e.g. `/-/merge_requests`).
-    // Building a `tree/` URL for those would ship a broken link.
-    expect(
-      resolveBranchArtifactUrl({ name: "feature/refund-retry" }, [
-        { type: "TYPE_PR", data: { url: "https://gitlab.example.com/example/repo/-/merge_requests/1" } },
-      ]),
-    ).toBeUndefined();
-  });
-
-  it("ignores sibling artifacts that are not PRs", () => {
-    expect(
-      resolveBranchArtifactUrl({ name: "feature/refund-retry" }, [
-        { type: "TYPE_MARKDOWN", data: { url: "https://github.com/example/repo/pull/42" } },
-      ]),
-    ).toBeUndefined();
-  });
-
-  it("returns undefined when the branch has neither a url nor a name", () => {
-    expect(resolveBranchArtifactUrl({})).toBeUndefined();
-    expect(resolveBranchArtifactUrl(undefined)).toBeUndefined();
-  });
-
-  it("returns undefined when there is no sibling PR at all", () => {
-    expect(resolveBranchArtifactUrl({ name: "feature/refund-retry" }, [])).toBeUndefined();
-    expect(resolveBranchArtifactUrl({ name: "feature/refund-retry" }, undefined)).toBeUndefined();
-  });
-
-  it("does not guess when multiple sibling PRs point at different repos", () => {
-    // Two GitHub PRs and no head-ref match: picking the first would
-    // send the branch chip to the wrong repository.
-    expect(
-      resolveBranchArtifactUrl({ name: "feature/refund-retry" }, [
-        { type: "TYPE_PR", data: { url: "https://github.com/acme/payments/pull/1" } },
-        { type: "TYPE_PR", data: { url: "https://github.com/acme/storefront/pull/9" } },
-      ]),
-    ).toBeUndefined();
-  });
-
-  it("prefers the sibling PR whose head ref matches the branch name", () => {
-    expect(
-      resolveBranchArtifactUrl({ name: "feature/refund-retry" }, [
-        { type: "TYPE_PR", data: { url: "https://github.com/acme/payments/pull/1", head_ref: "chore/deps" } },
-        {
-          type: "TYPE_PR",
-          data: { url: "https://github.com/acme/storefront/pull/9", head: { ref: "feature/refund-retry" } },
-        },
-      ]),
-    ).toBe("https://github.com/acme/storefront/tree/feature/refund-retry");
-  });
-});
-
-describe("normalizeArtifactKind", () => {
-  it("strips the TYPE_ proto prefix and lower-cases the value", () => {
-    expect(normalizeArtifactKind("TYPE_PR")).toBe("pr");
-    expect(normalizeArtifactKind("TYPE_BRANCH")).toBe("branch");
-    expect(normalizeArtifactKind("branch")).toBe("branch");
-    expect(normalizeArtifactKind("")).toBe("");
-  });
-});
-
 describe("buildLatestArtifactDataById", () => {
   it("indexes artifacts that have both an id and data", () => {
     const byId = buildLatestArtifactDataById([
@@ -329,16 +216,3 @@ describe("toArtifactDataRecord", () => {
   });
 });
 
-describe("toWorkOrderArtifactLikes", () => {
-  it("narrows API artifacts to the sibling-lookup shape", () => {
-    expect(
-      toWorkOrderArtifactLikes([
-        { type: "TYPE_PR", data: { url: "https://github.com/example/repo/pull/1" } },
-        { type: null, data: undefined },
-      ]),
-    ).toEqual([
-      { type: "TYPE_PR", data: { url: "https://github.com/example/repo/pull/1" } },
-      { type: undefined, data: undefined },
-    ]);
-  });
-});
