@@ -19,7 +19,9 @@ import {
   workOrderRouteNeedsCanonicalRedirect,
   type WorkOrderResolution,
 } from "../lib/workOrderNumberResolution";
+import { useWorkOrderChecks } from "../useWorkOrderChecks";
 import { useWorkOrderDetailActions } from "../useWorkOrderDetailActions";
+import type { WorkOrderCheckPresentation } from "../WorkOrderChecksSection";
 import { WorkOrderDetailLoadedView } from "../WorkOrderDetailLoadedView";
 import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
 
@@ -116,6 +118,7 @@ function WorkOrderDetailPageContent({
   const eventsQuery = useWorkOrderEvents(organizationId, factoryId, orderId);
   const events = useMemo(() => flattenWorkOrderEventsPages(eventsQuery.data?.pages), [eventsQuery.data?.pages]);
   const artifactsQuery = useWorkOrderArtifacts(organizationId, factoryId, orderId);
+  const checksQuery = useWorkOrderChecks(organizationId, factoryId, orderId);
 
   const actions = useWorkOrderDetailActions(organizationId, factoryId, orderId);
   // Memoize so derived arrays (e.g. `assigneeIds`) keep a stable reference
@@ -152,6 +155,7 @@ function WorkOrderDetailPageContent({
       events={events}
       eventsQuery={eventsQuery}
       artifactsQuery={artifactsQuery}
+      checks={checksQuery.data ?? []}
       canManageWorkOrders={canAct("work_orders", "update")}
       permissionsLoading={permissionsLoading}
       actions={actions}
@@ -179,6 +183,7 @@ interface LoadedWorkOrderDetailProps {
   events: ReturnType<typeof flattenWorkOrderEventsPages>;
   eventsQuery: ReturnType<typeof useWorkOrderEvents>;
   artifactsQuery: ReturnType<typeof useWorkOrderArtifacts>;
+  checks: WorkOrderCheckPresentation[];
   canManageWorkOrders: boolean;
   permissionsLoading: boolean;
   actions: ReturnType<typeof useWorkOrderDetailActions>;
@@ -193,6 +198,7 @@ function LoadedWorkOrderDetail({
   events,
   eventsQuery,
   artifactsQuery,
+  checks,
   canManageWorkOrders,
   permissionsLoading,
   actions,
@@ -216,6 +222,7 @@ function LoadedWorkOrderDetail({
       artifacts={artifactsQuery.data ?? []}
       isArtifactsLoading={artifactsQuery.isLoading}
       artifactsError={artifactsQuery.error ?? null}
+      checks={checks}
       displayStatus={derived.displayStatus!}
       statusMeta={derived.statusMeta!}
       assigneeIds={derived.assigneeIds}
