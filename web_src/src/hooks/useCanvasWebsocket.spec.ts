@@ -5,6 +5,7 @@ import { createElement } from "react";
 import type { ReactNode } from "react";
 import type { CanvasesCanvasRun } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
+import { WEBSOCKET_RECONNECT_MAX_MS } from "@/lib/websocketReconnect";
 import type { InfiniteRunsPage } from "@/hooks/canvasInfiniteCache";
 
 const { useWebSocketMock, nodeExecutionStoreMock } = vi.hoisted(() => ({
@@ -448,5 +449,19 @@ describe("useCanvasWebsocket", () => {
 
     expect(onCanvasStagingEvent).toHaveBeenCalledOnce();
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.canvasStaging(testCanvasId))).toHaveLength(0);
+  });
+
+  it("backs off between reconnect attempts", () => {
+    renderCanvasWebsocketHook(new QueryClient());
+
+    const options = useWebSocketMock.mock.calls.at(-1)?.[1] as {
+      reconnectInterval?: number | ((attempt: number) => number);
+    };
+
+    expect(typeof options.reconnectInterval).toBe("function");
+
+    const reconnectInterval = options.reconnectInterval as (attempt: number) => number;
+    expect(reconnectInterval(5)).toBeGreaterThan(reconnectInterval(0));
+    expect(reconnectInterval(100)).toBeLessThanOrEqual(WEBSOCKET_RECONNECT_MAX_MS);
   });
 });
