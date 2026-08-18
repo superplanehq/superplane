@@ -295,6 +295,40 @@ func TestDefaultAuthorizationRulesAreKeyedByHTTPRoute(t *testing.T) {
 	assert.Equal(t, []string{IDPathParam}, rule.ResourcePathParams)
 }
 
+func TestWidgetCatalogRoutesRequireOrgRead(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+	routes := []HTTPRoute{
+		{Method: http.MethodGet, Pattern: "/api/v1/widgets"},
+		{Method: http.MethodGet, Pattern: "/api/v1/widgets/{name}"},
+	}
+
+	for _, route := range routes {
+		rule, ok := rules[route]
+		require.True(t, ok, route.String())
+		assert.Equal(t, "org", rule.Resource)
+		assert.Equal(t, "read", rule.Action)
+		assert.Equal(t, models.DomainTypeOrganization, rule.DomainType)
+	}
+}
+
+func TestGatewayAuthorizerRequiresAuthForWidgetCatalogRoutes(t *testing.T) {
+	authorizer := NewGatewayAuthorizer(actionPermissionChecker{})
+	routes := []HTTPRoute{
+		{Method: http.MethodGet, Pattern: "/api/v1/widgets"},
+		{Method: http.MethodGet, Pattern: "/api/v1/widgets/{name}"},
+	}
+
+	for _, route := range routes {
+		_, err := authorizer.AuthorizeHTTP(
+			context.Background(),
+			httptestRequest(t, nil),
+			route,
+			map[string]string{},
+		)
+		require.Error(t, err, route.String())
+	}
+}
+
 func httptestRequest(t *testing.T, headers map[string]string) *http.Request {
 	t.Helper()
 
