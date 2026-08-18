@@ -3,7 +3,7 @@ import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryLineMetrics, useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
@@ -46,7 +46,7 @@ import {
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
 import { LineListCard } from "./LineListCard";
-import { descriptionForLine, metricsForLine } from "./lineListMetricsMockData";
+import { descriptionForLine } from "./lineListMetricsMockData";
 import { PhaseGlyph } from "./linePhaseGlyph";
 
 const LIST_SUBTITLE = "Last 30 days. Success rate, completions per day, rework, and cost per merged work order.";
@@ -56,6 +56,7 @@ export function LinesPage() {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId } = useParams<{ lineId: string }>();
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
+  const { data: metricsByLineId = {} } = useFactoryLineMetrics(organizationId, factoryId);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
 
   const canUpdate = canAct("factories", "update");
@@ -143,7 +144,7 @@ export function LinesPage() {
                   <LineListCard
                     line={line}
                     href={factoryLineDetailPath(organizationId, factoryKey, line.id)}
-                    metrics={metricsForLine(line.id)}
+                    metrics={metricsByLineId[line.id] ?? null}
                     description={descriptionForLine(line.id)}
                   />
                 </li>

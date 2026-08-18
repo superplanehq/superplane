@@ -4,54 +4,11 @@ import {
   REFUND_LINE_ONBOARDING_ID,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
+import type { LineListMetrics } from "./lineListMetrics";
 
 /**
- * Stand-in line-list metrics until an aggregation API exists.
- *
- * None of these fields exist on the factory-line API yet. This type is the
- * contract a later endpoint should fill.
- *
- * Window: last 30 days.
+ * Per-line mock values keyed to the Refunds Factory fixture lines.
  */
-export type LineListMetrics = {
-  /**
-   * Share of closed work orders on this line whose pull request merged to main.
-   * Numerator is merged work orders. Denominator is closed work orders
-   * (merged + not merged). Omit when the line has no closed work orders.
-   */
-  successRatePct: number;
-  /** Merged-to-main work orders in the window (success-rate numerator). */
-  mergedCount: number;
-  /** Closed work orders in the window (success-rate denominator). */
-  totalClosedCount: number;
-  /**
-   * Average human interventions per work order: steering comments, tweaks,
-   * and re-dispatches. 1.0 means one intervention per work order.
-   */
-  reworkPerWorkOrder: number;
-  /**
-   * Tracked cost (model tokens + execution compute) divided by merged work
-   * orders. Failed and reworked runs raise this number.
-   */
-  costPerSuccessUsd: number;
-  /** Daily success-rate samples in the window, oldest first. 0–100. */
-  successTrendPct: number[];
-  /** Success-rate points vs the prior 30 days. Positive is better. */
-  successDeltaPts: number;
-  /** Rework change vs the prior 30 days. Negative is better. */
-  reworkDelta: number;
-  /** Cost change vs the prior 30 days, in USD. Negative is better. */
-  costDeltaUsd: number;
-  /**
-   * Merged work orders per day in the window. Completions, not closed
-   * work orders.
-   */
-  throughputPerDay: number;
-  /** Daily merged-work-order counts in the window, oldest first. */
-  throughputTrend: number[];
-};
-
-/** Per-line mock values keyed to the Refunds Factory fixture lines. */
 export const LINE_LIST_METRICS_BY_ID: Record<string, LineListMetrics | null> = {
   [REFUND_LINE_PLAN_ID]: {
     successRatePct: 82,
@@ -105,13 +62,6 @@ export const LINE_LIST_DESCRIPTION_BY_ID: Record<string, string> = {
   [REFUND_LINE_ONBOARDING_ID]: "First-run path for a new workspace.",
   [REFUND_LINE_FEATURE_ID]: "Feature path that includes a pull request and a CI loop.",
 };
-
-export function metricsForLine(lineId: string | undefined): LineListMetrics | null {
-  if (!lineId) {
-    return null;
-  }
-  return LINE_LIST_METRICS_BY_ID[lineId] ?? null;
-}
 
 export function descriptionForLine(lineId: string | undefined): string | undefined {
   if (!lineId) {

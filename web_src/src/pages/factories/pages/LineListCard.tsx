@@ -14,7 +14,7 @@ import {
   formatSuccessRate,
   formatThroughput,
 } from "./lineListMetricsFormat";
-import type { LineListMetrics } from "./lineListMetricsMockData";
+import type { LineListMetrics } from "./lineListMetrics";
 
 export function LineListCard({
   line,

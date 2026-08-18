@@ -1,6 +1,7 @@
 import { defaultFactoriesFixture, ORGANIZATION_USERS, type FactoriesFixture } from "./factoryPageResponses";
 import type { FactoriesWorkOrder } from "@/api-client";
 import { fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
+import { LINE_LIST_METRICS_BY_ID } from "../pages/lineListMetricsMockData";
 
 export type { FactoriesFixture };
 
@@ -77,6 +78,25 @@ function factoriesCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {
 
 function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
+    {
+      pattern: re("/api/v1/factories/([^/]+)/line-metrics"),
+      resolve: (match) => {
+        const factory = fixture.factories.find((entry) => entry.id === match[1]);
+        const lines = (factory?.lines ?? []).flatMap((line) => {
+          if (!line.id) {
+            return [];
+          }
+          const metrics = LINE_LIST_METRICS_BY_ID[line.id];
+          return [
+            {
+              lineId: line.id,
+              ...(metrics ? { metrics } : {}),
+            },
+          ];
+        });
+        return { json: { lines } };
+      },
+    },
     {
       pattern: re("/api/v1/factories/([^/]+)"),
       resolve: (match, method, body) => {

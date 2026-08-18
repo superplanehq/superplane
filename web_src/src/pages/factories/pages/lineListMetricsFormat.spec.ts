@@ -10,7 +10,7 @@ import {
   formatThroughput,
   LINE_LIST_METRICS_EMPTY,
 } from "./lineListMetricsFormat";
-import type { LineListMetrics } from "./lineListMetricsMockData";
+import type { LineListMetrics } from "./lineListMetrics";
 
 const sample: LineListMetrics = {
   successRatePct: 82,

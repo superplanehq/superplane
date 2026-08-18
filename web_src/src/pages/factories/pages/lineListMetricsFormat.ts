@@ -1,4 +1,4 @@
-import type { LineListMetrics } from "./lineListMetricsMockData";
+import type { LineListMetrics } from "./lineListMetrics";
 
 export const LINE_LIST_METRICS_EMPTY = "—";
 
