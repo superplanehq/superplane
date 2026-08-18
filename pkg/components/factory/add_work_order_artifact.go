@@ -25,16 +25,22 @@ type ArtifactDataEntry struct {
 }
 
 type AddWorkOrderArtifactConfiguration struct {
-	OrderID      string              `json:"orderId" mapstructure:"orderId"`
-	ArtifactType string              `json:"artifactType" mapstructure:"artifactType"`
-	URL          string              `json:"url" mapstructure:"url"`
-	Number       string              `json:"number" mapstructure:"number"`
-	State        string              `json:"state" mapstructure:"state"`
-	Title        string              `json:"title" mapstructure:"title"`
-	Body         string              `json:"body" mapstructure:"body"`
-	Name         string              `json:"name" mapstructure:"name"`
-	ArtifactKey  string              `json:"artifactKey" mapstructure:"artifactKey"`
-	Data         []ArtifactDataEntry `json:"data" mapstructure:"data"`
+	OrderID      string `json:"orderId" mapstructure:"orderId"`
+	ArtifactType string `json:"artifactType" mapstructure:"artifactType"`
+	URL          string `json:"url" mapstructure:"url"`
+	Number       string `json:"number" mapstructure:"number"`
+	// State / Merged / Draft accept expressions, so a flow can wire
+	// them directly to a `github.onPullRequest` payload. `any` because
+	// after resolution the value may be a bool, string, or number.
+	State       any                 `json:"state,omitempty" mapstructure:"state,omitempty"`
+	Merged      any                 `json:"merged,omitempty" mapstructure:"merged,omitempty"`
+	Draft       any                 `json:"draft,omitempty" mapstructure:"draft,omitempty"`
+	Title       string              `json:"title" mapstructure:"title"`
+	Body        string              `json:"body" mapstructure:"body"`
+	Name        string              `json:"name" mapstructure:"name"`
+	Repository  string              `json:"repository" mapstructure:"repository"`
+	ArtifactKey string              `json:"artifactKey" mapstructure:"artifactKey"`
+	Data        []ArtifactDataEntry `json:"data" mapstructure:"data"`
 }
 
 func (c *AddWorkOrderArtifact) Name() string {
@@ -54,9 +60,9 @@ func (c *AddWorkOrderArtifact) Documentation() string {
 
 Supported types:
 
-- **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + `, ` + "`title`" + `, and ` + "`state`" + ` (` + "`open`" + `/` + "`draft`" + `/` + "`closed`" + `/` + "`merged`" + `, defaults to ` + "`open`" + `) which drives the icon/color of the artifact chip in the work order UI.
+- **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + `, ` + "`title`" + `, ` + "`state`" + `, ` + "`merged`" + `, and ` + "`draft`" + `. The ` + "`state`" + ` field (` + "`open`" + `/` + "`draft`" + `/` + "`closed`" + `/` + "`merged`" + `, defaults to ` + "`open`" + `) drives the icon/color of the artifact chip in the work order UI. ` + "`state`" + `, ` + "`merged`" + `, and ` + "`draft`" + ` all accept expressions, so a flow can wire them straight to a ` + "`github.onPullRequest`" + ` payload: a GitHub-shaped ` + "`state: \"closed\"`" + ` + ` + "`merged: true`" + ` folds into SuperPlane's ` + "`state: \"merged\"`" + ` before it hits the artifact.
 - **Markdown note** (` + "`markdown`" + `): requires ` + "`body`" + `; optional ` + "`title`" + `.
-- **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` (the branch name); optional ` + "`url`" + ` to link to the branch on its provider (e.g. a GitHub tree URL).
+- **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` (the branch name). Set ` + "`url`" + ` when you attach the branch — SuperPlane does not wait for a pull request. If you set ` + "`repository`" + ` (` + "`owner/repo`" + ` or a repository http(s) URL) and leave ` + "`url`" + ` blank, SuperPlane writes a GitHub tree URL from that repository and the branch name.
 
 PR and markdown types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key.
 
@@ -107,7 +113,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 	bothTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}}
 	withMetadata := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}}
 
-	return []configuration.Field{
+	fields := []configuration.Field{
 		{
 			Name:        "orderId",
 			Label:       "Work Order ID",
@@ -136,7 +142,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		{
 			Name:                 "url",
 			Label:                "URL",
-			Description:          "Link to the pull request or branch (must be http or https). Required for pull requests; optional for branches — e.g. a GitHub tree URL like https://github.com/{owner}/{repo}/tree/{branch}.",
+			Description:          "Link to the pull request or branch (must be http or https). Required for pull requests. For branches, set this when you attach the branch — SuperPlane does not wait for a pull request. Example: https://github.com/{owner}/{repo}/tree/{branch}.",
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
 			VisibilityConditions: linkableTypes,
@@ -152,26 +158,15 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			Required:             false,
 			VisibilityConditions: prOnly,
 		},
-		{
-			Name:                 "state",
-			Label:                "State",
-			Description:          "Pull request state — drives the artifact chip's icon/color. Update it later with updateWorkOrderArtifact as the PR progresses.",
-			Type:                 configuration.FieldTypeSelect,
-			Required:             false,
-			Default:              "open",
-			VisibilityConditions: prOnly,
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Open", Value: "open"},
-						{Label: "Draft", Value: "draft"},
-						{Label: "Closed", Value: "closed"},
-						{Label: "Merged", Value: "merged"},
-					},
-				},
-			},
-		},
-		{
+	}
+
+	fields = append(fields, prArtifactLifecycleFields(prArtifactLifecycleFieldOptions{
+		Visibility:   prOnly,
+		StateDefault: "open",
+	})...)
+
+	return append(fields,
+		configuration.Field{
 			Name:                 "body",
 			Label:                "Body",
 			Description:          "Markdown note body — rendered inline in the work order timeline",
@@ -182,7 +177,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 				{Field: "artifactType", Values: []string{"markdown"}},
 			},
 		},
-		{
+		configuration.Field{
 			Name:                 "name",
 			Label:                "Name",
 			Description:          "Branch name (e.g. feature/refund-retry)",
@@ -193,7 +188,15 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 				{Field: "artifactType", Values: []string{"branch"}},
 			},
 		},
-		{
+		configuration.Field{
+			Name:                 "repository",
+			Label:                "Repository",
+			Description:          "Repository that owns the branch (`owner/repo` or the repository https URL). When URL is empty, SuperPlane writes a GitHub tree URL from this value and the branch name.",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			VisibilityConditions: branchOnly,
+		},
+		configuration.Field{
 			Name:                 "title",
 			Label:                "Title",
 			Description:          "Optional artifact title",
@@ -201,7 +204,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			Required:             false,
 			VisibilityConditions: bothTypes,
 		},
-		{
+		configuration.Field{
 			Name:        "artifactKey",
 			Label:       "Artifact Key",
 			Description: "Optional queryable key for this artifact (e.g. a pull request's URL), unique per factory. Lets findWorkOrder (by: artifactKey) resolve this work order later.",
@@ -210,7 +213,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			Togglable:   true,
 			Default:     "",
 		},
-		{
+		configuration.Field{
 			Name:                 "data",
 			Label:                "Metadata",
 			Description:          "Extra name/value pairs merged into the artifact's data map (typed fields above take precedence on name collisions)",
@@ -230,7 +233,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 				},
 			},
 		},
-	}
+	)
 }
 
 func (c *AddWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
@@ -239,7 +242,10 @@ func (c *AddWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	data := buildArtifactData(config)
+	data, err := buildArtifactData(config)
+	if err != nil {
+		return err
+	}
 
 	artifact, err := ctx.Factory.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
 		OrderID: config.OrderID,
@@ -287,13 +293,12 @@ func (c *AddWorkOrderArtifact) HandleHook(ctx core.ActionHookContext) error {
 // buildArtifactData folds the free-form list into a map and layers the
 // typed inputs on top, so a user who defines both `url` and a `url`
 // row still ends up with the typed value on the wire.
-func buildArtifactData(config AddWorkOrderArtifactConfiguration) map[string]any {
+func buildArtifactData(config AddWorkOrderArtifactConfiguration) (map[string]any, error) {
 	data := artifactDataToMap(config.Data)
 
 	typed := map[string]string{
 		"url":    config.URL,
 		"number": config.Number,
-		"state":  config.State,
 		"title":  config.Title,
 		"body":   config.Body,
 		"name":   config.Name,
@@ -309,7 +314,22 @@ func buildArtifactData(config AddWorkOrderArtifactConfiguration) map[string]any 
 		data[key] = value
 	}
 
-	return data
+	data = applyBranchTreeURL(config, data)
+
+	updates, err := prArtifactStateUpdates(config.State, config.Merged, config.Draft)
+	if err != nil {
+		return nil, err
+	}
+	if len(updates) > 0 {
+		if data == nil {
+			data = map[string]any{}
+		}
+		for key, value := range updates {
+			data[key] = value
+		}
+	}
+
+	return data, nil
 }
 
 // artifactDataToMap flattens the list into a map; blank names are
