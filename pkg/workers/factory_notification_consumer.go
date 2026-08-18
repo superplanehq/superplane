@@ -257,6 +257,9 @@ func (c *FactoryNotificationConsumer) resolveRecipients(
 
 	recipients := make([]workOrderEmailRecipient, 0, len(users))
 	for i := range users {
+		if users[i].DeletedAt.Valid {
+			continue
+		}
 		email := users[i].GetEmail()
 		if email == "" {
 			continue

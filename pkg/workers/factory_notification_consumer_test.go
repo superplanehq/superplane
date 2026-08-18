@@ -244,6 +244,29 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		assert.ElementsMatch(t, []string{owner.GetEmail(), creator.GetEmail()}, recipients)
 	})
 
+	t.Run("soft-deleted members are not emailed", func(t *testing.T) {
+		left := support.CreateUser(t, r, r.Organization.ID)
+		enableNotifications(t, left.ID, models.UserNotificationSettingsParams{
+			Enabled:        true,
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+		require.NoError(t, left.Delete())
+
+		emailService := services.NewNoopEmailService()
+		consume(t, newConsumer(emailService), messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID:  r.Organization.ID.String(),
+			FactoryID:       factoryModel.ID.String(),
+			OrderID:         order.ID.String(),
+			EventType:       factoryevents.EventTypeOrderAssigneesUpdated,
+			ActorUserID:     creator.ID.String(),
+			AssignedUserIDs: []string{left.ID.String()},
+		})
+
+		for _, email := range emailService.SentWorkOrderNotificationEmails() {
+			assert.NotEqual(t, left.GetEmail(), email.ToEmail)
+		}
+	})
+
 	t.Run("missing work order is skipped without error", func(t *testing.T) {
 		emailService := services.NewNoopEmailService()
 		message := commentMessage(creator.ID.String())
