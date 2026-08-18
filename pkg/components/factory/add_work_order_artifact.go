@@ -34,6 +34,8 @@ type AddWorkOrderArtifactConfiguration struct {
 	Body         string              `json:"body" mapstructure:"body"`
 	Name         string              `json:"name" mapstructure:"name"`
 	ArtifactKey  string              `json:"artifactKey" mapstructure:"artifactKey"`
+	MergedAt     string              `json:"mergedAt" mapstructure:"mergedAt"`
+	ClosedAt     string              `json:"closedAt" mapstructure:"closedAt"`
 	Data         []ArtifactDataEntry `json:"data" mapstructure:"data"`
 }
 
@@ -211,6 +213,24 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			Default:     "",
 		},
 		{
+			Name:                 "mergedAt",
+			Label:                "Merged At",
+			Description:          "Optional RFC3339 merge timestamp — usually {{ event.data.pull_request.merged_at }}. Set when attaching an already-merged PR so Velocity attributes it to the real merge day; unset falls back to now.",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			Togglable:            true,
+			VisibilityConditions: prOnly,
+		},
+		{
+			Name:                 "closedAt",
+			Label:                "Closed At",
+			Description:          "Optional RFC3339 close timestamp — usually {{ event.data.pull_request.closed_at }}. Set when attaching an already-closed PR so Velocity waste attributes it to the real close day.",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			Togglable:            true,
+			VisibilityConditions: prOnly,
+		},
+		{
 			Name:                 "data",
 			Label:                "Metadata",
 			Description:          "Extra name/value pairs merged into the artifact's data map (typed fields above take precedence on name collisions)",
@@ -291,12 +311,14 @@ func buildArtifactData(config AddWorkOrderArtifactConfiguration) map[string]any 
 	data := artifactDataToMap(config.Data)
 
 	typed := map[string]string{
-		"url":    config.URL,
-		"number": config.Number,
-		"state":  config.State,
-		"title":  config.Title,
-		"body":   config.Body,
-		"name":   config.Name,
+		"url":      config.URL,
+		"number":   config.Number,
+		"state":    config.State,
+		"title":    config.Title,
+		"body":     config.Body,
+		"name":     config.Name,
+		"mergedAt": config.MergedAt,
+		"closedAt": config.ClosedAt,
 	}
 
 	for key, value := range typed {
