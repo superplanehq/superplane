@@ -9,5 +9,7 @@ CREATE TABLE public.user_notification_settings (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     CONSTRAINT user_notification_settings_pkey PRIMARY KEY (id),
-    CONSTRAINT user_notification_settings_organization_id_user_id_key UNIQUE (organization_id, user_id)
+    CONSTRAINT user_notification_settings_organization_id_user_id_key UNIQUE (organization_id, user_id),
+    CONSTRAINT user_notification_settings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+    CONSTRAINT user_notification_settings_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
 );
