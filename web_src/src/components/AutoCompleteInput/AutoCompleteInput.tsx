@@ -980,7 +980,10 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         calculateDropdownPosition({
           cursor,
           viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+          cursorLineHeight: markerRect.height,
           dropdownWidth,
+          dropdownHeight: SUGGESTION_LIST_MAX_HEIGHT_PX,
           valuePreviewWidth,
           showValuePreview,
         }),
@@ -1623,55 +1626,31 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                           properties
                         </div>
                         <div className={twMerge(valuePreviewCodeBlockClassName, "space-y-0.5")}>
-                          {Object.keys(highlightedValue as Record<string, unknown>)
-                            .filter((k) => !k.startsWith("__"))
-                            .slice(0, 5)
-                            .map((key) => (
-                              <div key={key} className="truncate">
-                                <span className="text-gray-500 dark:text-gray-400">.</span>
-                                <span className="text-sky-700 dark:text-sky-400">{key}</span>
-                              </div>
-                            ))}
-                          {Object.keys(highlightedValue as Record<string, unknown>).filter((k) => !k.startsWith("__"))
-                            .length > 5 && (
-                            <div className="text-gray-600 dark:text-gray-400 mt-1">
-                              +
-                              {Object.keys(highlightedValue as Record<string, unknown>).filter(
-                                (k) => !k.startsWith("__"),
-                              ).length - 5}{" "}
-                              more...
-                            </div>
-                          )}
+                          <pre className="whitespace-pre-wrap break-all font-mono text-xs text-gray-700 dark:text-gray-300">
+                            {JSON.stringify(highlightedValue, null, 2)}
+                          </pre>
                         </div>
                       </>
                     ) : /* Array values */
                     Array.isArray(highlightedValue) ? (
                       <>
                         <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Array</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                          {highlightedValue.length} item{highlightedValue.length !== 1 ? "s" : ""}
+                        <div className={twMerge(valuePreviewCodeBlockClassName, "space-y-0.5")}>
+                          <pre className="whitespace-pre-wrap break-all font-mono text-xs text-gray-700 dark:text-gray-300">
+                            {JSON.stringify(highlightedValue, null, 2)}
+                          </pre>
                         </div>
-                        {highlightedValue.length > 0 && (
-                          <div className={valuePreviewCodeBlockClassName}>
-                            <span className="text-gray-500 dark:text-gray-400">[</span>
-                            <span className="text-purple-700 dark:text-purple-400">{typeof highlightedValue[0]}</span>
-                            <span className="text-gray-500 dark:text-gray-400">, ...]</span>
-                          </div>
-                        )}
                       </>
                     ) : /* String values */
                     typeof highlightedValue === "string" ? (
                       <>
                         <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">String</div>
-                        {highlightedValue.length > 50 && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                            {highlightedValue.length} characters
-                          </div>
-                        )}
                         <div className={twMerge(valuePreviewCodeBlockClassName, "break-all")}>
                           <span className="text-amber-700 dark:text-amber-400">"</span>
                           <span className="text-amber-800 dark:text-amber-300">
-                            {highlightedValue.length > 100 ? highlightedValue.slice(0, 100) + "..." : highlightedValue}
+                            {highlightedValue.length > 500
+                              ? highlightedValue.substring(0, 500) + "..."
+                              : highlightedValue}
                           </span>
                           <span className="text-amber-700 dark:text-amber-400">"</span>
                         </div>
@@ -1690,14 +1669,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     typeof highlightedValue === "boolean" ? (
                       <>
                         <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Boolean</div>
-                        <div className={valuePreviewCodeBlockClassName}>
-                          <span
-                            className={
-                              highlightedValue ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                            }
-                          >
-                            {String(highlightedValue)}
-                          </span>
+                        <div
+                          className={twMerge(
+                            valuePreviewCodeBlockClassName,
+                            highlightedValue ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400",
+                          )}
+                        >
+                          {highlightedValue ? "true" : "false"}
                         </div>
                       </>
                     ) : /* Null values */
