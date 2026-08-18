@@ -6,6 +6,7 @@ import {
 } from "./factoryPageResponses";
 import { DEFAULT_ARTIFACTS_BY_ORDER_ID, DEFAULT_EVENTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
 import type { FactoriesWorkOrder, FactoriesWorkOrderEvent } from "@/api-client";
+import { defaultNotificationSettings } from "@/lib/notificationSettings";
 import { fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
 
 export type { FactoriesFixture };
@@ -299,16 +300,7 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
 }
 
 function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
-  const defaults = {
-    enabled: true,
-    workspaceScope: "WORKSPACE_SCOPE_ALL",
-    factoryIds: [],
-    workOrderAssigned: true,
-    workOrderCommentOwned: true,
-    workOrderCommentCreated: true,
-    workOrderStatusOwned: true,
-    workOrderArtifactOwned: true,
-  } satisfies FactoriesFixture["notificationSettings"];
+  const defaults = defaultNotificationSettings();
 
   return {
     pattern: re("/api/v1/me/notification-settings"),

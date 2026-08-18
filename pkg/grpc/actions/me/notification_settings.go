@@ -51,15 +51,66 @@ func serializeNotificationSettings(settings *models.UserNotificationSettings) *p
 	}
 
 	return &pb.NotificationSettings{
-		Enabled:                 settings.Enabled,
-		WorkspaceScope:          notificationScopeToProto(settings.WorkspaceScope),
-		FactoryIds:              factoryIDs,
-		WorkOrderAssigned:       notificationTypeEnabled(settings, models.NotificationTypeWorkOrderAssigned),
-		WorkOrderCommentOwned:   notificationTypeEnabled(settings, models.NotificationTypeWorkOrderCommentOwned),
-		WorkOrderCommentCreated: notificationTypeEnabled(settings, models.NotificationTypeWorkOrderCommentCreated),
-		WorkOrderStatusOwned:    notificationTypeEnabled(settings, models.NotificationTypeWorkOrderStatusOwned),
-		WorkOrderArtifactOwned:  notificationTypeEnabled(settings, models.NotificationTypeWorkOrderArtifactOwned),
+		Enabled:        settings.Enabled,
+		WorkspaceScope: notificationScopeToProto(settings.WorkspaceScope),
+		FactoryIds:     factoryIDs,
+		Types:          serializeNotificationTypes(settings),
 	}
+}
+
+func serializeNotificationTypes(settings *models.UserNotificationSettings) []*pb.NotificationSettings_TypeToggle {
+	toggles := make([]*pb.NotificationSettings_TypeToggle, 0, len(models.NotificationTypes))
+	for _, notificationType := range models.NotificationTypes {
+		protoType, ok := notificationTypeToProto(notificationType)
+		if !ok {
+			continue
+		}
+		toggles = append(toggles, &pb.NotificationSettings_TypeToggle{
+			Type:    protoType,
+			Enabled: notificationTypeEnabled(settings, notificationType),
+		})
+	}
+	return toggles
+}
+
+func notificationTypesFromProto(toggles []*pb.NotificationSettings_TypeToggle) (map[string]bool, error) {
+	types := map[string]bool{}
+	for _, toggle := range toggles {
+		if toggle == nil {
+			continue
+		}
+		if toggle.GetType() == pb.NotificationSettings_TYPE_UNSPECIFIED {
+			return nil, grpcerrors.InvalidArgument(nil, "notification type is required")
+		}
+		name, ok := notificationTypeFromProto(toggle.GetType())
+		if !ok {
+			return nil, grpcerrors.InvalidArgument(nil, "unknown notification type")
+		}
+		types[name] = toggle.GetEnabled()
+	}
+	return types, nil
+}
+
+var notificationTypeProto = map[string]pb.NotificationSettings_Type{
+	models.NotificationTypeWorkOrderAssigned:       pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED,
+	models.NotificationTypeWorkOrderCommentOwned:   pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED,
+	models.NotificationTypeWorkOrderCommentCreated: pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_CREATED,
+	models.NotificationTypeWorkOrderStatusOwned:    pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_OWNED,
+	models.NotificationTypeWorkOrderArtifactOwned:  pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED,
+}
+
+func notificationTypeToProto(notificationType string) (pb.NotificationSettings_Type, bool) {
+	protoType, ok := notificationTypeProto[notificationType]
+	return protoType, ok
+}
+
+func notificationTypeFromProto(protoType pb.NotificationSettings_Type) (string, bool) {
+	for name, mapped := range notificationTypeProto {
+		if mapped == protoType {
+			return name, true
+		}
+	}
+	return "", false
 }
 
 // notificationTypeEnabled reads the raw type toggle for serialization,

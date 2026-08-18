@@ -44,17 +44,16 @@ func UpdateNotificationSettings(
 		return nil, grpcerrors.InvalidArgument(nil, "select at least one workspace or use the all workspaces scope")
 	}
 
+	types, err := notificationTypesFromProto(requested.GetTypes())
+	if err != nil {
+		return nil, err
+	}
+
 	params := models.UserNotificationSettingsParams{
 		Enabled:        requested.GetEnabled(),
 		WorkspaceScope: scope,
 		FactoryIDs:     factoryIDsToStrings(factoryIDs),
-		Types: map[string]bool{
-			models.NotificationTypeWorkOrderAssigned:       requested.GetWorkOrderAssigned(),
-			models.NotificationTypeWorkOrderCommentOwned:   requested.GetWorkOrderCommentOwned(),
-			models.NotificationTypeWorkOrderCommentCreated: requested.GetWorkOrderCommentCreated(),
-			models.NotificationTypeWorkOrderStatusOwned:    requested.GetWorkOrderStatusOwned(),
-			models.NotificationTypeWorkOrderArtifactOwned:  requested.GetWorkOrderArtifactOwned(),
-		},
+		Types:          types,
 	}
 
 	var settings *models.UserNotificationSettings

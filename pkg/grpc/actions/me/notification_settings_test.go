@@ -25,11 +25,11 @@ func Test__DescribeNotificationSettings(t *testing.T) {
 		require.NotNil(t, resp.Settings)
 		assert.True(t, resp.Settings.Enabled)
 		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_ALL, resp.Settings.WorkspaceScope)
-		assert.True(t, resp.Settings.WorkOrderAssigned)
-		assert.True(t, resp.Settings.WorkOrderCommentOwned)
-		assert.True(t, resp.Settings.WorkOrderCommentCreated)
-		assert.True(t, resp.Settings.WorkOrderStatusOwned)
-		assert.True(t, resp.Settings.WorkOrderArtifactOwned)
+		assert.True(t, notificationTypeToggleEnabled(resp.Settings, pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED))
+		assert.True(t, notificationTypeToggleEnabled(resp.Settings, pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED))
+		assert.True(t, notificationTypeToggleEnabled(resp.Settings, pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_CREATED))
+		assert.True(t, notificationTypeToggleEnabled(resp.Settings, pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_OWNED))
+		assert.True(t, notificationTypeToggleEnabled(resp.Settings, pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED))
 	})
 
 	t.Run("unauthenticated", func(t *testing.T) {
@@ -50,25 +50,27 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 	t.Run("persists enabled settings for all workspaces", func(t *testing.T) {
 		resp, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
 			Settings: &pb.NotificationSettings{
-				Enabled:                 true,
-				WorkspaceScope:          pb.NotificationSettings_WORKSPACE_SCOPE_ALL,
-				WorkOrderAssigned:       true,
-				WorkOrderCommentOwned:   false,
-				WorkOrderCommentCreated: true,
-				WorkOrderStatusOwned:    true,
-				WorkOrderArtifactOwned:  false,
+				Enabled:        true,
+				WorkspaceScope: pb.NotificationSettings_WORKSPACE_SCOPE_ALL,
+				Types: []*pb.NotificationSettings_TypeToggle{
+					notificationTypeToggle(pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED, true),
+					notificationTypeToggle(pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED, false),
+					notificationTypeToggle(pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_CREATED, true),
+					notificationTypeToggle(pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_OWNED, true),
+					notificationTypeToggle(pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED, false),
+				},
 			},
 		})
 		require.NoError(t, err)
 		assert.True(t, resp.Settings.Enabled)
 		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_ALL, resp.Settings.WorkspaceScope)
-		assert.False(t, resp.Settings.WorkOrderCommentOwned)
-		assert.False(t, resp.Settings.WorkOrderArtifactOwned)
+		assert.False(t, notificationTypeToggleEnabled(resp.Settings, pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED))
+		assert.False(t, notificationTypeToggleEnabled(resp.Settings, pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED))
 
 		described, err := DescribeNotificationSettings(ctx)
 		require.NoError(t, err)
 		assert.Equal(t, resp.Settings.Enabled, described.Settings.Enabled)
-		assert.False(t, described.Settings.WorkOrderCommentOwned)
+		assert.False(t, notificationTypeToggleEnabled(described.Settings, pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED))
 	})
 
 	t.Run("selected scope requires a workspace when enabled", func(t *testing.T) {
@@ -114,6 +116,21 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
+
+	t.Run("unspecified notification type is rejected", func(t *testing.T) {
+		_, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
+			Settings: &pb.NotificationSettings{
+				Enabled:        true,
+				WorkspaceScope: pb.NotificationSettings_WORKSPACE_SCOPE_ALL,
+				Types: []*pb.NotificationSettings_TypeToggle{
+					notificationTypeToggle(pb.NotificationSettings_TYPE_UNSPECIFIED, true),
+				},
+			},
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+	})
 }
 
 func notificationSettingsContext(userID, organizationID string) context.Context {
@@ -124,4 +141,17 @@ func notificationSettingsContext(userID, organizationID string) context.Context 
 			"x-organization-id", organizationID,
 		),
 	)
+}
+
+func notificationTypeToggle(notificationType pb.NotificationSettings_Type, enabled bool) *pb.NotificationSettings_TypeToggle {
+	return &pb.NotificationSettings_TypeToggle{Type: notificationType, Enabled: enabled}
+}
+
+func notificationTypeToggleEnabled(settings *pb.NotificationSettings, notificationType pb.NotificationSettings_Type) bool {
+	for _, toggle := range settings.GetTypes() {
+		if toggle.GetType() == notificationType {
+			return toggle.GetEnabled()
+		}
+	}
+	return true
 }

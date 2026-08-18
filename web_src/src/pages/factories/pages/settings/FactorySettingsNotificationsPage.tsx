@@ -7,6 +7,12 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useFactories } from "@/hooks/useFactoryData";
 import { useNotificationSettings, useUpdateNotificationSettings } from "@/hooks/useNotificationSettings";
 import { getApiErrorMessage } from "@/lib/errors";
+import {
+  notificationTypesFromToggles,
+  notificationTypeTogglesFromSettings,
+  type ConfigurableNotificationType,
+  type NotificationTypeToggles,
+} from "@/lib/notificationSettings";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/ui/switch";
@@ -18,42 +24,34 @@ import { FactorySettingsNotificationWorkspacePicker } from "./FactorySettingsNot
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 
 interface NotificationTypeOption {
-  key: keyof NotificationTypeToggles;
+  key: ConfigurableNotificationType;
   label: string;
   description: string;
 }
 
-interface NotificationTypeToggles {
-  workOrderAssigned: boolean;
-  workOrderCommentOwned: boolean;
-  workOrderCommentCreated: boolean;
-  workOrderStatusOwned: boolean;
-  workOrderArtifactOwned: boolean;
-}
-
 const NOTIFICATION_TYPE_OPTIONS: NotificationTypeOption[] = [
   {
-    key: "workOrderAssigned",
+    key: "TYPE_WORK_ORDER_ASSIGNED",
     label: "Added as owner",
     description: "You become an owner of a work order.",
   },
   {
-    key: "workOrderCommentOwned",
+    key: "TYPE_WORK_ORDER_COMMENT_OWNED",
     label: "Comments you own",
     description: "Someone comments on a work order you own.",
   },
   {
-    key: "workOrderCommentCreated",
+    key: "TYPE_WORK_ORDER_COMMENT_CREATED",
     label: "Comments you created",
     description: "Someone comments on a work order you created.",
   },
   {
-    key: "workOrderStatusOwned",
+    key: "TYPE_WORK_ORDER_STATUS_OWNED",
     label: "Status changes",
     description: "A work order you own or created opens, closes, or moves back to draft.",
   },
   {
-    key: "workOrderArtifactOwned",
+    key: "TYPE_WORK_ORDER_ARTIFACT_OWNED",
     label: "New artifacts",
     description: "An artifact is added to a work order you own.",
   },
@@ -71,13 +69,7 @@ function formStateFromSettings(settings: MeNotificationSettings | undefined): No
     enabled: settings?.enabled ?? true,
     scope: settings?.workspaceScope === "WORKSPACE_SCOPE_SELECTED" ? "selected" : "all",
     selectedFactoryIds: settings?.factoryIds ?? [],
-    toggles: {
-      workOrderAssigned: settings?.workOrderAssigned ?? true,
-      workOrderCommentOwned: settings?.workOrderCommentOwned ?? true,
-      workOrderCommentCreated: settings?.workOrderCommentCreated ?? true,
-      workOrderStatusOwned: settings?.workOrderStatusOwned ?? true,
-      workOrderArtifactOwned: settings?.workOrderArtifactOwned ?? true,
-    },
+    toggles: notificationTypeTogglesFromSettings(settings),
   };
 }
 
@@ -89,7 +81,7 @@ function settingsFromFormState(state: NotificationsFormState): MeNotificationSet
     enabled: state.enabled,
     workspaceScope: scope,
     factoryIds: state.scope === "selected" ? state.selectedFactoryIds : [],
-    ...state.toggles,
+    types: notificationTypesFromToggles(state.toggles),
   };
 }
 
