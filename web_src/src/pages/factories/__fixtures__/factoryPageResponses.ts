@@ -4,6 +4,7 @@ import type {
   FactoriesNotificationSettings,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
+  FactoriesWorkOrderEvent,
   FactoriesWorkOrderExecution,
   FactoryApp,
   FactoryLineStep,
@@ -170,8 +171,22 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
   number: "101",
   key: "RF-101",
   title: "Reconcile duplicate refunds in ledger",
-  description:
-    "Users are seeing duplicate refund entries after retries. Reconcile the ledger, patch retry logic, and add a regression test.",
+  description: [
+    "Users see duplicate refund entries in the ledger after payment retries. Support reported 14 affected accounts this week, and finance cannot close the monthly report until the totals match.",
+    "",
+    "### Scope",
+    "",
+    "- Reconcile the ledger and remove duplicate entries created by retries.",
+    "- Patch the retry logic in `ledger-writer` so replays reuse the original idempotency key.",
+    "- Add a regression test that replays a retry burst against a seeded ledger.",
+    "",
+    "### Out of scope",
+    "",
+    "- Migrating the ledger to the new event schema (tracked separately).",
+    "- Changes to the refund approval flow.",
+    "",
+    "First repro: retry a refund three times with the writer under load — the second and third attempts land outside the idempotency window and insert new rows.",
+  ].join("\n"),
   state: "STATE_OPEN",
   result: "RESULT_UNSPECIFIED",
   createdAt: HOUR_AGO,
@@ -193,7 +208,11 @@ export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
   number: "102",
   key: "RF-102",
   title: "Add refund reason enum to schema",
-  description: "Extend the refund ledger schema with a nullable reason enum so audit can categorize.",
+  description: [
+    "Audit cannot categorize refunds because the ledger stores the reason as free text. Extend the schema with a nullable `reason` enum so reports can group refunds by cause.",
+    "",
+    "Proposed values: `duplicate_charge`, `customer_request`, `fraud`, `service_outage`, `other`. Keep the column nullable so the backfill can run separately.",
+  ].join("\n"),
   state: "STATE_OPEN",
   result: "RESULT_UNSPECIFIED",
   createdAt: TWO_HOURS_AGO,
@@ -209,7 +228,13 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   number: "103",
   key: "RF-103",
   title: "Add refund reconciliation test",
-  description: "Cover the newly discovered duplicate refund case with a regression test running in CI.",
+  description: [
+    "The duplicate refund case found in RF-101 has no automated coverage. Add a regression test that runs in CI so the bug cannot return unnoticed.",
+    "",
+    "- Seed a ledger with one refund and replay the retry burst from the incident.",
+    "- Assert the ledger contains exactly one entry per refund after reconciliation.",
+    "- Run the test in the `verify` step of the plan-and-implement line.",
+  ].join("\n"),
   state: "STATE_OPEN",
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
@@ -237,7 +262,11 @@ export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
   number: "104",
   key: "RF-104",
   title: "Ship idempotent refund retries",
-  description: "Retry logic should be idempotent so replays don't create duplicate refunds.",
+  description: [
+    "Retry logic must be idempotent so replays do not create duplicate refunds. Today each retry attempt generates a new request id, which defeats the dedupe check downstream.",
+    "",
+    "Derive the idempotency key from the refund id plus the original attempt, and extend the dedupe window in `ledger-writer` to cover delayed replays from the queue.",
+  ].join("\n"),
   state: "STATE_OPEN",
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
@@ -261,7 +290,15 @@ export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   number: "105",
   key: "RF-105",
   title: "Draft: rework refund telemetry",
-  description: "Still scoping the metric shape and dashboards before we mark this ready.",
+  description: [
+    "Still scoping. The current refund metrics count events but hide latency, so we cannot tell whether reconciliation slows down under load.",
+    "",
+    "Open questions before this is ready:",
+    "",
+    "- Which percentiles do the dashboards need (p50/p95/p99)?",
+    "- Do we tag metrics by provider, by line, or both?",
+    "- Can we reuse the payment-poller histogram buckets?",
+  ].join("\n"),
   state: "STATE_DRAFT",
   result: "RESULT_UNSPECIFIED",
   createdAt: HOUR_AGO,
@@ -276,7 +313,11 @@ export const CLOSED_FAILED_WORK_ORDER: FactoriesWorkOrder = {
   number: "92",
   key: "RF-92",
   title: "Failed: reconcile refund ledger for Q1 audit",
-  description: "Line completed but validation flagged a mismatch; closed as failed for follow-up.",
+  description: [
+    "Reconcile the refund ledger for the Q1 audit. The line completed, but validation flagged a $412.66 mismatch between the ledger and the payment provider export.",
+    "",
+    "Closed as failed. Follow-up: trace the mismatch to its source transactions before the audit deadline — see the reconciliation report artifact for the affected date range.",
+  ].join("\n"),
   state: "STATE_CLOSED",
   result: "RESULT_FAILED",
   createdAt: LAST_WEEK,
@@ -291,7 +332,11 @@ export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
   number: "87",
   key: "RF-87",
   title: "Backfill refund audit trail",
-  description: "Add historical audit entries so the reconciliation report has a full retroactive picture.",
+  description: [
+    "The reconciliation report needs a full retroactive picture, but refunds processed before March have no audit entries.",
+    "",
+    "Backfill historical audit entries from the provider exports, then verify row counts against the ledger for each month. The backfill ran in batches of 10k rows to keep replication lag flat.",
+  ].join("\n"),
   state: "STATE_CLOSED",
   result: "RESULT_COMPLETED",
   createdAt: LAST_WEEK,
@@ -368,6 +413,13 @@ export interface FactoriesFixture {
   appsByFactoryId: Record<string, FactoryApp[]>;
   /** Per-user notification settings backing `/api/v1/factory-notification-settings`. */
   notificationSettings?: FactoriesNotificationSettings;
+  /**
+   * Per-order activity timelines. When an order id is absent, the handlers
+   * fall back to `DEFAULT_EVENTS_BY_ORDER_ID` from `factoryPageEventFixtures`.
+   */
+  eventsByOrderId?: Record<string, FactoriesWorkOrderEvent[]>;
+  /** Per-order artifacts; same fallback pattern as `eventsByOrderId`. */
+  artifactsByOrderId?: Record<string, FactoriesWorkOrderArtifact[]>;
 }
 
 export const defaultFactoriesFixture: FactoriesFixture = {

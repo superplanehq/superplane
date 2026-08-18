@@ -20,6 +20,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
   ComponentsIntegrationRef,
+  ComponentsConcurrencySpec,
 } from "@/api-client";
 import type { EventState, EventStateMap } from "../componentBase";
 import type { ReactNode } from "react";
@@ -140,7 +141,11 @@ interface ComponentSidebarProps {
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
     integrationRef?: ComponentsIntegrationRef,
+    concurrency?: ComponentsConcurrencySpec,
   ) => void | Promise<void>;
+  showNodeConcurrency?: boolean;
+  nodeConcurrency?: ComponentsConcurrencySpec;
+  nodeConcurrencyMaxOnly?: boolean;
   onNodeConfigCancel?: () => void;
   domainId?: string;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
@@ -202,6 +207,9 @@ export const ComponentSidebar = ({
   nodeConfiguration = {},
   nodeConfigurationFields = [],
   onNodeConfigSave,
+  showNodeConcurrency = false,
+  nodeConcurrency,
+  nodeConcurrencyMaxOnly = false,
   onNodeConfigCancel,
   domainId,
   customField,
@@ -744,6 +752,9 @@ export const ComponentSidebar = ({
                     configuration={nodeConfiguration}
                     configurationFields={nodeConfigurationFields}
                     onSave={onNodeConfigSave || (() => {})}
+                    showConcurrency={showNodeConcurrency}
+                    concurrency={nodeConcurrency}
+                    concurrencyMaxOnly={nodeConcurrencyMaxOnly}
                     onCancel={onNodeConfigCancel}
                     domainId={domainId}
                     customField={customField}

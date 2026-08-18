@@ -46,6 +46,7 @@ import type {
   ActionsAction,
   ComponentsEdge,
   ComponentsIntegrationRef,
+  ComponentsConcurrencySpec,
   SuperplaneComponentsNode as ComponentsNode,
   ConfigurationField,
   OrganizationsIntegration,
@@ -156,6 +157,11 @@ export interface NodeEditData {
   integrationLabel?: string;
   blockName?: string;
   integrationRef?: ComponentsIntegrationRef;
+  /** Inline concurrency configuration; only action nodes support it. */
+  concurrency?: ComponentsConcurrencySpec;
+  supportsConcurrency?: boolean;
+  /** Loop only honors max (its parallel-session cap); hides key. */
+  concurrencyMaxOnly?: boolean;
 }
 
 export interface NewNodeData {
@@ -293,6 +299,7 @@ export interface CanvasPageProps {
     configuration: Record<string, unknown>,
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
+    concurrency?: ComponentsConcurrencySpec,
   ) => void | Promise<void>;
   onAnnotationUpdate?: (
     nodeId: string,
@@ -1163,11 +1170,16 @@ function CanvasPage(props: CanvasPageProps) {
 
   const onNodeConfigurationSave = props.onNodeConfigurationSave;
   const handleSaveConfiguration = useCallback(
-    (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
+    (
+      configuration: Record<string, unknown>,
+      nodeName: string,
+      integrationRef?: ComponentsIntegrationRef,
+      concurrency?: ComponentsConcurrencySpec,
+    ) => {
       if (!editingNodeData?.nodeId || !onNodeConfigurationSave) {
         return;
       }
-      return onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
+      return onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef, concurrency);
     },
     [editingNodeData?.nodeId, onNodeConfigurationSave],
   );
@@ -1724,6 +1736,7 @@ function Sidebar({
     configuration: Record<string, unknown>,
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
+    concurrency?: ComponentsConcurrencySpec,
   ) => void | Promise<void>;
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
@@ -1870,6 +1883,9 @@ function Sidebar({
       nodeConfiguration={editingNodeData?.configuration || {}}
       nodeConfigurationFields={editingNodeData?.configurationFields ?? []}
       onNodeConfigSave={onSaveConfiguration}
+      showNodeConcurrency={editingNodeData?.supportsConcurrency ?? false}
+      nodeConcurrency={editingNodeData?.concurrency}
+      nodeConcurrencyMaxOnly={editingNodeData?.concurrencyMaxOnly ?? false}
       onNodeConfigCancel={undefined}
       domainId={organizationId}
       customField={

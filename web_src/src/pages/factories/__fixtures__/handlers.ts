@@ -1,5 +1,11 @@
-import { defaultFactoriesFixture, ORGANIZATION_USERS, type FactoriesFixture } from "./factoryPageResponses";
-import type { FactoriesWorkOrder } from "@/api-client";
+import {
+  defaultFactoriesFixture,
+  ORGANIZATION_USERS,
+  STORYBOOK_ME_USER_ID,
+  type FactoriesFixture,
+} from "./factoryPageResponses";
+import { DEFAULT_ARTIFACTS_BY_ORDER_ID, DEFAULT_EVENTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
+import type { FactoriesWorkOrder, FactoriesWorkOrderEvent } from "@/api-client";
 import { fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
 
 export type { FactoriesFixture };
@@ -25,6 +31,7 @@ interface RequestBody {
   line_name?: unknown;
   result?: unknown;
   steps?: unknown;
+  body?: unknown;
 }
 
 function stringOrEmpty(value: unknown): string {
@@ -172,6 +179,10 @@ function findOrder(fixture: FactoriesFixture, factoryId: string, orderId: string
   return orders.find((entry) => entry.id === orderId);
 }
 
+function orderEvents(fixture: FactoriesFixture, orderId: string): FactoriesWorkOrderEvent[] {
+  return fixture.eventsByOrderId?.[orderId] ?? DEFAULT_EVENTS_BY_ORDER_ID[orderId] ?? [];
+}
+
 function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: string, request: RequestBody) {
   const order = findOrder(fixture, factoryId, orderId);
   if (!order) return { json: {} };
@@ -243,6 +254,45 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         order.result = stringOrEmpty(request.result) === "RESULT_REJECTED" ? "RESULT_REJECTED" : "RESULT_COMPLETED";
         order.updatedAt = new Date().toISOString();
         return { json: { order } };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/events"),
+      resolve: (match) => {
+        const events = orderEvents(fixture, match[2]);
+        return { json: { events, totalCount: events.length, hasNextPage: false } };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/artifacts"),
+      resolve: (match, method) => {
+        if (method !== "GET") return { json: {} };
+        const artifacts = fixture.artifactsByOrderId?.[match[2]] ?? DEFAULT_ARTIFACTS_BY_ORDER_ID[match[2]] ?? [];
+        return { json: { artifacts } };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/comments"),
+      resolve: (match, method, body) => {
+        if (method !== "POST") return null;
+        const order = findOrder(fixture, match[1], match[2]);
+        if (!order) return { json: {} };
+        const commentBody = stringOrEmpty(((body ?? {}) as RequestBody).body);
+        const timestamp = new Date().toISOString();
+        const events: FactoriesWorkOrderEvent[] = [
+          ...orderEvents(fixture, match[2]),
+          {
+            type: "order.comment.added",
+            timestamp,
+            event: {
+              order: { id: order.id, title: order.title },
+              body: commentBody,
+              author: { kind: "user", userId: STORYBOOK_ME_USER_ID },
+            },
+          },
+        ];
+        fixture.eventsByOrderId = { ...(fixture.eventsByOrderId ?? {}), [match[2]]: events };
+        return { json: { comment: { id: `comment-${events.length}`, body: commentBody, createdAt: timestamp } } };
       },
     },
   ];
