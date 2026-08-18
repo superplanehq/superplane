@@ -354,6 +354,76 @@ func (a *AuthService) RemoveUserFromGroup(domainID string, domainType string, us
 	return nil
 }
 
+// GroupWithDetails is a group's role and members.
+type GroupWithDetails struct {
+	Name    string
+	Role    string
+	Members []string
+}
+
+// GetGroupsWithDetails returns each group's role and members.
+// It uses one read enforcer instead of one per group.
+func (a *AuthService) GetGroupsWithDetails(ctx context.Context, domainID string, domainType string) ([]GroupWithDetails, error) {
+	domain := prefixDomain(domainType, domainID)
+
+	var details []GroupWithDetails
+	err := a.withReadEnforcer(ctx, domainType, domainID, func(enforcer casbin.IEnforcer) error {
+		policies, err := enforcer.GetFilteredGroupingPolicy(2, domain)
+		if err != nil {
+			return fmt.Errorf("failed to get groups: %w", err)
+		}
+
+		groupNames := make([]string, 0)
+		seen := make(map[string]bool)
+		for _, policy := range policies {
+			if !strings.HasPrefix(policy[0], "/groups/") {
+				continue
+			}
+			groupName := policy[0][len("/groups/"):]
+			if seen[groupName] {
+				continue
+			}
+			seen[groupName] = true
+			groupNames = append(groupNames, groupName)
+		}
+
+		details = make([]GroupWithDetails, 0, len(groupNames))
+		for _, groupName := range groupNames {
+			prefixedGroupName := prefixGroupName(groupName)
+
+			role := ""
+			for _, r := range enforcer.GetRolesForUserInDomain(prefixedGroupName, domain) {
+				if strings.HasPrefix(r, "/roles/") {
+					role = strings.TrimPrefix(r, "/roles/")
+					break
+				}
+			}
+
+			memberPolicies, err := enforcer.GetFilteredGroupingPolicy(1, prefixedGroupName, domain)
+			if err != nil {
+				return fmt.Errorf("failed to get group users: %w", err)
+			}
+			members := make([]string, 0, len(memberPolicies))
+			for _, policy := range memberPolicies {
+				members = append(members, strings.TrimPrefix(policy[0], "/users/"))
+			}
+
+			details = append(details, GroupWithDetails{
+				Name:    groupName,
+				Role:    role,
+				Members: members,
+			})
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return details, nil
+}
+
 func (a *AuthService) GetGroupUsers(ctx context.Context, domainID string, domainType string, group string) ([]string, error) {
 	domain := prefixDomain(domainType, domainID)
 	prefixedGroupName := prefixGroupName(group)
@@ -562,6 +632,39 @@ func (a *AuthService) RemoveRole(userID, role, domainID string, domainType strin
 	}
 
 	return nil
+}
+
+// GetOrgUsersByRoles returns the users for each role.
+// It uses one read enforcer instead of one per role.
+// A role whose lookup fails is skipped.
+func (a *AuthService) GetOrgUsersByRoles(ctx context.Context, orgID string, roleNames []string) (map[string][]string, error) {
+	orgDomain := prefixDomain(models.DomainTypeOrganization, orgID)
+
+	usersByRole := make(map[string][]string, len(roleNames))
+	err := a.withReadEnforcer(ctx, models.DomainTypeOrganization, orgID, func(enforcer casbin.IEnforcer) error {
+		for _, role := range roleNames {
+			prefixedRole := prefixRoleName(role)
+			users, err := enforcer.GetUsersForRole(prefixedRole, orgDomain)
+			if err != nil {
+				continue
+			}
+
+			unprefixedUsers := make([]string, 0, len(users))
+			for _, user := range users {
+				if strings.HasPrefix(user, "/users/") {
+					unprefixedUsers = append(unprefixedUsers, strings.TrimPrefix(user, "/users/"))
+				}
+			}
+			usersByRole[role] = unprefixedUsers
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return usersByRole, nil
 }
 
 func (a *AuthService) GetOrgUsersForRole(ctx context.Context, role string, orgID string) ([]string, error) {
