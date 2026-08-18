@@ -26,8 +26,10 @@ function validateCronExpression(cronExpression: string): string | null {
     return `Expected 5 or 6 fields, got ${parts.length}`;
   }
 
-  // Quick validation with pre-compiled regex for better performance
-  const validChars = /^[0-9*,\-/A-Z]+$/;
+  // Quick validation with pre-compiled regex for better performance.
+  // Day and month names are case-insensitive, matching the backend validator
+  // (pkg/configuration/validation.go) and the preview parser in lib/cron.ts.
+  const validChars = /^[0-9*,\-/a-zA-Z]+$/;
 
   // Use a more efficient approach - validate only the problematic parts
   for (let i = 0; i < parts.length; i++) {
