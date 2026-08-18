@@ -1,14 +1,26 @@
 {
   "install_params": [
     {
-      "name": "repository",
+      "name": "appRepository",
       "type": "integration-resource",
       "integration": "github",
       "resourceType": "repository",
       "useNameAsValue": true,
       "required": true,
-      "label": "Choose repository",
-      "placeholder": "owner/repo"
+      "label": "App repository",
+      "placeholder": "owner/repo",
+      "description": "Repository where the factory creates branches, pull requests, and CI work."
+    },
+    {
+      "name": "backlogRepository",
+      "type": "integration-resource",
+      "integration": "github",
+      "resourceType": "repository",
+      "useNameAsValue": true,
+      "required": true,
+      "label": "Backlog repository",
+      "placeholder": "owner/repo",
+      "description": "Repository where the factory creates and watches issues."
     }
   ]
 }
