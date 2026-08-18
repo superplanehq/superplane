@@ -275,6 +275,17 @@ service Factories {
     };
   }
 
+  rpc ListWorkOrderChecks(ListWorkOrderChecksRequest) returns (ListWorkOrderChecksResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/orders/{order_id}/checks"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List work order checks";
+      description: "Returns scored checks reported on a work order";
+      tags: "Factory";
+    };
+  }
+
 }
 
 // Factories
@@ -750,6 +761,52 @@ message WorkOrderArtifact {
   google.protobuf.Struct data = 3;
   UserRef created_by = 4;
   google.protobuf.Timestamp created_at = 5;
+}
+
+message ListWorkOrderChecksRequest {
+  string factory_id = 1;
+  string order_id = 2;
+}
+
+message ListWorkOrderChecksResponse {
+  repeated WorkOrderCheck checks = 1;
+}
+
+// WorkOrderCheck is a scored assessment an automation reported on a work
+// order (risk review, coverage, confidence). Latest-only state: one entry
+// per key, updated in place on every report; history lives in
+// `order.check.reported` timeline events.
+message WorkOrderCheck {
+  enum Format {
+    FORMAT_UNSPECIFIED = 0;
+    FORMAT_FRACTION = 1;
+    FORMAT_PERCENT = 2;
+  }
+
+  enum Level {
+    LEVEL_UNSPECIFIED = 0;
+    LEVEL_POSITIVE = 1;
+    LEVEL_NEUTRAL = 2;
+    LEVEL_CAUTION = 3;
+    LEVEL_CRITICAL = 4;
+  }
+
+  string id = 1;
+  string key = 2;
+  string name = 3;
+  double score = 4;
+  double max_score = 5;
+  Format format = 6;
+  Level level = 7;
+  // Score the same check key held before the latest report, if any.
+  optional double previous_score = 8;
+  string summary = 9;
+  string analysis = 10;
+  // Automation that reported the check and the run that produced it.
+  AutomationRef automation = 11;
+  string run_id = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
 }
 
 // Internal AMQP message for factory work-order websocket fan-out.

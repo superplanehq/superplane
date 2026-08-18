@@ -405,6 +405,31 @@ CREATE TABLE public.factory_work_order_assignees (
 
 
 --
+-- Name: factory_work_order_checks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_work_order_checks (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    work_order_id uuid NOT NULL,
+    key character varying(255) NOT NULL,
+    name character varying(255) NOT NULL,
+    score double precision NOT NULL,
+    max_score double precision NOT NULL,
+    format character varying(16) DEFAULT 'fraction'::character varying NOT NULL,
+    level character varying(16) DEFAULT 'neutral'::character varying NOT NULL,
+    previous_score double precision,
+    summary text DEFAULT ''::text NOT NULL,
+    analysis text DEFAULT ''::text NOT NULL,
+    automation jsonb,
+    run_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_work_order_events; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1138,6 +1163,14 @@ ALTER TABLE ONLY public.factory_work_order_assignees
 
 
 --
+-- Name: factory_work_order_checks factory_work_order_checks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_checks
+    ADD CONSTRAINT factory_work_order_checks_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: factory_work_order_events factory_work_order_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1715,6 +1748,20 @@ CREATE INDEX idx_factory_work_order_assignees_user_id ON public.factory_work_ord
 
 
 --
+-- Name: idx_factory_work_order_checks_factory_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_checks_factory_created ON public.factory_work_order_checks USING btree (factory_id, created_at DESC);
+
+
+--
+-- Name: idx_factory_work_order_checks_order_key_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_work_order_checks_order_key_unique ON public.factory_work_order_checks USING btree (work_order_id, key);
+
+
+--
 -- Name: idx_factory_work_order_events_work_order_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2284,6 +2331,22 @@ ALTER TABLE ONLY public.factory_work_order_assignees
 
 
 --
+-- Name: factory_work_order_checks factory_work_order_checks_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_checks
+    ADD CONSTRAINT factory_work_order_checks_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_order_checks factory_work_order_checks_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_checks
+    ADD CONSTRAINT factory_work_order_checks_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: factory_work_order_events factory_work_order_events_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2827,7 +2890,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260818202644	f
+20260818210337	f
 \.
 
 

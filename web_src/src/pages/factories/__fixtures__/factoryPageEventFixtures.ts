@@ -24,6 +24,11 @@ import {
 
 const REFUND_LINE = { id: "line-plan-and-implement", name: "plan-and-implement" };
 
+/** Fresh timestamp for the risk re-score, matching the checks fixture's "updated 12 minutes ago". */
+const TWELVE_MINUTES_AGO = new Date(Date.now() - 12 * 60_000).toISOString();
+
+const RISK_REVIEW_AUTOMATION = { appId: "app-pr-risk-review", appName: "PR Risk Review" };
+
 interface StepExecutionEventFixture {
   order: FactoriesWorkOrder;
   stepName: string;
@@ -175,6 +180,29 @@ function artifactAddedEvent(
       ...(automation ? { automation } : {}),
       order: { id: order.id, title: order.title },
       artifact,
+    },
+  };
+}
+
+// A score reported by a dedicated automation (`order.check.reported`).
+// `previousScore` marks a re-score, which the timeline renders as a trend
+// ("82 → 65") instead of a bare number.
+function checkReportedEvent(
+  order: FactoriesWorkOrder,
+  at: string,
+  check: { name: string; score: number; maxScore: number; format?: "fraction" | "percent"; previousScore?: number },
+  automation: AutomationRefFixture,
+  run?: { id: string },
+): FactoriesWorkOrderEvent {
+  return {
+    type: "order.check.reported",
+    timestamp: at,
+    event: {
+      order: { id: order.id, title: order.title },
+      check,
+      automation,
+      ...(run ? { run } : {}),
+      ...(automation.appId ? { app: { id: automation.appId } } : {}),
     },
   };
 }
@@ -436,6 +464,23 @@ export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     },
     null,
     { nodeName: "attach-artifact", appName: "Refund Diagnostics", lineName: "Plan", stepName: "step-01" },
+  ),
+  // Check history: the first risk score landed before the PR, follow-up
+  // commits addressed the concerns, and the re-score dropped 82 → 65 — the
+  // timeline tells the trend while the Checks section shows only the latest.
+  checkReportedEvent(
+    OPEN_WORK_ORDER,
+    TWO_HOURS_AGO,
+    { name: "Risk review", score: 82, maxScore: 100 },
+    RISK_REVIEW_AUTOMATION,
+    { id: "run-risk-review-100" },
+  ),
+  checkReportedEvent(
+    OPEN_WORK_ORDER,
+    TWELVE_MINUTES_AGO,
+    { name: "Risk review", score: 65, maxScore: 100, previousScore: 82 },
+    RISK_REVIEW_AUTOMATION,
+    { id: "run-risk-review-101" },
   ),
 ];
 

@@ -5,6 +5,7 @@ import {
   type FactoriesFixture,
 } from "./factoryPageResponses";
 import { DEFAULT_ARTIFACTS_BY_ORDER_ID, DEFAULT_EVENTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
+import { DEFAULT_CHECKS_BY_ORDER_ID } from "./workOrderCheckFixtures";
 import type {
   FactoriesFactoryLine,
   FactoriesWorkOrder,
@@ -292,6 +293,14 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         if (method !== "GET") return { json: {} };
         const artifacts = fixture.artifactsByOrderId?.[match[2]] ?? DEFAULT_ARTIFACTS_BY_ORDER_ID[match[2]] ?? [];
         return { json: { artifacts } };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/checks"),
+      resolve: (match, method) => {
+        if (method !== "GET") return { json: {} };
+        const checks = fixture.checksByOrderId?.[match[2]] ?? DEFAULT_CHECKS_BY_ORDER_ID[match[2]] ?? [];
+        return { json: { checks } };
       },
     },
     {
