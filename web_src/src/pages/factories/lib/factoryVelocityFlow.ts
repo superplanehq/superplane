@@ -1,4 +1,5 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
+import { flattenWorkOrderExecutions } from "./workOrderExecutions";
 
 export type FactoryVelocityFlowPeriodDays = 7 | 30;
 
@@ -135,7 +136,7 @@ function closeTimestamp(order: FactoriesWorkOrder, executions: FactoriesWorkOrde
 function toCycleSample(order: FactoriesWorkOrder, windowStart: number, windowEnd: number): CycleSample | null {
   if (order.state !== "STATE_CLOSED") return null;
 
-  const executions = order.executions ?? [];
+  const executions = flattenWorkOrderExecutions(order);
   if (executions.length === 0) return null;
 
   const start = firstExecutionStart(executions);

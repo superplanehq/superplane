@@ -344,19 +344,17 @@ func (c *FactoryContext) lineStep() (lineStepInfo, bool) {
 		return lineStepInfo{}, false
 	}
 
-	f, err := models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
-	if err != nil {
-		return lineStepInfo{}, false
-	}
-
-	line, err := f.FindLine(c.tx, execution.LineID)
+	// Attribute back to the line dispatch's snapshot, not the live line —
+	// this is a historical fact about the traversal, so a line rename after
+	// dispatch shouldn't change what earlier events say.
+	dispatch, err := models.FindWorkOrderLineDispatch(c.tx, execution.LineDispatchID)
 	if err != nil {
 		return lineStepInfo{}, false
 	}
 
 	c.lineStepCache = lineStepInfo{
-		LineID:    line.ID,
-		LineName:  line.Name,
+		LineID:    dispatch.LineID,
+		LineName:  dispatch.LineName,
 		StepIndex: execution.StepIndex,
 		StepName:  execution.StepName,
 	}

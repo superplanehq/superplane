@@ -23,14 +23,21 @@ function execution(overrides: Partial<FactoriesWorkOrderExecution>): FactoriesWo
   };
 }
 
-function closedOrder(overrides: Partial<FactoriesWorkOrder>): FactoriesWorkOrder {
+/** Fixture-only shape: velocity math flattens dispatches, so tests list step
+ * executions directly and `closedOrder` wraps them into one dispatch. */
+type ClosedOrderOverrides = Partial<FactoriesWorkOrder> & {
+  executions?: FactoriesWorkOrderExecution[];
+};
+
+function closedOrder(overrides: ClosedOrderOverrides): FactoriesWorkOrder {
+  const { executions = [execution({})], ...rest } = overrides;
   return {
-    id: overrides.id ?? "order",
+    id: rest.id ?? "order",
     state: "STATE_CLOSED",
     createdAt: iso(-3 * DAY),
     updatedAt: iso(-1 * DAY),
-    executions: [execution({})],
-    ...overrides,
+    lineDispatches: [{ id: `dispatch-${rest.id ?? "order"}`, stepExecutions: executions }],
+    ...rest,
   };
 }
 
@@ -51,7 +58,7 @@ describe("aggregateFactoryVelocityFlow", () => {
 
   it("skips draft/open orders and orders without executions", () => {
     const orders: FactoriesWorkOrder[] = [
-      { ...closedOrder({ id: "no-exec" }), executions: [] },
+      closedOrder({ id: "no-exec", executions: [] }),
       { ...closedOrder({ id: "draft" }), state: "STATE_DRAFT" },
       { ...closedOrder({ id: "open" }), state: "STATE_OPEN" },
     ];
