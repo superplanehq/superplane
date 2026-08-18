@@ -25,7 +25,7 @@ import {
   workOrderDetailPath,
   workOrdersPath,
 } from "../../lib/factoryPagePaths";
-import { factoryContentBodyClassName } from "../factoryPageLayoutStyles";
+import { factorySectionBodyClassName, factorySectionHeaderClassName } from "../factoryPageLayoutStyles";
 import { CardEmptyState, CardViewAllLink, OverviewCard } from "./overviewRedesignCardParts";
 import { HealthScorecards } from "./HealthScorecards";
 import { ImprovementsCard, SuggestionsCard } from "./OverviewRedesignRail";
@@ -66,6 +66,7 @@ export function OverviewRedesignPage({ data }: { data: OverviewRedesignData }) {
   return (
     <>
       <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
         title="Overview"
         subtitle={
           data.briefing ? (
@@ -81,7 +82,7 @@ export function OverviewRedesignPage({ data }: { data: OverviewRedesignData }) {
         actions={<OverviewScopeToggle value={scope} onChange={setScope} />}
       />
 
-      <div className={factoryContentBodyClassName}>
+      <div className={factorySectionBodyClassName}>
         <HealthScorecards metrics={data.health} velocityHref={factoryVelocityPath(organizationId, factoryKey)} />
 
         <div className="mt-6 flex min-w-0 flex-col gap-6">
