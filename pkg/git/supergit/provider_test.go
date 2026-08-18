@@ -70,6 +70,10 @@ func TestCreateRepositoryCreatesInitialCommit(t *testing.T) {
 				Name  string `json:"name"`
 				Email string `json:"email"`
 			} `json:"author"`
+			Committer struct {
+				Name  string `json:"name"`
+				Email string `json:"email"`
+			} `json:"committer"`
 			Files []struct {
 				Path      string `json:"path"`
 				Operation string `json:"operation"`
@@ -83,6 +87,10 @@ func TestCreateRepositoryCreatesInitialCommit(t *testing.T) {
 	require.Equal(t, "Initialize repository", metadata.Metadata.CommitMessage)
 	require.Equal(t, "SuperPlane", metadata.Metadata.Author.Name)
 	require.Equal(t, "bot@superplane.local", metadata.Metadata.Author.Email)
+	// The committer must be sent explicitly (defaulting to the author) so the
+	// code-storage service never falls back to its host's "ubuntu" identity.
+	require.Equal(t, "SuperPlane", metadata.Metadata.Committer.Name)
+	require.Equal(t, "bot@superplane.local", metadata.Metadata.Committer.Email)
 	require.Len(t, metadata.Metadata.Files, 1)
 	require.Equal(t, "README.md", metadata.Metadata.Files[0].Path)
 	require.Equal(t, "upsert", metadata.Metadata.Files[0].Operation)
