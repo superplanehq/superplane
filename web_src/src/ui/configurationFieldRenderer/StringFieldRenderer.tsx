@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
 import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
+import { resolveExpressionQuickTip } from "./expressionQuickTip";
 
 export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
@@ -70,7 +71,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       inputSize="md"
       showValuePreview
       valuePreviewLabel={valuePreviewLabel}
-      quickTip="Tip: type `{{` to start an expression."
+      quickTip={resolveExpressionQuickTip(field, allowExpressions)}
       className=""
       data-testid={toTestId(`string-field-${field.name}`)}
       excludedSuggestions={excludedSuggestions}

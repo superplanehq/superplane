@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
 import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
+import { resolveExpressionQuickTip } from "./expressionQuickTip";
 
 export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
@@ -48,7 +49,7 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
       expressionMode="raw"
       inputSize="md"
       showValuePreview
-      quickTip="Tip: type `$` to browse node payloads."
+      quickTip={resolveExpressionQuickTip(field, allowExpressions)}
       className=""
       data-testid={toTestId(`expression-field-${field.name}`)}
     />
