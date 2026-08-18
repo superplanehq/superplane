@@ -6,12 +6,8 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 
-import {
-  CheckAttribution,
-  formatCheckScore,
-  LEVEL_LABEL,
-  type WorkOrderCheckPresentation,
-} from "./WorkOrderChecksSection";
+import type { WorkOrderCheckPresentation } from "./lib/workOrderChecks";
+import { CheckAttribution, formatCheckScore, LEVEL_LABEL } from "./WorkOrderChecksSection";
 
 /** Expanded view of one check: score, summary, and the full markdown analysis. */
 export function WorkOrderCheckDialog({

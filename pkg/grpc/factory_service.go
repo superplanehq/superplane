@@ -118,3 +118,8 @@ func (s *FactoryService) CreateWorkOrderArtifact(ctx context.Context, req *pb.Cr
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.CreateWorkOrderArtifact(ctx, organizationID, req)
 }
+
+func (s *FactoryService) ListWorkOrderChecks(ctx context.Context, req *pb.ListWorkOrderChecksRequest) (*pb.ListWorkOrderChecksResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListWorkOrderChecks(ctx, organizationID, req)
+}

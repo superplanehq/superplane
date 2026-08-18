@@ -4,6 +4,7 @@ import {
   useFactoryWorkOrders,
   useWorkOrder,
   useWorkOrderArtifacts,
+  useWorkOrderChecks,
   useWorkOrderEvents,
 } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -19,9 +20,8 @@ import {
   workOrderRouteNeedsCanonicalRedirect,
   type WorkOrderResolution,
 } from "../lib/workOrderNumberResolution";
-import { useWorkOrderChecks } from "../useWorkOrderChecks";
+import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../lib/workOrderChecks";
 import { useWorkOrderDetailActions } from "../useWorkOrderDetailActions";
-import type { WorkOrderCheckPresentation } from "../WorkOrderChecksSection";
 import { WorkOrderDetailLoadedView } from "../WorkOrderDetailLoadedView";
 import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
 
@@ -119,6 +119,7 @@ function WorkOrderDetailPageContent({
   const events = useMemo(() => flattenWorkOrderEventsPages(eventsQuery.data?.pages), [eventsQuery.data?.pages]);
   const artifactsQuery = useWorkOrderArtifacts(organizationId, factoryId, orderId);
   const checksQuery = useWorkOrderChecks(organizationId, factoryId, orderId);
+  const checks = useMemo(() => presentWorkOrderChecks(checksQuery.data ?? []), [checksQuery.data]);
 
   const actions = useWorkOrderDetailActions(organizationId, factoryId, orderId);
   // Memoize so derived arrays (e.g. `assigneeIds`) keep a stable reference
@@ -155,7 +156,7 @@ function WorkOrderDetailPageContent({
       events={events}
       eventsQuery={eventsQuery}
       artifactsQuery={artifactsQuery}
-      checks={checksQuery.data ?? []}
+      checks={checks}
       canManageWorkOrders={canAct("work_orders", "update")}
       permissionsLoading={permissionsLoading}
       actions={actions}

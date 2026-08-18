@@ -52,6 +52,11 @@ export function invalidateFactoryWorkOrderQueries(
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, orderId),
   });
+  // Check reports (reportWorkOrderCheck) update the scorecards in place;
+  // refetch so a re-scored check shows its new value and trend delta.
+  void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.workOrderChecks(organizationId, factoryId, orderId),
+  });
 }
 
 export function useFactoryWebsocket(organizationId: string, factoryId: string, enabled = true): void {
