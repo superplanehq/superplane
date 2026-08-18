@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { FactorySettingsPageFrame } from "./FactorySettingsCard";
 
 interface FactorySettingsSoonPageProps {
@@ -8,6 +9,8 @@ interface FactorySettingsSoonPageProps {
 }
 
 export function FactorySettingsSoonPage({ title, description, Icon }: FactorySettingsSoonPageProps) {
+  usePageTitle([title, "Settings"]);
+
   return (
     <FactorySettingsPageFrame title={title} subtitle={description}>
       <div

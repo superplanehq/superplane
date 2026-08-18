@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.11 (Ubuntu 17.11-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -387,7 +387,9 @@ CREATE TABLE public.factory_work_order_artifacts (
     data jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_by_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    key character varying(512)
+    key character varying(512),
+    merged_at timestamp with time zone,
+    closed_at timestamp with time zone
 );
 
 
@@ -1689,6 +1691,20 @@ CREATE UNIQUE INDEX idx_factory_work_order_artifacts_factory_key_unique ON publi
 
 
 --
+-- Name: idx_factory_work_order_artifacts_pr_closed_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_artifacts_pr_closed_at ON public.factory_work_order_artifacts USING btree (factory_id, closed_at DESC) WHERE (((type)::text = 'pr'::text) AND (closed_at IS NOT NULL));
+
+
+--
+-- Name: idx_factory_work_order_artifacts_pr_merged_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_artifacts_pr_merged_at ON public.factory_work_order_artifacts USING btree (factory_id, merged_at DESC) WHERE (((type)::text = 'pr'::text) AND (merged_at IS NOT NULL));
+
+
+--
 -- Name: idx_factory_work_order_artifacts_work_order_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2752,7 +2768,7 @@ ALTER TABLE ONLY public.workflows
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.11 (Ubuntu 17.11-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2771,7 +2787,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260818170102	f
+20260818173022	f
 \.
 
 
@@ -2788,7 +2804,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.11 (Ubuntu 17.11-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
