@@ -12,7 +12,7 @@ function HeaderHarness({
   onCreateWorkOrder: () => void;
   canCreate?: boolean;
 }) {
-  const state = useWorkOrderListState();
+  const state = useWorkOrderListState("factory-1");
   return (
     <WorkOrdersHeader
       state={state}
