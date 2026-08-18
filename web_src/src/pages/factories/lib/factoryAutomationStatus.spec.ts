@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvasRun, FactoriesWorkOrder } from "@/api-client";
 import {
+  findWorkOrderForAutomationRun,
   listFactoryAutomationRuns,
   resolveFactoryAutomationStatus,
   resolveFactoryAutomationStatusFromCanvasRuns,
@@ -163,5 +164,24 @@ describe("listFactoryAutomationRuns", () => {
         label: "Cancelling",
       }),
     ]);
+  });
+});
+
+describe("findWorkOrderForAutomationRun", () => {
+  const orders: FactoriesWorkOrder[] = [
+    order("wo-other", "Other", [{ id: "e0", run: { id: "run-x", appId: "app-other" } }]),
+    order("wo-match", "Matched", [{ id: "e1", run: { id: "run-1", appId: "app-1" } }]),
+  ];
+
+  it("returns the work order whose execution run matches this canvas run", () => {
+    expect(findWorkOrderForAutomationRun(orders, "run-1")?.id).toBe("wo-match");
+  });
+
+  it("matches by run id even when the execution app differs", () => {
+    expect(findWorkOrderForAutomationRun(orders, "run-x")?.id).toBe("wo-other");
+  });
+
+  it("returns undefined when no execution matches the run", () => {
+    expect(findWorkOrderForAutomationRun(orders, "run-missing")).toBeUndefined();
   });
 });

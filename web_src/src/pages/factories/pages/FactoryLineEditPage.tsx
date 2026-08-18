@@ -108,7 +108,7 @@ function LineEditCard({ isCreate, line, organizationId, factoryApps, isSaving, o
       <h1 className={factoryPageTitleClassName}>{title}</h1>
       {isCreate ? (
         <p className="mt-2 text-[13px] text-muted-foreground">
-          Define the apps and triggers that run when work is dispatched to this line.
+          Define the automations and triggers that run when work is dispatched to this line.
         </p>
       ) : null}
 
