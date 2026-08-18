@@ -124,6 +124,7 @@ message NotificationSettings {
     TYPE_WORK_ORDER_COMMENT_CREATED = 3;
     TYPE_WORK_ORDER_STATUS_OWNED = 4;
     TYPE_WORK_ORDER_ARTIFACT_OWNED = 5;
+    TYPE_WORK_ORDER_MENTIONED = 6;
   }
 
   message TypeToggle {
