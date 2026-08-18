@@ -88,6 +88,12 @@ Each branch event includes:
 
 This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
+### Notes
+
+- This trigger fires only when a new branch is created.
+- Branch deletion events are handled separately and do not trigger this event.
+- Existing branches will not trigger this event when the workflow is first configured.
+
 ### Example Data
 
 ```json
