@@ -70,6 +70,15 @@ func createQueueItemAt(t *testing.T, canvasID uuid.UUID, nodeID string, event *m
 	return &item
 }
 
+// createResolvedQueueItemAt creates a queue item whose queue name is
+// already resolved, as if a previous dispatch pass touched it.
+func createResolvedQueueItemAt(t *testing.T, canvasID uuid.UUID, nodeID string, event *models.CanvasEvent, queueName string, createdAt time.Time) *models.CanvasNodeQueueItem {
+	t.Helper()
+	item := createQueueItemAt(t, canvasID, nodeID, event, createdAt)
+	require.NoError(t, database.Conn().Model(item).Update("queue_name", queueName).Error)
+	return item
+}
+
 func concurrencyMax(limit int) *int {
 	return &limit
 }
@@ -418,6 +427,62 @@ func Test__Queueing_LoopSessionsRespectMaxWithinOnePass(t *testing.T) {
 
 	assert.Len(t, listActiveNodeExecutionsForTest(t, canvas.ID, loopNode), 1)
 	assert.Len(t, listQueueItemsForTest(t, canvas.ID, loopNode), 1)
+}
+
+// A deep backlog on one busy queue must not starve other queues. The
+// dispatch pass scans at most queueItemScanLimit items; if items waiting
+// on a full queue counted against that window, a busy key with a backlog
+// deeper than the limit would keep items of other keys out of every pass.
+func Test__Queueing_DeepBlockedBacklogDoesNotStarveOtherQueues(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := queueWorkerForTest(r)
+	componentNode := "ci-node"
+
+	canvas, _ := support.CreateCanvas(
+		t, r.Organization.ID, r.User,
+		triggerAndComponent(componentNode, &models.ConcurrencySpec{Key: "ci-{{ root().branch }}"}),
+		triggerToComponentEdge(componentNode),
+	)
+
+	base := time.Now().Add(-10 * time.Hour)
+
+	//
+	// The busy branch fills its only slot (default max 1)...
+	//
+	busyEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "trigger-1", "default", nil, map[string]any{"branch": "busy"})
+	createQueueItemAt(t, canvas.ID, componentNode, busyEvent, base)
+	processQueueNode(t, worker, canvas.ID, componentNode)
+	require.Len(t, listActiveNodeExecutionsForTest(t, canvas.ID, componentNode), 1)
+
+	//
+	// ...and accumulates a resolved backlog deeper than the scan window.
+	//
+	for i := 0; i < queueItemScanLimit; i++ {
+		createResolvedQueueItemAt(t, canvas.ID, componentNode, busyEvent, "ci-busy", base.Add(time.Duration(i+1)*time.Minute))
+	}
+
+	//
+	// An item for another branch arrives behind the whole busy backlog.
+	//
+	idleEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "trigger-1", "default", nil, map[string]any{"branch": "idle"})
+	createQueueItemAt(t, canvas.ID, componentNode, idleEvent, base.Add(time.Duration(queueItemScanLimit+1)*time.Minute))
+
+	//
+	// One pass dispatches it: blocked busy items do not consume the scan
+	// window. The busy backlog itself stays queued.
+	//
+	processQueueNode(t, worker, canvas.ID, componentNode)
+
+	idleExecution := findExecutionByEvent(t, canvas.ID, componentNode, idleEvent.ID)
+	require.NotNil(t, idleExecution)
+	require.NotNil(t, idleExecution.QueueName)
+	assert.Equal(t, "ci-idle", *idleExecution.QueueName)
+
+	items, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, componentNode, queueItemScanLimit+10, nil)
+	require.NoError(t, err)
+	assert.Len(t, items, queueItemScanLimit)
 }
 
 func findExecutionByEvent(t *testing.T, canvasID uuid.UUID, nodeID string, eventID uuid.UUID) *models.CanvasNodeExecution {

@@ -479,14 +479,29 @@ func (c *CanvasNode) UpdateState(tx *gorm.DB, state string) error {
 		Error
 }
 
-// ListPendingQueueItems returns the node's backlog in FIFO order, up to
-// limit items. The dispatch loop scans this list and starts every item
-// whose queue still has capacity.
+// ListPendingQueueItems returns the node's actionable backlog in FIFO
+// order, up to limit items. Items whose resolved queue is already at
+// capacity are excluded, so a deep backlog on one busy queue cannot fill
+// the scan window and starve items of other queues. Items without a
+// queue name always qualify: either the name is not resolved yet
+// (capacity is unknown until then) or the node's component manages its
+// own queue items and is never capacity-gated.
 func (c *CanvasNode) ListPendingQueueItems(tx *gorm.DB, limit int) ([]CanvasNodeQueueItem, error) {
 	var queueItems []CanvasNodeQueueItem
 	err := tx.
 		Where("workflow_id = ?", c.WorkflowID).
 		Where("node_id = ?", c.NodeID).
+		Where(`
+			queue_name IS NULL
+			OR (
+				SELECT COUNT(*)
+				FROM workflow_node_executions e
+				WHERE e.workflow_id = workflow_node_queue_items.workflow_id
+				  AND e.node_id = workflow_node_queue_items.node_id
+				  AND e.queue_name = workflow_node_queue_items.queue_name
+				  AND e.state IN ?
+			) < ?
+		`, CanvasNodeExecutionActiveStates, c.ConcurrencySpec().EffectiveMax()).
 		Order("created_at ASC").
 		Limit(limit).
 		Find(&queueItems).

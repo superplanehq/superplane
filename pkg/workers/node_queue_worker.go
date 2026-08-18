@@ -291,12 +291,16 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 
 // queueItemScanLimit bounds how much of a node's backlog a single dispatch
 // pass looks at. Items beyond the limit are picked up by later passes.
+// The fetch already excludes items waiting on full queues (see
+// ListPendingQueueItems), so a deep backlog on one busy queue does not
+// consume the window and starve other queues.
 const queueItemScanLimit = 100
 
-// processNodeQueueItems scans the node's backlog in FIFO order and starts
-// every item whose queue still has capacity. Items in a full queue block
-// later items of the same queue (per-queue FIFO), but items of other
-// queues can still dispatch.
+// processNodeQueueItems scans the node's actionable backlog in FIFO order
+// and starts every item whose queue still has capacity. Items in a full
+// queue block later items of the same queue (per-queue FIFO), but items
+// of other queues can still dispatch. The blocked map handles queues
+// whose remaining capacity is exhausted by earlier items in this pass.
 func (w *NodeQueueWorker) processNodeQueueItems(tx *gorm.DB, logger *log.Entry, node *models.CanvasNode, collector *MessageCollector) error {
 	items, err := node.ListPendingQueueItems(tx, queueItemScanLimit)
 	if err != nil {
