@@ -1,5 +1,6 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { Plus } from "lucide-react";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
@@ -13,6 +14,12 @@ import { useAutomationsPageModel } from "./useAutomationsPageModel";
 export function AutomationsPage() {
   const model = useAutomationsPageModel();
   const cardActions = useWorkOrderCardActions(model.organizationId, model.factoryId);
+
+  // Above the list/detail branching below (hooks can't be conditional): this
+  // single call covers both the Automations list and the in-page detail view
+  // for a selected app, re-firing when the selection changes without an
+  // unmount/mount.
+  usePageTitle([model.selectedApp?.name ?? "Automations", model.factory?.name ?? "Workspace"]);
 
   if (model.showLegacyRedirect) {
     return (

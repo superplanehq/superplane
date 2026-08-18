@@ -9,7 +9,9 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { SegmentedNav } from "@/ui/SegmentedNav";
+import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { FACTORY_VELOCITY_FLOW_BY_PERIOD, type FactoryVelocityFlowPeriod } from "./factoryVelocityFlowMockData";
 import {
@@ -424,7 +426,10 @@ export function VelocityPrototypePage() {
 }
 
 export function VelocityPage({ includeWorkOrderFlow = false }: VelocityPageProps = {}) {
+  const { factory } = useFactoriesLayout();
   const [periodDays, setPeriodDays] = useState<FactoryVelocityPeriodDays>(7);
+
+  usePageTitle(["Velocity", factory?.name ?? "Workspace"]);
 
   return (
     <>
