@@ -109,8 +109,19 @@ func (c *artifactAddCommand) buildData(
 		}
 		return data, openapi_client.FACTORIESWORKORDERARTIFACTTYPE_TYPE_BRANCH, nil
 
+	case "link":
+		url := strings.TrimSpace(stringValue(c.url))
+		if url == "" {
+			return nil, "", fmt.Errorf("--url is required for type link")
+		}
+		data["url"] = url
+		if title := strings.TrimSpace(stringValue(c.title)); title != "" {
+			data["title"] = title
+		}
+		return data, openapi_client.FACTORIESWORKORDERARTIFACTTYPE_TYPE_LINK, nil
+
 	default:
-		return nil, "", fmt.Errorf("unknown artifact type %q (expected pr, markdown, or branch)", artifactType)
+		return nil, "", fmt.Errorf("unknown artifact type %q (expected pr, markdown, branch, or link)", artifactType)
 	}
 }
 
