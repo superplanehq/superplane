@@ -243,3 +243,35 @@ func TestListIntegrationsLegacySetupOnlyRespectsExperimentalFeature(t *testing.T
 	require.Len(t, resp.Integrations, 1)
 	require.False(t, resp.Integrations[0].LegacySetupOnly)
 }
+
+func TestListIntegrationsLegacySetupOnlyWithoutValidOrganization(t *testing.T) {
+	reg := &registry.Registry{
+		Integrations: map[string]core.Integration{
+			"dummy": impl.NewDummyIntegration(impl.DummyIntegrationOptions{}),
+		},
+		SetupProviders: map[string]core.IntegrationSetupProvider{
+			"dummy": &testSetupProvider{
+				groups: []core.CapabilityGroup{{Label: "Group", Capabilities: []core.Capability{{Name: "feat"}}}},
+			},
+		},
+	}
+
+	t.Run("missing organization header", func(t *testing.T) {
+		resp, err := ListIntegrations(context.Background(), reg)
+		require.NoError(t, err)
+		require.Len(t, resp.Integrations, 1)
+		require.True(t, resp.Integrations[0].LegacySetupOnly)
+		require.Len(t, resp.Integrations[0].CapabilityGroups, 1)
+		require.Equal(t, "Group", resp.Integrations[0].CapabilityGroups[0].Label)
+	})
+
+	t.Run("invalid organization id", func(t *testing.T) {
+		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+			"x-organization-id", "not-a-uuid",
+		))
+		resp, err := ListIntegrations(ctx, reg)
+		require.NoError(t, err)
+		require.Len(t, resp.Integrations, 1)
+		require.True(t, resp.Integrations[0].LegacySetupOnly)
+	})
+}
