@@ -44,7 +44,7 @@ spec:
       configuration:
         body: Stopping work.Tried to fix the CI, but it is still failing after 5 attempts.
         issueNumber: '{{ root().data.parameters.PullRequestNumber }}'
-        repository: '{{ install_params.repository }}'
+        repository: '{{ install_params.appRepository }}'
       position:
         x: 1920
         'y': 2448
@@ -65,7 +65,7 @@ spec:
       component: github.getIssue
       configuration:
         issueNumber: '{{ root().data.parameters.PullRequestNumber }}'
-        repository: '{{ install_params.repository }}'
+        repository: '{{ install_params.appRepository }}'
       position:
         x: 612
         'y': 3504
@@ -259,7 +259,7 @@ spec:
       configuration:
         actions:
           - assigned
-        repository: '{{ install_params.repository }}'
+        repository: '{{ install_params.backlogRepository }}'
       position:
         x: 72
         'y': -432
@@ -324,7 +324,7 @@ spec:
       component: github.onPRComment
       configuration:
         contentFilter: '@superplaneagent'
-        repository: '{{ install_params.repository }}'
+        repository: '{{ install_params.appRepository }}'
       position:
         x: 72
         'y': 816
@@ -354,7 +354,7 @@ spec:
               name: github
         environment:
           - name: REPO
-            value: '{{ root().data.repository.full_name }}'
+            value: '{{ install_params.appRepository }}'
             valueSource: literal
           - name: BRANCH
             value: '{{ $["Create Branch"].data.result.branch }}'
@@ -375,7 +375,7 @@ spec:
             prompt: |-
               You are writing an implementation plan for a GitHub issue. The repository is checked out in your current working directory on the working branch.
 
-              Repository: {{ root().data.repository.full_name }}
+              Repository: {{ install_params.appRepository }}
               Issue number: {{ root().data.issue.number }}
               Issue title: {{ root().data.issue.title }}
 
@@ -482,7 +482,7 @@ spec:
               name: github
         environment:
           - name: REPO
-            value: '{{ root().data.repository.full_name }}'
+            value: '{{ install_params.appRepository }}'
             valueSource: literal
           - name: ISSUE_NUMBER
             value: '{{ root().data.issue.number }}'
@@ -511,7 +511,7 @@ spec:
             prompt: |-
               You are implementing a fix for a GitHub issue. The repository is already checked out in your current working directory, on the branch to work on.
 
-              Repository: {{ root().data.repository.full_name }}
+              Repository: {{ install_params.appRepository }}
               Issue number: {{ root().data.issue.number }}
               Issue title: {{ root().data.issue.title }}
 
@@ -552,7 +552,11 @@ spec:
         text: |-
           ## Create Task
 
-          Manually file a clear, well-formed issue for the factory from a short description. Applying the "factory" label starts the factory on it.
+          File a clear, well-formed issue for the factory from a short description.
+          Applying the "factory" label starts the factory on it.
+
+          Also reachable from the Work Order Dispatch onRun entrypoint when a factory line
+          sends a work order (title and description).
       position:
         x: 72
         'y': 3960
@@ -565,7 +569,7 @@ spec:
         issueNumber: '{{ $["Create Issue"].data.number }}'
         labels:
           - factory
-        repository: '{{ install_params.repository }}'
+        repository: '{{ install_params.backlogRepository }}'
       position:
         x: 1872
         'y': 4200
@@ -681,7 +685,7 @@ spec:
       component: github.markPullRequestReadyForReview
       configuration:
         pullNumber: '{{ $["Open Draft PR"].data.number }}'
-        repository: '{{ install_params.repository }}'
+        repository: '{{ install_params.appRepository }}'
       position:
         x: 4968
         'y': 24
@@ -738,7 +742,7 @@ spec:
               name: github
         environment:
           - name: REPO
-            value: '{{ root().data.repository.full_name }}'
+            value: '{{ install_params.appRepository }}'
             valueSource: literal
           - name: ISSUE_TITLE
             value: '{{ root().data.issue.title }}'
@@ -857,7 +861,7 @@ spec:
           Taking a look!
           Follow my progress: {{ $["Open Draft PR"].data.html_url }}
         issueNumber: '{{ root().data.issue.number }}'
-        repository: '{{ install_params.repository }}'
+        repository: '{{ install_params.backlogRepository }}'
       position:
         x: 2304
         'y': 192
@@ -879,7 +883,7 @@ spec:
       configuration:
         body: '{{ replace($["Get Pull Request Description"].data.body, "- [ ] " + root().data.parameters.CheckName, "- [x] " + root().data.parameters.CheckName)  }}'
         issueNumber: '{{ root().data.parameters.PullRequestNumber }}'
-        repository: '{{ install_params.repository }}'
+        repository: '{{ install_params.appRepository }}'
         state: open
       position:
         x: 1152
@@ -911,7 +915,7 @@ spec:
       configuration:
         actions:
           - closed
-        repository: '{{ install_params.repository }}'
+        repository: '{{ install_params.appRepository }}'
       position:
         x: 72
         'y': 1536
@@ -927,7 +931,7 @@ spec:
           ---
 
           Automatically created by the Software Factory
-        repository: '{{ install_params.repository }}'
+        repository: '{{ install_params.backlogRepository }}'
         title: '{{ fromJSON($["Draft Issue"].data.result.result[indexOf($["Draft Issue"].data.result.result, "{"):lastIndexOf($["Draft Issue"].data.result.result, "}") + 1]).title }}'
       position:
         x: 1272
@@ -940,7 +944,7 @@ spec:
       configuration:
         base: '{{ $["Create Branch"].data.result.base }}'
         body: |-
-          fixes #{{ root().data.issue.number }}
+          fixes {{ install_params.backlogRepository }}#{{ root().data.issue.number }}
 
           ### Summary
 
@@ -958,7 +962,7 @@ spec:
           Automatically created by the Software Factory
         draft: true
         head: '{{ $["Create Branch"].data.result.branch }}'
-        repository: '{{ install_params.repository }}'
+        repository: '{{ install_params.appRepository }}'
         title: 'fix: {{ root().data.issue.title }}'
       position:
         x: 1728
@@ -971,7 +975,7 @@ spec:
       configuration:
         actions:
           - labeled
-        repository: '{{ install_params.repository }}'
+        repository: '{{ install_params.backlogRepository }}'
       position:
         x: 72
         'y': -216
@@ -998,9 +1002,9 @@ spec:
           - name: status
             value: in_progress
           - name: title
-            value: '{{ root().data.description }}'
+            value: '{{ order() != nil ? order().title + (order().description != "" ? "\n\n" + order().description : "") : root().data.description }}'
           - name: description
-            value: '{{ root().data.description }}'
+            value: '{{ order() != nil ? order().title + (order().description != "" ? "\n\n" + order().description : "") : root().data.description }}'
       position:
         x: 672
         'y': 4392
@@ -1011,7 +1015,7 @@ spec:
       component: github.onIssueComment
       configuration:
         contentFilter: '@superplaneagent'
-        repository: '{{ install_params.repository }}'
+        repository: '{{ install_params.backlogRepository }}'
       position:
         x: 72
         'y': 0
@@ -1025,7 +1029,7 @@ spec:
         node: onrun-onrun-u02eup
         parameters:
           PullRequestNumber: '{{ $["Open Draft PR"].data.number }}'
-          Repository: '{{ root().data.repository.full_name }}'
+          Repository: '{{ install_params.appRepository }}'
         timeout: 3600
       metadata:
         node:
@@ -1043,7 +1047,7 @@ spec:
         issueNumber: '{{ $["Open Draft PR"].data.number }}'
         labels:
           - factory
-        repository: '{{ install_params.repository }}'
+        repository: '{{ install_params.appRepository }}'
       position:
         x: 2304
         'y': 288
@@ -1054,7 +1058,7 @@ spec:
       component: github.onPRReviewComment
       configuration:
         contentFilter: '@superplaneagent'
-        repository: '{{ install_params.repository }}'
+        repository: '{{ install_params.appRepository }}'
       position:
         x: 72
         'y': 1080
@@ -1187,7 +1191,7 @@ spec:
 
               Task description:
               ---
-              {{ root().data.description }}
+              {{ order() != nil ? order().title + (order().description != "" ? "\n\n" + order().description : "") : root().data.description }}
               ---
 
               ## What are you analyzing 
@@ -1235,7 +1239,7 @@ spec:
               name: github
         environment:
           - name: REPO
-            value: '{{ install_params.repository }}'
+            value: '{{ install_params.appRepository }}'
             valueSource: literal
         credentials:
           source: integration
@@ -1313,9 +1317,6 @@ spec:
       type: TYPE_ACTION
       component: upsertMemory
       configuration:
-        # Match the card created/updated by Correlate Issue Memory (or create one
-        # for label/assign/mention paths that never ran Submit Task Memory).
-        # Matching on pr_number here would miss that row and insert a duplicate.
         matchList:
           - name: issue_number
             value: '{{ root().data.issue.number }}'
@@ -1339,6 +1340,16 @@ spec:
         x: 2304
         'y': 380
       isCollapsed: true
+    - id: work-order-dispatch
+      name: Work Order Dispatch
+      type: TYPE_TRIGGER
+      component: onRun
+      configuration:
+        parameters: []
+      position:
+        x: 72
+        'y': 4440
+      isCollapsed: false
   edges:
     - sourceId: analyze-create-issue
       targetId: create-task-issue
@@ -1481,3 +1492,9 @@ spec:
     - sourceId: wait-for-pr-checks
       targetId: fix-ci-claude
       channel: failed
+    - sourceId: work-order-dispatch
+      targetId: analyze-create-issue
+      channel: default
+    - sourceId: work-order-dispatch
+      targetId: submit-task-memory
+      channel: default

@@ -7,7 +7,7 @@ import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
 /**
  * Opens the real SuperPlane IntegrationCreateDialog with Storybook stubs
- * so onboarding connect feels grounded in product UI.
+ * so setup connect feels grounded in product UI.
  */
 export function useConnectDialog(setup: OnboardingSetupApi) {
   const [pending, setPending] = useState<IntegrationId | null>(null);

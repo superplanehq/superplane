@@ -172,7 +172,7 @@ export const defaultHomePageFixture: HomePageFixture = {
   folders,
 };
 
-/** Fresh org: no apps or folders — HomePage redirects to the create/onboarding screen. */
+/** Fresh org: no apps or folders — HomePage redirects to the create/setup screen. */
 export const emptyHomePageFixture: HomePageFixture = {
   organizationId: HOME_ORGANIZATION_ID,
   organizationName: "Acme",
