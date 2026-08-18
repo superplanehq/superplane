@@ -771,8 +771,27 @@ spec:
           git config --global user.email "automation@example.com"
           git config --global user.name "Factory Automation"
 
-          git clone --depth 1 --branch "$BASE" "$GITURL" "$WORKDIR"
-          cd "$WORKDIR"
+          # Distinguish a missing default-branch ref (empty repository) from real
+          # git failures, so auth/network/permission errors are not misclassified
+          # as an empty repository. List every remote head once; if the command
+          # itself fails, abort loudly. Only an absent refs/heads/$BASE ref takes
+          # the empty-repository path.
+          REMOTE_HEADS="$(git ls-remote --heads "$GITURL")" || {
+            echo "Failed to list remote branches for ${REPO}" >&2
+            exit 1
+          }
+
+          if printf '%s\n' "$REMOTE_HEADS" | grep -Eq "refs/heads/${BASE}\$"; then
+            git clone --depth 1 --branch "$BASE" "$GITURL" "$WORKDIR"
+            cd "$WORKDIR"
+          else
+            echo "Repository has no ${BASE} branch; initializing empty repository"
+            git clone "$GITURL" "$WORKDIR"
+            cd "$WORKDIR"
+            git checkout --orphan "$BASE"
+            git commit -s --allow-empty -m "chore: initialize ${BASE}"
+            git push -u origin "$BASE"
+          fi
 
           # Create an empty branch off the base: a single empty commit so a draft PR can be opened,
           # with no files added.
