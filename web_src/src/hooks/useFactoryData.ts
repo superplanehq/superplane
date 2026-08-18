@@ -380,13 +380,14 @@ export function useAddWorkOrderComment(organizationId: string, factoryId: string
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { orderId: string; body: string }) => {
+    mutationFn: async (input: { orderId: string; body: string; mentionedUserIds?: string[] }) => {
       const response = await factoriesAddWorkOrderComment(
         withOrganizationHeader({
           organizationId,
           path: { factoryId, orderId: input.orderId },
           body: {
             body: input.body,
+            mentionedUserIds: input.mentionedUserIds,
           },
         }),
       );

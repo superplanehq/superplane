@@ -97,6 +97,7 @@ var notificationTypeProto = map[string]pb.NotificationSettings_Type{
 	models.NotificationTypeWorkOrderCommentCreated: pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_CREATED,
 	models.NotificationTypeWorkOrderStatusOwned:    pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_OWNED,
 	models.NotificationTypeWorkOrderArtifactOwned:  pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED,
+	models.NotificationTypeWorkOrderMention:        pb.NotificationSettings_TYPE_WORK_ORDER_MENTIONED,
 }
 
 func notificationTypeToProto(notificationType string) (pb.NotificationSettings_Type, bool) {

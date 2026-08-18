@@ -11,6 +11,7 @@ describe("notificationSettings", () => {
     const settings = defaultNotificationSettings();
     expect(settings.types?.every((toggle) => toggle.enabled)).toBe(true);
     expect(notificationTypeTogglesFromSettings(undefined).TYPE_WORK_ORDER_ASSIGNED).toBe(true);
+    expect(notificationTypeTogglesFromSettings(undefined).TYPE_WORK_ORDER_MENTIONED).toBe(true);
   });
 
   it("keeps omitted types on when some toggles are saved off", () => {
