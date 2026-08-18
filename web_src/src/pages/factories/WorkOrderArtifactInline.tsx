@@ -19,32 +19,37 @@ import {
   extractArtifactUrl,
   extractPrArtifactState,
   formatPrArtifactLabel,
+  normalizeArtifactKind,
+  resolveBranchArtifactUrl,
   type PrArtifactState,
+  type WorkOrderArtifactLike,
+  type WorkOrderArtifactPresentation,
 } from "./lib/workOrderArtifact";
 import { WorkOrderMarkdownArtifactDialog } from "./WorkOrderMarkdownArtifactDialog";
-
-export interface WorkOrderArtifactPresentation {
-  id?: string;
-  type: string;
-  data?: Record<string, unknown>;
-}
 
 interface WorkOrderArtifactInlineProps {
   artifact: WorkOrderArtifactPresentation;
   className?: string;
+  /**
+   * Other artifacts on the same work order, used to derive a link for
+   * an artifact that doesn't carry its own URL yet — for example a
+   * branch attached before its PR opens, which we make clickable by
+   * pointing at the sibling PR's repository tree.
+   */
+  relatedArtifacts?: readonly WorkOrderArtifactLike[];
 }
 
 const artifactInlineClassName =
   "inline-flex min-w-0 max-w-full items-center gap-1.5 text-[13px] font-medium tracking-[-0.01em] text-foreground";
 
-export function WorkOrderArtifactInline({ artifact, className }: WorkOrderArtifactInlineProps) {
+export function WorkOrderArtifactInline({ artifact, className, relatedArtifacts }: WorkOrderArtifactInlineProps) {
   const kind = normalizeArtifactKind(artifact.type);
-  const safeUrl = safeExternalUrl(extractArtifactUrl(artifact.data));
 
   if (kind === "markdown") {
     return <MarkdownArtifactInline artifact={artifact} className={className} />;
   }
 
+  const safeUrl = safeExternalUrl(resolveArtifactHref(kind, artifact.data, relatedArtifacts));
   const { icon: Icon, label, iconClassName } = artifactLinkPresentation(kind, artifact);
   const content = (
     <>
@@ -141,8 +146,19 @@ function firstLabel(...labels: Array<string | undefined>): string {
   return labels.find((label) => Boolean(label?.trim())) ?? "Artifact";
 }
 
-function normalizeArtifactKind(type: string): string {
-  return type.replace(/^TYPE_/i, "").toLowerCase();
+// Branch artifacts frequently arrive without their own `url`, because
+// the branch usually gets attached before the PR exists. Fall back to
+// deriving a repository tree URL from a sibling PR so the chip is
+// clickable without every flow author remembering to pass `url`.
+function resolveArtifactHref(
+  kind: string,
+  data: WorkOrderArtifactPresentation["data"],
+  relatedArtifacts: readonly WorkOrderArtifactLike[] | undefined,
+): string | undefined {
+  if (kind === "branch") {
+    return resolveBranchArtifactUrl(data, relatedArtifacts);
+  }
+  return extractArtifactUrl(data);
 }
 
 function compactUrlLabel(value: string | undefined): string | undefined {

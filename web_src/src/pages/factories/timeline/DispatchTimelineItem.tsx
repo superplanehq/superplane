@@ -7,6 +7,7 @@ import { ChevronDown, ExternalLink, Sparkles } from "lucide-react";
 import { useState } from "react";
 
 import { formatWorkOrderDateTime } from "../lib/workOrderDateTime";
+import type { WorkOrderArtifactLike } from "../lib/workOrderArtifact";
 import {
   formatStepExecutionDuration,
   type WorkOrderTimelineEvent,
@@ -24,6 +25,13 @@ interface DispatchTimelineItemProps {
   factoryKey: string;
   orderNumber?: string;
   isLatestDispatch: boolean;
+  /**
+   * All artifacts attached to the same work order. A branch chip in
+   * this dispatch's steps may need a sibling PR attached in a
+   * *different* step to build its tree URL, so the caller passes the
+   * whole list, not just this step's `step.artifacts`.
+   */
+  relatedArtifacts?: readonly WorkOrderArtifactLike[];
 }
 
 export function DispatchTimelineItem({
@@ -32,6 +40,7 @@ export function DispatchTimelineItem({
   factoryKey,
   orderNumber,
   isLatestDispatch,
+  relatedArtifacts,
 }: DispatchTimelineItemProps) {
   const [isExpanded, setIsExpanded] = useState(isLatestDispatch);
   const steps = event.steps ?? [];
@@ -91,6 +100,7 @@ export function DispatchTimelineItem({
                   factoryKey={factoryKey}
                   orderNumber={orderNumber}
                   step={step}
+                  relatedArtifacts={relatedArtifacts}
                 />
               ))}
             </ul>
@@ -106,11 +116,13 @@ function DispatchStepRow({
   factoryKey,
   orderNumber,
   step,
+  relatedArtifacts,
 }: {
   organizationId: string;
   factoryKey: string;
   orderNumber?: string;
   step: WorkOrderTimelineStep;
+  relatedArtifacts?: readonly WorkOrderArtifactLike[];
 }) {
   const runHref = getWorkOrderExecutionRunHref(organizationId, factoryKey, step.execution, { orderNumber });
   const duration = formatStepExecutionDuration(step);
@@ -129,7 +141,7 @@ function DispatchStepRow({
         {duration ? <span className="text-[12px] tabular-nums text-muted-foreground">{duration}</span> : null}
         {step.artifacts?.map((artifact, index) => (
           <span className="inline-flex min-w-0 max-w-full" key={artifact.id ?? `${artifact.type}-${index}`}>
-            <WorkOrderArtifactInline artifact={artifact} />
+            <WorkOrderArtifactInline artifact={artifact} relatedArtifacts={relatedArtifacts} />
           </span>
         ))}
       </div>

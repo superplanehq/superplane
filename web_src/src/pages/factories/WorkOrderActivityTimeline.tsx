@@ -3,12 +3,15 @@ import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact, FactoriesWorkOrder
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
-import type { OrgUserDisplay, OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
+import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
-import { MarkdownContent } from "@/pages/app/Markdown";
 import { useMemo, type ReactNode } from "react";
 import { FileText, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
-import { buildLatestArtifactDataById, overlayLiveArtifactData } from "./lib/workOrderArtifact";
+import {
+  buildLatestArtifactDataById,
+  toWorkOrderArtifactLikes,
+  type WorkOrderArtifactLike,
+} from "./lib/workOrderArtifact";
 import {
   buildWorkOrderTimelineView,
   buildWorkOrderUserDisplayLookup,
@@ -19,6 +22,8 @@ import {
 } from "./lib/workOrderTimelineEvents";
 import { formatWorkOrderDateTime as formatTimelineDate } from "./lib/workOrderDateTime";
 import { getWorkOrderRunHref } from "./lib/workOrderExecutions";
+import { ArtifactEventBody } from "./timeline/ArtifactEventBody";
+import { CommentEventBody } from "./timeline/CommentEventBody";
 import { DispatchTimelineItem } from "./timeline/DispatchTimelineItem";
 import { TimelineAutomationActor } from "./timeline";
 import { TimelineMarker } from "./timeline/TimelineMarker";
@@ -28,7 +33,6 @@ import {
   timelineParagraphClassName as inlineParagraphClassName,
   timelineTimeClassName as inlineTimeClassName,
 } from "./timeline/timelineStyles";
-import { WorkOrderArtifactInline } from "./WorkOrderArtifactInline";
 import { AssigneeChangeDescription } from "./workOrderTimelineAssignee";
 
 interface WorkOrderTimelineProps {
@@ -73,6 +77,10 @@ export function WorkOrderActivityTimeline({
   const resolveUserName = useMemo(() => buildWorkOrderUserNameLookup(users, order), [users, order]);
   const resolveUserDisplay = useMemo(() => buildWorkOrderUserDisplayLookup(users, order), [users, order]);
   const latestArtifactDataById = useMemo(() => buildLatestArtifactDataById(artifacts), [artifacts]);
+  // Work-order-wide sibling list. A branch chip in a dispatch step can
+  // look up the PR attached in a *different* step to build its tree URL,
+  // so pass the whole list through instead of only that step's artifacts.
+  const relatedArtifacts = useMemo(() => toWorkOrderArtifactLikes(artifacts), [artifacts]);
   const pendingView = renderTimelinePendingView({ events, eventsError, isLoading, onRetryEvents });
   const timeline = pendingView
     ? { events: [] as WorkOrderTimelineEvent[] }
@@ -99,6 +107,7 @@ export function WorkOrderActivityTimeline({
           events={timeline.events}
           resolveUserDisplay={resolveUserDisplay}
           latestArtifactDataById={latestArtifactDataById}
+          relatedArtifacts={relatedArtifacts}
           hasMoreEvents={hasMoreEvents}
           isLoadingMoreEvents={isLoadingMoreEvents}
           onLoadMoreEvents={onLoadMoreEvents}
@@ -121,6 +130,7 @@ interface TimelineEventsListProps {
   events: WorkOrderTimelineEvent[];
   resolveUserDisplay: OrgUserDisplayLookup;
   latestArtifactDataById: Map<string, Record<string, unknown>>;
+  relatedArtifacts: readonly WorkOrderArtifactLike[];
   hasMoreEvents: boolean;
   isLoadingMoreEvents: boolean;
   onLoadMoreEvents?: () => void;
@@ -133,6 +143,7 @@ function TimelineEventsList({
   events,
   resolveUserDisplay,
   latestArtifactDataById,
+  relatedArtifacts,
   hasMoreEvents,
   isLoadingMoreEvents,
   onLoadMoreEvents,
@@ -166,6 +177,7 @@ function TimelineEventsList({
               orderNumber={orderNumber}
               resolveUserDisplay={resolveUserDisplay}
               latestArtifactDataById={latestArtifactDataById}
+              relatedArtifacts={relatedArtifacts}
               isLatestDispatch={index === latestDispatchIndex}
             />
           ))}
@@ -240,6 +252,7 @@ function TimelineItem({
   orderNumber,
   resolveUserDisplay,
   latestArtifactDataById,
+  relatedArtifacts,
   isLatestDispatch,
 }: {
   event: WorkOrderTimelineEvent;
@@ -248,6 +261,7 @@ function TimelineItem({
   orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   latestArtifactDataById: Map<string, Record<string, unknown>>;
+  relatedArtifacts: readonly WorkOrderArtifactLike[];
   isLatestDispatch: boolean;
 }) {
   if (event.kind === "dispatched") {
@@ -258,6 +272,7 @@ function TimelineItem({
         factoryKey={factoryKey}
         orderNumber={orderNumber}
         isLatestDispatch={isLatestDispatch}
+        relatedArtifacts={relatedArtifacts}
       />
     );
   }
@@ -280,6 +295,7 @@ function TimelineItem({
             orderNumber={orderNumber}
             resolveUserDisplay={resolveUserDisplay}
             latestArtifactDataById={latestArtifactDataById}
+            relatedArtifacts={relatedArtifacts}
           />
         </div>
       </div>
@@ -294,6 +310,7 @@ function TimelineItemBody({
   orderNumber,
   resolveUserDisplay,
   latestArtifactDataById,
+  relatedArtifacts,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
@@ -301,6 +318,7 @@ function TimelineItemBody({
   orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   latestArtifactDataById: Map<string, Record<string, unknown>>;
+  relatedArtifacts: readonly WorkOrderArtifactLike[];
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
   const timeLabel = formatTimelineDate(new Date(event.at));
@@ -325,6 +343,7 @@ function TimelineItemBody({
         actorDisplay={actorDisplay}
         timeLabel={timeLabel}
         latestArtifactDataById={latestArtifactDataById}
+        relatedArtifacts={relatedArtifacts}
       />
     );
   }
@@ -338,94 +357,6 @@ function TimelineItemBody({
       resolveUserDisplay={resolveUserDisplay}
       timeLabel={timeLabel}
     />
-  );
-}
-
-function CommentEventBody({
-  event,
-  actorDisplay,
-  timeLabel,
-  organizationId,
-  factoryKey,
-  orderNumber,
-}: {
-  event: WorkOrderTimelineEvent;
-  actorDisplay: OrgUserDisplay | null;
-  timeLabel: string;
-  organizationId: string;
-  factoryKey: string;
-  orderNumber?: string;
-}) {
-  const comment = event.comment;
-  if (!comment) return null;
-  const isAutomation = (comment.authorKind ?? "").toLowerCase() === "automation";
-  const runHref = getWorkOrderRunHref(organizationId, factoryKey, event.sourceAppId, event.sourceRunId, {
-    orderNumber,
-  });
-
-  return (
-    <>
-      <p className={inlineParagraphClassName}>
-        {isAutomation && (event.actorAutomation || comment.automation) ? (
-          <TimelineAutomationActor actor={event.actorAutomation ?? comment.automation!} fallbackLabel="Automation" />
-        ) : actorDisplay ? (
-          <span className={inlineActorClassName}>{actorDisplay.name}</span>
-        ) : (
-          <span className={inlineActorClassName}>Someone</span>
-        )}{" "}
-        commented
-        {isAutomation && runHref ? (
-          <>
-            {" "}
-            via{" "}
-            <Link href={runHref} className={inlineLinkClassName}>
-              run
-            </Link>
-          </>
-        ) : null}
-        <span className={inlineTimeClassName}>
-          {" · "}
-          {timeLabel}
-        </span>
-      </p>
-      <div className="mt-1" data-testid="work-order-timeline-comment-body">
-        <MarkdownContent content={comment.body} variant="workspace" />
-      </div>
-    </>
-  );
-}
-
-function ArtifactEventBody({
-  event,
-  actorDisplay,
-  timeLabel,
-  latestArtifactDataById,
-}: {
-  event: WorkOrderTimelineEvent;
-  actorDisplay: OrgUserDisplay | null;
-  timeLabel: string;
-  latestArtifactDataById: Map<string, Record<string, unknown>>;
-}) {
-  const artifact = event.artifact;
-  if (!artifact) return null;
-
-  const displayArtifact = overlayLiveArtifactData(artifact, latestArtifactDataById);
-
-  return (
-    <p className={inlineParagraphClassName}>
-      {actorDisplay ? (
-        <span className={inlineActorClassName}>{actorDisplay.name}</span>
-      ) : event.actorAutomation ? (
-        <TimelineAutomationActor actor={event.actorAutomation} />
-      ) : (
-        <span className={inlineActorClassName}>Someone</span>
-      )}{" "}
-      attached <WorkOrderArtifactInline artifact={displayArtifact} className="align-baseline" />
-      <span className={inlineTimeClassName}>
-        {" · "}
-        {timeLabel}
-      </span>
-    </p>
   );
 }
 
