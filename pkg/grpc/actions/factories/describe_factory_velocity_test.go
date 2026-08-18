@@ -183,6 +183,30 @@ func TestDescribeFactoryVelocity_PeopleSearchFailedKeepsSuperPlaneCounts(t *test
 	assert.Equal(t, "example/repo", resp.Repository)
 }
 
+func TestLoadPeopleCohort_ScanErrorReportsFailure(t *testing.T) {
+	r := support.Setup(t)
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	cancelled, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	hits, hasPeople, failed := loadPeopleCohort(peopleCohortRequest{
+		ctx:           context.Background(),
+		tx:            database.DB(cancelled),
+		orgID:         r.Organization.ID,
+		factoryID:     factoryModel.ID,
+		integrationID: "00000000-0000-0000-0000-000000000001",
+		repoOwner:     "example",
+		repoName:      "repo",
+		from:          time.Now().Add(-24 * time.Hour),
+		endExclusive:  time.Now(),
+	})
+	assert.True(t, failed)
+	assert.False(t, hasPeople)
+	assert.Empty(t, hits)
+}
+
 func TestCalendarDayUTCNoon(t *testing.T) {
 	loc := time.FixedZone("UTC-3", -3*3600)
 	localMidnight := time.Date(2026, 8, 17, 0, 0, 0, 0, loc)

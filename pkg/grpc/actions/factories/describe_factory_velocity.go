@@ -73,27 +73,18 @@ func DescribeFactoryVelocity(
 	peopleSearchFailed := false
 	var peopleHits []peopleMerge
 	if hasRepo && req.GetIntegrationId() != "" {
-		knownSuperPlane, knownErr := listKnownSuperPlanePRs(db, factoryID)
-		if knownErr != nil {
-			return nil, factoryErrorToStatus(knownErr, "failed to describe factory velocity")
-		}
-		hits, searchErr := searchPeopleMerges(
-			ctx,
-			reg,
-			orgID,
-			req.GetIntegrationId(),
-			repoOwner,
-			repoName,
-			buckets[0].start,
-			buckets[len(buckets)-1].end,
-		)
-		if searchErr != nil {
-			log.WithContext(ctx).WithError(searchErr).Warn("factory velocity: GitHub people search failed")
-			peopleSearchFailed = true
-		} else {
-			peopleHits = subtractSuperPlaneHits(hits, knownSuperPlane)
-			hasPeople = true
-		}
+		peopleHits, hasPeople, peopleSearchFailed = loadPeopleCohort(peopleCohortRequest{
+			ctx:           ctx,
+			reg:           reg,
+			tx:            db,
+			orgID:         orgID,
+			factoryID:     factoryID,
+			integrationID: req.GetIntegrationId(),
+			repoOwner:     repoOwner,
+			repoName:      repoName,
+			from:          buckets[0].start,
+			endExclusive:  buckets[len(buckets)-1].end,
+		})
 	}
 
 	fillBuckets(buckets, superplaneMerges, superplaneWaste, peopleHits)
@@ -323,6 +314,47 @@ func classifySuperPlaneArtifacts(artifacts []prArtifactMeta, repoOwner, repoName
 type peopleMerge struct {
 	url      string
 	mergedAt time.Time
+}
+
+type peopleCohortRequest struct {
+	ctx           context.Context
+	reg           *registry.Registry
+	tx            *gorm.DB
+	orgID         uuid.UUID
+	factoryID     uuid.UUID
+	integrationID string
+	repoOwner     string
+	repoName      string
+	from          time.Time
+	endExclusive  time.Time
+}
+
+// loadPeopleCohort loads GitHub People merges and subtracts SuperPlane PRs.
+// Scan or search errors drop the People series and report failure so SuperPlane
+// counts still return.
+func loadPeopleCohort(req peopleCohortRequest) (hits []peopleMerge, hasPeople, failed bool) {
+	known, err := listKnownSuperPlanePRs(req.tx, req.factoryID)
+	if err != nil {
+		log.WithContext(req.ctx).WithError(err).Warn("factory velocity: SuperPlane PR scan failed")
+		return nil, false, true
+	}
+
+	found, err := searchPeopleMerges(
+		req.ctx,
+		req.reg,
+		req.orgID,
+		req.integrationID,
+		req.repoOwner,
+		req.repoName,
+		req.from,
+		req.endExclusive,
+	)
+	if err != nil {
+		log.WithContext(req.ctx).WithError(err).Warn("factory velocity: GitHub people search failed")
+		return nil, false, true
+	}
+
+	return subtractSuperPlaneHits(found, known), true, false
 }
 
 func searchPeopleMerges(
