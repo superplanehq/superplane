@@ -4,12 +4,20 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support/impl"
+	"google.golang.org/grpc/metadata"
 )
+
+func contextWithOrganizationID(orgID string) context.Context {
+	return metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		"x-organization-id", orgID,
+	))
+}
 
 type testAction struct {
 	name    string
@@ -99,7 +107,7 @@ func TestListIntegrationsIncludesExamplePayloadsForLegacyCapabilities(t *testing
 		SetupProviders: map[string]core.IntegrationSetupProvider{},
 	}
 
-	resp, err := ListIntegrations(context.Background(), r)
+	resp, err := ListIntegrations(contextWithOrganizationID(uuid.New().String()), r)
 	require.NoError(t, err)
 	require.Len(t, resp.Integrations, 1)
 	require.Len(t, resp.Integrations[0].Capabilities, 2)
@@ -120,7 +128,7 @@ func TestListIntegrationsAddsGlobalFieldsToLegacyTriggerCapabilities(t *testing.
 		SetupProviders: map[string]core.IntegrationSetupProvider{},
 	}
 
-	resp, err := ListIntegrations(context.Background(), r)
+	resp, err := ListIntegrations(contextWithOrganizationID(uuid.New().String()), r)
 	require.NoError(t, err)
 	require.Len(t, resp.Integrations, 1)
 	require.Len(t, resp.Integrations[0].Capabilities, 1)
@@ -160,7 +168,7 @@ func TestListIntegrationsIncludesExamplePayloadsForSetupProviderCapabilities(t *
 		},
 	}
 
-	resp, err := ListIntegrations(context.Background(), r)
+	resp, err := ListIntegrations(contextWithOrganizationID(uuid.New().String()), r)
 	require.NoError(t, err)
 	require.Len(t, resp.Integrations, 1)
 	require.Len(t, resp.Integrations[0].Capabilities, 2)
@@ -199,7 +207,7 @@ func TestListIntegrationsAddsGlobalFieldsToSetupProviderTriggerCapabilities(t *t
 		},
 	}
 
-	resp, err := ListIntegrations(context.Background(), r)
+	resp, err := ListIntegrations(contextWithOrganizationID(uuid.New().String()), r)
 	require.NoError(t, err)
 	require.Len(t, resp.Integrations, 1)
 	require.Len(t, resp.Integrations[0].Capabilities, 1)
