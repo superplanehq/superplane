@@ -265,6 +265,7 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *Change) error {
 		CreatedAt:         &now,
 		UpdatedAt:         &now,
 	}
+	newNode.SetConcurrencySpec(node.Concurrency)
 
 	//
 	// If node update led to an error, set the node to error state.
@@ -359,6 +360,7 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error 
 	existingNode.Configuration = datatypes.NewJSONType(updatedNode.Configuration)
 	existingNode.Position = datatypes.NewJSONType(updatedNode.Position)
 	existingNode.IsCollapsed = updatedNode.IsCollapsed
+	existingNode.SetConcurrencySpec(updatedNode.Concurrency)
 	existingNode.AppInstallationID = appInstallationID
 	existingNode.UpdatedAt = &now
 
