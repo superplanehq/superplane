@@ -11,7 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ArrowRightLeft, Check, Factory as FactoryIcon, Plus, Settings } from "lucide-react";
 import { Link, useNavigate } from "react-router";
-import { factoryDetailPath, factorySettingsPath } from "../lib/factoryPagePaths";
+import { factoryDetailPath, factoryOverviewPath, factorySettingsPath } from "../lib/factoryPagePaths";
 
 interface WorkspaceSwitcherProps {
   organizationId: string;
@@ -33,16 +33,19 @@ export function WorkspaceSwitcher({
   onCreateFactory,
 }: WorkspaceSwitcherProps) {
   const navigate = useNavigate();
-  const settingsHref = factory.id ? factorySettingsPath(organizationId, factory.id) : "#";
+  const overviewHref = factory.key ? factoryOverviewPath(organizationId, factory.key) : "#";
+  const settingsHref = factory.key ? factorySettingsPath(organizationId, factory.key) : "#";
 
   return (
     <div className="flex items-center gap-0.5 px-2 pt-3 pb-1" data-testid="factories-workspace-switcher">
-      <p
-        className="flex-1 truncate rounded-md px-2.5 py-1.5 text-[13px] font-medium tracking-[-0.01em] text-foreground hover:bg-sidebar-accent"
+      <Link
+        to={overviewHref}
+        className="min-w-0 flex-1 truncate rounded-md px-2.5 py-1.5 text-[13px] font-medium tracking-[-0.01em] text-foreground hover:bg-sidebar-accent"
         title={factory.name ?? undefined}
+        data-testid="factories-workspace-overview-link"
       >
         {factory.name}
-      </p>
+      </Link>
       <PermissionTooltip
         allowed={canOpenSettings || permissionsLoading}
         message="You don't have permission to open workspace settings."
@@ -79,7 +82,7 @@ export function WorkspaceSwitcher({
           <DropdownMenuLabel>Switch workspace</DropdownMenuLabel>
           {factories.map((entry) => {
             const isCurrent = entry.id === factory.id;
-            const targetHref = entry.id ? factoryDetailPath(organizationId, entry.id) : "";
+            const targetHref = entry.key ? factoryDetailPath(organizationId, entry.key) : "";
             return (
               <DropdownMenuItem
                 key={entry.id}

@@ -1,6 +1,6 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { WorkOrderAssigneePicker } from "./WorkOrderAssigneePicker";
 
 interface WorkOrderAssigneesPopoverProps {
@@ -13,6 +13,16 @@ interface WorkOrderAssigneesPopoverProps {
   onChange?: (assigneeIds: string[]) => void;
   onSave?: (assigneeIds: string[]) => Promise<void>;
   children: ReactNode;
+}
+
+function haveSameIds(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  const sortedLeft = [...left].sort();
+  const sortedRight = [...right].sort();
+  return sortedLeft.every((id, index) => id === sortedRight[index]);
 }
 
 export function WorkOrderAssigneesPopover({
@@ -28,17 +38,21 @@ export function WorkOrderAssigneesPopover({
 }: WorkOrderAssigneesPopoverProps) {
   const [open, setOpen] = useState(false);
   const [draftIds, setDraftIds] = useState<string[]>(selectedIds);
+  // Snapshot of the confirmed selection, used to keep assigned users pinned
+  // to the top of the list while the popover is open.
+  const [pinnedIds, setPinnedIds] = useState<string[]>(selectedIds);
   const isSaveMode = Boolean(onSave);
 
-  useEffect(() => {
-    if (open) {
-      setDraftIds(selectedIds);
-    }
-  }, [open, selectedIds]);
-
+  // `draftIds` is only synced from `selectedIds` when the popover opens, not
+  // on every render, so it doesn't discard pending edits.
   const handleOpenChange = (nextOpen: boolean) => {
     if (isSaving) {
       return;
+    }
+
+    if (nextOpen && !open) {
+      setDraftIds(selectedIds);
+      setPinnedIds(selectedIds);
     }
 
     setOpen(nextOpen);
@@ -62,6 +76,12 @@ export function WorkOrderAssigneesPopover({
       return;
     }
 
+    if (haveSameIds(draftIds, selectedIds)) {
+      // No actual change; skip the request.
+      setOpen(false);
+      return;
+    }
+
     try {
       await onSave(draftIds);
       setOpen(false);
@@ -76,11 +96,12 @@ export function WorkOrderAssigneesPopover({
   return (
     <Popover open={open} onOpenChange={handleOpenChange} modal={false}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent align={align} className="w-72 p-3" sideOffset={8}>
+      <PopoverContent align={align} className="z-[70] w-72 p-3" sideOffset={8}>
         <div className="space-y-3">
           <WorkOrderAssigneePicker
             organizationId={organizationId}
             selectedIds={activeIds}
+            pinnedIds={isSaveMode ? pinnedIds : selectedIds}
             onChange={handleChange}
             disabled={pickerDisabled}
             variant="popover"

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -571,10 +570,6 @@ func (c *RunTask) Setup(ctx core.SetupContext) error {
 		Region:         config.Region,
 		SubscriptionID: subscriptionID.String(),
 	})
-}
-
-func (c *RunTask) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *RunTask) Execute(ctx core.ExecutionContext) error {

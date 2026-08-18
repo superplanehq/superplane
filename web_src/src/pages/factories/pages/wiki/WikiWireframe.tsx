@@ -1,14 +1,14 @@
-import { Heading } from "@/components/Heading/heading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { ChevronRight, FileText, Folder } from "lucide-react";
+import { ChevronRight, FileText, Folder, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { factoryPageSubtitleClassName, factoryPageTitleClassName } from "../factoryPageLayoutStyles";
+import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
+import { factorySectionHeaderClassName } from "../factoryPageLayoutStyles";
 import { buildWikiTree, wikiFolderPaths, type WikiDocument, type WikiTreeNode } from "./wikiMocks";
 
 export type WikiWireframeProps = {
@@ -211,19 +211,19 @@ function WikiDocumentPane({
 
 function WikiWireframeHeader({ refreshing, onRefresh }: { refreshing: boolean; onRefresh: () => void }) {
   return (
-    <header className="flex shrink-0 items-end justify-between gap-4 border-b border-border bg-background px-8 py-6">
-      <div className="min-w-0">
-        <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
-          Wiki
-        </Heading>
-        <p className={cn("mt-1", factoryPageSubtitleClassName)}>
-          Shared product context — intent, architecture, and delivery notes for people and Planner.
-        </p>
-      </div>
-      <Button type="button" variant="outline" size="sm" className="shrink-0" disabled={refreshing} onClick={onRefresh}>
-        {refreshing ? "Refreshing…" : "Refresh knowledge"}
-      </Button>
-    </header>
+    <div className="shrink-0">
+      <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
+        title="Wiki"
+        subtitle="Shared product context — intent, architecture, and delivery notes for people and Planner."
+        actions={
+          <Button type="button" variant="outline" size="sm" disabled={refreshing} onClick={onRefresh}>
+            <RefreshCw className="size-3.5" aria-hidden />
+            {refreshing ? "Refreshing…" : "Refresh knowledge"}
+          </Button>
+        }
+      />
+    </div>
   );
 }
 

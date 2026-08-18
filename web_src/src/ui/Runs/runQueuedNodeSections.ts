@@ -1,17 +1,24 @@
 import type {
+  ActionsAction,
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasRun,
   SuperplaneComponentsNode as ComponentsNode,
+  TriggersTrigger,
 } from "@/api-client";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { resolveComponentLabel } from "./runNodeConfigurationFields";
 import type { RunInspectorNodeSection } from "./types";
 
 export function buildQueuedNodeSections({
   run,
   workflowNodes,
+  componentDefinitionsByName,
+  triggerDefinitionsByName,
 }: {
   run: CanvasesCanvasRun;
   workflowNodes: ComponentsNode[];
+  componentDefinitionsByName: Map<string, ActionsAction>;
+  triggerDefinitionsByName: Map<string, TriggersTrigger>;
 }): RunInspectorNodeSection[] {
   return [...(run.queueItems ?? [])]
     .filter((queueItem) => queueItem.id && queueItem.nodeId)
@@ -24,6 +31,11 @@ export function buildQueuedNodeSections({
         sectionValue: queuedSectionValue(queueItem),
         nodeId,
         nodeName: workflowNode?.name || nodeId,
+        componentLabel: resolveComponentLabel({
+          workflowNode,
+          componentDefinitionsByName,
+          triggerDefinitionsByName,
+        }),
         workflowNode,
         queueItem,
         isTrigger: false,

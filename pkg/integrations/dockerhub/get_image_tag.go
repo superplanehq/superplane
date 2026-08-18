@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -103,10 +102,6 @@ func (c *GetImageTag) Setup(ctx core.SetupContext) error {
 	}
 
 	return nil
-}
-
-func (c *GetImageTag) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *GetImageTag) Execute(ctx core.ExecutionContext) error {

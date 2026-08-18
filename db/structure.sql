@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.11 (Ubuntu 17.11-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -350,7 +350,10 @@ CREATE TABLE public.factories (
     description text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    deleted_at timestamp with time zone
+    deleted_at timestamp with time zone,
+    key character varying(5) NOT NULL,
+    next_work_order_number bigint DEFAULT 1 NOT NULL,
+    CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text))
 );
 
 
@@ -448,7 +451,9 @@ CREATE TABLE public.factory_work_orders (
     created_by_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    source_run_id uuid
+    source_run_id uuid,
+    number bigint NOT NULL,
+    CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
 
@@ -1424,6 +1429,20 @@ CREATE INDEX agent_sessions_provider_session_id_idx ON public.agent_sessions USI
 --
 
 CREATE UNIQUE INDEX agent_sessions_user_canvas_idx ON public.agent_sessions USING btree (organization_id, user_id, canvas_id);
+
+
+--
+-- Name: factories_organization_id_key_active_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX factories_organization_id_key_active_key ON public.factories USING btree (organization_id, key) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: factory_work_orders_factory_id_number_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX factory_work_orders_factory_id_number_key ON public.factory_work_orders USING btree (factory_id, number);
 
 
 --
@@ -2670,7 +2689,7 @@ ALTER TABLE ONLY public.workflows
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.11 (Ubuntu 17.11-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2689,7 +2708,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260811235128	f
+20260812184220	f
 \.
 
 
@@ -2706,7 +2725,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.11 (Ubuntu 17.11-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;

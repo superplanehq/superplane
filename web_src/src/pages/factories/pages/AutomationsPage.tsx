@@ -1,27 +1,24 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { Heading } from "@/components/Heading/heading";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { Plus } from "lucide-react";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
-import {
-  factoryContentBodyClassName,
-  factoryContentHeaderClassName,
-  factoryPageSubtitleClassName,
-  factoryPageTitleClassName,
-} from "./factoryPageLayoutStyles";
+import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
+import { factorySectionBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
+import { AutomationDetail } from "./AutomationDetail";
 import { AutomationsPageBody } from "./automationsPageBody";
 import { AutomationsLegacyRedirect } from "./automationsPageRedirect";
 import { useAutomationsPageModel } from "./useAutomationsPageModel";
 
 export function AutomationsPage() {
   const model = useAutomationsPageModel();
+  const cardActions = useWorkOrderCardActions(model.organizationId, model.factoryId);
 
   if (model.showLegacyRedirect) {
     return (
       <AutomationsLegacyRedirect
         organizationId={model.organizationId}
-        factoryId={model.factoryId}
+        factoryKey={model.factoryKey}
         factoryLoaded={Boolean(model.factory)}
         legacyLineId={model.legacyLineId}
       />
@@ -29,51 +26,64 @@ export function AutomationsPage() {
   }
 
   const selectedApp = model.selectedApp;
+  const workOrderCardContext = {
+    organizationId: model.organizationId,
+    factoryKey: model.factoryKey,
+    factoryLines: model.factory?.lines ?? [],
+    canDispatch: model.canUpdateWorkOrders,
+    canAssign: model.canUpdateWorkOrders,
+    ...cardActions,
+  };
+
+  if (selectedApp && model.selectedAppActions) {
+    return (
+      <div className="flex h-full min-h-0 flex-col" data-testid="automations-detail-page">
+        <AutomationDetail
+          organizationId={model.organizationId}
+          factoryKey={model.factoryKey}
+          app={selectedApp}
+          actions={model.selectedAppActions}
+          factory={model.factory}
+          workOrders={model.workOrders}
+          workOrderCardContext={workOrderCardContext}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div
-      className={cn(selectedApp && "flex h-full min-h-0 flex-col")}
-      data-testid={selectedApp ? "automations-detail-page" : "automations-list-page"}
-    >
-      <header className={cn(factoryContentHeaderClassName, selectedApp && "shrink-0")}>
-        <div>
-          <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
-            Automations
-          </Heading>
-          <p className={cn("mt-1", factoryPageSubtitleClassName)}>
-            Automations are one-step lines. Each one listens for a trigger and runs a canvas when it fires.
-          </p>
-        </div>
-        {selectedApp == null ? (
+    <div data-testid="automations-list-page">
+      <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
+        title="Automations"
+        subtitle="Automations are one-step lines. Each one listens for a trigger and runs a canvas when it fires."
+        actions={
           <PermissionTooltip
             allowed={model.canCreateApp || model.permissionsLoading}
             message="You don't have permission to create automations."
           >
             <Button
               type="button"
-              variant="outline"
-              asChild={false}
+              size="sm"
               disabled={!model.canCreateApp}
               onClick={() => model.setCreateOpen(true)}
               data-testid="automations-create-button"
             >
-              <Plus className="h-3.5 w-3.5" aria-hidden />
-              Add automation
+              <Plus className="size-3.5" aria-hidden />
+              New automation
             </Button>
           </PermissionTooltip>
-        ) : null}
-      </header>
+        }
+      />
 
-      <div
-        className={cn(factoryContentBodyClassName, selectedApp && "flex min-h-0 flex-1 flex-col overflow-hidden py-6")}
-      >
+      <div className={factorySectionBodyClassName}>
         <AutomationsPageBody
           organizationId={model.organizationId}
-          factoryId={model.factoryId}
+          factoryKey={model.factoryKey}
           apps={model.apps}
           workOrders={model.workOrders}
           appsLoading={model.appsLoading}
-          selectedApp={selectedApp}
+          actionsForApp={model.actionsForApp}
           canCreate={model.canCreateApp || model.permissionsLoading}
           onCreate={() => model.setCreateOpen(true)}
         />

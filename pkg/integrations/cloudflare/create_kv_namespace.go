@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -126,10 +125,6 @@ func (c *CreateKVNamespace) Execute(ctx core.ExecutionContext) error {
 
 func (c *CreateKVNamespace) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *CreateKVNamespace) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateKVNamespace) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

@@ -9,7 +9,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
-func loadAndSerializeWorkOrder(ctx context.Context, order *models.FactoryWorkOrder) (*pb.WorkOrder, error) {
+func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, order *models.FactoryWorkOrder) (*pb.WorkOrder, error) {
 	db := database.DB(ctx)
 	executionsByOrderID, err := models.ListFactoryWorkOrderExecutionsByWorkOrderIDs(db, []uuid.UUID{order.ID})
 	if err != nil {
@@ -22,13 +22,14 @@ func loadAndSerializeWorkOrder(ctx context.Context, order *models.FactoryWorkOrd
 	}
 
 	return serializeWorkOrder(
+		factory,
 		order,
 		executionsByOrderID[order.ID],
 		creatorAutomations[order.ID],
 	), nil
 }
 
-func loadAndSerializeWorkOrders(ctx context.Context, orders []models.FactoryWorkOrder) ([]*pb.WorkOrder, error) {
+func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, orders []models.FactoryWorkOrder) ([]*pb.WorkOrder, error) {
 	if len(orders) == 0 {
 		return nil, nil
 	}
@@ -52,6 +53,7 @@ func loadAndSerializeWorkOrders(ctx context.Context, orders []models.FactoryWork
 	result := make([]*pb.WorkOrder, len(orders))
 	for i := range orders {
 		result[i] = serializeWorkOrder(
+			factory,
 			&orders[i],
 			executionsByOrderID[orders[i].ID],
 			creatorAutomations[orders[i].ID],

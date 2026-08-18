@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -139,10 +138,6 @@ func (c *CreateDatabase) Execute(ctx core.ExecutionContext) error {
 
 func (c *CreateDatabase) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *CreateDatabase) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateDatabase) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

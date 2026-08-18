@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -122,10 +121,6 @@ func (d *DeleteSilence) Execute(ctx core.ExecutionContext) error {
 
 func (d *DeleteSilence) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (d *DeleteSilence) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (d *DeleteSilence) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

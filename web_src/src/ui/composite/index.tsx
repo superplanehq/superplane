@@ -67,6 +67,11 @@ export interface CompositeProps extends ComponentActionsProps {
   onViewMoreEvents?: () => void;
   dimBodyBelowHeader?: boolean;
   draftDiffStatus?: DraftDiffStatus;
+  isFactoryApp?: boolean;
+  showRuntimeStatus?: boolean;
+  runIsActive?: boolean;
+  componentLabel?: string;
+  nodeName?: string;
 }
 
 export const Composite: React.FC<CompositeProps> = ({
@@ -91,6 +96,11 @@ export const Composite: React.FC<CompositeProps> = ({
   warning,
   dimBodyBelowHeader,
   draftDiffStatus,
+  isFactoryApp = false,
+  showRuntimeStatus,
+  runIsActive,
+  componentLabel,
+  nodeName,
   onDuplicate,
   onToggleView,
   onDelete,
@@ -213,6 +223,11 @@ export const Composite: React.FC<CompositeProps> = ({
       warning={warning}
       dimBodyBelowHeader={dimBodyBelowHeader}
       draftDiffStatus={draftDiffStatus}
+      isFactoryApp={isFactoryApp}
+      showRuntimeStatus={showRuntimeStatus}
+      runIsActive={runIsActive}
+      componentLabel={componentLabel}
+      nodeName={nodeName}
     />
   );
 };

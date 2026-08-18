@@ -8,6 +8,8 @@ import { useMemo } from "react";
 interface WorkOrderAssigneePickerProps {
   organizationId: string;
   selectedIds: string[];
+  /** Ids used to decide sort order (pinned to the top). Defaults to `selectedIds`. */
+  pinnedIds?: string[];
   onChange: (assigneeIds: string[]) => void;
   disabled?: boolean;
   variant?: "default" | "popover";
@@ -16,14 +18,17 @@ interface WorkOrderAssigneePickerProps {
 export function WorkOrderAssigneePicker({
   organizationId,
   selectedIds,
+  pinnedIds,
   onChange,
   disabled = false,
   variant = "default",
 }: WorkOrderAssigneePickerProps) {
   const { data: users = [], isLoading } = useOrganizationUsers(organizationId);
+  const pinned = pinnedIds ?? selectedIds;
 
   const userOptions = useMemo(() => {
     const usersById = buildOrgUserDisplayMap(users);
+    const pinnedSet = new Set(pinned);
 
     return users
       .filter((user) => user.metadata?.id)
@@ -41,8 +46,16 @@ export function WorkOrderAssigneePicker({
           display,
         };
       })
-      .sort((left, right) => left.label.localeCompare(right.label));
-  }, [users]);
+      .sort((left, right) => {
+        const leftPinned = pinnedSet.has(left.id);
+        const rightPinned = pinnedSet.has(right.id);
+        if (leftPinned !== rightPinned) {
+          return leftPinned ? -1 : 1;
+        }
+
+        return left.label.localeCompare(right.label);
+      });
+  }, [users, pinned]);
 
   const toggleUser = (userId: string, checked: boolean) => {
     if (disabled) {

@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -2265,10 +2264,6 @@ func (c *CreateVM) Configuration() []configuration.Field {
 
 func (c *CreateVM) Setup(ctx core.SetupContext) error {
 	return nil
-}
-
-func (c *CreateVM) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateVM) Execute(ctx core.ExecutionContext) error {

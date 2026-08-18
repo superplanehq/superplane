@@ -1,5 +1,5 @@
 import { Text } from "@/components/Text/text";
-import type { FactoriesWorkOrder, FactoriesWorkOrderEvent } from "@/api-client";
+import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact, FactoriesWorkOrderEvent } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
@@ -8,15 +8,17 @@ import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { useMemo, type ReactNode } from "react";
 import { FileText, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
+import { buildLatestArtifactDataById, overlayLiveArtifactData } from "./lib/workOrderArtifact";
 import {
   buildWorkOrderTimelineView,
   buildWorkOrderUserDisplayLookup,
   buildWorkOrderUserNameLookup,
+  findLatestDispatchIndex,
   type WorkOrderTimelineEvent,
   type WorkOrderTimelineEventKind,
 } from "./lib/workOrderTimelineEvents";
 import { formatWorkOrderDateTime as formatTimelineDate } from "./lib/workOrderDateTime";
-import { factoryAppRunPath } from "./lib/factoryPagePaths";
+import { getWorkOrderRunHref } from "./lib/workOrderExecutions";
 import { DispatchTimelineItem } from "./timeline/DispatchTimelineItem";
 import { TimelineAutomationActor } from "./timeline";
 import { TimelineMarker } from "./timeline/TimelineMarker";
@@ -31,7 +33,7 @@ import { AssigneeChangeDescription } from "./workOrderTimelineAssignee";
 
 interface WorkOrderTimelineProps {
   organizationId: string;
-  factoryId: string;
+  factoryKey: string;
   order: FactoriesWorkOrder;
   events?: FactoriesWorkOrderEvent[];
   eventsError?: Error | null;
@@ -40,13 +42,22 @@ interface WorkOrderTimelineProps {
   isLoadingMoreEvents?: boolean;
   onLoadMoreEvents?: () => void;
   onRetryEvents?: () => void;
+  /**
+   * Current artifacts list (from useWorkOrderArtifacts), used to overlay
+   * live data — e.g. a PR's current `state` — on top of each
+   * `artifactAdded` event's data snapshot, so the "attached" chip in the
+   * timeline doesn't go stale the moment the PR changes state. Falls
+   * back to the event's own snapshot when an artifact isn't found here
+   * (very old events beyond the artifacts list, or a deleted artifact).
+   */
+  artifacts?: FactoriesWorkOrderArtifact[];
   /** Optional trailing timeline content, such as the comment composer. */
   footer?: ReactNode;
 }
 
 export function WorkOrderActivityTimeline({
   organizationId,
-  factoryId,
+  factoryKey,
   order,
   events,
   eventsError = null,
@@ -55,11 +66,13 @@ export function WorkOrderActivityTimeline({
   isLoadingMoreEvents = false,
   onLoadMoreEvents,
   onRetryEvents,
+  artifacts,
   footer,
 }: WorkOrderTimelineProps) {
   const { data: users = [] } = useOrganizationUsers(organizationId);
   const resolveUserName = useMemo(() => buildWorkOrderUserNameLookup(users, order), [users, order]);
   const resolveUserDisplay = useMemo(() => buildWorkOrderUserDisplayLookup(users, order), [users, order]);
+  const latestArtifactDataById = useMemo(() => buildLatestArtifactDataById(artifacts), [artifacts]);
   const pendingView = renderTimelinePendingView({ events, eventsError, isLoading, onRetryEvents });
   const timeline = pendingView
     ? { events: [] as WorkOrderTimelineEvent[] }
@@ -81,10 +94,11 @@ export function WorkOrderActivityTimeline({
       ) : (
         <TimelineEventsList
           organizationId={organizationId}
-          factoryId={factoryId}
-          orderId={order.id}
+          factoryKey={factoryKey}
+          orderNumber={order.number}
           events={timeline.events}
           resolveUserDisplay={resolveUserDisplay}
+          latestArtifactDataById={latestArtifactDataById}
           hasMoreEvents={hasMoreEvents}
           isLoadingMoreEvents={isLoadingMoreEvents}
           onLoadMoreEvents={onLoadMoreEvents}
@@ -102,10 +116,11 @@ export function WorkOrderActivityTimeline({
 
 interface TimelineEventsListProps {
   organizationId: string;
-  factoryId: string;
-  orderId?: string;
+  factoryKey: string;
+  orderNumber?: string;
   events: WorkOrderTimelineEvent[];
   resolveUserDisplay: OrgUserDisplayLookup;
+  latestArtifactDataById: Map<string, Record<string, unknown>>;
   hasMoreEvents: boolean;
   isLoadingMoreEvents: boolean;
   onLoadMoreEvents?: () => void;
@@ -113,10 +128,11 @@ interface TimelineEventsListProps {
 
 function TimelineEventsList({
   organizationId,
-  factoryId,
-  orderId,
+  factoryKey,
+  orderNumber,
   events,
   resolveUserDisplay,
+  latestArtifactDataById,
   hasMoreEvents,
   isLoadingMoreEvents,
   onLoadMoreEvents,
@@ -146,9 +162,10 @@ function TimelineEventsList({
               key={event.id}
               event={event}
               organizationId={organizationId}
-              factoryId={factoryId}
-              orderId={orderId}
+              factoryKey={factoryKey}
+              orderNumber={orderNumber}
               resolveUserDisplay={resolveUserDisplay}
+              latestArtifactDataById={latestArtifactDataById}
               isLatestDispatch={index === latestDispatchIndex}
             />
           ))}
@@ -206,16 +223,6 @@ function TimelineActivityEmpty() {
   return <p className="text-sm text-muted-foreground">No activity yet.</p>;
 }
 
-function findLatestDispatchIndex(events: WorkOrderTimelineEvent[]): number {
-  let idx = -1;
-  events.forEach((event, i) => {
-    if (event.kind === "dispatched") {
-      idx = i;
-    }
-  });
-  return idx;
-}
-
 // Kinds that render an avatar marker (when the actor is resolvable).
 const AVATAR_MARKER_KINDS: WorkOrderTimelineEventKind[] = [
   "created",
@@ -229,16 +236,18 @@ const AVATAR_MARKER_KINDS: WorkOrderTimelineEventKind[] = [
 function TimelineItem({
   event,
   organizationId,
-  factoryId,
-  orderId,
+  factoryKey,
+  orderNumber,
   resolveUserDisplay,
+  latestArtifactDataById,
   isLatestDispatch,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
-  factoryId: string;
-  orderId?: string;
+  factoryKey: string;
+  orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
+  latestArtifactDataById: Map<string, Record<string, unknown>>;
   isLatestDispatch: boolean;
 }) {
   if (event.kind === "dispatched") {
@@ -246,8 +255,8 @@ function TimelineItem({
       <DispatchTimelineItem
         event={event}
         organizationId={organizationId}
-        factoryId={factoryId}
-        orderId={orderId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
         isLatestDispatch={isLatestDispatch}
       />
     );
@@ -267,9 +276,10 @@ function TimelineItem({
           <TimelineItemBody
             event={event}
             organizationId={organizationId}
-            factoryId={factoryId}
-            orderId={orderId}
+            factoryKey={factoryKey}
+            orderNumber={orderNumber}
             resolveUserDisplay={resolveUserDisplay}
+            latestArtifactDataById={latestArtifactDataById}
           />
         </div>
       </div>
@@ -280,33 +290,51 @@ function TimelineItem({
 function TimelineItemBody({
   event,
   organizationId,
-  factoryId,
-  orderId,
+  factoryKey,
+  orderNumber,
   resolveUserDisplay,
+  latestArtifactDataById,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
-  factoryId: string;
-  orderId?: string;
+  factoryKey: string;
+  orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
+  latestArtifactDataById: Map<string, Record<string, unknown>>;
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
   const timeLabel = formatTimelineDate(new Date(event.at));
 
   if (event.kind === "commented") {
-    return <CommentEventBody event={event} actorDisplay={actorDisplay} timeLabel={timeLabel} />;
+    return (
+      <CommentEventBody
+        event={event}
+        actorDisplay={actorDisplay}
+        timeLabel={timeLabel}
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
+      />
+    );
   }
 
   if (event.kind === "artifactAdded") {
-    return <ArtifactEventBody event={event} actorDisplay={actorDisplay} timeLabel={timeLabel} />;
+    return (
+      <ArtifactEventBody
+        event={event}
+        actorDisplay={actorDisplay}
+        timeLabel={timeLabel}
+        latestArtifactDataById={latestArtifactDataById}
+      />
+    );
   }
 
   return (
     <UserActionEventDescription
       event={event}
       organizationId={organizationId}
-      factoryId={factoryId}
-      orderId={orderId}
+      factoryKey={factoryKey}
+      orderNumber={orderNumber}
       resolveUserDisplay={resolveUserDisplay}
       timeLabel={timeLabel}
     />
@@ -317,14 +345,23 @@ function CommentEventBody({
   event,
   actorDisplay,
   timeLabel,
+  organizationId,
+  factoryKey,
+  orderNumber,
 }: {
   event: WorkOrderTimelineEvent;
   actorDisplay: OrgUserDisplay | null;
   timeLabel: string;
+  organizationId: string;
+  factoryKey: string;
+  orderNumber?: string;
 }) {
   const comment = event.comment;
   if (!comment) return null;
   const isAutomation = (comment.authorKind ?? "").toLowerCase() === "automation";
+  const runHref = getWorkOrderRunHref(organizationId, factoryKey, event.sourceAppId, event.sourceRunId, {
+    orderNumber,
+  });
 
   return (
     <>
@@ -337,6 +374,15 @@ function CommentEventBody({
           <span className={inlineActorClassName}>Someone</span>
         )}{" "}
         commented
+        {isAutomation && runHref ? (
+          <>
+            {" "}
+            via{" "}
+            <Link href={runHref} className={inlineLinkClassName}>
+              run
+            </Link>
+          </>
+        ) : null}
         <span className={inlineTimeClassName}>
           {" · "}
           {timeLabel}
@@ -353,13 +399,17 @@ function ArtifactEventBody({
   event,
   actorDisplay,
   timeLabel,
+  latestArtifactDataById,
 }: {
   event: WorkOrderTimelineEvent;
   actorDisplay: OrgUserDisplay | null;
   timeLabel: string;
+  latestArtifactDataById: Map<string, Record<string, unknown>>;
 }) {
   const artifact = event.artifact;
   if (!artifact) return null;
+
+  const displayArtifact = overlayLiveArtifactData(artifact, latestArtifactDataById);
 
   return (
     <p className={inlineParagraphClassName}>
@@ -370,7 +420,7 @@ function ArtifactEventBody({
       ) : (
         <span className={inlineActorClassName}>Someone</span>
       )}{" "}
-      attached <WorkOrderArtifactInline artifact={artifact} className="align-baseline" />
+      attached <WorkOrderArtifactInline artifact={displayArtifact} className="align-baseline" />
       <span className={inlineTimeClassName}>
         {" · "}
         {timeLabel}
@@ -385,15 +435,15 @@ const SOMEONE_FALLBACK_KINDS: WorkOrderTimelineEventKind[] = ["created", "status
 function UserActionEventDescription({
   event,
   organizationId,
-  factoryId,
-  orderId,
+  factoryKey,
+  orderNumber,
   resolveUserDisplay,
   timeLabel,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
-  factoryId: string;
-  orderId?: string;
+  factoryKey: string;
+  orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   timeLabel: string;
 }) {
@@ -421,7 +471,12 @@ function UserActionEventDescription({
             resolveUserDisplay={resolveUserDisplay}
           />
         ) : hasSourceRun ? (
-          <SourceRunAttribution event={event} organizationId={organizationId} factoryId={factoryId} orderId={orderId} />
+          <SourceRunAttribution
+            event={event}
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            orderNumber={orderNumber}
+          />
         ) : (
           <span>{event.title}</span>
         )}
@@ -440,21 +495,17 @@ function UserActionEventDescription({
 function SourceRunAttribution({
   event,
   organizationId,
-  factoryId,
-  orderId,
+  factoryKey,
+  orderNumber,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
-  factoryId: string;
-  orderId?: string;
+  factoryKey: string;
+  orderNumber?: string;
 }) {
-  const runHref =
-    event.sourceAppId && event.sourceRunId
-      ? factoryAppRunPath(organizationId, factoryId, event.sourceAppId, event.sourceRunId, {
-          from: "work-order",
-          orderId,
-        })
-      : null;
+  const runHref = getWorkOrderRunHref(organizationId, factoryKey, event.sourceAppId, event.sourceRunId, {
+    orderNumber,
+  });
   const connector = event.kind === "created" ? "from" : "via";
   return (
     <span className="inline-flex flex-wrap items-baseline gap-x-1">

@@ -3,9 +3,13 @@ import { createContext, useContext } from "react";
 
 export interface FactoriesLayoutContextValue {
   organizationId: string;
+  /** Real database id — use for API calls, mutations, and the websocket subscription. */
   factoryId: string;
+  /** Canonical workspace key (e.g. `SP`) — use for building links. */
+  factoryKey: string;
   factory: FactoriesFactory | null;
   factories: FactoriesFactory[];
+  openCreateWorkOrder: () => void;
 }
 
 export const FactoriesLayoutContext = createContext<FactoriesLayoutContextValue | null>(null);

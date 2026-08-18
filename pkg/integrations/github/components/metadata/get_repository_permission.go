@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -119,10 +118,6 @@ func (c *GetRepositoryPermission) Execute(ctx core.ExecutionContext) error {
 		"github.repositoryPermission",
 		[]any{permission},
 	)
-}
-
-func (c *GetRepositoryPermission) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *GetRepositoryPermission) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

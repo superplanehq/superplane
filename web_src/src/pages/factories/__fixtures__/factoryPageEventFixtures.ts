@@ -7,6 +7,10 @@ import {
   FAILED_WORK_ORDER,
   HOUR_AGO,
   LAST_WEEK,
+  LINE_RUN_IMPLEMENT_FAILED_ID,
+  LINE_RUN_IMPLEMENT_ID,
+  LINE_RUN_IMPLEMENT_PASSED_ID,
+  LINE_RUN_VERIFY_PASSED_ID,
   OPEN_WORK_ORDER,
   OPERATOR_USER,
   REVIEWER_USER,
@@ -35,6 +39,10 @@ interface CommentAuthorFixture {
     nodeName?: string;
     appId?: string;
     appName?: string;
+    lineId?: string;
+    lineName?: string;
+    stepIndex?: number;
+    stepName?: string;
   };
 }
 
@@ -132,6 +140,7 @@ function commentAddedEvent(
   at: string,
   body: string,
   author: CommentAuthorFixture,
+  run?: { id: string },
 ): FactoriesWorkOrderEvent {
   return {
     type: "order.comment.added",
@@ -140,6 +149,7 @@ function commentAddedEvent(
       order: { id: order.id, title: order.title },
       body,
       author,
+      ...(run ? { run } : {}),
     },
   };
 }
@@ -244,9 +254,31 @@ export const RUNNING_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     order: RUNNING_WORK_ORDER,
     stepName: "implement",
     at: HOUR_AGO,
-    runId: "run-implement",
+    runId: LINE_RUN_IMPLEMENT_ID,
     appId: "app-refund-implementer",
   }),
+  // Automation-authored comment attached to the in-flight "implement" step.
+  // It is matched to the step by line id ("plan-and-implement"), not the
+  // canvas node name, and renders as plain text — the step's own title
+  // already names the line and links to its run.
+  commentAddedEvent(
+    RUNNING_WORK_ORDER,
+    HOUR_AGO,
+    "Applying the ledger fix now, will report back once tests pass.",
+    {
+      kind: "automation",
+      automation: {
+        nodeId: "node-implement",
+        nodeName: "node-implement",
+        appId: "app-refund-implementer",
+        appName: "Refund Implementer",
+        lineId: REFUND_LINE.id,
+        lineName: REFUND_LINE.name,
+        stepName: "implement",
+      },
+    },
+    { id: LINE_RUN_IMPLEMENT_ID },
+  ),
 ];
 
 export const FAILED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
@@ -270,14 +302,14 @@ export const FAILED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     order: FAILED_WORK_ORDER,
     stepName: "implement",
     at: HOUR_AGO,
-    runId: "run-implement-2",
+    runId: LINE_RUN_IMPLEMENT_FAILED_ID,
     appId: "app-refund-implementer",
   }),
   stepExecutionFinishedEvent({
     order: FAILED_WORK_ORDER,
     stepName: "implement",
     at: HOUR_AGO,
-    runId: "run-implement-2",
+    runId: LINE_RUN_IMPLEMENT_FAILED_ID,
     appId: "app-refund-implementer",
     result: "failed",
   }),
@@ -304,14 +336,14 @@ export const CLOSED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     order: CLOSED_WORK_ORDER,
     stepName: "implement",
     at: LAST_WEEK,
-    runId: "run-implement-3",
+    runId: LINE_RUN_IMPLEMENT_PASSED_ID,
     appId: "app-refund-implementer",
   }),
   stepExecutionFinishedEvent({
     order: CLOSED_WORK_ORDER,
     stepName: "implement",
     at: LAST_WEEK,
-    runId: "run-implement-3",
+    runId: LINE_RUN_IMPLEMENT_PASSED_ID,
     appId: "app-refund-implementer",
     result: "passed",
   }),
@@ -319,14 +351,14 @@ export const CLOSED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     order: CLOSED_WORK_ORDER,
     stepName: "verify",
     at: YESTERDAY,
-    runId: "run-verify-3",
+    runId: LINE_RUN_VERIFY_PASSED_ID,
     appId: "app-refund-verifier",
   }),
   stepExecutionFinishedEvent({
     order: CLOSED_WORK_ORDER,
     stepName: "verify",
     at: YESTERDAY,
-    runId: "run-verify-3",
+    runId: LINE_RUN_VERIFY_PASSED_ID,
     appId: "app-refund-verifier",
     result: "passed",
   }),

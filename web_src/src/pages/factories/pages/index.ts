@@ -1,6 +1,6 @@
 export { AutomationsPage } from "./AutomationsPage";
 export { ComingSoonPage } from "./ComingSoonPage";
-export { CreateWorkOrderPage } from "./CreateWorkOrderPage";
+export { CreateWorkOrderComposeRedirect } from "./CreateWorkOrderComposeRedirect";
 export { FactoryAppCanvasPage } from "./FactoryAppCanvasPage";
 export { FactoryLineEditPage } from "./FactoryLineEditPage";
 export { LinesPage } from "./LinesPage";
@@ -8,7 +8,7 @@ export { MissionsPage } from "./MissionsPage";
 export { OverviewPage } from "./OverviewPage";
 export { VelocityPage } from "./VelocityPage";
 export { WikiPage } from "./WikiPage";
-export { WorkOrderDetailPage } from "./WorkOrderDetailPage";
+export { LegacyWorkOrderDetailRedirect, WorkOrderDetailPage } from "./WorkOrderDetailPage";
 export { WorkOrdersPage } from "./WorkOrdersPage";
 export { FactorySettingsLayout } from "./settings/FactorySettingsLayout";
 export { FactorySettingsGeneralPage } from "./settings/FactorySettingsGeneralPage";

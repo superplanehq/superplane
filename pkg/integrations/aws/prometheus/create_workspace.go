@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -84,10 +83,6 @@ func (c *CreateWorkspace) Configuration() []configuration.Field {
 func (c *CreateWorkspace) Setup(ctx core.SetupContext) error {
 	_, err := c.decodeConfiguration(ctx.Configuration)
 	return err
-}
-
-func (c *CreateWorkspace) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateWorkspace) Execute(ctx core.ExecutionContext) error {

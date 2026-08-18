@@ -854,10 +854,6 @@ func (c *CreateInstance) poll(ctx core.ActionHookContext) error {
 	}
 }
 
-func (c *CreateInstance) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
-
 func (c *CreateInstance) Cancel(ctx core.ExecutionContext) error {
 	var metadata CreateInstanceExecutionMetadata
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {

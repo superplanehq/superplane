@@ -6,7 +6,7 @@ import { ChevronDown, Plus, Sparkles } from "lucide-react";
 import { Link } from "react-router";
 
 import { DispatchWorkOrderPopover } from "../DispatchWorkOrderPopover";
-import { factoryLineDestinationPath } from "../lib/factoryLineNavigation";
+import { factoryLineDetailPath } from "../lib/factoryPagePaths";
 import {
   deriveFactoryLineRows,
   FACTORY_LINE_TONE_DOT_CLASS,
@@ -16,8 +16,7 @@ import { SidebarSectionHeading } from "./SidebarPrimitives";
 
 interface WorkOrderSidebarFactoryLinesProps {
   organizationId: string;
-  factoryId: string;
-  canEditFactoryLines: boolean;
+  factoryKey: string;
   executions: FactoriesWorkOrderExecution[];
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
@@ -29,8 +28,7 @@ interface WorkOrderSidebarFactoryLinesProps {
 
 export function WorkOrderSidebarFactoryLines({
   organizationId,
-  factoryId,
-  canEditFactoryLines,
+  factoryKey,
   executions,
   factoryLines,
   canDispatch,
@@ -51,13 +49,7 @@ export function WorkOrderSidebarFactoryLines({
           <p className="text-[13px] text-muted-foreground">Not run on a line yet.</p>
         ) : (
           rows.map((row) => (
-            <FactoryLineRow
-              key={row.lineId}
-              row={row}
-              organizationId={organizationId}
-              factoryId={factoryId}
-              canEdit={canEditFactoryLines}
-            />
+            <FactoryLineRow key={row.lineId} row={row} organizationId={organizationId} factoryKey={factoryKey} />
           ))
         )}
 
@@ -96,15 +88,14 @@ export function WorkOrderSidebarFactoryLines({
 function FactoryLineRow({
   row,
   organizationId,
-  factoryId,
-  canEdit,
+  factoryKey,
 }: {
   row: FactoryLineRowModel;
   organizationId: string;
-  factoryId: string;
-  canEdit: boolean;
+  factoryKey: string;
 }) {
-  const href = factoryLineDestinationPath({ lineId: row.lineId, organizationId, factoryId, canEdit });
+  const href =
+    row.lineId && row.lineId !== "unknown" ? factoryLineDetailPath(organizationId, factoryKey, row.lineId) : undefined;
   const inner = (
     <>
       <Sparkles className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -120,7 +111,7 @@ function FactoryLineRow({
   }
 
   return (
-    <Link to={href} className={commonClass} aria-label={`${canEdit ? "Edit" : "View"} ${row.lineName}`}>
+    <Link to={href} className={commonClass} aria-label={`View ${row.lineName}`}>
       {inner}
     </Link>
   );

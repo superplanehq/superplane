@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -319,10 +318,6 @@ func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {
 
 func (c *CreateLoadBalancer) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *CreateLoadBalancer) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateLoadBalancer) Hooks() []core.Hook {

@@ -9,21 +9,36 @@ import (
 // order().artifacts (dot or bracket), including nested uses like
 // none(order().artifacts, …). Used to lazy-load artifacts only when needed.
 func ExpressionUsesOrderArtifacts(expression string) (bool, error) {
+	return expressionReferencesOrderProperty(expression, "artifacts")
+}
+
+// ExpressionUsesOrderComments reports whether the expression accesses
+// order().comments (dot or bracket), including nested uses like
+// len(order().comments). Used to lazy-load comments only when needed.
+func ExpressionUsesOrderComments(expression string) (bool, error) {
+	return expressionReferencesOrderProperty(expression, "comments")
+}
+
+// expressionReferencesOrderProperty reports whether the expression accesses
+// order().<property> (dot or bracket), including nested uses such as
+// len(order().<property>) or none(order().<property>, …).
+func expressionReferencesOrderProperty(expression, property string) (bool, error) {
 	tree, err := parser.Parse(expression)
 	if err != nil {
 		return false, err
 	}
 
-	collector := &orderArtifactsCollector{}
+	collector := &orderPropertyCollector{property: property}
 	ast.Walk(&tree.Node, collector)
 	return collector.found, nil
 }
 
-type orderArtifactsCollector struct {
-	found bool
+type orderPropertyCollector struct {
+	property string
+	found    bool
 }
 
-func (c *orderArtifactsCollector) Visit(node *ast.Node) {
+func (c *orderPropertyCollector) Visit(node *ast.Node) {
 	if c.found {
 		return
 	}
@@ -34,7 +49,7 @@ func (c *orderArtifactsCollector) Visit(node *ast.Node) {
 	}
 
 	name, ok := memberPropertyName(member.Property)
-	if !ok || name != "artifacts" {
+	if !ok || name != c.property {
 		return
 	}
 

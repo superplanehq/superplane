@@ -386,10 +386,6 @@ func (c *CreateRepositorySandbox) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *CreateRepositorySandbox) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
-
 func (c *CreateRepositorySandbox) Hooks() []core.Hook {
 	return []core.Hook{
 		{Name: "poll", Type: core.HookTypeInternal},

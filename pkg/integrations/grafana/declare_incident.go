@@ -3,7 +3,6 @@ package grafana
 import (
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -82,10 +81,6 @@ func (d *DeclareIncident) Execute(ctx core.ExecutionContext) error {
 
 func (d *DeclareIncident) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (d *DeclareIncident) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (d *DeclareIncident) Hooks() []core.Hook {

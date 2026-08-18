@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -343,10 +342,6 @@ func buildPayloads(spec Spec, matches map[string]any, values []any) []any {
 			"count":      len(values),
 		},
 	}
-}
-
-func (c *ReadMemory) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *ReadMemory) Cancel(ctx core.ExecutionContext) error {
