@@ -1,6 +1,12 @@
-import type { ComponentsIntegrationRef, ConfigurationField, OrganizationsIntegration } from "@/api-client";
+import type {
+  ComponentsIntegrationRef,
+  ComponentsConcurrencySpec,
+  ConfigurationField,
+  OrganizationsIntegration,
+} from "@/api-client";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,7 +42,15 @@ interface SettingsTabProps {
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
     integrationRef?: ComponentsIntegrationRef,
+    concurrency?: ComponentsConcurrencySpec,
   ) => void | Promise<void>;
+  // Concurrency section: rendered only when showConcurrency is true
+  // (action nodes except merge, which is inherently unbounded).
+  showConcurrency?: boolean;
+  concurrency?: ComponentsConcurrencySpec;
+  // Loop only honors max (its parallel-session cap): key is hidden
+  // and never saved.
+  concurrencyMaxOnly?: boolean;
   onCancel?: () => void;
   domainId?: string;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
@@ -53,10 +67,47 @@ interface SettingsTabProps {
   canUpdateIntegrations?: boolean;
 }
 
+// Concurrency form state: strings, so inputs can be empty while typing.
+interface ConcurrencyDraft {
+  key: string;
+  max: string;
+}
+
+function concurrencyDraftFromSpec(spec?: ComponentsConcurrencySpec): ConcurrencyDraft {
+  return {
+    key: spec?.key ?? "",
+    max: spec?.max ? String(spec.max) : "",
+  };
+}
+
+// Empty or invalid input keeps the implicit default (1).
+function draftMax(draft: ConcurrencyDraft): number | undefined {
+  const parsed = Number.parseInt(draft.max.trim(), 10);
+  return Number.isFinite(parsed) && parsed >= 1 ? parsed : undefined;
+}
+
+// An all-default draft maps to no concurrency spec, so the node keeps
+// the default behavior instead of storing an empty object. With maxOnly,
+// key is dropped even if present in the loaded spec.
+function concurrencyDraftToSpec(draft: ConcurrencyDraft, maxOnly: boolean): ComponentsConcurrencySpec | undefined {
+  const key = maxOnly ? "" : draft.key.trim();
+  const max = draftMax(draft);
+
+  if (key === "" && max === undefined) {
+    return undefined;
+  }
+
+  const spec: ComponentsConcurrencySpec = {};
+  if (key !== "") spec.key = key;
+  if (max !== undefined) spec.max = max;
+  return spec;
+}
+
 function buildAutosaveSnapshot(
   configuration: Record<string, unknown>,
   nodeName: string,
   integrationRef?: ComponentsIntegrationRef,
+  concurrency?: ComponentsConcurrencySpec,
 ): string {
   return JSON.stringify({
     configuration,
@@ -67,6 +118,7 @@ function buildAutosaveSnapshot(
           name: integrationRef.name || "",
         }
       : null,
+    concurrency: concurrency ?? null,
   });
 }
 
@@ -91,6 +143,9 @@ export function SettingsTab({
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
+  showConcurrency = false,
+  concurrency,
+  concurrencyMaxOnly = false,
 }: SettingsTabProps) {
   const CONNECT_ANOTHER_INSTANCE_VALUE = "__connect_another_instance__";
   const isReadOnly = readOnly ?? false;
@@ -102,9 +157,18 @@ export function SettingsTab({
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
+  const [concurrencyDraft, setConcurrencyDraft] = useState<ConcurrencyDraft>(() =>
+    concurrencyDraftFromSpec(concurrency),
+  );
+  const concurrencySpec = useMemo(
+    () => concurrencyDraftToSpec(concurrencyDraft, concurrencyMaxOnly),
+    [concurrencyDraft, concurrencyMaxOnly],
+  );
   const savingRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
-  const autosaveBaselineSnapshotRef = useRef(buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef));
+  const autosaveBaselineSnapshotRef = useRef(
+    buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef, concurrency),
+  );
   const pendingAutosaveSnapshotRef = useRef<string | null>(null);
   // Use autocompleteExampleObj directly - current node is already filtered out
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
@@ -240,14 +304,15 @@ export function SettingsTab({
     }
 
     const filteredConfig = filterVisibleFields(newConfig);
-    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(filteredConfig, nodeName, integrationRef);
+    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(filteredConfig, nodeName, integrationRef, concurrency);
     pendingAutosaveSnapshotRef.current = null;
     setNodeConfiguration(filteredConfig);
     setCurrentNodeName(nodeName);
     setSelectedIntegration(integrationRef);
+    setConcurrencyDraft(concurrencyDraftFromSpec(concurrency));
     setValidationErrors(new Set());
     setShowValidation(false);
-  }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, integrationRef]);
+  }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, integrationRef, concurrency]);
 
   // Auto-select the first installation if none is selected or selection is invalid
   useEffect(() => {
@@ -257,7 +322,12 @@ export function SettingsTab({
 
     if (integrationsOfType.length === 0) {
       if (selectedIntegration) {
-        autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, undefined);
+        autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(
+          nodeConfiguration,
+          currentNodeName,
+          undefined,
+          concurrencySpec,
+        );
         setSelectedIntegration(undefined);
       }
       return;
@@ -276,12 +346,17 @@ export function SettingsTab({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     };
-    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, nextIntegration);
+    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(
+      nodeConfiguration,
+      currentNodeName,
+      nextIntegration,
+      concurrencySpec,
+    );
     setSelectedIntegration({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     });
-  }, [integrationsOfType, isReadOnly, selectedIntegration, nodeConfiguration, currentNodeName]);
+  }, [integrationsOfType, isReadOnly, selectedIntegration, nodeConfiguration, currentNodeName, concurrencySpec]);
 
   const shouldShowConfiguration = true;
   const shouldAutosaveOnChangeByFieldType = useCallback((fieldType: ConfigurationField["type"] | undefined) => {
@@ -332,7 +407,7 @@ export function SettingsTab({
       return;
     }
 
-    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
+    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration, concurrencySpec);
     if (snapshot === autosaveBaselineSnapshotRef.current) {
       pendingAutosaveSnapshotRef.current = null;
       return;
@@ -348,7 +423,7 @@ export function SettingsTab({
       return;
     }
 
-    const result = onSave(nodeConfiguration, currentNodeName, selectedIntegration);
+    const result = onSave(nodeConfiguration, currentNodeName, selectedIntegration, concurrencySpec);
     if (!(result instanceof Promise)) {
       updateAutosaveBaseline(snapshot);
       return;
@@ -368,6 +443,7 @@ export function SettingsTab({
     currentNodeName,
     selectedIntegration,
     nodeConfiguration,
+    concurrencySpec,
     onSave,
     queuePendingAutosave,
     updateAutosaveBaseline,
@@ -417,7 +493,7 @@ export function SettingsTab({
     if (isReadOnly) {
       return;
     }
-    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
+    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration, concurrencySpec);
     if (snapshot === autosaveBaselineSnapshotRef.current) {
       return;
     }
@@ -433,7 +509,7 @@ export function SettingsTab({
     return () => {
       window.clearTimeout(fallbackTimer);
     };
-  }, [isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
+  }, [isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration, concurrencySpec]);
 
   const configurationDisplayModel = useMemo(
     () =>
@@ -748,6 +824,54 @@ export function SettingsTab({
                 />
               );
             })}
+          </div>
+        )}
+
+        {/* Concurrency section */}
+        {showConcurrency && (
+          <div className={cn(SETTINGS_TAB_DIVIDER_CLASS, "space-y-4")}>
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Concurrency</h3>
+            <div className="flex flex-col gap-2">
+              <Label className="min-w-[100px] text-left">Max parallel executions</Label>
+              <Input
+                data-testid="node-concurrency-max-input"
+                type="number"
+                min={1}
+                value={concurrencyDraft.max}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setConcurrencyDraft((prev) => ({ ...prev, max: value }));
+                }}
+                placeholder="1"
+                className="shadow-none"
+              />
+              <p className="text-xs text-gray-500">
+                Executions above this limit wait in the queue. Default: one execution at a time.
+              </p>
+            </div>
+            {!concurrencyMaxOnly && (
+              <div className="flex flex-col gap-2">
+                <Label className="min-w-[100px] text-left">Key</Label>
+                <AutoCompleteInput
+                  data-testid="node-concurrency-key-input"
+                  exampleObj={resolvedAutocompleteExampleObj ?? null}
+                  value={concurrencyDraft.key}
+                  onChange={(value) => {
+                    setConcurrencyDraft((prev) => ({ ...prev, key: value }));
+                  }}
+                  placeholder={"ci-{{ $.data.branch }}"}
+                  startWord="{{"
+                  prefix="{{ "
+                  suffix=" }}"
+                  inputSize="md"
+                  quickTip="Tip: type `{{` to start an expression."
+                  className="shadow-none"
+                />
+                <p className="text-xs text-gray-500">
+                  Optional expression that splits the backlog. Each value is a separate queue.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
