@@ -408,6 +408,23 @@ func (f *Factory) SoftDeleteCanvases(tx *gorm.DB) error {
 	return nil
 }
 
+// CountFactoriesByIDs counts the active factories in the organization
+// matching the given IDs. Callers use it to verify a caller-provided
+// workspace list before persisting references to it.
+func CountFactoriesByIDs(tx *gorm.DB, organizationID uuid.UUID, ids []uuid.UUID) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	var count int64
+	err := tx.Model(&Factory{}).
+		Where("organization_id = ?", organizationID).
+		Where("id IN ?", ids).
+		Count(&count).
+		Error
+	return count, err
+}
+
 func CountFactoriesByOrganization(tx *gorm.DB, organizationID uuid.UUID) (int64, error) {
 	var count int64
 	err := tx.Unscoped().

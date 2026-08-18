@@ -124,6 +124,15 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 		allowed, err = r.AuthService.CheckOrganizationPermission(context.Background(), viewerID, orgID, memberPath, "create")
 		require.NoError(t, err)
 		assert.False(t, allowed)
+
+		// Self-scoped notification settings: viewers read and update their own.
+		allowed, err = r.AuthService.CheckOrganizationPermission(context.Background(), viewerID, orgID, "notifications", "read")
+		require.NoError(t, err)
+		assert.True(t, allowed)
+
+		allowed, err = r.AuthService.CheckOrganizationPermission(context.Background(), viewerID, orgID, "notifications", "update")
+		require.NoError(t, err)
+		assert.True(t, allowed)
 	})
 }
 
@@ -471,11 +480,21 @@ func Test__AuthService_GetRolePermissions(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, viewerPermissions)
 
-		// All permissions should be read-only
+		hasNotificationRead := false
+		hasNotificationUpdate := false
 		for _, perm := range viewerPermissions {
-			assert.Equal(t, "read", perm.Action)
 			assert.Equal(t, models.DomainTypeOrganization, perm.DomainType)
+			if perm.Resource == "notifications" && perm.Action == "update" {
+				hasNotificationUpdate = true
+				continue
+			}
+			assert.Equal(t, "read", perm.Action, perm.Resource)
+			if perm.Resource == "notifications" {
+				hasNotificationRead = true
+			}
 		}
+		assert.True(t, hasNotificationRead)
+		assert.True(t, hasNotificationUpdate)
 
 		// Test org admin permissions (should include viewer permissions + more)
 		adminPermissions, err := r.AuthService.GetRolePermissions(context.Background(), models.RoleOrgAdmin, models.DomainTypeOrganization, orgID)
