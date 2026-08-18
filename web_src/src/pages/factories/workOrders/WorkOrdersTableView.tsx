@@ -22,19 +22,37 @@ interface WorkOrdersTableViewProps {
 }
 
 /**
+ * Shared grid-template-columns tracks for the header and every row. Every
+ * track is a fixed length or `1fr` — never `auto` — so the header and each
+ * row (which are separate CSS grid formatting contexts) always resolve to
+ * identical pixel widths and stay aligned regardless of row content (e.g.
+ * whether a row has an avatar, a "+N" badge, or a dispatch button in the
+ * Owner column). Keep the header `<div>` and row `<article>` className
+ * referencing this constant so the two templates can never drift apart.
+ */
+const TABLE_GRID_COLS =
+  "grid-cols-[110px_60px_1fr_120px] md:grid-cols-[110px_60px_1fr_140px_120px_120px] lg:grid-cols-[110px_70px_1fr_180px_120px_120px]";
+
+/**
  * Responsive table. Columns collapse gracefully on narrower viewports —
- * Spend and Updated hide first, Line hides second. Status/ID/Title stay
- * visible in every layout.
+ * Updated hides first, Line hides second. Status/ID/Title/Owner stay
+ * visible in every layout. There is no Spend column here — usage data is
+ * empty in practice, so it's only shown as an optional chip in the list
+ * and board layouts.
  */
 export function WorkOrdersTableView(props: WorkOrdersTableViewProps) {
   return (
     <div className="overflow-hidden rounded-md border border-border bg-card" data-testid="work-orders-table">
-      <div className="grid grid-cols-[110px_60px_1fr_auto] items-center gap-3 border-b border-border bg-muted/30 px-3 py-2 text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground md:grid-cols-[110px_60px_1fr_140px_120px_auto] lg:grid-cols-[110px_70px_1fr_180px_100px_120px_auto]">
+      <div
+        className={cn(
+          "grid items-center gap-3 border-b border-border bg-muted/30 px-3 py-2 text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground",
+          TABLE_GRID_COLS,
+        )}
+      >
         <span>Status</span>
         <span>ID</span>
         <span>Title</span>
         <span className="hidden md:inline">Line</span>
-        <span className="hidden lg:inline">Spend</span>
         <span className="hidden md:inline">Updated</span>
         <span className="text-right">Owner</span>
       </div>
@@ -67,7 +85,10 @@ function TableRow({
   const timeLabel = entry.updatedAtMs > 0 ? formatTimeAgo(new Date(entry.updatedAtMs)) : "—";
   return (
     <article
-      className="group relative grid grid-cols-[110px_60px_1fr_auto] items-center gap-3 px-3 py-2 transition-colors hover:bg-accent/40 md:grid-cols-[110px_60px_1fr_140px_120px_auto] lg:grid-cols-[110px_70px_1fr_180px_100px_120px_auto]"
+      className={cn(
+        "group relative grid items-center gap-3 px-3 py-2 transition-colors hover:bg-accent/40",
+        TABLE_GRID_COLS,
+      )}
       data-testid={`work-orders-table-row-${entry.id}`}
     >
       <Link to={href} className="absolute inset-0 z-0" aria-label={`Open ${entry.title}`} />
@@ -95,13 +116,6 @@ function TableRow({
         className="relative z-10 pointer-events-none hidden min-w-0 md:inline-flex"
         fallback="—"
       />
-
-      <span
-        className="relative z-10 pointer-events-none hidden text-[11px] text-muted-foreground lg:inline"
-        title={entry.usageTooltip ?? undefined}
-      >
-        {entry.usageLabel ?? "—"}
-      </span>
 
       <span className="relative z-10 pointer-events-none hidden text-[11px] text-muted-foreground md:inline">
         {timeLabel}
