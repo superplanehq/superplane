@@ -103,3 +103,50 @@ func Test__ExecutionTerminator__InvokesComponentCancel(t *testing.T) {
 	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
 	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedExecution.Result)
 }
+
+func Test__ExecutionTerminator__DoesNotMarkCancelledWhenComponentCancelFails(t *testing.T) {
+	cancelCalled := false
+	componentName := "execution_terminator_cancel_fail_" + uuid.New().String()
+
+	r := support.Setup(t)
+	r.Registry.Actions[componentName] = impl.NewDummyAction(impl.DummyActionOptions{
+		Name: componentName,
+		CancelFunc: func(ctx core.ExecutionContext) error {
+			cancelCalled = true
+			return assert.AnError
+		},
+	})
+
+	terminator := NewExecutionTerminator("", r.AuthService, r.Encryptor, r.Registry)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "node-1",
+				Name:   "Node 1",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: componentName},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID)
+	require.NoError(t, database.Conn().Model(execution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
+
+	require.NoError(t, execution.RequestCancellation(database.DB(t.Context()), &r.User))
+	require.Error(t, terminator.LockAndCancelExecution(*execution))
+
+	assert.True(t, cancelCalled, "component Cancel should be invoked")
+
+	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
+	assert.NotEqual(t, models.CanvasNodeExecutionResultCancelled, updatedExecution.Result)
+}
