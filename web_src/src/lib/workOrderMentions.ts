@@ -58,7 +58,51 @@ export function insertMentionAtCursor(
 }
 
 export function retainMentions(mentions: WorkOrderMentionCandidate[], body: string): WorkOrderMentionCandidate[] {
-  return mentions.filter((mention) => body.includes(`@${mention.name}`));
+  return mentions.filter((mention) => bodyContainsMentionToken(body, mention, mentions));
+}
+
+function bodyContainsMentionToken(
+  body: string,
+  mention: WorkOrderMentionCandidate,
+  tracked: WorkOrderMentionCandidate[],
+): boolean {
+  const token = `@${mention.name}`;
+  let from = 0;
+  while (from <= body.length) {
+    const index = body.indexOf(token, from);
+    if (index < 0) {
+      return false;
+    }
+    if (isCompleteMentionToken(body, index, token.length, mention, tracked)) {
+      return true;
+    }
+    from = index + 1;
+  }
+  return false;
+}
+
+function isCompleteMentionToken(
+  body: string,
+  start: number,
+  tokenLength: number,
+  mention: WorkOrderMentionCandidate,
+  tracked: WorkOrderMentionCandidate[],
+): boolean {
+  if (!isMentionTrigger(body, start)) {
+    return false;
+  }
+
+  const end = start + tokenLength;
+  if (end < body.length && /[A-Za-z0-9_]/.test(body[end] ?? "")) {
+    return false;
+  }
+
+  return !tracked.some(
+    (other) =>
+      other.name.length > mention.name.length &&
+      other.name.startsWith(mention.name) &&
+      body.startsWith(`@${other.name}`, start),
+  );
 }
 
 function isMentionTrigger(value: string, atIndex: number): boolean {

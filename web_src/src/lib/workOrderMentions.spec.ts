@@ -8,7 +8,9 @@ import {
 } from "./workOrderMentions";
 
 const alice = { id: "alice", name: "Alice Anderson", email: "alice@example.com" };
-const bob = { id: "bob", name: "Bob Brown", email: "bob@example.com" };
+const aliceShort = { id: "alice-short", name: "Alice", email: "alice-short@example.com" };
+const bob = { id: "bob", name: "Bob", email: "bob@example.com" };
+const bobby = { id: "bobby", name: "Bobby", email: "bobby@example.com" };
 
 describe("mentionQueryAtCursor", () => {
   it("opens after @ at the start of the comment", () => {
@@ -48,5 +50,17 @@ describe("insertMentionAtCursor", () => {
 describe("retainMentions", () => {
   it("drops mentions whose @Name is no longer in the body", () => {
     expect(retainMentions([alice, bob], "Thanks @Alice Anderson")).toEqual([alice]);
+  });
+
+  it("does not keep a shorter name inside a longer @Name", () => {
+    expect(retainMentions([bob, bobby], "Thanks @Bobby")).toEqual([bobby]);
+  });
+
+  it("keeps the longer name when both nested names are tracked", () => {
+    expect(retainMentions([aliceShort, alice], "Thanks @Alice Anderson")).toEqual([alice]);
+  });
+
+  it("keeps the shorter name when only that mention is tracked", () => {
+    expect(retainMentions([aliceShort], "Thanks @Alice Anderson")).toEqual([aliceShort]);
   });
 });

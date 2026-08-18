@@ -56,4 +56,18 @@ describe("WorkOrderCommentComposer", () => {
 
     expect(onSubmit).toHaveBeenCalledWith("Hello @Alice Anderson", ["alice"]);
   });
+
+  it("keeps the mention menu closed after Escape when the caret moves", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+
+    await user.type(screen.getByLabelText("Add a comment"), "@Ali");
+    expect(screen.getByTestId("work-order-mention-menu")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByTestId("work-order-mention-menu")).not.toBeInTheDocument();
+
+    await user.keyboard("{ArrowLeft}");
+    expect(screen.queryByTestId("work-order-mention-menu")).not.toBeInTheDocument();
+  });
 });

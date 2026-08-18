@@ -35,11 +35,18 @@ export function useWorkOrderMentionComposer(users: SuperplaneUsersUser[]): UseWo
   const suggestions = query && !dismissed ? filterMentionCandidates(candidates, query.query) : [];
 
   const applyBody = (nextBody: string, nextCursor: number, nextMentions?: WorkOrderMentionCandidate[]) => {
+    const previousQuery = mentionQueryAtCursor(body, cursor);
+    const nextQuery = mentionQueryAtCursor(nextBody, nextCursor);
     setBody(nextBody);
     setCursor(nextCursor);
     setMentions(retainMentions(nextMentions ?? mentions, nextBody));
     setHighlightIndex(0);
-    setDismissed(false);
+
+    const sameTrigger =
+      nextBody === body && previousQuery !== null && nextQuery !== null && previousQuery.start === nextQuery.start;
+    if (!sameTrigger) {
+      setDismissed(false);
+    }
   };
 
   const handleSelectMention = (candidate: WorkOrderMentionCandidate) => {
