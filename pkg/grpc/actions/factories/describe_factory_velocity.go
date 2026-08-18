@@ -69,15 +69,14 @@ func DescribeFactoryVelocity(
 
 	superplaneMerges, superplaneWaste := classifySuperPlaneArtifacts(artifacts, repoOwner, repoName, hasRepo)
 
-	knownSuperPlane, err := listKnownSuperPlanePRs(db, factoryID)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
-	}
-
 	hasPeople := false
 	peopleSearchFailed := false
 	var peopleHits []peopleMerge
 	if hasRepo && req.GetIntegrationId() != "" {
+		knownSuperPlane, knownErr := listKnownSuperPlanePRs(db, factoryID)
+		if knownErr != nil {
+			return nil, factoryErrorToStatus(knownErr, "failed to describe factory velocity")
+		}
 		hits, searchErr := searchPeopleMerges(
 			ctx,
 			reg,
