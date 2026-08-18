@@ -46,6 +46,14 @@ interface EventArtifactPayload {
   data?: Record<string, unknown>;
 }
 
+interface EventCheckPayload {
+  name?: string;
+  score?: number;
+  maxScore?: number;
+  format?: "fraction" | "percent";
+  previousScore?: number;
+}
+
 interface EventPayload extends LineStepExecutionPayload {
   user?: EventUserRef;
   automation?: EventAutomationRefPayload;
@@ -62,6 +70,7 @@ interface EventPayload extends LineStepExecutionPayload {
   body?: string;
   author?: EventCommentAuthorPayload;
   artifact?: EventArtifactPayload;
+  check?: EventCheckPayload;
 }
 
 interface TimelineBuildState {
@@ -75,6 +84,7 @@ const WORK_ORDER_EVENT_TYPE_ORDER: Record<string, number> = {
   "step.execution.created": 30,
   "step.execution.finished": 40,
   "order.comment.added": 45,
+  "order.check.reported": 46,
   "order.artifact.added": 47,
 };
 
@@ -142,6 +152,9 @@ function applyApiEventToTimeline(
       return;
     case "order.artifact.added":
       appendArtifactEvent(state, index, payload, at, resolveUserName);
+      return;
+    case "order.check.reported":
+      appendCheckReportedEvent(state, index, payload, at);
   }
 }
 
@@ -322,6 +335,33 @@ function appendArtifactEvent(
     actorAutomation: automationActor,
     artifact: timelineArtifact,
     title: describeArtifactAdded(artifact),
+  });
+}
+
+// Check reports stay top-level: they come from dedicated automations
+// (risk review, coverage), not from a dispatched line step.
+function appendCheckReportedEvent(state: TimelineBuildState, index: number, payload: EventPayload, at: string): void {
+  const check = payload.check;
+  if (!check?.name || check.score === undefined || check.maxScore === undefined) {
+    return;
+  }
+
+  const automationActor = toAutomationActor(payload.automation);
+  state.events.push({
+    id: `check-${index}`,
+    kind: "checkReported",
+    at,
+    actorAutomation: automationActor,
+    sourceRunId: payload.run?.id,
+    sourceAppId: automationActor?.appId ?? payload.app?.id,
+    check: {
+      name: check.name,
+      score: check.score,
+      maxScore: check.maxScore,
+      format: check.format,
+      previousScore: check.previousScore,
+    },
+    title: check.previousScore === undefined ? `reported ${check.name}` : `re-scored ${check.name}`,
   });
 }
 
