@@ -6,18 +6,17 @@ import {
   buildFactoryRunParameters,
   materializeFactoryCanvas,
   materializeFactoryConsole,
+  normalizeFactoryInstallParams,
   substituteInstallParams,
   wireFactoryIntegrations,
 } from "./materializeFactoryTemplate";
 
-function materializeSoftwareFactory() {
+function materializeSoftwareFactory(installParams: Record<string, string> = { repository: "acme/web" }) {
   return materializeFactoryCanvas({
     definition: getFactoryDefinition("software-factory"),
     canvasName: "My Factory",
     canvasId: "canvas-123",
-    installParams: {
-      repository: "acme/web",
-    },
+    installParams,
     integrations: {
       github: { id: "int-1", name: "acme-github", ready: true },
       claude: { id: "int-2", name: "acme-claude", ready: true },
@@ -27,16 +26,35 @@ function materializeSoftwareFactory() {
 
 describe("materializeFactoryTemplate", () => {
   it("substitutes install_params placeholders", () => {
-    const yaml = 'repository: "{{ install_params.repository }}"';
+    const yaml = 'repository: "{{ install_params.appRepository }}"';
     expect(
       substituteInstallParams(yaml, {
-        repository: "acme/web",
+        appRepository: "acme/web",
       }),
     ).toBe('repository: "acme/web"');
   });
 
   it("leaves unknown install_params placeholders unresolved", () => {
     expect(substituteInstallParams("x: {{ install_params.missing }}", {})).toBe("x: {{ install_params.missing }}");
+  });
+
+  it("maps legacy repository onto app and backlog repositories", () => {
+    expect(normalizeFactoryInstallParams({ repository: "acme/web" })).toEqual({
+      repository: "acme/web",
+      appRepository: "acme/web",
+      backlogRepository: "acme/web",
+    });
+    expect(
+      normalizeFactoryInstallParams({
+        repository: "acme/web",
+        appRepository: "acme/app",
+        backlogRepository: "acme/backlog",
+      }),
+    ).toEqual({
+      repository: "acme/web",
+      appRepository: "acme/app",
+      backlogRepository: "acme/backlog",
+    });
   });
 
   it("wires integration refs onto matching components", () => {
@@ -78,11 +96,44 @@ spec:
     expect(canvasYaml).toContain("name: My Factory");
     expect(canvasYaml).toContain("acme/web");
     expect(canvasYaml).toContain("create-task-start");
+    expect(canvasYaml).toContain("work-order-dispatch");
     expect(canvasYaml).toContain("id: int-1");
     expect(canvasYaml).toContain("app: canvas-123");
     expect(canvasYaml).not.toContain(FACTORY_CANVAS_ID_PLACEHOLDER);
     expect(canvasYaml).not.toContain("{{ install_params.");
     expect(definition.integrations).toEqual(["github", "claude"]);
+  });
+
+  it("routes issue work to backlog and branch/PR/CI work to app repositories", () => {
+    const canvasYaml = materializeSoftwareFactory({
+      appRepository: "acme/app",
+      backlogRepository: "acme/backlog",
+    });
+
+    expect(canvasYaml).toContain("acme/app");
+    expect(canvasYaml).toContain("acme/backlog");
+    expect(canvasYaml).toContain("fixes acme/backlog#");
+    expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*repository: acme\/backlog/);
+    expect(canvasYaml).toMatch(/component: github\.createIssue[\s\S]*repository: acme\/backlog/);
+    expect(canvasYaml).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
+    expect(canvasYaml).toMatch(/component: github\.onPullRequest[\s\S]*repository: acme\/app/);
+    expect(canvasYaml).toMatch(/id: runner-create-branch-2[\s\S]*name: REPO[\s\S]*value: acme\/app/);
+    expect(canvasYaml).toMatch(/id: analyze-create-issue[\s\S]*name: REPO[\s\S]*value: acme\/app/);
+    expect(canvasYaml).not.toContain("{{ install_params.");
+    expect(canvasYaml).not.toContain("install_params.repository");
+  });
+
+  it("connects work-order dispatch onRun to the create-task pipeline", () => {
+    const canvasYaml = materializeSoftwareFactory();
+
+    expect(canvasYaml).toMatch(/id: work-order-dispatch[\s\S]*component: onRun/);
+    expect(canvasYaml).toContain("sourceId: work-order-dispatch");
+    expect(canvasYaml).toContain("targetId: analyze-create-issue");
+    expect(canvasYaml).toContain("targetId: submit-task-memory");
+    expect(canvasYaml).toContain("order() != nil");
+    expect(canvasYaml).toContain("order().title");
+    expect(canvasYaml).toContain("order().description");
+    expect(canvasYaml).toContain("root().data.description");
   });
 
   it("materializes runners with integration-sourced credentials", () => {
@@ -118,5 +169,10 @@ spec:
       template: "Create Task",
       description: "fix a bug",
     });
+  });
+
+  it("exposes separate app and backlog install params on the bundled definition", () => {
+    const definition = getFactoryDefinition("software-factory");
+    expect(definition.installParams.map((param) => param.name)).toEqual(["appRepository", "backlogRepository"]);
   });
 });
