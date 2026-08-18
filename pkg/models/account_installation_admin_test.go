@@ -21,6 +21,21 @@ func TestInstallationAdmin(t *testing.T) {
 		assert.False(t, account.IsInstallationAdmin())
 	})
 
+	t.Run("installation admin account creation sets the flag", func(t *testing.T) {
+		var account *Account
+		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			var txErr error
+			account, txErr = CreateInstallationAdminAccountInTransaction(tx, "Owner User", "owner@example.com")
+			return txErr
+		})
+		require.NoError(t, err)
+		assert.True(t, account.IsInstallationAdmin())
+
+		refreshed, err := FindAccountByID(account.ID.String())
+		require.NoError(t, err)
+		assert.True(t, refreshed.IsInstallationAdmin())
+	})
+
 	t.Run("PromoteToInstallationAdmin sets the flag", func(t *testing.T) {
 		account, err := CreateAccount("Admin Candidate", "candidate@example.com")
 		require.NoError(t, err)

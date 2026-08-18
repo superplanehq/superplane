@@ -61,16 +61,10 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var err error
 
-		account, err = models.CreateAccountInTransaction(tx, fullName, req.Email)
+		account, err = models.CreateInstallationAdminAccountInTransaction(tx, fullName, req.Email)
 		if err != nil {
 			return err
 		}
-
-		// The first account is automatically an installation admin
-		if err := tx.Model(account).Update("installation_admin", true).Error; err != nil {
-			return err
-		}
-		account.InstallationAdmin = true
 
 		if err := usage.EnsureAccountWithinLimits(r.Context(), s.usageService, account.ID.String(), &usagepb.AccountState{
 			Organizations: 1,

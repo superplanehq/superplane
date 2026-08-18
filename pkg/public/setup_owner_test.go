@@ -65,6 +65,10 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, response.Code)
 
+	account, err := models.FindAccountByEmail("owner@example.com")
+	require.NoError(t, err)
+	assert.True(t, account.IsInstallationAdmin())
+
 	metadata, err := models.GetInstallationMetadata(database.Conn())
 	require.NoError(t, err)
 	assert.False(t, metadata.AllowPrivateNetworkAccess)

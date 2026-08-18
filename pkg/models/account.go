@@ -120,6 +120,20 @@ func CreateAccount(name, email string) (*Account, error) {
 	return CreateAccountInTransaction(database.Conn(), name, email)
 }
 
+func CreateInstallationAdminAccountInTransaction(tx *gorm.DB, name, email string) (*Account, error) {
+	account := &Account{
+		Name:              name,
+		Email:             utils.NormalizeEmail(email),
+		InstallationAdmin: true,
+	}
+	err := tx.Create(account).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return account, nil
+}
+
 func CreateAccountInTransaction(tx *gorm.DB, name, email string) (*Account, error) {
 	account := &Account{Name: name, Email: utils.NormalizeEmail(email)}
 	err := tx.Create(account).Error
