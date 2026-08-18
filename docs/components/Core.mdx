@@ -23,7 +23,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Add Memory" href="#add-memory" description="Add a namespaced JSON value to canvas memory" />
-  <LinkCard title="Add Work Order Artifact" href="#add-work-order-artifact" description="Attach a typed artifact (PR, markdown note, or branch) to a work order" />
+  <LinkCard title="Add Work Order Artifact" href="#add-work-order-artifact" description="Attach a typed artifact (PR, markdown note, branch, or link) to a work order" />
   <LinkCard title="Add Work Order Comment" href="#add-work-order-comment" description="Append a comment to a work order timeline" />
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
   <LinkCard title="Broadcast Message" href="#broadcast-message" description="Broadcast a message to other SuperPlane apps" />
@@ -437,8 +437,9 @@ Supported types:
 - **Pull request** (`pr`): requires `url`; optional `number`, `title`, and `state` (`open`/`draft`/`closed`/`merged`, defaults to `open`) which drives the icon/color of the artifact chip in the work order UI.
 - **Markdown note** (`markdown`): requires `body`; optional `title`.
 - **Branch** (`branch`): requires `name` (the branch name); optional `url` to link to the branch on its provider (e.g. a GitHub tree URL).
+- **Link** (`link`): requires `url` (must be http or https); optional `title` for the artifact chip's label — e.g. attach a preview-environment URL as "Preview".
 
-PR and markdown types accept a free-form `data` list of `{name, value}` entries that gets merged into the artifact's `data` map. Typed inputs take precedence over free-form entries with the same key.
+PR, markdown, and link types accept a free-form `data` list of `{name, value}` entries that gets merged into the artifact's `data` map. Typed inputs take precedence over free-form entries with the same key.
 
 Set `artifactKey` to tag the artifact with a queryable key (e.g. the pull request's URL) so a later `findWorkOrder` (`by: artifactKey`) step can resolve this work order from it — useful in flows that aren't dispatched from a factory line, such as closing a work order from a `github.onPullRequest` merged event. Keys are unique per factory.
 
