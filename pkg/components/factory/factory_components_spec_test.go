@@ -766,6 +766,9 @@ func TestResolvePrArtifactState_Precedence(t *testing.T) {
 		{"draft bool sets draft when not merged", "open", nil, true, "draft"},
 		{"draft bool ignored when merged", nil, true, true, "merged"},
 		{"non-string state is treated as absent", 42, nil, nil, ""},
+		{"merged false vetoes leftover state merged", "merged", false, nil, ""},
+		{"draft false vetoes leftover state draft", "draft", nil, false, ""},
+		{"merged false keeps closed", "closed", false, nil, "closed"},
 	}
 
 	for _, tc := range cases {
@@ -833,6 +836,14 @@ func TestBuildArtifactData_CanonicalFlagsOverwriteFreeFormMerged(t *testing.T) {
 
 func TestPrArtifactStateUpdates_ClearsStaleMergedFlag(t *testing.T) {
 	updates, err := prArtifactStateUpdates(nil, false, nil)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"merged": false}, updates)
+}
+
+func TestPrArtifactStateUpdates_DoesNotPersistVetoedMergedState(t *testing.T) {
+	// Incoming `state: merged` + `merged: false` must not write `state: merged`
+	// back — that leftover is what kept the chip purple.
+	updates, err := prArtifactStateUpdates("merged", false, nil)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{"merged": false}, updates)
 }

@@ -79,6 +79,16 @@ func resolvePrArtifactState(state, merged, draft any) string {
 	}
 
 	explicit := normalizePrArtifactStateValue(state)
+	// A flag-only update can send `merged: false` (or `draft: false`)
+	// while a leftover SuperPlane `state` still says merged/draft.
+	// The flag is the newer signal — do not persist the stale state.
+	if explicit == "merged" && isPresentConfigValue(merged) && !isTruthyConfigValue(merged) {
+		explicit = ""
+	}
+	if explicit == "draft" && isPresentConfigValue(draft) && !isTruthyConfigValue(draft) {
+		explicit = ""
+	}
+
 	if explicit != "" && explicit != "open" {
 		return explicit
 	}
@@ -94,7 +104,9 @@ func resolvePrArtifactState(state, merged, draft any) string {
 // When a SuperPlane state is produced, `merged` and `draft` are rewritten
 // to match it so a leftover GitHub flag cannot outrank a later `state`
 // on the chip. When only a flag is supplied, that flag is written as a
-// bool so `merged: false` can clear a stale `merged: true`.
+// bool so `merged: false` can clear a stale `merged: true`. A vetoed
+// `state: merged` (flag is false) is not written back — the chip then
+// ignores leftover `state: merged` when `merged` is false.
 func prArtifactStateUpdates(state, merged, draft any) (map[string]any, error) {
 	resolved := resolvePrArtifactState(state, merged, draft)
 	if err := validatePrArtifactState(resolved); err != nil {

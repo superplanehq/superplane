@@ -167,6 +167,21 @@ describe("extractPrArtifactState", () => {
   it("keeps an explicit non-open state over a GitHub `draft: true` flag", () => {
     expect(extractPrArtifactState({ state: "closed", draft: true })).toBe("closed");
   });
+
+  it("does not keep a leftover state:merged when merged is explicitly false", () => {
+    // A flag-only update writes `merged: false` and leaves `state: merged`
+    // in the map. The chip must not stay purple.
+    expect(extractPrArtifactState({ state: "merged", merged: false })).toBeUndefined();
+    expect(extractPrArtifactState({ state: "merged", merged: "false" })).toBeUndefined();
+  });
+
+  it("does not keep a leftover state:draft when draft is explicitly false", () => {
+    expect(extractPrArtifactState({ state: "draft", draft: false })).toBeUndefined();
+  });
+
+  it("still treats state:closed as closed when merged is explicitly false", () => {
+    expect(extractPrArtifactState({ state: "closed", merged: false })).toBe("closed");
+  });
 });
 
 describe("resolveBranchArtifactUrl", () => {
@@ -244,6 +259,29 @@ describe("resolveBranchArtifactUrl", () => {
   it("returns undefined when there is no sibling PR at all", () => {
     expect(resolveBranchArtifactUrl({ name: "feature/refund-retry" }, [])).toBeUndefined();
     expect(resolveBranchArtifactUrl({ name: "feature/refund-retry" }, undefined)).toBeUndefined();
+  });
+
+  it("does not guess when multiple sibling PRs point at different repos", () => {
+    // Two GitHub PRs and no head-ref match: picking the first would
+    // send the branch chip to the wrong repository.
+    expect(
+      resolveBranchArtifactUrl({ name: "feature/refund-retry" }, [
+        { type: "TYPE_PR", data: { url: "https://github.com/acme/payments/pull/1" } },
+        { type: "TYPE_PR", data: { url: "https://github.com/acme/storefront/pull/9" } },
+      ]),
+    ).toBeUndefined();
+  });
+
+  it("prefers the sibling PR whose head ref matches the branch name", () => {
+    expect(
+      resolveBranchArtifactUrl({ name: "feature/refund-retry" }, [
+        { type: "TYPE_PR", data: { url: "https://github.com/acme/payments/pull/1", head_ref: "chore/deps" } },
+        {
+          type: "TYPE_PR",
+          data: { url: "https://github.com/acme/storefront/pull/9", head: { ref: "feature/refund-retry" } },
+        },
+      ]),
+    ).toBe("https://github.com/acme/storefront/tree/feature/refund-retry");
   });
 });
 

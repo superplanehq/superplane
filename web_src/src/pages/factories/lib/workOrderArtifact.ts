@@ -89,7 +89,16 @@ export function extractPrArtifactState(data: ArtifactData): PrArtifactState | un
     return "merged";
   }
 
-  const explicit = readPrArtifactStateField(data);
+  // A flag-only update can leave `state: merged` in the map while writing
+  // `merged: false`. The flag is the newer signal — do not keep purple.
+  let explicit = readPrArtifactStateField(data);
+  if (explicit === "merged" && extractArtifactBoolean(data, "merged") === false) {
+    explicit = undefined;
+  }
+  if (explicit === "draft" && extractArtifactBoolean(data, "draft") === false) {
+    explicit = undefined;
+  }
+
   if (explicit && explicit !== "open") {
     return explicit;
   }
@@ -129,6 +138,7 @@ export function resolveBranchArtifactUrl(
     return undefined;
   }
 
+  const candidates: Array<{ treeUrl: string; headRef?: string }> = [];
   for (const related of relatedArtifacts ?? []) {
     if (normalizeArtifactKind(related.type ?? "") !== "pr") {
       continue;
@@ -140,8 +150,19 @@ export function resolveBranchArtifactUrl(
 
     const treeUrl = buildTreeUrlFromPullRequestUrl(siblingUrl, branchName);
     if (treeUrl) {
-      return treeUrl;
+      candidates.push({ treeUrl, headRef: extractPrHeadRef(related.data) });
     }
+  }
+
+  const matching = candidates.filter((candidate) => candidate.headRef === branchName);
+  if (matching.length > 0) {
+    return matching[0].treeUrl;
+  }
+
+  // One GitHub PR on the work order: safe to assume it is the same repo.
+  // Two or more with no head-ref match: do not guess the repository.
+  if (candidates.length === 1) {
+    return candidates[0].treeUrl;
   }
 
   return undefined;
@@ -185,6 +206,28 @@ function readPrArtifactStateField(data: ArtifactData): PrArtifactState | undefin
   }
   const normalized = raw.toLowerCase();
   return PR_ARTIFACT_STATES.find((state) => state === normalized);
+}
+
+function extractPrHeadRef(data: ArtifactData): string | undefined {
+  const fromField =
+    extractArtifactField(data, "head_ref") ??
+    extractArtifactField(data, "headRef") ??
+    extractArtifactField(data, "branch");
+  if (fromField) {
+    return fromField;
+  }
+  if (!data) {
+    return undefined;
+  }
+
+  const head = data.head;
+  if (head && typeof head === "object" && !Array.isArray(head)) {
+    const ref = (head as Record<string, unknown>).ref;
+    if (typeof ref === "string" && ref.trim() !== "") {
+      return ref.trim();
+    }
+  }
+  return undefined;
 }
 
 // GitHub payloads carry real booleans; templated flow inputs almost
