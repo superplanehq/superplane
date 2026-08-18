@@ -36,6 +36,11 @@ export interface CloudWatchAlarm {
   consoleUrl?: string;
 }
 
+/** Pre-delete snapshot emitted by the delete alarm component. It carries no console URL. */
+export interface CloudWatchDeletedAlarm extends CloudWatchAlarm {
+  deleted?: boolean;
+}
+
 export interface CloudWatchAlarmState {
   value?: string;
   reason?: string;

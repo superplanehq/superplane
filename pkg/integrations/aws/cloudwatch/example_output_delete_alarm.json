@@ -1,0 +1,40 @@
+{
+  "data": {
+    "actionsEnabled": true,
+    "alarmActions": ["arn:aws:sns:us-east-1:123456789012:ops-alerts"],
+    "alarmArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm:api-high-cpu",
+    "alarmConfigurationUpdatedTimestamp": "2026-06-04T09:12:44.108Z",
+    "alarmDescription": "API instances above 90% CPU",
+    "alarmName": "api-high-cpu",
+    "comparisonOperator": "GreaterThanThreshold",
+    "datapointsToAlarm": 2,
+    "deleted": true,
+    "dimensions": [
+      {
+        "name": "InstanceId",
+        "value": "i-1234567890abcdef0"
+      }
+    ],
+    "evaluateLowSampleCountPercentile": "",
+    "evaluationPeriods": 3,
+    "extendedStatistic": "",
+    "insufficientDataActions": [],
+    "metricName": "CPUUtilization",
+    "namespace": "AWS/EC2",
+    "okActions": ["arn:aws:sns:us-east-1:123456789012:ops-alerts"],
+    "period": 300,
+    "region": "us-east-1",
+    "stateReason": "Threshold Crossed: 1 datapoint [72.4 (04/06/26 09:07:00)] was not greater than the threshold (90.0).",
+    "stateReasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-06-04T09:12:44.101+0000\",\"statistic\":\"Average\",\"period\":300,\"recentDatapoints\":[72.4],\"threshold\":90.0}",
+    "stateTransitionedTimestamp": "2026-06-04T09:12:44.108Z",
+    "stateUpdatedTimestamp": "2026-06-04T09:12:44.108Z",
+    "stateValue": "OK",
+    "statistic": "Average",
+    "threshold": 90,
+    "thresholdMetricId": "",
+    "treatMissingData": "missing",
+    "unit": "Percent"
+  },
+  "timestamp": "2026-06-04T09:14:11.902154337Z",
+  "type": "aws.cloudwatch.alarm.deleted"
+}
