@@ -35,8 +35,14 @@ export function extractArtifactMarkdownBody(data: ArtifactData): string | undefi
   return extractArtifactField(data, "body");
 }
 
+/**
+ * Returns the artifact's outgoing link, if any. `url` is SuperPlane's
+ * canonical key; `html_url` is GitHub's own field name and is what
+ * `github.createPullRequest` writes into free-form data, so it lands
+ * here without the caller having to remap.
+ */
 export function extractArtifactUrl(data: ArtifactData): string | undefined {
-  return extractArtifactField(data, "url");
+  return extractArtifactField(data, "url") ?? extractArtifactField(data, "html_url");
 }
 
 export function extractArtifactTitle(data: ArtifactData): string | undefined {
@@ -48,20 +54,46 @@ export function extractArtifactName(data: ArtifactData): string | undefined {
 }
 
 /**
- * Returns the PR's lifecycle state when the free-form artifact data
- * carries a known value, normalizing case. Returns undefined for
- * missing/unrecognized values (e.g. artifacts attached before this
- * field existed) so callers can fall back to the default "open" look
- * instead of crashing or rendering something misleading.
+ * Returns the PR's lifecycle state as SuperPlane sees it, using both
+ * the canonical `state` field and GitHub-native `merged` / `draft`
+ * flags so a chip renders correctly even when nobody rewrote the raw
+ * webhook payload into SuperPlane's vocabulary.
+ *
+ * Precedence, strongest signal first:
+ * 1. `merged: true` — a merged GitHub PR is `{ state: "closed", merged: true }`;
+ *    without this the chip would render red instead of purple.
+ * 2. Explicit non-"open" SuperPlane `state` (draft/closed/merged).
+ * 3. `draft: true` — GitHub draft PRs stay `state: "open"`.
+ * 4. Explicit "open" `state`.
+ *
+ * Returns undefined for missing / unrecognized values so the chip
+ * falls back to the default "open" look instead of misrepresenting
+ * the PR.
  */
 export function extractPrArtifactState(data: ArtifactData): PrArtifactState | undefined {
-  const raw = extractArtifactField(data, "state");
-  if (!raw) {
-    return undefined;
+  if (extractArtifactBoolean(data, "merged") === true) {
+    return "merged";
   }
 
-  const normalized = raw.toLowerCase();
-  return PR_ARTIFACT_STATES.find((state) => state === normalized);
+  // A flag-only update can leave `state: merged` in the map while writing
+  // `merged: false`. The flag is the newer signal — do not keep purple.
+  let explicit = readPrArtifactStateField(data);
+  if (explicit === "merged" && extractArtifactBoolean(data, "merged") === false) {
+    explicit = undefined;
+  }
+  if (explicit === "draft" && extractArtifactBoolean(data, "draft") === false) {
+    explicit = undefined;
+  }
+
+  if (explicit && explicit !== "open") {
+    return explicit;
+  }
+
+  if (extractArtifactBoolean(data, "draft") === true) {
+    return "draft";
+  }
+
+  return explicit;
 }
 
 export function buildLatestArtifactDataById(
@@ -83,6 +115,42 @@ export function overlayLiveArtifactData<T extends { id?: string; data?: Record<s
 ): T {
   const liveData = artifact.id ? latestById.get(artifact.id) : undefined;
   return liveData ? { ...artifact, data: liveData } : artifact;
+}
+
+function readPrArtifactStateField(data: ArtifactData): PrArtifactState | undefined {
+  const raw = extractArtifactField(data, "state");
+  if (!raw) {
+    return undefined;
+  }
+  const normalized = raw.toLowerCase();
+  return PR_ARTIFACT_STATES.find((state) => state === normalized);
+}
+
+// GitHub payloads carry real booleans; templated flow inputs almost
+// always arrive as the strings "true" / "false". Tolerate both so a
+// PR chip can pick up the state without an if-node in the flow.
+function extractArtifactBoolean(data: ArtifactData, key: string): boolean | undefined {
+  if (!data) {
+    return undefined;
+  }
+  const value = data[key];
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim().toLowerCase();
+    if (trimmed === "true") return true;
+    if (trimmed === "false") return false;
+  }
+  return undefined;
+}
+
+/**
+ * Narrows the API's `data?: unknown` into the string-keyed shape every
+ * artifact consumer expects, without lying about non-object payloads.
+ */
+export function toArtifactDataRecord(data: unknown): Record<string, unknown> | undefined {
+  return data && typeof data === "object" ? (data as Record<string, unknown>) : undefined;
 }
 
 function extractArtifactField(data: ArtifactData, key: string): string | undefined {
