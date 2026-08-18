@@ -102,9 +102,7 @@ describe("client-side navigation updates document.title", () => {
     expect(await screen.findByTestId("automations-list-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(document.title).toBe("Automations · Refunds Factory · SuperPlane");
 
-    await user.click(
-      await screen.findByTestId("automations-app-app-refund-planner", {}, { timeout: 8000 }),
-    );
+    await user.click(await screen.findByTestId("automations-app-app-refund-planner", {}, { timeout: 8000 }));
     expect(await screen.findByTestId("automations-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(document.title).toBe("Refund Planner · Refunds Factory · SuperPlane");
 
