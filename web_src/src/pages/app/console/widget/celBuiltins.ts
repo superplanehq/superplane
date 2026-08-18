@@ -353,7 +353,8 @@ function githubAvatar(author: unknown, committer: unknown): string {
   const committerRecord = asRecord(committer);
   const username = coerceToString(authorRecord?.username).trim();
   if (username) {
-    return `<img class="avatar avatar-image" src="https://github.com/${username}.png" alt="" />`;
+    const initial = initialLetter(authorRecord?.name) || initialLetter(username);
+    return `<img class="avatar avatar-image" src="https://github.com/${username}.png" alt="" title="${initial}" />`;
   }
   const letter = firstInitialFromValues(
     authorRecord?.name,

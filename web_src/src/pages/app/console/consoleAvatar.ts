@@ -17,7 +17,11 @@ export function resolveConsoleAvatar(author: unknown, committer?: unknown): Cons
       return { src: username, name: "" };
     }
     if (username) {
-      return { src: `https://github.com/${username}.png`, name: username };
+      return {
+        src: `https://github.com/${username}.png`,
+        initials: firstInitialFromValues(username),
+        name: username,
+      };
     }
   }
 
@@ -27,7 +31,11 @@ export function resolveConsoleAvatar(author: unknown, committer?: unknown): Cons
   const name = coerceToString(authorRecord?.name).trim() || coerceToString(committerRecord?.name).trim() || username;
 
   if (username) {
-    return { src: `https://github.com/${username}.png`, name };
+    return {
+      src: `https://github.com/${username}.png`,
+      initials: firstInitialFromValues(authorRecord?.name, committerRecord?.name, username),
+      name,
+    };
   }
 
   const initials = firstInitialFromValues(

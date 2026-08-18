@@ -75,6 +75,27 @@ describe("interpolateMarkdownTemplate", () => {
     expect(out).toBe('<div class="avatar avatar-fallback">C</div>');
   });
 
+  it("embeds a fallback initial in title when github username avatar html is rendered", () => {
+    const out = interpolateMarkdownTemplate(
+      "{{ githubAvatarOrInitial(prod.payload.data.head_commit.author, prod.payload.data.head_commit.committer) }}",
+      {
+        prod: {
+          payload: {
+            data: {
+              head_commit: {
+                author: { name: "cloud-robot", username: "cloud-robot" },
+                committer: { name: "cloud-robot" },
+              },
+            },
+          },
+        },
+      },
+    );
+    expect(out).toContain('src="https://github.com/cloud-robot.png"');
+    expect(out).toContain('title="C"');
+    expect(out).toContain('class="avatar avatar-image"');
+  });
+
   it("serializes object values as JSON for inline insertion", () => {
     const out = interpolateMarkdownTemplate("Payload: {{ run.payload }}", { run: { payload: { pr: 7 } } });
     expect(out).toBe('Payload: {"pr":7}');
