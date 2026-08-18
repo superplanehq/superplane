@@ -28,7 +28,7 @@ function renderPage() {
     <MemoryRouter initialEntries={["/org-1/workspaces/new"]}>
       <Routes>
         <Route path="/:organizationId/workspaces/new" element={<NewWorkspacePage />} />
-        <Route path="/:organizationId/workspaces/:factoryKey/onboarding" element={<CurrentPath />} />
+        <Route path="/:organizationId/workspaces/:factoryKey/setup" element={<CurrentPath />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -43,7 +43,7 @@ describe("NewWorkspacePage", () => {
     await user.click(screen.getByRole("button", { name: "Continue to version control" }));
 
     expect(createFactory).toHaveBeenCalledWith({ name: "Payments", description: "", key: "" });
-    expect(await screen.findByText("/org-1/workspaces/PAY/onboarding")).toBeInTheDocument();
+    expect(await screen.findByText("/org-1/workspaces/PAY/setup")).toBeInTheDocument();
   });
 
   it("keeps version control locked until the workspace exists", async () => {

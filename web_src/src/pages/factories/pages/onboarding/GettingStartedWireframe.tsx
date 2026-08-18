@@ -8,7 +8,7 @@ import { linesPath } from "../../lib/factoryPagePaths";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
 /**
- * Storybook-only post-onboarding checklist (v3 parity).
+ * Storybook-only post-setup checklist (v3 parity).
  * Shown on overview when tips are active for the current workspace.
  */
 export function GettingStartedWireframe({ onDismiss }: { onDismiss?: () => void }) {

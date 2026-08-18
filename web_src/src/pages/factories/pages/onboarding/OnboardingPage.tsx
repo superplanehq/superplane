@@ -22,7 +22,7 @@ export function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-full w-full bg-background text-foreground" data-testid="workspace-onboarding">
+    <div className="min-h-full w-full bg-background text-foreground" data-testid="workspace-setup">
       <div className="mx-auto w-full max-w-3xl px-6 py-8 lg:px-8">
         <h1 className="text-[22px] font-semibold tracking-[-0.02em]">Set up your workspace</h1>
         <p className="mt-1.5 max-w-2xl text-[13px] text-muted-foreground">

@@ -330,7 +330,7 @@ export function SetupSections({
 }
 
 /**
- * Storybook-only workspace onboarding: progressive stack + setup.log side panel.
+ * Storybook-only workspace setup: progressive stack + setup.log side panel.
  * Connect uses the real IntegrationCreateDialog. Not mounted on production routes.
  */
 export function OnboardingWireframe() {

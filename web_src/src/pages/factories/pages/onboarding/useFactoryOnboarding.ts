@@ -16,7 +16,7 @@ export function useFactoryOnboarding(organizationId: string, factoryId: string) 
         }),
       );
       if (!response.data?.factory) {
-        throw new Error("Failed to update workspace onboarding");
+        throw new Error("Failed to update workspace setup");
       }
       return response.data.factory;
     },

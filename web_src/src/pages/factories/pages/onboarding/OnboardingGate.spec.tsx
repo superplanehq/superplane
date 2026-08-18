@@ -32,7 +32,7 @@ function renderRoute(path: string) {
         <Route path="/org-1/workspaces/PAY" element={<Layout />}>
           <Route element={<OnboardingGate />}>
             <Route path="overview" element={<CurrentPath />} />
-            <Route path="onboarding" element={<CurrentPath />} />
+            <Route path="setup" element={<CurrentPath />} />
           </Route>
         </Route>
       </Routes>
@@ -45,15 +45,15 @@ describe("OnboardingGate", () => {
     factory = { id: "factory-1", onboarding: {} };
   });
 
-  it("redirects an incomplete workspace to onboarding", async () => {
+  it("redirects an incomplete workspace to setup", async () => {
     renderRoute("/org-1/workspaces/PAY/overview");
 
-    expect(await screen.findByText("/org-1/workspaces/PAY/onboarding")).toBeInTheDocument();
+    expect(await screen.findByText("/org-1/workspaces/PAY/setup")).toBeInTheDocument();
   });
 
-  it("redirects a completed workspace away from onboarding", async () => {
+  it("redirects a completed workspace away from setup", async () => {
     factory = { id: "factory-1", onboarding: { completedAt: "2026-08-17T12:00:00Z" } };
-    renderRoute("/org-1/workspaces/PAY/onboarding");
+    renderRoute("/org-1/workspaces/PAY/setup");
 
     expect(await screen.findByText("/org-1/workspaces/PAY/overview")).toBeInTheDocument();
   });

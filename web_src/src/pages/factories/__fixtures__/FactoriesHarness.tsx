@@ -28,12 +28,12 @@ interface FactoriesHarnessProps {
    * Wiki defaults to the wireframe so sidebar navigation shows it; pass
    * `pageOverrides={{ wiki: WikiPage }}` to keep Coming Soon.
    * Work Orders defaults to the missions page so the sidebar keeps missions.
-   * Onboarding + Get started overview are enabled by default.
+   * Setup + Get started overview are enabled by default.
    */
   pageOverrides?: OrgWorkspacePageOverrides;
-  /** Seed pending providers/repos/tips for onboarding stories. */
+  /** Seed pending providers/repos/tips for setup stories. */
   onboardingSeed?: OnboardingStorybookSeed;
-  /** When false, skip onboarding provider/routes (app-like create → overview). */
+  /** When false, skip setup provider/routes (app-like create → overview). */
   enableOnboarding?: boolean;
 }
 

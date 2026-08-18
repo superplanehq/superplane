@@ -49,19 +49,19 @@ func TestFactories(t *testing.T) {
 		steps.assertFactoryVisibleInList(name)
 	})
 
-	t.Run("persists onboarding completion across reload", func(t *testing.T) {
+	t.Run("persists setup completion across reload", func(t *testing.T) {
 		steps := &factorySteps{t: t}
 		name := support.RandomName("factory")
 
 		steps.start()
 		factory := steps.givenFactoryExists(name, "")
 		steps.visitFactoryOverview(factory)
-		steps.session.AssertVisible(q.TestID("workspace-onboarding"))
+		steps.session.AssertVisible(q.TestID("workspace-setup"))
 
 		steps.completeFactoryOnboarding(factory)
 		steps.visitFactoryOverview(factory)
 		steps.session.AssertVisible(q.TestID("overview-lines-card"))
-		steps.session.AssertHidden(q.TestID("workspace-onboarding"))
+		steps.session.AssertHidden(q.TestID("workspace-setup"))
 	})
 }
 

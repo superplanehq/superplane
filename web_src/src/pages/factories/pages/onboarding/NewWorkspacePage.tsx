@@ -8,7 +8,7 @@ import { showErrorToast } from "@/lib/toast";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
-import { factoryListPath, factoryOnboardingPath } from "../../lib/factoryPagePaths";
+import { factoryListPath, factorySetupPath } from "../../lib/factoryPagePaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { SetupSections, type SectionId } from "./OnboardingWireframe";
 import { useOnboardingSetupState } from "./useOnboardingSetupState";
@@ -52,7 +52,7 @@ function NewWorkspacePageContent({ organizationId }: { organizationId: string })
       if (!factory.key) {
         throw new Error("The workspace was created without a key");
       }
-      navigate(factoryOnboardingPath(organizationId, factory.key), { replace: true });
+      navigate(factorySetupPath(organizationId, factory.key), { replace: true });
       return true;
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to create workspace"));

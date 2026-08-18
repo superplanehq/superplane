@@ -175,7 +175,8 @@ function AppRouter() {
                   >
                     <Route element={<OnboardingGate />}>
                       <Route index element={<Navigate to="overview" replace />} />
-                      <Route path="onboarding" element={<OnboardingPage />} />
+                      <Route path="setup" element={<OnboardingPage />} />
+                      <Route path="onboarding" element={<Navigate to="../setup" replace />} />
                       <Route path="overview" element={<WorkspaceOverviewPage />} />
                       <Route path="missions" element={<MissionsPage />} />
                       <Route path="wiki" element={<WikiPage />} />

@@ -15,8 +15,8 @@ export function factoryOverviewPath(organizationId: string, factoryKey: string) 
   return `${factoryDetailPath(organizationId, factoryKey)}/overview`;
 }
 
-export function factoryOnboardingPath(organizationId: string, factoryKey: string) {
-  return `${factoryDetailPath(organizationId, factoryKey)}/onboarding`;
+export function factorySetupPath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/setup`;
 }
 
 export function workOrdersPath(organizationId: string, factoryKey: string) {

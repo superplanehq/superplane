@@ -16,7 +16,7 @@ function materializeLineApp(factoryId: string) {
   });
 }
 
-describe("onboarding factory line apps", () => {
+describe("setup factory line apps", () => {
   it("orders the apps as plan, implement, open PR", () => {
     expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).toEqual([
       "line-planning",
