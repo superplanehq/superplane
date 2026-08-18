@@ -34,6 +34,14 @@ func AssignRole(ctx context.Context, orgID, domainType, domainID, roleName, user
 		return nil, grpcerrors.InvalidArgument(nil, "API keys cannot be assigned the org_owner role")
 	}
 
+	if err := ensureNotDemotingLastOwner(ctx, authService, orgID, user.ID.String(), roleName); err != nil {
+		return nil, err
+	}
+
+	if err := ensureCanGrantRole(ctx, authService, requesterID, domainType, domainID, roleName); err != nil {
+		return nil, err
+	}
+
 	err = authService.AssignRole(user.ID.String(), roleName, domainID, domainType)
 	if err != nil {
 		log.Errorf("Error assigning role %s to %s: %v", roleName, user.ID.String(), err)

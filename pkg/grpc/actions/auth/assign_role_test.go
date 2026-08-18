@@ -83,4 +83,56 @@ func Test_AssignRole(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, code)
 		assert.Equal(t, "user not found", msg)
 	})
+
+	t.Run("admin cannot assign org_owner", func(t *testing.T) {
+		admin := support.CreateUser(t, r, r.Organization.ID)
+		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, admin.ID.String(), "", r.AuthService)
+		require.NoError(t, err)
+
+		target := support.CreateUser(t, r, r.Organization.ID)
+		adminCtx := authentication.SetUserIdInMetadata(context.Background(), admin.ID.String())
+		_, err = AssignRole(adminCtx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgOwner, target.ID.String(), "", r.AuthService)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.PermissionDenied, code)
+		assert.Equal(t, "cannot assign a role with permissions you do not have", msg)
+	})
+
+	t.Run("admin can assign org_admin", func(t *testing.T) {
+		admin := support.CreateUser(t, r, r.Organization.ID)
+		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, admin.ID.String(), "", r.AuthService)
+		require.NoError(t, err)
+
+		target := support.CreateUser(t, r, r.Organization.ID)
+		adminCtx := authentication.SetUserIdInMetadata(context.Background(), admin.ID.String())
+		resp, err := AssignRole(adminCtx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, target.ID.String(), "", r.AuthService)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+	})
+
+	t.Run("cannot demote the last organization owner", func(t *testing.T) {
+		admin := support.CreateUser(t, r, r.Organization.ID)
+		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, admin.ID.String(), "", r.AuthService)
+		require.NoError(t, err)
+
+		adminCtx := authentication.SetUserIdInMetadata(context.Background(), admin.ID.String())
+		_, err = AssignRole(adminCtx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgViewer, r.User.String(), "", r.AuthService)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, "cannot demote the last organization owner", msg)
+
+		secondOwner := support.CreateUser(t, r, r.Organization.ID)
+		_, err = AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgOwner, secondOwner.ID.String(), "", r.AuthService)
+		require.NoError(t, err)
+
+		_, err = AssignRole(adminCtx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, secondOwner.ID.String(), "", r.AuthService)
+		require.NoError(t, err)
+
+		_, err = AssignRole(adminCtx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgViewer, r.User.String(), "", r.AuthService)
+		code, msg, ok = grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, "cannot demote the last organization owner", msg)
+	})
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -12,6 +13,11 @@ import (
 )
 
 func CreateGroup(ctx context.Context, domainType, domainID string, group *pb.Group, authService authorization.Authorization) (*pb.CreateGroupResponse, error) {
+	requesterID, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
+	}
+
 	if group == nil {
 		return nil, grpcerrors.InvalidArgument(nil, "group must be specified")
 	}
@@ -30,6 +36,10 @@ func CreateGroup(ctx context.Context, domainType, domainID string, group *pb.Gro
 
 	if group.Spec.Role == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "role must be specified")
+	}
+
+	if err := ensureCanGrantRole(ctx, authService, requesterID, domainType, domainID, group.Spec.Role); err != nil {
+		return nil, err
 	}
 
 	var displayName string
