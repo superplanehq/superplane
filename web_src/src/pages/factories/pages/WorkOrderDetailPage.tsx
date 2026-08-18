@@ -4,9 +4,9 @@ import {
   useFactoryWorkOrders,
   useWorkOrder,
   useWorkOrderArtifacts,
-  useWorkOrderChecks,
   useWorkOrderEvents,
 } from "@/hooks/useFactoryData";
+import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { useMemo } from "react";

@@ -11,7 +11,6 @@ import {
   factoriesListFactories,
   factoriesListFactoryApps,
   factoriesListWorkOrderArtifacts,
-  factoriesListWorkOrderChecks,
   factoriesListWorkOrderEvents,
   factoriesListWorkOrders,
   factoriesUpdateFactory,
@@ -24,7 +23,6 @@ import type {
   FactoriesFactoryLine,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
-  FactoriesWorkOrderCheck,
   FactoriesWorkOrderResult,
   FactoriesWorkOrderState,
   FactoryApp,
@@ -418,22 +416,6 @@ export function useWorkOrderArtifacts(organizationId: string, factoryId: string,
         }),
       );
       return response.data?.artifacts ?? [];
-    },
-    enabled: Boolean(organizationId && factoryId && orderId),
-  });
-}
-
-export function useWorkOrderChecks(organizationId: string, factoryId: string, orderId: string) {
-  return useQuery({
-    queryKey: factoryQueryKeys.workOrderChecks(organizationId, factoryId, orderId),
-    queryFn: async (): Promise<FactoriesWorkOrderCheck[]> => {
-      const response = await factoriesListWorkOrderChecks(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId, orderId },
-        }),
-      );
-      return response.data?.checks ?? [];
     },
     enabled: Boolean(organizationId && factoryId && orderId),
   });

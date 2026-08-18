@@ -28,6 +28,41 @@ export interface WorkOrderCheckPresentation {
   updatedAt?: string;
 }
 
+/** Textual verdict next to the score — color alone must not carry the meaning
+ * (see Vercel Speed Insights / Shopify fraud analysis). */
+export const LEVEL_LABEL: Record<WorkOrderCheckLevel, { label: string; className: string; badgeClassName: string }> = {
+  positive: {
+    label: "Healthy",
+    className: "text-emerald-700 dark:text-emerald-400",
+    badgeClassName: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  },
+  neutral: {
+    label: "Neutral",
+    className: "text-slate-600 dark:text-slate-400",
+    badgeClassName: "border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-400",
+  },
+  caution: {
+    label: "Needs attention",
+    className: "text-amber-700 dark:text-amber-400",
+    badgeClassName: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  },
+  critical: {
+    label: "Critical",
+    className: "text-red-700 dark:text-red-400",
+    badgeClassName: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400",
+  },
+};
+
+export function formatCheckScore(check: Pick<WorkOrderCheckPresentation, "score" | "maxScore" | "format">): {
+  value: string;
+  scale: string;
+} {
+  if (check.format === "percent") {
+    return { value: String(check.score), scale: "%" };
+  }
+  return { value: String(check.score), scale: `/${check.maxScore}` };
+}
+
 const LEVEL_FROM_API: Partial<Record<ApiWorkOrderCheckLevel, WorkOrderCheckLevel>> = {
   LEVEL_POSITIVE: "positive",
   LEVEL_NEUTRAL: "neutral",
@@ -35,20 +70,29 @@ const LEVEL_FROM_API: Partial<Record<ApiWorkOrderCheckLevel, WorkOrderCheckLevel
   LEVEL_CRITICAL: "critical",
 };
 
+function presentCheckLevel(level: ApiWorkOrderCheckLevel | undefined): WorkOrderCheckLevel {
+  return (level && LEVEL_FROM_API[level]) || "neutral";
+}
+
+function emptyToUndefined(value: string | undefined): string | undefined {
+  return value || undefined;
+}
+
 export function presentWorkOrderCheck(check: FactoriesWorkOrderCheck): WorkOrderCheckPresentation {
+  const automation = check.automation;
   return {
     id: check.id ?? check.key ?? "",
     name: check.name ?? "",
     score: check.score ?? 0,
     maxScore: check.maxScore ?? 0,
     format: check.format === "FORMAT_PERCENT" ? "percent" : "fraction",
-    level: (check.level && LEVEL_FROM_API[check.level]) || "neutral",
+    level: presentCheckLevel(check.level),
     previousScore: check.previousScore,
-    summary: check.summary || undefined,
-    analysis: check.analysis || undefined,
-    sourceName: check.automation?.appName || check.automation?.nodeName || undefined,
-    appId: check.automation?.appId || undefined,
-    runId: check.runId || undefined,
+    summary: emptyToUndefined(check.summary),
+    analysis: emptyToUndefined(check.analysis),
+    sourceName: emptyToUndefined(automation?.appName) ?? emptyToUndefined(automation?.nodeName),
+    appId: emptyToUndefined(automation?.appId),
+    runId: emptyToUndefined(check.runId),
     updatedAt: check.updatedAt,
   };
 }
