@@ -33,6 +33,7 @@ interface WorkOrderDetailLoadedViewProps {
   artifactsError?: Error | null;
   /** Scores reported by automations (risk review, coverage, …). */
   checks?: WorkOrderCheckPresentation[];
+  isChecksLoading?: boolean;
   checksError?: Error | null;
   displayStatus: WorkOrderDisplayStatus;
   statusMeta: { label: string; className: string };
@@ -102,6 +103,7 @@ function WorkOrderDetailBody({
   isArtifactsLoading,
   artifactsError,
   checks,
+  isChecksLoading,
   checksError,
   displayStatus,
   statusMeta,
@@ -120,7 +122,7 @@ function WorkOrderDetailBody({
   onAssigneesSave,
   onAddComment,
 }: WorkOrderDetailLoadedViewProps) {
-  const hasChecksSection = Boolean(checks?.length) || Boolean(checksError);
+  const hasChecksSection = Boolean(checks?.length) || Boolean(isChecksLoading) || Boolean(checksError);
 
   return (
     <div className={factoryContentBodyClassName}>
@@ -131,6 +133,7 @@ function WorkOrderDetailBody({
           {hasChecksSection ? (
             <WorkOrderChecksSection
               checks={checks ?? []}
+              isLoading={isChecksLoading}
               error={checksError}
               organizationId={organizationId}
               factoryKey={factoryKey}

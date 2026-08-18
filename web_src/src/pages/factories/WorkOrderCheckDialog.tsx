@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 
 import { formatCheckScore, LEVEL_LABEL, type WorkOrderCheckPresentation } from "./lib/workOrderChecks";
-import { CheckAttribution } from "./WorkOrderChecksSection";
+import { WorkOrderCheckAttribution } from "./WorkOrderCheckAttribution";
 
 /** Expanded view of one check: score, summary, and the full markdown analysis. */
 export function WorkOrderCheckDialog({
@@ -53,7 +53,7 @@ export function WorkOrderCheckDialog({
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted-foreground">
           <span>
-            <CheckAttribution check={check} />
+            <WorkOrderCheckAttribution check={check} />
           </span>
           {runHref ? (
             <Link

@@ -1,7 +1,6 @@
 import { MoveDown, MoveUp } from "lucide-react";
 import { useState } from "react";
 
-import { formatRelative } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
 import {
@@ -11,6 +10,7 @@ import {
   type WorkOrderCheckPresentation,
 } from "./lib/workOrderChecks";
 import { getWorkOrderRunHref } from "./lib/workOrderExecutions";
+import { WorkOrderCheckAttribution } from "./WorkOrderCheckAttribution";
 import { WorkOrderCheckDialog } from "./WorkOrderCheckDialog";
 
 const LEVEL_METER_CLASSNAME: Record<WorkOrderCheckLevel, string> = {
@@ -27,6 +27,7 @@ const LEVEL_METER_CLASSNAME: Record<WorkOrderCheckLevel, string> = {
  */
 export function WorkOrderChecksSection({
   checks,
+  isLoading,
   error,
   organizationId,
   factoryKey,
@@ -34,6 +35,8 @@ export function WorkOrderChecksSection({
   className,
 }: {
   checks: WorkOrderCheckPresentation[];
+  /** Initial fetch in flight — renders the section with a loading line. */
+  isLoading?: boolean;
   /** Fetch failure — renders the section with an error line instead of hiding it. */
   error?: Error | null;
   organizationId: string;
@@ -41,7 +44,7 @@ export function WorkOrderChecksSection({
   orderNumber?: string;
   className?: string;
 }) {
-  if (!error && checks.length === 0) {
+  if (!isLoading && !error && checks.length === 0) {
     return null;
   }
 
@@ -53,6 +56,8 @@ export function WorkOrderChecksSection({
       </p>
       {error ? (
         <p className="mt-4 text-[13px] text-destructive">Failed to load checks.</p>
+      ) : isLoading ? (
+        <p className="mt-4 text-[13px] text-muted-foreground">Loading checks…</p>
       ) : (
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {checks.map((check) => (
@@ -99,17 +104,12 @@ function WorkOrderCheckCard({ check, runHref }: { check: WorkOrderCheckPresentat
           />
         </span>
         <span className="mt-2 block truncate text-[11px] text-muted-foreground">
-          <CheckAttribution check={check} />
+          <WorkOrderCheckAttribution check={check} />
         </span>
       </button>
       <WorkOrderCheckDialog open={open} onClose={() => setOpen(false)} check={check} runHref={runHref} />
     </>
   );
-}
-
-export function CheckAttribution({ check }: { check: WorkOrderCheckPresentation }) {
-  const parts = [check.sourceName, check.updatedAt ? formatRelative(check.updatedAt) : undefined].filter(Boolean);
-  return <>{parts.join(" · ")}</>;
 }
 
 /**

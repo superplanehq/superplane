@@ -157,6 +157,7 @@ function WorkOrderDetailPageContent({
       eventsQuery={eventsQuery}
       artifactsQuery={artifactsQuery}
       checks={checks}
+      isChecksLoading={checksQuery.isLoading}
       checksError={checksQuery.error ?? null}
       canManageWorkOrders={canAct("work_orders", "update")}
       permissionsLoading={permissionsLoading}
@@ -186,6 +187,7 @@ interface LoadedWorkOrderDetailProps {
   eventsQuery: ReturnType<typeof useWorkOrderEvents>;
   artifactsQuery: ReturnType<typeof useWorkOrderArtifacts>;
   checks: WorkOrderCheckPresentation[];
+  isChecksLoading: boolean;
   checksError: Error | null;
   canManageWorkOrders: boolean;
   permissionsLoading: boolean;
@@ -202,6 +204,7 @@ function LoadedWorkOrderDetail({
   eventsQuery,
   artifactsQuery,
   checks,
+  isChecksLoading,
   checksError,
   canManageWorkOrders,
   permissionsLoading,
@@ -227,6 +230,7 @@ function LoadedWorkOrderDetail({
       isArtifactsLoading={artifactsQuery.isLoading}
       artifactsError={artifactsQuery.error ?? null}
       checks={checks}
+      isChecksLoading={isChecksLoading}
       checksError={checksError}
       displayStatus={derived.displayStatus!}
       statusMeta={derived.statusMeta!}
