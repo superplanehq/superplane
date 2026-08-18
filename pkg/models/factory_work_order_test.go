@@ -564,6 +564,66 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		assert.Equal(t, "feature/refund-retry", payload.Artifact.Data["name"])
 	})
 
+	t.Run("link requires data.url", func(t *testing.T) {
+		_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+
+		_, err = order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{"url": "   "},
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+	})
+
+	t.Run("link rejects non-http(s) data.url", func(t *testing.T) {
+		cases := []string{
+			"javascript:alert(1)",
+			"data:text/html,<script>alert(1)</script>",
+			"file:///etc/passwd",
+			"mailto:someone@example.com",
+			"//evil.example/preview",
+			"not a url at all",
+		}
+		for _, linkURL := range cases {
+			t.Run(linkURL, func(t *testing.T) {
+				_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+					Type: FactoryWorkOrderArtifactTypeLink,
+					Data: map[string]any{"url": linkURL},
+				})
+				require.Error(t, err)
+				assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+			})
+		}
+	})
+
+	t.Run("creates link and emits event", func(t *testing.T) {
+		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/pr-42",
+				"title": "Preview",
+			},
+			CreatedBy: &userID,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, artifact)
+		assert.Equal(t, FactoryWorkOrderArtifactTypeLink, artifact.Type)
+
+		events, err := order.ListEvents(database.Conn(), 10, nil)
+		require.NoError(t, err)
+
+		artifactEvent := findEventOfType(t, events, factory.EventTypeOrderArtifactAdded)
+		var payload factory.WorkOrderArtifactAdded
+		require.NoError(t, json.Unmarshal(artifactEvent.Data, &payload))
+		require.NotNil(t, payload.Artifact)
+		assert.Equal(t, "https://preview.example.com/pr-42", payload.Artifact.Data["url"])
+		assert.Equal(t, "Preview", payload.Artifact.Data["title"])
+	})
+
 	// A markdown artifact with no data.url must succeed — the http(s)
 	// guard only kicks in when url is actually present. Runs last so
 	// earlier subtests that count artifacts stay accurate.

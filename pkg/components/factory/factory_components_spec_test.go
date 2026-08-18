@@ -376,6 +376,16 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
+	t.Run("requires url for link", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "link",
+		})
+		if err == nil {
+			t.Fatal("expected error for link without url")
+		}
+	})
+
 	t.Run("requires orderId", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"artifactType": "pr",
@@ -434,7 +444,19 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
-	t.Run("url field is visible for both pr and branch", func(t *testing.T) {
+	t.Run("accepts valid link", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "link",
+			"url":          "https://preview.example.com/pr-42",
+			"title":        "Preview",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("url field is visible for pr, branch, and link", func(t *testing.T) {
 		var urlField *configuration.Field
 		for i := range fields {
 			if fields[i].Name == "url" {
@@ -452,7 +474,7 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		if condition.Field != "artifactType" {
 			t.Fatalf("expected visibility condition on artifactType, got %q", condition.Field)
 		}
-		for _, want := range []string{"pr", "branch"} {
+		for _, want := range []string{"pr", "branch", "link"} {
 			found := false
 			for _, got := range condition.Values {
 				if got == want {
