@@ -2,9 +2,12 @@ package models
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -158,6 +161,18 @@ func TestFactoryWorkOrder_ReportCheck_ReReportUpdatesInPlace(t *testing.T) {
 	require.NotNil(t, reported[0].Check.PreviousScore)
 	assert.Equal(t, float64(7), *reported[0].Check.PreviousScore)
 	assert.Nil(t, reported[1].Check.PreviousScore)
+}
+
+// The retry in ReportCheck keys off this detection: a raced first report
+// must be recognized by the unique index name, nothing else.
+func TestIsFactoryWorkOrderCheckKeyConflict(t *testing.T) {
+	conflict := &pgconn.PgError{ConstraintName: factoryWorkOrderCheckKeyUniqueConstraint}
+
+	assert.True(t, isFactoryWorkOrderCheckKeyConflict(conflict))
+	assert.True(t, isFactoryWorkOrderCheckKeyConflict(fmt.Errorf("insert: %w", conflict)))
+	assert.False(t, isFactoryWorkOrderCheckKeyConflict(nil))
+	assert.False(t, isFactoryWorkOrderCheckKeyConflict(errors.New("boom")))
+	assert.False(t, isFactoryWorkOrderCheckKeyConflict(&pgconn.PgError{ConstraintName: "other_constraint"}))
 }
 
 func TestFactoryWorkOrder_ListChecks_OrdersByFirstReport(t *testing.T) {
