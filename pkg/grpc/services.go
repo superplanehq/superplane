@@ -89,7 +89,7 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 			cfg.UsageService,
 		),
 		CanvasFolders: NewCanvasFolderService(),
-		Factories:     NewFactoryService(),
+		Factories:     NewFactoryService(cfg.Registry),
 		APIKeys:       NewAPIKeysService(cfg.AuthService),
 		Agents:        NewAgentsService(cfg.AgentService),
 	}, nil

@@ -544,6 +544,33 @@ func TestUpdateWorkOrderArtifact_Execute(t *testing.T) {
 		})
 		require.Error(t, err)
 	})
+
+	// Velocity relies on the artifact table's merged_at column. The model
+	// falls back to `now` when the canvas only sends `state`, but a
+	// canvas that has GitHub's real timestamp should get to pass it
+	// through so history is honest.
+	t.Run("forwards mergedAt and closedAt to the factory context", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{updateArtifactResult: artifact}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":     "wo-1",
+				"artifactKey": "https://github.com/example/repo/pull/1",
+				"state":       "merged",
+				"mergedAt":    "2026-08-17T12:34:56Z",
+				"closedAt":    "2026-08-17T12:00:00Z",
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{
+			"state":    "merged",
+			"mergedAt": "2026-08-17T12:34:56Z",
+			"closedAt": "2026-08-17T12:00:00Z",
+		}, factoryCtx.updateArtifactParams.Data)
+	})
 }
 
 func TestUpdateWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
