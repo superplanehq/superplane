@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CanvasFoldersCanvasFolder, CanvasesCanvasSummary } from "@/api-client";
+import type * as ApiClientModule from "@/api-client";
 import type { ReactNode } from "react";
 import { showErrorToast } from "@/lib/toast";
 
@@ -134,6 +135,16 @@ vi.mock("@/hooks/useCanvasData", () => ({
   useUpdateCanvasFolderMembership,
   useUpdateCanvasPreference,
 }));
+
+// createCanvasWithUniqueName lists existing canvases through this generated client.
+// In jsdom the real client can't resolve the relative "/api/v1/canvases" URL, so stub it.
+vi.mock("@/api-client", async (importOriginal) => {
+  const actual = await importOriginal<typeof ApiClientModule>();
+  return {
+    ...actual,
+    canvasesListCanvases: vi.fn().mockResolvedValue({ data: { canvases: [] } }),
+  };
+});
 
 import { HomePage } from "./index";
 import { InstallProgressPanel } from "./InstallProgressPanel";
@@ -535,6 +546,8 @@ describe("HomePage canvas folders", () => {
 
   it("opens a folder-scoped installed app when folder membership update fails", async () => {
     const user = userEvent.setup();
+    // createCanvasWithUniqueName lists existing canvases (via canvasesListCanvases, mocked
+    // above) before installing; the raw preview and install calls go through fetch.
     const fetchMock = vi.fn();
     fetchMock
       .mockResolvedValueOnce(new Response(JSON.stringify({ integrations: [], installParams: [] }), { status: 200 }))

@@ -14,6 +14,7 @@ import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { appPath } from "@/lib/appPaths";
 import type { AppEntry } from "./AppDetailModal";
 import { appendCanvasToFolderMembership } from "./canvasFolderMembership";
+import { createCanvasWithUniqueName, listExistingCanvasNames } from "./createCanvasWithUniqueName";
 import type { IntegrationSelections } from "./InstallIntegrationsSection";
 import type { CanvasFolderData } from "./types";
 import type { InstallParam } from "../install/types";
@@ -38,8 +39,20 @@ async function executeInstall(opts: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error((await response.text()) || "Failed to install");
+  if (!response.ok) {
+    const message = (await response.text()) || "Failed to install";
+    const error = new Error(message) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
+  }
   return response.json() as Promise<{ canvasId: string; organizationId: string }>;
+}
+
+// /apps/install returns 409 with an "App"-flavored message (distinct from the
+// "Canvas with the same name already exists" text isCanvasNameAlreadyExistsError
+// checks for), so collisions here are detected by status code instead.
+function isInstallNameCollisionError(error: unknown): boolean {
+  return error instanceof Error && (error as Error & { status?: number }).status === 409;
 }
 
 function prepareAgentSidebar(app: AppEntry, canvasId: string) {
@@ -105,12 +118,20 @@ export function useInstallAction({
       isInstallingRef.current = true;
       setIsInstalling(true);
       try {
-        const result = await executeInstall({
-          repo: app.repo,
-          organizationId,
-          name: canvasName,
-          installParams: !skipParams && installParams.length > 0 ? paramValues : undefined,
-          integrations: integrationSelections,
+        const existingNames = new Set(await listExistingCanvasNames(organizationId, queryClient));
+        const result = await createCanvasWithUniqueName({
+          title: canvasName || generateCanvasName(),
+          existingNames,
+          isNameCollisionError: isInstallNameCollisionError,
+          failureMessage: "Failed to install app",
+          createCanvas: (name) =>
+            executeInstall({
+              repo: app.repo,
+              organizationId,
+              name,
+              installParams: !skipParams && installParams.length > 0 ? paramValues : undefined,
+              integrations: integrationSelections,
+            }),
         });
         if (folder) {
           try {

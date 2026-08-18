@@ -1,13 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import {
-  canvasesCommitCanvasStaging,
-  canvasesInvokeNodeTriggerHook,
-  canvasesListCanvases,
-  canvasesPutCanvasStaging,
-  type CanvasesCanvasSummary,
-} from "@/api-client";
+import { canvasesCommitCanvasStaging, canvasesInvokeNodeTriggerHook, canvasesPutCanvasStaging } from "@/api-client";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { writeCanvasRunsSidebarOpen } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { usePermissions } from "@/contexts/usePermissions";
@@ -22,6 +16,7 @@ import { encodeRepositoryFileContent } from "@/pages/app/files/lib/repository-fi
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "@/pages/app/lib/workflow-spec-paths";
 
 import { appendCanvasToFolderMembership } from "./canvasFolderMembership";
+import { createCanvasWithUniqueName, listExistingCanvasNames } from "./createCanvasWithUniqueName";
 import {
   buildFactoryRunParameters,
   getFactoryDefinition,
@@ -31,9 +26,6 @@ import {
 } from "./factories";
 import type { IntegrationSelections } from "./homeIntegrationStatus";
 import type { CanvasFolderData } from "./types";
-import { isCanvasNameAlreadyExistsError, uniqueCanvasName } from "./uniqueCanvasName";
-
-const MAX_NAME_RETRY_ATTEMPTS = 20;
 
 export interface InstallFactoryInput {
   factoryId?: string;
@@ -99,50 +91,6 @@ async function materializeAndCommitFactoryTemplate(args: {
   await stageAndCommitFactorySpecs(args.canvasId, canvasYaml, consoleYaml);
 }
 
-async function listExistingCanvasNames(organizationId: string, queryClient: QueryClient) {
-  const cached = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));
-  if (cached) {
-    return cached.map((canvas) => canvas.name).filter((name): name is string => Boolean(name));
-  }
-
-  const response = await canvasesListCanvases(withOrganizationHeader({ organizationId }));
-  return (response.data?.canvases ?? []).map((canvas) => canvas.name).filter((name): name is string => Boolean(name));
-}
-
-async function createCanvasWithUniqueName(args: {
-  title: string;
-  description?: string;
-  existingNames: Set<string>;
-  createCanvas: (input: { name: string; description?: string; method: "ui" }) => Promise<{
-    data?: { canvas?: { metadata?: { id?: string } } };
-  }>;
-}): Promise<{ canvasId: string; canvasName: string }> {
-  let canvasName = uniqueCanvasName(args.title, args.existingNames);
-
-  for (let attempt = 0; attempt < MAX_NAME_RETRY_ATTEMPTS; attempt++) {
-    try {
-      const result = await args.createCanvas({
-        name: canvasName,
-        description: args.description,
-        method: "ui",
-      });
-      const canvasId = result?.data?.canvas?.metadata?.id;
-      if (!canvasId) {
-        throw new Error("Failed to create factory canvas");
-      }
-      return { canvasId, canvasName };
-    } catch (error) {
-      if (!isCanvasNameAlreadyExistsError(error)) {
-        throw error;
-      }
-      args.existingNames.add(canvasName);
-      canvasName = uniqueCanvasName(args.title, args.existingNames);
-    }
-  }
-
-  throw new Error("Failed to create factory canvas");
-}
-
 async function ensureFactoryCanvas(args: {
   pending: { canvasId: string; canvasName: string } | null;
   organizationId: string;
@@ -159,9 +107,16 @@ async function ensureFactoryCanvas(args: {
   const existingNames = new Set(await listExistingCanvasNames(args.organizationId, args.queryClient));
   const created = await createCanvasWithUniqueName({
     title: args.definition.title,
-    description: args.definition.description,
     existingNames,
-    createCanvas: args.createCanvas,
+    failureMessage: "Failed to create factory canvas",
+    createCanvas: async (name) => {
+      const result = await args.createCanvas({ name, description: args.definition.description, method: "ui" });
+      const canvasId = result?.data?.canvas?.metadata?.id;
+      if (!canvasId) {
+        throw new Error("Failed to create factory canvas");
+      }
+      return { canvasId };
+    },
   });
 
   if (args.folder) {
