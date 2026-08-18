@@ -19,6 +19,9 @@ import { canvasKeys, invalidateStagedCanvasCaches } from "./useCanvasData";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/`;
 
+// How long a single drain slice may run before yielding to the browser.
+const QUEUE_SLICE_BUDGET_MS = 8;
+
 type CanvasWebsocketPayload = {
   canvasId: string;
   userId?: string;
@@ -311,12 +314,20 @@ export function useCanvasWebsocket(
       processingNodes.current.add(nodeId);
 
       try {
-        // Process messages in order
+        // Process messages in order, in slices: a burst is applied in one go and
+        // rendered once, and we only yield to the browser between slices so a
+        // long burst cannot block interaction.
         while (queue.length > 0) {
-          const message = queue.shift();
-          if (message) {
-            processMessage(message.data);
-            // Small delay to ensure state updates are applied
+          const sliceStart = performance.now();
+
+          while (queue.length > 0 && performance.now() - sliceStart < QUEUE_SLICE_BUDGET_MS) {
+            const message = queue.shift();
+            if (message) {
+              processMessage(message.data);
+            }
+          }
+
+          if (queue.length > 0) {
             await new Promise((resolve) => setTimeout(resolve, 0));
           }
         }
@@ -328,6 +339,9 @@ export function useCanvasWebsocket(
         if (remainingQueue && remainingQueue.length > 0) {
           // Schedule next processing
           setTimeout(() => processQueue(nodeId), 0);
+        } else {
+          // Drop the empty queue so nodes that stop emitting do not accumulate.
+          messageQueues.current.delete(nodeId);
         }
       }
     },

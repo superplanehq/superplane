@@ -449,4 +449,30 @@ describe("useCanvasWebsocket", () => {
     expect(onCanvasStagingEvent).toHaveBeenCalledOnce();
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.canvasStaging(testCanvasId))).toHaveLength(0);
   });
+
+  it("drains a burst of messages for one node without a task per message", async () => {
+    const queryClient = new QueryClient();
+    vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+    seedInfiniteRuns(queryClient, []);
+
+    renderCanvasWebsocketHook(queryClient);
+
+    const burstSize = 50;
+    for (let i = 0; i < burstSize; i++) {
+      emitWebsocketMessage("execution_created", {
+        id: `execution-${i}`,
+        nodeId: testNodeId,
+        state: "STATE_PENDING",
+        updatedAt: "2026-06-01T12:00:00.000Z",
+        rootEvent: { id: "event-1", nodeId: testNodeId },
+      });
+    }
+
+    await flushMessageQueue();
+
+    expect(nodeExecutionStoreMock.updateNodeExecution).toHaveBeenCalledTimes(burstSize);
+    expect(nodeExecutionStoreMock.updateNodeExecution.mock.calls.map((call) => (call[1] as { id: string }).id)).toEqual(
+      Array.from({ length: burstSize }, (_, i) => `execution-${i}`),
+    );
+  });
 });
