@@ -1,5 +1,6 @@
 import type { CanvasesCanvasRun, FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
 import { shortId } from "@/ui/Runs/runPresentation";
+import { flattenWorkOrderExecutions } from "./workOrderExecutions";
 
 export type FactoryAutomationTick = "running" | "waiting" | "queued" | "passed" | "failed" | "cancelled" | null;
 
@@ -190,5 +191,5 @@ export function findWorkOrderForAutomationRun(
     return undefined;
   }
 
-  return workOrders.find((order) => (order.executions ?? []).some((execution) => execution.run?.id === runId));
+  return workOrders.find((order) => flattenWorkOrderExecutions(order).some((execution) => execution.run?.id === runId));
 }

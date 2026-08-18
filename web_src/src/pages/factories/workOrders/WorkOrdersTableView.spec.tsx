@@ -22,15 +22,20 @@ const busyEntry = buildWorkOrderListEntry(
     state: "STATE_OPEN",
     createdAt: "2024-06-01T00:00:00Z",
     updatedAt: "2024-06-02T00:00:00Z",
-    executions: [
+    lineDispatches: [
       {
-        id: "e1",
-        step: "verify",
-        state: "STATE_FINISHED",
-        result: "RESULT_PASSED",
+        id: "dispatch-1",
         line: { id: "line-a", name: "hotfix" },
-        totalTokens: "1200",
-        costCents: "45",
+        stepExecutions: [
+          {
+            id: "e1",
+            step: "verify",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            totalTokens: "1200",
+            costCents: "45",
+          },
+        ],
       },
     ],
     assignees: [{ id: "user-1", name: "Ada Lovelace" }],
@@ -48,7 +53,7 @@ const idleEntry = buildWorkOrderListEntry(
     state: "STATE_CLOSED",
     createdAt: "2024-06-01T00:00:00Z",
     updatedAt: "2024-06-03T00:00:00Z",
-    executions: [],
+    lineDispatches: [],
     assignees: [],
   } satisfies FactoriesWorkOrder,
   factory,
