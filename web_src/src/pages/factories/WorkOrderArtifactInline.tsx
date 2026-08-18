@@ -39,12 +39,12 @@ const artifactInlineClassName =
 
 export function WorkOrderArtifactInline({ artifact, className }: WorkOrderArtifactInlineProps) {
   const kind = normalizeArtifactKind(artifact.type);
-  const safeUrl = safeExternalUrl(extractArtifactUrl(artifact.data));
 
   if (kind === "markdown") {
     return <MarkdownArtifactInline artifact={artifact} className={className} />;
   }
 
+  const safeUrl = safeExternalUrl(extractArtifactUrl(artifact.data));
   const { icon: Icon, label, iconClassName } = artifactLinkPresentation(kind, artifact);
   const content = (
     <>
