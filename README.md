@@ -25,7 +25,7 @@ SuperPlane orchestrates your existing stack into git-backed **apps** with durabl
 - **Apps**: A deployable unit combining a workflow graph, custom console UI, app-scoped memory, and deterministic execution. Versioned in git (`canvas.yaml`, `console.yaml`); defines guardrails for AI agents and human operators.
 - **Event-driven orchestration**: Multi-step workflows across your Git, CI/CD, observability, incident tools, and notifications — triggered by webhooks, schedules, and tool events, with approvals, policy checks, and human-in-the-loop steps.
 - **Console dashboards**: Define your own per-app operational UI as a dynamic grid of panels. Use it to display KPIs, tables, charts, runbooks, pinned nodes, and workflow controls, backed by live data from memory, runs, and executions.
-- **Agents & operators**: Built-in per-app agent to design workflows and debug runs; CLI and [skills](https://github.com/superplanehq/skills) for external coding agents. Same RBAC on all paths.
+- **Agents & operators**: Built-in per-app agent to design workflows and debug runs; CLI and [skills](https://github.com/superplanehq/skills) for external coding agents. Same role-based access control (RBAC) on all paths.
 
 ## How it works
 
