@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -690,10 +689,6 @@ func (u *UpdateFirewall) Execute(ctx core.ExecutionContext) error {
 
 func (u *UpdateFirewall) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (u *UpdateFirewall) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (u *UpdateFirewall) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

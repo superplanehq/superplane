@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -375,9 +374,6 @@ func (c *GetArtifactAnalysis) HandleWebhook(_ core.WebhookRequestContext) (int, 
 }
 func (c *GetArtifactAnalysis) Cancel(_ core.ExecutionContext) error { return nil }
 func (c *GetArtifactAnalysis) Cleanup(_ core.SetupContext) error    { return nil }
-func (c *GetArtifactAnalysis) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
 
 func (c *GetArtifactAnalysis) Hooks() []core.Hook {
 	return []core.Hook{}

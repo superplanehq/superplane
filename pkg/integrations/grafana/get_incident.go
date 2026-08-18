@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -90,10 +89,6 @@ func (g *GetIncident) Execute(ctx core.ExecutionContext) error {
 
 func (g *GetIncident) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (g *GetIncident) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (g *GetIncident) Hooks() []core.Hook {

@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -297,10 +296,6 @@ func (e *GraphQL) Configuration() []configuration.Field {
 			},
 		},
 	}
-}
-
-func (e *GraphQL) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (e *GraphQL) Execute(ctx core.ExecutionContext) error {

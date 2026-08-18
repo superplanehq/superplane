@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -129,10 +128,6 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 
 func (tg *TimeGate) Setup(ctx core.SetupContext) error {
 	return nil
-}
-
-func (tg *TimeGate) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (tg *TimeGate) Execute(ctx core.ExecutionContext) error {

@@ -3,7 +3,6 @@ package runner
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -286,10 +285,6 @@ func (c *RunJS) Setup(ctx core.SetupContext) error {
 
 	_, err = ctx.Webhook.Setup()
 	return err
-}
-
-func (c *RunJS) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *RunJS) Execute(ctx core.ExecutionContext) error {

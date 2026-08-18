@@ -48,13 +48,13 @@ export function FactoryLineStepEditor({
         </div>
 
         <div className={cn("space-y-2", stepFieldClassName)}>
-          <Label htmlFor={`factory-line-step-app-${index}`}>App</Label>
+          <Label htmlFor={`factory-line-step-app-${index}`}>Automation</Label>
           <Select
             value={step.appId || undefined}
             onValueChange={(appId) => onChange({ ...step, appId, entrypoint: "" })}
           >
             <SelectTrigger id={`factory-line-step-app-${index}`} className={stepFieldClassName}>
-              <SelectValue placeholder="Select app" />
+              <SelectValue placeholder="Select automation" />
             </SelectTrigger>
             <SelectContent>
               {apps.map((app) => (
@@ -86,7 +86,7 @@ export function FactoryLineStepEditor({
           </Select>
           {step.appId && !canvasLoading && triggers.length === 0 ? (
             <p className="text-xs text-amber-700 dark:text-amber-300">
-              {appById.get(step.appId)?.name ?? "This app"} has no triggers yet.
+              {appById.get(step.appId)?.name ?? "This automation"} has no triggers yet.
             </p>
           ) : null}
         </div>

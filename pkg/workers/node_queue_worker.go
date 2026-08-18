@@ -417,12 +417,50 @@ func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, no
 		return fmt.Errorf("action %s not found: %w", ref.Component.Name, err)
 	}
 
-	executionID, err := action.ProcessQueueItem(*ctx)
+	executionID, err := w.processQueueItem(ctx, action)
 	if err != nil {
 		return err
 	}
 
 	collector.AddExecutionID(executionID)
+	return nil
+}
+
+// processQueueItem delegates to the component's own queue item processor
+// when it has one; otherwise it runs the engine's default processing:
+// create the execution, consume the item, and mark the node as processing.
+func (w *NodeQueueWorker) processQueueItem(ctx *core.ProcessQueueContext, action core.Action) (*uuid.UUID, error) {
+	if processor := queueItemProcessorFor(action); processor != nil {
+		return processor.ProcessQueueItem(*ctx)
+	}
+
+	executionCtx, err := ctx.CreateExecution()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := ctx.DequeueItem(); err != nil {
+		return nil, err
+	}
+
+	if err := ctx.UpdateNodeState(models.CanvasNodeStateProcessing); err != nil {
+		return nil, err
+	}
+
+	return &executionCtx.ID, nil
+}
+
+// queueItemProcessorFor extracts an action's core.QueueItemProcessor,
+// looking through the registry's panic-recovery wrapper.
+func queueItemProcessorFor(action core.Action) core.QueueItemProcessor {
+	if wrapped, ok := action.(*registry.PanicableAction); ok {
+		return wrapped.QueueItemProcessor()
+	}
+
+	if processor, ok := action.(core.QueueItemProcessor); ok {
+		return processor
+	}
+
 	return nil
 }
 
