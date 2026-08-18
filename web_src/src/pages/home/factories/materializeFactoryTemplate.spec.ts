@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import yaml from "js-yaml";
 
 import { getFactoryDefinition } from "./index";
 import {
@@ -100,6 +101,121 @@ spec:
     expect(canvasYaml).not.toContain("install_params.anthropic_api_key");
     expect(canvasYaml).not.toContain("install_params.github_token");
     expect(canvasYaml).not.toContain("REPLACE_ME_WITH_");
+  });
+
+  it("acknowledges every GitHub instruction path with an eyes reaction", () => {
+    const canvas = yaml.load(materializeSoftwareFactory()) as {
+      spec?: {
+        nodes?: Array<{
+          id?: string;
+          component?: string;
+          configuration?: Record<string, unknown>;
+          integration?: { id?: string; name?: string };
+        }>;
+        edges?: Array<{ sourceId?: string; targetId?: string; channel?: string }>;
+      };
+    };
+    const nodesById = new Map((canvas.spec?.nodes ?? []).map((node) => [node.id, node]));
+    const edges = canvas.spec?.edges ?? [];
+
+    expect(nodesById.get("acknowledge-issue-instruction")).toMatchObject({
+      component: "github.addIssueReaction",
+      configuration: {
+        repository: "acme/web",
+        issueNumber: "{{ root().data.issue.number }}",
+        content: "eyes",
+      },
+      integration: { id: "int-1", name: "acme-github" },
+    });
+    expect(nodesById.get("acknowledge-comment-instruction")).toMatchObject({
+      component: "github.addReaction",
+      configuration: {
+        repository: "acme/web",
+        target: "issueComment",
+        commentId: "{{ root().data.comment.id }}",
+        content: "eyes",
+      },
+      integration: { id: "int-1", name: "acme-github" },
+    });
+    expect(nodesById.get("acknowledge-pr-review-comment-instruction")).toMatchObject({
+      component: "github.addReaction",
+      configuration: {
+        repository: "acme/web",
+        target: "reviewComment",
+        commentId: "{{ root().data.comment.id }}",
+        content: "eyes",
+      },
+      integration: { id: "int-1", name: "acme-github" },
+    });
+
+    expect(nodesById.get("assigned-to-agent-filter")).toMatchObject({
+      configuration: {
+        expression: expect.stringContaining("root().data.issue.pull_request == nil"),
+      },
+    });
+    expect(nodesById.get("factory-pr-review-comment-filter")).toMatchObject({
+      configuration: {
+        expression: expect.stringContaining("root().data.comment != nil"),
+      },
+    });
+
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourceId: "assigned-to-agent-filter",
+          targetId: "acknowledge-issue-instruction",
+        }),
+        expect.objectContaining({
+          sourceId: "label-is-factory-filter",
+          targetId: "acknowledge-issue-instruction",
+        }),
+        expect.objectContaining({
+          sourceId: "component-node-4m9qti",
+          targetId: "acknowledge-comment-instruction",
+        }),
+        expect.objectContaining({
+          sourceId: "factory-pr-comment-filter",
+          targetId: "acknowledge-comment-instruction",
+        }),
+        expect.objectContaining({
+          sourceId: "factory-pr-comment-filter",
+          targetId: "apply-user-request-claude",
+        }),
+        expect.objectContaining({
+          sourceId: "factory-pr-review-comment-filter",
+          targetId: "acknowledge-pr-review-comment-instruction",
+        }),
+        expect.objectContaining({
+          sourceId: "factory-pr-review-comment-filter",
+          targetId: "apply-user-request-claude",
+        }),
+      ]),
+    );
+
+    expect(edges).not.toContainEqual(
+      expect.objectContaining({
+        sourceId: "on-pr-comment-trigger",
+        targetId: "apply-user-request-claude",
+      }),
+    );
+    expect(edges).not.toContainEqual(
+      expect.objectContaining({
+        sourceId: "on-pr-review-comment-trigger",
+        targetId: "apply-user-request-claude",
+      }),
+    );
+    expect(edges).not.toContainEqual(
+      expect.objectContaining({
+        sourceId: "on-pr-comment-trigger",
+        targetId: "acknowledge-comment-instruction",
+      }),
+    );
+    expect(edges).not.toContainEqual(
+      expect.objectContaining({
+        sourceId: "on-pr-review-comment-trigger",
+        targetId: "acknowledge-pr-review-comment-instruction",
+      }),
+    );
   });
 
   it("materializes console canvasId to the installed canvas", () => {

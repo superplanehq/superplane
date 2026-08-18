@@ -31,6 +31,9 @@ var exampleDataOnIssueBytes []byte
 //go:embed payloads/add_issue_label.json
 var exampleOutputAddIssueLabelBytes []byte
 
+//go:embed payloads/add_issue_reaction.json
+var exampleOutputAddIssueReactionBytes []byte
+
 //go:embed payloads/remove_issue_label.json
 var exampleOutputRemoveIssueLabelBytes []byte
 
@@ -63,6 +66,9 @@ var exampleDataOnIssue map[string]any
 
 var exampleOutputAddIssueLabelOnce sync.Once
 var exampleOutputAddIssueLabel map[string]any
+
+var exampleOutputAddIssueReactionOnce sync.Once
+var exampleOutputAddIssueReaction map[string]any
 
 var exampleOutputRemoveIssueLabelOnce sync.Once
 var exampleOutputRemoveIssueLabel map[string]any
@@ -103,6 +109,10 @@ func (t *OnIssue) ExampleData() map[string]any {
 
 func (c *AddIssueLabel) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddIssueLabelOnce, exampleOutputAddIssueLabelBytes, &exampleOutputAddIssueLabel)
+}
+
+func (c *AddIssueReaction) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddIssueReactionOnce, exampleOutputAddIssueReactionBytes, &exampleOutputAddIssueReaction)
 }
 
 func (c *RemoveIssueLabel) ExampleOutput() map[string]any {

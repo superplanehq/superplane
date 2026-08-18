@@ -54,7 +54,7 @@ spec:
       type: TYPE_ACTION
       component: filter
       configuration:
-        expression: any(root().data.pull_request.labels, {.name == "factory"})
+        expression: root().data.comment != nil && any(root().data.pull_request.labels, {.name == "factory"})
       position:
         x: 672
         'y': 1080
@@ -438,7 +438,7 @@ spec:
       type: TYPE_ACTION
       component: filter
       configuration:
-        expression: root().data.assignee.login == "superplaneagent"
+        expression: root().data.assignee.login == "superplaneagent" && root().data.issue.pull_request == nil
       position:
         x: 552
         'y': -432
@@ -840,10 +840,11 @@ spec:
         text: |-
           ## Main Entrypoint
 
-          Two ways to trigger:
+          Three ways to trigger:
 
-          1/ Mention @superplaneagent
-          2/ Add "factory" label
+          1/ Mention @superplaneagent in an issue or Factory PR
+          2/ Add the "factory" label to an issue
+          3/ Assign an issue to @superplaneagent
       position:
         x: 72
         'y': -744
@@ -1339,6 +1340,44 @@ spec:
         x: 2304
         'y': 380
       isCollapsed: true
+    - id: acknowledge-issue-instruction
+      name: Acknowledge Issue Instruction
+      type: TYPE_ACTION
+      component: github.addIssueReaction
+      configuration:
+        repository: '{{ install_params.repository }}'
+        issueNumber: '{{ root().data.issue.number }}'
+        content: eyes
+      position:
+        x: 1104
+        'y': -432
+      isCollapsed: true
+    - id: acknowledge-comment-instruction
+      name: Acknowledge Comment Instruction
+      type: TYPE_ACTION
+      component: github.addReaction
+      configuration:
+        repository: '{{ install_params.repository }}'
+        target: issueComment
+        commentId: '{{ root().data.comment.id }}'
+        content: eyes
+      position:
+        x: 1104
+        'y': 816
+      isCollapsed: true
+    - id: acknowledge-pr-review-comment-instruction
+      name: Acknowledge PR Review Comment Instruction
+      type: TYPE_ACTION
+      component: github.addReaction
+      configuration:
+        repository: '{{ install_params.repository }}'
+        target: reviewComment
+        commentId: '{{ root().data.comment.id }}'
+        content: eyes
+      position:
+        x: 1104
+        'y': 1080
+      isCollapsed: true
   edges:
     - sourceId: analyze-create-issue
       targetId: create-task-issue
@@ -1348,6 +1387,9 @@ spec:
       channel: passed
     - sourceId: assigned-to-agent-filter
       targetId: runner-create-branch-2
+      channel: default
+    - sourceId: assigned-to-agent-filter
+      targetId: acknowledge-issue-instruction
       channel: default
     - sourceId: ci-green
       targetId: component-node-vwmzg2
@@ -1366,6 +1408,9 @@ spec:
       channel: next
     - sourceId: component-node-4m9qti
       targetId: runner-create-branch-2
+      channel: default
+    - sourceId: component-node-4m9qti
+      targetId: acknowledge-comment-instruction
       channel: default
     - sourceId: component-node-nbf347
       targetId: github-markpullrequestreadyforreview-github-markpullrequestreadyforreview-wie92w
@@ -1394,6 +1439,12 @@ spec:
     - sourceId: factory-pr-comment-filter
       targetId: reopen-followup-memory
       channel: default
+    - sourceId: factory-pr-comment-filter
+      targetId: apply-user-request-claude
+      channel: default
+    - sourceId: factory-pr-comment-filter
+      targetId: acknowledge-comment-instruction
+      channel: default
     - sourceId: factory-pr-merged-filter
       targetId: mark-merged-memory
       channel: default
@@ -1402,6 +1453,12 @@ spec:
       channel: default
     - sourceId: factory-pr-review-comment-filter
       targetId: reopen-followup-memory
+      channel: default
+    - sourceId: factory-pr-review-comment-filter
+      targetId: apply-user-request-claude
+      channel: default
+    - sourceId: factory-pr-review-comment-filter
+      targetId: acknowledge-pr-review-comment-instruction
       channel: default
     - sourceId: fix-ci-claude
       targetId: ci-loop
@@ -1430,6 +1487,9 @@ spec:
     - sourceId: label-is-factory-filter
       targetId: runner-create-branch-2
       channel: default
+    - sourceId: label-is-factory-filter
+      targetId: acknowledge-issue-instruction
+      channel: default
     - sourceId: on-issue-assigned-trigger
       targetId: assigned-to-agent-filter
       channel: default
@@ -1437,13 +1497,7 @@ spec:
       targetId: label-is-factory-filter
       channel: default
     - sourceId: on-pr-comment-trigger
-      targetId: apply-user-request-claude
-      channel: default
-    - sourceId: on-pr-comment-trigger
       targetId: factory-pr-comment-filter
-      channel: default
-    - sourceId: on-pr-review-comment-trigger
-      targetId: apply-user-request-claude
       channel: default
     - sourceId: on-pr-review-comment-trigger
       targetId: factory-pr-review-comment-filter

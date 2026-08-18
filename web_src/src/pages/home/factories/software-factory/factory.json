@@ -5,6 +5,8 @@
   "integrations": ["github", "claude"],
   "componentIntegrations": {
     "github.addIssueLabel": "github",
+    "github.addIssueReaction": "github",
+    "github.addReaction": "github",
     "github.createIssue": "github",
     "github.createIssueComment": "github",
     "github.createPullRequest": "github",

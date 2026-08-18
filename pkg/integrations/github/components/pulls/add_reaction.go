@@ -59,7 +59,9 @@ func (c *AddReaction) Documentation() string {
 
 ## Output
 
-Returns the created GitHub reaction object, including id, content, user, and timestamp.`
+Returns the created GitHub reaction object, including id, content, user, and timestamp.
+
+Transient GitHub failures (timeouts, rate limits, and 5xx responses) are attempted up to three times using durable scheduled hooks. Permanent configuration and permission errors fail immediately.`
 }
 
 func (c *AddReaction) Icon() string {
@@ -140,7 +142,7 @@ func (c *AddReaction) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if config.Repository == "" {
+	if strings.TrimSpace(config.Repository) == "" {
 		return errors.New("repository is required")
 	}
 
@@ -148,8 +150,11 @@ func (c *AddReaction) Setup(ctx core.SetupContext) error {
 		return errors.New("comment ID is required")
 	}
 
-	if config.Content == "" {
+	if strings.TrimSpace(config.Content) == "" {
 		return errors.New("reaction content is required")
+	}
+	if err := common.ValidateReactionContent(config.Content); err != nil {
+		return err
 	}
 
 	if config.Target == "" {
@@ -182,31 +187,36 @@ func (c *AddReaction) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("comment ID is not a number: %v", err)
 	}
+	if commentID <= 0 {
+		return errors.New("comment ID must be positive")
+	}
+	if err := common.ValidateReactionContent(config.Content); err != nil {
+		return err
+	}
 
 	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
-	reaction := &github.Reaction{}
 	switch config.Target {
 	case ReactionTargetIssueComment:
-		reaction, _, err = client.CreateIssueReaction(context.Background(), config.Repository, commentID, config.Content)
+		err = common.ExecuteReaction(ctx, func() (*github.Reaction, *github.Response, error) {
+			return client.CreateIssueCommentReaction(context.Background(), config.Repository, commentID, config.Content)
+		})
 		if err != nil {
 			return fmt.Errorf("failed to create issue reaction: %w", err)
 		}
 	case ReactionTargetReviewComment:
-		reaction, _, err = client.CreateReviewCommentReaction(context.Background(), config.Repository, commentID, config.Content)
+		err = common.ExecuteReaction(ctx, func() (*github.Reaction, *github.Response, error) {
+			return client.CreateReviewCommentReaction(context.Background(), config.Repository, commentID, config.Content)
+		})
 		if err != nil {
 			return fmt.Errorf("failed to create review comment reaction: %w", err)
 		}
 	}
 
-	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
-		"github.reaction",
-		[]any{reaction},
-	)
+	return nil
 }
 
 func (c *AddReaction) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
@@ -253,9 +263,55 @@ func parseCommentID(value string) (int64, error) {
 }
 
 func (c *AddReaction) Hooks() []core.Hook {
-	return []core.Hook{}
+	return common.ReactionHooks()
 }
 
 func (c *AddReaction) HandleHook(ctx core.ActionHookContext) error {
+	if ctx.Name != common.ReactionRetryHookName {
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
+	}
+
+	var config AddReactionConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return common.FailReactionHook(ctx, fmt.Errorf("failed to decode configuration: %w", err))
+	}
+
+	if config.Target != ReactionTargetIssueComment && config.Target != ReactionTargetReviewComment {
+		return common.FailReactionHook(ctx, fmt.Errorf("invalid target: %s", config.Target))
+	}
+
+	commentID, err := parseCommentID(config.CommentID)
+	if err != nil {
+		return common.FailReactionHook(ctx, fmt.Errorf("comment ID is not a number: %v", err))
+	}
+	if commentID <= 0 {
+		return common.FailReactionHook(ctx, errors.New("comment ID must be positive"))
+	}
+	if err := common.ValidateReactionContent(config.Content); err != nil {
+		return common.FailReactionHook(ctx, err)
+	}
+
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
+	if err != nil {
+		return common.FailReactionHook(ctx, fmt.Errorf("failed to initialize GitHub client: %w", err))
+	}
+
+	switch config.Target {
+	case ReactionTargetIssueComment:
+		err = common.RetryReaction(ctx, func() (*github.Reaction, *github.Response, error) {
+			return client.CreateIssueCommentReaction(context.Background(), config.Repository, commentID, config.Content)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create issue reaction: %w", err)
+		}
+	case ReactionTargetReviewComment:
+		err = common.RetryReaction(ctx, func() (*github.Reaction, *github.Response, error) {
+			return client.CreateReviewCommentReaction(context.Background(), config.Repository, commentID, config.Content)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create review comment reaction: %w", err)
+		}
+	}
+
 	return nil
 }
