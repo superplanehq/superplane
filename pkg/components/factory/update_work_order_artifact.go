@@ -4,11 +4,17 @@ import (
 	"net/http"
 
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
+
+// UpdateWorkOrderArtifact
+//
+// State / Merged / Draft accept expressions, so a flow can wire them
+// straight to a `github.onPullRequest` payload without an if-node.
+// After template resolution, values may arrive as bool, string, or
+// number; `any` avoids brittle assumptions.
 
 const UpdateWorkOrderArtifactComponentName = "updateWorkOrderArtifact"
 
@@ -21,8 +27,12 @@ type UpdateWorkOrderArtifact struct{}
 type UpdateWorkOrderArtifactConfiguration struct {
 	OrderID     string `json:"orderId" mapstructure:"orderId"`
 	ArtifactKey string `json:"artifactKey" mapstructure:"artifactKey"`
-	State       string `json:"state" mapstructure:"state"`
+	State       any    `json:"state,omitempty" mapstructure:"state,omitempty"`
+	Merged      any    `json:"merged,omitempty" mapstructure:"merged,omitempty"`
+	Draft       any    `json:"draft,omitempty" mapstructure:"draft,omitempty"`
 	Title       string `json:"title" mapstructure:"title"`
+	MergedAt    string `json:"mergedAt" mapstructure:"mergedAt"`
+	ClosedAt    string `json:"closedAt" mapstructure:"closedAt"`
 }
 
 func (c *UpdateWorkOrderArtifact) Name() string {
@@ -42,7 +52,9 @@ func (c *UpdateWorkOrderArtifact) Documentation() string {
 
 This does not add a new timeline entry: the work order's "attached" line and the sidebar artifact list both update in place so the chip's icon/color track the pull request's current state without spamming the timeline on every open → draft → merged flip.
 
-Typical wiring to stay in sync with GitHub: a ` + "`github.onPullRequest`" + ` trigger (actions: opened, ready_for_review, converted_to_draft, closed) → ` + "`findWorkOrder`" + ` (` + "`by: artifactKey`" + `, ` + "`artifactKey: {{ event.data.pull_request.html_url }}`" + `) → this component, with ` + "`state`" + ` derived from the webhook action: ` + "`opened`" + `/` + "`reopened`" + ` → ` + "`open`" + `, ` + "`converted_to_draft`" + ` → ` + "`draft`" + `, ` + "`ready_for_review`" + ` → ` + "`open`" + `, ` + "`closed`" + ` with ` + "`pull_request.merged == true`" + ` → ` + "`merged`" + `, ` + "`closed`" + ` with ` + "`merged == false`" + ` → ` + "`closed`" + `.
+Typical wiring to stay in sync with GitHub: a ` + "`github.onPullRequest`" + ` trigger (actions: opened, ready_for_review, converted_to_draft, closed) → ` + "`findWorkOrder`" + ` (` + "`by: artifactKey`" + `, ` + "`artifactKey: {{ event.data.pull_request.html_url }}`" + `) → this component.
+
+The ` + "`state`" + `, ` + "`merged`" + `, and ` + "`draft`" + ` fields all accept expressions, so you can pass the webhook payload through as-is instead of writing an if-node per branch. Set ` + "`state: \"{{ event.data.pull_request.state }}\"`" + ` and ` + "`merged: \"{{ event.data.pull_request.merged }}\"`" + ` (plus optional ` + "`draft: \"{{ event.data.pull_request.draft }}\"`" + `); the component folds a GitHub-shaped payload (` + "`state: \"closed\"`" + ` + ` + "`merged: true`" + `) into SuperPlane's ` + "`state: \"merged\"`" + ` before it hits the artifact, so the chip flips to purple as soon as the merge event lands.
 
 ` + "`orderId`" + ` explicitly targets the work order — it defaults to ` + "`{{ order().id }}`" + `, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event such as ` + "`github.onPullRequest`" + `, replace it with ` + "`{{ previous().data.workOrder.id }}`" + ` after a ` + "`findWorkOrder`" + ` step. This component can only be used in factory-owned apps.`
 }
@@ -79,7 +91,7 @@ func (c *UpdateWorkOrderArtifact) OutputChannels(configuration any) []core.Outpu
 }
 
 func (c *UpdateWorkOrderArtifact) Configuration() []configuration.Field {
-	return []configuration.Field{
+	fields := []configuration.Field{
 		{
 			Name:        "orderId",
 			Label:       "Work Order ID",
@@ -95,25 +107,14 @@ func (c *UpdateWorkOrderArtifact) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 		},
-		{
-			Name:        "state",
-			Label:       "State",
-			Description: "New pull request state — drives the artifact chip's icon/color. Leave unset to update only the title.",
-			Type:        configuration.FieldTypeSelect,
-			Required:    false,
-			Togglable:   true,
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Open", Value: "open"},
-						{Label: "Draft", Value: "draft"},
-						{Label: "Closed", Value: "closed"},
-						{Label: "Merged", Value: "merged"},
-					},
-				},
-			},
-		},
-		{
+	}
+
+	fields = append(fields, prArtifactLifecycleFields(prArtifactLifecycleFieldOptions{
+		StateTogglable: true,
+	})...)
+
+	return append(fields,
+		configuration.Field{
 			Name:        "title",
 			Label:       "Title",
 			Description: "New title, in case the pull request was retitled. Leave unset to keep the existing title.",
@@ -121,7 +122,23 @@ func (c *UpdateWorkOrderArtifact) Configuration() []configuration.Field {
 			Required:    false,
 			Togglable:   true,
 		},
-	}
+		configuration.Field{
+			Name:        "mergedAt",
+			Label:       "Merged At",
+			Description: "Optional RFC3339 merge timestamp — usually {{ event.data.pull_request.merged_at }}. Set with state = merged so Velocity attributes the merge to the real day; unset falls back to now.",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+		},
+		configuration.Field{
+			Name:        "closedAt",
+			Label:       "Closed At",
+			Description: "Optional RFC3339 close timestamp — usually {{ event.data.pull_request.closed_at }}. Set with state = closed so Velocity waste attributes it to the real day.",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+		},
+	)
 }
 
 func (c *UpdateWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
@@ -130,12 +147,18 @@ func (c *UpdateWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	data := map[string]any{}
-	if config.State != "" {
-		data["state"] = config.State
+	data, err := prArtifactStateUpdates(config.State, config.Merged, config.Draft)
+	if err != nil {
+		return err
 	}
 	if config.Title != "" {
 		data["title"] = config.Title
+	}
+	if config.MergedAt != "" {
+		data["mergedAt"] = config.MergedAt
+	}
+	if config.ClosedAt != "" {
+		data["closedAt"] = config.ClosedAt
 	}
 
 	artifact, err := ctx.Factory.UpdateWorkOrderArtifact(core.UpdateWorkOrderArtifactParams{
@@ -154,10 +177,6 @@ func (c *UpdateWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 			"artifact": artifact,
 		}},
 	)
-}
-
-func (c *UpdateWorkOrderArtifact) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *UpdateWorkOrderArtifact) Setup(ctx core.SetupContext) error {

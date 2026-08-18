@@ -28,6 +28,7 @@ import {
   LegacyWorkOrderDetailRedirect,
   LinesPage,
   MissionsPage,
+  NewWorkspacePage,
   OverviewPage,
   VelocityPage,
   WikiPage,
@@ -76,10 +77,12 @@ function fixtureFetchState(): FixtureFetchState {
 export interface OrgWorkspacePageOverrides {
   wiki?: ComponentType;
   overview?: ComponentType;
-  /** When set, mounts `/onboarding` and gates other factory pages while pending. */
+  /** When set, mounts `/setup` and gates other factory pages while pending. */
   onboarding?: ComponentType;
   /** Storybook-only Work Orders page. Live app ignores this. */
   workOrders?: ComponentType;
+  /** Storybook-only Velocity page (e.g. work-order flow prototype). */
+  velocity?: ComponentType;
 }
 
 export interface OrgWorkspaceHarnessProps {
@@ -196,6 +199,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
   const WikiRoutePage = pageOverrides?.wiki ?? WikiPage;
   const OverviewRoutePage = pageOverrides?.overview ?? OverviewPage;
   const WorkOrdersRoutePage = pageOverrides?.workOrders ?? WorkOrdersPage;
+  const VelocityRoutePage = pageOverrides?.velocity ?? VelocityPage;
   const OnboardingRoutePage = pageOverrides?.onboarding;
   const onboardingEnabled = Boolean(OnboardingRoutePage);
 
@@ -214,15 +218,16 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
         <Route path="apps/:appId" element={<AppPage />} />
         <Route path="workspaces">
           <Route index element={factoryRoute(<FactoriesIndexPage />)} />
+          <Route path="new" element={factoryRoute(<NewWorkspacePage />)} />
           <Route path=":factoryKey" element={factoryRoute(<FactoriesLayout />)}>
             <Route element={<OptionalOnboardingGate enabled={onboardingEnabled} />}>
               <Route index element={<Navigate to="overview" replace />} />
-              {OnboardingRoutePage ? <Route path="onboarding" element={<OnboardingRoutePage />} /> : null}
+              {OnboardingRoutePage ? <Route path="setup" element={<OnboardingRoutePage />} /> : null}
               <Route path="overview" element={<OverviewRoutePage />} />
               <Route path="missions" element={<MissionsPage />} />
               <Route path="missions/:missionId" element={<MissionDetailPage />} />
               <Route path="wiki" element={<WikiRoutePage />} />
-              <Route path="velocity" element={<VelocityPage />} />
+              <Route path="velocity" element={<VelocityRoutePage />} />
               <Route path="work-orders">
                 <Route index element={<WorkOrdersRoutePage />} />
                 <Route path="new" element={<CreateWorkOrderComposeRedirect />} />

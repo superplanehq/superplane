@@ -13,6 +13,7 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 		Name:        factory.Name,
 		Description: factory.Description,
 		Key:         factory.Key,
+		Onboarding:  serializeFactoryOnboarding(factory),
 	}
 }
 
@@ -26,6 +27,53 @@ func serializeFactoryWithLines(
 		Description: factory.Description,
 		Key:         factory.Key,
 		Lines:       serializeFactoryLines(lines),
+		Onboarding:  serializeFactoryOnboarding(factory),
+	}
+}
+
+func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
+	config := factory.OnboardingConfigValue()
+	onboarding := &pb.FactoryOnboarding{
+		VcsIntegrationId:   config.VCSIntegrationID,
+		AgentIntegrationId: config.AgentIntegrationID,
+		AppRepository:      config.AppRepository,
+		BacklogRepository:  config.BacklogRepository,
+		IssuesSource:       serializeFactoryOnboardingIssuesSource(config.IssuesSource),
+		AgentHarness:       serializeFactoryOnboardingAgentHarness(config.AgentHarness),
+		ProvisionedAppId:   config.ProvisionedAppID,
+		ProvisionedLineId:  config.ProvisionedLineID,
+	}
+	if factory.OnboardingCompletedAt != nil {
+		onboarding.CompletedAt = timestamppb.New(*factory.OnboardingCompletedAt)
+	}
+	return onboarding
+}
+
+func serializeFactoryOnboardingIssuesSource(source string) pb.FactoryOnboarding_IssuesSource {
+	switch source {
+	case models.FactoryOnboardingIssuesSourceVCS:
+		return pb.FactoryOnboarding_ISSUES_SOURCE_VCS
+	case models.FactoryOnboardingIssuesSourceLinear:
+		return pb.FactoryOnboarding_ISSUES_SOURCE_LINEAR
+	case models.FactoryOnboardingIssuesSourceJira:
+		return pb.FactoryOnboarding_ISSUES_SOURCE_JIRA
+	case models.FactoryOnboardingIssuesSourceSkip:
+		return pb.FactoryOnboarding_ISSUES_SOURCE_SKIP
+	default:
+		return pb.FactoryOnboarding_ISSUES_SOURCE_UNSPECIFIED
+	}
+}
+
+func serializeFactoryOnboardingAgentHarness(harness string) pb.FactoryOnboarding_AgentHarness {
+	switch harness {
+	case models.FactoryOnboardingAgentHarnessClaudeCode:
+		return pb.FactoryOnboarding_AGENT_HARNESS_CLAUDE_CODE
+	case models.FactoryOnboardingAgentHarnessCursor:
+		return pb.FactoryOnboarding_AGENT_HARNESS_CURSOR
+	case models.FactoryOnboardingAgentHarnessCodex:
+		return pb.FactoryOnboarding_AGENT_HARNESS_CODEX
+	default:
+		return pb.FactoryOnboarding_AGENT_HARNESS_UNSPECIFIED
 	}
 }
 

@@ -1,178 +1,61 @@
 import { useCallback, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import {
-  canvasesCommitCanvasStaging,
-  canvasesInvokeNodeTriggerHook,
-  canvasesListCanvases,
-  canvasesPutCanvasStaging,
-  type CanvasesCanvasSummary,
-} from "@/api-client";
+import { useQueryClient } from "@tanstack/react-query";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { writeCanvasRunsSidebarOpen } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { usePermissions } from "@/contexts/usePermissions";
 import { canvasKeys, useCreateCanvas, useUpdateCanvasFolderMembership } from "@/hooks/useCanvasData";
 import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { appPath } from "@/lib/appPaths";
-import { getApiErrorMessage } from "@/lib/errors";
-import { showErrorToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { encodeRepositoryFileContent } from "@/pages/app/files/lib/repository-files";
-import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "@/pages/app/lib/workflow-spec-paths";
+import { showErrorToast } from "@/lib/toast";
 
-import { appendCanvasToFolderMembership } from "./canvasFolderMembership";
 import {
-  buildFactoryRunParameters,
-  getFactoryDefinition,
-  materializeFactoryCanvas,
-  materializeFactoryConsole,
-  type FactoryDefinition,
-} from "./factories";
+  ensureFactoryCanvas,
+  invokeFactoryRun,
+  materializeAndCommitFactoryTemplate,
+  type FactoryCanvasHandle,
+} from "./installFactoryCanvas";
+import { getFactoryDefinition, type FactoryDefinition } from "./factories";
 import type { IntegrationSelections } from "./homeIntegrationStatus";
 import type { CanvasFolderData } from "./types";
-import { isCanvasNameAlreadyExistsError, uniqueCanvasName } from "./uniqueCanvasName";
-
-const MAX_NAME_RETRY_ATTEMPTS = 20;
 
 export interface InstallFactoryInput {
+  /** Bundled template id. Defaults to the Software Factory template. */
   factoryId?: string;
+  /** When set, create the canvas owned by this workspace factory. */
+  workspaceFactoryId?: string;
+  /** Resume materialization onto this canvas instead of creating a new one. */
+  existingCanvasId?: string;
+  /** Called as soon as the canvas exists, before template materialization starts. */
+  onCanvasReady?: (canvas: FactoryCanvasHandle) => void | Promise<void>;
   integrations: IntegrationSelections;
   installParams: Record<string, string>;
   startingTaskPrompt: string;
+  /**
+   * When false, skip navigation and canvas sidebar preference writes.
+   * Defaults to true for legacy home install.
+   */
+  navigateOnComplete?: boolean;
+  /**
+   * When false, never invoke the starting-task run.
+   * Defaults to true when `startingTaskPrompt` is non-empty.
+   */
+  startInitialRun?: boolean;
 }
+
+export type InstallFactoryResult = FactoryCanvasHandle;
 
 interface UseInstallFactoryOptions {
   folder?: CanvasFolderData;
 }
 
-async function stageAndCommitFactorySpecs(canvasId: string, canvasYaml: string, consoleYaml: string) {
-  await canvasesPutCanvasStaging(
-    withOrganizationHeader({
-      path: { canvasId },
-      body: {
-        operations: [
-          { path: CANVAS_YAML_PATH, content: encodeRepositoryFileContent(canvasYaml) },
-          { path: CONSOLE_YAML_PATH, content: encodeRepositoryFileContent(consoleYaml) },
-        ],
-      },
-    }),
-  );
-  await canvasesCommitCanvasStaging(
-    withOrganizationHeader({
-      path: { canvasId },
-      body: { commitMessage: "Install factory template" },
-    }),
-  );
-}
-
-async function invokeFactoryRun(canvasId: string, definition: FactoryDefinition, startingTaskPrompt: string) {
-  await canvasesInvokeNodeTriggerHook(
-    withOrganizationHeader({
-      path: {
-        canvasId,
-        nodeId: definition.run.nodeId,
-        hookName: definition.run.hookName,
-      },
-      body: {
-        parameters: buildFactoryRunParameters(definition, startingTaskPrompt),
-      },
-    }),
-  );
-}
-
-async function materializeAndCommitFactoryTemplate(args: {
-  canvasId: string;
-  canvasName: string;
-  definition: FactoryDefinition;
-  installParams: Record<string, string>;
-  integrations: IntegrationSelections;
-}) {
-  const canvasYaml = materializeFactoryCanvas({
-    definition: args.definition,
-    canvasName: args.canvasName,
-    canvasId: args.canvasId,
-    installParams: args.installParams,
-    integrations: args.integrations,
-  });
-  const consoleYaml = materializeFactoryConsole(args.definition, args.canvasName, args.canvasId);
-  await stageAndCommitFactorySpecs(args.canvasId, canvasYaml, consoleYaml);
-}
-
-async function listExistingCanvasNames(organizationId: string, queryClient: QueryClient) {
-  const cached = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));
-  if (cached) {
-    return cached.map((canvas) => canvas.name).filter((name): name is string => Boolean(name));
-  }
-
-  const response = await canvasesListCanvases(withOrganizationHeader({ organizationId }));
-  return (response.data?.canvases ?? []).map((canvas) => canvas.name).filter((name): name is string => Boolean(name));
-}
-
-async function createCanvasWithUniqueName(args: {
-  title: string;
-  description?: string;
-  existingNames: Set<string>;
-  createCanvas: (input: { name: string; description?: string; method: "ui" }) => Promise<{
-    data?: { canvas?: { metadata?: { id?: string } } };
-  }>;
-}): Promise<{ canvasId: string; canvasName: string }> {
-  let canvasName = uniqueCanvasName(args.title, args.existingNames);
-
-  for (let attempt = 0; attempt < MAX_NAME_RETRY_ATTEMPTS; attempt++) {
-    try {
-      const result = await args.createCanvas({
-        name: canvasName,
-        description: args.description,
-        method: "ui",
-      });
-      const canvasId = result?.data?.canvas?.metadata?.id;
-      if (!canvasId) {
-        throw new Error("Failed to create factory canvas");
-      }
-      return { canvasId, canvasName };
-    } catch (error) {
-      if (!isCanvasNameAlreadyExistsError(error)) {
-        throw error;
-      }
-      args.existingNames.add(canvasName);
-      canvasName = uniqueCanvasName(args.title, args.existingNames);
-    }
-  }
-
-  throw new Error("Failed to create factory canvas");
-}
-
-async function ensureFactoryCanvas(args: {
-  pending: { canvasId: string; canvasName: string } | null;
-  organizationId: string;
-  queryClient: QueryClient;
-  definition: FactoryDefinition;
-  folder?: CanvasFolderData;
-  createCanvas: (input: { name: string; description?: string; method: "ui" }) => Promise<{
-    data?: { canvas?: { metadata?: { id?: string } } };
-  }>;
-  updateCanvasFolderMembership: (membership: ReturnType<typeof appendCanvasToFolderMembership>) => Promise<unknown>;
-}): Promise<{ canvasId: string; canvasName: string }> {
-  if (args.pending) return args.pending;
-
-  const existingNames = new Set(await listExistingCanvasNames(args.organizationId, args.queryClient));
-  const created = await createCanvasWithUniqueName({
-    title: args.definition.title,
-    description: args.definition.description,
-    existingNames,
-    createCanvas: args.createCanvas,
-  });
-
-  if (args.folder) {
-    try {
-      await args.updateCanvasFolderMembership(appendCanvasToFolderMembership(args.folder, created.canvasId));
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "App created, but failed to add it to folder"));
-    }
-  }
-
-  return created;
+async function prepareFactoryCanvas(
+  canvas: FactoryCanvasHandle,
+  onCanvasReady?: (canvas: FactoryCanvasHandle) => void | Promise<void>,
+): Promise<FactoryCanvasHandle> {
+  await onCanvasReady?.(canvas);
+  return canvas;
 }
 
 async function finishFactoryInstall(args: {
@@ -180,10 +63,12 @@ async function finishFactoryInstall(args: {
   canvasId: string;
   definition: FactoryDefinition;
   startingTaskPrompt: string;
-  queryClient: QueryClient;
+  startInitialRun: boolean;
+  navigateOnComplete: boolean;
+  queryClient: ReturnType<typeof useQueryClient>;
   navigate: (path: string) => void;
 }) {
-  const shouldTriggerRun = args.startingTaskPrompt.length > 0;
+  const shouldTriggerRun = args.startInitialRun && args.startingTaskPrompt.length > 0;
   if (shouldTriggerRun) {
     await invokeFactoryRun(args.canvasId, args.definition, args.startingTaskPrompt);
     args.queryClient.invalidateQueries({ queryKey: canvasKeys.infiniteRuns(args.canvasId) });
@@ -192,10 +77,16 @@ async function finishFactoryInstall(args: {
   if (args.definition.agentSuggestions?.length) {
     setAgentSuggestions(args.canvasId, args.definition.agentSuggestions);
   }
+
+  args.queryClient.invalidateQueries({ queryKey: canvasKeys.list(args.organizationId) });
+
+  if (!args.navigateOnComplete) {
+    return;
+  }
+
   writeCanvasAgentSidebarOpen(args.canvasId, false);
   writeCanvasRunsSidebarOpen(args.canvasId, shouldTriggerRun);
   localStorage.setItem("canvasSidebarOpen", "false");
-  args.queryClient.invalidateQueries({ queryKey: canvasKeys.list(args.organizationId) });
   args.navigate(appPath(args.organizationId, args.canvasId, shouldTriggerRun ? "?view=console" : ""));
 }
 
@@ -211,24 +102,27 @@ export function useInstallFactory({ folder }: UseInstallFactoryOptions = {}) {
   const [isInstalling, setIsInstalling] = useState(false);
   const isInstallingRef = useRef(false);
   // Reuse a canvas created on a failed attempt so retry does not spawn duplicates.
-  const pendingCanvasRef = useRef<{ canvasId: string; canvasName: string } | null>(null);
+  const pendingCanvasRef = useRef<FactoryCanvasHandle | null>(null);
 
   const canCreateCanvases = canAct("canvases", "create");
   const canUpdateCanvases = canAct("canvases", "update");
 
   const installFactory = useCallback(
-    async (input: InstallFactoryInput) => {
+    async (input: InstallFactoryInput): Promise<InstallFactoryResult | undefined> => {
       if (!organizationId || isInstallingRef.current) return;
-      if (!canCreateCanvases) {
+      const reusingCanvas = Boolean(input.existingCanvasId);
+      if (!reusingCanvas && !canCreateCanvases) {
         showErrorToast("You don't have permission to create canvases.");
         return;
       }
-      if (folder && !canUpdateCanvases) {
+      if ((folder || reusingCanvas) && !canUpdateCanvases) {
         showErrorToast("You don't have permission to update canvases.");
         return;
       }
 
       const definition = getFactoryDefinition(input.factoryId);
+      const navigateOnComplete = input.navigateOnComplete !== false;
+      const startInitialRun = input.startInitialRun !== false;
       isInstallingRef.current = true;
       setIsInstalling(true);
 
@@ -239,10 +133,12 @@ export function useInstallFactory({ folder }: UseInstallFactoryOptions = {}) {
           queryClient,
           definition,
           folder,
+          workspaceFactoryId: input.workspaceFactoryId,
+          existingCanvasId: input.existingCanvasId,
           createCanvas,
           updateCanvasFolderMembership,
         });
-        pendingCanvasRef.current = { canvasId, canvasName };
+        pendingCanvasRef.current = await prepareFactoryCanvas({ canvasId, canvasName }, input.onCanvasReady);
 
         await materializeAndCommitFactoryTemplate({
           canvasId,
@@ -260,10 +156,13 @@ export function useInstallFactory({ folder }: UseInstallFactoryOptions = {}) {
           canvasId,
           definition,
           startingTaskPrompt: input.startingTaskPrompt.trim(),
+          startInitialRun,
+          navigateOnComplete,
           queryClient,
           navigate,
         });
         pendingCanvasRef.current = null;
+        return { canvasId, canvasName };
       } catch (error) {
         showErrorToast(getUsageLimitToastMessage(error, "Failed to install factory"));
         throw error;

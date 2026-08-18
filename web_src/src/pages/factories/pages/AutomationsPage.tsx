@@ -1,9 +1,11 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
+import { usePageTitle } from "@/hooks/usePageTitle";
+import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { Plus } from "lucide-react";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
-import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import { factorySectionBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
 import { AutomationDetail } from "./AutomationDetail";
 import { AutomationsPageBody } from "./automationsPageBody";
 import { AutomationsLegacyRedirect } from "./automationsPageRedirect";
@@ -11,6 +13,13 @@ import { useAutomationsPageModel } from "./useAutomationsPageModel";
 
 export function AutomationsPage() {
   const model = useAutomationsPageModel();
+  const cardActions = useWorkOrderCardActions(model.organizationId, model.factoryId);
+
+  // Above the list/detail branching below (hooks can't be conditional): this
+  // single call covers both the Automations list and the in-page detail view
+  // for a selected app, re-firing when the selection changes without an
+  // unmount/mount.
+  usePageTitle([model.selectedApp?.name ?? "Automations", model.factory?.name ?? "Workspace"]);
 
   if (model.showLegacyRedirect) {
     return (
@@ -24,6 +33,14 @@ export function AutomationsPage() {
   }
 
   const selectedApp = model.selectedApp;
+  const workOrderCardContext = {
+    organizationId: model.organizationId,
+    factoryKey: model.factoryKey,
+    factoryLines: model.factory?.lines ?? [],
+    canDispatch: model.canUpdateWorkOrders,
+    canAssign: model.canUpdateWorkOrders,
+    ...cardActions,
+  };
 
   if (selectedApp && model.selectedAppActions) {
     return (
@@ -33,6 +50,9 @@ export function AutomationsPage() {
           factoryKey={model.factoryKey}
           app={selectedApp}
           actions={model.selectedAppActions}
+          factory={model.factory}
+          workOrders={model.workOrders}
+          workOrderCardContext={workOrderCardContext}
         />
       </div>
     );
@@ -41,6 +61,7 @@ export function AutomationsPage() {
   return (
     <div data-testid="automations-list-page">
       <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
         title="Automations"
         subtitle="Automations are one-step lines. Each one listens for a trigger and runs a canvas when it fires."
         actions={
@@ -62,15 +83,13 @@ export function AutomationsPage() {
         }
       />
 
-      <div className={factoryContentBodyClassName}>
+      <div className={factorySectionBodyClassName}>
         <AutomationsPageBody
           organizationId={model.organizationId}
           factoryKey={model.factoryKey}
           apps={model.apps}
           workOrders={model.workOrders}
           appsLoading={model.appsLoading}
-          selectedApp={null}
-          selectedAppActions={null}
           actionsForApp={model.actionsForApp}
           canCreate={model.canCreateApp || model.permissionsLoading}
           onCreate={() => model.setCreateOpen(true)}

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -374,10 +373,6 @@ func (c *CreateGPUDroplet) Execute(ctx core.ExecutionContext) error {
 
 func (c *CreateGPUDroplet) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *CreateGPUDroplet) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateGPUDroplet) Hooks() []core.Hook {

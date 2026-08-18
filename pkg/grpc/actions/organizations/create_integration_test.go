@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
@@ -292,5 +293,29 @@ func Test__CreateIntegration(t *testing.T) {
 		assert.Equal(t, "organization integration limit exceeded", status.Convert(err).Message())
 		require.Len(t, service.checkOrganizationCalls, 1)
 		assert.Equal(t, int32(integrationCount+1), service.checkOrganizationCalls[0].state.Integrations)
+	})
+
+	t.Run("github uses legacy create when new setup flow feature is off", func(t *testing.T) {
+		name := support.RandomName("integration")
+		appConfig, err := structpb.NewStruct(map[string]any{"organization": "test-org"})
+		require.NoError(t, err)
+
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "github", name, appConfig)
+		require.NoError(t, err)
+		require.NotNil(t, response.Integration)
+		assert.Nil(t, response.Integration.Status.SetupState)
+	})
+
+	t.Run("github uses setup provider when new setup flow feature is on", func(t *testing.T) {
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureNewIntegrationSetupFlow))
+
+		name := support.RandomName("integration")
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, nil)
+		require.NoError(t, err)
+		require.NotNil(t, response.Integration)
+		require.NotNil(t, response.Integration.Status.SetupState)
+		require.NotNil(t, response.Integration.Status.SetupState.CurrentStep)
 	})
 }

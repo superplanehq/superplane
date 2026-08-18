@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -148,10 +147,6 @@ func (c *AddCustomDomain) Setup(ctx core.SetupContext) error {
 	}
 
 	return setServiceNodeMetadata(ctx, spec.Service)
-}
-
-func (c *AddCustomDomain) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *AddCustomDomain) Execute(ctx core.ExecutionContext) error {

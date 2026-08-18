@@ -72,6 +72,18 @@ service Factories {
     };
   }
 
+  rpc UpdateFactoryOnboarding(UpdateFactoryOnboardingRequest) returns (UpdateFactoryOnboardingResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{id}/onboarding"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory onboarding";
+      description: "Saves workspace onboarding progress and optionally marks setup complete";
+      tags: "Factory";
+    };
+  }
+
   rpc DeleteFactory(DeleteFactoryRequest) returns (DeleteFactoryResponse) {
     option (google.api.http) = {
       delete: "/api/v1/factories/{id}"
@@ -252,6 +264,17 @@ service Factories {
     };
   }
 
+  rpc DescribeFactoryVelocity(DescribeFactoryVelocityRequest) returns (DescribeFactoryVelocityResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/velocity"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe factory velocity";
+      description: "Returns SuperPlane vs People merge counts and waste for a factory over a period";
+      tags: "Factory";
+    };
+  }
+
 }
 
 // Factories
@@ -295,11 +318,63 @@ message UpdateFactoryResponse {
   Factory factory = 1;
 }
 
+message UpdateFactoryOnboardingRequest {
+  string id = 1;
+  // Organization integration used for version control.
+  optional string vcs_integration_id = 2;
+  // Organization integration used for the coding agent.
+  optional string agent_integration_id = 3;
+  // App repository slug (for example `acme/api`).
+  optional string app_repository = 4;
+  // Backlog repository slug. May differ from the app repository.
+  optional string backlog_repository = 5;
+  optional FactoryOnboarding.IssuesSource issues_source = 6;
+  optional FactoryOnboarding.AgentHarness agent_harness = 7;
+  // Canvas ID created during Software Factory provisioning.
+  optional string provisioned_app_id = 8;
+  // Default factory line ID created after the app is ready.
+  optional string provisioned_line_id = 9;
+  // When true, validate readiness and set onboarding_completed_at.
+  optional bool complete = 10;
+}
+
+message UpdateFactoryOnboardingResponse {
+  Factory factory = 1;
+}
+
 message DeleteFactoryRequest {
   string id = 1;
 }
 
 message DeleteFactoryResponse {}
+
+message FactoryOnboarding {
+  enum IssuesSource {
+    ISSUES_SOURCE_UNSPECIFIED = 0;
+    ISSUES_SOURCE_VCS = 1;
+    ISSUES_SOURCE_LINEAR = 2;
+    ISSUES_SOURCE_JIRA = 3;
+    ISSUES_SOURCE_SKIP = 4;
+  }
+
+  enum AgentHarness {
+    AGENT_HARNESS_UNSPECIFIED = 0;
+    AGENT_HARNESS_CLAUDE_CODE = 1;
+    AGENT_HARNESS_CURSOR = 2;
+    AGENT_HARNESS_CODEX = 3;
+  }
+
+  // Set when workspace setup finished. Null while onboarding is open.
+  google.protobuf.Timestamp completed_at = 1;
+  string vcs_integration_id = 2;
+  string agent_integration_id = 3;
+  string app_repository = 4;
+  string backlog_repository = 5;
+  IssuesSource issues_source = 6;
+  AgentHarness agent_harness = 7;
+  string provisioned_app_id = 8;
+  string provisioned_line_id = 9;
+}
 
 message Factory {
   message App {
@@ -316,6 +391,7 @@ message Factory {
   repeated FactoryLine lines = 4;
   // Workspace key. 2 to 5 uppercase letters, unique per organization.
   string key = 5;
+  FactoryOnboarding onboarding = 6;
 }
 
 message FactoryLine {
@@ -666,6 +742,7 @@ message WorkOrderArtifact {
     TYPE_PR = 1;
     TYPE_MARKDOWN = 2;
     TYPE_BRANCH = 3;
+    TYPE_LINK = 4;
   }
 
   string id = 1;
@@ -681,4 +758,59 @@ message FactoryWorkOrderUpdatedMessage {
   string order_id = 2;
   string reason = 3;
   google.protobuf.Timestamp timestamp = 4;
+}
+
+// Velocity
+
+message DescribeFactoryVelocityRequest {
+  string factory_id = 1;
+  // Period window in days. Only 7 and 30 are supported by the UI today; any
+  // other positive value is clamped server-side.
+  int32 period_days = 2;
+  // Optional GitHub integration and `owner/repo` to include the People cohort.
+  // When either is empty the response returns SuperPlane data only and sets
+  // `has_people_cohort = false` so the UI can hide the People series.
+  string integration_id = 3;
+  string repository = 4;
+}
+
+message DescribeFactoryVelocityResponse {
+  DescribeFactoryVelocityYesterday yesterday = 1;
+  DescribeFactoryVelocityTotals totals = 2;
+  repeated DescribeFactoryVelocityDay points = 3;
+  // Repository the People cohort was computed for (`owner/repo`), or empty when
+  // no repository was selected.
+  string repository = 4;
+  // True when GitHub search succeeded for the selected repository.
+  bool has_people_cohort = 5;
+  // True when a repository was selected and GitHub search failed.
+  // SuperPlane counts are still present; the People series is omitted.
+  bool people_search_failed = 6;
+}
+
+message DescribeFactoryVelocityDay {
+  // Local-day label ready to render on the chart axis.
+  string day = 1;
+  google.protobuf.Timestamp date = 2;
+  int32 superplane_merged = 3;
+  int32 people_merged = 4;
+  // Waste = SuperPlane PRs closed without merging on that day.
+  int32 waste = 5;
+}
+
+message DescribeFactoryVelocityYesterday {
+  google.protobuf.Timestamp date = 1;
+  int32 superplane_merged = 2;
+  int32 waste = 3;
+}
+
+message DescribeFactoryVelocityTotals {
+  int32 superplane_merged = 1;
+  int32 people_merged = 2;
+  int32 waste = 3;
+  // SuperPlane share of merged PRs, as a rounded percentage (0-100).
+  // Zero when there are no merges in the window.
+  int32 superplane_share_pct = 4;
+  // Waste as a percentage of SuperPlane closes (merged + waste), 0-100.
+  int32 waste_pct = 5;
 }

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v84/github"
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -208,10 +207,6 @@ func (c *AddReaction) Execute(ctx core.ExecutionContext) error {
 		"github.reaction",
 		[]any{reaction},
 	)
-}
-
-func (c *AddReaction) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *AddReaction) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

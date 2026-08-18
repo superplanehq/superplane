@@ -1,51 +1,235 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { MemoryRouter } from "react-router";
+import { describe, expect, it, vi } from "vitest";
 
-import { FACTORY_VELOCITY_BY_PERIOD, FACTORY_VELOCITY_YESTERDAY } from "./factoryVelocityMockData";
+import type {
+  FactoriesDescribeFactoryVelocityResponse,
+  FactoriesWorkOrder,
+  OrganizationsIntegration,
+} from "@/api-client";
+
+import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY, REFUND_FACTORY } from "../__fixtures__/factoryPageResponses";
+import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { VelocityPage } from "./VelocityPage";
 
-describe("VelocityPage", () => {
-  it("shows yesterday metrics, period pills, trend, and source split", () => {
-    render(<VelocityPage />);
+interface VelocityHookState {
+  data?: FactoriesDescribeFactoryVelocityResponse;
+  isLoading?: boolean;
+  isFetching?: boolean;
+  error?: Error | null;
+}
 
-    expect(screen.getByRole("heading", { name: "Velocity" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "7d" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "30d" })).toBeInTheDocument();
+interface WorkOrdersHookState {
+  data?: FactoriesWorkOrder[];
+  isLoading?: boolean;
+  isFetching?: boolean;
+  error?: Error | null;
+}
 
-    const yesterday = screen.getByTestId("velocity-yesterday");
-    expect(yesterday).toHaveTextContent("Yesterday");
-    expect(yesterday).toHaveTextContent(String(FACTORY_VELOCITY_YESTERDAY.merged));
-    expect(yesterday).toHaveTextContent("Merged PRs");
-    expect(yesterday).toHaveTextContent("Waste");
-    expect(yesterday).toHaveTextContent("Cost");
-    expect(yesterday).toHaveTextContent("Cost per merged PR");
+const velocityHookState: VelocityHookState = {};
+const workOrdersHookState: WorkOrdersHookState = {};
+const integrationsHookState: { data: OrganizationsIntegration[] } = { data: [] };
+const repositoryResourcesHookState: { data: Array<{ name?: string }>; isLoading: boolean } = {
+  data: [],
+  isLoading: false,
+};
 
-    const trend = screen.getByTestId("velocity-trend");
-    expect(trend).toHaveTextContent("Last 7 days");
-    expect(trend).toHaveTextContent(String(FACTORY_VELOCITY_BY_PERIOD[7].totals.merged));
-    expect(trend).toHaveTextContent("SuperPlane output");
+vi.mock("@/hooks/useFactoryVelocity", () => ({
+  useFactoryVelocity: () => ({
+    data: velocityHookState.data,
+    isLoading: velocityHookState.isLoading ?? false,
+    isFetching: velocityHookState.isFetching ?? false,
+    error: velocityHookState.error ?? null,
+    refetch: vi.fn(),
+  }),
+}));
 
-    const split = screen.getByTestId("velocity-source-split");
-    expect(split).toHaveTextContent("Merged PRs by source");
-    expect(split).toHaveTextContent("SuperPlane");
-    expect(split).toHaveTextContent(`${FACTORY_VELOCITY_BY_PERIOD[7].totals.superplaneSharePct}%`);
+vi.mock("@/hooks/useFactoryData", () => ({
+  useFactoryWorkOrders: () => ({
+    data: workOrdersHookState.data ?? [],
+    isLoading: workOrdersHookState.isLoading ?? false,
+    isFetching: workOrdersHookState.isFetching ?? false,
+    error: workOrdersHookState.error ?? null,
+  }),
+}));
+
+vi.mock("@/hooks/useIntegrations", () => ({
+  useConnectedIntegrations: () => ({ data: integrationsHookState.data }),
+  useIntegrationResources: () => ({
+    data: repositoryResourcesHookState.data,
+    isLoading: repositoryResourcesHookState.isLoading,
+  }),
+}));
+
+function renderShell() {
+  return render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={["/velocity"]}>
+        <FactoriesLayoutContext.Provider
+          value={{
+            organizationId: "org-1",
+            factoryId: PRIMARY_FACTORY_ID,
+            factoryKey: PRIMARY_FACTORY_KEY,
+            factory: REFUND_FACTORY,
+            factories: [REFUND_FACTORY],
+            openCreateWorkOrder: vi.fn(),
+          }}
+        >
+          <VelocityPage />
+        </FactoriesLayoutContext.Provider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+function resetState() {
+  velocityHookState.data = undefined;
+  velocityHookState.isLoading = false;
+  velocityHookState.isFetching = false;
+  velocityHookState.error = null;
+  workOrdersHookState.data = [];
+  workOrdersHookState.isLoading = false;
+  workOrdersHookState.isFetching = false;
+  workOrdersHookState.error = null;
+  integrationsHookState.data = [];
+  repositoryResourcesHookState.data = [];
+  repositoryResourcesHookState.isLoading = false;
+}
+
+describe("VelocityPage shell", () => {
+  it("sets the document title from the page and workspace name", () => {
+    resetState();
+    renderShell();
+
+    expect(document.title).toBe(`Velocity · ${REFUND_FACTORY.name} · SuperPlane`);
   });
 
-  it("updates trend totals when the period changes and keeps yesterday fixed", async () => {
-    const user = userEvent.setup();
-    render(<VelocityPage />);
+  it("shows the loading state while velocity is loading", () => {
+    resetState();
+    velocityHookState.isLoading = true;
 
-    const yesterdayMerged = FACTORY_VELOCITY_YESTERDAY.merged;
-    expect(screen.getByTestId("velocity-yesterday")).toHaveTextContent(String(yesterdayMerged));
+    renderShell();
 
-    await user.click(screen.getByRole("tab", { name: "30d" }));
+    expect(screen.getByTestId("velocity-loading-state")).toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-yesterday")).not.toBeInTheDocument();
+  });
 
-    expect(screen.getByRole("tab", { name: "30d" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("velocity-trend")).toHaveTextContent("Last 30 days");
-    expect(screen.getByTestId("velocity-trend")).toHaveTextContent(
-      String(FACTORY_VELOCITY_BY_PERIOD[30].totals.merged),
-    );
-    expect(screen.getByTestId("velocity-yesterday")).toHaveTextContent(String(yesterdayMerged));
+  it("shows an error state with retry when velocity fails to load", () => {
+    resetState();
+    velocityHookState.error = new Error("network");
+
+    renderShell();
+
+    expect(screen.getByTestId("velocity-error-state")).toBeInTheDocument();
+    expect(screen.getByTestId("velocity-error-retry")).toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-yesterday")).not.toBeInTheDocument();
+  });
+
+  it("keeps the loaded view when a refetch fails and cached data remains", () => {
+    resetState();
+    velocityHookState.data = {
+      yesterday: { superplaneMerged: 3, waste: 1 },
+      totals: {
+        superplaneMerged: 12,
+        peopleMerged: 0,
+        waste: 4,
+        superplaneSharePct: 0,
+        wastePct: 25,
+      },
+      points: [{ day: "Mon", superplaneMerged: 2, peopleMerged: 0, waste: 1 }],
+      hasPeopleCohort: false,
+    };
+    velocityHookState.error = new Error("network");
+
+    renderShell();
+
+    expect(screen.getByTestId("velocity-yesterday")).toHaveTextContent("3");
+    expect(screen.queryByTestId("velocity-error-state")).not.toBeInTheDocument();
+  });
+
+  it("renders the loaded view and hides People cohort without a repo", () => {
+    resetState();
+    velocityHookState.data = {
+      yesterday: { superplaneMerged: 3, waste: 1 },
+      totals: {
+        superplaneMerged: 12,
+        peopleMerged: 0,
+        waste: 4,
+        superplaneSharePct: 0,
+        wastePct: 25,
+      },
+      points: [
+        { day: "Mon", superplaneMerged: 2, peopleMerged: 0, waste: 1 },
+        { day: "Tue", superplaneMerged: 3, peopleMerged: 0, waste: 0 },
+      ],
+      hasPeopleCohort: false,
+    };
+
+    renderShell();
+
+    const yesterday = screen.getByTestId("velocity-yesterday");
+    expect(yesterday).toHaveTextContent("Merged PRs");
+    expect(yesterday).toHaveTextContent("3");
+    expect(yesterday).not.toHaveTextContent("Cost");
+
+    const split = screen.getByTestId("velocity-source-split");
+    expect(split).toHaveTextContent("Connect GitHub to compare People and SuperPlane.");
+    expect(split).not.toHaveTextContent("SuperPlane authored");
+  });
+
+  it("explains when People merges could not be loaded", () => {
+    resetState();
+    integrationsHookState.data = [
+      {
+        metadata: { id: "int-1", name: "GitHub", integrationName: "github" },
+        status: { state: "ready" },
+      },
+    ];
+    repositoryResourcesHookState.data = [{ name: "acme/api" }];
+    velocityHookState.data = {
+      yesterday: { superplaneMerged: 3, waste: 0 },
+      totals: {
+        superplaneMerged: 12,
+        peopleMerged: 0,
+        waste: 0,
+        superplaneSharePct: 0,
+        wastePct: 0,
+      },
+      points: [{ day: "Mon", superplaneMerged: 3, peopleMerged: 0, waste: 0 }],
+      hasPeopleCohort: false,
+      peopleSearchFailed: true,
+      repository: "acme/api",
+    };
+
+    renderShell();
+
+    const split = screen.getByTestId("velocity-source-split");
+    expect(split).toHaveTextContent("We could not load People merges. SuperPlane counts still show.");
+    expect(split).not.toHaveTextContent("No merged pull requests");
+    expect(split).not.toHaveTextContent("SuperPlane authored");
+  });
+
+  it("explains when work order time could not be loaded", () => {
+    resetState();
+    velocityHookState.data = {
+      yesterday: { superplaneMerged: 3, waste: 1 },
+      totals: {
+        superplaneMerged: 12,
+        peopleMerged: 0,
+        waste: 4,
+        superplaneSharePct: 0,
+        wastePct: 25,
+      },
+      points: [{ day: "Mon", superplaneMerged: 2, peopleMerged: 0, waste: 1 }],
+      hasPeopleCohort: false,
+    };
+    workOrdersHookState.error = new Error("network");
+
+    renderShell();
+
+    const flow = screen.getByTestId("velocity-work-order-flow");
+    expect(flow).toHaveTextContent("We could not load work order time.");
+    expect(flow).not.toHaveTextContent("No work orders closed in this period.");
   });
 });

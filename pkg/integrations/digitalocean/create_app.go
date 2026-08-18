@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -575,10 +574,6 @@ func buildSourceConfig(spec CreateAppSpec) (*GitHubSource, *GitLabSource, *Bitbu
 
 func (c *CreateApp) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *CreateApp) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateApp) Hooks() []core.Hook {

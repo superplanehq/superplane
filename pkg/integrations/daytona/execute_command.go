@@ -285,10 +285,6 @@ func (e *ExecuteCommand) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (e *ExecuteCommand) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
-
 func (e *ExecuteCommand) Hooks() []core.Hook {
 	return []core.Hook{
 		{Name: "poll", Type: core.HookTypeInternal},

@@ -14,28 +14,54 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+// Node states. The state column no longer acts as a dispatch mutex:
+// scheduling is derived from execution counts per queue. The error state
+// keeps its meaning (broken configuration blocks dispatch).
 const (
-	CanvasNodeStateReady      = "ready"
-	CanvasNodeStateProcessing = "processing"
-	CanvasNodeStateError      = "error"
+	CanvasNodeStateReady = "ready"
+	CanvasNodeStateError = "error"
 
 	NodeTypeTrigger   = "trigger"
 	NodeTypeComponent = "component"
 	NodeTypeWidget    = "widget"
 )
 
+const DefaultConcurrencyMax = 1
+
+// ConcurrencySpec is a node's inline concurrency configuration. A node
+// without a spec runs one execution at a time.
+type ConcurrencySpec struct {
+	// Key is an optional template expression that partitions the node's
+	// backlog: each resolved value is an independent queue.
+	Key string `json:"key,omitempty"`
+
+	// Max is presence-aware: nil means the default (1). Must be 1 or
+	// greater when set.
+	Max *int `json:"max,omitempty"`
+}
+
+// EffectiveMax returns the configured limit, defaulting to 1 when the
+// spec or the field is absent.
+func (s *ConcurrencySpec) EffectiveMax() int {
+	if s == nil || s.Max == nil {
+		return DefaultConcurrencyMax
+	}
+	return *s.Max
+}
+
 type Node struct {
-	ID             string         `json:"id"`
-	Name           string         `json:"name"`
-	Type           string         `json:"type"`
-	Ref            NodeRef        `json:"ref"`
-	Configuration  map[string]any `json:"configuration"`
-	Metadata       map[string]any `json:"metadata"`
-	Position       Position       `json:"position"`
-	IsCollapsed    bool           `json:"isCollapsed"`
-	IntegrationID  *string        `json:"integrationId,omitempty"`
-	ErrorMessage   *string        `json:"errorMessage,omitempty"`
-	WarningMessage *string        `json:"warningMessage,omitempty"`
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	Type           string           `json:"type"`
+	Ref            NodeRef          `json:"ref"`
+	Configuration  map[string]any   `json:"configuration"`
+	Metadata       map[string]any   `json:"metadata"`
+	Position       Position         `json:"position"`
+	IsCollapsed    bool             `json:"isCollapsed"`
+	Concurrency    *ConcurrencySpec `json:"concurrency,omitempty"`
+	IntegrationID  *string          `json:"integrationId,omitempty"`
+	ErrorMessage   *string          `json:"errorMessage,omitempty"`
+	WarningMessage *string          `json:"warningMessage,omitempty"`
 }
 
 func (c *Node) ComponentName() string {
@@ -84,17 +110,27 @@ type Edge struct {
 }
 
 type CanvasNode struct {
-	WorkflowID        uuid.UUID `gorm:"primaryKey"`
-	NodeID            string    `gorm:"primaryKey"`
-	Name              string
-	State             string
-	StateReason       *string
-	Type              string
-	Position          datatypes.JSONType[Position]
-	Ref               datatypes.JSONType[NodeRef]
-	Configuration     datatypes.JSONType[map[string]any]
-	Metadata          datatypes.JSONType[map[string]any]
-	IsCollapsed       bool
+	WorkflowID    uuid.UUID `gorm:"primaryKey"`
+	NodeID        string    `gorm:"primaryKey"`
+	Name          string
+	State         string
+	StateReason   *string
+	Type          string
+	Position      datatypes.JSONType[Position]
+	Ref           datatypes.JSONType[NodeRef]
+	Configuration datatypes.JSONType[map[string]any]
+	Metadata      datatypes.JSONType[map[string]any]
+	IsCollapsed   bool
+
+	//
+	// The node's inline concurrency configuration. Each field defaults
+	// independently, so all-NULL means the default behavior: one
+	// execution at a time in the node's implicit queue. The key may
+	// contain {{ }} expressions resolved per queue item.
+	//
+	ConcurrencyKey *string
+	ConcurrencyMax *int
+
 	WebhookID         *uuid.UUID
 	AppInstallationID *uuid.UUID
 	CreatedAt         *time.Time
@@ -109,6 +145,38 @@ type DeleteCanvasNodeResult struct {
 
 func (c *CanvasNode) TableName() string {
 	return "workflow_nodes"
+}
+
+// ConcurrencySpec returns the node's inline concurrency configuration,
+// or nil when the node uses the default (one execution at a time).
+func (c *CanvasNode) ConcurrencySpec() *ConcurrencySpec {
+	if c.ConcurrencyKey == nil && c.ConcurrencyMax == nil {
+		return nil
+	}
+
+	spec := &ConcurrencySpec{Max: c.ConcurrencyMax}
+	if c.ConcurrencyKey != nil {
+		spec.Key = *c.ConcurrencyKey
+	}
+
+	return spec
+}
+
+// SetConcurrencySpec stores a concurrency spec on the node's columns.
+// Empty fields are stored as NULL, so an absent spec and a spec with
+// all fields empty are the same (default) configuration.
+func (c *CanvasNode) SetConcurrencySpec(spec *ConcurrencySpec) {
+	c.ConcurrencyKey = nil
+	c.ConcurrencyMax = nil
+	if spec == nil {
+		return
+	}
+
+	if spec.Key != "" {
+		c.ConcurrencyKey = &spec.Key
+	}
+
+	c.ConcurrencyMax = spec.Max
 }
 
 func (c *CanvasNode) ComponentName() string {
@@ -286,17 +354,56 @@ func FindCanvasNodesByIDs(tx *gorm.DB, canvasID uuid.UUID, nodeIDs []string) ([]
 	return nodes, nil
 }
 
-func ListCanvasNodesReady() ([]CanvasNode, error) {
+// ListCanvasNodesReady returns the component nodes with at least one
+// actionable pending queue item, i.e. the nodes a dispatch pass can make
+// progress on. A pending item is actionable when any of these holds:
+//
+//   - it has no queue name: either not resolved yet (capacity is unknown
+//     until then) or the node's component manages its own queue items
+//     (never capacity-gated, never resolved — merge, loop);
+//   - the item's queue has fewer active executions than the node's
+//     concurrency max.
+//
+// Nodes whose entire backlog waits on full queues are excluded: they
+// become actionable again when an execution leaves an active state, so
+// the next poll returns them.
+func ListCanvasNodesReady(tx *gorm.DB) ([]CanvasNode, error) {
 	var nodes []CanvasNode
-	query := database.Conn().
-		Distinct().
-		Joins("JOIN workflow_node_queue_items ON workflow_nodes.workflow_id = workflow_node_queue_items.workflow_id AND workflow_nodes.node_id = workflow_node_queue_items.node_id").
-		Where("workflow_nodes.state = ?", CanvasNodeStateReady).
-		Where("workflow_nodes.type = ?", NodeTypeComponent).
-		Where("workflow_nodes.deleted_at IS NULL")
-
-	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
-		Find(&nodes).
+	err := tx.
+		Raw(`
+			SELECT wn.*
+			FROM workflow_nodes wn
+			JOIN workflows w ON w.id = wn.workflow_id
+			JOIN organizations o ON o.id = w.organization_id
+			WHERE wn.state <> ?
+			  AND wn.type = ?
+			  AND wn.deleted_at IS NULL
+			  AND w.deleted_at IS NULL
+			  AND o.deleted_at IS NULL
+			  AND EXISTS (
+			    SELECT 1
+			    FROM workflow_node_queue_items qi
+			    WHERE qi.workflow_id = wn.workflow_id
+			      AND qi.node_id = wn.node_id
+			      AND (
+			        qi.queue_name IS NULL
+			        OR (
+			          SELECT COUNT(*)
+			          FROM workflow_node_executions e
+			          WHERE e.workflow_id = qi.workflow_id
+			            AND e.node_id = qi.node_id
+			            AND e.queue_name = qi.queue_name
+			            AND e.state IN ?
+			        ) < COALESCE(wn.concurrency_max, ?)
+			      )
+			  )
+		`,
+			CanvasNodeStateError,
+			NodeTypeComponent,
+			CanvasNodeExecutionActiveStates,
+			DefaultConcurrencyMax,
+		).
+		Scan(&nodes).
 		Error
 
 	if err != nil {
@@ -334,7 +441,7 @@ func LockCanvasNode(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (*CanvasNo
 		}).
 		Where("workflow_nodes.workflow_id = ?", workflowID).
 		Where("workflow_nodes.node_id = ?", nodeId).
-		Where("workflow_nodes.state = ?", CanvasNodeStateReady).
+		Where("workflow_nodes.state <> ?", CanvasNodeStateError).
 		Where("workflow_nodes.deleted_at IS NULL")
 
 	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
@@ -370,6 +477,41 @@ func (c *CanvasNode) UpdateState(tx *gorm.DB, state string) error {
 		Update("state", state).
 		Update("updated_at", time.Now()).
 		Error
+}
+
+// ListPendingQueueItems returns the node's actionable backlog in FIFO
+// order, up to limit items. Items whose resolved queue is already at
+// capacity are excluded, so a deep backlog on one busy queue cannot fill
+// the scan window and starve items of other queues. Items without a
+// queue name always qualify: either the name is not resolved yet
+// (capacity is unknown until then) or the node's component manages its
+// own queue items and is never capacity-gated.
+func (c *CanvasNode) ListPendingQueueItems(tx *gorm.DB, limit int) ([]CanvasNodeQueueItem, error) {
+	var queueItems []CanvasNodeQueueItem
+	err := tx.
+		Where("workflow_id = ?", c.WorkflowID).
+		Where("node_id = ?", c.NodeID).
+		Where(`
+			queue_name IS NULL
+			OR (
+				SELECT COUNT(*)
+				FROM workflow_node_executions e
+				WHERE e.workflow_id = workflow_node_queue_items.workflow_id
+				  AND e.node_id = workflow_node_queue_items.node_id
+				  AND e.queue_name = workflow_node_queue_items.queue_name
+				  AND e.state IN ?
+			) < ?
+		`, CanvasNodeExecutionActiveStates, c.ConcurrencySpec().EffectiveMax()).
+		Order("created_at ASC").
+		Limit(limit).
+		Find(&queueItems).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return queueItems, nil
 }
 
 func (c *CanvasNode) FirstQueueItem(tx *gorm.DB) (*CanvasNodeQueueItem, error) {
@@ -424,6 +566,13 @@ type CanvasNodeQueueItem struct {
 	// which holds the input for this queue item.
 	//
 	EventID uuid.UUID
+
+	//
+	// The resolved queue name for this item. Nil until the queue worker
+	// touches the item for the first time; the resolution is persisted so
+	// name expressions are evaluated exactly once per item.
+	//
+	QueueName *string
 }
 
 func (i *CanvasNodeQueueItem) TableName() string {

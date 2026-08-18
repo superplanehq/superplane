@@ -3,42 +3,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { TooltipProvider } from "@/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Check, Copy, ListTodo, Loader2, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import {
-  AGENT_OPTIONS,
   FIXTURE_INVITE_URL,
   FIXTURE_REPOS,
   VCS_OPTIONS,
-  integrationLabel,
   vcsLabel,
-  type AgentHarnessId,
   type IntegrationId,
-  type IssuesChoiceId,
   type VcsHostId,
 } from "./onboardingFixtures";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
-export function Shell({ children, className }: { children: ReactNode; className?: string }) {
-  useFactoriesThemeClass();
-  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider delayDuration={150}>
-        <div className={cn("w-full bg-background text-foreground", className)} data-testid="onboarding-shell">
-          {children}
-        </div>
-      </TooltipProvider>
-    </QueryClientProvider>
-  );
-}
-
-function IntegrationChoiceIcon({ name, size = 20 }: { name: IntegrationId | VcsHostId; size?: number }) {
+export function IntegrationChoiceIcon({ name, size = 20 }: { name: IntegrationId | VcsHostId; size?: number }) {
   return <IntegrationIcon integrationName={name} className={size <= 16 ? "size-3.5" : "size-5"} size={size} />;
 }
 
@@ -68,7 +46,7 @@ function connectOptionRowTone(soon: boolean, selected: boolean): string {
  * Shared row for version control, issues, and coding agent options.
  * Connectable rows always show Connect / Connected on the right.
  */
-function ConnectOptionRow({
+export function ConnectOptionRow({
   icon,
   title,
   detail,
@@ -153,7 +131,23 @@ function ConnectOptionRow({
   );
 }
 
-export function NameInviteStep({ setup }: { setup: OnboardingSetupApi }) {
+export function NameInviteStep({
+  setup,
+  inviteUrl = FIXTURE_INVITE_URL,
+  inviteLoading = false,
+  canInvite = true,
+}: {
+  setup: OnboardingSetupApi;
+  inviteUrl?: string | null;
+  inviteLoading?: boolean;
+  canInvite?: boolean;
+}) {
+  const copyInviteLink = () => {
+    if (!inviteUrl) return;
+    void navigator.clipboard?.writeText(inviteUrl);
+    setup.setInviteCopied(true);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -181,16 +175,14 @@ export function NameInviteStep({ setup }: { setup: OnboardingSetupApi }) {
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <code className="max-w-full truncate rounded-md border border-border bg-accent/40 px-2 py-1.5 text-[12px]">
-            {FIXTURE_INVITE_URL}
+            {inviteLoading ? "Loading invite link…" : (inviteUrl ?? "Invite link is not available.")}
           </code>
           <Button
             type="button"
             size="sm"
             variant="outline"
-            onClick={() => {
-              void navigator.clipboard?.writeText(FIXTURE_INVITE_URL);
-              setup.setInviteCopied(true);
-            }}
+            disabled={!canInvite || inviteLoading || !inviteUrl}
+            onClick={copyInviteLink}
           >
             <Copy className="size-3.5" aria-hidden />
             {setup.inviteCopied ? "Copied" : "Copy link"}
@@ -287,13 +279,15 @@ function RepositoryPicker({
 export function RepoStep({
   setup,
   onRequestConnect,
+  repos,
 }: {
   setup: OnboardingSetupApi;
   onRequestConnect: (id: IntegrationId) => void;
+  repos?: string[];
 }) {
   const host = setup.vcsHost;
   const hostConnected = host ? setup.connected.has(host) : false;
-  const repos = host && hostConnected ? FIXTURE_REPOS[host] : [];
+  const availableRepos = repos ?? (host && hostConnected ? FIXTURE_REPOS[host] : []);
 
   return (
     <div className="space-y-4">
@@ -320,7 +314,12 @@ export function RepoStep({
       </div>
 
       {host && hostConnected ? (
-        <RepositoryPicker host={host} repos={repos} selectedRepo={setup.selectedRepo} onSelect={setup.selectRepo} />
+        <RepositoryPicker
+          host={host}
+          repos={availableRepos}
+          selectedRepo={setup.selectedRepo}
+          onSelect={setup.selectRepo}
+        />
       ) : null}
     </div>
   );
@@ -330,10 +329,12 @@ export function IssuesStep({
   setup,
   onRequestConnect,
   autoDiscover,
+  repos,
 }: {
   setup: OnboardingSetupApi;
   onRequestConnect: (id: IntegrationId) => void;
   autoDiscover?: boolean;
+  repos?: string[];
 }) {
   const {
     selectedRepo,
@@ -362,7 +363,7 @@ export function IssuesStep({
   }
 
   const backlogRepo = issuesRepo ?? selectedRepo;
-  const repos = FIXTURE_REPOS[host];
+  const availableRepos = repos ?? FIXTURE_REPOS[host];
   const showDiscoveryResult = setup.issuesDiscovered || Boolean(setup.issuesChoice);
 
   return (
@@ -380,10 +381,12 @@ export function IssuesStep({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[13px] font-medium">
-                  Found {setup.issueCount} open issues on {vcsLabel(host)}
+                  {setup.issueCount === undefined
+                    ? `Use ${vcsLabel(host)} Issues`
+                    : `Found ${setup.issueCount} open issues on ${vcsLabel(host)}`}
                 </div>
                 <p className="mt-1 text-[12px] text-muted-foreground">
-                  SuperPlane can score these for autonomous work.
+                  Select the repository that SuperPlane will use for work orders.
                 </p>
               </div>
               <button
@@ -404,7 +407,7 @@ export function IssuesStep({
               <div className="mt-3">
                 <RepositoryPicker
                   host={host}
-                  repos={repos}
+                  repos={availableRepos}
                   selectedRepo={backlogRepo}
                   title="Select backlog repository"
                   description="Choose the repository that holds the issue backlog. The app repository does not change."
@@ -459,76 +462,6 @@ export function IssuesStep({
           </div>
         </>
       ) : null}
-    </div>
-  );
-}
-
-export function AgentStep({
-  setup,
-  onRequestConnect,
-}: {
-  setup: OnboardingSetupApi;
-  onRequestConnect: (id: IntegrationId) => void;
-}) {
-  return (
-    <div className="grid gap-2">
-      {AGENT_OPTIONS.map((option) => {
-        const connected = setup.connected.has(option.integrationId);
-        return (
-          <ConnectOptionRow
-            key={option.id}
-            icon={<IntegrationChoiceIcon name={option.integrationId} />}
-            title={option.label}
-            detail={option.detail}
-            selected={setup.agent === option.id}
-            connectLabel={integrationLabel(option.integrationId)}
-            connected={connected}
-            soon={option.soon}
-            onSelect={() => setup.setAgent(option.id as AgentHarnessId)}
-            onConnect={() => onRequestConnect(option.integrationId)}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
-export function DonePanel({ setup }: { setup: OnboardingSetupApi }) {
-  const issuesLabel = (choice: IssuesChoiceId | null) => {
-    if (choice === "vcs" && setup.vcsHost) {
-      const backlog = setup.issuesRepo ?? setup.selectedRepo;
-      return backlog ? `${vcsLabel(setup.vcsHost)} Issues · ${backlog}` : `${vcsLabel(setup.vcsHost)} Issues`;
-    }
-    if (choice === "linear") return "Linear";
-    if (choice === "jira") return "Jira";
-    if (choice === "skip") return "Manual work orders";
-    return "Not set";
-  };
-
-  return (
-    <div className="space-y-4 rounded-lg border border-border p-5">
-      <div>
-        <h2 className="text-[18px] font-semibold tracking-[-0.02em]">Workspace ready</h2>
-        <p className="mt-1 text-[13px] text-muted-foreground">
-          SuperPlane can keep analyzing the app and backlog. Create a work order to hand the first task to your coding
-          agent.
-        </p>
-      </div>
-      <ul className="space-y-2 text-[13px]">
-        <li>
-          <span className="text-muted-foreground">Workspace</span> · {setup.summary.workspaceName}
-        </li>
-        <li>
-          <span className="text-muted-foreground">App repository</span> · {setup.summary.selectedRepo}
-        </li>
-        <li>
-          <span className="text-muted-foreground">Backlog</span> · {issuesLabel(setup.issuesChoice)}
-        </li>
-        <li>
-          <span className="text-muted-foreground">Coding agent</span> ·{" "}
-          {AGENT_OPTIONS.find((option) => option.id === setup.agent)?.label ?? "—"}
-        </li>
-      </ul>
     </div>
   );
 }

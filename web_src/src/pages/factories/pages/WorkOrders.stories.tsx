@@ -11,9 +11,8 @@ import { CHECKOUT_RELIABILITY_MISSION, REFUNDS_V2_MISSION } from "./missions/mis
 import { WorkOrdersPage } from "./WorkOrdersPage";
 
 /**
- * Work Orders page. Storybook uses the missions page from FactoriesHarness.
- * The live app still renders `WorkOrdersPage`. New Work Order opens the
- * create dialog.
+ * Work Orders page. Storybook uses the FactoriesHarness work-orders route.
+ * New Work Order opens the create dialog.
  */
 const meta = {
   title: "Factories/Pages/Work Orders",

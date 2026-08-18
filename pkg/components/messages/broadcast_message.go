@@ -3,7 +3,6 @@ package messages
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -56,10 +55,6 @@ func (c *BroadcastMessage) ExampleOutput() map[string]any {
 
 func (c *BroadcastMessage) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
-}
-
-func (c *BroadcastMessage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *BroadcastMessage) Configuration() []configuration.Field {

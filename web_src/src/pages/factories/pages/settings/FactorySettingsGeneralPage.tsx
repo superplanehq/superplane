@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Trash2 } from "lucide-react";
@@ -36,6 +37,8 @@ export function FactorySettingsGeneralPage() {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const updateFactory = useUpdateFactory(organizationId, factoryId);
   const deleteFactory = useDeleteFactory(organizationId);
+
+  usePageTitle(["General", "Settings", factory.name ?? "Workspace"]);
 
   const [name, setName] = useState(factory.name ?? "");
   const [description, setDescription] = useState(factory.description ?? "");

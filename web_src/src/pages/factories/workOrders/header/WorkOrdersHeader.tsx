@@ -5,8 +5,9 @@ import { Plus } from "lucide-react";
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import type { WorkOrderListState } from "../../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../../lib/useWorkOrdersHeaderShortcuts";
+import { factorySectionHeaderClassName } from "../../pages/factoryPageLayoutStyles";
 import { buildAssigneeFilterOptions, buildLineFilterOptions } from "../../lib/workOrderFilterOptions";
-import type { WorkOrderListEntry } from "../../lib/workOrderListModel";
+import { WORK_ORDER_SCOPES, type WorkOrderListEntry } from "../../lib/workOrderListModel";
 import { DisplayMenu } from "./DisplayMenu";
 import { FilterChips } from "./FilterChips";
 import { FilterMenu } from "./FilterMenu";
@@ -24,11 +25,8 @@ interface WorkOrdersHeaderProps {
 }
 
 /**
- * Title bar for the Work Orders page. Uses the shared workspace page header,
- * with scope pills next to the title and the Filter menu, collapsible
- * search, Display menu, and New button in the trailing actions slot. Layout
- * and ordering sit inside Display rather than on the bar so the row stays
- * quiet.
+ * Compact title bar for the Work Orders page. Title, scope, and Filter
+ * stay on the left. Search, Display, and New sit on the right.
  *
  * The Filter menu and the chip row read from one shared set of options, so
  * both always show the same labels.
@@ -47,12 +45,22 @@ export function WorkOrdersHeader({
 
   return (
     <WorkspacePageHeader
+      className={factorySectionHeaderClassName}
       data-testid="work-orders-header"
       title="Work Orders"
-      leading={<ScopePills value={state.scope} onChange={state.setScope} />}
+      leading={
+        <>
+          <ScopePills
+            value={state.scope}
+            onChange={state.setScope}
+            options={WORK_ORDER_SCOPES}
+            testIdPrefix="work-orders-scope"
+          />
+          <FilterMenu state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
+        </>
+      }
       actions={
         <>
-          <FilterMenu state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
           <SearchField
             inputRef={searchRef}
             open={state.searchOpen}

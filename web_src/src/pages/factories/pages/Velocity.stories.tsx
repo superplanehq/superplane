@@ -3,10 +3,8 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 import { VelocityPage } from "./VelocityPage";
+import { VelocityPrototypePage } from "./VelocityPrototypePage";
 
-/**
- * Velocity page: yesterday snapshot, SuperPlane output trend, and source split.
- */
 const meta = {
   title: "Factories/Pages/Velocity",
   component: VelocityPage,
@@ -22,6 +20,7 @@ export const Default: Story = {
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/velocity`}
       factoriesFixture={defaultFactoriesFixture}
+      pageOverrides={{ velocity: VelocityPrototypePage }}
     />
   ),
 };

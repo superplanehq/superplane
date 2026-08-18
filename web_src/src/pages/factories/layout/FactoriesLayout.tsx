@@ -2,24 +2,24 @@ import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useCreateFactory, useFactories, useFactory, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactories, useFactory, useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { AlertTriangle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from "react-router";
-import { CreateFactoryDialog } from "../CreateFactoryDialog";
 import { CreateWorkOrderDialog } from "../CreateWorkOrderDialog";
 import {
   factoryRouteNeedsCanonicalRedirect,
   replaceFactoryKeySegment,
   resolveFactoryByKey,
 } from "../lib/factoryKeyResolution";
-import { factoryDetailPath, factoryListPath, factoryOnboardingPath } from "../lib/factoryPagePaths";
+import { factoryListPath, newFactoryPath } from "../lib/factoryPagePaths";
 import { clearLastVisitedFactory, recordLastVisitedFactory } from "../lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
 import { useOnboardingStorybook } from "../pages/onboarding/useOnboardingStorybook";
+import { isFactoryOnboardingComplete } from "../pages/onboarding/onboardingStatus";
 import { FactoriesLayoutContext } from "./factoriesLayoutContext";
 import { FactoriesNav } from "./FactoriesNav";
 import { SidebarUserMenu } from "./SidebarUserMenu";
@@ -30,6 +30,24 @@ const MAX_RECENT_WORK_ORDERS = 5;
 
 function isOnboardingSidebarHidden(pendingWorkspaceId: string | undefined, factoryId: string) {
   return Boolean(pendingWorkspaceId && pendingWorkspaceId === factoryId);
+}
+
+/**
+ * Hide workspace chrome while onboarding runs so the setup wizard matches the
+ * onboarding design. Storybook uses its pending pointer; production checks the
+ * server-backed onboarding state for admins who run setup.
+ */
+function shouldHideOnboardingSidebar(args: {
+  storybookPendingWorkspaceId: string | undefined;
+  hasStorybookOnboarding: boolean;
+  factoryId: string;
+  canConfigure: boolean;
+  factory: FactoriesFactory | null;
+}): boolean {
+  if (isOnboardingSidebarHidden(args.storybookPendingWorkspaceId, args.factoryId)) {
+    return true;
+  }
+  return !args.hasStorybookOnboarding && args.canConfigure && !isFactoryOnboardingComplete(args.factory);
 }
 
 export function FactoriesLayout() {
@@ -97,7 +115,6 @@ function FactoriesLayoutContent({
   const navigate = useNavigate();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const [createFactoryOpen, setCreateFactoryOpen] = useState(false);
   const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
     useCreateWorkOrderDialogState(organizationId, factoryKey, canAct("work_orders", "create"));
 
@@ -106,11 +123,18 @@ function FactoriesLayoutContent({
   useFactoryWebsocket(organizationId, factoryId);
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
 
-  const createFactory = useCreateFactory(organizationId);
   const storybookOnboarding = useOnboardingStorybook();
 
+  // Once `factory` has loaded, the `<Outlet/>` below mounts a leaf page that
+  // owns the full, specific title itself (see `usePageTitle` call sites under
+  // `pages/factories/pages/`). React fires a newly-mounted child's effects
+  // before its parent's, so if this effect stayed enabled it would run right
+  // after the leaf's and clobber it back down to just the factory name on
+  // every first render (e.g. a hard reload straight to a work order
+  // permalink). Disable it as soon as there's a leaf to hand off to; keep it
+  // enabled only for the loading/error baseline rendered before that.
   const pageTitle = useMemo(() => (factory?.name ? [factory.name] : ["Workspaces"]), [factory?.name]);
-  usePageTitle(pageTitle);
+  usePageTitle(pageTitle, { enabled: !factory });
 
   useEffect(() => {
     if (account?.id && factory?.id) {
@@ -141,24 +165,6 @@ function FactoriesLayoutContent({
     [organizationId, factoryId, factoryKey, factory, factories, openCreateWorkOrder],
   );
 
-  const handleCreateFactory = async (input: { name: string; description: string; key: string }) => {
-    // Let CreateFactoryDialog catch failures so duplicate-name inline errors work.
-    const created = await createFactory.mutateAsync(input);
-    setCreateFactoryOpen(false);
-    if (!created.key) {
-      return;
-    }
-    if (storybookOnboarding && created.id) {
-      storybookOnboarding.beginOnboarding({
-        workspaceId: created.id,
-        workspaceName: created.name || input.name,
-      });
-      navigate(factoryOnboardingPath(organizationId, created.key));
-      return;
-    }
-    navigate(factoryDetailPath(organizationId, created.key));
-  };
-
   if (factoryError) {
     return <FactoriesLayoutError organizationId={organizationId} />;
   }
@@ -167,10 +173,20 @@ function FactoriesLayoutContent({
     return <FactoriesLayoutLoading />;
   }
 
+  // Incomplete workspaces show only the setup wizard, without workspace
+  // chrome, so the production flow matches the onboarding design.
+  const hideSidebar = shouldHideOnboardingSidebar({
+    storybookPendingWorkspaceId: storybookOnboarding?.pending?.workspaceId,
+    hasStorybookOnboarding: Boolean(storybookOnboarding),
+    factoryId,
+    canConfigure: canAct("factories", "update"),
+    factory,
+  });
+
   return (
     <FactoriesLayoutContext.Provider value={layoutContextValue}>
       <div className="flex h-screen w-full bg-background text-foreground" data-testid="factories-layout">
-        {isOnboardingSidebarHidden(storybookOnboarding?.pending?.workspaceId, factoryId) ? null : (
+        {hideSidebar ? null : (
           <FactoriesSidebar
             organizationId={organizationId}
             factoryKey={factoryKey}
@@ -184,7 +200,7 @@ function FactoriesLayoutContent({
             canCreateFactory={canAct("factories", "create")}
             permissionsLoading={permissionsLoading}
             recentWorkOrders={recentWorkOrders}
-            onOpenCreateFactory={() => setCreateFactoryOpen(true)}
+            onOpenCreateFactory={() => navigate(newFactoryPath(organizationId))}
           />
         )}
         <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
@@ -192,12 +208,6 @@ function FactoriesLayoutContent({
         </main>
       </div>
 
-      <CreateFactoryDialog
-        open={createFactoryOpen}
-        isSaving={createFactory.isPending}
-        onClose={() => setCreateFactoryOpen(false)}
-        onCreate={handleCreateFactory}
-      />
       {canAct("work_orders", "create") ? (
         <CreateWorkOrderDialog
           open={createWorkOrderOpen}

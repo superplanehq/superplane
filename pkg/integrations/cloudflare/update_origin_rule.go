@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -189,10 +188,6 @@ func (c *UpdateOriginRule) Execute(ctx core.ExecutionContext) error {
 
 func (c *UpdateOriginRule) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *UpdateOriginRule) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *UpdateOriginRule) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
