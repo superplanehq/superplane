@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
+import { defaultNotificationTypeToggles, notificationTypesFromToggles } from "@/lib/notificationSettings";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
 
 /**
@@ -55,12 +56,11 @@ export const NotificationsEnabled: Story = {
           enabled: true,
           workspaceScope: "WORKSPACE_SCOPE_SELECTED",
           factoryIds: [defaultFactoriesFixture.factories[0]?.id ?? ""],
-          workOrderAssigned: true,
-          workOrderCommentOwned: true,
-          workOrderCommentCreated: false,
-          workOrderStatusOwned: true,
-          workOrderArtifactOwned: false,
-          workOrderMentioned: true,
+          types: notificationTypesFromToggles({
+            ...defaultNotificationTypeToggles(),
+            TYPE_WORK_ORDER_COMMENT_CREATED: false,
+            TYPE_WORK_ORDER_ARTIFACT_OWNED: false,
+          }),
         },
       }}
     />

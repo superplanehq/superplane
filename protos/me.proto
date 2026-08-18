@@ -114,16 +114,28 @@ message NotificationSettings {
     WORKSPACE_SCOPE_SELECTED = 2;
   }
 
+  // Type identifies a work order email category. A missing toggle
+  // defaults to on, so a newly added type stays enabled until the
+  // user turns it off.
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    TYPE_WORK_ORDER_ASSIGNED = 1;
+    TYPE_WORK_ORDER_COMMENT_OWNED = 2;
+    TYPE_WORK_ORDER_COMMENT_CREATED = 3;
+    TYPE_WORK_ORDER_STATUS_OWNED = 4;
+    TYPE_WORK_ORDER_ARTIFACT_OWNED = 5;
+  }
+
+  message TypeToggle {
+    Type type = 1;
+    bool enabled = 2;
+  }
+
   bool enabled = 1;
   WorkspaceScope workspace_scope = 2;
   // Factory (workspace) IDs covered when `workspace_scope` is SELECTED.
   repeated string factory_ids = 3;
-  bool work_order_assigned = 4;
-  bool work_order_comment_owned = 5;
-  bool work_order_comment_created = 6;
-  bool work_order_status_owned = 7;
-  bool work_order_artifact_owned = 8;
-  bool work_order_mentioned = 9;
+  repeated TypeToggle types = 4;
 }
 
 message DescribeNotificationSettingsRequest {}

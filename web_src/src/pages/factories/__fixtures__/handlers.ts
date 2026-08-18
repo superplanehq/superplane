@@ -6,6 +6,7 @@ import {
 } from "./factoryPageResponses";
 import { DEFAULT_ARTIFACTS_BY_ORDER_ID, DEFAULT_EVENTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
 import type { FactoriesWorkOrder, FactoriesWorkOrderEvent } from "@/api-client";
+import { defaultNotificationSettings } from "@/lib/notificationSettings";
 import { fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
 
 export type { FactoriesFixture };
@@ -32,8 +33,6 @@ interface RequestBody {
   result?: unknown;
   steps?: unknown;
   body?: unknown;
-  mentionedUserIds?: unknown;
-  mentioned_user_ids?: unknown;
 }
 
 function stringOrEmpty(value: unknown): string {
@@ -280,9 +279,6 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         const order = findOrder(fixture, match[1], match[2]);
         if (!order) return { json: {} };
         const commentBody = stringOrEmpty(((body ?? {}) as RequestBody).body);
-        const mentionedUserIds = stringArrayOrEmpty(
-          ((body ?? {}) as RequestBody).mentionedUserIds ?? ((body ?? {}) as RequestBody).mentioned_user_ids,
-        );
         const timestamp = new Date().toISOString();
         const events: FactoriesWorkOrderEvent[] = [
           ...orderEvents(fixture, match[2]),
@@ -292,7 +288,6 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
             event: {
               order: { id: order.id, title: order.title },
               body: commentBody,
-              mentionedUserIds,
               author: { kind: "user", userId: STORYBOOK_ME_USER_ID },
             },
           },
@@ -305,17 +300,7 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
 }
 
 function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
-  const defaults = {
-    enabled: true,
-    workspaceScope: "WORKSPACE_SCOPE_ALL",
-    factoryIds: [],
-    workOrderAssigned: true,
-    workOrderCommentOwned: true,
-    workOrderCommentCreated: true,
-    workOrderStatusOwned: true,
-    workOrderArtifactOwned: true,
-    workOrderMentioned: true,
-  } satisfies FactoriesFixture["notificationSettings"];
+  const defaults = defaultNotificationSettings();
 
   return {
     pattern: re("/api/v1/me/notification-settings"),
