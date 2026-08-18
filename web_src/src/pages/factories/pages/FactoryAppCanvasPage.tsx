@@ -1,4 +1,6 @@
 import { AppPage } from "@/pages/app";
+import { usePageTitle } from "@/hooks/usePageTitle";
+import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { FactoryAppCanvasHeader } from "./FactoryAppCanvasHeader";
 import { FactoryAppCanvasRedirect } from "./factoryAppCanvasGuards";
 import { useFactoryAppCanvasPageModel } from "./useFactoryAppCanvasPageModel";
@@ -9,7 +11,13 @@ import { useFactoryAppCanvasPageModel } from "./useFactoryAppCanvasPageModel";
  * opens Configure (edit mode) with Discard / Save.
  */
 export function FactoryAppCanvasPage() {
+  const { factory } = useFactoriesLayout();
   const model = useFactoryAppCanvasPageModel();
+
+  // `model.title` is already computed for the visible header (falls back to
+  // "Untitled automation" while the canvas name loads); reuse it here so the
+  // tab title and on-page heading always agree.
+  usePageTitle([model.title, factory?.name ?? "Workspace"]);
 
   if (model.shouldRedirect) {
     return <FactoryAppCanvasRedirect organizationId={model.organizationId} factoryKey={model.factoryKey} />;
