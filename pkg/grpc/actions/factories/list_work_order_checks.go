@@ -84,15 +84,7 @@ func serializeCheck(check *models.FactoryWorkOrderCheck) (*pb.WorkOrderCheck, er
 		Analysis:      check.Analysis,
 		CreatedAt:     timestamppb.New(check.CreatedAt),
 		UpdatedAt:     timestamppb.New(check.UpdatedAt),
-	}
-
-	if automation != nil {
-		serialized.Automation = &pb.AutomationRef{
-			NodeId:   automation.NodeID,
-			NodeName: automation.NodeName,
-			AppId:    automation.AppID.String(),
-			AppName:  automation.AppName,
-		}
+		Automation:    serializeAutomationRef(automation),
 	}
 
 	if check.RunID != nil {
