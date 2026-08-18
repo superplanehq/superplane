@@ -103,8 +103,10 @@ export const REFUND_FACTORY_APPS: FactoryApp[] = [
   },
 ];
 
-const REFUND_LINE_PLAN_ID = "line-plan-and-implement";
-const REFUND_LINE_HOTFIX_ID = "line-hotfix";
+export const REFUND_LINE_PLAN_ID = "line-plan-and-implement";
+export const REFUND_LINE_HOTFIX_ID = "line-hotfix";
+export const REFUND_LINE_ONBOARDING_ID = "line-onboarding";
+export const REFUND_LINE_FEATURE_ID = "line-feature-delivery";
 
 export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
   {
@@ -445,6 +447,153 @@ export const emptyWorkOrdersFactoriesFixture: FactoriesFixture = {
   workOrdersByFactoryId: {
     [PRIMARY_FACTORY_ID]: [CLOSED_WORK_ORDER],
     [EMPTY_FACTORY_ID]: [],
+  },
+};
+
+const ONBOARDING_FACTORY_LINE: FactoriesFactoryLine = {
+  id: REFUND_LINE_ONBOARDING_ID,
+  name: "onboarding",
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+  steps: [
+    runAppStep("plan", "app-refund-planner", "start-plan"),
+    runAppStep("implement", "app-refund-implementer", "start-implementation"),
+  ],
+};
+
+const FEATURE_PLAN_STEP = "Create Implementation Plan";
+const FEATURE_IMPLEMENT_STEP = "Implement";
+const FEATURE_PR_STEP = "Open Pull Request";
+const FEATURE_CI_STEP = "Ci Loop";
+
+const FEATURE_DELIVERY_LINE: FactoriesFactoryLine = {
+  id: REFUND_LINE_FEATURE_ID,
+  name: "feature-delivery",
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+  steps: [
+    runAppStep(FEATURE_PLAN_STEP, "app-refund-planner", "start-plan"),
+    runAppStep(FEATURE_IMPLEMENT_STEP, "app-refund-implementer", "start-implementation"),
+    runAppStep(FEATURE_PR_STEP, "app-refund-implementer", "start-pull-request"),
+    runAppStep(FEATURE_CI_STEP, "app-refund-verifier", "start-ci-loop"),
+  ],
+};
+
+function featureLineExecution(
+  step: string,
+  overrides: Partial<FactoriesWorkOrderExecution> = {},
+): FactoriesWorkOrderExecution {
+  return {
+    id: `exec-feature-${overrides.id ?? step}`,
+    line: { id: REFUND_LINE_FEATURE_ID, name: "feature-delivery" },
+    step,
+    state: "STATE_FINISHED",
+    result: "RESULT_PASSED",
+    createdAt: TWO_HOURS_AGO,
+    updatedAt: HOUR_AGO,
+    run: {
+      id: `run-feature-${step}`,
+      appId: "app-refund-implementer",
+      appName: "Refund Implementer",
+    },
+    ...overrides,
+  };
+}
+
+const FEATURE_RUNNING_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-feature-implement",
+  number: "201",
+  key: "RF-201",
+  title: "Ship ledger retry window",
+  description: "Implement the retry window from the plan and open a pull request.",
+  state: "STATE_OPEN",
+  result: "RESULT_UNSPECIFIED",
+  createdAt: YESTERDAY,
+  updatedAt: HOUR_AGO,
+  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  executions: [
+    featureLineExecution(FEATURE_PLAN_STEP, { id: "plan-1" }),
+    featureLineExecution(FEATURE_IMPLEMENT_STEP, {
+      id: "impl-1",
+      state: "STATE_STARTED",
+      result: "RESULT_UNKNOWN",
+      run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+    }),
+  ],
+};
+
+const FEATURE_PR_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-feature-pr",
+  number: "202",
+  key: "RF-202",
+  title: "Open refund schema pull request",
+  description: "Plan and implementation passed. Pull request is waiting for review.",
+  state: "STATE_OPEN",
+  result: "RESULT_UNSPECIFIED",
+  createdAt: YESTERDAY,
+  updatedAt: HOUR_AGO,
+  createdBy: { user: { id: REVIEWER_USER.id, name: REVIEWER_USER.name } },
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  executions: [
+    featureLineExecution(FEATURE_PLAN_STEP, { id: "plan-2" }),
+    featureLineExecution(FEATURE_IMPLEMENT_STEP, { id: "impl-2" }),
+    featureLineExecution(FEATURE_PR_STEP, {
+      id: "pr-2",
+      state: "STATE_PENDING",
+      result: "RESULT_UNKNOWN",
+    }),
+  ],
+};
+
+const FEATURE_CI_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-feature-ci",
+  number: "203",
+  key: "RF-203",
+  title: "Run CI on refund enum pull request",
+  description: "Pull request is open. CI loop is running.",
+  state: "STATE_OPEN",
+  result: "RESULT_UNSPECIFIED",
+  createdAt: YESTERDAY,
+  updatedAt: HOUR_AGO,
+  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  executions: [
+    featureLineExecution(FEATURE_PLAN_STEP, { id: "plan-3" }),
+    featureLineExecution(FEATURE_IMPLEMENT_STEP, { id: "impl-3" }),
+    featureLineExecution(FEATURE_PR_STEP, { id: "pr-3" }),
+    featureLineExecution(FEATURE_CI_STEP, {
+      id: "ci-3",
+      state: "STATE_STARTED",
+      result: "RESULT_UNKNOWN",
+      run: { id: LINE_RUN_VERIFY_PASSED_ID, appId: "app-refund-verifier", appName: "Refund Verifier" },
+    }),
+  ],
+};
+
+/**
+ * Extra lines for the populated Lines list: unused onboarding plus a
+ * four-phase feature line.
+ */
+export const lineMetricsFactoriesFixture: FactoriesFixture = {
+  ...defaultFactoriesFixture,
+  factories: defaultFactoriesFixture.factories.map((factory) => {
+    if (factory.id !== PRIMARY_FACTORY_ID) {
+      return factory;
+    }
+    return {
+      ...factory,
+      lines: [...(factory.lines ?? []), ONBOARDING_FACTORY_LINE, FEATURE_DELIVERY_LINE],
+    };
+  }),
+  workOrdersByFactoryId: {
+    ...defaultFactoriesFixture.workOrdersByFactoryId,
+    [PRIMARY_FACTORY_ID]: [
+      ...(defaultFactoriesFixture.workOrdersByFactoryId[PRIMARY_FACTORY_ID] ?? []),
+      FEATURE_RUNNING_WORK_ORDER,
+      FEATURE_PR_WORK_ORDER,
+      FEATURE_CI_WORK_ORDER,
+    ],
   },
 };
 

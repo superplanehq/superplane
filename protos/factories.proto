@@ -134,6 +134,17 @@ service Factories {
     };
   }
 
+  rpc ListFactoryLineMetrics(ListFactoryLineMetricsRequest) returns (ListFactoryLineMetricsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/line-metrics"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory line metrics";
+      description: "Returns last-30-day performance metrics for each factory line";
+      tags: "Factory";
+    };
+  }
+
   // Work orders APIs
 
   rpc ListWorkOrders(ListWorkOrdersRequest) returns (ListWorkOrdersResponse) {
@@ -429,6 +440,38 @@ message ListFactoryAppsRequest {
 
 message ListFactoryAppsResponse {
   repeated Factory.App apps = 1;
+}
+
+message ListFactoryLineMetricsRequest {
+  string factory_id = 1;
+}
+
+message ListFactoryLineMetricsResponse {
+  repeated FactoryLineMetricsEntry lines = 1;
+}
+
+message FactoryLineMetricsEntry {
+  string line_id = 1;
+  // Unset when the line has no closed work orders in the last 30 days.
+  FactoryLineMetrics metrics = 2;
+}
+
+// Last 30 days. Daily trend series cover the last 14 days, oldest first.
+message FactoryLineMetrics {
+  // Share of closed work orders whose pull request merged to main.
+  double success_rate_pct = 1;
+  int32 merged_count = 2;
+  int32 total_closed_count = 3;
+  // Average user comments plus extra step runs per closed work order.
+  double rework_per_work_order = 4;
+  // Execution cost in USD divided by merged work orders.
+  double cost_per_success_usd = 5;
+  repeated double success_trend_pct = 6;
+  double success_delta_pts = 7;
+  double rework_delta = 8;
+  double cost_delta_usd = 9;
+  double throughput_per_day = 10;
+  repeated int32 throughput_trend = 11;
 }
 
 // Work orders
