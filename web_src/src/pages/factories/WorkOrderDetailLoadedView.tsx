@@ -10,6 +10,7 @@ import { workOrdersPath } from "./lib/factoryPagePaths";
 import { getWorkOrderDisplayKey, type WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 import { factoryContentBodyClassName } from "./pages/factoryPageLayoutStyles";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
+import { WorkOrderChecksSection, type WorkOrderCheckPresentation } from "./WorkOrderChecksSection";
 import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
 import { WorkOrderDescription } from "./WorkOrderDescription";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
@@ -29,6 +30,8 @@ interface WorkOrderDetailLoadedViewProps {
   artifacts: FactoriesWorkOrderArtifact[];
   isArtifactsLoading: boolean;
   artifactsError?: Error | null;
+  /** Scores reported by automations (risk review, coverage, …). Mock-driven until the checks API exists. */
+  checks?: WorkOrderCheckPresentation[];
   displayStatus: WorkOrderDisplayStatus;
   statusMeta: { label: string; className: string };
   assigneeIds: string[];
@@ -96,6 +99,7 @@ function WorkOrderDetailBody({
   artifacts,
   isArtifactsLoading,
   artifactsError,
+  checks,
   displayStatus,
   statusMeta,
   assigneeIds,
@@ -119,7 +123,17 @@ function WorkOrderDetailBody({
         <div className="min-w-0">
           {order.description ? <WorkOrderDescription description={order.description} /> : null}
 
-          <section className={order.description ? "mt-10" : undefined}>
+          {checks?.length ? (
+            <WorkOrderChecksSection
+              checks={checks}
+              organizationId={organizationId}
+              factoryKey={factoryKey}
+              orderNumber={order.number !== undefined ? String(Number(order.number)) : undefined}
+              className={order.description ? "mt-10" : undefined}
+            />
+          ) : null}
+
+          <section className={order.description || checks?.length ? "mt-10" : undefined}>
             <h2 className="workspace-section-title">Activity</h2>
             <p className="workspace-body-text mt-1 text-muted-foreground">
               Actions and comments on the work order, plus factory line runs.
