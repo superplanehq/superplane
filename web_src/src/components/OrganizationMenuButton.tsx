@@ -192,7 +192,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
                 aria-expanded={isMenuOpen}
                 aria-haspopup="menu"
               >
-                <Menu className="h-5 w-5" aria-hidden />
+                <Menu className="size-4.5" aria-hidden />
               </button>
             </TooltipTrigger>
             <TooltipContent>Open Menu</TooltipContent>
@@ -332,16 +332,20 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
             <Link
               to={logoHref}
               aria-label="Go to canvases"
-              className="flex h-8 cursor-pointer items-center rounded-md px-2 hover:bg-slate-100 dark:hover:bg-gray-800"
+              className="flex h-8 cursor-pointer items-center rounded-md px-1.5 hover:bg-slate-100 dark:hover:bg-gray-800"
             >
-              <img src={SuperplaneLogo} alt="SuperPlane" className="h-6 w-6 dark:brightness-0 dark:invert" />
+              <img
+                src={SuperplaneLogo}
+                alt="SuperPlane"
+                className="h-6 w-6 dark:brightness-0 dark:invert dark:opacity-80"
+              />
             </Link>
           </TooltipTrigger>
           <TooltipContent>Homepage</TooltipContent>
         </Tooltip>
         <HoverCard openDelay={100} closeDelay={150}>
           <HoverCardTrigger asChild>
-            <Badge className="cursor-pointer rounded-full border border-gray-500 bg-transparent pl-1.5 pr-1 py-0 text-[10px] font-semibold uppercase tracking-wide text-gray-500 hover:bg-gray-950/5 dark:border-gray-400 dark:text-gray-400 dark:hover:bg-white/5">
+            <Badge className="ml-1 cursor-pointer rounded-full border border-blue-400 bg-blue-50 pl-1.5 pr-1 py-0 text-[10px] font-semibold uppercase tracking-wide text-blue-500 hover:bg-blue-100 dark:border-blue-500/50 dark:bg-blue-950/50 dark:text-blue-400/60 dark:hover:bg-blue-950/70">
               Beta
             </Badge>
           </HoverCardTrigger>

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Kanban, Loader2 } from "lucide-react";
+import { Check, Kanban, Loader2, RefreshCcw, User, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -8,16 +8,15 @@ import { useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
 import { isManualRunNode } from "../manualRunTriggers";
 import { WidgetEmptyState } from "../WidgetEmptyState";
 import { applyTableWhere } from "./evalTableWhere";
-import { laneStyleFor } from "./boardLaneStyles";
 import { resolveCellValue } from "./resolveCellValue";
 import { evaluateRowShow } from "./rowVisibility";
 import { applySort } from "./widgetData";
-import { WidgetBoardCardField } from "./WidgetBoardCardField";
+import { WidgetBoardCardField, isBoardCardHeaderField, isBoardCardMetaField } from "./WidgetBoardCardField";
 import { WidgetRowActionButton } from "./WidgetRowActionButton";
 import { rowKeyForRow } from "./rowKey";
 import { WidgetLoadMoreFooter } from "./WidgetTable";
 import { WidgetTableActionLockProvider } from "./WidgetTableActionLock";
-import type { WidgetBoardLane, WidgetBoardRender, WidgetRowAction } from "./types";
+import type { WidgetBoardLane, WidgetBoardRender, WidgetRowAction, WidgetTableColumn } from "./types";
 
 interface WidgetBoardProps {
   render: WidgetBoardRender;
@@ -168,40 +167,36 @@ function BoardLane({
   rowActions: WidgetRowAction[];
   render: WidgetBoardRender;
 }) {
-  const laneStyle = laneStyleFor(bucket.lane.color);
   const laneLabel = bucket.lane.label?.trim() ? bucket.lane.label : bucket.lane.value;
+  const laneStatus = laneStatusFor(bucket.lane);
   return (
     <div
-      className="flex h-full min-h-0 min-w-56 flex-1 flex-col rounded-md border border-slate-200 bg-white dark:border-gray-800 dark:bg-gray-900/40"
+      className="flex h-full min-h-0 min-w-72 flex-1 flex-col rounded-md bg-slate-100 dark:bg-gray-900/40"
       data-testid="widget-board-lane"
       data-lane-key={bucket.key}
     >
-      <div
-        className={cn(
-          "flex items-center justify-between rounded-t-md border-b border-slate-200 px-3 py-1.5 dark:border-gray-800",
-          laneStyle.header,
-        )}
-      >
-        <span className="truncate text-xs font-medium">{laneLabel}</span>
+      <div className="flex items-center justify-between rounded-t-md px-3 py-1.5 text-slate-500 dark:text-gray-200">
+        <span className="truncate text-[13px] font-medium">{laneLabel}</span>
         <span
-          className={cn(
-            "ml-2 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
-            laneStyle.badge,
-          )}
+          className="ml-2 shrink-0 rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-slate-700 dark:bg-gray-700 dark:text-gray-200"
           data-testid="widget-board-lane-count"
         >
           {bucket.rows.length}
         </span>
       </div>
-      <div
-        className={cn("flex-1 space-y-2 overflow-y-auto border-l-2 p-2", laneStyle.strip)}
-        data-testid="widget-board-lane-body"
-      >
+      <div className="flex-1 space-y-2 overflow-y-auto p-2" data-testid="widget-board-lane-body">
         {bucket.rows.length === 0 ? (
           <p className="p-2 text-center text-[11px] text-slate-400 dark:text-gray-500">Empty lane</p>
         ) : (
           bucket.rows.map((row, idx) => (
-            <BoardCard key={rowKeyForRow(row, idx)} row={row} index={idx} rowActions={rowActions} render={render} />
+            <BoardCard
+              key={rowKeyForRow(row, idx)}
+              row={row}
+              index={idx}
+              rowActions={rowActions}
+              render={render}
+              laneStatus={laneStatus}
+            />
           ))
         )}
       </div>
@@ -214,25 +209,90 @@ function BoardCard({
   index,
   rowActions,
   render,
+  laneStatus,
 }: {
   row: Record<string, unknown>;
   index: number;
   rowActions: WidgetRowAction[];
   render: WidgetBoardRender;
+  laneStatus?: BoardLaneStatus;
 }) {
   const rowKey = rowKeyForRow(row, index);
   const title = cardTitle(row, render);
   const visibleActions = rowActions.filter((action) => evaluateRowShow(action.show, row));
+  const { headerFields, metaFields, bodyFields } = partitionCardFields(render.card.fields ?? []);
+  const durationFields = metaFields.filter((field) => field.format === "duration");
+  const relativeFields = metaFields.filter((field) => field.format === "relative");
+  const showStatusIcon =
+    laneStatus === "failed" || laneStatus === "done" || laneStatus === "in_progress" || laneStatus === "human_review";
 
   return (
     <div
-      className="rounded-md border border-slate-200 bg-white p-2 shadow-sm hover:border-slate-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
+      className={cn(
+        "rounded-lg border border-slate-950/15 bg-clip-padding p-2 dark:border-gray-700/70",
+        laneStatus === "failed"
+          ? "bg-[radial-gradient(100px_circle_at_top_right,theme(colors.red.100)_0%,theme(colors.white)_100%)] dark:bg-[radial-gradient(100px_circle_at_top_right,rgb(153_27_27_/_0.55)_0%,rgb(255_255_255_/_0.05)_100%)]"
+          : "bg-white dark:bg-white/5",
+      )}
       data-testid="widget-board-card"
     >
+      {headerFields.length > 0 || showStatusIcon ? (
+        <div className="mb-1 flex w-full items-center justify-between gap-2" data-testid="board-card-header-fields">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+            {headerFields.map((field, fi) => (
+              <WidgetBoardCardField key={`${field.field}-${fi}`} col={field} row={row} variant="header" />
+            ))}
+          </div>
+          {laneStatus === "failed" ? (
+            <X
+              className="ml-auto size-3.5 shrink-0 text-red-600 dark:text-red-400"
+              aria-hidden
+              data-testid="board-card-failed-icon"
+            />
+          ) : null}
+          {laneStatus === "done" ? (
+            <Check
+              className="ml-auto size-3.5 shrink-0 text-emerald-600"
+              aria-hidden
+              data-testid="board-card-done-icon"
+            />
+          ) : null}
+          {laneStatus === "in_progress" ? (
+            <RefreshCcw
+              className="ml-auto size-3.5 shrink-0 animate-[spin_2.5s_linear_infinite] [animation-direction:reverse] text-blue-600 dark:text-blue-400"
+              aria-hidden
+              data-testid="board-card-in-progress-icon"
+            />
+          ) : null}
+          {laneStatus === "human_review" ? (
+            <User
+              className="ml-auto size-3.5 shrink-0 text-yellow-800 dark:text-yellow-400"
+              aria-hidden
+              data-testid="board-card-human-review-icon"
+            />
+          ) : null}
+        </div>
+      ) : null}
       <div className="text-[13px] font-medium leading-tight text-slate-800 dark:text-gray-100">{title}</div>
-      {(render.card.fields ?? []).length > 0 ? (
+      {metaFields.length > 0 ? (
+        <div className="mt-1.5 flex w-full items-center justify-between gap-2" data-testid="board-card-meta-fields">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5">
+            {durationFields.map((field, fi) => (
+              <WidgetBoardCardField key={`${field.field}-${fi}`} col={field} row={row} variant="meta" />
+            ))}
+          </div>
+          {relativeFields.length > 0 ? (
+            <div className="ml-auto flex shrink-0 items-center justify-end gap-1.5">
+              {relativeFields.map((field, fi) => (
+                <WidgetBoardCardField key={`${field.field}-${fi}`} col={field} row={row} variant="meta" />
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {bodyFields.length > 0 ? (
         <div className="mt-1.5 space-y-1">
-          {(render.card.fields ?? []).map((field, fi) => (
+          {bodyFields.map((field, fi) => (
             <WidgetBoardCardField key={`${field.field}-${fi}`} col={field} row={row} />
           ))}
         </div>
@@ -246,6 +306,49 @@ function BoardCard({
       ) : null}
     </div>
   );
+}
+
+/**
+ * Split card fields into header links (above title), time meta (one row under
+ * the title), and remaining body rows — preserving configured order in each
+ * group.
+ */
+function partitionCardFields(fields: WidgetTableColumn[]): {
+  headerFields: WidgetTableColumn[];
+  metaFields: WidgetTableColumn[];
+  bodyFields: WidgetTableColumn[];
+} {
+  const headerFields: WidgetTableColumn[] = [];
+  const metaFields: WidgetTableColumn[] = [];
+  const bodyFields: WidgetTableColumn[] = [];
+  for (const field of fields) {
+    if (isBoardCardHeaderField(field)) {
+      headerFields.push(field);
+      continue;
+    }
+    if (isBoardCardMetaField(field)) {
+      metaFields.push(field);
+      continue;
+    }
+    bodyFields.push(field);
+  }
+  return { headerFields, metaFields, bodyFields };
+}
+
+type BoardLaneStatus = "failed" | "done" | "in_progress" | "human_review";
+
+/**
+ * Match factory YAML (`failed`/`done`/`in_progress`/`human_review`) and
+ * fixture labels (`Failed`/`Done`/`In progress`/`Human review`) for
+ * lane-specific card chrome.
+ */
+function laneStatusFor(lane: WidgetBoardLane): BoardLaneStatus | undefined {
+  const keys = [normalizeBoardLaneValue(lane.value), normalizeBoardLaneValue(lane.label)];
+  if (keys.includes("failed")) return "failed";
+  if (keys.includes("done")) return "done";
+  if (keys.includes("in_progress") || keys.includes("in progress")) return "in_progress";
+  if (keys.includes("human_review") || keys.includes("human review")) return "human_review";
+  return undefined;
 }
 
 function cardTitle(row: Record<string, unknown>, render: WidgetBoardRender): string {
@@ -272,7 +375,7 @@ function groupIntoLanes(rows: Record<string, unknown>[], render: WidgetBoardRend
   }
 
   const otherBucket: LaneBucket | undefined = render.otherLane
-    ? { lane: { value: OTHER_LANE_KEY, label: "Other", color: "neutral" }, rows: [], key: OTHER_LANE_KEY }
+    ? { lane: { value: OTHER_LANE_KEY, label: "Other" }, rows: [], key: OTHER_LANE_KEY }
     : undefined;
 
   for (const row of rows) {

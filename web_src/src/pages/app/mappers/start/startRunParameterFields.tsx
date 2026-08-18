@@ -143,7 +143,7 @@ function StartRunParameterField({
           placeholder={parameterInputPlaceholder(param, label)}
           value={String(value ?? "")}
           rows={stretchText ? undefined : 5}
-          className={stretchText ? "min-h-0 flex-1 resize-none [field-sizing:fixed]" : undefined}
+          className={cn("text-[13px]", stretchText && "min-h-0 flex-1 resize-none [field-sizing:fixed]")}
           onChange={(e) =>
             onParameterValuesChange((prev) => ({
               ...prev,
