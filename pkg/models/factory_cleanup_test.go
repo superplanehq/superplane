@@ -160,6 +160,16 @@ func Test__FactoryResourceCleaner__HardDeletesFactoryDomain(t *testing.T) {
 	}
 	require.NoError(t, db.Create(&execution).Error)
 
+	// Checks reference the order and factory with RESTRICT FKs, so the
+	// cleaner must remove them before the order and factory rows.
+	_, err = order.ReportCheck(db, models.FactoryWorkOrderCheckParams{
+		Key:      "risk-review",
+		Name:     "Risk review",
+		Score:    42,
+		MaxScore: 100,
+	})
+	require.NoError(t, err)
+
 	require.NoError(t, factory.SoftDelete(db))
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		_, err := run.DeleteChain(tx)
@@ -181,6 +191,10 @@ func Test__FactoryResourceCleaner__HardDeletesFactoryDomain(t *testing.T) {
 	var orderCount int64
 	require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("factory_id = ?", factory.ID).Count(&orderCount).Error)
 	assert.Equal(t, int64(0), orderCount)
+
+	var checkCount int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrderCheck{}).Where("factory_id = ?", factory.ID).Count(&checkCount).Error)
+	assert.Equal(t, int64(0), checkCount)
 }
 
 func Test__FactoryResourceCleaner__RespectsLimit(t *testing.T) {

@@ -24,6 +24,8 @@ import {
   RICH_OPEN_WORK_ORDER_EVENTS,
   RUNNING_WORK_ORDER_EVENTS,
 } from "./__fixtures__/factoryPageEventFixtures";
+import { CRITICAL_WORK_ORDER_CHECKS, OPEN_WORK_ORDER_CHECKS } from "./__fixtures__/workOrderCheckFixtures";
+import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "./lib/workOrderChecks";
 import { WorkOrderDetailLoadedView } from "./WorkOrderDetailLoadedView";
 import { getWorkOrderDetailDerived } from "./lib/workOrderProgress";
 
@@ -59,6 +61,7 @@ type Story = StoryObj<typeof meta>;
 interface BuildLoadedViewOverrides {
   events?: FactoriesWorkOrderEvent[];
   artifacts?: FactoriesWorkOrderArtifact[];
+  checks?: WorkOrderCheckPresentation[];
 }
 
 function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedViewOverrides = {}) {
@@ -69,6 +72,7 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     order,
     events: overrides.events ?? [],
     artifacts: overrides.artifacts ?? [],
+    checks: overrides.checks,
     isArtifactsLoading: false,
     displayStatus: derived.displayStatus!,
     statusMeta: derived.statusMeta!,
@@ -139,6 +143,25 @@ export const WithCommentsAndArtifacts: Story = {
   args: buildLoadedViewArgs(OPEN_WORK_ORDER, {
     events: RICH_OPEN_WORK_ORDER_EVENTS,
     artifacts: OPEN_WORK_ORDER_ARTIFACTS,
+  }),
+};
+
+/** Checks — automation-reported scorecards (risk, coverage, confidence) above Activity. Click a card to open the full analysis. */
+export const WithChecks: Story = {
+  name: "With Checks",
+  args: buildLoadedViewArgs(OPEN_WORK_ORDER, {
+    events: RICH_OPEN_WORK_ORDER_EVENTS,
+    artifacts: OPEN_WORK_ORDER_ARTIFACTS,
+    checks: presentWorkOrderChecks(OPEN_WORK_ORDER_CHECKS),
+  }),
+};
+
+/** Single critical check — the smallest checks state, with the critical accent. */
+export const WithCriticalCheck: Story = {
+  name: "With Critical Check",
+  args: buildLoadedViewArgs(OPEN_WORK_ORDER, {
+    events: OPEN_WORK_ORDER_EVENTS,
+    checks: presentWorkOrderChecks(CRITICAL_WORK_ORDER_CHECKS),
   }),
 };
 

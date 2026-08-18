@@ -65,6 +65,16 @@ func (c *FactoryResourceCleaner) Run() (deleted int64, complete bool, err error)
 		return deleted, false, nil
 	}
 
+	count, err = deleteRowsLimited(c.tx, &FactoryWorkOrderCheck{}, remaining, "factory_id = ?", c.factory.ID)
+	if err != nil {
+		return deleted, false, fmt.Errorf("delete factory work order checks: %w", err)
+	}
+	deleted += count
+	remaining -= int(count)
+	if remaining <= 0 {
+		return deleted, false, nil
+	}
+
 	count, err = deleteFactoryAssigneesLimited(c.tx, c.factory.ID, remaining)
 	if err != nil {
 		return deleted, false, fmt.Errorf("delete factory work order assignees: %w", err)
@@ -170,6 +180,11 @@ func deleteOrphanFactoryWorkOrdersLimited(tx *gorm.DB, factoryID uuid.UUID, limi
 			NOT EXISTS (
 				SELECT 1 FROM factory_work_order_executions
 				WHERE factory_work_order_executions.work_order_id = factory_work_orders.id
+			)`).
+		Where(`
+			NOT EXISTS (
+				SELECT 1 FROM factory_work_order_checks
+				WHERE factory_work_order_checks.work_order_id = factory_work_orders.id
 			)`).
 		Limit(limit)
 
