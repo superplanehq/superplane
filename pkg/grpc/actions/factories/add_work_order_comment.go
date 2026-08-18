@@ -83,6 +83,18 @@ func AddWorkOrderComment(
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", orderID)
 	}
 
+	notification := messages.FactoryWorkOrderNotificationMessage{
+		OrganizationID: orgID.String(),
+		FactoryID:      factoryID.String(),
+		OrderID:        orderID.String(),
+		EventType:      factory.EventTypeOrderCommentAdded,
+		ActorUserID:    userIDStr,
+		CommentBody:    body,
+	}
+	if err := notification.Publish(); err != nil {
+		log.WithError(err).Warnf("Failed to publish work order notification for order %s", orderID)
+	}
+
 	return &pb.AddWorkOrderCommentResponse{
 		Comment: &pb.WorkOrderComment{
 			Body:      body,
