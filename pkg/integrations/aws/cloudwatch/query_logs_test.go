@@ -1,6 +1,7 @@
 package cloudwatch
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -143,6 +144,34 @@ func TestQueryLogs_Execute(t *testing.T) {
 
 		require.Len(t, httpContext.Requests, 1)
 		assert.Equal(t, "Logs_20140328.StartQuery", httpContext.Requests[0].Header.Get("X-Amz-Target"))
+	})
+
+	t.Run("zero limit -> sends the field's default instead of leaving it unset", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"queryId":"query-123"}`)),
+				},
+			},
+		}
+
+		config := validQueryLogsConfig()
+		config["limit"] = 0
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  config,
+			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+			HTTP:           httpContext,
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       &contexts.RequestContext{},
+			Integration:    &contexts.IntegrationContext{CurrentSecrets: credentialSecrets()},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+		body, readErr := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, readErr)
+		assert.Contains(t, string(body), fmt.Sprintf(`"limit":%d`, defaultQueryLogsLimit))
 	})
 }
 
