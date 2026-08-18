@@ -799,6 +799,233 @@ func TestFactoryWorkOrder_UpdateArtifactData(t *testing.T) {
 	})
 }
 
+// Merge / close timestamp stamping is what unblocks the Velocity page — the
+// existing github.onPullRequest -> updateWorkOrderArtifact path only sets
+// `state`, so the model must fall back to `now` while still honoring an
+// explicit RFC3339 timestamp when the canvas hands one in.
+func TestFactoryWorkOrder_UpdateArtifactData_StampsPRTimestamps(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "artifact-stamps")
+
+	newOrderWithPR := func(t *testing.T, key string) (*FactoryWorkOrder, *FactoryWorkOrderArtifact) {
+		t.Helper()
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Stamp target", "", &userID, nil, nil)
+		require.NoError(t, err)
+		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypePR,
+			Data: map[string]any{"url": key},
+			Key:  key,
+		})
+		require.NoError(t, err)
+		require.Nil(t, artifact.MergedAt)
+		require.Nil(t, artifact.ClosedAt)
+		return order, artifact
+	}
+
+	t.Run("state-only merged falls back to now", func(t *testing.T) {
+		order, _ := newOrderWithPR(t, "https://github.com/example/repo/pull/100")
+		before := time.Now()
+
+		updated, err := order.UpdateArtifactData(database.Conn(), "https://github.com/example/repo/pull/100", map[string]any{"state": "merged"})
+		require.NoError(t, err)
+		require.NotNil(t, updated.MergedAt)
+		assert.WithinDuration(t, before, *updated.MergedAt, 5*time.Second)
+		assert.Nil(t, updated.ClosedAt)
+	})
+
+	t.Run("explicit mergedAt is preserved", func(t *testing.T) {
+		order, _ := newOrderWithPR(t, "https://github.com/example/repo/pull/101")
+		mergedAt := time.Now().Add(-2 * time.Hour).UTC().Truncate(time.Second)
+
+		updated, err := order.UpdateArtifactData(database.Conn(), "https://github.com/example/repo/pull/101", map[string]any{
+			"state":    "merged",
+			"mergedAt": mergedAt.Format(time.RFC3339),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, updated.MergedAt)
+		assert.True(t, updated.MergedAt.Equal(mergedAt), "expected %s, got %s", mergedAt, updated.MergedAt)
+	})
+
+	t.Run("state-only closed stamps closed_at only", func(t *testing.T) {
+		order, _ := newOrderWithPR(t, "https://github.com/example/repo/pull/102")
+
+		updated, err := order.UpdateArtifactData(database.Conn(), "https://github.com/example/repo/pull/102", map[string]any{"state": "closed"})
+		require.NoError(t, err)
+		require.NotNil(t, updated.ClosedAt)
+		assert.Nil(t, updated.MergedAt)
+	})
+
+	t.Run("reopen does not clear the merge stamp", func(t *testing.T) {
+		order, _ := newOrderWithPR(t, "https://github.com/example/repo/pull/103")
+
+		merged, err := order.UpdateArtifactData(database.Conn(), "https://github.com/example/repo/pull/103", map[string]any{"state": "merged"})
+		require.NoError(t, err)
+		originalMergedAt := *merged.MergedAt
+
+		reopened, err := order.UpdateArtifactData(database.Conn(), "https://github.com/example/repo/pull/103", map[string]any{"state": "open"})
+		require.NoError(t, err)
+		require.NotNil(t, reopened.MergedAt)
+		assert.WithinDuration(t, originalMergedAt, *reopened.MergedAt, time.Millisecond)
+	})
+
+	t.Run("close-then-merge stamps both columns", func(t *testing.T) {
+		order, _ := newOrderWithPR(t, "https://github.com/example/repo/pull/104")
+
+		closed, err := order.UpdateArtifactData(database.Conn(), "https://github.com/example/repo/pull/104", map[string]any{"state": "closed"})
+		require.NoError(t, err)
+		originalClosedAt := *closed.ClosedAt
+
+		merged, err := order.UpdateArtifactData(database.Conn(), "https://github.com/example/repo/pull/104", map[string]any{"state": "merged"})
+		require.NoError(t, err)
+		require.NotNil(t, merged.MergedAt)
+		require.NotNil(t, merged.ClosedAt)
+		assert.WithinDuration(t, originalClosedAt, *merged.ClosedAt, time.Millisecond)
+	})
+
+	t.Run("rejects malformed mergedAt", func(t *testing.T) {
+		order, _ := newOrderWithPR(t, "https://github.com/example/repo/pull/105")
+
+		_, err := order.UpdateArtifactData(database.Conn(), "https://github.com/example/repo/pull/105", map[string]any{
+			"state":    "merged",
+			"mergedAt": "not-a-timestamp",
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+	})
+
+	t.Run("repeated merged state without a stamp does not fall back to now", func(t *testing.T) {
+		order, artifact := newOrderWithPR(t, "https://github.com/example/repo/pull/106")
+		require.NoError(t, database.Conn().Model(artifact).Update("data", datatypes.JSON([]byte(
+			`{"url":"https://github.com/example/repo/pull/106","state":"merged"}`,
+		))).Error)
+
+		updated, err := order.UpdateArtifactData(database.Conn(), "https://github.com/example/repo/pull/106", map[string]any{"state": "merged"})
+		require.NoError(t, err)
+		assert.Nil(t, updated.MergedAt)
+	})
+}
+
+func TestFactoryWorkOrder_CreateArtifact_StampsPRTimestamps(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "artifact-create-stamps")
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Create stamp target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	t.Run("state = merged at attach time stamps merged_at", func(t *testing.T) {
+		mergedAt := time.Now().Add(-30 * time.Minute).UTC().Truncate(time.Second)
+
+		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypePR,
+			Data: map[string]any{
+				"url":      "https://github.com/example/repo/pull/200",
+				"state":    "merged",
+				"mergedAt": mergedAt.Format(time.RFC3339),
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, artifact.MergedAt)
+		assert.True(t, artifact.MergedAt.Equal(mergedAt))
+	})
+
+	t.Run("state = open does not stamp anything", func(t *testing.T) {
+		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypePR,
+			Data: map[string]any{
+				"url":   "https://github.com/example/repo/pull/201",
+				"state": "open",
+			},
+		})
+		require.NoError(t, err)
+		assert.Nil(t, artifact.MergedAt)
+		assert.Nil(t, artifact.ClosedAt)
+	})
+}
+
+func TestListFactoryPRArtifacts(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "list-pr-artifacts")
+
+	now := time.Now().UTC().Truncate(time.Second)
+
+	mkPR := func(t *testing.T, urlPath string, state string, at time.Time) {
+		t.Helper()
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "PR order", "", &userID, nil, nil)
+		require.NoError(t, err)
+		key := "https://github.com/example/repo/pull/" + urlPath
+		params := FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypePR,
+			Data: map[string]any{"url": key, "state": state},
+			Key:  key,
+		}
+		if state == PrArtifactStateMerged {
+			params.Data["mergedAt"] = at.Format(time.RFC3339)
+		}
+		if state == PrArtifactStateClosed {
+			params.Data["closedAt"] = at.Format(time.RFC3339)
+		}
+		_, err = order.CreateArtifact(database.Conn(), params)
+		require.NoError(t, err)
+	}
+
+	mkPR(t, "1", PrArtifactStateMerged, now.Add(-24*time.Hour))
+	mkPR(t, "2", PrArtifactStateMerged, now.Add(-6*24*time.Hour))
+	mkPR(t, "3", PrArtifactStateMerged, now.Add(-15*24*time.Hour))
+	mkPR(t, "4", PrArtifactStateClosed, now.Add(-24*time.Hour))
+	mkPR(t, "5", PrArtifactStateOpen, time.Time{})
+
+	from7 := now.Add(-7 * 24 * time.Hour)
+
+	t.Run("merged in last 7 days", func(t *testing.T) {
+		results, err := ListFactoryPRArtifacts(database.Conn(), factoryModel.ID, FactoryPRArtifactFilter{
+			State:      PrArtifactStateMerged,
+			MergedFrom: &from7,
+		})
+		require.NoError(t, err)
+		assert.Len(t, results, 2)
+	})
+
+	t.Run("closed-unmerged in last 7 days", func(t *testing.T) {
+		results, err := ListFactoryPRArtifacts(database.Conn(), factoryModel.ID, FactoryPRArtifactFilter{
+			State:      PrArtifactStateClosed,
+			ClosedFrom: &from7,
+		})
+		require.NoError(t, err)
+		assert.Len(t, results, 1)
+	})
+
+	t.Run("filters by factory", func(t *testing.T) {
+		_, otherUserID, otherFactory := setupFactoryWithUser(t, "list-pr-artifacts-other")
+		otherOrder, err := otherFactory.CreateWorkOrder(database.Conn(), "Other order", "", &otherUserID, nil, nil)
+		require.NoError(t, err)
+		_, err = otherOrder.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypePR,
+			Data: map[string]any{
+				"url":      "https://github.com/other/repo/pull/1",
+				"state":    "merged",
+				"mergedAt": now.Format(time.RFC3339),
+			},
+			Key: "https://github.com/other/repo/pull/1",
+		})
+		require.NoError(t, err)
+
+		results, err := ListFactoryPRArtifacts(database.Conn(), factoryModel.ID, FactoryPRArtifactFilter{
+			State:      PrArtifactStateMerged,
+			MergedFrom: &from7,
+		})
+		require.NoError(t, err)
+		assert.Len(t, results, 2, "primary factory should not see other factory artifacts")
+	})
+
+	t.Run("rejects unknown state filter", func(t *testing.T) {
+		_, err := ListFactoryPRArtifacts(database.Conn(), factoryModel.ID, FactoryPRArtifactFilter{State: "flaky"})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+	})
+}
+
 func TestFactory_FindWorkOrderByArtifactKey(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 

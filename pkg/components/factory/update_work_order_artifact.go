@@ -31,6 +31,8 @@ type UpdateWorkOrderArtifactConfiguration struct {
 	Merged      any    `json:"merged,omitempty" mapstructure:"merged,omitempty"`
 	Draft       any    `json:"draft,omitempty" mapstructure:"draft,omitempty"`
 	Title       string `json:"title" mapstructure:"title"`
+	MergedAt    string `json:"mergedAt" mapstructure:"mergedAt"`
+	ClosedAt    string `json:"closedAt" mapstructure:"closedAt"`
 }
 
 func (c *UpdateWorkOrderArtifact) Name() string {
@@ -111,14 +113,32 @@ func (c *UpdateWorkOrderArtifact) Configuration() []configuration.Field {
 		StateTogglable: true,
 	})...)
 
-	return append(fields, configuration.Field{
-		Name:        "title",
-		Label:       "Title",
-		Description: "New title, in case the pull request was retitled. Leave unset to keep the existing title.",
-		Type:        configuration.FieldTypeString,
-		Required:    false,
-		Togglable:   true,
-	})
+	return append(fields,
+		configuration.Field{
+			Name:        "title",
+			Label:       "Title",
+			Description: "New title, in case the pull request was retitled. Leave unset to keep the existing title.",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+		},
+		configuration.Field{
+			Name:        "mergedAt",
+			Label:       "Merged At",
+			Description: "Optional RFC3339 merge timestamp — usually {{ event.data.pull_request.merged_at }}. Set with state = merged so Velocity attributes the merge to the real day; unset falls back to now.",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+		},
+		configuration.Field{
+			Name:        "closedAt",
+			Label:       "Closed At",
+			Description: "Optional RFC3339 close timestamp — usually {{ event.data.pull_request.closed_at }}. Set with state = closed so Velocity waste attributes it to the real day.",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+		},
+	)
 }
 
 func (c *UpdateWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
@@ -133,6 +153,12 @@ func (c *UpdateWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 	}
 	if config.Title != "" {
 		data["title"] = config.Title
+	}
+	if config.MergedAt != "" {
+		data["mergedAt"] = config.MergedAt
+	}
+	if config.ClosedAt != "" {
+		data["closedAt"] = config.ClosedAt
 	}
 
 	artifact, err := ctx.Factory.UpdateWorkOrderArtifact(core.UpdateWorkOrderArtifactParams{

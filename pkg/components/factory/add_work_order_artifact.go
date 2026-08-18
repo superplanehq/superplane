@@ -40,6 +40,8 @@ type AddWorkOrderArtifactConfiguration struct {
 	Name        string              `json:"name" mapstructure:"name"`
 	Repository  string              `json:"repository" mapstructure:"repository"`
 	ArtifactKey string              `json:"artifactKey" mapstructure:"artifactKey"`
+	MergedAt    string              `json:"mergedAt" mapstructure:"mergedAt"`
+	ClosedAt    string              `json:"closedAt" mapstructure:"closedAt"`
 	Data        []ArtifactDataEntry `json:"data" mapstructure:"data"`
 }
 
@@ -60,7 +62,7 @@ func (c *AddWorkOrderArtifact) Documentation() string {
 
 Supported types:
 
-- **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + `, ` + "`title`" + `, ` + "`state`" + `, ` + "`merged`" + `, and ` + "`draft`" + `. The ` + "`state`" + ` field (` + "`open`" + `/` + "`draft`" + `/` + "`closed`" + `/` + "`merged`" + `, defaults to ` + "`open`" + `) drives the icon/color of the artifact chip in the work order UI. ` + "`state`" + `, ` + "`merged`" + `, and ` + "`draft`" + ` all accept expressions, so a flow can wire them straight to a ` + "`github.onPullRequest`" + ` payload: a GitHub-shaped ` + "`state: \"closed\"`" + ` + ` + "`merged: true`" + ` folds into SuperPlane's ` + "`state: \"merged\"`" + ` before it hits the artifact.
+- **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + `, ` + "`title`" + `, ` + "`state`" + `, ` + "`merged`" + `, ` + "`draft`" + `, ` + "`mergedAt`" + `, and ` + "`closedAt`" + `. The ` + "`state`" + ` field (` + "`open`" + `/` + "`draft`" + `/` + "`closed`" + `/` + "`merged`" + `, defaults to ` + "`open`" + `) drives the icon/color of the artifact chip in the work order UI. ` + "`state`" + `, ` + "`merged`" + `, and ` + "`draft`" + ` all accept expressions, so a flow can wire them straight to a ` + "`github.onPullRequest`" + ` payload: a GitHub-shaped ` + "`state: \"closed\"`" + ` + ` + "`merged: true`" + ` folds into SuperPlane's ` + "`state: \"merged\"`" + ` before it hits the artifact. Set ` + "`mergedAt`" + ` / ` + "`closedAt`" + ` (RFC3339, usually from the GitHub event) when you attach an already-merged or closed PR so Velocity uses the real day instead of now.
 - **Markdown note** (` + "`markdown`" + `): requires ` + "`body`" + `; optional ` + "`title`" + `.
 - **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` (the branch name). Set ` + "`url`" + ` when you attach the branch — SuperPlane does not wait for a pull request. If you set ` + "`repository`" + ` (` + "`owner/repo`" + ` or a repository http(s) URL) and leave ` + "`url`" + ` blank, SuperPlane writes a GitHub tree URL from that repository and the branch name.
 - **Link** (` + "`link`" + `): requires ` + "`url`" + ` (must be http or https); optional ` + "`title`" + ` for the artifact chip's label — e.g. attach a preview-environment URL as "Preview".
@@ -216,6 +218,24 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			Default:     "",
 		},
 		configuration.Field{
+			Name:                 "mergedAt",
+			Label:                "Merged At",
+			Description:          "Optional RFC3339 merge timestamp — usually {{ event.data.pull_request.merged_at }}. Set when attaching an already-merged PR so Velocity attributes it to the real merge day; unset falls back to now.",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			Togglable:            true,
+			VisibilityConditions: prOnly,
+		},
+		configuration.Field{
+			Name:                 "closedAt",
+			Label:                "Closed At",
+			Description:          "Optional RFC3339 close timestamp — usually {{ event.data.pull_request.closed_at }}. Set when attaching an already-closed PR so Velocity waste attributes it to the real close day.",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			Togglable:            true,
+			VisibilityConditions: prOnly,
+		},
+		configuration.Field{
 			Name:                 "data",
 			Label:                "Metadata",
 			Description:          "Extra name/value pairs merged into the artifact's data map (typed fields above take precedence on name collisions)",
@@ -299,11 +319,13 @@ func buildArtifactData(config AddWorkOrderArtifactConfiguration) (map[string]any
 	data := artifactDataToMap(config.Data)
 
 	typed := map[string]string{
-		"url":    config.URL,
-		"number": config.Number,
-		"title":  config.Title,
-		"body":   config.Body,
-		"name":   config.Name,
+		"url":      config.URL,
+		"number":   config.Number,
+		"title":    config.Title,
+		"body":     config.Body,
+		"name":     config.Name,
+		"mergedAt": config.MergedAt,
+		"closedAt": config.ClosedAt,
 	}
 
 	for key, value := range typed {
