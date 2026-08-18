@@ -29,6 +29,9 @@ const (
 	TypeMonths  = "months"
 	TypeCron    = "cron"
 
+	ConcurrencyPolicyAllow = "allow"
+	ConcurrencyPolicySkip  = "skip"
+
 	WeekDayMonday    = "monday"
 	WeekDayTuesday   = "tuesday"
 	WeekDayWednesday = "wednesday"
@@ -46,18 +49,19 @@ type Metadata struct {
 }
 
 type Configuration struct {
-	Type            string   `json:"type"`
-	MinutesInterval *int     `json:"minutesInterval"` // 1-59 minutes between triggers
-	HoursInterval   *int     `json:"hoursInterval"`   // 1-23 hours between triggers
-	DaysInterval    *int     `json:"daysInterval"`    // 1-31 days between triggers
-	WeeksInterval   *int     `json:"weeksInterval"`   // 1-52 weeks between triggers
-	MonthsInterval  *int     `json:"monthsInterval"`  // 1-24 months between triggers
-	Minute          *int     `json:"minute"`          // 0-59 for hours, days, weeks, months
-	Hour            *int     `json:"hour"`            // 0-23 for days, weeks, months
-	WeekDays        []string `json:"weekDays"`        // For weeks scheduling (multiple days)
-	DayOfMonth      *int     `json:"dayOfMonth"`      // 1-31 for months scheduling
-	CronExpression  *string  `json:"cronExpression"`  // For cron scheduling
-	Timezone        *string  `json:"timezone"`        // Timezone offset (e.g., "0", "-5", "5.5")
+	Type              string   `json:"type"`
+	ConcurrencyPolicy string   `json:"concurrencyPolicy"`
+	MinutesInterval   *int     `json:"minutesInterval"` // 1-59 minutes between triggers
+	HoursInterval     *int     `json:"hoursInterval"`   // 1-23 hours between triggers
+	DaysInterval      *int     `json:"daysInterval"`    // 1-31 days between triggers
+	WeeksInterval     *int     `json:"weeksInterval"`   // 1-52 weeks between triggers
+	MonthsInterval    *int     `json:"monthsInterval"`  // 1-24 months between triggers
+	Minute            *int     `json:"minute"`          // 0-59 for hours, days, weeks, months
+	Hour              *int     `json:"hour"`            // 0-23 for days, weeks, months
+	WeekDays          []string `json:"weekDays"`        // For weeks scheduling (multiple days)
+	DayOfMonth        *int     `json:"dayOfMonth"`      // 1-31 for months scheduling
+	CronExpression    *string  `json:"cronExpression"`  // For cron scheduling
+	Timezone          *string  `json:"timezone"`        // Timezone offset (e.g., "0", "-5", "5.5")
 }
 
 func (s *Schedule) Name() string {
@@ -90,6 +94,13 @@ func (s *Schedule) Documentation() string {
 - **Weeks**: Trigger every N weeks on specific weekdays at a specific time (1-52 weeks)
 - **Months**: Trigger every N months on a specific day and time (1-24 months)
 - **Cron**: Use a cron expression for advanced scheduling patterns
+
+## Overlapping Runs
+
+- **Allow** (default): Start a new run on every scheduled tick, even if an earlier run is still active.
+- **Skip**: Skip scheduled ticks while any run of this workflow is pending, running, waiting for approval, or cancelling.
+
+Skipped ticks do not stop the schedule; the next tick is still planned. A manual **Run** always starts a new run regardless of this setting.
 
 ## Timezone Support
 
@@ -144,6 +155,21 @@ func (s *Schedule) Configuration() []configuration.Field {
 						{Label: "Weeks", Value: "weeks"},
 						{Label: "Months", Value: "months"},
 						{Label: "Cron (Custom)", Value: "cron"},
+					},
+				},
+			},
+		},
+		{
+			Name:        "concurrencyPolicy",
+			Label:       "When a previous run is still active",
+			Type:        configuration.FieldTypeSelect,
+			Default:     ConcurrencyPolicyAllow,
+			Description: "Choose whether scheduled ticks may overlap. Manual Run always starts a new run.",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Start another run", Value: ConcurrencyPolicyAllow},
+						{Label: "Skip this tick", Value: ConcurrencyPolicySkip},
 					},
 				},
 			},
@@ -432,6 +458,38 @@ func (s *Schedule) emitEvent(ctx core.TriggerHookContext) error {
 		return err
 	}
 
+	skip, err := shouldSkipScheduledEvent(ctx, spec)
+	if err != nil {
+		return err
+	}
+
+	if !skip {
+		if err := s.emitTick(ctx, spec); err != nil {
+			return err
+		}
+	}
+
+	return s.scheduleNext(ctx, spec)
+}
+
+func shouldSkipScheduledEvent(ctx core.TriggerHookContext, spec Configuration) (bool, error) {
+	if ctx.Name != HookEmitEvent || spec.ConcurrencyPolicy != ConcurrencyPolicySkip {
+		return false, nil
+	}
+
+	if ctx.Runs == nil {
+		return false, fmt.Errorf("run state context is required for skip concurrency policy")
+	}
+
+	active, err := ctx.Runs.HasActive()
+	if err != nil {
+		return false, fmt.Errorf("failed to check active runs: %w", err)
+	}
+
+	return active, nil
+}
+
+func (s *Schedule) emitTick(ctx core.TriggerHookContext, spec Configuration) error {
 	var timezone *time.Location
 	var now time.Time
 
@@ -460,14 +518,12 @@ func (s *Schedule) emitEvent(ctx core.TriggerHookContext) error {
 		payload["timezone"] = formatTimezone(timezone)
 	}
 
-	err = ctx.Events.Emit("scheduler.tick", payload)
+	return ctx.Events.Emit("scheduler.tick", payload)
+}
 
-	if err != nil {
-		return err
-	}
-
+func (s *Schedule) scheduleNext(ctx core.TriggerHookContext, spec Configuration) error {
 	var existingMetadata Metadata
-	err = mapstructure.Decode(ctx.Metadata.Get(), &existingMetadata)
+	err := mapstructure.Decode(ctx.Metadata.Get(), &existingMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse existing metadata: %w", err)
 	}

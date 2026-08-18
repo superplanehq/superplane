@@ -220,6 +220,13 @@ The Schedule trigger starts workflow executions automatically based on a configu
 - **Months**: Trigger every N months on a specific day and time (1-24 months)
 - **Cron**: Use a cron expression for advanced scheduling patterns
 
+### Overlapping Runs
+
+- **Allow** (default): Start a new run on every scheduled tick, even if an earlier run is still active.
+- **Skip**: Skip scheduled ticks while any run of this workflow is pending, running, waiting for approval, or cancelling.
+
+Skipped ticks do not stop the schedule; the next tick is still planned. A manual **Run** always starts a new run regardless of this setting.
+
 ### Timezone Support
 
 For days, weeks, months, and cron schedules, you can specify a timezone to ensure triggers occur at the correct local time.
