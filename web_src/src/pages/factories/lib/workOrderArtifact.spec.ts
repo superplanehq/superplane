@@ -9,6 +9,7 @@ import {
   extractPrArtifactState,
   formatPrArtifactLabel,
   overlayLiveArtifactData,
+  toArtifactDataRecord,
 } from "./workOrderArtifact";
 
 describe("formatPrArtifactLabel", () => {
@@ -56,6 +57,21 @@ describe("extractArtifactMarkdownBody", () => {
 describe("extractArtifactUrl", () => {
   it("returns data.url when present", () => {
     expect(extractArtifactUrl({ url: "https://example.com/pr/1" })).toBe("https://example.com/pr/1");
+  });
+
+  it("falls back to data.html_url when data.url is missing (GitHub payload shape)", () => {
+    expect(extractArtifactUrl({ html_url: "https://github.com/example/repo/pull/1" })).toBe(
+      "https://github.com/example/repo/pull/1",
+    );
+  });
+
+  it("prefers data.url when both fields are set", () => {
+    expect(
+      extractArtifactUrl({
+        url: "https://superplane.example/pr/1",
+        html_url: "https://github.com/example/repo/pull/1",
+      }),
+    ).toBe("https://superplane.example/pr/1");
   });
 
   it("returns undefined for missing / blank / non-string urls", () => {
@@ -112,6 +128,57 @@ describe("extractPrArtifactState", () => {
     expect(extractPrArtifactState({ state: "" })).toBeUndefined();
     expect(extractPrArtifactState({ state: "in_review" })).toBeUndefined();
   });
+
+  it("treats a GitHub-style `merged: true` as merged, even when state is closed", () => {
+    // GitHub's own payload for a merged PR: `{ state: "closed", merged: true }`.
+    // Rendering that as closed (red) would misrepresent every merged PR the
+    // flow attached via the raw github.onPullRequest payload.
+    expect(extractPrArtifactState({ state: "closed", merged: true })).toBe("merged");
+  });
+
+  it("treats a GitHub-style `merged: true` as merged, even when state is still open", () => {
+    // Some flows attach a PR eagerly with state:"open" and only later flip
+    // merged:true — before this fix the chip stayed green forever.
+    expect(extractPrArtifactState({ state: "open", merged: true })).toBe("merged");
+  });
+
+  it('accepts a stringified merged flag ("true"/"false") so templated inputs work', () => {
+    expect(extractPrArtifactState({ state: "closed", merged: "true" })).toBe("merged");
+    expect(extractPrArtifactState({ state: "closed", merged: "TRUE" })).toBe("merged");
+    expect(extractPrArtifactState({ state: "closed", merged: "false" })).toBe("closed");
+  });
+
+  it("treats a GitHub-style `draft: true` as draft when the PR is not merged", () => {
+    // GitHub draft PRs are `{ state: "open", draft: true }`. Without this,
+    // the chip renders as open (green) instead of the muted draft look.
+    expect(extractPrArtifactState({ state: "open", draft: true })).toBe("draft");
+    expect(extractPrArtifactState({ draft: "true" })).toBe("draft");
+  });
+
+  it("keeps a merged PR merged even when draft:true is also set", () => {
+    // Defensive: merged is the strongest signal; a merged PR that once was
+    // a draft should not flip back to draft on redisplay.
+    expect(extractPrArtifactState({ merged: true, draft: true })).toBe("merged");
+  });
+
+  it("keeps an explicit non-open state over a GitHub `draft: true` flag", () => {
+    expect(extractPrArtifactState({ state: "closed", draft: true })).toBe("closed");
+  });
+
+  it("does not keep a leftover state:merged when merged is explicitly false", () => {
+    // A flag-only update writes `merged: false` and leaves `state: merged`
+    // in the map. The chip must not stay purple.
+    expect(extractPrArtifactState({ state: "merged", merged: false })).toBeUndefined();
+    expect(extractPrArtifactState({ state: "merged", merged: "false" })).toBeUndefined();
+  });
+
+  it("does not keep a leftover state:draft when draft is explicitly false", () => {
+    expect(extractPrArtifactState({ state: "draft", draft: false })).toBeUndefined();
+  });
+
+  it("still treats state:closed as closed when merged is explicitly false", () => {
+    expect(extractPrArtifactState({ state: "closed", merged: false })).toBe("closed");
+  });
 });
 
 describe("buildLatestArtifactDataById", () => {
@@ -138,5 +205,13 @@ describe("overlayLiveArtifactData", () => {
   it("keeps the snapshot when the artifact is missing from the live list", () => {
     const snapshot = { id: "art-1", data: { state: "open" } };
     expect(overlayLiveArtifactData(snapshot, new Map())).toBe(snapshot);
+  });
+});
+
+describe("toArtifactDataRecord", () => {
+  it("returns a record for object payloads and undefined otherwise", () => {
+    expect(toArtifactDataRecord({ url: "https://example.com" })).toEqual({ url: "https://example.com" });
+    expect(toArtifactDataRecord(undefined)).toBeUndefined();
+    expect(toArtifactDataRecord("https://example.com")).toBeUndefined();
   });
 });
