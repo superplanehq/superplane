@@ -816,6 +816,40 @@ func TestResolvePrArtifactState_Precedence(t *testing.T) {
 	}
 }
 
+func TestBuildArtifactData_IgnoresPrLifecycleOnNonPr(t *testing.T) {
+	// Switching a node from PR to branch/markdown can leave the sticky
+	// `state` default (and leftover merged/draft flags) in the config.
+	// Those fields are PR-only and must not be written — or reject the attach.
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
+		ArtifactType: "branch",
+		Name:         "feature/refund-retry",
+		State:        "open",
+		Merged:       true,
+		Draft:        true,
+	})
+	if _, ok := data["state"]; ok {
+		t.Fatal("expected leftover PR state not to be stored on a branch artifact")
+	}
+	if _, ok := data["merged"]; ok {
+		t.Fatal("expected leftover merged flag not to be stored on a branch artifact")
+	}
+	if _, ok := data["draft"]; ok {
+		t.Fatal("expected leftover draft flag not to be stored on a branch artifact")
+	}
+}
+
+func TestBuildArtifactData_DoesNotRejectInvalidStateOnMarkdown(t *testing.T) {
+	data, err := buildArtifactData(AddWorkOrderArtifactConfiguration{
+		ArtifactType: "markdown",
+		Body:         "note body",
+		State:        "in_review",
+	})
+	require.NoError(t, err)
+	if _, ok := data["state"]; ok {
+		t.Fatal("expected leftover PR state not to be stored on a markdown artifact")
+	}
+}
+
 func TestBuildArtifactData_SkipsBlankTypedInputs(t *testing.T) {
 	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
 		ArtifactType: "markdown",

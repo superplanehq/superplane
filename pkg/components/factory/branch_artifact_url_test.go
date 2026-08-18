@@ -40,6 +40,12 @@ func TestBranchTreeURL(t *testing.T) {
 			want:       "https://git.example.com/acme/storefront/tree/hotfix",
 		},
 		{
+			name:       "strips embedded credentials from a repository URL",
+			repository: "https://oauth2:token@git.example.com/acme/storefront",
+			branch:     "hotfix",
+			want:       "https://git.example.com/acme/storefront/tree/hotfix",
+		},
+		{
 			name:       "blank repository",
 			repository: "",
 			branch:     "feature/foo",

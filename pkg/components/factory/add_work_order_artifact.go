@@ -316,14 +316,16 @@ func buildArtifactData(config AddWorkOrderArtifactConfiguration) (map[string]any
 
 	data = applyBranchTreeURL(config, data)
 
+	if config.ArtifactType != "pr" {
+		return data, nil
+	}
+
 	updates, err := prArtifactStateUpdates(config.State, config.Merged, config.Draft)
 	if err != nil {
 		return nil, err
 	}
 	if len(updates) > 0 {
-		if data == nil {
-			data = map[string]any{}
-		}
+		data = ensureArtifactData(data)
 		for key, value := range updates {
 			data[key] = value
 		}

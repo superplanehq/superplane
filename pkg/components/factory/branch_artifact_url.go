@@ -27,6 +27,7 @@ func branchTreeURL(repository, name string) string {
 		if parsed.Scheme != "http" && parsed.Scheme != "https" {
 			return ""
 		}
+		parsed.User = nil
 		parsed.RawQuery = ""
 		parsed.Fragment = ""
 		// Assign the raw branch name to Path. String() encodes reserved
