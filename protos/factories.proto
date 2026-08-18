@@ -696,6 +696,7 @@ message WorkOrderArtifact {
     TYPE_PR = 1;
     TYPE_MARKDOWN = 2;
     TYPE_BRANCH = 3;
+    TYPE_LINK = 4;
   }
 
   string id = 1;
