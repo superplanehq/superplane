@@ -10,6 +10,8 @@ import type {
 } from "@/api-client";
 import { canvasAppIds } from "@/pages/app/__fixtures__/handlers";
 
+import type { FactoriesWorkOrderCheck } from "@/api-client";
+
 /** Shared with the home fixture so routes stay in sync across HomePage → Factories navigation. */
 export const FACTORIES_ORGANIZATION_ID = "3ee1aa47-3a60-4c1f-b645-0b9859ab91f8";
 
@@ -417,6 +419,8 @@ export interface FactoriesFixture {
   eventsByOrderId?: Record<string, FactoriesWorkOrderEvent[]>;
   /** Per-order artifacts; same fallback pattern as `eventsByOrderId`. */
   artifactsByOrderId?: Record<string, FactoriesWorkOrderArtifact[]>;
+  /** Per-order checks (automation-reported scores); same fallback pattern as `eventsByOrderId`. */
+  checksByOrderId?: Record<string, FactoriesWorkOrderCheck[]>;
 }
 
 export const defaultFactoriesFixture: FactoriesFixture = {
