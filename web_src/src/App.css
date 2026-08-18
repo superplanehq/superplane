@@ -744,6 +744,32 @@
   }
 }
 
+/*
+ * Theme-aware text selection for the agent chat (issue #6372).
+ *
+ * The app's dark mode is class-based (`.dark`) and independent of the OS, so the
+ * system `Highlight`/`HighlightText` colors used by the `input/textarea:focus::selection`
+ * rule above resolve to the OS palette and leave dark-on-light (unreadable) selections
+ * when the app is dark but the OS is light. The composer is worse still: its `<textarea>`
+ * renders transparent text over a styled backdrop (see MentionTextarea), so an opaque
+ * `HighlightText` color makes the selection unreadable.
+ *
+ * These rules are intentionally left unlayered so they beat the `@layer base` rule above
+ * (unlayered styles win over any cascade layer), and they carry an explicit `.dark`
+ * override so highlighted text keeps strong contrast in both themes.
+ */
+.agent-chat-selection::selection,
+.agent-chat-selection ::selection {
+  background-color: color-mix(in oklab, theme("colors.blue.300") 60%, transparent);
+  color: theme("colors.slate.900");
+}
+
+.dark .agent-chat-selection::selection,
+.dark .agent-chat-selection ::selection {
+  background-color: color-mix(in oklab, theme("colors.blue.400") 55%, transparent);
+  color: theme("colors.gray.50");
+}
+
 .json-viewer-hide-types .w-rjv-type:not([data-type="null"]) {
   display: none !important;
 }

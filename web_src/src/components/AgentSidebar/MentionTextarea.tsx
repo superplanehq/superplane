@@ -121,7 +121,10 @@ export function MentionTextarea({
           composerTextMetrics,
           "outline-none ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none",
           "placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
-          "text-transparent caret-slate-900 selection:bg-blue-200/50 dark:caret-gray-100 dark:selection:bg-blue-500/30",
+          // The textarea text is transparent (the visible text lives in the backdrop), so the
+          // selection color must come from the theme-aware `.agent-chat-selection` rule in App.css
+          // rather than the OS `HighlightText` color, which is unreadable in dark mode (issue #6372).
+          "agent-chat-selection text-transparent caret-slate-900 dark:caret-gray-100",
           "dark:bg-transparent",
         )}
         onKeyDown={onKeyDown}
