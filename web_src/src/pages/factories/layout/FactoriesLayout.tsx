@@ -125,8 +125,16 @@ function FactoriesLayoutContent({
 
   const storybookOnboarding = useOnboardingStorybook();
 
+  // Once `factory` has loaded, the `<Outlet/>` below mounts a leaf page that
+  // owns the full, specific title itself (see `usePageTitle` call sites under
+  // `pages/factories/pages/`). React fires a newly-mounted child's effects
+  // before its parent's, so if this effect stayed enabled it would run right
+  // after the leaf's and clobber it back down to just the factory name on
+  // every first render (e.g. a hard reload straight to a work order
+  // permalink). Disable it as soon as there's a leaf to hand off to; keep it
+  // enabled only for the loading/error baseline rendered before that.
   const pageTitle = useMemo(() => (factory?.name ? [factory.name] : ["Workspaces"]), [factory?.name]);
-  usePageTitle(pageTitle);
+  usePageTitle(pageTitle, { enabled: !factory });
 
   useEffect(() => {
     if (account?.id && factory?.id) {

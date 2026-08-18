@@ -4,6 +4,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
@@ -62,6 +63,12 @@ export function LinesPage() {
     () => (routeLineId ? (lines.find((line) => line.id === routeLineId) ?? null) : null),
     [lines, routeLineId],
   );
+
+  // Above the list/detail branching below (hooks can't be conditional): this
+  // single call covers both the Lines list and the in-page detail view for a
+  // selected line, re-firing when the selection changes without an
+  // unmount/mount.
+  usePageTitle([selectedLine ? humanizeLineName(selectedLine.name) : "Lines", factory?.name ?? "Workspace"]);
 
   if (routeLineId && factory && !selectedLine) {
     return <Navigate to={linesPath(organizationId, factoryKey)} replace />;

@@ -98,6 +98,13 @@ function resetState() {
 }
 
 describe("VelocityPage shell", () => {
+  it("sets the document title from the page and workspace name", () => {
+    resetState();
+    renderShell();
+
+    expect(document.title).toBe(`Velocity · ${REFUND_FACTORY.name} · SuperPlane`);
+  });
+
   it("shows the loading state while velocity is loading", () => {
     resetState();
     velocityHookState.isLoading = true;

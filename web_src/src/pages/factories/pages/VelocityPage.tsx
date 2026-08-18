@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import type { OrganizationsIntegration } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 import { SegmentedNav } from "@/ui/SegmentedNav";
 
@@ -20,8 +21,9 @@ const CARD_CLASSES =
 const NO_REPO_SENTINEL = "__none__";
 
 export function VelocityPage() {
-  const { organizationId, factoryId } = useFactoriesLayout();
+  const { organizationId, factoryId, factory } = useFactoriesLayout();
   const model = useVelocityPageModel(organizationId, factoryId);
+  usePageTitle(["Velocity", factory?.name ?? "Workspace"]);
 
   const header = <VelocityHeader model={model} />;
 
