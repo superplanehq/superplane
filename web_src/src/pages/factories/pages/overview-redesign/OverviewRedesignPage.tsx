@@ -240,10 +240,13 @@ function OwnerReference({ owner, className }: { owner?: WorkOrderOwner; classNam
       </span>
     );
   }
+  // The name stays visible on every breakpoint — hover-only reveals fail on
+  // touch and behind `pointer-events-none` row content. Pointer events come
+  // back on so the title tooltip can expand a truncated name.
   return (
-    <span className={cn("flex shrink-0 items-center gap-1.5", className)} title={owner.name}>
+    <span className={cn("flex shrink-0 items-center gap-1.5", className, "pointer-events-auto")} title={owner.name}>
       <Avatar initials={owner.initials} alt={owner.name} className="size-5" />
-      <span className="hidden max-w-[12ch] truncate text-[12px] text-muted-foreground xl:inline">{owner.name}</span>
+      <span className="max-w-[16ch] truncate text-[12px] text-muted-foreground">{owner.name}</span>
     </span>
   );
 }
