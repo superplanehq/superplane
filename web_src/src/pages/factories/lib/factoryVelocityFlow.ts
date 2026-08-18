@@ -38,8 +38,25 @@ export interface FactoryVelocityFlow {
 }
 
 const MS_PER_HOUR = 60 * 60 * 1000;
-const MS_PER_DAY = 24 * MS_PER_HOUR;
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+const yesterdayFormatter = new Intl.DateTimeFormat(undefined, {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+export function formatVelocityYesterdayLabel(iso?: string, now: number = Date.now()): string {
+  const parsed = iso ? new Date(iso) : null;
+  if (parsed && !Number.isNaN(parsed.getTime())) {
+    return `Yesterday · ${yesterdayFormatter.format(parsed)}`;
+  }
+
+  const local = new Date(now);
+  const utcNoon = Date.UTC(local.getFullYear(), local.getMonth(), local.getDate() - 1, 12, 0, 0);
+  return `Yesterday · ${yesterdayFormatter.format(new Date(utcNoon))}`;
+}
 
 interface CycleSample {
   closedDay: number;
@@ -57,6 +74,12 @@ function parseTimestamp(value: string | null | undefined): number | null {
 function localMidnight(timestamp: number): number {
   const date = new Date(timestamp);
   date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+function addLocalCalendarDays(timestamp: number, days: number): number {
+  const date = new Date(timestamp);
+  date.setDate(date.getDate() + days);
   return date.getTime();
 }
 
@@ -163,7 +186,7 @@ function buildDayBuckets(periodDays: FactoryVelocityFlowPeriodDays, now: number)
   const todayMidnight = localMidnight(now);
 
   for (let offset = periodDays - 1; offset >= 0; offset--) {
-    const key = todayMidnight - offset * MS_PER_DAY;
+    const key = addLocalCalendarDays(todayMidnight, -offset);
     const date = new Date(key);
     const dayIndex = periodDays - 1 - offset;
     buckets.push({
@@ -181,8 +204,9 @@ export function aggregateFactoryVelocityFlow(
   periodDays: FactoryVelocityFlowPeriodDays,
   now: number = Date.now(),
 ): FactoryVelocityFlow {
-  const windowEnd = localMidnight(now) + MS_PER_DAY;
-  const windowStart = windowEnd - periodDays * MS_PER_DAY;
+  const todayMidnight = localMidnight(now);
+  const windowStart = addLocalCalendarDays(todayMidnight, 1 - periodDays);
+  const windowEnd = addLocalCalendarDays(todayMidnight, 1);
 
   const samples: CycleSample[] = [];
   for (const order of orders) {

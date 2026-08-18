@@ -70,6 +70,7 @@ func DescribeFactoryVelocity(
 	superplaneMerges, superplaneWaste := classifySuperPlaneArtifacts(artifacts, repoOwner, repoName, hasRepo)
 
 	hasPeople := false
+	peopleSearchFailed := false
 	var peopleHits []peopleMerge
 	if hasRepo && req.GetIntegrationId() != "" {
 		hits, searchErr := searchPeopleMerges(
@@ -84,6 +85,7 @@ func DescribeFactoryVelocity(
 		)
 		if searchErr != nil {
 			log.WithContext(ctx).WithError(searchErr).Warn("factory velocity: GitHub people search failed")
+			peopleSearchFailed = true
 		} else {
 			peopleHits = subtractSuperPlaneHits(hits, superplaneMerges)
 			hasPeople = true
@@ -114,14 +116,15 @@ func DescribeFactoryVelocity(
 
 	return &pb.DescribeFactoryVelocityResponse{
 		Yesterday: &pb.DescribeFactoryVelocityYesterday{
-			Date:             timestamppb.New(yesterday.start),
+			Date:             timestamppb.New(calendarDayUTCNoon(yesterday.start)),
 			SuperplaneMerged: int32(yesterday.superplaneMerged),
 			Waste:            int32(yesterday.waste),
 		},
-		Totals:          totals,
-		Points:          points,
-		Repository:      joinOwnerRepo(repoOwner, repoName),
-		HasPeopleCohort: hasPeople,
+		Totals:             totals,
+		Points:             points,
+		Repository:         joinOwnerRepo(repoOwner, repoName),
+		HasPeopleCohort:    hasPeople,
+		PeopleSearchFailed: peopleSearchFailed,
 	}, nil
 }
 
@@ -159,9 +162,17 @@ func buildDayBuckets(now time.Time, periodDays int) []dayBucket {
 	buckets := make([]dayBucket, periodDays)
 	for i := 0; i < periodDays; i++ {
 		start := today.AddDate(0, 0, -(periodDays - 1 - i))
-		buckets[i] = dayBucket{start: start, end: start.Add(24 * time.Hour)}
+		buckets[i] = dayBucket{start: start, end: start.AddDate(0, 0, 1)}
 	}
 	return buckets
+}
+
+// calendarDayUTCNoon returns 12:00 UTC on the civil date of t in t's location.
+// The UI formats this instant in UTC so the label matches the server calendar
+// day, independent of the browser timezone.
+func calendarDayUTCNoon(t time.Time) time.Time {
+	year, month, day := t.Date()
+	return time.Date(year, month, day, 12, 0, 0, 0, time.UTC)
 }
 
 type prArtifactMeta struct {

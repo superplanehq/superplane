@@ -34,6 +34,7 @@ func TestDescribeFactoryVelocity_WithoutRepository(t *testing.T) {
 	require.NotNil(t, resp)
 
 	assert.False(t, resp.HasPeopleCohort, "people cohort must be hidden without a repo")
+	assert.False(t, resp.PeopleSearchFailed)
 	assert.Equal(t, int32(2), resp.Totals.SuperplaneMerged)
 	assert.Equal(t, int32(0), resp.Totals.PeopleMerged)
 	assert.Equal(t, int32(1), resp.Totals.Waste)
@@ -132,6 +133,56 @@ func TestParseOwnerRepo(t *testing.T) {
 
 	_, _, ok = parseOwnerRepo("/foo")
 	assert.False(t, ok)
+}
+
+func TestDescribeFactoryVelocity_PeopleSearchFailedKeepsSuperPlaneCounts(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	now := time.Now()
+	seedPRArtifact(t, factoryModel, "https://github.com/example/repo/pull/1", models.PrArtifactStateMerged, now.Add(-1*time.Hour))
+
+	resp, err := DescribeFactoryVelocity(ctx, nil, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:     factoryModel.ID.String(),
+		PeriodDays:    7,
+		IntegrationId: "00000000-0000-0000-0000-000000000001",
+		Repository:    "example/repo",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	assert.True(t, resp.PeopleSearchFailed)
+	assert.False(t, resp.HasPeopleCohort)
+	assert.Equal(t, int32(1), resp.Totals.SuperplaneMerged)
+	assert.Equal(t, int32(0), resp.Totals.PeopleMerged)
+	assert.Equal(t, "example/repo", resp.Repository)
+}
+
+func TestCalendarDayUTCNoon(t *testing.T) {
+	loc := time.FixedZone("UTC-3", -3*3600)
+	localMidnight := time.Date(2026, 8, 17, 0, 0, 0, 0, loc)
+	got := calendarDayUTCNoon(localMidnight)
+	assert.True(t, got.Equal(time.Date(2026, 8, 17, 12, 0, 0, 0, time.UTC)))
+}
+
+func TestBuildDayBuckets_CalendarDaysAcrossDST(t *testing.T) {
+	loc, err := time.LoadLocation("America/New_York")
+	require.NoError(t, err)
+
+	// Monday after the 2026 US spring-forward (Sunday 8 March).
+	now := time.Date(2026, 3, 9, 15, 0, 0, 0, loc)
+	buckets := buildDayBuckets(now, 7)
+	require.Len(t, buckets, 7)
+
+	for i := 1; i < len(buckets); i++ {
+		assert.Equal(t, buckets[i-1].end, buckets[i].start)
+		assert.Equal(t, 0, buckets[i].start.Hour())
+	}
+	assert.Equal(t, time.Date(2026, 3, 3, 0, 0, 0, 0, loc), buckets[0].start)
+	assert.Equal(t, time.Date(2026, 3, 9, 0, 0, 0, 0, loc), buckets[6].start)
 }
 
 func TestBuildDayBuckets(t *testing.T) {

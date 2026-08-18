@@ -680,9 +680,11 @@ message DescribeFactoryVelocityResponse {
   // Repository the People cohort was computed for (`owner/repo`), or empty when
   // no repository was selected.
   string repository = 4;
-  // Whether the response includes the People cohort (GitHub search returned
-  // hits or the request omitted a repository).
+  // True when GitHub search succeeded for the selected repository.
   bool has_people_cohort = 5;
+  // True when a repository was selected and GitHub search failed.
+  // SuperPlane counts are still present; the People series is omitted.
+  bool people_search_failed = 6;
 }
 
 message DescribeFactoryVelocityDay {

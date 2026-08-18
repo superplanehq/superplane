@@ -8,15 +8,10 @@ import { useConnectedIntegrations, useIntegrationResources } from "@/hooks/useIn
 import {
   aggregateFactoryVelocityFlow,
   factoryVelocityPeriodLabel,
+  formatVelocityYesterdayLabel,
   type FactoryVelocityFlow,
 } from "../lib/factoryVelocityFlow";
 import type { VelocityData, VelocityDayPoint, VelocityPeriodDays } from "./VelocityLoadedView";
-
-const yesterdayFormatter = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric" });
-
-function formatYesterdayLabel(date: Date): string {
-  return `Yesterday · ${yesterdayFormatter.format(date)}`;
-}
 
 function computeWastePct(merged: number, waste: number): number {
   const total = merged + waste;
@@ -44,6 +39,7 @@ export interface VelocityPageModel {
     error: unknown;
     refetch: () => void;
     hasPeopleCohort: boolean;
+    peopleSearchFailed: boolean;
     repositoryLabel?: string;
   };
 
@@ -90,16 +86,6 @@ function toVelocityData(response: FactoriesDescribeFactoryVelocityResponse, date
     },
     points: points.map(toDayPoint),
   };
-}
-
-function yesterdayDateLabel(iso?: string): string {
-  const parsed = iso ? new Date(iso) : null;
-  if (parsed && !Number.isNaN(parsed.getTime())) {
-    return formatYesterdayLabel(parsed);
-  }
-  const fallback = new Date();
-  fallback.setDate(fallback.getDate() - 1);
-  return formatYesterdayLabel(fallback);
 }
 
 export function useVelocityPageModel(organizationId: string, factoryId: string): VelocityPageModel {
@@ -163,7 +149,7 @@ export function useVelocityPageModel(organizationId: string, factoryId: string):
   const hasPeopleCohort = Boolean(velocityResponse?.hasPeopleCohort && hasRepoContext);
 
   const velocityData = velocityResponse
-    ? toVelocityData(velocityResponse, yesterdayDateLabel(velocityResponse.yesterday?.date))
+    ? toVelocityData(velocityResponse, formatVelocityYesterdayLabel(velocityResponse.yesterday?.date))
     : undefined;
   const workOrderFlow = isWorkOrdersLoading ? null : aggregateFactoryVelocityFlow(workOrders, periodDays);
 
@@ -190,6 +176,7 @@ export function useVelocityPageModel(organizationId: string, factoryId: string):
       error: velocityError,
       refetch: () => void refetchVelocity(),
       hasPeopleCohort,
+      peopleSearchFailed: Boolean(velocityResponse?.peopleSearchFailed),
       repositoryLabel: velocityResponse?.repository || repository || undefined,
     },
 

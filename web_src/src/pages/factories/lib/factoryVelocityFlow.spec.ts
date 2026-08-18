@@ -1,7 +1,7 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
 import { describe, expect, it } from "vitest";
 
-import { aggregateFactoryVelocityFlow } from "./factoryVelocityFlow";
+import { aggregateFactoryVelocityFlow, formatVelocityYesterdayLabel } from "./factoryVelocityFlow";
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -201,5 +201,38 @@ describe("aggregateFactoryVelocityFlow", () => {
     expect(flow.days).toBe(30);
     expect(flow.label).toBe("Last 30 days");
     expect(flow.timeTrend).toHaveLength(30);
+  });
+
+  it("keeps a close on its local calendar day across a short DST day", () => {
+    // 8 March 2026 is the US spring-forward. Bucket keys must follow
+    // local calendar midnights, not fixed 24-hour offsets.
+    const now = new Date(2026, 2, 9, 12, 0, 0).getTime();
+    const close = new Date(2026, 2, 7, 16, 0, 0);
+    const start = new Date(2026, 2, 7, 10, 0, 0);
+    const order = closedOrder({
+      id: "dst",
+      updatedAt: close.toISOString(),
+      executions: [
+        execution({
+          createdAt: start.toISOString(),
+          finishedAt: close.toISOString(),
+        }),
+      ],
+    });
+
+    const flow = aggregateFactoryVelocityFlow([order], 7, now);
+
+    expect(flow.sampleSize).toBe(1);
+    const nonZeroBuckets = flow.timeTrend.filter((point) => point.runningHours > 0 || point.waitingHours > 0);
+    expect(nonZeroBuckets).toHaveLength(1);
+  });
+});
+
+describe("formatVelocityYesterdayLabel", () => {
+  it("formats the UTC-noon calendar stamp so the day does not shift by timezone", () => {
+    const label = formatVelocityYesterdayLabel("2026-08-17T12:00:00.000Z");
+    expect(label).toMatch(/^Yesterday · /);
+    expect(label).toMatch(/17/);
+    expect(label).not.toMatch(/16/);
   });
 });

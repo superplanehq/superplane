@@ -40,6 +40,7 @@ export function VelocityPage() {
       hasGithubIntegration: model.githubIntegrations.length > 0,
       hasIntegrationSelected: Boolean(model.integrationId),
       hasRepositorySelected: Boolean(model.repository),
+      peopleSearchFailed: model.velocity.peopleSearchFailed,
     }),
   };
 
@@ -182,18 +183,27 @@ interface SourceSplitEmptyStateArgs {
   hasGithubIntegration: boolean;
   hasIntegrationSelected: boolean;
   hasRepositorySelected: boolean;
+  peopleSearchFailed: boolean;
 }
 
 function renderSourceSplitEmptyState({
   hasGithubIntegration,
   hasIntegrationSelected,
   hasRepositorySelected,
+  peopleSearchFailed,
 }: SourceSplitEmptyStateArgs) {
   if (!hasGithubIntegration) {
     return <p className="text-[13px] text-muted-foreground">Connect GitHub to compare People and SuperPlane.</p>;
   }
   if (!hasIntegrationSelected) {
     return <p className="text-[13px] text-muted-foreground">Select a GitHub integration and repository.</p>;
+  }
+  if (peopleSearchFailed) {
+    return (
+      <p className="text-[13px] text-muted-foreground">
+        We could not load People merges. SuperPlane counts still show.
+      </p>
+    );
   }
   if (!hasRepositorySelected) {
     return <p className="text-[13px] text-muted-foreground">Select a repository to compare People and SuperPlane.</p>;

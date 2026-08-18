@@ -145,4 +145,36 @@ describe("VelocityPage shell", () => {
     expect(split).toHaveTextContent("Connect GitHub to compare People and SuperPlane.");
     expect(split).not.toHaveTextContent("SuperPlane authored");
   });
+
+  it("explains when People merges could not be loaded", () => {
+    resetState();
+    integrationsHookState.data = [
+      {
+        metadata: { id: "int-1", name: "GitHub", integrationName: "github" },
+        status: { state: "ready" },
+      },
+    ];
+    repositoryResourcesHookState.data = [{ name: "acme/api" }];
+    velocityHookState.data = {
+      yesterday: { superplaneMerged: 3, waste: 0 },
+      totals: {
+        superplaneMerged: 12,
+        peopleMerged: 0,
+        waste: 0,
+        superplaneSharePct: 0,
+        wastePct: 0,
+      },
+      points: [{ day: "Mon", superplaneMerged: 3, peopleMerged: 0, waste: 0 }],
+      hasPeopleCohort: false,
+      peopleSearchFailed: true,
+      repository: "acme/api",
+    };
+
+    renderShell();
+
+    const split = screen.getByTestId("velocity-source-split");
+    expect(split).toHaveTextContent("We could not load People merges. SuperPlane counts still show.");
+    expect(split).not.toHaveTextContent("No merged pull requests");
+    expect(split).not.toHaveTextContent("SuperPlane authored");
+  });
 });
