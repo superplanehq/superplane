@@ -48,6 +48,14 @@ git clone https://github.com/YOUR_USERNAME/superplane.git
 cd superplane
 ```
 
+3. **Add** the original SuperPlane repository as the `upstream` remote so you
+   can keep your fork synchronized:
+
+```bash
+git remote add upstream https://github.com/superplanehq/superplane.git
+git remote -v
+```
+
 ### Setting Up the Development Environment
 
 Once inside the cloned repository, bring up Docker, install dependencies and
@@ -59,9 +67,13 @@ make dev.setup     # Codegen, Go + JS deps, database create/migrate (run inside 
 make dev.server    # Start air + Vite (UI at http://localhost:8000)
 ```
 
-After the first setup, run `make dev.up` when the stack is not running, then `make dev.server` to start air and Vite (use `make dev.server.fg` for foreground logs). Re-run `make dev.setup` when you need a fresh `npm install`, codegen, or migrations.
+After the first setup, run `make dev.up` when the stack is not running, then
+`make dev.server` to start air and Vite (use `make dev.server.fg` for foreground
+logs). Re-run `make dev.setup` when you need a fresh `npm install`, codegen, or
+migrations.
 
-When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
+When `make dev.server` reports the app as healthy, open SuperPlane at
+[http://localhost:8000](http://localhost:8000).
 
 ## Additional Development Resources
 
