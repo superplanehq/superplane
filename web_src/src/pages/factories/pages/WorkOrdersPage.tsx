@@ -21,7 +21,7 @@ export function WorkOrdersPage() {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { data: me } = useMe(false);
 
-  const state = useWorkOrderListState();
+  const state = useWorkOrderListState(factoryId);
 
   const {
     data: workOrders = [],
