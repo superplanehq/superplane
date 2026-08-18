@@ -60,6 +60,13 @@ type CanvasSpec struct {
 	Edges []Edge `json:"edges" yaml:"edges"`
 }
 
+// ConcurrencySpec is a node's inline concurrency configuration. max is
+// presence-aware: absent means 1, and must be 1 or greater when set.
+type ConcurrencySpec struct {
+	Key string `json:"key,omitempty" yaml:"key,omitempty"`
+	Max *int   `json:"max,omitempty" yaml:"max,omitempty"`
+}
+
 type Edge struct {
 	SourceID string `json:"sourceId" yaml:"sourceId"`
 	TargetID string `json:"targetId" yaml:"targetId"`
@@ -75,22 +82,45 @@ func (e *Edge) Model() models.Edge {
 }
 
 type Node struct {
-	ID             string          `json:"id" yaml:"id"`
-	Name           string          `json:"name" yaml:"name"`
-	Type           string          `json:"type" yaml:"type"`
-	Component      string          `json:"component" yaml:"component"`
-	Configuration  map[string]any  `json:"configuration" yaml:"configuration"`
-	Position       Position        `json:"position" yaml:"position"`
-	IsCollapsed    bool            `json:"isCollapsed" yaml:"isCollapsed"`
-	Metadata       map[string]any  `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Integration    *IntegrationRef `json:"integration,omitempty" yaml:"integration,omitempty"`
-	ErrorMessage   *string         `json:"errorMessage,omitempty" yaml:"errorMessage,omitempty"`
-	WarningMessage *string         `json:"warningMessage,omitempty" yaml:"warningMessage,omitempty"`
+	ID             string           `json:"id" yaml:"id"`
+	Name           string           `json:"name" yaml:"name"`
+	Type           string           `json:"type" yaml:"type"`
+	Component      string           `json:"component" yaml:"component"`
+	Configuration  map[string]any   `json:"configuration" yaml:"configuration"`
+	Position       Position         `json:"position" yaml:"position"`
+	IsCollapsed    bool             `json:"isCollapsed" yaml:"isCollapsed"`
+	Concurrency    *ConcurrencySpec `json:"concurrency,omitempty" yaml:"concurrency,omitempty"`
+	Metadata       map[string]any   `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Integration    *IntegrationRef  `json:"integration,omitempty" yaml:"integration,omitempty"`
+	ErrorMessage   *string          `json:"errorMessage,omitempty" yaml:"errorMessage,omitempty"`
+	WarningMessage *string          `json:"warningMessage,omitempty" yaml:"warningMessage,omitempty"`
 }
 
 type IntegrationRef struct {
 	ID   string `json:"id" yaml:"id"`
 	Name string `json:"name" yaml:"name"`
+}
+
+func (c *ConcurrencySpec) Model() *models.ConcurrencySpec {
+	if c == nil {
+		return nil
+	}
+
+	return &models.ConcurrencySpec{
+		Key: c.Key,
+		Max: c.Max,
+	}
+}
+
+func concurrencySpecFromModel(spec *models.ConcurrencySpec) *ConcurrencySpec {
+	if spec == nil {
+		return nil
+	}
+
+	return &ConcurrencySpec{
+		Key: spec.Key,
+		Max: spec.Max,
+	}
 }
 
 func (n *Node) NodeTypeForModel() string {
@@ -114,6 +144,7 @@ func (n *Node) Model() models.Node {
 		Configuration:  n.Configuration,
 		Metadata:       n.Metadata,
 		IsCollapsed:    n.IsCollapsed,
+		Concurrency:    n.Concurrency.Model(),
 		ErrorMessage:   n.ErrorMessage,
 		WarningMessage: n.WarningMessage,
 		Position: models.Position{
@@ -244,6 +275,7 @@ func VersionToCanvasYAML(name string, description string, canvasVersion *models.
 			Configuration:  node.Configuration,
 			Metadata:       node.Metadata,
 			IsCollapsed:    node.IsCollapsed,
+			Concurrency:    concurrencySpecFromModel(node.Concurrency),
 			ErrorMessage:   node.ErrorMessage,
 			WarningMessage: node.WarningMessage,
 			Position: Position{
@@ -341,6 +373,10 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 
 		if node.Type != NodeTypeTrigger && node.Type != NodeTypeWidget && node.Type != NodeTypeAction {
 			return nil, nil, fmt.Errorf("node %s: invalid type %q", node.ID, node.Type)
+		}
+
+		if err := validateNodeConcurrency(node); err != nil {
+			return nil, nil, err
 		}
 
 		nodeIDs[node.ID] = true
@@ -442,6 +478,39 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 	}
 
 	return nodes, c.Edges(), nil
+}
+
+// validateNodeConcurrency enforces the inline concurrency spec
+// invariants: only action nodes take a spec, max must be at least 1 when
+// set, and the fields must apply to the node's component. Merge admits
+// every run's queue item into the run's session, so its throughput is
+// inherently unbounded and no concurrency field applies. Loop honors max
+// as its parallel-session cap, but its backlog mixes session starts with
+// feedback for running sessions, so partitioning (key) it would break
+// the sessions.
+func validateNodeConcurrency(node Node) error {
+	concurrency := node.Concurrency
+	if concurrency == nil {
+		return nil
+	}
+
+	if node.Type != NodeTypeAction {
+		return fmt.Errorf("node %s: concurrency is only supported on action nodes", node.ID)
+	}
+
+	if node.Component == "merge" {
+		return fmt.Errorf("node %s: the merge component does not support concurrency", node.ID)
+	}
+
+	if node.Component == "loop" && concurrency.Key != "" {
+		return fmt.Errorf("node %s: the loop component does not support concurrency key", node.ID)
+	}
+
+	if concurrency.Max != nil && *concurrency.Max < 1 {
+		return fmt.Errorf("node %s: concurrency max must be at least 1", node.ID)
+	}
+
+	return nil
 }
 
 func (c *Canvas) validateNodeRef(registry *registry.Registry, organizationID string, node Node) error {

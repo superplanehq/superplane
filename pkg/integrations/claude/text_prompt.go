@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/attachments"
@@ -357,10 +356,6 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 
 func (c *TextPrompt) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *TextPrompt) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *TextPrompt) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
-import { buildLinePhaseBoard, resolvePhaseRunStatus } from "./linePhaseRuns";
+import { factoryAppPath, factoryAppRunPath, linesPath } from "./factoryPagePaths";
+import { buildLinePhaseBoard, linePhaseRunHref, resolvePhaseRunStatus } from "./linePhaseRuns";
 
 const LINE: FactoriesFactoryLine = {
   id: "line-1",
@@ -77,7 +78,7 @@ describe("buildLinePhaseBoard", () => {
     expect(board).toHaveLength(3);
     expect(board[0].stepName).toBe("plan");
     expect(board[0].appId).toBeUndefined();
-    expect(board[0].runs.map((run) => run.title)).toEqual(["Beta", "Gamma", "Alpha", "Delta"]);
+    expect(board[0].runs.map((run) => run.order.title)).toEqual(["Beta", "Gamma", "Alpha", "Delta"]);
     expect(board[0].tick).toBe("running");
     expect(board[1].stepName).toBe("build");
     expect(board[1].runs).toEqual([]);
@@ -123,11 +124,7 @@ describe("buildLinePhaseBoard", () => {
     expect(board[0].runs).toEqual([]);
     expect(board[1].runs).toEqual([]);
     expect(board[2].runs).toHaveLength(1);
-    expect(board[2].runs[0]).toMatchObject({
-      workOrderId: "wo-progress",
-      title: "Progressing",
-      executionId: "e-demo",
-    });
+    expect(board[2].runs[0]).toMatchObject({ workOrderId: "wo-progress", executionId: "e-demo" });
     expect(board[2].tick).toBe("running");
     expect(workOrderIds(board)).toEqual(["wo-progress"]);
   });
@@ -195,6 +192,52 @@ describe("buildLinePhaseBoard", () => {
 
     const board = buildLinePhaseBoard(LINE, orders);
     expect(board[1].tick).toBeNull();
+  });
+});
+
+describe("linePhaseRunHref", () => {
+  it("opens the canvas run when the phase execution has an app run", () => {
+    const href = linePhaseRunHref("org-1", "RF", "line-1", {
+      executionId: "e1",
+      workOrderId: "wo-1",
+      order: { id: "wo-1", number: "42", title: "Ship retries" },
+      execution: { id: "e1", run: { id: "run-implement", appId: "app-refund-implementer" } },
+    });
+
+    expect(href).toBe(
+      factoryAppRunPath("org-1", "RF", "app-refund-implementer", "run-implement", {
+        from: "lines",
+        lineId: "line-1",
+      }),
+    );
+  });
+
+  it("opens the phase canvas when the execution has an app but no run id", () => {
+    const href = linePhaseRunHref(
+      "org-1",
+      "RF",
+      "line-1",
+      {
+        executionId: "e1",
+        workOrderId: "wo-1",
+        order: { id: "wo-1", number: "42", title: "Ship retries" },
+        execution: { id: "e1" },
+      },
+      "app-refund-implementer",
+    );
+
+    expect(href).toBe(factoryAppPath("org-1", "RF", "app-refund-implementer", { from: "lines", lineId: "line-1" }));
+  });
+
+  it("falls back to the lines list when the phase has no canvas", () => {
+    const href = linePhaseRunHref("org-1", "RF", "line-1", {
+      executionId: "e1",
+      workOrderId: "wo-1",
+      order: { id: "wo-1", title: "Ship retries" },
+      execution: { id: "e1" },
+    });
+
+    expect(href).toBe(linesPath("org-1", "RF"));
   });
 });
 

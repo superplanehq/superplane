@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -175,10 +174,6 @@ func (c *DeleteAlarm) Hooks() []core.Hook {
 
 func (c *DeleteAlarm) HandleHook(_ core.ActionHookContext) error {
 	return nil
-}
-
-func (c *DeleteAlarm) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *DeleteAlarm) Cancel(_ core.ExecutionContext) error {

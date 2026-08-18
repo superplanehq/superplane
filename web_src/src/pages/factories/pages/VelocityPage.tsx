@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { SegmentedNav } from "@/ui/SegmentedNav";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
+import { FACTORY_VELOCITY_FLOW_BY_PERIOD, type FactoryVelocityFlowPeriod } from "./factoryVelocityFlowMockData";
 import {
   FACTORY_VELOCITY_BY_PERIOD,
   FACTORY_VELOCITY_YESTERDAY,
@@ -18,7 +19,7 @@ import {
   type FactoryVelocityPeriodDays,
   type FactoryVelocityYesterday,
 } from "./factoryVelocityMockData";
-import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import { factorySectionBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
 
 const PERIOD_OPTIONS: { value: string; label: string }[] = [
   { value: "7", label: "7d" },
@@ -39,8 +40,22 @@ const sourceChartConfig = {
   superplaneMerged: { label: "SuperPlane", color: "#10b981" },
 } satisfies ChartConfig;
 
+const timeTrendChartConfig = {
+  runningHours: { label: "Time running", color: "#60a5fa" },
+  waitingHours: { label: "Time in Waiting", color: "#f59e0b" },
+} satisfies ChartConfig;
+
 function formatUsd(value: number) {
   return `$${value.toFixed(2)}`;
+}
+
+/** Formats elapsed hours as `14h` or `1.5d` for compact metric cells. */
+function formatDurationHours(hours: number) {
+  if (hours < 48) {
+    return `${Math.round(hours)}h`;
+  }
+  const days = hours / 24;
+  return `${days % 1 === 0 ? days.toFixed(0) : days.toFixed(1)}d`;
 }
 
 function formatTokens(value: number) {
@@ -53,6 +68,24 @@ function formatTokens(value: number) {
 
 function formatPct(value: number) {
   return `${value}%`;
+}
+
+function formatTimeTrendTooltip(value: unknown, name: unknown) {
+  const hours = Array.isArray(value) ? Number(value[0]) : Number(value);
+  const seriesKey = String(name);
+  const label =
+    seriesKey in timeTrendChartConfig
+      ? timeTrendChartConfig[seriesKey as keyof typeof timeTrendChartConfig].label
+      : seriesKey;
+
+  return (
+    <div className="flex w-full items-center justify-between gap-8">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono font-medium text-foreground tabular-nums">
+        {Number.isFinite(hours) ? formatDurationHours(hours) : String(value)}
+      </span>
+    </div>
+  );
 }
 
 function MetricCell({ value, label, hint }: { value: string; label: string; hint?: string }) {
@@ -281,14 +314,128 @@ function SourceSplitCard({ periodDays }: { periodDays: FactoryVelocityPeriodDays
   );
 }
 
-export function VelocityPage() {
+function TimeTrendChart({ period }: { period: FactoryVelocityFlowPeriod }) {
+  const height = period.days === 7 ? 240 : 220;
+
+  return (
+    <ChartContainer
+      config={timeTrendChartConfig}
+      className="aspect-auto w-full"
+      style={{ height }}
+      initialDimension={{ width: 720, height }}
+    >
+      <AreaChart data={period.timeTrend} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+        <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
+        <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} interval={0} className="text-[11px]" />
+        <YAxis
+          tickLine={false}
+          axisLine={false}
+          width={36}
+          tickMargin={4}
+          className="text-[11px]"
+          tickFormatter={(value: number) => `${Number(value).toFixed(0)}h`}
+        />
+        <ChartTooltip content={<ChartTooltipContent formatter={formatTimeTrendTooltip} />} />
+        <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" />
+        <Area
+          type="monotone"
+          dataKey="runningHours"
+          stackId="day"
+          stroke="var(--color-runninghours)"
+          fill="var(--color-runninghours)"
+          fillOpacity={0.35}
+          strokeWidth={1.5}
+        />
+        <Area
+          type="monotone"
+          dataKey="waitingHours"
+          stackId="day"
+          stroke="var(--color-waitinghours)"
+          fill="var(--color-waitinghours)"
+          fillOpacity={0.35}
+          strokeWidth={1.5}
+        />
+      </AreaChart>
+    </ChartContainer>
+  );
+}
+
+function WorkOrderFlowCard({ periodDays }: { periodDays: FactoryVelocityPeriodDays }) {
+  const period = FACTORY_VELOCITY_FLOW_BY_PERIOD[periodDays];
+
+  return (
+    <section
+      className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5 sm:py-5"
+      data-testid="velocity-work-order-flow"
+    >
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-[14px] font-medium tracking-[-0.01em] text-foreground">Work order time</h2>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
+            Median times for work orders that closed in this period. Cycle time is time running plus time in Waiting
+            after the work order leaves Draft.
+          </p>
+        </div>
+        <p className="text-[12px] text-muted-foreground">{period.label}</p>
+      </div>
+
+      <div className="mt-5">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-3">
+          <MetricCell
+            value={formatDurationHours(period.medianCycleHours)}
+            label="Cycle time"
+            hint="From start to close"
+          />
+          <MetricCell
+            value={formatDurationHours(period.medianRunningHours)}
+            label="Time running"
+            hint={`${period.runningShareOfCyclePct}% of cycle time`}
+          />
+          <MetricCell
+            value={formatDurationHours(period.medianWaitingHours)}
+            label="Time in Waiting"
+            hint={`${period.waitingShareOfCyclePct}% of cycle time`}
+          />
+        </div>
+        <p className="mt-3 text-[12px] text-muted-foreground">
+          Time running is time on a line. Time in Waiting is review or a pause before the next dispatch.
+        </p>
+      </div>
+
+      <div className="mt-6 border-t border-border pt-5">
+        <h3 className="text-[13px] font-medium text-foreground">Time running and Time in Waiting by day</h3>
+        <p className="mb-3 mt-0.5 text-[12px] text-muted-foreground">
+          Median for work orders that closed on that day. The stacked area is the two parts of cycle time.
+        </p>
+        <TimeTrendChart period={period} />
+      </div>
+    </section>
+  );
+}
+
+export type VelocityPageProps = {
+  /** Storybook prototype: show work-order lifecycle and Waiting bottleneck. */
+  includeWorkOrderFlow?: boolean;
+};
+
+/** Storybook entry that enables the work-order flow prototype section. */
+export function VelocityPrototypePage() {
+  return <VelocityPage includeWorkOrderFlow />;
+}
+
+export function VelocityPage({ includeWorkOrderFlow = false }: VelocityPageProps = {}) {
   const [periodDays, setPeriodDays] = useState<FactoryVelocityPeriodDays>(7);
 
   return (
     <>
       <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
         title="Velocity"
-        subtitle="Merged pull requests from SuperPlane, waste, and cost."
+        subtitle={
+          includeWorkOrderFlow
+            ? "Merged pull requests, waste, cost, and work order time."
+            : "Merged pull requests from SuperPlane, waste, and cost."
+        }
         actions={
           <SegmentedNav
             ariaLabel="Velocity period in days"
@@ -303,10 +450,11 @@ export function VelocityPage() {
         }
       />
 
-      <div className={cn(factoryContentBodyClassName, "space-y-6")} data-testid="factory-velocity-page">
+      <div className={cn(factorySectionBodyClassName, "space-y-6")} data-testid="factory-velocity-page">
         <YesterdayCard snapshot={FACTORY_VELOCITY_YESTERDAY} />
         <TrendCard periodDays={periodDays} />
         <SourceSplitCard periodDays={periodDays} />
+        {includeWorkOrderFlow ? <WorkOrderFlowCard periodDays={periodDays} /> : null}
       </div>
     </>
   );

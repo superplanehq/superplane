@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -361,10 +360,6 @@ func (c *ManageInstancePower) pollStop(ctx core.ActionHookContext, instance *Ins
 	}
 
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, instancePollInterval)
-}
-
-func (c *ManageInstancePower) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *ManageInstancePower) Cancel(ctx core.ExecutionContext) error {

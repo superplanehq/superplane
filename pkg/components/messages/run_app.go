@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -113,10 +112,6 @@ func (c *RunApp) OutputChannels(configuration any) []core.OutputChannel {
 		{Name: PassedOutputChannel, Label: "Passed"},
 		{Name: FailedOutputChannel, Label: "Failed"},
 	}
-}
-
-func (c *RunApp) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *RunApp) Configuration() []configuration.Field {

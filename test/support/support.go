@@ -28,6 +28,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/graphql"
 	_ "github.com/superplanehq/superplane/pkg/components/http"
 	_ "github.com/superplanehq/superplane/pkg/components/if"
+	_ "github.com/superplanehq/superplane/pkg/components/loop"
 	_ "github.com/superplanehq/superplane/pkg/components/merge"
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
 	_ "github.com/superplanehq/superplane/pkg/components/readmemory"
@@ -359,6 +360,7 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 			Metadata:      node.Metadata.Data(),
 			Position:      node.Position.Data(),
 			IsCollapsed:   node.IsCollapsed,
+			Concurrency:   node.ConcurrencySpec(),
 		}
 	}
 
@@ -397,6 +399,7 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 				CreatedAt:     &now,
 				UpdatedAt:     &now,
 			}
+			canvasNode.SetConcurrencySpec(node.Concurrency)
 
 			if err := tx.Clauses(clause.Returning{}).Create(&canvasNode).Error; err != nil {
 				return err

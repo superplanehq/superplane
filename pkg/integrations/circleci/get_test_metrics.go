@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -120,10 +119,6 @@ func decodeGetTestMetricsConfiguration(config any) (GetTestMetricsConfiguration,
 func (c *GetTestMetrics) Setup(ctx core.SetupContext) error {
 	_, err := decodeGetTestMetricsConfiguration(ctx.Configuration)
 	return err
-}
-
-func (c *GetTestMetrics) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *GetTestMetrics) Execute(ctx core.ExecutionContext) error {

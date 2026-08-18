@@ -26,9 +26,6 @@ func init() {
 		Hooks: []core.Hook{
 			{Name: "probeHook", Type: core.HookTypeInternal},
 		},
-		ProcessQueueFunc: func(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-			return ctx.DefaultProcessing()
-		},
 		ExecuteFunc: func(ctx core.ExecutionContext) error {
 			return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "hook_probe.done", []any{map[string]any{}})
 		},
