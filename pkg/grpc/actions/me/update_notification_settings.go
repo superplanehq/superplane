@@ -1,24 +1,23 @@
-package factories
+package me
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	pb "github.com/superplanehq/superplane/pkg/protos/me"
 	"gorm.io/gorm"
 )
 
 func UpdateNotificationSettings(
 	ctx context.Context,
-	organizationID string,
 	req *pb.UpdateNotificationSettingsRequest,
 ) (*pb.UpdateNotificationSettingsResponse, error) {
-	orgID, err := parseOrganizationID(organizationID)
+	orgID, err := currentOrganizationID(ctx)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update notification settings")
+		return nil, err
 	}
 
 	userID, err := currentUserID(ctx)
@@ -28,27 +27,21 @@ func UpdateNotificationSettings(
 
 	requested := req.GetSettings()
 	if requested == nil {
-		return nil, factoryErrorToStatus(invalidArgument("settings is required"), "failed to update notification settings")
+		return nil, grpcerrors.InvalidArgument(nil, "settings is required")
 	}
 
 	scope, ok := notificationScopeFromProto(requested.GetWorkspaceScope())
 	if !ok {
-		return nil, factoryErrorToStatus(
-			invalidArgument("workspace scope must be all or selected"),
-			"failed to update notification settings",
-		)
+		return nil, grpcerrors.InvalidArgument(nil, "workspace scope must be all or selected")
 	}
 
 	factoryIDs, err := notificationFactoryIDs(scope, requested.GetFactoryIds())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update notification settings")
+		return nil, err
 	}
 
 	if requested.GetEnabled() && scope == models.NotificationWorkspaceScopeSelected && len(factoryIDs) == 0 {
-		return nil, factoryErrorToStatus(
-			invalidArgument("select at least one workspace or use the all workspaces scope"),
-			"failed to update notification settings",
-		)
+		return nil, grpcerrors.InvalidArgument(nil, "select at least one workspace or use the all workspaces scope")
 	}
 
 	params := models.UserNotificationSettingsParams{
@@ -74,37 +67,12 @@ func UpdateNotificationSettings(
 		return err
 	})
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update notification settings")
+		return nil, mapNotificationSettingsError(err)
 	}
 
 	return &pb.UpdateNotificationSettingsResponse{
 		Settings: serializeNotificationSettings(settings),
 	}, nil
-}
-
-// notificationFactoryIDs parses the requested workspace list. An `all`
-// scope ignores the list. An empty `selected` list is allowed when
-// notifications are off; the caller rejects it when they are on.
-func notificationFactoryIDs(scope string, requestedIDs []string) ([]uuid.UUID, error) {
-	if scope != models.NotificationWorkspaceScopeSelected {
-		return nil, nil
-	}
-
-	seen := map[uuid.UUID]struct{}{}
-	factoryIDs := make([]uuid.UUID, 0, len(requestedIDs))
-	for _, requestedID := range requestedIDs {
-		factoryID, err := uuid.Parse(requestedID)
-		if err != nil {
-			return nil, invalidArgument(fmt.Sprintf("invalid workspace id %q", requestedID))
-		}
-		if _, duplicate := seen[factoryID]; duplicate {
-			continue
-		}
-		seen[factoryID] = struct{}{}
-		factoryIDs = append(factoryIDs, factoryID)
-	}
-
-	return factoryIDs, nil
 }
 
 func ensureFactoriesExist(tx *gorm.DB, orgID uuid.UUID, factoryIDs []uuid.UUID) error {
@@ -118,16 +86,15 @@ func ensureFactoriesExist(tx *gorm.DB, orgID uuid.UUID, factoryIDs []uuid.UUID) 
 	}
 
 	if count != int64(len(factoryIDs)) {
-		return invalidArgument("one or more selected workspaces were not found")
+		return grpcerrors.InvalidArgument(nil, "one or more selected workspaces were not found")
 	}
 
 	return nil
 }
 
-func factoryIDsToStrings(factoryIDs []uuid.UUID) []string {
-	result := make([]string, 0, len(factoryIDs))
-	for _, factoryID := range factoryIDs {
-		result = append(result, factoryID.String())
+func mapNotificationSettingsError(err error) error {
+	if _, _, ok := grpcerrors.HandlerStatus(err); ok {
+		return err
 	}
-	return result
+	return grpcerrors.Internal(err, "failed to update notification settings")
 }

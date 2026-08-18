@@ -40,6 +40,12 @@ func TestMatchHTTPRoute(t *testing.T) {
 			path:   "/api/v1/me",
 			wantOK: false,
 		},
+		{
+			method: http.MethodGet,
+			path:   "/api/v1/me/notification-settings",
+			want:   HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/me/notification-settings"},
+			wantOK: true,
+		},
 	}
 
 	for _, tt := range tests {

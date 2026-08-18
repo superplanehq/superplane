@@ -1,22 +1,20 @@
-package factories
+package me
 
 import (
 	"context"
 	"errors"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	pb "github.com/superplanehq/superplane/pkg/protos/me"
 	"gorm.io/gorm"
 )
 
-func DescribeNotificationSettings(
-	ctx context.Context,
-	organizationID string,
-) (*pb.DescribeNotificationSettingsResponse, error) {
-	orgID, err := parseOrganizationID(organizationID)
+func DescribeNotificationSettings(ctx context.Context) (*pb.DescribeNotificationSettingsResponse, error) {
+	orgID, err := currentOrganizationID(ctx)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe notification settings")
+		return nil, err
 	}
 
 	userID, err := currentUserID(ctx)
@@ -31,7 +29,7 @@ func DescribeNotificationSettings(
 		}, nil
 	}
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe notification settings")
+		return nil, grpcerrors.Internal(err, "failed to describe notification settings")
 	}
 
 	return &pb.DescribeNotificationSettingsResponse{

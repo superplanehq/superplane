@@ -311,7 +311,7 @@ function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
   } satisfies FactoriesFixture["notificationSettings"];
 
   return {
-    pattern: re("/api/v1/factory-notification-settings"),
+    pattern: re("/api/v1/me/notification-settings"),
     resolve: (_match, method, body) => {
       if (method === "PUT") {
         const request = (body ?? {}) as { settings?: FactoriesFixture["notificationSettings"] };

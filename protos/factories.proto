@@ -264,34 +264,6 @@ service Factories {
     };
   }
 
-  // Notification settings APIs.
-  // Self-scoped: each user reads and writes only their own settings.
-  // The path avoids `/api/v1/factories/{...}` so the gateway does not
-  // match it against the `{id}` wildcard routes above.
-
-  rpc DescribeNotificationSettings(DescribeNotificationSettingsRequest) returns (DescribeNotificationSettingsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/factory-notification-settings"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Describe notification settings";
-      description: "Returns the calling user's work order notification settings";
-      tags: "Factory";
-    };
-  }
-
-  rpc UpdateNotificationSettings(UpdateNotificationSettingsRequest) returns (UpdateNotificationSettingsResponse) {
-    option (google.api.http) = {
-      put: "/api/v1/factory-notification-settings"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update notification settings";
-      description: "Updates the calling user's work order notification settings";
-      tags: "Factory";
-    };
-  }
-
 }
 
 // Factories
@@ -731,44 +703,6 @@ message WorkOrderArtifact {
   google.protobuf.Struct data = 3;
   UserRef created_by = 4;
   google.protobuf.Timestamp created_at = 5;
-}
-
-// Notification settings
-
-// NotificationSettings is a user's organization-wide configuration for
-// work order notification emails. Type toggles and the master `enabled`
-// switch default to on until the user saves different settings.
-message NotificationSettings {
-  enum WorkspaceScope {
-    WORKSPACE_SCOPE_UNSPECIFIED = 0;
-    WORKSPACE_SCOPE_ALL = 1;
-    WORKSPACE_SCOPE_SELECTED = 2;
-  }
-
-  bool enabled = 1;
-  WorkspaceScope workspace_scope = 2;
-  // Factory (workspace) IDs covered when `workspace_scope` is SELECTED.
-  repeated string factory_ids = 3;
-  // Notification type toggles.
-  bool work_order_assigned = 4;
-  bool work_order_comment_owned = 5;
-  bool work_order_comment_created = 6;
-  bool work_order_status_owned = 7;
-  bool work_order_artifact_owned = 8;
-}
-
-message DescribeNotificationSettingsRequest {}
-
-message DescribeNotificationSettingsResponse {
-  NotificationSettings settings = 1;
-}
-
-message UpdateNotificationSettingsRequest {
-  NotificationSettings settings = 1;
-}
-
-message UpdateNotificationSettingsResponse {
-  NotificationSettings settings = 1;
 }
 
 // Internal AMQP message for factory work-order websocket fan-out.

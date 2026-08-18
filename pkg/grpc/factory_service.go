@@ -118,13 +118,3 @@ func (s *FactoryService) CreateWorkOrderArtifact(ctx context.Context, req *pb.Cr
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.CreateWorkOrderArtifact(ctx, organizationID, req)
 }
-
-func (s *FactoryService) DescribeNotificationSettings(ctx context.Context, req *pb.DescribeNotificationSettingsRequest) (*pb.DescribeNotificationSettingsResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.DescribeNotificationSettings(ctx, organizationID)
-}
-
-func (s *FactoryService) UpdateNotificationSettings(ctx context.Context, req *pb.UpdateNotificationSettingsRequest) (*pb.UpdateNotificationSettingsResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.UpdateNotificationSettings(ctx, organizationID, req)
-}

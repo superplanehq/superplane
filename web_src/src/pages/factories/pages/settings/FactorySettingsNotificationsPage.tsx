@@ -1,7 +1,9 @@
-import type { FactoriesNotificationSettings, NotificationSettingsWorkspaceScope } from "@/api-client";
+import type { MeNotificationSettings, NotificationSettingsWorkspaceScope } from "@/api-client";
+import { PermissionTooltip } from "@/components/PermissionGate";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useFactories } from "@/hooks/useFactoryData";
 import { useNotificationSettings, useUpdateNotificationSettings } from "@/hooks/useNotificationSettings";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -64,7 +66,7 @@ interface NotificationsFormState {
   toggles: NotificationTypeToggles;
 }
 
-function formStateFromSettings(settings: FactoriesNotificationSettings | undefined): NotificationsFormState {
+function formStateFromSettings(settings: MeNotificationSettings | undefined): NotificationsFormState {
   return {
     enabled: settings?.enabled ?? true,
     scope: settings?.workspaceScope === "WORKSPACE_SCOPE_SELECTED" ? "selected" : "all",
@@ -79,7 +81,7 @@ function formStateFromSettings(settings: FactoriesNotificationSettings | undefin
   };
 }
 
-function settingsFromFormState(state: NotificationsFormState): FactoriesNotificationSettings {
+function settingsFromFormState(state: NotificationsFormState): MeNotificationSettings {
   const scope: NotificationSettingsWorkspaceScope =
     state.scope === "selected" ? "WORKSPACE_SCOPE_SELECTED" : "WORKSPACE_SCOPE_ALL";
 
@@ -97,9 +99,11 @@ function isDirtyState(current: NotificationsFormState, saved: NotificationsFormS
 
 export function FactorySettingsNotificationsPage() {
   const { organizationId } = useFactorySettingsLayout();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { data: settings, isLoading } = useNotificationSettings(organizationId);
   const { data: factories = [] } = useFactories(organizationId);
   const updateSettings = useUpdateNotificationSettings(organizationId);
+  const canUpdate = canAct("notifications", "update");
 
   const [form, setForm] = useState<NotificationsFormState>(() => formStateFromSettings(settings));
   const [savedForm, setSavedForm] = useState<NotificationsFormState>(() => formStateFromSettings(settings));
@@ -115,6 +119,9 @@ export function FactorySettingsNotificationsPage() {
   const isDirty = isDirtyState(form, savedForm);
 
   const handleSave = async () => {
+    if (!canUpdate) {
+      return;
+    }
     if (form.enabled && form.scope === "selected" && form.selectedFactoryIds.length === 0) {
       setScopeError("Select at least one workspace, or use all workspaces.");
       return;
@@ -141,7 +148,7 @@ export function FactorySettingsNotificationsPage() {
             <Switch
               id="notifications-enabled"
               checked={form.enabled}
-              disabled={isLoading}
+              disabled={isLoading || !canUpdate}
               aria-label="Email notifications"
               data-testid="notifications-enabled"
               onCheckedChange={(enabled) => setForm((prev) => ({ ...prev, enabled }))}
@@ -150,7 +157,7 @@ export function FactorySettingsNotificationsPage() {
               Email notifications
             </Label>
           </div>
-          <div className={cn("mt-6 space-y-6", !form.enabled && "pointer-events-none opacity-50")}>
+          <div className={cn("mt-6 space-y-6", (!form.enabled || !canUpdate) && "pointer-events-none opacity-50")}>
             <WorkspaceScopeSection
               scope={form.scope}
               selectedFactoryIds={form.selectedFactoryIds}
@@ -182,15 +189,20 @@ export function FactorySettingsNotificationsPage() {
             />
           </div>
         </FactorySettingsCard>
-        <LoadingButton
-          disabled={isLoading || !isDirty}
-          loading={updateSettings.isPending}
-          loadingText="Saving..."
-          onClick={() => void handleSave()}
-          data-testid="notifications-save"
+        <PermissionTooltip
+          allowed={canUpdate || permissionsLoading}
+          message="You do not have permission to change notification settings."
         >
-          Save
-        </LoadingButton>
+          <LoadingButton
+            disabled={isLoading || !canUpdate || !isDirty}
+            loading={updateSettings.isPending}
+            loadingText="Saving..."
+            onClick={() => void handleSave()}
+            data-testid="notifications-save"
+          >
+            Save
+          </LoadingButton>
+        </PermissionTooltip>
       </div>
     </FactorySettingsPageFrame>
   );

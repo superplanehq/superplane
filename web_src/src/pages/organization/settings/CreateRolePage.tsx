@@ -283,6 +283,28 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
     ],
   },
   {
+    category: "Notifications",
+    icon: "notifications",
+    permissions: [
+      {
+        id: "notification.read",
+        name: "View Notification Settings",
+        description: "View your work order notification settings",
+        category: "Notifications",
+        resource: "notifications",
+        action: "read",
+      },
+      {
+        id: "notification.update",
+        name: "Change Notification Settings",
+        description: "Change your work order notification settings",
+        category: "Notifications",
+        resource: "notifications",
+        action: "update",
+      },
+    ],
+  },
+  {
     category: "Integrations",
     icon: "integration_instructions",
     permissions: [

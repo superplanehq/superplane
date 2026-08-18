@@ -1,17 +1,16 @@
-package factories
+package me
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	pb "github.com/superplanehq/superplane/pkg/protos/me"
 )
 
-// currentUserID resolves the authenticated caller for the self-scoped
-// notification settings endpoints.
 func currentUserID(ctx context.Context) (uuid.UUID, error) {
 	userIDStr, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
@@ -20,10 +19,24 @@ func currentUserID(ctx context.Context) (uuid.UUID, error) {
 
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		return uuid.Nil, invalidArgument("invalid user id")
+		return uuid.Nil, grpcerrors.InvalidArgument(err, "invalid user id")
 	}
 
 	return userID, nil
+}
+
+func currentOrganizationID(ctx context.Context) (uuid.UUID, error) {
+	orgIDStr, ok := authentication.GetOrganizationIdFromMetadata(ctx)
+	if !ok {
+		return uuid.Nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
+	}
+
+	orgID, err := uuid.Parse(orgIDStr)
+	if err != nil {
+		return uuid.Nil, grpcerrors.InvalidArgument(err, "invalid organization id")
+	}
+
+	return orgID, nil
 }
 
 func defaultNotificationSettingsProto() *pb.NotificationSettings {
@@ -79,4 +92,34 @@ func notificationScopeFromProto(scope pb.NotificationSettings_WorkspaceScope) (s
 		return models.NotificationWorkspaceScopeSelected, true
 	}
 	return "", false
+}
+
+func notificationFactoryIDs(scope string, requestedIDs []string) ([]uuid.UUID, error) {
+	if scope != models.NotificationWorkspaceScopeSelected {
+		return nil, nil
+	}
+
+	seen := map[uuid.UUID]struct{}{}
+	factoryIDs := make([]uuid.UUID, 0, len(requestedIDs))
+	for _, requestedID := range requestedIDs {
+		factoryID, err := uuid.Parse(requestedID)
+		if err != nil {
+			return nil, grpcerrors.InvalidArgument(err, fmt.Sprintf("invalid workspace id %q", requestedID))
+		}
+		if _, duplicate := seen[factoryID]; duplicate {
+			continue
+		}
+		seen[factoryID] = struct{}{}
+		factoryIDs = append(factoryIDs, factoryID)
+	}
+
+	return factoryIDs, nil
+}
+
+func factoryIDsToStrings(factoryIDs []uuid.UUID) []string {
+	result := make([]string, 0, len(factoryIDs))
+	for _, factoryID := range factoryIDs {
+		result = append(result, factoryID.String())
+	}
+	return result
 }

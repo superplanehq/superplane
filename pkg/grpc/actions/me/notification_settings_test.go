@@ -1,4 +1,4 @@
-package factories
+package me
 
 import (
 	"context"
@@ -6,21 +6,21 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	pb "github.com/superplanehq/superplane/pkg/protos/me"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 )
 
 func Test__DescribeNotificationSettings(t *testing.T) {
 	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
 
 	t.Run("missing row returns defaults with notifications on", func(t *testing.T) {
-		resp, err := DescribeNotificationSettings(ctx, r.Organization.ID.String())
+		resp, err := DescribeNotificationSettings(ctx)
 		require.NoError(t, err)
 		require.NotNil(t, resp.Settings)
 		assert.True(t, resp.Settings.Enabled)
@@ -33,7 +33,7 @@ func Test__DescribeNotificationSettings(t *testing.T) {
 	})
 
 	t.Run("unauthenticated", func(t *testing.T) {
-		_, err := DescribeNotificationSettings(context.Background(), r.Organization.ID.String())
+		_, err := DescribeNotificationSettings(context.Background())
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, code)
@@ -42,13 +42,13 @@ func Test__DescribeNotificationSettings(t *testing.T) {
 
 func Test__UpdateNotificationSettings(t *testing.T) {
 	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
 
 	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
 	t.Run("persists enabled settings for all workspaces", func(t *testing.T) {
-		resp, err := UpdateNotificationSettings(ctx, r.Organization.ID.String(), &pb.UpdateNotificationSettingsRequest{
+		resp, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
 			Settings: &pb.NotificationSettings{
 				Enabled:                 true,
 				WorkspaceScope:          pb.NotificationSettings_WORKSPACE_SCOPE_ALL,
@@ -65,14 +65,14 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 		assert.False(t, resp.Settings.WorkOrderCommentOwned)
 		assert.False(t, resp.Settings.WorkOrderArtifactOwned)
 
-		described, err := DescribeNotificationSettings(ctx, r.Organization.ID.String())
+		described, err := DescribeNotificationSettings(ctx)
 		require.NoError(t, err)
 		assert.Equal(t, resp.Settings.Enabled, described.Settings.Enabled)
 		assert.False(t, described.Settings.WorkOrderCommentOwned)
 	})
 
 	t.Run("selected scope requires a workspace when enabled", func(t *testing.T) {
-		_, err := UpdateNotificationSettings(ctx, r.Organization.ID.String(), &pb.UpdateNotificationSettingsRequest{
+		_, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
 			Settings: &pb.NotificationSettings{
 				Enabled:        true,
 				WorkspaceScope: pb.NotificationSettings_WORKSPACE_SCOPE_SELECTED,
@@ -84,7 +84,7 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 	})
 
 	t.Run("disabled selected scope allows an empty workspace list", func(t *testing.T) {
-		resp, err := UpdateNotificationSettings(ctx, r.Organization.ID.String(), &pb.UpdateNotificationSettingsRequest{
+		resp, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
 			Settings: &pb.NotificationSettings{
 				Enabled:        false,
 				WorkspaceScope: pb.NotificationSettings_WORKSPACE_SCOPE_SELECTED,
@@ -97,7 +97,7 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 	})
 
 	t.Run("selected scope stores factory ids", func(t *testing.T) {
-		resp, err := UpdateNotificationSettings(ctx, r.Organization.ID.String(), &pb.UpdateNotificationSettingsRequest{
+		resp, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
 			Settings: &pb.NotificationSettings{
 				Enabled:        true,
 				WorkspaceScope: pb.NotificationSettings_WORKSPACE_SCOPE_SELECTED,
@@ -109,9 +109,19 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 	})
 
 	t.Run("settings is required", func(t *testing.T) {
-		_, err := UpdateNotificationSettings(ctx, r.Organization.ID.String(), &pb.UpdateNotificationSettingsRequest{})
+		_, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{})
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
+}
+
+func notificationSettingsContext(userID, organizationID string) context.Context {
+	return metadata.NewIncomingContext(
+		context.Background(),
+		metadata.Pairs(
+			"x-user-id", userID,
+			"x-organization-id", organizationID,
+		),
+	)
 }
