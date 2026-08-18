@@ -48,6 +48,21 @@ func TestFactories(t *testing.T) {
 		steps.visitFactoriesList()
 		steps.assertFactoryVisibleInList(name)
 	})
+
+	t.Run("persists onboarding completion across reload", func(t *testing.T) {
+		steps := &factorySteps{t: t}
+		name := support.RandomName("factory")
+
+		steps.start()
+		factory := steps.givenFactoryExists(name, "")
+		steps.visitFactoryOverview(factory)
+		steps.session.AssertVisible(q.TestID("workspace-onboarding"))
+
+		steps.completeFactoryOnboarding(factory)
+		steps.visitFactoryOverview(factory)
+		steps.session.AssertVisible(q.TestID("overview-lines-card"))
+		steps.session.AssertHidden(q.TestID("workspace-onboarding"))
+	})
 }
 
 type factorySteps struct {
@@ -76,6 +91,31 @@ func (s *factorySteps) visitFactoriesList() {
 func (s *factorySteps) visitFactorySettings(factory *models.Factory) {
 	s.session.Visit("/" + s.session.OrgID.String() + "/workspaces/" + factory.Key + "/settings/general")
 	s.session.AssertVisible(q.TestID("factory-settings-name"))
+}
+
+func (s *factorySteps) visitFactoryOverview(factory *models.Factory) {
+	s.session.Visit("/" + s.session.OrgID.String() + "/workspaces/" + factory.Key + "/overview")
+}
+
+func (s *factorySteps) completeFactoryOnboarding(factory *models.Factory) {
+	vcsID := uuid.New().String()
+	agentID := uuid.New().String()
+	appRepository := "acme/app"
+	backlogRepository := "acme/backlog"
+	issuesSource := models.FactoryOnboardingIssuesSourceVCS
+	agentHarness := models.FactoryOnboardingAgentHarnessClaudeCode
+	appID := uuid.New().String()
+	lineID := uuid.New().String()
+	require.NoError(s.t, factory.CompleteOnboarding(database.DB(s.t.Context()), models.FactoryOnboardingPatch{
+		VCSIntegrationID:   &vcsID,
+		AgentIntegrationID: &agentID,
+		AppRepository:      &appRepository,
+		BacklogRepository:  &backlogRepository,
+		IssuesSource:       &issuesSource,
+		AgentHarness:       &agentHarness,
+		ProvisionedAppID:   &appID,
+		ProvisionedLineID:  &lineID,
+	}))
 }
 
 func (s *factorySteps) fillFactorySettingsName(name string) {

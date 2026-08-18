@@ -28,6 +28,7 @@ import {
   LegacyWorkOrderDetailRedirect,
   LinesPage,
   MissionsPage,
+  NewWorkspacePage,
   OverviewPage,
   VelocityPage,
   WikiPage,
@@ -217,6 +218,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
         <Route path="apps/:appId" element={<AppPage />} />
         <Route path="workspaces">
           <Route index element={factoryRoute(<FactoriesIndexPage />)} />
+          <Route path="new" element={factoryRoute(<NewWorkspacePage />)} />
           <Route path=":factoryKey" element={factoryRoute(<FactoriesLayout />)}>
             <Route element={<OptionalOnboardingGate enabled={onboardingEnabled} />}>
               <Route index element={<Navigate to="overview" replace />} />

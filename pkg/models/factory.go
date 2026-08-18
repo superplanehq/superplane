@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -32,15 +33,17 @@ var ErrFactoryKeyAlreadyExists = errors.New("factory key already exists in this 
 var factoryKeyPattern = regexp.MustCompile(`^[A-Z]{2,5}$`)
 
 type Factory struct {
-	ID                  uuid.UUID
-	OrganizationID      uuid.UUID
-	Name                string
-	Description         string
-	Key                 string
-	NextWorkOrderNumber int64
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-	DeletedAt           gorm.DeletedAt `gorm:"index"`
+	ID                    uuid.UUID
+	OrganizationID        uuid.UUID
+	Name                  string
+	Description           string
+	Key                   string
+	NextWorkOrderNumber   int64
+	OnboardingConfig      datatypes.JSONType[FactoryOnboardingConfig]
+	OnboardingCompletedAt *time.Time
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+	DeletedAt             gorm.DeletedAt `gorm:"index"`
 }
 
 // NormalizeFactoryKey uppercases and trims whitespace so callers can accept
@@ -121,14 +124,16 @@ func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key
 
 	now := time.Now()
 	factory := &Factory{
-		ID:                  uuid.New(),
-		OrganizationID:      organizationID,
-		Name:                name,
-		Description:         description,
-		Key:                 normalizedKey,
-		NextWorkOrderNumber: 1,
-		CreatedAt:           now,
-		UpdatedAt:           now,
+		ID:                    uuid.New(),
+		OrganizationID:        organizationID,
+		Name:                  name,
+		Description:           description,
+		Key:                   normalizedKey,
+		NextWorkOrderNumber:   1,
+		OnboardingConfig:      datatypes.NewJSONType(FactoryOnboardingConfig{}),
+		OnboardingCompletedAt: nil,
+		CreatedAt:             now,
+		UpdatedAt:             now,
 	}
 
 	if err := tx.Clauses(clause.Returning{}).Create(factory).Error; err != nil {
