@@ -37,6 +37,7 @@ const (
 	ArtifactTypePR       = "pr"
 	ArtifactTypeMarkdown = "markdown"
 	ArtifactTypeBranch   = "branch"
+	ArtifactTypeLink     = "link"
 )
 
 // Events

@@ -47,6 +47,13 @@ export const factoryQueryKeys = {
   workOrderArtifacts: (organizationId: string, factoryId: string, orderId: string) =>
     ["factories", organizationId, factoryId, "work-orders", orderId, "artifacts"] as const,
   apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
+  velocity: (
+    organizationId: string,
+    factoryId: string,
+    periodDays: number,
+    integrationId: string,
+    repository: string,
+  ) => ["factories", organizationId, factoryId, "velocity", periodDays, integrationId, repository] as const,
 };
 
 function factoryListKey(organizationId: string) {
