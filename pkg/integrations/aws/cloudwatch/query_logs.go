@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -367,10 +366,6 @@ func validateQueryLogsConfiguration(config QueryLogsConfiguration) error {
 	}
 
 	return nil
-}
-
-func (c *QueryLogs) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *QueryLogs) Cancel(ctx core.ExecutionContext) error {
