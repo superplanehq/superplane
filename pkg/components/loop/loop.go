@@ -357,7 +357,9 @@ func (c *Loop) startLoop(ctx core.ProcessQueueContext, spec Spec) (*uuid.UUID, e
 // sessionsAtLimit reports whether this node already has as many loop runs in
 // progress as the node's concurrency max allows. A session execution stays
 // unfinished for the whole loop and only finishes on done/fail, so active
-// sessions are simply running executions on the node.
+// sessions are the node's pending, started, and cancelling executions.
+// Counting pending matters: sessions created earlier in the same dispatch
+// pass have not started yet and must still hold their slot.
 func (c *Loop) sessionsAtLimit(ctx core.ProcessQueueContext) (bool, error) {
 	if ctx.MaxConcurrency == 0 || ctx.CountRunningExecutions == nil {
 		return false, nil

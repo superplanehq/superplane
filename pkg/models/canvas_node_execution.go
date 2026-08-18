@@ -318,24 +318,25 @@ func CountNodeExecutions(db *gorm.DB, workflowID uuid.UUID, nodeID string, state
 	return totalCount, nil
 }
 
-func CountRunningExecutionsForNode(workflowID uuid.UUID, nodeID string) (int64, error) {
-	return CountRunningExecutionsForNodeInTransaction(database.Conn(), workflowID, nodeID)
-}
-
-func CountRunningExecutionsForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (int64, error) {
-	var runningCount int64
+// CountActiveExecutionsForNode counts the node's executions occupying a
+// concurrency slot: pending, started, or cancelling. Pending executions
+// count because they will start, and cancelling ones because they hold
+// resources until they terminate — the same slot semantics the queue
+// worker uses when capacity-gating dispatch.
+func CountActiveExecutionsForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (int64, error) {
+	var count int64
 	err := tx.
 		Model(&CanvasNodeExecution{}).
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID).
-		Where("state = ?", CanvasNodeExecutionStateStarted).
-		Count(&runningCount).
+		Where("state IN ?", CanvasNodeExecutionActiveStates).
+		Count(&count).
 		Error
 	if err != nil {
 		return 0, err
 	}
 
-	return runningCount, nil
+	return count, nil
 }
 
 func FindNodeExecution(workflowID, id uuid.UUID) (*CanvasNodeExecution, error) {

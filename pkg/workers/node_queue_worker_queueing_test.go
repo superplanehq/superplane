@@ -372,6 +372,54 @@ func Test__Queueing_SelfManagedMergeIsNotCapacityGated(t *testing.T) {
 	assert.Nil(t, executions[0].QueueName)
 }
 
+// A loop honors concurrency.max for its parallel sessions even within a
+// single dispatch pass. Sessions created earlier in the pass are still
+// pending (the executor has not started them), so the slot count must
+// include pending executions or every backlog item would open a session.
+func Test__Queueing_LoopSessionsRespectMaxWithinOnePass(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := queueWorkerForTest(r)
+	loopNode := "loop-node"
+
+	canvas, _ := support.CreateCanvas(
+		t, r.Organization.ID, r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "trigger-1",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: loopNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "loop"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{
+					"untilExpression": `$["Checker"].ready == true`,
+				}),
+			},
+		},
+		triggerToComponentEdge(loopNode),
+	)
+
+	base := time.Now().Add(-10 * time.Minute)
+	for i := 0; i < 2; i++ {
+		event := support.EmitCanvasEventForNode(t, canvas.ID, "trigger-1", "default", nil)
+		createQueueItemAt(t, canvas.ID, loopNode, event, base.Add(time.Duration(i)*time.Minute))
+	}
+
+	//
+	// One pass: the first item opens a session; the second is deferred
+	// because the still-pending session holds the only slot (default
+	// max 1).
+	//
+	processQueueNode(t, worker, canvas.ID, loopNode)
+
+	assert.Len(t, listActiveNodeExecutionsForTest(t, canvas.ID, loopNode), 1)
+	assert.Len(t, listQueueItemsForTest(t, canvas.ID, loopNode), 1)
+}
+
 func findExecutionByEvent(t *testing.T, canvasID uuid.UUID, nodeID string, eventID uuid.UUID) *models.CanvasNodeExecution {
 	t.Helper()
 	executions := listNodeExecutionsForTest(t, canvasID, nodeID)

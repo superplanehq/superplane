@@ -24,3 +24,15 @@ ALTER TABLE workflow_node_executions ADD COLUMN queue_name character varying(256
 CREATE INDEX idx_workflow_node_executions_active_queue
     ON workflow_node_executions (workflow_id, node_id, queue_name)
     WHERE state IN ('pending', 'started', 'cancelling');
+
+--
+-- Executions that are in flight when this migration runs must occupy a
+-- slot in their node's queue, or capacity checks would not see them and
+-- nodes could exceed their concurrency max until those executions
+-- finish. No node has a concurrency key yet, so every node's queue is
+-- its implicit node-ID queue. Terminal executions never enter capacity
+-- counts and stay untouched.
+--
+UPDATE workflow_node_executions
+    SET queue_name = node_id
+    WHERE state IN ('pending', 'started', 'cancelling');

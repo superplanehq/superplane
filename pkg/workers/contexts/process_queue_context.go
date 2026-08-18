@@ -212,7 +212,7 @@ func BuildProcessQueueContext(
 
 	ctx.MaxConcurrency = node.ConcurrencySpec().EffectiveMax()
 	ctx.CountRunningExecutions = func() (int64, error) {
-		return models.CountRunningExecutionsForNodeInTransaction(tx, node.WorkflowID, node.NodeID)
+		return models.CountActiveExecutionsForNode(tx, node.WorkflowID, node.NodeID)
 	}
 
 	return ctx, nil

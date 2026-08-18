@@ -195,8 +195,10 @@ type ProcessQueueContext struct {
 	MaxConcurrency int
 
 	//
-	// CountRunningExecutions returns how many unfinished (running)
-	// executions this node currently has.
+	// CountRunningExecutions returns how many executions of this node
+	// currently occupy a concurrency slot: pending, started, or
+	// cancelling. Pending counts so that items processed in the same
+	// pass cannot all pass a limit check before any execution starts.
 	//
 	CountRunningExecutions func() (int64, error)
 
