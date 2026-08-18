@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	emailTypeMagicCode = "magic_code"
+	emailTypeMagicCode                = "magic_code"
+	emailTypeOrganizationMemberJoined = "organization_member_joined"
 
 	emailWorkerReasonInvalidMessage = "invalid_message"
 	emailWorkerReasonSendError      = "send_error"

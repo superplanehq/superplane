@@ -1,0 +1,3 @@
+{{.MemberName}} ({{.MemberEmail}}) joined {{.OrganizationName}} on SuperPlane.
+
+Manage organization members: {{.SettingsURL}}

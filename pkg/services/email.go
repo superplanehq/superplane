@@ -14,11 +14,39 @@ import (
 
 type EmailService interface {
 	SendMagicCodeEmail(toEmail, code, magicLink string) error
+	SendOrganizationMemberJoinedEmail(toEmail, memberName, memberEmail, organizationName, settingsURL string) error
 }
 
 type MagicCodeTemplateData struct {
 	Code      string
 	MagicLink string
+}
+
+type OrganizationMemberJoinedTemplateData struct {
+	MemberName       string
+	MemberEmail      string
+	OrganizationName string
+	SettingsURL      string
+}
+
+func organizationMemberJoinedEmailContent(templateDir, memberName, memberEmail, organizationName, settingsURL string) (string, string, string, error) {
+	memberName = strings.TrimSpace(memberName)
+	if memberName == "" {
+		memberName = memberEmail
+	}
+
+	data := OrganizationMemberJoinedTemplateData{
+		MemberName: memberName, MemberEmail: memberEmail, OrganizationName: organizationName, SettingsURL: settingsURL,
+	}
+	textBody, err := renderEmailTemplate(templateDir, "organization_member_joined.txt", data)
+	if err != nil {
+		return "", "", "", fmt.Errorf("render member joined text template: %w", err)
+	}
+	htmlBody, err := renderEmailTemplate(templateDir, "organization_member_joined.html", data)
+	if err != nil {
+		return "", "", "", fmt.Errorf("render member joined HTML template: %w", err)
+	}
+	return fmt.Sprintf("%s joined %s on SuperPlane", memberName, organizationName), textBody, htmlBody, nil
 }
 
 type ResendEmailService struct {
@@ -70,6 +98,15 @@ func (s *ResendEmailService) SendMagicCodeEmail(toEmail, code, magicLink string)
 
 	log.Infof("Magic code email sent successfully to %s (ID: %s)", toEmail, response.Id)
 	return nil
+}
+
+func (s *ResendEmailService) SendOrganizationMemberJoinedEmail(toEmail, memberName, memberEmail, organizationName, settingsURL string) error {
+	subject, textBody, htmlBody, err := organizationMemberJoinedEmailContent(s.templateDir, memberName, memberEmail, organizationName, settingsURL)
+	if err != nil {
+		return err
+	}
+	_, err = s.client.Emails.Send(&resend.SendEmailRequest{From: fmt.Sprintf("%s <%s>", s.fromName, s.fromEmail), To: []string{toEmail}, Subject: subject, Text: textBody, Html: htmlBody})
+	return err
 }
 
 func (s *ResendEmailService) renderTemplate(templateName string, data any) (string, error) {

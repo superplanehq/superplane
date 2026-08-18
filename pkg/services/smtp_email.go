@@ -158,6 +158,18 @@ func (s *SMTPEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) e
 	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
 }
 
+func (s *SMTPEmailService) SendOrganizationMemberJoinedEmail(toEmail, memberName, memberEmail, organizationName, settingsURL string) error {
+	settings, err := s.settingsProvider.GetSMTPSettings(context.Background())
+	if err != nil {
+		return err
+	}
+	subject, textBody, htmlBody, err := organizationMemberJoinedEmailContent(s.templateDir, memberName, memberEmail, organizationName, settingsURL)
+	if err != nil {
+		return err
+	}
+	return s.sendEmail(settings, []string{toEmail}, nil, subject, textBody, htmlBody)
+}
+
 func (s *SMTPEmailService) renderTemplate(templateName string, data any) (string, error) {
 	return renderEmailTemplate(s.templateDir, templateName, data)
 }

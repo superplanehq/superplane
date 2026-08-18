@@ -193,6 +193,66 @@ func TestSMTPEmailService_SendMagicCodeEmail(t *testing.T) {
 	assert.True(t, strings.Contains(message, "<p>Code 123456</p>"))
 }
 
+func TestSMTPEmailService_SendOrganizationMemberJoinedEmail(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeOrganizationMemberJoinedTemplates(t, tmpDir)
+
+	service := NewSMTPEmailService(&fakeSettingsProvider{settings: &SMTPSettings{
+		Host:      "superplane-mailpit",
+		Port:      1025,
+		FromName:  "SuperPlane",
+		FromEmail: "notifications@superplane.local",
+	}}, tmpDir)
+
+	fakeClient := &fakeSMTPClient{extensions: map[string]bool{}}
+	originalDial := smtpDial
+	smtpDial = func(addr string) (smtpClient, error) {
+		assert.Equal(t, "superplane-mailpit:1025", addr)
+		return fakeClient, nil
+	}
+	t.Cleanup(func() {
+		smtpDial = originalDial
+	})
+
+	err := service.SendOrganizationMemberJoinedEmail(
+		"owner@example.com",
+		"",
+		"alex@example.com",
+		"Example Organization",
+		"https://app.superplane.test/org-1/settings/members",
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, "notifications@superplane.local", fakeClient.mailFrom)
+	assert.Equal(t, []string{"owner@example.com"}, fakeClient.rcpt)
+	assert.False(t, fakeClient.startedTLS)
+	assert.False(t, fakeClient.authCalled)
+	message := fakeClient.message.String()
+	assert.Contains(t, message, "Subject: alex@example.com joined Example Organization on SuperPlane")
+	assert.Contains(t, message, "alex@example.com (alex@example.com) joined Example Organization")
+	assert.Contains(t, message, "https://app.superplane.test/org-1/settings/members")
+}
+
+func TestOrganizationMemberJoinedEmailContentEscapesHTML(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeOrganizationMemberJoinedTemplates(t, tmpDir)
+
+	subject, textBody, htmlBody, err := organizationMemberJoinedEmailContent(
+		tmpDir,
+		"<Alex & Sam>",
+		"alex@example.com",
+		"Demo <Production>",
+		"https://app.superplane.test/org-1/settings/members?tab=all&sort=name",
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, "<Alex & Sam> joined Demo <Production> on SuperPlane", subject)
+	assert.Contains(t, textBody, "<Alex & Sam> (alex@example.com) joined Demo <Production>")
+	assert.Contains(t, htmlBody, "&lt;Alex &amp; Sam&gt;")
+	assert.Contains(t, htmlBody, "Demo &lt;Production&gt;")
+	assert.Contains(t, htmlBody, "tab=all&amp;sort=name")
+}
+
 func TestRenderEmailTemplate(t *testing.T) {
 	tmpDir := t.TempDir()
 	templateDir := filepath.Join(tmpDir, "email")
@@ -258,4 +318,13 @@ func writeMagicCodeTemplates(t *testing.T, root string) {
 	require.NoError(t, os.MkdirAll(templateDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "magic_code.txt"), []byte("Code {{.Code}}\n{{.MagicLink}}"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "magic_code.html"), []byte("<p>Code {{.Code}}</p><a href=\"{{.MagicLink}}\">Open</a>"), 0o644))
+}
+
+func writeOrganizationMemberJoinedTemplates(t *testing.T, root string) {
+	t.Helper()
+
+	templateDir := filepath.Join(root, "email")
+	require.NoError(t, os.MkdirAll(templateDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "organization_member_joined.txt"), []byte("{{.MemberName}} ({{.MemberEmail}}) joined {{.OrganizationName}}\n{{.SettingsURL}}"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(templateDir, "organization_member_joined.html"), []byte("<p>{{.MemberName}} ({{.MemberEmail}}) joined {{.OrganizationName}}</p><a href=\"{{.SettingsURL}}\">Manage</a>"), 0o644))
 }

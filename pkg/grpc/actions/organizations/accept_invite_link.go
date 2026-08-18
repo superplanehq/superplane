@@ -3,9 +3,11 @@ package organizations
 import (
 	"context"
 	"errors"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
@@ -13,6 +15,9 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/gorm"
 )
+
+type memberJoinedPublisher func(messages.OrganizationMemberJoinedMessage) error
+type eligibleOwnerLister func(*gorm.DB, string, []string) ([]models.User, error)
 
 func AcceptInviteLink(ctx context.Context, authService authorization.Authorization, accountID string, token string) (*structpb.Struct, error) {
 	return AcceptInviteLinkWithUsage(ctx, authService, nil, accountID, token)
@@ -22,6 +27,20 @@ func AcceptInviteLinkWithUsage(
 	ctx context.Context,
 	authService authorization.Authorization,
 	usageService usage.Service,
+	accountID string,
+	token string,
+) (*structpb.Struct, error) {
+	return acceptInviteLinkWithUsage(ctx, authService, usageService, func(message messages.OrganizationMemberJoinedMessage) error {
+		return message.Publish()
+	}, models.ListActiveHumanUsersByIDs, accountID, token)
+}
+
+func acceptInviteLinkWithUsage(
+	ctx context.Context,
+	authService authorization.Authorization,
+	usageService usage.Service,
+	publish memberJoinedPublisher,
+	listOwners eligibleOwnerLister,
 	accountID string,
 	token string,
 ) (*structpb.Struct, error) {
@@ -110,7 +129,43 @@ func AcceptInviteLinkWithUsage(
 		return nil, grpcerrors.Internal(err, "failed to accept invite")
 	}
 
+	notifyOrganizationOwnersOfJoinedMember(ctx, authService, publish, listOwners, org, user)
+
 	return inviteLinkAcceptResponse(org.ID.String(), org.Name, statusValue)
+}
+
+func notifyOrganizationOwnersOfJoinedMember(
+	ctx context.Context,
+	authService authorization.Authorization,
+	publish memberJoinedPublisher,
+	listOwners eligibleOwnerLister,
+	organization *models.Organization,
+	member *models.User,
+) {
+	ownerIDs, err := authService.GetOrgUsersForRole(ctx, models.RoleOrgOwner, organization.ID.String())
+	if err != nil {
+		log.Errorf("failed to resolve organization owners for member join notification: %v", err)
+		return
+	}
+
+	owners, err := listOwners(database.DB(ctx), organization.ID.String(), ownerIDs)
+	if err != nil {
+		log.Errorf("failed to load organization owners for member join notification: %v", err)
+		return
+	}
+
+	for _, owner := range owners {
+		message := messages.OrganizationMemberJoinedMessage{
+			ToEmail:          owner.GetEmail(),
+			OrganizationID:   organization.ID.String(),
+			OrganizationName: organization.Name,
+			MemberEmail:      member.GetEmail(),
+			MemberName:       member.Name,
+		}
+		if err := publish(message); err != nil {
+			log.Errorf("failed to publish member join notification for organization %s and owner %s: %v", organization.ID, owner.ID, err)
+		}
+	}
 }
 
 func inviteLinkAcceptResponse(organizationID, organizationName, statusValue string) (*structpb.Struct, error) {

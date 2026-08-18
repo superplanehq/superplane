@@ -80,3 +80,7 @@ func (s *failingEmailService) SendInvitationEmail(_, _, _, _ string) error {
 func (s *failingEmailService) SendMagicCodeEmail(_, _, _ string) error {
 	return s.err
 }
+
+func (s *failingEmailService) SendOrganizationMemberJoinedEmail(_, _, _, _, _ string) error {
+	return s.err
+}

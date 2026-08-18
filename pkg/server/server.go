@@ -342,6 +342,9 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	log.Println("Starting Magic Code Email Consumer")
 	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
 	go magicCodeEmailConsumer.Start()
+	log.Println("Starting Organization Member Joined Email Consumer")
+	organizationMemberJoinedEmailConsumer := workers.NewOrganizationMemberJoinedEmailConsumer(rabbitMQURL, emailService, baseURL)
+	go organizationMemberJoinedEmailConsumer.Start()
 }
 
 func buildGRPCServices(
