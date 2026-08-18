@@ -196,12 +196,12 @@ func LockPendingNodeExecutionInActiveCanvas(tx *gorm.DB, id uuid.UUID) (*CanvasN
 	return &execution, nil
 }
 
-func ListNodeExecutions(db *gorm.DB, workflowID uuid.UUID, nodeID string, states []string, results []string, limit int, beforeTime *time.Time) ([]CanvasNodeExecution, error) {
+func ListNodeExecutions(db *gorm.DB, workflowID uuid.UUID, nodeID string, states []string, results []string, limit int, cursor *KeysetCursor) ([]CanvasNodeExecution, error) {
 	var executions []CanvasNodeExecution
 	query := db.
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID).
-		Order("created_at DESC").
+		Order("created_at DESC, id DESC").
 		Limit(int(limit))
 
 	if len(states) > 0 {
@@ -212,9 +212,7 @@ func ListNodeExecutions(db *gorm.DB, workflowID uuid.UUID, nodeID string, states
 		query = query.Where("result IN ?", results)
 	}
 
-	if beforeTime != nil {
-		query = query.Where("created_at < ?", beforeTime)
-	}
+	query = cursor.Apply(query)
 
 	err := query.Find(&executions).Error
 	if err != nil {

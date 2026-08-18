@@ -597,18 +597,16 @@ func (i *CanvasNodeQueueItem) Delete(tx *gorm.DB) error {
 	return tx.Delete(i).Error
 }
 
-func ListNodeQueueItems(db *gorm.DB, workflowID uuid.UUID, nodeID string, limit int, beforeTime *time.Time) ([]CanvasNodeQueueItem, error) {
+func ListNodeQueueItems(db *gorm.DB, workflowID uuid.UUID, nodeID string, limit int, cursor *KeysetCursor) ([]CanvasNodeQueueItem, error) {
 	var queueItems []CanvasNodeQueueItem
 	query := db.
 		Preload("RootEvent").
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID).
-		Order("created_at DESC").
+		Order("created_at DESC, id DESC").
 		Limit(int(limit))
 
-	if beforeTime != nil {
-		query = query.Where("created_at < ?", beforeTime)
-	}
+	query = cursor.Apply(query)
 
 	err := query.Find(&queueItems).Error
 	if err != nil {

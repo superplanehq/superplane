@@ -159,7 +159,7 @@ func ListCanvasVersionHistoryInTransaction(
 	tx *gorm.DB,
 	workflowID uuid.UUID,
 	limit int,
-	before *time.Time,
+	cursor *KeysetCursor,
 ) ([]CanvasVersionMetadata, error) {
 	query := tx.
 		Model(&CanvasVersion{}).
@@ -167,9 +167,7 @@ func ListCanvasVersionHistoryInTransaction(
 		Where("workflow_id = ?", workflowID).
 		Order("created_at DESC, id DESC")
 
-	if before != nil {
-		query = query.Where("created_at < ?", *before)
-	}
+	query = cursor.Apply(query)
 
 	if limit > 0 {
 		query = query.Limit(limit)

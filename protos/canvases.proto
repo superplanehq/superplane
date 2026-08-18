@@ -507,6 +507,9 @@ message ListCanvasVersionsRequest {
   string canvas_id = 1;
   uint32 limit = 2;
   google.protobuf.Timestamp before = 3;
+  // Id of the last row of the previous page. Echo `last_id` back together
+  // with `before` so rows sharing that timestamp are not skipped.
+  string before_id = 4;
 }
 
 message ListCanvasVersionsResponse {
@@ -514,6 +517,7 @@ message ListCanvasVersionsResponse {
   uint32 total_count = 2;
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;
+  string last_id = 5;
 }
 
 message DescribeCanvasVersionRequest {
@@ -629,6 +633,9 @@ message ListNodeEventsRequest {
   string node_id = 2;
   uint32 limit = 3;
   google.protobuf.Timestamp before = 4;
+  // Id of the last row of the previous page. Echo `last_id` back together
+  // with `before` so rows sharing that timestamp are not skipped.
+  string before_id = 5;
 }
 
 message ListNodeEventsResponse {
@@ -636,6 +643,7 @@ message ListNodeEventsResponse {
   uint32 total_count = 2;
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;
+  string last_id = 5;
 }
 
 message ReemitTriggerEventRequest {
@@ -653,6 +661,9 @@ message ListNodeQueueItemsRequest {
   string node_id = 2;
   uint32 limit = 3;
   google.protobuf.Timestamp before = 4;
+  // Id of the last row of the previous page. Echo `last_id` back together
+  // with `before` so rows sharing that timestamp are not skipped.
+  string before_id = 5;
 }
 
 message ListNodeQueueItemsResponse {
@@ -660,6 +671,7 @@ message ListNodeQueueItemsResponse {
   uint32 total_count = 2;
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;
+  string last_id = 5;
 }
 
 message DeleteNodeQueueItemRequest {
@@ -677,6 +689,9 @@ message ListNodeExecutionsRequest {
   repeated CanvasNodeExecution.Result results = 4;
   uint32 limit = 5;
   google.protobuf.Timestamp before = 6;
+  // Id of the last row of the previous page. Echo `last_id` back together
+  // with `before` so rows sharing that timestamp are not skipped.
+  string before_id = 7;
 }
 
 message ListNodeExecutionsResponse {
@@ -684,6 +699,7 @@ message ListNodeExecutionsResponse {
   uint32 total_count = 2;
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;
+  string last_id = 5;
 }
 
 //
@@ -783,6 +799,9 @@ message ListRunsRequest {
   google.protobuf.Timestamp before = 3;
   repeated CanvasRun.State states = 4;
   repeated CanvasRun.Result results = 5;
+  // Id of the last row of the previous page. Echo `last_id` back together
+  // with `before` so rows sharing that timestamp are not skipped.
+  string before_id = 6;
 }
 
 message ListRunsResponse {
@@ -790,6 +809,7 @@ message ListRunsResponse {
   uint32 total_count = 2;
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;
+  string last_id = 5;
 }
 
 message DescribeRunRequest {
