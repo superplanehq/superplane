@@ -19,8 +19,6 @@ func branchTreeURL(repository, name string) string {
 		return ""
 	}
 
-	path := encodeBranchPath(branch)
-
 	if strings.HasPrefix(repo, "https://") || strings.HasPrefix(repo, "http://") {
 		parsed, err := url.Parse(repo)
 		if err != nil || parsed.Host == "" {
@@ -29,7 +27,12 @@ func branchTreeURL(repository, name string) string {
 		if parsed.Scheme != "http" && parsed.Scheme != "https" {
 			return ""
 		}
-		return strings.TrimRight(parsed.String(), "/") + "/tree/" + path
+		parsed.RawQuery = ""
+		parsed.Fragment = ""
+		// Assign the raw branch name to Path. String() encodes reserved
+		// characters. Pre-escaping here would double-encode `#` as `%2523`.
+		parsed.Path = strings.TrimRight(parsed.Path, "/") + "/tree/" + branch
+		return parsed.String()
 	}
 
 	if strings.Contains(repo, "://") || strings.HasPrefix(repo, "/") {
@@ -41,7 +44,7 @@ func branchTreeURL(repository, name string) string {
 		return ""
 	}
 
-	return "https://github.com/" + owner + "/" + rest + "/tree/" + path
+	return "https://github.com/" + owner + "/" + rest + "/tree/" + encodeBranchPath(branch)
 }
 
 func encodeBranchPath(name string) string {

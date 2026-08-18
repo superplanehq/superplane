@@ -215,4 +215,3 @@ describe("toArtifactDataRecord", () => {
     expect(toArtifactDataRecord("https://example.com")).toBeUndefined();
   });
 });
-

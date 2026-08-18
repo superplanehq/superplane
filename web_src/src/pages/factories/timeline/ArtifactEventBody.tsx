@@ -31,8 +31,7 @@ export function ArtifactEventBody({
       ) : (
         <span className={timelineActorClassName}>Someone</span>
       )}{" "}
-      attached{" "}
-      <WorkOrderArtifactInline artifact={displayArtifact} className="align-baseline" />
+      attached <WorkOrderArtifactInline artifact={displayArtifact} className="align-baseline" />
       <span className={timelineTimeClassName}>
         {" · "}
         {timeLabel}

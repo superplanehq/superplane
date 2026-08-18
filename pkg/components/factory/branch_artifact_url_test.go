@@ -34,6 +34,12 @@ func TestBranchTreeURL(t *testing.T) {
 			want:       "https://git.example.com/acme/storefront/tree/feat/%2342-fix",
 		},
 		{
+			name:       "strips query and fragment from a repository URL",
+			repository: "https://git.example.com/acme/storefront?tab=readme#readme",
+			branch:     "hotfix",
+			want:       "https://git.example.com/acme/storefront/tree/hotfix",
+		},
+		{
 			name:       "blank repository",
 			repository: "",
 			branch:     "feature/foo",
