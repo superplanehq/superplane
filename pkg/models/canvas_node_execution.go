@@ -1,7 +1,6 @@
 package models
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -62,6 +61,12 @@ type CanvasNodeExecution struct {
 	// which holds the input for this execution.
 	//
 	EventID uuid.UUID
+
+	//
+	// The resolved queue name this execution occupies a slot in.
+	// Node-queue capacity is a count of active executions per queue name.
+	//
+	QueueName *string
 
 	//
 	// State management fields.
@@ -313,24 +318,25 @@ func CountNodeExecutions(db *gorm.DB, workflowID uuid.UUID, nodeID string, state
 	return totalCount, nil
 }
 
-func CountRunningExecutionsForNode(workflowID uuid.UUID, nodeID string) (int64, error) {
-	return CountRunningExecutionsForNodeInTransaction(database.Conn(), workflowID, nodeID)
-}
-
-func CountRunningExecutionsForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (int64, error) {
-	var runningCount int64
+// CountActiveExecutionsForNode counts the node's executions occupying a
+// concurrency slot: pending, started, or cancelling. Pending executions
+// count because they will start, and cancelling ones because they hold
+// resources until they terminate — the same slot semantics the queue
+// worker uses when capacity-gating dispatch.
+func CountActiveExecutionsForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (int64, error) {
+	var count int64
 	err := tx.
 		Model(&CanvasNodeExecution{}).
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID).
-		Where("state = ?", CanvasNodeExecutionStateStarted).
-		Count(&runningCount).
+		Where("state IN ?", CanvasNodeExecutionActiveStates).
+		Count(&count).
 		Error
 	if err != nil {
 		return 0, err
 	}
 
-	return runningCount, nil
+	return count, nil
 }
 
 func FindNodeExecution(workflowID, id uuid.UUID) (*CanvasNodeExecution, error) {
@@ -487,21 +493,6 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 	}
 
 	//
-	// Update the workflow node state to ready.
-	//
-	node, err := FindCanvasNode(tx, e.WorkflowID, e.NodeID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-
-	if node != nil {
-		err = node.UpdateState(tx, CanvasNodeStateReady)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	//
 	// Update execution state
 	//
 	e.State = CanvasNodeExecutionStateFinished
@@ -560,18 +551,6 @@ func (e *CanvasNodeExecution) EmitOutputsInTransaction(tx *gorm.DB, channelOutpu
 		}
 	}
 
-	node, err := FindCanvasNode(tx, e.WorkflowID, e.NodeID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-
-	if node != nil {
-		err = node.UpdateState(tx, CanvasNodeStateReady)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	if e.State == CanvasNodeExecutionStatePending {
 		if err := e.StartInTransaction(tx); err != nil {
 			return nil, err
@@ -617,21 +596,6 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 
 	if err != nil {
 		return false, err
-	}
-
-	//
-	// Update the workflow node state to ready.
-	//
-	node, err := FindCanvasNode(tx, e.WorkflowID, e.NodeID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return false, err
-	}
-
-	if node != nil {
-		err := node.UpdateState(tx, CanvasNodeStateReady)
-		if err != nil {
-			return false, err
-		}
 	}
 
 	return true, CompletePendingRequestsForExecution(tx, e.ID)
@@ -697,18 +661,6 @@ func (e *CanvasNodeExecution) CancelInTransaction(tx *gorm.DB, cancelledBy *uuid
 
 	if err != nil {
 		return err
-	}
-
-	node, err := FindCanvasNode(tx, e.WorkflowID, e.NodeID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
-	}
-
-	if node != nil {
-		err := node.UpdateState(tx, CanvasNodeStateReady)
-		if err != nil {
-			return err
-		}
 	}
 
 	return CompletePendingRequestsForExecution(tx, e.ID)
@@ -829,4 +781,24 @@ func FindLastExecutionPerNode(tx *gorm.DB, workflowID uuid.UUID) ([]CanvasNodeEx
 	}
 
 	return executions, nil
+}
+
+// CountActiveExecutionsInQueue counts the executions occupying slots in a
+// node's queue. Queues are private to a node, so capacity is scoped by
+// (workflow, node, resolved queue name).
+func CountActiveExecutionsInQueue(tx *gorm.DB, workflowID uuid.UUID, nodeID, queueName string) (int64, error) {
+	var count int64
+	err := tx.
+		Model(&CanvasNodeExecution{}).
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		Where("queue_name = ?", queueName).
+		Where("state IN ?", CanvasNodeExecutionActiveStates).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
