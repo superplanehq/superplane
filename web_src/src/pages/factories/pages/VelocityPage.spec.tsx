@@ -126,6 +126,28 @@ describe("VelocityPage shell", () => {
     expect(screen.queryByTestId("velocity-yesterday")).not.toBeInTheDocument();
   });
 
+  it("keeps the loaded view when a refetch fails and cached data remains", () => {
+    resetState();
+    velocityHookState.data = {
+      yesterday: { superplaneMerged: 3, waste: 1 },
+      totals: {
+        superplaneMerged: 12,
+        peopleMerged: 0,
+        waste: 4,
+        superplaneSharePct: 0,
+        wastePct: 25,
+      },
+      points: [{ day: "Mon", superplaneMerged: 2, peopleMerged: 0, waste: 1 }],
+      hasPeopleCohort: false,
+    };
+    velocityHookState.error = new Error("network");
+
+    renderShell();
+
+    expect(screen.getByTestId("velocity-yesterday")).toHaveTextContent("3");
+    expect(screen.queryByTestId("velocity-error-state")).not.toBeInTheDocument();
+  });
+
   it("renders the loaded view and hides People cohort without a repo", () => {
     resetState();
     velocityHookState.data = {

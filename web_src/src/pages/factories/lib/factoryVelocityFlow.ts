@@ -109,7 +109,15 @@ function sumRunningMillis(executions: FactoriesWorkOrderExecution[]): number {
   return total;
 }
 
-function cycleEndTimestamp(order: FactoriesWorkOrder, executions: FactoriesWorkOrderExecution[]): number | null {
+function closeTimestamp(order: FactoriesWorkOrder, executions: FactoriesWorkOrderExecution[]): number | null {
+  // The work-order API has no closed_at. updatedAt is the close instant for
+  // STATE_CLOSED rows unless a later edit moved it. Windowing and day
+  // buckets must follow that instant so the card matches "closed in this period".
+  const closedAt = parseTimestamp(order.updatedAt);
+  if (closedAt !== null) {
+    return closedAt;
+  }
+
   let latestFinish = -Infinity;
   for (const execution of executions) {
     if (execution.state !== "STATE_FINISHED") continue;
@@ -121,7 +129,7 @@ function cycleEndTimestamp(order: FactoriesWorkOrder, executions: FactoriesWorkO
   if (Number.isFinite(latestFinish)) {
     return latestFinish;
   }
-  return parseTimestamp(order.updatedAt);
+  return null;
 }
 
 function toCycleSample(order: FactoriesWorkOrder, windowStart: number, windowEnd: number): CycleSample | null {
@@ -131,7 +139,7 @@ function toCycleSample(order: FactoriesWorkOrder, windowStart: number, windowEnd
   if (executions.length === 0) return null;
 
   const start = firstExecutionStart(executions);
-  const end = cycleEndTimestamp(order, executions);
+  const end = closeTimestamp(order, executions);
   if (start === null || end === null) return null;
   if (end < windowStart || end >= windowEnd) return null;
 

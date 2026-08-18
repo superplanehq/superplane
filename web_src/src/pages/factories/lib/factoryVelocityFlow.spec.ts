@@ -63,8 +63,8 @@ describe("aggregateFactoryVelocityFlow", () => {
 
   it("derives cycle, running and waiting from multiple executions", () => {
     // Two runs: first ran for 4h, then a 4h gap, then a 4h run.
-    // Cycle end = latest finish (-4h), cycle start = first exec (-16h).
-    // Cycle = 12h, running = 8h, waiting = 4h.
+    // Cycle end is the close instant (updatedAt, -2h), not the last run finish.
+    // Cycle start = first exec (-16h). Cycle = 14h, running = 8h, waiting = 6h.
     const order = closedOrder({
       id: "multi",
       updatedAt: iso(-2 * HOUR),
@@ -85,16 +85,34 @@ describe("aggregateFactoryVelocityFlow", () => {
     const flow = aggregateFactoryVelocityFlow([order], 7, NOW);
 
     expect(flow.sampleSize).toBe(1);
-    expect(flow.medianCycleHours).toBeCloseTo(12, 5);
+    expect(flow.medianCycleHours).toBeCloseTo(14, 5);
     expect(flow.medianRunningHours).toBeCloseTo(8, 5);
-    expect(flow.medianWaitingHours).toBeCloseTo(4, 5);
-    expect(flow.runningShareOfCyclePct).toBe(67);
-    expect(flow.waitingShareOfCyclePct).toBe(33);
+    expect(flow.medianWaitingHours).toBeCloseTo(6, 5);
+    expect(flow.runningShareOfCyclePct).toBe(57);
+    expect(flow.waitingShareOfCyclePct).toBe(43);
   });
 
-  it("falls back to updatedAt when the order has no finished executions", () => {
-    // Only pending executions ⇒ latest finish is missing.
-    // Cycle end must fall back to `updatedAt`.
+  it("falls back to the last run finish when updatedAt is missing", () => {
+    const order = closedOrder({
+      id: "no-updated-at",
+      updatedAt: undefined,
+      executions: [
+        execution({
+          createdAt: iso(-16 * HOUR),
+          finishedAt: iso(-6 * HOUR),
+        }),
+      ],
+    });
+
+    const flow = aggregateFactoryVelocityFlow([order], 7, NOW);
+
+    expect(flow.sampleSize).toBe(1);
+    expect(flow.medianCycleHours).toBeCloseTo(10, 5);
+    expect(flow.medianRunningHours).toBeCloseTo(10, 5);
+    expect(flow.medianWaitingHours).toBeCloseTo(0, 5);
+  });
+
+  it("uses updatedAt when the order has no finished executions", () => {
     const order = closedOrder({
       id: "no-finish",
       updatedAt: iso(-6 * HOUR),
@@ -141,9 +159,49 @@ describe("aggregateFactoryVelocityFlow", () => {
     expect(flow.medianRunningHours).toBeCloseTo(4, 5);
   });
 
+  it("includes a closed order whose last run finished before the period", () => {
+    // Last run finished 10 days ago; the work order closed yesterday.
+    // Windowing must use the close instant, not the last run finish.
+    const order = closedOrder({
+      id: "closed-later",
+      updatedAt: iso(-1 * DAY),
+      executions: [
+        execution({
+          createdAt: iso(-10 * DAY - 4 * HOUR),
+          finishedAt: iso(-10 * DAY),
+        }),
+      ],
+    });
+
+    const flow = aggregateFactoryVelocityFlow([order], 7, NOW);
+
+    expect(flow.sampleSize).toBe(1);
+  });
+
+  it("buckets a sample on the close day, not the last run finish day", () => {
+    const close = new Date(2026, 0, 15, 9, 0, 0);
+    const now = new Date(2026, 0, 15, 12, 0, 0).getTime();
+    const order = closedOrder({
+      id: "late-close",
+      updatedAt: close.toISOString(),
+      executions: [
+        execution({
+          createdAt: new Date(2026, 0, 14, 9, 0, 0).toISOString(),
+          finishedAt: new Date(2026, 0, 14, 11, 0, 0).toISOString(),
+        }),
+      ],
+    });
+
+    const flow = aggregateFactoryVelocityFlow([order], 7, now);
+
+    expect(flow.sampleSize).toBe(1);
+    const lastBucket = flow.timeTrend[flow.timeTrend.length - 1];
+    expect(lastBucket.runningHours).toBeGreaterThan(0);
+    const earlierBuckets = flow.timeTrend.slice(0, -1);
+    expect(earlierBuckets.every((point) => point.runningHours === 0 && point.waitingHours === 0)).toBe(true);
+  });
+
   it("excludes orders that closed outside the window", () => {
-    // Cycle end uses the latest finished execution, so both timestamps must
-    // fall outside the window for the sample to be excluded.
     const orders: FactoriesWorkOrder[] = [
       closedOrder({
         id: "too-old",

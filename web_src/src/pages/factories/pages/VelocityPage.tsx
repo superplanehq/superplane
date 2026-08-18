@@ -27,7 +27,7 @@ export function VelocityPage() {
 
   const header = <VelocityHeader model={model} />;
 
-  if (model.velocity.error) {
+  if (model.velocity.error && !model.velocity.data) {
     return renderShell(header, <VelocityErrorState onRetry={model.velocity.refetch} />);
   }
 
