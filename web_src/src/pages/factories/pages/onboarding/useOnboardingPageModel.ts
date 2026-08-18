@@ -12,6 +12,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
+import { ONBOARDING_LINE_APPS } from "@/pages/home/factories";
 import { useInstallFactory, type InstallFactoryInput } from "@/pages/home/useInstallFactory";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
@@ -23,7 +24,6 @@ import type { IntegrationId, IssuesChoiceId } from "./onboardingFixtures";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 
-const WORK_ORDER_ENTRYPOINT = "work-order-dispatch";
 const DEFAULT_LINE_NAME = "Software delivery";
 const ONBOARDING_INTEGRATIONS = ["github", "claude"];
 
@@ -128,65 +128,88 @@ async function runSave(setSaving: (saving: boolean) => void, action: () => Promi
 
 type UpdateOnboarding = (input: FactoriesUpdateFactoryOnboardingBody) => Promise<unknown>;
 
-async function provisionApp(args: {
+const PRIMARY_LINE_APP_ENTRYPOINT = ONBOARDING_LINE_APPS[0].entrypointNodeId;
+
+// A finished line has one step per bundled app, each calling the app onRun
+// entrypoint. Match on the first entrypoint to recover a line provisioned by an
+// earlier, interrupted attempt.
+function findProvisionedLine(factory: FactoriesFactory | null): FactoriesFactoryLine | undefined {
+  return factory?.lines?.find((line) =>
+    line.steps?.some((step) => step.app?.entrypoint === PRIMARY_LINE_APP_ENTRYPOINT),
+  );
+}
+
+// Install each bundled app in order and return the line steps that call them.
+// installFactory clears its pending-canvas ref after each success, so the
+// sequential calls create distinct canvases.
+async function provisionLineApps(args: {
   factoryId: string;
-  existingAppId?: string;
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
   installFactory: (input: InstallFactoryInput) => Promise<{ canvasId: string; canvasName: string } | undefined>;
-  updateOnboarding: UpdateOnboarding;
-}): Promise<string> {
-  let appId = args.existingAppId;
-  const installed = await args.installFactory({
-    workspaceFactoryId: args.factoryId,
-    existingCanvasId: appId,
-    integrations: args.selections,
-    installParams: {
-      appRepository: args.appRepository,
-      backlogRepository: args.backlogRepository,
-    },
-    startingTaskPrompt: "",
-    navigateOnComplete: false,
-    startInitialRun: false,
-    onCanvasReady: async ({ canvasId }) => {
-      appId = canvasId;
-      await args.updateOnboarding({ provisionedAppId: canvasId });
-    },
-  });
-  appId = installed?.canvasId ?? appId;
-  if (!appId) throw new Error("Software Factory app was not created");
-  return appId;
+}): Promise<FactoryLineStep[]> {
+  const steps: FactoryLineStep[] = [];
+  for (const app of ONBOARDING_LINE_APPS) {
+    const installed = await args.installFactory({
+      factoryId: app.factoryId,
+      workspaceFactoryId: args.factoryId,
+      integrations: args.selections,
+      installParams: {
+        appRepository: args.appRepository,
+        backlogRepository: args.backlogRepository,
+      },
+      startingTaskPrompt: "",
+      navigateOnComplete: false,
+      startInitialRun: false,
+    });
+    if (!installed?.canvasId) throw new Error(`Failed to create the ${app.factoryId} app`);
+    steps.push({
+      name: app.lineStepName,
+      type: "runApp",
+      app: { app: installed.canvasId, entrypoint: app.entrypointNodeId },
+    });
+  }
+  return steps;
 }
 
-function existingLineId(factory: FactoriesFactory | null, appId: string): string | undefined {
-  return factory?.lines?.find((line) =>
-    line.steps?.some((step) => step.app?.app === appId && step.app.entrypoint === WORK_ORDER_ENTRYPOINT),
-  )?.id;
+interface ProvisionedLine {
+  lineId: string;
+  primaryAppId: string;
 }
 
 async function provisionLine(args: {
   factory: FactoriesFactory | null;
-  appId: string;
-  existingLineId?: string;
+  savedLineId?: string;
+  savedAppId?: string;
+  selections: IntegrationSelections;
+  appRepository: string;
+  backlogRepository: string;
+  installFactory: (input: InstallFactoryInput) => Promise<{ canvasId: string; canvasName: string } | undefined>;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   updateOnboarding: UpdateOnboarding;
-}): Promise<string> {
-  const savedLineId = args.existingLineId ?? existingLineId(args.factory, args.appId);
-  if (savedLineId) return savedLineId;
-  const line = await args.createLine({
-    name: DEFAULT_LINE_NAME,
-    steps: [
-      {
-        name: "Build",
-        type: "runApp",
-        app: { app: args.appId, entrypoint: WORK_ORDER_ENTRYPOINT },
-      },
-    ],
+}): Promise<ProvisionedLine> {
+  const existing = findProvisionedLine(args.factory);
+  const lineId = args.savedLineId ?? existing?.id;
+  if (lineId) {
+    const primaryAppId = args.savedAppId ?? existing?.steps?.[0]?.app?.app;
+    if (primaryAppId) return { lineId, primaryAppId };
+  }
+
+  const steps = await provisionLineApps({
+    factoryId: args.factory?.id ?? "",
+    selections: args.selections,
+    appRepository: args.appRepository,
+    backlogRepository: args.backlogRepository,
+    installFactory: args.installFactory,
   });
+  const primaryAppId = steps[0]?.app?.app;
+  if (!primaryAppId) throw new Error("Software delivery apps were not created");
+
+  const line = await args.createLine({ name: DEFAULT_LINE_NAME, steps });
   if (!line.id) throw new Error("Software delivery line was not created");
-  await args.updateOnboarding({ provisionedLineId: line.id });
-  return line.id;
+  await args.updateOnboarding({ provisionedAppId: primaryAppId, provisionedLineId: line.id });
+  return { lineId: line.id, primaryAppId };
 }
 
 function useSectionSaves(args: {
@@ -253,24 +276,19 @@ function useFinishOnboarding(args: {
         issuesSource: apiIssuesSource(args.setup.issuesChoice),
         agentHarness: "AGENT_HARNESS_CLAUDE_CODE",
       });
-      const appId = await provisionApp({
-        factoryId: args.factoryId,
-        existingAppId: args.factory?.onboarding?.provisionedAppId,
+      const { lineId, primaryAppId } = await provisionLine({
+        factory: args.factory,
+        savedLineId: args.factory?.onboarding?.provisionedLineId,
+        savedAppId: args.factory?.onboarding?.provisionedAppId,
         selections: args.selections,
         appRepository,
         backlogRepository,
         installFactory: args.installFactory,
-        updateOnboarding: args.updateOnboarding,
-      });
-      const lineId = await provisionLine({
-        factory: args.factory,
-        appId,
-        existingLineId: args.factory?.onboarding?.provisionedLineId,
         createLine: args.createLine,
         updateOnboarding: args.updateOnboarding,
       });
       await args.updateOnboarding({
-        provisionedAppId: appId,
+        provisionedAppId: primaryAppId,
         provisionedLineId: lineId,
         complete: true,
       });
