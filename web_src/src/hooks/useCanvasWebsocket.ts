@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
+import { getWebsocketReconnectInterval } from "@/lib/websocketReconnect";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import type {
   CanvasesCanvasNodeExecution,
@@ -400,7 +401,7 @@ export function useCanvasWebsocket(
       shouldReconnect: () => true,
       reconnectAttempts: Number.POSITIVE_INFINITY,
       heartbeat: false,
-      reconnectInterval: 3000,
+      reconnectInterval: getWebsocketReconnectInterval,
       onOpen: handleWebSocketOpen,
       onError: () => {},
       onClose: () => {},
