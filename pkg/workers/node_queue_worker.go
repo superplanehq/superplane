@@ -92,7 +92,7 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			tickStart := time.Now()
-			nodes, err := models.ListCanvasNodesReady()
+			nodes, err := models.ListCanvasNodesReady(database.Conn())
 			if err != nil {
 				w.logger.Errorf("Error finding canvas nodes ready to be processed: %v", err)
 			}
@@ -225,13 +225,11 @@ func (w *NodeQueueWorker) tryProcessReadyNode(canvasID uuid.UUID, nodeID string,
 	}
 
 	//
-	// Node is not ready yet, skip it. For queue-item-created messages this happens
-	// when a new item arrives while the node is still executing. For
-	// execution-finished messages this can happen if another worker has already
-	// moved the node into a non-ready state.
+	// Nodes in error state have a broken configuration and never dispatch;
+	// items routed to them stay queued until the user fixes the node.
 	//
-	if node.State != models.CanvasNodeStateReady {
-		w.logger.Infof("Node %s is not ready, skipping", node.NodeID)
+	if node.State == models.CanvasNodeStateError {
+		w.logger.Infof("Node %s is in error state, skipping", node.NodeID)
 		telemetry.RecordQueueWorkerNodeProcessing(
 			context.Background(),
 			time.Since(attemptStart),
@@ -273,7 +271,7 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 			return nil
 		}
 
-		err = w.processNodeQueueItem(tx, logger, n, messageCollector)
+		err = w.processNodeQueueItems(tx, logger, n, messageCollector)
 		if err != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyProcessError(err)
@@ -291,42 +289,137 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 	return nil
 }
 
-func (w *NodeQueueWorker) processNodeQueueItem(tx *gorm.DB, logger *log.Entry, node *models.CanvasNode, collector *MessageCollector) error {
-	item, err := node.FirstQueueItem(tx)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
+// queueItemScanLimit bounds how much of a node's backlog a single dispatch
+// pass looks at. Items beyond the limit are picked up by later passes.
+const queueItemScanLimit = 100
 
+// processNodeQueueItems scans the node's backlog in FIFO order and starts
+// every item whose queue still has capacity. Items in a full queue block
+// later items of the same queue (per-queue FIFO), but items of other
+// queues can still dispatch.
+func (w *NodeQueueWorker) processNodeQueueItems(tx *gorm.DB, logger *log.Entry, node *models.CanvasNode, collector *MessageCollector) error {
+	items, err := node.ListPendingQueueItems(tx, queueItemScanLimit)
+	if err != nil {
 		return err
 	}
 
+	if len(items) == 0 {
+		return nil
+	}
+
+	spec := node.ConcurrencySpec()
+
+	//
+	// Components with their own queue item processor (merge, loop) keep
+	// executions open while waiting for more queue items, so their items
+	// are never gated on capacity: the component decides admission in
+	// ProcessQueueItem. Their items keep a NULL queue name, which is also
+	// what keeps their nodes in the safety-net poll (see
+	// ListCanvasNodesReady).
+	//
+	selfManaged := w.queueItemProcessorForNode(node) != nil
+
+	live, err := w.prepareQueueItems(tx, logger, node, items, selfManaged, collector)
+	if err != nil {
+		return err
+	}
+
+	blocked := map[string]bool{}
+	for _, item := range live {
+		//
+		// Self-managed items have no queue name; key them by node.
+		//
+		queueName := node.NodeID
+		if item.QueueName != nil {
+			queueName = *item.QueueName
+		}
+
+		if blocked[queueName] {
+			continue
+		}
+
+		if !selfManaged {
+			activeCount, err := models.CountActiveExecutionsInQueue(tx, node.WorkflowID, node.NodeID, queueName)
+			if err != nil {
+				return err
+			}
+
+			if activeCount >= int64(spec.EffectiveMax()) {
+				blocked[queueName] = true
+				continue
+			}
+		}
+
+		if err := w.dispatchQueueItem(tx, logger, node, item, collector); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// prepareQueueItems drops items for cancelling runs and resolves the queue
+// name of the rest. Items whose queue name expression fails to resolve get
+// the configuration-error treatment: failed execution, item deleted.
+// Self-managed nodes skip resolution: their items are not in any
+// capacity-gated queue, and the persisted NULL marks them as always
+// actionable for the safety-net poll.
+func (w *NodeQueueWorker) prepareQueueItems(
+	tx *gorm.DB,
+	logger *log.Entry,
+	node *models.CanvasNode,
+	items []models.CanvasNodeQueueItem,
+	selfManaged bool,
+	collector *MessageCollector,
+) ([]*models.CanvasNodeQueueItem, error) {
+	live := make([]*models.CanvasNodeQueueItem, 0, len(items))
+	for i := range items {
+		item := &items[i]
+
+		run, err := models.FindCanvasRunInTransaction(tx, item.WorkflowID, item.RunID)
+		if err != nil {
+			return nil, err
+		}
+
+		if run.State == models.CanvasRunStateCancelling {
+			if err := tx.Delete(item).Error; err != nil {
+				return nil, err
+			}
+
+			logger.Infof("Skipping queue item for cancelling run %s", item.RunID)
+			collector.AddQueueItemDeleted(item)
+			continue
+		}
+
+		if !selfManaged {
+			if _, err := contexts.ResolveQueueName(tx, node, item); err != nil {
+				logger.Errorf("Error resolving queue name for item %s: %v", item.ID, err)
+				if err := w.handleQueueNameResolutionError(tx, node, item, err, collector); err != nil {
+					return nil, err
+				}
+				continue
+			}
+		}
+
+		live = append(live, item)
+	}
+
+	return live, nil
+}
+
+func (w *NodeQueueWorker) dispatchQueueItem(
+	tx *gorm.DB,
+	logger *log.Entry,
+	node *models.CanvasNode,
+	item *models.CanvasNodeQueueItem,
+	collector *MessageCollector,
+) error {
 	logger = logging.WithQueueItem(logger, *item)
 	logger.Info("Processing queue item")
 
 	configFields, err := w.configurationFieldsForNode(node)
 	if err != nil {
 		return err
-	}
-
-	//
-	// Check if the run is cancelling.
-	// If it is, we should not create new executions,
-	// and instead, delete the queue item and return.
-	//
-	run, err := models.FindCanvasRunInTransaction(tx, item.WorkflowID, item.RunID)
-	if err != nil {
-		return err
-	}
-
-	if run.State == models.CanvasRunStateCancelling {
-		if err := tx.Delete(item).Error; err != nil {
-			return err
-		}
-
-		logger.Infof("Skipping queue item for cancelling run %s", item.RunID)
-		collector.AddQueueItemDeleted(item)
-		return nil
 	}
 
 	ctx, err := contexts.BuildProcessQueueContext(
@@ -386,6 +479,62 @@ func (w *NodeQueueWorker) processNodeQueueItem(tx *gorm.DB, logger *log.Entry, n
 	return nil
 }
 
+// handleQueueNameResolutionError treats a failing queue name expression
+// like a configuration error: it will keep failing until the user fixes
+// the node, so the item is consumed and a failed execution records why.
+func (w *NodeQueueWorker) handleQueueNameResolutionError(
+	tx *gorm.DB,
+	node *models.CanvasNode,
+	item *models.CanvasNodeQueueItem,
+	resolutionErr error,
+	collector *MessageCollector,
+) error {
+	event, err := models.FindCanvasEventInTransaction(tx, item.EventID)
+	if err != nil {
+		return err
+	}
+
+	return w.handleNodeConfigurationError(tx, &contexts.ConfigurationBuildError{
+		Err:         resolutionErr,
+		QueueItem:   item,
+		Node:        node,
+		Event:       event,
+		RootEventID: item.RootEventID,
+	}, collector)
+}
+
+// queueItemProcessorForNode returns the component's self-managed queue
+// item processor, or nil when the engine's default processing applies.
+// Implementing core.QueueItemProcessor also means the node's queue items
+// are never gated on queue capacity.
+func (w *NodeQueueWorker) queueItemProcessorForNode(node *models.CanvasNode) core.QueueItemProcessor {
+	ref := node.Ref.Data()
+	if ref.Component == nil || ref.Component.Name == "" {
+		return nil
+	}
+
+	action, err := w.registry.GetAction(ref.Component.Name)
+	if err != nil {
+		return nil
+	}
+
+	return queueItemProcessorFor(action)
+}
+
+// queueItemProcessorFor extracts an action's core.QueueItemProcessor,
+// looking through the registry's panic-recovery wrapper.
+func queueItemProcessorFor(action core.Action) core.QueueItemProcessor {
+	if wrapped, ok := action.(*registry.PanicableAction); ok {
+		return wrapped.QueueItemProcessor()
+	}
+
+	if processor, ok := action.(core.QueueItemProcessor); ok {
+		return processor
+	}
+
+	return nil
+}
+
 func (w *NodeQueueWorker) configurationFieldsForNode(node *models.CanvasNode) ([]configuration.Field, error) {
 	ref := node.Ref.Data()
 	switch node.Type {
@@ -428,7 +577,7 @@ func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, no
 
 // processQueueItem delegates to the component's own queue item processor
 // when it has one; otherwise it runs the engine's default processing:
-// create the execution, consume the item, and mark the node as processing.
+// create the execution, consume the item.
 func (w *NodeQueueWorker) processQueueItem(ctx *core.ProcessQueueContext, action core.Action) (*uuid.UUID, error) {
 	if processor := queueItemProcessorFor(action); processor != nil {
 		return processor.ProcessQueueItem(*ctx)
@@ -443,25 +592,7 @@ func (w *NodeQueueWorker) processQueueItem(ctx *core.ProcessQueueContext, action
 		return nil, err
 	}
 
-	if err := ctx.UpdateNodeState(models.CanvasNodeStateProcessing); err != nil {
-		return nil, err
-	}
-
 	return &executionCtx.ID, nil
-}
-
-// queueItemProcessorFor extracts an action's core.QueueItemProcessor,
-// looking through the registry's panic-recovery wrapper.
-func queueItemProcessorFor(action core.Action) core.QueueItemProcessor {
-	if wrapped, ok := action.(*registry.PanicableAction); ok {
-		return wrapped.QueueItemProcessor()
-	}
-
-	if processor, ok := action.(core.QueueItemProcessor); ok {
-		return processor
-	}
-
-	return nil
 }
 
 func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, configErr *contexts.ConfigurationBuildError, collector *MessageCollector) error {
