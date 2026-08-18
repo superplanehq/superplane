@@ -310,8 +310,9 @@ function NeedsAttentionCard({
                 <span className={cn("shrink-0 text-[12px] tabular-nums text-muted-foreground", rowContentClassName)}>
                   {item.waitingFor}
                 </span>
-                <Button size="xs" variant="outline" className="relative z-10 shrink-0">
-                  {meta.actionLabel}
+                {/* The action happens on the detail page, so the button links there too. */}
+                <Button asChild size="xs" variant="outline" className="relative z-10 shrink-0">
+                  <Link to={workOrderHref(organizationId, factoryKey, item.workOrderKey)}>{meta.actionLabel}</Link>
                 </Button>
               </li>
             );

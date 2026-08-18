@@ -35,7 +35,7 @@ export function HealthScorecards({ metrics, velocityHref }: { metrics?: HealthMe
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {metrics
+        {metrics?.length
           ? metrics.map((metric) => (
               <div key={metric.id} className={cn(factoryCardClassName, "px-4 py-3")}>
                 <p className="text-[12px] text-muted-foreground">{metric.label}</p>

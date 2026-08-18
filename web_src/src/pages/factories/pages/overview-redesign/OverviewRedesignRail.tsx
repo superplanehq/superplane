@@ -32,53 +32,69 @@ export function SuggestionsCard({ suggestions }: { suggestions: SuggestionsState
       preview
       testId="overview-suggestions-card"
     >
-      {suggestions.scanning ? (
-        <CardEmptyState
-          icon={<Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />}
-          title="Repository scan in progress"
-          hint={
-            suggestions.scanTarget
-              ? `Analyzing ${suggestions.scanTarget}. Suggestions appear when the scan completes.`
-              : "Suggestions appear when the scan completes."
-          }
-        />
-      ) : suggestions.candidates.length === 0 ? (
-        <CardEmptyState
-          icon={<Sparkles className="size-5 text-muted-foreground" aria-hidden />}
-          title="No suggestions right now"
-          hint="SuperPlane analyzes connected repositories and proposes work here."
-        />
-      ) : (
-        <ul>
-          {suggestions.candidates.slice(0, 3).map((candidate) => (
-            <li
-              key={candidate.id}
-              className="border-b border-border/60 px-4 py-3 last:border-b-0"
-              data-testid={`overview-candidate-row-${candidate.id}`}
-            >
-              <p className="text-[13px] font-medium leading-snug text-foreground">{candidate.title}</p>
-              <div className="mt-1.5 flex items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
-                  {candidate.repository}
-                </span>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "shrink-0 px-1.5 py-0 text-[11px] font-medium tabular-nums",
-                    confidenceChipClassName(candidate.confidencePct),
-                  )}
-                >
-                  {candidate.confidencePct}%
-                </Badge>
-                <Button size="xs" variant="outline" className="shrink-0">
-                  Review
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <SuggestionsCardBody suggestions={suggestions} />
     </OverviewCard>
+  );
+}
+
+function SuggestionsCardBody({ suggestions }: { suggestions: SuggestionsState }) {
+  if (suggestions.scanning) {
+    return (
+      <CardEmptyState
+        icon={<Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />}
+        title="Repository scan in progress"
+        hint={
+          suggestions.scanTarget
+            ? `Analyzing ${suggestions.scanTarget}. Suggestions appear when the scan completes.`
+            : "Suggestions appear when the scan completes."
+        }
+      />
+    );
+  }
+
+  if (suggestions.candidates.length === 0) {
+    return (
+      <CardEmptyState
+        icon={<Sparkles className="size-5 text-muted-foreground" aria-hidden />}
+        title="No suggestions right now"
+        hint="SuperPlane analyzes connected repositories and proposes work here."
+      />
+    );
+  }
+
+  return (
+    <ul>
+      {suggestions.candidates.slice(0, 3).map((candidate) => (
+        <li
+          key={candidate.id}
+          className="border-b border-border/60 px-4 py-3 last:border-b-0"
+          data-testid={`overview-candidate-row-${candidate.id}`}
+        >
+          <p className="text-[13px] font-medium leading-snug text-foreground">{candidate.title}</p>
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">{candidate.repository}</span>
+            <Badge
+              variant="outline"
+              className={cn(
+                "shrink-0 px-1.5 py-0 text-[11px] font-medium tabular-nums",
+                confidenceChipClassName(candidate.confidencePct),
+              )}
+            >
+              {candidate.confidencePct}%
+            </Badge>
+            {/* Mock-only: the candidate review flow does not exist yet. */}
+            <Button
+              size="xs"
+              variant="outline"
+              className="shrink-0"
+              onClick={() => console.warn("mock action: review work order candidate", candidate.id)}
+            >
+              Review
+            </Button>
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -173,7 +189,13 @@ export function ImprovementsCard({
                     <p className="mt-1 text-[13px] font-medium leading-snug text-foreground">{proposal.title}</p>
                     <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{proposal.description}</p>
                   </div>
-                  <Button size="xs" variant="outline" className="shrink-0">
+                  {/* Mock-only: the proposal flows (update line, create automation…) do not exist yet. */}
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={() => console.warn("mock action: apply improvement proposal", proposal.id)}
+                  >
                     {proposal.actionLabel}
                   </Button>
                 </li>
