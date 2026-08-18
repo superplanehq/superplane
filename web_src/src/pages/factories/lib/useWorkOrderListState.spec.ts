@@ -102,6 +102,9 @@ describe("useWorkOrderListState", () => {
     });
     act(() => {
       result.current.setScope("active");
+      result.current.openSearch();
+      result.current.setSearch("refund");
+      result.current.setFilterMenuOpen(true);
     });
     expect(result.current.scope).toBe("active");
 
@@ -109,7 +112,11 @@ describe("useWorkOrderListState", () => {
 
     expect(result.current.scope).toBe("my");
     expect(result.current.filters.statuses).toEqual(["failed"]);
+    // Session-local UI state is reset by the factory-change callback, which the
+    // effect reaches through a ref; asserting all three guards that wiring.
     expect(result.current.search).toBe("");
+    expect(result.current.searchOpen).toBe(false);
+    expect(result.current.filterMenuOpen).toBe(false);
   });
 
   it("falls back to empty filters when storage holds malformed data", () => {
