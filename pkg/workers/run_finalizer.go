@@ -529,8 +529,12 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return nil, err
 	}
 
+	// The order closed while this step was running. The traversal is
+	// abandoned, not just paused: finish it as cancelled so the order
+	// doesn't keep a zombie active dispatch (which would block any
+	// re-dispatch after a reopen).
 	if !workOrder.IsOpen() {
-		return nil, nil
+		return nil, dispatch.Finish(tx, models.CanvasRunResultCancelled)
 	}
 
 	nextIndex := execution.StepIndex + 1

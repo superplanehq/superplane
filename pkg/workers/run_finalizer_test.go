@@ -741,6 +741,67 @@ func testExecuteNextFactoryLineStepFinishesDispatchWithResult(t *testing.T, term
 	assert.Equal(t, terminalResult, reloaded.Result)
 }
 
+// A work order can close while a step run is still executing. When that run
+// later passes, the traversal must not advance — and it must not stay active
+// either, or the reopened order could never dispatch again.
+func Test__RunFinalizer__ExecuteNextFactoryLineStep__CancelsDispatchWhenOrderClosedMidTraversal(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
+
+	line, err := factory.CreateLine(database.Conn(), "ship", nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
+	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
+	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
+		{Name: "step-one", Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Name: "step-two", Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+	}))
+
+	var dispatch *models.FactoryWorkOrderLineDispatch
+	var result *models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var dispatchErr error
+		dispatch, result, dispatchErr = line.Dispatch(tx, order)
+		return dispatchErr
+	}))
+
+	_, err = order.Close(database.Conn(), models.FactoryWorkOrderResultCompleted, &r.User)
+	require.NoError(t, err)
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(result.Run).Updates(map[string]any{
+		"state":       models.CanvasRunStateFinished,
+		"result":      models.CanvasRunResultPassed,
+		"updated_at":  &now,
+		"finished_at": &now,
+	}).Error)
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	var pending *factoryLinePendingRun
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var advanceErr error
+		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		return advanceErr
+	}))
+	assert.Nil(t, pending, "a closed order never starts the next step")
+
+	reloaded, err := models.FindWorkOrderLineDispatch(database.Conn(), dispatch.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateFinished, reloaded.State,
+		"an abandoned traversal must not stay active")
+	assert.Equal(t, models.CanvasRunResultCancelled, reloaded.Result)
+	assert.NotNil(t, reloaded.FinishedAt)
+}
+
 // Test__RunFinalizer__ExecuteNextFactoryLineStep__LineEditMidTraversalDoesNotChangeNextStep
 // covers acceptance criterion 3: editing a line's steps while a work order
 // is mid-traversal doesn't change which step runs next for that traversal.
