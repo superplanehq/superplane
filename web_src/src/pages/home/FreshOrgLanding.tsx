@@ -1,12 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { LeadIcon, type AppEntry } from "./AppDetailModal";
+import { CreateAppModal } from "./CreateAppModal";
 import { APP_CATALOG } from "./appCatalog";
 import { FactorySetupPanel } from "./FactorySetupPanel";
 import { getFactoryDefinition } from "./factories";
@@ -42,6 +42,7 @@ export function FreshOrgLanding({
   const [showCatalog, setShowCatalog] = useState(false);
   const [visibleCount, setVisibleCount] = useState(7);
   const [installingApp, setInstallingApp] = useState<AppEntry | null>(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const busy = folderContextPending || isSaving || isInstalling;
   const inFocusedSetup = showFactorySetup || installingApp !== null;
@@ -117,7 +118,7 @@ export function FreshOrgLanding({
             showCatalog={showCatalog}
             onCreateBlank={() => {
               if (busy) return;
-              void createApp(generateCanvasName());
+              setCreateModalOpen(true);
             }}
             onToggleCatalog={() => setShowCatalog((open) => !open)}
           />
@@ -137,6 +138,16 @@ export function FreshOrgLanding({
           }}
         />
       )}
+
+      <CreateAppModal
+        open={createModalOpen}
+        isSaving={isSaving}
+        onClose={() => setCreateModalOpen(false)}
+        onCreate={async (name) => {
+          await createApp(name);
+          setCreateModalOpen(false);
+        }}
+      />
     </div>
   );
 }

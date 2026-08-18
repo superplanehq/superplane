@@ -217,6 +217,13 @@ function renderInstallProgressPanel(app: AppEntry) {
   );
 }
 
+async function createBlankAppNamed(user: ReturnType<typeof userEvent.setup>, name = "Sentry Analysis") {
+  await user.click(await screen.findByRole("button", { name: /create a blank app/i }));
+  const dialog = await screen.findByRole("dialog", { name: /create app/i });
+  await user.type(within(dialog).getByLabelText(/app name/i), name);
+  await user.click(within(dialog).getByTestId("create-app-submit-button"));
+}
+
 describe("HomePage canvas folders", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
@@ -266,10 +273,17 @@ describe("HomePage canvas folders", () => {
 
     await user.click(await screen.findByRole("button", { name: /create a blank app/i }));
 
+    expect(await screen.findByRole("dialog", { name: /create app/i })).toBeInTheDocument();
+    expect(mutationMocks.createCanvasAsync).not.toHaveBeenCalled();
+
+    const dialog = screen.getByRole("dialog", { name: /create app/i });
+    await user.type(within(dialog).getByLabelText(/app name/i), "Sentry Analysis");
+    await user.click(within(dialog).getByTestId("create-app-submit-button"));
+
     await waitFor(() => {
       expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: expect.stringMatching(/^[a-z]+-[a-z]+$/),
+          name: "Sentry Analysis",
           method: "ui",
         }),
       );
@@ -495,11 +509,11 @@ describe("HomePage canvas folders", () => {
     await user.click(within(deploymentsSection).getByLabelText("Create app in folder Deployments"));
     expect(await screen.findByRole("heading", { name: "Create New App in Deployments Folder" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /create a blank app/i }));
+    await createBlankAppNamed(user);
 
     await waitFor(() => {
       expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith({
-        name: expect.stringMatching(/^[a-z]+-[a-z]+$/),
+        name: "Sentry Analysis",
         method: "ui",
       });
       expect(mutationMocks.updateCanvasFolderMembership).toHaveBeenCalledWith({
@@ -527,7 +541,7 @@ describe("HomePage canvas folders", () => {
     renderHome();
     const deploymentsSection = screen.getByText("Deployments").closest("section")!;
     await user.click(within(deploymentsSection).getByLabelText("Create app in folder Deployments"));
-    await user.click(await screen.findByRole("button", { name: /create a blank app/i }));
+    await createBlankAppNamed(user);
 
     expect(await screen.findByText("Canvas editor")).toBeInTheDocument();
     expect(showErrorToast).toHaveBeenCalledWith("App created, but failed to add it to folder");
@@ -585,7 +599,7 @@ describe("HomePage canvas folders", () => {
     });
 
     renderHome(["/org-123/apps/new?folderId=folder-1"]);
-    await user.click(await screen.findByRole("button", { name: /create a blank app/i }));
+    await createBlankAppNamed(user);
 
     expect(mutationMocks.createCanvasAsync).not.toHaveBeenCalled();
     expect(showErrorToast).toHaveBeenCalledWith("You don't have permission to update canvases.");
