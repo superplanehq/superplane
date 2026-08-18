@@ -48,7 +48,7 @@ to pick from a list. Non-interactive with no args prints the active factory id.`
 
 --factory is a factory name or UUID. When omitted, the active factory
 from "superplane factory active" is used. --order-id is the work order UUID.
---type is one of: pr, markdown, branch.
+--type is one of: pr, markdown, branch, link.
 
 Examples:
   superplane factory artifacts list --factory shipping --order-id "$OID"
@@ -76,16 +76,22 @@ Examples:
   superplane factory artifacts add \
     --order-id "$OID" \
     --type branch \
-    --name feature/login`,
+    --name feature/login
+
+  superplane factory artifacts add \
+    --order-id "$OID" \
+    --type link \
+    --url https://preview.example.com/pr-42 \
+    --title Preview`,
 		Args: cobra.NoArgs,
 	}
 	addCmd.Flags().StringVar(&factory, "factory", "", "factory name or UUID (default: active factory)")
 	addCmd.Flags().StringVar(&orderID, "order-id", "", "work order UUID")
-	addCmd.Flags().StringVar(&typeName, "type", "", "artifact type: pr, markdown, or branch")
+	addCmd.Flags().StringVar(&typeName, "type", "", "artifact type: pr, markdown, branch, or link")
 	addCmd.Flags().StringVar(&title, "title", "", "artifact title")
 	addCmd.Flags().StringVar(&body, "body", "", "markdown body (inline)")
 	addCmd.Flags().StringVarP(&file, "file", "f", "", "read markdown body from file (or - for stdin)")
-	addCmd.Flags().StringVar(&url, "url", "", "artifact URL (required for pr)")
+	addCmd.Flags().StringVar(&url, "url", "", "artifact URL (required for pr and link)")
 	addCmd.Flags().Int64Var(&number, "number", 0, "pull request number")
 	addCmd.Flags().StringVar(&name, "name", "", "branch name (required for branch)")
 	_ = addCmd.MarkFlagRequired("order-id")
