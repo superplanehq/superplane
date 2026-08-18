@@ -1236,7 +1236,9 @@ Runs shell commands on a fleet runner.
 - **Docker**: Commands run inside a container started from **Docker image**. The runner pulls the image, starts a long-lived container, and executes your script via `docker exec`. The image must include a usable `sleep` (common base images do).
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Serverless**: Runs the commands as a serverless function instead of on a runner machine. Docker execution is not available for serverless steps.
+- **Function type**: Memory size of the serverless function. Shown only when **Serverless** is on.
+- **Machine type**: Runner fleet registered on the task-broker (required unless **Serverless** is on).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Choose a common public image, or **Other (custom image)** to enter any OCI reference.
 - **Custom container image**: Shown only for **Other**; use a normal reference (`my.registry.example.com/org/repo:1.2.3` or `debian:bookworm-slim@sha256:…`). Private registries require the runner to be configured with registry credentials.
@@ -1301,7 +1303,9 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
 ```
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Serverless**: Runs the script as a serverless function instead of on a runner machine. Docker execution is not available for serverless steps.
+- **Function type**: Memory size of the serverless function. Shown only when **Serverless** is on.
+- **Machine type**: Runner fleet registered on the task-broker (required unless **Serverless** is on).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Defaults to a Debian image in Docker mode.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
@@ -1415,7 +1419,9 @@ function main() {
 ```
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Serverless**: Runs the script as a serverless function instead of on a runner machine. Docker execution is not available for serverless steps.
+- **Function type**: Memory size of the serverless function. Shown only when **Serverless** is on.
+- **Machine type**: Runner fleet registered on the task-broker (required unless **Serverless** is on).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Defaults to a Node.js image in Docker mode.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
@@ -1468,7 +1474,9 @@ def main(payload):
 ```
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Serverless**: Runs the script as a serverless function instead of on a runner machine. Docker execution is not available for serverless steps.
+- **Function type**: Memory size of the serverless function. Shown only when **Serverless** is on.
+- **Machine type**: Runner fleet registered on the task-broker (required unless **Serverless** is on).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Defaults to a Python image in Docker mode.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.

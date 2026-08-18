@@ -25,14 +25,21 @@ const BROKER_TASK_ID_METADATA_KEY = "runner_broker_task_id";
 const EXECUTION_MODE_DOCKER = "docker";
 const DOCKER_IMAGE_PRESET_CUSTOM = "custom";
 
+function trimmedString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isServerless(c: Record<string, unknown>): boolean {
+  return c.enableServerless === true || trimmedString(c.enableServerless).toLowerCase() === "true";
+}
+
 /** Mirrors `resolvedDockerImageRef` in pkg/components/runner/spec.go for execution summaries. */
 function resolvedContainerImageRef(c: Record<string, unknown>): string {
-  const rawMode = typeof c.execution_mode === "string" ? c.execution_mode.trim().toLowerCase() : "";
-  if (rawMode !== EXECUTION_MODE_DOCKER) {
+  if (trimmedString(c.execution_mode).toLowerCase() !== EXECUTION_MODE_DOCKER) {
     return "";
   }
-  const preset = typeof c.docker_image_preset === "string" ? c.docker_image_preset.trim() : "";
-  const custom = typeof c.docker_image === "string" ? c.docker_image.trim() : "";
+  const preset = trimmedString(c.docker_image_preset);
+  const custom = trimmedString(c.docker_image);
   if (!preset) {
     return custom;
   }
@@ -42,6 +49,30 @@ function resolvedContainerImageRef(c: Record<string, unknown>): string {
   return preset;
 }
 
+/** Mirrors the compute target split in pkg/components/runner/serverless.go. */
+function computeTargetDetails(c: Record<string, unknown>): Record<string, string> {
+  if (isServerless(c)) {
+    const functionType = trimmedString(c.functionType);
+    if (!functionType) {
+      return { Execution: "Serverless" };
+    }
+    return { Execution: "Serverless", "Function type": functionType };
+  }
+
+  const details: Record<string, string> = {};
+  const machineType = trimmedString(c.machineType ?? c.machine_type);
+  if (machineType) {
+    details["Machine type"] = machineType;
+  }
+  details["Execution mode"] =
+    trimmedString(c.execution_mode).toLowerCase() === EXECUTION_MODE_DOCKER ? "Docker" : "Host";
+  const image = resolvedContainerImageRef(c);
+  if (image) {
+    details["Container image"] = image;
+  }
+  return details;
+}
+
 /** Exported for tests; mirrors runner node configuration shown in execution details. */
 export function runnerConfigurationDetails(configuration: unknown): Record<string, string> {
   const details: Record<string, string> = {};
@@ -49,21 +80,7 @@ export function runnerConfigurationDetails(configuration: unknown): Record<strin
     return details;
   }
   const c = configuration as Record<string, unknown>;
-  const machineTypeRaw = c.machineType ?? c.machine_type;
-  const machineType = typeof machineTypeRaw === "string" ? machineTypeRaw.trim() : "";
-  if (machineType) {
-    details["Machine type"] = machineType;
-  }
-  const rawMode = typeof c.execution_mode === "string" ? c.execution_mode.trim().toLowerCase() : "";
-  if (rawMode === EXECUTION_MODE_DOCKER) {
-    details["Execution mode"] = "Docker";
-  } else {
-    details["Execution mode"] = "Host";
-  }
-  const image = resolvedContainerImageRef(c);
-  if (image) {
-    details["Container image"] = image;
-  }
+  Object.assign(details, computeTargetDetails(c));
   const timeoutRaw = c.executionTimeoutSeconds ?? c.execution_timeout_seconds;
   const timeoutLabel = (value: number | string) => {
     const parsed = typeof value === "number" ? value : Number.parseInt(value.trim(), 10);

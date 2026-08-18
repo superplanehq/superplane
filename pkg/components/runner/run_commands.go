@@ -27,10 +27,12 @@ func init() {
 type Runner struct{}
 
 var dockerExecutionOnly = []configuration.VisibilityCondition{
+	{Field: configurationFieldEnableServerless, Values: []string{"false"}},
 	{Field: "execution_mode", Values: []string{ExecutionModeDocker}},
 }
 
 var dockerImageCustomOnly = []configuration.VisibilityCondition{
+	{Field: configurationFieldEnableServerless, Values: []string{"false"}},
 	{Field: "execution_mode", Values: []string{ExecutionModeDocker}},
 	{Field: "docker_image_preset", Values: []string{DockerImagePresetCustom}},
 }
@@ -71,7 +73,9 @@ func (c *Runner) Documentation() string {
 - **Docker**: Commands run inside a container started from **Docker image**. The runner pulls the image, starts a long-lived container, and executes your script via ` + "`docker exec`" + `. The image must include a usable ` + "`sleep`" + ` (common base images do).
 
 ## Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Serverless**: Runs the commands as a serverless function instead of on a runner machine. Docker execution is not available for serverless steps.
+- **Function type**: Memory size of the serverless function. Shown only when **Serverless** is on.
+- **Machine type**: Runner fleet registered on the task-broker (required unless **Serverless** is on).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Choose a common public image, or **Other (custom image)** to enter any OCI reference.
 - **Custom container image**: Shown only for **Other**; use a normal reference (` + "`my.registry.example.com/org/repo:1.2.3`" + ` or ` + "`debian:bookworm-slim@sha256:…`" + `). Private registries require the runner to be configured with registry credentials.
@@ -89,25 +93,16 @@ If the completed broker task includes valid JSON in **result**, SuperPlane inclu
 }
 
 func (c *Runner) Configuration() []configuration.Field {
-	return []configuration.Field{
+	return append(serverlessConfigurationFields(), []configuration.Field{
+		machineTypeConfigurationField(),
 		{
-			Name:     configurationFieldMachineType,
-			Label:    "Machine type",
-			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: machineTypeSelectOptions,
-				},
-			},
-		},
-		{
-			Name:        "execution_mode",
-			Label:       "Execution mode",
-			Type:        configuration.FieldTypeSelect,
-			Required:    false, // legacy nodes omit this; defaults applied in decodeRunnerSpec / normalizeExecutionMode
-			Default:     ExecutionModeHost,
-			Description: "Where the shell commands run: on the runner machine, or inside a container.",
+			Name:                 "execution_mode",
+			Label:                "Execution mode",
+			Type:                 configuration.FieldTypeSelect,
+			Required:             false, // legacy nodes omit this; defaults applied in decodeRunnerSpec / normalizeExecutionMode
+			Default:              ExecutionModeHost,
+			Description:          "Where the shell commands run: on the runner machine, or inside a container.",
+			VisibilityConditions: machineExecutionOnly,
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -252,7 +247,7 @@ func (c *Runner) Configuration() []configuration.Field {
 				},
 			},
 		},
-	}
+	}...)
 }
 
 func intPtr(v int) *int {
@@ -310,6 +305,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	mode := normalizeExecutionMode(spec.ExecutionMode)
 	params := CreateTaskParams{
 		MachineType:    spec.MachineType,
+		FunctionType:   resolvedFunctionType(spec.EnableServerless, spec.FunctionType),
 		Commands:       BrokerCommandsFromLines(cmds),
 		WebhookURL:     webhookURL,
 		Environment:    environment,

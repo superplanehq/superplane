@@ -7,6 +7,8 @@ import (
 
 // RunPythonSpec is persisted runnerPython node configuration.
 type RunPythonSpec struct {
+	EnableServerless        bool                   `mapstructure:"enableServerless"`
+	FunctionType            string                 `mapstructure:"functionType"`
 	MachineType             string                 `mapstructure:"machine_type"`
 	Script                  string                 `mapstructure:"script"`
 	EnableSetupCommands     bool                   `mapstructure:"enable_setup_commands"`
@@ -45,6 +47,9 @@ func applyRunPythonSpecDefaults(spec *RunPythonSpec) {
 }
 
 func resolvedRunPythonDockerImageRef(spec RunPythonSpec) string {
+	if spec.EnableServerless {
+		return ""
+	}
 	if normalizeExecutionMode(spec.ExecutionMode) != ExecutionModeDocker {
 		return ""
 	}
@@ -78,18 +83,20 @@ func validateRunPythonSpec(spec RunPythonSpec) error {
 		}
 	}
 
-	if strings.TrimSpace(spec.MachineType) == "" {
-		return fmt.Errorf("machine type is required")
+	if err := validateComputeSelection(spec.EnableServerless, spec.FunctionType, spec.MachineType); err != nil {
+		return err
 	}
 
-	ref := strings.TrimSpace(resolvedRunPythonDockerImageRef(spec))
-	mode := normalizeExecutionMode(spec.ExecutionMode)
+	if !spec.EnableServerless {
+		ref := strings.TrimSpace(resolvedRunPythonDockerImageRef(spec))
+		mode := normalizeExecutionMode(spec.ExecutionMode)
 
-	if ref != "" && len(ref) > maxDockerImageReferenceChars {
-		return fmt.Errorf("container image reference must be at most %d characters", maxDockerImageReferenceChars)
-	}
-	if mode == ExecutionModeDocker && ref == "" {
-		return fmt.Errorf("container image is required when execution mode is Docker")
+		if ref != "" && len(ref) > maxDockerImageReferenceChars {
+			return fmt.Errorf("container image reference must be at most %d characters", maxDockerImageReferenceChars)
+		}
+		if mode == ExecutionModeDocker && ref == "" {
+			return fmt.Errorf("container image is required when execution mode is Docker")
+		}
 	}
 
 	if spec.ExecutionTimeoutSeconds != 0 {

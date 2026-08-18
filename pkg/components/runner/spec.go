@@ -34,6 +34,8 @@ type EnvironmentVariable struct {
 
 // Spec is persisted Runner node configuration.
 type Spec struct {
+	EnableServerless        bool                   `mapstructure:"enableServerless"`
+	FunctionType            string                 `mapstructure:"functionType"`
 	MachineType             string                 `mapstructure:"machine_type"`
 	Commands                string                 `mapstructure:"commands"`
 	EnvironmentFrom         []EnvironmentFromEntry `mapstructure:"environmentFrom"`
@@ -88,6 +90,9 @@ func normalizeExecutionMode(mode string) string {
 // resolvedDockerImageRef returns the OCI reference sent to the broker in Docker mode.
 // Legacy configs omit docker_image_preset and only set docker_image.
 func resolvedDockerImageRef(spec Spec) string {
+	if spec.EnableServerless {
+		return ""
+	}
 	if normalizeExecutionMode(spec.ExecutionMode) != ExecutionModeDocker {
 		return ""
 	}
@@ -115,18 +120,20 @@ func validateRunnerSpec(spec Spec) error {
 		return err
 	}
 
-	if strings.TrimSpace(spec.MachineType) == "" {
-		return fmt.Errorf("machine type is required")
+	if err := validateComputeSelection(spec.EnableServerless, spec.FunctionType, spec.MachineType); err != nil {
+		return err
 	}
 
-	ref := strings.TrimSpace(resolvedDockerImageRef(spec))
-	mode := normalizeExecutionMode(spec.ExecutionMode)
+	if !spec.EnableServerless {
+		ref := strings.TrimSpace(resolvedDockerImageRef(spec))
+		mode := normalizeExecutionMode(spec.ExecutionMode)
 
-	if ref != "" && len(ref) > maxDockerImageReferenceChars {
-		return fmt.Errorf("container image reference must be at most %d characters", maxDockerImageReferenceChars)
-	}
-	if mode == ExecutionModeDocker && ref == "" {
-		return fmt.Errorf("container image is required when execution mode is Docker")
+		if ref != "" && len(ref) > maxDockerImageReferenceChars {
+			return fmt.Errorf("container image reference must be at most %d characters", maxDockerImageReferenceChars)
+		}
+		if mode == ExecutionModeDocker && ref == "" {
+			return fmt.Errorf("container image is required when execution mode is Docker")
+		}
 	}
 
 	if spec.ExecutionTimeoutSeconds != 0 {

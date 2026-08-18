@@ -76,7 +76,9 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
 ` + "```" + `
 
 ## Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Serverless**: Runs the script as a serverless function instead of on a runner machine. Docker execution is not available for serverless steps.
+- **Function type**: Memory size of the serverless function. Shown only when **Serverless** is on.
+- **Machine type**: Runner fleet registered on the task-broker (required unless **Serverless** is on).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Defaults to a Debian image in Docker mode.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
@@ -91,25 +93,16 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
 }
 
 func (c *RunBash) Configuration() []configuration.Field {
-	return []configuration.Field{
+	return append(serverlessConfigurationFields(), []configuration.Field{
+		machineTypeConfigurationField(),
 		{
-			Name:     configurationFieldMachineType,
-			Label:    "Machine type",
-			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: machineTypeSelectOptions,
-				},
-			},
-		},
-		{
-			Name:        "execution_mode",
-			Label:       "Execution mode",
-			Type:        configuration.FieldTypeSelect,
-			Required:    false,
-			Default:     ExecutionModeHost,
-			Description: "Where the script runs: on the runner machine, or inside a container.",
+			Name:                 "execution_mode",
+			Label:                "Execution mode",
+			Type:                 configuration.FieldTypeSelect,
+			Required:             false,
+			Default:              ExecutionModeHost,
+			Description:          "Where the script runs: on the runner machine, or inside a container.",
+			VisibilityConditions: machineExecutionOnly,
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -272,7 +265,7 @@ func (c *RunBash) Configuration() []configuration.Field {
 				},
 			},
 		},
-	}
+	}...)
 }
 
 func (c *RunBash) Setup(ctx core.SetupContext) error {
@@ -331,6 +324,7 @@ func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 
 	params := CreateTaskParams{
 		MachineType:    spec.MachineType,
+		FunctionType:   resolvedFunctionType(spec.EnableServerless, spec.FunctionType),
 		RunMode:        RunModeBash,
 		Script:         spec.Script,
 		MessageChain:   messageChain,
