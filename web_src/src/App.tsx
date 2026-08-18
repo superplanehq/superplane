@@ -32,8 +32,11 @@ import {
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
+  FactorySettingsNotificationsPage,
+  FactorySettingsProfilePage,
   FactorySettingsSoonPage,
   FACTORY_SETTINGS_NAV_ITEMS,
+  isFactorySettingsComingSoon,
   LegacyWorkOrderDetailRedirect,
   LinesPage,
   MissionsPage,
@@ -208,21 +211,7 @@ function AppRouter() {
                     path=":factoryKey/settings"
                     element={withAuthPermissionAndFactoriesFeature(FactorySettingsLayout, "factories", "read")}
                   >
-                    <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
-                    <Route path="general" element={<FactorySettingsGeneralPage />} />
-                    {FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.id !== "general").map((item) => (
-                      <Route
-                        key={item.id}
-                        path={item.id}
-                        element={
-                          <FactorySettingsSoonPage
-                            title={item.label}
-                            description={`${item.label} settings for this workspace.`}
-                            Icon={item.Icon}
-                          />
-                        }
-                      />
-                    ))}
+                    {factorySettingsSectionRoutes}
                   </Route>
                 </Route>
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
@@ -275,6 +264,26 @@ function FactoryLineEditPageGate() {
     </RequirePermission>
   );
 }
+
+const factorySettingsSectionRoutes = [
+  <Route key="factory-settings-index" index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />,
+  <Route key="factory-settings-general" path="general" element={<FactorySettingsGeneralPage />} />,
+  <Route key="factory-settings-profile" path="profile" element={<FactorySettingsProfilePage />} />,
+  <Route key="factory-settings-notifications" path="notifications" element={<FactorySettingsNotificationsPage />} />,
+  ...FACTORY_SETTINGS_NAV_ITEMS.filter(isFactorySettingsComingSoon).map((item) => (
+    <Route
+      key={item.id}
+      path={item.id}
+      element={
+        <FactorySettingsSoonPage
+          title={item.label}
+          description={`${item.label} settings for this workspace.`}
+          Icon={item.Icon}
+        />
+      }
+    />
+  )),
+];
 
 function LegacyAutomationsNewLineRedirect() {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
