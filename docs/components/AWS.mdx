@@ -604,7 +604,8 @@ The Add Log Event component writes a single log event to a CloudWatch Logs log s
 - **Log Group**: Target log group
 - **Log Stream**: Name of the log stream to write to; created automatically if missing
 - **Message**: The log event message
-- **Timestamp**: Optional; defaults to now. Must be within the last 14 days and no more than 2 hours in the future
+- **Timestamp**: Optional; defaults to now (UTC). Must be within the last 14 days and no more than 2 hours in the future
+- **Timezone**: Timezone the timestamp is in, when it has no UTC offset of its own (e.g. picked from the date/time widget). Defaults to UTC; ignored for timestamps that already carry an offset
 
 ### Output
 

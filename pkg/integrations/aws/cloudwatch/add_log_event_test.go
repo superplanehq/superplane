@@ -79,6 +79,22 @@ func TestAddLogEvent_Setup(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("datetime-local timestamp with an explicit timezone -> no error", func(t *testing.T) {
+		config := validAddLogEventConfig()
+		config["timestamp"] = "2026-05-29T09:00"
+		config["timezone"] = "America/New_York"
+		err := component.Setup(core.SetupContext{Configuration: config})
+		require.NoError(t, err)
+	})
+
+	t.Run("invalid timezone -> error", func(t *testing.T) {
+		config := validAddLogEventConfig()
+		config["timestamp"] = "2026-05-29T09:00"
+		config["timezone"] = "not-a-zone"
+		err := component.Setup(core.SetupContext{Configuration: config})
+		require.ErrorContains(t, err, "invalid timezone")
+	})
+
 	t.Run("valid configuration -> no error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{Configuration: validAddLogEventConfig()})
 		require.NoError(t, err)
@@ -86,26 +102,37 @@ func TestAddLogEvent_Setup(t *testing.T) {
 }
 
 func TestParseLogEventTimestamp(t *testing.T) {
-	t.Run("RFC3339 -> parsed as-is", func(t *testing.T) {
-		parsed, err := parseLogEventTimestamp("2026-05-29T09:00:00Z")
+	t.Run("RFC3339 -> parsed as-is regardless of timezone", func(t *testing.T) {
+		parsed, err := parseLogEventTimestamp("2026-05-29T09:00:00Z", "America/New_York")
 		require.NoError(t, err)
 		assert.Equal(t, "2026-05-29T09:00:00Z", parsed.Format(time.RFC3339))
 	})
 
-	t.Run("datetime-local without seconds -> parsed as UTC", func(t *testing.T) {
-		parsed, err := parseLogEventTimestamp("2026-05-29T09:00")
+	t.Run("datetime-local without seconds -> parsed in the given timezone", func(t *testing.T) {
+		parsed, err := parseLogEventTimestamp("2026-05-29T09:00", "UTC")
 		require.NoError(t, err)
 		assert.Equal(t, "2026-05-29T09:00:00Z", parsed.Format(time.RFC3339))
 	})
 
-	t.Run("datetime-local with seconds -> parsed as UTC", func(t *testing.T) {
-		parsed, err := parseLogEventTimestamp("2026-05-29T09:00:30")
+	t.Run("datetime-local with seconds -> parsed in the given timezone", func(t *testing.T) {
+		parsed, err := parseLogEventTimestamp("2026-05-29T09:00:30", "UTC")
 		require.NoError(t, err)
 		assert.Equal(t, "2026-05-29T09:00:30Z", parsed.Format(time.RFC3339))
 	})
 
+	t.Run("datetime-local in a non-UTC timezone -> converted to UTC", func(t *testing.T) {
+		parsed, err := parseLogEventTimestamp("2026-05-29T09:00", "America/New_York")
+		require.NoError(t, err)
+		assert.Equal(t, "2026-05-29T13:00:00Z", parsed.Format(time.RFC3339))
+	})
+
+	t.Run("invalid timezone -> error", func(t *testing.T) {
+		_, err := parseLogEventTimestamp("2026-05-29T09:00", "not-a-zone")
+		require.ErrorContains(t, err, "invalid timezone")
+	})
+
 	t.Run("garbage -> error", func(t *testing.T) {
-		_, err := parseLogEventTimestamp("not-a-date")
+		_, err := parseLogEventTimestamp("not-a-date", "UTC")
 		require.ErrorContains(t, err, "invalid timestamp")
 	})
 }
