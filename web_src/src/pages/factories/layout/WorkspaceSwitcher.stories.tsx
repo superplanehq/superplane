@@ -8,7 +8,14 @@ import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 const meta = {
   title: "Factories/Layout/WorkspaceSwitcher",
   component: WorkspaceSwitcher,
-  parameters: { layout: "padded" },
+  parameters: {
+    layout: "padded",
+    docs: {
+      description: {
+        component: "The workspace name opens Overview. The gear opens settings. The swap control switches workspace.",
+      },
+    },
+  },
   decorators: [
     (Story) => (
       <ComponentStoryShell className="min-h-40 w-[240px] border-r border-sidebar-border bg-sidebar p-2">

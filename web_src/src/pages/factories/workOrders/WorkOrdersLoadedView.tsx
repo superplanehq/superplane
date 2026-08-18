@@ -9,7 +9,7 @@ import {
   buildWorkOrderListEntries,
 } from "../lib/workOrderListModel";
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
-import { factoryContentBodyClassName } from "../pages/factoryPageLayoutStyles";
+import { factoryKanbanPageClassName, factoryWorkOrdersBodyClassName } from "../pages/factoryPageLayoutStyles";
 import { WorkOrdersBoardView } from "./WorkOrdersBoardView";
 import {
   WorkOrdersFilteredEmptyState,
@@ -57,6 +57,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   const ordered = useMemo(() => applyWorkOrderOrdering(searched, state.ordering), [searched, state.ordering]);
 
   const totalCount = entries.length;
+  const showKanbanBoard = state.layout === "board" && totalCount > 0 && ordered.length > 0;
 
   const body = () => {
     if (totalCount === 0) {
@@ -103,17 +104,19 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   };
 
   return (
-    <>
-      <WorkOrdersHeader
-        state={state}
-        entries={entries}
-        factoryLines={props.factoryLines}
-        onCreateWorkOrder={props.onCreateWorkOrder}
-        canCreate={props.canCreate}
-        permissionsLoading={props.permissionsLoading}
-      />
+    <div className={showKanbanBoard ? factoryKanbanPageClassName : undefined}>
+      <div className="shrink-0">
+        <WorkOrdersHeader
+          state={state}
+          entries={entries}
+          factoryLines={props.factoryLines}
+          onCreateWorkOrder={props.onCreateWorkOrder}
+          canCreate={props.canCreate}
+          permissionsLoading={props.permissionsLoading}
+        />
+      </div>
 
-      <div className={cn(factoryContentBodyClassName, "flex flex-col gap-4")}>{body()}</div>
-    </>
+      <div className={cn(factoryWorkOrdersBodyClassName, "flex flex-col gap-4")}>{body()}</div>
+    </div>
   );
 }

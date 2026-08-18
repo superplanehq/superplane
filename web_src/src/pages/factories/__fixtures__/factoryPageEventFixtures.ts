@@ -1,4 +1,4 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderEvent } from "@/api-client";
+import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact, FactoriesWorkOrderEvent } from "@/api-client";
 
 import {
   CLOSED_FAILED_WORK_ORDER,
@@ -7,7 +7,13 @@ import {
   FAILED_WORK_ORDER,
   HOUR_AGO,
   LAST_WEEK,
+  LINE_RUN_IMPLEMENT_FAILED_ID,
+  LINE_RUN_IMPLEMENT_ID,
+  LINE_RUN_IMPLEMENT_PASSED_ID,
+  LINE_RUN_VERIFY_PASSED_ID,
   OPEN_WORK_ORDER,
+  OPEN_WORK_ORDER_ARTIFACTS,
+  OPEN_WORK_ORDER_SECONDARY,
   OPERATOR_USER,
   REVIEWER_USER,
   RUNNING_WORK_ORDER,
@@ -250,7 +256,7 @@ export const RUNNING_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     order: RUNNING_WORK_ORDER,
     stepName: "implement",
     at: HOUR_AGO,
-    runId: "run-implement",
+    runId: LINE_RUN_IMPLEMENT_ID,
     appId: "app-refund-implementer",
   }),
   // Automation-authored comment attached to the in-flight "implement" step.
@@ -273,7 +279,7 @@ export const RUNNING_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
         stepName: "implement",
       },
     },
-    { id: "run-implement" },
+    { id: LINE_RUN_IMPLEMENT_ID },
   ),
 ];
 
@@ -298,14 +304,14 @@ export const FAILED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     order: FAILED_WORK_ORDER,
     stepName: "implement",
     at: HOUR_AGO,
-    runId: "run-implement-2",
+    runId: LINE_RUN_IMPLEMENT_FAILED_ID,
     appId: "app-refund-implementer",
   }),
   stepExecutionFinishedEvent({
     order: FAILED_WORK_ORDER,
     stepName: "implement",
     at: HOUR_AGO,
-    runId: "run-implement-2",
+    runId: LINE_RUN_IMPLEMENT_FAILED_ID,
     appId: "app-refund-implementer",
     result: "failed",
   }),
@@ -332,14 +338,14 @@ export const CLOSED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     order: CLOSED_WORK_ORDER,
     stepName: "implement",
     at: LAST_WEEK,
-    runId: "run-implement-3",
+    runId: LINE_RUN_IMPLEMENT_PASSED_ID,
     appId: "app-refund-implementer",
   }),
   stepExecutionFinishedEvent({
     order: CLOSED_WORK_ORDER,
     stepName: "implement",
     at: LAST_WEEK,
-    runId: "run-implement-3",
+    runId: LINE_RUN_IMPLEMENT_PASSED_ID,
     appId: "app-refund-implementer",
     result: "passed",
   }),
@@ -347,14 +353,14 @@ export const CLOSED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     order: CLOSED_WORK_ORDER,
     stepName: "verify",
     at: YESTERDAY,
-    runId: "run-verify-3",
+    runId: LINE_RUN_VERIFY_PASSED_ID,
     appId: "app-refund-verifier",
   }),
   stepExecutionFinishedEvent({
     order: CLOSED_WORK_ORDER,
     stepName: "verify",
     at: YESTERDAY,
-    runId: "run-verify-3",
+    runId: LINE_RUN_VERIFY_PASSED_ID,
     appId: "app-refund-verifier",
     result: "passed",
   }),
@@ -432,3 +438,24 @@ export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     { nodeName: "attach-artifact", appName: "Refund Diagnostics", lineName: "Plan", stepName: "step-01" },
   ),
 ];
+
+/**
+ * Activity served by the fixture HTTP handlers for harnessed page stories
+ * (`GET …/orders/{orderId}/events`). The open order uses the rich set so
+ * the page-level detail story shows comments, artifacts, and runs without
+ * per-story wiring. Direct-props stories keep choosing their own arrays.
+ */
+export const DEFAULT_EVENTS_BY_ORDER_ID: Record<string, FactoriesWorkOrderEvent[]> = {
+  [OPEN_WORK_ORDER.id!]: RICH_OPEN_WORK_ORDER_EVENTS,
+  [OPEN_WORK_ORDER_SECONDARY.id!]: [openedWorkOrderEvent(OPEN_WORK_ORDER_SECONDARY, TWO_HOURS_AGO)],
+  [RUNNING_WORK_ORDER.id!]: RUNNING_WORK_ORDER_EVENTS,
+  [FAILED_WORK_ORDER.id!]: FAILED_WORK_ORDER_EVENTS,
+  [DRAFT_WORK_ORDER.id!]: DRAFT_WORK_ORDER_EVENTS,
+  [CLOSED_WORK_ORDER.id!]: CLOSED_WORK_ORDER_EVENTS,
+  [CLOSED_FAILED_WORK_ORDER.id!]: CLOSED_FAILED_WORK_ORDER_EVENTS,
+};
+
+/** Artifacts served by the fixture HTTP handlers (`GET …/orders/{orderId}/artifacts`). */
+export const DEFAULT_ARTIFACTS_BY_ORDER_ID: Record<string, FactoriesWorkOrderArtifact[]> = {
+  [OPEN_WORK_ORDER.id!]: OPEN_WORK_ORDER_ARTIFACTS,
+};
