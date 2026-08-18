@@ -32,6 +32,8 @@ interface RequestBody {
   result?: unknown;
   steps?: unknown;
   body?: unknown;
+  mentionedUserIds?: unknown;
+  mentioned_user_ids?: unknown;
 }
 
 function stringOrEmpty(value: unknown): string {
@@ -278,6 +280,9 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         const order = findOrder(fixture, match[1], match[2]);
         if (!order) return { json: {} };
         const commentBody = stringOrEmpty(((body ?? {}) as RequestBody).body);
+        const mentionedUserIds = stringArrayOrEmpty(
+          ((body ?? {}) as RequestBody).mentionedUserIds ?? ((body ?? {}) as RequestBody).mentioned_user_ids,
+        );
         const timestamp = new Date().toISOString();
         const events: FactoriesWorkOrderEvent[] = [
           ...orderEvents(fixture, match[2]),
@@ -287,6 +292,7 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
             event: {
               order: { id: order.id, title: order.title },
               body: commentBody,
+              mentionedUserIds,
               author: { kind: "user", userId: STORYBOOK_ME_USER_ID },
             },
           },
@@ -308,6 +314,7 @@ function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
     workOrderCommentCreated: true,
     workOrderStatusOwned: true,
     workOrderArtifactOwned: true,
+    workOrderMentioned: true,
   } satisfies FactoriesFixture["notificationSettings"];
 
   return {

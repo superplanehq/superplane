@@ -30,6 +30,7 @@ func Test__DescribeNotificationSettings(t *testing.T) {
 		assert.True(t, resp.Settings.WorkOrderCommentCreated)
 		assert.True(t, resp.Settings.WorkOrderStatusOwned)
 		assert.True(t, resp.Settings.WorkOrderArtifactOwned)
+		assert.True(t, resp.Settings.WorkOrderMentioned)
 	})
 
 	t.Run("unauthenticated", func(t *testing.T) {
@@ -57,6 +58,7 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 				WorkOrderCommentCreated: true,
 				WorkOrderStatusOwned:    true,
 				WorkOrderArtifactOwned:  false,
+				WorkOrderMentioned:      true,
 			},
 		})
 		require.NoError(t, err)
@@ -64,6 +66,7 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_ALL, resp.Settings.WorkspaceScope)
 		assert.False(t, resp.Settings.WorkOrderCommentOwned)
 		assert.False(t, resp.Settings.WorkOrderArtifactOwned)
+		assert.True(t, resp.Settings.WorkOrderMentioned)
 
 		described, err := DescribeNotificationSettings(ctx)
 		require.NoError(t, err)

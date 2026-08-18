@@ -59,6 +59,7 @@ func serializeNotificationSettings(settings *models.UserNotificationSettings) *p
 		WorkOrderCommentCreated: notificationTypeEnabled(settings, models.NotificationTypeWorkOrderCommentCreated),
 		WorkOrderStatusOwned:    notificationTypeEnabled(settings, models.NotificationTypeWorkOrderStatusOwned),
 		WorkOrderArtifactOwned:  notificationTypeEnabled(settings, models.NotificationTypeWorkOrderArtifactOwned),
+		WorkOrderMentioned:      notificationTypeEnabled(settings, models.NotificationTypeWorkOrderMention),
 	}
 }
 
