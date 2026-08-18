@@ -394,6 +394,64 @@ func TestFactoryContext_AddWorkOrderArtifact_ExplicitOrderIDOnUnattachedRun(t *t
 	assert.Equal(t, order.ID.String(), artifact.WorkOrderID)
 }
 
+func TestFactoryContext_ReportWorkOrderCheck(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Check target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	notifications := 0
+	lastReason := ""
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).
+		WithWorkOrderUpdated(func(_, _, reason string) {
+			notifications++
+			lastReason = reason
+		})
+
+	check, err := ctx.ReportWorkOrderCheck(core.ReportWorkOrderCheckParams{
+		OrderID:  order.ID.String(),
+		CheckKey: "risk-review",
+		Name:     "Risk review",
+		Score:    7,
+		MaxScore: 10,
+		Level:    models.FactoryWorkOrderCheckLevelCaution,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, order.ID.String(), check.WorkOrderID)
+	assert.Nil(t, check.PreviousScore)
+	assert.Equal(t, 1, notifications)
+	assert.Equal(t, factoryevents.EventTypeOrderCheckReported, lastReason)
+
+	// A re-report of the same key updates in place and keeps the prior score.
+	updated, err := ctx.ReportWorkOrderCheck(core.ReportWorkOrderCheckParams{
+		OrderID:  order.ID.String(),
+		CheckKey: "risk-review",
+		Name:     "Risk review",
+		Score:    3,
+		MaxScore: 10,
+		Level:    models.FactoryWorkOrderCheckLevelPositive,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, check.ID, updated.ID)
+	require.NotNil(t, updated.PreviousScore)
+	assert.Equal(t, float64(7), *updated.PreviousScore)
+	assert.Equal(t, 2, notifications)
+
+	// The timeline event carries automation + run attribution.
+	event := findWorkOrderEvent(t, order, factoryevents.EventTypeOrderCheckReported)
+	var payload factoryevents.WorkOrderCheckReported
+	require.NoError(t, json.Unmarshal(event.Data, &payload))
+	require.NotNil(t, payload.Automation)
+	assert.Equal(t, canvas.ID, payload.Automation.AppID)
+	require.NotNil(t, payload.Run)
+	assert.Equal(t, nodeExecution.RunID, payload.Run.ID)
+}
+
 func TestFactoryContext_FindWorkOrder_ByID(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
