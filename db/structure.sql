@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.11 (Ubuntu 17.11-1.pgdg22.04+2)
+-- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -718,7 +718,8 @@ CREATE TABLE public.workflow_node_executions (
     updated_at timestamp without time zone NOT NULL,
     cancelled_by uuid,
     run_id uuid NOT NULL,
-    cancelled_at timestamp without time zone
+    cancelled_at timestamp without time zone,
+    queue_name character varying(256)
 );
 
 
@@ -733,7 +734,8 @@ CREATE TABLE public.workflow_node_queue_items (
     root_event_id uuid,
     event_id uuid,
     created_at timestamp without time zone NOT NULL,
-    run_id uuid NOT NULL
+    run_id uuid NOT NULL,
+    queue_name character varying(256)
 );
 
 
@@ -775,7 +777,10 @@ CREATE TABLE public.workflow_nodes (
     is_collapsed boolean DEFAULT false NOT NULL,
     deleted_at timestamp with time zone,
     app_installation_id uuid,
-    state_reason text
+    state_reason text,
+    concurrency_key text,
+    concurrency_max integer,
+    CONSTRAINT workflow_nodes_concurrency_max_check CHECK ((concurrency_max >= 1))
 );
 
 
@@ -1810,6 +1815,13 @@ CREATE INDEX idx_workflow_node_execution_kvs_workflow_node_key_value ON public.w
 
 
 --
+-- Name: idx_workflow_node_executions_active_queue; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_active_queue ON public.workflow_node_executions USING btree (workflow_id, node_id, queue_name) WHERE ((state)::text = ANY ((ARRAY['pending'::character varying, 'started'::character varying, 'cancelling'::character varying])::text[]));
+
+
+--
 -- Name: idx_workflow_node_executions_event_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2689,7 +2701,7 @@ ALTER TABLE ONLY public.workflows
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.11 (Ubuntu 17.11-1.pgdg22.04+2)
+-- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2708,7 +2720,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260812184220	f
+20260818003440	f
 \.
 
 
@@ -2725,7 +2737,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.11 (Ubuntu 17.11-1.pgdg22.04+2)
+-- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;

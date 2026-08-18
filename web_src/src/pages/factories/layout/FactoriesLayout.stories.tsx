@@ -5,9 +5,9 @@ import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../__fixtures__/fa
 import { FactoriesLayout } from "./FactoriesLayout";
 
 /**
- * The Factories layout shell: workspace switcher on top, nav + recent orders,
- * bottom-left user menu, and content area for nested routes. Stories mount
- * the layout with a live route so the sidebar links behave.
+ * The Factories layout shell: workspace name (opens Overview), nav + recent
+ * orders, bottom-left user menu, and a compact section header in the pane.
+ * Stories mount the layout with a live route so the sidebar links behave.
  */
 const meta = {
   title: "Factories/Layout/FactoriesLayout",
