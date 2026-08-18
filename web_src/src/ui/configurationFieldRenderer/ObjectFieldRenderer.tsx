@@ -18,6 +18,8 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   integrationId,
   organizationId,
   autocompleteExampleObj,
+  payloadSourceLabel,
+  payloadSourceIsExample,
   allowExpressions = false,
   readOnly = false,
 }) => {
@@ -292,6 +294,8 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
           integrationId={integrationId}
           organizationId={organizationId}
           autocompleteExampleObj={autocompleteExampleObj}
+          payloadSourceLabel={payloadSourceLabel}
+          payloadSourceIsExample={payloadSourceIsExample}
           readOnly={readOnly}
         />
       ))}

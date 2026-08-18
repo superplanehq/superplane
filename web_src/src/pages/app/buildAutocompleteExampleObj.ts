@@ -23,12 +23,36 @@ export function buildAutocompleteAppExample(
   };
 }
 
+/**
+ * Where a node's authoring payload came from. Kept out of the expression
+ * environment so it can drive UI labels without adding fake keys to the `$`
+ * payload.
+ */
+export type AutocompletePayloadSource =
+  | { kind: "execution"; executionId?: string; observedAt?: string }
+  | { kind: "event"; eventId?: string; observedAt?: string }
+  | { kind: "example" };
+
+/**
+ * Result of building the autocomplete example object for a node.
+ *
+ * `context` is the expression environment (the `$` payload). `sourcesByNodeId`
+ * records, per upstream chain node, where that node's payload came from so the
+ * UI can label it.
+ */
+export type AutocompleteExampleResult = {
+  context: Record<string, unknown> | null;
+  sourcesByNodeId: Record<string, AutocompletePayloadSource>;
+};
+
 export type AutocompleteExampleContext = {
   canvasNodes: ComponentsNode[];
   canvasNodesById: Map<string, ComponentsNode>;
   incomingNodeIdsByTargetId: Map<string, string[]>;
-  visibleNodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
-  visibleNodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
+  // Raw execution/event maps from the store. Authoring reads these directly;
+  // the canvas keeps separate visibility-filtered maps for overlays.
+  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
+  nodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
   allComponentsByName: Map<string | undefined, ActionsAction>;
   allTriggersByName: Map<string | undefined, TriggersTrigger>;
   app?: AutocompleteAppExample;
@@ -133,13 +157,76 @@ function collectChainNodeIds(
   return chainNodeIds;
 }
 
+// Outputs are keyed by channel. Return the first item of the first non-empty
+// array, which is the delivered payload.
+function firstUsableOutput(execution: CanvasesCanvasNodeExecution): unknown | undefined {
+  const outputs = execution.outputs;
+  if (!outputs) {
+    return undefined;
+  }
+  const found = Object.values(outputs).find((output) => Array.isArray(output) && output.length > 0) as
+    | unknown[]
+    | undefined;
+  return found?.[0];
+}
+
+// Executions are newest first (created_at DESC; websocket updates prepend at
+// index 0). Check state and output in the same pass so a newer execution without
+// output does not hide an older one that still has a usable payload.
+function selectUsableExecutionWithOutput(
+  executions: CanvasesCanvasNodeExecution[] | undefined,
+): { execution: CanvasesCanvasNodeExecution; output: unknown } | undefined {
+  for (const execution of executions ?? []) {
+    if (execution.state !== "STATE_FINISHED") continue;
+    if (execution.resultReason === "RESULT_REASON_ERROR") continue;
+    const output = firstUsableOutput(execution);
+    if (output !== undefined) {
+      return { execution, output };
+    }
+  }
+  return undefined;
+}
+
+// Clone outputs and examples the same way. Spreading an array into `{...}`
+// would turn it into a numeric-keyed object.
+function clonePayload(value: unknown): unknown {
+  if (Array.isArray(value)) return [...value];
+  if (value && typeof value === "object") return { ...(value as Record<string, unknown>) };
+  return value;
+}
+
+function isUsableExample(value: unknown): value is Record<string, unknown> | unknown[] {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (Array.isArray(value) ? value.length > 0 : Object.keys(value).length > 0)
+  );
+}
+
+// Attach config to a payload unless the payload already has one. configData
+// must come from the same source as payload: the selected execution for a real
+// payload, or the node's own config for an example fallback.
+function attachConfig(payload: unknown, configData: unknown): void {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return;
+  if ("config" in (payload as Record<string, unknown>)) return;
+  if (configData && typeof configData === "object" && Object.keys(configData).length > 0) {
+    (payload as Record<string, unknown>).config = configData;
+  }
+}
+
+type ChainNodeExamplesResult = {
+  exampleObj: Record<string, unknown>;
+  sourcesByNodeId: Record<string, AutocompletePayloadSource>;
+};
+
 function buildChainNodeExamples(
   chainNodeIds: Set<string>,
   context: AutocompleteExampleContext,
   nodeNamesById: Record<string, string>,
   nodeMetadata: Record<string, { name?: string; componentType: string; description?: string }>,
-): Record<string, unknown> {
+): ChainNodeExamplesResult {
   const exampleObj: Record<string, unknown> = {};
+  const sourcesByNodeId: Record<string, AutocompletePayloadSource> = {};
 
   chainNodeIds.forEach((chainNodeId) => {
     const chainNode = context.canvasNodesById.get(chainNodeId);
@@ -158,19 +245,21 @@ function buildChainNodeExamples(
         description: triggerMetadata?.description,
       };
 
-      const latestEvent = context.visibleNodeEventsMap[chainNodeId]?.[0];
-      if (latestEvent?.data) {
-        exampleObj[chainNodeId] = { ...(latestEvent.data || {}) } as Record<string, unknown>;
-      }
-      if (exampleObj[chainNodeId]) {
+      const latestEvent = context.nodeEventsMap[chainNodeId]?.[0];
+      if (latestEvent?.data && typeof latestEvent.data === "object") {
+        exampleObj[chainNodeId] = clonePayload(latestEvent.data);
+        sourcesByNodeId[chainNodeId] = {
+          kind: "event",
+          eventId: latestEvent.id,
+          observedAt: latestEvent.createdAt,
+        };
         return;
       }
 
       const exampleData = triggerMetadata?.exampleData;
-      if (exampleData && typeof exampleData === "object") {
-        exampleObj[chainNodeId] = Array.isArray(exampleData)
-          ? [...exampleData]
-          : ({ ...exampleData } as Record<string, unknown>);
+      if (exampleData && isUsableExample(exampleData)) {
+        exampleObj[chainNodeId] = clonePayload(exampleData);
+        sourcesByNodeId[chainNodeId] = { kind: "example" };
       }
       return;
     }
@@ -182,59 +271,31 @@ function buildChainNodeExamples(
       description: componentMetadata?.description,
     };
 
-    const latestExecution = context.visibleNodeExecutionsMap[chainNodeId]?.find(
-      (execution) => execution.state === "STATE_FINISHED" && execution.resultReason !== "RESULT_REASON_ERROR",
-    );
-    if (!latestExecution?.outputs) {
-      const exampleOutput = componentMetadata?.exampleOutput;
-      if (exampleOutput && typeof exampleOutput === "object") {
-        exampleObj[chainNodeId] = Array.isArray(exampleOutput)
-          ? [...exampleOutput]
-          : ({ ...exampleOutput } as Record<string, unknown>);
-      }
-      return;
-    }
-
-    const outputData: unknown[] = Object.values(latestExecution.outputs)?.find((output) => {
-      return Array.isArray(output) && output.length > 0;
-    }) as unknown[];
-
-    if (outputData?.length > 0) {
-      exampleObj[chainNodeId] = { ...(outputData?.[0] || {}) } as Record<string, unknown>;
+    const selected = selectUsableExecutionWithOutput(context.nodeExecutionsMap[chainNodeId]);
+    if (selected) {
+      const payload = clonePayload(selected.output);
+      exampleObj[chainNodeId] = payload;
+      sourcesByNodeId[chainNodeId] = {
+        kind: "execution",
+        executionId: selected.execution.id,
+        observedAt: selected.execution.createdAt,
+      };
+      // Config from the same execution that produced the payload.
+      attachConfig(payload, selected.execution.configuration);
       return;
     }
 
     const exampleOutput = componentMetadata?.exampleOutput;
-    if (exampleOutput && typeof exampleOutput === "object" && Object.keys(exampleOutput).length > 0) {
-      exampleObj[chainNodeId] = { ...exampleOutput } as Record<string, unknown>;
+    if (exampleOutput && isUsableExample(exampleOutput)) {
+      const payload = clonePayload(exampleOutput);
+      exampleObj[chainNodeId] = payload;
+      sourcesByNodeId[chainNodeId] = { kind: "example" };
+      // Use the node's own config here, not the unrelated execution's.
+      attachConfig(payload, chainNode.configuration);
     }
   });
 
-  return exampleObj;
-}
-
-function injectConfigIntoExamples(
-  chainNodeIds: Set<string>,
-  exampleObj: Record<string, unknown>,
-  context: AutocompleteExampleContext,
-): void {
-  chainNodeIds.forEach((chainNodeId) => {
-    const chainNode = context.canvasNodesById.get(chainNodeId);
-    if (!chainNode || chainNode.type !== "TYPE_ACTION") return;
-
-    const obj = exampleObj[chainNodeId];
-    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return;
-
-    const latestExecution = context.visibleNodeExecutionsMap[chainNodeId]?.find(
-      (execution) => execution.state === "STATE_FINISHED" && execution.resultReason !== "RESULT_REASON_ERROR",
-    );
-    if ("config" in (obj as Record<string, unknown>)) return;
-
-    const configData = latestExecution?.configuration || chainNode.configuration;
-    if (configData && typeof configData === "object" && Object.keys(configData).length > 0) {
-      (obj as Record<string, unknown>).config = configData;
-    }
-  });
+  return { exampleObj, sourcesByNodeId };
 }
 
 function buildPreviousByDepth(
@@ -376,23 +437,22 @@ function buildNamedExampleObj({
   return namedExampleObj;
 }
 
-export function buildAutocompleteExampleObj(
+export function buildAutocompleteExampleResult(
   nodeId: string,
   context: AutocompleteExampleContext,
-): Record<string, unknown> | null {
+): AutocompleteExampleResult {
   const currentNode = context.canvasNodesById.get(nodeId);
   const chainNodeIds = collectChainNodeIds(nodeId, currentNode, context.incomingNodeIdsByTargetId);
   if (chainNodeIds.size === 0) {
-    return null;
+    return { context: null, sourcesByNodeId: {} };
   }
 
   const nodeMetadata: Record<string, { name?: string; componentType: string; description?: string }> = {};
   const nodeNamesById: Record<string, string> = {};
-  const exampleObj = buildChainNodeExamples(chainNodeIds, context, nodeNamesById, nodeMetadata);
-  injectConfigIntoExamples(chainNodeIds, exampleObj, context);
+  const { exampleObj, sourcesByNodeId } = buildChainNodeExamples(chainNodeIds, context, nodeNamesById, nodeMetadata);
   const previousByDepth = buildPreviousByDepth(nodeId, exampleObj, context.incomingNodeIdsByTargetId);
 
-  return buildNamedExampleObj({
+  const namedExampleObj = buildNamedExampleObj({
     currentNode,
     chainNodeIds,
     exampleObj,
@@ -405,4 +465,71 @@ export function buildAutocompleteExampleObj(
     canvasNodes: context.canvasNodes,
     incomingNodeIdsByTargetId: context.incomingNodeIdsByTargetId,
   });
+
+  if (!namedExampleObj) {
+    return { context: null, sourcesByNodeId: {} };
+  }
+
+  // The authored node never contributes a payload; drop it from provenance.
+  const sourcesForNamed = { ...sourcesByNodeId };
+  if (currentNode?.id) {
+    delete sourcesForNamed[currentNode.id];
+  }
+
+  return { context: namedExampleObj, sourcesByNodeId: sourcesForNamed };
+}
+
+/**
+ * Backward-compatible wrapper that returns only the expression environment.
+ * Prefer `buildAutocompleteExampleResult` when you also need payload provenance
+ * for source labels.
+ */
+export function buildAutocompleteExampleObj(
+  nodeId: string,
+  context: AutocompleteExampleContext,
+): Record<string, unknown> | null {
+  return buildAutocompleteExampleResult(nodeId, context).context;
+}
+
+export type PayloadSourceSummary = {
+  label: string;
+  isExample: boolean;
+};
+
+/**
+ * Reduces per-node provenance into a single label for the editor.
+ *
+ * - all executions        -> "Latest real payload"
+ * - all events            -> "Latest trigger event"
+ * - all examples          -> "Example payload"
+ * - mixed real + example  -> "Includes example data"
+ * - otherwise             -> "Latest real data"
+ *
+ * The execution label says "real payload" rather than "successful" because the
+ * selector keeps any finished, non-error execution with output, including
+ * cancelled or resolved-error ones.
+ */
+export function summarizePayloadSources(
+  sources: Record<string, AutocompletePayloadSource>,
+): PayloadSourceSummary | null {
+  const values = Object.values(sources);
+  if (values.length === 0) {
+    return null;
+  }
+
+  const kinds = new Set(values.map((source) => source.kind));
+  const onlyExamples = kinds.size === 1 && kinds.has("example");
+  if (onlyExamples) {
+    return { label: "Example payload", isExample: true };
+  }
+  if (kinds.has("example")) {
+    return { label: "Includes example data", isExample: true };
+  }
+  if (kinds.size === 1 && kinds.has("execution")) {
+    return { label: "Latest real payload", isExample: false };
+  }
+  if (kinds.size === 1 && kinds.has("event")) {
+    return { label: "Latest trigger event", isExample: false };
+  }
+  return { label: "Latest real data", isExample: false };
 }

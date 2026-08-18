@@ -32,6 +32,14 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
    * Use this inside modals or panels that provide their own scroll container.
    */
   fullHeight?: boolean;
+  /**
+   * Source label for the authoring payload, e.g. "Latest real payload",
+   * "Latest trigger event", or "Example payload". Shown as a small badge so the
+   * author can tell whether the preview uses real run data or an embedded example.
+   */
+  payloadSourceLabel?: string;
+  /** True when the label reflects example (non-real) data. */
+  payloadSourceIsExample?: boolean;
 }
 
 const suggestionSortPriority = {
@@ -128,6 +136,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       excludedSuggestions,
       minHeight,
       fullHeight = false,
+      payloadSourceLabel,
+      payloadSourceIsExample,
       ...rest
     } = props;
     const [inputValue, setInputValue] = useState(value);
@@ -1376,7 +1386,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const shouldShowValuePreview = showValuePreview && highlightedIndex >= 0;
 
     const showPreviewToggle = showValuePreview;
-    const showBottomBar = showPreviewToggle || (isFocused && !!quickTip);
+    const showBottomBar = showPreviewToggle || (isFocused && !!quickTip) || !!payloadSourceLabel;
 
     return (
       <div
@@ -1471,34 +1481,56 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             {...rest}
           />
         </span>
-        {/* Bottom bar with preview toggle and quickTip — rendered in normal flow so it
-            never overlaps the input regardless of the parent layout (grid, flex, etc.) */}
+        {/* Rendered in normal flow so the bar never overlaps the input,
+            regardless of parent layout (grid, flex, etc.). */}
         {showBottomBar && (
-          <div className="flex items-center justify-between mt-1 px-0.5">
-            {/* Preview toggle - left side */}
-            {showPreviewToggle ? (
-              <button
-                type="button"
-                onClick={() => setPreviewMode(!previewMode)}
-                className={twMerge([
-                  "flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors",
-                  previewMode
-                    ? allExpressionsValid
-                      ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
-                      : "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
-                    : allExpressionsValid
-                      ? "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
-                      : "text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30",
-                ])}
-              >
-                {previewMode ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                <span>{valuePreviewLabel}</span>
-              </button>
-            ) : (
-              <span />
-            )}
-            {/* QuickTip - right side */}
-            <span className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+          <div className="flex items-center justify-between mt-1 px-0.5 gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              {showPreviewToggle ? (
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode(!previewMode)}
+                  className={twMerge([
+                    "flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors",
+                    previewMode
+                      ? allExpressionsValid
+                        ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
+                        : "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+                      : allExpressionsValid
+                        ? "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
+                        : "text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30",
+                  ])}
+                >
+                  {previewMode ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  <span>{valuePreviewLabel}</span>
+                </button>
+              ) : null}
+              {payloadSourceLabel && (
+                <span
+                  data-testid="autocomplete-payload-source"
+                  title={
+                    payloadSourceIsExample
+                      ? "Preview includes embedded example payloads where no usable real run data is available."
+                      : "Previewing against the most recent real run data."
+                  }
+                  className={twMerge([
+                    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium leading-none whitespace-nowrap truncate",
+                    payloadSourceIsExample
+                      ? "bg-slate-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                      : "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300",
+                  ])}
+                >
+                  <span
+                    className={twMerge(
+                      "inline-block size-1.5 rounded-full shrink-0",
+                      payloadSourceIsExample ? "bg-gray-400 dark:bg-gray-500" : "bg-blue-500 dark:bg-blue-400",
+                    )}
+                  />
+                  {payloadSourceLabel}
+                </span>
+              )}
+            </div>
+            <span className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400 shrink-0">
               {quickTip
                 ? renderQuickTip(quickTip)
                 : [

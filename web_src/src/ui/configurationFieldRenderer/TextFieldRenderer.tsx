@@ -73,6 +73,8 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
   value,
   onChange,
   autocompleteExampleObj,
+  payloadSourceLabel,
+  payloadSourceIsExample,
   allowExpressions = false,
   excludedSuggestions,
   valuePreviewLabel,
@@ -98,6 +100,8 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
       minHeight={PLAIN_TEXT_MIN_HEIGHT_PX}
       showValuePreview
       valuePreviewLabel={valuePreviewLabel}
+      payloadSourceLabel={payloadSourceLabel}
+      payloadSourceIsExample={payloadSourceIsExample}
       quickTip="Tip: type `{{` to start an expression."
       excludedSuggestions={excludedSuggestions}
       data-testid={toTestId(testId)}
@@ -141,6 +145,8 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
               inputSize="md"
               showValuePreview
               valuePreviewLabel={valuePreviewLabel}
+              payloadSourceLabel={payloadSourceLabel}
+              payloadSourceIsExample={payloadSourceIsExample}
               quickTip="Tip: type `{{` to start an expression."
               excludedSuggestions={excludedSuggestions}
               fullHeight

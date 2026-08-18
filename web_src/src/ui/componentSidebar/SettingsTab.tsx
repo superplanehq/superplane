@@ -59,6 +59,8 @@ interface SettingsTabProps {
   integrations?: OrganizationsIntegration[];
   integrationDefinition?: { name?: string; label?: string; icon?: string };
   autocompleteExampleObj?: Record<string, unknown> | null;
+  payloadSourceLabel?: string;
+  payloadSourceIsExample?: boolean;
   onOpenCreateIntegrationDialog?: () => void;
   onOpenConfigureIntegrationDialog?: (integrationId: string) => void;
   readOnly?: boolean;
@@ -137,6 +139,8 @@ export function SettingsTab({
   integrations = [],
   integrationDefinition,
   autocompleteExampleObj,
+  payloadSourceLabel,
+  payloadSourceIsExample,
   onOpenCreateIntegrationDialog,
   onOpenConfigureIntegrationDialog,
   readOnly = false,
@@ -598,6 +602,8 @@ export function SettingsTab({
                 allValues={nodeConfiguration}
                 organizationId={domainId}
                 autocompleteExampleObj={resolvedAutocompleteExampleObj}
+                payloadSourceLabel={payloadSourceLabel}
+                payloadSourceIsExample={payloadSourceIsExample}
                 realtimeValidationErrors={realtimeValidationErrors}
                 enableRealtimeValidation={true}
               />
@@ -821,6 +827,8 @@ export function SettingsTab({
                   realtimeValidationErrors={realtimeValidationErrors}
                   enableRealtimeValidation={true}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
+                  payloadSourceLabel={payloadSourceLabel}
+                  payloadSourceIsExample={payloadSourceIsExample}
                 />
               );
             })}
