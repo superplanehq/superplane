@@ -10,6 +10,7 @@ import {
   factoriesDispatchWorkOrder,
   factoriesListFactories,
   factoriesListFactoryApps,
+  factoriesListFactoryLineMetrics,
   factoriesListWorkOrderArtifacts,
   factoriesListWorkOrderEvents,
   factoriesListWorkOrders,
@@ -33,6 +34,7 @@ import {
   getWorkOrderEventsNextPageParam,
   WORK_ORDER_EVENTS_PAGE_LIMIT,
 } from "@/pages/factories/lib/workOrderEventsPagination";
+import { lineListMetricsFromApi, type LineListMetrics } from "@/pages/factories/pages/lineListMetrics";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const factoryQueryKeys = {
@@ -47,6 +49,8 @@ export const factoryQueryKeys = {
   workOrderArtifacts: (organizationId: string, factoryId: string, orderId: string) =>
     ["factories", organizationId, factoryId, "work-orders", orderId, "artifacts"] as const,
   apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
+  lineMetrics: (organizationId: string, factoryId: string) =>
+    ["factories", organizationId, factoryId, "line-metrics"] as const,
 };
 
 function factoryListKey(organizationId: string) {
@@ -75,6 +79,10 @@ function workOrderArtifactsKey(organizationId: string, factoryId: string, orderI
 
 export function factoryAppsKey(organizationId: string, factoryId: string) {
   return factoryQueryKeys.apps(organizationId, factoryId);
+}
+
+function factoryLineMetricsKey(organizationId: string, factoryId: string) {
+  return factoryQueryKeys.lineMetrics(organizationId, factoryId);
 }
 
 export function useFactories(organizationId: string, enabled = true) {
@@ -336,6 +344,7 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
       void queryClient.invalidateQueries({
         queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
       });
+      void queryClient.invalidateQueries({ queryKey: factoryLineMetricsKey(organizationId, factoryId) });
     },
   });
 }
@@ -372,6 +381,7 @@ export function useUpdateWorkOrderStatus(organizationId: string, factoryId: stri
       void queryClient.invalidateQueries({
         queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
       });
+      void queryClient.invalidateQueries({ queryKey: factoryLineMetricsKey(organizationId, factoryId) });
     },
   });
 }
@@ -399,6 +409,7 @@ export function useAddWorkOrderComment(organizationId: string, factoryId: string
       void queryClient.invalidateQueries({
         queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
       });
+      void queryClient.invalidateQueries({ queryKey: factoryLineMetricsKey(organizationId, factoryId) });
     },
   });
 }
@@ -446,6 +457,7 @@ export function useCloseWorkOrder(organizationId: string, factoryId: string) {
       void queryClient.invalidateQueries({
         queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
       });
+      void queryClient.invalidateQueries({ queryKey: factoryLineMetricsKey(organizationId, factoryId) });
     },
   });
 }
@@ -461,6 +473,29 @@ export function useFactoryApps(organizationId: string, factoryId: string) {
         }),
       );
       return response.data?.apps ?? [];
+    },
+    enabled: Boolean(organizationId && factoryId),
+  });
+}
+
+export function useFactoryLineMetrics(organizationId: string, factoryId: string) {
+  return useQuery({
+    queryKey: factoryLineMetricsKey(organizationId, factoryId),
+    queryFn: async (): Promise<Record<string, LineListMetrics | null>> => {
+      const response = await factoriesListFactoryLineMetrics(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId },
+        }),
+      );
+      const byLineId: Record<string, LineListMetrics | null> = {};
+      for (const entry of response.data?.lines ?? []) {
+        if (!entry.lineId) {
+          continue;
+        }
+        byLineId[entry.lineId] = lineListMetricsFromApi(entry.metrics);
+      }
+      return byLineId;
     },
     enabled: Boolean(organizationId && factoryId),
   });
@@ -488,6 +523,7 @@ export function useCreateFactoryLine(organizationId: string, factoryId: string) 
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({ queryKey: factoryLineMetricsKey(organizationId, factoryId) });
     },
   });
 }
@@ -514,6 +550,7 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({ queryKey: factoryLineMetricsKey(organizationId, factoryId) });
     },
   });
 }

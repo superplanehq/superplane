@@ -37,6 +37,12 @@ func TestMatchHTTPRoute(t *testing.T) {
 		},
 		{
 			method: http.MethodGet,
+			path:   "/api/v1/factories/factory-123/line-metrics",
+			want:   HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/line-metrics"},
+			wantOK: true,
+		},
+		{
+			method: http.MethodGet,
 			path:   "/api/v1/me",
 			wantOK: false,
 		},
