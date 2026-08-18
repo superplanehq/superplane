@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -111,6 +112,55 @@ func TestBuildArtifactData_WritesBranchTreeURLFromFreeFormRepo(t *testing.T) {
 	})
 
 	assert.Equal(t, "https://github.com/acme/storefront/tree/hotfix", data["url"])
+}
+
+func TestBuildArtifactData_StripsCredentialsFromStoredRepository(t *testing.T) {
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
+		ArtifactType: "branch",
+		Name:         "hotfix",
+		Repository:   "https://oauth2:token@git.example.com/acme/storefront",
+	})
+
+	assert.Equal(t, "https://git.example.com/acme/storefront", data["repository"])
+	assert.Equal(t, "https://git.example.com/acme/storefront/tree/hotfix", data["url"])
+	assert.NotContains(t, fmt.Sprintf("%v", data), "token")
+}
+
+func TestBuildArtifactData_StripsCredentialsFromStoredRepositoryWhenURLIsSet(t *testing.T) {
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
+		ArtifactType: "branch",
+		Name:         "hotfix",
+		Repository:   "https://oauth2:token@git.example.com/acme/storefront",
+		URL:          "https://git.example.com/acme/storefront/tree/hotfix",
+	})
+
+	assert.Equal(t, "https://git.example.com/acme/storefront", data["repository"])
+	assert.NotContains(t, fmt.Sprintf("%v", data), "token")
+}
+
+func TestBuildArtifactData_DropsUnparseableRepositoryURLWithCredentials(t *testing.T) {
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
+		ArtifactType: "branch",
+		Name:         "hotfix",
+		Repository:   "https://oauth2:token@",
+	})
+
+	_, hasRepo := data["repository"]
+	assert.False(t, hasRepo)
+	assert.NotContains(t, fmt.Sprintf("%v", data), "token")
+}
+
+func TestBuildArtifactData_StripsCredentialsFromFreeFormRepository(t *testing.T) {
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
+		ArtifactType: "branch",
+		Name:         "hotfix",
+		Data: []ArtifactDataEntry{
+			{Name: "repository", Value: "https://oauth2:token@git.example.com/acme/storefront"},
+		},
+	})
+
+	assert.Equal(t, "https://git.example.com/acme/storefront", data["repository"])
+	assert.NotContains(t, fmt.Sprintf("%v", data), "token")
 }
 
 func TestBuildArtifactData_DoesNotInventBranchURLWithoutRepository(t *testing.T) {

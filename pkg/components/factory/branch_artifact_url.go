@@ -19,20 +19,10 @@ func branchTreeURL(repository, name string) string {
 		return ""
 	}
 
-	if strings.HasPrefix(repo, "https://") || strings.HasPrefix(repo, "http://") {
-		parsed, err := url.Parse(repo)
-		if err != nil || parsed.Host == "" {
-			return ""
-		}
-		if parsed.Scheme != "http" && parsed.Scheme != "https" {
-			return ""
-		}
-		parsed.User = nil
-		parsed.RawQuery = ""
-		parsed.Fragment = ""
+	if parsed := parseHTTPRepositoryURL(repo); parsed != nil {
 		// Assign the raw branch name to Path. String() encodes reserved
 		// characters. Pre-escaping here would double-encode `#` as `%2523`.
-		parsed.Path = strings.TrimRight(parsed.Path, "/") + "/tree/" + branch
+		parsed.Path = parsed.Path + "/tree/" + branch
 		return parsed.String()
 	}
 
@@ -62,19 +52,18 @@ func applyBranchTreeURL(config AddWorkOrderArtifactConfiguration, data map[strin
 		return data
 	}
 
-	if config.Repository != "" {
-		data = ensureArtifactData(data)
-		data["repository"] = config.Repository
+	repository := config.Repository
+	if repository == "" {
+		repository = artifactString(data, "repository")
 	}
+	data = storeSanitizedRepositoryField(data, "repository", repository)
+	data = storeSanitizedRepositoryField(data, "repo", artifactString(data, "repo"))
 
 	if artifactString(data, "url") != "" || artifactString(data, "html_url") != "" {
 		return data
 	}
 
-	repo := config.Repository
-	if repo == "" {
-		repo = artifactString(data, "repository")
-	}
+	repo := artifactString(data, "repository")
 	if repo == "" {
 		repo = artifactString(data, "repo")
 	}
@@ -91,6 +80,62 @@ func applyBranchTreeURL(config AddWorkOrderArtifactConfiguration, data map[strin
 
 	data = ensureArtifactData(data)
 	data["url"] = tree
+	return data
+}
+
+// parseHTTPRepositoryURL returns a credential-free repository URL.
+// Query and fragment are dropped so later path joins stay on the path.
+func parseHTTPRepositoryURL(repository string) *url.URL {
+	if !strings.HasPrefix(repository, "https://") && !strings.HasPrefix(repository, "http://") {
+		return nil
+	}
+
+	parsed, err := url.Parse(repository)
+	if err != nil || parsed.Host == "" {
+		return nil
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return nil
+	}
+
+	parsed.User = nil
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	parsed.Path = strings.TrimRight(parsed.Path, "/")
+	return parsed
+}
+
+// sanitizeRepositoryRef strips userinfo, query, and fragment from a
+// repository http(s) URL. owner/repo values pass through unchanged.
+func sanitizeRepositoryRef(repository string) string {
+	repo := strings.TrimRight(strings.TrimSpace(repository), "/")
+	if repo == "" {
+		return ""
+	}
+	if strings.HasPrefix(repo, "https://") || strings.HasPrefix(repo, "http://") {
+		if parsed := parseHTTPRepositoryURL(repo); parsed != nil {
+			return parsed.String()
+		}
+		return ""
+	}
+	return repo
+}
+
+func storeSanitizedRepositoryField(data map[string]any, key, value string) map[string]any {
+	if value == "" {
+		return data
+	}
+
+	sanitized := sanitizeRepositoryRef(value)
+	if sanitized == "" {
+		if data != nil {
+			delete(data, key)
+		}
+		return data
+	}
+
+	data = ensureArtifactData(data)
+	data[key] = sanitized
 	return data
 }
 
