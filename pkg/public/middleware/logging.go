@@ -13,6 +13,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/requesterror"
 )
 
 func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
@@ -21,6 +22,12 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 			start := time.Now()
 			// Use a response writer wrapper to capture status code
 			lrw := &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+
+			// Handlers sanitize errors before they reach the client. The
+			// recorder keeps the cause, so the error report below contains
+			// more than the status code and the path.
+			ctx, recorder := requesterror.NewContext(r.Context())
+			r = r.WithContext(ctx)
 
 			defer func() {
 				recovered := recover()
@@ -58,7 +65,7 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 				}
 
 				if shouldCaptureHTTPError(status) {
-					captureHTTPError(r, status)
+					captureHTTPError(r, status, recorder.Err())
 				}
 			}()
 
@@ -107,7 +114,11 @@ func shouldCaptureHTTPError(status int) bool {
 	return true
 }
 
-func captureHTTPError(r *http.Request, status int) {
+// captureHTTPError forwards a server error to Sentry. It sends the cause when
+// the handler recorded one, because the status code alone does not show why
+// the request failed. It sends a message when there is no recorded cause, for
+// example when a handler writes a 5xx response without an error.
+func captureHTTPError(r *http.Request, status int, err error) {
 	hub := sentry.CurrentHub()
 	if hub == nil || hub.Client() == nil {
 		return
@@ -116,6 +127,12 @@ func captureHTTPError(r *http.Request, status int) {
 	hub.WithScope(func(scope *sentry.Scope) {
 		scope.SetRequest(r)
 		scope.SetTag("status", strconv.Itoa(status))
+
+		if err != nil {
+			hub.CaptureException(err)
+			return
+		}
+
 		hub.CaptureMessage(fmt.Sprintf("HTTP %d %s", status, r.URL.Path))
 	})
 }

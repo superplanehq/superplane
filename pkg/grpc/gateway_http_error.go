@@ -1,7 +1,6 @@
 package grpc
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -9,8 +8,9 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func writeGatewayHTTPError(ctx context.Context, w http.ResponseWriter, err error) {
-	sanitized := SanitizeError(ctx, err)
+func writeGatewayHTTPError(r *http.Request, w http.ResponseWriter, err error) {
+	sanitized := SanitizeError(r.Context(), err)
+	reportGatewayError(r, err, sanitized)
 	s := status.Convert(sanitized)
 
 	marshaler := &runtime.JSONPb{
