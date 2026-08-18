@@ -641,6 +641,34 @@ func TestUpdateWorkOrderArtifact_Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, map[string]any{"state": "merged", "merged": true, "draft": false}, factoryCtx.updateArtifactParams.Data)
 	})
+
+	// Velocity relies on the artifact table's merged_at column. The model
+	// falls back to now when the canvas only sends state, but a canvas
+	// that has GitHub's real timestamp should pass it through.
+	t.Run("forwards mergedAt and closedAt to the factory context", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{updateArtifactResult: artifact}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":     "wo-1",
+				"artifactKey": "https://github.com/example/repo/pull/1",
+				"state":       "merged",
+				"mergedAt":    "2026-08-17T12:34:56Z",
+				"closedAt":    "2026-08-17T12:00:00Z",
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{
+			"state":    "merged",
+			"merged":   true,
+			"draft":    false,
+			"mergedAt": "2026-08-17T12:34:56Z",
+			"closedAt": "2026-08-17T12:00:00Z",
+		}, factoryCtx.updateArtifactParams.Data)
+	})
 }
 
 func TestUpdateWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
@@ -739,6 +767,23 @@ func TestBuildArtifactData_IncludesPrState(t *testing.T) {
 	}
 	if got := data["draft"]; got != true {
 		t.Fatalf("expected draft=true when state is draft, got %v", got)
+	}
+}
+
+func TestBuildArtifactData_IncludesMergedAndClosedAt(t *testing.T) {
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
+		ArtifactType: "pr",
+		URL:          "https://github.com/example/repo/pull/9",
+		State:        "merged",
+		MergedAt:     "2026-08-17T12:34:56Z",
+		ClosedAt:     "2026-08-17T12:00:00Z",
+	})
+
+	if got := data["mergedAt"]; got != "2026-08-17T12:34:56Z" {
+		t.Fatalf("expected mergedAt to pass through, got %v", got)
+	}
+	if got := data["closedAt"]; got != "2026-08-17T12:00:00Z" {
+		t.Fatalf("expected closedAt to pass through, got %v", got)
 	}
 }
 
