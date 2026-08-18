@@ -1,4 +1,4 @@
-import type { FactoryApp } from "@/api-client";
+import type { FactoriesFactory, FactoriesWorkOrder, FactoryApp } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
@@ -8,14 +8,17 @@ import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import {
+  findWorkOrderForAutomationRun,
   listFactoryAutomationRuns,
   resolveFactoryAutomationStatusFromCanvasRuns,
   type FactoryAutomationRunCard,
 } from "../lib/factoryAutomationStatus";
 import { automationsPath, factoryAppRunPath } from "../lib/factoryPagePaths";
+import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
+import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { type AutomationCardActions } from "./automationCardActions";
 import { AutomationHeaderActions, DeleteAutomationDialog, StatusTick } from "./automationsPageParts";
-import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import { factorySectionBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
 import { LineVelocityPanel } from "./LineVelocityPanel";
 
 export function AutomationDetail({
@@ -23,11 +26,17 @@ export function AutomationDetail({
   factoryKey,
   app,
   actions,
+  factory,
+  workOrders,
+  workOrderCardContext,
 }: {
   organizationId: string;
   factoryKey: string;
   app: FactoryApp;
   actions: AutomationCardActions;
+  factory: FactoriesFactory | null | undefined;
+  workOrders: FactoriesWorkOrder[];
+  workOrderCardContext: WorkOrderCardContext;
 }) {
   const canvasId = app.id ?? "";
   const {
@@ -67,6 +76,7 @@ export function AutomationDetail({
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="automations-detail">
       <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
         variant="entity"
         backHref={automationsPath(organizationId, factoryKey)}
         backLabel="Automations"
@@ -92,13 +102,16 @@ export function AutomationDetail({
       />
 
       <div
-        className={cn(factoryContentBodyClassName, "flex min-h-0 flex-1 flex-col overflow-hidden")}
+        className={cn(factorySectionBodyClassName, "flex min-h-0 flex-1 flex-col overflow-hidden")}
         data-testid="automations-detail-body"
       >
         <AutomationDetailTabs
           organizationId={organizationId}
           factoryKey={factoryKey}
           canvasId={canvasId}
+          factory={factory}
+          workOrders={workOrders}
+          workOrderCardContext={workOrderCardContext}
           runs={runs}
           runsLoading={runsLoading}
           isFetchingNextPage={isFetchingNextPage}
@@ -114,6 +127,9 @@ function AutomationDetailTabs({
   organizationId,
   factoryKey,
   canvasId,
+  factory,
+  workOrders,
+  workOrderCardContext,
   runs,
   runsLoading,
   isFetchingNextPage,
@@ -123,6 +139,9 @@ function AutomationDetailTabs({
   organizationId: string;
   factoryKey: string;
   canvasId: string;
+  factory: FactoriesFactory | null | undefined;
+  workOrders: FactoriesWorkOrder[];
+  workOrderCardContext: WorkOrderCardContext;
   runs: FactoryAutomationRunCard[];
   runsLoading: boolean;
   isFetchingNextPage: boolean;
@@ -153,11 +172,14 @@ function AutomationDetailTabs({
           ) : (
             <>
               {runs.map((run) => (
-                <li key={run.runId}>
-                  <AutomationRunRow
+                <li key={run.runId} className="w-full min-w-0">
+                  <AutomationRunCard
                     organizationId={organizationId}
                     factoryKey={factoryKey}
                     appId={canvasId}
+                    factory={factory}
+                    workOrders={workOrders}
+                    workOrderCardContext={workOrderCardContext}
                     run={run}
                   />
                 </li>
@@ -179,18 +201,34 @@ function AutomationDetailTabs({
   );
 }
 
-function AutomationRunRow({
+function AutomationRunCard({
   organizationId,
   factoryKey,
   appId,
+  factory,
+  workOrders,
+  workOrderCardContext,
   run,
 }: {
   organizationId: string;
   factoryKey: string;
   appId: string;
+  factory: FactoriesFactory | null | undefined;
+  workOrders: FactoriesWorkOrder[];
+  workOrderCardContext: WorkOrderCardContext;
   run: FactoryAutomationRunCard;
 }) {
   const href = factoryAppRunPath(organizationId, factoryKey, appId, run.runId, { from: "automations" });
+  const order = findWorkOrderForAutomationRun(workOrders, run.runId);
+  if (order) {
+    const entry = buildWorkOrderListEntry(order, factory);
+    return <WorkOrderCard {...workOrderCardContext} entry={entry} href={href} />;
+  }
+
+  return <AutomationRunRow href={href} run={run} />;
+}
+
+function AutomationRunRow({ href, run }: { href: string; run: FactoryAutomationRunCard }) {
   const timestamp = run.updatedAt ?? run.finishedAt ?? run.createdAt;
   const timeLabel =
     run.tick === "queued" && !timestamp ? "next" : timestamp ? formatTimeAgo(new Date(timestamp), false) : null;
