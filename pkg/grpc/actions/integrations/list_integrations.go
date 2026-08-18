@@ -3,9 +3,12 @@ package integrations
 import (
 	"context"
 
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	actionpb "github.com/superplanehq/superplane/pkg/protos/actions"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -14,14 +17,29 @@ import (
 )
 
 func ListIntegrations(ctx context.Context, registry *registry.Registry) (*pb.ListIntegrationsResponse, error) {
-	integrations := registry.ListIntegrations()
+	orgID, err := organizationIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.ListIntegrationsResponse{
-		Integrations: serializeIntegrations(registry, integrations),
+		Integrations: serializeIntegrations(registry, orgID, registry.ListIntegrations()),
 	}, nil
 }
 
-func serializeIntegrations(registry *registry.Registry, in []core.Integration) []*pb.IntegrationDefinition {
+func organizationIDFromContext(ctx context.Context) (uuid.UUID, error) {
+	raw, ok := authentication.GetOrganizationIdFromMetadata(ctx)
+	if !ok {
+		return uuid.Nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return uuid.Nil, grpcerrors.InvalidArgument(err, "invalid organization ID")
+	}
+	return id, nil
+}
+
+func serializeIntegrations(registry *registry.Registry, orgID uuid.UUID, in []core.Integration) []*pb.IntegrationDefinition {
 	out := make([]*pb.IntegrationDefinition, len(in))
 	for i, integration := range in {
 		configFields := integration.Configuration()
@@ -30,6 +48,7 @@ func serializeIntegrations(registry *registry.Registry, in []core.Integration) [
 			configuration[j] = actions.ConfigurationFieldToProto(field)
 		}
 
+		useNewFlow := registry.UseNewSetupFlow(orgID, integration.Name())
 		out[i] = &pb.IntegrationDefinition{
 			Name:             integration.Name(),
 			Label:            integration.Label(),
@@ -39,7 +58,7 @@ func serializeIntegrations(registry *registry.Registry, in []core.Integration) [
 			Configuration:    configuration,
 			Capabilities:     serializeCapabilities(registry, integration),
 			CapabilityGroups: serializeCapabilityGroups(registry, integration),
-			LegacySetupOnly:  !registry.SupportsNewSetupFlow(integration.Name()),
+			LegacySetupOnly:  !useNewFlow,
 		}
 	}
 	return out

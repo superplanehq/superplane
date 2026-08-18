@@ -466,25 +466,16 @@ func TestRegistry_ComponentType(t *testing.T) {
 
 func TestRegistry_SupportsNewSetupFlow(t *testing.T) {
 	stub := impl.NewDummyIntegrationSetupProvider(impl.DummyIntegrationSetupProviderOptions{})
-	t.Run("true when provider exists and app env is development", func(t *testing.T) {
+
+	t.Run("true when provider exists", func(t *testing.T) {
 		r := &registry.Registry{
-			AppEnv:         "development",
 			SetupProviders: map[string]core.IntegrationSetupProvider{"acme": stub},
 		}
 		assert.True(t, r.SupportsNewSetupFlow("acme"))
 	})
 
-	t.Run("false when app env is not development", func(t *testing.T) {
-		r := &registry.Registry{
-			AppEnv:         "production",
-			SetupProviders: map[string]core.IntegrationSetupProvider{"acme": stub},
-		}
-		assert.False(t, r.SupportsNewSetupFlow("acme"))
-	})
-
 	t.Run("false when setup provider is missing", func(t *testing.T) {
 		r := &registry.Registry{
-			AppEnv:         "development",
 			SetupProviders: map[string]core.IntegrationSetupProvider{},
 		}
 		assert.False(t, r.SupportsNewSetupFlow("missing"))
