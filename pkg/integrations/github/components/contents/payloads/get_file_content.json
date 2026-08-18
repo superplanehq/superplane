@@ -1,0 +1,15 @@
+{
+  "data": {
+    "content": "# Widget service\n\nConfiguration and deployment notes for the widget service.\n",
+    "name": "README.md",
+    "path": "docs/README.md",
+    "sha": "4d4ba9968a4c7c80e25b715bd7522f2c4dc51f3f",
+    "size": 75,
+    "ref": "main",
+    "url": "https://api.github.com/repos/acme/widgets/contents/docs/README.md?ref=main",
+    "html_url": "https://github.com/acme/widgets/blob/main/docs/README.md",
+    "download_url": "https://raw.githubusercontent.com/acme/widgets/main/docs/README.md"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.fileContent"
+}
