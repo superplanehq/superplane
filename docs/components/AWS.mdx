@@ -22,7 +22,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="CloudWatch • Add Log Event" href="#cloud-watch-•-add-log-event" description="Write a log event to a CloudWatch Logs log stream" />
   <LinkCard title="CloudWatch • Create Alarm" href="#cloud-watch-•-create-alarm" description="Create a CloudWatch metric alarm for any metric" />
+  <LinkCard title="CloudWatch • Query Logs" href="#cloud-watch-•-query-logs" description="Run a CloudWatch Logs Insights query over one or more log groups and return structured rows" />
   <LinkCard title="CloudWatch • Update Alarm" href="#cloud-watch-•-update-alarm" description="Update an existing CloudWatch metric alarm" />
   <LinkCard title="CodeArtifact • Copy Package Versions" href="#code-artifact-•-copy-package-versions" description="Copy package versions from one repository to another in the same domain" />
   <LinkCard title="CodeArtifact • Create Repository" href="#code-artifact-•-create-repository" description="Create an AWS CodeArtifact repository in a domain" />
@@ -577,6 +579,53 @@ During setup, SuperPlane creates a webhook endpoint for this trigger and subscri
 }
 ```
 
+<a id="cloud-watch-•-add-log-event"></a>
+
+## CloudWatch • Add Log Event
+
+**Component key:** `aws.cloudwatch.addLogEvent`
+
+The Add Log Event component writes a single log event to a CloudWatch Logs log stream, creating the stream first if it doesn't exist yet.
+
+### Use Cases
+
+- **Workflow auditing**: Record workflow decisions or approvals in a searchable log group
+- **External event logging**: Forward events from other systems into CloudWatch Logs for correlation with application logs
+- **Custom instrumentation**: Emit structured log lines that downstream Logs Insights queries can pick up
+
+### How It Works
+
+1. Creates the log stream if it doesn't already exist
+2. Writes the message as a log event, using the given timestamp or the current time
+
+### Configuration
+
+- **Region**: AWS region of the log group
+- **Log Group**: Target log group
+- **Log Stream**: Name of the log stream to write to; created automatically if missing
+- **Message**: The log event message
+- **Timestamp**: Optional; defaults to now (UTC). Must be within the last 14 days and no more than 2 hours in the future
+- **Timezone**: Timezone the timestamp is in, when it has no UTC offset of its own (e.g. picked from the date/time widget). Defaults to UTC; ignored for timestamps that already carry an offset
+
+### Output
+
+- `logGroup`, `logStream`, `message`, `timestamp`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "logGroup": "/aws/lambda/my-function",
+    "logStream": "workflow-run-42",
+    "message": "Deployment approved by felix.gateru@example.com",
+    "timestamp": "2026-05-29T09:00:00Z"
+  },
+  "timestamp": "2026-05-29T09:00:00.657831534Z",
+  "type": "aws.cloudwatch.logEvent"
+}
+```
+
 <a id="cloud-watch-•-create-alarm"></a>
 
 ## CloudWatch • Create Alarm
@@ -665,6 +714,79 @@ Emits the created alarm on the default output channel, including `alarmName`, `a
   },
   "timestamp": "2026-06-03T16:36:13.985915034Z",
   "type": "aws.cloudwatch.alarm"
+}
+```
+
+<a id="cloud-watch-•-query-logs"></a>
+
+## CloudWatch • Query Logs
+
+**Component key:** `aws.cloudwatch.queryLogs`
+
+The Query Logs component runs a CloudWatch Logs Insights query over one or more log groups and returns the matching rows.
+
+### Use Cases
+
+- **Incident investigation**: Pull recent error logs when responding to an alert
+- **Auditing**: Search for specific events across log groups over a time window
+- **Reporting**: Aggregate log data (e.g. `stats count(*) by field`) for dashboards
+
+### How It Works
+
+1. Starts a Logs Insights query with `StartQuery` over the selected log groups and lookback window
+2. Polls `GetQueryResults` until the query reaches a terminal state
+3. Emits the matched rows once the query completes
+
+### Configuration
+
+- **Region**: AWS region of the log groups
+- **Log Groups**: One or more CloudWatch log groups to query
+- **Query String**: Logs Insights query, e.g. `fields @timestamp, @message | sort @timestamp desc | limit 20`
+- **Lookback Period**: How far back to search, relative to now
+- **Limit**: Maximum number of log events to return (up to 10000)
+
+### Output
+
+- `queryId`, `status`, `start`, `end`
+- `rows`: array of objects, one per matched log event, mapping field name to value
+- `statistics`: `bytesScanned`, `recordsMatched`, `recordsScanned`
+
+### Important Notes
+
+- Queries time out after 60 minutes on the AWS side; this component gives up polling after about 10 minutes and fails the execution
+- A single query can return at most 10000 rows
+
+### Example Output
+
+```json
+{
+  "data": {
+    "end": "2026-05-29T09:00:00Z",
+    "logGroups": [
+      "/aws/lambda/my-function"
+    ],
+    "queryId": "12ab3456-12ab-123a-789e-1234567890ab",
+    "queryString": "fields @timestamp, @message | sort @timestamp desc | limit 20",
+    "rows": [
+      {
+        "@message": "START RequestId: 3f2a1c9e-1234-4a5b-8b9c-0d1e2f3a4b5c Version: $LATEST",
+        "@timestamp": "2026-05-29 08:59:42.123"
+      },
+      {
+        "@message": "END RequestId: 3f2a1c9e-1234-4a5b-8b9c-0d1e2f3a4b5c",
+        "@timestamp": "2026-05-29 08:59:41.987"
+      }
+    ],
+    "start": "2026-05-29T08:00:00Z",
+    "statistics": {
+      "bytesScanned": 20480,
+      "recordsMatched": 2,
+      "recordsScanned": 512
+    },
+    "status": "Complete"
+  },
+  "timestamp": "2026-05-29T09:00:01.123456Z",
+  "type": "aws.cloudwatch.queryResult"
 }
 ```
 
