@@ -3,7 +3,6 @@ package canvases
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -41,8 +40,7 @@ func PutCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, o
 		if normalized == "" {
 			return nil, grpcerrors.InvalidArgument(nil, "file path is required")
 		}
-		if normalized == gitprovider.ReservedSuperPlanePath ||
-			strings.HasPrefix(normalized, gitprovider.ReservedSuperPlanePath+"/") {
+		if gitprovider.IsReservedPath(normalized) {
 			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("path %q is reserved for SuperPlane", operation.GetPath()))
 		}
 
