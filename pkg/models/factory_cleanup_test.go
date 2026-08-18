@@ -144,6 +144,8 @@ func Test__FactoryResourceCleaner__HardDeletesFactoryDomain(t *testing.T) {
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
 	run := createRunForRootEvent(t, rootEvent)
 
+	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factory.ID, order.ID, line.ID, line.Name, nil)
+
 	now := time.Now()
 	execution := models.FactoryWorkOrderExecution{
 		ID:             uuid.New(),
@@ -151,6 +153,7 @@ func Test__FactoryResourceCleaner__HardDeletesFactoryDomain(t *testing.T) {
 		FactoryID:      factory.ID,
 		WorkOrderID:    order.ID,
 		LineID:         line.ID,
+		LineDispatchID: dispatch.ID,
 		StepIndex:      0,
 		StepName:       "step",
 		RunID:          run.ID,
@@ -331,6 +334,8 @@ func Test__CanvasRun__DeleteChain__RemovesFactoryWorkOrderExecution(t *testing.T
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
 	run := createRunForRootEvent(t, rootEvent)
 
+	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factory.ID, order.ID, line.ID, line.Name, nil)
+
 	now := time.Now()
 	execution := models.FactoryWorkOrderExecution{
 		ID:             uuid.New(),
@@ -338,6 +343,7 @@ func Test__CanvasRun__DeleteChain__RemovesFactoryWorkOrderExecution(t *testing.T
 		FactoryID:      factory.ID,
 		WorkOrderID:    order.ID,
 		LineID:         line.ID,
+		LineDispatchID: dispatch.ID,
 		StepIndex:      0,
 		StepName:       "step",
 		RunID:          run.ID,
@@ -430,6 +436,8 @@ func Test__FactoryWorkOrder__UpdateStatus__OpenToDraft__RejectsWhenExecutionActi
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
 	run := createRunForRootEvent(t, rootEvent)
 
+	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factory.ID, order.ID, line.ID, line.Name, nil)
+
 	now := time.Now()
 	execution := models.FactoryWorkOrderExecution{
 		ID:             uuid.New(),
@@ -437,6 +445,7 @@ func Test__FactoryWorkOrder__UpdateStatus__OpenToDraft__RejectsWhenExecutionActi
 		FactoryID:      factory.ID,
 		WorkOrderID:    order.ID,
 		LineID:         line.ID,
+		LineDispatchID: dispatch.ID,
 		StepIndex:      0,
 		StepName:       "step",
 		RunID:          run.ID,
@@ -451,7 +460,7 @@ func Test__FactoryWorkOrder__UpdateStatus__OpenToDraft__RejectsWhenExecutionActi
 		Actor:   &r.User,
 	})
 	require.Error(t, err)
-	assert.ErrorIs(t, err, models.ErrFactoryWorkOrderExecutionActive)
+	assert.ErrorIs(t, err, models.ErrFactoryWorkOrderLineDispatchActive)
 
 	reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
 	require.NoError(t, err)
@@ -459,6 +468,7 @@ func Test__FactoryWorkOrder__UpdateStatus__OpenToDraft__RejectsWhenExecutionActi
 		"failed back-to-draft must not mutate the row")
 
 	require.NoError(t, execution.MarkFinished(db, models.FactoryWorkOrderResultCompleted))
+	require.NoError(t, dispatch.Finish(db, models.FactoryWorkOrderResultCompleted))
 
 	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
 		ToState: models.FactoryWorkOrderStateDraft,

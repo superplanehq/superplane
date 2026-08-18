@@ -162,7 +162,6 @@ function executionFromStepPayload(
     result: isFinished ? mapExecutionResult(run?.result) : "RESULT_UNKNOWN",
     createdAt: startedAt,
     updatedAt: at,
-    line: payload.line?.id ? { id: payload.line.id, name: payload.line.name } : undefined,
     run:
       run?.id && payload.app?.id
         ? {
