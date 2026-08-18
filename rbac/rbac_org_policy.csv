@@ -9,6 +9,8 @@ p,/roles/org_viewer,/org/*,factories,read
 p,/roles/org_viewer,/org/*,work_orders,read
 p,/roles/org_viewer,/org/*,api_keys,read
 p,/roles/org_viewer,/org/*,agents,read
+p,/roles/org_viewer,/org/*,notifications,read
+p,/roles/org_viewer,/org/*,notifications,update
 p,/roles/org_admin,/org/*,canvases,create
 p,/roles/org_admin,/org/*,canvases,update
 p,/roles/org_admin,/org/*,canvases,delete
