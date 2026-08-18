@@ -17,6 +17,7 @@ import type {
   ActionsAction,
   ComponentsEdge,
   ComponentsIntegrationRef,
+  ComponentsConcurrencySpec,
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
 } from "@/api-client";
@@ -2021,6 +2022,12 @@ export function AppPage({
         integrationLabel,
         blockName,
         integrationRef: node.integration,
+        concurrency: node.concurrency,
+        // Merge admits every run's queue item, so it is inherently
+        // unbounded and takes no concurrency configuration. Loop only
+        // honors max, as its parallel-session cap.
+        supportsConcurrency: node.type === "TYPE_ACTION" && node.component !== "merge",
+        concurrencyMaxOnly: node.component === "loop",
       };
     },
     [
@@ -2188,6 +2195,7 @@ export function AppPage({
       updatedConfiguration: Record<string, any>,
       updatedNodeName: string,
       integrationRef?: ComponentsIntegrationRef,
+      concurrency?: ComponentsConcurrencySpec,
     ) => {
       if (!canvas || !organizationId || !canvasId) return;
 
@@ -2219,6 +2227,7 @@ export function AppPage({
             configuration: updatedConfiguration,
             name: updatedNodeName,
             integration: integrationRef,
+            concurrency,
           };
         }
         return node;
