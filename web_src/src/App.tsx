@@ -11,6 +11,7 @@ import "./App.css";
 // Import pages
 import AuthGuard from "./components/AuthGuard";
 import { GlobalCommandPalette } from "./components/GlobalCommandPalette";
+import { NotFoundPage } from "./components/NotFoundPage";
 import { RequireExperimentalFeature } from "./components/RequireExperimentalFeature";
 import { AccountProvider } from "./contexts/AccountProvider";
 import { ThemeProvider } from "./contexts/ThemeProvider";
@@ -218,7 +219,16 @@ function AppRouter() {
               </Route>
 
               {/* Catch-all route */}
-              <Route path="*" element={<Navigate to="/" />} />
+              <Route
+                path="*"
+                element={
+                  <NotFoundPage
+                    description="This plane has left the control plane."
+                    actionLabel="Return to the hangar"
+                    showFlightAnimation
+                  />
+                }
+              />
             </Routes>
           </SetupGuard>
         </div>
