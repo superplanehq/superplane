@@ -771,8 +771,21 @@ spec:
           git config --global user.email "automation@example.com"
           git config --global user.name "Factory Automation"
 
-          git clone --depth 1 --branch "$BASE" "$GITURL" "$WORKDIR"
-          cd "$WORKDIR"
+          # Empty repositories have no refs yet: GitHub still reports a default
+          # branch name for them, but cloning it fails with "Remote branch not
+          # found". Initialize the base branch with an empty commit so it can be
+          # cloned and branched from.
+          if [ -z "$(git ls-remote --heads "$GITURL")" ]; then
+            echo "Repository is empty - initializing ${BASE} with an empty commit."
+            git clone "$GITURL" "$WORKDIR"
+            cd "$WORKDIR"
+            git symbolic-ref HEAD "refs/heads/${BASE}"
+            git commit -s --allow-empty -m "chore: initialize ${BASE}"
+            git push -u origin "$BASE"
+          else
+            git clone --depth 1 --branch "$BASE" "$GITURL" "$WORKDIR"
+            cd "$WORKDIR"
+          fi
 
           # Create an empty branch off the base: a single empty commit so a draft PR can be opened,
           # with no files added.
