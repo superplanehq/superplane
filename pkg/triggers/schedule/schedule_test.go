@@ -144,8 +144,12 @@ func TestGetNextTrigger(t *testing.T) {
 				Hour:          intPtr(15),
 				Minute:        intPtr(30),
 			},
-			now:        mustParseTime("2025-01-06T10:00:00Z"), // Monday
-			expectNext: mustParseTime("2025-01-17T15:30:00Z"), // Friday of next week
+			now: mustParseTime("2025-01-06T10:00:00Z"), // Monday
+			// This Friday, not the one after. Skipping a whole interval before the first
+			// fire is the same off-by-a-week that made a multi-day schedule collapse onto
+			// one day: it can only hold if the search always starts an interval away from
+			// now, which is what kept the other selected days from ever running.
+			expectNext: mustParseTime("2025-01-10T15:30:00Z"), // Friday of the same week
 		},
 		{
 			name: "months configuration",
@@ -386,8 +390,10 @@ func TestTimezoneHandling(t *testing.T) {
 				Minute:        intPtr(0),       // on the hour
 				Timezone:      stringPtr("-8"), // GMT-8 (PST)
 			},
-			now:        mustParseTime("2025-01-06T16:00:00Z"), // Monday 8 AM PST (4 PM UTC)
-			expectNext: mustParseTime("2025-01-13T17:00:00Z"), // Monday 9 AM PST (5 PM UTC) of the next week
+			now: mustParseTime("2025-01-06T16:00:00Z"), // Monday 8 AM PST (4 PM UTC)
+			// One hour later, not a week later. Someone who sets up "every Monday at 9 AM"
+			// at 8 AM on a Monday means today.
+			expectNext: mustParseTime("2025-01-06T17:00:00Z"), // Monday 9 AM PST (5 PM UTC), same day
 		},
 		{
 			name: "month schedule in GMT+9 timezone (JST)",
@@ -648,5 +654,106 @@ func TestHandleHookRun(t *testing.T) {
 
 	if eventCtx.Payloads[0].Type != "scheduler.tick" {
 		t.Errorf("expected payload type to be scheduler.tick, got %q", eventCtx.Payloads[0].Type)
+	}
+}
+
+func TestNextWeeksTriggerFiresOnEverySelectedWeekday(t *testing.T) {
+	// weekDays is a multi-select and the node label reads the days back to the user, so a
+	// weeks schedule has to fire on all of them. Walking the fire/re-arm loop is what shows
+	// it: a single call could look right while the loop still returns one day per week.
+	tests := []struct {
+		name     string
+		interval int
+		weekDays []string
+		start    time.Time
+		expect   []time.Time
+	}{
+		{
+			name:     "every week on monday, wednesday and friday",
+			interval: 1,
+			weekDays: []string{"monday", "wednesday", "friday"},
+			start:    time.Date(2026, 1, 7, 12, 0, 0, 0, time.UTC), // wednesday, after 09:00
+			expect: []time.Time{
+				time.Date(2026, 1, 9, 9, 0, 0, 0, time.UTC),
+				time.Date(2026, 1, 12, 9, 0, 0, 0, time.UTC),
+				time.Date(2026, 1, 14, 9, 0, 0, 0, time.UTC),
+				time.Date(2026, 1, 16, 9, 0, 0, 0, time.UTC),
+			},
+		},
+		{
+			// The component's own docs advertise this one: "Weekdays at 2 PM".
+			name:     "every week on weekdays",
+			interval: 1,
+			weekDays: []string{"monday", "tuesday", "wednesday", "thursday", "friday"},
+			start:    time.Date(2026, 1, 7, 12, 0, 0, 0, time.UTC),
+			expect: []time.Time{
+				time.Date(2026, 1, 8, 9, 0, 0, 0, time.UTC),
+				time.Date(2026, 1, 9, 9, 0, 0, 0, time.UTC),
+				time.Date(2026, 1, 12, 9, 0, 0, 0, time.UTC),
+				time.Date(2026, 1, 13, 9, 0, 0, 0, time.UTC),
+			},
+		},
+		{
+			// Interval 2 keeps every selected day of the weeks it visits and skips the week
+			// in between: it fires in the weeks of Jan 4, Jan 18 and Feb 1.
+			name:     "every two weeks on monday and friday",
+			interval: 2,
+			weekDays: []string{"monday", "friday"},
+			start:    time.Date(2026, 1, 7, 12, 0, 0, 0, time.UTC),
+			expect: []time.Time{
+				time.Date(2026, 1, 9, 9, 0, 0, 0, time.UTC),
+				time.Date(2026, 1, 19, 9, 0, 0, 0, time.UTC),
+				time.Date(2026, 1, 23, 9, 0, 0, 0, time.UTC),
+				time.Date(2026, 2, 2, 9, 0, 0, 0, time.UTC),
+			},
+		},
+		{
+			name:     "a single selected day still runs weekly",
+			interval: 1,
+			weekDays: []string{"monday"},
+			start:    time.Date(2026, 1, 7, 12, 0, 0, 0, time.UTC),
+			expect: []time.Time{
+				time.Date(2026, 1, 12, 9, 0, 0, 0, time.UTC),
+				time.Date(2026, 1, 19, 9, 0, 0, 0, time.UTC),
+				time.Date(2026, 1, 26, 9, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			now := tt.start
+			for i, want := range tt.expect {
+				got, err := nextWeeksTrigger(tt.interval, tt.weekDays, 9, 0, now)
+				if err != nil {
+					t.Fatalf("fire %d: unexpected error: %v", i+1, err)
+				}
+				if !got.Equal(want) {
+					t.Fatalf("fire %d: expected %s, got %s",
+						i+1, want.Format(time.RFC3339), got.Format(time.RFC3339))
+				}
+				now = *got
+			}
+		})
+	}
+}
+
+func TestNextWeeksTriggerNeverReturnsThePast(t *testing.T) {
+	// The trigger re-arms from the time it just fired, so a candidate that is not strictly
+	// after now would make the scheduler fire the same instant forever.
+	now := time.Date(2026, 1, 7, 12, 0, 0, 0, time.UTC) // wednesday, past 09:00
+	got, err := nextWeeksTrigger(1, []string{"wednesday"}, 9, 0, now)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !got.After(now) {
+		t.Errorf("expected a time after %s, got %s",
+			now.Format(time.RFC3339), got.Format(time.RFC3339))
+	}
+}
+
+func TestNextWeeksTriggerRejectsEmptyWeekDays(t *testing.T) {
+	if _, err := nextWeeksTrigger(1, nil, 9, 0, time.Now()); err == nil {
+		t.Error("expected an error when no weekday is selected")
 	}
 }

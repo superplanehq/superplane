@@ -731,14 +731,30 @@ func nextWeeksTrigger(interval int, weekDays []string, hour int, minute int, now
 		validWeekdays[weekday] = true
 	}
 
-	nextIntervalStart := nowInTZ.AddDate(0, 0, interval*7)
+	if len(validWeekdays) == 0 {
+		return nil, fmt.Errorf("weekDays must contain at least one day")
+	}
 
-	// start the search on Sunday of the next week
-	nextIntervalStart.Add(-time.Duration(nextIntervalStart.Weekday()) * time.Hour)
-	for i := 0; i < 7; i++ {
-		checkDate := nextIntervalStart.AddDate(0, 0, i)
-		if validWeekdays[checkDate.Weekday()] {
+	// Walk forward from the Sunday of the current week and return the first selected weekday
+	// whose scheduled time is still ahead of now. Weeks are visited in interval steps, so an
+	// interval of 2 skips the week in between while still firing on every selected day of
+	// the weeks it does visit.
+	//
+	// The previous version jumped a whole interval away from now before searching, which
+	// landed on the same weekday as now and returned it, so only one of the selected days
+	// ever fired. It also meant to rewind to Sunday but discarded the result of Add (and
+	// scaled the offset in hours rather than days), so the rewind never happened.
+	weekStart := nowInTZ.AddDate(0, 0, -int(nowInTZ.Weekday()))
+	for weekOffset := 0; weekOffset <= interval; weekOffset += interval {
+		for i := 0; i < 7; i++ {
+			checkDate := weekStart.AddDate(0, 0, weekOffset*7+i)
+			if !validWeekdays[checkDate.Weekday()] {
+				continue
+			}
 			candidateTime := time.Date(checkDate.Year(), checkDate.Month(), checkDate.Day(), hour, minute, 0, 0, checkDate.Location())
+			if !candidateTime.After(nowInTZ) {
+				continue
+			}
 			utcResult := candidateTime.UTC()
 			return &utcResult, nil
 		}
