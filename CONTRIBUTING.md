@@ -32,9 +32,9 @@ your machine. Everything runs in containers managed by Make and Docker.
 
 Before you begin, make sure you have the following:
 
-- You are running MacOS or Linux
+- You are running MacOS or Linux (Windows users can use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) with a Linux distribution such as Ubuntu)
 - [Make](https://www.gnu.org/software/make/)
-- [Docker](https://www.docker.com/)
+- [Docker](https://www.docker.com/) — if using WSL2, enable [Docker Desktop's WSL2 integration](https://docs.docker.com/desktop/wsl/) for your distro
 
 ### Forking and Cloning the Repository
 
