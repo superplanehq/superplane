@@ -112,11 +112,17 @@ describe("CanvasModeToggle", () => {
 
     const tabList = screen.getByRole("navigation", { name: "Canvas view" });
     expect(tabList.className).toContain("bg-orange-200");
+    expect(tabList.className).toContain("dark:bg-orange-950");
     const activeTab = screen.getByRole("link", { name: "Canvas (editing)" });
     expect(activeTab.className).toContain("bg-white");
     expect(activeTab.className).toContain("shadow-sm");
     expect(activeTab.className).toContain("font-medium");
     expect(activeTab.className).not.toContain("font-bold");
+    // Dark edit mode uses a cream pill, so the shared gray values must be dropped.
+    expect(activeTab.className).toContain("dark:bg-orange-200");
+    expect(activeTab.className).toContain("dark:text-orange-950");
+    expect(activeTab.className).not.toContain("dark:bg-gray-400");
+    expect(activeTab.className).not.toContain("dark:bg-gray-800");
     expect(screen.getByTestId("canvas-view-mode-live-uncommitted-dot")).toHaveClass("bg-orange-500");
     expect(screen.getByTestId("canvas-view-mode-console-uncommitted-dot")).toHaveClass("bg-orange-500");
   });
@@ -139,6 +145,7 @@ describe("CanvasModeToggle", () => {
 
     const consoleTab = screen.getByRole("link", { name: "Console" });
     expect(consoleTab.className).toContain("text-orange-950/80");
+    expect(consoleTab.className).toContain("dark:text-orange-200/80");
 
     expect(screen.getByTestId("canvas-view-mode-live-committed-dot")).toHaveClass("bg-blue-500");
   });
