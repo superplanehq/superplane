@@ -2,6 +2,11 @@ export function factoryListPath(organizationId: string) {
   return `/${organizationId}/workspaces`;
 }
 
+/** Setup wizard for a workspace that does not exist yet. */
+export function newFactoryPath(organizationId: string) {
+  return `${factoryListPath(organizationId)}/new`;
+}
+
 export function factoryDetailPath(organizationId: string, factoryKey: string) {
   return `${factoryListPath(organizationId)}/${factoryKey}`;
 }
@@ -10,8 +15,8 @@ export function factoryOverviewPath(organizationId: string, factoryKey: string) 
   return `${factoryDetailPath(organizationId, factoryKey)}/overview`;
 }
 
-export function factoryOnboardingPath(organizationId: string, factoryKey: string) {
-  return `${factoryDetailPath(organizationId, factoryKey)}/onboarding`;
+export function factorySetupPath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/setup`;
 }
 
 export function workOrdersPath(organizationId: string, factoryKey: string) {
