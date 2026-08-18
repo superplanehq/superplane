@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import { factoryContentBodyClassName } from "../factoryPageLayoutStyles";
 
@@ -9,6 +10,8 @@ interface FactorySettingsSoonPageProps {
 }
 
 export function FactorySettingsSoonPage({ title, description, Icon }: FactorySettingsSoonPageProps) {
+  usePageTitle([title, "Settings"]);
+
   return (
     <>
       <WorkspacePageHeader title={title} subtitle={description} />
