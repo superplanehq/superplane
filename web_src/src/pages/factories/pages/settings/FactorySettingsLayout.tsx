@@ -76,7 +76,11 @@ function FactorySettingsLayoutContent({
   const { data: organization } = useOrganization(organizationId);
   const { data: factory, isLoading, error } = useFactory(organizationId, factoryId);
 
-  usePageTitle(factory?.name ? [factory.name, "Settings"] : ["Settings"]);
+  // See the matching comment in `FactoriesLayout`: once `factory` has loaded
+  // the `<Outlet/>` below mounts a leaf settings page that owns the full
+  // title itself, and this baseline must stop firing so it can't clobber the
+  // leaf's title on the same first-render commit.
+  usePageTitle(factory?.name ? [factory.name, "Settings"] : ["Settings"], { enabled: !factory });
 
   if (!isLoading && error) {
     return <Navigate to={factoryListPath(organizationId)} replace />;

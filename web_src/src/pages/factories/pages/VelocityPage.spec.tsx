@@ -1,14 +1,40 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import type { ReactElement } from "react";
+import { describe, expect, it, vi } from "vitest";
 
+import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY, REFUND_FACTORY } from "../__fixtures__/factoryPageResponses";
+import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { FACTORY_VELOCITY_BY_PERIOD, FACTORY_VELOCITY_YESTERDAY } from "./factoryVelocityMockData";
 import { FACTORY_VELOCITY_FLOW_BY_PERIOD } from "./factoryVelocityFlowMockData";
 import { VelocityPage } from "./VelocityPage";
 
+function renderWithFactoriesLayout(ui: ReactElement) {
+  return render(
+    <FactoriesLayoutContext.Provider
+      value={{
+        organizationId: "org-1",
+        factoryId: PRIMARY_FACTORY_ID,
+        factoryKey: PRIMARY_FACTORY_KEY,
+        factory: REFUND_FACTORY,
+        factories: [REFUND_FACTORY],
+        openCreateWorkOrder: vi.fn(),
+      }}
+    >
+      {ui}
+    </FactoriesLayoutContext.Provider>,
+  );
+}
+
 describe("VelocityPage", () => {
+  it("sets the document title from the page and workspace name", () => {
+    renderWithFactoriesLayout(<VelocityPage />);
+
+    expect(document.title).toBe(`Velocity · ${REFUND_FACTORY.name} · SuperPlane`);
+  });
+
   it("shows yesterday metrics, period pills, trend, and source split", () => {
-    render(<VelocityPage />);
+    renderWithFactoriesLayout(<VelocityPage />);
 
     expect(screen.getByRole("heading", { name: "Velocity" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "7d" })).toHaveAttribute("aria-selected", "true");
@@ -37,7 +63,7 @@ describe("VelocityPage", () => {
 
   it("updates trend totals when the period changes and keeps yesterday fixed", async () => {
     const user = userEvent.setup();
-    render(<VelocityPage />);
+    renderWithFactoriesLayout(<VelocityPage />);
 
     const yesterdayMerged = FACTORY_VELOCITY_YESTERDAY.merged;
     expect(screen.getByTestId("velocity-yesterday")).toHaveTextContent(String(yesterdayMerged));
@@ -53,7 +79,7 @@ describe("VelocityPage", () => {
   });
 
   it("shows work-order time metrics when includeWorkOrderFlow is set", () => {
-    render(<VelocityPage includeWorkOrderFlow />);
+    renderWithFactoriesLayout(<VelocityPage includeWorkOrderFlow />);
 
     const flow = screen.getByTestId("velocity-work-order-flow");
     const period = FACTORY_VELOCITY_FLOW_BY_PERIOD[7];
@@ -76,7 +102,7 @@ describe("VelocityPage", () => {
 
   it("updates closed-period metrics when the period changes", async () => {
     const user = userEvent.setup();
-    render(<VelocityPage includeWorkOrderFlow />);
+    renderWithFactoriesLayout(<VelocityPage includeWorkOrderFlow />);
 
     expect(screen.getByTestId("velocity-work-order-flow")).toHaveTextContent(
       `${FACTORY_VELOCITY_FLOW_BY_PERIOD[7].waitingShareOfCyclePct}% of cycle time`,

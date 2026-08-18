@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
 
@@ -9,6 +10,8 @@ interface ComingSoonPageProps {
 }
 
 export function ComingSoonPage({ title, description, Icon }: ComingSoonPageProps) {
+  usePageTitle([title]);
+
   return (
     <>
       <WorkspacePageHeader title={title} subtitle={description} />
