@@ -1,3 +1,4 @@
+import { MoveDown, MoveUp } from "lucide-react";
 import { useState } from "react";
 
 import { formatRelative } from "@/lib/datetime";
@@ -20,6 +21,8 @@ export interface WorkOrderCheckPresentation {
   /** "percent" renders `82%`; "fraction" (default) renders `65/100`. */
   format?: "fraction" | "percent";
   level: WorkOrderCheckLevel;
+  /** Score from the previous report of the same check — powers the trend delta. */
+  previousScore?: number;
   /** One-line result, shown in the expanded dialog under the score. */
   summary?: string;
   /** Full markdown analysis behind the score. */
@@ -133,6 +136,7 @@ function WorkOrderCheckCard({ check, runHref }: { check: WorkOrderCheckPresentat
           <span className="flex items-baseline gap-0.5">
             <span className="text-xl font-semibold tabular-nums tracking-tight text-foreground">{value}</span>
             <span className="text-[12px] text-muted-foreground">{scale}</span>
+            <CheckTrendDelta check={check} />
           </span>
           <span className={cn("truncate text-[11px] font-medium", LEVEL_LABEL[check.level].className)}>
             {LEVEL_LABEL[check.level].label}
@@ -156,4 +160,29 @@ function WorkOrderCheckCard({ check, runHref }: { check: WorkOrderCheckPresentat
 export function CheckAttribution({ check }: { check: WorkOrderCheckPresentation }) {
   const parts = [check.sourceName, check.updatedAt ? formatRelative(check.updatedAt) : undefined].filter(Boolean);
   return <>{parts.join(" · ")}</>;
+}
+
+/**
+ * Direction of travel since the previous report ("↓ 17"). The arrow stays
+ * neutral muted — whether a move is good or bad is the level's job, since
+ * lower is better for risk but worse for coverage.
+ */
+function CheckTrendDelta({ check }: { check: Pick<WorkOrderCheckPresentation, "score" | "previousScore"> }) {
+  if (check.previousScore === undefined || check.previousScore === check.score) {
+    return null;
+  }
+
+  const rising = check.score > check.previousScore;
+  const Arrow = rising ? MoveUp : MoveDown;
+  return (
+    <span
+      className="inline-flex items-baseline text-[11px] tabular-nums text-muted-foreground"
+      title={`Previous run: ${check.previousScore}`}
+    >
+      <Arrow className="size-3 shrink-0 self-center" aria-hidden />
+      {Math.abs(check.score - check.previousScore)}
+      <span className="sr-only">{rising ? "up" : "down"} from </span>
+      <span className="sr-only">{check.previousScore}</span>
+    </span>
+  );
 }
