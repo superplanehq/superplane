@@ -17,7 +17,7 @@ This guide explains how to add new integration and extend existing integration w
 Integrations in SuperPlane are connections with external services that allow users to trigger workflows and interact with those services. Integrations consist of:
 
 - **Backend implementation** (Go): Located in `pkg/integrations/<app-name>/`
-- **Frontend mappers** (TypeScript): Located in `web_src/src/pages/workflowv2/mappers/<integration-name>/`
+- **Frontend mappers** (TypeScript): Located in `web_src/src/pages/app/mappers/<integration-name>/`
 
 Each integration can have:
 - **Triggers**: Event sources that start workflow executions (e.g., "On Pull Request", "On Pipeline Done")
@@ -45,10 +45,10 @@ pkg/integrations/
 
 ### Frontend Structure
 
-Frontend mappers are organized in `web_src/src/pages/workflowv2/mappers/`:
+Frontend mappers are organized in `web_src/src/pages/app/mappers/`:
 
 ```
-web_src/src/pages/workflowv2/mappers/
+web_src/src/pages/app/mappers/
 ├── github/
 │   ├── index.ts            # Exports all trigger/component renderers
 │   ├── on_pull_request.ts  # Trigger renderer
@@ -412,7 +412,7 @@ Frontend mappers render triggers and components in the UI. They define how event
 
 ### 1. Create the Mapper File
 
-Create a new file in `web_src/src/pages/workflowv2/mappers/<app-name>/` (e.g., `on_event.ts`):
+Create a new file in `web_src/src/pages/app/mappers/<app-name>/` (e.g., `on_event.ts`):
 
 ```typescript
 import { WorkflowsWorkflowEvent } from "@/api-client";
@@ -534,7 +534,7 @@ Key features:
 - Validates that the repository is accessible to the GitHub app installation
 - Filters events by action type before emitting
 
-### Frontend (`web_src/src/pages/workflowv2/mappers/github/on_issue.ts`)
+### Frontend (`web_src/src/pages/app/mappers/github/on_issue.ts`)
 
 The mapper provides:
 - `getTitleAndSubtitle`: Formats event display as "#123 - Issue title"
@@ -567,4 +567,4 @@ After implementing your integration:
 - GitHub integration: `pkg/integrations/github/`
 - Semaphore integration: `pkg/integrations/semaphore/`
 - Core interfaces: `pkg/core/`
-- Frontend mappers: `web_src/src/pages/workflowv2/mappers/`
+- Frontend mappers: `web_src/src/pages/app/mappers/`
