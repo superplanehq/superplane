@@ -19,6 +19,11 @@ const FeatureClaudeManagedAgents = "claude_managed_agents"
 // for a organization until the feature is generally available.
 const FeatureFactories = "factories"
 
+// FeatureNewIntegrationSetupFlow enables the SetupProvider wizard for
+// integrations that register one (for example GitHub). When disabled, create
+// still uses the legacy IntegrationCreateDialog path.
+const FeatureNewIntegrationSetupFlow = "new_integration_setup_flow"
+
 func released() *bool {
 	v := true
 	return &v
@@ -27,6 +32,7 @@ func released() *bool {
 var registry = []Feature{
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
+	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
 }
 
 func All() []Feature {

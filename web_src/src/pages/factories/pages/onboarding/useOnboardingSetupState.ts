@@ -69,10 +69,16 @@ function setupReadiness(input: {
   };
 }
 
-export function useOnboardingSetupState(initialName = "") {
+export function useOnboardingSetupState(
+  initialName = "",
+  options?: {
+    connected?: Set<IntegrationId>;
+    simulateDiscovery?: boolean;
+  },
+) {
   const [workspaceName, setWorkspaceName] = useState(() => initialName.trim());
   const [inviteCopied, setInviteCopied] = useState(false);
-  const [connected, setConnected] = useState<Set<IntegrationId>>(() => new Set());
+  const [localConnected, setLocalConnected] = useState<Set<IntegrationId>>(() => new Set());
   const [vcsHost, setVcsHost] = useState<VcsHostId | null>(null);
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
   /** True after Continue to issues — starts repository analysis. */
@@ -87,6 +93,7 @@ export function useOnboardingSetupState(initialName = "") {
   const [agent, setAgent] = useState<AgentHarnessId | null>(null);
   const [finished, setFinished] = useState(false);
   const discoveryTimerRef = useRef<number | null>(null);
+  const connected = options?.connected ?? localConnected;
 
   const clearDiscoveryTimer = useCallback(() => {
     if (discoveryTimerRef.current === null) {
@@ -99,7 +106,7 @@ export function useOnboardingSetupState(initialName = "") {
   useEffect(() => clearDiscoveryTimer, [clearDiscoveryTimer]);
 
   const connectIntegration = useCallback((id: IntegrationId) => {
-    setConnected((prev) => new Set(prev).add(id));
+    setLocalConnected((prev) => new Set(prev).add(id));
   }, []);
 
   const resetIssuesState = useCallback(() => {
@@ -144,6 +151,13 @@ export function useOnboardingSetupState(initialName = "") {
     (backlogRepo: string) => {
       clearDiscoveryTimer();
       setIssuesRepo(backlogRepo);
+      if (options?.simulateDiscovery === false) {
+        setIssuesDiscovering(false);
+        setIssuesDiscovered(true);
+        setIssuesChoice((current) => current ?? "vcs");
+        return;
+      }
+
       setIssuesDiscovering(true);
       setIssuesDiscovered(false);
       discoveryTimerRef.current = window.setTimeout(() => {
@@ -154,7 +168,7 @@ export function useOnboardingSetupState(initialName = "") {
         setIssuesChoice((current) => current ?? "vcs");
       }, 900);
     },
-    [clearDiscoveryTimer],
+    [clearDiscoveryTimer, options?.simulateDiscovery],
   );
 
   const startIssuesDiscovery = useCallback(() => {
@@ -172,7 +186,8 @@ export function useOnboardingSetupState(initialName = "") {
   );
 
   const backlogRepo = issuesRepo ?? selectedRepo;
-  const issueCount = backlogRepo ? fixtureIssueCount(backlogRepo) : 0;
+  const issueCount =
+    options?.simulateDiscovery === false ? undefined : backlogRepo ? fixtureIssueCount(backlogRepo) : 0;
   const { nameReady, repoReady, issuesReady, agentReady, canFinish } = setupReadiness({
     workspaceName,
     vcsHost,
