@@ -18,9 +18,11 @@ import {
 } from "@/ui/dropdownMenu";
 import { LayoutGrid, LogOut, SunMoon, User as UserIcon } from "lucide-react";
 import { useNavigate } from "react-router";
+import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 
 interface SidebarUserMenuProps {
   organizationId: string;
+  factoryKey?: string;
   userName: string;
   userEmail?: string;
   userAvatarUrl?: string | null;
@@ -56,6 +58,7 @@ function labelForTheme(preference: ThemePreference): string {
 
 export function SidebarUserMenu({
   organizationId,
+  factoryKey,
   userName,
   userEmail,
   userAvatarUrl,
@@ -64,7 +67,9 @@ export function SidebarUserMenu({
 }: SidebarUserMenuProps) {
   const navigate = useNavigate();
   const homeHref = `/${organizationId}`;
-  const profileHref = `/${organizationId}/settings/profile`;
+  const profileHref = factoryKey
+    ? factorySettingsSectionPath(organizationId, factoryKey, "profile")
+    : `/${organizationId}/settings/profile`;
 
   const handleSignOut = () => {
     posthog.reset();
@@ -111,7 +116,11 @@ export function SidebarUserMenu({
             <LayoutGrid aria-hidden />
             Back to Apps
           </DropdownMenuItem>
-          <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={() => navigate(profileHref)}>
+          <DropdownMenuItem
+            className={MENU_ITEM_CLASS}
+            onClick={() => navigate(profileHref)}
+            data-testid="factories-sidebar-profile"
+          >
             <UserIcon aria-hidden />
             Profile
           </DropdownMenuItem>

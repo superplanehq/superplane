@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { FACTORIES_ORGANIZATION_ID } from "../__fixtures__/factoryPageResponses";
 import { SidebarUserMenu } from "./SidebarUserMenu";
 
 vi.mock("@/posthog", () => ({
@@ -15,7 +16,8 @@ function renderMenu() {
     <MemoryRouter>
       <ThemeProvider>
         <SidebarUserMenu
-          organizationId="org-1"
+          organizationId={FACTORIES_ORGANIZATION_ID}
+          factoryKey="RFSDR"
           userName="Ada Lovelace"
           userEmail="ada@example.com"
           organizationName="SuperPlane"
