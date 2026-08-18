@@ -85,8 +85,13 @@ func applyBranchTreeURL(config AddWorkOrderArtifactConfiguration, data map[strin
 
 // parseHTTPRepositoryURL returns a credential-free repository URL.
 // Query and fragment are dropped so later path joins stay on the path.
+func hasHTTPScheme(repository string) bool {
+	lower := strings.ToLower(repository)
+	return strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://")
+}
+
 func parseHTTPRepositoryURL(repository string) *url.URL {
-	if !strings.HasPrefix(repository, "https://") && !strings.HasPrefix(repository, "http://") {
+	if !hasHTTPScheme(repository) {
 		return nil
 	}
 
@@ -94,7 +99,7 @@ func parseHTTPRepositoryURL(repository string) *url.URL {
 	if err != nil || parsed.Host == "" {
 		return nil
 	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+	if !strings.EqualFold(parsed.Scheme, "http") && !strings.EqualFold(parsed.Scheme, "https") {
 		return nil
 	}
 
@@ -112,7 +117,7 @@ func sanitizeRepositoryRef(repository string) string {
 	if repo == "" {
 		return ""
 	}
-	if strings.HasPrefix(repo, "https://") || strings.HasPrefix(repo, "http://") {
+	if hasHTTPScheme(repo) {
 		if parsed := parseHTTPRepositoryURL(repo); parsed != nil {
 			return parsed.String()
 		}

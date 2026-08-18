@@ -47,6 +47,12 @@ func TestBranchTreeURL(t *testing.T) {
 			want:       "https://git.example.com/acme/storefront/tree/hotfix",
 		},
 		{
+			name:       "strips credentials from a mixed-case scheme",
+			repository: "HTTPS://oauth2:token@git.example.com/acme/storefront",
+			branch:     "hotfix",
+			want:       "https://git.example.com/acme/storefront/tree/hotfix",
+		},
+		{
 			name:       "blank repository",
 			repository: "",
 			branch:     "feature/foo",
@@ -119,6 +125,18 @@ func TestBuildArtifactData_StripsCredentialsFromStoredRepository(t *testing.T) {
 		ArtifactType: "branch",
 		Name:         "hotfix",
 		Repository:   "https://oauth2:token@git.example.com/acme/storefront",
+	})
+
+	assert.Equal(t, "https://git.example.com/acme/storefront", data["repository"])
+	assert.Equal(t, "https://git.example.com/acme/storefront/tree/hotfix", data["url"])
+	assert.NotContains(t, fmt.Sprintf("%v", data), "token")
+}
+
+func TestBuildArtifactData_StripsCredentialsFromMixedCaseRepositoryScheme(t *testing.T) {
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
+		ArtifactType: "branch",
+		Name:         "hotfix",
+		Repository:   "HTTPS://oauth2:token@git.example.com/acme/storefront",
 	})
 
 	assert.Equal(t, "https://git.example.com/acme/storefront", data["repository"])
