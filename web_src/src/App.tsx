@@ -32,8 +32,11 @@ import {
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
+  FactorySettingsNotificationsPage,
+  FactorySettingsProfilePage,
   FactorySettingsSoonPage,
   FACTORY_SETTINGS_NAV_ITEMS,
+  isFactorySettingsComingSoon,
   LegacyWorkOrderDetailRedirect,
   LinesPage,
   MissionsPage,
@@ -210,7 +213,9 @@ function AppRouter() {
                   >
                     <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
                     <Route path="general" element={<FactorySettingsGeneralPage />} />
-                    {FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.id !== "general").map((item) => (
+                    <Route path="profile" element={<FactorySettingsProfilePage />} />
+                    <Route path="notifications" element={<FactorySettingsNotificationsPage />} />
+                    {FACTORY_SETTINGS_NAV_ITEMS.filter(isFactorySettingsComingSoon).map((item) => (
                       <Route
                         key={item.id}
                         path={item.id}
