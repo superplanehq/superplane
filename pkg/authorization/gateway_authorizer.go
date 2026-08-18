@@ -33,8 +33,18 @@ func (a *GatewayAuthorizer) AuthorizeHTTP(
 	route HTTPRoute,
 	pathParams map[string]string,
 ) (context.Context, error) {
-	rule, requiresAuth := a.rules[route]
-	if !requiresAuth {
+	rule, ok := a.rules[route]
+	if !ok {
+		log.Errorf("No authorization rule for route %s", route)
+		return nil, status.Error(codes.NotFound, "Not found")
+	}
+
+	if rule.AccountAuthenticated {
+		if firstHTTPHeader(r, "x-account-id") == "" {
+			log.Errorf("Account not found in request headers")
+			return nil, status.Error(codes.NotFound, "Not found")
+		}
+
 		return withAuthorizedContext(ctx, pathParams, ""), nil
 	}
 

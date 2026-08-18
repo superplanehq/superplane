@@ -38,6 +38,24 @@ func TestMatchHTTPRoute(t *testing.T) {
 		{
 			method: http.MethodGet,
 			path:   "/api/v1/me",
+			want:   HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/me"},
+			wantOK: true,
+		},
+		{
+			method: http.MethodGet,
+			path:   "/api/v1/widgets",
+			want:   HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/widgets"},
+			wantOK: true,
+		},
+		{
+			method: http.MethodPost,
+			path:   "/api/v1/invite-links/some-token/accept",
+			want:   HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/invite-links/{token}/accept"},
+			wantOK: true,
+		},
+		{
+			method: http.MethodGet,
+			path:   "/api/v1/unregistered-route",
 			wantOK: false,
 		},
 	}

@@ -261,6 +261,11 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
+		{Method: "GET", Pattern: "/api/v1/me"}: {
+			Resource:   "org",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
 		{Method: "GET", Pattern: "/api/v1/organizations/{id}"}: {
 			Resource:   "org",
 			Action:     "read",
@@ -333,6 +338,16 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		{Method: "GET", Pattern: "/api/v1/users"}: {
 			Resource:   "members",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/widgets"}: {
+			Resource:   "org",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/widgets/{name}"}: {
+			Resource:   "org",
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
@@ -537,6 +552,14 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		{Method: "POST", Pattern: "/api/v1/groups/{group_name}/users"}: {
 			Resource:   "groups",
 			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "POST", Pattern: "/api/v1/invite-links/{token}/accept"}: {
+			AccountAuthenticated: true,
+		},
+		{Method: "POST", Pattern: "/api/v1/me/token"}: {
+			Resource:   "org",
+			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/integrations"}: {

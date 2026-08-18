@@ -20,7 +20,11 @@ type AuthorizationRule struct {
 	ResourcePathParams []string
 	// LegacyActions keeps persisted grants working during permission migrations.
 	// Prefer Action for new checks, and scope legacy actions to the smallest route set possible.
-	LegacyActions                []string
+	LegacyActions []string
+	// AccountAuthenticated allows account-scoped routes that must not require org membership
+	// or RBAC (for example accepting an invite before the account joins the organization).
+	// When set, AuthorizeHTTP requires x-account-id and skips org permission checks.
+	AccountAuthenticated         bool
 	RequiredExperimentalFeatures []string
 }
 

@@ -84,3 +84,35 @@ func TestGatewayAuthorizationMiddlewareReturnsNotFoundWhenPermissionDenied(t *te
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	assert.Equal(t, "Not found", body["message"])
 }
+
+func TestGatewayAuthorizationMiddlewareDeniesUnmatchedRoutes(t *testing.T) {
+	t.Parallel()
+
+	authorizer := authorization.NewGatewayAuthorizer(allowingPermissionChecker{})
+	middleware := GatewayAuthorizationMiddleware(authorizer)
+
+	called := false
+	handler := middleware(func(_ http.ResponseWriter, _ *http.Request, _ map[string]string) {
+		called = true
+	})
+
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/unregistered-route", nil)
+	r.Header.Set("x-user-id", "22222222-2222-4222-8222-222222222222")
+	r.Header.Set("x-organization-id", "11111111-1111-4111-8111-111111111111")
+
+	rec := httptest.NewRecorder()
+	handler(rec, r, nil)
+
+	assert.False(t, called)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "Not found", body["message"])
+}
+
+type allowingPermissionChecker struct{}
+
+func (allowingPermissionChecker) CheckOrganizationPermission(_ context.Context, _, _, _, _ string) (bool, error) {
+	return true, nil
+}

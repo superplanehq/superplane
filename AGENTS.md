@@ -96,7 +96,9 @@ Cross-cutting rules when extending the backend:
   `cmd/server/main.go` and update the docker compose files with any new
   environment variables.
 - After adding new API endpoints, ensure they are covered in
-  `pkg/authorization/interceptor.go`.
+  `pkg/authorization/gateway_auth_rules.go` (deny-by-default; unmatched gateway
+  routes are rejected). The coverage test
+  `TestDefaultAuthorizationRulesCoverAllProtoHTTPRoutes` enforces this.
 
 Further reading:
 
