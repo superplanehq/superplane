@@ -154,6 +154,7 @@ func (c *FactoryNotificationConsumer) process(db *gorm.DB, message messages.Fact
 	}
 
 	content := buildWorkOrderNotificationContent(factoryModel, order, message, c.actorDisplayName(db, orgID, message))
+	applyWorkOrderEmailCard(&content.Data, order, loadWorkOrderExecutionsForEmail(db, order.ID), time.Now())
 	content.Data.WorkOrderLink = fmt.Sprintf(
 		"%s/%s/workspaces/%s/work-order/%d",
 		c.BaseURL, orgID, factoryModel.Key, order.Number,
@@ -203,8 +204,7 @@ func (c *FactoryNotificationConsumer) resolveRecipients(
 	for userID, notificationType := range candidates {
 		settings, ok := settingsByUserID[userID]
 		if !ok {
-			// No settings row means the user never enabled notifications.
-			continue
+			settings = models.DefaultUserNotificationSettings()
 		}
 		if !settings.NotifiesType(notificationType) {
 			continue

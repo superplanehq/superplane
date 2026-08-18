@@ -2,7 +2,7 @@ CREATE TABLE public.user_notification_settings (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     organization_id uuid NOT NULL,
     user_id uuid NOT NULL,
-    enabled boolean DEFAULT false NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
     workspace_scope character varying(50) DEFAULT 'all' NOT NULL,
     factory_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
     types jsonb DEFAULT '{}'::jsonb NOT NULL,

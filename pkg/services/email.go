@@ -34,6 +34,17 @@ type WorkOrderNotificationTemplateData struct {
 	// Detail is optional supporting text (comment excerpt, state change).
 	Detail        string
 	WorkOrderLink string
+	// Kanban-card fields. Colors are light-theme hex values so the HTML
+	// email matches the work order board card.
+	StatusLabel      string
+	StatusFg         string
+	StatusBg         string
+	StatusBorder     string
+	StatusDot        string
+	LineStepLabel    string
+	UpdatedLabel     string
+	AssigneeInitials string
+	AssigneeOverflow string
 }
 
 type ResendEmailService struct {

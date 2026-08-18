@@ -23,8 +23,8 @@ const (
 )
 
 // NotificationTypes lists every configurable notification type.
-// `work_order_mention` is reserved for a future release and intentionally
-// not included (see docs/prd/factory-notifications.md).
+// `work_order_mention` is reserved for a future release and is
+// intentionally not included.
 var NotificationTypes = []string{
 	NotificationTypeWorkOrderAssigned,
 	NotificationTypeWorkOrderCommentOwned,
@@ -37,7 +37,8 @@ var ErrNotificationWorkspaceScopeInvalid = errors.New("workspace scope must be a
 
 // UserNotificationSettings holds a user's organization-wide email
 // notification configuration for factory work order activity. A user
-// without a row receives no notification emails.
+// without a row uses DefaultUserNotificationSettings: emails on, all
+// types, all workspaces.
 type UserNotificationSettings struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
@@ -59,6 +60,15 @@ type UserNotificationSettingsParams struct {
 	WorkspaceScope string
 	FactoryIDs     []string
 	Types          map[string]bool
+}
+
+// DefaultUserNotificationSettings is the configuration SuperPlane uses
+// when the user has not saved settings yet.
+func DefaultUserNotificationSettings() UserNotificationSettings {
+	return UserNotificationSettings{
+		Enabled:        true,
+		WorkspaceScope: NotificationWorkspaceScopeAll,
+	}
 }
 
 func (UserNotificationSettings) TableName() string {

@@ -74,6 +74,13 @@ func Test__UserNotificationSettings(t *testing.T) {
 }
 
 func Test__UserNotificationSettings__NotifiesType(t *testing.T) {
+	t.Run("defaults enable every type in every workspace", func(t *testing.T) {
+		settings := models.DefaultUserNotificationSettings()
+		assert.True(t, settings.Enabled)
+		assert.True(t, settings.NotifiesType(models.NotificationTypeWorkOrderAssigned))
+		assert.True(t, settings.AppliesToFactory(uuid.New()))
+	})
+
 	t.Run("master switch off blocks every type", func(t *testing.T) {
 		settings := models.UserNotificationSettings{Enabled: false}
 		assert.False(t, settings.NotifiesType(models.NotificationTypeWorkOrderAssigned))

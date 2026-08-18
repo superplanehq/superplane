@@ -250,7 +250,7 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
 
 function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
   const defaults = {
-    enabled: false,
+    enabled: true,
     workspaceScope: "WORKSPACE_SCOPE_ALL",
     factoryIds: [],
     workOrderAssigned: true,

@@ -19,11 +19,11 @@ func Test__DescribeNotificationSettings(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	t.Run("missing row returns defaults with notifications off", func(t *testing.T) {
+	t.Run("missing row returns defaults with notifications on", func(t *testing.T) {
 		resp, err := DescribeNotificationSettings(ctx, r.Organization.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, resp.Settings)
-		assert.False(t, resp.Settings.Enabled)
+		assert.True(t, resp.Settings.Enabled)
 		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_ALL, resp.Settings.WorkspaceScope)
 		assert.True(t, resp.Settings.WorkOrderAssigned)
 		assert.True(t, resp.Settings.WorkOrderCommentOwned)

@@ -294,6 +294,45 @@ func TestRenderEmailTemplate(t *testing.T) {
 	assert.Contains(t, html, "tab=activity")
 }
 
+func TestWorkOrderNotificationTemplates_KanbanCard(t *testing.T) {
+	templateRoot := filepath.Join("..", "..", "templates")
+	data := WorkOrderNotificationTemplateData{
+		Summary:          "Ana Souza commented on SP-52.",
+		WorkOrderKey:     "SP-52",
+		WorkOrderTitle:   "Metrics on list of lines",
+		Detail:           "Looks good",
+		WorkOrderLink:    "https://app.superplane.com/org/workspaces/sp/work-order/52",
+		StatusLabel:      "Waiting",
+		StatusFg:         "#b45309",
+		StatusBg:         "#fffbeb",
+		StatusBorder:     "#fde68a",
+		StatusDot:        "#f59e0b",
+		LineStepLabel:    "Bugs · CI Loop",
+		UpdatedLabel:     "8h ago",
+		AssigneeInitials: "AS",
+		AssigneeOverflow: "+1",
+	}
+
+	html, err := renderEmailTemplate(templateRoot, "work_order_notification.html", data)
+	require.NoError(t, err)
+	assert.Contains(t, html, "Waiting")
+	assert.Contains(t, html, "SP-52")
+	assert.Contains(t, html, "Metrics on list of lines")
+	assert.Contains(t, html, "Bugs · CI Loop")
+	assert.Contains(t, html, "8h ago")
+	assert.Contains(t, html, "AS")
+	assert.Contains(t, html, "&#43;1")
+	assert.Contains(t, html, "#fffbeb")
+	assert.Contains(t, html, "https://app.superplane.com/org/workspaces/sp/work-order/52")
+
+	text, err := renderEmailTemplate(templateRoot, "work_order_notification.txt", data)
+	require.NoError(t, err)
+	assert.Contains(t, text, "Waiting")
+	assert.Contains(t, text, "SP-52")
+	assert.Contains(t, text, "Bugs · CI Loop")
+	assert.Contains(t, text, "8h ago")
+}
+
 func TestBuildEmailService(t *testing.T) {
 	assert.Nil(t, BuildEmailService(nil, EmailServiceConfig{}))
 

@@ -165,6 +165,8 @@ function resolveSettingsPageObservability(organizationId: string, segments: stri
       return { pageKey: "settingsAPIKeys", attributes: organizationAttributes };
     case "profile":
       return { pageKey: "settingsProfile", attributes: organizationAttributes };
+    case "notifications":
+      return { pageKey: "settingsNotifications", attributes: organizationAttributes };
     case "billing":
       return { pageKey: "settingsUsage", attributes: organizationAttributes };
     default:

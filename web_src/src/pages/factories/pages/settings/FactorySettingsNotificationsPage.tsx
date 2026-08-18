@@ -2,14 +2,17 @@ import type { FactoriesNotificationSettings, NotificationSettingsWorkspaceScope 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { cn } from "@/lib/utils";
 import { useFactories } from "@/hooks/useFactoryData";
 import { useNotificationSettings, useUpdateNotificationSettings } from "@/hooks/useNotificationSettings";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
+import { Switch } from "@/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
+import { Info } from "lucide-react";
 import { useEffect, useState } from "react";
-import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
-import { factoryCardClassName, factoryContentBodyClassName } from "../factoryPageLayoutStyles";
+import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
+import { FactorySettingsNotificationWorkspacePicker } from "./FactorySettingsNotificationWorkspacePicker";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 
 interface NotificationTypeOption {
@@ -34,12 +37,12 @@ const NOTIFICATION_TYPE_OPTIONS: NotificationTypeOption[] = [
   },
   {
     key: "workOrderCommentOwned",
-    label: "Comments on work orders you own",
+    label: "Comments you own",
     description: "Someone comments on a work order you own.",
   },
   {
     key: "workOrderCommentCreated",
-    label: "Comments on work orders you created",
+    label: "Comments you created",
     description: "Someone comments on a work order you created.",
   },
   {
@@ -63,7 +66,7 @@ interface NotificationsFormState {
 
 function formStateFromSettings(settings: FactoriesNotificationSettings | undefined): NotificationsFormState {
   return {
-    enabled: settings?.enabled ?? false,
+    enabled: settings?.enabled ?? true,
     scope: settings?.workspaceScope === "WORKSPACE_SCOPE_SELECTED" ? "selected" : "all",
     selectedFactoryIds: settings?.factoryIds ?? [],
     toggles: {
@@ -128,79 +131,68 @@ export function FactorySettingsNotificationsPage() {
   };
 
   return (
-    <>
-      <WorkspacePageHeader
-        title="Notifications"
-        subtitle="Choose which work order emails you receive. These settings apply to you only."
-      />
-
-      <div className={factoryContentBodyClassName}>
-        <div className="max-w-2xl space-y-6">
-          <section className={cn("p-6", factoryCardClassName)} data-testid="factory-settings-notifications-form">
-            <h2 className="text-[13px] font-medium tracking-[-0.01em] text-foreground">Email notifications</h2>
-            <div className="mt-4 space-y-4">
-              <label className="flex items-start gap-3" htmlFor="notifications-enabled">
-                <Checkbox
-                  id="notifications-enabled"
-                  data-testid="notifications-enabled"
-                  checked={form.enabled}
-                  disabled={isLoading}
-                  onChange={(event) => {
-                    const enabled = event.target.checked;
-                    setForm((prev) => ({ ...prev, enabled }));
-                  }}
-                />
-                <span className="space-y-0.5">
-                  <span className="block text-[13px] font-medium text-foreground">Send me email notifications</span>
-                  <span className="block text-[12px] text-muted-foreground">
-                    Get an email when work order activity involves you. You never get an email about your own actions.
-                  </span>
-                </span>
-              </label>
-            </div>
-
-            <div className={cn("mt-6 space-y-6", !form.enabled && "opacity-50")}>
-              <WorkspaceScopeSection
-                scope={form.scope}
-                selectedFactoryIds={form.selectedFactoryIds}
-                factories={factories}
-                scopeError={scopeError}
-                onScopeChange={(scope) => {
-                  setScopeError("");
-                  setForm((prev) => ({ ...prev, scope }));
-                }}
-                onToggleFactory={(factoryId, selected) => {
-                  setScopeError("");
-                  setForm((prev) => ({
-                    ...prev,
-                    selectedFactoryIds: selected
-                      ? [...prev.selectedFactoryIds, factoryId]
-                      : prev.selectedFactoryIds.filter((id) => id !== factoryId),
-                  }));
-                }}
-              />
-
-              <NotificationTypesSection
-                toggles={form.toggles}
-                onToggle={(key, value) => setForm((prev) => ({ ...prev, toggles: { ...prev.toggles, [key]: value } }))}
-              />
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <LoadingButton
-                disabled={isLoading || !isDirty}
-                loading={updateSettings.isPending}
-                loadingText="Saving..."
-                onClick={() => void handleSave()}
-                data-testid="notifications-save"
-              >
-                Save
-              </LoadingButton>
-            </div>
-          </section>
-        </div>
+    <FactorySettingsPageFrame
+      title="Notifications"
+      subtitle="Choose which work order emails you receive. You never get an email about your own actions."
+    >
+      <div className="space-y-6" data-testid="factory-settings-notifications-form">
+        <FactorySettingsCard>
+          <div className="flex items-center gap-2.5">
+            <Switch
+              id="notifications-enabled"
+              checked={form.enabled}
+              disabled={isLoading}
+              aria-label="Email notifications"
+              data-testid="notifications-enabled"
+              onCheckedChange={(enabled) => setForm((prev) => ({ ...prev, enabled }))}
+            />
+            <Label htmlFor="notifications-enabled" className="text-[13px] font-medium text-foreground">
+              Email notifications
+            </Label>
+          </div>
+          <div className={cn("mt-6 space-y-6", !form.enabled && "pointer-events-none opacity-50")}>
+            <WorkspaceScopeSection
+              scope={form.scope}
+              selectedFactoryIds={form.selectedFactoryIds}
+              factories={factories}
+              scopeError={scopeError}
+              onScopeChange={(scope) => {
+                setScopeError("");
+                setForm((prev) => ({ ...prev, scope }));
+              }}
+              onAddFactory={(factoryId) => {
+                setScopeError("");
+                setForm((prev) =>
+                  prev.selectedFactoryIds.includes(factoryId)
+                    ? prev
+                    : { ...prev, selectedFactoryIds: [...prev.selectedFactoryIds, factoryId] },
+                );
+              }}
+              onRemoveFactory={(factoryId) => {
+                setScopeError("");
+                setForm((prev) => ({
+                  ...prev,
+                  selectedFactoryIds: prev.selectedFactoryIds.filter((id) => id !== factoryId),
+                }));
+              }}
+            />
+            <NotificationTypesSection
+              toggles={form.toggles}
+              onToggle={(key, value) => setForm((prev) => ({ ...prev, toggles: { ...prev.toggles, [key]: value } }))}
+            />
+          </div>
+        </FactorySettingsCard>
+        <LoadingButton
+          disabled={isLoading || !isDirty}
+          loading={updateSettings.isPending}
+          loadingText="Saving..."
+          onClick={() => void handleSave()}
+          data-testid="notifications-save"
+        >
+          Save
+        </LoadingButton>
       </div>
-    </>
+    </FactorySettingsPageFrame>
   );
 }
 
@@ -210,7 +202,8 @@ interface WorkspaceScopeSectionProps {
   factories: { id?: string; name?: string }[];
   scopeError: string;
   onScopeChange: (scope: "all" | "selected") => void;
-  onToggleFactory: (factoryId: string, selected: boolean) => void;
+  onAddFactory: (factoryId: string) => void;
+  onRemoveFactory: (factoryId: string) => void;
 }
 
 function WorkspaceScopeSection({
@@ -219,20 +212,23 @@ function WorkspaceScopeSection({
   factories,
   scopeError,
   onScopeChange,
-  onToggleFactory,
+  onAddFactory,
+  onRemoveFactory,
 }: WorkspaceScopeSectionProps) {
   return (
-    <div className="space-y-2">
-      <Label>Workspaces</Label>
-      <p className="text-[12px] text-muted-foreground">Choose which workspaces send you notifications.</p>
-      <div className="space-y-2" role="radiogroup" aria-label="Workspace scope">
-        <ScopeRadio
+    <div className="space-y-3">
+      <div>
+        <Label>Workspaces</Label>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">Choose which workspaces send you notifications.</p>
+      </div>
+      <div className="inline-flex rounded-md border border-border p-0.5" role="radiogroup" aria-label="Workspace scope">
+        <ScopeChoice
           id="notifications-scope-all"
           label="All workspaces"
           checked={scope === "all"}
           onSelect={() => onScopeChange("all")}
         />
-        <ScopeRadio
+        <ScopeChoice
           id="notifications-scope-selected"
           label="Selected workspaces"
           checked={scope === "selected"}
@@ -240,84 +236,108 @@ function WorkspaceScopeSection({
         />
       </div>
       {scope === "selected" ? (
-        <div className="ml-6 mt-2 space-y-2 rounded-md border border-border bg-background p-3">
-          {factories.length === 0 ? (
-            <p className="text-[12px] text-muted-foreground">No workspaces available.</p>
-          ) : (
-            factories.map((factory) => {
-              const factoryId = factory.id ?? "";
-              return (
-                <label
-                  key={factoryId}
-                  className="flex items-center gap-2"
-                  htmlFor={`notifications-factory-${factoryId}`}
-                >
-                  <Checkbox
-                    id={`notifications-factory-${factoryId}`}
-                    data-testid={`notifications-factory-${factoryId}`}
-                    checked={selectedFactoryIds.includes(factoryId)}
-                    onChange={(event) => onToggleFactory(factoryId, event.target.checked)}
-                  />
-                  <span className="text-[13px] text-foreground">{factory.name}</span>
-                </label>
-              );
-            })
-          )}
-        </div>
+        <FactorySettingsNotificationWorkspacePicker
+          factories={factories}
+          selectedFactoryIds={selectedFactoryIds}
+          onAdd={onAddFactory}
+          onRemove={onRemoveFactory}
+        />
       ) : null}
       {scopeError ? <p className="text-[11px] text-destructive">{scopeError}</p> : null}
     </div>
   );
 }
 
-interface ScopeRadioProps {
+function ScopeChoice({
+  id,
+  label,
+  checked,
+  onSelect,
+}: {
   id: string;
   label: string;
   checked: boolean;
   onSelect: () => void;
-}
-
-function ScopeRadio({ id, label, checked, onSelect }: ScopeRadioProps) {
+}) {
   return (
-    <label className="flex cursor-pointer items-center gap-2" htmlFor={id}>
-      <input
-        type="radio"
-        id={id}
-        data-testid={id}
-        name="notifications-scope"
-        className="size-3.5 accent-foreground"
-        checked={checked}
-        onChange={onSelect}
-      />
-      <span className="text-[13px] text-foreground">{label}</span>
-    </label>
+    <button
+      type="button"
+      id={id}
+      role="radio"
+      aria-checked={checked}
+      data-testid={id}
+      className={cn(
+        "rounded-[5px] px-3 py-1.5 text-[13px] tracking-[-0.01em] text-muted-foreground hover:text-foreground",
+        checked && "bg-accent font-medium text-foreground",
+      )}
+      onClick={onSelect}
+    >
+      {label}
+    </button>
   );
 }
 
-interface NotificationTypesSectionProps {
+function NotificationTypesSection({
+  toggles,
+  onToggle,
+}: {
   toggles: NotificationTypeToggles;
   onToggle: (key: keyof NotificationTypeToggles, value: boolean) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <Label>Notify me about</Label>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+        {NOTIFICATION_TYPE_OPTIONS.map((option) => (
+          <NotificationTypeRow
+            key={option.key}
+            option={option}
+            checked={toggles[option.key]}
+            onToggle={(value) => onToggle(option.key, value)}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
-function NotificationTypesSection({ toggles, onToggle }: NotificationTypesSectionProps) {
+function NotificationTypeRow({
+  option,
+  checked,
+  onToggle,
+}: {
+  option: NotificationTypeOption;
+  checked: boolean;
+  onToggle: (value: boolean) => void;
+}) {
+  const checkboxId = `notifications-type-${option.key}`;
+
   return (
-    <div className="space-y-2">
-      <Label>Notify me about</Label>
-      <div className="space-y-3">
-        {NOTIFICATION_TYPE_OPTIONS.map((option) => (
-          <label key={option.key} className="flex items-start gap-3" htmlFor={`notifications-type-${option.key}`}>
-            <Checkbox
-              id={`notifications-type-${option.key}`}
-              data-testid={`notifications-type-${option.key}`}
-              checked={toggles[option.key]}
-              onChange={(event) => onToggle(option.key, event.target.checked)}
-            />
-            <span className="space-y-0.5">
-              <span className="block text-[13px] font-medium text-foreground">{option.label}</span>
-              <span className="block text-[12px] text-muted-foreground">{option.description}</span>
-            </span>
-          </label>
-        ))}
+    <div className="flex min-w-0 items-center gap-2">
+      <Checkbox
+        id={checkboxId}
+        data-testid={checkboxId}
+        checked={checked}
+        onChange={(event) => onToggle(event.target.checked)}
+      />
+      <div className="flex min-w-0 items-center gap-1">
+        <Label htmlFor={checkboxId} className="text-[13px] font-medium leading-snug text-foreground">
+          {option.label}
+        </Label>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="shrink-0 rounded-sm text-muted-foreground hover:text-foreground"
+              aria-label={`About ${option.label}`}
+            >
+              <Info className="size-3.5" aria-hidden />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            {option.description}
+          </TooltipContent>
+        </Tooltip>
       </div>
     </div>
   );

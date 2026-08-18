@@ -27,16 +27,8 @@ func currentUserID(ctx context.Context) (uuid.UUID, error) {
 }
 
 func defaultNotificationSettingsProto() *pb.NotificationSettings {
-	return &pb.NotificationSettings{
-		Enabled:                 false,
-		WorkspaceScope:          pb.NotificationSettings_WORKSPACE_SCOPE_ALL,
-		FactoryIds:              []string{},
-		WorkOrderAssigned:       true,
-		WorkOrderCommentOwned:   true,
-		WorkOrderCommentCreated: true,
-		WorkOrderStatusOwned:    true,
-		WorkOrderArtifactOwned:  true,
-	}
+	settings := models.DefaultUserNotificationSettings()
+	return serializeNotificationSettings(&settings)
 }
 
 func serializeNotificationSettings(settings *models.UserNotificationSettings) *pb.NotificationSettings {

@@ -671,8 +671,8 @@ message WorkOrderArtifact {
 // Notification settings
 
 // NotificationSettings is a user's organization-wide configuration for
-// work order notification emails. Type toggles default to on; the master
-// `enabled` switch defaults to off until the user saves settings.
+// work order notification emails. Type toggles and the master `enabled`
+// switch default to on until the user saves different settings.
 message NotificationSettings {
   enum WorkspaceScope {
     WORKSPACE_SCOPE_UNSPECIFIED = 0;

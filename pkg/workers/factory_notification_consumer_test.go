@@ -50,11 +50,27 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		}
 	}
 
-	t.Run("users without settings receive nothing", func(t *testing.T) {
+	t.Run("users without settings receive the default emails", func(t *testing.T) {
 		emailService := services.NewNoopEmailService()
 		consume(t, newConsumer(emailService), commentMessage(creator.ID.String()))
 
-		assert.Empty(t, emailService.SentWorkOrderNotificationEmails())
+		sent := emailService.SentWorkOrderNotificationEmails()
+		require.Len(t, sent, 1)
+		assert.Equal(t, owner.GetEmail(), sent[0].ToEmail)
+	})
+
+	t.Run("master switch off blocks the email", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			Enabled:        false,
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consume(t, newConsumer(emailService), commentMessage(creator.ID.String()))
+
+		for _, email := range emailService.SentWorkOrderNotificationEmails() {
+			assert.NotEqual(t, owner.GetEmail(), email.ToEmail)
+		}
 	})
 
 	t.Run("comment notifies the owner but never the actor", func(t *testing.T) {
@@ -77,6 +93,11 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		assert.Contains(t, sent[0].Subject, factoryModel.WorkOrderKey(order.Number))
 		assert.Equal(t, "Looks good to me", sent[0].Data.Detail)
 		assert.Contains(t, sent[0].Data.WorkOrderLink, factoryModel.Key)
+		assert.Equal(t, "Draft", sent[0].Data.StatusLabel)
+		assert.Equal(t, "Fix login flow", sent[0].Data.WorkOrderTitle)
+		assert.Equal(t, factoryModel.WorkOrderKey(order.Number), sent[0].Data.WorkOrderKey)
+		assert.NotEmpty(t, sent[0].Data.UpdatedLabel)
+		assert.NotEmpty(t, sent[0].Data.AssigneeInitials)
 	})
 
 	t.Run("type toggle off blocks the email", func(t *testing.T) {

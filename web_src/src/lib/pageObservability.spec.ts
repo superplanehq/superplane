@@ -62,5 +62,9 @@ describe("resolvePageObservability", () => {
       pageKey: "settingsGroupMembers",
       attributes: { organization_id: "org-1", group_name: "admins" },
     });
+    expect(resolvePageObservability("/org-1/settings/notifications")).toEqual({
+      pageKey: "settingsNotifications",
+      attributes: { organization_id: "org-1" },
+    });
   });
 });

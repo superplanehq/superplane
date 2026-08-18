@@ -24,8 +24,10 @@ import {
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
   FactorySettingsNotificationsPage,
+  FactorySettingsProfilePage,
   FactorySettingsSoonPage,
   FACTORY_SETTINGS_NAV_ITEMS,
+  isFactorySettingsComingSoon,
   LegacyWorkOrderDetailRedirect,
   LinesPage,
   MissionsPage,
@@ -43,6 +45,7 @@ import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGat
 import { HomePage } from "@/pages/home";
 import { homePageIds, type HomePageFixture } from "@/pages/home/__fixtures__/handlers";
 import { NewAppPage } from "@/pages/home/NewAppPage";
+import { OrganizationSettings } from "@/pages/organization/settings";
 import type { AgentSuggestion } from "@/ui/CanvasPage";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -253,28 +256,28 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
           <Route path=":factoryKey/settings" element={factoryRoute(<FactorySettingsLayout />)}>
             <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
             <Route path="general" element={<FactorySettingsGeneralPage />} />
+            <Route path="profile" element={<FactorySettingsProfilePage />} />
             <Route path="notifications" element={<FactorySettingsNotificationsPage />} />
-            {FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.id !== "general" && item.id !== "notifications").map(
-              (item) => (
-                <Route
-                  key={item.id}
-                  path={item.id}
-                  element={
-                    <FactorySettingsSoonPage
-                      title={item.label}
-                      description={`${item.label} settings for this workspace.`}
-                      Icon={item.Icon}
-                    />
-                  }
-                />
-              ),
-            )}
+            {FACTORY_SETTINGS_NAV_ITEMS.filter(isFactorySettingsComingSoon).map((item) => (
+              <Route
+                key={item.id}
+                path={item.id}
+                element={
+                  <FactorySettingsSoonPage
+                    title={item.label}
+                    description={`${item.label} settings for this workspace.`}
+                    Icon={item.Icon}
+                  />
+                }
+              />
+            ))}
           </Route>
         </Route>
         <Route
           path="settings/integrations/:integrationName/setup"
           element={<div data-testid="integration-setup-placeholder">Integration setup</div>}
         />
+        <Route path="settings/*" element={<OrganizationSettings />} />
       </Route>
     </Routes>
   );
