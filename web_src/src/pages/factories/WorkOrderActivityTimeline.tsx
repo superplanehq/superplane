@@ -19,6 +19,7 @@ import {
 import { formatWorkOrderDateTime as formatTimelineDate } from "./lib/workOrderDateTime";
 import { getWorkOrderRunHref } from "./lib/workOrderExecutions";
 import { ArtifactEventBody } from "./timeline/ArtifactEventBody";
+import { CheckReportedEventBody } from "./timeline/CheckReportedEventBody";
 import { CommentEventBody } from "./timeline/CommentEventBody";
 import { DispatchTimelineItem } from "./timeline/DispatchTimelineItem";
 import { TimelineAutomationActor } from "./timeline";
@@ -350,68 +351,6 @@ function TimelineItemBody({
       resolveUserDisplay={resolveUserDisplay}
       timeLabel={timeLabel}
     />
-  );
-}
-
-/**
- * A check score reported by an automation: "PR Risk Review re-scored
- * Risk review: 82 → 65/100 via run". Re-scores keep the previous value in
- * the sentence so the timeline reads as a trend, not a bare number.
- */
-function CheckReportedEventBody({
-  event,
-  timeLabel,
-  organizationId,
-  factoryKey,
-  orderNumber,
-}: {
-  event: WorkOrderTimelineEvent;
-  timeLabel: string;
-  organizationId: string;
-  factoryKey: string;
-  orderNumber?: string;
-}) {
-  const check = event.check;
-  if (!check) return null;
-
-  const runHref = getWorkOrderRunHref(organizationId, factoryKey, event.sourceAppId, event.sourceRunId, {
-    orderNumber,
-  });
-  const scale = check.format === "percent" ? "%" : `/${check.maxScore}`;
-  const isRescore = check.previousScore !== undefined && check.previousScore !== check.score;
-
-  return (
-    <p className={inlineParagraphClassName}>
-      {event.actorAutomation ? (
-        <TimelineAutomationActor actor={event.actorAutomation} fallbackLabel="Automation" />
-      ) : (
-        <span className={inlineActorClassName}>Automation</span>
-      )}{" "}
-      {isRescore ? "re-scored" : "reported"} <span className={inlineActorClassName}>{check.name}</span>:{" "}
-      {isRescore ? (
-        <>
-          <span className="tabular-nums text-muted-foreground">{check.previousScore}</span>
-          <span className="text-muted-foreground"> → </span>
-        </>
-      ) : null}
-      <span className={cn(inlineActorClassName, "tabular-nums")}>
-        {check.score}
-        {scale}
-      </span>
-      {runHref ? (
-        <>
-          {" "}
-          via{" "}
-          <Link href={runHref} className={inlineLinkClassName}>
-            run
-          </Link>
-        </>
-      ) : null}
-      <span className={inlineTimeClassName}>
-        {" · "}
-        {timeLabel}
-      </span>
-    </p>
   );
 }
 

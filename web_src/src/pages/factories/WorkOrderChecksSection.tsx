@@ -4,7 +4,12 @@ import { useState } from "react";
 import { formatRelative } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
-import type { WorkOrderCheckLevel, WorkOrderCheckPresentation } from "./lib/workOrderChecks";
+import {
+  formatCheckScore,
+  LEVEL_LABEL,
+  type WorkOrderCheckLevel,
+  type WorkOrderCheckPresentation,
+} from "./lib/workOrderChecks";
 import { getWorkOrderRunHref } from "./lib/workOrderExecutions";
 import { WorkOrderCheckDialog } from "./WorkOrderCheckDialog";
 
@@ -14,41 +19,6 @@ const LEVEL_METER_CLASSNAME: Record<WorkOrderCheckLevel, string> = {
   caution: "bg-amber-500",
   critical: "bg-red-500",
 };
-
-/** Textual verdict next to the score — color alone must not carry the meaning
- * (see Vercel Speed Insights / Shopify fraud analysis). */
-export const LEVEL_LABEL: Record<WorkOrderCheckLevel, { label: string; className: string; badgeClassName: string }> = {
-  positive: {
-    label: "Healthy",
-    className: "text-emerald-700 dark:text-emerald-400",
-    badgeClassName: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-  },
-  neutral: {
-    label: "Neutral",
-    className: "text-slate-600 dark:text-slate-400",
-    badgeClassName: "border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-400",
-  },
-  caution: {
-    label: "Needs attention",
-    className: "text-amber-700 dark:text-amber-400",
-    badgeClassName: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-  },
-  critical: {
-    label: "Critical",
-    className: "text-red-700 dark:text-red-400",
-    badgeClassName: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400",
-  },
-};
-
-export function formatCheckScore(check: Pick<WorkOrderCheckPresentation, "score" | "maxScore" | "format">): {
-  value: string;
-  scale: string;
-} {
-  if (check.format === "percent") {
-    return { value: String(check.score), scale: "%" };
-  }
-  return { value: String(check.score), scale: `/${check.maxScore}` };
-}
 
 /**
  * Scores reported by automations that reviewed the work order (risk review,
