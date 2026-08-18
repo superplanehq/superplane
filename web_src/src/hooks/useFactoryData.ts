@@ -11,6 +11,7 @@ import {
   factoriesListFactories,
   factoriesListFactoryApps,
   factoriesListWorkOrderArtifacts,
+  factoriesListWorkOrderChecks,
   factoriesListWorkOrderEvents,
   factoriesListWorkOrders,
   factoriesUpdateFactory,
@@ -23,6 +24,7 @@ import type {
   FactoriesFactoryLine,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
+  FactoriesWorkOrderCheck,
   FactoriesWorkOrderResult,
   FactoriesWorkOrderState,
   FactoryApp,
@@ -46,6 +48,8 @@ export const factoryQueryKeys = {
     ["factories", organizationId, factoryId, "work-orders", orderId, "events"] as const,
   workOrderArtifacts: (organizationId: string, factoryId: string, orderId: string) =>
     ["factories", organizationId, factoryId, "work-orders", orderId, "artifacts"] as const,
+  workOrderChecks: (organizationId: string, factoryId: string, orderId: string) =>
+    ["factories", organizationId, factoryId, "work-orders", orderId, "checks"] as const,
   apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
   velocity: (
     organizationId: string,
@@ -421,6 +425,22 @@ export function useWorkOrderArtifacts(organizationId: string, factoryId: string,
         }),
       );
       return response.data?.artifacts ?? [];
+    },
+    enabled: Boolean(organizationId && factoryId && orderId),
+  });
+}
+
+export function useWorkOrderChecks(organizationId: string, factoryId: string, orderId: string) {
+  return useQuery({
+    queryKey: factoryQueryKeys.workOrderChecks(organizationId, factoryId, orderId),
+    queryFn: async (): Promise<FactoriesWorkOrderCheck[]> => {
+      const response = await factoriesListWorkOrderChecks(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId },
+        }),
+      );
+      return response.data?.checks ?? [];
     },
     enabled: Boolean(organizationId && factoryId && orderId),
   });

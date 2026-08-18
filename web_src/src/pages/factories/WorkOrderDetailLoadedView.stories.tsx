@@ -25,8 +25,8 @@ import {
   RUNNING_WORK_ORDER_EVENTS,
 } from "./__fixtures__/factoryPageEventFixtures";
 import { CRITICAL_WORK_ORDER_CHECKS, OPEN_WORK_ORDER_CHECKS } from "./__fixtures__/workOrderCheckFixtures";
+import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "./lib/workOrderChecks";
 import { WorkOrderDetailLoadedView } from "./WorkOrderDetailLoadedView";
-import type { WorkOrderCheckPresentation } from "./WorkOrderChecksSection";
 import { getWorkOrderDetailDerived } from "./lib/workOrderProgress";
 
 /**
@@ -152,7 +152,7 @@ export const WithChecks: Story = {
   args: buildLoadedViewArgs(OPEN_WORK_ORDER, {
     events: RICH_OPEN_WORK_ORDER_EVENTS,
     artifacts: OPEN_WORK_ORDER_ARTIFACTS,
-    checks: OPEN_WORK_ORDER_CHECKS,
+    checks: presentWorkOrderChecks(OPEN_WORK_ORDER_CHECKS),
   }),
 };
 
@@ -161,7 +161,7 @@ export const WithCriticalCheck: Story = {
   name: "With Critical Check",
   args: buildLoadedViewArgs(OPEN_WORK_ORDER, {
     events: OPEN_WORK_ORDER_EVENTS,
-    checks: CRITICAL_WORK_ORDER_CHECKS,
+    checks: presentWorkOrderChecks(CRITICAL_WORK_ORDER_CHECKS),
   }),
 };
 
