@@ -347,6 +347,9 @@ function appendCheckReportedEvent(state: TimelineBuildState, index: number, payl
   }
 
   const automationActor = toAutomationActor(payload.automation);
+  // Same wording rule as CheckReportedEventBody: a re-report with an
+  // unchanged score still reads as "reported".
+  const isRescore = check.previousScore !== undefined && check.previousScore !== check.score;
   state.events.push({
     id: `check-${index}`,
     kind: "checkReported",
@@ -361,7 +364,7 @@ function appendCheckReportedEvent(state: TimelineBuildState, index: number, payl
       format: check.format,
       previousScore: check.previousScore,
     },
-    title: check.previousScore === undefined ? `reported ${check.name}` : `re-scored ${check.name}`,
+    title: isRescore ? `re-scored ${check.name}` : `reported ${check.name}`,
   });
 }
 

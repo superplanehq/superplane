@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -34,6 +35,8 @@ const (
 )
 
 var ErrFactoryWorkOrderCheckInvalid = errors.New("invalid work order check")
+
+const factoryWorkOrderCheckKeyUniqueConstraint = "idx_factory_work_order_checks_order_key_unique"
 
 // FactoryWorkOrderCheck is latest-only state: one row per (work order,
 // key), updated in place on every report. History lives in
@@ -114,8 +117,29 @@ func (o *FactoryWorkOrder) ReportCheck(
 		runID = &id
 	}
 
+	check, err := o.reportCheck(db, normalized, automationJSON, runID)
+	if isFactoryWorkOrderCheckKeyConflict(err) {
+		// Two first reports of the same key raced on insert. Postgres
+		// holds the losing INSERT until the winner commits, so by the
+		// time the unique violation surfaces the row is visible — a
+		// single retry lands as the in-place update it should have been.
+		check, err = o.reportCheck(db, normalized, automationJSON, runID)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return check, nil
+}
+
+func (o *FactoryWorkOrder) reportCheck(
+	db *gorm.DB,
+	normalized FactoryWorkOrderCheckParams,
+	automationJSON datatypes.JSON,
+	runID *uuid.UUID,
+) (*FactoryWorkOrderCheck, error) {
 	var check *FactoryWorkOrderCheck
-	err = db.Transaction(func(tx *gorm.DB) error {
+	err := db.Transaction(func(tx *gorm.DB) error {
 		existing, findErr := o.findCheckByKey(tx, normalized.Key)
 		if findErr != nil && !errors.Is(findErr, gorm.ErrRecordNotFound) {
 			return findErr
@@ -302,6 +326,14 @@ func normalizeCheckParams(params FactoryWorkOrderCheckParams) (FactoryWorkOrderC
 
 func isFiniteCheckNumber(value float64) bool {
 	return !math.IsNaN(value) && !math.IsInf(value, 0)
+}
+
+// isFactoryWorkOrderCheckKeyConflict reports whether err is a violation
+// of the per-order unique `key` index, mirroring
+// MapFactoryWorkOrderArtifactKeyUniqueConstraintError.
+func isFactoryWorkOrderCheckKeyConflict(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.ConstraintName == factoryWorkOrderCheckKeyUniqueConstraint
 }
 
 func encodeCheckAutomation(ref *factory.AutomationRef) (datatypes.JSON, error) {

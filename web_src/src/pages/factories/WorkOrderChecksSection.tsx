@@ -57,18 +57,21 @@ export function formatCheckScore(check: Pick<WorkOrderCheckPresentation, "score"
  */
 export function WorkOrderChecksSection({
   checks,
+  error,
   organizationId,
   factoryKey,
   orderNumber,
   className,
 }: {
   checks: WorkOrderCheckPresentation[];
+  /** Fetch failure — renders the section with an error line instead of hiding it. */
+  error?: Error | null;
   organizationId: string;
   factoryKey: string;
   orderNumber?: string;
   className?: string;
 }) {
-  if (checks.length === 0) {
+  if (!error && checks.length === 0) {
     return null;
   }
 
@@ -78,15 +81,19 @@ export function WorkOrderChecksSection({
       <p className="workspace-body-text mt-1 text-muted-foreground">
         Scores reported by automations that reviewed this work order.
       </p>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {checks.map((check) => (
-          <WorkOrderCheckCard
-            key={check.id}
-            check={check}
-            runHref={getWorkOrderRunHref(organizationId, factoryKey, check.appId, check.runId, { orderNumber })}
-          />
-        ))}
-      </div>
+      {error ? (
+        <p className="mt-4 text-[13px] text-destructive">Failed to load checks.</p>
+      ) : (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {checks.map((check) => (
+            <WorkOrderCheckCard
+              key={check.id}
+              check={check}
+              runHref={getWorkOrderRunHref(organizationId, factoryKey, check.appId, check.runId, { orderNumber })}
+            />
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -147,13 +154,16 @@ function CheckTrendDelta({ check }: { check: Pick<WorkOrderCheckPresentation, "s
 
   const rising = check.score > check.previousScore;
   const Arrow = rising ? MoveUp : MoveDown;
+  // Trim float noise (7.5 - 6.3 = 1.2000000000000002) without forcing
+  // decimals onto integer scores.
+  const delta = Number(Math.abs(check.score - check.previousScore).toFixed(2));
   return (
     <span
       className="inline-flex items-baseline text-[11px] tabular-nums text-muted-foreground"
       title={`Previous run: ${check.previousScore}`}
     >
       <Arrow className="size-3 shrink-0 self-center" aria-hidden />
-      {Math.abs(check.score - check.previousScore)}
+      {delta}
       <span className="sr-only">{rising ? "up" : "down"} from </span>
       <span className="sr-only">{check.previousScore}</span>
     </span>
