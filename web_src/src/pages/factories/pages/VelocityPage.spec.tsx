@@ -24,6 +24,7 @@ interface WorkOrdersHookState {
   data?: FactoriesWorkOrder[];
   isLoading?: boolean;
   isFetching?: boolean;
+  error?: Error | null;
 }
 
 const velocityHookState: VelocityHookState = {};
@@ -49,6 +50,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
     data: workOrdersHookState.data ?? [],
     isLoading: workOrdersHookState.isLoading ?? false,
     isFetching: workOrdersHookState.isFetching ?? false,
+    error: workOrdersHookState.error ?? null,
   }),
 }));
 
@@ -89,6 +91,7 @@ function resetState() {
   workOrdersHookState.data = [];
   workOrdersHookState.isLoading = false;
   workOrdersHookState.isFetching = false;
+  workOrdersHookState.error = null;
   integrationsHookState.data = [];
   repositoryResourcesHookState.data = [];
   repositoryResourcesHookState.isLoading = false;
@@ -176,5 +179,28 @@ describe("VelocityPage shell", () => {
     expect(split).toHaveTextContent("We could not load People merges. SuperPlane counts still show.");
     expect(split).not.toHaveTextContent("No merged pull requests");
     expect(split).not.toHaveTextContent("SuperPlane authored");
+  });
+
+  it("explains when work order time could not be loaded", () => {
+    resetState();
+    velocityHookState.data = {
+      yesterday: { superplaneMerged: 3, waste: 1 },
+      totals: {
+        superplaneMerged: 12,
+        peopleMerged: 0,
+        waste: 4,
+        superplaneSharePct: 0,
+        wastePct: 25,
+      },
+      points: [{ day: "Mon", superplaneMerged: 2, peopleMerged: 0, waste: 1 }],
+      hasPeopleCohort: false,
+    };
+    workOrdersHookState.error = new Error("network");
+
+    renderShell();
+
+    const flow = screen.getByTestId("velocity-work-order-flow");
+    expect(flow).toHaveTextContent("We could not load work order time.");
+    expect(flow).not.toHaveTextContent("No work orders closed in this period.");
   });
 });

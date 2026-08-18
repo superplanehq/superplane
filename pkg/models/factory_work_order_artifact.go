@@ -139,7 +139,7 @@ func (o *FactoryWorkOrder) CreateArtifact(
 	}
 
 	now := time.Now()
-	mergedAt, closedAt, err := extractPrLifecycleTimestamps(artifactType, params.Data, now, nil, nil)
+	mergedAt, closedAt, err := extractPrLifecycleTimestamps(artifactType, params.Data, now, nil, nil, "")
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +235,14 @@ func (o *FactoryWorkOrder) UpdateArtifactData(
 		)
 	}
 
-	mergedAt, closedAt, err := extractPrLifecycleTimestamps(artifact.Type, merged, time.Now(), artifact.MergedAt, artifact.ClosedAt)
+	mergedAt, closedAt, err := extractPrLifecycleTimestamps(
+		artifact.Type,
+		merged,
+		time.Now(),
+		artifact.MergedAt,
+		artifact.ClosedAt,
+		readArtifactState(artifact.Data),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -446,6 +453,7 @@ func extractPrLifecycleTimestamps(
 	data map[string]any,
 	now time.Time,
 	existingMerged, existingClosed *time.Time,
+	previousState string,
 ) (mergedAt *time.Time, closedAt *time.Time, err error) {
 	if artifactType != FactoryWorkOrderArtifactTypePR {
 		return nil, nil, nil
@@ -453,19 +461,44 @@ func extractPrLifecycleTimestamps(
 
 	state := extractArtifactString(data, "state")
 
-	if state == PrArtifactStateMerged && existingMerged == nil {
-		mergedAt, err = pickTimestamp(data, "mergedAt", now)
+	if existingMerged == nil {
+		mergedAt, err = stampPRLifecycleTime(data, "mergedAt", state, previousState, PrArtifactStateMerged, now)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
-	if state == PrArtifactStateClosed && existingClosed == nil {
-		closedAt, err = pickTimestamp(data, "closedAt", now)
+	if existingClosed == nil {
+		closedAt, err = stampPRLifecycleTime(data, "closedAt", state, previousState, PrArtifactStateClosed, now)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
 	return mergedAt, closedAt, nil
+}
+
+func stampPRLifecycleTime(
+	data map[string]any,
+	key, state, previousState, targetState string,
+	now time.Time,
+) (*time.Time, error) {
+	if extractArtifactString(data, key) != "" {
+		return pickTimestamp(data, key, now)
+	}
+	if state != targetState || previousState == targetState {
+		return nil, nil
+	}
+	return pickTimestamp(data, key, now)
+}
+
+func readArtifactState(raw datatypes.JSON) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var data map[string]any
+	if err := json.Unmarshal(raw, &data); err != nil {
+		return ""
+	}
+	return extractArtifactString(data, "state")
 }
 
 func pickTimestamp(data map[string]any, key string, fallback time.Time) (*time.Time, error) {

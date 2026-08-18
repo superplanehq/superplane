@@ -51,7 +51,14 @@ export function VelocityPage() {
       periodDays={model.periodDays}
       data={model.velocity.data}
       sourceSplit={sourceSplit}
-      workOrderFlow={model.workOrderFlow.isLoading ? undefined : { flow: model.workOrderFlow.flow }}
+      workOrderFlow={
+        model.workOrderFlow.isLoading
+          ? undefined
+          : {
+              flow: model.workOrderFlow.flow,
+              emptyLabel: model.workOrderFlow.error ? "We could not load work order time." : undefined,
+            }
+      }
     />,
     "factory-velocity-page",
   );

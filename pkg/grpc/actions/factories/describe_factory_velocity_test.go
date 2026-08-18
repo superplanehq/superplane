@@ -190,6 +190,15 @@ func TestCalendarDayUTCNoon(t *testing.T) {
 	assert.True(t, got.Equal(time.Date(2026, 8, 17, 12, 0, 0, 0, time.UTC)))
 }
 
+func TestGithubMergedDateRange_CoversLocalWindowInUTC(t *testing.T) {
+	loc := time.FixedZone("UTC-3", -3*3600)
+	from := time.Date(2026, 8, 11, 0, 0, 0, 0, loc)
+	endExclusive := time.Date(2026, 8, 18, 0, 0, 0, 0, loc)
+	fromDate, toDate := githubMergedDateRange(from, endExclusive)
+	assert.Equal(t, "2026-08-11", fromDate)
+	assert.Equal(t, "2026-08-18", toDate)
+}
+
 func TestBuildDayBuckets_CalendarDaysAcrossDST(t *testing.T) {
 	loc, err := time.LoadLocation("America/New_York")
 	require.NoError(t, err)

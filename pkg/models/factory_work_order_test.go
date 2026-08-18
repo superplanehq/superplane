@@ -833,6 +833,17 @@ func TestFactoryWorkOrder_UpdateArtifactData_StampsPRTimestamps(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
 	})
+
+	t.Run("repeated merged state without a stamp does not fall back to now", func(t *testing.T) {
+		order, artifact := newOrderWithPR(t, "https://github.com/example/repo/pull/106")
+		require.NoError(t, database.Conn().Model(artifact).Update("data", datatypes.JSON([]byte(
+			`{"url":"https://github.com/example/repo/pull/106","state":"merged"}`,
+		))).Error)
+
+		updated, err := order.UpdateArtifactData(database.Conn(), "https://github.com/example/repo/pull/106", map[string]any{"state": "merged"})
+		require.NoError(t, err)
+		assert.Nil(t, updated.MergedAt)
+	})
 }
 
 func TestFactoryWorkOrder_CreateArtifact_StampsPRTimestamps(t *testing.T) {

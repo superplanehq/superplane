@@ -46,6 +46,7 @@ export interface VelocityPageModel {
   workOrderFlow: {
     flow: FactoryVelocityFlow | null;
     isLoading: boolean;
+    error: unknown;
   };
 }
 
@@ -140,6 +141,7 @@ export function useVelocityPageModel(organizationId: string, factoryId: string):
     data: workOrders = [],
     isLoading: workOrdersLoading,
     isFetching: workOrdersFetching,
+    error: workOrdersError,
   } = useFactoryWorkOrders(organizationId, factoryId);
 
   const isVelocityLoading = velocityLoading || (velocityFetching && !velocityResponse);
@@ -183,6 +185,7 @@ export function useVelocityPageModel(organizationId: string, factoryId: string):
     workOrderFlow: {
       flow: workOrderFlow,
       isLoading: isWorkOrdersLoading,
+      error: workOrdersError,
     },
   };
 }

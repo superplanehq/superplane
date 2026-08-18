@@ -85,7 +85,7 @@ func DescribeFactoryVelocity(
 			repoOwner,
 			repoName,
 			buckets[0].start,
-			buckets[len(buckets)-1].start,
+			buckets[len(buckets)-1].end,
 		)
 		if searchErr != nil {
 			log.WithContext(ctx).WithError(searchErr).Warn("factory velocity: GitHub people search failed")
@@ -331,7 +331,7 @@ func searchPeopleMerges(
 	orgID uuid.UUID,
 	integrationID string,
 	repoOwner, repoName string,
-	from, to time.Time,
+	from, endExclusive time.Time,
 ) ([]peopleMerge, error) {
 	integrationUUID, err := uuid.Parse(integrationID)
 	if err != nil {
@@ -343,12 +343,13 @@ func searchPeopleMerges(
 		return nil, err
 	}
 
+	fromDate, toDate := githubMergedDateRange(from, endExclusive)
 	query := fmt.Sprintf(
 		"repo:%s/%s is:pr is:merged merged:%s..%s",
 		repoOwner,
 		repoName,
-		from.Format("2006-01-02"),
-		to.Format("2006-01-02"),
+		fromDate,
+		toDate,
 	)
 
 	opts := &github.SearchOptions{
@@ -378,6 +379,14 @@ func searchPeopleMerges(
 		opts.Page = resp.NextPage
 	}
 	return hits, nil
+}
+
+// githubMergedDateRange returns inclusive UTC calendar dates that cover the
+// local window. GitHub Search interprets YYYY-MM-DD as UTC. fillBuckets then
+// drops hits that fall outside the local day buckets.
+func githubMergedDateRange(from, endExclusive time.Time) (string, string) {
+	lastInstant := endExclusive.Add(-time.Nanosecond)
+	return from.UTC().Format("2006-01-02"), lastInstant.UTC().Format("2006-01-02")
 }
 
 func newVelocityGitHubClient(reg *registry.Registry, orgID, integrationID uuid.UUID) (*common.Client, error) {
