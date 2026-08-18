@@ -183,6 +183,12 @@ function usePersistedScopeAndFilters(
   const suppressScopeWriteRef = useRef(false);
   const suppressFiltersWriteRef = useRef(false);
 
+  // Callers pass a fresh closure each render, so we read it through a ref to
+  // keep the factory-change effect keyed solely on `factoryId`. Re-running it
+  // for a new closure would defeat the factoryId-transition check below.
+  const onFactoryChangeRef = useRef(onFactoryChange);
+  onFactoryChangeRef.current = onFactoryChange;
+
   useEffect(() => {
     if (previousFactoryIdRef.current === factoryId) {
       return;
@@ -192,11 +198,7 @@ function usePersistedScopeAndFilters(
     suppressFiltersWriteRef.current = true;
     setScope(readPersisted(scopedStorageKey(SCOPE_STORAGE_PREFIX, factoryId), VALID_SCOPES, DEFAULT_SCOPE));
     setFilters(readPersistedFilters(scopedStorageKey(FILTERS_STORAGE_PREFIX, factoryId)));
-    onFactoryChange();
-    // `onFactoryChange` intentionally excluded: callers pass a fresh closure
-    // each render, and re-running this effect for that alone would defeat
-    // the factoryId-transition check above.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    onFactoryChangeRef.current();
   }, [factoryId]);
 
   useEffect(() => {
