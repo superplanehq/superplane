@@ -20,6 +20,7 @@ const (
 	FactoryWorkOrderArtifactTypePR       = factory.ArtifactTypePR
 	FactoryWorkOrderArtifactTypeMarkdown = factory.ArtifactTypeMarkdown
 	FactoryWorkOrderArtifactTypeBranch   = factory.ArtifactTypeBranch
+	FactoryWorkOrderArtifactTypeLink     = factory.ArtifactTypeLink
 
 	// MaxFactoryWorkOrderArtifactDataBytes caps JSON-encoded artifact data.
 	MaxFactoryWorkOrderArtifactDataBytes = 64 * 1024
@@ -253,7 +254,7 @@ func (o *FactoryWorkOrder) ListArtifacts(tx *gorm.DB) ([]FactoryWorkOrderArtifac
 // IsValidWorkOrderArtifactType reports whether CreateArtifact accepts t.
 func IsValidWorkOrderArtifactType(t string) bool {
 	switch t {
-	case FactoryWorkOrderArtifactTypePR, FactoryWorkOrderArtifactTypeMarkdown, FactoryWorkOrderArtifactTypeBranch:
+	case FactoryWorkOrderArtifactTypePR, FactoryWorkOrderArtifactTypeMarkdown, FactoryWorkOrderArtifactTypeBranch, FactoryWorkOrderArtifactTypeLink:
 		return true
 	}
 	return false
@@ -283,6 +284,10 @@ func validateArtifactData(artifactType string, data map[string]any) error {
 	case FactoryWorkOrderArtifactTypeBranch:
 		if extractArtifactString(data, "name") == "" {
 			return fmt.Errorf("%w: branch artifacts require data.name", ErrFactoryWorkOrderArtifactInvalid)
+		}
+	case FactoryWorkOrderArtifactTypeLink:
+		if extractArtifactString(data, "url") == "" {
+			return fmt.Errorf("%w: link artifacts require a url", ErrFactoryWorkOrderArtifactInvalid)
 		}
 	default:
 		return fmt.Errorf("%w: unknown artifact type %q", ErrFactoryWorkOrderArtifactInvalid, artifactType)

@@ -7,6 +7,24 @@ const INSTALL_PARAM_PATTERN = /\{\{\s*install_params\.(\w+)\s*\}\}/g;
 
 export const FACTORY_CANVAS_ID_PLACEHOLDER = "__FACTORY_CANVAS_ID__";
 
+/**
+ * Legacy home install passed a single `repository`. Map it onto the split
+ * app/backlog params so older callers and tests keep working.
+ */
+export function normalizeFactoryInstallParams(params: Record<string, string>): Record<string, string> {
+  const next = { ...params };
+  const legacyRepository = next.repository?.trim();
+  if (!legacyRepository) return next;
+
+  if (!next.appRepository?.trim()) {
+    next.appRepository = legacyRepository;
+  }
+  if (!next.backlogRepository?.trim()) {
+    next.backlogRepository = legacyRepository;
+  }
+  return next;
+}
+
 export function substituteInstallParams(content: string, params: Record<string, string>): string {
   return content.replace(INSTALL_PARAM_PATTERN, (match, name: string) => {
     if (Object.prototype.hasOwnProperty.call(params, name)) {
@@ -99,7 +117,8 @@ export function materializeFactoryCanvas(args: {
     [FACTORY_CANVAS_ID_PLACEHOLDER]: args.canvasId,
   });
 
-  const substituted = substituteInstallParams(withPlaceholders, args.installParams);
+  const installParams = normalizeFactoryInstallParams(args.installParams);
+  const substituted = substituteInstallParams(withPlaceholders, installParams);
   const wired = wireFactoryIntegrations(substituted, args.definition.componentIntegrations, args.integrations);
   const doc = yaml.load(wired) as YamlCanvas;
   if (!doc.metadata) doc.metadata = {};

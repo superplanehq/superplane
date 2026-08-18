@@ -86,6 +86,36 @@ func Test__CreateWorkOrderArtifact(t *testing.T) {
 		assert.Equal(t, "feature/login", resp.Artifact.Data.AsMap()["name"])
 	})
 
+	t.Run("creates link artifact", func(t *testing.T) {
+		data, err := structpb.NewStruct(map[string]any{
+			"url":   "https://preview.example.com/pr-42",
+			"title": "Preview",
+		})
+		require.NoError(t, err)
+
+		resp, err := CreateWorkOrderArtifact(ctx, r.Organization.ID.String(), &pb.CreateWorkOrderArtifactRequest{
+			FactoryId: factoryModel.ID.String(),
+			OrderId:   order.ID.String(),
+			Type:      pb.WorkOrderArtifact_TYPE_LINK,
+			Data:      data,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, pb.WorkOrderArtifact_TYPE_LINK, resp.Artifact.Type)
+		assert.Equal(t, "https://preview.example.com/pr-42", resp.Artifact.Data.AsMap()["url"])
+		assert.Equal(t, "Preview", resp.Artifact.Data.AsMap()["title"])
+	})
+
+	t.Run("rejects link without url", func(t *testing.T) {
+		_, err := CreateWorkOrderArtifact(ctx, r.Organization.ID.String(), &pb.CreateWorkOrderArtifactRequest{
+			FactoryId: factoryModel.ID.String(),
+			OrderId:   order.ID.String(),
+			Type:      pb.WorkOrderArtifact_TYPE_LINK,
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
 	t.Run("rejects unspecified type", func(t *testing.T) {
 		_, err := CreateWorkOrderArtifact(ctx, r.Organization.ID.String(), &pb.CreateWorkOrderArtifactRequest{
 			FactoryId: factoryModel.ID.String(),

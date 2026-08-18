@@ -46,7 +46,7 @@ func (c *AddWorkOrderArtifact) Label() string {
 }
 
 func (c *AddWorkOrderArtifact) Description() string {
-	return "Attach a typed artifact (PR, markdown note, or branch) to a work order"
+	return "Attach a typed artifact (PR, markdown note, branch, or link) to a work order"
 }
 
 func (c *AddWorkOrderArtifact) Documentation() string {
@@ -57,8 +57,9 @@ Supported types:
 - **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + `, ` + "`title`" + `, and ` + "`state`" + ` (` + "`open`" + `/` + "`draft`" + `/` + "`closed`" + `/` + "`merged`" + `, defaults to ` + "`open`" + `) which drives the icon/color of the artifact chip in the work order UI.
 - **Markdown note** (` + "`markdown`" + `): requires ` + "`body`" + `; optional ` + "`title`" + `.
 - **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` (the branch name); optional ` + "`url`" + ` to link to the branch on its provider (e.g. a GitHub tree URL).
+- **Link** (` + "`link`" + `): requires ` + "`url`" + ` (must be http or https); optional ` + "`title`" + ` for the artifact chip's label — e.g. attach a preview-environment URL as "Preview".
 
-PR and markdown types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key.
+PR, markdown, and link types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key.
 
 Set ` + "`artifactKey`" + ` to tag the artifact with a queryable key (e.g. the pull request's URL) so a later ` + "`findWorkOrder`" + ` (` + "`by: artifactKey`" + `) step can resolve this work order from it — useful in flows that aren't dispatched from a factory line, such as closing a work order from a ` + "`github.onPullRequest`" + ` merged event. Keys are unique per factory.
 
@@ -103,9 +104,9 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 	prOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr"}}}
 	markdownOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"markdown"}}}
 	branchOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"branch"}}}
-	linkableTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "branch"}}}
-	bothTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}}
-	withMetadata := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}}
+	linkableTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "branch", "link"}}}
+	titledTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown", "link"}}}
+	withMetadata := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown", "link"}}}
 
 	return []configuration.Field{
 		{
@@ -129,6 +130,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 						{Label: "Pull Request", Value: "pr"},
 						{Label: "Markdown", Value: "markdown"},
 						{Label: "Branch", Value: "branch"},
+						{Label: "Link", Value: "link"},
 					},
 				},
 			},
@@ -136,12 +138,12 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		{
 			Name:                 "url",
 			Label:                "URL",
-			Description:          "Link to the pull request or branch (must be http or https). Required for pull requests; optional for branches — e.g. a GitHub tree URL like https://github.com/{owner}/{repo}/tree/{branch}.",
+			Description:          "Link to the pull request, branch, or external resource (must be http or https). Required for pull requests and links; optional for branches — e.g. a GitHub tree URL like https://github.com/{owner}/{repo}/tree/{branch}.",
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
 			VisibilityConditions: linkableTypes,
 			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "artifactType", Values: []string{"pr"}},
+				{Field: "artifactType", Values: []string{"pr", "link"}},
 			},
 		},
 		{
@@ -196,10 +198,10 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		{
 			Name:                 "title",
 			Label:                "Title",
-			Description:          "Optional artifact title",
+			Description:          "Optional artifact title — for links, this becomes the chip's label (e.g. \"Preview\")",
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
-			VisibilityConditions: bothTypes,
+			VisibilityConditions: titledTypes,
 		},
 		{
 			Name:        "artifactKey",

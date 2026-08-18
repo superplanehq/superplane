@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -20,8 +21,8 @@ import (
 func Test__NextIntegrationSetupStep(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureNewIntegrationSetupFlow))
 
-	r.Registry.AppEnv = "development"
 	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
 	r.Registry.SetupProviders["dummy"] = impl.NewDummyIntegrationSetupProvider(impl.DummyIntegrationSetupProviderOptions{
 		CapabilityGroups: []core.CapabilityGroup{{Capabilities: []core.Capability{{Name: "feat"}}}},
@@ -97,7 +98,7 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 		ctx4 := authentication.SetUserIdInMetadata(context.Background(), r4.User.String())
 		onStepSubmitCalled := false
 
-		r4.Registry.AppEnv = "development"
+		require.NoError(t, models.EnableExperimentalFeature(r4.Organization.ID, features.FeatureNewIntegrationSetupFlow))
 		r4.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
 		r4.Registry.SetupProviders["dummy"] = impl.NewDummyIntegrationSetupProvider(impl.DummyIntegrationSetupProviderOptions{
 			CapabilityGroups: []core.CapabilityGroup{{Capabilities: []core.Capability{{Name: "feat"}}}},
@@ -142,7 +143,7 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 		r3 := support.Setup(t)
 		ctx3 := authentication.SetUserIdInMetadata(context.Background(), r3.User.String())
 
-		r3.Registry.AppEnv = "development"
+		require.NoError(t, models.EnableExperimentalFeature(r3.Organization.ID, features.FeatureNewIntegrationSetupFlow))
 		r3.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
 		r3.Registry.SetupProviders["dummy"] = impl.NewDummyIntegrationSetupProvider(impl.DummyIntegrationSetupProviderOptions{
 			FirstStep: func(ctx core.SetupStepContext) core.SetupStep {
