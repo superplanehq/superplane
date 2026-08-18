@@ -93,6 +93,22 @@ func TestValidateRunClaudeCodeSpec(t *testing.T) {
 		spec.Steps = []ClaudeCodeStep{{Name: "Echo", Type: claudeStepBash, Command: strPtr("echo hi")}}
 		require.Error(t, validateRunClaudeCodeSpec(spec))
 	})
+
+	t.Run("rejects ANTHROPIC_API_KEY in environment", func(t *testing.T) {
+		spec := valid
+		spec.Environment = []runner.EnvironmentVariable{
+			{Name: envAnthropicAPIKey, ValueSource: runner.EnvironmentValueSourceLiteral, Value: strPtr("sk-ant-api03-x")},
+		}
+		require.Error(t, validateRunClaudeCodeSpec(spec))
+	})
+
+	t.Run("rejects ANTHROPIC_AUTH_TOKEN in environment", func(t *testing.T) {
+		spec := valid
+		spec.Environment = []runner.EnvironmentVariable{
+			{Name: envAnthropicAuthToken, ValueSource: runner.EnvironmentValueSourceLiteral, Value: strPtr("sk-ant-oat01-x")},
+		}
+		require.Error(t, validateRunClaudeCodeSpec(spec))
+	})
 }
 
 func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {

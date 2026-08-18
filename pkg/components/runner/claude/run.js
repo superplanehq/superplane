@@ -48,8 +48,13 @@ async function runPrompt(promptFile, model) {
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
 
+  // --bare skips keychain reads, which subscription (OAuth) auth needs to
+  // resolve the credential. When a subscription token is present
+  // (ANTHROPIC_AUTH_TOKEN), omit --bare so the login path stays available;
+  // keep it otherwise, where its isolation costs nothing.
+  const bare = process.env.ANTHROPIC_AUTH_TOKEN ? [] : ["--bare"];
   const claudeArgs = [
-    "--bare",
+    ...bare,
     "-p",
     "--output-format",
     "stream-json",
