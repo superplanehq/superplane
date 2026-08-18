@@ -1,5 +1,4 @@
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
-import { Heading } from "@/components/Heading/heading";
 import { Badge } from "@/components/ui/badge";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { cn } from "@/lib/utils";
@@ -7,14 +6,13 @@ import { formatTimeAgo } from "@/lib/date";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { Link } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { factoryLineDetailPath, linesPath, workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import {
   factoryCardClassName,
-  factoryContentBodyClassName,
-  factoryContentHeaderClassName,
-  factoryPageSubtitleClassName,
-  factoryPageTitleClassName,
+  factorySectionBodyClassName,
+  factorySectionHeaderClassName,
 } from "./factoryPageLayoutStyles";
 
 const MAX_ROWS = 8;
@@ -39,18 +37,13 @@ export function OverviewPage() {
 
   return (
     <>
-      <header className={factoryContentHeaderClassName}>
-        <div>
-          <Heading level={1} className={cn("!text-[22px]", factoryPageTitleClassName)}>
-            Overview
-          </Heading>
-          <p className={cn("mt-1", factoryPageSubtitleClassName)}>
-            Your workspace at a glance. Content for this page comes next.
-          </p>
-        </div>
-      </header>
+      <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
+        title="Overview"
+        subtitle="Your workspace at a glance. Content for this page comes next."
+      />
 
-      <div className={factoryContentBodyClassName}>
+      <div className={factorySectionBodyClassName}>
         <div className="grid gap-6 lg:grid-cols-2">
           <WorkOrdersOverviewCard
             organizationId={organizationId}

@@ -4,10 +4,12 @@ import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
-import type { FactoryApp } from "@/api-client";
+import type { FactoriesWorkOrder, FactoryApp } from "@/api-client";
 
-import { AutomationCard, AutomationDetail } from "./automationsPageParts";
+import { AutomationDetail } from "./AutomationDetail";
+import { AutomationCard } from "./automationsPageParts";
 import { duplicateAutomationName } from "./automationCardActions";
+import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 
 vi.mock("@/hooks/useCanvasData", () => ({
   useInfiniteCanvasRuns: () => ({
@@ -40,6 +42,14 @@ vi.mock("@/hooks/useCanvasData", () => ({
 
 vi.mock("./LineVelocityPanel", () => ({
   LineVelocityPanel: () => <div data-testid="line-velocity-panel">Velocity</div>,
+}));
+
+vi.mock("@/hooks/useOrgUserLookup", () => ({
+  useOrgUserLookup: () => ({
+    resolveUser: (id: string | undefined, name?: string) =>
+      id ? { id, name: name ?? "Unknown member", initials: "U" } : null,
+    isLoading: false,
+  }),
 }));
 
 const app: FactoryApp = {
@@ -131,10 +141,48 @@ describe("AutomationDetail tabs", () => {
     canDelete: true,
   };
 
-  function renderDetail() {
+  const workOrderCardContext: WorkOrderCardContext = {
+    organizationId: "org-1",
+    factoryKey: "SP",
+    factoryLines: [],
+    canDispatch: false,
+    canAssign: false,
+    isDispatching: false,
+    isAssigneesSaving: false,
+    onDispatch: vi.fn().mockResolvedValue(undefined),
+    onAssigneesSave: vi.fn().mockResolvedValue(undefined),
+  };
+
+  const matchingOrder: FactoriesWorkOrder = {
+    id: "wo-1",
+    number: "103",
+    key: "SP-103",
+    title: "Add refund reconciliation test",
+    state: "STATE_OPEN",
+    assignees: [{ id: "user-1", name: "Ada Lovelace" }],
+    executions: [
+      {
+        id: "e1",
+        step: "implement",
+        state: "STATE_STARTED",
+        run: { id: "run-c1111111", appId: "app-refund-planner" },
+        line: { id: "line-1", name: "Refunds" },
+      },
+    ],
+  };
+
+  function renderDetail(workOrders: FactoriesWorkOrder[] = []) {
     return render(
       <MemoryRouter>
-        <AutomationDetail organizationId="org-1" factoryKey="SP" app={app} actions={actions} />
+        <AutomationDetail
+          organizationId="org-1"
+          factoryKey="SP"
+          app={app}
+          actions={actions}
+          factory={{ id: "factory-1", name: "Refunds", key: "SP" }}
+          workOrders={workOrders}
+          workOrderCardContext={workOrderCardContext}
+        />
       </MemoryRouter>,
     );
   }
@@ -152,6 +200,21 @@ describe("AutomationDetail tabs", () => {
     expect(run.className).toMatch(/\brounded-md\b/);
     expect(screen.getByTestId("automations-runs-scroll").className).toMatch(/\bgap-2\b/);
     expect(screen.getByTestId("automations-runs-scroll").closest("section")).toBeNull();
+    expect(screen.getByTestId("automations-detail-body").className).toMatch(/\bmax-w-none\b/);
+  });
+
+  it("renders the work order card when the run belongs to a work order", () => {
+    renderDetail([matchingOrder]);
+
+    const card = screen.getByTestId("work-order-card-wo-1");
+    expect(card).toHaveTextContent("Add refund reconciliation test");
+    expect(card).toHaveTextContent("Running");
+    expect(card).toHaveTextContent("SP-103");
+    expect(screen.getByTestId("work-order-row-assignees-wo-1")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Add refund reconciliation test" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("run=run-c1111111"),
+    );
   });
 
   it("opens the Velocity tab", async () => {

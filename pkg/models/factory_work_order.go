@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -191,10 +192,19 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 		return err
 	}
 
+	// Omit associations: `o.Assignees` is stale after ReplaceAssignees, and
+	// GORM would otherwise re-save it as part of this update, reverting the
+	// change we just made.
 	now := time.Now()
 	o.UpdatedAt = now
-	if err := tx.Model(o).Update("updated_at", now).Error; err != nil {
+	if err := tx.Model(o).Omit(clause.Associations).Update("updated_at", now).Error; err != nil {
 		return err
+	}
+
+	// Keep the in-memory association in sync with what was just written.
+	o.Assignees = make([]FactoryWorkOrderAssignee, 0, len(assigneeIDs))
+	for _, assigneeID := range assigneeIDs {
+		o.Assignees = append(o.Assignees, FactoryWorkOrderAssignee{WorkOrderID: o.ID, UserID: assigneeID})
 	}
 
 	assigned, unassigned := assigneeDiff(previousAssignees, assigneeIDs)
@@ -427,6 +437,25 @@ func (o *FactoryWorkOrder) ListEvents(tx *gorm.DB, limit int, before *time.Time)
 	err := query.
 		Order("created_at DESC").
 		Order("id DESC").
+		Find(&events).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
+// ListComments returns the work order's comment thread (`order.comment.added`
+// events), oldest first — unlike ListEvents (which is DESC for activity
+// feeds), a comment thread reads chronologically oldest→newest.
+func (o *FactoryWorkOrder) ListComments(tx *gorm.DB) ([]FactoryWorkOrderEvent, error) {
+	var events []FactoryWorkOrderEvent
+	err := tx.
+		Where("work_order_id = ?", o.ID).
+		Where("type = ?", factory.EventTypeOrderCommentAdded).
+		Order("created_at ASC").
+		Order("id ASC").
 		Find(&events).
 		Error
 	if err != nil {

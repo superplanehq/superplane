@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
@@ -30,7 +32,10 @@ func Test__CanvasNodeExecutionKV(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("FirstNodeExecutionByKVInTransaction returns the first created execution with that key", func(t *testing.T) {
+	t.Run("FirstNodeExecutionByKVInTransaction returns the first created execution and logs the collision", func(t *testing.T) {
+		hook := logtest.NewGlobal()
+		defer hook.Reset()
+
 		tx := database.Conn().Begin()
 		defer tx.Rollback()
 
@@ -46,6 +51,32 @@ func Test__CanvasNodeExecutionKV(t *testing.T) {
 		foundExec, err := FirstNodeExecutionByKVInTransaction(tx, exec1.WorkflowID, exec1.NodeID, "test-key", "test-value")
 		require.NoError(t, err)
 		require.Equal(t, exec1.ID, foundExec.ID)
+
+		require.Len(t, hook.Entries, 1)
+		require.Equal(t, log.ErrorLevel, hook.Entries[0].Level)
+		require.Contains(t, hook.Entries[0].Message, "matches 2 executions")
+	})
+
+	t.Run("FirstNodeExecutionByKVInTransaction does not treat duplicate rows for one execution as a collision", func(t *testing.T) {
+		hook := logtest.NewGlobal()
+		defer hook.Reset()
+
+		tx := database.Conn().Begin()
+		defer tx.Rollback()
+
+		exec := steps.CreateExecution()
+
+		err := CreateNodeExecutionKVInTransaction(tx, exec.WorkflowID, exec.NodeID, exec.ID, "dup-key", "dup-value")
+		require.NoError(t, err)
+
+		err = CreateNodeExecutionKVInTransaction(tx, exec.WorkflowID, exec.NodeID, exec.ID, "dup-key", "dup-value")
+		require.NoError(t, err)
+
+		foundExec, err := FirstNodeExecutionByKVInTransaction(tx, exec.WorkflowID, exec.NodeID, "dup-key", "dup-value")
+		require.NoError(t, err)
+		require.Equal(t, exec.ID, foundExec.ID)
+
+		require.Empty(t, hook.Entries)
 	})
 
 	t.Run("FirstNodeExecutionByKVInTransaction returns error if not found", func(t *testing.T) {

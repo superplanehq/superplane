@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -163,10 +162,6 @@ func (c *SnoozeIncident) Execute(ctx core.ExecutionContext) error {
 
 func (c *SnoozeIncident) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *SnoozeIncident) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *SnoozeIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

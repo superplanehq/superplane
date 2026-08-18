@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -517,10 +516,6 @@ func (c *UpdateAlarm) Hooks() []core.Hook {
 
 func (c *UpdateAlarm) HandleHook(_ core.ActionHookContext) error {
 	return nil
-}
-
-func (c *UpdateAlarm) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *UpdateAlarm) Cancel(_ core.ExecutionContext) error {

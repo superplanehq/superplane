@@ -185,10 +185,6 @@ func (a *RunCodeAgent) Setup(ctx core.SetupContext) error {
 	return setNodeMetadata(ctx, spec)
 }
 
-func (a *RunCodeAgent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
-
 func (a *RunCodeAgent) Execute(ctx core.ExecutionContext) error {
 	spec, err := decodeSpec(ctx.Configuration)
 	if err != nil {

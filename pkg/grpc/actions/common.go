@@ -803,10 +803,46 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			Configuration:  node.Configuration.AsMap(),
 			Position:       ProtoToPosition(node.Position),
 			IsCollapsed:    node.IsCollapsed,
+			Concurrency:    ProtoToConcurrencySpec(node.Concurrency),
 			IntegrationID:  integrationID,
 			ErrorMessage:   errorMessage,
 			WarningMessage: warningMessage,
 		}
+	}
+
+	return result
+}
+
+func ProtoToConcurrencySpec(spec *componentpb.ConcurrencySpec) *models.ConcurrencySpec {
+	if spec == nil {
+		return nil
+	}
+
+	result := &models.ConcurrencySpec{
+		Key: spec.GetKey(),
+	}
+
+	if spec.Max != nil {
+		max := int(*spec.Max)
+		result.Max = &max
+	}
+
+	return result
+}
+
+func ConcurrencySpecToProto(spec *models.ConcurrencySpec) *componentpb.ConcurrencySpec {
+	if spec == nil {
+		return nil
+	}
+
+	result := &componentpb.ConcurrencySpec{}
+	if spec.Key != "" {
+		result.Key = &spec.Key
+	}
+
+	if spec.Max != nil {
+		max := int32(*spec.Max)
+		result.Max = &max
 	}
 
 	return result
@@ -846,6 +882,7 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 			Type:        NodeTypeToProto(node.Type),
 			Position:    PositionToProto(node.Position),
 			IsCollapsed: node.IsCollapsed,
+			Concurrency: ConcurrencySpecToProto(node.Concurrency),
 		}
 
 		if node.Ref.Component != nil {

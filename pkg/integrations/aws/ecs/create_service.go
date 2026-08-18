@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -124,10 +123,6 @@ func (c *CreateService) Setup(ctx core.SetupContext) error {
 		ServiceName:    config.ServiceName,
 		TaskDefinition: config.TaskDefinition,
 	})
-}
-
-func (c *CreateService) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateService) Execute(ctx core.ExecutionContext) error {

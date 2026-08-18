@@ -9,6 +9,7 @@ interface DiffSummaryHoverCardProps {
   onToggleVisualDiff?: () => void;
   diffToggles?: {
     showDeletedNodes: boolean;
+    showDeletedNodesControl?: boolean;
     toggleShowDeletedNodes: () => void;
     showEdgeDiff: boolean;
     toggleShowEdgeDiff: () => void;
@@ -66,16 +67,18 @@ export function DiffSummaryHoverCard({
           )}
           {diffToggles && visualDiffEnabled && (
             <>
-              <div className="flex items-center gap-1.5">
-                <Checkbox
-                  id="show-deleted-nodes"
-                  checked={diffToggles.showDeletedNodes}
-                  onCheckedChange={diffToggles.toggleShowDeletedNodes}
-                />
-                <label htmlFor="show-deleted-nodes" className={diffMenuLabelClassName}>
-                  Show deleted nodes
-                </label>
-              </div>
+              {diffToggles.showDeletedNodesControl !== false ? (
+                <div className="flex items-center gap-1.5">
+                  <Checkbox
+                    id="show-deleted-nodes"
+                    checked={diffToggles.showDeletedNodes}
+                    onCheckedChange={diffToggles.toggleShowDeletedNodes}
+                  />
+                  <label htmlFor="show-deleted-nodes" className={diffMenuLabelClassName}>
+                    Show deleted nodes
+                  </label>
+                </div>
+              ) : null}
               <div className="flex items-center gap-1.5">
                 <Checkbox
                   id="show-edge-diff"

@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -27,12 +26,11 @@ func (a *testAction) ExampleOutput() map[string]any { return a.example }
 func (a *testAction) OutputChannels(any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
-func (a *testAction) Configuration() []configuration.Field                          { return nil }
-func (a *testAction) Setup(core.SetupContext) error                                 { return nil }
-func (a *testAction) ProcessQueueItem(core.ProcessQueueContext) (*uuid.UUID, error) { return nil, nil }
-func (a *testAction) Execute(core.ExecutionContext) error                           { return nil }
-func (a *testAction) Hooks() []core.Hook                                            { return nil }
-func (a *testAction) HandleHook(core.ActionHookContext) error                       { return nil }
+func (a *testAction) Configuration() []configuration.Field    { return nil }
+func (a *testAction) Setup(core.SetupContext) error           { return nil }
+func (a *testAction) Execute(core.ExecutionContext) error     { return nil }
+func (a *testAction) Hooks() []core.Hook                      { return nil }
+func (a *testAction) HandleHook(core.ActionHookContext) error { return nil }
 func (a *testAction) HandleWebhook(core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }

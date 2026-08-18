@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -381,10 +380,6 @@ func (c *AllocateElasticIP) Hooks() []core.Hook {
 
 func (c *AllocateElasticIP) HandleHook(ctx core.ActionHookContext) error {
 	return nil
-}
-
-func (c *AllocateElasticIP) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *AllocateElasticIP) Cancel(ctx core.ExecutionContext) error {

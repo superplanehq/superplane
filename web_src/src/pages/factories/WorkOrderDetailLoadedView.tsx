@@ -6,13 +6,14 @@ import type {
   FactoriesWorkOrderResult,
   FactoriesWorkOrderState,
 } from "@/api-client";
+import { workOrdersPath } from "./lib/factoryPagePaths";
+import { getWorkOrderDisplayKey, type WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 import { factoryContentBodyClassName } from "./pages/factoryPageLayoutStyles";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
 import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
 import { WorkOrderDescription } from "./WorkOrderDescription";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
 import { WorkOrderDetailSidebar } from "./WorkOrderDetailSidebar";
-import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailLoadedViewProps {
   organizationId: string;
@@ -33,7 +34,6 @@ interface WorkOrderDetailLoadedViewProps {
   assigneeIds: string[];
   assigneeNames: string[];
   factoryLines: FactoriesFactoryLine[];
-  canEditFactoryLines: boolean;
   isOpen: boolean;
   isDispatchable: boolean;
   isClosed: boolean;
@@ -56,7 +56,33 @@ interface WorkOrderDetailLoadedViewProps {
   onAddComment: (body: string) => Promise<void>;
 }
 
-export function WorkOrderDetailLoadedView({
+export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps) {
+  const identifier = getWorkOrderDisplayKey(props.order, props.factoryKey);
+  return (
+    <>
+      <WorkOrderDetailHeader
+        orderTitle={props.order.title ?? "Work Order"}
+        orderIdentifier={identifier === "—" ? undefined : identifier}
+        backHref={workOrdersPath(props.organizationId, props.factoryKey)}
+        displayStatus={props.displayStatus}
+        isOpen={props.isOpen}
+        isDispatchable={props.isDispatchable}
+        isClosed={props.isClosed}
+        canClose={props.canClose}
+        canManage={props.canManage}
+        isCompleting={props.isCompleting}
+        isRejecting={props.isRejecting}
+        isClosing={props.isClosing}
+        isUpdatingStatus={props.isUpdatingStatus}
+        onClose={props.onClose}
+        onStatusChange={props.onStatusChange}
+      />
+      <WorkOrderDetailBody {...props} />
+    </>
+  );
+}
+
+function WorkOrderDetailBody({
   organizationId,
   factoryKey,
   order,
@@ -75,47 +101,21 @@ export function WorkOrderDetailLoadedView({
   assigneeIds,
   assigneeNames,
   factoryLines,
-  canEditFactoryLines,
-  isOpen,
   isDispatchable,
-  isClosed,
   canDispatch,
-  canClose,
   canAssign,
   canManage,
   permissionsLoading,
   isDispatching,
-  isCompleting,
-  isRejecting,
-  isClosing,
   isAssigneesSaving,
-  isUpdatingStatus,
   isAddingComment,
   onDispatch,
-  onClose,
   onAssigneesSave,
-  onStatusChange,
   onAddComment,
 }: WorkOrderDetailLoadedViewProps) {
   return (
     <div className={factoryContentBodyClassName}>
       <div className="grid gap-x-[var(--workspace-column-gap)] gap-y-0 lg:grid-cols-[minmax(0,1fr)_var(--workspace-detail-sidebar-width)]">
-        <WorkOrderDetailHeader
-          orderTitle={order.title ?? "Work Order"}
-          displayStatus={displayStatus}
-          isOpen={isOpen}
-          isDispatchable={isDispatchable}
-          isClosed={isClosed}
-          canClose={canClose}
-          canManage={canManage}
-          isCompleting={isCompleting}
-          isRejecting={isRejecting}
-          isClosing={isClosing}
-          isUpdatingStatus={isUpdatingStatus}
-          onClose={onClose}
-          onStatusChange={onStatusChange}
-        />
-
         <div className="min-w-0">
           {order.description ? <WorkOrderDescription description={order.description} /> : null}
 
@@ -136,6 +136,7 @@ export function WorkOrderDetailLoadedView({
                 isLoadingMoreEvents={isLoadingMoreEvents}
                 onLoadMoreEvents={onLoadMoreEvents}
                 onRetryEvents={onRetryEvents}
+                artifacts={artifacts}
                 footer={
                   <WorkOrderCommentComposer
                     canComment={canManage}
@@ -161,7 +162,6 @@ export function WorkOrderDetailLoadedView({
             assigneeIds={assigneeIds}
             assigneeNames={assigneeNames}
             factoryLines={factoryLines}
-            canEditFactoryLines={canEditFactoryLines}
             canAssign={canAssign}
             canDispatch={canDispatch}
             permissionsLoading={permissionsLoading}

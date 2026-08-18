@@ -16,7 +16,7 @@ import { STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT } from "@/pages/app/__fixtures__
 import { canvasAppIds, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import {
   AutomationsPage,
-  CreateWorkOrderPage,
+  CreateWorkOrderComposeRedirect,
   FactoriesIndexPage,
   FactoriesLayout,
   FactoryAppCanvasPage,
@@ -36,6 +36,7 @@ import {
 } from "@/pages/factories";
 import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
 import { createFactoryLinePath, editFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
+import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetailPage";
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
 import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
 import { HomePage } from "@/pages/home";
@@ -77,6 +78,10 @@ export interface OrgWorkspacePageOverrides {
   overview?: ComponentType;
   /** When set, mounts `/onboarding` and gates other factory pages while pending. */
   onboarding?: ComponentType;
+  /** Storybook-only Work Orders page. Live app ignores this. */
+  workOrders?: ComponentType;
+  /** Storybook-only Velocity page (e.g. work-order flow prototype). */
+  velocity?: ComponentType;
 }
 
 export interface OrgWorkspaceHarnessProps {
@@ -192,6 +197,8 @@ function OptionalOnboardingGate({ enabled }: { enabled: boolean }) {
 function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePageOverrides }) {
   const WikiRoutePage = pageOverrides?.wiki ?? WikiPage;
   const OverviewRoutePage = pageOverrides?.overview ?? OverviewPage;
+  const WorkOrdersRoutePage = pageOverrides?.workOrders ?? WorkOrdersPage;
+  const VelocityRoutePage = pageOverrides?.velocity ?? VelocityPage;
   const OnboardingRoutePage = pageOverrides?.onboarding;
   const onboardingEnabled = Boolean(OnboardingRoutePage);
 
@@ -216,11 +223,12 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
               {OnboardingRoutePage ? <Route path="onboarding" element={<OnboardingRoutePage />} /> : null}
               <Route path="overview" element={<OverviewRoutePage />} />
               <Route path="missions" element={<MissionsPage />} />
+              <Route path="missions/:missionId" element={<MissionDetailPage />} />
               <Route path="wiki" element={<WikiRoutePage />} />
-              <Route path="velocity" element={<VelocityPage />} />
+              <Route path="velocity" element={<VelocityRoutePage />} />
               <Route path="work-orders">
-                <Route index element={<WorkOrdersPage />} />
-                <Route path="new" element={<CreateWorkOrderPage />} />
+                <Route index element={<WorkOrdersRoutePage />} />
+                <Route path="new" element={<CreateWorkOrderComposeRedirect />} />
                 <Route path=":orderId" element={<LegacyWorkOrderDetailRedirect />} />
               </Route>
               <Route path="work-order/:orderNumber" element={<WorkOrderDetailPage />} />

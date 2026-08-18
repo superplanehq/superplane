@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -214,10 +213,6 @@ func (q *QueryPrometheus) Execute(ctx core.ExecutionContext) error {
 
 func (q *QueryPrometheus) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (q *QueryPrometheus) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (q *QueryPrometheus) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

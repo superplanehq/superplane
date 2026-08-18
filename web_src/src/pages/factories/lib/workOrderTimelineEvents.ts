@@ -145,8 +145,18 @@ export function formatStepExecutionDuration(step: WorkOrderTimelineStep): string
     return null;
   }
 
-  const formatted = formatDuration(durationMs);
+  const formatted = formatDuration(durationMs, { precision: "second" });
   return formatted || null;
+}
+
+export function findLatestDispatchIndex(events: WorkOrderTimelineEvent[]): number {
+  let idx = -1;
+  events.forEach((event, i) => {
+    if (event.kind === "dispatched") {
+      idx = i;
+    }
+  });
+  return idx;
 }
 
 function addOrderFallbackNames(usersById: Map<string, OrgUserDisplay>, order: FactoriesWorkOrder): void {

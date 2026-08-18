@@ -118,7 +118,9 @@ function WorkOrderDetailPageContent({
   const artifactsQuery = useWorkOrderArtifacts(organizationId, factoryId, orderId);
 
   const actions = useWorkOrderDetailActions(organizationId, factoryId, orderId);
-  const derived = getWorkOrderDetailDerived(order);
+  // Memoize so derived arrays (e.g. `assigneeIds`) keep a stable reference
+  // across re-renders/refetches that don't actually change `order`.
+  const derived = useMemo(() => getWorkOrderDetailDerived(order), [order]);
 
   usePageTitle([order?.title ?? "Work Order", factory?.name ?? "Workspace"]);
 
@@ -151,7 +153,6 @@ function WorkOrderDetailPageContent({
       eventsQuery={eventsQuery}
       artifactsQuery={artifactsQuery}
       canManageWorkOrders={canAct("work_orders", "update")}
-      canEditFactoryLines={canAct("factories", "update")}
       permissionsLoading={permissionsLoading}
       actions={actions}
     />
@@ -179,7 +180,6 @@ interface LoadedWorkOrderDetailProps {
   eventsQuery: ReturnType<typeof useWorkOrderEvents>;
   artifactsQuery: ReturnType<typeof useWorkOrderArtifacts>;
   canManageWorkOrders: boolean;
-  canEditFactoryLines: boolean;
   permissionsLoading: boolean;
   actions: ReturnType<typeof useWorkOrderDetailActions>;
 }
@@ -194,7 +194,6 @@ function LoadedWorkOrderDetail({
   eventsQuery,
   artifactsQuery,
   canManageWorkOrders,
-  canEditFactoryLines,
   permissionsLoading,
   actions,
 }: LoadedWorkOrderDetailProps) {
@@ -222,7 +221,6 @@ function LoadedWorkOrderDetail({
       assigneeIds={derived.assigneeIds}
       assigneeNames={derived.assigneeNames}
       factoryLines={factoryLines}
-      canEditFactoryLines={canEditFactoryLines}
       isOpen={derived.isOpen}
       isDispatchable={derived.isDispatchable}
       isClosed={derived.isClosed}

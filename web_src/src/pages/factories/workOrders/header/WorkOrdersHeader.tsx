@@ -1,10 +1,11 @@
 import type { FactoriesFactoryLine } from "@/api-client";
-import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import type { WorkOrderListState } from "../../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../../lib/useWorkOrdersHeaderShortcuts";
+import { factorySectionHeaderClassName } from "../../pages/factoryPageLayoutStyles";
 import { buildAssigneeFilterOptions, buildLineFilterOptions } from "../../lib/workOrderFilterOptions";
 import type { WorkOrderListEntry } from "../../lib/workOrderListModel";
 import { DisplayMenu } from "./DisplayMenu";
@@ -18,16 +19,14 @@ interface WorkOrdersHeaderProps {
   /** Every entry before scope/filters, used to build the assignee options. */
   entries: WorkOrderListEntry[];
   factoryLines: FactoriesFactoryLine[];
-  createHref: string;
+  onCreateWorkOrder: () => void;
   canCreate: boolean;
   permissionsLoading: boolean;
 }
 
 /**
- * Title bar for the Work Orders page. Everything lives on one row: the page
- * title and scope pills on the left, and the Filter menu, collapsible
- * search, Display menu, and New button on the right. Layout and ordering sit
- * inside Display rather than on the bar so the row stays quiet.
+ * Compact title bar for the Work Orders page. Title, scope, and Filter
+ * stay on the left. Search, Display, and New sit on the right.
  *
  * The Filter menu and the chip row read from one shared set of options, so
  * both always show the same labels.
@@ -36,7 +35,7 @@ export function WorkOrdersHeader({
   state,
   entries,
   factoryLines,
-  createHref,
+  onCreateWorkOrder,
   canCreate,
   permissionsLoading,
 }: WorkOrdersHeaderProps) {
@@ -45,15 +44,18 @@ export function WorkOrdersHeader({
   const assigneeOptions = buildAssigneeFilterOptions(entries);
 
   return (
-    <div className="flex w-full flex-col" data-testid="work-orders-header">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground">Work Orders</h1>
+    <WorkspacePageHeader
+      className={factorySectionHeaderClassName}
+      data-testid="work-orders-header"
+      title="Work Orders"
+      leading={
+        <>
           <ScopePills value={state.scope} onChange={state.setScope} />
-        </div>
-
-        <div className="flex items-center gap-1">
           <FilterMenu state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
+        </>
+      }
+      actions={
+        <>
           <SearchField
             inputRef={searchRef}
             open={state.searchOpen}
@@ -70,21 +72,21 @@ export function WorkOrdersHeader({
             <Button
               type="button"
               size="sm"
-              asChild
               disabled={!canCreate}
-              className="h-8 shrink-0 gap-1.5 px-2.5"
+              onClick={onCreateWorkOrder}
               data-testid="work-order-list-create-button"
             >
-              <Link href={canCreate ? createHref : "#"}>
-                <Plus className="size-3.5" aria-hidden />
-                New
-              </Link>
+              <Plus className="size-3.5" aria-hidden />
+              New work order
             </Button>
           </PermissionTooltip>
-        </div>
-      </div>
-
-      <FilterChips state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
-    </div>
+        </>
+      }
+      belowRow={
+        state.filterCount > 0 ? (
+          <FilterChips state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
+        ) : undefined
+      }
+    />
   );
 }

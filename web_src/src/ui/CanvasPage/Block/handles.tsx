@@ -374,12 +374,14 @@ export function RightHandle({
     <FactorySideSourceHandle isConnectionInteractive={isConnectionInteractive} />
   ) : null;
 
-  // Run-inspection compact fork: centered spine + side — no MultiBottom S-stems.
-  // Always mount spine so cycle/loop-back edges (not leaf/spine classified) still attach.
-  if (data._factoryCompactFork) {
+  // Run inspection uses only the ports required by route geometry. Channel
+  // names stay on edge badges instead of rendering edit-style stems.
+  if (data._factoryRunDisplaySource) {
     return (
       <>
-        <FactorySpineSourceHandle isConnectionInteractive={isConnectionInteractive} />
+        {data._factorySpineSource ? (
+          <FactorySpineSourceHandle isConnectionInteractive={isConnectionInteractive} />
+        ) : null}
         {sideSource}
       </>
     );

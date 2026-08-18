@@ -1,7 +1,6 @@
 import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
-import { createWorkOrderPath } from "../lib/factoryPagePaths";
 import {
   applyWorkOrderFilters,
   applyWorkOrderOrdering,
@@ -10,7 +9,7 @@ import {
   buildWorkOrderListEntries,
 } from "../lib/workOrderListModel";
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
-import { factoryContentBodyClassName, factoryContentHeaderClassName } from "../pages/factoryPageLayoutStyles";
+import { factoryKanbanPageClassName, factoryWorkOrdersBodyClassName } from "../pages/factoryPageLayoutStyles";
 import { WorkOrdersBoardView } from "./WorkOrdersBoardView";
 import {
   WorkOrdersFilteredEmptyState,
@@ -30,6 +29,7 @@ interface WorkOrdersLoadedViewProps {
   state: WorkOrderListState;
   currentUserId?: string;
   canCreate: boolean;
+  onCreateWorkOrder: () => void;
   canDispatch: boolean;
   canAssign: boolean;
   permissionsLoading: boolean;
@@ -57,13 +57,13 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   const ordered = useMemo(() => applyWorkOrderOrdering(searched, state.ordering), [searched, state.ordering]);
 
   const totalCount = entries.length;
-  const createHref = createWorkOrderPath(props.organizationId, props.factoryKey);
+  const showKanbanBoard = state.layout === "board" && totalCount > 0 && ordered.length > 0;
 
   const body = () => {
     if (totalCount === 0) {
       return (
         <WorkOrdersTrueEmptyState
-          createHref={createHref}
+          onCreateWorkOrder={props.onCreateWorkOrder}
           canCreate={props.canCreate}
           permissionsLoading={props.permissionsLoading}
         />
@@ -104,19 +104,19 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   };
 
   return (
-    <>
-      <header className={factoryContentHeaderClassName}>
+    <div className={showKanbanBoard ? factoryKanbanPageClassName : undefined}>
+      <div className="shrink-0">
         <WorkOrdersHeader
           state={state}
           entries={entries}
           factoryLines={props.factoryLines}
-          createHref={createHref}
+          onCreateWorkOrder={props.onCreateWorkOrder}
           canCreate={props.canCreate}
           permissionsLoading={props.permissionsLoading}
         />
-      </header>
+      </div>
 
-      <div className={cn(factoryContentBodyClassName, "flex flex-col gap-4")}>{body()}</div>
-    </>
+      <div className={cn(factoryWorkOrdersBodyClassName, "flex flex-col gap-4")}>{body()}</div>
+    </div>
   );
 }

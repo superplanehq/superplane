@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -276,10 +275,6 @@ func (c *Runner) Setup(ctx core.SetupContext) error {
 
 	_, err = ctx.Webhook.Setup()
 	return err
-}
-
-func (c *Runner) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *Runner) Execute(ctx core.ExecutionContext) error {

@@ -7,6 +7,7 @@ import type {
   FactoryApp,
   FactoryLineStep,
 } from "@/api-client";
+import { canvasAppIds } from "@/pages/app/__fixtures__/handlers";
 
 /** Shared with the home fixture so routes stay in sync across HomePage → Factories navigation. */
 export const FACTORIES_ORGANIZATION_ID = "3ee1aa47-3a60-4c1f-b645-0b9859ab91f8";
@@ -34,6 +35,20 @@ export const HOUR_AGO = relativeIso(HOUR_MS);
 export const TWO_HOURS_AGO = relativeIso(2 * HOUR_MS);
 export const YESTERDAY = relativeIso(DAY_MS);
 export const LAST_WEEK = relativeIso(7 * DAY_MS);
+
+/**
+ * Canvas run ids on Line phase cards. Must be UUIDs: AppPage strips any
+ * `?run=` value that fails `isValidRunId`, which drops factory run autolayout.
+ *
+ * `LINE_RUN_IMPLEMENT_FAILED_ID` matches the captured Software Factory
+ * published run so Storybook reuses that run's executions and root event.
+ */
+export const LINE_RUN_IMPLEMENT_ID = "8f3a1c2e-4b5d-46f0-a789-0b1c2d3e4f50";
+export const LINE_RUN_IMPLEMENT_FAILED_ID = canvasAppIds.publishedRunId ?? "fef4cee8-fdd7-47af-b5da-e739664cd31d";
+export const LINE_RUN_IMPLEMENT_PASSED_ID = "9a4b2d3f-5c6e-47f0-b890-1c2d3e4f5061";
+export const LINE_RUN_VERIFY_PASSED_ID = "0b5c3e4a-6d7f-4081-8901-2d3e4f506172";
+export const LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID =
+  canvasAppIds.rootEventId ?? "755a4430-2481-43f6-94cb-089c331a5d2f";
 
 export const REVIEWER_USER = {
   id: "user-reviewer-alex",
@@ -209,7 +224,7 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
       id: "2",
       state: "STATE_STARTED",
       result: "RESULT_UNKNOWN",
-      run: { id: "run-implement", appId: "app-refund-implementer", appName: "Refund Implementer" },
+      run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
       updatedAt: HOUR_AGO,
     }),
   ],
@@ -234,7 +249,7 @@ export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
       id: "4",
       state: "STATE_FINISHED",
       result: "RESULT_FAILED",
-      run: { id: "run-implement-2", appId: "app-refund-implementer", appName: "Refund Implementer" },
+      run: { id: LINE_RUN_IMPLEMENT_FAILED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
       updatedAt: HOUR_AGO,
     }),
   ],
@@ -288,14 +303,14 @@ export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
       id: "6",
       state: "STATE_FINISHED",
       result: "RESULT_PASSED",
-      run: { id: "run-implement-3", appId: "app-refund-implementer", appName: "Refund Implementer" },
+      run: { id: LINE_RUN_IMPLEMENT_PASSED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
       updatedAt: LAST_WEEK,
     }),
     planLineExecution("verify", {
       id: "7",
       state: "STATE_FINISHED",
       result: "RESULT_PASSED",
-      run: { id: "run-verify-3", appId: "app-refund-verifier", appName: "Refund Verifier" },
+      run: { id: LINE_RUN_VERIFY_PASSED_ID, appId: "app-refund-verifier", appName: "Refund Verifier" },
       updatedAt: YESTERDAY,
     }),
   ],
@@ -328,6 +343,7 @@ export const OPEN_WORK_ORDER_ARTIFACTS: FactoriesWorkOrderArtifact[] = [
     type: "TYPE_BRANCH",
     data: {
       name: "feature/refund-retry",
+      url: "https://github.com/example/ledger/tree/feature/refund-retry",
     },
     createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
     createdAt: HOUR_AGO,
@@ -378,4 +394,30 @@ export const emptyWorkOrdersFactoriesFixture: FactoriesFixture = {
     [PRIMARY_FACTORY_ID]: [CLOSED_WORK_ORDER],
     [EMPTY_FACTORY_ID]: [],
   },
+};
+
+/** Story-only clone: Plan and Implement has five phases so the board can scroll on x. */
+export const fiveStepLineFactoriesFixture: FactoriesFixture = {
+  ...defaultFactoriesFixture,
+  factories: defaultFactoriesFixture.factories.map((factory) => {
+    if (factory.id !== PRIMARY_FACTORY_ID) {
+      return factory;
+    }
+    return {
+      ...factory,
+      lines: (factory.lines ?? []).map((line) => {
+        if (line.id !== REFUND_LINE_PLAN_ID) {
+          return line;
+        }
+        return {
+          ...line,
+          steps: [
+            ...(line.steps ?? []),
+            runAppStep("release", "app-refund-verifier", "start-verification"),
+            runAppStep("observe", "app-refund-planner", "start-plan"),
+          ],
+        };
+      }),
+    };
+  }),
 };

@@ -54,6 +54,11 @@ describe("staging-content-match", () => {
     await expect(matchesCommittedCanvasYaml("canvas-1", "version-1", reorderedCanvasYaml)).resolves.toBe(true);
   });
 
+  it("treats a metadata name change as uncommitted", async () => {
+    const renamedYaml = sampleCanvasYaml.replace("name: demo", "name: renamed");
+    await expect(matchesCommittedCanvasYaml("canvas-1", "version-1", renamedYaml)).resolves.toBe(false);
+  });
+
   it("treats semantically identical console yaml as committed", async () => {
     await expect(matchesCommittedConsoleYaml("canvas-1", "version-1", emptyConsoleYaml)).resolves.toBe(true);
   });
