@@ -1,0 +1,12 @@
+{
+  "data": {
+    "dimensions": [{ "name": "Environment", "value": "production" }],
+    "metricName": "OrdersProcessed",
+    "namespace": "MyApp/Orders",
+    "timestamp": "2026-05-29T09:00:00Z",
+    "unit": "Count",
+    "value": 42
+  },
+  "timestamp": "2026-05-29T09:00:00.657831534Z",
+  "type": "aws.cloudwatch.metricSent"
+}
