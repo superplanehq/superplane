@@ -6,6 +6,7 @@ describe("resolveConsoleAvatar", () => {
   it("uses the GitHub avatar for a plain username string", () => {
     expect(resolveConsoleAvatar("forestileao")).toEqual({
       src: "https://github.com/forestileao.png",
+      initials: "F",
       name: "forestileao",
     });
   });

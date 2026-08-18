@@ -17,7 +17,11 @@ export function resolveConsoleAvatar(author: unknown, committer?: unknown): Cons
       return { src: username, name: "" };
     }
     if (username) {
-      return { src: `https://github.com/${username}.png`, name: username };
+      return {
+        src: `https://github.com/${username}.png`,
+        initials: firstInitialFromValues(username),
+        name: username,
+      };
     }
   }
 
