@@ -7,7 +7,7 @@ import type { WorkOrderListState } from "../../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../../lib/useWorkOrdersHeaderShortcuts";
 import { factorySectionHeaderClassName } from "../../pages/factoryPageLayoutStyles";
 import { buildAssigneeFilterOptions, buildLineFilterOptions } from "../../lib/workOrderFilterOptions";
-import type { WorkOrderListEntry } from "../../lib/workOrderListModel";
+import { WORK_ORDER_SCOPES, type WorkOrderListEntry } from "../../lib/workOrderListModel";
 import { DisplayMenu } from "./DisplayMenu";
 import { FilterChips } from "./FilterChips";
 import { FilterMenu } from "./FilterMenu";
@@ -50,7 +50,12 @@ export function WorkOrdersHeader({
       title="Work Orders"
       leading={
         <>
-          <ScopePills value={state.scope} onChange={state.setScope} />
+          <ScopePills
+            value={state.scope}
+            onChange={state.setScope}
+            options={WORK_ORDER_SCOPES}
+            testIdPrefix="work-orders-scope"
+          />
           <FilterMenu state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
         </>
       }
