@@ -22,6 +22,11 @@ const (
 	queryStatusRunning   = "Running"
 
 	QueryLogsPayloadType = "aws.cloudwatch.queryResult"
+
+	// defaultQueryLogsLimit mirrors the "limit" field's UI default. A blank or
+	// cleared field decodes to 0, which StartQuery would otherwise omit,
+	// letting AWS apply its own much larger default instead of ours.
+	defaultQueryLogsLimit = 100
 )
 
 var queryLookbackDurations = map[string]time.Duration{
@@ -223,13 +228,18 @@ func (c *QueryLogs) Execute(ctx core.ExecutionContext) error {
 	endTime := time.Now().UTC()
 	startTime := endTime.Add(-duration)
 
+	limit := config.Limit
+	if limit <= 0 {
+		limit = defaultQueryLogsLimit
+	}
+
 	client := NewLogsClient(ctx.HTTP, creds, config.Region)
 	queryID, err := client.StartQuery(StartQueryInput{
 		LogGroupNames: config.LogGroups,
 		QueryString:   config.QueryString,
 		StartTime:     startTime,
 		EndTime:       endTime,
-		Limit:         config.Limit,
+		Limit:         limit,
 	})
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to start Logs Insights query: %v", err))

@@ -22,6 +22,7 @@ type AddLogEventConfiguration struct {
 	LogStream string `json:"logStream" mapstructure:"logStream"`
 	Message   string `json:"message" mapstructure:"message"`
 	Timestamp string `json:"timestamp" mapstructure:"timestamp"`
+	Timezone  string `json:"timezone" mapstructure:"timezone"`
 }
 
 func (c *AddLogEvent) Name() string {
@@ -56,7 +57,8 @@ func (c *AddLogEvent) Documentation() string {
 - **Log Group**: Target log group
 - **Log Stream**: Name of the log stream to write to; created automatically if missing
 - **Message**: The log event message
-- **Timestamp**: Optional; defaults to now. Must be within the last 14 days and no more than 2 hours in the future
+- **Timestamp**: Optional; defaults to now (UTC). Must be within the last 14 days and no more than 2 hours in the future
+- **Timezone**: Timezone the timestamp is in, when it has no UTC offset of its own (e.g. picked from the date/time widget). Defaults to UTC; ignored for timestamps that already carry an offset
 
 ## Output
 
@@ -137,11 +139,14 @@ func (c *AddLogEvent) Configuration() []configuration.Field {
 			Label:       "Timestamp",
 			Type:        configuration.FieldTypeDateTime,
 			Required:    false,
-			Description: "Defaults to now",
+			Description: "Defaults to now (UTC)",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "logStream", Values: []string{"*"}},
 			},
 		},
+		timestampTimezoneField([]configuration.VisibilityCondition{
+			{Field: "timestamp", Values: []string{"*"}},
+		}),
 	}
 }
 
@@ -236,24 +241,37 @@ func validateAddLogEventConfiguration(config AddLogEventConfiguration) (time.Tim
 		return time.Now().UTC(), nil
 	}
 
-	return parseLogEventTimestamp(timestampStr)
+	timezone := strings.TrimSpace(config.Timezone)
+	if timezone == "" {
+		timezone = "UTC"
+	}
+
+	return parseLogEventTimestamp(timestampStr, timezone)
 }
 
 // datetimeLocalLayouts covers the value shape produced by the "datetime" field's
 // HTML datetime-local input ("2006-01-02T15:04", with seconds if the user's
-// browser includes them), which carries no timezone and is treated as UTC.
+// browser includes them), which carries no timezone of its own.
 var datetimeLocalLayouts = []string{
 	"2006-01-02T15:04:05",
 	"2006-01-02T15:04",
 }
 
-func parseLogEventTimestamp(raw string) (time.Time, error) {
+// parseLogEventTimestamp accepts either a full RFC3339 timestamp, whose own
+// offset always wins, or a bare datetime-local value, which is interpreted in
+// the given timezone since it carries no offset information of its own.
+func parseLogEventTimestamp(raw, timezone string) (time.Time, error) {
 	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
 		return parsed.UTC(), nil
 	}
 
+	location, err := time.LoadLocation(timezone)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid timezone %q: %w", timezone, err)
+	}
+
 	for _, layout := range datetimeLocalLayouts {
-		if parsed, err := time.Parse(layout, raw); err == nil {
+		if parsed, err := time.ParseInLocation(layout, raw, location); err == nil {
 			return parsed.UTC(), nil
 		}
 	}
