@@ -1136,26 +1136,17 @@ func artifactExpressionPayload(artifact *models.FactoryWorkOrderArtifact) (map[s
 	}, nil
 }
 
-func commentExpressionPayload(event *models.FactoryWorkOrderEvent) (map[string]any, error) {
-	var decoded factory.WorkOrderCommentAdded
-	if len(event.Data) > 0 {
-		if err := json.Unmarshal(event.Data, &decoded); err != nil {
-			return nil, fmt.Errorf("order() could not decode comment data: %w", err)
-		}
-	}
-
+func commentExpressionPayload(comment *models.FactoryWorkOrderComment) (map[string]any, error) {
+	author := comment.Author()
 	payload := map[string]any{
-		"id":         event.ID.String(),
-		"body":       decoded.Body,
-		"created_at": event.CreatedAt,
+		"id":         comment.ID.String(),
+		"body":       comment.Body,
+		"created_at": comment.CreatedAt,
+		"author":     commentAuthorExpressionPayload(&author),
 	}
 
-	if decoded.Author != nil {
-		payload["author"] = commentAuthorExpressionPayload(decoded.Author)
-	}
-
-	if decoded.Run != nil {
-		payload["run"] = map[string]any{"id": decoded.Run.ID.String()}
+	if run := comment.RunRef(); run != nil {
+		payload["run"] = map[string]any{"id": run.ID.String()}
 	}
 
 	return normalizeExpressionValue(payload).(map[string]any), nil
