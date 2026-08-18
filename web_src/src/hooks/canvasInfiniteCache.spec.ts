@@ -38,11 +38,13 @@ describe("parseRunsFiltersFromQueryKey", () => {
     const queryKey = canvasKeys.infiniteRuns("canvas-1", {
       states: ["STATE_STARTED"],
       results: ["RESULT_FAILED", "RESULT_CANCELLED"],
+      triggeredByUserId: "user-1",
     });
 
     expect(parseRunsFiltersFromQueryKey(queryKey)).toEqual({
       states: ["STATE_STARTED"],
       results: ["RESULT_FAILED", "RESULT_CANCELLED"],
+      triggeredByUserId: "user-1",
     });
   });
 
@@ -56,10 +58,17 @@ describe("runMatchesFilters", () => {
     const run = makeRun({ state: "STATE_FINISHED", result: "RESULT_PASSED" });
 
     expect(runMatchesFilters(run, {})).toBe(true);
+    expect(runMatchesFilters(run, { triggeredByUserId: "user-1" })).toBe(false);
     expect(runMatchesFilters(run, { states: ["STATE_FINISHED"] })).toBe(true);
     expect(runMatchesFilters(run, { results: ["RESULT_PASSED"] })).toBe(true);
     expect(runMatchesFilters(run, { states: ["STATE_STARTED"] })).toBe(false);
     expect(runMatchesFilters(run, { results: ["RESULT_FAILED"] })).toBe(false);
+  });
+
+  it("matches runs against triggered-by filters", () => {
+    const run = makeRun({ triggeredBy: { id: "user-1", name: "Me" } });
+    expect(runMatchesFilters(run, { triggeredByUserId: "user-1" })).toBe(true);
+    expect(runMatchesFilters(run, { triggeredByUserId: "user-2" })).toBe(false);
   });
 });
 

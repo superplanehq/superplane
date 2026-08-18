@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -74,53 +75,83 @@ func InvokeNodeTriggerHook(
 
 	expressionParameters := buildHookExpressionParameters(node.Ref.Data().Trigger.Name, hookName, node.Configuration.Data(), parameters)
 
-	resolvedConfiguration, err := contexts.NewNodeConfigurationBuilder(db, node.WorkflowID).
-		WithNodeID(node.NodeID).
-		WithExpressionVariables(map[string]any{
-			"parameters": expressionParameters,
-		}).
-		WithConfigurationFields(hookProvider.Configuration()).
-		Build(contexts.WithoutRunTitleConfiguration(node.Configuration.Data()))
+	userUUID, err := uuid.Parse(userID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "failed to resolve trigger configuration")
+		return nil, grpcerrors.Unauthenticated(err, "user not authenticated")
 	}
 
-	hookCtx := core.TriggerHookContext{
-		Name:          hookName,
-		Parameters:    parameters,
-		Configuration: resolvedConfiguration,
-		HTTP:          registry.HTTPContext(),
-		Metadata:      contexts.NewNodeMetadataContext(db, node),
-		Requests:      contexts.NewNodeRequestContext(db, node),
-		Webhook:       contexts.NewNodeWebhookContext(ctx, db, encryptor, node, webhookBaseURL),
-		Events:        contexts.NewEventContext(db, node, nil, onNewEvents),
-	}
+	shouldRecordTriggeredBy := node.Ref.Data().Trigger.Name == "start" && hookName == "run" ||
+		node.Ref.Data().Trigger.Name == "schedule" && hookName == "run"
 
-	if node.AppInstallationID != nil {
-		integration, err := models.FindUnscopedIntegrationInTransaction(db, *node.AppInstallationID)
+	var hookResult map[string]any
+	err = db.Transaction(func(tx *gorm.DB) error {
+		resolvedConfiguration, err := contexts.NewNodeConfigurationBuilder(tx, node.WorkflowID).
+			WithNodeID(node.NodeID).
+			WithExpressionVariables(map[string]any{
+				"parameters": expressionParameters,
+			}).
+			WithConfigurationFields(hookProvider.Configuration()).
+			Build(contexts.WithoutRunTitleConfiguration(node.Configuration.Data()))
 		if err != nil {
-			logger.Errorf("error finding app installation: %v", err)
-			return nil, grpcerrors.Internal(err, "error building context")
+			return grpcerrors.InvalidArgument(err, "failed to resolve trigger configuration")
 		}
 
-		logger = logging.WithIntegration(logger, *integration)
-		hookCtx.Integration = contexts.NewIntegrationContext(db, node, integration, encryptor, registry, onNewEvents)
-	}
+		var run *models.CanvasRun
+		if shouldRecordTriggeredBy {
+			run, err = models.CreateCanvasRunInTransaction(tx, canvas.ID, node.NodeID, models.CanvasRunStateStarted, "")
+			if err != nil {
+				return err
+			}
 
-	hookCtx.Logger = logger
-	result, err := hookProvider.HandleHook(hookCtx)
+			if err := tx.Model(run).Update("triggered_by", userUUID).Error; err != nil {
+				return err
+			}
+
+			run.TriggeredBy = &userUUID
+		}
+
+		hookCtx := core.TriggerHookContext{
+			Name:          hookName,
+			Parameters:    parameters,
+			Configuration: resolvedConfiguration,
+			HTTP:          registry.HTTPContext(),
+			Metadata:      contexts.NewNodeMetadataContext(tx, node),
+			Requests:      contexts.NewNodeRequestContext(tx, node),
+			Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
+			Events:        contexts.NewEventContext(tx, node, run, onNewEvents),
+		}
+
+		if node.AppInstallationID != nil {
+			integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+			if err != nil {
+				logger.Errorf("error finding app installation: %v", err)
+				return grpcerrors.Internal(err, "error building context")
+			}
+
+			logger = logging.WithIntegration(logger, *integration)
+			hookCtx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry, onNewEvents)
+		}
+
+		hookCtx.Logger = logger
+		hookResult, err = hookProvider.HandleHook(hookCtx)
+		if err != nil {
+			logger.Errorf("trigger hook %q execution failed: %v", hookName, err)
+			return grpcerrors.InvalidArgument(err, "hook execution failed")
+		}
+
+		return nil
+	})
 	if err != nil {
-		logger.Errorf("trigger hook %q execution failed: %v", hookName, err)
-		return nil, grpcerrors.InvalidArgument(err, "hook execution failed")
+		return nil, err
 	}
 
 	if len(newEvents) > 0 {
-		if result == nil {
-			result = map[string]any{}
+		if hookResult == nil {
+			hookResult = map[string]any{}
 		}
 
-		if _, exists := result["event_id"]; !exists {
-			result["event_id"] = newEvents[0].ID.String()
+		if _, exists := hookResult["event_id"]; !exists {
+			hookResult["event_id"] = newEvents[0].ID.String()
 		}
 	}
 
@@ -129,7 +160,7 @@ func InvokeNodeTriggerHook(
 	}
 
 	// Convert result to protobuf struct
-	resultStruct, err := newStructpbStruct(result)
+	resultStruct, err := newStructpbStruct(hookResult)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to create result struct")
 	}

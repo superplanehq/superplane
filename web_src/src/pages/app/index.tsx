@@ -535,9 +535,16 @@ export function AppPage({
   const canvasNodes = canvas?.spec?.nodes ?? EMPTY_CANVAS_SPEC_ITEMS;
 
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
+  const [myRunsOnly, setMyRunsOnly] = useState(false);
   const runApiFilters = useMemo(
-    () => (isRunInspectionMode && selectedRunId ? {} : statusFiltersToApiFilters(runStatusFilters)),
-    [isRunInspectionMode, selectedRunId, runStatusFilters],
+    () => {
+      if (isRunInspectionMode && selectedRunId) return {};
+      const base = statusFiltersToApiFilters(runStatusFilters);
+      if (!myRunsOnly) return base;
+      if (!me?.id) return base;
+      return { ...base, triggeredByUserId: me.id };
+    },
+    [isRunInspectionMode, selectedRunId, runStatusFilters, myRunsOnly, me?.id],
   );
   const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, showLiveActivity);
   const infiniteLogRunsQuery = useInfiniteCanvasRuns(canvasId!, {}, isViewingLiveVersion);
@@ -611,6 +618,7 @@ export function AppPage({
     workflowNodes: canvasNodes,
     componentIconMap,
     onStatusFiltersChange: setRunStatusFilters,
+    onMyRunsOnlyChange: setMyRunsOnly,
   });
   const {
     data: canvasMemoryEntries = [],

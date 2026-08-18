@@ -11,11 +11,19 @@ interface UseRunFiltersParams {
   workflowNodes: ComponentsNode[];
   componentIconMap: Record<string, string>;
   onStatusFiltersChange?: (filters: RunStatusFilter[]) => void;
+  onMyRunsOnlyChange?: (enabled: boolean) => void;
 }
 
-export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange }: UseRunFiltersParams) {
+export function useRunFilters({
+  runs,
+  workflowNodes,
+  componentIconMap,
+  onStatusFiltersChange,
+  onMyRunsOnlyChange,
+}: UseRunFiltersParams) {
   const [selectedTriggerIds, setSelectedTriggerIds] = useState<Set<string>>(() => loadPersistedFilters().triggerIds);
   const [selectedStatuses, setSelectedStatuses] = useState<Set<RunStatusFilter>>(() => loadPersistedFilters().statuses);
+  const [myRunsOnly, setMyRunsOnly] = useState<boolean>(() => loadPersistedFilters().myRunsOnly);
   const [searchQuery, setSearchQuery] = useState("");
 
   const nodeMap = useMemo(() => buildNodeMap(workflowNodes), [workflowNodes]);
@@ -36,8 +44,9 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
 
   useEffect(() => {
     onStatusFiltersChange?.(Array.from(selectedStatuses));
-    savePersistedFilters({ statuses: selectedStatuses, triggerIds: selectedTriggerIds });
-  }, [selectedStatuses, selectedTriggerIds, onStatusFiltersChange]);
+    onMyRunsOnlyChange?.(myRunsOnly);
+    savePersistedFilters({ statuses: selectedStatuses, triggerIds: selectedTriggerIds, myRunsOnly });
+  }, [selectedStatuses, selectedTriggerIds, myRunsOnly, onStatusFiltersChange, onMyRunsOnlyChange]);
 
   useEffect(() => {
     if (triggerOptions.length === 0) return;
@@ -79,11 +88,12 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
   );
 
   const hasSearchFilter = searchQuery.trim().length > 0;
-  const hasAnyFilter = selectedTriggerIds.size > 0 || selectedStatuses.size > 0 || hasSearchFilter;
+  const hasAnyFilter = myRunsOnly || selectedTriggerIds.size > 0 || selectedStatuses.size > 0 || hasSearchFilter;
 
   const clearFilters = useCallback(() => {
     setSelectedStatuses(new Set());
     setSelectedTriggerIds(new Set());
+    setMyRunsOnly(false);
     setSearchQuery("");
   }, []);
 
@@ -108,6 +118,7 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
   return {
     selectedStatuses,
     selectedTriggerIds,
+    myRunsOnly,
     searchQuery,
     triggerOptions,
     filteredRuns,
@@ -118,6 +129,7 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
     clearFilters,
     toggleStatus,
     toggleTrigger,
+    setMyRunsOnly,
     clearStatuses: () => setSelectedStatuses(new Set()),
     clearTriggers: () => setSelectedTriggerIds(new Set()),
   };

@@ -39,6 +39,7 @@ func DescribeRun(ctx context.Context, db *gorm.DB, canvas *models.Canvas, runID 
 		runDetails.rootEventsByRunID[run.ID.String()],
 		runDetails.executionsByRunID[run.ID.String()],
 		runDetails.queueItemsByRunID[run.ID.String()],
+		runDetails.triggeredByUsersByID,
 		parentRunForDescribe(runDetails.parentRunsByRunID, run.ID.String()),
 		runDetails.childRunsByExecutionID,
 	)

@@ -11,6 +11,7 @@ interface UseRunSidebarNavigationStateParams {
   workflowNodes: ComponentsNode[];
   componentIconMap: Record<string, string>;
   onStatusFiltersChange: (filters: RunStatusFilter[]) => void;
+  onMyRunsOnlyChange: (enabled: boolean) => void;
 }
 
 export function useRunSidebarNavigationState({
@@ -20,8 +21,9 @@ export function useRunSidebarNavigationState({
   workflowNodes,
   componentIconMap,
   onStatusFiltersChange,
+  onMyRunsOnlyChange,
 }: UseRunSidebarNavigationStateParams) {
-  const runFilterState = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange });
+  const runFilterState = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange, onMyRunsOnlyChange });
   const runNavigation = useMemo(
     () =>
       getRunSidebarNavigation(runFilterState.orderedRuns, selectedRunId, {

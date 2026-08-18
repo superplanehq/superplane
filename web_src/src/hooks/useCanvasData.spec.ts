@@ -149,6 +149,7 @@ describe("useInfiniteCanvasRuns", () => {
         useInfiniteCanvasRuns("canvas-1", {
           states: ["STATE_FINISHED"],
           results: ["RESULT_FAILED", "RESULT_CANCELLED"],
+          triggeredByUserId: "user-1",
         }),
       {
         wrapper: createWrapper(queryClient),
@@ -163,6 +164,7 @@ describe("useInfiniteCanvasRuns", () => {
             limit: 25,
             states: ["STATE_FINISHED"],
             results: ["RESULT_FAILED", "RESULT_CANCELLED"],
+            triggeredByUserId: "user-1",
           },
         }),
       );
