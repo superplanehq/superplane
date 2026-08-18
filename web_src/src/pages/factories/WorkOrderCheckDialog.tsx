@@ -45,6 +45,7 @@ export function WorkOrderCheckDialog({
             {level.label}
           </Badge>
         </div>
+        <CheckTrendLine check={check} />
 
         {check.summary ? <p className="mt-3 text-sm text-foreground">{check.summary}</p> : null}
 
@@ -70,5 +71,19 @@ export function WorkOrderCheckDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Trend versus the previous report, spelled out in text. */
+function CheckTrendLine({ check }: { check: WorkOrderCheckPresentation }) {
+  if (check.previousScore === undefined || check.previousScore === check.score) {
+    return null;
+  }
+
+  const direction = check.score > check.previousScore ? "Up" : "Down";
+  return (
+    <p className="mt-2 text-[12px] text-muted-foreground">
+      {direction} from <span className="tabular-nums">{check.previousScore}</span> on the previous run.
+    </p>
   );
 }
