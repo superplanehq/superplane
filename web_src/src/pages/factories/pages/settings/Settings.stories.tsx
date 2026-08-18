@@ -60,6 +60,7 @@ export const NotificationsEnabled: Story = {
           workOrderCommentCreated: false,
           workOrderStatusOwned: true,
           workOrderArtifactOwned: false,
+          workOrderMentioned: true,
         },
       }}
     />

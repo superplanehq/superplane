@@ -54,6 +54,7 @@ func UpdateNotificationSettings(
 			models.NotificationTypeWorkOrderCommentCreated: requested.GetWorkOrderCommentCreated(),
 			models.NotificationTypeWorkOrderStatusOwned:    requested.GetWorkOrderStatusOwned(),
 			models.NotificationTypeWorkOrderArtifactOwned:  requested.GetWorkOrderArtifactOwned(),
+			models.NotificationTypeWorkOrderMention:        requested.GetWorkOrderMentioned(),
 		},
 	}
 

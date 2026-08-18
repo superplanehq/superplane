@@ -153,23 +153,52 @@ func (c *FactoryNotificationConsumer) process(db *gorm.DB, message messages.Fact
 		return false, nil
 	}
 
-	content := buildWorkOrderNotificationContent(factoryModel, order, message, c.actorDisplayName(db, orgID, message))
-	applyWorkOrderEmailCard(&content.Data, order, loadWorkOrderExecutionsForEmail(db, order.ID), time.Now())
-	content.Data.WorkOrderLink = fmt.Sprintf(
-		"%s/%s/workspaces/%s/work-order/%d",
-		c.BaseURL, orgID, factoryModel.Key, order.Number,
-	)
+	actorName := c.actorDisplayName(db, orgID, message)
+	executions := loadWorkOrderExecutionsForEmail(db, order.ID)
+	return c.sendWorkOrderNotificationEmails(orgID, factoryModel, order, message, actorName, executions, recipients), nil
+}
 
+type workOrderEmailRecipient struct {
+	email            string
+	notificationType string
+}
+
+func (c *FactoryNotificationConsumer) sendWorkOrderNotificationEmails(
+	orgID uuid.UUID,
+	factoryModel *models.Factory,
+	order *models.FactoryWorkOrder,
+	message messages.FactoryWorkOrderNotificationMessage,
+	actorName string,
+	executions []models.FactoryWorkOrderExecutionRecord,
+	recipients []workOrderEmailRecipient,
+) bool {
+	contentByType := map[string]workOrderNotificationContent{}
 	sent := false
 	for _, recipient := range recipients {
-		if err := c.EmailService.SendWorkOrderNotificationEmail(recipient, content.Subject, content.Data); err != nil {
-			log.Errorf("Failed to send work order notification email to %s: %v", recipient, err)
+		content, ok := contentByType[recipient.notificationType]
+		if !ok {
+			content = buildWorkOrderNotificationContent(
+				factoryModel,
+				order,
+				message,
+				actorName,
+				recipient.notificationType,
+			)
+			applyWorkOrderEmailCard(&content.Data, order, executions, time.Now())
+			content.Data.WorkOrderLink = fmt.Sprintf(
+				"%s/%s/workspaces/%s/work-order/%d",
+				c.BaseURL, orgID, factoryModel.Key, order.Number,
+			)
+			contentByType[recipient.notificationType] = content
+		}
+		if err := c.EmailService.SendWorkOrderNotificationEmail(recipient.email, content.Subject, content.Data); err != nil {
+			log.Errorf("Failed to send work order notification email to %s: %v", recipient.email, err)
 			continue
 		}
 		sent = true
 	}
 
-	return sent, nil
+	return sent
 }
 
 // resolveRecipients returns the email addresses that should receive this
@@ -180,7 +209,7 @@ func (c *FactoryNotificationConsumer) resolveRecipients(
 	orgID, factoryID uuid.UUID,
 	order *models.FactoryWorkOrder,
 	message messages.FactoryWorkOrderNotificationMessage,
-) ([]string, error) {
+) ([]workOrderEmailRecipient, error) {
 	candidates := workOrderNotificationCandidates(order, message)
 	delete(candidates, uuid.Nil)
 	if actorID, err := uuid.Parse(message.ActorUserID); err == nil {
@@ -201,6 +230,7 @@ func (c *FactoryNotificationConsumer) resolveRecipients(
 	}
 
 	allowedIDs := make([]string, 0, len(candidates))
+	allowedTypes := map[string]string{}
 	for userID, notificationType := range candidates {
 		settings, ok := settingsByUserID[userID]
 		if !ok {
@@ -212,7 +242,9 @@ func (c *FactoryNotificationConsumer) resolveRecipients(
 		if !settings.AppliesToFactory(factoryID) {
 			continue
 		}
-		allowedIDs = append(allowedIDs, userID.String())
+		id := userID.String()
+		allowedIDs = append(allowedIDs, id)
+		allowedTypes[id] = notificationType
 	}
 	if len(allowedIDs) == 0 {
 		return nil, nil
@@ -223,14 +255,19 @@ func (c *FactoryNotificationConsumer) resolveRecipients(
 		return nil, err
 	}
 
-	emails := make([]string, 0, len(users))
+	recipients := make([]workOrderEmailRecipient, 0, len(users))
 	for i := range users {
-		if email := users[i].GetEmail(); email != "" {
-			emails = append(emails, email)
+		email := users[i].GetEmail()
+		if email == "" {
+			continue
 		}
+		recipients = append(recipients, workOrderEmailRecipient{
+			email:            email,
+			notificationType: allowedTypes[users[i].ID.String()],
+		})
 	}
 
-	return emails, nil
+	return recipients, nil
 }
 
 // workOrderNotificationCandidates maps candidate recipients to the
@@ -242,42 +279,51 @@ func workOrderNotificationCandidates(
 	message messages.FactoryWorkOrderNotificationMessage,
 ) map[uuid.UUID]string {
 	candidates := map[uuid.UUID]string{}
-
-	addOwners := func(notificationType string) {
-		for _, assignee := range order.Assignees {
-			candidates[assignee.UserID] = notificationType
-		}
-	}
-	addCreator := func(notificationType string) {
-		if order.CreatedByID == nil {
+	add := func(userID uuid.UUID, notificationType string) {
+		if userID == uuid.Nil {
 			return
 		}
-		if _, alreadyCovered := candidates[*order.CreatedByID]; alreadyCovered {
+		if _, exists := candidates[userID]; exists {
 			return
 		}
-		candidates[*order.CreatedByID] = notificationType
+		candidates[userID] = notificationType
 	}
 
 	switch message.EventType {
 	case factory.EventTypeOrderAssigneesUpdated:
 		for _, assignedID := range message.AssignedUserIDs {
 			if userID, err := uuid.Parse(assignedID); err == nil {
-				candidates[userID] = models.NotificationTypeWorkOrderAssigned
+				add(userID, models.NotificationTypeWorkOrderAssigned)
 			}
 		}
 	case factory.EventTypeOrderCommentAdded:
-		addOwners(models.NotificationTypeWorkOrderCommentOwned)
-		addCreator(models.NotificationTypeWorkOrderCommentCreated)
+		for _, mentionedID := range message.MentionedUserIDs {
+			if userID, err := uuid.Parse(mentionedID); err == nil {
+				add(userID, models.NotificationTypeWorkOrderMention)
+			}
+		}
+		for _, assignee := range order.Assignees {
+			add(assignee.UserID, models.NotificationTypeWorkOrderCommentOwned)
+		}
+		if order.CreatedByID != nil {
+			add(*order.CreatedByID, models.NotificationTypeWorkOrderCommentCreated)
+		}
 	case factory.EventTypeOrderStatusUpdated:
 		// The initial `"" → draft` transition is work order creation,
 		// not a change anyone needs an email about.
 		if message.FromState == "" {
 			return candidates
 		}
-		addOwners(models.NotificationTypeWorkOrderStatusOwned)
-		addCreator(models.NotificationTypeWorkOrderStatusOwned)
+		for _, assignee := range order.Assignees {
+			add(assignee.UserID, models.NotificationTypeWorkOrderStatusOwned)
+		}
+		if order.CreatedByID != nil {
+			add(*order.CreatedByID, models.NotificationTypeWorkOrderStatusOwned)
+		}
 	case factory.EventTypeOrderArtifactAdded:
-		addOwners(models.NotificationTypeWorkOrderArtifactOwned)
+		for _, assignee := range order.Assignees {
+			add(assignee.UserID, models.NotificationTypeWorkOrderArtifactOwned)
+		}
 	}
 
 	return candidates
@@ -312,6 +358,7 @@ func buildWorkOrderNotificationContent(
 	order *models.FactoryWorkOrder,
 	message messages.FactoryWorkOrderNotificationMessage,
 	actorName string,
+	notificationType string,
 ) workOrderNotificationContent {
 	orderKey := factoryModel.WorkOrderKey(order.Number)
 
@@ -327,8 +374,13 @@ func buildWorkOrderNotificationContent(
 		content.Subject = fmt.Sprintf("[%s] You are now an owner", orderKey)
 		content.Data.Summary = fmt.Sprintf("%s made you an owner of %s.", actorName, orderKey)
 	case factory.EventTypeOrderCommentAdded:
-		content.Subject = fmt.Sprintf("[%s] New comment from %s", orderKey, actorName)
-		content.Data.Summary = fmt.Sprintf("%s commented on %s.", actorName, orderKey)
+		if notificationType == models.NotificationTypeWorkOrderMention {
+			content.Subject = fmt.Sprintf("[%s] %s mentioned you", orderKey, actorName)
+			content.Data.Summary = fmt.Sprintf("%s mentioned you in a comment on %s.", actorName, orderKey)
+		} else {
+			content.Subject = fmt.Sprintf("[%s] New comment from %s", orderKey, actorName)
+			content.Data.Summary = fmt.Sprintf("%s commented on %s.", actorName, orderKey)
+		}
 		content.Data.Detail = truncateNotificationDetail(message.CommentBody)
 	case factory.EventTypeOrderStatusUpdated:
 		verb := statusChangeDescription(message)

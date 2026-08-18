@@ -29,6 +29,7 @@ interface NotificationTypeToggles {
   workOrderCommentCreated: boolean;
   workOrderStatusOwned: boolean;
   workOrderArtifactOwned: boolean;
+  workOrderMentioned: boolean;
 }
 
 const NOTIFICATION_TYPE_OPTIONS: NotificationTypeOption[] = [
@@ -57,6 +58,11 @@ const NOTIFICATION_TYPE_OPTIONS: NotificationTypeOption[] = [
     label: "New artifacts",
     description: "An artifact is added to a work order you own.",
   },
+  {
+    key: "workOrderMentioned",
+    label: "Mentions",
+    description: "Someone mentions you in a work order comment.",
+  },
 ];
 
 interface NotificationsFormState {
@@ -77,6 +83,7 @@ function formStateFromSettings(settings: MeNotificationSettings | undefined): No
       workOrderCommentCreated: settings?.workOrderCommentCreated ?? true,
       workOrderStatusOwned: settings?.workOrderStatusOwned ?? true,
       workOrderArtifactOwned: settings?.workOrderArtifactOwned ?? true,
+      workOrderMentioned: settings?.workOrderMentioned ?? true,
     },
   };
 }

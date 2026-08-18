@@ -123,6 +123,7 @@ message NotificationSettings {
   bool work_order_comment_created = 6;
   bool work_order_status_owned = 7;
   bool work_order_artifact_owned = 8;
+  bool work_order_mentioned = 9;
 }
 
 message DescribeNotificationSettingsRequest {}
