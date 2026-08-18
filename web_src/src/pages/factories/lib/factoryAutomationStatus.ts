@@ -35,14 +35,16 @@ export function resolveFactoryAutomationStatus(
   let hasQueued = false;
 
   for (const order of workOrders) {
-    for (const execution of order.executions ?? []) {
-      if (execution.run?.appId !== appId) {
-        continue;
+    for (const dispatch of order.lineDispatches ?? []) {
+      for (const execution of dispatch.stepExecutions ?? []) {
+        if (execution.run?.appId !== appId) {
+          continue;
+        }
+        const kind = classifyWorkOrderExecution(execution);
+        if (kind === "running") hasRunning = true;
+        else if (kind === "waiting") hasWaiting = true;
+        else if (kind === "queued") hasQueued = true;
       }
-      const kind = classifyWorkOrderExecution(execution);
-      if (kind === "running") hasRunning = true;
-      else if (kind === "waiting") hasWaiting = true;
-      else if (kind === "queued") hasQueued = true;
     }
   }
 
