@@ -69,6 +69,11 @@ func DescribeFactoryVelocity(
 
 	superplaneMerges, superplaneWaste := classifySuperPlaneArtifacts(artifacts, repoOwner, repoName, hasRepo)
 
+	knownSuperPlane, err := listKnownSuperPlanePRs(db, factoryID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
+	}
+
 	hasPeople := false
 	peopleSearchFailed := false
 	var peopleHits []peopleMerge
@@ -87,7 +92,7 @@ func DescribeFactoryVelocity(
 			log.WithContext(ctx).WithError(searchErr).Warn("factory velocity: GitHub people search failed")
 			peopleSearchFailed = true
 		} else {
-			peopleHits = subtractSuperPlaneHits(hits, superplaneMerges)
+			peopleHits = subtractSuperPlaneHits(hits, knownSuperPlane)
 			hasPeople = true
 		}
 	}
@@ -215,6 +220,24 @@ func listVelocityArtifacts(tx *gorm.DB, factoryID uuid.UUID, from, to time.Time)
 	for i := range closed {
 		if meta, ok := toPRMeta(&closed[i]); ok {
 			meta.isClosedNM = true
+			out = append(out, meta)
+		}
+	}
+	return out, nil
+}
+
+func listKnownSuperPlanePRs(tx *gorm.DB, factoryID uuid.UUID) ([]prArtifactMeta, error) {
+	// Every SuperPlane PR URL, including artifacts that predate merged_at /
+	// closed_at. People search still returns those PRs; subtracting only
+	// windowed timestamps would count them as People.
+	artifacts, err := models.ListFactoryPRArtifacts(tx, factoryID, models.FactoryPRArtifactFilter{})
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]prArtifactMeta, 0, len(artifacts))
+	for i := range artifacts {
+		if meta, ok := toPRMeta(&artifacts[i]); ok {
 			out = append(out, meta)
 		}
 	}

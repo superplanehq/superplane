@@ -97,6 +97,28 @@ func TestSubtractSuperPlaneHits(t *testing.T) {
 	assert.Equal(t, "https://github.com/example/repo/pull/3", got[0].url)
 }
 
+func TestListKnownSuperPlanePRs_IncludesUntimestamped(t *testing.T) {
+	r := support.Setup(t)
+
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	seedPRArtifact(t, factoryModel, "https://github.com/example/repo/pull/11", models.PrArtifactStateOpen, time.Time{})
+	seedPRArtifact(t, factoryModel, "https://github.com/example/repo/pull/12", models.PrArtifactStateMerged, time.Now())
+
+	got, err := listKnownSuperPlanePRs(database.DB(t.Context()), factoryModel.ID)
+	require.NoError(t, err)
+
+	urls := make([]string, 0, len(got))
+	for _, meta := range got {
+		urls = append(urls, meta.url)
+	}
+	assert.ElementsMatch(t, []string{
+		"https://github.com/example/repo/pull/11",
+		"https://github.com/example/repo/pull/12",
+	}, urls)
+}
+
 func TestParsePRURL(t *testing.T) {
 	cases := []struct {
 		url    string
