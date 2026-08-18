@@ -1,14 +1,20 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
+
+var ErrAPIKeyNameAlreadyExists = errors.New("api key name already exists")
+
+const apiKeyNameUniqueConstraint = "unique_api_key_in_organization"
 
 type User struct {
 	ID              uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
@@ -140,6 +146,19 @@ func CreateAPIKey(tx *gorm.DB, orgID uuid.UUID, name string, description *string
 	}
 
 	return user, nil
+}
+
+func MapAPIKeyNameUniqueConstraintError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.ConstraintName == apiKeyNameUniqueConstraint {
+		return ErrAPIKeyNameAlreadyExists
+	}
+
+	return err
 }
 
 func FindAPIKeysByOrganization(db *gorm.DB, orgID string) ([]User, error) {
