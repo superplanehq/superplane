@@ -82,7 +82,7 @@ import {
 } from "@/ui/CanvasPage/canvasFitOptions";
 import { Sentry } from "@/sentry";
 import { useTheme } from "@/contexts/useTheme";
-import { useSidebarLayoutStore, useSidebarMount } from "@/stores/sidebarLayoutStore";
+import { useEffectiveRightSidebarWidth, useSidebarLayoutStore, useSidebarMount } from "@/stores/sidebarLayoutStore";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
@@ -2359,6 +2359,7 @@ function CanvasContent({
     const saved = localStorage.getItem(CONSOLE_HEIGHT_STORAGE_KEY);
     return saved ? parseInt(saved, 10) : 320;
   });
+  const logRightOffset = useEffectiveRightSidebarWidth();
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
   const isEditMode = isEditing;
   const runSelectableSet = useMemo(() => {
@@ -3539,6 +3540,7 @@ function CanvasContent({
           onClose={() => setIsLogSidebarOpen(false)}
           height={logSidebarHeight}
           onHeightChange={setLogSidebarHeight}
+          rightOffset={logRightOffset}
           searchValue={logSearch}
           onSearchChange={setLogSearch}
           entries={filteredLogEntries}
