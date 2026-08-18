@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	actionpb "github.com/superplanehq/superplane/pkg/protos/actions"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -16,24 +17,26 @@ import (
 )
 
 func ListIntegrations(ctx context.Context, registry *registry.Registry) (*pb.ListIntegrationsResponse, error) {
-	integrations := registry.ListIntegrations()
-	orgID := organizationIDFromContext(ctx)
+	orgID, err := organizationIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.ListIntegrationsResponse{
-		Integrations: serializeIntegrations(registry, orgID, integrations),
+		Integrations: serializeIntegrations(registry, orgID, registry.ListIntegrations()),
 	}, nil
 }
 
-func organizationIDFromContext(ctx context.Context) uuid.UUID {
+func organizationIDFromContext(ctx context.Context) (uuid.UUID, error) {
 	raw, ok := authentication.GetOrganizationIdFromMetadata(ctx)
 	if !ok {
-		return uuid.Nil
+		return uuid.Nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil
+		return uuid.Nil, grpcerrors.InvalidArgument(err, "invalid organization ID")
 	}
-	return id
+	return id, nil
 }
 
 func serializeIntegrations(registry *registry.Registry, orgID uuid.UUID, in []core.Integration) []*pb.IntegrationDefinition {
@@ -45,7 +48,7 @@ func serializeIntegrations(registry *registry.Registry, orgID uuid.UUID, in []co
 			configuration[j] = actions.ConfigurationFieldToProto(field)
 		}
 
-		useNewFlow := orgID != uuid.Nil && registry.UseNewSetupFlow(orgID, integration.Name())
+		useNewFlow := registry.UseNewSetupFlow(orgID, integration.Name())
 		out[i] = &pb.IntegrationDefinition{
 			Name:             integration.Name(),
 			Label:            integration.Label(),
