@@ -8,8 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/features"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -218,4 +223,51 @@ func TestListIntegrationsAddsGlobalFieldsToSetupProviderTriggerCapabilities(t *t
 	require.Equal(t, "customName", configuration[1].Name)
 	require.Equal(t, "Run title", configuration[1].Label)
 	require.Equal(t, "{{ root().data.head_commit.message }} - {{ root().data.head_commit.id[:7] }}", configuration[1].GetDefaultValue())
+}
+
+func TestListIntegrationsLegacySetupOnlyRespectsExperimentalFeature(t *testing.T) {
+	setup := support.Setup(t)
+	reg := &registry.Registry{
+		Integrations: map[string]core.Integration{
+			"dummy": impl.NewDummyIntegration(impl.DummyIntegrationOptions{}),
+		},
+		SetupProviders: map[string]core.IntegrationSetupProvider{
+			"dummy": &testSetupProvider{},
+		},
+	}
+
+	ctx := contextWithOrganizationID(setup.Organization.ID.String())
+
+	resp, err := ListIntegrations(ctx, reg)
+	require.NoError(t, err)
+	require.Len(t, resp.Integrations, 1)
+	require.True(t, resp.Integrations[0].LegacySetupOnly)
+
+	require.NoError(t, models.EnableExperimentalFeature(setup.Organization.ID, features.FeatureNewIntegrationSetupFlow))
+
+	resp, err = ListIntegrations(ctx, reg)
+	require.NoError(t, err)
+	require.Len(t, resp.Integrations, 1)
+	require.False(t, resp.Integrations[0].LegacySetupOnly)
+}
+
+func TestListIntegrationsRequiresOrganization(t *testing.T) {
+	reg := &registry.Registry{
+		Integrations: map[string]core.Integration{
+			"dummy": impl.NewDummyIntegration(impl.DummyIntegrationOptions{}),
+		},
+		SetupProviders: map[string]core.IntegrationSetupProvider{},
+	}
+
+	t.Run("missing organization header", func(t *testing.T) {
+		resp, err := ListIntegrations(context.Background(), reg)
+		require.Nil(t, resp)
+		require.Equal(t, codes.Unauthenticated, grpcerrors.Code(err))
+	})
+
+	t.Run("invalid organization id", func(t *testing.T) {
+		resp, err := ListIntegrations(contextWithOrganizationID("not-a-uuid"), reg)
+		require.Nil(t, resp)
+		require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
 }
