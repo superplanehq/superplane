@@ -1,10 +1,11 @@
-import type { WorkOrderCheckPresentation } from "../WorkOrderChecksSection";
+import type { FactoriesWorkOrderCheck } from "@/api-client";
 
 import { OPEN_WORK_ORDER, RUNNING_WORK_ORDER } from "./factoryPageResponses";
 
 /**
  * Mock checks for Storybook — scores that dedicated automations attach to a
- * work order (risk review, coverage, confidence). Timestamps are relative to
+ * work order (risk review, coverage, confidence). Shaped like the
+ * `ListWorkOrderChecks` API response entries. Timestamps are relative to
  * now so the cards always read as recent.
  */
 
@@ -49,94 +50,94 @@ const CONFIDENCE_ANALYSIS = `The agent completed all planned steps without human
 
 Confidence is not higher because the change modifies retry behavior that only manifests under provider degradation, which no automated test simulates.`;
 
-export const OPEN_WORK_ORDER_CHECKS: WorkOrderCheckPresentation[] = [
+export const OPEN_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
   {
     id: "check-risk-review",
+    key: "risk-review",
     name: "Risk review",
     score: 65,
     maxScore: 100,
-    level: "caution",
+    level: "LEVEL_CAUTION",
     previousScore: 82,
     summary: "Moderate risk: retry policy changes affect every refund path and remove the backoff cap.",
     analysis: RISK_REVIEW_ANALYSIS,
-    sourceName: "PR Risk Review",
-    appId: "app-pr-risk-review",
+    automation: { appId: "app-pr-risk-review", appName: "PR Risk Review" },
     runId: "run-risk-review-101",
     updatedAt: minutesAgo(12),
   },
   {
     id: "check-code-coverage",
+    key: "code-coverage",
     name: "Code coverage",
     score: 82,
     maxScore: 100,
-    format: "percent",
-    level: "positive",
+    format: "FORMAT_PERCENT",
+    level: "LEVEL_POSITIVE",
     previousScore: 81,
     summary: "Overall coverage rose to 82% (+1.3%), with a small drop in the provider client package.",
     analysis: CODE_COVERAGE_ANALYSIS,
-    sourceName: "Coverage Report",
-    appId: "app-coverage-report",
+    automation: { appId: "app-coverage-report", appName: "Coverage Report" },
     runId: "run-coverage-101",
     updatedAt: minutesAgo(9),
   },
   {
     id: "check-test-coverage",
+    key: "test-coverage",
     name: "Test coverage",
     score: 74,
     maxScore: 100,
-    format: "percent",
-    level: "neutral",
+    format: "FORMAT_PERCENT",
+    level: "LEVEL_NEUTRAL",
     summary: "74% of the new code is covered; gaps concentrate in retry error handling.",
     analysis: TEST_COVERAGE_ANALYSIS,
-    sourceName: "Coverage Report",
-    appId: "app-coverage-report",
+    automation: { appId: "app-coverage-report", appName: "Coverage Report" },
     runId: "run-coverage-101",
     updatedAt: minutesAgo(9),
   },
   {
     id: "check-confidence",
+    key: "confidence",
     name: "Confidence score",
     score: 8,
     maxScore: 10,
-    level: "positive",
+    level: "LEVEL_POSITIVE",
     previousScore: 7,
     summary: "All planned steps completed without human correction; every automated suite passed first try.",
     analysis: CONFIDENCE_ANALYSIS,
-    sourceName: "Line Confidence",
-    appId: "app-line-confidence",
+    automation: { appId: "app-line-confidence", appName: "Line Confidence" },
     runId: "run-confidence-101",
     updatedAt: minutesAgo(4),
   },
 ];
 
 /** Two checks only — the risk review has landed, coverage is still running. */
-export const RUNNING_WORK_ORDER_CHECKS: WorkOrderCheckPresentation[] = [
+export const RUNNING_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
   {
     id: "check-risk-review-running",
+    key: "risk-review",
     name: "Risk review",
     score: 38,
     maxScore: 100,
-    level: "neutral",
+    level: "LEVEL_NEUTRAL",
     summary: "Low-moderate risk: the change is additive and scoped to one worker.",
     analysis:
       "### Summary\n\nThe change adds a new reconciliation worker without touching existing dispatch paths. Blast radius is limited to the new queue.\n\n### Concerns\n\n- The worker shares a database pool with the dispatcher; a slow query could starve it under load.",
-    sourceName: "PR Risk Review",
-    appId: "app-pr-risk-review",
+    automation: { appId: "app-pr-risk-review", appName: "PR Risk Review" },
     runId: "run-risk-review-102",
     updatedAt: minutesAgo(25),
   },
   {
     id: "check-confidence-running",
+    key: "confidence",
     name: "Confidence score",
     score: 6,
     maxScore: 10,
-    level: "caution",
+    level: "LEVEL_CAUTION",
     previousScore: 8,
     summary: "The agent needed one human correction during planning; verification has not run yet.",
     analysis:
       "The plan step was corrected once: the agent initially targeted the wrong ledger table. Implementation followed the corrected plan without further intervention.\n\nVerification is still in progress, so this score may change.",
-    sourceName: "Line Confidence",
-    appId: "app-line-confidence",
+    automation: { appId: "app-line-confidence", appName: "Line Confidence" },
     runId: "run-confidence-102",
     updatedAt: minutesAgo(11),
   },
@@ -145,23 +146,24 @@ export const RUNNING_WORK_ORDER_CHECKS: WorkOrderCheckPresentation[] = [
 /** Fallback map for fixtures that do not override `checksByOrderId` —
  * the open order carries the full set, the running order a partial one,
  * and every other order (closed, draft, failed) has none. */
-export const DEFAULT_CHECKS_BY_ORDER_ID: Record<string, WorkOrderCheckPresentation[]> = {
+export const DEFAULT_CHECKS_BY_ORDER_ID: Record<string, FactoriesWorkOrderCheck[]> = {
   [OPEN_WORK_ORDER.id!]: OPEN_WORK_ORDER_CHECKS,
   [RUNNING_WORK_ORDER.id!]: RUNNING_WORK_ORDER_CHECKS,
 };
 
 /** A single critical check — the smallest interesting state. */
-export const CRITICAL_WORK_ORDER_CHECKS: WorkOrderCheckPresentation[] = [
+export const CRITICAL_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
   {
     id: "check-risk-review-critical",
+    key: "risk-review",
     name: "Risk review",
     score: 91,
     maxScore: 100,
-    level: "critical",
+    level: "LEVEL_CRITICAL",
     summary: "Critical risk: the change disables idempotency checks on refund submission.",
     analysis:
       "### Summary\n\nThe diff removes the idempotency key from `ProviderClient.refund`. A retry after a network timeout would submit the refund twice.\n\n### Concerns\n\n- Duplicate refunds are unrecoverable without manual reconciliation.\n- No test covers the timeout-then-retry sequence.",
-    sourceName: "PR Risk Review",
+    automation: { appName: "PR Risk Review" },
     updatedAt: minutesAgo(2),
   },
 ];

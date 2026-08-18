@@ -4,36 +4,9 @@ import { useState } from "react";
 import { formatRelative } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
+import type { WorkOrderCheckLevel, WorkOrderCheckPresentation } from "./lib/workOrderChecks";
 import { getWorkOrderRunHref } from "./lib/workOrderExecutions";
 import { WorkOrderCheckDialog } from "./WorkOrderCheckDialog";
-
-/** How strongly the reported score should alarm (or reassure) the reader.
- * The emitting automation decides — the UI cannot know whether a high
- * number is good (coverage) or bad (risk). */
-export type WorkOrderCheckLevel = "positive" | "neutral" | "caution" | "critical";
-
-export interface WorkOrderCheckPresentation {
-  id: string;
-  /** Short human name, e.g. "Risk review" or "Code coverage". */
-  name: string;
-  score: number;
-  maxScore: number;
-  /** "percent" renders `82%`; "fraction" (default) renders `65/100`. */
-  format?: "fraction" | "percent";
-  level: WorkOrderCheckLevel;
-  /** Score from the previous report of the same check — powers the trend delta. */
-  previousScore?: number;
-  /** One-line result, shown in the expanded dialog under the score. */
-  summary?: string;
-  /** Full markdown analysis behind the score. */
-  analysis?: string;
-  /** Automation that produced the check, e.g. "PR Risk Review". */
-  sourceName?: string;
-  /** App + run that reported the score — powers the "View run" link. */
-  appId?: string;
-  runId?: string;
-  updatedAt?: string;
-}
 
 const LEVEL_METER_CLASSNAME: Record<WorkOrderCheckLevel, string> = {
   positive: "bg-emerald-500",
