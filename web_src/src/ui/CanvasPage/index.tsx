@@ -793,6 +793,7 @@ function CanvasPage(props: CanvasPageProps) {
   const state = useCanvasState(props);
   const readOnly = props.readOnly ?? false;
   const workflowHeaderMode = normalizeCanvasHeaderMode(props.headerMode);
+  const rightPanelWidth = useSidebarLayoutStore((sidebarState) => sidebarState.rightWidth);
   const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">(() =>
     props.canvasStateMode === "editing" ? "settings" : "latest",
   );
@@ -1380,6 +1381,17 @@ function CanvasPage(props: CanvasPageProps) {
     ],
   );
 
+  // The bottom log console is absolutely positioned across the full canvas width;
+  // offset it by the open right panel's width so it stops beside the panel
+  // instead of sliding underneath it (see #6472).
+  const isRightPanelOpenForLog =
+    (isComponentSidebarVisibleMode(props.headerMode) &&
+      !props.isRunInspectionMode &&
+      !!props.isEditing &&
+      state.componentSidebar.isOpen) ||
+    (!props.hideAddControls && isBuildingBlocksSidebarOpen && !!props.isEditing && allowsBuildingBlocksSidebar(workflowHeaderMode));
+  const logSidebarRightOffset = isRightPanelOpenForLog ? rightPanelWidth : 0;
+
   return (
     <div
       ref={canvasWrapperRef}
@@ -1589,6 +1601,7 @@ function CanvasPage(props: CanvasPageProps) {
                   missingIntegrations={props.missingIntegrations}
                   onConnectIntegration={props.onConnectIntegration}
                   canCreateIntegrations={props.canCreateIntegrations}
+                  logSidebarRightOffset={logSidebarRightOffset}
                 />
               </ReactFlowProvider>
             )}
@@ -2227,6 +2240,7 @@ function CanvasContent({
   missingIntegrations,
   onConnectIntegration,
   canCreateIntegrations,
+  logSidebarRightOffset = 0,
 }: {
   state: CanvasPageState;
   factoryId?: string;
@@ -2287,6 +2301,7 @@ function CanvasContent({
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
   canCreateIntegrations?: boolean;
+  logSidebarRightOffset?: number;
 }) {
   const { fitView, screenToFlowPosition, getViewport, getInternalNode, getNodes, setViewport } = useReactFlow();
   const factoryAutoLayout = isFactoryAutoLayout(layoutMode);
@@ -3537,6 +3552,7 @@ function CanvasContent({
         <CanvasLogSidebar
           isOpen={isLogSidebarOpen}
           onClose={() => setIsLogSidebarOpen(false)}
+          rightOffset={logSidebarRightOffset}
           height={logSidebarHeight}
           onHeightChange={setLogSidebarHeight}
           searchValue={logSearch}
