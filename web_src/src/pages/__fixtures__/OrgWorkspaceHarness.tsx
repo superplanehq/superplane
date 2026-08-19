@@ -24,6 +24,7 @@ import {
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
   FactorySettingsSoonPage,
+  FactorySettingsUsagePage,
   FACTORY_SETTINGS_NAV_ITEMS,
   LegacyWorkOrderDetailRedirect,
   LinesPage,
@@ -43,6 +44,7 @@ import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGat
 import { HomePage } from "@/pages/home";
 import { homePageIds, type HomePageFixture } from "@/pages/home/__fixtures__/handlers";
 import { NewAppPage } from "@/pages/home/NewAppPage";
+import { OrganizationSettings } from "@/pages/organization/settings";
 import type { AgentSuggestion } from "@/ui/CanvasPage";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -254,7 +256,8 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
           <Route path=":factoryKey/settings" element={factoryRoute(<FactorySettingsLayout />)}>
             <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
             <Route path="general" element={<FactorySettingsGeneralPage />} />
-            {FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.id !== "general").map((item) => (
+            <Route path="usage" element={<FactorySettingsUsagePage />} />
+            {FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.id !== "general" && item.id !== "usage").map((item) => (
               <Route
                 key={item.id}
                 path={item.id}
@@ -273,6 +276,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
           path="settings/integrations/:integrationName/setup"
           element={<div data-testid="integration-setup-placeholder">Integration setup</div>}
         />
+        <Route path="settings/*" element={<OrganizationSettings />} />
       </Route>
     </Routes>
   );

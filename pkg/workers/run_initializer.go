@@ -165,6 +165,8 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 	}
 
 	stateUpdated := false
+	alreadyInitialized := false
+	failedBeforeStart := false
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		locked, err := models.LockCanvasRunInTransaction(tx, runID)
 		if err != nil {
@@ -182,6 +184,7 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 
 		if locked.State != models.CanvasRunStatePending {
 			logger.Infof("Run already initialized - skipping")
+			alreadyInitialized = true
 			return nil
 		}
 
@@ -199,6 +202,7 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 			if err := w.failRun(tx, locked, eventCollector, executionCollector, err.Error()); err != nil {
 				return err
 			}
+			failedBeforeStart = true
 			stateUpdated = true
 			return nil
 		}
@@ -223,6 +227,10 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 
 	if err != nil {
 		return err
+	}
+
+	if alreadyInitialized || failedBeforeStart {
+		rollUpFactoryUsageBestEffort(logger, database.Conn(), runID)
 	}
 
 	if stateUpdated {
@@ -312,6 +320,12 @@ func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runI
 
 	if err := execution.RollupUsage(tx); err != nil {
 		w.logger.WithError(err).WithField("run_id", runID).Error("failed to roll up factory usage")
+	}
+
+	// A later initializer pass can find this step already finished after a
+	// rollup error. Still copy ledger totals, but do not finish the line twice.
+	if execution.Status == models.FactoryWorkOrderExecutionStatusFinished {
+		return nil
 	}
 
 	if err := execution.MarkFinished(tx, result); err != nil {

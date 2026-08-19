@@ -1,3 +1,4 @@
+import { EMPTY_USAGE_REPORT } from "./usageReportFixtures";
 import {
   defaultFactoriesFixture,
   ORGANIZATION_USERS,
@@ -123,6 +124,10 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     {
       pattern: re("/api/v1/factories/([^/]+)/apps"),
       resolve: (match) => ({ json: { apps: fixture.appsByFactoryId[match[1]] ?? [] } }),
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/usage"),
+      resolve: (match) => ({ json: fixture.usageByFactoryId?.[match[1]] ?? EMPTY_USAGE_REPORT }),
     },
   ];
 }
@@ -330,6 +335,13 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   ];
 }
 
+function organizationLlmSpendRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/llm-spend"),
+    resolve: () => ({ json: fixture.organizationLlmSpend ?? EMPTY_USAGE_REPORT }),
+  };
+}
+
 /** Builds a resolvable factories route table for a fixture snapshot. */
 function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
@@ -337,6 +349,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...factoryDetailRoutes(fixture),
     ...factoryLinesRoutes(fixture),
     ...workOrderRoutes(fixture),
+    organizationLlmSpendRoute(fixture),
   ];
 }
 
