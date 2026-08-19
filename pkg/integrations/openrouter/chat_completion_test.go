@@ -266,7 +266,10 @@ func Test__ChatCompletion__Execute(t *testing.T) {
 		assert.Equal(t, map[string]any{"city": "Nairobi"}, payload.Parsed)
 	})
 
-	t.Run("structured output keeps routing the user configured", func(t *testing.T) {
+	// Switching Provider Routing on persists requireParameters=false from the
+	// field default, so honouring that value would drop the pin precisely when
+	// routing is configured.
+	t.Run("structured output pins routing even when the block says otherwise", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{Responses: []*http.Response{response(http.StatusOK, completionBody)}}
 
 		require.NoError(t, c.Execute(execContext(map[string]any{
@@ -277,8 +280,20 @@ func Test__ChatCompletion__Execute(t *testing.T) {
 		}, httpContext, &contexts.ExecutionStateContext{})))
 
 		provider := requestBody(t, httpContext.Requests[0])["provider"].(map[string]any)
-		assert.Equal(t, "price", provider["sort"])
-		// An explicit opt-out is respected rather than overridden.
+		assert.Equal(t, "price", provider["sort"], "the rest of the routing block is preserved")
+		assert.Equal(t, true, provider["require_parameters"])
+	})
+
+	t.Run("routing is left alone without a schema", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{response(http.StatusOK, completionBody)}}
+
+		require.NoError(t, c.Execute(execContext(map[string]any{
+			"model":    "openai/gpt-4o-mini",
+			"prompt":   "Where?",
+			"provider": map[string]any{"sort": "price", "requireParameters": false},
+		}, httpContext, &contexts.ExecutionStateContext{})))
+
+		provider := requestBody(t, httpContext.Requests[0])["provider"].(map[string]any)
 		assert.Equal(t, false, provider["require_parameters"])
 	})
 

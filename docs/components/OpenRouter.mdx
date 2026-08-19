@@ -66,7 +66,7 @@ A model ID on OpenRouter is a listing, not a server: several providers compete t
 - **Optimize For**: Sort candidate providers by price, throughput, or latency
 - **Allowed Providers** / **Excluded Providers**: Restrict routing to (or away from) specific providers. The list is narrowed to the providers actually serving the selected model.
 - **Allow Fallbacks**: When off, the request fails rather than silently rerouting to a provider outside your preferences
-- **Require Parameter Support**: Only route to providers that honour every parameter sent. Off by default, matching OpenRouter — a provider that does not support a parameter accepts the request and ignores it rather than returning an error.
+- **Require Parameter Support**: Only route to providers that honour every parameter sent. Off by default, matching OpenRouter — a provider that does not support a parameter accepts the request and ignores it rather than returning an error. Configuring Structured Output forces it on regardless of this setting.
 - **Data Collection**: Set to Deny to exclude providers that may train on submitted data
 
 ### Output
@@ -89,7 +89,7 @@ Returns the completion including:
 - Attachments are inlined into the request body rather than uploaded, so the combined size is capped at 8MB.
 - Only PDFs and images are sent as attachments. Text files become part of the prompt, so they cost prompt tokens and are not subject to OpenRouter's document parsing.
 - Web search is billed per request on top of tokens, so it costs money even when the model itself is free.
-- Structured Output is supported by most but not all models. Because a provider that does not support it accepts the request and ignores the schema, enabling it forces Require Parameter Support on, which can make the request fail rather than silently return prose.
+- Structured Output is supported by most but not all models. Because a provider that does not support it accepts the request and ignores the schema, enabling it forces Require Parameter Support on, overriding that setting in Provider Routing. This can make a request fail outright rather than silently return prose, which is the intended trade: an unparseable reply is harder to notice than an error.
 - Image generation is not available here. OpenRouter generates images through a separate endpoint, and the `modalities` parameter is ignored by chat completions.
 
 ### Example Output
