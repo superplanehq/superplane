@@ -4,8 +4,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -23,8 +25,35 @@ const keyBody = `{"data":{
 	"is_free_tier": false
 }}`
 
+// creditsContext is an integration connected via OAuth that also has the
+// provisioning key /credits requires.
+func creditsContext(httpContext *contexts.HTTPContext, state *contexts.ExecutionStateContext) core.ExecutionContext {
+	return core.ExecutionContext{
+		Logger:         logrus.NewEntry(logrus.New()),
+		Configuration:  map[string]any{},
+		HTTP:           httpContext,
+		Integration:    connectedIntegration(map[string]any{"managementKey": "sk-or-provisioning"}),
+		ExecutionState: state,
+	}
+}
+
 func Test__GetCredits__Execute(t *testing.T) {
 	c := &GetCredits{}
+
+	t.Run("requires a provisioning key", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+
+		err := c.Execute(core.ExecutionContext{
+			Logger:         logrus.NewEntry(logrus.New()),
+			Configuration:  map[string]any{},
+			HTTP:           httpContext,
+			Integration:    connectedIntegration(map[string]any{}),
+			ExecutionState: &contexts.ExecutionStateContext{},
+		})
+
+		require.ErrorContains(t, err, "provisioning API key is not configured")
+		assert.Empty(t, httpContext.Requests)
+	})
 
 	t.Run("success", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
@@ -33,7 +62,7 @@ func Test__GetCredits__Execute(t *testing.T) {
 		}}
 		state := &contexts.ExecutionStateContext{}
 
-		err := c.Execute(execContext(map[string]any{}, httpContext, state))
+		err := c.Execute(creditsContext(httpContext, state))
 		require.NoError(t, err)
 
 		require.Len(t, httpContext.Requests, 2)
@@ -63,7 +92,7 @@ func Test__GetCredits__Execute(t *testing.T) {
 		}}
 		state := &contexts.ExecutionStateContext{}
 
-		require.NoError(t, c.Execute(execContext(map[string]any{}, httpContext, state)))
+		require.NoError(t, c.Execute(creditsContext(httpContext, state)))
 
 		output := state.Payloads[0].(map[string]any)["data"].(GetCreditsOutput)
 		assert.Nil(t, output.Key.Limit)
@@ -76,7 +105,7 @@ func Test__GetCredits__Execute(t *testing.T) {
 			response(http.StatusUnauthorized, `{"error":{"message":"User not found.","code":401}}`),
 		}}
 
-		err := c.Execute(execContext(map[string]any{}, httpContext, &contexts.ExecutionStateContext{}))
+		err := c.Execute(creditsContext(httpContext, &contexts.ExecutionStateContext{}))
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "401")
@@ -89,7 +118,7 @@ func Test__GetCredits__Execute(t *testing.T) {
 			response(http.StatusTooManyRequests, `{"error":{"message":"Rate limit exceeded","code":429,"metadata":{"retry_after_seconds":5}}}`),
 		}}
 
-		err := c.Execute(execContext(map[string]any{}, httpContext, &contexts.ExecutionStateContext{}))
+		err := c.Execute(creditsContext(httpContext, &contexts.ExecutionStateContext{}))
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "retry after 5 seconds")

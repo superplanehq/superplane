@@ -15,24 +15,28 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-## OpenRouter API Key
+## Connecting
 
-Create an [OpenRouter API key](https://openrouter.ai/settings/keys) and copy it (starts with `sk-or-v1-`).
+Connecting sends you to OpenRouter to approve access. OpenRouter issues an API key back to SuperPlane automatically, so there is no key to copy for **Chat Completion**.
 
-- Used by every component below, including **Get Credits**.
-- A credit limit can be set per key; leave it empty for no limit.
+- You need an OpenRouter account with credits available.
+- The connection uses OAuth with PKCE, so there is no app to register.
+- To disconnect, delete the key under [Keys](https://openrouter.ai/settings/keys) and re-connect here.
 
 ## Provisioning API Key (optional)
 
-Not required by any component below. Create one at [Provisioning Keys](https://openrouter.ai/settings/provisioning-keys) only if you want the integration to verify account-wide activity access.
+Only required by the **Get Credits** component. OpenRouter's OAuth cannot issue this kind of key, so it is entered by hand.
 
-- Provisioning keys manage keys and read account activity, but cannot call model endpoints.
+Create one at [Provisioning Keys](https://openrouter.ai/settings/provisioning-keys) and paste it below.
+
+- Provisioning keys read account credits and manage keys, but cannot call model endpoints.
+- Leave it empty if you only use Chat Completion.
 
 ## Credits
 
 Chat Completion spends credits from your OpenRouter account. Free model variants (IDs ending in `:free`) draw from a shared upstream pool and are rate limited independently of your balance.
 
-> **Note:** Keys are shown only once — store them somewhere safe before continuing.
+> **Note:** The provisioning key is shown only once — store it somewhere safe before continuing.
 
 <a id="chat-completion"></a>
 
@@ -183,7 +187,7 @@ The Get Credits component fetches the credit balance of your OpenRouter account 
 
 ### Configuration
 
-None. The component uses the API key configured on the integration.
+None on the component itself. It uses the **Provisioning API Key** set on the integration, which OpenRouter requires for reading account credits.
 
 ### Output
 
@@ -195,7 +199,8 @@ The output includes:
 
 ### Notes
 
-- Works with a normal API key; no provisioning key is required
+- Requires a Provisioning API Key on the integration. OpenRouter documents `/credits` as a management-key endpoint, and OAuth cannot issue that kind of key.
+- The key figures describe the OAuth-issued inference key, while the credit totals describe the account.
 - `key.limit` and `key.limitRemaining` are null when the key has no credit limit set
 - Account credit totals cover the whole account, while the key figures cover only the configured key
 

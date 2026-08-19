@@ -48,12 +48,23 @@ const completionBody = `{
 	"usage": {"prompt_tokens": 14, "completion_tokens": 9, "total_tokens": 23, "cost": 0.0000075}
 }`
 
+// connectedIntegration is an integration that finished the OAuth flow, so the
+// inference key lives in secrets rather than configuration.
+func connectedIntegration(config map[string]any) *contexts.IntegrationContext {
+	return &contexts.IntegrationContext{
+		Configuration: config,
+		CurrentSecrets: map[string]core.IntegrationSecret{
+			SecretAPIKey: {Name: SecretAPIKey, Value: []byte("sk-or-v1-test")},
+		},
+	}
+}
+
 func execContext(config map[string]any, httpContext *contexts.HTTPContext, state *contexts.ExecutionStateContext) core.ExecutionContext {
 	return core.ExecutionContext{
 		Logger:         logrus.NewEntry(logrus.New()),
 		Configuration:  config,
 		HTTP:           httpContext,
-		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-or-v1-test"}},
+		Integration:    connectedIntegration(map[string]any{}),
 		ExecutionState: state,
 	}
 }
@@ -144,6 +155,46 @@ func Test__ChatCompletion__Execute(t *testing.T) {
 			"require_parameters": true,
 			"data_collection":    "deny",
 		}, body["provider"])
+	})
+
+	// Node configuration arrives as JSON, so the numeric fields reach Execute as
+	// float64 or json.Number rather than as Go ints.
+	t.Run("numeric fields survive the JSON round trip", func(t *testing.T) {
+		for name, value := range map[string]any{
+			"float64":     float64(1024),
+			"json.Number": json.Number("1024"),
+			"int":         1024,
+		} {
+			t.Run(name, func(t *testing.T) {
+				httpContext := &contexts.HTTPContext{Responses: []*http.Response{response(http.StatusOK, completionBody)}}
+
+				err := c.Execute(execContext(map[string]any{
+					"model":       "openai/gpt-4o-mini",
+					"prompt":      "Say hello",
+					"maxTokens":   value,
+					"temperature": value,
+				}, httpContext, &contexts.ExecutionStateContext{}))
+
+				require.NoError(t, err)
+				body := requestBody(t, httpContext.Requests[0])
+				assert.Equal(t, float64(1024), body["max_tokens"])
+				assert.Equal(t, float64(1024), body["temperature"])
+			})
+		}
+	})
+
+	t.Run("numeric fields are omitted when unset", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{response(http.StatusOK, completionBody)}}
+
+		err := c.Execute(execContext(map[string]any{
+			"model":  "openai/gpt-4o-mini",
+			"prompt": "Say hello",
+		}, httpContext, &contexts.ExecutionStateContext{}))
+
+		require.NoError(t, err)
+		body := requestBody(t, httpContext.Requests[0])
+		assert.NotContains(t, body, "max_tokens")
+		assert.NotContains(t, body, "temperature")
 	})
 
 	t.Run("the balanced sort is omitted rather than sent", func(t *testing.T) {

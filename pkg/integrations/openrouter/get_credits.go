@@ -1,6 +1,7 @@
 package openrouter
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -61,7 +62,7 @@ func (c *GetCredits) Documentation() string {
 
 ## Configuration
 
-None. The component uses the API key configured on the integration.
+None on the component itself. It uses the **Provisioning API Key** set on the integration, which OpenRouter requires for reading account credits.
 
 ## Output
 
@@ -73,7 +74,8 @@ The output includes:
 
 ## Notes
 
-- Works with a normal API key; no provisioning key is required
+- Requires a Provisioning API Key on the integration. OpenRouter documents ` + "`/credits`" + ` as a management-key endpoint, and OAuth cannot issue that kind of key.
+- The key figures describe the OAuth-issued inference key, while the credit totals describe the account.
 - ` + "`key.limit`" + ` and ` + "`key.limitRemaining`" + ` are null when the key has no credit limit set
 - Account credit totals cover the whole account, while the key figures cover only the configured key`
 }
@@ -102,6 +104,10 @@ func (c *GetCredits) Execute(ctx core.ExecutionContext) error {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
+	}
+
+	if client.ManagementKey == "" {
+		return fmt.Errorf("provisioning API key is not configured in the integration")
 	}
 
 	credits, err := client.GetCredits()

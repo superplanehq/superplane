@@ -2,13 +2,19 @@ package openrouter
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
+
+const connectDescription = `Connect your OpenRouter account.
+
+You will be sent to OpenRouter to approve the connection, and an API key will be issued back to SuperPlane automatically. Nothing needs to be copied by hand.`
 
 func init() {
 	registry.RegisterIntegration("openrouter", &OpenRouter{})
@@ -22,7 +28,6 @@ const (
 type OpenRouter struct{}
 
 type Configuration struct {
-	APIKey        string `json:"apiKey"`
 	ManagementKey string `json:"managementKey"`
 }
 
@@ -45,20 +50,12 @@ func (o *OpenRouter) Description() string {
 func (o *OpenRouter) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "apiKey",
-			Label:       "API Key",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Sensitive:   true,
-			Description: "OpenRouter API key (sk-or-v1-...)",
-		},
-		{
 			Name:        "managementKey",
 			Label:       "Provisioning API Key",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Sensitive:   true,
-			Description: "Provisioning key, used for account-wide activity reporting. Not required by the components below.",
+			Description: "Only needed for Get Credits. OpenRouter's OAuth cannot issue a provisioning key, so this one is entered by hand.",
 		},
 	}
 }
@@ -75,24 +72,28 @@ func (o *OpenRouter) Triggers() []core.Trigger {
 }
 
 func (o *OpenRouter) Instructions() string {
-	return `## OpenRouter API Key
+	return `## Connecting
 
-Create an [OpenRouter API key](https://openrouter.ai/settings/keys) and copy it (starts with ` + "`sk-or-v1-`" + `).
+Connecting sends you to OpenRouter to approve access. OpenRouter issues an API key back to SuperPlane automatically, so there is no key to copy for **Chat Completion**.
 
-- Used by every component below, including **Get Credits**.
-- A credit limit can be set per key; leave it empty for no limit.
+- You need an OpenRouter account with credits available.
+- The connection uses OAuth with PKCE, so there is no app to register.
+- To disconnect, delete the key under [Keys](https://openrouter.ai/settings/keys) and re-connect here.
 
 ## Provisioning API Key (optional)
 
-Not required by any component below. Create one at [Provisioning Keys](https://openrouter.ai/settings/provisioning-keys) only if you want the integration to verify account-wide activity access.
+Only required by the **Get Credits** component. OpenRouter's OAuth cannot issue this kind of key, so it is entered by hand.
 
-- Provisioning keys manage keys and read account activity, but cannot call model endpoints.
+Create one at [Provisioning Keys](https://openrouter.ai/settings/provisioning-keys) and paste it below.
+
+- Provisioning keys read account credits and manage keys, but cannot call model endpoints.
+- Leave it empty if you only use Chat Completion.
 
 ## Credits
 
 Chat Completion spends credits from your OpenRouter account. Free model variants (IDs ending in ` + "`:free`" + `) draw from a shared upstream pool and are rate limited independently of your balance.
 
-> **Note:** Keys are shown only once — store them somewhere safe before continuing.`
+> **Note:** The provisioning key is shown only once — store it somewhere safe before continuing.`
 }
 
 func (o *OpenRouter) Cleanup(ctx core.IntegrationCleanupContext) error {
@@ -105,8 +106,15 @@ func (o *OpenRouter) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
-	if config.APIKey == "" {
-		return fmt.Errorf("apiKey is required")
+	callbackURL := fmt.Sprintf("%s/api/v1/integrations/%s/callback", ctx.BaseURL, ctx.Integration.ID())
+
+	//
+	// Without a key, send the user through OpenRouter's OAuth consent screen.
+	// The key is issued there rather than pasted in.
+	//
+	apiKey, _ := findSecret(ctx.Integration, SecretAPIKey)
+	if apiKey == "" {
+		return o.requestAuthorization(ctx, callbackURL)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -118,20 +126,112 @@ func (o *OpenRouter) Sync(ctx core.SyncContext) error {
 		return err
 	}
 
-	// The provisioning key is optional and unused by the components, so a failed
-	// verification must not block them from becoming ready.
+	// The provisioning key is only used by Get Credits, so a failed verification
+	// must not block Chat Completion from becoming ready.
 	if config.ManagementKey != "" {
 		if err := client.VerifyManagement(); err != nil && ctx.Logger != nil {
 			ctx.Logger.Warnf("provisioning key verification failed: %v", err)
 		}
 	}
 
+	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.Ready()
 	return nil
 }
 
+// requestAuthorization starts the PKCE flow: it mints a verifier, stores it, and
+// points the user at OpenRouter's consent screen.
+func (o *OpenRouter) requestAuthorization(ctx core.SyncContext, callbackURL string) error {
+	verifier, err := newCodeVerifier()
+	if err != nil {
+		return fmt.Errorf("failed to generate code verifier: %v", err)
+	}
+
+	if err := ctx.Integration.SetSecret(SecretCodeVerifier, []byte(verifier)); err != nil {
+		return fmt.Errorf("failed to store code verifier: %v", err)
+	}
+
+	state, err := crypto.Base64String(32)
+	if err != nil {
+		return fmt.Errorf("failed to generate state: %v", err)
+	}
+	ctx.Integration.SetMetadata(Metadata{State: state})
+
+	ctx.Integration.NewBrowserAction(core.BrowserAction{
+		Description: connectDescription,
+		URL:         authorizeURL(callbackURL, state, verifier),
+		Method:      "GET",
+	})
+
+	return nil
+}
+
 func (o *OpenRouter) HandleRequest(ctx core.HTTPRequestContext) {
-	// no-op
+	if !strings.HasSuffix(ctx.Request.URL.Path, "/callback") {
+		ctx.Response.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	settingsURL := fmt.Sprintf("%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID())
+
+	code := ctx.Request.URL.Query().Get("code")
+	if code == "" {
+		ctx.Logger.Error("Callback error: missing code")
+		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		return
+	}
+
+	//
+	// This endpoint is unauthenticated, so the state guards against a forged
+	// callback planting someone else's key. OpenRouter's authorize endpoint takes
+	// no state parameter of its own, so it rides along in callback_url and only
+	// comes back if OpenRouter preserves the query string.
+	//
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		ctx.Logger.Errorf("Callback error: failed to decode metadata: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	state := ctx.Request.URL.Query().Get("state")
+	if state != "" && state != metadata.State {
+		ctx.Logger.Error("Callback error: invalid state")
+		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		return
+	}
+	if state == "" {
+		ctx.Logger.Warn("Callback did not carry the state parameter; it could not be verified")
+	}
+
+	verifier, err := findSecret(ctx.Integration, SecretCodeVerifier)
+	if err != nil || verifier == "" {
+		ctx.Logger.Error("Callback error: no code verifier stored")
+		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		return
+	}
+
+	apiKey, err := NewAuth(ctx.HTTP).ExchangeCode(code, verifier)
+	if err != nil {
+		ctx.Logger.Errorf("Callback error: %v", err)
+		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		return
+	}
+
+	if err := ctx.Integration.SetSecret(SecretAPIKey, []byte(apiKey)); err != nil {
+		ctx.Logger.Errorf("Callback error: failed to store key: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// The verifier and state are single-use.
+	_ = ctx.Integration.SetSecret(SecretCodeVerifier, []byte(""))
+	ctx.Integration.SetMetadata(Metadata{})
+
+	ctx.Integration.RemoveBrowserAction()
+	ctx.Integration.Ready()
+
+	http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
 }
 
 func (o *OpenRouter) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {

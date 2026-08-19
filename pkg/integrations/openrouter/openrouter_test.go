@@ -3,6 +3,7 @@ package openrouter
 import (
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -20,92 +21,223 @@ func response(status int, body string) *http.Response {
 	}
 }
 
+func syncContext(integration *contexts.IntegrationContext, httpContext *contexts.HTTPContext) core.SyncContext {
+	return core.SyncContext{
+		Logger:        logrus.NewEntry(logrus.New()),
+		Configuration: integration.Configuration,
+		BaseURL:       "https://app.superplane.test",
+		HTTP:          httpContext,
+		Integration:   integration,
+	}
+}
+
 func Test__Sync(t *testing.T) {
 	o := &OpenRouter{}
 
-	t.Run("success", func(t *testing.T) {
+	t.Run("without a key it sends the user to OpenRouter's consent screen", func(t *testing.T) {
+		integration := &contexts.IntegrationContext{Configuration: map[string]any{}}
+
+		err := o.Sync(syncContext(integration, &contexts.HTTPContext{}))
+
+		require.NoError(t, err)
+		require.NotNil(t, integration.BrowserAction)
+		assert.Equal(t, "GET", integration.BrowserAction.Method)
+		assert.Contains(t, integration.BrowserAction.URL, AuthorizeURL)
+		assert.Contains(t, integration.BrowserAction.URL, "code_challenge_method=S256")
+
+		// The callback carries the state, since OpenRouter's authorize endpoint
+		// takes no state parameter of its own.
+		assert.Contains(t, integration.BrowserAction.URL, "callback_url=")
+		assert.Contains(t, integration.BrowserAction.URL, "state")
+
+		// The verifier is a secret, never metadata: metadata reaches the browser.
+		verifier, err := findSecret(integration, SecretCodeVerifier)
+		require.NoError(t, err)
+		assert.NotEmpty(t, verifier)
+		assert.NotContains(t, integration.BrowserAction.URL, verifier)
+
+		assert.NotEqual(t, "ready", integration.State)
+	})
+
+	t.Run("with a key it verifies and becomes ready", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				response(http.StatusOK, `{"data":{"label":"test","usage":0,"is_free_tier":true}}`),
 			},
 		}
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{"apiKey": "sk-or-v1-test"},
-		}
+		integration := connectedIntegration(map[string]any{})
+		integration.BrowserAction = &core.BrowserAction{URL: "stale"}
 
-		err := o.Sync(core.SyncContext{
-			Logger:        logrus.NewEntry(logrus.New()),
-			Configuration: map[string]any{"apiKey": "sk-or-v1-test"},
-			HTTP:          httpContext,
-			Integration:   integrationCtx,
-		})
+		err := o.Sync(syncContext(integration, httpContext))
 
 		require.NoError(t, err)
-		assert.Equal(t, "ready", integrationCtx.State)
+		assert.Equal(t, "ready", integration.State)
+		assert.Nil(t, integration.BrowserAction)
 		require.Len(t, httpContext.Requests, 1)
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "/key")
 		assert.Equal(t, "Bearer sk-or-v1-test", httpContext.Requests[0].Header.Get("Authorization"))
 		assert.Equal(t, attributionTitle, httpContext.Requests[0].Header.Get("X-Title"))
-		assert.Equal(t, attributionReferer, httpContext.Requests[0].Header.Get("HTTP-Referer"))
 	})
 
-	t.Run("invalid key", func(t *testing.T) {
+	t.Run("a revoked key fails the sync", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				response(http.StatusUnauthorized, `{"error":{"message":"User not found.","code":401}}`),
 			},
 		}
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{"apiKey": "bad"},
-		}
+		integration := connectedIntegration(map[string]any{})
 
-		err := o.Sync(core.SyncContext{
-			Logger:        logrus.NewEntry(logrus.New()),
-			Configuration: map[string]any{"apiKey": "bad"},
-			HTTP:          httpContext,
-			Integration:   integrationCtx,
-		})
+		err := o.Sync(syncContext(integration, httpContext))
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "401")
-		assert.Contains(t, err.Error(), "User not found.")
-		assert.NotEqual(t, "ready", integrationCtx.State)
+		assert.NotEqual(t, "ready", integration.State)
 	})
 
-	t.Run("missing api key", func(t *testing.T) {
-		err := o.Sync(core.SyncContext{
-			Logger:        logrus.NewEntry(logrus.New()),
-			Configuration: map[string]any{"apiKey": ""},
-			HTTP:          &contexts.HTTPContext{},
-			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{}},
-		})
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "apiKey is required")
-	})
-
-	t.Run("provisioning key failure does not block readiness", func(t *testing.T) {
+	t.Run("a bad provisioning key does not block readiness", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				response(http.StatusOK, `{"data":{"label":"test"}}`),
-				response(http.StatusForbidden, `{"error":{"message":"Management key required.","code":403}}`),
+				response(http.StatusForbidden, `{"error":{"message":"Only management keys can fetch activity for an account","code":403}}`),
 			},
 		}
-		config := map[string]any{"apiKey": "sk-or-v1-test", "managementKey": "sk-or-provisioning"}
-		integrationCtx := &contexts.IntegrationContext{Configuration: config}
+		integration := connectedIntegration(map[string]any{"managementKey": "sk-or-provisioning"})
 
-		err := o.Sync(core.SyncContext{
-			Logger:        logrus.NewEntry(logrus.New()),
-			Configuration: config,
-			HTTP:          httpContext,
-			Integration:   integrationCtx,
-		})
+		err := o.Sync(syncContext(integration, httpContext))
 
 		require.NoError(t, err)
-		assert.Equal(t, "ready", integrationCtx.State)
+		assert.Equal(t, "ready", integration.State)
 		require.Len(t, httpContext.Requests, 2)
 		assert.Contains(t, httpContext.Requests[1].URL.String(), "/activity")
 		assert.Equal(t, "Bearer sk-or-provisioning", httpContext.Requests[1].Header.Get("Authorization"))
+	})
+}
+
+func callbackRequest(target string) *http.Request {
+	return httptest.NewRequest(http.MethodGet, target, nil)
+}
+
+func Test__HandleRequest__Callback(t *testing.T) {
+	o := &OpenRouter{}
+
+	newIntegration := func() *contexts.IntegrationContext {
+		return &contexts.IntegrationContext{
+			Configuration:  map[string]any{},
+			Metadata:       map[string]any{"state": "expected-state"},
+			CurrentSecrets: map[string]core.IntegrationSecret{SecretCodeVerifier: {Name: SecretCodeVerifier, Value: []byte("verifier-123")}},
+			BrowserAction:  &core.BrowserAction{URL: "authorize"},
+		}
+	}
+
+	requestContext := func(integration *contexts.IntegrationContext, httpContext *contexts.HTTPContext, target string, recorder *httptest.ResponseRecorder) core.HTTPRequestContext {
+		return core.HTTPRequestContext{
+			Logger:         logrus.NewEntry(logrus.New()),
+			Request:        callbackRequest(target),
+			Response:       recorder,
+			BaseURL:        "https://app.superplane.test",
+			OrganizationID: "org-1",
+			HTTP:           httpContext,
+			Integration:    integration,
+		}
+	}
+
+	t.Run("exchanges the code and stores the key", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{response(http.StatusOK, `{"key":"sk-or-v1-issued"}`)},
+		}
+		integration := newIntegration()
+		recorder := httptest.NewRecorder()
+
+		o.HandleRequest(requestContext(integration, httpContext, "/api/v1/integrations/abc/callback?code=the-code&state=expected-state", recorder))
+
+		require.Len(t, httpContext.Requests, 1)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/auth/keys")
+
+		body, err := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(body), `"code":"the-code"`)
+		assert.Contains(t, string(body), `"code_verifier":"verifier-123"`)
+		assert.Contains(t, string(body), `"code_challenge_method":"S256"`)
+
+		key, err := findSecret(integration, SecretAPIKey)
+		require.NoError(t, err)
+		assert.Equal(t, "sk-or-v1-issued", key)
+
+		// The verifier is single-use.
+		verifier, err := findSecret(integration, SecretCodeVerifier)
+		require.NoError(t, err)
+		assert.Empty(t, verifier)
+
+		assert.Equal(t, "ready", integration.State)
+		assert.Nil(t, integration.BrowserAction)
+		assert.Equal(t, http.StatusSeeOther, recorder.Code)
+	})
+
+	t.Run("rejects a mismatched state without exchanging", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		integration := newIntegration()
+		recorder := httptest.NewRecorder()
+
+		o.HandleRequest(requestContext(integration, httpContext, "/api/v1/integrations/abc/callback?code=the-code&state=forged", recorder))
+
+		assert.Empty(t, httpContext.Requests)
+		key, _ := findSecret(integration, SecretAPIKey)
+		assert.Empty(t, key)
+		assert.NotEqual(t, "ready", integration.State)
+	})
+
+	t.Run("does not exchange without a code", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		integration := newIntegration()
+		recorder := httptest.NewRecorder()
+
+		o.HandleRequest(requestContext(integration, httpContext, "/api/v1/integrations/abc/callback?state=expected-state", recorder))
+
+		assert.Empty(t, httpContext.Requests)
+		assert.NotEqual(t, "ready", integration.State)
+	})
+
+	t.Run("surfaces an exchange failure without storing a key", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{response(http.StatusBadRequest, `{"error":{"message":"Invalid code","code":400}}`)},
+		}
+		integration := newIntegration()
+		recorder := httptest.NewRecorder()
+
+		o.HandleRequest(requestContext(integration, httpContext, "/api/v1/integrations/abc/callback?code=bad&state=expected-state", recorder))
+
+		key, _ := findSecret(integration, SecretAPIKey)
+		assert.Empty(t, key)
+		assert.NotEqual(t, "ready", integration.State)
+	})
+
+	t.Run("ignores unknown paths", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+
+		o.HandleRequest(requestContext(newIntegration(), &contexts.HTTPContext{}, "/api/v1/integrations/abc/webhook", recorder))
+
+		assert.Equal(t, http.StatusNotFound, recorder.Code)
+	})
+}
+
+func Test__PKCE(t *testing.T) {
+	t.Run("the challenge is the unpadded base64url SHA-256 of the verifier", func(t *testing.T) {
+		// Test vector from RFC 7636 appendix B.
+		assert.Equal(t,
+			"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+			codeChallenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
+		)
+	})
+
+	t.Run("verifiers are unpadded and unique", func(t *testing.T) {
+		first, err := newCodeVerifier()
+		require.NoError(t, err)
+		second, err := newCodeVerifier()
+		require.NoError(t, err)
+
+		assert.NotEqual(t, first, second)
+		assert.NotContains(t, first, "=")
+		assert.GreaterOrEqual(t, len(first), 43)
 	})
 }
 
@@ -124,7 +256,7 @@ func Test__ListResources__Models(t *testing.T) {
 	resources, err := o.ListResources(ResourceTypeModel, core.ListResourcesContext{
 		Logger:      logrus.NewEntry(logrus.New()),
 		HTTP:        httpContext,
-		Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "key"}},
+		Integration: connectedIntegration(map[string]any{}),
 	})
 
 	require.NoError(t, err)
@@ -150,7 +282,7 @@ func Test__ListResources__Providers(t *testing.T) {
 		resources, err := o.ListResources(ResourceTypeProvider, core.ListResourcesContext{
 			Logger:      logrus.NewEntry(logrus.New()),
 			HTTP:        httpContext,
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "key"}},
+			Integration: connectedIntegration(map[string]any{}),
 			Parameters:  map[string]string{"model": "openai/gpt-4o-mini"},
 		})
 
@@ -179,7 +311,7 @@ func Test__ListResources__Providers(t *testing.T) {
 		resources, err := o.ListResources(ResourceTypeProvider, core.ListResourcesContext{
 			Logger:      logrus.NewEntry(logrus.New()),
 			HTTP:        httpContext,
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "key"}},
+			Integration: connectedIntegration(map[string]any{}),
 		})
 
 		require.NoError(t, err)
@@ -195,7 +327,7 @@ func Test__ListResources__UnknownType(t *testing.T) {
 	resources, err := o.ListResources("unknown", core.ListResourcesContext{
 		Logger:      logrus.NewEntry(logrus.New()),
 		HTTP:        &contexts.HTTPContext{},
-		Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "key"}},
+		Integration: connectedIntegration(map[string]any{}),
 	})
 
 	require.NoError(t, err)

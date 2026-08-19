@@ -39,7 +39,9 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 		return nil, fmt.Errorf("no integration context")
 	}
 
-	apiKey, err := ctx.GetConfig("apiKey")
+	// The inference key is issued by the OAuth exchange and stored as a secret,
+	// not entered as configuration.
+	apiKey, err := findSecret(ctx, SecretAPIKey)
 	if err != nil {
 		return nil, err
 	}
@@ -47,10 +49,19 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 	managementKey, _ := ctx.GetConfig("managementKey")
 
 	return &Client{
-		APIKey:        string(apiKey),
+		APIKey:        apiKey,
 		ManagementKey: string(managementKey),
 		http:          httpClient,
 	}, nil
+}
+
+// readAll drains a response body.
+func readAll(res *http.Response) ([]byte, error) {
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+	return body, nil
 }
 
 // ChatCompletionRequest is the OpenAI-compatible chat completions body.
@@ -272,8 +283,15 @@ func (c *Client) ListProviders() ([]Provider, error) {
 	return response.Data, nil
 }
 
+// GetCredits reads the account credit totals. OpenRouter documents /credits as a
+// management-key endpoint, so it is signed with the provisioning key rather than
+// the inference key, even though the endpoint currently also accepts the latter.
 func (c *Client) GetCredits() (*Credits, error) {
-	body, err := c.execRequest(http.MethodGet, baseURL+"/credits", nil)
+	if c.ManagementKey == "" {
+		return nil, fmt.Errorf("provisioning API key is not configured")
+	}
+
+	body, err := c.execRequestWithKey(context.Background(), http.MethodGet, baseURL+"/credits", nil, c.ManagementKey)
 	if err != nil {
 		return nil, err
 	}
@@ -286,6 +304,9 @@ func (c *Client) GetCredits() (*Credits, error) {
 	return &response.Data, nil
 }
 
+// GetKey reports usage and limits for the key that signs the request, so it uses
+// the inference key: the provisioning key's own usage is not what the component
+// reports on.
 func (c *Client) GetKey() (*KeyInfo, error) {
 	body, err := c.execRequest(http.MethodGet, baseURL+"/key", nil)
 	if err != nil {
