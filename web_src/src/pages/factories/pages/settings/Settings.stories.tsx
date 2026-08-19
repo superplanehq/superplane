@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
+import { eventTypesFromToggles, defaultNotificationTypeToggles } from "@/lib/notificationSettings";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
 
 /**
@@ -22,6 +23,51 @@ export const General: Story = {
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/general`}
       factoriesFixture={defaultFactoriesFixture}
+    />
+  ),
+};
+
+export const Profile: Story = {
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/profile`}
+      factoriesFixture={defaultFactoriesFixture}
+    />
+  ),
+};
+
+export const Notifications: Story = {
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/notifications`}
+      factoriesFixture={defaultFactoriesFixture}
+    />
+  ),
+};
+
+export const NotificationsFiltered: Story = {
+  name: "Notifications (Filtered)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/notifications`}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        notificationSettings: {
+          workspaces: {
+            scope: "WORKSPACE_SCOPE_FILTERED",
+            filters: [
+              {
+                workspaceId: defaultFactoriesFixture.factories[0]?.id ?? "",
+                eventTypes: eventTypesFromToggles({
+                  ...defaultNotificationTypeToggles(),
+                  TYPE_WORK_ORDER_COMMENT_CREATED: false,
+                  TYPE_WORK_ORDER_ARTIFACT_OWNED: false,
+                }),
+              },
+            ],
+          },
+        },
+      }}
     />
   ),
 };

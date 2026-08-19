@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
-import { factoryContentBodyClassName } from "../factoryPageLayoutStyles";
+import { FactorySettingsPageFrame } from "./FactorySettingsCard";
 
 interface FactorySettingsSoonPageProps {
   title: string;
@@ -13,18 +12,15 @@ export function FactorySettingsSoonPage({ title, description, Icon }: FactorySet
   usePageTitle([title, "Settings"]);
 
   return (
-    <>
-      <WorkspacePageHeader title={title} subtitle={description} />
-      <div className={factoryContentBodyClassName}>
-        <div
-          className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card px-8 py-16 text-center"
-          data-testid="factory-settings-soon"
-        >
-          <Icon className="h-10 w-10 text-muted-foreground" aria-hidden />
-          <p className="mt-4 text-[15px] font-semibold text-foreground">Soon</p>
-          <p className="mt-2 max-w-md text-[13px] text-muted-foreground">This section is coming soon.</p>
-        </div>
+    <FactorySettingsPageFrame title={title} subtitle={description}>
+      <div
+        className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card px-8 py-16 text-center"
+        data-testid="factory-settings-soon"
+      >
+        <Icon className="h-10 w-10 text-muted-foreground" aria-hidden />
+        <p className="mt-4 text-[15px] font-semibold text-foreground">Soon</p>
+        <p className="mt-2 max-w-md text-[13px] text-muted-foreground">This section is coming soon.</p>
       </div>
-    </>
+    </FactorySettingsPageFrame>
   );
 }
