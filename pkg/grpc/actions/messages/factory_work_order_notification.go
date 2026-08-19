@@ -21,13 +21,14 @@ type FactoryWorkOrderNotificationMessage struct {
 	// automation actors; those recipients are never excluded.
 	ActorUserID string `json:"actor_user_id,omitempty"`
 	// ActorName is a display name for automation actors (app or node name).
-	ActorName       string   `json:"actor_name,omitempty"`
-	AssignedUserIDs []string `json:"assigned_user_ids,omitempty"`
-	CommentBody     string   `json:"comment_body,omitempty"`
-	FromState       string   `json:"from_state,omitempty"`
-	ToState         string   `json:"to_state,omitempty"`
-	Result          string   `json:"result,omitempty"`
-	ArtifactType    string   `json:"artifact_type,omitempty"`
+	ActorName        string   `json:"actor_name,omitempty"`
+	AssignedUserIDs  []string `json:"assigned_user_ids,omitempty"`
+	CommentBody      string   `json:"comment_body,omitempty"`
+	MentionedUserIDs []string `json:"mentioned_user_ids,omitempty"`
+	FromState        string   `json:"from_state,omitempty"`
+	ToState          string   `json:"to_state,omitempty"`
+	Result           string   `json:"result,omitempty"`
+	ArtifactType     string   `json:"artifact_type,omitempty"`
 }
 
 func (m FactoryWorkOrderNotificationMessage) Publish() error {

@@ -97,6 +97,52 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		assert.NotEmpty(t, sent[0].Data.AssigneeInitials)
 	})
 
+	t.Run("mention notifies mentioned users and wins over owner comment", func(t *testing.T) {
+		mentioned := support.CreateUser(t, r, r.Organization.ID)
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+		enableNotifications(t, mentioned.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		emailService := services.NewNoopEmailService()
+		message := commentMessage(creator.ID.String())
+		message.MentionedUserIDs = []string{mentioned.ID.String(), owner.ID.String()}
+		consume(t, newConsumer(emailService), message)
+
+		sent := emailService.SentWorkOrderNotificationEmails()
+		recipients := make([]string, 0, len(sent))
+		for _, email := range sent {
+			recipients = append(recipients, email.ToEmail)
+			assert.Contains(t, email.Subject, "mentioned you")
+		}
+		assert.ElementsMatch(t, []string{mentioned.GetEmail(), owner.GetEmail()}, recipients)
+	})
+
+	t.Run("filtered type list without mentions blocks the mention email", func(t *testing.T) {
+		mentioned := support.CreateUser(t, r, r.Organization.ID)
+		enableNotifications(t, mentioned.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeFiltered,
+			WorkspaceFilters: []models.NotificationWorkspaceFilter{{
+				WorkspaceID: factoryModel.ID.String(),
+				EventTypes:  []string{models.NotificationTypeWorkOrderAssigned},
+			}},
+		})
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		emailService := services.NewNoopEmailService()
+		message := commentMessage(creator.ID.String())
+		message.MentionedUserIDs = []string{mentioned.ID.String()}
+		consume(t, newConsumer(emailService), message)
+
+		for _, email := range emailService.SentWorkOrderNotificationEmails() {
+			assert.NotEqual(t, mentioned.GetEmail(), email.ToEmail)
+		}
+	})
+
 	t.Run("filtered type list without comments blocks the email", func(t *testing.T) {
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeFiltered,
