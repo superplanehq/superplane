@@ -158,6 +158,7 @@ Returns the completion including:
 - Only PDFs and images are sent as attachments. Text files become part of the prompt, so they cost prompt tokens and are not subject to OpenRouter's document parsing.
 - Web search is billed per request on top of tokens, so it costs money even when the model itself is free.
 - Structured Output is supported by most but not all models. Because a provider that does not support it accepts the request and ignores the schema, enabling it forces Require Parameter Support on, overriding that setting in Provider Routing. This can make a request fail outright rather than silently return prose, which is the intended trade: an unparseable reply is harder to notice than an error.
+- The schema is validated before the request and sent in strict mode. Strict mode marks every property required, so express optional fields by making their type nullable.
 - Image generation is not available here. OpenRouter generates images through a separate endpoint, and the ` + "`modalities`" + ` parameter is ignored by chat completions.`
 }
 
@@ -274,7 +275,7 @@ func (c *ChatCompletion) Configuration() []configuration.Field {
 		structuredoutput.ConfigField(
 			"outputSchema",
 			"Structured Output",
-			"A JSON Schema describing the response. The model is constrained to return JSON matching it (available on the `parsed` output). The schema is validated before the request and sent in strict mode; strict mode marks every property required, so express optional fields by making their type nullable. Only some models support this, so the request is automatically restricted to providers that honour it.",
+			"A JSON Schema describing the response.",
 		),
 		{
 			Name:        "provider",
