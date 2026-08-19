@@ -26,8 +26,10 @@ export function resolveDefaultDialogName(
   dialogIntegrationName: string | null,
   pending: OrganizationsIntegration | undefined,
   existingNames: Set<string>,
+  preferredName?: string,
 ): string {
   if (pending?.metadata?.name) return pending.metadata.name;
+  if (preferredName?.trim()) return getNextIntegrationName(preferredName.trim(), existingNames);
   if (!dialogIntegrationName) return "";
   return getNextIntegrationName(dialogIntegrationName, existingNames);
 }
@@ -37,6 +39,7 @@ export function useCreateDialogProps(
   availableIntegrations: Array<{ name?: string; [key: string]: unknown }>,
   connected: OrganizationsIntegration[],
   existingIntegrationNames: Set<string>,
+  preferredName?: string,
 ) {
   const dialogDefinition = useMemo(
     () => (dialogIntegrationName ? availableIntegrations.find((d) => d.name === dialogIntegrationName) : undefined),
@@ -54,8 +57,9 @@ export function useCreateDialogProps(
   const initialWebhookSetup = useMemo(() => buildWebhookSetup(dialogPendingInstance), [dialogPendingInstance]);
 
   const defaultDialogName = useMemo(
-    () => resolveDefaultDialogName(dialogIntegrationName, dialogPendingInstance, existingIntegrationNames),
-    [dialogIntegrationName, dialogPendingInstance, existingIntegrationNames],
+    () =>
+      resolveDefaultDialogName(dialogIntegrationName, dialogPendingInstance, existingIntegrationNames, preferredName),
+    [dialogIntegrationName, dialogPendingInstance, existingIntegrationNames, preferredName],
   );
 
   return { dialogDefinition, dialogPendingInstance, initialWebhookSetup, defaultDialogName };
