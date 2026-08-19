@@ -61,6 +61,13 @@ describe("setup factory line apps", () => {
     const pr = materializeOnboardingApp("line-pr");
     expect(pr).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
   });
+
+  it("links the pull request back to the work order", () => {
+    const pr = materializeOnboardingApp("line-pr");
+
+    expect(pr).toMatch(/component: github\.createPullRequest[\s\S]*\[Work Order\]\(\{\{ order\(\)\.url \}\}\)/);
+    expect(pr).toContain("Created via [SuperPlane](https://superplane.com)");
+  });
 });
 
 describe("setup factory event apps", () => {

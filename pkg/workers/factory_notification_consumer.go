@@ -155,10 +155,7 @@ func (c *FactoryNotificationConsumer) process(db *gorm.DB, message messages.Fact
 
 	content := buildWorkOrderNotificationContent(factoryModel, order, message, c.actorDisplayName(db, orgID, message))
 	applyWorkOrderEmailCard(&content.Data, order, loadWorkOrderExecutionsForEmail(db, order.ID), time.Now())
-	content.Data.WorkOrderLink = fmt.Sprintf(
-		"%s/%s/workspaces/%s/work-order/%d",
-		c.BaseURL, orgID, factoryModel.Key, order.Number,
-	)
+	content.Data.WorkOrderLink = c.BaseURL + order.URLPath(factoryModel.Key)
 
 	sent := false
 	for _, recipient := range recipients {
