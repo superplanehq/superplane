@@ -207,8 +207,13 @@ func resolveWorkspace(tx *gorm.DB, orgID uuid.UUID, workspaceID, workspaceKey st
 }
 
 func mapWorkspaceLookupError(err error) error {
-	if errors.Is(err, models.ErrFactoryNotFound) {
+	switch {
+	case errors.Is(err, models.ErrFactoryNotFound):
 		return grpcerrors.InvalidArgument(nil, "one or more selected workspaces were not found")
+	case errors.Is(err, models.ErrFactoryKeyRequired):
+		return grpcerrors.InvalidArgument(err, "workspace key is required")
+	case errors.Is(err, models.ErrFactoryKeyInvalid):
+		return grpcerrors.InvalidArgument(err, "workspace key must be 2 to 5 uppercase letters")
 	}
 	if _, _, ok := grpcerrors.HandlerStatus(err); ok {
 		return err
