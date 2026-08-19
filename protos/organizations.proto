@@ -117,6 +117,17 @@ service Organizations {
     };
   }
 
+  rpc DescribeOrganizationLLMSpend(DescribeOrganizationLLMSpendRequest) returns (DescribeOrganizationLLMSpendResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/llm-spend"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe organization LLM spend";
+      description: "Returns token and estimated dollar spend for factory LLM calls, grouped by model";
+      tags: "Organization";
+    };
+  }
+
   rpc AcceptInviteLink(InviteLink) returns (google.protobuf.Struct) {
     option (google.api.http) = {
       post: "/api/v1/invite-links/{token}/accept"
@@ -368,6 +379,26 @@ message DescribeUsageResponse {
   string status_message = 2;
   OrganizationLimits limits = 3;
   OrganizationUsage usage = 4;
+}
+
+message DescribeOrganizationLLMSpendRequest {
+  string id = 1;
+  // Period window in days. Defaults to 30. Maximum is 90.
+  int32 period_days = 2;
+}
+
+message DescribeOrganizationLLMSpendResponse {
+  int64 total_tokens = 1;
+  int64 total_cost_cents = 2;
+  int32 period_days = 3;
+  repeated LLMSpendByModel by_model = 4;
+}
+
+message LLMSpendByModel {
+  string provider = 1;
+  string model = 2;
+  int64 total_tokens = 3;
+  int64 cost_cents = 4;
 }
 
 message RemoveUserRequest {

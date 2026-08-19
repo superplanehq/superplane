@@ -26,6 +26,7 @@ import {
   FactorySettingsNotificationsPage,
   FactorySettingsProfilePage,
   FactorySettingsSoonPage,
+  FactorySettingsUsagePage,
   FACTORY_SETTINGS_NAV_ITEMS,
   isFactorySettingsComingSoon,
   LegacyWorkOrderDetailRedirect,
@@ -258,6 +259,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
           <Route path=":factoryKey/settings" element={factoryRoute(<FactorySettingsLayout />)}>
             <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
             <Route path="general" element={<FactorySettingsGeneralPage />} />
+            <Route path="usage" element={<FactorySettingsUsagePage />} />
             <Route path="profile" element={<FactorySettingsProfilePage />} />
             <Route path="notifications" element={<FactorySettingsNotificationsPage />} />
             {FACTORY_SETTINGS_NAV_ITEMS.filter(isFactorySettingsComingSoon).map((item) => (

@@ -355,6 +355,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	}
 
 	var finalized bool
+	var skippedAsFinished bool
 	var nextFactoryLineRuns []factoryLinePendingRun
 	var factoryOrderUpdates []factoryWorkOrderUpdate
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -368,6 +369,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		if err != nil {
 			return err
 		}
+		skippedAsFinished = skipReason == runFinalizerReasonAlreadyFinished
 		if !finalized {
 			return nil
 		}
@@ -381,6 +383,13 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		outcome = executorOutcomeFailed
 		reason = classifyProcessError(err)
 		return err
+	}
+
+	// Retry cached spend after the finish transaction. A rollup error must not
+	// block the factory line, but a later pass still has to fill total_tokens
+	// and cost_cents from ledger rows.
+	if finalized || skippedAsFinished {
+		rollUpFactoryUsageBestEffort(logger, database.Conn(), runID)
 	}
 
 	if !finalized {
@@ -539,6 +548,13 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	run, err := models.LockCanvasRunInTransaction(tx, runID)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// Fill cached spend even when this step is already finished. A previous
+	// pass can mark the step finished after a rollup error, and a later pass
+	// must still copy ledger totals into total_tokens / cost_cents.
+	if err := execution.RollupUsage(tx); err != nil {
+		w.logger.WithError(err).WithField("run_id", runID).Error("failed to roll up factory usage")
 	}
 
 	if execution.Status == models.FactoryWorkOrderExecutionStatusFinished {
