@@ -5,6 +5,7 @@ import {
   factoryDetailPath,
   factorySettingsGeneralPathAfterKeyChange,
   legacyWorkOrderDetailPath,
+  parseFactoryAppNavFrom,
   workOrderDetailPath,
   workOrdersPath,
 } from "./factoryPagePaths";
@@ -56,5 +57,15 @@ describe("factorySettingsGeneralPathAfterKeyChange", () => {
 describe("factoryAppConfigurePath", () => {
   it("adds configure=1", () => {
     expect(factoryAppConfigurePath("org-1", "SP", "app-1")).toBe("/org-1/workspaces/SP/apps/app-1?configure=1");
+  });
+});
+
+describe("parseFactoryAppNavFrom", () => {
+  it("accepts known from values", () => {
+    expect(parseFactoryAppNavFrom("lines")).toBe("lines");
+  });
+
+  it("returns undefined for unknown from values", () => {
+    expect(parseFactoryAppNavFrom("canvas")).toBeUndefined();
   });
 });

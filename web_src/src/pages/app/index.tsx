@@ -272,6 +272,7 @@ export type { FactoryConfigureActions } from "./useFactoryConfigureSession";
 export function AppPage({
   factoryEmbed = false,
   factoryConfigure = false,
+  factoryAgentEnabled = false,
   factoryConfigureActionsRef,
   onFactoryConfigureBusyChange,
   onFactoryConfigureDone,
@@ -279,6 +280,8 @@ export function AppPage({
   factoryEmbed?: boolean;
   /** Factory-shell Configure: same chrome as embed, but canvas edit session allowed. */
   factoryConfigure?: boolean;
+  /** Factory-shell opt-in: show the in-app agent sidebar next to the canvas. */
+  factoryAgentEnabled?: boolean;
   /** Imperative Discard/Save handlers for the factory Configure chrome (no setState bridge). */
   factoryConfigureActionsRef?: MutableRefObject<FactoryConfigureActions | null>;
   onFactoryConfigureBusyChange?: (busy: boolean) => void;
@@ -371,7 +374,7 @@ export function AppPage({
   const { data: availableIntegrations = [], isLoading: integrationsLoading } = useAvailableIntegrations();
   const canReadIntegrations = canAct("integrations", "read");
   const canUpdateIntegrations = canAct("integrations", "update");
-  const canUseAgents = !factoryEmbed && canAct("agents", "create") && canAct("agents", "read");
+  const canUseAgents = (!factoryEmbed || factoryAgentEnabled) && canAct("agents", "create") && canAct("agents", "read");
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const {
     data: liveCanvas,
@@ -3713,6 +3716,7 @@ export function AppPage({
   });
   const factoryEmbedCanvasChrome = resolveFactoryEmbedCanvasChrome({
     factoryEmbed,
+    factoryAgentEnabled,
     factoryViewOnly,
     factoryOwnedApp,
     routeFactoryId,

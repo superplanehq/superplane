@@ -2,6 +2,7 @@ import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { FactoryAppCanvasTitleEditor } from "./FactoryAppCanvasTitleEditor";
+import { FactoryAppCanvasViewActions } from "./FactoryAppCanvasViewActions";
 
 type FactoryAppCanvasHeaderProps = {
   backHref: string;
@@ -15,6 +16,11 @@ type FactoryAppCanvasHeaderProps = {
   onSave: () => void;
   /** Local draft only — persisted when the user clicks Save. */
   onDraftTitleChange?: (name: string) => void;
+  yamlDisabled?: boolean;
+  onOpenVisualEditor?: () => void;
+  onAskAgent?: () => void;
+  onOpenDesktopAgentSetup?: () => void;
+  onViewYaml?: () => void;
 };
 
 export function FactoryAppCanvasHeader({
@@ -28,17 +34,16 @@ export function FactoryAppCanvasHeader({
   onDiscard,
   onSave,
   onDraftTitleChange,
+  yamlDisabled = false,
+  onOpenVisualEditor,
+  onAskAgent,
+  onOpenDesktopAgentSetup,
+  onViewYaml,
 }: FactoryAppCanvasHeaderProps) {
   const renameEnabled = Boolean(isConfigure && canRename && onDraftTitleChange);
 
   return (
-    <div
-      className={
-        isConfigure
-          ? "flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-3"
-          : "shrink-0 border-b border-border px-5 py-3"
-      }
-    >
+    <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-3">
       <div className="min-w-0">
         <Link
           href={backHref}
@@ -89,6 +94,14 @@ export function FactoryAppCanvasHeader({
             Save
           </Button>
         </div>
+      ) : onOpenVisualEditor && onAskAgent && onOpenDesktopAgentSetup && onViewYaml ? (
+        <FactoryAppCanvasViewActions
+          yamlDisabled={yamlDisabled}
+          onOpenVisualEditor={onOpenVisualEditor}
+          onAskAgent={onAskAgent}
+          onOpenDesktopAgentSetup={onOpenDesktopAgentSetup}
+          onViewYaml={onViewYaml}
+        />
       ) : null}
     </div>
   );

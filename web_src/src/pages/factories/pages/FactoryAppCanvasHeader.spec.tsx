@@ -90,4 +90,47 @@ describe("FactoryAppCanvasHeader", () => {
     expect(screen.queryByTestId("factory-app-rename-input")).not.toBeInTheDocument();
     expect(onDraftTitleChange).not.toHaveBeenCalled();
   });
+
+  it("shows Edit and View YAML in view mode", async () => {
+    const user = userEvent.setup();
+    const onOpenVisualEditor = vi.fn();
+    const onAskAgent = vi.fn();
+    const onOpenDesktopAgentSetup = vi.fn();
+    const onViewYaml = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <FactoryAppCanvasHeader
+          backHref="/back"
+          backLabel="Plan and Implement"
+          title="Refund Implementer"
+          subtitle="Canvas"
+          isConfigure={false}
+          configureBusy={false}
+          onDiscard={vi.fn()}
+          onSave={vi.fn()}
+          onOpenVisualEditor={onOpenVisualEditor}
+          onAskAgent={onAskAgent}
+          onOpenDesktopAgentSetup={onOpenDesktopAgentSetup}
+          onViewYaml={onViewYaml}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("factory-app-view-yaml")).toHaveTextContent("View YAML");
+    await user.click(screen.getByTestId("factory-app-view-yaml"));
+    expect(onViewYaml).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByTestId("factory-app-edit-menu"));
+    await user.click(screen.getByTestId("factory-app-edit-visual"));
+    expect(onOpenVisualEditor).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByTestId("factory-app-edit-menu"));
+    await user.click(screen.getByTestId("factory-app-edit-ask-agent"));
+    expect(onAskAgent).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByTestId("factory-app-edit-menu"));
+    await user.click(screen.getByTestId("factory-app-edit-desktop-agent"));
+    expect(onOpenDesktopAgentSetup).toHaveBeenCalledTimes(1);
+  });
 });

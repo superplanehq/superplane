@@ -35,6 +35,8 @@ interface FactoriesHarnessProps {
   onboardingSeed?: OnboardingStorybookSeed;
   /** When false, skip setup provider/routes (app-like create → overview). */
   enableOnboarding?: boolean;
+  /** Open the canvas agent sidebar on mount (factory canvas agent story). */
+  openAgentSidebar?: boolean;
 }
 
 function DefaultWikiWireframe() {
@@ -55,6 +57,7 @@ export function FactoriesHarness({
   pageOverrides,
   onboardingSeed,
   enableOnboarding = true,
+  openAgentSidebar = false,
 }: FactoriesHarnessProps) {
   const homeFixture: HomePageFixture = {
     ...defaultHomePageFixture,
@@ -74,6 +77,7 @@ export function FactoriesHarness({
       homeFixture={homeFixture}
       factoriesFixture={factoriesFixture}
       appFixture={appFixture}
+      openAgentSidebar={openAgentSidebar}
       pageOverrides={
         enableOnboarding
           ? {

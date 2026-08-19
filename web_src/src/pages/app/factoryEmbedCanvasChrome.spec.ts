@@ -60,4 +60,18 @@ describe("resolveFactoryEmbedCanvasChrome", () => {
     expect(chrome.onRunNodeDetailClose).toBe(handleBackToRunList);
     expect(chrome.onBackToLiveCanvas).toBe(handleSelectLiveCanvas);
   });
+
+  it("hides the canvas tool sidebar in factory embed by default", () => {
+    const { input } = buildInput({ factoryEmbed: true });
+    const chrome = resolveFactoryEmbedCanvasChrome(input);
+
+    expect(chrome.hideCanvasToolSidebar).toBe(true);
+  });
+
+  it("shows the canvas tool sidebar when factory agents are enabled", () => {
+    const { input } = buildInput({ factoryEmbed: true, factoryAgentEnabled: true });
+    const chrome = resolveFactoryEmbedCanvasChrome(input);
+
+    expect(chrome.hideCanvasToolSidebar).toBe(false);
+  });
 });

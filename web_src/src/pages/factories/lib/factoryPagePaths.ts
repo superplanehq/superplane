@@ -72,6 +72,13 @@ export function automationDetailPath(organizationId: string, factoryKey: string,
 
 export type FactoryAppNavFrom = "automations" | "lines" | "work-order" | "overview";
 
+export function parseFactoryAppNavFrom(value: string | null): FactoryAppNavFrom | undefined {
+  if (value === "automations" || value === "lines" || value === "work-order" || value === "overview") {
+    return value;
+  }
+  return undefined;
+}
+
 export type FactoryAppNavOptions = {
   from?: FactoryAppNavFrom;
   lineId?: string;

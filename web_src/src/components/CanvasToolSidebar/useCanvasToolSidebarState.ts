@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { persistAgentMode, readInitialAgentMode, type AgentMode } from "@/components/AgentSidebar/agentMode";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import type { CanvasPageHeaderMode } from "@/pages/app/viewState";
+import { subscribeCanvasAgentSidebarOpen } from "./canvasAgentSidebarOpenRequest";
 
 // Keep in sync with pkg/features/features.go.
 export const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
@@ -116,6 +117,12 @@ export function useCanvasToolSidebarState({
     persistOpen(true);
   }, [persistOpen]);
 
+  useOpenCanvasAgentSidebarOnRequest({
+    canvasId,
+    enabled: Boolean(!hideCanvasToolSidebar && (agentEnabled || forceEnable)),
+    openToolSidebar,
+  });
+
   const handleToolSidebarToggle = useCallback(() => {
     if (isToolSidebarOpen) onBeforeClose?.();
 
@@ -205,3 +212,21 @@ export function useCanvasToolSidebarState({
 }
 
 export type CanvasToolSidebarState = ReturnType<typeof useCanvasToolSidebarState>;
+
+function useOpenCanvasAgentSidebarOnRequest({
+  canvasId,
+  enabled,
+  openToolSidebar,
+}: {
+  canvasId?: string;
+  enabled: boolean;
+  openToolSidebar: () => void;
+}) {
+  useEffect(() => {
+    if (!enabled) return;
+    return subscribeCanvasAgentSidebarOpen((requestedCanvasId) => {
+      if (requestedCanvasId !== canvasId) return;
+      openToolSidebar();
+    });
+  }, [canvasId, enabled, openToolSidebar]);
+}

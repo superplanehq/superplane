@@ -24,6 +24,14 @@ export function isFactoryAppConfigureMode(searchParams: URLSearchParams) {
   return searchParams.get("configure") === "1" || searchParams.get("edit") === "1";
 }
 
+export function isFactoryAppAgentPromptOpen(searchParams: URLSearchParams) {
+  return searchParams.get("agentPrompt") === "1";
+}
+
+export function isFactoryAppYamlViewOpen(searchParams: URLSearchParams) {
+  return searchParams.get("yaml") === "1";
+}
+
 export function resolveFactoryLineName(
   lines: Array<{ id?: string; name?: string }> | undefined,
   lineId: string | null,
