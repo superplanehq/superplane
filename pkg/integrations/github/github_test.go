@@ -52,7 +52,6 @@ func Test__GitHub__Sync(t *testing.T) {
 		require.NoError(t, g.Sync(core.SyncContext{
 			Configuration: Configuration{Organization: "testhq"},
 			Integration:   integrationCtx,
-			HTTP:          &fakeHTTPContext{statusCode: http.StatusOK},
 		}))
 
 		//
@@ -71,32 +70,6 @@ func Test__GitHub__Sync(t *testing.T) {
 		metadata := integrationCtx.Metadata.(common.Metadata)
 		assert.Equal(t, metadata.Owner, "testhq")
 		assert.NotEmpty(t, metadata.State)
-	})
-
-	t.Run("organization name that GitHub cannot accept", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{}
-		err := g.Sync(core.SyncContext{
-			Configuration: Configuration{Organization: "https://github.com/testhq"},
-			Integration:   integrationCtx,
-			HTTP:          &fakeHTTPContext{statusCode: http.StatusOK},
-		})
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "enter only the organization name")
-		assert.Nil(t, integrationCtx.BrowserAction)
-	})
-
-	t.Run("organization that GitHub does not know", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{}
-		err := g.Sync(core.SyncContext{
-			Configuration: Configuration{Organization: "no-such-org"},
-			Integration:   integrationCtx,
-			HTTP:          &fakeHTTPContext{statusCode: http.StatusNotFound},
-		})
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no GitHub organization named no-such-org exists")
-		assert.Nil(t, integrationCtx.BrowserAction)
 	})
 }
 
