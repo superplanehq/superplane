@@ -142,7 +142,7 @@ func serializeWorkOrder(
 	order *models.FactoryWorkOrder,
 	dispatches []models.FactoryWorkOrderLineDispatchRecord,
 	createdByAutomation *factory.AutomationRef,
-) *pb.WorkOrder {
+) (*pb.WorkOrder, error) {
 	serializedDispatches := serializeWorkOrderLineDispatches(dispatches)
 
 	var totalTokens, totalCostCents int64
@@ -156,6 +156,11 @@ func serializeWorkOrder(
 	displayKey := ""
 	if f != nil {
 		displayKey = f.WorkOrderKey(order.Number)
+	}
+
+	statusNote, err := serializeWorkOrderStatusNote(order)
+	if err != nil {
+		return nil, err
 	}
 
 	return &pb.WorkOrder{
@@ -173,7 +178,33 @@ func serializeWorkOrder(
 		CreatedBy:      serializeWorkOrderCreator(order, createdByAutomation),
 		TotalTokens:    totalTokens,
 		TotalCostCents: totalCostCents,
+		StatusNote:     statusNote,
+	}, nil
+}
+
+func serializeWorkOrderStatusNote(order *models.FactoryWorkOrder) (*pb.WorkOrderStatusNote, error) {
+	note, err := order.StatusNoteRef()
+	if err != nil {
+		return nil, err
 	}
+	if note == nil {
+		return nil, nil
+	}
+
+	serialized := &pb.WorkOrderStatusNote{
+		Kind:       note.Kind,
+		Headline:   note.Headline,
+		Body:       note.Body,
+		CtaLabel:   note.CtaLabel,
+		CtaUrl:     note.CtaURL,
+		Automation: serializeAutomationRef(note.Automation),
+		UpdatedAt:  timestamppb.New(note.UpdatedAt),
+	}
+	if note.Run != nil {
+		serialized.RunId = note.Run.ID.String()
+	}
+
+	return serialized, nil
 }
 
 func serializeAutomationRef(ref *factory.AutomationRef) *pb.AutomationRef {

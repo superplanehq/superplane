@@ -23,6 +23,7 @@ import {
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../lib/workOrderChecks";
 import { useWorkOrderDetailActions } from "../useWorkOrderDetailActions";
 import { WorkOrderDetailLoadedView } from "../WorkOrderDetailLoadedView";
+import { presentWorkOrderStatusNote } from "../lib/workOrderStatusNote";
 import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
 
 export function WorkOrderDetailPage() {
@@ -212,6 +213,7 @@ function LoadedWorkOrderDetail({
 }: LoadedWorkOrderDetailProps) {
   return (
     <WorkOrderDetailLoadedView
+      statusNote={presentWorkOrderStatusNote(order.statusNote)}
       organizationId={organizationId}
       factoryKey={factoryKey}
       order={order}

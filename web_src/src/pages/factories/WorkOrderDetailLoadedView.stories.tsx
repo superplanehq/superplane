@@ -30,6 +30,7 @@ import {
   RUNNING_WORK_ORDER_CHECKS,
 } from "./__fixtures__/workOrderCheckFixtures";
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "./lib/workOrderChecks";
+import { presentWorkOrderStatusNote } from "./lib/workOrderStatusNote";
 import { WorkOrderDetailLoadedView } from "./WorkOrderDetailLoadedView";
 import { getWorkOrderDetailDerived } from "./lib/workOrderProgress";
 
@@ -176,6 +177,22 @@ export const WithCriticalCheck: Story = {
     events: OPEN_WORK_ORDER_EVENTS,
     checks: presentWorkOrderChecks(CRITICAL_WORK_ORDER_CHECKS),
   }),
+};
+
+/**
+ * Status note — a watcher automation announces why the order is Waiting
+ * and what resolves it, so first-time users know the next step. Set by
+ * the setWorkOrderStatusNote component; cleared on any state change.
+ */
+export const WithStatusNote: Story = {
+  name: "With Status Note",
+  args: {
+    ...buildLoadedViewArgs(OPEN_WORK_ORDER, {
+      events: RICH_OPEN_WORK_ORDER_EVENTS,
+      artifacts: OPEN_WORK_ORDER_ARTIFACTS,
+    }),
+    statusNote: presentWorkOrderStatusNote(OPEN_WORK_ORDER.statusNote),
+  },
 };
 
 /** Closed as failed — failed badge, reopen actions, markdown artifact + failed close. */
