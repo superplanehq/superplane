@@ -165,10 +165,13 @@ export const WithChecks: Story = {
 /** Failing boolean check — CI reads Fail next to two scored checks while the line retries. */
 export const WithFailingCICheck: Story = {
   name: "With Failing CI Check",
-  args: buildLoadedViewArgs(RUNNING_WORK_ORDER, {
-    events: RUNNING_WORK_ORDER_EVENTS,
-    checks: presentWorkOrderChecks(RUNNING_WORK_ORDER_CHECKS),
-  }),
+  args: {
+    ...buildLoadedViewArgs(RUNNING_WORK_ORDER, {
+      events: RUNNING_WORK_ORDER_EVENTS,
+      checks: presentWorkOrderChecks(RUNNING_WORK_ORDER_CHECKS),
+    }),
+    statusNotes: presentWorkOrderStatusNotes(OPEN_WORK_ORDER.statusNotes),
+  },
 };
 
 /** Single critical check — the smallest checks state, with the critical accent. */
@@ -181,10 +184,10 @@ export const WithCriticalCheck: Story = {
 };
 
 /**
- * Status notes — watcher automations announce why the order is Waiting
- * and what resolves it, so first-time users know the next step. Set by
- * the setWorkOrderStatusNote component, keyed so several notes can sit
- * side by side; cleared on any state change.
+ * Status notes — automations announce the next step and what resolves
+ * it. Set by setWorkOrderStatusNote, keyed so several notes can sit
+ * side by side; cleared on any state change. Shown whenever the order
+ * has notes, including while a line is still running.
  */
 export const WithStatusNote: Story = {
   name: "With Status Note",

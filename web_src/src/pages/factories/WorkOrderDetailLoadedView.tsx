@@ -129,14 +129,13 @@ function WorkOrderDetailMainColumn({
   isUpdatingStatus,
   onClose,
   onStatusChange,
-  displayStatus,
   canManage,
   isAddingComment,
   onAddComment,
 }: WorkOrderDetailLoadedViewProps) {
   const hasChecksSection = Boolean(checks?.length) || Boolean(isChecksLoading) || Boolean(checksError);
-  const statusNotesToShow = waitingStatusNotes(displayStatus, statusNotes);
-  const showStatusNotes = statusNotesToShow.length > 0;
+  const notesToShow = statusNotes ?? [];
+  const showStatusNotes = notesToShow.length > 0;
 
   return (
     <div className="min-w-0">
@@ -145,7 +144,7 @@ function WorkOrderDetailMainColumn({
       {showStatusNotes ? (
         <div className={order.description ? "mt-10" : undefined}>
           <WorkOrderStatusNotesSection
-            notes={statusNotesToShow}
+            notes={notesToShow}
             organizationId={organizationId}
             canClose={canClose}
             canManage={canManage}
@@ -202,16 +201,6 @@ function WorkOrderDetailMainColumn({
       </section>
     </div>
   );
-}
-
-function waitingStatusNotes(
-  displayStatus: WorkOrderDisplayStatus,
-  notes: WorkOrderStatusNotePresentation[] | undefined,
-): WorkOrderStatusNotePresentation[] {
-  if (displayStatus !== "waiting" || !notes?.length) {
-    return [];
-  }
-  return notes;
 }
 
 function WorkOrderDetailBodyAside({
