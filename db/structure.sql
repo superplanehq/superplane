@@ -954,7 +954,7 @@ CREATE TABLE public.workflow_runs (
     parent_execution_id uuid,
     callbacks jsonb DEFAULT '[]'::jsonb NOT NULL,
     input jsonb DEFAULT '{}'::jsonb NOT NULL,
-    result_message text
+    errors jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -3204,7 +3204,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260819201039	f
+20260819202800	f
 \.
 
 

@@ -23,6 +23,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Add Memory" href="#add-memory" description="Add a namespaced JSON value to canvas memory" />
+  <LinkCard title="Add Run Error" href="#add-run-error" description="Record a business failure on the current run" />
   <LinkCard title="Add Work Order Artifact" href="#add-work-order-artifact" description="Attach a typed artifact (PR, markdown note, branch, or link) to a work order" />
   <LinkCard title="Add Work Order Comment" href="#add-work-order-comment" description="Append a comment to a work order timeline" />
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
@@ -422,6 +423,39 @@ A single `memory.added` event is emitted with all written rows and the total `co
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "memory.added"
+}
+```
+
+<a id="add-run-error"></a>
+
+## Add Run Error
+
+**Component key:** `addRunError`
+
+The Add Run Error component appends an error entry to the current run.
+
+### Use Cases
+
+- **Channel-based failures**: Mark the run as failed when a component emits on a failed output channel instead of failing the execution
+- **Handled failures**: Record that a business operation failed even though downstream nodes continue
+- **Parallel branches**: Each branch can report its own failure; all entries are collected on the run
+
+### Behavior
+
+- Appends an error message to the run
+- A run with one or more recorded errors is treated as failed when it finishes
+- Downstream nodes still receive an event on the default output channel
+- The execution itself passes unless storing the error exceeds platform limits
+
+### Example Output
+
+```json
+{
+  "data": {
+    "message": "pipeline failed"
+  },
+  "timestamp": "2026-07-20T12:00:00Z",
+  "type": "addRunError.finished"
 }
 ```
 
