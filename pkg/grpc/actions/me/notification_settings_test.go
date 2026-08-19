@@ -141,6 +141,40 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
+	t.Run("invalid workspace key is rejected", func(t *testing.T) {
+		_, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
+			Settings: &pb.NotificationSettings{
+				Workspaces: &pb.NotificationSettings_Workspaces{
+					Scope: pb.NotificationSettings_WORKSPACE_SCOPE_FILTERED,
+					Filters: []*pb.NotificationSettings_WorkspaceFilter{{
+						WorkspaceKey: "TOOLONG",
+						EventTypes:   []pb.NotificationSettings_Type{pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED},
+					}},
+				},
+			},
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
+	t.Run("blank workspace key is rejected", func(t *testing.T) {
+		_, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
+			Settings: &pb.NotificationSettings{
+				Workspaces: &pb.NotificationSettings_Workspaces{
+					Scope: pb.NotificationSettings_WORKSPACE_SCOPE_FILTERED,
+					Filters: []*pb.NotificationSettings_WorkspaceFilter{{
+						WorkspaceKey: "   ",
+						EventTypes:   []pb.NotificationSettings_Type{pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED},
+					}},
+				},
+			},
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
 	t.Run("unspecified notification type is rejected", func(t *testing.T) {
 		_, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
 			Settings: &pb.NotificationSettings{
