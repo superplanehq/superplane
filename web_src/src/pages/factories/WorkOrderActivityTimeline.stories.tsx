@@ -23,7 +23,14 @@ import {
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
 import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
 
-const composerFooter = <WorkOrderCommentComposer canComment isSubmitting={false} onSubmit={async () => undefined} />;
+const composerFooter = (
+  <WorkOrderCommentComposer
+    organizationId={FACTORIES_ORGANIZATION_ID}
+    canComment
+    isSubmitting={false}
+    onSubmit={async () => undefined}
+  />
+);
 
 /**
  * Vertical timeline of the work order lifecycle: `created` marker, dispatch
