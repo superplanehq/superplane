@@ -59,5 +59,5 @@ export function useConnectDialog(setup: OnboardingSetupApi) {
     />
   );
 
-  return { requestConnect, dialog };
+  return { requestConnect, requestConfigure: requestConnect, dialog };
 }
