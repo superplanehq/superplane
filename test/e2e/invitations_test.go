@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/assert"
@@ -137,17 +138,38 @@ func (s *invitationSteps) followInviteLinkToLogin(token string) {
 	require.NoError(s.t, waitErr)
 }
 
+// openSignupForm navigates from the login page to the signup form.
+//
+// Depending on which login method is primary, "Create an account" may
+// already be visible, or a "Sign in with password instead" toggle may
+// need to be clicked first. This waits for whichever appears first and
+// clicks the toggle only if needed.
 func (s *invitationSteps) openSignupForm() {
-	// With magic code enabled, toggle to password login first
-	// so the "Create an account" link becomes visible.
-	toggle := s.session.Page().Locator("text=Sign in with password instead").First()
-	if err := toggle.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(3000)}); err == nil {
-		require.NoError(s.t, toggle.Click())
+	page := s.session.Page()
+	const timeout = 15000 * time.Millisecond
+
+	toggle := page.Locator("text=Sign in with password instead").First()
+	createAccount := page.Locator("text=Create an account").First()
+
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if visible, err := toggle.IsVisible(); err == nil && visible {
+			require.NoError(s.t, toggle.Click())
+			break
+		}
+		if visible, err := createAccount.IsVisible(); err == nil && visible {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 
-	button := s.session.Page().Locator("text=Create an account").First()
-	require.NoError(s.t, button.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}))
-	require.NoError(s.t, button.Click())
+	if err := createAccount.WaitFor(pw.LocatorWaitForOptions{
+		State:   pw.WaitForSelectorStateVisible,
+		Timeout: pw.Float(float64(timeout / time.Millisecond)),
+	}); err != nil {
+		s.t.Fatalf("neither the password-login toggle nor \"Create an account\" appeared within %s: %v", timeout, err)
+	}
+	require.NoError(s.t, createAccount.Click())
 }
 
 func (s *invitationSteps) fillSignupForm(firstName, lastName, email, password string) {
