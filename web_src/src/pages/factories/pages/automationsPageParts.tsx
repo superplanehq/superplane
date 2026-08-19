@@ -1,4 +1,5 @@
-import type { FactoryApp } from "@/api-client";
+import type { FactoriesFactoryLine, FactoryApp } from "@/api-client";
+import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -12,10 +13,12 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 import { Copy, MoreHorizontal, Pencil, Plus, Trash2, Workflow } from "lucide-react";
-import { useState, type MouseEvent } from "react";
+import { Fragment, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router";
+import { linesUsingAutomation, type AutomationLineRef } from "../lib/automationLineUsage";
 import { resolveFactoryAutomationStatus, type FactoryAutomationTick } from "../lib/factoryAutomationStatus";
 import { automationDetailPath } from "../lib/factoryPagePaths";
+import { humanizeLineName } from "../lib/humanizeLineName";
 import { type AutomationCardActions } from "./automationCardActions";
 
 function resolveAutomationCardNavigation(href: string | undefined, navigate: ReturnType<typeof useNavigate>) {
@@ -45,6 +48,7 @@ export function AutomationCard({
   statusLabel,
   emphasized,
   actions,
+  lines,
 }: {
   app: FactoryApp;
   href?: string;
@@ -52,12 +56,14 @@ export function AutomationCard({
   statusLabel: string;
   emphasized?: boolean;
   actions?: AutomationCardActions;
+  lines?: FactoriesFactoryLine[];
 }) {
   const navigate = useNavigate();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const description = app.description?.trim() || "Factory automation canvas.";
   const automationName = app.name?.trim() || "Unnamed automation";
   const { interactive, onClick, onKeyDown } = resolveAutomationCardNavigation(href, navigate);
+  const usedByLines = linesUsingAutomation(lines, app.id);
 
   return (
     <div
@@ -93,6 +99,7 @@ export function AutomationCard({
         <StatusTick tick={tick} />
         <span className="text-[12px] leading-tight text-muted-foreground">{statusLabel}</span>
       </div>
+      <AutomationUsedByLines lines={usedByLines} className="mt-1.5" />
       {actions ? (
         <DeleteAutomationDialog
           open={deleteOpen}
@@ -312,6 +319,46 @@ export function StatusTick({ tick, size = "md" }: { tick: FactoryAutomationTick;
   );
 }
 
+export function AutomationUsedByLines({
+  lines,
+  className,
+  lineHref,
+}: {
+  lines: AutomationLineRef[];
+  className?: string;
+  lineHref?: (lineId: string) => string;
+}) {
+  return (
+    <p className={cn("text-[12px] leading-snug text-muted-foreground", className)} data-testid="automations-used-by">
+      {lines.length === 0 ? (
+        "Not used by a line"
+      ) : (
+        <>
+          Used by{" "}
+          {lines.map((line, index) => (
+            <Fragment key={line.id}>
+              {index > 0 ? ", " : null}
+              <AutomationUsedByLineName line={line} href={lineHref?.(line.id)} />
+            </Fragment>
+          ))}
+        </>
+      )}
+    </p>
+  );
+}
+
+function AutomationUsedByLineName({ line, href }: { line: AutomationLineRef; href?: string }) {
+  const name = humanizeLineName(line.name);
+  if (!href) {
+    return name;
+  }
+  return (
+    <Link href={href} className="text-foreground hover:underline" onClick={(event) => event.stopPropagation()}>
+      {name}
+    </Link>
+  );
+}
+
 export function EmptyAutomationsState({ canCreate, onCreate }: { canCreate: boolean; onCreate: () => void }) {
   return (
     <div
@@ -337,12 +384,14 @@ export function AutomationsPageList({
   apps,
   workOrders,
   actionsForApp,
+  lines,
 }: {
   organizationId: string;
   factoryKey: string;
   apps: FactoryApp[];
   workOrders: Parameters<typeof resolveFactoryAutomationStatus>[1];
   actionsForApp: (app: FactoryApp) => AutomationCardActions;
+  lines?: FactoriesFactoryLine[];
 }) {
   return (
     <ul className="flex flex-col gap-2" data-testid="automations-list">
@@ -359,6 +408,7 @@ export function AutomationsPageList({
               tick={status.tick}
               statusLabel={status.label}
               actions={actionsForApp(app)}
+              lines={lines}
             />
           </li>
         );
