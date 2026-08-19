@@ -25,6 +25,12 @@ describe("notificationSettings", () => {
     expect(togglesFromAllScopeEventTypes(["TYPE_WORK_ORDER_ASSIGNED"]).TYPE_WORK_ORDER_COMMENT_OWNED).toBe(false);
   });
 
+  it("treats a missing all-scope type list as every type on", () => {
+    expect(togglesFromAllScopeEventTypes(undefined).TYPE_WORK_ORDER_ASSIGNED).toBe(true);
+    expect(togglesFromAllScopeEventTypes([]).TYPE_WORK_ORDER_ARTIFACT_OWNED).toBe(true);
+    expect(togglesFromAllScopeEventTypes(["TYPE_WORK_ORDER_ASSIGNED"]).TYPE_WORK_ORDER_COMMENT_OWNED).toBe(false);
+  });
+
   it("treats a missing filtered type as off", () => {
     const toggles = togglesFromEventTypes(["TYPE_WORK_ORDER_ASSIGNED"]);
     expect(toggles.TYPE_WORK_ORDER_ASSIGNED).toBe(true);

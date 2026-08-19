@@ -155,7 +155,7 @@ func (c *FactoryNotificationConsumer) process(db *gorm.DB, message messages.Fact
 
 	actorName := c.actorDisplayName(db, orgID, message)
 	executions := loadWorkOrderExecutionsForEmail(db, order.ID)
-	return c.sendWorkOrderNotificationEmails(orgID, factoryModel, order, message, actorName, executions, recipients), nil
+	return c.sendWorkOrderNotificationEmails(factoryModel, order, message, actorName, executions, recipients), nil
 }
 
 type workOrderEmailRecipient struct {
@@ -164,7 +164,6 @@ type workOrderEmailRecipient struct {
 }
 
 func (c *FactoryNotificationConsumer) sendWorkOrderNotificationEmails(
-	orgID uuid.UUID,
 	factoryModel *models.Factory,
 	order *models.FactoryWorkOrder,
 	message messages.FactoryWorkOrderNotificationMessage,
@@ -185,10 +184,7 @@ func (c *FactoryNotificationConsumer) sendWorkOrderNotificationEmails(
 				recipient.notificationType,
 			)
 			applyWorkOrderEmailCard(&content.Data, order, executions, time.Now())
-			content.Data.WorkOrderLink = fmt.Sprintf(
-				"%s/%s/workspaces/%s/work-order/%d",
-				c.BaseURL, orgID, factoryModel.Key, order.Number,
-			)
+			content.Data.WorkOrderLink = c.BaseURL + order.URLPath(factoryModel.Key)
 			contentByType[recipient.notificationType] = content
 		}
 		if err := c.EmailService.SendWorkOrderNotificationEmail(recipient.email, content.Subject, content.Data); err != nil {

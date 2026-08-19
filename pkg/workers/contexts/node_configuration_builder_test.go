@@ -310,6 +310,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, factoryModel.ID.String(), payload["factory_id"])
 		assert.Equal(t, models.FactoryWorkOrderStateDraft, payload["state"])
 		assert.Equal(t, "", payload["result"])
+		assert.NotContains(t, payload, "url")
 		assert.NotContains(t, payload, "artifacts")
 		assert.NotContains(t, payload, "comments")
 
@@ -341,6 +342,27 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, order.ID.String(), built["orderID"])
 		assert.Equal(t, "Ship feature", built["title"])
+	})
+
+	t.Run("permalink back to the work order", func(t *testing.T) {
+		expectedSuffix := fmt.Sprintf(
+			"/%s/workspaces/%s/work-order/%d",
+			r.Organization.ID.String(), factoryModel.Key, order.Number,
+		)
+
+		url, err := builder.ResolveExpression(`order().url`)
+		require.NoError(t, err)
+		assert.Contains(t, url, expectedSuffix)
+
+		bracket, err := builder.ResolveExpression(`order()["url"]`)
+		require.NoError(t, err)
+		assert.Equal(t, url, bracket)
+
+		built, err := builder.Build(map[string]any{
+			"body": "[Work Order]({{ order().url }})",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, fmt.Sprintf("[Work Order](%s)", url), built["body"])
 	})
 
 	t.Run("artifacts equivalents", func(t *testing.T) {

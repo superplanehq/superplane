@@ -80,6 +80,13 @@ func (FactoryWorkOrder) TableName() string {
 	return "factory_work_orders"
 }
 
+// URLPath is the canonical UI permalink of the work order, relative to the
+// server base URL. The factory key is part of the path, so callers that only
+// hold the order must load the factory that owns it.
+func (o *FactoryWorkOrder) URLPath(factoryKey string) string {
+	return fmt.Sprintf("/%s/workspaces/%s/work-order/%d", o.OrganizationID, factoryKey, o.Number)
+}
+
 func (o *FactoryWorkOrder) IsOpen() bool {
 	return o.State == FactoryWorkOrderStateOpen
 }
