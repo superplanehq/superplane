@@ -6,7 +6,12 @@ import type {
 } from "@/api-client";
 import { automationNameForLineStep } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, linesPath } from "./factoryPagePaths";
-import { isActiveWorkOrderExecution } from "./workOrderExecutions";
+import {
+  dispatchStepRows,
+  isActiveWorkOrderExecution,
+  isQueuedStepRow,
+  type WorkOrderStepRow,
+} from "./workOrderExecutions";
 
 export type LinePhaseTick = "running" | "waiting" | "queued" | "failed" | null;
 
@@ -18,7 +23,7 @@ export type LinePhaseRunCard = {
   workOrderId: string;
   /** Raw work order, so the board can build the shared work order card model. */
   order: FactoriesWorkOrder;
-  execution: FactoriesWorkOrderExecution;
+  execution: WorkOrderStepRow;
 };
 
 export type LinePhaseColumn = {
@@ -86,10 +91,14 @@ export function buildLinePhaseBoard(
   });
 }
 
-export function resolvePhaseRunStatus(execution: FactoriesWorkOrderExecution): {
+export function resolvePhaseRunStatus(execution: WorkOrderStepRow): {
   kind: "running" | "waiting" | "queued" | "failed" | "idle";
   label: string;
 } {
+  if (isQueuedStepRow(execution)) {
+    const position = execution.queuePosition ?? 0;
+    return { kind: "queued", label: position > 0 ? `Queued #${position}` : "Queued" };
+  }
   if (execution.state === "STATE_STARTED") {
     return { kind: "running", label: "Executing" };
   }
@@ -210,7 +219,7 @@ function appendCurrentRunForOrder(
   }
   const currentDispatch = pickMostRecentDispatch(dispatchesForLine);
 
-  const lineExecutions = (currentDispatch.stepExecutions ?? []).filter(
+  const lineExecutions = dispatchStepRows(currentDispatch).filter(
     (execution) => liveColumnIndexForExecution(steps, execution) != null,
   );
   if (lineExecutions.length === 0) {
@@ -245,14 +254,11 @@ function pickMostRecentDispatch(dispatches: FactoriesWorkOrderLineDispatch[]): F
   });
 }
 
-function executionTimestamp(execution: FactoriesWorkOrderExecution): number {
+function executionTimestamp(execution: WorkOrderStepRow): number {
   return Date.parse(execution.updatedAt ?? execution.createdAt ?? "") || 0;
 }
 
-function isPreferableCurrentExecution(
-  candidate: FactoriesWorkOrderExecution,
-  incumbent: FactoriesWorkOrderExecution,
-): boolean {
+function isPreferableCurrentExecution(candidate: WorkOrderStepRow, incumbent: WorkOrderStepRow): boolean {
   const candidateStep = executionStepIndex(candidate) ?? -1;
   const incumbentStep = executionStepIndex(incumbent) ?? -1;
   if (candidateStep !== incumbentStep) {
@@ -266,10 +272,10 @@ function isPreferableCurrentExecution(
   return (candidate.id ?? "") > (incumbent.id ?? "");
 }
 
-function pickCurrentLineExecution(executions: FactoriesWorkOrderExecution[]): FactoriesWorkOrderExecution | null {
+function pickCurrentLineExecution(executions: WorkOrderStepRow[]): WorkOrderStepRow | null {
   const active = executions.filter(isActiveWorkOrderExecution);
   const candidates = active.length > 0 ? active : executions;
-  let best: FactoriesWorkOrderExecution | null = null;
+  let best: WorkOrderStepRow | null = null;
 
   for (const execution of candidates) {
     if (executionStepIndex(execution) == null) {

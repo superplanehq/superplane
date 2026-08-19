@@ -3,8 +3,49 @@ import type {
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderExecutionResult,
   FactoriesWorkOrderExecutionState,
+  FactoriesWorkOrderLineDispatch,
+  FactoriesWorkOrderQueueItem,
 } from "@/api-client";
 import { factoryAppRunPath } from "./factoryPagePaths";
+
+/**
+ * One row in a work order's step activity: either a real execution or a
+ * queue item projected into the same shape. `queuePosition` is set only
+ * for queued rows (1 is next to be admitted).
+ */
+export type WorkOrderStepRow = FactoriesWorkOrderExecution & {
+  queuePosition?: number;
+};
+
+export function isQueuedStepRow(row: WorkOrderStepRow): boolean {
+  return row.queuePosition !== undefined;
+}
+
+export function queueItemToStepRow(item: FactoriesWorkOrderQueueItem): WorkOrderStepRow {
+  return {
+    id: item.id,
+    step: item.stepName,
+    stepIndex: item.stepIndex,
+    createdAt: item.createdAt,
+    // No run exists for a queued step yet; project the step's app into the
+    // run shape so board-column matching and card links treat queued rows
+    // like execution rows.
+    run: item.appId ? { appId: item.appId } : undefined,
+    queuePosition: item.position ?? 0,
+  };
+}
+
+/**
+ * A dispatch's step activity as one chronological list: its step
+ * executions, plus a projected row for the step it is queued at, if any.
+ */
+export function dispatchStepRows(dispatch: FactoriesWorkOrderLineDispatch): WorkOrderStepRow[] {
+  const rows: WorkOrderStepRow[] = [...(dispatch.stepExecutions ?? [])];
+  if (dispatch.queueItem) {
+    rows.push(queueItemToStepRow(dispatch.queueItem));
+  }
+  return rows;
+}
 
 export interface WorkOrderExecutionDisplayMeta {
   label: string;
@@ -107,9 +148,12 @@ export function getExecutionStepTimestamp(execution: FactoriesWorkOrderExecution
   return execution.createdAt ?? execution.updatedAt ?? "";
 }
 
-export function isActiveWorkOrderExecution(execution: FactoriesWorkOrderExecution): boolean {
+export function isActiveWorkOrderExecution(execution: WorkOrderStepRow): boolean {
   return (
-    execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED" || execution.state === "STATE_CANCELLING"
+    isQueuedStepRow(execution) ||
+    execution.state === "STATE_PENDING" ||
+    execution.state === "STATE_STARTED" ||
+    execution.state === "STATE_CANCELLING"
   );
 }
 
