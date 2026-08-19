@@ -76,7 +76,7 @@ export function useCanvasToolSidebarState({
   forceEnable = false,
   onBeforeClose,
 }: UseCanvasToolSidebarStateOptions) {
-  const { has: hasFeature } = useExperimentalFeature(organizationId);
+  const { has: hasFeature, isLoading: featureLoading } = useExperimentalFeature(organizationId);
   const featureEnabled = hasFeature(FEATURE_CLAUDE_MANAGED_AGENTS);
   const agentEnabled = canUseAgents && featureEnabled;
 
@@ -150,41 +150,17 @@ export function useCanvasToolSidebarState({
     setAgentUnavailableCanvasId((currentCanvasId) => (currentCanvasId === canvasId ? undefined : currentCanvasId));
   }, [agentUnavailable, canvasId]);
 
-  useEffect(() => {
-    if ((!agentEnabled && !forceEnable) || hideCanvasToolSidebar) {
-      setIsToolSidebarOpen(false);
-    }
-  }, [agentEnabled, forceEnable, hideCanvasToolSidebar]);
+  useSyncToolSidebarOpenWithAvailability({
+    featureLoading,
+    agentEnabled,
+    forceEnable,
+    hideCanvasToolSidebar,
+    canvasId,
+    setIsToolSidebarOpen,
+  });
 
   const showToolSidebarToggle = (agentEnabled || forceEnable) && !hideCanvasToolSidebar;
-
-  useEffect(() => {
-    if (!showToolSidebarToggle) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Some instrumentation SDKs dispatch synthetic keyboard events where `key` is unset.
-      const { key } = event as KeyboardEvent & { key?: unknown };
-      const lowerKey = typeof key === "string" ? key.toLowerCase() : "";
-
-      if (lowerKey !== "b" || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) {
-        return;
-      }
-
-      const target = event.target;
-      if (
-        target instanceof Element &&
-        target.closest('input, textarea, select, [contenteditable="true"], .monaco-editor')
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-      handleToolSidebarToggle();
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showToolSidebarToggle, handleToolSidebarToggle]);
+  useCanvasToolSidebarShortcut({ showToolSidebarToggle, handleToolSidebarToggle });
 
   return {
     canvasId,
@@ -212,6 +188,67 @@ export function useCanvasToolSidebarState({
 }
 
 export type CanvasToolSidebarState = ReturnType<typeof useCanvasToolSidebarState>;
+
+function useSyncToolSidebarOpenWithAvailability({
+  featureLoading,
+  agentEnabled,
+  forceEnable,
+  hideCanvasToolSidebar,
+  canvasId,
+  setIsToolSidebarOpen,
+}: {
+  featureLoading: boolean;
+  agentEnabled: boolean;
+  forceEnable: boolean;
+  hideCanvasToolSidebar?: boolean;
+  canvasId?: string;
+  setIsToolSidebarOpen: (open: boolean) => void;
+}) {
+  useEffect(() => {
+    if (featureLoading) return;
+    if ((!agentEnabled && !forceEnable) || hideCanvasToolSidebar) {
+      setIsToolSidebarOpen(false);
+      return;
+    }
+    setIsToolSidebarOpen(readInitialToolSidebarOpen(canvasId));
+  }, [agentEnabled, canvasId, featureLoading, forceEnable, hideCanvasToolSidebar, setIsToolSidebarOpen]);
+}
+
+function useCanvasToolSidebarShortcut({
+  showToolSidebarToggle,
+  handleToolSidebarToggle,
+}: {
+  showToolSidebarToggle: boolean;
+  handleToolSidebarToggle: () => void;
+}) {
+  useEffect(() => {
+    if (!showToolSidebarToggle) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Some instrumentation SDKs dispatch synthetic keyboard events where `key` is unset.
+      const { key } = event as KeyboardEvent & { key?: unknown };
+      const lowerKey = typeof key === "string" ? key.toLowerCase() : "";
+
+      if (lowerKey !== "b" || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) {
+        return;
+      }
+
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest('input, textarea, select, [contenteditable="true"], .monaco-editor')
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      handleToolSidebarToggle();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showToolSidebarToggle, handleToolSidebarToggle]);
+}
 
 function useOpenCanvasAgentSidebarOnRequest({
   canvasId,
