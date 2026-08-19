@@ -115,6 +115,43 @@ function isDirtyState(current: NotificationsFormState, saved: NotificationsFormS
   return JSON.stringify(current) !== JSON.stringify(saved);
 }
 
+function notificationSaveError(form: NotificationsFormState): { scope?: string; type?: string } {
+  if (form.scope === "filtered" && form.filters.length === 0) {
+    return { scope: "Select at least one workspace, or use all workspaces." };
+  }
+  if (form.scope === "all" && eventTypesFromToggles(form.toggles).length === 0) {
+    return { type: "Select at least one event type, or choose none." };
+  }
+  if (form.scope === "filtered" && form.filters.some((filter) => eventTypesFromToggles(filter.toggles).length === 0)) {
+    return { type: "Select at least one event type for each workspace." };
+  }
+  return {};
+}
+
+function withAddedWorkspace(prev: NotificationsFormState, workspaceId: string): NotificationsFormState {
+  if (prev.filters.some((filter) => filter.workspaceId === workspaceId)) {
+    return prev;
+  }
+  return {
+    ...prev,
+    filters: [...prev.filters, { workspaceId, toggles: defaultNotificationTypeToggles() }],
+  };
+}
+
+function withWorkspaceType(
+  prev: NotificationsFormState,
+  workspaceId: string,
+  key: ConfigurableNotificationType,
+  value: boolean,
+): NotificationsFormState {
+  return {
+    ...prev,
+    filters: prev.filters.map((filter) =>
+      filter.workspaceId === workspaceId ? { ...filter, toggles: { ...filter.toggles, [key]: value } } : filter,
+    ),
+  };
+}
+
 export function FactorySettingsNotificationsPage() {
   const { organizationId } = useFactorySettingsLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
@@ -143,19 +180,13 @@ export function FactorySettingsNotificationsPage() {
     if (!canUpdate) {
       return;
     }
-    if (form.scope === "filtered" && form.filters.length === 0) {
-      setScopeError("Select at least one workspace, or use all workspaces.");
+    const error = notificationSaveError(form);
+    if (error.scope) {
+      setScopeError(error.scope);
       return;
     }
-    if (form.scope === "all" && eventTypesFromToggles(form.toggles).length === 0) {
-      setTypeError("Select at least one event type, or choose none.");
-      return;
-    }
-    if (
-      form.scope === "filtered" &&
-      form.filters.some((filter) => eventTypesFromToggles(filter.toggles).length === 0)
-    ) {
-      setTypeError("Select at least one event type for each workspace.");
+    if (error.type) {
+      setTypeError(error.type);
       return;
     }
     try {
@@ -164,8 +195,8 @@ export function FactorySettingsNotificationsPage() {
       setForm(next);
       setSavedForm(next);
       showSuccessToast("Notification settings saved.");
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to save notification settings"));
+    } catch (caught) {
+      showErrorToast(getApiErrorMessage(caught, "Failed to save notification settings"));
     }
   };
 
@@ -190,14 +221,7 @@ export function FactorySettingsNotificationsPage() {
               }}
               onAddWorkspace={(workspaceId) => {
                 setScopeError("");
-                setForm((prev) =>
-                  prev.filters.some((filter) => filter.workspaceId === workspaceId)
-                    ? prev
-                    : {
-                        ...prev,
-                        filters: [...prev.filters, { workspaceId, toggles: defaultNotificationTypeToggles() }],
-                      },
-                );
+                setForm((prev) => withAddedWorkspace(prev, workspaceId));
               }}
               onRemoveWorkspace={(workspaceId) => {
                 setScopeError("");
@@ -208,14 +232,7 @@ export function FactorySettingsNotificationsPage() {
               }}
               onToggleType={(workspaceId, key, value) => {
                 setTypeError("");
-                setForm((prev) => ({
-                  ...prev,
-                  filters: prev.filters.map((filter) =>
-                    filter.workspaceId === workspaceId
-                      ? { ...filter, toggles: { ...filter.toggles, [key]: value } }
-                      : filter,
-                  ),
-                }));
+                setForm((prev) => withWorkspaceType(prev, workspaceId, key, value));
               }}
             />
             {form.scope === "all" ? (
