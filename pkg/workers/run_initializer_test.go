@@ -253,6 +253,56 @@ func Test__RunInitializer__RollsUpUsageWhenAlreadyFinished(t *testing.T) {
 	assert.Equal(t, int64(300), updated.CostCents)
 }
 
+// A factory step run that fails during initialization never reaches the
+// run finalizer (failRun already finished it), so the initializer itself
+// must refill the freed step slot from the step's queue.
+func Test__RunInitializer__AdmitsQueuedWorkOrderWhenInitializationFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(1)})
+
+	first := fixture.createOpenWorkOrder(t, r, "First")
+	second := fixture.createOpenWorkOrder(t, r, "Second")
+
+	firstDispatch, firstResult := fixture.dispatchLine(t, first)
+	require.NotNil(t, firstResult.Run)
+
+	secondDispatch, secondResult := fixture.dispatchLine(t, second)
+	require.NotNil(t, secondResult.QueueItem)
+
+	// Make the first run fail initialization: its pending callback cannot
+	// be dispatched.
+	require.NoError(t, database.Conn().Model(firstResult.Run).Update(
+		"callbacks",
+		datatypes.NewJSONSlice([]core.RunCallback{
+			{When: core.RunCallbackWhenPending, On: "bogus", Hook: "onMessage"},
+		}),
+	).Error)
+
+	amqpURL, _ := config.RabbitMQURL()
+	initializer := NewRunInitializer(amqpURL, r.Registry)
+	require.NoError(t, initializer.initializeRun(firstResult.Run.WorkflowID, firstResult.Run.ID, runInitializerTriggerPending))
+
+	// The failed run, its execution, and its traversal are finished...
+	failedRun, err := models.FindCanvasRunInTransaction(database.Conn(), firstResult.Run.WorkflowID, firstResult.Run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateFinished, failedRun.State)
+	assert.Equal(t, models.CanvasRunResultFailed, failedRun.Result)
+
+	failedExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), firstResult.Run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, failedExecution.Status)
+	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateFinished, reloadDispatch(t, firstDispatch.ID).State)
+
+	// ...and the freed slot admits the queued work order right away.
+	assert.Nil(t, queueItemForDispatch(t, secondDispatch.ID))
+	admitted := executionsForOrder(t, second.ID)
+	require.Len(t, admitted, 1)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, admitted[0].Status)
+	assert.Equal(t, secondDispatch.ID, admitted[0].LineDispatchID)
+}
+
 func createPendingRun(t *testing.T, workflowID uuid.UUID, nodeID string, callbacks []core.RunCallback) *models.CanvasRun {
 	t.Helper()
 

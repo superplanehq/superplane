@@ -24,12 +24,16 @@ export function HomeIntegrationCreateDialog({
   onClose,
   onCapabilitySetup,
   onRefetch,
+  setupReturnTo,
+  preferredCreateName,
 }: {
   open: boolean;
   dialogIntegrationName: string | null;
   dialogMode: "create" | "resume";
   organizationId: string;
   integrationHomeHref?: string;
+  setupReturnTo?: string;
+  preferredCreateName?: string;
   dialogDefinition: unknown;
   defaultDialogName: string;
   existingIntegrationNames: Set<string>;
@@ -66,7 +70,7 @@ export function HomeIntegrationCreateDialog({
       onReset={() => createIntegrationMutation.reset()}
       defaultName={
         dialogMode === "create"
-          ? resolveDefaultDialogName(dialogIntegrationName, undefined, existingIntegrationNames)
+          ? resolveDefaultDialogName(dialogIntegrationName, undefined, existingIntegrationNames, preferredCreateName)
           : defaultDialogName
       }
       onCreated={(integrationId, instanceName) => {
@@ -94,6 +98,8 @@ export function HomeIntegrationCreateDialog({
       initialCreatedIntegrationId={resumePendingForDialog?.metadata?.id}
       initialWebhookSetup={dialogMode === "create" ? undefined : initialWebhookSetup}
       initialConfiguration={resumePendingForDialog?.spec?.configuration as Record<string, unknown> | undefined}
+      setupReturnTo={setupReturnTo}
+      existingIntegrationNames={existingIntegrationNames}
     />
   );
 }
