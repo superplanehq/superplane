@@ -1,6 +1,22 @@
-import { defaultFactoriesFixture, ORGANIZATION_USERS, type FactoriesFixture } from "./factoryPageResponses";
-import type { FactoriesWorkOrder } from "@/api-client";
+import {
+  defaultFactoriesFixture,
+  ORGANIZATION_USERS,
+  STORYBOOK_ME_USER_EMAIL,
+  STORYBOOK_ME_USER_ID,
+  STORYBOOK_ME_USER_NAME,
+  type FactoriesFixture,
+} from "./factoryPageResponses";
+import { DEFAULT_ARTIFACTS_BY_ORDER_ID, DEFAULT_EVENTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
+import { DEFAULT_CHECKS_BY_ORDER_ID } from "./workOrderCheckFixtures";
+import type {
+  FactoriesFactoryLine,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderEvent,
+  FactoriesWorkOrderLineDispatch,
+} from "@/api-client";
+import { defaultNotificationSettings } from "@/lib/notificationSettings";
 import { fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
+import { automationNameForLineStep } from "../lib/factoryLineFormShared";
 
 export type { FactoriesFixture };
 
@@ -25,6 +41,7 @@ interface RequestBody {
   line_name?: unknown;
   result?: unknown;
   steps?: unknown;
+  body?: unknown;
 }
 
 function stringOrEmpty(value: unknown): string {
@@ -163,7 +180,7 @@ function createWorkOrderFromRequest(request: RequestBody, orderCount: number): F
     updatedAt: nowIso,
     createdBy: { user: { id: ORGANIZATION_USERS[0].id, name: ORGANIZATION_USERS[0].name } },
     assignees: findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids)),
-    executions: [],
+    lineDispatches: [],
   };
 }
 
@@ -172,25 +189,56 @@ function findOrder(fixture: FactoriesFixture, factoryId: string, orderId: string
   return orders.find((entry) => entry.id === orderId);
 }
 
+function buildDispatchedLineDispatch(
+  line: FactoriesFactoryLine | undefined,
+  lineName: string,
+  now: string,
+  apps: Array<{ id?: string; name?: string }> = [],
+): FactoriesWorkOrderLineDispatch {
+  const firstStep = line?.steps?.[0];
+  const firstAppId = firstStep?.app?.app;
+  const firstName = automationNameForLineStep(firstStep, apps, 0);
+  return {
+    id: `dispatch-${Date.now()}`,
+    line: line ? { id: line.id, name: line.name } : { id: "line-unknown", name: lineName },
+    steps: (line?.steps ?? []).map((step, index) => ({
+      name: automationNameForLineStep(step, apps, index),
+      stepIndex: index,
+    })),
+    state: "STATE_ACTIVE",
+    result: "RESULT_UNKNOWN",
+    createdAt: now,
+    stepExecutions: [
+      {
+        id: `exec-${Date.now()}`,
+        step: firstName,
+        stepIndex: 0,
+        state: "STATE_STARTED",
+        result: "RESULT_UNKNOWN",
+        createdAt: now,
+        updatedAt: now,
+        run: firstAppId ? { appId: firstAppId, appName: firstName } : undefined,
+      },
+    ],
+  };
+}
+
+function orderEvents(fixture: FactoriesFixture, orderId: string): FactoriesWorkOrderEvent[] {
+  return fixture.eventsByOrderId?.[orderId] ?? DEFAULT_EVENTS_BY_ORDER_ID[orderId] ?? [];
+}
+
 function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: string, request: RequestBody) {
   const order = findOrder(fixture, factoryId, orderId);
   if (!order) return { json: {} };
   const factory = fixture.factories.find((entry) => entry.id === factoryId);
   const lineName = stringOrEmpty(request.lineName ?? request.line_name);
   const line = factory?.lines?.find((entry) => entry.name === lineName) ?? factory?.lines?.[0];
-  order.updatedAt = new Date().toISOString();
-  order.executions = [
-    ...(order.executions ?? []),
-    {
-      id: `dispatch-${Date.now()}`,
-      line: line ? { id: line.id, name: line.name } : { id: "line-unknown", name: lineName },
-      step: line?.steps?.[0]?.name ?? "start",
-      state: "STATE_STARTED",
-      result: "RESULT_UNKNOWN",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ];
+  const now = new Date().toISOString();
+  order.updatedAt = now;
+
+  const apps = fixture.appsByFactoryId[factoryId] ?? [];
+  const newDispatch = buildDispatchedLineDispatch(line, lineName, now, apps);
+  order.lineDispatches = [...(order.lineDispatches ?? []), newDispatch];
   return { json: { order } };
 }
 
@@ -245,13 +293,87 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         return { json: { order } };
       },
     },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/events"),
+      resolve: (match) => {
+        const events = orderEvents(fixture, match[2]);
+        return { json: { events, totalCount: events.length, hasNextPage: false } };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/artifacts"),
+      resolve: (match, method) => {
+        if (method !== "GET") return { json: {} };
+        const artifacts = fixture.artifactsByOrderId?.[match[2]] ?? DEFAULT_ARTIFACTS_BY_ORDER_ID[match[2]] ?? [];
+        return { json: { artifacts } };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/checks"),
+      resolve: (match, method) => {
+        if (method !== "GET") return { json: {} };
+        const checks = fixture.checksByOrderId?.[match[2]] ?? DEFAULT_CHECKS_BY_ORDER_ID[match[2]] ?? [];
+        return { json: { checks } };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/comments"),
+      resolve: (match, method, body) => {
+        if (method !== "POST") return null;
+        const order = findOrder(fixture, match[1], match[2]);
+        if (!order) return { json: {} };
+        const commentBody = stringOrEmpty(((body ?? {}) as RequestBody).body);
+        const timestamp = new Date().toISOString();
+        const events: FactoriesWorkOrderEvent[] = [
+          ...orderEvents(fixture, match[2]),
+          {
+            type: "order.comment.added",
+            timestamp,
+            event: {
+              order: { id: order.id, title: order.title },
+              body: commentBody,
+              author: { kind: "user", userId: STORYBOOK_ME_USER_ID },
+            },
+          },
+        ];
+        fixture.eventsByOrderId = { ...(fixture.eventsByOrderId ?? {}), [match[2]]: events };
+        return { json: { comment: { id: `comment-${events.length}`, body: commentBody, createdAt: timestamp } } };
+      },
+    },
   ];
+}
+
+/** Serves `/api/v1/me` so factory stories resolve `useMe` without the Home harness. */
+function meRoute(): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/me"),
+    resolve: () => ({
+      json: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME, email: STORYBOOK_ME_USER_EMAIL } },
+    }),
+  };
+}
+
+function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
+  const defaults = defaultNotificationSettings();
+
+  return {
+    pattern: re("/api/v1/me/notification-settings"),
+    resolve: (_match, method, body) => {
+      if (method === "PUT") {
+        const request = (body ?? {}) as { settings?: FactoriesFixture["notificationSettings"] };
+        fixture.notificationSettings = { ...defaults, ...(request.settings ?? {}) };
+      }
+      return { json: { settings: fixture.notificationSettings ?? defaults } };
+    },
+  };
 }
 
 /** Builds a resolvable factories route table for a fixture snapshot. */
 function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     factoriesCollectionRoute(fixture),
+    meRoute(),
+    notificationSettingsRoute(fixture),
     ...factoryDetailRoutes(fixture),
     ...factoryLinesRoutes(fixture),
     ...workOrderRoutes(fixture),

@@ -1,0 +1,90 @@
+import { describe, expect, it } from "vitest";
+
+import { getFactoryDefinition, ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS } from "./index";
+import { FACTORY_CANVAS_ID_PLACEHOLDER, materializeFactoryCanvas } from "./materializeFactoryTemplate";
+
+function materializeOnboardingApp(factoryId: string) {
+  return materializeFactoryCanvas({
+    definition: getFactoryDefinition(factoryId),
+    canvasName: "My Planning",
+    canvasId: "canvas-abc",
+    installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
+    integrations: {
+      github: { id: "int-1", name: "acme-github", ready: true },
+      claude: { id: "int-2", name: "acme-claude", ready: true },
+    },
+  });
+}
+
+describe("setup factory line apps", () => {
+  it("orders the apps as plan, implement, open PR", () => {
+    expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).toEqual([
+      "line-planning",
+      "line-implementation",
+      "line-pr",
+    ]);
+  });
+
+  it("exposes a single onRun entrypoint per app that the line calls", () => {
+    for (const app of ONBOARDING_LINE_APPS) {
+      const canvasYaml = materializeOnboardingApp(app.factoryId);
+      expect(canvasYaml).toMatch(new RegExp(`id: ${app.entrypointNodeId}[\\s\\S]*component: onRun`));
+    }
+  });
+
+  it("materializes repositories and integration wiring, leaving no template placeholders", () => {
+    for (const app of ONBOARDING_LINE_APPS) {
+      const canvasYaml = materializeOnboardingApp(app.factoryId);
+      expect(canvasYaml).toContain("name: acme-claude");
+      expect(canvasYaml).toContain("name: acme-github");
+      expect(canvasYaml).not.toContain("{{ install_params.");
+      expect(canvasYaml).not.toContain(FACTORY_CANVAS_ID_PLACEHOLDER);
+      // No org-specific bindings copied from the production canvases.
+      expect(canvasYaml).not.toContain("superplanehq");
+      expect(canvasYaml).not.toContain("claude-superplane-apps");
+    }
+  });
+
+  it("routes code work to the app repository", () => {
+    const planning = materializeOnboardingApp("line-planning");
+    expect(planning).toContain("acme/app");
+    expect(planning).toContain("acme/backlog");
+
+    const implementation = materializeOnboardingApp("line-implementation");
+    expect(implementation).toContain("acme/app");
+
+    const pr = materializeOnboardingApp("line-pr");
+    expect(pr).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
+  });
+
+  it("links the pull request back to the work order", () => {
+    const pr = materializeOnboardingApp("line-pr");
+
+    expect(pr).toMatch(/component: github\.createPullRequest[\s\S]*\[Work Order\]\(\{\{ order\(\)\.url \}\}\)/);
+    expect(pr).toContain("Created via [SuperPlane](https://superplane.com)");
+  });
+});
+
+describe("setup factory event apps", () => {
+  it("provisions PR Closure outside the factory line", () => {
+    expect(ONBOARDING_EVENT_APPS).toEqual(["pr-closure"]);
+    expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("pr-closure");
+  });
+
+  it("closes the work order when a factory pull request is closed", () => {
+    const canvasYaml = materializeOnboardingApp("pr-closure");
+
+    expect(canvasYaml).toMatch(/component: github\.onPullRequest[\s\S]*actions:[\s\S]*- closed/);
+    expect(canvasYaml).toMatch(/component: github\.onPullRequest[\s\S]*repository: acme\/app/);
+    expect(canvasYaml).toContain("component: findWorkOrder");
+    expect(canvasYaml).toContain("by: artifactKey");
+    expect(canvasYaml).toContain("result: completed");
+    expect(canvasYaml).toContain("result: rejected");
+    expect(canvasYaml).toContain("id: int-1");
+    expect(canvasYaml).toContain("name: acme-github");
+    expect(canvasYaml).not.toContain("{{ install_params.");
+    expect(canvasYaml).not.toContain(FACTORY_CANVAS_ID_PLACEHOLDER);
+    expect(canvasYaml).not.toContain("superplanehq");
+    expect(canvasYaml).not.toMatch(/component: onRun/);
+  });
+});

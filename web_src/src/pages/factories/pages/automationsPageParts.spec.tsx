@@ -160,13 +160,19 @@ describe("AutomationDetail tabs", () => {
     title: "Add refund reconciliation test",
     state: "STATE_OPEN",
     assignees: [{ id: "user-1", name: "Ada Lovelace" }],
-    executions: [
+    lineDispatches: [
       {
-        id: "e1",
-        step: "implement",
-        state: "STATE_STARTED",
-        run: { id: "run-c1111111", appId: "app-refund-planner" },
+        id: "dispatch-1",
         line: { id: "line-1", name: "Refunds" },
+        state: "STATE_ACTIVE",
+        stepExecutions: [
+          {
+            id: "e1",
+            step: "implement",
+            state: "STATE_STARTED",
+            run: { id: "run-c1111111", appId: "app-refund-planner" },
+          },
+        ],
       },
     ],
   };

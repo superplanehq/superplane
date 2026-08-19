@@ -22,7 +22,7 @@ const workOrdersPayload = `{
       "result": "RESULT_UNSPECIFIED",
       "createdAt": "2025-01-15T10:00:00Z",
       "assignees": [{"id": "user-1", "name": "Alice"}],
-      "executions": [{"id": "exec-1"}, {"id": "exec-2"}]
+      "lineDispatches": [{"id": "dispatch-1", "stepExecutions": [{"id": "exec-1"}, {"id": "exec-2"}]}]
     }
   ]
 }`

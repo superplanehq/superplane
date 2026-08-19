@@ -36,3 +36,23 @@ var exampleOutputUpdateAlarm map[string]any
 func (c *UpdateAlarm) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateAlarmOnce, exampleOutputUpdateAlarmBytes, &exampleOutputUpdateAlarm)
 }
+
+//go:embed example_output_get_alarm.json
+var exampleOutputGetAlarmBytes []byte
+
+var exampleOutputGetAlarmOnce sync.Once
+var exampleOutputGetAlarm map[string]any
+
+func (c *GetAlarm) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetAlarmOnce, exampleOutputGetAlarmBytes, &exampleOutputGetAlarm)
+}
+
+//go:embed example_output_delete_alarm.json
+var exampleOutputDeleteAlarmBytes []byte
+
+var exampleOutputDeleteAlarmOnce sync.Once
+var exampleOutputDeleteAlarm map[string]any
+
+func (c *DeleteAlarm) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteAlarmOnce, exampleOutputDeleteAlarmBytes, &exampleOutputDeleteAlarm)
+}

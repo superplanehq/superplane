@@ -19,6 +19,11 @@ const (
 	// merged transition; the row is updated in place and this reason
 	// just tells the frontend which query to invalidate.
 	EventTypeOrderArtifactUpdated = "order.artifact.updated"
+	// EventTypeOrderCheckReported records every check report, including
+	// re-reports of the same check key. The check row itself is
+	// latest-only state (one row per key, updated in place); the events
+	// keep the score history on the timeline.
+	EventTypeOrderCheckReported = "order.check.reported"
 
 	// Factory line events
 	EventTypeLineStepExecutionCreated  = "step.execution.created"
@@ -37,6 +42,26 @@ const (
 	ArtifactTypePR       = "pr"
 	ArtifactTypeMarkdown = "markdown"
 	ArtifactTypeBranch   = "branch"
+	ArtifactTypeLink     = "link"
+)
+
+// Check levels. The reporting component computes the level from its
+// declarative thresholds (direction + cautionAt/criticalAt); the model
+// only validates and stores it.
+const (
+	CheckLevelPositive = "positive"
+	CheckLevelNeutral  = "neutral"
+	CheckLevelCaution  = "caution"
+	CheckLevelCritical = "critical"
+)
+
+// Check score formats: render as `score/maxScore` or as a percentage.
+const (
+	CheckFormatFraction = "fraction"
+	CheckFormatPercent  = "percent"
+	// CheckFormatBoolean is a pass/fail verdict: score 1 (pass) or 0
+	// (fail) on a max score of 1.
+	CheckFormatBoolean = "boolean"
 )
 
 // Events
@@ -86,16 +111,25 @@ type WorkOrderCommentAuthor struct {
 }
 
 type WorkOrderCommentAdded struct {
-	Order  *WorkOrderRef           `json:"order,omitempty"`
-	Body   string                  `json:"body"`
-	Author *WorkOrderCommentAuthor `json:"author,omitempty"`
-	Run    *RunRef                 `json:"run,omitempty"`
+	Order          *WorkOrderRef           `json:"order,omitempty"`
+	CommentID      uuid.UUID               `json:"commentId,omitempty"`
+	Body           string                  `json:"body"`
+	Author         *WorkOrderCommentAuthor `json:"author,omitempty"`
+	Run            *RunRef                 `json:"run,omitempty"`
+	MentionedUsers []UserRef               `json:"mentionedUsers,omitempty"`
 }
 
 type WorkOrderArtifactAdded struct {
 	Order      *WorkOrderRef  `json:"order,omitempty"`
 	Artifact   *ArtifactRef   `json:"artifact,omitempty"`
 	User       *UserRef       `json:"user,omitempty"`
+	Automation *AutomationRef `json:"automation,omitempty"`
+	Run        *RunRef        `json:"run,omitempty"`
+}
+
+type WorkOrderCheckReported struct {
+	Order      *WorkOrderRef  `json:"order,omitempty"`
+	Check      *CheckRef      `json:"check,omitempty"`
 	Automation *AutomationRef `json:"automation,omitempty"`
 	Run        *RunRef        `json:"run,omitempty"`
 }
@@ -134,7 +168,8 @@ type LineRef struct {
 }
 
 type AppRef struct {
-	ID uuid.UUID `json:"id"`
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name,omitempty"`
 }
 
 type RunRef struct {
@@ -147,4 +182,18 @@ type ArtifactRef struct {
 	ID   uuid.UUID      `json:"id"`
 	Type string         `json:"type"`
 	Data map[string]any `json:"data,omitempty"`
+}
+
+// CheckRef snapshots a check report for the timeline. PreviousScore is
+// the score the same check key held before this report, if any, so the
+// timeline can show the movement without replaying older events.
+type CheckRef struct {
+	ID            uuid.UUID `json:"id"`
+	Key           string    `json:"key"`
+	Name          string    `json:"name"`
+	Score         float64   `json:"score"`
+	MaxScore      float64   `json:"maxScore"`
+	Format        string    `json:"format"`
+	Level         string    `json:"level"`
+	PreviousScore *float64  `json:"previousScore,omitempty"`
 }

@@ -272,17 +272,26 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 	require.NoError(t, err)
 
 	userIDStr := r.User.String()
-	require.NoError(t, order.RecordCommentAdded(database.Conn(), "Kicking this off", factory.WorkOrderCommentAuthor{
-		Kind:   factory.CommentAuthorKindUser,
-		UserID: &userIDStr,
-	}, nil))
-	require.NoError(t, order.RecordCommentAdded(database.Conn(), "Opened the PR", factory.WorkOrderCommentAuthor{
-		Kind: factory.CommentAuthorKindAutomation,
-		Automation: &factory.AutomationRef{
-			NodeID:   "implement",
-			NodeName: "Implement",
+	_, err = order.RecordCommentAdded(database.Conn(), models.FactoryWorkOrderCommentParams{
+		Body: "Kicking this off",
+		Author: factory.WorkOrderCommentAuthor{
+			Kind:   factory.CommentAuthorKindUser,
+			UserID: &userIDStr,
 		},
-	}, &factory.RunRef{ID: run.ID, State: "running"}))
+	})
+	require.NoError(t, err)
+	_, err = order.RecordCommentAdded(database.Conn(), models.FactoryWorkOrderCommentParams{
+		Body: "Opened the PR",
+		Author: factory.WorkOrderCommentAuthor{
+			Kind: factory.CommentAuthorKindAutomation,
+			Automation: &factory.AutomationRef{
+				NodeID:   "implement",
+				NodeName: "Implement",
+			},
+		},
+		Run: &factory.RunRef{ID: run.ID, State: "running"},
+	})
+	require.NoError(t, err)
 
 	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithRootEvent(&nodeExecution.RootEventID).
@@ -301,11 +310,9 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, factoryModel.ID.String(), payload["factory_id"])
 		assert.Equal(t, models.FactoryWorkOrderStateDraft, payload["state"])
 		assert.Equal(t, "", payload["result"])
+		assert.NotContains(t, payload, "url")
 		assert.NotContains(t, payload, "artifacts")
 		assert.NotContains(t, payload, "comments")
-
-		expectedURLSuffix := fmt.Sprintf("/%s/workspaces/%s/work-order/%d", r.Organization.ID.String(), factoryModel.Key, order.Number)
-		assert.Contains(t, payload["url"], expectedURLSuffix)
 
 		source, ok := payload["source"].(map[string]any)
 		require.True(t, ok)
@@ -328,19 +335,34 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, float64(42), issueNumber)
 
-		url, err := builder.ResolveExpression(`order().url`)
-		require.NoError(t, err)
-		assert.Contains(t, url, fmt.Sprintf("/%s/workspaces/%s/work-order/%d", r.Organization.ID.String(), factoryModel.Key, order.Number))
-
 		built, err := builder.Build(map[string]any{
-			"orderID":  "{{ order().id }}",
-			"title":    "{{ order().title }}",
-			"orderURL": "{{ order().url }}",
+			"orderID": "{{ order().id }}",
+			"title":   "{{ order().title }}",
 		})
 		require.NoError(t, err)
 		assert.Equal(t, order.ID.String(), built["orderID"])
 		assert.Equal(t, "Ship feature", built["title"])
-		assert.Contains(t, built["orderURL"], fmt.Sprintf("/%s/workspaces/%s/work-order/%d", r.Organization.ID.String(), factoryModel.Key, order.Number))
+	})
+
+	t.Run("permalink back to the work order", func(t *testing.T) {
+		expectedSuffix := fmt.Sprintf(
+			"/%s/workspaces/%s/work-order/%d",
+			r.Organization.ID.String(), factoryModel.Key, order.Number,
+		)
+
+		url, err := builder.ResolveExpression(`order().url`)
+		require.NoError(t, err)
+		assert.Contains(t, url, expectedSuffix)
+
+		bracket, err := builder.ResolveExpression(`order()["url"]`)
+		require.NoError(t, err)
+		assert.Equal(t, url, bracket)
+
+		built, err := builder.Build(map[string]any{
+			"body": "[Work Order]({{ order().url }})",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, fmt.Sprintf("[Work Order](%s)", url), built["body"])
 	})
 
 	t.Run("artifacts equivalents", func(t *testing.T) {

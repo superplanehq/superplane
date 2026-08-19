@@ -1,13 +1,20 @@
 import type {
   FactoriesFactory,
   FactoriesFactoryLine,
+  MeNotificationSettings,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
+  FactoriesWorkOrderEvent,
   FactoriesWorkOrderExecution,
+  FactoriesWorkOrderLineDispatch,
+  FactoriesWorkOrderLineDispatchResult,
+  FactoriesWorkOrderLineDispatchState,
   FactoryApp,
   FactoryLineStep,
 } from "@/api-client";
 import { canvasAppIds } from "@/pages/app/__fixtures__/handlers";
+
+import type { FactoriesWorkOrderCheck } from "@/api-client";
 
 /** Shared with the home fixture so routes stay in sync across HomePage → Factories navigation. */
 export const FACTORIES_ORGANIZATION_ID = "3ee1aa47-3a60-4c1f-b645-0b9859ab91f8";
@@ -70,9 +77,8 @@ export const ORGANIZATION_USERS = [
 
 const RUN_APP_TYPE = "runApp";
 
-function runAppStep(name: string, appId: string, entrypoint: string): FactoryLineStep {
+function runAppStep(appId: string, entrypoint: string): FactoryLineStep {
   return {
-    name,
     type: RUN_APP_TYPE,
     app: { app: appId, entrypoint },
   };
@@ -112,9 +118,9 @@ export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
     steps: [
-      runAppStep("plan", "app-refund-planner", "start-plan"),
-      runAppStep("implement", "app-refund-implementer", "start-implementation"),
-      runAppStep("verify", "app-refund-verifier", "start-verification"),
+      runAppStep("app-refund-planner", "start-plan"),
+      runAppStep("app-refund-implementer", "start-implementation"),
+      runAppStep("app-refund-verifier", "start-verification"),
     ],
   },
   {
@@ -122,7 +128,7 @@ export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
     name: "hotfix",
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
-    steps: [runAppStep("verify", "app-refund-verifier", "start-verification")],
+    steps: [runAppStep("app-refund-verifier", "start-verification")],
   },
 ];
 
@@ -143,14 +149,21 @@ export const EMPTY_FACTORY: FactoriesFactory = {
   lines: [],
 };
 
+const PLAN_STEP_INDEX: Record<string, number> = { plan: 0, implement: 1, verify: 2 };
+const PLAN_STEP_LABEL: Record<string, string> = {
+  plan: "Refund Planner",
+  implement: "Refund Implementer",
+  verify: "Refund Verifier",
+};
+
 function planLineExecution(
   step: string,
   overrides: Partial<FactoriesWorkOrderExecution> = {},
 ): FactoriesWorkOrderExecution {
   return {
     id: `exec-${step}-${overrides.id ?? Math.random().toString(36).slice(2, 8)}`,
-    line: { id: REFUND_LINE_PLAN_ID, name: "plan-and-implement" },
-    step,
+    step: PLAN_STEP_LABEL[step] ?? step,
+    stepIndex: PLAN_STEP_INDEX[step] ?? 0,
     state: "STATE_FINISHED",
     result: "RESULT_PASSED",
     createdAt: TWO_HOURS_AGO,
@@ -164,13 +177,64 @@ function planLineExecution(
   };
 }
 
+/**
+ * Builds a single line dispatch (traversal) around a set of step
+ * executions — the fixtures below give every work order at most one
+ * dispatch of the `plan-and-implement` line, since none of the storybook
+ * scenarios need to show two traversals of the same line side by side.
+ */
+function planLineDispatch(
+  stepExecutions: FactoriesWorkOrderExecution[],
+  overrides: Partial<FactoriesWorkOrderLineDispatch> = {},
+): FactoriesWorkOrderLineDispatch {
+  const state: FactoriesWorkOrderLineDispatchState = stepExecutions.some(
+    (execution) => execution.state !== "STATE_FINISHED",
+  )
+    ? "STATE_ACTIVE"
+    : "STATE_FINISHED";
+
+  const lastExecution = stepExecutions[stepExecutions.length - 1];
+  const result: FactoriesWorkOrderLineDispatchResult =
+    state === "STATE_FINISHED" ? (lastExecution?.result ?? "RESULT_UNKNOWN") : "RESULT_UNKNOWN";
+
+  return {
+    id: `dispatch-${REFUND_LINE_PLAN_ID}-${stepExecutions[0]?.id ?? "empty"}`,
+    line: { id: REFUND_LINE_PLAN_ID, name: "plan-and-implement" },
+    steps: [
+      { name: "Refund Planner", stepIndex: 0 },
+      { name: "Refund Implementer", stepIndex: 1 },
+      { name: "Refund Verifier", stepIndex: 2 },
+    ],
+    state,
+    result,
+    createdAt: stepExecutions[0]?.createdAt ?? TWO_HOURS_AGO,
+    finishedAt: state === "STATE_FINISHED" ? (lastExecution?.updatedAt ?? HOUR_AGO) : undefined,
+    stepExecutions,
+    ...overrides,
+  };
+}
+
 export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-open-refunds",
   number: "101",
   key: "RF-101",
   title: "Reconcile duplicate refunds in ledger",
-  description:
-    "Users are seeing duplicate refund entries after retries. Reconcile the ledger, patch retry logic, and add a regression test.",
+  description: [
+    "Users see duplicate refund entries in the ledger after payment retries. Support reported 14 affected accounts this week, and finance cannot close the monthly report until the totals match.",
+    "",
+    "### Scope",
+    "",
+    "- Reconcile the ledger and remove duplicate entries created by retries.",
+    "- Patch the retry logic in `ledger-writer` so replays reuse the original idempotency key.",
+    "- Add a regression test that replays a retry burst against a seeded ledger.",
+    "",
+    "### Out of scope",
+    "",
+    "- Migrating the ledger to the new event schema (tracked separately).",
+    "- Changes to the refund approval flow.",
+    "",
+    "First repro: retry a refund three times with the writer under load — the second and third attempts land outside the idempotency window and insert new rows.",
+  ].join("\n"),
   state: "STATE_OPEN",
   result: "RESULT_UNSPECIFIED",
   createdAt: HOUR_AGO,
@@ -180,7 +244,7 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
     { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
     { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
   ],
-  executions: [],
+  lineDispatches: [],
 };
 
 /**
@@ -192,14 +256,18 @@ export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
   number: "102",
   key: "RF-102",
   title: "Add refund reason enum to schema",
-  description: "Extend the refund ledger schema with a nullable reason enum so audit can categorize.",
+  description: [
+    "Audit cannot categorize refunds because the ledger stores the reason as free text. Extend the schema with a nullable `reason` enum so reports can group refunds by cause.",
+    "",
+    "Proposed values: `duplicate_charge`, `customer_request`, `fraud`, `service_outage`, `other`. Keep the column nullable so the backfill can run separately.",
+  ].join("\n"),
   state: "STATE_OPEN",
   result: "RESULT_UNSPECIFIED",
   createdAt: TWO_HOURS_AGO,
   updatedAt: TWO_HOURS_AGO,
   createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  executions: [],
+  lineDispatches: [],
 };
 
 // Storybook user is co-assigned so "mine + running" surfaces this order.
@@ -208,7 +276,13 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   number: "103",
   key: "RF-103",
   title: "Add refund reconciliation test",
-  description: "Cover the newly discovered duplicate refund case with a regression test running in CI.",
+  description: [
+    "The duplicate refund case found in RF-101 has no automated coverage. Add a regression test that runs in CI so the bug cannot return unnoticed.",
+    "",
+    "- Seed a ledger with one refund and replay the retry burst from the incident.",
+    "- Assert the ledger contains exactly one entry per refund after reconciliation.",
+    "- Run the test in the `verify` step of the plan-and-implement line.",
+  ].join("\n"),
   state: "STATE_OPEN",
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
@@ -218,15 +292,22 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
     { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
     { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
   ],
-  executions: [
-    planLineExecution("plan", { id: "1", state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: TWO_HOURS_AGO }),
-    planLineExecution("implement", {
-      id: "2",
-      state: "STATE_STARTED",
-      result: "RESULT_UNKNOWN",
-      run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
-      updatedAt: HOUR_AGO,
-    }),
+  lineDispatches: [
+    planLineDispatch([
+      planLineExecution("plan", {
+        id: "1",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        updatedAt: TWO_HOURS_AGO,
+      }),
+      planLineExecution("implement", {
+        id: "2",
+        state: "STATE_STARTED",
+        result: "RESULT_UNKNOWN",
+        run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+        updatedAt: HOUR_AGO,
+      }),
+    ]),
   ],
 };
 
@@ -236,22 +317,33 @@ export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
   number: "104",
   key: "RF-104",
   title: "Ship idempotent refund retries",
-  description: "Retry logic should be idempotent so replays don't create duplicate refunds.",
+  description: [
+    "Retry logic must be idempotent so replays do not create duplicate refunds. Today each retry attempt generates a new request id, which defeats the dedupe check downstream.",
+    "",
+    "Derive the idempotency key from the refund id plus the original attempt, and extend the dedupe window in `ledger-writer` to cover delayed replays from the queue.",
+  ].join("\n"),
   state: "STATE_OPEN",
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
   createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  executions: [
-    planLineExecution("plan", { id: "3", state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: TWO_HOURS_AGO }),
-    planLineExecution("implement", {
-      id: "4",
-      state: "STATE_FINISHED",
-      result: "RESULT_FAILED",
-      run: { id: LINE_RUN_IMPLEMENT_FAILED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
-      updatedAt: HOUR_AGO,
-    }),
+  lineDispatches: [
+    planLineDispatch([
+      planLineExecution("plan", {
+        id: "3",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        updatedAt: TWO_HOURS_AGO,
+      }),
+      planLineExecution("implement", {
+        id: "4",
+        state: "STATE_FINISHED",
+        result: "RESULT_FAILED",
+        run: { id: LINE_RUN_IMPLEMENT_FAILED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+        updatedAt: HOUR_AGO,
+      }),
+    ]),
   ],
 };
 
@@ -260,14 +352,22 @@ export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   number: "105",
   key: "RF-105",
   title: "Draft: rework refund telemetry",
-  description: "Still scoping the metric shape and dashboards before we mark this ready.",
+  description: [
+    "Still scoping. The current refund metrics count events but hide latency, so we cannot tell whether reconciliation slows down under load.",
+    "",
+    "Open questions before this is ready:",
+    "",
+    "- Which percentiles do the dashboards need (p50/p95/p99)?",
+    "- Do we tag metrics by provider, by line, or both?",
+    "- Can we reuse the payment-poller histogram buckets?",
+  ].join("\n"),
   state: "STATE_DRAFT",
   result: "RESULT_UNSPECIFIED",
   createdAt: HOUR_AGO,
   updatedAt: HOUR_AGO,
   createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  executions: [],
+  lineDispatches: [],
 };
 
 export const CLOSED_FAILED_WORK_ORDER: FactoriesWorkOrder = {
@@ -275,14 +375,18 @@ export const CLOSED_FAILED_WORK_ORDER: FactoriesWorkOrder = {
   number: "92",
   key: "RF-92",
   title: "Failed: reconcile refund ledger for Q1 audit",
-  description: "Line completed but validation flagged a mismatch; closed as failed for follow-up.",
+  description: [
+    "Reconcile the refund ledger for the Q1 audit. The line completed, but validation flagged a $412.66 mismatch between the ledger and the payment provider export.",
+    "",
+    "Closed as failed. Follow-up: trace the mismatch to its source transactions before the audit deadline — see the reconciliation report artifact for the affected date range.",
+  ].join("\n"),
   state: "STATE_CLOSED",
   result: "RESULT_FAILED",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
   createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  executions: [],
+  lineDispatches: [],
 };
 
 export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
@@ -290,29 +394,35 @@ export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
   number: "87",
   key: "RF-87",
   title: "Backfill refund audit trail",
-  description: "Add historical audit entries so the reconciliation report has a full retroactive picture.",
+  description: [
+    "The reconciliation report needs a full retroactive picture, but refunds processed before March have no audit entries.",
+    "",
+    "Backfill historical audit entries from the provider exports, then verify row counts against the ledger for each month. The backfill ran in batches of 10k rows to keep replication lag flat.",
+  ].join("\n"),
   state: "STATE_CLOSED",
   result: "RESULT_COMPLETED",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
   createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  executions: [
-    planLineExecution("plan", { id: "5", state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: LAST_WEEK }),
-    planLineExecution("implement", {
-      id: "6",
-      state: "STATE_FINISHED",
-      result: "RESULT_PASSED",
-      run: { id: LINE_RUN_IMPLEMENT_PASSED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
-      updatedAt: LAST_WEEK,
-    }),
-    planLineExecution("verify", {
-      id: "7",
-      state: "STATE_FINISHED",
-      result: "RESULT_PASSED",
-      run: { id: LINE_RUN_VERIFY_PASSED_ID, appId: "app-refund-verifier", appName: "Refund Verifier" },
-      updatedAt: YESTERDAY,
-    }),
+  lineDispatches: [
+    planLineDispatch([
+      planLineExecution("plan", { id: "5", state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: LAST_WEEK }),
+      planLineExecution("implement", {
+        id: "6",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        run: { id: LINE_RUN_IMPLEMENT_PASSED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+        updatedAt: LAST_WEEK,
+      }),
+      planLineExecution("verify", {
+        id: "7",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        run: { id: LINE_RUN_VERIFY_PASSED_ID, appId: "app-refund-verifier", appName: "Refund Verifier" },
+        updatedAt: YESTERDAY,
+      }),
+    ]),
   ],
 };
 
@@ -365,6 +475,17 @@ export interface FactoriesFixture {
   factories: FactoriesFactory[];
   workOrdersByFactoryId: Record<string, FactoriesWorkOrder[]>;
   appsByFactoryId: Record<string, FactoryApp[]>;
+  /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
+  notificationSettings?: MeNotificationSettings;
+  /**
+   * Per-order activity timelines. When an order id is absent, the handlers
+   * fall back to `DEFAULT_EVENTS_BY_ORDER_ID` from `factoryPageEventFixtures`.
+   */
+  eventsByOrderId?: Record<string, FactoriesWorkOrderEvent[]>;
+  /** Per-order artifacts; same fallback pattern as `eventsByOrderId`. */
+  artifactsByOrderId?: Record<string, FactoriesWorkOrderArtifact[]>;
+  /** Per-order checks (automation-reported scores); same fallback pattern as `eventsByOrderId`. */
+  checksByOrderId?: Record<string, FactoriesWorkOrderCheck[]>;
 }
 
 export const defaultFactoriesFixture: FactoriesFixture = {
@@ -413,8 +534,8 @@ export const fiveStepLineFactoriesFixture: FactoriesFixture = {
           ...line,
           steps: [
             ...(line.steps ?? []),
-            runAppStep("release", "app-refund-verifier", "start-verification"),
-            runAppStep("observe", "app-refund-planner", "start-plan"),
+            runAppStep("app-refund-verifier", "start-verification"),
+            runAppStep("app-refund-planner", "start-plan"),
           ],
         };
       }),

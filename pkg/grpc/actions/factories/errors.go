@@ -22,6 +22,34 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.AlreadyExists(err, "workspace key already exists in this organization")
 	case errors.Is(err, models.ErrFactoryNotFound):
 		return grpcerrors.NotFound(err, "factory not found")
+	case errors.Is(err, models.ErrFactoryOnboardingInvalidIssuesSource):
+		return grpcerrors.InvalidArgument(err, "invalid issues source")
+	case errors.Is(err, models.ErrFactoryOnboardingInvalidAgentHarness):
+		return grpcerrors.InvalidArgument(err, "invalid agent harness")
+	case errors.Is(err, models.ErrFactoryOnboardingInvalidIntegrationID):
+		return grpcerrors.InvalidArgument(err, "invalid integration id")
+	case errors.Is(err, models.ErrFactoryOnboardingInvalidAppID):
+		return grpcerrors.InvalidArgument(err, "invalid provisioned app id")
+	case errors.Is(err, models.ErrFactoryOnboardingInvalidLineID):
+		return grpcerrors.InvalidArgument(err, "invalid provisioned line id")
+	case errors.Is(err, models.ErrFactoryOnboardingInvalidRepository):
+		return grpcerrors.InvalidArgument(err, "repository must use the owner/name format")
+	case errors.Is(err, models.ErrFactoryOnboardingVCSIntegrationRequired):
+		return grpcerrors.InvalidArgument(err, "version control integration is required to complete onboarding")
+	case errors.Is(err, models.ErrFactoryOnboardingAgentIntegrationRequired):
+		return grpcerrors.InvalidArgument(err, "agent integration is required to complete onboarding")
+	case errors.Is(err, models.ErrFactoryOnboardingAppRepositoryRequired):
+		return grpcerrors.InvalidArgument(err, "app repository is required to complete onboarding")
+	case errors.Is(err, models.ErrFactoryOnboardingBacklogRepoRequired):
+		return grpcerrors.InvalidArgument(err, "backlog repository is required to complete onboarding")
+	case errors.Is(err, models.ErrFactoryOnboardingIssuesSourceRequired):
+		return grpcerrors.InvalidArgument(err, "issues source is required to complete onboarding")
+	case errors.Is(err, models.ErrFactoryOnboardingAgentHarnessRequired):
+		return grpcerrors.InvalidArgument(err, "agent harness is required to complete onboarding")
+	case errors.Is(err, models.ErrFactoryOnboardingAppIDRequired):
+		return grpcerrors.InvalidArgument(err, "provisioned app id is required to complete onboarding")
+	case errors.Is(err, models.ErrFactoryOnboardingLineIDRequired):
+		return grpcerrors.InvalidArgument(err, "provisioned line id is required to complete onboarding")
 	case errors.Is(err, models.ErrFactoryWorkOrderNotFound):
 		return grpcerrors.NotFound(err, "work order not found")
 	case errors.Is(err, models.ErrFactoryLineNotFound):
@@ -32,8 +60,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "work order cannot be dispatched in its current state")
 	case errors.Is(err, models.ErrFactoryWorkOrderInvalidState):
 		return grpcerrors.FailedPrecondition(err, err.Error())
-	case errors.Is(err, models.ErrFactoryWorkOrderExecutionActive):
-		return grpcerrors.FailedPrecondition(err, "work order already has an active execution")
+	case errors.Is(err, models.ErrFactoryWorkOrderLineDispatchActive):
+		return grpcerrors.FailedPrecondition(err, "work order already has an active line dispatch")
 	case errors.Is(err, models.ErrFactoryLineHasNoSteps):
 		return grpcerrors.FailedPrecondition(err, "factory line has no steps")
 	case errors.Is(err, models.ErrFactoryLineStepNotOnRun):

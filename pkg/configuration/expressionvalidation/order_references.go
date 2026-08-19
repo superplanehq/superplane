@@ -19,6 +19,13 @@ func ExpressionUsesOrderComments(expression string) (bool, error) {
 	return expressionReferencesOrderProperty(expression, "comments")
 }
 
+// ExpressionUsesOrderURL reports whether the expression accesses order().url
+// (dot or bracket). Used to resolve the work order permalink only when needed,
+// since it costs an extra lookup of the factory that owns the order.
+func ExpressionUsesOrderURL(expression string) (bool, error) {
+	return expressionReferencesOrderProperty(expression, "url")
+}
+
 // expressionReferencesOrderProperty reports whether the expression accesses
 // order().<property> (dot or bracket), including nested uses such as
 // len(order().<property>) or none(order().<property>, …).

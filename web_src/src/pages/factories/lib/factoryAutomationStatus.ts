@@ -1,5 +1,6 @@
 import type { CanvasesCanvasRun, FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
 import { shortId } from "@/ui/Runs/runPresentation";
+import { flattenWorkOrderExecutions } from "./workOrderExecutions";
 
 export type FactoryAutomationTick = "running" | "waiting" | "queued" | "passed" | "failed" | "cancelled" | null;
 
@@ -35,14 +36,16 @@ export function resolveFactoryAutomationStatus(
   let hasQueued = false;
 
   for (const order of workOrders) {
-    for (const execution of order.executions ?? []) {
-      if (execution.run?.appId !== appId) {
-        continue;
+    for (const dispatch of order.lineDispatches ?? []) {
+      for (const execution of dispatch.stepExecutions ?? []) {
+        if (execution.run?.appId !== appId) {
+          continue;
+        }
+        const kind = classifyWorkOrderExecution(execution);
+        if (kind === "running") hasRunning = true;
+        else if (kind === "waiting") hasWaiting = true;
+        else if (kind === "queued") hasQueued = true;
       }
-      const kind = classifyWorkOrderExecution(execution);
-      if (kind === "running") hasRunning = true;
-      else if (kind === "waiting") hasWaiting = true;
-      else if (kind === "queued") hasQueued = true;
     }
   }
 
@@ -188,5 +191,5 @@ export function findWorkOrderForAutomationRun(
     return undefined;
   }
 
-  return workOrders.find((order) => (order.executions ?? []).some((execution) => execution.run?.id === runId));
+  return workOrders.find((order) => flattenWorkOrderExecutions(order).some((execution) => execution.run?.id === runId));
 }

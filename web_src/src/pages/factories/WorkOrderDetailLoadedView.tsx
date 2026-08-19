@@ -10,6 +10,8 @@ import { workOrdersPath } from "./lib/factoryPagePaths";
 import { getWorkOrderDisplayKey, type WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 import { factoryContentBodyClassName } from "./pages/factoryPageLayoutStyles";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
+import type { WorkOrderCheckPresentation } from "./lib/workOrderChecks";
+import { WorkOrderChecksSection } from "./WorkOrderChecksSection";
 import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
 import { WorkOrderDescription } from "./WorkOrderDescription";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
@@ -29,6 +31,10 @@ interface WorkOrderDetailLoadedViewProps {
   artifacts: FactoriesWorkOrderArtifact[];
   isArtifactsLoading: boolean;
   artifactsError?: Error | null;
+  /** Scores reported by automations (risk review, coverage, …). */
+  checks?: WorkOrderCheckPresentation[];
+  isChecksLoading?: boolean;
+  checksError?: Error | null;
   displayStatus: WorkOrderDisplayStatus;
   statusMeta: { label: string; className: string };
   assigneeIds: string[];
@@ -53,7 +59,7 @@ interface WorkOrderDetailLoadedViewProps {
   onClose: (result: FactoriesWorkOrderResult) => void;
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
-  onAddComment: (body: string) => Promise<void>;
+  onAddComment: (body: string, mentionedUserIds: string[]) => Promise<void>;
 }
 
 export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps) {
@@ -96,6 +102,9 @@ function WorkOrderDetailBody({
   artifacts,
   isArtifactsLoading,
   artifactsError,
+  checks,
+  isChecksLoading,
+  checksError,
   displayStatus,
   statusMeta,
   assigneeIds,
@@ -113,13 +122,27 @@ function WorkOrderDetailBody({
   onAssigneesSave,
   onAddComment,
 }: WorkOrderDetailLoadedViewProps) {
+  const hasChecksSection = Boolean(checks?.length) || Boolean(isChecksLoading) || Boolean(checksError);
+
   return (
     <div className={factoryContentBodyClassName}>
       <div className="grid gap-x-[var(--workspace-column-gap)] gap-y-0 lg:grid-cols-[minmax(0,1fr)_var(--workspace-detail-sidebar-width)]">
         <div className="min-w-0">
           {order.description ? <WorkOrderDescription description={order.description} /> : null}
 
-          <section className={order.description ? "mt-10" : undefined}>
+          {hasChecksSection ? (
+            <WorkOrderChecksSection
+              checks={checks ?? []}
+              isLoading={isChecksLoading}
+              error={checksError}
+              organizationId={organizationId}
+              factoryKey={factoryKey}
+              orderNumber={order.number}
+              className={order.description ? "mt-10" : undefined}
+            />
+          ) : null}
+
+          <section className={order.description || hasChecksSection ? "mt-10" : undefined}>
             <h2 className="workspace-section-title">Activity</h2>
             <p className="workspace-body-text mt-1 text-muted-foreground">
               Actions and comments on the work order, plus factory line runs.
@@ -139,6 +162,7 @@ function WorkOrderDetailBody({
                 artifacts={artifacts}
                 footer={
                   <WorkOrderCommentComposer
+                    organizationId={organizationId}
                     canComment={canManage}
                     isSubmitting={isAddingComment}
                     onSubmit={onAddComment}
