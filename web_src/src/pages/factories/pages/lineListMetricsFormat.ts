@@ -3,10 +3,7 @@ import type { LineListMetrics } from "./lineListMetricsMockData";
 export const LINE_LIST_METRICS_EMPTY = "—";
 
 export function formatSuccessRate(metrics: LineListMetrics | null): string {
-  if (!metrics) {
-    return LINE_LIST_METRICS_EMPTY;
-  }
-  return `${Math.round(metrics.successRatePct)}%`;
+  return `${Math.round(metrics?.successRatePct ?? 0)}%`;
 }
 
 /** Median cycle time. Example: `15m`. */
@@ -37,10 +34,7 @@ function signedNumber(value: number, digits: number): string {
 
 /** Success-rate change vs the prior window. Example: `+6 pts`. */
 export function formatSuccessDelta(metrics: LineListMetrics | null): string {
-  if (!metrics) {
-    return LINE_LIST_METRICS_EMPTY;
-  }
-  if (metrics.successDeltaPts == null) {
+  if (metrics?.successDeltaPts == null) {
     return "";
   }
   return `${signedNumber(metrics.successDeltaPts, 0)} pts`;
@@ -48,10 +42,7 @@ export function formatSuccessDelta(metrics: LineListMetrics | null): string {
 
 /** Duration change vs the prior window. Example: `−2m`. */
 export function formatDurationDelta(metrics: LineListMetrics | null): string {
-  if (!metrics) {
-    return LINE_LIST_METRICS_EMPTY;
-  }
-  if (metrics.durationDeltaMinutes == null) {
+  if (metrics?.durationDeltaMinutes == null) {
     return "";
   }
   const minutes = metrics.durationDeltaMinutes;
@@ -67,10 +58,7 @@ export function formatDurationDelta(metrics: LineListMetrics | null): string {
 
 /** Cost change vs the prior window. Example: `−$0.40`. */
 export function formatCostDelta(metrics: LineListMetrics | null): string {
-  if (!metrics) {
-    return LINE_LIST_METRICS_EMPTY;
-  }
-  if (metrics.costDeltaUsd == null) {
+  if (metrics?.costDeltaUsd == null) {
     return "";
   }
   const abs = `$${Math.abs(metrics.costDeltaUsd).toFixed(2)}`;
@@ -85,10 +73,7 @@ export function formatCostDelta(metrics: LineListMetrics | null): string {
 
 /** Completions per day. Example: `1.4 per day`. */
 export function formatThroughput(metrics: LineListMetrics | null): string {
-  if (!metrics) {
-    return LINE_LIST_METRICS_EMPTY;
-  }
-  const value = metrics.throughputPerDay;
+  const value = metrics?.throughputPerDay ?? 0;
   const rounded = value % 1 === 0 ? value.toFixed(0) : value.toFixed(1);
   return `${rounded} per day`;
 }

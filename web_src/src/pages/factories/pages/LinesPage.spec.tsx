@@ -58,9 +58,11 @@ function renderList(factory: FactoriesFactory = REFUND_FACTORY) {
 }
 
 describe("LinesPage metrics", () => {
-  it("shows dashes when a line has no nested metrics", () => {
+  it("shows zero success rate and completions when a line has no nested metrics", () => {
     renderList();
     const cards = screen.getAllByTestId("lines-card-metrics");
+    expect(cards[0]).toHaveTextContent("0%");
+    expect(cards[0]).toHaveTextContent("0 per day");
     expect(cards[0]).toHaveTextContent("—");
   });
 
@@ -73,6 +75,7 @@ describe("LinesPage metrics", () => {
     };
     renderList(factory);
     expect(screen.getByTestId(`lines-card-${REFUND_LINE_PLAN_ID}`)).toHaveTextContent("82%");
-    expect(screen.getByTestId("lines-card-line-hotfix")).toHaveTextContent("—");
+    expect(screen.getByTestId("lines-card-line-hotfix")).toHaveTextContent("0%");
+    expect(screen.getByTestId("lines-card-line-hotfix")).toHaveTextContent("0 per day");
   });
 });

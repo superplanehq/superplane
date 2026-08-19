@@ -152,7 +152,7 @@ Work-order lifecycle (create/list/describe orders, status, assignees, dispatch, 
 
 ## Line metrics
 
-`DescribeFactory` and `UpdateFactory` return trailing 30-day summary numbers on each `FactoryLine` (`metrics`). Auth is `factories:read` or `factories:update`. The window is 30 local calendar days, including today. The prior window is the 30 days before that (deltas). When a line has no closed work orders in the current window, `metrics` is unset. The UI shows dashes. Create-line and update-line responses do not include metrics.
+`DescribeFactory` and `UpdateFactory` return trailing 30-day summary numbers on each `FactoryLine` (`metrics`). Auth is `factories:read` or `factories:update`. The window is 30 local calendar days, including today. The prior window is the 30 days before that (deltas). When a line has no closed work orders in the current window, `metrics` is unset. The UI shows 0% success rate and 0 completions per day. Duration and cost stay as dashes. Create-line and update-line responses do not include metrics.
 
 Rules:
 
