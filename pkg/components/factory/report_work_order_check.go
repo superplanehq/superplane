@@ -35,6 +35,10 @@ type ReportWorkOrderCheckConfiguration struct {
 	Score    string `json:"score" mapstructure:"score"`
 	MaxScore string `json:"maxScore" mapstructure:"maxScore"`
 	Format   string `json:"format" mapstructure:"format"`
+	// Passed replaces Score for boolean checks: a true/false verdict
+	// (accepts expressions). Pass maps to level positive, fail to
+	// critical.
+	Passed string `json:"passed" mapstructure:"passed"`
 	// Direction plus the two thresholds determine the check's level
 	// declaratively: crossing CautionAt in the bad direction flags
 	// caution, crossing CriticalAt flags critical. With no thresholds
@@ -55,7 +59,7 @@ func (c *ReportWorkOrderCheck) Label() string {
 }
 
 func (c *ReportWorkOrderCheck) Description() string {
-	return "Report a scored check (risk, coverage, confidence) on a work order"
+	return "Report a scored or pass/fail check (risk, coverage, CI) on a work order"
 }
 
 func (c *ReportWorkOrderCheck) Documentation() string {
@@ -63,7 +67,12 @@ func (c *ReportWorkOrderCheck) Documentation() string {
 
 Each check is identified by its ` + "`checkKey`" + ` (for example ` + "`risk-review`" + `). The first report creates the check. A later report with the same key updates the check in place and keeps the prior score, so the UI can show the movement between runs. Every report also adds an entry to the work order timeline.
 
-The check's level (healthy / neutral / needs attention / critical) is computed from the score and the thresholds you configure:
+A check is either scored or a pass/fail verdict, controlled by ` + "`format`" + `:
+
+- ` + "`fraction`" + ` and ` + "`percent`" + ` are scored checks. Set ` + "`score`" + ` and ` + "`maxScore`" + `.
+- ` + "`boolean`" + ` is a pass/fail verdict (e.g. CI status). Set ` + "`passed`" + ` to true or false instead of a score; a pass shows as healthy, a fail as critical.
+
+For scored checks, the level (healthy / neutral / needs attention / critical) is computed from the score and the thresholds you configure:
 
 - ` + "`direction`" + ` says which way is bad: ` + "`higherIsBetter`" + ` (e.g. coverage) or ` + "`lowerIsBetter`" + ` (e.g. risk).
 - ` + "`cautionAt`" + ` and ` + "`criticalAt`" + ` are score thresholds. When the score crosses a threshold in the bad direction, the check shows that level.
@@ -71,7 +80,7 @@ The check's level (healthy / neutral / needs attention / critical) is computed f
 
 For example, a risk score from 0 to 10 where lower is better, with ` + "`cautionAt: 5`" + ` and ` + "`criticalAt: 8`" + `: a score of 3 is healthy, 6 needs attention, 9 is critical.
 
-` + "`score`" + ` and ` + "`maxScore`" + ` accept expressions, so a preceding automation run can feed them (e.g. ` + "`{{ previous().data.risk.score }}`" + `). Use ` + "`analysis`" + ` for the full markdown report — it renders when a user opens the check.
+` + "`score`" + `, ` + "`maxScore`" + `, and ` + "`passed`" + ` accept expressions, so a preceding automation run can feed them (e.g. ` + "`{{ previous().data.risk.score }}`" + `). Use ` + "`analysis`" + ` for the full markdown report — it renders when a user opens the check.
 
 ` + "`orderId`" + ` explicitly targets the work order — it defaults to ` + "`{{ order().id }}`" + `, the work order driving the current run. This component can only be used in factory-owned apps.`
 }
@@ -107,6 +116,15 @@ func (c *ReportWorkOrderCheck) OutputChannels(configuration any) []core.OutputCh
 }
 
 func (c *ReportWorkOrderCheck) Configuration() []configuration.Field {
+	// The empty value keeps numeric fields visible for configs saved
+	// before the format field existed (they default to fraction).
+	numericFormats := []configuration.VisibilityCondition{
+		{Field: "format", Values: []string{"", factory.CheckFormatFraction, factory.CheckFormatPercent}},
+	}
+	booleanFormat := []configuration.VisibilityCondition{
+		{Field: "format", Values: []string{factory.CheckFormatBoolean}},
+	}
+
 	return []configuration.Field{
 		{
 			Name:        "orderId",
@@ -131,24 +149,9 @@ func (c *ReportWorkOrderCheck) Configuration() []configuration.Field {
 			Required:    true,
 		},
 		{
-			Name:        "score",
-			Label:       "Score",
-			Description: "The score to report. Accepts expressions, e.g. {{ previous().data.risk.score }}.",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-		},
-		{
-			Name:        "maxScore",
-			Label:       "Max Score",
-			Description: "The scale's maximum (e.g. 10, or 100 for percentages). Accepts expressions.",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Default:     "100",
-		},
-		{
 			Name:        "format",
 			Label:       "Format",
-			Description: "How the score is rendered: as score/maxScore or as a percentage",
+			Description: "How the check is rendered: as score/maxScore, as a percentage, or as a pass/fail verdict",
 			Type:        configuration.FieldTypeSelect,
 			Required:    false,
 			Default:     factory.CheckFormatFraction,
@@ -157,8 +160,43 @@ func (c *ReportWorkOrderCheck) Configuration() []configuration.Field {
 					Options: []configuration.FieldOption{
 						{Label: "Fraction (score/max)", Value: factory.CheckFormatFraction},
 						{Label: "Percent", Value: factory.CheckFormatPercent},
+						{Label: "Boolean (pass/fail)", Value: factory.CheckFormatBoolean},
 					},
 				},
+			},
+		},
+		{
+			Name:                 "passed",
+			Label:                "Passed",
+			Description:          "The pass/fail verdict: true or false. Accepts expressions, e.g. {{ previous().data.ci.passed }}.",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			VisibilityConditions: booleanFormat,
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "format", Values: []string{factory.CheckFormatBoolean}},
+			},
+		},
+		{
+			Name:                 "score",
+			Label:                "Score",
+			Description:          "The score to report. Accepts expressions, e.g. {{ previous().data.risk.score }}.",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			VisibilityConditions: numericFormats,
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "format", Values: []string{"", factory.CheckFormatFraction, factory.CheckFormatPercent}},
+			},
+		},
+		{
+			Name:                 "maxScore",
+			Label:                "Max Score",
+			Description:          "The scale's maximum (e.g. 10, or 100 for percentages). Accepts expressions.",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			Default:              "100",
+			VisibilityConditions: numericFormats,
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "format", Values: []string{"", factory.CheckFormatFraction, factory.CheckFormatPercent}},
 			},
 		},
 		{
@@ -176,22 +214,25 @@ func (c *ReportWorkOrderCheck) Configuration() []configuration.Field {
 					},
 				},
 			},
+			VisibilityConditions: numericFormats,
 		},
 		{
-			Name:        "cautionAt",
-			Label:       "Caution Threshold",
-			Description: "Score at which the check shows \"needs attention\". Leave both thresholds unset to keep the check neutral.",
-			Type:        configuration.FieldTypeNumber,
-			Required:    false,
-			Togglable:   true,
+			Name:                 "cautionAt",
+			Label:                "Caution Threshold",
+			Description:          "Score at which the check shows \"needs attention\". Leave both thresholds unset to keep the check neutral.",
+			Type:                 configuration.FieldTypeNumber,
+			Required:             false,
+			Togglable:            true,
+			VisibilityConditions: numericFormats,
 		},
 		{
-			Name:        "criticalAt",
-			Label:       "Critical Threshold",
-			Description: "Score at which the check shows \"critical\"",
-			Type:        configuration.FieldTypeNumber,
-			Required:    false,
-			Togglable:   true,
+			Name:                 "criticalAt",
+			Label:                "Critical Threshold",
+			Description:          "Score at which the check shows \"critical\"",
+			Type:                 configuration.FieldTypeNumber,
+			Required:             false,
+			Togglable:            true,
+			VisibilityConditions: numericFormats,
 		},
 		{
 			Name:        "summary",
@@ -216,16 +257,7 @@ func (c *ReportWorkOrderCheck) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	score, err := parseCheckScore("score", config.Score)
-	if err != nil {
-		return err
-	}
-	maxScore, err := parseCheckScore("maxScore", config.MaxScore)
-	if err != nil {
-		return err
-	}
-
-	level, err := computeCheckLevel(score, config.Direction, config.CautionAt, config.CriticalAt)
+	score, maxScore, level, err := resolveCheckScore(config)
 	if err != nil {
 		return err
 	}
@@ -276,6 +308,71 @@ func (c *ReportWorkOrderCheck) Hooks() []core.Hook {
 
 func (c *ReportWorkOrderCheck) HandleHook(ctx core.ActionHookContext) error {
 	return nil
+}
+
+// resolveCheckScore turns the configuration into the (score, maxScore,
+// level) triple to store. Numeric formats parse the score fields and
+// compute the level from the thresholds; the boolean format derives all
+// three from the pass/fail verdict.
+func resolveCheckScore(config ReportWorkOrderCheckConfiguration) (float64, float64, string, error) {
+	if config.Format == factory.CheckFormatBoolean {
+		return resolveBooleanCheckScore(config)
+	}
+
+	if strings.TrimSpace(config.Passed) != "" {
+		return 0, 0, "", fmt.Errorf("passed only applies to the boolean format")
+	}
+
+	score, err := parseCheckScore("score", config.Score)
+	if err != nil {
+		return 0, 0, "", err
+	}
+	maxScore, err := parseCheckScore("maxScore", config.MaxScore)
+	if err != nil {
+		return 0, 0, "", err
+	}
+
+	level, err := computeCheckLevel(score, config.Direction, config.CautionAt, config.CriticalAt)
+	if err != nil {
+		return 0, 0, "", err
+	}
+
+	return score, maxScore, level, nil
+}
+
+// resolveBooleanCheckScore maps the pass/fail verdict onto the score
+// model: pass is 1/1 with level positive, fail is 0/1 with level
+// critical. Score thresholds do not apply — a verdict has no bands.
+func resolveBooleanCheckScore(config ReportWorkOrderCheckConfiguration) (float64, float64, string, error) {
+	if config.CautionAt != nil || config.CriticalAt != nil {
+		return 0, 0, "", fmt.Errorf("cautionAt and criticalAt do not apply to the boolean format")
+	}
+
+	passed, err := parseCheckPassed(config.Passed)
+	if err != nil {
+		return 0, 0, "", err
+	}
+
+	if passed {
+		return 1, 1, factory.CheckLevelPositive, nil
+	}
+	return 0, 1, factory.CheckLevelCritical, nil
+}
+
+// parseCheckPassed converts a resolved pass/fail expression to a bool.
+// Expressions resolve booleans to "true"/"false"; 1/0 are accepted for
+// automations that emit numeric flags.
+func parseCheckPassed(raw string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "":
+		return false, fmt.Errorf("passed is required for the boolean format")
+	case "true", "1":
+		return true, nil
+	case "false", "0":
+		return false, nil
+	default:
+		return false, fmt.Errorf("passed must be true or false, got %q", raw)
+	}
 }
 
 // parseCheckScore converts a resolved score expression to a number,
