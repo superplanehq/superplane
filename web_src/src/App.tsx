@@ -43,6 +43,8 @@ import {
   NewWorkspacePage,
   OnboardingGate,
   OnboardingPage,
+  OrganizationSettingsLayout,
+  organizationSettingsSectionRoutes,
   VelocityPage,
   WikiPage,
   WorkOrderDetailPage,
@@ -212,6 +214,12 @@ function AppRouter() {
                     element={withAuthPermissionAndFactoriesFeature(FactorySettingsLayout, "factories", "read")}
                   >
                     {factorySettingsSectionRoutes}
+                  </Route>
+                  <Route
+                    path=":factoryKey/organization"
+                    element={withAuthPermissionAndFactoriesFeature(OrganizationSettingsLayout, "factories", "read")}
+                  >
+                    {organizationSettingsSectionRoutes}
                   </Route>
                 </Route>
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />

@@ -15,7 +15,7 @@ import type {
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
 import { defaultNotificationSettings } from "@/lib/notificationSettings";
-import { fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
+import { buildStorybookMeUser, fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
 import { automationNameForLineStep } from "../lib/factoryLineFormShared";
 
 export type { FactoriesFixture };
@@ -344,11 +344,18 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
 }
 
 /** Serves `/api/v1/me` so factory stories resolve `useMe` without the Home harness. */
-function meRoute(): FactoriesRoute {
+function meRoute(organizationId: string): FactoriesRoute {
   return {
     pattern: re("/api/v1/me"),
     resolve: () => ({
-      json: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME, email: STORYBOOK_ME_USER_EMAIL } },
+      json: {
+        user: {
+          ...buildStorybookMeUser(organizationId),
+          id: STORYBOOK_ME_USER_ID,
+          name: STORYBOOK_ME_USER_NAME,
+          email: STORYBOOK_ME_USER_EMAIL,
+        },
+      },
     }),
   };
 }
@@ -372,7 +379,7 @@ function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
 function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     factoriesCollectionRoute(fixture),
-    meRoute(),
+    meRoute(fixture.organizationId),
     notificationSettingsRoute(fixture),
     ...factoryDetailRoutes(fixture),
     ...factoryLinesRoutes(fixture),

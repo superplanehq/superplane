@@ -1,3 +1,8 @@
+import {
+  STORYBOOK_ME_USER_AVATAR_URL,
+  STORYBOOK_ME_USER_EMAIL,
+  STORYBOOK_ME_USER_NAME,
+} from "@/pages/factories/__fixtures__/factoryPageResponses";
 import { defaultHomePageFixture, type HomePageFixture } from "./homePageResponses";
 
 export type { HomePageFixture };
@@ -6,11 +11,11 @@ export const homePageIds = {
   organizationId: defaultHomePageFixture.organizationId,
 };
 
-function buildMeUser(orgId: string) {
+export function buildStorybookMeUser(orgId: string) {
   return {
     id: "storybook-user",
-    name: "Storybook User",
-    email: "storybook@superplane.dev",
+    name: STORYBOOK_ME_USER_NAME,
+    email: STORYBOOK_ME_USER_EMAIL,
     organizationId: orgId,
     hasToken: true,
     roles: ["org_admin"],
@@ -42,7 +47,7 @@ interface Route {
 
 function buildRoutes(fixture: HomePageFixture): Route[] {
   const orgId = fixture.organizationId;
-  const meUser = buildMeUser(orgId);
+  const meUser = buildStorybookMeUser(orgId);
 
   return [
     { pattern: re("/api/v1/me"), resolve: () => ({ json: { user: meUser } }) },
@@ -165,6 +170,15 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       }),
     },
     {
+      pattern: re("/organizations"),
+      resolve: () => ({
+        json: [
+          { id: orgId, name: fixture.organizationName },
+          { id: "org-storybook-acme", name: "Acme" },
+        ],
+      }),
+    },
+    {
       pattern: re("/account"),
       resolve: () => ({
         json: {
@@ -172,6 +186,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
           email: meUser.email,
           name: meUser.name,
           organization_id: orgId,
+          avatar_url: STORYBOOK_ME_USER_AVATAR_URL,
         },
       }),
     },

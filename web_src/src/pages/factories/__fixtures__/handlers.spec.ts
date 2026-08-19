@@ -7,12 +7,12 @@ describe("matchFactoryPageFixture", () => {
   it("lists factories and returns the primary factory by id", async () => {
     const list = await fetchFactoryPageFixture("/api/v1/factories");
     await expect(list.json()).resolves.toMatchObject({
-      factories: expect.arrayContaining([expect.objectContaining({ name: "Refunds Factory" })]),
+      factories: expect.arrayContaining([expect.objectContaining({ name: "Semaphore" })]),
     });
 
     const detail = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}`);
     await expect(detail.json()).resolves.toMatchObject({
-      factory: expect.objectContaining({ id: PRIMARY_FACTORY_ID, name: "Refunds Factory" }),
+      factory: expect.objectContaining({ id: PRIMARY_FACTORY_ID, name: "Semaphore" }),
     });
   });
 
@@ -27,6 +27,15 @@ describe("matchFactoryPageFixture", () => {
     const apps = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/apps`);
     await expect(apps.json()).resolves.toMatchObject({
       apps: expect.arrayContaining([expect.objectContaining({ name: "Refund Planner" })]),
+    });
+  });
+
+  it("grants workspace settings permission on /api/v1/me", async () => {
+    const me = await fetchFactoryPageFixture("/api/v1/me");
+    await expect(me.json()).resolves.toMatchObject({
+      user: {
+        permissions: expect.arrayContaining([expect.objectContaining({ resource: "factories", action: "update" })]),
+      },
     });
   });
 });

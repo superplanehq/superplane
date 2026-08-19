@@ -32,6 +32,8 @@ import {
   LinesPage,
   MissionsPage,
   NewWorkspacePage,
+  OrganizationSettingsLayout,
+  organizationSettingsSectionRoutes,
   OverviewPage,
   VelocityPage,
   WikiPage,
@@ -209,6 +211,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
 
   return (
     <Routes>
+      <Route path="create" element={<div data-testid="organization-create-page">Create a new organization</div>} />
       <Route
         path=":organizationId"
         element={
@@ -273,6 +276,9 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 }
               />
             ))}
+          </Route>
+          <Route path=":factoryKey/organization" element={factoryRoute(<OrganizationSettingsLayout />)}>
+            {organizationSettingsSectionRoutes}
           </Route>
         </Route>
         <Route

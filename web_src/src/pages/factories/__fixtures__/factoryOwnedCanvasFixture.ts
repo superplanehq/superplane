@@ -36,7 +36,7 @@ export const REFUND_IMPLEMENTER_APP = REFUND_FACTORY_APPS[1];
 export const REFUND_VERIFIER_APP = REFUND_FACTORY_APPS[2];
 
 /**
- * Clone of the captured Software Factory canvas, owned by the Refunds Factory
+ * Clone of the captured Software Factory canvas, owned by Semaphore
  * so FactoryAppCanvasPage does not redirect to Overview.
  */
 export function factoryOwnedCanvasFixture(
