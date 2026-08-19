@@ -39,6 +39,7 @@ export function OnboardingPage() {
             openSection={model.openSection}
             setOpenSection={model.setOpenSection}
             requestConnect={model.requestConnect}
+            requestConfigure={model.requestConfigure}
             onContinueRepo={model.saveRepository}
             onContinueIssues={model.saveIssues}
             onFinish={model.finish}

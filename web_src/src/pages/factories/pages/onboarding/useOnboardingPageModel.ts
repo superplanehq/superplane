@@ -3,10 +3,11 @@ import type {
   FactoriesFactoryLine,
   FactoriesUpdateFactoryOnboardingBody,
   FactoryLineStep,
+  OrganizationsIntegration,
 } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateFactoryLine, useCreateWorkOrder, useUpdateFactory } from "@/hooks/useFactoryData";
-import { useIntegrationResources } from "@/hooks/useIntegrations";
+import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
@@ -25,6 +26,17 @@ import { workspaceNameFromRepository } from "./workspaceNames";
 
 const DEFAULT_LINE_NAME = "Software delivery";
 const ONBOARDING_INTEGRATIONS = ["github", "claude"];
+
+// The GitHub App setup stores the page that manages this installation, which is
+// account specific (organization or user). Without it we can only send the user
+// to the list of their installations.
+const APP_INSTALLATION_URL_PROPERTY = "appInstallationURL";
+const GITHUB_INSTALLATIONS_URL = "https://github.com/settings/installations";
+
+function appInstallationUrl(integration: OrganizationsIntegration | null | undefined): string {
+  const property = integration?.status?.properties?.find((entry) => entry.name === APP_INSTALLATION_URL_PROPERTY);
+  return property?.value || GITHUB_INSTALLATIONS_URL;
+}
 
 function initialSelections(onboarding: FactoriesFactory["onboarding"]): IntegrationSelections {
   const selections: IntegrationSelections = {};
@@ -416,6 +428,7 @@ export function useOnboardingPageModel(args: {
   const createWorkOrder = useCreateWorkOrder(args.organizationId, args.factoryId);
   const installer = useInstallFactory();
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
+  const githubIntegration = useIntegration(args.organizationId, githubIntegrationId);
   const resources = useIntegrationResources(args.organizationId, githubIntegrationId, "repository");
   const repositories = useMemo(
     () =>
@@ -448,6 +461,10 @@ export function useOnboardingPageModel(args: {
     openSection,
     setOpenSection,
     requestConnect: connect.requestConnect,
+    requestConfigure: () => {
+      // Manage which repositories the GitHub App can access, on GitHub itself.
+      window.open(appInstallationUrl(githubIntegration.data), "_blank", "noopener,noreferrer");
+    },
     integrationDialogs: connect.dialogs,
     repositories,
     repositoriesLoading: resources.isLoading,

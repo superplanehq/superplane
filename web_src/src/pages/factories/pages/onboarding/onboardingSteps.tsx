@@ -256,9 +256,6 @@ function RepositoryPicker({
           </ul>
         )}
       </div>
-      <p className="text-[11px] text-muted-foreground">
-        {filtered.length} of {repos.length} repositories
-      </p>
     </div>
   );
 }
@@ -308,11 +305,13 @@ export function RepositoryStep({
   setup,
   repos,
   onSelect,
+  onEditConnection,
 }: {
   setup: OnboardingSetupApi;
   repos?: string[];
   /** Selecting a repository is the answer for this step, so it also continues. */
   onSelect: (repo: string) => void;
+  onEditConnection: () => void;
 }) {
   const host = setup.vcsHost;
   if (!host || !setup.connected.has(host)) {
@@ -321,7 +320,21 @@ export function RepositoryStep({
 
   const availableRepos = repos ?? FIXTURE_REPOS[host];
 
-  return <RepositoryPicker host={host} repos={availableRepos} selectedRepo={setup.selectedRepo} onSelect={onSelect} />;
+  return (
+    <div className="space-y-3">
+      <RepositoryPicker host={host} repos={availableRepos} selectedRepo={setup.selectedRepo} onSelect={onSelect} />
+      <p className="text-[13px] text-muted-foreground">
+        Do not see your repo?{" "}
+        <button
+          type="button"
+          onClick={onEditConnection}
+          className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
+        >
+          Edit {vcsLabel(host)} connection
+        </button>
+      </p>
+    </div>
+  );
 }
 
 export function IssuesStep({

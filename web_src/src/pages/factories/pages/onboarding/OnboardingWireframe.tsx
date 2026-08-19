@@ -152,6 +152,7 @@ function WizardStepBody({
   repos,
   onSelectRepository,
   onSelectVcs,
+  onEditVcsConnection,
 }: {
   step: WizardStepId;
   setup: OnboardingSetupApi;
@@ -159,12 +160,20 @@ function WizardStepBody({
   repos?: string[];
   onSelectRepository: (repo: string) => void;
   onSelectVcs: (host: VcsHostId) => void;
+  onEditVcsConnection: () => void;
 }) {
   switch (step) {
     case "vcs":
       return <VcsStep onSelect={onSelectVcs} />;
     case "repo":
-      return <RepositoryStep setup={setup} repos={repos} onSelect={onSelectRepository} />;
+      return (
+        <RepositoryStep
+          setup={setup}
+          repos={repos}
+          onSelect={onSelectRepository}
+          onEditConnection={onEditVcsConnection}
+        />
+      );
     case "issues":
       return <IssuesStep setup={setup} onRequestConnect={requestConnect} autoDiscover repos={repos} />;
     case "agent":
@@ -199,6 +208,7 @@ export function SetupSections({
   openSection,
   setOpenSection,
   requestConnect,
+  requestConfigure,
   onFinish,
   onContinueRepo,
   onContinueIssues,
@@ -209,6 +219,8 @@ export function SetupSections({
   openSection: WizardStepId;
   setOpenSection: (id: WizardStepId) => void;
   requestConnect: (id: IntegrationId) => void;
+  /** Opens the connected VCS integration so the user can grant missing repositories. */
+  requestConfigure?: () => void;
   onFinish: () => void | Promise<void>;
   onContinueRepo?: (repository: string) => Promise<boolean>;
   onContinueIssues?: () => Promise<boolean>;
@@ -252,6 +264,10 @@ export function SetupSections({
     requestConnect(host);
   };
 
+  const editVcsConnection = () => {
+    requestConfigure?.();
+  };
+
   const goNext = () => {
     if (!nextStep) {
       void onFinish();
@@ -278,6 +294,7 @@ export function SetupSections({
       repos={repos}
       onSelectRepository={selectRepository}
       onSelectVcs={selectVcs}
+      onEditVcsConnection={editVcsConnection}
     />
   );
 
@@ -333,7 +350,7 @@ export function OnboardingWireframe() {
   const { organizationId, factoryId, factoryKey } = useFactoriesLayout();
   const onboarding = useOnboardingStorybook();
   const setup = useOnboardingSetupState(onboarding?.pending?.workspaceName ?? "");
-  const { requestConnect, dialog } = useConnectDialog(setup);
+  const { requestConnect, requestConfigure, dialog } = useConnectDialog(setup);
   const [openSection, setOpenSection] = useState<WizardStepId>("vcs");
 
   const finishSetup = () => {
@@ -367,6 +384,9 @@ export function OnboardingWireframe() {
             openSection={openSection}
             setOpenSection={setOpenSection}
             requestConnect={requestConnect}
+            requestConfigure={() => {
+              if (setup.vcsHost) requestConfigure(setup.vcsHost);
+            }}
             onFinish={finishSetup}
           />
           <div className="lg:sticky lg:top-6 lg:self-start">
