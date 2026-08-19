@@ -53,6 +53,7 @@ type UserNotificationSettings struct {
 	UserID           uuid.UUID
 	WorkspaceScope   string
 	WorkspaceFilters datatypes.JSONType[[]NotificationWorkspaceFilter]
+	EventTypes       datatypes.JSONType[[]string]
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 }
@@ -62,6 +63,7 @@ type UserNotificationSettings struct {
 type UserNotificationSettingsParams struct {
 	WorkspaceScope   string
 	WorkspaceFilters []NotificationWorkspaceFilter
+	EventTypes       []string
 }
 
 // DefaultUserNotificationSettings is the configuration SuperPlane uses
@@ -91,7 +93,7 @@ func (s *UserNotificationSettings) Notifies(workspaceID uuid.UUID, notificationT
 		}
 		return false
 	default:
-		return true
+		return notifiesAllScopeType(s.EventTypes.Data(), notificationType)
 	}
 }
 
@@ -158,6 +160,10 @@ func UpsertUserNotificationSettings(
 	if filters == nil {
 		filters = []NotificationWorkspaceFilter{}
 	}
+	eventTypes := params.EventTypes
+	if eventTypes == nil {
+		eventTypes = []string{}
+	}
 
 	now := time.Now()
 	settings := &UserNotificationSettings{
@@ -166,6 +172,7 @@ func UpsertUserNotificationSettings(
 		UserID:           userID,
 		WorkspaceScope:   params.WorkspaceScope,
 		WorkspaceFilters: datatypes.NewJSONType(filters),
+		EventTypes:       datatypes.NewJSONType(eventTypes),
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}
@@ -176,6 +183,7 @@ func UpsertUserNotificationSettings(
 			DoUpdates: clause.AssignmentColumns([]string{
 				"workspace_scope",
 				"workspace_filters",
+				"event_types",
 				"updated_at",
 			}),
 		}).
@@ -186,4 +194,11 @@ func UpsertUserNotificationSettings(
 	}
 
 	return FindUserNotificationSettings(tx, organizationID, userID)
+}
+
+func notifiesAllScopeType(eventTypes []string, notificationType string) bool {
+	if len(eventTypes) == 0 {
+		return true
+	}
+	return slices.Contains(eventTypes, notificationType)
 }
