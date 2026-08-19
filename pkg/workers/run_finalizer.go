@@ -502,6 +502,28 @@ type factoryWorkOrderUpdate struct {
 	orderID   uuid.UUID
 }
 
+// factoryAdmissionOutcomes converts admitted step results into the pending
+// run and work-order update fan-outs the caller publishes after commit.
+func factoryAdmissionOutcomes(admitted []*models.FactoryLineStepResult) ([]factoryLinePendingRun, []factoryWorkOrderUpdate) {
+	var pendingRuns []factoryLinePendingRun
+	var orderUpdates []factoryWorkOrderUpdate
+	for _, admission := range admitted {
+		if admission.Run != nil {
+			pendingRuns = append(pendingRuns, factoryLinePendingRun{
+				workflowID: admission.Run.WorkflowID,
+				runID:      admission.Run.ID,
+			})
+		}
+		if admission.Execution != nil {
+			orderUpdates = append(orderUpdates, factoryWorkOrderUpdate{
+				factoryID: admission.Execution.FactoryID,
+				orderID:   admission.Execution.WorkOrderID,
+			})
+		}
+	}
+	return pendingRuns, orderUpdates
+}
+
 func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) ([]factoryLinePendingRun, []factoryWorkOrderUpdate, error) {
 	//
 	// Finish current factory work order execution.
@@ -527,9 +549,6 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return nil, nil, err
 	}
 
-	var pendingRuns []factoryLinePendingRun
-	var orderUpdates []factoryWorkOrderUpdate
-
 	//
 	// The finished run freed a slot at its step: admit queued work orders
 	// while slots are free. Failed and cancelled runs free their slot the
@@ -540,20 +559,7 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return nil, nil, err
 	}
 
-	for _, admission := range admitted {
-		if admission.Run != nil {
-			pendingRuns = append(pendingRuns, factoryLinePendingRun{
-				workflowID: admission.Run.WorkflowID,
-				runID:      admission.Run.ID,
-			})
-		}
-		if admission.Execution != nil {
-			orderUpdates = append(orderUpdates, factoryWorkOrderUpdate{
-				factoryID: admission.Execution.FactoryID,
-				orderID:   admission.Execution.WorkOrderID,
-			})
-		}
-	}
+	pendingRuns, orderUpdates := factoryAdmissionOutcomes(admitted)
 
 	//
 	// Advance (or finish) the line dispatch this step run belongs to. The

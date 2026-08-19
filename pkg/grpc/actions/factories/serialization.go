@@ -245,19 +245,26 @@ func serializeWorkOrderLineDispatch(dispatch models.FactoryWorkOrderLineDispatch
 		item.FinishedAt = timestamppb.New(*dispatch.FinishedAt)
 	}
 	if dispatch.QueueItem != nil {
-		item.QueueItem = serializeWorkOrderQueueItem(dispatch.QueueItem)
+		item.QueueItem = serializeWorkOrderQueueItem(dispatch.QueueItem, dispatch.Steps)
 	}
 	return item
 }
 
-func serializeWorkOrderQueueItem(item *models.FactoryWorkOrderQueueItemRecord) *pb.WorkOrderQueueItem {
-	return &pb.WorkOrderQueueItem{
+func serializeWorkOrderQueueItem(
+	item *models.FactoryWorkOrderQueueItemRecord,
+	steps []models.FactoryLineStep,
+) *pb.WorkOrderQueueItem {
+	result := &pb.WorkOrderQueueItem{
 		Id:        item.ID.String(),
 		StepName:  item.StepName,
 		StepIndex: int32(item.StepIndex),
 		Position:  int32(item.Position),
 		CreatedAt: timestamppb.New(item.CreatedAt),
 	}
+	if item.StepIndex >= 0 && item.StepIndex < len(steps) {
+		result.AppId = steps[item.StepIndex].AppID.String()
+	}
+	return result
 }
 
 func serializeLineDispatchState(state string) pb.WorkOrderLineDispatch_State {

@@ -27,6 +27,10 @@ export function queueItemToStepRow(item: FactoriesWorkOrderQueueItem): WorkOrder
     step: item.stepName,
     stepIndex: item.stepIndex,
     createdAt: item.createdAt,
+    // No run exists for a queued step yet; project the step's app into the
+    // run shape so board-column matching and card links treat queued rows
+    // like execution rows.
+    run: item.appId ? { appId: item.appId } : undefined,
     queuePosition: item.position ?? 0,
   };
 }

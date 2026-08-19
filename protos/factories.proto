@@ -602,6 +602,10 @@ message WorkOrderQueueItem {
   // the line.
   int32 position = 4;
   google.protobuf.Timestamp created_at = 5;
+  // App (canvas) id of the queued step, from the parent dispatch's steps
+  // snapshot. Lets the UI place the queued work order on the correct
+  // board column even after a line edit moved the step.
+  string app_id = 6;
 }
 
 message WorkOrderExecution {

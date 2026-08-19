@@ -178,7 +178,36 @@ func findOldestFactoryWorkOrderQueueItem(tx *gorm.DB, lineID uuid.UUID, stepInde
 // active dispatch would block re-dispatch after a reopen. Dispatches with
 // a running step are not touched here: the run finalizer cancels them
 // when their run ends.
+//
+// It holds the admission lock of every involved line while it works, so a
+// concurrent admission cannot consume a queue item this close is about to
+// drop — without the lock, the close could finish a dispatch whose step
+// run had just started.
 func (o *FactoryWorkOrder) dropQueuedLineWork(tx *gorm.DB) error {
+	var lineIDs []uuid.UUID
+	err := tx.
+		Model(&FactoryWorkOrderQueueItem{}).
+		Distinct().
+		Where("work_order_id = ?", o.ID).
+		Order("line_id").
+		Pluck("line_id", &lineIDs).
+		Error
+	if err != nil {
+		return err
+	}
+	if len(lineIDs) == 0 {
+		return nil
+	}
+
+	// Sorted lock order, so two closes over the same lines cannot deadlock.
+	for _, lineID := range lineIDs {
+		if _, err := lockFactoryLineForStepAdmission(tx, lineID); err != nil {
+			return err
+		}
+	}
+
+	// Re-read under the locks: an item seen above may have been admitted
+	// (and its row deleted) before the lock was acquired.
 	var items []FactoryWorkOrderQueueItem
 	if err := tx.Where("work_order_id = ?", o.ID).Find(&items).Error; err != nil {
 		return err
