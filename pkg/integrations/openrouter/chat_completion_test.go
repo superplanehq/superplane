@@ -197,6 +197,109 @@ func Test__ChatCompletion__Execute(t *testing.T) {
 		assert.NotContains(t, body, "temperature")
 	})
 
+	t.Run("web search enables the web plugin and flattens citations", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			response(http.StatusOK, `{"id":"gen-w","model":"m","provider":"P","choices":[{"index":0,"finish_reason":"stop","message":{
+				"role":"assistant","content":"Rates rose.","annotations":[
+					{"type":"url_citation","url_citation":{"url":"https://example.com/a","title":"Report A","content":"..."}},
+					{"type":"other","url_citation":{"url":"https://example.com/ignored","title":"Ignored"}}
+				]}}]}`),
+		}}
+		state := &contexts.ExecutionStateContext{}
+
+		err := c.Execute(execContext(map[string]any{
+			"model":         "openai/gpt-4o-mini",
+			"prompt":        "What happened?",
+			"webSearch":     true,
+			"webMaxResults": 3,
+		}, httpContext, state))
+
+		require.NoError(t, err)
+		body := requestBody(t, httpContext.Requests[0])
+		assert.Equal(t, []any{map[string]any{"id": "web", "max_results": float64(3)}}, body["plugins"])
+
+		payload := state.Payloads[0].(map[string]any)["data"].(*ChatCompletionPayload)
+		require.Len(t, payload.Citations, 1)
+		assert.Equal(t, "https://example.com/a", payload.Citations[0].URL)
+		assert.Equal(t, "Report A", payload.Citations[0].Title)
+	})
+
+	t.Run("web search is omitted when off", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{response(http.StatusOK, completionBody)}}
+
+		require.NoError(t, c.Execute(execContext(map[string]any{
+			"model":  "openai/gpt-4o-mini",
+			"prompt": "hi",
+		}, httpContext, &contexts.ExecutionStateContext{})))
+
+		assert.NotContains(t, requestBody(t, httpContext.Requests[0]), "plugins")
+	})
+
+	t.Run("structured output sends a strict json schema and parses the reply", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			response(http.StatusOK, `{"id":"gen-s","model":"m","provider":"P","choices":[{"index":0,"finish_reason":"stop",
+				"message":{"role":"assistant","content":"{\"city\":\"Nairobi\"}"}}]}`),
+		}}
+		state := &contexts.ExecutionStateContext{}
+
+		err := c.Execute(execContext(map[string]any{
+			"model":        "openai/gpt-4o-mini",
+			"prompt":       "Where?",
+			"outputSchema": `{"type":"object","properties":{"city":{"type":"string"}}}`,
+		}, httpContext, state))
+
+		require.NoError(t, err)
+		body := requestBody(t, httpContext.Requests[0])
+
+		format := body["response_format"].(map[string]any)
+		assert.Equal(t, "json_schema", format["type"])
+		schema := format["json_schema"].(map[string]any)
+		assert.Equal(t, "structured_output", schema["name"])
+		assert.Equal(t, true, schema["strict"])
+		assert.NotNil(t, schema["schema"])
+
+		// A provider that ignores response_format would return prose, so routing
+		// is pinned to providers that honour it.
+		assert.Equal(t, map[string]any{"require_parameters": true}, body["provider"])
+
+		payload := state.Payloads[0].(map[string]any)["data"].(*ChatCompletionPayload)
+		assert.Equal(t, map[string]any{"city": "Nairobi"}, payload.Parsed)
+	})
+
+	t.Run("structured output keeps routing the user configured", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{response(http.StatusOK, completionBody)}}
+
+		require.NoError(t, c.Execute(execContext(map[string]any{
+			"model":        "openai/gpt-4o-mini",
+			"prompt":       "Where?",
+			"outputSchema": `{"type":"object","properties":{"city":{"type":"string"}}}`,
+			"provider":     map[string]any{"sort": "price", "requireParameters": false},
+		}, httpContext, &contexts.ExecutionStateContext{})))
+
+		provider := requestBody(t, httpContext.Requests[0])["provider"].(map[string]any)
+		assert.Equal(t, "price", provider["sort"])
+		// An explicit opt-out is respected rather than overridden.
+		assert.Equal(t, false, provider["require_parameters"])
+	})
+
+	t.Run("a refusal is not parsed as structured output", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			response(http.StatusOK, `{"id":"gen-r","model":"m","choices":[{"index":0,"finish_reason":"stop",
+				"message":{"role":"assistant","content":null,"refusal":"I cannot help with that."}}]}`),
+		}}
+		state := &contexts.ExecutionStateContext{}
+
+		require.NoError(t, c.Execute(execContext(map[string]any{
+			"model":        "m",
+			"prompt":       "no",
+			"outputSchema": `{"type":"object","properties":{"a":{"type":"string"}}}`,
+		}, httpContext, state)))
+
+		payload := state.Payloads[0].(map[string]any)["data"].(*ChatCompletionPayload)
+		assert.Equal(t, "I cannot help with that.", payload.Text)
+		assert.Nil(t, payload.Parsed)
+	})
+
 	t.Run("the balanced sort is omitted rather than sent", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{Responses: []*http.Response{response(http.StatusOK, completionBody)}}
 
@@ -460,6 +563,43 @@ func Test__ChatCompletion__Setup(t *testing.T) {
 			},
 		})
 		require.ErrorContains(t, err, "both allowed and excluded")
+	})
+
+	t.Run("rejects an invalid output schema", func(t *testing.T) {
+		require.ErrorContains(t, setup(map[string]any{
+			"model":        "m",
+			"prompt":       "hi",
+			"outputSchema": "{not json",
+		}), "schema")
+	})
+
+	t.Run("defers validating a schema that still holds an expression", func(t *testing.T) {
+		require.NoError(t, setup(map[string]any{
+			"model":        "m",
+			"prompt":       "hi",
+			"outputSchema": "{{ inputs.schema }}",
+		}))
+	})
+
+	t.Run("records structured output and web search", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{}
+		err := c.Setup(core.SetupContext{
+			Logger: logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"model":        "openai/gpt-4o-mini",
+				"prompt":       "hi",
+				"webSearch":    true,
+				"outputSchema": `{"type":"object","properties":{"a":{"type":"string"}}}`,
+			},
+			Metadata: metadata,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, ChatCompletionNodeMetadata{
+			Model:            "openai/gpt-4o-mini",
+			StructuredOutput: true,
+			WebSearch:        true,
+		}, metadata.Metadata)
 	})
 
 	t.Run("rejects a file that is not in the repository", func(t *testing.T) {

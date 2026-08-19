@@ -2,12 +2,15 @@ package openrouter
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/attachments"
+	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
 	"github.com/superplanehq/superplane/pkg/core"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 )
@@ -38,14 +41,17 @@ var dataCollectionOptions = []configuration.FieldOption{
 type ChatCompletion struct{}
 
 type ChatCompletionSpec struct {
-	Model        string               `json:"model" mapstructure:"model"`
-	Prompt       string               `json:"prompt" mapstructure:"prompt"`
-	SystemPrompt string               `json:"systemPrompt" mapstructure:"systemPrompt"`
-	Files        []string             `json:"files" mapstructure:"files"`
-	MaxTokens    *int                 `json:"maxTokens" mapstructure:"maxTokens"`
-	Temperature  *float64             `json:"temperature" mapstructure:"temperature"`
-	Models       []string             `json:"models" mapstructure:"models"`
-	Provider     *ProviderRoutingSpec `json:"provider" mapstructure:"provider"`
+	Model         string               `json:"model" mapstructure:"model"`
+	Prompt        string               `json:"prompt" mapstructure:"prompt"`
+	SystemPrompt  string               `json:"systemPrompt" mapstructure:"systemPrompt"`
+	Files         []string             `json:"files" mapstructure:"files"`
+	MaxTokens     *int                 `json:"maxTokens" mapstructure:"maxTokens"`
+	Temperature   *float64             `json:"temperature" mapstructure:"temperature"`
+	Models        []string             `json:"models" mapstructure:"models"`
+	Provider      *ProviderRoutingSpec `json:"provider" mapstructure:"provider"`
+	OutputSchema  string               `json:"outputSchema" mapstructure:"outputSchema"`
+	WebSearch     bool                 `json:"webSearch" mapstructure:"webSearch"`
+	WebMaxResults *int                 `json:"webMaxResults" mapstructure:"webMaxResults"`
 }
 
 type ProviderRoutingSpec struct {
@@ -62,17 +68,27 @@ type ChatCompletionPayload struct {
 	Model        string                  `json:"model"`
 	Provider     string                  `json:"provider"`
 	Text         string                  `json:"text"`
+	Parsed       any                     `json:"parsed,omitempty"`
 	Reasoning    string                  `json:"reasoning,omitempty"`
+	Citations    []Citation              `json:"citations,omitempty"`
 	FinishReason string                  `json:"finishReason"`
 	Usage        *Usage                  `json:"usage,omitempty"`
 	Response     *ChatCompletionResponse `json:"response"`
 }
 
+// Citation is a source the web plugin used, flattened for downstream nodes.
+type Citation struct {
+	URL   string `json:"url"`
+	Title string `json:"title"`
+}
+
 // ChatCompletionNodeMetadata is node-level metadata surfaced in the UI so the
 // configured model and routing are visible without opening the node.
 type ChatCompletionNodeMetadata struct {
-	Model           string `json:"model" mapstructure:"model"`
-	ProviderRouting bool   `json:"providerRouting" mapstructure:"providerRouting"`
+	Model            string `json:"model" mapstructure:"model"`
+	ProviderRouting  bool   `json:"providerRouting" mapstructure:"providerRouting"`
+	StructuredOutput bool   `json:"structuredOutput" mapstructure:"structuredOutput"`
+	WebSearch        bool   `json:"webSearch" mapstructure:"webSearch"`
 }
 
 func (c *ChatCompletion) Name() string {
@@ -106,6 +122,9 @@ func (c *ChatCompletion) Documentation() string {
 - **Max Tokens**: (Optional) Upper bound on generated tokens. Reasoning models bill their reasoning against this budget, so a low value can return an empty response.
 - **Temperature**: (Optional) Sampling temperature
 - **Fallback Models**: (Optional) Models to try when the primary fails at runtime. Tried in order.
+- **Web Search**: (Optional) Search the web before answering and cite the sources used. Billed on top of tokens, including on free models.
+- **Web Search Results**: (Optional) How many results to gather when Web Search is on. More results cost more.
+- **Structured Output**: (Optional) A JSON Schema for the response. The model returns JSON matching it, available on the ` + "`parsed`" + ` output. Only some models support this, so enabling it automatically restricts routing to providers that honour it.
 - **Provider Routing**: (Optional) Control which upstream provider serves the request. See below.
 
 ## Provider Routing
@@ -122,6 +141,8 @@ A model ID on OpenRouter is a listing, not a server: several providers compete t
 
 Returns the completion including:
 - **text**: The generated text
+- **parsed**: When Structured Output is configured, the response parsed into an object
+- **citations**: When Web Search is on, the sources the model cited, with url and title
 - **reasoning**: The model's reasoning trace, when it returns one
 - **model**: The model that served the request
 - **provider**: The upstream provider that actually served it, which can differ between requests
@@ -134,7 +155,10 @@ Returns the completion including:
 - Fallback models cover runtime failures such as rate limits and provider outages. An invalid model ID still fails the request outright.
 - Free model variants (IDs ending in ` + "`:free`" + `) draw from a shared upstream pool and are rate limited independently of your balance.
 - Attachments are inlined into the request body rather than uploaded, so the combined size is capped at 8MB.
-- Only PDFs and images are sent as attachments. Text files become part of the prompt, so they cost prompt tokens and are not subject to OpenRouter's document parsing.`
+- Only PDFs and images are sent as attachments. Text files become part of the prompt, so they cost prompt tokens and are not subject to OpenRouter's document parsing.
+- Web search is billed per request on top of tokens, so it costs money even when the model itself is free.
+- Structured Output is supported by most but not all models. Because a provider that does not support it accepts the request and ignores the schema, enabling it forces Require Parameter Support on, which can make the request fail rather than silently return prose.
+- Image generation is not available here. OpenRouter generates images through a separate endpoint, and the ` + "`modalities`" + ` parameter is ignored by chat completions.`
 }
 
 func (c *ChatCompletion) Icon() string {
@@ -228,6 +252,30 @@ func (c *ChatCompletion) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "webSearch",
+			Label:       "Web Search",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Search the web before answering and cite the sources used. Billed on top of tokens, including on free models.",
+		},
+		{
+			Name:        "webMaxResults",
+			Label:       "Web Search Results",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Togglable:   true,
+			Description: "How many search results to gather. More results cost more.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "webSearch", Values: []string{"true"}},
+			},
+		},
+		structuredoutput.ConfigField(
+			"outputSchema",
+			"Structured Output",
+			"A JSON Schema describing the response. The model is constrained to return JSON matching it (available on the `parsed` output). The schema is validated before the request and sent in strict mode; strict mode marks every property required, so express optional fields by making their type nullable. Only some models support this, so the request is automatically restricted to providers that honour it.",
+		),
 		{
 			Name:        "provider",
 			Label:       "Provider Routing",
@@ -382,10 +430,22 @@ func (c *ChatCompletion) Setup(ctx core.SetupContext) error {
 		}
 	}
 
+	// The schema supports expressions (like the prompt), which resolve only at
+	// execution. Validate it as JSON when it has no unresolved expression;
+	// Execute re-parses the resolved value.
+	hasSchema := strings.TrimSpace(spec.OutputSchema) != ""
+	if hasSchema && !strings.Contains(spec.OutputSchema, "{{") {
+		if _, err := structuredoutput.Parse(spec.OutputSchema); err != nil {
+			return err
+		}
+	}
+
 	if ctx.Metadata != nil {
 		_ = ctx.Metadata.Set(ChatCompletionNodeMetadata{
-			Model:           spec.Model,
-			ProviderRouting: spec.Provider != nil,
+			Model:            spec.Model,
+			ProviderRouting:  spec.Provider != nil,
+			StructuredOutput: hasSchema,
+			WebSearch:        spec.WebSearch,
 		})
 	}
 
@@ -466,11 +526,34 @@ func (c *ChatCompletion) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	schema, err := structuredoutput.Parse(spec.OutputSchema)
+	if err != nil {
+		return err
+	}
+
 	req := ChatCompletionRequest{
 		Messages:    buildMessages(spec.SystemPrompt, spec.Prompt, atts),
 		MaxTokens:   spec.MaxTokens,
 		Temperature: spec.Temperature,
 		Provider:    buildRouting(spec.Provider),
+		Plugins:     buildPlugins(spec),
+	}
+
+	if schema != nil {
+		req.ResponseFormat = &ResponseFormat{
+			Type: "json_schema",
+			JSONSchema: &JSONSchema{
+				Name:   "structured_output",
+				Strict: true,
+				Schema: structuredoutput.Prepare(schema, true),
+			},
+		}
+
+		// Providers that do not support response_format accept the request and
+		// ignore it, returning prose where the workflow expects JSON. Pinning
+		// routing to providers that honour every parameter is what makes the
+		// schema binding actually hold.
+		req.Provider = requireParameters(req.Provider)
 	}
 
 	// A fallback chain replaces the single model field: OpenRouter takes the
@@ -491,6 +574,15 @@ func (c *ChatCompletion) Execute(ctx core.ExecutionContext) error {
 	payload, err := buildPayload(response)
 	if err != nil {
 		return err
+	}
+
+	// A refusal arrives as prose rather than schema-shaped JSON, so only parse
+	// when the model actually answered.
+	if schema != nil && response.Choices[0].Message.Refusal == "" && payload.Text != "" {
+		var parsed any
+		if err := json.Unmarshal([]byte(payload.Text), &parsed); err == nil {
+			payload.Parsed = parsed
+		}
 	}
 
 	ctx.Logger.Infof("OpenRouter chat completion served by %s", response.Provider)
@@ -517,6 +609,44 @@ func modelChain(model string, fallbacks []string) []string {
 	}
 
 	return chain
+}
+
+// buildPlugins enables the web plugin when web search is on.
+func buildPlugins(spec ChatCompletionSpec) []Plugin {
+	if !spec.WebSearch {
+		return nil
+	}
+
+	return []Plugin{{ID: "web", MaxResults: spec.WebMaxResults}}
+}
+
+// requireParameters turns on provider parameter matching, creating the routing
+// block when the user configured none.
+func requireParameters(routing *ProviderRouting) *ProviderRouting {
+	required := true
+	if routing == nil {
+		return &ProviderRouting{RequireParameters: &required}
+	}
+
+	if routing.RequireParameters == nil {
+		routing.RequireParameters = &required
+	}
+	return routing
+}
+
+// citations flattens the web plugin's annotations for downstream nodes.
+func citations(message ChoiceMessage) []Citation {
+	var out []Citation
+	for _, annotation := range message.Annotations {
+		if annotation.Type != "url_citation" || annotation.URLCitation == nil {
+			continue
+		}
+		out = append(out, Citation{
+			URL:   annotation.URLCitation.URL,
+			Title: annotation.URLCitation.Title,
+		})
+	}
+	return out
 }
 
 // buildRouting maps the configured routing onto the API's provider object.
@@ -619,6 +749,7 @@ func buildPayload(response *ChatCompletionResponse) (*ChatCompletionPayload, err
 		Provider:     response.Provider,
 		Text:         text,
 		Reasoning:    choice.Message.Reasoning,
+		Citations:    citations(choice.Message),
 		FinishReason: choice.FinishReason,
 		Usage:        response.Usage,
 		Response:     response,

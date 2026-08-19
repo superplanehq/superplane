@@ -5,7 +5,16 @@
         "model": "openai/gpt-4o-mini",
         "provider": "OpenAI",
         "text": "Hello, world!",
+        "parsed": {
+            "greeting": "Hello, world!"
+        },
         "reasoning": "The user greeted me, so a short greeting back is enough.",
+        "citations": [
+            {
+                "url": "https://example.com/greetings",
+                "title": "A short history of greetings"
+            }
+        ],
         "finishReason": "stop",
         "usage": {
             "prompt_tokens": 14,

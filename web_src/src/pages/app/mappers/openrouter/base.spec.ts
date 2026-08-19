@@ -30,6 +30,24 @@ describe("openrouter baseMapper node metadata", () => {
     expect(props.metadata).toContainEqual({ icon: "route", label: "Provider routing" });
   });
 
+  it("badges structured output and web search", () => {
+    const props = baseMapper.props(
+      buildContext(buildNode({ configuration: { model: "openai/gpt-4o-mini", outputSchema: "{}", webSearch: true } })),
+    );
+    expect(props.metadata).toEqual([
+      { icon: "sparkles", label: "openai/gpt-4o-mini" },
+      { icon: "braces", label: "Structured output" },
+      { icon: "globe", label: "Web search" },
+    ]);
+  });
+
+  it("ignores a blank output schema", () => {
+    const props = baseMapper.props(
+      buildContext(buildNode({ configuration: { model: "openai/gpt-4o-mini", outputSchema: "   " } })),
+    );
+    expect(props.metadata).toEqual([{ icon: "sparkles", label: "openai/gpt-4o-mini" }]);
+  });
+
   it("prefers the live configuration over stale metadata", () => {
     // Autosave updates configuration only, so metadata can lag behind.
     const props = baseMapper.props(

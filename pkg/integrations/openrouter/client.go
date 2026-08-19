@@ -69,12 +69,35 @@ func readAll(res *http.Response) ([]byte, error) {
 // ordered fallback chain whose first entry is the primary. Provider carries the
 // per-request provider routing preferences.
 type ChatCompletionRequest struct {
-	Model       string           `json:"model,omitempty"`
-	Models      []string         `json:"models,omitempty"`
-	Messages    []Message        `json:"messages"`
-	MaxTokens   *int             `json:"max_tokens,omitempty"`
-	Temperature *float64         `json:"temperature,omitempty"`
-	Provider    *ProviderRouting `json:"provider,omitempty"`
+	Model          string           `json:"model,omitempty"`
+	Models         []string         `json:"models,omitempty"`
+	Messages       []Message        `json:"messages"`
+	MaxTokens      *int             `json:"max_tokens,omitempty"`
+	Temperature    *float64         `json:"temperature,omitempty"`
+	Provider       *ProviderRouting `json:"provider,omitempty"`
+	ResponseFormat *ResponseFormat  `json:"response_format,omitempty"`
+	Plugins        []Plugin         `json:"plugins,omitempty"`
+}
+
+// ResponseFormat constrains the reply to a JSON schema. Note this is the chat
+// completions shape (response_format.json_schema), not the Responses API's
+// text.format that the OpenAI integration uses.
+type ResponseFormat struct {
+	Type       string      `json:"type"`
+	JSONSchema *JSONSchema `json:"json_schema,omitempty"`
+}
+
+type JSONSchema struct {
+	Name   string `json:"name"`
+	Strict bool   `json:"strict"`
+	Schema any    `json:"schema"`
+}
+
+// Plugin enables an OpenRouter plugin. The web plugin runs a search before the
+// model answers and is billed on top of tokens, even on free models.
+type Plugin struct {
+	ID         string `json:"id"`
+	MaxResults *int   `json:"max_results,omitempty"`
 }
 
 // ProviderRouting controls which upstream provider serves the request. A model
@@ -136,10 +159,23 @@ type Choice struct {
 // OpenRouter returns null when reasoning tokens consumed the whole token
 // budget, which is distinct from an empty string.
 type ChoiceMessage struct {
-	Role      string  `json:"role"`
-	Content   *string `json:"content"`
-	Reasoning string  `json:"reasoning,omitempty"`
-	Refusal   string  `json:"refusal,omitempty"`
+	Role        string       `json:"role"`
+	Content     *string      `json:"content"`
+	Reasoning   string       `json:"reasoning,omitempty"`
+	Refusal     string       `json:"refusal,omitempty"`
+	Annotations []Annotation `json:"annotations,omitempty"`
+}
+
+// Annotation is a source the web plugin cited.
+type Annotation struct {
+	Type        string       `json:"type"`
+	URLCitation *URLCitation `json:"url_citation,omitempty"`
+}
+
+type URLCitation struct {
+	URL     string `json:"url"`
+	Title   string `json:"title"`
+	Content string `json:"content,omitempty"`
 }
 
 type Usage struct {

@@ -17,11 +17,15 @@ import type { MetadataItem } from "@/ui/metadataList";
 type ChatCompletionNodeMetadata = {
   model?: string;
   providerRouting?: boolean;
+  structuredOutput?: boolean;
+  webSearch?: boolean;
 };
 
 type ChatCompletionConfiguration = {
   model?: string;
   provider?: Record<string, unknown>;
+  outputSchema?: string;
+  webSearch?: boolean;
 };
 
 type ChatCompletionPayload = {
@@ -55,7 +59,21 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     items.push({ icon: "route", label: "Provider routing" });
   }
 
+  const structured = config ? hasSchema(config.outputSchema) : Boolean(meta?.structuredOutput);
+  if (structured) {
+    items.push({ icon: "braces", label: "Structured output" });
+  }
+
+  const webSearch = config ? Boolean(config.webSearch) : Boolean(meta?.webSearch);
+  if (webSearch) {
+    items.push({ icon: "globe", label: "Web search" });
+  }
+
   return items;
+}
+
+function hasSchema(schema: unknown): boolean {
+  return typeof schema === "string" && schema.trim().length > 0;
 }
 
 function formatTimestamp(timestamp?: string): string | undefined {

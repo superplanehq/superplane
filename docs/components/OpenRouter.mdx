@@ -54,6 +54,9 @@ The Chat Completion component sends a prompt to any of the models OpenRouter bro
 - **Max Tokens**: (Optional) Upper bound on generated tokens. Reasoning models bill their reasoning against this budget, so a low value can return an empty response.
 - **Temperature**: (Optional) Sampling temperature
 - **Fallback Models**: (Optional) Models to try when the primary fails at runtime. Tried in order.
+- **Web Search**: (Optional) Search the web before answering and cite the sources used. Billed on top of tokens, including on free models.
+- **Web Search Results**: (Optional) How many results to gather when Web Search is on. More results cost more.
+- **Structured Output**: (Optional) A JSON Schema for the response. The model returns JSON matching it, available on the `parsed` output. Only some models support this, so enabling it automatically restricts routing to providers that honour it.
 - **Provider Routing**: (Optional) Control which upstream provider serves the request. See below.
 
 ### Provider Routing
@@ -70,6 +73,8 @@ A model ID on OpenRouter is a listing, not a server: several providers compete t
 
 Returns the completion including:
 - **text**: The generated text
+- **parsed**: When Structured Output is configured, the response parsed into an object
+- **citations**: When Web Search is on, the sources the model cited, with url and title
 - **reasoning**: The model's reasoning trace, when it returns one
 - **model**: The model that served the request
 - **provider**: The upstream provider that actually served it, which can differ between requests
@@ -83,15 +88,27 @@ Returns the completion including:
 - Free model variants (IDs ending in `:free`) draw from a shared upstream pool and are rate limited independently of your balance.
 - Attachments are inlined into the request body rather than uploaded, so the combined size is capped at 8MB.
 - Only PDFs and images are sent as attachments. Text files become part of the prompt, so they cost prompt tokens and are not subject to OpenRouter's document parsing.
+- Web search is billed per request on top of tokens, so it costs money even when the model itself is free.
+- Structured Output is supported by most but not all models. Because a provider that does not support it accepts the request and ignores the schema, enabling it forces Require Parameter Support on, which can make the request fail rather than silently return prose.
+- Image generation is not available here. OpenRouter generates images through a separate endpoint, and the `modalities` parameter is ignored by chat completions.
 
 ### Example Output
 
 ```json
 {
   "data": {
+    "citations": [
+      {
+        "title": "A short history of greetings",
+        "url": "https://example.com/greetings"
+      }
+    ],
     "finishReason": "stop",
     "id": "gen-1755000000-AbCdEfGhIjKlMnOp",
     "model": "openai/gpt-4o-mini",
+    "parsed": {
+      "greeting": "Hello, world!"
+    },
     "provider": "OpenAI",
     "reasoning": "The user greeted me, so a short greeting back is enough.",
     "response": {
