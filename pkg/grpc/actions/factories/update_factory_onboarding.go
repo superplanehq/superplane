@@ -58,8 +58,13 @@ func UpdateFactoryOnboarding(
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
 
+	serialized, err := serializeFactoryWithLineMetrics(db, factory, lines)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+	}
+
 	return &pb.UpdateFactoryOnboardingResponse{
-		Factory: serializeFactoryWithLines(factory, lines),
+		Factory: serialized,
 	}, nil
 }
 

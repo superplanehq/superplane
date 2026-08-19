@@ -1,10 +1,12 @@
 package factories
 
 import (
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
 func serializeFactory(factory *models.Factory) *pb.Factory {
@@ -20,15 +22,31 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 func serializeFactoryWithLines(
 	factory *models.Factory,
 	lines []models.FactoryLine,
+	metricsByLine map[uuid.UUID]*pb.FactoryLineMetrics,
 ) *pb.Factory {
 	return &pb.Factory{
 		Id:          factory.ID.String(),
 		Name:        factory.Name,
 		Description: factory.Description,
 		Key:         factory.Key,
-		Lines:       serializeFactoryLines(lines),
+		Lines:       serializeFactoryLines(lines, metricsByLine),
 		Onboarding:  serializeFactoryOnboarding(factory),
 	}
+}
+
+func serializeFactoryWithLineMetrics(
+	tx *gorm.DB,
+	factory *models.Factory,
+	lines []models.FactoryLine,
+) (*pb.Factory, error) {
+	if len(lines) == 0 {
+		return serializeFactoryWithLines(factory, lines, nil), nil
+	}
+	metricsByLine, err := loadFactoryLineMetrics(tx, factory.ID)
+	if err != nil {
+		return nil, err
+	}
+	return serializeFactoryWithLines(factory, lines, metricsByLine), nil
 }
 
 func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
@@ -77,10 +95,14 @@ func serializeFactoryOnboardingAgentHarness(harness string) pb.FactoryOnboarding
 	}
 }
 
-func serializeFactoryLines(lines []models.FactoryLine) []*pb.FactoryLine {
+func serializeFactoryLines(lines []models.FactoryLine, metricsByLine map[uuid.UUID]*pb.FactoryLineMetrics) []*pb.FactoryLine {
 	result := make([]*pb.FactoryLine, len(lines))
 	for i := range lines {
-		result[i] = serializeFactoryLine(&lines[i])
+		serialized := serializeFactoryLine(&lines[i])
+		if metricsByLine != nil {
+			serialized.Metrics = metricsByLine[lines[i].ID]
+		}
+		result[i] = serialized
 	}
 	return result
 }
