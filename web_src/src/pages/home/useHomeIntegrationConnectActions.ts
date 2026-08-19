@@ -6,6 +6,7 @@ type ConnectDialogMode = "create" | "resume";
 
 export function useHomeIntegrationConnectActions({
   organizationId,
+  returnTo,
   availableIntegrations,
   connected,
   pendingConnectKeyRef,
@@ -14,6 +15,7 @@ export function useHomeIntegrationConnectActions({
   setConfigureIntegrationId,
 }: {
   organizationId: string;
+  returnTo?: string;
   availableIntegrations: Array<{ name?: string }>;
   connected: OrganizationsIntegration[];
   pendingConnectKeyRef: MutableRefObject<string | null>;
@@ -23,7 +25,10 @@ export function useHomeIntegrationConnectActions({
 }) {
   const openCapabilitySetup = (integrationName: string, integrationId?: string) => {
     const path = `/${organizationId}/settings/integrations/${integrationName}/setup`;
-    const href = integrationId ? `${path}?integrationId=${encodeURIComponent(integrationId)}` : path;
+    const query = new URLSearchParams();
+    if (integrationId) query.set("integrationId", integrationId);
+    if (returnTo) query.set("returnTo", returnTo);
+    const href = query.size > 0 ? `${path}?${query.toString()}` : path;
     // Keep factory setup on the current tab; finish GitHub install in a new one.
     window.open(href, "_blank", "noopener,noreferrer");
   };

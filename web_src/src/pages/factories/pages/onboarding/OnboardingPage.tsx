@@ -1,6 +1,8 @@
 import { getApiErrorMessage } from "@/lib/errors";
+import { X } from "lucide-react";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
+import { OnboardingCancelDialog } from "./OnboardingCancelDialog";
 import { SetupSections } from "./OnboardingWireframe";
 import { useOnboardingPageModel } from "./useOnboardingPageModel";
 
@@ -22,7 +24,21 @@ export function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-full w-full bg-background text-foreground" data-testid="workspace-setup">
+    <div className="relative min-h-full w-full bg-background text-foreground" data-testid="workspace-setup">
+      {model.canDeleteWorkspace ? (
+        <button
+          type="button"
+          aria-label="Cancel setup and delete this workspace"
+          title="Cancel setup"
+          disabled={model.deleting}
+          onClick={() => model.setDeleteOpen(true)}
+          className="absolute left-4 top-4 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+          data-testid="workspace-setup-cancel"
+        >
+          <X className="size-6" aria-hidden />
+        </button>
+      ) : null}
+
       <div className="mx-auto w-full max-w-3xl px-6 py-8 lg:px-8">
         {model.repositoriesLoading ? (
           <p className="mb-6 text-[13px] text-muted-foreground">Loading repositories…</p>
@@ -49,6 +65,13 @@ export function OnboardingPage() {
         </div>
       </div>
       {model.integrationDialogs}
+      <OnboardingCancelDialog
+        open={model.deleteOpen}
+        canDelete={model.canDeleteWorkspace}
+        isDeleting={model.deleting}
+        onClose={() => model.setDeleteOpen(false)}
+        onConfirm={model.cancelSetup}
+      />
     </div>
   );
 }

@@ -15,11 +15,13 @@ import { useInstallIntegrationSelections, useRefetchOnWindowFocus } from "./useI
  */
 export function useIntegrationConnectDialog({
   organizationId,
+  returnTo,
   integrationNames,
   selections,
   onSelectionsChange,
 }: {
   organizationId: string;
+  returnTo?: string;
   integrationNames: string[];
   selections: IntegrationSelections;
   onSelectionsChange: (selections: IntegrationSelections) => void;
@@ -74,6 +76,7 @@ export function useIntegrationConnectDialog({
   const { openCapabilitySetup, openCreateIntegrationModal, openConnectDialog, openConfigureDialog } =
     useHomeIntegrationConnectActions({
       organizationId,
+      returnTo,
       availableIntegrations,
       connected,
       pendingConnectKeyRef,
