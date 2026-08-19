@@ -167,7 +167,7 @@ func (l *FactoryWorkOrderLineDispatch) StartStep(tx *gorm.DB, order *FactoryWork
 		LineDispatchID: l.ID,
 		StepIndex:      stepIndex,
 		StepName:       canvas.Name,
-		RunID:          run.ID,
+		RunID:          &run.ID,
 		Status:         FactoryWorkOrderExecutionStatusPending,
 		Result:         "",
 		CreatedAt:      now,
