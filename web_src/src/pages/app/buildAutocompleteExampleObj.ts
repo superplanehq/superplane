@@ -82,6 +82,20 @@ function buildRunExample(): Record<string, unknown> {
 // Real values come from the factory execution at runtime; this is only a stub.
 const EXAMPLE_ORDER_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
 const EXAMPLE_FACTORY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
+const EXAMPLE_ORDER_NUMBER = 12;
+
+// Work order permalinks are workspace-scoped
+// (`/{org}/workspaces/{workspaceKey}/work-order/{number}`), so the example is
+// only meaningful on a workspace app page, where order() also resolves.
+function exampleOrderUrl(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const { origin, pathname } = window.location;
+  const workspacePath = pathname.match(/^\/[^/]+\/workspaces\/[^/]+/)?.[0];
+  return workspacePath ? `${origin}${workspacePath}/work-order/${EXAMPLE_ORDER_NUMBER}` : "";
+}
 
 function buildOrderExample(): Record<string, unknown> {
   return {
@@ -91,6 +105,7 @@ function buildOrderExample(): Record<string, unknown> {
     factory_id: EXAMPLE_FACTORY_ID,
     state: "open",
     result: "",
+    url: exampleOrderUrl(),
     source: {
       issue: { number: 42, title: "Fix login" },
     },

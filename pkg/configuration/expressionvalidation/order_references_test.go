@@ -35,6 +35,34 @@ func TestExpressionUsesOrderArtifacts(t *testing.T) {
 	}
 }
 
+func TestExpressionUsesOrderURL(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{name: "order only", raw: `order()`, want: false},
+		{name: "order id", raw: `order().id`, want: false},
+		{name: "artifact url", raw: `order().artifacts[0].data.url`, want: false},
+		{name: "dot url", raw: `order().url`, want: true},
+		{name: "bracket url", raw: `order()["url"]`, want: true},
+		{name: "concatenated", raw: `"[Work Order](" + order().url + ")"`, want: true},
+		{name: "unrelated", raw: `app().url`, want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ExpressionUsesOrderURL(tc.raw)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestExpressionUsesOrderComments(t *testing.T) {
 	cases := []struct {
 		name string
