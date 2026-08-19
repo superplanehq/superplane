@@ -264,31 +264,40 @@ function RepositoryPicker({
 }
 
 export function VcsStep({
-  setup,
-  onRequestConnect,
+  onSelect,
 }: {
-  setup: OnboardingSetupApi;
-  onRequestConnect: (id: IntegrationId) => void;
+  /** Choosing a host also continues when that host is ready. */
+  onSelect: (host: VcsHostId) => void;
 }) {
   return (
-    <div className="grid gap-2">
+    <div className="grid gap-3 sm:grid-cols-2">
       {VCS_OPTIONS.map((option) => {
         const optionId = option.id as VcsHostId;
-        const connected = setup.connected.has(optionId);
-        const selected = setup.vcsHost === optionId;
+        const soon = Boolean(option.soon);
         return (
-          <ConnectOptionRow
+          <button
             key={option.id}
-            icon={<IntegrationChoiceIcon name={option.id} />}
-            title={option.label}
-            detail={option.detail}
-            selected={selected}
-            connectLabel={vcsLabel(optionId)}
-            connected={connected}
-            soon={option.soon}
-            onSelect={() => setup.selectVcsHost(optionId)}
-            onConnect={() => onRequestConnect(optionId)}
-          />
+            type="button"
+            disabled={soon}
+            onClick={() => onSelect(optionId)}
+            className={cn(
+              "relative flex min-h-44 flex-col items-center justify-center gap-3 rounded-lg border px-6 py-12 transition-colors",
+              soon
+                ? "cursor-not-allowed overflow-hidden border-border/70 bg-muted/20 opacity-70"
+                : "border-border bg-background hover:border-foreground hover:bg-accent/30",
+            )}
+          >
+            {soon ? <ComingSoonRibbon /> : null}
+            <IntegrationIcon integrationName={option.id} className="size-10" size={40} />
+            <span
+              className={cn(
+                "text-[22px] font-semibold tracking-[-0.02em]",
+                soon ? "text-muted-foreground" : "text-foreground",
+              )}
+            >
+              {option.label}
+            </span>
+          </button>
         );
       })}
     </div>

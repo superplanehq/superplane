@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Check, ChevronLeft } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
@@ -151,16 +151,18 @@ function WizardStepBody({
   requestConnect,
   repos,
   onSelectRepository,
+  onSelectVcs,
 }: {
   step: WizardStepId;
   setup: OnboardingSetupApi;
   requestConnect: (id: IntegrationId) => void;
   repos?: string[];
   onSelectRepository: (repo: string) => void;
+  onSelectVcs: (host: VcsHostId) => void;
 }) {
   switch (step) {
     case "vcs":
-      return <VcsStep setup={setup} onRequestConnect={requestConnect} />;
+      return <VcsStep onSelect={onSelectVcs} />;
     case "repo":
       return <RepositoryStep setup={setup} repos={repos} onSelect={onSelectRepository} />;
     case "issues":
@@ -219,6 +221,14 @@ export function SetupSections({
   const previousStep = currentIndex > 0 ? WIZARD_STEPS[currentIndex - 1] : null;
   const nextStep = currentIndex < WIZARD_STEPS.length - 1 ? WIZARD_STEPS[currentIndex + 1] : null;
   const advanceEnabled = canAdvance(setup, openSection) && !saving;
+  // After Connect succeeds, continue once without bouncing when the user goes Back.
+  const advanceAfterVcsConnect = useRef(false);
+
+  useEffect(() => {
+    if (!advanceAfterVcsConnect.current || !setup.vcsReady) return;
+    advanceAfterVcsConnect.current = false;
+    setOpenSection("repo");
+  }, [setup.vcsReady, setOpenSection]);
 
   // The repository travels as an argument because a click both selects it and
   // continues, and the state update is not visible to this handler yet.
@@ -230,6 +240,16 @@ export function SetupSections({
   const selectRepository = (repository: string) => {
     setup.selectRepo(repository);
     continueFromRepository(repository);
+  };
+
+  const selectVcs = (host: VcsHostId) => {
+    setup.selectVcsHost(host);
+    if (setup.connected.has(host)) {
+      setOpenSection("repo");
+      return;
+    }
+    advanceAfterVcsConnect.current = true;
+    requestConnect(host);
   };
 
   const goNext = () => {
@@ -250,6 +270,17 @@ export function SetupSections({
     setOpenSection(nextStep.id);
   };
 
+  const stepBody = (
+    <WizardStepBody
+      step={openSection}
+      setup={setup}
+      requestConnect={requestConnect}
+      repos={repos}
+      onSelectRepository={selectRepository}
+      onSelectVcs={selectVcs}
+    />
+  );
+
   return (
     <div className="space-y-6">
       <WizardProgress
@@ -259,40 +290,36 @@ export function SetupSections({
         onSelectStep={setOpenSection}
       />
 
-      <section className="rounded-lg border border-border">
-        <div className="border-b border-border px-4 py-3">
-          <h2 className="text-[15px] font-medium tracking-[-0.01em]">{current.label}</h2>
-          <p className="mt-1 text-[13px] text-muted-foreground">{current.purpose}</p>
-        </div>
-        <div className="px-4 py-4">
-          <WizardStepBody
-            step={openSection}
-            setup={setup}
-            requestConnect={requestConnect}
-            repos={repos}
-            onSelectRepository={selectRepository}
-          />
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
-          {previousStep ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              disabled={saving}
-              onClick={() => setOpenSection(previousStep.id)}
-            >
-              <ChevronLeft className="size-3.5" aria-hidden />
-              Back
+      {openSection === "vcs" ? (
+        stepBody
+      ) : (
+        <section className="rounded-lg border border-border">
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="text-[15px] font-medium tracking-[-0.01em]">{current.label}</h2>
+            <p className="mt-1 text-[13px] text-muted-foreground">{current.purpose}</p>
+          </div>
+          <div className="px-4 py-4">{stepBody}</div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
+            {previousStep ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={saving}
+                onClick={() => setOpenSection(previousStep.id)}
+              >
+                <ChevronLeft className="size-3.5" aria-hidden />
+                Back
+              </Button>
+            ) : (
+              <span />
+            )}
+            <Button type="button" size="sm" disabled={!advanceEnabled} onClick={goNext}>
+              {CONTINUE_LABELS[openSection]}
             </Button>
-          ) : (
-            <span />
-          )}
-          <Button type="button" size="sm" disabled={!advanceEnabled} onClick={goNext}>
-            {CONTINUE_LABELS[openSection]}
-          </Button>
-        </div>
-      </section>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
