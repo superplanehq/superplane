@@ -27,9 +27,8 @@ export function useInitialRunFitOnEntry({
 
   useEffect(() => {
     if (handledRef.current) return;
-    handledRef.current = true;
-
     if (!shouldRequestInitialRunFit({ isRunInspectionMode, selectedRunId, searchParams })) return;
+    handledRef.current = true;
     requestRunFitRef.current(selectedRunId!);
   }, [isRunInspectionMode, requestRunFitRef, searchParams, selectedRunId]);
 }
