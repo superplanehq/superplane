@@ -15,9 +15,14 @@ function red() {
 
 function diff() {
   # Ignore the diff header lines
-  # Ignore the pg_dump version line
   # Only show actual schema changes
-  git diff --unified=0 -- db/structure.sql | grep -E '^\+|^\-' | grep -v "/db/structure.sql" | grep -v "Dumped by pg_dump version "
+  #
+  # Note: the volatile "Dumped by pg_dump version"/"Dumped from database
+  # version" comment lines are stripped when db/structure.sql is generated
+  # (see scripts/db_migrate.sh), so they should never show up here. If they
+  # do reappear, that means the generation-time fix regressed and this
+  # check should legitimately fail.
+  git diff --unified=0 -- db/structure.sql | grep -E '^\+|^\-' | grep -v "/db/structure.sql"
 }
 
 lineCount=$(diff | wc -l)
