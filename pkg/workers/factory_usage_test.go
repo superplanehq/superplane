@@ -2,6 +2,7 @@ package workers
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -21,6 +22,43 @@ func Test__RollUpFactoryUsage__FillsFinishedExecutionCache(t *testing.T) {
 	require.NoError(t, execution.MarkFinished(database.Conn(), models.CanvasRunResultPassed))
 
 	require.NoError(t, rollUpFactoryUsage(database.Conn(), execution.RunID))
+
+	updated, err := models.FindWorkOrderExecutionByRunID(database.Conn(), execution.RunID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1_000_000), updated.TotalTokens)
+	assert.Equal(t, int64(300), updated.CostCents)
+}
+
+func Test__RollUpFactoryUsage__FillsCacheFromChildRun(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	execution := dispatchFactoryExecutionForUsageTest(t, r)
+	parentRun, err := models.FindUnscopedCanvasRun(database.Conn(), execution.RunID)
+	require.NoError(t, err)
+
+	now := parentRun.CreatedAt
+	if now == nil {
+		created := time.Now()
+		now = &created
+	}
+	childRun := models.CanvasRun{
+		ID:               uuid.New(),
+		WorkflowID:       parentRun.WorkflowID,
+		NodeID:           parentRun.NodeID,
+		VersionID:        parentRun.VersionID,
+		ParentRunID:      &parentRun.ID,
+		ParentWorkflowID: &parentRun.WorkflowID,
+		State:            models.CanvasRunStateStarted,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	require.NoError(t, database.Conn().Create(&childRun).Error)
+
+	recordFactoryLLMUsage(t, r.Organization.ID, childRun.ID)
+	require.NoError(t, execution.MarkFinished(database.Conn(), models.CanvasRunResultPassed))
+
+	require.NoError(t, rollUpFactoryUsage(database.Conn(), childRun.ID))
 
 	updated, err := models.FindWorkOrderExecutionByRunID(database.Conn(), execution.RunID)
 	require.NoError(t, err)

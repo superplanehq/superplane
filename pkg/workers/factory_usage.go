@@ -10,9 +10,10 @@ import (
 )
 
 // rollUpFactoryUsage copies ledger totals into the factory step cache.
-// Runs that are not factory steps are ignored.
+// Child runs created by ctx.Runs.Create keep a different run ID than the
+// factory line step, so lookup walks ancestor runs.
 func rollUpFactoryUsage(tx *gorm.DB, runID uuid.UUID) error {
-	execution, err := models.FindWorkOrderExecutionByRunID(tx, runID)
+	execution, err := models.FindWorkOrderExecutionForRun(tx, runID)
 	if err != nil {
 		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
 			return nil
