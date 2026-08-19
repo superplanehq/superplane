@@ -126,3 +126,8 @@ func (s *FactoryService) DescribeFactoryVelocity(ctx context.Context, req *pb.De
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DescribeFactoryVelocity(ctx, s.registry, organizationID, req)
 }
+
+func (s *FactoryService) ListWorkOrderChecks(ctx context.Context, req *pb.ListWorkOrderChecksRequest) (*pb.ListWorkOrderChecksResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListWorkOrderChecks(ctx, organizationID, req)
+}

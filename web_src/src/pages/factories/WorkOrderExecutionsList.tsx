@@ -1,4 +1,4 @@
-import type { FactoriesWorkOrderExecution } from "@/api-client";
+import type { FactoriesWorkOrderExecution, FactoriesWorkOrderLineDispatch } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
@@ -7,15 +7,18 @@ import {
   getExecutionStepTimestamp,
   getWorkOrderExecutionDisplayMeta,
   getWorkOrderExecutionRunHref,
-  groupWorkOrderExecutionsByLine,
-  type WorkOrderExecutionLineGroup,
 } from "./lib/workOrderExecutions";
 
 interface WorkOrderExecutionsListProps {
   organizationId: string;
   factoryKey: string;
   orderNumber?: string;
-  executions?: FactoriesWorkOrderExecution[];
+  /**
+   * Every traversal (line dispatch) of this work order, oldest first. Two
+   * dispatches of the same line render as two separate groups here — this
+   * is the audit-trail view, unlike the sidebar's compact per-line summary.
+   */
+  dispatches?: FactoriesWorkOrderLineDispatch[];
   variant?: "default" | "compact" | "inline";
   emptyMessage?: string;
 }
@@ -24,11 +27,11 @@ export function WorkOrderExecutionsList({
   organizationId,
   factoryKey,
   orderNumber,
-  executions,
+  dispatches,
   variant = "default",
   emptyMessage = "No line runs yet. Dispatch this work order to a line to start execution.",
 }: WorkOrderExecutionsListProps) {
-  const groups = groupWorkOrderExecutionsByLine(executions);
+  const groups = dispatches ?? [];
 
   if (groups.length === 0) {
     return variant === "compact" || variant === "inline" ? null : (
@@ -39,10 +42,10 @@ export function WorkOrderExecutionsList({
   if (variant === "inline") {
     return (
       <ul className="space-y-1.5">
-        {groups.flatMap((group) =>
-          group.executions.map((execution, index) => (
+        {groups.flatMap((dispatch) =>
+          (dispatch.stepExecutions ?? []).map((execution, index) => (
             <CompactExecutionRow
-              key={execution.id ?? `${group.lineId}-${execution.step}-${index}`}
+              key={execution.id ?? `${dispatch.id}-${execution.step}-${index}`}
               organizationId={organizationId}
               factoryKey={factoryKey}
               orderNumber={orderNumber}
@@ -57,13 +60,13 @@ export function WorkOrderExecutionsList({
   if (variant === "compact") {
     return (
       <ul className="mt-4 space-y-4">
-        {groups.map((group) => (
+        {groups.map((dispatch) => (
           <CompactLineGroup
-            key={group.lineId}
+            key={dispatch.id}
             organizationId={organizationId}
             factoryKey={factoryKey}
             orderNumber={orderNumber}
-            group={group}
+            dispatch={dispatch}
           />
         ))}
       </ul>
@@ -72,15 +75,15 @@ export function WorkOrderExecutionsList({
 
   return (
     <ul className="space-y-4">
-      {groups.map((group) => (
-        <li key={group.lineId} className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700/70">
+      {groups.map((dispatch) => (
+        <li key={dispatch.id} className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700/70">
           <div className="border-b border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-900 dark:border-gray-700/70 dark:bg-gray-800/60 dark:text-gray-100">
-            {group.lineName}
+            {dispatch.line?.name?.trim() || "Unnamed line"}
           </div>
           <ul className="divide-y divide-gray-200 dark:divide-gray-700/70">
-            {group.executions.map((execution, index) => (
+            {(dispatch.stepExecutions ?? []).map((execution, index) => (
               <ExecutionRow
-                key={execution.id ?? `${group.lineId}-${execution.step}-${index}`}
+                key={execution.id ?? `${dispatch.id}-${execution.step}-${index}`}
                 organizationId={organizationId}
                 factoryKey={factoryKey}
                 orderNumber={orderNumber}
@@ -98,20 +101,22 @@ function CompactLineGroup({
   organizationId,
   factoryKey,
   orderNumber,
-  group,
+  dispatch,
 }: {
   organizationId: string;
   factoryKey: string;
   orderNumber?: string;
-  group: WorkOrderExecutionLineGroup;
+  dispatch: FactoriesWorkOrderLineDispatch;
 }) {
   return (
     <li>
-      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{group.lineName}</p>
+      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+        {dispatch.line?.name?.trim() || "Unnamed line"}
+      </p>
       <ul className="mt-2 space-y-1.5">
-        {group.executions.map((execution, index) => (
+        {(dispatch.stepExecutions ?? []).map((execution, index) => (
           <CompactExecutionRow
-            key={execution.id ?? `${group.lineId}-${execution.step}-${index}`}
+            key={execution.id ?? `${dispatch.id}-${execution.step}-${index}`}
             organizationId={organizationId}
             factoryKey={factoryKey}
             orderNumber={orderNumber}

@@ -13,7 +13,8 @@ import (
 
 const (
 	NotificationWorkspaceScopeAll      = "all"
-	NotificationWorkspaceScopeSelected = "selected"
+	NotificationWorkspaceScopeFiltered = "filtered"
+	NotificationWorkspaceScopeNone     = "none"
 
 	NotificationTypeWorkOrderAssigned       = "work_order_assigned"
 	NotificationTypeWorkOrderCommentOwned   = "work_order_comment_owned"
@@ -33,40 +34,40 @@ var NotificationTypes = []string{
 	NotificationTypeWorkOrderMention,
 }
 
-var ErrNotificationWorkspaceScopeInvalid = errors.New("workspace scope must be all or selected")
+var ErrNotificationWorkspaceScopeInvalid = errors.New("workspace scope must be all, filtered, or none")
+
+// NotificationWorkspaceFilter selects event types for one workspace
+// when the scope is filtered.
+type NotificationWorkspaceFilter struct {
+	WorkspaceID string   `json:"workspace_id"`
+	EventTypes  []string `json:"event_types"`
+}
 
 // UserNotificationSettings holds a user's organization-wide email
-// notification configuration for factory work order activity. A user
-// without a row uses DefaultUserNotificationSettings: emails on, all
-// types, all workspaces.
+// notification configuration for workspace work order activity. A user
+// without a row uses DefaultUserNotificationSettings: all events from
+// all workspaces.
 type UserNotificationSettings struct {
-	ID             uuid.UUID
-	OrganizationID uuid.UUID
-	UserID         uuid.UUID
-	Enabled        bool
-	WorkspaceScope string
-	FactoryIDs     datatypes.JSONSlice[string]
-	// Types maps a notification type to its toggle. A missing key means
-	// the type is on, so newly introduced types default to enabled.
-	Types     datatypes.JSONType[map[string]bool]
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID               uuid.UUID
+	OrganizationID   uuid.UUID
+	UserID           uuid.UUID
+	WorkspaceScope   string
+	WorkspaceFilters datatypes.JSONType[[]NotificationWorkspaceFilter]
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 // UserNotificationSettingsParams carries the caller-editable fields for
 // UpsertUserNotificationSettings.
 type UserNotificationSettingsParams struct {
-	Enabled        bool
-	WorkspaceScope string
-	FactoryIDs     []string
-	Types          map[string]bool
+	WorkspaceScope   string
+	WorkspaceFilters []NotificationWorkspaceFilter
 }
 
 // DefaultUserNotificationSettings is the configuration SuperPlane uses
 // when the user has not saved settings yet.
 func DefaultUserNotificationSettings() UserNotificationSettings {
 	return UserNotificationSettings{
-		Enabled:        true,
 		WorkspaceScope: NotificationWorkspaceScopeAll,
 	}
 }
@@ -75,31 +76,29 @@ func (UserNotificationSettings) TableName() string {
 	return "user_notification_settings"
 }
 
-// NotifiesType reports whether the settings allow emails for the given
-// notification type. A missing key defaults to on.
-func (s *UserNotificationSettings) NotifiesType(notificationType string) bool {
-	if !s.Enabled {
+// Notifies reports whether the settings allow an email for the given
+// workspace and notification type.
+func (s *UserNotificationSettings) Notifies(workspaceID uuid.UUID, notificationType string) bool {
+	switch s.WorkspaceScope {
+	case NotificationWorkspaceScopeNone:
 		return false
-	}
-
-	enabled, ok := s.Types.Data()[notificationType]
-	if !ok {
+	case NotificationWorkspaceScopeFiltered:
+		for _, filter := range s.WorkspaceFilters.Data() {
+			if filter.WorkspaceID != workspaceID.String() {
+				continue
+			}
+			return slices.Contains(filter.EventTypes, notificationType)
+		}
+		return false
+	default:
 		return true
 	}
-	return enabled
-}
-
-// AppliesToFactory reports whether the settings cover activity in the
-// given factory (workspace).
-func (s *UserNotificationSettings) AppliesToFactory(factoryID uuid.UUID) bool {
-	if s.WorkspaceScope != NotificationWorkspaceScopeSelected {
-		return true
-	}
-	return slices.Contains(s.FactoryIDs, factoryID.String())
 }
 
 func IsValidNotificationWorkspaceScope(scope string) bool {
-	return scope == NotificationWorkspaceScopeAll || scope == NotificationWorkspaceScopeSelected
+	return scope == NotificationWorkspaceScopeAll ||
+		scope == NotificationWorkspaceScopeFiltered ||
+		scope == NotificationWorkspaceScopeNone
 }
 
 func FindUserNotificationSettings(tx *gorm.DB, organizationID, userID uuid.UUID) (*UserNotificationSettings, error) {
@@ -155,36 +154,28 @@ func UpsertUserNotificationSettings(
 		return nil, ErrNotificationWorkspaceScopeInvalid
 	}
 
-	factoryIDs := params.FactoryIDs
-	if factoryIDs == nil {
-		factoryIDs = []string{}
-	}
-	types := params.Types
-	if types == nil {
-		types = map[string]bool{}
+	filters := params.WorkspaceFilters
+	if filters == nil {
+		filters = []NotificationWorkspaceFilter{}
 	}
 
 	now := time.Now()
 	settings := &UserNotificationSettings{
-		ID:             uuid.New(),
-		OrganizationID: organizationID,
-		UserID:         userID,
-		Enabled:        params.Enabled,
-		WorkspaceScope: params.WorkspaceScope,
-		FactoryIDs:     datatypes.NewJSONSlice(factoryIDs),
-		Types:          datatypes.NewJSONType(types),
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:               uuid.New(),
+		OrganizationID:   organizationID,
+		UserID:           userID,
+		WorkspaceScope:   params.WorkspaceScope,
+		WorkspaceFilters: datatypes.NewJSONType(filters),
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}
 
 	err := tx.
 		Clauses(clause.OnConflict{
 			Columns: []clause.Column{{Name: "organization_id"}, {Name: "user_id"}},
 			DoUpdates: clause.AssignmentColumns([]string{
-				"enabled",
 				"workspace_scope",
-				"factory_ids",
-				"types",
+				"workspace_filters",
 				"updated_at",
 			}),
 		}).

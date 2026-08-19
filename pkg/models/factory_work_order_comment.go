@@ -183,12 +183,12 @@ func (o *FactoryWorkOrder) recordCommentAddedEvent(
 	author factory.WorkOrderCommentAuthor,
 ) error {
 	data := factory.WorkOrderCommentAdded{
-		Order:            o.Ref(),
-		CommentID:        comment.ID,
-		Body:             comment.Body,
-		Author:           &author,
-		Run:              comment.RunRef(),
-		MentionedUserIDs: uuidStrings(comment.MentionedUserIDs),
+		Order:          o.Ref(),
+		CommentID:      comment.ID,
+		Body:           comment.Body,
+		Author:         &author,
+		Run:            comment.RunRef(),
+		MentionedUsers: userRefs(comment.MentionedUserIDs),
 	}
 
 	return o.recordEvent(tx, factory.EventTypeOrderCommentAdded, data)
@@ -277,4 +277,12 @@ func uuidStrings(ids []uuid.UUID) []string {
 		result = append(result, id.String())
 	}
 	return result
+}
+
+func userRefs(ids []uuid.UUID) []factory.UserRef {
+	refs := make([]factory.UserRef, 0, len(ids))
+	for _, id := range ids {
+		refs = append(refs, factory.UserRef{ID: id})
+	}
+	return refs
 }

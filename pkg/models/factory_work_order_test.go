@@ -418,6 +418,16 @@ func TestFactoryWorkOrder_RecordCommentAdded_Mentions(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []uuid.UUID{mentioned.ID}, comment.MentionedUserIDs)
 
+	events, err := order.ListEvents(database.Conn(), 10, nil)
+	require.NoError(t, err)
+	var payload factory.WorkOrderCommentAdded
+	for _, event := range events {
+		if event.Type == factory.EventTypeOrderCommentAdded {
+			require.NoError(t, json.Unmarshal(event.Data, &payload))
+		}
+	}
+	assert.Equal(t, []factory.UserRef{{ID: mentioned.ID}}, payload.MentionedUsers)
+
 	var stored []FactoryWorkOrderCommentMention
 	require.NoError(t, database.Conn().Where("comment_id = ?", comment.ID).Find(&stored).Error)
 	require.Len(t, stored, 1)

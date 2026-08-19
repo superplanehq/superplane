@@ -24,7 +24,7 @@ export function WorkOrdersPage() {
 
   usePageTitle(["Work Orders", factory?.name ?? "Workspace"]);
 
-  const state = useWorkOrderListState();
+  const state = useWorkOrderListState(factoryId);
 
   const {
     data: workOrders = [],

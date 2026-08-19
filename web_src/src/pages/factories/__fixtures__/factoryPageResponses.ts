@@ -6,10 +6,15 @@ import type {
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderEvent,
   FactoriesWorkOrderExecution,
+  FactoriesWorkOrderLineDispatch,
+  FactoriesWorkOrderLineDispatchResult,
+  FactoriesWorkOrderLineDispatchState,
   FactoryApp,
   FactoryLineStep,
 } from "@/api-client";
 import { canvasAppIds } from "@/pages/app/__fixtures__/handlers";
+
+import type { FactoriesWorkOrderCheck } from "@/api-client";
 
 /** Shared with the home fixture so routes stay in sync across HomePage → Factories navigation. */
 export const FACTORIES_ORGANIZATION_ID = "3ee1aa47-3a60-4c1f-b645-0b9859ab91f8";
@@ -151,7 +156,6 @@ function planLineExecution(
 ): FactoriesWorkOrderExecution {
   return {
     id: `exec-${step}-${overrides.id ?? Math.random().toString(36).slice(2, 8)}`,
-    line: { id: REFUND_LINE_PLAN_ID, name: "plan-and-implement" },
     step,
     state: "STATE_FINISHED",
     result: "RESULT_PASSED",
@@ -162,6 +166,43 @@ function planLineExecution(
       appId: "app-refund-planner",
       appName: "Refund Planner",
     },
+    ...overrides,
+  };
+}
+
+/**
+ * Builds a single line dispatch (traversal) around a set of step
+ * executions — the fixtures below give every work order at most one
+ * dispatch of the `plan-and-implement` line, since none of the storybook
+ * scenarios need to show two traversals of the same line side by side.
+ */
+function planLineDispatch(
+  stepExecutions: FactoriesWorkOrderExecution[],
+  overrides: Partial<FactoriesWorkOrderLineDispatch> = {},
+): FactoriesWorkOrderLineDispatch {
+  const state: FactoriesWorkOrderLineDispatchState = stepExecutions.some(
+    (execution) => execution.state !== "STATE_FINISHED",
+  )
+    ? "STATE_ACTIVE"
+    : "STATE_FINISHED";
+
+  const lastExecution = stepExecutions[stepExecutions.length - 1];
+  const result: FactoriesWorkOrderLineDispatchResult =
+    state === "STATE_FINISHED" ? (lastExecution?.result ?? "RESULT_UNKNOWN") : "RESULT_UNKNOWN";
+
+  return {
+    id: `dispatch-${REFUND_LINE_PLAN_ID}-${stepExecutions[0]?.id ?? "empty"}`,
+    line: { id: REFUND_LINE_PLAN_ID, name: "plan-and-implement" },
+    steps: [
+      { name: "plan", stepIndex: 0 },
+      { name: "implement", stepIndex: 1 },
+      { name: "verify", stepIndex: 2 },
+    ],
+    state,
+    result,
+    createdAt: stepExecutions[0]?.createdAt ?? TWO_HOURS_AGO,
+    finishedAt: state === "STATE_FINISHED" ? (lastExecution?.updatedAt ?? HOUR_AGO) : undefined,
+    stepExecutions,
     ...overrides,
   };
 }
@@ -196,7 +237,7 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
     { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
     { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
   ],
-  executions: [],
+  lineDispatches: [],
 };
 
 /**
@@ -219,7 +260,7 @@ export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
   updatedAt: TWO_HOURS_AGO,
   createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  executions: [],
+  lineDispatches: [],
 };
 
 // Storybook user is co-assigned so "mine + running" surfaces this order.
@@ -244,15 +285,22 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
     { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
     { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
   ],
-  executions: [
-    planLineExecution("plan", { id: "1", state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: TWO_HOURS_AGO }),
-    planLineExecution("implement", {
-      id: "2",
-      state: "STATE_STARTED",
-      result: "RESULT_UNKNOWN",
-      run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
-      updatedAt: HOUR_AGO,
-    }),
+  lineDispatches: [
+    planLineDispatch([
+      planLineExecution("plan", {
+        id: "1",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        updatedAt: TWO_HOURS_AGO,
+      }),
+      planLineExecution("implement", {
+        id: "2",
+        state: "STATE_STARTED",
+        result: "RESULT_UNKNOWN",
+        run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+        updatedAt: HOUR_AGO,
+      }),
+    ]),
   ],
 };
 
@@ -273,15 +321,22 @@ export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
   updatedAt: HOUR_AGO,
   createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  executions: [
-    planLineExecution("plan", { id: "3", state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: TWO_HOURS_AGO }),
-    planLineExecution("implement", {
-      id: "4",
-      state: "STATE_FINISHED",
-      result: "RESULT_FAILED",
-      run: { id: LINE_RUN_IMPLEMENT_FAILED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
-      updatedAt: HOUR_AGO,
-    }),
+  lineDispatches: [
+    planLineDispatch([
+      planLineExecution("plan", {
+        id: "3",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        updatedAt: TWO_HOURS_AGO,
+      }),
+      planLineExecution("implement", {
+        id: "4",
+        state: "STATE_FINISHED",
+        result: "RESULT_FAILED",
+        run: { id: LINE_RUN_IMPLEMENT_FAILED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+        updatedAt: HOUR_AGO,
+      }),
+    ]),
   ],
 };
 
@@ -305,7 +360,7 @@ export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   updatedAt: HOUR_AGO,
   createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  executions: [],
+  lineDispatches: [],
 };
 
 export const CLOSED_FAILED_WORK_ORDER: FactoriesWorkOrder = {
@@ -324,7 +379,7 @@ export const CLOSED_FAILED_WORK_ORDER: FactoriesWorkOrder = {
   updatedAt: YESTERDAY,
   createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  executions: [],
+  lineDispatches: [],
 };
 
 export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
@@ -343,22 +398,24 @@ export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
   updatedAt: YESTERDAY,
   createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  executions: [
-    planLineExecution("plan", { id: "5", state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: LAST_WEEK }),
-    planLineExecution("implement", {
-      id: "6",
-      state: "STATE_FINISHED",
-      result: "RESULT_PASSED",
-      run: { id: LINE_RUN_IMPLEMENT_PASSED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
-      updatedAt: LAST_WEEK,
-    }),
-    planLineExecution("verify", {
-      id: "7",
-      state: "STATE_FINISHED",
-      result: "RESULT_PASSED",
-      run: { id: LINE_RUN_VERIFY_PASSED_ID, appId: "app-refund-verifier", appName: "Refund Verifier" },
-      updatedAt: YESTERDAY,
-    }),
+  lineDispatches: [
+    planLineDispatch([
+      planLineExecution("plan", { id: "5", state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: LAST_WEEK }),
+      planLineExecution("implement", {
+        id: "6",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        run: { id: LINE_RUN_IMPLEMENT_PASSED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+        updatedAt: LAST_WEEK,
+      }),
+      planLineExecution("verify", {
+        id: "7",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        run: { id: LINE_RUN_VERIFY_PASSED_ID, appId: "app-refund-verifier", appName: "Refund Verifier" },
+        updatedAt: YESTERDAY,
+      }),
+    ]),
   ],
 };
 
@@ -420,6 +477,8 @@ export interface FactoriesFixture {
   eventsByOrderId?: Record<string, FactoriesWorkOrderEvent[]>;
   /** Per-order artifacts; same fallback pattern as `eventsByOrderId`. */
   artifactsByOrderId?: Record<string, FactoriesWorkOrderArtifact[]>;
+  /** Per-order checks (automation-reported scores); same fallback pattern as `eventsByOrderId`. */
+  checksByOrderId?: Record<string, FactoriesWorkOrderCheck[]>;
 }
 
 export const defaultFactoriesFixture: FactoriesFixture = {

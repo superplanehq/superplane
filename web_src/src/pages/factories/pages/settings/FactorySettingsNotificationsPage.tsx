@@ -8,14 +8,17 @@ import { useFactories } from "@/hooks/useFactoryData";
 import { useNotificationSettings, useUpdateNotificationSettings } from "@/hooks/useNotificationSettings";
 import { getApiErrorMessage } from "@/lib/errors";
 import {
-  notificationTypesFromToggles,
-  notificationTypeTogglesFromSettings,
+  defaultNotificationTypeToggles,
+  eventTypesFromToggles,
+  filtersFromSettings,
+  togglesFromEventTypes,
+  workspaceScopeFromSettings,
   type ConfigurableNotificationType,
   type NotificationTypeToggles,
+  type WorkspaceScopeForm,
 } from "@/lib/notificationSettings";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { Switch } from "@/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 import { Info } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -62,31 +65,46 @@ const NOTIFICATION_TYPE_OPTIONS: NotificationTypeOption[] = [
   },
 ];
 
-interface NotificationsFormState {
-  enabled: boolean;
-  scope: "all" | "selected";
-  selectedFactoryIds: string[];
+const WORKSPACE_SCOPE_TO_PROTO: Record<WorkspaceScopeForm, NotificationSettingsWorkspaceScope> = {
+  all: "WORKSPACE_SCOPE_ALL",
+  filtered: "WORKSPACE_SCOPE_FILTERED",
+  none: "WORKSPACE_SCOPE_NONE",
+};
+
+interface WorkspaceFilterForm {
+  workspaceId: string;
   toggles: NotificationTypeToggles;
+}
+
+interface NotificationsFormState {
+  scope: WorkspaceScopeForm;
+  filters: WorkspaceFilterForm[];
 }
 
 function formStateFromSettings(settings: MeNotificationSettings | undefined): NotificationsFormState {
   return {
-    enabled: settings?.enabled ?? true,
-    scope: settings?.workspaceScope === "WORKSPACE_SCOPE_SELECTED" ? "selected" : "all",
-    selectedFactoryIds: settings?.factoryIds ?? [],
-    toggles: notificationTypeTogglesFromSettings(settings),
+    scope: workspaceScopeFromSettings(settings),
+    filters: filtersFromSettings(settings).flatMap((filter) => {
+      if (!filter.workspaceId) {
+        return [];
+      }
+      return [{ workspaceId: filter.workspaceId, toggles: togglesFromEventTypes(filter.eventTypes) }];
+    }),
   };
 }
 
 function settingsFromFormState(state: NotificationsFormState): MeNotificationSettings {
-  const scope: NotificationSettingsWorkspaceScope =
-    state.scope === "selected" ? "WORKSPACE_SCOPE_SELECTED" : "WORKSPACE_SCOPE_ALL";
-
   return {
-    enabled: state.enabled,
-    workspaceScope: scope,
-    factoryIds: state.scope === "selected" ? state.selectedFactoryIds : [],
-    types: notificationTypesFromToggles(state.toggles),
+    workspaces: {
+      scope: WORKSPACE_SCOPE_TO_PROTO[state.scope],
+      filters:
+        state.scope === "filtered"
+          ? state.filters.map((filter) => ({
+              workspaceId: filter.workspaceId,
+              eventTypes: eventTypesFromToggles(filter.toggles),
+            }))
+          : [],
+    },
   };
 }
 
@@ -114,12 +132,13 @@ export function FactorySettingsNotificationsPage() {
   }, [settings]);
 
   const isDirty = isDirtyState(form, savedForm);
+  const formLocked = isLoading || !canUpdate;
 
   const handleSave = async () => {
     if (!canUpdate) {
       return;
     }
-    if (form.enabled && form.scope === "selected" && form.selectedFactoryIds.length === 0) {
+    if (form.scope === "filtered" && form.filters.length === 0) {
       setScopeError("Select at least one workspace, or use all workspaces.");
       return;
     }
@@ -141,53 +160,44 @@ export function FactorySettingsNotificationsPage() {
     >
       <div className="space-y-6" data-testid="factory-settings-notifications-form">
         <FactorySettingsCard>
-          <div className="flex items-center gap-2.5">
-            <Switch
-              id="notifications-enabled"
-              checked={form.enabled}
-              disabled={isLoading || !canUpdate}
-              aria-label="Email notifications"
-              data-testid="notifications-enabled"
-              onCheckedChange={(enabled) => setForm((prev) => ({ ...prev, enabled }))}
-            />
-            <Label htmlFor="notifications-enabled" className="text-[13px] font-medium text-foreground">
-              Email notifications
-            </Label>
-          </div>
-          <div
-            className={cn(
-              "mt-6 space-y-6",
-              (!form.enabled || isLoading || !canUpdate) && "pointer-events-none opacity-50",
-            )}
-          >
+          <div className={cn("space-y-6", formLocked && "pointer-events-none opacity-50")}>
             <WorkspaceScopeSection
               scope={form.scope}
-              selectedFactoryIds={form.selectedFactoryIds}
+              filters={form.filters}
               factories={factories}
               scopeError={scopeError}
               onScopeChange={(scope) => {
                 setScopeError("");
                 setForm((prev) => ({ ...prev, scope }));
               }}
-              onAddFactory={(factoryId) => {
+              onAddWorkspace={(workspaceId) => {
                 setScopeError("");
                 setForm((prev) =>
-                  prev.selectedFactoryIds.includes(factoryId)
+                  prev.filters.some((filter) => filter.workspaceId === workspaceId)
                     ? prev
-                    : { ...prev, selectedFactoryIds: [...prev.selectedFactoryIds, factoryId] },
+                    : {
+                        ...prev,
+                        filters: [...prev.filters, { workspaceId, toggles: defaultNotificationTypeToggles() }],
+                      },
                 );
               }}
-              onRemoveFactory={(factoryId) => {
+              onRemoveWorkspace={(workspaceId) => {
                 setScopeError("");
                 setForm((prev) => ({
                   ...prev,
-                  selectedFactoryIds: prev.selectedFactoryIds.filter((id) => id !== factoryId),
+                  filters: prev.filters.filter((filter) => filter.workspaceId !== workspaceId),
                 }));
               }}
-            />
-            <NotificationTypesSection
-              toggles={form.toggles}
-              onToggle={(key, value) => setForm((prev) => ({ ...prev, toggles: { ...prev.toggles, [key]: value } }))}
+              onToggleType={(workspaceId, key, value) => {
+                setForm((prev) => ({
+                  ...prev,
+                  filters: prev.filters.map((filter) =>
+                    filter.workspaceId === workspaceId
+                      ? { ...filter, toggles: { ...filter.toggles, [key]: value } }
+                      : filter,
+                  ),
+                }));
+              }}
             />
           </div>
         </FactorySettingsCard>
@@ -211,24 +221,29 @@ export function FactorySettingsNotificationsPage() {
 }
 
 interface WorkspaceScopeSectionProps {
-  scope: "all" | "selected";
-  selectedFactoryIds: string[];
+  scope: WorkspaceScopeForm;
+  filters: WorkspaceFilterForm[];
   factories: { id?: string; name?: string }[];
   scopeError: string;
-  onScopeChange: (scope: "all" | "selected") => void;
-  onAddFactory: (factoryId: string) => void;
-  onRemoveFactory: (factoryId: string) => void;
+  onScopeChange: (scope: WorkspaceScopeForm) => void;
+  onAddWorkspace: (workspaceId: string) => void;
+  onRemoveWorkspace: (workspaceId: string) => void;
+  onToggleType: (workspaceId: string, key: ConfigurableNotificationType, value: boolean) => void;
 }
 
 function WorkspaceScopeSection({
   scope,
-  selectedFactoryIds,
+  filters,
   factories,
   scopeError,
   onScopeChange,
-  onAddFactory,
-  onRemoveFactory,
+  onAddWorkspace,
+  onRemoveWorkspace,
+  onToggleType,
 }: WorkspaceScopeSectionProps) {
+  const selectedFactoryIds = filters.map((filter) => filter.workspaceId);
+  const factoriesById = new Map(factories.flatMap((factory) => (factory.id ? [[factory.id, factory]] : [])));
+
   return (
     <div className="space-y-3">
       <div>
@@ -243,19 +258,36 @@ function WorkspaceScopeSection({
           onSelect={() => onScopeChange("all")}
         />
         <ScopeChoice
-          id="notifications-scope-selected"
-          label="Selected workspaces"
-          checked={scope === "selected"}
-          onSelect={() => onScopeChange("selected")}
+          id="notifications-scope-filtered"
+          label="Filtered"
+          checked={scope === "filtered"}
+          onSelect={() => onScopeChange("filtered")}
+        />
+        <ScopeChoice
+          id="notifications-scope-none"
+          label="None"
+          checked={scope === "none"}
+          onSelect={() => onScopeChange("none")}
         />
       </div>
-      {scope === "selected" ? (
-        <FactorySettingsNotificationWorkspacePicker
-          factories={factories}
-          selectedFactoryIds={selectedFactoryIds}
-          onAdd={onAddFactory}
-          onRemove={onRemoveFactory}
-        />
+      {scope === "filtered" ? (
+        <div className="space-y-4">
+          <FactorySettingsNotificationWorkspacePicker
+            factories={factories}
+            selectedFactoryIds={selectedFactoryIds}
+            onAdd={onAddWorkspace}
+            onRemove={onRemoveWorkspace}
+          />
+          {filters.map((filter) => (
+            <WorkspaceEventTypesSection
+              key={filter.workspaceId}
+              workspaceId={filter.workspaceId}
+              workspaceName={factoriesById.get(filter.workspaceId)?.name || filter.workspaceId}
+              toggles={filter.toggles}
+              onToggle={(key, value) => onToggleType(filter.workspaceId, key, value)}
+            />
+          ))}
+        </div>
       ) : null}
       {scopeError ? <p className="text-[11px] text-destructive">{scopeError}</p> : null}
     </div>
@@ -291,21 +323,31 @@ function ScopeChoice({
   );
 }
 
-function NotificationTypesSection({
+function WorkspaceEventTypesSection({
+  workspaceId,
+  workspaceName,
   toggles,
   onToggle,
 }: {
+  workspaceId: string;
+  workspaceName: string;
   toggles: NotificationTypeToggles;
-  onToggle: (key: keyof NotificationTypeToggles, value: boolean) => void;
+  onToggle: (key: ConfigurableNotificationType, value: boolean) => void;
 }) {
   return (
     <div className="space-y-3">
-      <Label>Notify me about</Label>
+      <div>
+        <Label>{workspaceName}</Label>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          Choose which events send an email for this workspace.
+        </p>
+      </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
         {NOTIFICATION_TYPE_OPTIONS.map((option) => (
           <NotificationTypeRow
             key={option.key}
             option={option}
+            checkboxId={`notifications-type-${workspaceId}-${option.key}`}
             checked={toggles[option.key]}
             onToggle={(value) => onToggle(option.key, value)}
           />
@@ -317,15 +359,15 @@ function NotificationTypesSection({
 
 function NotificationTypeRow({
   option,
+  checkboxId,
   checked,
   onToggle,
 }: {
   option: NotificationTypeOption;
+  checkboxId: string;
   checked: boolean;
   onToggle: (value: boolean) => void;
 }) {
-  const checkboxId = `notifications-type-${option.key}`;
-
   return (
     <div className="flex min-w-0 items-center gap-2">
       <Checkbox

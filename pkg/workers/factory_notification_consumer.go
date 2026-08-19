@@ -169,7 +169,7 @@ func (c *FactoryNotificationConsumer) sendWorkOrderNotificationEmails(
 	order *models.FactoryWorkOrder,
 	message messages.FactoryWorkOrderNotificationMessage,
 	actorName string,
-	executions []models.FactoryWorkOrderExecutionRecord,
+	executions []workOrderEmailExecution,
 	recipients []workOrderEmailRecipient,
 ) bool {
 	contentByType := map[string]workOrderNotificationContent{}
@@ -236,10 +236,7 @@ func (c *FactoryNotificationConsumer) resolveRecipients(
 		if !ok {
 			settings = models.DefaultUserNotificationSettings()
 		}
-		if !settings.NotifiesType(notificationType) {
-			continue
-		}
-		if !settings.AppliesToFactory(factoryID) {
+		if !settings.Notifies(factoryID, notificationType) {
 			continue
 		}
 		id := userID.String()

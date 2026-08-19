@@ -26,31 +26,29 @@ func Test__UserNotificationSettings(t *testing.T) {
 		userID := support.CreateUser(t, r, r.Organization.ID).ID
 
 		created, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, userID, models.UserNotificationSettingsParams{
-			Enabled:        true,
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
 		})
 		require.NoError(t, err)
-		assert.True(t, created.Enabled)
 		assert.Equal(t, models.NotificationWorkspaceScopeAll, created.WorkspaceScope)
 
 		factoryID := uuid.New().String()
 		updated, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, userID, models.UserNotificationSettingsParams{
-			Enabled:        false,
-			WorkspaceScope: models.NotificationWorkspaceScopeSelected,
-			FactoryIDs:     []string{factoryID},
-			Types:          map[string]bool{models.NotificationTypeWorkOrderAssigned: false},
+			WorkspaceScope: models.NotificationWorkspaceScopeFiltered,
+			WorkspaceFilters: []models.NotificationWorkspaceFilter{{
+				WorkspaceID: factoryID,
+				EventTypes:  []string{models.NotificationTypeWorkOrderAssigned},
+			}},
 		})
 		require.NoError(t, err)
 		assert.Equal(t, created.ID, updated.ID)
-		assert.False(t, updated.Enabled)
-		assert.Equal(t, models.NotificationWorkspaceScopeSelected, updated.WorkspaceScope)
-		assert.Equal(t, []string{factoryID}, []string(updated.FactoryIDs))
-		assert.False(t, updated.Types.Data()[models.NotificationTypeWorkOrderAssigned])
+		assert.Equal(t, models.NotificationWorkspaceScopeFiltered, updated.WorkspaceScope)
+		require.Len(t, updated.WorkspaceFilters.Data(), 1)
+		assert.Equal(t, factoryID, updated.WorkspaceFilters.Data()[0].WorkspaceID)
+		assert.Equal(t, []string{models.NotificationTypeWorkOrderAssigned}, updated.WorkspaceFilters.Data()[0].EventTypes)
 	})
 
 	t.Run("upsert rejects invalid workspace scope", func(t *testing.T) {
 		_, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, r.User, models.UserNotificationSettingsParams{
-			Enabled:        true,
 			WorkspaceScope: "everywhere",
 		})
 		assert.ErrorIs(t, err, models.ErrNotificationWorkspaceScopeInvalid)
@@ -61,7 +59,6 @@ func Test__UserNotificationSettings(t *testing.T) {
 		withoutRow := support.CreateUser(t, r, r.Organization.ID).ID
 
 		_, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, withRow, models.UserNotificationSettingsParams{
-			Enabled:        true,
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
 		})
 		require.NoError(t, err)
@@ -73,51 +70,36 @@ func Test__UserNotificationSettings(t *testing.T) {
 	})
 }
 
-func Test__UserNotificationSettings__NotifiesType(t *testing.T) {
-	t.Run("defaults enable every type in every workspace", func(t *testing.T) {
+func Test__UserNotificationSettings__Notifies(t *testing.T) {
+	workspaceID := uuid.New()
+	otherWorkspaceID := uuid.New()
+
+	t.Run("defaults notify every type in every workspace", func(t *testing.T) {
 		settings := models.DefaultUserNotificationSettings()
-		assert.True(t, settings.Enabled)
-		assert.True(t, settings.NotifiesType(models.NotificationTypeWorkOrderAssigned))
-		assert.True(t, settings.AppliesToFactory(uuid.New()))
+		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAssigned))
+		assert.True(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderCommentOwned))
 	})
 
-	t.Run("master switch off blocks every type", func(t *testing.T) {
-		settings := models.UserNotificationSettings{Enabled: false}
-		assert.False(t, settings.NotifiesType(models.NotificationTypeWorkOrderAssigned))
+	t.Run("none scope blocks every type", func(t *testing.T) {
+		settings := models.UserNotificationSettings{WorkspaceScope: models.NotificationWorkspaceScopeNone}
+		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAssigned))
 	})
 
-	t.Run("missing type key defaults to on", func(t *testing.T) {
-		settings := models.UserNotificationSettings{Enabled: true}
-		assert.True(t, settings.NotifiesType(models.NotificationTypeWorkOrderCommentOwned))
-	})
-
-	t.Run("explicit toggle wins", func(t *testing.T) {
-		settings := models.UserNotificationSettings{
-			Enabled: true,
-			Types: datatypes.NewJSONType(map[string]bool{
-				models.NotificationTypeWorkOrderCommentOwned: false,
-			}),
-		}
-		assert.False(t, settings.NotifiesType(models.NotificationTypeWorkOrderCommentOwned))
-		assert.True(t, settings.NotifiesType(models.NotificationTypeWorkOrderStatusOwned))
-	})
-}
-
-func Test__UserNotificationSettings__AppliesToFactory(t *testing.T) {
-	selected := uuid.New()
-	other := uuid.New()
-
-	t.Run("all scope covers every factory", func(t *testing.T) {
+	t.Run("all scope keeps a missing type on", func(t *testing.T) {
 		settings := models.UserNotificationSettings{WorkspaceScope: models.NotificationWorkspaceScopeAll}
-		assert.True(t, settings.AppliesToFactory(other))
+		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderCommentOwned))
 	})
 
-	t.Run("selected scope only covers listed factories", func(t *testing.T) {
+	t.Run("filtered scope requires the workspace and the type", func(t *testing.T) {
 		settings := models.UserNotificationSettings{
-			WorkspaceScope: models.NotificationWorkspaceScopeSelected,
-			FactoryIDs:     datatypes.NewJSONSlice([]string{selected.String()}),
+			WorkspaceScope: models.NotificationWorkspaceScopeFiltered,
+			WorkspaceFilters: datatypes.NewJSONType([]models.NotificationWorkspaceFilter{{
+				WorkspaceID: workspaceID.String(),
+				EventTypes:  []string{models.NotificationTypeWorkOrderAssigned},
+			}}),
 		}
-		assert.True(t, settings.AppliesToFactory(selected))
-		assert.False(t, settings.AppliesToFactory(other))
+		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAssigned))
+		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderCommentOwned))
+		assert.False(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderAssigned))
 	})
 }

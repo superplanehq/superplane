@@ -105,18 +105,9 @@ message RegenerateTokenResponse {
 }
 
 // NotificationSettings is a user's organization-wide configuration for
-// work order notification emails. Type toggles and the master `enabled`
-// switch default to on until the user saves different settings.
+// work order notification emails. A missing row defaults to all
+// workspace events. Nested `workspaces` leaves room for other levels later.
 message NotificationSettings {
-  enum WorkspaceScope {
-    WORKSPACE_SCOPE_UNSPECIFIED = 0;
-    WORKSPACE_SCOPE_ALL = 1;
-    WORKSPACE_SCOPE_SELECTED = 2;
-  }
-
-  // Type identifies a work order email category. A missing toggle
-  // defaults to on, so a newly added type stays enabled until the
-  // user turns it off.
   enum Type {
     TYPE_UNSPECIFIED = 0;
     TYPE_WORK_ORDER_ASSIGNED = 1;
@@ -127,16 +118,25 @@ message NotificationSettings {
     TYPE_WORK_ORDER_MENTIONED = 6;
   }
 
-  message TypeToggle {
-    Type type = 1;
-    bool enabled = 2;
+  enum WorkspaceScope {
+    WORKSPACE_SCOPE_UNSPECIFIED = 0;
+    WORKSPACE_SCOPE_ALL = 1;
+    WORKSPACE_SCOPE_FILTERED = 2;
+    WORKSPACE_SCOPE_NONE = 3;
   }
 
-  bool enabled = 1;
-  WorkspaceScope workspace_scope = 2;
-  // Factory (workspace) IDs covered when `workspace_scope` is SELECTED.
-  repeated string factory_ids = 3;
-  repeated TypeToggle types = 4;
+  message WorkspaceFilter {
+    string workspace_id = 1;
+    string workspace_key = 2;
+    repeated Type event_types = 3;
+  }
+
+  message Workspaces {
+    WorkspaceScope scope = 1;
+    repeated WorkspaceFilter filters = 2;
+  }
+
+  Workspaces workspaces = 1;
 }
 
 message DescribeNotificationSettingsRequest {}

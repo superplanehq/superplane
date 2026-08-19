@@ -12,9 +12,11 @@ import (
 
 func Test__workOrderEmailDisplayStatus(t *testing.T) {
 	open := &models.FactoryWorkOrder{State: models.FactoryWorkOrderStateOpen}
-	active := []models.FactoryWorkOrderExecutionRecord{{
-		FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{
-			Status: models.FactoryWorkOrderExecutionStatusRunning,
+	active := []workOrderEmailExecution{{
+		FactoryWorkOrderExecutionRecord: models.FactoryWorkOrderExecutionRecord{
+			FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{
+				Status: models.FactoryWorkOrderExecutionStatusRunning,
+			},
 		},
 	}}
 
@@ -50,22 +52,26 @@ func Test__applyWorkOrderEmailCard(t *testing.T) {
 			{User: &models.User{Name: "Bo Chen"}},
 		},
 	}
-	executions := []models.FactoryWorkOrderExecutionRecord{
+	executions := []workOrderEmailExecution{
 		{
-			FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{
-				LineID:    bugsLine,
-				StepName:  "CI Loop",
-				Status:    models.FactoryWorkOrderExecutionStatusFinished,
-				UpdatedAt: now.Add(-2 * time.Hour),
+			FactoryWorkOrderExecutionRecord: models.FactoryWorkOrderExecutionRecord{
+				FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{
+					LineID:    bugsLine,
+					StepName:  "CI Loop",
+					Status:    models.FactoryWorkOrderExecutionStatusFinished,
+					UpdatedAt: now.Add(-2 * time.Hour),
+				},
 			},
 			LineName: "Bugs",
 		},
 		{
-			FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{
-				LineID:    ciLine,
-				StepName:  "Verify",
-				Status:    models.FactoryWorkOrderExecutionStatusFinished,
-				UpdatedAt: now.Add(-9 * time.Hour),
+			FactoryWorkOrderExecutionRecord: models.FactoryWorkOrderExecutionRecord{
+				FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{
+					LineID:    ciLine,
+					StepName:  "Verify",
+					Status:    models.FactoryWorkOrderExecutionStatusFinished,
+					UpdatedAt: now.Add(-9 * time.Hour),
+				},
 			},
 			LineName: "Hotfix",
 		},

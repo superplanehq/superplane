@@ -213,6 +213,32 @@ func (c *FactoryContext) UpdateWorkOrderArtifact(params core.UpdateWorkOrderArti
 	return artifactToCore(artifact)
 }
 
+func (c *FactoryContext) ReportWorkOrderCheck(params core.ReportWorkOrderCheckParams) (*core.WorkOrderCheck, error) {
+	order, err := c.resolveWorkOrder(params.OrderID)
+	if err != nil {
+		return nil, err
+	}
+
+	check, err := order.ReportCheck(c.tx, models.FactoryWorkOrderCheckParams{
+		Key:        params.CheckKey,
+		Name:       params.Name,
+		Score:      params.Score,
+		MaxScore:   params.MaxScore,
+		Format:     params.Format,
+		Level:      params.Level,
+		Summary:    params.Summary,
+		Analysis:   params.Analysis,
+		Automation: c.automationRef(),
+		Run:        c.runRef(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderCheckReported)
+	return checkToCore(check), nil
+}
+
 // FindWorkOrder resolves a work order by id or by an artifact key,
 // independent of the current run's `factory_work_order_executions` row.
 // This is what lets a plain webhook-triggered run (e.g. github.onPullRequest)
@@ -383,19 +409,17 @@ func (c *FactoryContext) lineStep() (lineStepInfo, bool) {
 		return lineStepInfo{}, false
 	}
 
-	f, err := models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
-	if err != nil {
-		return lineStepInfo{}, false
-	}
-
-	line, err := f.FindLine(c.tx, execution.LineID)
+	// Attribute back to the line dispatch's snapshot, not the live line —
+	// this is a historical fact about the traversal, so a line rename after
+	// dispatch shouldn't change what earlier events say.
+	dispatch, err := models.FindWorkOrderLineDispatch(c.tx, execution.LineDispatchID)
 	if err != nil {
 		return lineStepInfo{}, false
 	}
 
 	c.lineStepCache = lineStepInfo{
-		LineID:    line.ID,
-		LineName:  line.Name,
+		LineID:    dispatch.LineID,
+		LineName:  dispatch.LineName,
 		StepIndex: execution.StepIndex,
 		StepName:  execution.StepName,
 	}
@@ -427,4 +451,18 @@ func artifactToCore(artifact *models.FactoryWorkOrderArtifact) (*core.WorkOrderA
 		Type:        artifact.Type,
 		Data:        data,
 	}, nil
+}
+
+func checkToCore(check *models.FactoryWorkOrderCheck) *core.WorkOrderCheck {
+	return &core.WorkOrderCheck{
+		ID:            check.ID.String(),
+		WorkOrderID:   check.WorkOrderID.String(),
+		Key:           check.Key,
+		Name:          check.Name,
+		Score:         check.Score,
+		MaxScore:      check.MaxScore,
+		Format:        check.Format,
+		Level:         check.Level,
+		PreviousScore: check.PreviousScore,
+	}
 }
