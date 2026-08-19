@@ -44,7 +44,12 @@ export function WorkOrderMentionMenu({
                 onSelect(candidate);
               }}
             >
-              <Avatar initials={getUserInitials(candidate.name)} alt={candidate.name} className="size-6" />
+              <Avatar
+                src={candidate.avatarUrl}
+                initials={getUserInitials(candidate.name)}
+                alt={candidate.name}
+                className="size-6"
+              />
               <span className="min-w-0">
                 <span className="block truncate text-[13px] font-medium text-foreground">{candidate.name}</span>
                 {candidate.email ? (

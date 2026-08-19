@@ -5,7 +5,9 @@ import type { SuperplaneUsersUser } from "@/api-client";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useWorkOrderMentionComposer } from "@/hooks/useWorkOrderMentionComposer";
 import { cn } from "@/lib/utils";
+import { WorkOrderMentionText } from "@/pages/app/markdownMentions";
 import { ArrowUp, Loader2 } from "lucide-react";
+import { useRef } from "react";
 import { WorkOrderMentionMenu } from "./WorkOrderMentionMenu";
 
 interface WorkOrderCommentComposerProps {
@@ -151,12 +153,67 @@ function WorkOrderCommentComposerInput({
       <label htmlFor="work-order-comment" className="sr-only">
         Add a comment
       </label>
+      <WorkOrderCommentComposerField
+        composer={composer}
+        canComment={canComment}
+        isSubmitting={isSubmitting}
+        canSubmit={canSubmit}
+        onSubmit={onSubmit}
+      />
+    </>
+  );
+}
+
+const COMPOSER_FIELD_TEXT_CLASS = "wrap-anywhere whitespace-pre-wrap px-3 pt-2.5 pb-8 text-[13px] leading-5";
+
+function WorkOrderCommentComposerField({
+  composer,
+  canComment,
+  isSubmitting,
+  canSubmit,
+  onSubmit,
+}: {
+  composer: ReturnType<typeof useWorkOrderMentionComposer>;
+  canComment: boolean;
+  isSubmitting: boolean;
+  canSubmit: boolean;
+  onSubmit: () => void;
+}) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  return (
+    <div className="relative">
+      <div
+        ref={overlayRef}
+        aria-hidden
+        data-testid="work-order-comment-mention-overlay"
+        className={cn(
+          "pointer-events-none absolute inset-0 z-[2] overflow-hidden text-foreground",
+          COMPOSER_FIELD_TEXT_CLASS,
+        )}
+      >
+        <WorkOrderMentionText
+          text={composer.body}
+          people={composer.mentionPeople}
+          mentionClassName="work-order-mention-in-composer"
+          capturePointer
+        />
+        {composer.body.endsWith("\n") ? "\n" : null}
+      </div>
       <Textarea
         ref={composer.textareaRef}
         id="work-order-comment"
         value={composer.body}
         onChange={(event) => composer.handleChange(event.target.value, event.target.selectionStart)}
         onSelect={(event) => composer.handleChange(event.currentTarget.value, event.currentTarget.selectionStart)}
+        onScroll={(event) => {
+          const overlay = overlayRef.current;
+          if (!overlay) {
+            return;
+          }
+          overlay.scrollTop = event.currentTarget.scrollTop;
+          overlay.scrollLeft = event.currentTarget.scrollLeft;
+        }}
         onKeyDown={(event) => {
           if (composer.handleMentionKeyDown(event)) {
             return;
@@ -169,8 +226,11 @@ function WorkOrderCommentComposerInput({
         rows={2}
         placeholder="Add a comment…"
         disabled={!canComment || isSubmitting}
-        className="min-h-[66px] resize-none border-0 bg-transparent px-3 pt-2.5 pb-8 text-[13px] leading-5 shadow-none focus-visible:ring-0"
+        className={cn(
+          COMPOSER_FIELD_TEXT_CLASS,
+          "relative z-[1] min-h-[66px] resize-none border-0 bg-transparent text-transparent caret-foreground shadow-none focus-visible:ring-0 dark:text-transparent",
+        )}
       />
-    </>
+    </div>
   );
 }

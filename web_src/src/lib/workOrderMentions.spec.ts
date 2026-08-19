@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   filterMentionCandidates,
   insertMentionAtCursor,
+  mentionCandidateByName,
   mentionQueryAtCursor,
   retainMentions,
+  splitMentionSegments,
 } from "./workOrderMentions";
 
 const alice = { id: "alice", name: "Alice Anderson", email: "alice@example.com" };
@@ -69,5 +71,31 @@ describe("retainMentions", () => {
     const aliceB = { id: "alice-b", name: "Alice Anderson" };
     expect(retainMentions([aliceA, aliceB], "Thanks @Alice Anderson")).toEqual([aliceA]);
     expect(retainMentions([aliceA, aliceB], "Thanks @Alice Anderson and @Alice Anderson")).toEqual([aliceA, aliceB]);
+  });
+});
+
+describe("splitMentionSegments", () => {
+  it("wraps a complete @Name including spaces", () => {
+    expect(splitMentionSegments("@test test dasdasd", ["test test"])).toEqual([
+      { text: "@test test", mention: true },
+      { text: " dasdasd", mention: false },
+    ]);
+  });
+
+  it("keeps the longer name when a shorter name is a prefix", () => {
+    expect(splitMentionSegments("Thanks @Alice Anderson", ["Alice", "Alice Anderson"])).toEqual([
+      { text: "Thanks ", mention: false },
+      { text: "@Alice Anderson", mention: true },
+    ]);
+  });
+
+  it("does not highlight an incomplete query", () => {
+    expect(splitMentionSegments("Hey @Ali", ["Alice Anderson"])).toEqual([{ text: "Hey @Ali", mention: false }]);
+  });
+});
+
+describe("mentionCandidateByName", () => {
+  it("finds the member whose name matches the @token", () => {
+    expect(mentionCandidateByName([alice, bob], "@Alice Anderson")).toEqual(alice);
   });
 });

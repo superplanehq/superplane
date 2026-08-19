@@ -1,8 +1,8 @@
 import type { SuperplaneUsersUser } from "@/api-client";
-import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
 import {
   filterMentionCandidates,
   insertMentionAtCursor,
+  mentionCandidatesFromOrgUsers,
   mentionQueryAtCursor,
   retainMentions,
   type WorkOrderMentionCandidate,
@@ -12,6 +12,7 @@ import { useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "r
 interface UseWorkOrderMentionComposerResult {
   body: string;
   mentionedUserIds: string[];
+  mentionPeople: WorkOrderMentionCandidate[];
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   suggestions: WorkOrderMentionCandidate[];
   highlightIndex: number;
@@ -30,7 +31,7 @@ export function useWorkOrderMentionComposer(users: SuperplaneUsersUser[]): UseWo
   const [highlightIndex, setHighlightIndex] = useState(0);
   const [dismissed, setDismissed] = useState(false);
 
-  const candidates = useMemo(() => organizationMentionCandidates(users), [users]);
+  const candidates = useMemo(() => mentionCandidatesFromOrgUsers(users), [users]);
   const query = mentionQueryAtCursor(body, cursor);
   const suggestions = query && !dismissed ? filterMentionCandidates(candidates, query.query) : [];
 
@@ -74,6 +75,7 @@ export function useWorkOrderMentionComposer(users: SuperplaneUsersUser[]): UseWo
   return {
     body,
     mentionedUserIds: mentions.map((mention) => mention.id),
+    mentionPeople: candidates,
     textareaRef,
     suggestions,
     highlightIndex,
@@ -123,14 +125,4 @@ function applyMentionMenuKeyDown(
     return true;
   }
   return false;
-}
-
-function organizationMentionCandidates(users: SuperplaneUsersUser[]): WorkOrderMentionCandidate[] {
-  return users.flatMap((user) => {
-    const display = getOrgUserDisplayFromUser(user);
-    if (!display) {
-      return [];
-    }
-    return [{ id: display.id, name: display.name, email: user.metadata?.email?.trim() || undefined }];
-  });
 }

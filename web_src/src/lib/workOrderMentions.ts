@@ -1,12 +1,22 @@
+import type { SuperplaneUsersUser } from "@/api-client";
+
+import { getOrgUserDisplayFromUser } from "./orgUserDisplay";
+
 export interface WorkOrderMentionCandidate {
   id: string;
   name: string;
   email?: string;
+  avatarUrl?: string;
 }
 
 export interface WorkOrderMentionQuery {
   start: number;
   query: string;
+}
+
+export interface WorkOrderMentionSegment {
+  text: string;
+  mention: boolean;
 }
 
 const MAX_MENTION_SUGGESTIONS = 8;
@@ -69,6 +79,117 @@ export function retainMentions(mentions: WorkOrderMentionCandidate[], body: stri
     kept.push(mention);
   }
   return kept;
+}
+
+export function uniqueMentionNames(names: string[]): string[] {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const name of names) {
+    const trimmed = name.trim();
+    if (!trimmed || seen.has(trimmed)) {
+      continue;
+    }
+    seen.add(trimmed);
+    unique.push(trimmed);
+  }
+  return unique;
+}
+
+export function mentionCandidatesFromOrgUsers(users: SuperplaneUsersUser[]): WorkOrderMentionCandidate[] {
+  return users.flatMap((user) => {
+    const display = getOrgUserDisplayFromUser(user);
+    if (!display) {
+      return [];
+    }
+    return [
+      {
+        id: display.id,
+        name: display.name,
+        email: user.metadata?.email?.trim() || undefined,
+        avatarUrl: display.avatarUrl,
+      },
+    ];
+  });
+}
+
+export function mentionCandidateByName(
+  people: WorkOrderMentionCandidate[],
+  token: string,
+): WorkOrderMentionCandidate | undefined {
+  const name = token.startsWith("@") ? token.slice(1) : token;
+  return people.find((person) => person.name === name);
+}
+
+export function splitMentionSegments(body: string, names: string[]): WorkOrderMentionSegment[] {
+  const mentionNames = uniqueMentionNames(names);
+  if (!body) {
+    return [];
+  }
+  if (mentionNames.length === 0) {
+    return [{ text: body, mention: false }];
+  }
+
+  const tracked = mentionNames.map((name) => ({ id: name, name }));
+  const segments: WorkOrderMentionSegment[] = [];
+  let cursor = 0;
+
+  while (cursor < body.length) {
+    const mention = nextCompleteMention(body, cursor, mentionNames, tracked);
+    if (!mention) {
+      segments.push({ text: body.slice(cursor), mention: false });
+      break;
+    }
+    if (mention.start > cursor) {
+      segments.push({ text: body.slice(cursor, mention.start), mention: false });
+    }
+    segments.push({ text: body.slice(mention.start, mention.end), mention: true });
+    cursor = mention.end;
+  }
+
+  return segments;
+}
+
+function nextCompleteMention(
+  body: string,
+  from: number,
+  names: string[],
+  tracked: WorkOrderMentionCandidate[],
+): { start: number; end: number } | null {
+  let searchFrom = from;
+  while (searchFrom < body.length) {
+    const at = body.indexOf("@", searchFrom);
+    if (at < 0) {
+      return null;
+    }
+    const mention = completeMentionAt(body, at, names, tracked);
+    if (mention) {
+      return mention;
+    }
+    searchFrom = at + 1;
+  }
+  return null;
+}
+
+function completeMentionAt(
+  body: string,
+  start: number,
+  names: string[],
+  tracked: WorkOrderMentionCandidate[],
+): { start: number; end: number } | null {
+  let best: { start: number; end: number } | null = null;
+  for (const name of names) {
+    const token = `@${name}`;
+    if (!body.startsWith(token, start)) {
+      continue;
+    }
+    if (!isCompleteMentionToken(body, start, token.length, name, tracked)) {
+      continue;
+    }
+    if (!best || token.length > best.end - best.start) {
+      best = { start, end: start + token.length };
+    }
+  }
+  return best;
 }
 
 function mentionTokenCounts(body: string, tracked: WorkOrderMentionCandidate[]): Map<string, number> {

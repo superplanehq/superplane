@@ -52,9 +52,24 @@ describe("WorkOrderCommentComposer", () => {
     const textarea = screen.getByLabelText("Add a comment");
     await user.type(textarea, "Hello @Ali");
     await user.keyboard("{Enter}");
+    expect(screen.getByTestId("work-order-mention")).toHaveTextContent("@Alice Anderson");
     await user.click(screen.getByTestId("work-order-comment-submit"));
 
     expect(onSubmit).toHaveBeenCalledWith("Hello @Alice Anderson", ["alice"]);
+  });
+
+  it("shows the mentioned member in a hover card", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+
+    const textarea = screen.getByLabelText("Add a comment");
+    await user.type(textarea, "@Ali");
+    await user.keyboard("{Enter}");
+    await user.hover(screen.getByTestId("work-order-mention"));
+
+    const card = await screen.findByTestId("work-order-mention-tooltip");
+    expect(card).toHaveTextContent("Alice Anderson");
+    expect(card).toHaveTextContent("alice@example.com");
   });
 
   it("submits with the send shortcut while the mention menu is open", async () => {
