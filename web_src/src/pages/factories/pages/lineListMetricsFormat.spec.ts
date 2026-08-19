@@ -40,15 +40,34 @@ describe("lineListMetricsFormat", () => {
     expect(formatCostDelta(sample)).toBe("−$0.40");
   });
 
-  it("uses an em dash when the line has no closed work orders", () => {
-    expect(formatSuccessRate(null)).toBe(LINE_LIST_METRICS_EMPTY);
+  it("shows zero success rate and completions when the line has no closed work orders", () => {
+    expect(formatSuccessRate(null)).toBe("0%");
+    expect(formatThroughput(null)).toBe("0 per day");
+    expect(formatSuccessDelta(null)).toBe("");
     expect(formatDuration(null)).toBe(LINE_LIST_METRICS_EMPTY);
     expect(formatCostPerSuccess(null)).toBe(LINE_LIST_METRICS_EMPTY);
-    expect(formatThroughput(null)).toBe(LINE_LIST_METRICS_EMPTY);
-    expect(formatSuccessDelta(null)).toBe(LINE_LIST_METRICS_EMPTY);
+    expect(formatDurationDelta(null)).toBe("");
+    expect(formatCostDelta(null)).toBe("");
   });
 
   it("formats 60 minutes or more as hours", () => {
     expect(formatDuration({ ...sample, durationMinutes: 90 })).toBe("1.5h");
+  });
+
+  it("dashes duration and cost when those fields are omitted", () => {
+    const withoutOptional: LineListMetrics = {
+      successRatePct: 0,
+      mergedCount: 0,
+      totalClosedCount: 2,
+      successTrendPct: [0, 0],
+      throughputPerDay: 0,
+      throughputTrend: [0, 0],
+    };
+    expect(formatDuration(withoutOptional)).toBe(LINE_LIST_METRICS_EMPTY);
+    expect(formatCostPerSuccess(withoutOptional)).toBe(LINE_LIST_METRICS_EMPTY);
+    expect(formatSuccessDelta(withoutOptional)).toBe("");
+    expect(formatDurationDelta(withoutOptional)).toBe("");
+    expect(formatCostDelta(withoutOptional)).toBe("");
+    expect(formatSuccessRate(withoutOptional)).toBe("0%");
   });
 });
