@@ -405,3 +405,45 @@ func Test__CreateResponse__Execute__codeInterpreter(t *testing.T) {
 		}
 	})
 }
+
+type recordingUsage struct {
+	records []core.UsageRecord
+}
+
+func (r *recordingUsage) Record(record core.UsageRecord) error {
+	r.records = append(r.records, record)
+	return nil
+}
+
+func Test__RecordOpenAIUsage__IncludesCachedAndReasoningTokens(t *testing.T) {
+	recorder := &recordingUsage{}
+	ctx := core.ExecutionContext{Usage: recorder}
+
+	recordOpenAIUsage(ctx, &OpenAIResponse{
+		Model: "gpt-5",
+		Usage: &ResponseUsage{
+			InputTokens:         150,
+			OutputTokens:        40,
+			TotalTokens:         190,
+			InputTokensDetails:  &ResponseUsageTokenDetails{CachedTokens: 50},
+			OutputTokensDetails: &ResponseUsageTokenDetails{ReasoningTokens: 10},
+		},
+	})
+
+	if len(recorder.records) != 1 {
+		t.Fatalf("expected 1 usage record, got %d", len(recorder.records))
+	}
+	got := recorder.records[0]
+	if got.InputTokens != 100 {
+		t.Errorf("expected uncached input 100, got %d", got.InputTokens)
+	}
+	if got.CacheReadTokens != 50 {
+		t.Errorf("expected cache read 50, got %d", got.CacheReadTokens)
+	}
+	if got.ReasoningTokens != 10 {
+		t.Errorf("expected reasoning 10, got %d", got.ReasoningTokens)
+	}
+	if got.OutputTokens != 40 || got.TotalTokens != 190 {
+		t.Errorf("unexpected output/total: %+v", got)
+	}
+}

@@ -76,7 +76,7 @@ type LLMUsageEventInput struct {
 }
 
 // RecordUsage inserts one factory-linked usage row. Non-factory runs are skipped.
-// A repeated node execution is ignored (idempotent).
+// Each billed call gets its own row, including retries of the same node execution.
 func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 	if in.Provider == "" || in.Model == "" || in.NodeExecutionID == uuid.Nil || in.CanvasRunID == uuid.Nil {
 		return fmt.Errorf("llm usage event requires provider, model, node execution, and canvas run")
@@ -137,7 +137,7 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 		CostMicros:           costMicros,
 		Currency:             "usd",
 		PriceBookVersion:     version,
-		IdempotencyKey:       "node_execution:" + in.NodeExecutionID.String(),
+		IdempotencyKey:       "call:" + uuid.New().String(),
 		OccurredAt:           now,
 		CreatedAt:            now,
 	}

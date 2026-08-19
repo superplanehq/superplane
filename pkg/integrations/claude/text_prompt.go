@@ -347,19 +347,32 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
-	ctx.RecordUsageBestEffort(core.UsageRecord{
-		Provider:     "anthropic",
-		Model:        response.Model,
-		InputTokens:  int64(response.Usage.InputTokens),
-		OutputTokens: int64(response.Usage.OutputTokens),
-		TotalTokens:  int64(response.Usage.InputTokens + response.Usage.OutputTokens),
-	})
+	recordClaudeUsage(ctx, response)
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		MessagePayloadType,
 		[]any{payload},
 	)
+}
+
+func recordClaudeUsage(ctx core.ExecutionContext, response *CreateMessageResponse) {
+	if response == nil {
+		return
+	}
+	cacheWrite := int64(response.Usage.cacheWriteTokens())
+	cacheRead := int64(response.Usage.CacheReadInputTokens)
+	input := int64(response.Usage.InputTokens)
+	output := int64(response.Usage.OutputTokens)
+	ctx.RecordUsageBestEffort(core.UsageRecord{
+		Provider:         "anthropic",
+		Model:            response.Model,
+		InputTokens:      input,
+		OutputTokens:     output,
+		CacheWriteTokens: cacheWrite,
+		CacheReadTokens:  cacheRead,
+		TotalTokens:      input + output + cacheWrite + cacheRead,
+	})
 }
 
 func (c *TextPrompt) Cancel(ctx core.ExecutionContext) error {

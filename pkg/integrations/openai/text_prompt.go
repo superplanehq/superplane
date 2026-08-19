@@ -547,12 +547,30 @@ func recordOpenAIUsage(ctx core.ExecutionContext, response *OpenAIResponse) {
 	if response == nil || response.Usage == nil {
 		return
 	}
+	cached := int64(0)
+	reasoning := int64(0)
+	if response.Usage.InputTokensDetails != nil {
+		cached = int64(response.Usage.InputTokensDetails.CachedTokens)
+	}
+	if response.Usage.OutputTokensDetails != nil {
+		reasoning = int64(response.Usage.OutputTokensDetails.ReasoningTokens)
+	}
+	input := int64(response.Usage.InputTokens)
+	if cached > 0 && cached <= input {
+		input -= cached
+	}
+	total := int64(response.Usage.TotalTokens)
+	if total == 0 {
+		total = input + int64(response.Usage.OutputTokens) + cached + reasoning
+	}
 	ctx.RecordUsageBestEffort(core.UsageRecord{
-		Provider:     "openai",
-		Model:        response.Model,
-		InputTokens:  int64(response.Usage.InputTokens),
-		OutputTokens: int64(response.Usage.OutputTokens),
-		TotalTokens:  int64(response.Usage.TotalTokens),
+		Provider:        "openai",
+		Model:           response.Model,
+		InputTokens:     input,
+		OutputTokens:    int64(response.Usage.OutputTokens),
+		CacheReadTokens: cached,
+		ReasoningTokens: reasoning,
+		TotalTokens:     total,
 	})
 }
 

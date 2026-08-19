@@ -1018,8 +1018,8 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__RollsUpUsageWhenAlreadyFini
 	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
 	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
-		{Name: "step-one", Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
-		{Name: "step-two", Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
 	}))
 
 	var firstResult *models.FactoryLineStepResult
@@ -1087,8 +1087,8 @@ func Test__RunFinalizer__FinalizeRun__RollsUpUsageWhenAlreadyFinished(t *testing
 	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
 	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
-		{Name: "step-one", Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
-		{Name: "step-two", Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
 	}))
 
 	var firstResult *models.FactoryLineStepResult

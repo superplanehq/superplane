@@ -33,19 +33,6 @@ func Test__RecordUsage__FactoryLinkedRunPersistsAndRollsUp(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = models.RecordUsage(db, models.LLMUsageEventInput{
-		OrganizationID:  r.Organization.ID,
-		CanvasRunID:     execution.RunID,
-		NodeExecutionID: nodeExecutionID,
-		NodeID:          "prompt",
-		Provider:        models.UsageProviderAnthropic,
-		Model:           "claude-sonnet-4-6",
-		InputTokens:     1_000_000,
-		OutputTokens:    0,
-		TotalTokens:     1_000_000,
-	})
-	require.NoError(t, err)
-
 	require.NoError(t, execution.RollupUsage(db))
 	assert.Equal(t, int64(1_000_000), execution.TotalTokens)
 	assert.Equal(t, int64(300), execution.CostCents)
@@ -60,6 +47,30 @@ func Test__RecordUsage__FactoryLinkedRunPersistsAndRollsUp(t *testing.T) {
 	require.Len(t, byModel, 1)
 	assert.Equal(t, "anthropic", byModel[0].Provider)
 	assert.Equal(t, "claude-sonnet-4-6", byModel[0].Model)
+}
+
+func Test__RecordUsage__SameNodeExecutionRecordsEachBilledCall(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	execution := dispatchWorkOrderExecution(t, r)
+	nodeExecutionID := uuid.New()
+
+	first := models.LLMUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     execution.RunID,
+		NodeExecutionID: nodeExecutionID,
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000_000,
+		TotalTokens:     1_000_000,
+	}
+	require.NoError(t, models.RecordUsage(db, first))
+	require.NoError(t, models.RecordUsage(db, first))
+
+	require.NoError(t, execution.RollupUsage(db))
+	assert.Equal(t, int64(2_000_000), execution.TotalTokens)
+	assert.Equal(t, int64(600), execution.CostCents)
 }
 
 func Test__RecordUsage__ChildRunUsesParentFactoryExecution(t *testing.T) {
@@ -144,7 +155,7 @@ func dispatchWorkOrderExecution(t *testing.T, r *support.ResourceRegistry) *mode
 
 	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "build", "start")
 	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
-		{Name: "build", Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
 	}))
 
 	var execution *models.FactoryWorkOrderExecution

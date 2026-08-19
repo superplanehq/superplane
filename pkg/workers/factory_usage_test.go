@@ -113,7 +113,7 @@ func dispatchFactoryExecutionForUsageTest(t *testing.T, r *support.ResourceRegis
 
 	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "build", "start")
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
-		{Name: "build", Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
 	}))
 
 	var execution *models.FactoryWorkOrderExecution
