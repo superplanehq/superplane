@@ -6,6 +6,28 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// A required condition that includes "" also matches configs that omit
+// the controlling field and rely on its default, mirroring the frontend
+// evaluator's treatment of missing values.
+func Test__ValidateConfiguration__RequiredConditionMatchesOmittedField(t *testing.T) {
+	fields := []Field{
+		{Name: "format", Type: FieldTypeString},
+		{
+			Name: "score",
+			Type: FieldTypeString,
+			RequiredConditions: []RequiredCondition{
+				{Field: "format", Values: []string{"", "fraction"}},
+			},
+		},
+	}
+
+	err := ValidateConfiguration(fields, map[string]any{})
+	assert.EqualError(t, err, "field 'score' is required")
+
+	err = ValidateConfiguration(fields, map[string]any{"format": "boolean"})
+	assert.NoError(t, err)
+}
+
 func Test__ValidateConfiguration__RequiredConditions(t *testing.T) {
 	fields := []Field{
 		{
