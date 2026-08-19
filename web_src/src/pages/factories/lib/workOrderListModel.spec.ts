@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import type {
+  FactoriesFactory,
+  FactoriesLineRef,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderExecution,
+  FactoriesWorkOrderLineDispatch,
+} from "@/api-client";
 
 import {
   EMPTY_WORK_ORDER_FILTERS,
@@ -13,10 +19,22 @@ import {
   buildWorkOrderListEntry,
   groupWorkOrderEntriesByLane,
 } from "./workOrderListModel";
+import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 
 const factory: FactoriesFactory = { id: "f", name: "Refunds", key: "RF" };
 
-function order(overrides: Partial<FactoriesWorkOrder> = {}): FactoriesWorkOrder {
+/** Fixture-only shape: a step execution plus which line it ran on, before
+ * it's grouped into a dispatch by `order()` below. */
+type TestExecution = FactoriesWorkOrderExecution & { line?: FactoriesLineRef };
+
+interface OrderOverrides extends Omit<Partial<FactoriesWorkOrder>, "lineDispatches"> {
+  /** Convenience: a flat execution list, grouped into one dispatch per
+   * distinct line so most test cases don't need to hand-build dispatches. */
+  executions?: TestExecution[];
+}
+
+function order(overrides: OrderOverrides = {}): FactoriesWorkOrder {
+  const { executions, ...rest } = overrides;
   return {
     id: overrides.id ?? "wo-1",
     title: "Order title",
@@ -24,9 +42,28 @@ function order(overrides: Partial<FactoriesWorkOrder> = {}): FactoriesWorkOrder 
     result: "RESULT_UNSPECIFIED",
     createdAt: "2024-06-01T00:00:00Z",
     updatedAt: "2024-06-02T00:00:00Z",
-    executions: [],
-    ...overrides,
+    lineDispatches: executions ? dispatchesFromExecutions(executions) : [],
+    ...rest,
   };
+}
+
+function dispatchesFromExecutions(executions: TestExecution[]): FactoriesWorkOrderLineDispatch[] {
+  const byLineId = new Map<string, FactoriesWorkOrderLineDispatch>();
+  for (const { line, ...execution } of executions) {
+    const lineId = line?.id ?? "unknown";
+    const dispatch = byLineId.get(lineId);
+    if (dispatch) {
+      dispatch.stepExecutions = [...(dispatch.stepExecutions ?? []), execution];
+      continue;
+    }
+    byLineId.set(lineId, {
+      id: `dispatch-${lineId}`,
+      line,
+      state: isActiveWorkOrderExecution(execution) ? "STATE_ACTIVE" : "STATE_FINISHED",
+      stepExecutions: [execution],
+    });
+  }
+  return [...byLineId.values()];
 }
 
 describe("buildWorkOrderListEntry", () => {
