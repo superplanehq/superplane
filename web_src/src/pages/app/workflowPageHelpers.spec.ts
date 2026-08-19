@@ -6,6 +6,7 @@ import {
   prepareCanvasLogNodes,
   shouldClearRunDetailNode,
   shouldClearStaleRunUrl,
+  shouldRequestInitialRunFit,
   withDerivedNodeWarnings,
 } from "./workflowPageHelpers";
 import { makeComponentsNode, makeEdge } from "@/test/factories";
@@ -137,6 +138,58 @@ describe("workflowPageHelpers run inspection", () => {
 
     expect(unchanged.get("sidebar")).toBe("1");
     expect(unchanged.get("node")).toBe("node-b");
+  });
+});
+
+describe("shouldRequestInitialRunFit", () => {
+  it("requests a fit when entering run inspection with a run and no pending node focus", () => {
+    expect(
+      shouldRequestInitialRunFit({
+        isRunInspectionMode: true,
+        selectedRunId: validRunId,
+        searchParams: new URLSearchParams({ run: validRunId }),
+      }),
+    ).toBe(true);
+  });
+
+  it("does not request a fit outside of run inspection mode", () => {
+    expect(
+      shouldRequestInitialRunFit({
+        isRunInspectionMode: false,
+        selectedRunId: validRunId,
+        searchParams: new URLSearchParams({ run: validRunId }),
+      }),
+    ).toBe(false);
+  });
+
+  it("does not request a fit without a selected run", () => {
+    expect(
+      shouldRequestInitialRunFit({
+        isRunInspectionMode: true,
+        selectedRunId: null,
+        searchParams: new URLSearchParams(),
+      }),
+    ).toBe(false);
+  });
+
+  it("does not request a fit when a node is already pending focus via the sidebar", () => {
+    expect(
+      shouldRequestInitialRunFit({
+        isRunInspectionMode: true,
+        selectedRunId: validRunId,
+        searchParams: new URLSearchParams({ run: validRunId, sidebar: "1", node: "node-a" }),
+      }),
+    ).toBe(false);
+  });
+
+  it("still requests a fit when sidebar param is set without a node", () => {
+    expect(
+      shouldRequestInitialRunFit({
+        isRunInspectionMode: true,
+        selectedRunId: validRunId,
+        searchParams: new URLSearchParams({ run: validRunId, sidebar: "1" }),
+      }),
+    ).toBe(true);
   });
 });
 
