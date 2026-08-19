@@ -1,10 +1,7 @@
 import type { ReactNode } from "react";
 
-import {
-  formatDurationHours,
-  type FactoryVelocityFlow,
-  type FactoryVelocityFlowPeriodDays,
-} from "../lib/factoryVelocityFlow";
+import type { FactoryVelocityFlow, FactoryVelocityFlowPeriodDays } from "../lib/factoryVelocityFlow";
+import { useVelocityDurationFormat } from "../lib/velocityDurationFormatSlot";
 import {
   CostSparkline,
   DailyOutputChart,
@@ -234,7 +231,7 @@ interface WorkOrderFlowCardProps {
   config: VelocityWorkOrderFlowConfig;
 }
 
-function WorkOrderFlowCard({ periodLabel, periodDays, config }: WorkOrderFlowCardProps) {
+export function WorkOrderFlowCard({ periodLabel, periodDays, config }: WorkOrderFlowCardProps) {
   const flow = config.flow;
   const emptyLabel = config.emptyLabel ?? "No work orders closed in this period.";
 
@@ -264,22 +261,24 @@ function WorkOrderFlowCard({ periodLabel, periodDays, config }: WorkOrderFlowCar
 }
 
 function WorkOrderFlowBody({ flow, periodDays }: { flow: FactoryVelocityFlow; periodDays: VelocityPeriodDays }) {
+  const durationFormat = useVelocityDurationFormat();
+
   return (
     <>
       <div className="mt-5">
         <div className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-3">
           <MetricCell
-            value={formatDurationHours(flow.medianCycleHours)}
+            value={durationFormat.formatDuration(flow.medianCycleHours)}
             label="Cycle time"
             hint="From start to close"
           />
           <MetricCell
-            value={formatDurationHours(flow.medianRunningHours)}
+            value={durationFormat.formatDuration(flow.medianRunningHours)}
             label="Time running"
             hint={`${flow.runningShareOfCyclePct}% of cycle time`}
           />
           <MetricCell
-            value={formatDurationHours(flow.medianWaitingHours)}
+            value={durationFormat.formatDuration(flow.medianWaitingHours)}
             label="Time in Waiting"
             hint={`${flow.waitingShareOfCyclePct}% of cycle time`}
           />

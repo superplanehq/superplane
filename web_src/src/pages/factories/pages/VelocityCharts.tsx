@@ -9,11 +9,8 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 
-import {
-  formatDurationHours,
-  type FactoryVelocityFlow,
-  type FactoryVelocityFlowPeriodDays,
-} from "../lib/factoryVelocityFlow";
+import type { FactoryVelocityFlow, FactoryVelocityFlowPeriodDays } from "../lib/factoryVelocityFlow";
+import { useVelocityDurationFormat } from "../lib/velocityDurationFormatSlot";
 
 export type VelocityChartsPeriodDays = FactoryVelocityFlowPeriodDays;
 
@@ -36,22 +33,24 @@ const timeTrendChartConfig = {
   waitingHours: { label: "Time in Waiting", color: "#f59e0b" },
 } satisfies ChartConfig;
 
-function formatTimeTrendTooltip(value: unknown, name: unknown) {
-  const hours = Array.isArray(value) ? Number(value[0]) : Number(value);
-  const seriesKey = String(name);
-  const label =
-    seriesKey in timeTrendChartConfig
-      ? timeTrendChartConfig[seriesKey as keyof typeof timeTrendChartConfig].label
-      : seriesKey;
+function createTimeTrendTooltipFormatter(formatDuration: (hours: number) => string) {
+  return (value: unknown, name: unknown) => {
+    const hours = Array.isArray(value) ? Number(value[0]) : Number(value);
+    const seriesKey = String(name);
+    const label =
+      seriesKey in timeTrendChartConfig
+        ? timeTrendChartConfig[seriesKey as keyof typeof timeTrendChartConfig].label
+        : seriesKey;
 
-  return (
-    <div className="flex w-full items-center justify-between gap-8">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-mono font-medium text-foreground tabular-nums">
-        {Number.isFinite(hours) ? formatDurationHours(hours) : String(value)}
-      </span>
-    </div>
-  );
+    return (
+      <div className="flex w-full items-center justify-between gap-8">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-mono font-medium text-foreground tabular-nums">
+          {Number.isFinite(hours) ? formatDuration(hours) : String(value)}
+        </span>
+      </div>
+    );
+  };
 }
 
 export interface DailyOutputPoint {
@@ -186,6 +185,9 @@ export function TimeTrendChart({
   days: VelocityChartsPeriodDays;
 }) {
   const height = days === 7 ? 240 : 220;
+  const durationFormat = useVelocityDurationFormat();
+  const chartUnit = durationFormat.pickChartUnit(trend.map((point) => point.runningHours + point.waitingHours));
+  const tooltipFormatter = createTimeTrendTooltipFormatter(durationFormat.formatDuration);
 
   return (
     <ChartContainer
@@ -200,12 +202,12 @@ export function TimeTrendChart({
         <YAxis
           tickLine={false}
           axisLine={false}
-          width={36}
+          width={40}
           tickMargin={4}
           className="text-[11px]"
-          tickFormatter={(value: number) => `${Number(value).toFixed(0)}h`}
+          tickFormatter={(value: number) => chartUnit.formatTick(Number(value))}
         />
-        <ChartTooltip content={<ChartTooltipContent formatter={formatTimeTrendTooltip} />} />
+        <ChartTooltip content={<ChartTooltipContent formatter={tooltipFormatter} />} />
         <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" />
         <Area
           type="monotone"

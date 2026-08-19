@@ -15,6 +15,8 @@ import { MissionAssignmentProvider } from "../pages/missions/MissionAssignmentCo
 import { MissionsWorkOrdersPage } from "../pages/missions/MissionsWorkOrdersPage";
 import { WorkOrderMissionOverviewRow } from "../pages/missions/WorkOrderMissionOverviewRow";
 import { WorkOrderOverviewMissionSlotContext } from "../sidebar/workOrderOverviewSlots";
+import { subHourVelocityDurationFormat } from "../lib/velocityDurationFormat";
+import { VelocityDurationFormatSlotContext } from "../lib/velocityDurationFormatSlot";
 
 interface FactoriesHarnessProps {
   /** Path under the org. Defaults to `workspaces` (list page). */
@@ -91,7 +93,9 @@ export function FactoriesHarness({
   const withMissions = (
     <MissionAssignmentProvider>
       <WorkOrderOverviewMissionSlotContext.Provider value={WorkOrderMissionOverviewRow}>
-        {harness}
+        <VelocityDurationFormatSlotContext.Provider value={subHourVelocityDurationFormat}>
+          {harness}
+        </VelocityDurationFormatSlotContext.Provider>
       </WorkOrderOverviewMissionSlotContext.Provider>
     </MissionAssignmentProvider>
   );

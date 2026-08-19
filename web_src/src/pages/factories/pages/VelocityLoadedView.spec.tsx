@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { subHourVelocityDurationFormat } from "../lib/velocityDurationFormat";
+import { VelocityDurationFormatSlotContext } from "../lib/velocityDurationFormatSlot";
 import { FACTORY_VELOCITY_BY_PERIOD, FACTORY_VELOCITY_YESTERDAY } from "./factoryVelocityMockData";
 import { FACTORY_VELOCITY_FLOW_BY_PERIOD } from "./factoryVelocityFlowMockData";
 import { VelocityLoadedView, type VelocityData, type VelocitySourceSplitConfig } from "./VelocityLoadedView";
@@ -110,6 +112,44 @@ describe("VelocityLoadedView", () => {
     expect(flow).toHaveTextContent("Time in Waiting");
     expect(flow).toHaveTextContent(`${mock.runningShareOfCyclePct}% of cycle time`);
     expect(flow).toHaveTextContent(`${mock.waitingShareOfCyclePct}% of cycle time`);
+  });
+
+  it("reads sub-hour medians in minutes when the duration format slot is provided (Storybook prototype)", () => {
+    const mock = FACTORY_VELOCITY_FLOW_BY_PERIOD[7];
+    const data = toData();
+    const sourceSplit: VelocitySourceSplitConfig = { hasPeopleCohort: true };
+
+    render(
+      <VelocityDurationFormatSlotContext.Provider value={subHourVelocityDurationFormat}>
+        <VelocityLoadedView
+          periodLabel="Last 7 days"
+          periodDays={7}
+          data={data}
+          sourceSplit={sourceSplit}
+          workOrderFlow={{
+            flow: {
+              days: 7,
+              label: "Last 7 days",
+              sampleSize: 5,
+              medianCycleHours: mock.medianCycleHours,
+              medianRunningHours: mock.medianRunningHours,
+              medianWaitingHours: mock.medianWaitingHours,
+              runningShareOfCyclePct: mock.runningShareOfCyclePct,
+              waitingShareOfCyclePct: mock.waitingShareOfCyclePct,
+              timeTrend: mock.timeTrend,
+            },
+          }}
+        />
+      </VelocityDurationFormatSlotContext.Provider>,
+    );
+
+    const flow = screen.getByTestId("velocity-work-order-flow");
+    // The mock's sub-hour medians (0.45h / 0.2h / 0.25h) must read as minutes,
+    // not collapse to "0h" the way the default whole-hour formatter would.
+    expect(flow).toHaveTextContent("27m");
+    expect(flow).toHaveTextContent("12m");
+    expect(flow).toHaveTextContent("15m");
+    expect(flow).not.toHaveTextContent("0h");
   });
 
   it("shows the empty label when the flow has no closed samples", () => {
