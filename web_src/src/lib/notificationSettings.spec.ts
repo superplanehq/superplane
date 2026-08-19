@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   defaultNotificationSettings,
+  defaultNotificationTypeToggles,
   eventTypesFromToggles,
   filtersFromSettings,
   togglesFromEventTypes,
@@ -14,6 +15,7 @@ describe("notificationSettings", () => {
     expect(settings.workspaces?.scope).toBe("WORKSPACE_SCOPE_ALL");
     expect(settings.workspaces?.filters).toEqual([]);
     expect(workspaceScopeFromSettings(undefined)).toBe("all");
+    expect(defaultNotificationTypeToggles().TYPE_WORK_ORDER_MENTIONED).toBe(true);
   });
 
   it("treats a missing filtered type as off", () => {
