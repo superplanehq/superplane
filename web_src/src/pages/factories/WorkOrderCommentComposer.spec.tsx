@@ -58,6 +58,18 @@ describe("WorkOrderCommentComposer", () => {
     expect(onSubmit).toHaveBeenCalledWith("Hello @Alice Anderson", ["alice"]);
   });
 
+  it("submits a typed complete @Name even when the picker is not used", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn(async () => undefined);
+    renderComposer(onSubmit);
+
+    const textarea = screen.getByLabelText("Add a comment");
+    await user.type(textarea, "Thanks @Alice Anderson ");
+    await user.click(screen.getByTestId("work-order-comment-submit"));
+
+    expect(onSubmit).toHaveBeenCalledWith("Thanks @Alice Anderson", ["alice"]);
+  });
+
   it("shows the mentioned member in a hover card", async () => {
     const user = userEvent.setup();
     renderComposer();

@@ -5,6 +5,7 @@ import {
   insertMentionAtCursor,
   mentionCandidateByName,
   mentionQueryAtCursor,
+  mentionsInBody,
   retainMentions,
   splitMentionSegments,
 } from "./workOrderMentions";
@@ -71,6 +72,18 @@ describe("retainMentions", () => {
     const aliceB = { id: "alice-b", name: "Alice Anderson" };
     expect(retainMentions([aliceA, aliceB], "Thanks @Alice Anderson")).toEqual([aliceA]);
     expect(retainMentions([aliceA, aliceB], "Thanks @Alice Anderson and @Alice Anderson")).toEqual([aliceA, aliceB]);
+  });
+});
+
+describe("mentionsInBody", () => {
+  it("attaches a typed complete @Name even without picker tracking", () => {
+    expect(mentionsInBody([alice, bob], "Thanks @Alice Anderson")).toEqual([alice]);
+  });
+
+  it("prefers the picker-selected ID when two members share a name", () => {
+    const aliceA = { id: "alice-a", name: "Alice Anderson" };
+    const aliceB = { id: "alice-b", name: "Alice Anderson" };
+    expect(mentionsInBody([aliceA, aliceB], "Thanks @Alice Anderson", [aliceB])).toEqual([aliceB]);
   });
 });
 

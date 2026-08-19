@@ -81,6 +81,23 @@ export function retainMentions(mentions: WorkOrderMentionCandidate[], body: stri
   return kept;
 }
 
+export function mentionsInBody(
+  candidates: WorkOrderMentionCandidate[],
+  body: string,
+  preferred: WorkOrderMentionCandidate[] = [],
+): WorkOrderMentionCandidate[] {
+  const seen = new Set<string>();
+  const ordered: WorkOrderMentionCandidate[] = [];
+  for (const person of [...preferred, ...candidates]) {
+    if (seen.has(person.id)) {
+      continue;
+    }
+    seen.add(person.id);
+    ordered.push(person);
+  }
+  return retainMentions(ordered, body);
+}
+
 export function uniqueMentionNames(names: string[]): string[] {
   const seen = new Set<string>();
   const unique: string[] = [];

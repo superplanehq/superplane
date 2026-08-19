@@ -4,7 +4,7 @@ import {
   insertMentionAtCursor,
   mentionCandidatesFromOrgUsers,
   mentionQueryAtCursor,
-  retainMentions,
+  mentionsInBody,
   type WorkOrderMentionCandidate,
 } from "@/lib/workOrderMentions";
 import { useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
@@ -40,7 +40,7 @@ export function useWorkOrderMentionComposer(users: SuperplaneUsersUser[]): UseWo
     const nextQuery = mentionQueryAtCursor(nextBody, nextCursor);
     setBody(nextBody);
     setCursor(nextCursor);
-    setMentions(retainMentions(nextMentions ?? mentions, nextBody));
+    setMentions(mentionsInBody(candidates, nextBody, nextMentions ?? mentions));
     setHighlightIndex(0);
 
     const sameTrigger =
