@@ -90,8 +90,6 @@ describe("FactorySettingsNotificationsPage — workspace scope control", () => {
 
     expect(screen.getByTestId("notifications-scope-filtered")).toHaveAttribute("aria-checked", "true");
     expect(screen.getByTestId("notifications-workspace-picker")).toBeInTheDocument();
-    expect(
-      screen.getByTestId(`notifications-type-${REFUND_FACTORY.id}-TYPE_WORK_ORDER_ASSIGNED`),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId(`notifications-type-${REFUND_FACTORY.id}-TYPE_WORK_ORDER_ASSIGNED`)).toBeInTheDocument();
   });
 });
