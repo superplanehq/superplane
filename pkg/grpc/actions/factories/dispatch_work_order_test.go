@@ -33,7 +33,7 @@ func Test__DispatchWorkOrder__CreatesLineDispatchWithSnapshot(t *testing.T) {
 
 	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
 	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
-		{Name: "step-one", Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
 	})
 	require.NoError(t, err)
 
@@ -49,7 +49,7 @@ func Test__DispatchWorkOrder__CreatesLineDispatchWithSnapshot(t *testing.T) {
 	assert.Equal(t, pb.WorkOrderLineDispatch_STATE_ACTIVE, dispatch.State)
 	assert.Equal(t, line.Name, dispatch.Line.Name)
 	require.Len(t, dispatch.Steps, 1)
-	assert.Equal(t, "step-one", dispatch.Steps[0].Name)
+	assert.Equal(t, app.Name, dispatch.Steps[0].Name)
 	require.Len(t, dispatch.StepExecutions, 1)
 	assert.Equal(t, pb.WorkOrderExecution_STATE_PENDING, dispatch.StepExecutions[0].State)
 
@@ -78,7 +78,7 @@ func Test__DispatchWorkOrder__RejectsWhenAlreadyActive(t *testing.T) {
 
 	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
 	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
-		{Name: "step-one", Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
 	})
 	require.NoError(t, err)
 
@@ -117,7 +117,7 @@ func Test__DispatchWorkOrder__SecondDispatchAfterFirstFinishesCreatesSeparateTra
 
 	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
 	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
-		{Name: "step-one", Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
 	})
 	require.NoError(t, err)
 
