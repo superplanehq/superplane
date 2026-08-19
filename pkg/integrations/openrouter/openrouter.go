@@ -74,26 +74,18 @@ func (o *OpenRouter) Triggers() []core.Trigger {
 func (o *OpenRouter) Instructions() string {
 	return `## Connecting
 
-Connecting sends you to OpenRouter to approve access. OpenRouter issues an API key back to SuperPlane automatically, so there is no key to copy for **Chat Completion**.
+Connection to OpenRouter is done through OAuth. Clicking connect will guide you through the process.
 
-- You need an OpenRouter account with credits available.
-- The connection uses OAuth with PKCE, so there is no app to register.
-- To disconnect, delete the key under [Keys](https://openrouter.ai/settings/keys) and re-connect here.
+You need an OpenRouter account with credits available. Free model variants (IDs ending in ` + "`:free`" + `) draw from a shared upstream pool and are rate limited independently of your balance.
 
 ## Provisioning API Key (optional)
 
-Only required by the **Get Credits** component. OpenRouter's OAuth cannot issue this kind of key, so it is entered by hand.
+Only required by the **Get Credits** component. OpenRouter's OAuth only issues keys for calling models, so this one is created and pasted by hand.
 
 Create one at [Provisioning Keys](https://openrouter.ai/settings/provisioning-keys) and paste it below.
 
 - Provisioning keys read account credits and manage keys, but cannot call model endpoints.
-- Leave it empty if you only use Chat Completion.
-
-## Credits
-
-Chat Completion spends credits from your OpenRouter account. Free model variants (IDs ending in ` + "`:free`" + `) draw from a shared upstream pool and are rate limited independently of your balance.
-
-> **Note:** The provisioning key is shown only once — store it somewhere safe before continuing.`
+- Leave it empty if you only use Chat Completion.`
 }
 
 func (o *OpenRouter) Cleanup(ctx core.IntegrationCleanupContext) error {
