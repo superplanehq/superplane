@@ -124,13 +124,12 @@ function buildEventApp(args: {
 export interface OnboardingLineApp {
   factoryId: string;
   entrypointNodeId: string;
-  lineStepName: string;
 }
 
 export const ONBOARDING_LINE_APPS: OnboardingLineApp[] = [
-  { factoryId: "line-planning", entrypointNodeId: "onrun-create-plan", lineStepName: "Create Implementation Plan" },
-  { factoryId: "line-implementation", entrypointNodeId: "onrun-implement", lineStepName: "Implement" },
-  { factoryId: "line-pr", entrypointNodeId: "onrun-open-pr", lineStepName: "Open Pull Request" },
+  { factoryId: "line-planning", entrypointNodeId: "onrun-create-plan" },
+  { factoryId: "line-implementation", entrypointNodeId: "onrun-implement" },
+  { factoryId: "line-pr", entrypointNodeId: "onrun-open-pr" },
 ];
 
 // Event-driven factory apps provisioned during onboarding. These listen for

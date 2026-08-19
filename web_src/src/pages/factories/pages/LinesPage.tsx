@@ -3,7 +3,7 @@ import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryApps, useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
@@ -57,6 +57,7 @@ export function LinesPage() {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId } = useParams<{ lineId: string }>();
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
+  const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
 
   const canUpdate = canAct("factories", "update");
@@ -87,6 +88,7 @@ export function LinesPage() {
             organizationId={organizationId}
             factoryKey={factoryKey}
             line={selectedLine}
+            apps={factoryApps}
             canUpdate={canUpdate}
           />
         </div>
@@ -96,6 +98,7 @@ export function LinesPage() {
             organizationId={organizationId}
             factoryKey={factoryKey}
             line={selectedLine}
+            apps={factoryApps}
             workOrders={workOrders}
             workOrderCardContext={{
               organizationId,
@@ -167,11 +170,13 @@ function LineDetailHeader({
   organizationId,
   factoryKey,
   line,
+  apps,
   canUpdate,
 }: {
   organizationId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
+  apps: Array<{ id?: string; name?: string }>;
   canUpdate: boolean;
 }) {
   const editHref = line.id ? editFactoryLinePath(organizationId, factoryKey, line.id) : "#";
@@ -183,7 +188,7 @@ function LineDetailHeader({
       backLabel="Lines"
       backTestId="lines-back-to-list"
       title={humanizeLineName(line.name)}
-      subtitle={formatLinePhaseDescription(line.steps)}
+      subtitle={formatLinePhaseDescription(line.steps, apps)}
       actions={
         canUpdate ? (
           <Button type="button" variant="outline" size="sm" asChild data-testid="lines-edit-button">
@@ -202,17 +207,19 @@ function LineDetail({
   organizationId,
   factoryKey,
   line,
+  apps,
   workOrders,
   workOrderCardContext,
 }: {
   organizationId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
+  apps: Array<{ id?: string; name?: string }>;
   workOrders: FactoriesWorkOrder[];
   workOrderCardContext: WorkOrderCardContext;
 }) {
   const steps = line.steps ?? [];
-  const board = useMemo(() => buildLinePhaseBoard(line, workOrders ?? []), [line, workOrders]);
+  const board = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
@@ -319,7 +326,7 @@ function PhaseColumn({
 
   return (
     <WorkOrderBoardLane
-      title={humanizeLineName(column.stepName)}
+      title={column.stepName}
       label={`${column.stepName} phase`}
       count={totalRuns}
       tone={PHASE_LANE_TONE[glyph]}

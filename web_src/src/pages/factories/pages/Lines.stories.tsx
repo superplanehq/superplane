@@ -1,13 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
-import {
-  emptyFactoriesFixture,
-  fiveStepLineFactoriesFixture,
-  lineMetricsFactoriesFixture,
-  PRIMARY_FACTORY_KEY,
-  REFUND_FACTORY_LINES,
-} from "../__fixtures__/factoryPageResponses";
+import { emptyFactoriesFixture, PRIMARY_FACTORY_KEY, REFUND_FACTORY_LINES } from "../__fixtures__/factoryPageResponses";
+import { fiveStepLineFactoriesFixture, lineMetricsFactoriesFixture } from "../__fixtures__/lineMetricsFactoriesFixture";
 import { LinesPage } from "./LinesPage";
 
 /**
