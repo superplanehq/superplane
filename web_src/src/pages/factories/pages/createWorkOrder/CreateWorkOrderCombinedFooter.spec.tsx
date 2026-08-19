@@ -54,6 +54,19 @@ describe("CreateWorkOrderCombinedFooter", () => {
     expect(onSendToLine).toHaveBeenCalledWith("plan-and-implement");
   });
 
+  it("right-aligns the line picker to the Send to line trigger so it doesn't overflow the footer", async () => {
+    const user = userEvent.setup();
+    renderFooter();
+
+    await user.click(screen.getByTestId("work-order-create-send-to-line"));
+
+    const panel = screen.getByTestId("work-order-line-picker-panel");
+    // "Send to line" sits at the far right of the footer, so the panel must
+    // hug the trigger's right edge (align="end") and grow leftward instead
+    // of overflowing past the dialog's edge (align="start" grows rightward).
+    expect(panel).toHaveAttribute("data-align", "end");
+  });
+
   it("disables Send to line and hints when the workspace has no lines", () => {
     renderFooter({ lines: [] });
 

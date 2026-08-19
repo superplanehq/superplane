@@ -134,6 +134,7 @@ export function CreateWorkOrderCombinedFooter({
                 selectedLineName=""
                 isSaving={isSaving}
                 portalRoot={portalRoot}
+                align="end"
                 onSelect={handlePickLine}
               />
             </Popover>

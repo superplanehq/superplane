@@ -169,17 +169,25 @@ export function LinePickerPanel({
   selectedLineName,
   isSaving,
   portalRoot,
+  align = "start",
   onSelect,
 }: {
   lines: FactoriesFactoryLine[];
   selectedLineName: string;
   isSaving: boolean;
   portalRoot: HTMLElement | null;
+  /**
+   * Which edge of the trigger the panel hugs. Triggers that sit near the
+   * right edge of their container (e.g. a "Send to line" button in a footer)
+   * should align "end" so the fixed-width panel opens toward the left
+   * instead of overflowing past the container's right edge.
+   */
+  align?: ComponentProps<typeof PopoverContent>["align"];
   onSelect: (lineName: string) => void;
 }) {
   return (
     <PopoverContent
-      align="start"
+      align={align}
       side="top"
       container={portalRoot}
       className="z-20 w-72 p-1"
