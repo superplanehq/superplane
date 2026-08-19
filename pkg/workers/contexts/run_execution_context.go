@@ -139,7 +139,7 @@ func (c *RunExecutionContext) AddError(message string) error {
 		return fmt.Errorf("add run error: execution is required")
 	}
 
-	run, err := models.LockCanvasRunInTransaction(c.tx, c.execution.RunID)
+	run, err := models.FindCanvasRunInTransaction(c.tx, c.execution.WorkflowID, c.execution.RunID)
 	if err != nil {
 		return err
 	}

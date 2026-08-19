@@ -2,6 +2,7 @@ package models_test
 
 import (
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -524,6 +525,99 @@ func Test__CanvasRun__AddError(t *testing.T) {
 
 		err = otherRun.AddError(database.Conn(), strings.Repeat("a", 128), 32)
 		require.ErrorIs(t, err, models.ErrRunErrorsTooLarge)
+	})
+
+	t.Run("concurrent appends keep both messages", func(t *testing.T) {
+		otherRun, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+		require.NoError(t, err)
+
+		messages := []string{"pipeline failed", "tests failed"}
+		var started sync.WaitGroup
+		started.Add(len(messages))
+
+		var wg sync.WaitGroup
+		errs := make([]error, len(messages))
+		for i, message := range messages {
+			wg.Add(1)
+			go func(idx int, message string) {
+				defer wg.Done()
+				errs[idx] = database.Conn().Transaction(func(tx *gorm.DB) error {
+					var current models.CanvasRun
+					if err := tx.Where("id = ?", otherRun.ID).First(&current).Error; err != nil {
+						started.Done()
+						return err
+					}
+
+					started.Done()
+					started.Wait()
+					return current.AddError(tx, message, 1024)
+				})
+			}(i, message)
+		}
+		wg.Wait()
+
+		for _, err := range errs {
+			require.NoError(t, err)
+		}
+
+		updated, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, otherRun.ID)
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []models.RunError{
+			{Message: "pipeline failed"},
+			{Message: "tests failed"},
+		}, []models.RunError(updated.Errors))
+	})
+
+	t.Run("does not block child event inserts while the lock is held", func(t *testing.T) {
+		otherRun, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+		require.NoError(t, err)
+
+		holding := make(chan struct{})
+		release := make(chan struct{})
+		holdErr := make(chan error, 1)
+
+		go func() {
+			holdErr <- database.Conn().Transaction(func(tx *gorm.DB) error {
+				if err := otherRun.AddError(tx, "pipeline failed", 1024); err != nil {
+					return err
+				}
+
+				close(holding)
+				<-release
+				return nil
+			})
+		}()
+
+		select {
+		case <-holding:
+		case err := <-holdErr:
+			require.NoError(t, err)
+			t.Fatal("lock holder transaction ended before the child insert")
+		case <-time.After(5 * time.Second):
+			t.Fatal("timed out waiting to hold the run lock")
+		}
+
+		insertErr := database.Conn().Transaction(func(tx *gorm.DB) error {
+			if err := tx.Exec("SET LOCAL lock_timeout = '500ms'").Error; err != nil {
+				return err
+			}
+
+			now := time.Now()
+			event := models.CanvasEvent{
+				WorkflowID: canvas.ID,
+				NodeID:     "trigger",
+				Channel:    "default",
+				Data:       models.NewJSONValue(map[string]any{"key": "value"}),
+				State:      models.CanvasEventStatePending,
+				RunID:      otherRun.ID,
+				CreatedAt:  &now,
+			}
+			return tx.Create(&event).Error
+		})
+		require.NoError(t, insertErr)
+
+		close(release)
+		require.NoError(t, <-holdErr)
 	})
 }
 

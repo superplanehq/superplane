@@ -1068,27 +1068,38 @@ func (r *CanvasRun) ErrorMessages() []string {
 
 /*
  * Appends a new error into the run errors slice.
- * Caller must lock the run first to ensure concurrent callers do not overwrite each other's changes.
+ * Locks the run with FOR NO KEY UPDATE so concurrent appends do not
+ * overwrite each other, while child FK inserts on the run can proceed.
  */
 func (r *CanvasRun) AddError(tx *gorm.DB, message string, maxSize int) error {
 	if message == "" {
 		return ErrRunErrorMessageRequired
 	}
 
-	if len(r.Errors) >= MaxRunErrorsCount {
-		return fmt.Errorf("%w: %d (max %d)", ErrRunErrorsTooMany, len(r.Errors), MaxRunErrorsCount)
-	}
+	return tx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.
+			Clauses(clause.Locking{Strength: lockingForUpdateNoKey}).
+			Where("id = ?", r.ID).
+			First(r).
+			Error; err != nil {
+			return err
+		}
 
-	next := append(slices.Clone(r.Errors), RunError{Message: message})
-	encoded, err := json.Marshal(next)
-	if err != nil {
-		return fmt.Errorf("marshal run errors: %w", err)
-	}
+		if len(r.Errors) >= MaxRunErrorsCount {
+			return fmt.Errorf("%w: %d (max %d)", ErrRunErrorsTooMany, len(r.Errors), MaxRunErrorsCount)
+		}
 
-	if len(encoded) > maxSize {
-		return fmt.Errorf("%w: %d bytes (max %d)", ErrRunErrorsTooLarge, len(encoded), maxSize)
-	}
+		next := append(slices.Clone(r.Errors), RunError{Message: message})
+		encoded, err := json.Marshal(next)
+		if err != nil {
+			return fmt.Errorf("marshal run errors: %w", err)
+		}
 
-	r.Errors = next
-	return tx.Model(r).Update("errors", r.Errors).Error
+		if len(encoded) > maxSize {
+			return fmt.Errorf("%w: %d bytes (max %d)", ErrRunErrorsTooLarge, len(encoded), maxSize)
+		}
+
+		r.Errors = next
+		return tx.Model(r).Update("errors", r.Errors).Error
+	})
 }
