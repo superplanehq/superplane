@@ -1,5 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 
 const { createMutate, dispatchMutate } = vi.hoisted(() => ({
   createMutate: vi.fn(),
@@ -15,6 +16,7 @@ vi.mock("@/lib/toast", () => ({
   showErrorToast: vi.fn(),
 }));
 
+import { CreateWorkOrderDefaultOwnerSlotContext } from "./createWorkOrderSlots";
 import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
 
 describe("useCreateWorkOrderComposer", () => {
@@ -103,6 +105,46 @@ describe("useCreateWorkOrderComposer", () => {
     });
 
     expect(result.current.title).toHaveLength(256);
+  });
+
+  it("seeds Owner with the default owner id supplied by the create-work-order slot", () => {
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <CreateWorkOrderDefaultOwnerSlotContext.Provider value="user-current">
+        {children}
+      </CreateWorkOrderDefaultOwnerSlotContext.Provider>
+    );
+
+    const { result } = renderHook(
+      () =>
+        useCreateWorkOrderComposer({
+          organizationId: "org-1",
+          factoryId: "factory-1",
+          onClose,
+          onCreated,
+        }),
+      { wrapper },
+    );
+
+    expect(result.current.assigneeIds).toEqual(["user-current"]);
+
+    act(() => {
+      result.current.setAssigneeIds([]);
+    });
+
+    expect(result.current.assigneeIds).toEqual([]);
+  });
+
+  it("leaves Owner empty when no default owner id is supplied", () => {
+    const { result } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    expect(result.current.assigneeIds).toEqual([]);
   });
 
   it("keeps the first 5000 characters of a long pasted description", () => {

@@ -3,6 +3,8 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useState } from "react";
 
+import { useCreateWorkOrderDefaultOwnerId } from "./createWorkOrderSlots";
+
 const MAX_TITLE_LENGTH = 256;
 const MAX_DESCRIPTION_LENGTH = 5000;
 
@@ -21,10 +23,15 @@ export function useCreateWorkOrderComposer({
 }: UseCreateWorkOrderComposerArgs) {
   const createWorkOrder = useCreateWorkOrder(organizationId, factoryId);
   const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);
+  const defaultOwnerId = useCreateWorkOrderDefaultOwnerId();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+  // Seeds Owner with the current user on first open (Storybook slot today,
+  // account context once this is wired live). Empty when no id is supplied,
+  // so behavior is unchanged until then. The picker stays the source of
+  // truth after this — changing or clearing Owner works the same either way.
+  const [assigneeIds, setAssigneeIds] = useState<string[]>(() => (defaultOwnerId ? [defaultOwnerId] : []));
   const [selectedLineName, setSelectedLineName] = useState("");
   const [titleError, setTitleError] = useState("");
   const [inFlightAction, setInFlightAction] = useState<"draft" | "send" | null>(null);

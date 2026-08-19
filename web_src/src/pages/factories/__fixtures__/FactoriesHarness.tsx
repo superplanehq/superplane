@@ -9,8 +9,14 @@ import type { OnboardingStorybookSeed } from "../pages/onboarding/onboardingMock
 import { StorybookOverviewPage } from "../pages/onboarding/StorybookOverviewPage";
 import { WikiWireframe } from "../pages/wiki/WikiWireframe";
 import { WIKI_DOCUMENTS_DEFAULT, WIKI_DOCUMENTS_REFRESHED } from "../pages/wiki/wikiMocks";
-import { defaultFactoriesFixture, FACTORIES_ORGANIZATION_ID, type FactoriesFixture } from "./factoryPageResponses";
+import {
+  defaultFactoriesFixture,
+  FACTORIES_ORGANIZATION_ID,
+  STORYBOOK_ME_USER_ID,
+  type FactoriesFixture,
+} from "./factoryPageResponses";
 import { refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
+import { CreateWorkOrderDefaultOwnerSlotContext } from "../createWorkOrderSlots";
 import { MissionAssignmentProvider } from "../pages/missions/MissionAssignmentContext";
 import { MissionsWorkOrdersPage } from "../pages/missions/MissionsWorkOrdersPage";
 import { WorkOrderMissionOverviewRow } from "../pages/missions/WorkOrderMissionOverviewRow";
@@ -91,7 +97,9 @@ export function FactoriesHarness({
   const withMissions = (
     <MissionAssignmentProvider>
       <WorkOrderOverviewMissionSlotContext.Provider value={WorkOrderMissionOverviewRow}>
-        {harness}
+        <CreateWorkOrderDefaultOwnerSlotContext.Provider value={STORYBOOK_ME_USER_ID}>
+          {harness}
+        </CreateWorkOrderDefaultOwnerSlotContext.Provider>
       </WorkOrderOverviewMissionSlotContext.Provider>
     </MissionAssignmentProvider>
   );
