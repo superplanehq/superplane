@@ -110,22 +110,7 @@ func (c *UpdateAlarm) OutputChannels(_ any) []core.OutputChannel {
 func (c *UpdateAlarm) Configuration() []configuration.Field {
 	return []configuration.Field{
 		regionField(),
-		{
-			Name:        "alarm",
-			Label:       "Alarm",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "CloudWatch alarm to update",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "region", Values: []string{"*"}},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type:       "cloudwatch.alarm",
-					Parameters: []configuration.ParameterRef{regionParameter()},
-				},
-			},
-		},
+		alarmField("CloudWatch alarm to update"),
 		{
 			Name:        "thresholdCondition",
 			Label:       "Threshold",
