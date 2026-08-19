@@ -425,7 +425,8 @@ CREATE TABLE public.factory_work_order_checks (
     automation jsonb,
     run_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    recent_scores jsonb
 );
 
 
@@ -2938,7 +2939,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260819015122	f
+20260819102909	f
 \.
 
 
