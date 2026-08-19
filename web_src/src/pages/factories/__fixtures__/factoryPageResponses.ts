@@ -1,6 +1,7 @@
 import type {
   FactoriesFactory,
   FactoriesFactoryLine,
+  MeNotificationSettings,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderEvent,
@@ -461,6 +462,8 @@ export interface FactoriesFixture {
   appsByFactoryId: Record<string, FactoryApp[]>;
   usageByFactoryId?: Record<string, StorybookUsageReport>;
   organizationLlmSpend?: StorybookUsageReport;
+  /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
+  notificationSettings?: MeNotificationSettings;
   /**
    * Per-order activity timelines. When an order id is absent, the handlers
    * fall back to `DEFAULT_EVENTS_BY_ORDER_ID` from `factoryPageEventFixtures`.

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/gorm"
@@ -22,6 +23,12 @@ type FactoryContext struct {
 	// mutation with a `reason` string (currently the event type that was
 	// recorded). Wired by the node executor via WithWorkOrderUpdated.
 	onWorkOrderUpdated func(factoryID, orderID, reason string)
+
+	// Optional notification fan-out callback: invoked with a fully built
+	// notification payload for mutations that should email work order
+	// owners/creators. The node executor collects these and publishes
+	// them after the surrounding transaction commits.
+	onWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage)
 
 	lineStepOnce   bool
 	lineStepLoaded bool
@@ -45,6 +52,13 @@ func NewFactoryContext(tx *gorm.DB, canvas *models.Canvas, execution *models.Can
 
 func (c *FactoryContext) WithWorkOrderUpdated(callback func(factoryID, orderID, reason string)) *FactoryContext {
 	c.onWorkOrderUpdated = callback
+	return c
+}
+
+func (c *FactoryContext) WithWorkOrderNotification(
+	callback func(messages.FactoryWorkOrderNotificationMessage),
+) *FactoryContext {
+	c.onWorkOrderNotification = callback
 	return c
 }
 
@@ -83,6 +97,7 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 		return nil, false, err
 	}
 
+	fromState := order.State
 	changed, err := order.UpdateStatus(c.tx, models.FactoryWorkOrderStatusUpdate{
 		ToState:    params.State,
 		Result:     params.Result,
@@ -103,6 +118,16 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	}
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderStatusUpdated)
+	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
+		OrganizationID: order.OrganizationID.String(),
+		FactoryID:      order.FactoryID.String(),
+		OrderID:        order.ID.String(),
+		EventType:      factory.EventTypeOrderStatusUpdated,
+		ActorName:      c.automationName(),
+		FromState:      fromState,
+		ToState:        order.State,
+		Result:         order.Result,
+	})
 	return workOrderToCore(order), true, nil
 }
 
@@ -129,6 +154,14 @@ func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentPara
 	}
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderCommentAdded)
+	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
+		OrganizationID: order.OrganizationID.String(),
+		FactoryID:      order.FactoryID.String(),
+		OrderID:        order.ID.String(),
+		EventType:      factory.EventTypeOrderCommentAdded,
+		ActorName:      c.automationName(),
+		CommentBody:    body,
+	})
 	return nil
 }
 
@@ -150,6 +183,14 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 	}
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactAdded)
+	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
+		OrganizationID: order.OrganizationID.String(),
+		FactoryID:      order.FactoryID.String(),
+		OrderID:        order.ID.String(),
+		EventType:      factory.EventTypeOrderArtifactAdded,
+		ActorName:      c.automationName(),
+		ArtifactType:   artifact.Type,
+	})
 	return artifactToCore(artifact)
 }
 
@@ -272,6 +313,26 @@ func (c *FactoryContext) notifyWorkOrderUpdated(factoryID, orderID uuid.UUID, re
 		return
 	}
 	c.onWorkOrderUpdated(factoryID.String(), orderID.String(), reason)
+}
+
+func (c *FactoryContext) notifyWorkOrderNotification(message messages.FactoryWorkOrderNotificationMessage) {
+	if c.onWorkOrderNotification == nil {
+		return
+	}
+	c.onWorkOrderNotification(message)
+}
+
+// automationName picks a display name for the automation actor shown in
+// notification emails: the canvas node name when known, else the app name.
+func (c *FactoryContext) automationName() string {
+	ref := c.automationRef()
+	if ref == nil {
+		return ""
+	}
+	if ref.NodeName != "" {
+		return ref.NodeName
+	}
+	return ref.AppName
 }
 
 // runRef attributes emitted events back to the currently executing run.

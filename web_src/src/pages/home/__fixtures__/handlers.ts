@@ -27,6 +27,7 @@ function buildMeUser(orgId: string) {
       "agents",
       "factories",
       "work_orders",
+      "notifications",
     ].flatMap((resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action }))),
   };
 }

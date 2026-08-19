@@ -23,9 +23,12 @@ import {
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
+  FactorySettingsNotificationsPage,
+  FactorySettingsProfilePage,
   FactorySettingsSoonPage,
   FactorySettingsUsagePage,
   FACTORY_SETTINGS_NAV_ITEMS,
+  isFactorySettingsComingSoon,
   LegacyWorkOrderDetailRedirect,
   LinesPage,
   MissionsPage,
@@ -257,7 +260,9 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
             <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
             <Route path="general" element={<FactorySettingsGeneralPage />} />
             <Route path="usage" element={<FactorySettingsUsagePage />} />
-            {FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.id !== "general" && item.id !== "usage").map((item) => (
+            <Route path="profile" element={<FactorySettingsProfilePage />} />
+            <Route path="notifications" element={<FactorySettingsNotificationsPage />} />
+            {FACTORY_SETTINGS_NAV_ITEMS.filter(isFactorySettingsComingSoon).map((item) => (
               <Route
                 key={item.id}
                 path={item.id}

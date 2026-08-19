@@ -26,3 +26,11 @@ func (s *MeService) Me(ctx context.Context, req *pb.MeRequest) (*pb.MeResponse, 
 func (s *MeService) RegenerateToken(ctx context.Context, req *emptypb.Empty) (*pb.RegenerateTokenResponse, error) {
 	return me.RegenerateToken(ctx)
 }
+
+func (s *MeService) DescribeNotificationSettings(ctx context.Context, req *pb.DescribeNotificationSettingsRequest) (*pb.DescribeNotificationSettingsResponse, error) {
+	return me.DescribeNotificationSettings(ctx)
+}
+
+func (s *MeService) UpdateNotificationSettings(ctx context.Context, req *pb.UpdateNotificationSettingsRequest) (*pb.UpdateNotificationSettingsResponse, error) {
+	return me.UpdateNotificationSettings(ctx, req)
+}

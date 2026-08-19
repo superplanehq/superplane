@@ -7,6 +7,7 @@ import { GroupMembersPage } from "./GroupMembersPage";
 import { CreateGroupPage } from "./CreateGroupPage";
 import { CreateRolePage } from "./CreateRolePage";
 import { Profile } from "./Profile";
+import { Notifications } from "./Notifications";
 import { useOrganization } from "../../../hooks/useOrganizationData";
 import { useAccount } from "../../../contexts/useAccount";
 import { useParams } from "react-router";
@@ -41,6 +42,8 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { usePermissions } from "@/contexts/usePermissions";
 import { PermissionTooltip, RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
+import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
+import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { IntegrationDetailsRoute } from "./components/IntegrationDetailsRoute";
 import { IntegrationSetup } from "./components/IntegrationSetup";
@@ -564,6 +567,14 @@ export function OrganizationSettings() {
               }
             />
             <Route path="profile" element={<Profile />} />
+            <Route
+              path="notifications"
+              element={
+                <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>
+                  <Notifications />
+                </RequireExperimentalFeature>
+              }
+            />
             <Route
               path="billing"
               element={

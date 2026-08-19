@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
@@ -568,6 +569,37 @@ func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
 	assert.NotEmpty(t, payload.Author.Automation.AppName)
 	assert.Equal(t, line.Name, payload.Author.Automation.LineName)
 	assert.Equal(t, "component-under-test", payload.Author.Automation.StepName)
+}
+
+func TestFactoryContext_AddWorkOrderComment_EmitsNotification(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Comment target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	var notifications []messages.FactoryWorkOrderNotificationMessage
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).
+		WithWorkOrderNotification(func(notification messages.FactoryWorkOrderNotificationMessage) {
+			notifications = append(notifications, notification)
+		})
+
+	require.NoError(t, ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
+		OrderID: order.ID.String(),
+		Body:    "Ready for review",
+	}))
+
+	require.Len(t, notifications, 1)
+	assert.Equal(t, factory.ID.String(), notifications[0].FactoryID)
+	assert.Equal(t, order.ID.String(), notifications[0].OrderID)
+	assert.Equal(t, factoryevents.EventTypeOrderCommentAdded, notifications[0].EventType)
+	assert.Equal(t, "Ready for review", notifications[0].CommentBody)
+	assert.NotEmpty(t, notifications[0].ActorName)
 }
 
 func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
