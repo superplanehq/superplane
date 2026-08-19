@@ -770,7 +770,11 @@ func isRequiredByCondition(field Field, config map[string]any) bool {
 			value = fmt.Sprintf("%v", conditionValue)
 		}
 
-		return slices.Contains(condition.Values, value)
+		// Any satisfied condition makes the field required (OR logic),
+		// matching isFieldRequired in web_src.
+		if slices.Contains(condition.Values, value) {
+			return true
+		}
 	}
 
 	return false

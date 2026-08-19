@@ -28,6 +28,30 @@ func Test__ValidateConfiguration__RequiredConditionMatchesOmittedField(t *testin
 	assert.NoError(t, err)
 }
 
+// A field with several required-when rules is required when any of them
+// matches (OR logic), mirroring isFieldRequired in web_src.
+func Test__ValidateConfiguration__RequiredConditionsUseOrLogic(t *testing.T) {
+	fields := []Field{
+		{Name: "type", Type: FieldTypeString},
+		{Name: "crawlType", Type: FieldTypeString},
+		{
+			Name: "option",
+			Type: FieldTypeString,
+			RequiredConditions: []RequiredCondition{
+				{Field: "type", Values: []string{"web"}},
+				{Field: "crawlType", Values: []string{"seed"}},
+			},
+		},
+	}
+
+	// First rule does not match ("type" is omitted), second rule does.
+	err := ValidateConfiguration(fields, map[string]any{"crawlType": "seed"})
+	assert.EqualError(t, err, "field 'option' is required")
+
+	err = ValidateConfiguration(fields, map[string]any{"crawlType": "sitemap"})
+	assert.NoError(t, err)
+}
+
 func Test__ValidateConfiguration__RequiredConditions(t *testing.T) {
 	fields := []Field{
 		{
