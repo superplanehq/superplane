@@ -23,7 +23,7 @@ import {
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
-import { Info } from "lucide-react";
+import { BellOff, Info } from "lucide-react";
 import { useEffect, useState } from "react";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { FactorySettingsNotificationWorkspacePicker } from "./FactorySettingsNotificationWorkspacePicker";
@@ -240,6 +240,34 @@ export function FactorySettingsNotificationsPage() {
   );
 }
 
+interface WorkspaceScopeOption {
+  value: WorkspaceScopeForm;
+  id: string;
+  label: string;
+  description: string;
+}
+
+const WORKSPACE_SCOPE_OPTIONS: WorkspaceScopeOption[] = [
+  {
+    value: "all",
+    id: "notifications-scope-all",
+    label: "All workspaces",
+    description: "Send an email for events in every workspace you can access.",
+  },
+  {
+    value: "filtered",
+    id: "notifications-scope-filtered",
+    label: "Choose workspaces",
+    description: "Pick specific workspaces and set which events send email for each.",
+  },
+  {
+    value: "none",
+    id: "notifications-scope-none",
+    label: "Off",
+    description: "Do not send any work order emails.",
+  },
+];
+
 interface WorkspaceScopeSectionProps {
   scope: WorkspaceScopeForm;
   filters: WorkspaceFilterForm[];
@@ -269,28 +297,22 @@ function WorkspaceScopeSection({
   return (
     <div className="space-y-3">
       <div>
-        <Label>Workspaces</Label>
-        <p className="mt-0.5 text-[12px] text-muted-foreground">Choose which workspaces send you notifications.</p>
+        <Label>Workspace scope</Label>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          Choose which workspaces can send you email, or turn workspace emails off.
+        </p>
       </div>
-      <div className="inline-flex rounded-md border border-border p-0.5" role="radiogroup" aria-label="Workspace scope">
-        <ScopeChoice
-          id="notifications-scope-all"
-          label="All workspaces"
-          checked={scope === "all"}
-          onSelect={() => onScopeChange("all")}
-        />
-        <ScopeChoice
-          id="notifications-scope-filtered"
-          label="Filtered"
-          checked={scope === "filtered"}
-          onSelect={() => onScopeChange("filtered")}
-        />
-        <ScopeChoice
-          id="notifications-scope-none"
-          label="None"
-          checked={scope === "none"}
-          onSelect={() => onScopeChange("none")}
-        />
+      <div className="space-y-2" role="radiogroup" aria-label="Workspace scope">
+        {WORKSPACE_SCOPE_OPTIONS.map((option) => (
+          <ScopeChoice
+            key={option.value}
+            id={option.id}
+            label={option.label}
+            description={option.description}
+            checked={scope === option.value}
+            onSelect={() => onScopeChange(option.value)}
+          />
+        ))}
       </div>
       {scope === "filtered" ? (
         <div className="space-y-4">
@@ -312,6 +334,15 @@ function WorkspaceScopeSection({
           ))}
         </div>
       ) : null}
+      {scope === "none" ? (
+        <div
+          className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-[13px] text-muted-foreground"
+          data-testid="notifications-scope-off-message"
+        >
+          <BellOff className="size-4 shrink-0" aria-hidden />
+          <span>You will not receive any work order emails.</span>
+        </div>
+      ) : null}
       {scopeError ? <p className="text-[11px] text-destructive">{scopeError}</p> : null}
     </div>
   );
@@ -320,11 +351,13 @@ function WorkspaceScopeSection({
 function ScopeChoice({
   id,
   label,
+  description,
   checked,
   onSelect,
 }: {
   id: string;
   label: string;
+  description: string;
   checked: boolean;
   onSelect: () => void;
 }) {
@@ -335,13 +368,15 @@ function ScopeChoice({
       role="radio"
       aria-checked={checked}
       data-testid={id}
-      className={cn(
-        "rounded-[5px] px-3 py-1.5 text-[13px] tracking-[-0.01em] text-muted-foreground hover:text-foreground",
-        checked && "bg-accent font-medium text-foreground",
-      )}
       onClick={onSelect}
+      className={cn(
+        "flex w-full flex-col items-start gap-0.5 rounded-md border border-border px-3 py-2 text-left transition-colors",
+        "hover:border-accent-foreground/30 hover:bg-accent/50",
+        checked && "border-foreground/40 bg-accent",
+      )}
     >
-      {label}
+      <span className="text-[13px] font-medium tracking-[-0.01em] text-foreground">{label}</span>
+      <span className="text-[12px] text-muted-foreground">{description}</span>
     </button>
   );
 }

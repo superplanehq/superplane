@@ -108,8 +108,10 @@ export const REFUND_FACTORY_APPS: FactoryApp[] = [
   },
 ];
 
-const REFUND_LINE_PLAN_ID = "line-plan-and-implement";
-const REFUND_LINE_HOTFIX_ID = "line-hotfix";
+export const REFUND_LINE_PLAN_ID = "line-plan-and-implement";
+export const REFUND_LINE_HOTFIX_ID = "line-hotfix";
+export const REFUND_LINE_ONBOARDING_ID = "line-onboarding";
+export const REFUND_LINE_FEATURE_ID = "line-feature-delivery";
 
 export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
   {
@@ -515,30 +517,4 @@ export const emptyWorkOrdersFactoriesFixture: FactoriesFixture = {
     [PRIMARY_FACTORY_ID]: [CLOSED_WORK_ORDER],
     [EMPTY_FACTORY_ID]: [],
   },
-};
-
-/** Story-only clone: Plan and Implement has five phases so the board can scroll on x. */
-export const fiveStepLineFactoriesFixture: FactoriesFixture = {
-  ...defaultFactoriesFixture,
-  factories: defaultFactoriesFixture.factories.map((factory) => {
-    if (factory.id !== PRIMARY_FACTORY_ID) {
-      return factory;
-    }
-    return {
-      ...factory,
-      lines: (factory.lines ?? []).map((line) => {
-        if (line.id !== REFUND_LINE_PLAN_ID) {
-          return line;
-        }
-        return {
-          ...line,
-          steps: [
-            ...(line.steps ?? []),
-            runAppStep("app-refund-verifier", "start-verification"),
-            runAppStep("app-refund-planner", "start-plan"),
-          ],
-        };
-      }),
-    };
-  }),
 };
