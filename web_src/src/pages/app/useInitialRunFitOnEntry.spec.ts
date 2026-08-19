@@ -108,4 +108,28 @@ describe("useInitialRunFitOnEntry", () => {
 
     expect(requestRunFit).not.toHaveBeenCalled();
   });
+
+  it("requests a fit once conditions become ready after mount", () => {
+    const requestRunFit = vi.fn();
+
+    const { rerender } = renderWithRef(
+      {
+        isRunInspectionMode: false,
+        selectedRunId: null,
+        searchParams: new URLSearchParams(),
+      },
+      requestRunFit,
+    );
+
+    expect(requestRunFit).not.toHaveBeenCalled();
+
+    rerender({
+      isRunInspectionMode: true,
+      selectedRunId: runId,
+      searchParams: new URLSearchParams({ run: runId }),
+    });
+
+    expect(requestRunFit).toHaveBeenCalledTimes(1);
+    expect(requestRunFit).toHaveBeenCalledWith(runId);
+  });
 });

@@ -405,7 +405,7 @@ function PhaseRunCard({
   const queuedLabel = isQueuedStepRow(run.execution) ? resolvePhaseRunStatus(run.execution).label : null;
 
   return (
-    <div>
+    <div data-testid={`lines-phase-run-${run.executionId}`}>
       <WorkOrderCard {...workOrderCardContext} entry={entry} href={href} />
       {queuedLabel ? (
         <p className="mt-1 flex items-center gap-1 px-0.5 text-[11px] text-muted-foreground">
