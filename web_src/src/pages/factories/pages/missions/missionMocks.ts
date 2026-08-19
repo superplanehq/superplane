@@ -16,7 +16,7 @@ export interface FactoryMission {
 
 const ALEX: MissionAssignee = { id: "user-reviewer-alex", name: "Alex Reviewer" };
 const JAMIE: MissionAssignee = { id: "user-operator-jamie", name: "Jamie Operator" };
-const STORYBOOK: MissionAssignee = { id: "storybook-user", name: "Storybook User" };
+const STORYBOOK: MissionAssignee = { id: "storybook-user", name: "Leonardo DiCaprio" };
 
 function mission(id: string, name: string, description: string, assignee: MissionAssignee): FactoryMission {
   return { id, name, description, assignee };

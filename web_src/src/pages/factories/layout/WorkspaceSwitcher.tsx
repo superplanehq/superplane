@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 import { cn } from "@/lib/utils";
-import { ArrowRightLeft, Check, Factory as FactoryIcon, Plus, Settings } from "lucide-react";
+import { ArrowRightLeft, Check, Plus, Settings, Triangle } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { factoryDetailPath, factoryOverviewPath, factorySettingsPath } from "../lib/factoryPagePaths";
 
@@ -93,7 +93,7 @@ export function WorkspaceSwitcher({
                 }}
                 data-testid={`factories-workspace-option-${entry.id}`}
               >
-                <FactoryIcon className="h-3.5 w-3.5" aria-hidden />
+                <Triangle className="h-3.5 w-3.5" aria-hidden />
                 <span className="truncate">{entry.name}</span>
                 {isCurrent ? <Check className="ml-auto h-3.5 w-3.5" aria-hidden /> : null}
               </DropdownMenuItem>
