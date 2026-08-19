@@ -10,6 +10,7 @@ import type { SetURLSearchParams } from "react-router";
 
 import type { CanvasFocusRequest } from "./useAgentNodeFocusRequest";
 import type { RunCanvasData } from "./useRunCanvasData";
+import { useInitialRunFitOnEntry } from "./useInitialRunFitOnEntry";
 import { useLiveCanvasRunInspectionClicks } from "./useLiveCanvasRunInspectionClicks";
 import { useRunInspectionSelectionHandlers } from "./useRunInspectionSelectionHandlers";
 import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
@@ -73,6 +74,8 @@ export function useRunInspectionNavigation(options: UseRunInspectionNavigationOp
     hasEditableVersion,
     liveCanvasVersionId,
     handleUseVersion,
+    searchParams,
+    requestRunFitRef,
   } = options;
 
   const selection = useRunInspectionSelectionHandlers(options);
@@ -95,6 +98,13 @@ export function useRunInspectionNavigation(options: UseRunInspectionNavigationOp
     isRunResolveLoading: isSelectedRunLoading,
     describeRunSettled,
     onClear: selection.handleClearRunInspection,
+  });
+
+  useInitialRunFitOnEntry({
+    isRunInspectionMode,
+    selectedRunId,
+    searchParams,
+    requestRunFitRef,
   });
 
   const {
