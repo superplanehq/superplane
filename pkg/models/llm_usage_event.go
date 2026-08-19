@@ -75,8 +75,10 @@ type LLMUsageEventInput struct {
 	CostMicros       *int64
 }
 
-// RecordUsage inserts one factory-linked usage row. Non-factory runs are skipped.
-// Each billed call gets its own row, including retries of the same node execution.
+// RecordUsage inserts one factory-linked usage row and copies ledger totals
+// into the step cache so in-progress work orders show spend. Non-factory
+// runs are skipped. Each billed call gets its own row, including retries
+// of the same node execution.
 func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 	if in.Provider == "" || in.Model == "" || in.NodeExecutionID == uuid.Nil || in.CanvasRunID == uuid.Nil {
 		return fmt.Errorf("llm usage event requires provider, model, node execution, and canvas run")
@@ -142,10 +144,15 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 		CreatedAt:            now,
 	}
 
-	return tx.Clauses(clause.OnConflict{
+	err = tx.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "idempotency_key"}},
 		DoNothing: true,
 	}).Create(&event).Error
+	if err != nil {
+		return err
+	}
+
+	return execution.RollupUsage(tx)
 }
 
 // UsageReportFilter scopes ledger aggregates.

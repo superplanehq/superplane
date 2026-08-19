@@ -33,9 +33,7 @@ func Test__RecordUsage__FactoryLinkedRunPersistsAndRollsUp(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.NoError(t, execution.RollupUsage(db))
-	assert.Equal(t, int64(1_000_000), execution.TotalTokens)
-	assert.Equal(t, int64(300), execution.CostCents)
+	assertInProgressExecutionUsage(t, db, execution.ID, 1_000_000, 300)
 
 	totals, byModel, err := models.SummarizeUsage(db, models.UsageReportFilter{
 		OrganizationID: r.Organization.ID,
@@ -68,9 +66,7 @@ func Test__RecordUsage__SameNodeExecutionRecordsEachBilledCall(t *testing.T) {
 	require.NoError(t, models.RecordUsage(db, first))
 	require.NoError(t, models.RecordUsage(db, first))
 
-	require.NoError(t, execution.RollupUsage(db))
-	assert.Equal(t, int64(2_000_000), execution.TotalTokens)
-	assert.Equal(t, int64(600), execution.CostCents)
+	assertInProgressExecutionUsage(t, db, execution.ID, 2_000_000, 600)
 }
 
 func Test__RecordUsage__ChildRunUsesParentFactoryExecution(t *testing.T) {
@@ -111,8 +107,7 @@ func Test__RecordUsage__ChildRunUsesParentFactoryExecution(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.NoError(t, execution.RollupUsage(db))
-	assert.Equal(t, int64(120), execution.TotalTokens)
+	assertInProgressExecutionUsage(t, db, execution.ID, 120, 0)
 }
 
 func Test__RecordUsage__SkipsRunsWithoutWorkOrderExecution(t *testing.T) {
@@ -138,6 +133,16 @@ func Test__RecordUsage__SkipsRunsWithoutWorkOrderExecution(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), totals.TotalTokens)
 	assert.Empty(t, byModel)
+}
+
+func assertInProgressExecutionUsage(t *testing.T, db *gorm.DB, executionID uuid.UUID, tokens, cents int64) {
+	t.Helper()
+
+	var updated models.FactoryWorkOrderExecution
+	require.NoError(t, db.First(&updated, "id = ?", executionID).Error)
+	assert.NotEqual(t, models.FactoryWorkOrderExecutionStatusFinished, updated.Status)
+	assert.Equal(t, tokens, updated.TotalTokens)
+	assert.Equal(t, cents, updated.CostCents)
 }
 
 func dispatchWorkOrderExecution(t *testing.T, r *support.ResourceRegistry) *models.FactoryWorkOrderExecution {
