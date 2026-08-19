@@ -1,7 +1,8 @@
 import { useCreateWorkOrder, useDispatchWorkOrder } from "@/hooks/useFactoryData";
+import { useMe } from "@/hooks/useMe";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const MAX_TITLE_LENGTH = 256;
 const MAX_DESCRIPTION_LENGTH = 5000;
@@ -21,17 +22,31 @@ export function useCreateWorkOrderComposer({
 }: UseCreateWorkOrderComposerArgs) {
   const createWorkOrder = useCreateWorkOrder(organizationId, factoryId);
   const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);
+  const { data: me } = useMe(false, organizationId);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
-  const [selectedLineName, setSelectedLineName] = useState("");
+  const [assigneeIds, setAssigneeIdsInternal] = useState<string[]>([]);
   const [titleError, setTitleError] = useState("");
   const [inFlightAction, setInFlightAction] = useState<"draft" | "send" | null>(null);
+  const hasSeededOwner = useRef(false);
 
   const isSaving = inFlightAction !== null;
   const canSaveDraft = Boolean(title.trim()) && !isSaving;
-  const canSendToLine = canSaveDraft && Boolean(selectedLineName);
+  const canSendToLine = canSaveDraft;
+
+  const setAssigneeIds = (ids: string[]) => {
+    hasSeededOwner.current = true;
+    setAssigneeIdsInternal(ids);
+  };
+
+  useEffect(() => {
+    if (hasSeededOwner.current || !me?.id) {
+      return;
+    }
+    hasSeededOwner.current = true;
+    setAssigneeIdsInternal([me.id]);
+  }, [me?.id]);
 
   const goToOrder = (order: { number?: string | number } | null) => {
     if (order?.number !== undefined && order.number !== "") {
@@ -72,8 +87,8 @@ export function useCreateWorkOrderComposer({
     }
   };
 
-  const handleSendToLine = async () => {
-    if (!selectedLineName) {
+  const handleSendToLine = async (lineName: string) => {
+    if (!lineName) {
       return;
     }
 
@@ -85,7 +100,7 @@ export function useCreateWorkOrderComposer({
       }
 
       try {
-        await dispatchWorkOrder.mutateAsync({ orderId: order.id, lineName: selectedLineName });
+        await dispatchWorkOrder.mutateAsync({ orderId: order.id, lineName });
         goToOrder(order);
       } catch (error) {
         showErrorToast(getApiErrorMessage(error, "Failed to send work order to line"));
@@ -111,7 +126,6 @@ export function useCreateWorkOrderComposer({
     title,
     description,
     assigneeIds,
-    selectedLineName,
     titleError,
     isSaving,
     isSavingDraft: inFlightAction === "draft",
@@ -121,7 +135,6 @@ export function useCreateWorkOrderComposer({
     maxDescriptionLength: MAX_DESCRIPTION_LENGTH,
     maxTitleLength: MAX_TITLE_LENGTH,
     setAssigneeIds,
-    setSelectedLineName,
     updateTitle,
     updateDescription,
     handleSaveDraft,

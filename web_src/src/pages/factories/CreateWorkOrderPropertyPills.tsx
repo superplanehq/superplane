@@ -1,74 +1,59 @@
 import type { FactoriesFactoryLine } from "@/api-client";
-import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { cn } from "@/lib/utils";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
-import { Layers, User } from "lucide-react";
+import { User } from "lucide-react";
 import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
 
 import { OrgUserReference } from "./OrgUserReference";
 import { WorkOrderAssigneePicker } from "./WorkOrderAssigneePicker";
 
-type OpenPicker = "assignee" | "line" | null;
-
 interface CreateWorkOrderPropertyPillsProps {
   organizationId: string;
   assigneeIds: string[];
-  lines: FactoriesFactoryLine[];
-  selectedLineName: string;
   isSaving: boolean;
-  canDispatch?: boolean;
   onAssigneeChange: (ids: string[]) => void;
-  onLineSelect: (lineName: string) => void;
 }
 
+/**
+ * The Owner pill shown in the create-work-order footer. Line selection now
+ * lives in the "Send to line" popover in `CreateWorkOrderDialog`, so this
+ * component only owns the assignee/owner picker.
+ */
 export function CreateWorkOrderPropertyPills({
   organizationId,
   assigneeIds,
-  lines,
-  selectedLineName,
   isSaving,
-  canDispatch = true,
   onAssigneeChange,
-  onLineSelect,
 }: CreateWorkOrderPropertyPillsProps) {
   const { resolveUser } = useOrgUserLookup(organizationId);
-  const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
+  const [isOpen, setIsOpen] = useState(false);
   const [draftAssigneeIds, setDraftAssigneeIds] = useState(assigneeIds);
   const [portalRoot, setPortalRoot] = useState<HTMLDivElement | null>(null);
-  const hasLines = lines.length > 0;
 
   useEffect(() => {
-    if (openPicker === "assignee") {
+    if (isOpen) {
       setDraftAssigneeIds(assigneeIds);
     }
-  }, [assigneeIds, openPicker]);
+  }, [assigneeIds, isOpen]);
 
-  const handlePickerOpenChange = (picker: Exclude<OpenPicker, null>) => (nextOpen: boolean) => {
+  const handleOpenChange = (nextOpen: boolean) => {
     if (isSaving) {
       return;
     }
-    if (picker === "line" && !canDispatch) {
-      return;
-    }
-    setOpenPicker(nextOpen ? picker : null);
+    setIsOpen(nextOpen);
   };
 
   const handleSaveAssignees = () => {
     onAssigneeChange(draftAssigneeIds);
-    setOpenPicker(null);
-  };
-
-  const handleLineChange = (lineName: string) => {
-    onLineSelect(lineName);
-    setOpenPicker(null);
+    setIsOpen(false);
   };
 
   return (
-    <div ref={setPortalRoot} className="relative flex min-w-0 flex-wrap items-center gap-1.5">
-      <Popover modal={false} open={openPicker === "assignee"} onOpenChange={handlePickerOpenChange("assignee")}>
+    <div ref={setPortalRoot} className="relative flex min-w-0 items-center">
+      <Popover modal={false} open={isOpen} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
           <PropertyPill disabled={isSaving} testId="work-order-assignees-button">
             {assigneeIds.length === 0 ? (
@@ -90,36 +75,11 @@ export function CreateWorkOrderPropertyPills({
           onSave={handleSaveAssignees}
         />
       </Popover>
-
-      {hasLines ? (
-        <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
-          <Popover modal={false} open={openPicker === "line"} onOpenChange={handlePickerOpenChange("line")}>
-            <PopoverTrigger asChild>
-              <PropertyPill disabled={isSaving || !canDispatch} testId="work-order-line-button">
-                <Layers className="size-3.5" aria-hidden />
-                {selectedLineName || "Line"}
-              </PropertyPill>
-            </PopoverTrigger>
-            <LinePickerPanel
-              lines={lines}
-              selectedLineName={selectedLineName}
-              isSaving={isSaving}
-              portalRoot={portalRoot}
-              onSelect={handleLineChange}
-            />
-          </Popover>
-        </PermissionTooltip>
-      ) : (
-        <PropertyPill disabled testId="work-order-line-button">
-          <Layers className="size-3.5" aria-hidden />
-          Line required
-        </PropertyPill>
-      )}
     </div>
   );
 }
 
-function AssigneePickerPanel({
+export function AssigneePickerPanel({
   organizationId,
   selectedIds,
   isSaving,
@@ -164,22 +124,24 @@ function AssigneePickerPanel({
   );
 }
 
-function LinePickerPanel({
+export function LinePickerPanel({
   lines,
   selectedLineName,
   isSaving,
   portalRoot,
+  align = "start",
   onSelect,
 }: {
   lines: FactoriesFactoryLine[];
   selectedLineName: string;
   isSaving: boolean;
   portalRoot: HTMLElement | null;
+  align?: "start" | "center" | "end";
   onSelect: (lineName: string) => void;
 }) {
   return (
     <PopoverContent
-      align="start"
+      align={align}
       side="top"
       container={portalRoot}
       className="z-20 w-72 p-1"
@@ -212,7 +174,7 @@ function LinePickerPanel({
   );
 }
 
-function PropertyPill({
+export function PropertyPill({
   children,
   disabled,
   testId,
@@ -240,7 +202,7 @@ function PropertyPill({
   );
 }
 
-function AssigneePillBody({
+export function AssigneePillBody({
   assigneeIds,
   resolveUser,
 }: {
