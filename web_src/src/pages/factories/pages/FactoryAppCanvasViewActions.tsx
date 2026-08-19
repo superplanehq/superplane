@@ -6,7 +6,7 @@ type FactoryAppCanvasViewActionsProps = {
 
 export function FactoryAppCanvasViewActions({ onOpenVisualEditor }: FactoryAppCanvasViewActionsProps) {
   return (
-    <div className="flex shrink-0 items-center gap-2 pt-0.5">
+    <div className="flex items-start justify-end">
       <Button type="button" size="sm" onClick={onOpenVisualEditor} data-testid="factory-app-edit">
         Edit
       </Button>

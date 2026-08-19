@@ -67,7 +67,6 @@ export function useFactoryAppCanvasRoute() {
     hasCanvas: Boolean(canvas),
   });
   const subtitle = resolveFactoryAppCanvasSubtitle({
-    isConfigure,
     description: canvas?.metadata?.description?.trim(),
     factoryName: factory?.name,
   });

@@ -672,7 +672,7 @@ export function AppPage({
    * This ref persists across re-renders to preserve sidebar state.
    */
   const isSidebarOpenRef = useRef<boolean | null>(null);
-  if (isSidebarOpenRef.current === null && typeof window !== "undefined") {
+  if (!factoryEmbed && isSidebarOpenRef.current === null && typeof window !== "undefined") {
     const storedSidebarState = window.localStorage.getItem(CANVAS_SIDEBAR_STORAGE_KEY);
     if (storedSidebarState !== null) {
       try {
@@ -683,7 +683,7 @@ export function AppPage({
       }
     }
   }
-  if (isSidebarOpenRef.current === null && canvas) {
+  if (!factoryEmbed && isSidebarOpenRef.current === null && canvas) {
     isSidebarOpenRef.current = canvas.spec?.nodes?.length === 0;
   }
 
@@ -3902,6 +3902,7 @@ export function AppPage({
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
           buildingBlocks={buildingBlocks}
           isEditing={isEditing}
+          factoryConfigure={factoryConfigure}
           activeCanvasVersionId={activeCanvasVersionId}
           liveCanvasVersionId={liveCanvasVersionId}
           onAgentStagingReady={handleAgentStagingReady}

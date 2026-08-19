@@ -81,4 +81,23 @@ describe("resolveFactoryEmbedCanvasChrome", () => {
 
     expect(chrome.hideRightSideControls).toBe(true);
   });
+
+  it("hides add controls in factory view-only mode", () => {
+    const { input } = buildInput({ factoryEmbed: true, factoryViewOnly: true, hideAddControls: false });
+    const chrome = resolveFactoryEmbedCanvasChrome(input);
+
+    expect(chrome.hideAddControls).toBe(true);
+  });
+
+  it("keeps add controls in factory Configure even when run inspection would hide them", () => {
+    const { input } = buildInput({
+      factoryEmbed: true,
+      factoryViewOnly: false,
+      hideAddControls: true,
+      runInspectionChromeActive: true,
+    });
+    const chrome = resolveFactoryEmbedCanvasChrome(input);
+
+    expect(chrome.hideAddControls).toBe(false);
+  });
 });

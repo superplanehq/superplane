@@ -1,15 +1,10 @@
 export function resolveFactoryAppCanvasSubtitle({
-  isConfigure,
   description,
   factoryName,
 }: {
-  isConfigure: boolean;
   description?: string;
   factoryName?: string;
 }) {
-  if (isConfigure) {
-    return "Drag steps and reconnect edges to configure this automation.";
-  }
   if (description) {
     return description;
   }

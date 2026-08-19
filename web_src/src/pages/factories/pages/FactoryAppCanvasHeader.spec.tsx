@@ -17,7 +17,7 @@ describe("FactoryAppCanvasHeader", () => {
           backHref="/back"
           backLabel="Automations"
           title="DFFDGD"
-          subtitle="Drag steps"
+          subtitle="Applies the plan across affected repos and opens PRs."
           isConfigure
           configureBusy={false}
           canRename
@@ -49,7 +49,7 @@ describe("FactoryAppCanvasHeader", () => {
           backHref="/back"
           backLabel="Automations"
           title="DFFDGD"
-          subtitle="Drag steps"
+          subtitle="Applies the plan across affected repos and opens PRs."
           isConfigure
           configureBusy={false}
           canRename={false}
@@ -116,6 +116,64 @@ describe("FactoryAppCanvasHeader", () => {
     expect(onOpenVisualEditor).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the header shell and title box stable in view and configure", () => {
+    const view = render(
+      <MemoryRouter>
+        <FactoryAppCanvasHeader
+          backHref="/back"
+          backLabel="plan-and-implement"
+          title="Refund Implementer"
+          subtitle="Applies the plan across affected repos and opens PRs."
+          isConfigure={false}
+          configureBusy={false}
+          onDiscard={vi.fn()}
+          onSave={vi.fn()}
+          onOpenVisualEditor={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    const viewHeader = screen.getByTestId("factory-app-canvas-header");
+    const viewTitle = screen.getByTestId("factory-app-canvas-title");
+    const viewHeaderClass = viewHeader.className;
+    const viewTitleClass = viewTitle.className;
+
+    view.unmount();
+
+    render(
+      <MemoryRouter>
+        <FactoryAppCanvasHeader
+          backHref="/back"
+          backLabel="plan-and-implement"
+          title="Refund Implementer"
+          subtitle="Applies the plan across affected repos and opens PRs."
+          isConfigure
+          configureBusy={false}
+          canRename
+          onDraftTitleChange={vi.fn()}
+          onDiscard={vi.fn()}
+          onSave={vi.fn()}
+          workspace={{
+            agentOpen: false,
+            componentsOpen: false,
+            onAgentOpenChange: vi.fn(),
+            onComponentsOpenChange: vi.fn(),
+            onViewYaml: vi.fn(),
+            onEditWithLocalAgent: vi.fn(),
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    const editHeader = screen.getByTestId("factory-app-canvas-header");
+    const editTitle = screen.getByTestId("factory-app-canvas-title");
+    expect(editHeader.className).toBe(viewHeaderClass);
+    expect(editTitle).toHaveClass(viewTitleClass);
+    expect(editTitle).not.toHaveClass("-mx-1");
+    expect(editTitle).not.toHaveClass("px-1");
+    expect(editTitle).not.toHaveClass("border");
+  });
+
   it("marks edit mode with workspace toggles and more options", async () => {
     const user = userEvent.setup();
     const onAgentOpenChange = vi.fn();
@@ -129,7 +187,7 @@ describe("FactoryAppCanvasHeader", () => {
           backHref="/back"
           backLabel="Plan and Implement"
           title="Refund Implementer"
-          subtitle="Drag steps"
+          subtitle="Applies the plan across affected repos and opens PRs."
           isConfigure
           configureBusy={false}
           onDiscard={vi.fn()}
@@ -147,7 +205,8 @@ describe("FactoryAppCanvasHeader", () => {
     );
 
     expect(screen.getByTestId("factory-app-canvas-header")).toHaveAttribute("data-editing", "true");
-    expect(screen.getByTestId("factory-app-editing-badge")).toHaveTextContent("Editing");
+    expect(screen.queryByTestId("factory-app-editing-badge")).not.toBeInTheDocument();
+    expect(screen.getByText("Applies the plan across affected repos and opens PRs.")).toBeInTheDocument();
     expect(screen.getByTestId("factory-app-workspace-components")).toHaveAttribute("aria-pressed", "true");
 
     const save = screen.getByTestId("factory-app-save");

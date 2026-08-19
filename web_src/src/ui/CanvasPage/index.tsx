@@ -63,6 +63,7 @@ import {
   useCanvasToolSidebarState,
   type CanvasToolSidebarState,
 } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import { FactoryCanvasToolSidebar } from "@/pages/factories/agent/FactoryCanvasToolSidebar";
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { countUnacknowledgedErrors } from "@/pages/app/lib/canvas-runs";
@@ -442,6 +443,8 @@ export interface CanvasPageProps {
    * selected, and chrome is Close-only (no newer/older/copy link).
    */
   factoryEmbed?: boolean;
+  /** Factory-shell Configure. Drives edit-grid dots before the draft session is ready. */
+  factoryConfigure?: boolean;
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -813,7 +816,7 @@ function CanvasPage(props: CanvasPageProps) {
   const hasUserToggledSidebarRef = props.hasUserToggledSidebarRef ?? localHasUserToggledSidebarRef;
   const isSidebarOpenRef = props.isSidebarOpenRef ?? localIsSidebarOpenRef;
 
-  if (isSidebarOpenRef.current === null && typeof window !== "undefined") {
+  if (isSidebarOpenRef.current === null && typeof window !== "undefined" && !props.factoryEmbed) {
     const storedSidebarState = window.localStorage.getItem(CANVAS_SIDEBAR_STORAGE_KEY);
     if (storedSidebarState !== null) {
       try {
@@ -825,13 +828,15 @@ function CanvasPage(props: CanvasPageProps) {
     }
   }
 
-  // Initialize sidebar state from ref if available, otherwise based on whether nodes exist
+  // Factory embed opens from the Components tab (`blocks=1`), not from empty
+  // canvases or the shared localStorage preference.
   const [isBuildingBlocksSidebarOpen, setIsBuildingBlocksSidebarOpen] = useState(() => {
-    // If we have a persisted state in the ref, use it
+    if (props.factoryEmbed) {
+      return isSidebarOpenRef.current === true;
+    }
     if (isSidebarOpenRef.current !== null) {
       return isSidebarOpenRef.current;
     }
-    // Otherwise, open if no nodes exist
     return props.nodes.length === 0;
   });
 
@@ -1112,7 +1117,7 @@ function CanvasPage(props: CanvasPageProps) {
     [props, readOnly],
   );
 
-  const handleSidebarToggle = useCallback(
+  const applyBuildingBlocksSidebarOpen = useCallback(
     (open: boolean) => {
       hasUserToggledSidebarRef.current = true;
       isSidebarOpenRef.current = open;
@@ -1120,14 +1125,21 @@ function CanvasPage(props: CanvasPageProps) {
       if (typeof window !== "undefined") {
         window.localStorage.setItem(CANVAS_SIDEBAR_STORAGE_KEY, JSON.stringify(open));
       }
+    },
+    [hasUserToggledSidebarRef, isSidebarOpenRef],
+  );
+
+  const handleSidebarToggle = useCallback(
+    (open: boolean) => {
+      applyBuildingBlocksSidebarOpen(open);
       if (props.canvasId) {
         publishBuildingBlocksSidebarChanged(props.canvasId, open);
       }
     },
-    [hasUserToggledSidebarRef, isSidebarOpenRef, props.canvasId],
+    [applyBuildingBlocksSidebarOpen, props.canvasId],
   );
 
-  useBuildingBlocksSidebarRequest(props.canvasId, handleSidebarToggle);
+  useBuildingBlocksSidebarRequest(props.canvasId, applyBuildingBlocksSidebarOpen);
 
   /**
    * Keyboard equivalent of dropping a block onto the canvas via drag-and-drop.
@@ -1472,7 +1484,11 @@ function CanvasPage(props: CanvasPageProps) {
 
       {/* Main content area with sidebar and canvas */}
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        <CanvasToolSidebar toolSidebarState={toolSidebarState} />
+        {props.factoryEmbed ? (
+          <FactoryCanvasToolSidebar toolSidebarState={toolSidebarState} />
+        ) : (
+          <CanvasToolSidebar toolSidebarState={toolSidebarState} />
+        )}
 
         <CanvasRunsSidebar isOpen={isRunsSidebarOpen}>{props.toolSidebarRunsContent ?? null}</CanvasRunsSidebar>
 
@@ -1553,6 +1569,7 @@ function CanvasPage(props: CanvasPageProps) {
                   state={state}
                   factoryId={props.factoryId}
                   factoryEmbed={props.factoryEmbed}
+                  factoryConfigure={props.factoryConfigure}
                   layoutMode={props.layoutMode}
                   onNodeDelete={handleNodeDelete}
                   onNodesDelete={handleNodesDelete}
@@ -2196,6 +2213,7 @@ function CanvasContent({
   state,
   factoryId,
   factoryEmbed = false,
+  factoryConfigure = false,
   layoutMode,
   onNodeDelete,
   onNodesDelete,
@@ -2250,6 +2268,7 @@ function CanvasContent({
   state: CanvasPageState;
   factoryId?: string;
   factoryEmbed?: boolean;
+  factoryConfigure?: boolean;
   layoutMode?: CanvasLayoutMode;
   onNodeDelete?: (nodeId: string) => void;
   onNodesDelete?: (nodeIds: string[]) => void;
@@ -2315,7 +2334,10 @@ function CanvasContent({
   const isReadOnly = readOnly ?? false;
   const flowDirection = resolveCanvasFlowDirection(factoryId);
   const isVerticalFlow = flowDirection === "vertical";
-  const factoryBackground = isVerticalFlow ? factoryCanvasBackground(resolvedTheme === "dark") : null;
+  const factoryEditGrid = isEditing || factoryConfigure;
+  const factoryBackground = isVerticalFlow
+    ? factoryCanvasBackground(resolvedTheme === "dark", factoryEditGrid)
+    : null;
   const flowBgColor = factoryBackground?.bgColor ?? (resolvedTheme === "dark" ? DARK_BASE_BG_HEX : "#F1F5F9");
   const flowDotColor = factoryBackground?.color ?? (resolvedTheme === "dark" ? "#374151" : "#cbd5e1");
   const flowDotGap = factoryBackground?.gap ?? 8;
@@ -3338,7 +3360,13 @@ function CanvasContent({
             style={reactFlowStyle}
             className="h-full w-full"
           >
-            <Background gap={flowDotGap} size={flowDotSize} bgColor={flowBgColor} color={flowDotColor} />
+            <Background
+              id={factoryBackground ? `dots-${factoryEditGrid ? "edit" : "view"}-${flowDotSize}` : undefined}
+              gap={flowDotGap}
+              size={flowDotSize}
+              bgColor={flowBgColor}
+              color={flowDotColor}
+            />
             <GlobalCommandPaletteCanvasNodeSearch onSearch={handleNodeSearch} onSelectNode={handleNodeSearchSelect} />
             <Panel
               position="bottom-left"

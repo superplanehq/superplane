@@ -130,7 +130,6 @@ export function factoryAppConfigurePath(
   return factoryAppPath(organizationId, factoryKey, appId, {
     ...options,
     configure: true,
-    blocks: options?.blocks ?? true,
   });
 }
 
