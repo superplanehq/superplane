@@ -99,6 +99,39 @@ func ec2ActionField(visibilityConditions []configuration.VisibilityCondition) co
 	}
 }
 
+// timestampTimezoneOptions is a curated set of IANA zones, matching the
+// select statuspage.CreateIncident already offers for the same "disambiguate
+// an offset-less timestamp" problem.
+var timestampTimezoneOptions = []configuration.FieldOption{
+	{Label: "UTC", Value: "UTC"},
+	{Label: "America/New_York", Value: "America/New_York"},
+	{Label: "America/Los_Angeles", Value: "America/Los_Angeles"},
+	{Label: "America/Chicago", Value: "America/Chicago"},
+	{Label: "Europe/London", Value: "Europe/London"},
+	{Label: "Europe/Paris", Value: "Europe/Paris"},
+	{Label: "Asia/Tokyo", Value: "Asia/Tokyo"},
+	{Label: "Asia/Singapore", Value: "Asia/Singapore"},
+}
+
+// scheduleTimezoneField lets a mute rule's schedule expression, and any
+// offset-less start/expire date, be evaluated in a specific timezone instead
+// of UTC.
+func scheduleTimezoneField() configuration.Field {
+	return configuration.Field{
+		Name:        "timezone",
+		Label:       "Timezone",
+		Type:        configuration.FieldTypeSelect,
+		Required:    false,
+		Default:     "UTC",
+		Description: "Timezone the schedule expression runs in, and that offset-less start/expire dates are interpreted in",
+		TypeOptions: &configuration.TypeOptions{
+			Select: &configuration.SelectTypeOptions{
+				Options: timestampTimezoneOptions,
+			},
+		},
+	}
+}
+
 func regionParameter() configuration.ParameterRef {
 	return configuration.ParameterRef{
 		Name:      "region",

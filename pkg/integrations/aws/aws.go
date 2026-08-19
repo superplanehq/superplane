@@ -139,6 +139,8 @@ func (a *AWS) Actions() []core.Action {
 	return []core.Action{
 		&cloudwatch.CreateAlarm{},
 		&cloudwatch.UpdateAlarm{},
+		&cloudwatch.CreateAlarmMuteRule{},
+		&cloudwatch.GetAlarmMuteRule{},
 		&codeartifact.CopyPackageVersions{},
 		&codeartifact.CreateRepository{},
 		&codeartifact.DeletePackageVersions{},

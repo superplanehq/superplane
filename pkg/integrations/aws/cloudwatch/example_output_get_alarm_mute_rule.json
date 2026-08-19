@@ -1,0 +1,18 @@
+{
+  "data": {
+    "alarmMuteRuleArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm-mute-rule:DailyMaintenanceWindow",
+    "alarmNames": ["WebServerCPUAlarm", "DatabaseConnectionAlarm"],
+    "description": "Mute alarms during daily maintenance",
+    "expireDate": "",
+    "lastUpdatedTimestamp": "2026-06-03T16:36:13Z",
+    "muteType": "RECURRING",
+    "name": "DailyMaintenanceWindow",
+    "scheduleDuration": "PT2H",
+    "scheduleExpression": "cron(0 2 * * *)",
+    "scheduleTimezone": "UTC",
+    "startDate": "",
+    "status": "ACTIVE"
+  },
+  "timestamp": "2026-06-03T16:36:13.985915034Z",
+  "type": "aws.cloudwatch.alarmMuteRule"
+}

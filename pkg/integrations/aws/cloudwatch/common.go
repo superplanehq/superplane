@@ -14,10 +14,18 @@ const (
 )
 
 const (
+	CreateAlarmMuteRulePayloadType = "aws.cloudwatch.alarmMuteRule"
+	GetAlarmMuteRulePayloadType    = "aws.cloudwatch.alarmMuteRule"
+)
+
+const (
 	StatisticAverage = "Average"
 
 	defaultAlarmPeriod            = 300
 	defaultAlarmEvaluationPeriods = 1
+
+	// maxMuteRuleAlarms mirrors PutAlarmMuteRule's own limit on MuteTargets.AlarmNames.
+	maxMuteRuleAlarms = 100
 )
 
 var AllAlarmStates = []configuration.FieldOption{

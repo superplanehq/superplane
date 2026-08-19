@@ -23,6 +23,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="CloudWatch • Create Alarm" href="#cloud-watch-•-create-alarm" description="Create a CloudWatch metric alarm for any metric" />
+  <LinkCard title="CloudWatch • Create Alarm Mute Rule" href="#cloud-watch-•-create-alarm-mute-rule" description="Mute one or more CloudWatch alarms during a scheduled window, like a Grafana silence" />
+  <LinkCard title="CloudWatch • Get Alarm Mute Rule" href="#cloud-watch-•-get-alarm-mute-rule" description="Fetch the current configuration and status of a CloudWatch alarm mute rule" />
   <LinkCard title="CloudWatch • Update Alarm" href="#cloud-watch-•-update-alarm" description="Update an existing CloudWatch metric alarm" />
   <LinkCard title="CodeArtifact • Copy Package Versions" href="#code-artifact-•-copy-package-versions" description="Copy package versions from one repository to another in the same domain" />
   <LinkCard title="CodeArtifact • Create Repository" href="#code-artifact-•-create-repository" description="Create an AWS CodeArtifact repository in a domain" />
@@ -665,6 +667,115 @@ Emits the created alarm on the default output channel, including `alarmName`, `a
   },
   "timestamp": "2026-06-03T16:36:13.985915034Z",
   "type": "aws.cloudwatch.alarm"
+}
+```
+
+<a id="cloud-watch-•-create-alarm-mute-rule"></a>
+
+## CloudWatch • Create Alarm Mute Rule
+
+**Component key:** `aws.cloudwatch.createAlarmMuteRule`
+
+The Create Alarm Mute Rule component creates or updates a CloudWatch alarm mute rule. While a rule is active, its targeted alarms keep evaluating and changing state, but their configured actions (SNS notifications, EC2 automations, etc.) are muted.
+
+### Use Cases
+
+- **Planned maintenance**: Silence noisy alarms during a deploy or maintenance window
+- **Recurring quiet hours**: Mute non-critical alarms every night or every weekend
+- **Incident response**: Silence a known-flapping alarm once, for a fixed duration
+
+### Configuration
+
+- **Region**: AWS region the alarms and the rule live in
+- **Name**: Unique mute rule name within the region; creating a rule with an existing name updates it
+- **Description** *(toggleable)*: Free-text description
+- **Alarms**: Alarms to mute while the rule is active (up to 100)
+- **Schedule Expression**: A recurring `cron(Minutes Hours Day-of-month Month Day-of-week)` expression (e.g. `cron(0 2 * * *)`) or a one-time `at(yyyy-MM-ddThh:mm)` expression (e.g. `at(2026-01-20T14:00)`)
+- **Duration**: How long alarms stay muted once the schedule activates, in ISO 8601 duration format (e.g. `PT2H` for 2 hours), between `PT1M` and `P15D`
+- **Timezone**: Timezone the schedule expression runs in, and that offset-less start/expire dates are interpreted in (default UTC)
+- **Starts At** *(toggleable)*: Rule takes effect immediately if left unset
+- **Expires At** *(toggleable)*: Rule never expires if left unset
+
+### Output
+
+Emits the mute rule on the default output channel, including `name`, `alarmMuteRuleArn`,
+`scheduleExpression`, `scheduleDuration`, `alarmNames`, `status` and `muteType`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alarmMuteRuleArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm-mute-rule:DailyMaintenanceWindow",
+    "alarmNames": [
+      "WebServerCPUAlarm",
+      "DatabaseConnectionAlarm"
+    ],
+    "description": "Mute alarms during daily maintenance",
+    "expireDate": "",
+    "lastUpdatedTimestamp": "2026-06-03T16:36:13Z",
+    "muteType": "RECURRING",
+    "name": "DailyMaintenanceWindow",
+    "scheduleDuration": "PT2H",
+    "scheduleExpression": "cron(0 2 * * *)",
+    "scheduleTimezone": "UTC",
+    "startDate": "",
+    "status": "SCHEDULED"
+  },
+  "timestamp": "2026-06-03T16:36:13.985915034Z",
+  "type": "aws.cloudwatch.alarmMuteRule"
+}
+```
+
+<a id="cloud-watch-•-get-alarm-mute-rule"></a>
+
+## CloudWatch • Get Alarm Mute Rule
+
+**Component key:** `aws.cloudwatch.getAlarmMuteRule`
+
+The Get Alarm Mute Rule component describes a CloudWatch alarm mute rule and emits its current details.
+
+### Use Cases
+
+- **Status inspection**: Check whether a mute rule is SCHEDULED, ACTIVE or EXPIRED before taking action
+- **Audit**: Record a mute rule's targeted alarms and schedule at a point in time
+
+### Configuration
+
+- **Region**: AWS region the mute rule lives in
+- **Name**: Name of the mute rule to describe
+
+### Output
+
+Emits the mute rule details on the default output channel:
+- `name`, `alarmMuteRuleArn`, `description`
+- `scheduleExpression`, `scheduleDuration`, `scheduleTimezone`
+- `alarmNames`, `startDate`, `expireDate`
+- `status`, `muteType`, `lastUpdatedTimestamp`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alarmMuteRuleArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm-mute-rule:DailyMaintenanceWindow",
+    "alarmNames": [
+      "WebServerCPUAlarm",
+      "DatabaseConnectionAlarm"
+    ],
+    "description": "Mute alarms during daily maintenance",
+    "expireDate": "",
+    "lastUpdatedTimestamp": "2026-06-03T16:36:13Z",
+    "muteType": "RECURRING",
+    "name": "DailyMaintenanceWindow",
+    "scheduleDuration": "PT2H",
+    "scheduleExpression": "cron(0 2 * * *)",
+    "scheduleTimezone": "UTC",
+    "startDate": "",
+    "status": "ACTIVE"
+  },
+  "timestamp": "2026-06-03T16:36:13.985915034Z",
+  "type": "aws.cloudwatch.alarmMuteRule"
 }
 ```
 
