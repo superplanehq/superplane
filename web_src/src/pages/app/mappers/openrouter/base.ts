@@ -58,6 +58,25 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return items;
 }
 
+function formatTimestamp(timestamp?: string): string | undefined {
+  return timestamp ? new Date(timestamp).toLocaleString() : undefined;
+}
+
+function formatTokens(usage?: ChatCompletionPayload["usage"]): string | undefined {
+  if (!usage?.total_tokens) return undefined;
+  const input = usage.prompt_tokens ?? 0;
+  const output = usage.completion_tokens ?? 0;
+  return `${usage.total_tokens.toLocaleString()} (${input.toLocaleString()} in / ${output.toLocaleString()} out)`;
+}
+
+function formatCost(usage?: ChatCompletionPayload["usage"]): string | undefined {
+  return typeof usage?.cost === "number" ? `$${usage.cost.toFixed(6)}` : undefined;
+}
+
+function modelUrl(model?: string): string | undefined {
+  return model ? `https://openrouter.ai/${model}` : undefined;
+}
+
 export const baseMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
@@ -78,40 +97,23 @@ export const baseMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const details: Record<string, string> = {};
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
     const data = payload?.data as ChatCompletionPayload | undefined;
 
-    if (payload?.timestamp) {
-      details["Completed At"] = new Date(payload.timestamp).toLocaleString();
-    }
+    const details: Record<string, string> = {};
+    const add = (label: string, value?: string) => {
+      if (value) details[label] = value;
+    };
 
-    if (data?.model) {
-      details["Model"] = data.model;
-    }
-
+    add("Completed At", formatTimestamp(payload?.timestamp));
+    add("Model", data?.model);
     // The provider that actually served the request can differ between runs on
     // the same model, so it is worth showing next to the model.
-    if (data?.provider) {
-      details["Provider"] = data.provider;
-    }
-
-    const usage = data?.usage;
-    if (usage?.total_tokens) {
-      const input = usage.prompt_tokens ?? 0;
-      const output = usage.completion_tokens ?? 0;
-      details["Tokens"] =
-        `${usage.total_tokens.toLocaleString()} (${input.toLocaleString()} in / ${output.toLocaleString()} out)`;
-    }
-
-    if (typeof usage?.cost === "number") {
-      details["Cost"] = `$${usage.cost.toFixed(6)}`;
-    }
-
-    if (data?.model) {
-      details["View Model"] = `https://openrouter.ai/${data.model}`;
-    }
+    add("Provider", data?.provider);
+    add("Tokens", formatTokens(data?.usage));
+    add("Cost", formatCost(data?.usage));
+    add("View Model", modelUrl(data?.model));
 
     return details;
   },

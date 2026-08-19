@@ -25,8 +25,12 @@ type GetCreditsPayload = {
   };
 };
 
-function credits(value: number): string {
-  return `$${value.toFixed(2)}`;
+function credits(value?: number | null): string | undefined {
+  return typeof value === "number" ? `$${value.toFixed(2)}` : undefined;
+}
+
+function formatTimestamp(timestamp?: string): string | undefined {
+  return timestamp ? new Date(timestamp).toLocaleString() : undefined;
 }
 
 export const getCreditsMapper: ComponentBaseMapper = {
@@ -48,35 +52,22 @@ export const getCreditsMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const details: Record<string, string> = {};
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
     const data = payload?.data as GetCreditsPayload | undefined;
 
-    if (payload?.timestamp) {
-      details["Fetched At"] = new Date(payload.timestamp).toLocaleString();
-    }
+    const details: Record<string, string> = {};
+    const add = (label: string, value?: string) => {
+      if (value) details[label] = value;
+    };
 
-    if (typeof data?.balance === "number") {
-      details["Balance"] = credits(data.balance);
-    }
-
-    if (typeof data?.totalCredits === "number") {
-      details["Total Credits"] = credits(data.totalCredits);
-    }
-
-    if (typeof data?.totalUsage === "number") {
-      details["Total Usage"] = credits(data.totalUsage);
-    }
-
-    if (typeof data?.key?.usageMonthly === "number") {
-      details["Key Usage (Month)"] = credits(data.key.usageMonthly);
-    }
-
+    add("Fetched At", formatTimestamp(payload?.timestamp));
+    add("Balance", credits(data?.balance));
+    add("Total Credits", credits(data?.totalCredits));
+    add("Total Usage", credits(data?.totalUsage));
+    add("Key Usage (Month)", credits(data?.key?.usageMonthly));
     // Null rather than absent when the key has no credit limit set.
-    if (typeof data?.key?.limitRemaining === "number") {
-      details["Key Limit Remaining"] = credits(data.key.limitRemaining);
-    }
+    add("Key Limit Remaining", credits(data?.key?.limitRemaining));
 
     return details;
   },
