@@ -21,7 +21,9 @@ import { RunInspectorNodeActions } from "./RunInspectorNodeAccordion";
 import { ResizeHandle } from "./RunInspectorResize";
 import { RunInspectorStepTimeline } from "./RunInspectorStepTimeline";
 import { RunInspectorStepsList } from "./RunInspectorStepsList";
+import { RunErrorsCard } from "./RunErrorsCard";
 import { buildNodeMap, buildRunPresentation, type RUN_STATUS_META } from "./runPresentation";
+import { normalizeRunErrors } from "./runErrors";
 import type { RunInspectorCurrentUser, RunInspectorErrorSummary, RunInspectorNodeSection } from "./types";
 import { useResizableInspectorWidth } from "./useResizableInspectorWidth";
 import { useRunInspectorActions } from "./useRunInspectorActions";
@@ -143,6 +145,7 @@ function RunInspectorPanelBody({
         currentUser={model.resolvedCurrentUser}
         errorScrollRequest={model.errorScrollRequest}
         onErrorScrolled={model.clearErrorScrollRequest}
+        runErrors={model.runErrors}
       />
     );
   }
@@ -159,6 +162,7 @@ function RunInspectorPanelBody({
         actionDisabled={stopping ? model.actions.stopDisabled : !run.rootEvent?.id}
       />
       <RunInspectorContent
+        runErrors={model.runErrors}
         errorSummaries={model.errorSummaries}
         status={model.presentation.status}
         sections={model.sections}
@@ -198,6 +202,7 @@ function FactoryNodeDetailBody({
   currentUser,
   errorScrollRequest,
   onErrorScrolled,
+  runErrors,
 }: {
   organizationId?: string;
   sections: RunInspectorNodeSection[];
@@ -211,13 +216,16 @@ function FactoryNodeDetailBody({
   currentUser: RunInspectorCurrentUser | undefined;
   errorScrollRequest: { nodeId: string; requestId: number } | null;
   onErrorScrolled: () => void;
+  runErrors: string[];
 }) {
   const selectedSection = sections.find((section) => section.sectionValue === selectedValue) ?? null;
+  const runErrorsCard = runErrors.length > 0 ? <RunErrorsCard errors={runErrors} /> : null;
 
   if (isLoading && !selectedSection) {
     return (
       <div className="flex min-h-0 flex-1 flex-col" data-testid="factory-run-node-detail">
         <FactorySidebarCloseRow onClose={onClose} />
+        {runErrorsCard ? <div className="px-3 pt-3">{runErrorsCard}</div> : null}
         <div className="flex min-h-0 flex-1 items-center justify-center gap-2 px-4 py-8 text-sm text-slate-500 dark:text-gray-400">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading run steps...
@@ -230,6 +238,7 @@ function FactoryNodeDetailBody({
     return (
       <div className="flex min-h-0 flex-1 flex-col" data-testid="factory-run-node-detail">
         <FactorySidebarCloseRow onClose={onClose} />
+        {runErrorsCard ? <div className="px-3 pt-3">{runErrorsCard}</div> : null}
         <div className="px-4 py-8 text-sm text-slate-500 dark:text-gray-400" data-testid="factory-run-inspector-empty">
           Select a node to inspect this run.
         </div>
@@ -254,6 +263,7 @@ function FactoryNodeDetailBody({
         />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 px-3 py-3 dark:bg-gray-950">
+        {runErrorsCard ? <div className="mb-3">{runErrorsCard}</div> : null}
         {selectedSection.isQueued ? (
           <p className="text-sm text-slate-500 dark:text-gray-400">This step is queued.</p>
         ) : (
@@ -316,6 +326,7 @@ function useRunInspectorPanelModel({
     [componentDefinitions, executions, run, triggerDefinitions, inspectorWorkflowEdges, inspectorWorkflowNodes],
   );
   const errorSummaries = useMemo(() => findRunInspectorErrorSummaries(sections), [sections]);
+  const runErrors = useMemo(() => normalizeRunErrors(run.errors), [run.errors]);
   const inspectorWidth = useResizableInspectorWidth();
   const [errorScrollRequest, setErrorScrollRequest] = useState<{ nodeId: string; requestId: number } | null>(null);
   const [selectedSectionValue, setSelectedSectionValue] = useState<string | null>(null);
@@ -339,6 +350,7 @@ function useRunInspectorPanelModel({
     clearErrorScrollRequest: () => setErrorScrollRequest(null),
     errorScrollRequest,
     errorSummaries,
+    runErrors,
     handleValueChange: (value: string) =>
       selectRunInspectorSection(value, sections, setSelectedSectionValue, onSelectNode, onClearSelectedNode),
     hasRunVersionSpec,
@@ -356,6 +368,7 @@ function useRunInspectorPanelModel({
 }
 
 function RunInspectorContent({
+  runErrors,
   errorSummaries,
   status,
   sections,
@@ -374,6 +387,7 @@ function RunInspectorContent({
   errorScrollRequest,
   onErrorScrolled,
 }: {
+  runErrors: string[];
   errorSummaries: RunInspectorErrorSummary[];
   status: keyof typeof RUN_STATUS_META;
   sections: RunInspectorNodeSection[];
@@ -394,6 +408,7 @@ function RunInspectorContent({
 }) {
   return (
     <RunInspectorStepsList
+      runErrors={runErrors}
       errorSummaries={errorSummaries}
       status={status}
       sections={sections}

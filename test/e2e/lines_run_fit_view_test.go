@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 // The fixed browser context viewport configured in test_context.go. A node
@@ -27,7 +28,6 @@ const (
 
 const (
 	linesRunFitTriggerNodeID = "kickoff"
-	linesRunFitStepName      = "Build"
 	// Factory run inspection re-lays a linear run out in a single vertical
 	// spine from a fixed, small origin (see layoutFactoryRunLeafGraph),
 	// independent of any saved editor position. A dozen chained steps stack
@@ -148,7 +148,6 @@ func (s *linesRunFitSteps) givenAFactoryAppWithAWideParticipantChain() {
 func (s *linesRunFitSteps) givenALineDispatchedForThatApp() {
 	line, err := s.factory.CreateLine(database.Conn(), support.RandomName("line"), []models.FactoryLineStep{
 		{
-			Name:       linesRunFitStepName,
 			Type:       models.FactoryLineStepTypeRunApp,
 			AppID:      s.canvas.ID,
 			Entrypoint: linesRunFitTriggerNodeID,
@@ -161,8 +160,12 @@ func (s *linesRunFitSteps) givenALineDispatchedForThatApp() {
 	require.NoError(s.t, err)
 	require.NoError(s.t, order.TransitionOnDispatch(database.Conn(), nil))
 
-	result, err := line.StartStep(database.Conn(), order, 0)
-	require.NoError(s.t, err)
+	var result *models.FactoryLineStepResult
+	require.NoError(s.t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var startErr error
+		_, result, startErr = line.Dispatch(tx, order)
+		return startErr
+	}))
 	s.execution = result.Execution
 	s.runID = result.Run.ID
 

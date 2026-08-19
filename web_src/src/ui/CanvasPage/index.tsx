@@ -92,8 +92,10 @@ import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "../componentSidebar/types";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
+import { RunErrorsCard } from "../Runs/RunErrorsCard";
 import { RunInspectorLoadingPanel } from "../Runs/RunInspectorLoadingPanel";
 import { RunInspectorPanel } from "../Runs/RunInspectorPanel";
+import { normalizeRunErrors, shouldShowFactoryCanvasRunErrors } from "../Runs/runErrors";
 import { getRunStatus } from "../Runs/runPresentation";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
@@ -1293,6 +1295,13 @@ function CanvasPage(props: CanvasPageProps) {
     factoryEmbed: props.factoryEmbed,
     selectedNodeId: props.runNodeDetailNodeId,
   });
+  const runErrors = normalizeRunErrors(props.runNodeDetailRun?.errors);
+  const showFactoryCanvasRunErrors = shouldShowFactoryCanvasRunErrors({
+    factoryEmbed: props.factoryEmbed,
+    isRunInspectionMode: props.isRunInspectionMode,
+    runInspectorOpen,
+    errorCount: runErrors.length,
+  });
 
   const renderInspectorSidebar = useCallback(
     (layout: "sidebar" | "bottom") => (
@@ -1526,6 +1535,11 @@ function CanvasPage(props: CanvasPageProps) {
                   props.onBackToLiveCanvas?.();
                 }}
               />
+            ) : null}
+            {showFactoryCanvasRunErrors ? (
+              <div className="absolute inset-x-0 top-0 z-[19] px-4 pt-3" data-testid="factory-run-errors-banner">
+                <RunErrorsCard errors={runErrors} className="mx-auto max-w-2xl shadow-sm" />
+              </div>
             ) : null}
             {props.headerMode === "files" ? (
               <div
