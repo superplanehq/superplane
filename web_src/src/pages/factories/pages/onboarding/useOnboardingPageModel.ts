@@ -20,6 +20,7 @@ import { useNavigate } from "react-router";
 import { factoryOverviewPath, workOrderDetailPath } from "../../lib/factoryPagePaths";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
+import { initialWizardStep } from "./onboardingStatus";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import { workspaceNameFromRepository } from "./workspaceNames";
@@ -55,15 +56,6 @@ function initialSelections(onboarding: FactoriesFactory["onboarding"]): Integrat
     };
   }
   return selections;
-}
-
-// Setup resumes at the first wizard step that still needs an answer.
-function initialSection(onboarding: FactoriesFactory["onboarding"]): WizardStepId {
-  if (onboarding?.agentHarness) return "name";
-  if (onboarding?.issuesSource) return "agent";
-  if (onboarding?.appRepository) return "issues";
-  if (onboarding?.vcsIntegrationId) return "repo";
-  return "vcs";
 }
 
 function localIssuesSource(source?: string): IssuesChoiceId | null {
@@ -420,7 +412,7 @@ export function useOnboardingPageModel(args: {
   useRestoreSetup(setup, onboarding, integrations.selections);
   useNameFromRepository(setup);
 
-  const [openSection, setOpenSection] = useState<WizardStepId>(() => initialSection(onboarding));
+  const [openSection, setOpenSection] = useState<WizardStepId>(() => initialWizardStep(onboarding));
   const [saving, setSaving] = useState(false);
   const updateFactory = useUpdateFactory(args.organizationId, args.factoryId);
   const updateOnboarding = useFactoryOnboarding(args.organizationId, args.factoryId);

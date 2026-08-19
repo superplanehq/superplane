@@ -99,8 +99,8 @@ export function useOnboardingSetupState(
   /** True after Continue to coding agent — starts backlog analysis. */
   const [issuesCommitted, setIssuesCommitted] = useState(false);
   const [agent, setAgent] = useState<AgentHarnessId | null>(null);
-  const [workOrderTitle, setWorkOrderTitle] = useState(START_WORK_ORDER.title);
-  const [workOrderDescription, setWorkOrderDescription] = useState(START_WORK_ORDER.description);
+  const [workOrderTitle, setWorkOrderTitle] = useState<string>(START_WORK_ORDER.title);
+  const [workOrderDescription, setWorkOrderDescription] = useState<string>(START_WORK_ORDER.description);
   const [finished, setFinished] = useState(false);
   const discoveryTimerRef = useRef<number | null>(null);
   const connected = options?.connected ?? localConnected;
