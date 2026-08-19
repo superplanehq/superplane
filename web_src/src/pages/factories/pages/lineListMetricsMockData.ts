@@ -25,10 +25,10 @@ export type LineListMetrics = {
   /** Closed work orders in the window (success-rate denominator). */
   totalClosedCount: number;
   /**
-   * Average human interventions per work order: steering comments, tweaks,
-   * and re-dispatches. 1.0 means one intervention per work order.
+   * Median time from first execution to merge, in minutes, for merged work
+   * orders.
    */
-  reworkPerWorkOrder: number;
+  durationMinutes: number;
   /**
    * Tracked cost (model tokens + execution compute) divided by merged work
    * orders. Failed and reworked runs raise this number.
@@ -38,8 +38,8 @@ export type LineListMetrics = {
   successTrendPct: number[];
   /** Success-rate points vs the prior 30 days. Positive is better. */
   successDeltaPts: number;
-  /** Rework change vs the prior 30 days. Negative is better. */
-  reworkDelta: number;
+  /** Duration change vs the prior 30 days, in minutes. Negative is better. */
+  durationDeltaMinutes: number;
   /** Cost change vs the prior 30 days, in USD. Negative is better. */
   costDeltaUsd: number;
   /**
@@ -57,11 +57,11 @@ export const LINE_LIST_METRICS_BY_ID: Record<string, LineListMetrics | null> = {
     successRatePct: 82,
     mergedCount: 41,
     totalClosedCount: 50,
-    reworkPerWorkOrder: 1.4,
+    durationMinutes: 15,
     costPerSuccessUsd: 3.2,
     successTrendPct: [68, 70, 69, 72, 74, 73, 76, 77, 78, 79, 80, 81, 80, 82],
     successDeltaPts: 6,
-    reworkDelta: -0.2,
+    durationDeltaMinutes: -2,
     costDeltaUsd: -0.4,
     throughputPerDay: 1.4,
     throughputTrend: [2, 3, 2, 4, 3, 2, 5, 3, 4, 3, 4, 2, 3, 4],
@@ -70,11 +70,11 @@ export const LINE_LIST_METRICS_BY_ID: Record<string, LineListMetrics | null> = {
     successRatePct: 54,
     mergedCount: 13,
     totalClosedCount: 24,
-    reworkPerWorkOrder: 3.8,
+    durationMinutes: 17,
     costPerSuccessUsd: 11.45,
     successTrendPct: [62, 65, 60, 58, 61, 55, 59, 57, 56, 54, 58, 52, 55, 54],
     successDeltaPts: -8,
-    reworkDelta: 0.9,
+    durationDeltaMinutes: 2,
     costDeltaUsd: 2.1,
     throughputPerDay: 0.4,
     throughputTrend: [1, 0, 2, 1, 0, 1, 0, 2, 1, 0, 1, 1, 0, 2],
@@ -84,11 +84,11 @@ export const LINE_LIST_METRICS_BY_ID: Record<string, LineListMetrics | null> = {
     successRatePct: 71,
     mergedCount: 22,
     totalClosedCount: 31,
-    reworkPerWorkOrder: 2.1,
+    durationMinutes: 14,
     costPerSuccessUsd: 5.4,
     successTrendPct: [64, 65, 66, 68, 67, 69, 70, 68, 70, 71, 69, 72, 70, 71],
     successDeltaPts: 3,
-    reworkDelta: 0.1,
+    durationDeltaMinutes: -1,
     costDeltaUsd: 0.2,
     throughputPerDay: 0.7,
     throughputTrend: [1, 2, 1, 2, 1, 2, 2, 1, 2, 2, 1, 2, 1, 2],

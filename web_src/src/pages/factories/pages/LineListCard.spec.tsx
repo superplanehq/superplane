@@ -31,7 +31,9 @@ describe("LineListCard", () => {
     expect(split).toHaveTextContent("1.4 per day");
     expect(split).toHaveTextContent("Success rate");
     expect(split).toHaveTextContent("Completions");
-    expect(split).toHaveTextContent("1.4x");
+    expect(split).toHaveTextContent("Duration");
+    expect(split).toHaveTextContent("15m");
+    expect(split).toHaveTextContent("−2m");
     expect(split).toHaveTextContent("$3.20");
   });
 

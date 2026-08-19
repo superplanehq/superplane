@@ -8,8 +8,8 @@ import { factoryCardClassName } from "./factoryPageLayoutStyles";
 import {
   formatCostDelta,
   formatCostPerSuccess,
-  formatReworkDelta,
-  formatReworkRate,
+  formatDuration,
+  formatDurationDelta,
   formatSuccessDelta,
   formatSuccessRate,
   formatThroughput,
@@ -67,7 +67,7 @@ export function LineListHeroSplit({ metrics }: { metrics: LineListMetrics | null
         </div>
       </div>
       <div className="flex shrink-0 flex-col gap-3 border-l border-border pl-5">
-        <MiniStat label="Rework" value={formatReworkRate(metrics)} hint={formatReworkDelta(metrics)} />
+        <MiniStat label="Duration" value={formatDuration(metrics)} hint={formatDurationDelta(metrics)} />
         <MiniStat label="Cost" value={formatCostPerSuccess(metrics)} hint={formatCostDelta(metrics)} />
       </div>
     </div>

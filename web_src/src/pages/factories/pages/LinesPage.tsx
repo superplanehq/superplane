@@ -50,7 +50,7 @@ import { LineListCard } from "./LineListCard";
 import { descriptionForLine, metricsForLine } from "./lineListMetricsMockData";
 import { PhaseGlyph } from "./linePhaseGlyph";
 
-const LIST_SUBTITLE = "Last 30 days. Success rate, completions per day, rework, and cost per merged work order.";
+const LIST_SUBTITLE = "Last 30 days. Success rate, completions per day, duration, and cost per merged work order.";
 
 export function LinesPage() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();

@@ -9,13 +9,12 @@ export function formatSuccessRate(metrics: LineListMetrics | null): string {
   return `${Math.round(metrics.successRatePct)}%`;
 }
 
-export function formatReworkRate(metrics: LineListMetrics | null): string {
+/** Median cycle time. Example: `15m`. */
+export function formatDuration(metrics: LineListMetrics | null): string {
   if (!metrics) {
     return LINE_LIST_METRICS_EMPTY;
   }
-  const value = metrics.reworkPerWorkOrder;
-  const rounded = value % 1 === 0 ? value.toFixed(0) : value.toFixed(1);
-  return `${rounded}x`;
+  return compactDurationMinutes(metrics.durationMinutes);
 }
 
 export function formatCostPerSuccess(metrics: LineListMetrics | null): string {
@@ -44,12 +43,20 @@ export function formatSuccessDelta(metrics: LineListMetrics | null): string {
   return `${signedNumber(metrics.successDeltaPts, 0)} pts`;
 }
 
-/** Rework change vs the prior window. Example: `−0.2x`. */
-export function formatReworkDelta(metrics: LineListMetrics | null): string {
+/** Duration change vs the prior window. Example: `−2m`. */
+export function formatDurationDelta(metrics: LineListMetrics | null): string {
   if (!metrics) {
     return LINE_LIST_METRICS_EMPTY;
   }
-  return `${signedNumber(metrics.reworkDelta, 1)}x`;
+  const minutes = metrics.durationDeltaMinutes;
+  const formatted = compactDurationMinutes(Math.abs(minutes));
+  if (minutes > 0) {
+    return `+${formatted}`;
+  }
+  if (minutes < 0) {
+    return `−${formatted}`;
+  }
+  return formatted;
 }
 
 /** Cost change vs the prior window. Example: `−$0.40`. */
@@ -75,4 +82,17 @@ export function formatThroughput(metrics: LineListMetrics | null): string {
   const value = metrics.throughputPerDay;
   const rounded = value % 1 === 0 ? value.toFixed(0) : value.toFixed(1);
   return `${rounded} per day`;
+}
+
+/** Compact minutes as `15m`, hours when 60 or more, days when 48 hours or more. */
+function compactDurationMinutes(minutes: number): string {
+  if (minutes < 60) {
+    return `${Math.round(minutes)}m`;
+  }
+  const hours = minutes / 60;
+  if (hours < 48) {
+    return `${hours % 1 === 0 ? hours.toFixed(0) : hours.toFixed(1)}h`;
+  }
+  const days = hours / 24;
+  return `${days % 1 === 0 ? days.toFixed(0) : days.toFixed(1)}d`;
 }
