@@ -18,7 +18,7 @@ func Test__DescribeFactory_AttachesLineMetrics(t *testing.T) {
 	r := support.Setup(t)
 	ctx := t.Context()
 	db := database.DB(ctx)
-	now := time.Date(2026, 8, 19, 15, 0, 0, 0, time.Local)
+	now := time.Now().In(time.Local)
 
 	originalNow := timeNow
 	timeNow = func() time.Time { return now }
