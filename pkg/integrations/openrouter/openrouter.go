@@ -104,7 +104,14 @@ func (o *OpenRouter) Sync(ctx core.SyncContext) error {
 	// Without a key, send the user through OpenRouter's OAuth consent screen.
 	// The key is issued there rather than pasted in.
 	//
-	apiKey, _ := findSecret(ctx.Integration, SecretAPIKey)
+	// A read failure must not be treated as "not connected": that would restart
+	// the flow and disconnect a working integration over a transient error.
+	//
+	apiKey, err := findSecret(ctx.Integration, SecretAPIKey)
+	if err != nil {
+		return fmt.Errorf("failed to read integration secrets: %v", err)
+	}
+
 	if apiKey == "" {
 		return o.requestAuthorization(ctx, callbackURL)
 	}
@@ -134,24 +141,45 @@ func (o *OpenRouter) Sync(ctx core.SyncContext) error {
 // requestAuthorization starts the PKCE flow: it mints a verifier, stores it, and
 // points the user at OpenRouter's consent screen.
 func (o *OpenRouter) requestAuthorization(ctx core.SyncContext, callbackURL string) error {
-	verifier, err := newCodeVerifier()
-	if err != nil {
-		return fmt.Errorf("failed to generate code verifier: %v", err)
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		ctx.Logger.Errorf("Failed to decode metadata while setting state: %v", err)
 	}
 
-	if err := ctx.Integration.SetSecret(SecretCodeVerifier, []byte(verifier)); err != nil {
-		return fmt.Errorf("failed to store code verifier: %v", err)
+	verifier, err := findSecret(ctx.Integration, SecretCodeVerifier)
+	if err != nil {
+		return fmt.Errorf("failed to read code verifier: %v", err)
 	}
 
-	state, err := crypto.Base64String(32)
-	if err != nil {
-		return fmt.Errorf("failed to generate state: %v", err)
+	//
+	// Sync runs on a schedule, so minting on every pass would rotate the
+	// verifier and state underneath a consent screen the user already has open,
+	// and the exchange would then fail even though they approved access. Keep
+	// whatever the pending flow started with; the authorize URL is derived from
+	// both, so rebuilding it from them is idempotent.
+	//
+	if verifier == "" || metadata.State == "" {
+		verifier, err = newCodeVerifier()
+		if err != nil {
+			return fmt.Errorf("failed to generate code verifier: %v", err)
+		}
+
+		if err := ctx.Integration.SetSecret(SecretCodeVerifier, []byte(verifier)); err != nil {
+			return fmt.Errorf("failed to store code verifier: %v", err)
+		}
+
+		state, err := crypto.Base64String(32)
+		if err != nil {
+			return fmt.Errorf("failed to generate state: %v", err)
+		}
+
+		metadata.State = state
+		ctx.Integration.SetMetadata(metadata)
 	}
-	ctx.Integration.SetMetadata(Metadata{State: state})
 
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
 		Description: connectDescription,
-		URL:         authorizeURL(callbackURL, state, verifier),
+		URL:         authorizeURL(callbackURL, metadata.State, verifier),
 		Method:      "GET",
 	})
 

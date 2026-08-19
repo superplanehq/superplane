@@ -1,6 +1,7 @@
 package openrouter
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -19,6 +20,15 @@ func response(status int, body string) *http.Response {
 		StatusCode: status,
 		Body:       io.NopCloser(strings.NewReader(body)),
 	}
+}
+
+// failingSecretsIntegration simulates a transient secret-store failure.
+type failingSecretsIntegration struct {
+	*contexts.IntegrationContext
+}
+
+func (f *failingSecretsIntegration) GetSecrets() ([]core.IntegrationSecret, error) {
+	return nil, fmt.Errorf("secret store unavailable")
 }
 
 func syncContext(integration *contexts.IntegrationContext, httpContext *contexts.HTTPContext) core.SyncContext {
@@ -57,6 +67,58 @@ func Test__Sync(t *testing.T) {
 		assert.NotContains(t, integration.BrowserAction.URL, verifier)
 
 		assert.NotEqual(t, "ready", integration.State)
+	})
+
+	// Sync runs on a schedule. Re-minting would rotate the verifier under a
+	// consent screen the user already opened, so the exchange would fail after
+	// they approved.
+	t.Run("a repeated sync keeps the pending flow intact", func(t *testing.T) {
+		integration := &contexts.IntegrationContext{Configuration: map[string]any{}}
+
+		require.NoError(t, o.Sync(syncContext(integration, &contexts.HTTPContext{})))
+		firstURL := integration.BrowserAction.URL
+		firstVerifier, err := findSecret(integration, SecretCodeVerifier)
+		require.NoError(t, err)
+		firstState := integration.Metadata.(Metadata).State
+
+		require.NoError(t, o.Sync(syncContext(integration, &contexts.HTTPContext{})))
+		secondVerifier, err := findSecret(integration, SecretCodeVerifier)
+		require.NoError(t, err)
+
+		assert.Equal(t, firstVerifier, secondVerifier, "the verifier must survive a background sync")
+		assert.Equal(t, firstState, integration.Metadata.(Metadata).State)
+		assert.Equal(t, firstURL, integration.BrowserAction.URL)
+	})
+
+	t.Run("a fresh connection mints a new flow", func(t *testing.T) {
+		first := &contexts.IntegrationContext{Configuration: map[string]any{}}
+		second := &contexts.IntegrationContext{Configuration: map[string]any{}}
+
+		require.NoError(t, o.Sync(syncContext(first, &contexts.HTTPContext{})))
+		require.NoError(t, o.Sync(syncContext(second, &contexts.HTTPContext{})))
+
+		firstVerifier, _ := findSecret(first, SecretCodeVerifier)
+		secondVerifier, _ := findSecret(second, SecretCodeVerifier)
+		assert.NotEqual(t, firstVerifier, secondVerifier)
+	})
+
+	// Treating a read failure as "not connected" would restart OAuth and
+	// disconnect a working integration over a transient error.
+	t.Run("a secret read failure does not restart the flow", func(t *testing.T) {
+		integration := &failingSecretsIntegration{
+			IntegrationContext: &contexts.IntegrationContext{Configuration: map[string]any{}},
+		}
+
+		err := o.Sync(core.SyncContext{
+			Logger:        logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{},
+			BaseURL:       "https://app.superplane.test",
+			HTTP:          &contexts.HTTPContext{},
+			Integration:   integration,
+		})
+
+		require.ErrorContains(t, err, "failed to read integration secrets")
+		assert.Nil(t, integration.BrowserAction)
 	})
 
 	t.Run("with a key it verifies and becomes ready", func(t *testing.T) {
