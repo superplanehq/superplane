@@ -15,7 +15,7 @@ const (
 	FactoryLineStepTypeRunApp = "runApp"
 
 	// DefaultFactoryLineStepMaxParallelism is the number of in-flight runs
-	// a step allows when maxParallelism is not set. 0 means unlimited.
+	// a step allows when maxParallelism is not set.
 	DefaultFactoryLineStepMaxParallelism = 10
 
 	factoryLineNameUniqueConstraint = "factory_lines_factory_id_name_key"
@@ -33,22 +33,16 @@ type FactoryLineStep struct {
 	AppID      uuid.UUID `json:"app_id"`
 	Entrypoint string    `json:"entrypoint"`
 	// MaxParallelism caps the step's in-flight runs across all work
-	// orders on the line. Unset means the default of 10; 0 means
-	// unlimited.
+	// orders on the line. Unset means the default of 10; there is no
+	// unbounded setting.
 	MaxParallelism *int `json:"max_parallelism,omitempty"`
 }
 
 func (s *FactoryLineStep) EffectiveMaxParallelism() int {
-	if s.MaxParallelism == nil {
+	if s.MaxParallelism == nil || *s.MaxParallelism < 1 {
 		return DefaultFactoryLineStepMaxParallelism
 	}
 	return *s.MaxParallelism
-}
-
-// UnlimitedParallelism reports whether the step admits any number of
-// in-flight runs (maxParallelism explicitly set to 0).
-func (s *FactoryLineStep) UnlimitedParallelism() bool {
-	return s.MaxParallelism != nil && *s.MaxParallelism == 0
 }
 
 type FactoryLine struct {

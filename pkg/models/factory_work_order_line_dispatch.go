@@ -112,14 +112,12 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 	}
 
 	step := admissionStep(line, l, stepIndex)
-	if !step.UnlimitedParallelism() {
-		active, err := countActiveFactoryStepExecutions(tx, l.LineID, stepIndex)
-		if err != nil {
-			return nil, err
-		}
-		if active >= int64(step.EffectiveMaxParallelism()) {
-			return l.enqueueStep(tx, order, stepIndex)
-		}
+	active, err := countActiveFactoryStepExecutions(tx, l.LineID, stepIndex)
+	if err != nil {
+		return nil, err
+	}
+	if active >= int64(step.EffectiveMaxParallelism()) {
+		return l.enqueueStep(tx, order, stepIndex)
 	}
 
 	return l.StartStep(tx, order, stepIndex)

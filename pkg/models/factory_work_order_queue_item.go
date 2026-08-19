@@ -211,14 +211,12 @@ func AdmitNextQueuedForStep(tx *gorm.DB, lineID uuid.UUID, stepIndex int) (*Fact
 		}
 
 		step := admissionStep(line, dispatch, stepIndex)
-		if !step.UnlimitedParallelism() {
-			active, err := countActiveFactoryStepExecutions(tx, lineID, stepIndex)
-			if err != nil {
-				return nil, err
-			}
-			if active >= int64(step.EffectiveMaxParallelism()) {
-				return nil, nil
-			}
+		active, err := countActiveFactoryStepExecutions(tx, lineID, stepIndex)
+		if err != nil {
+			return nil, err
+		}
+		if active >= int64(step.EffectiveMaxParallelism()) {
+			return nil, nil
 		}
 
 		if err := item.Delete(tx); err != nil {

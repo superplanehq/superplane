@@ -2,20 +2,15 @@ import type { FactoryLineStep } from "@/api-client";
 
 export const RUN_APP_TYPE = "runApp";
 
-// How the step limits parallel runs. "" keeps the server default (10),
-// "limited" uses the maxParallelism value, "unlimited" stores 0.
-export type DraftParallelism = "" | "limited" | "unlimited";
-
 export type DraftStep = {
   appId: string;
   entrypoint: string;
-  parallelism: DraftParallelism;
-  // Text form value; only meaningful while parallelism is "limited".
+  // Text form value; empty keeps the server default (10).
   maxParallelism: string;
 };
 
 export function emptyStep(): DraftStep {
-  return { appId: "", entrypoint: "", parallelism: "", maxParallelism: "" };
+  return { appId: "", entrypoint: "", maxParallelism: "" };
 }
 
 export function draftStepsFromLine(steps: FactoryLineStep[] | undefined): DraftStep[] {
@@ -26,8 +21,7 @@ export function draftStepsFromLine(steps: FactoryLineStep[] | undefined): DraftS
   return steps.map((step) => ({
     appId: step.app?.app ?? "",
     entrypoint: step.app?.entrypoint ?? "",
-    parallelism: step.maxParallelism == null ? "" : step.maxParallelism === 0 ? "unlimited" : "limited",
-    maxParallelism: step.maxParallelism != null && step.maxParallelism !== 0 ? String(step.maxParallelism) : "",
+    maxParallelism: step.maxParallelism != null && step.maxParallelism > 0 ? String(step.maxParallelism) : "",
   }));
 }
 
@@ -50,16 +44,8 @@ export function draftStepsToProto(steps: DraftStep[]): FactoryLineStep[] {
   });
 }
 
-// 0 means unlimited on the wire; null keeps the server default.
+// Null keeps the server default (10).
 function draftMaxParallelism(step: DraftStep): number | null {
-  if (step.parallelism === "unlimited") {
-    return 0;
-  }
-
-  if (step.parallelism !== "limited") {
-    return null;
-  }
-
   const parsed = Number.parseInt(step.maxParallelism.trim(), 10);
   if (Number.isNaN(parsed) || parsed < 1) {
     return null;

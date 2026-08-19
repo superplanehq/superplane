@@ -411,7 +411,7 @@ message FactoryLine {
     optional AppStep app = 2;
     // Maximum in-flight runs for this step across all work orders on the
     // line. Work orders above this limit wait in the step's queue. Unset
-    // means the server default (10); 0 means unlimited.
+    // means the server default (10). Must be at least 1 when set.
     optional int32 max_parallelism = 3;
   }
 

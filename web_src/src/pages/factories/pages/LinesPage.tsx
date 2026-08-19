@@ -9,7 +9,7 @@ import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Layers, MoreHorizontal, Pencil, Plus, Workflow } from "lucide-react";
+import { Clock, Layers, MoreHorizontal, Pencil, Plus, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
@@ -19,11 +19,13 @@ import {
   LINE_PHASE_RUNS_PAGE_SIZE,
   linePhaseRunHref,
   resolveColumnGlyph,
+  resolvePhaseRunStatus,
   type LinePhaseColumn,
   type LinePhaseRunCard,
   type LinePhaseTick,
   type PhaseGlyphKind,
 } from "../lib/linePhaseRuns";
+import { isQueuedStepRow } from "../lib/workOrderExecutions";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import {
   WorkOrderBoardLane,
@@ -481,7 +483,19 @@ function PhaseRunCard({
     run,
     stepAppId,
   );
-  return <WorkOrderCard {...workOrderCardContext} entry={entry} href={href} />;
+  const queuedLabel = isQueuedStepRow(run.execution) ? resolvePhaseRunStatus(run.execution).label : null;
+
+  return (
+    <div>
+      <WorkOrderCard {...workOrderCardContext} entry={entry} href={href} />
+      {queuedLabel ? (
+        <p className="mt-1 flex items-center gap-1 px-0.5 text-[11px] text-muted-foreground">
+          <Clock className="size-3 shrink-0" aria-hidden />
+          {queuedLabel} — waiting for a free slot
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function PhaseTickDot({ tick }: { tick: LinePhaseTick }) {

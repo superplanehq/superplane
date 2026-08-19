@@ -171,19 +171,6 @@ func Test__StepQueue_DispatchQueuesWhenStepAtCapacity(t *testing.T) {
 	assert.Equal(t, int64(1), queuedEvents)
 }
 
-func Test__StepQueue_UnlimitedStepAlwaysStarts(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(0)})
-
-	for _, title := range []string{"One", "Two", "Three"} {
-		order := fixture.createOpenWorkOrder(t, r, title)
-		_, result := fixture.dispatchLine(t, order)
-		require.NotNil(t, result.Run, "unlimited step must start immediately")
-	}
-}
-
 func Test__StepQueue_TerminalRunAdmitsOldestQueuedWorkOrder(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
