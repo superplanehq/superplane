@@ -12,6 +12,7 @@ import type {
   FactoriesWorkOrderEvent,
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
+import { defaultNotificationSettings } from "@/lib/notificationSettings";
 import { fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
 
 export type { FactoriesFixture };
@@ -330,10 +331,26 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   ];
 }
 
+function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
+  const defaults = defaultNotificationSettings();
+
+  return {
+    pattern: re("/api/v1/me/notification-settings"),
+    resolve: (_match, method, body) => {
+      if (method === "PUT") {
+        const request = (body ?? {}) as { settings?: FactoriesFixture["notificationSettings"] };
+        fixture.notificationSettings = { ...defaults, ...(request.settings ?? {}) };
+      }
+      return { json: { settings: fixture.notificationSettings ?? defaults } };
+    },
+  };
+}
+
 /** Builds a resolvable factories route table for a fixture snapshot. */
 function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     factoriesCollectionRoute(fixture),
+    notificationSettingsRoute(fixture),
     ...factoryDetailRoutes(fixture),
     ...factoryLinesRoutes(fixture),
     ...workOrderRoutes(fixture),

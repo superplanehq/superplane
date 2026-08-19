@@ -103,6 +103,14 @@ vi.mock("@/hooks/useCanvasData", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => false,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
+
 vi.mock("@/hooks/useOrganizationData", () => ({
   useOrganization: () => ({
     data: {

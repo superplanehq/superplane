@@ -1,5 +1,4 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,10 +14,9 @@ import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
-import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import { factoryListPath, factorySettingsGeneralPathAfterKeyChange } from "../../lib/factoryPagePaths";
 import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
-import { factoryCardClassName, factoryContentBodyClassName } from "../factoryPageLayoutStyles";
+import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 import {
   WORKSPACE_KEY_MAX_LENGTH,
@@ -108,42 +106,35 @@ export function FactorySettingsGeneralPage() {
 
   return (
     <>
-      <WorkspacePageHeader
-        title="General"
-        subtitle="General workspace preferences. Content for this page comes next."
-      />
+      <FactorySettingsPageFrame title="General" subtitle="Name, key, and description for this workspace.">
+        <WorkspaceDetailsSection
+          name={name}
+          description={description}
+          factoryKey={key}
+          nameError={nameError}
+          keyError={keyError}
+          canUpdate={canUpdate}
+          permissionsLoading={permissionsLoading}
+          isSaving={updateFactory.isPending}
+          isDirty={isDirty}
+          onNameChange={(next) => {
+            setName(next);
+            if (nameError) setNameError("");
+          }}
+          onDescriptionChange={setDescription}
+          onKeyChange={(next) => {
+            setKey(normalizeWorkspaceKey(next));
+            if (keyError) setKeyError("");
+          }}
+          onSave={handleSave}
+        />
 
-      <div className={factoryContentBodyClassName}>
-        <div className="max-w-2xl space-y-6">
-          <WorkspaceDetailsSection
-            name={name}
-            description={description}
-            factoryKey={key}
-            nameError={nameError}
-            keyError={keyError}
-            canUpdate={canUpdate}
-            permissionsLoading={permissionsLoading}
-            isSaving={updateFactory.isPending}
-            isDirty={isDirty}
-            onNameChange={(next) => {
-              setName(next);
-              if (nameError) setNameError("");
-            }}
-            onDescriptionChange={setDescription}
-            onKeyChange={(next) => {
-              setKey(normalizeWorkspaceKey(next));
-              if (keyError) setKeyError("");
-            }}
-            onSave={handleSave}
-          />
-
-          <DangerZoneSection
-            canDelete={canDelete}
-            permissionsLoading={permissionsLoading}
-            onOpenDelete={() => setDeleteOpen(true)}
-          />
-        </div>
-      </div>
+        <DangerZoneSection
+          canDelete={canDelete}
+          permissionsLoading={permissionsLoading}
+          onOpenDelete={() => setDeleteOpen(true)}
+        />
+      </FactorySettingsPageFrame>
 
       <FactoryDeleteDialog
         open={deleteOpen}
@@ -189,75 +180,70 @@ function WorkspaceDetailsSection({
   onSave,
 }: WorkspaceDetailsSectionProps) {
   return (
-    <section className={cn("p-6", factoryCardClassName)} data-testid="factory-settings-general-form">
-      <h2 className="text-[13px] font-medium tracking-[-0.01em] text-foreground">Workspace details</h2>
-      <div className="mt-4 space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="factory-settings-name">Name</Label>
-          <Input
-            id="factory-settings-name"
-            data-testid="factory-settings-name"
-            value={name}
-            onChange={(event) => {
-              if (event.target.value.length <= MAX_NAME_LENGTH) {
-                onNameChange(event.target.value);
-              }
-            }}
-            maxLength={MAX_NAME_LENGTH}
-            disabled={!canUpdate}
-          />
-          {nameError ? <p className="text-[11px] text-destructive">{nameError}</p> : null}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="factory-settings-key">Workspace key</Label>
-          <Input
-            id="factory-settings-key"
-            data-testid="factory-settings-key"
-            value={factoryKey}
-            onChange={(event) => onKeyChange(event.target.value)}
-            maxLength={WORKSPACE_KEY_MAX_LENGTH}
-            disabled={!canUpdate}
-            className="uppercase tracking-wider"
-            autoComplete="off"
-          />
-          <p className="text-[11px] text-muted-foreground">
-            Changing the key updates every work order identifier for this workspace. IDs already shared elsewhere will
-            no longer resolve.
-          </p>
-          {keyError ? <p className="text-[11px] text-destructive">{keyError}</p> : null}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="factory-settings-description">Description</Label>
-          <Textarea
-            id="factory-settings-description"
-            data-testid="factory-settings-description"
-            value={description}
-            onChange={(event) => {
-              if (event.target.value.length <= MAX_DESCRIPTION_LENGTH) {
-                onDescriptionChange(event.target.value);
-              }
-            }}
-            rows={3}
-            disabled={!canUpdate}
-          />
-        </div>
+    <section className="space-y-4" data-testid="factory-settings-general-form">
+      <div className="space-y-2">
+        <Label htmlFor="factory-settings-name">Name</Label>
+        <Input
+          id="factory-settings-name"
+          data-testid="factory-settings-name"
+          value={name}
+          onChange={(event) => {
+            if (event.target.value.length <= MAX_NAME_LENGTH) {
+              onNameChange(event.target.value);
+            }
+          }}
+          maxLength={MAX_NAME_LENGTH}
+          disabled={!canUpdate}
+        />
+        {nameError ? <p className="text-[11px] text-destructive">{nameError}</p> : null}
       </div>
-      <div className="mt-6 flex justify-end">
-        <PermissionTooltip
-          allowed={canUpdate || permissionsLoading}
-          message="You don't have permission to update workspaces."
+      <div className="space-y-2">
+        <Label htmlFor="factory-settings-key">Workspace key</Label>
+        <Input
+          id="factory-settings-key"
+          data-testid="factory-settings-key"
+          value={factoryKey}
+          onChange={(event) => onKeyChange(event.target.value)}
+          maxLength={WORKSPACE_KEY_MAX_LENGTH}
+          disabled={!canUpdate}
+          className="max-w-xs uppercase tracking-wider"
+          autoComplete="off"
+        />
+        <p className="text-[11px] text-muted-foreground">
+          Changing the key updates every work order identifier for this workspace. IDs already shared elsewhere will no
+          longer resolve.
+        </p>
+        {keyError ? <p className="text-[11px] text-destructive">{keyError}</p> : null}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="factory-settings-description">Description</Label>
+        <Textarea
+          id="factory-settings-description"
+          data-testid="factory-settings-description"
+          value={description}
+          onChange={(event) => {
+            if (event.target.value.length <= MAX_DESCRIPTION_LENGTH) {
+              onDescriptionChange(event.target.value);
+            }
+          }}
+          rows={3}
+          disabled={!canUpdate}
+        />
+      </div>
+      <PermissionTooltip
+        allowed={canUpdate || permissionsLoading}
+        message="You don't have permission to update workspaces."
+      >
+        <LoadingButton
+          disabled={!canUpdate || !name.trim() || !isDirty}
+          loading={isSaving}
+          loadingText="Saving..."
+          onClick={() => void onSave()}
+          data-testid="factory-settings-save"
         >
-          <LoadingButton
-            disabled={!canUpdate || !name.trim() || !isDirty}
-            loading={isSaving}
-            loadingText="Saving..."
-            onClick={() => void onSave()}
-            data-testid="factory-settings-save"
-          >
-            Save
-          </LoadingButton>
-        </PermissionTooltip>
-      </div>
+          Save
+        </LoadingButton>
+      </PermissionTooltip>
     </section>
   );
 }
@@ -270,9 +256,13 @@ interface DangerZoneSectionProps {
 
 function DangerZoneSection({ canDelete, permissionsLoading, onOpenDelete }: DangerZoneSectionProps) {
   return (
-    <section className="rounded-lg border border-destructive/40 bg-card p-6" data-testid="factory-settings-danger-zone">
-      <h2 className="text-[13px] font-medium tracking-[-0.01em] text-destructive">Danger zone</h2>
-      <p className="mt-1 text-[13px] text-muted-foreground">
+    <FactorySettingsCard
+      title="Danger zone"
+      titleClassName="text-destructive"
+      className="border-destructive/40"
+      data-testid="factory-settings-danger-zone"
+    >
+      <p className="text-[13px] text-muted-foreground">
         Deleting a workspace permanently removes its work orders, lines, and apps.
       </p>
       <div className="mt-4">
@@ -292,6 +282,6 @@ function DangerZoneSection({ canDelete, permissionsLoading, onOpenDelete }: Dang
           </Button>
         </PermissionTooltip>
       </div>
-    </section>
+    </FactorySettingsCard>
   );
 }
