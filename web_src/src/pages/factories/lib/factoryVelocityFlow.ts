@@ -12,12 +12,68 @@ export function factoryVelocityPeriodLabel(days: FactoryVelocityFlowPeriodDays):
   return days === 7 ? "Last 7 days" : "Last 30 days";
 }
 
-export function formatDurationHours(hours: number) {
-  if (hours < 48) {
-    return `${Math.round(hours)}h`;
-  }
+type VelocityDurationUnit = "m" | "h" | "d";
+
+/** Classifies a raw (unrounded) hours value into the unit band it belongs to. */
+function classifyVelocityDurationUnit(hours: number): VelocityDurationUnit {
+  if (!Number.isFinite(hours) || hours <= 0) return "h";
+  if (hours < 1) return "m";
+  if (hours < 48) return "h";
+  return "d";
+}
+
+/** Renders minutes, guarding the rollover where rounding pushes 59.5–59.99m to "60m". */
+function formatMinutes(hours: number): string {
+  const minutes = Math.round(hours * 60);
+  if (minutes >= 60) return "1h";
+  return `${Math.max(1, minutes)}m`;
+}
+
+function formatHours(hours: number): string {
+  return `${Math.round(hours)}h`;
+}
+
+function formatDays(hours: number): string {
   const days = hours / 24;
   return `${days % 1 === 0 ? days.toFixed(0) : days.toFixed(1)}d`;
+}
+
+function formatVelocityDuration(hours: number, unit: VelocityDurationUnit): string {
+  switch (unit) {
+    case "m":
+      return formatMinutes(hours);
+    case "d":
+      return formatDays(hours);
+    case "h":
+    default:
+      return formatHours(hours);
+  }
+}
+
+export function formatDurationHours(hours: number): string {
+  const safeHours = Number.isFinite(hours) ? Math.max(0, hours) : 0;
+  return formatVelocityDuration(safeHours, classifyVelocityDurationUnit(safeHours));
+}
+
+export interface VelocityChartUnit {
+  unit: VelocityDurationUnit;
+  formatTick: (hours: number) => string;
+}
+
+/**
+ * Picks a single unit for a whole chart axis from the largest raw value in
+ * the series, so ticks never mix units (e.g. a sub-hour period doesn't
+ * repeat "0h" and a multi-day period doesn't show triple-digit hours).
+ */
+export function pickVelocityChartUnit(hoursValues: number[]): VelocityChartUnit {
+  const safeValues = hoursValues.filter((value) => Number.isFinite(value) && value > 0);
+  const max = safeValues.length > 0 ? Math.max(...safeValues) : 0;
+  const unit = classifyVelocityDurationUnit(max);
+
+  return {
+    unit,
+    formatTick: (hours: number) => formatVelocityDuration(Number.isFinite(hours) ? Math.max(0, hours) : 0, unit),
+  };
 }
 
 export interface FactoryVelocityFlowTrendPoint {

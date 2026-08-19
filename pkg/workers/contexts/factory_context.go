@@ -464,5 +464,6 @@ func checkToCore(check *models.FactoryWorkOrderCheck) *core.WorkOrderCheck {
 		Format:        check.Format,
 		Level:         check.Level,
 		PreviousScore: check.PreviousScore,
+		RecentScores:  check.RecentScores,
 	}
 }

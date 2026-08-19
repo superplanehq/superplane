@@ -1,7 +1,12 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
 import { describe, expect, it } from "vitest";
 
-import { aggregateFactoryVelocityFlow, formatVelocityYesterdayLabel } from "./factoryVelocityFlow";
+import {
+  aggregateFactoryVelocityFlow,
+  formatDurationHours,
+  formatVelocityYesterdayLabel,
+  pickVelocityChartUnit,
+} from "./factoryVelocityFlow";
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -290,6 +295,65 @@ describe("aggregateFactoryVelocityFlow", () => {
     expect(flow.sampleSize).toBe(1);
     const nonZeroBuckets = flow.timeTrend.filter((point) => point.runningHours > 0 || point.waitingHours > 0);
     expect(nonZeroBuckets).toHaveLength(1);
+  });
+});
+
+describe("formatDurationHours", () => {
+  it("formats sub-hour values in minutes", () => {
+    expect(formatDurationHours(0.2)).toBe("12m");
+    expect(formatDurationHours(1 / 60)).toBe("1m");
+  });
+
+  it("treats genuine zero and defensive inputs as 0h", () => {
+    expect(formatDurationHours(0)).toBe("0h");
+    expect(formatDurationHours(-5)).toBe("0h");
+    expect(formatDurationHours(NaN)).toBe("0h");
+  });
+
+  it("guards the minute rollover so a value just under 1h renders as 1h, not 60m", () => {
+    expect(formatDurationHours(0.999)).toBe("1h");
+  });
+
+  it("formats in-range hours as whole hours", () => {
+    expect(formatDurationHours(1)).toBe("1h");
+    expect(formatDurationHours(5)).toBe("5h");
+  });
+
+  it("formats multi-day durations in days", () => {
+    expect(formatDurationHours(48)).toBe("2d");
+    expect(formatDurationHours(60)).toBe("2.5d");
+  });
+});
+
+describe("pickVelocityChartUnit", () => {
+  it("picks minutes when every value in the period is sub-hour", () => {
+    const chartUnit = pickVelocityChartUnit([0.1, 0.2, 0.3]);
+
+    expect(chartUnit.unit).toBe("m");
+    expect(chartUnit.formatTick(0.2)).toBe("12m");
+    expect(chartUnit.formatTick(0.05)).toBe("3m");
+  });
+
+  it("picks hours when the largest value in the period is in hour range", () => {
+    const chartUnit = pickVelocityChartUnit([0.2, 5, 20]);
+
+    expect(chartUnit.unit).toBe("h");
+    expect(chartUnit.formatTick(0.2)).toBe("0h");
+    expect(chartUnit.formatTick(5)).toBe("5h");
+  });
+
+  it("picks days when the largest value in the period is multi-day", () => {
+    const chartUnit = pickVelocityChartUnit([5, 60, 72]);
+
+    expect(chartUnit.unit).toBe("d");
+    expect(chartUnit.formatTick(5)).toBe("0.2d");
+    expect(chartUnit.formatTick(72)).toBe("3d");
+  });
+
+  it("falls back to hours without throwing for empty or all-zero input", () => {
+    expect(pickVelocityChartUnit([]).unit).toBe("h");
+    expect(pickVelocityChartUnit([0, 0, 0]).unit).toBe("h");
+    expect(pickVelocityChartUnit([]).formatTick(0)).toBe("0h");
   });
 });
 

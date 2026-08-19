@@ -59,6 +59,9 @@ const (
 const (
 	CheckFormatFraction = "fraction"
 	CheckFormatPercent  = "percent"
+	// CheckFormatBoolean is a pass/fail verdict: score 1 (pass) or 0
+	// (fail) on a max score of 1.
+	CheckFormatBoolean = "boolean"
 )
 
 // Events

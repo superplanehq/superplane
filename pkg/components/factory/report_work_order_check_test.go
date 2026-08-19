@@ -152,6 +152,108 @@ func TestReportWorkOrderCheck_Execute(t *testing.T) {
 		assert.Equal(t, 0, factoryCtx.reportCheckCalls)
 	})
 
+	t.Run("boolean pass reports 1/1 with level positive", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{reportCheckResult: reported}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":  "wo-1",
+				"checkKey": "ci",
+				"name":     "CI",
+				"format":   factory.CheckFormatBoolean,
+				"passed":   "true",
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, float64(1), factoryCtx.reportCheckParams.Score)
+		assert.Equal(t, float64(1), factoryCtx.reportCheckParams.MaxScore)
+		assert.Equal(t, factory.CheckFormatBoolean, factoryCtx.reportCheckParams.Format)
+		assert.Equal(t, factory.CheckLevelPositive, factoryCtx.reportCheckParams.Level)
+	})
+
+	t.Run("boolean fail reports 0/1 with level critical", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{reportCheckResult: reported}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":  "wo-1",
+				"checkKey": "ci",
+				"name":     "CI",
+				"format":   factory.CheckFormatBoolean,
+				"passed":   "false",
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, float64(0), factoryCtx.reportCheckParams.Score)
+		assert.Equal(t, float64(1), factoryCtx.reportCheckParams.MaxScore)
+		assert.Equal(t, factory.CheckLevelCritical, factoryCtx.reportCheckParams.Level)
+	})
+
+	t.Run("boolean fails when passed did not resolve to a bool", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":  "wo-1",
+				"checkKey": "ci",
+				"name":     "CI",
+				"format":   factory.CheckFormatBoolean,
+				"passed":   "maybe",
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Factory:        factoryCtx,
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "passed must be true or false")
+		assert.Equal(t, 0, factoryCtx.reportCheckCalls)
+	})
+
+	t.Run("boolean rejects score thresholds", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":   "wo-1",
+				"checkKey":  "ci",
+				"name":      "CI",
+				"format":    factory.CheckFormatBoolean,
+				"passed":    "true",
+				"cautionAt": 5,
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Factory:        factoryCtx,
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "do not apply to the boolean format")
+		assert.Equal(t, 0, factoryCtx.reportCheckCalls)
+	})
+
+	t.Run("numeric formats reject a passed value", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":  "wo-1",
+				"checkKey": "risk-review",
+				"name":     "Risk review",
+				"score":    "6",
+				"maxScore": "10",
+				"passed":   "true",
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Factory:        factoryCtx,
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "passed only applies to the boolean format")
+		assert.Equal(t, 0, factoryCtx.reportCheckCalls)
+	})
+
 	t.Run("propagates errors from the factory context", func(t *testing.T) {
 		factoryCtx := &fakeFactoryContext{reportCheckErr: errors.New("boom")}
 		stateCtx := &contexts.ExecutionStateContext{}
@@ -198,6 +300,59 @@ func TestReportWorkOrderCheck_ValidatesConfiguration(t *testing.T) {
 			"criticalAt": 8,
 			"summary":    "One-line takeaway",
 			"analysis":   "### Findings\n\nDetails here.",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("requires score for numeric formats", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":  "{{ order().id }}",
+			"checkKey": "risk-review",
+			"name":     "Risk review",
+			"format":   "fraction",
+			"maxScore": "10",
+		})
+		if err == nil {
+			t.Fatal("expected error for missing score")
+		}
+	})
+
+	t.Run("requires score when format is omitted", func(t *testing.T) {
+		// Configs saved before the format field existed omit it and rely
+		// on the fraction default — score must still be required at save
+		// time, not only at run time.
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":  "{{ order().id }}",
+			"checkKey": "risk-review",
+			"name":     "Risk review",
+			"maxScore": "10",
+		})
+		if err == nil {
+			t.Fatal("expected error for missing score")
+		}
+	})
+
+	t.Run("requires passed for the boolean format", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":  "{{ order().id }}",
+			"checkKey": "ci",
+			"name":     "CI",
+			"format":   "boolean",
+		})
+		if err == nil {
+			t.Fatal("expected error for missing passed")
+		}
+	})
+
+	t.Run("accepts a boolean configuration", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":  "{{ order().id }}",
+			"checkKey": "ci",
+			"name":     "CI",
+			"format":   "boolean",
+			"passed":   "{{ previous().data.ci.passed }}",
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
