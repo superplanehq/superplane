@@ -48,16 +48,25 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 			Settings: &pb.NotificationSettings{
 				Workspaces: &pb.NotificationSettings_Workspaces{
 					Scope: pb.NotificationSettings_WORKSPACE_SCOPE_ALL,
+					EventTypes: []pb.NotificationSettings_Type{
+						pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED,
+						pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED,
+					},
 				},
 			},
 		})
 		require.NoError(t, err)
 		assert.Equal(t, pb.NotificationSettings_WORKSPACE_SCOPE_ALL, resp.Settings.Workspaces.Scope)
 		assert.Empty(t, resp.Settings.Workspaces.Filters)
+		assert.Equal(t, []pb.NotificationSettings_Type{
+			pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED,
+			pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED,
+		}, resp.Settings.Workspaces.EventTypes)
 
 		described, err := DescribeNotificationSettings(ctx)
 		require.NoError(t, err)
 		assert.Equal(t, resp.Settings.Workspaces.Scope, described.Settings.Workspaces.Scope)
+		assert.Equal(t, resp.Settings.Workspaces.EventTypes, described.Settings.Workspaces.EventTypes)
 	})
 
 	t.Run("filtered scope requires a workspace", func(t *testing.T) {

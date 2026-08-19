@@ -11,6 +11,7 @@ import {
   defaultNotificationTypeToggles,
   eventTypesFromToggles,
   filtersFromSettings,
+  togglesFromAllScopeEventTypes,
   togglesFromEventTypes,
   workspaceScopeFromSettings,
   type ConfigurableNotificationType,
@@ -73,12 +74,18 @@ interface WorkspaceFilterForm {
 
 interface NotificationsFormState {
   scope: WorkspaceScopeForm;
+  toggles: NotificationTypeToggles;
   filters: WorkspaceFilterForm[];
 }
 
 function formStateFromSettings(settings: MeNotificationSettings | undefined): NotificationsFormState {
+  const scope = workspaceScopeFromSettings(settings);
   return {
-    scope: workspaceScopeFromSettings(settings),
+    scope,
+    toggles:
+      scope === "all"
+        ? togglesFromAllScopeEventTypes(settings?.workspaces?.eventTypes)
+        : defaultNotificationTypeToggles(),
     filters: filtersFromSettings(settings).flatMap((filter) => {
       if (!filter.workspaceId) {
         return [];
@@ -92,6 +99,7 @@ function settingsFromFormState(state: NotificationsFormState): MeNotificationSet
   return {
     workspaces: {
       scope: WORKSPACE_SCOPE_TO_PROTO[state.scope],
+      eventTypes: state.scope === "all" ? eventTypesFromToggles(state.toggles) : [],
       filters:
         state.scope === "filtered"
           ? state.filters.map((filter) => ({
@@ -107,6 +115,43 @@ function isDirtyState(current: NotificationsFormState, saved: NotificationsFormS
   return JSON.stringify(current) !== JSON.stringify(saved);
 }
 
+function notificationSaveError(form: NotificationsFormState): { scope?: string; type?: string } {
+  if (form.scope === "filtered" && form.filters.length === 0) {
+    return { scope: "Select at least one workspace, or use all workspaces." };
+  }
+  if (form.scope === "all" && eventTypesFromToggles(form.toggles).length === 0) {
+    return { type: "Select at least one event type, or choose none." };
+  }
+  if (form.scope === "filtered" && form.filters.some((filter) => eventTypesFromToggles(filter.toggles).length === 0)) {
+    return { type: "Select at least one event type for each workspace." };
+  }
+  return {};
+}
+
+function withAddedWorkspace(prev: NotificationsFormState, workspaceId: string): NotificationsFormState {
+  if (prev.filters.some((filter) => filter.workspaceId === workspaceId)) {
+    return prev;
+  }
+  return {
+    ...prev,
+    filters: [...prev.filters, { workspaceId, toggles: defaultNotificationTypeToggles() }],
+  };
+}
+
+function withWorkspaceType(
+  prev: NotificationsFormState,
+  workspaceId: string,
+  key: ConfigurableNotificationType,
+  value: boolean,
+): NotificationsFormState {
+  return {
+    ...prev,
+    filters: prev.filters.map((filter) =>
+      filter.workspaceId === workspaceId ? { ...filter, toggles: { ...filter.toggles, [key]: value } } : filter,
+    ),
+  };
+}
+
 export function FactorySettingsNotificationsPage() {
   const { organizationId } = useFactorySettingsLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
@@ -118,12 +163,14 @@ export function FactorySettingsNotificationsPage() {
   const [form, setForm] = useState<NotificationsFormState>(() => formStateFromSettings(settings));
   const [savedForm, setSavedForm] = useState<NotificationsFormState>(() => formStateFromSettings(settings));
   const [scopeError, setScopeError] = useState("");
+  const [typeError, setTypeError] = useState("");
 
   useEffect(() => {
     const next = formStateFromSettings(settings);
     setForm(next);
     setSavedForm(next);
     setScopeError("");
+    setTypeError("");
   }, [settings]);
 
   const isDirty = isDirtyState(form, savedForm);
@@ -133,8 +180,13 @@ export function FactorySettingsNotificationsPage() {
     if (!canUpdate) {
       return;
     }
-    if (form.scope === "filtered" && form.filters.length === 0) {
-      setScopeError("Select at least one workspace, or use all workspaces.");
+    const error = notificationSaveError(form);
+    if (error.scope) {
+      setScopeError(error.scope);
+      return;
+    }
+    if (error.type) {
+      setTypeError(error.type);
       return;
     }
     try {
@@ -143,8 +195,8 @@ export function FactorySettingsNotificationsPage() {
       setForm(next);
       setSavedForm(next);
       showSuccessToast("Notification settings saved.");
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to save notification settings"));
+    } catch (caught) {
+      showErrorToast(getApiErrorMessage(caught, "Failed to save notification settings"));
     }
   };
 
@@ -161,20 +213,15 @@ export function FactorySettingsNotificationsPage() {
               filters={form.filters}
               factories={factories}
               scopeError={scopeError}
+              typeError={typeError}
               onScopeChange={(scope) => {
                 setScopeError("");
+                setTypeError("");
                 setForm((prev) => ({ ...prev, scope }));
               }}
               onAddWorkspace={(workspaceId) => {
                 setScopeError("");
-                setForm((prev) =>
-                  prev.filters.some((filter) => filter.workspaceId === workspaceId)
-                    ? prev
-                    : {
-                        ...prev,
-                        filters: [...prev.filters, { workspaceId, toggles: defaultNotificationTypeToggles() }],
-                      },
-                );
+                setForm((prev) => withAddedWorkspace(prev, workspaceId));
               }}
               onRemoveWorkspace={(workspaceId) => {
                 setScopeError("");
@@ -184,16 +231,26 @@ export function FactorySettingsNotificationsPage() {
                 }));
               }}
               onToggleType={(workspaceId, key, value) => {
-                setForm((prev) => ({
-                  ...prev,
-                  filters: prev.filters.map((filter) =>
-                    filter.workspaceId === workspaceId
-                      ? { ...filter, toggles: { ...filter.toggles, [key]: value } }
-                      : filter,
-                  ),
-                }));
+                setTypeError("");
+                setForm((prev) => withWorkspaceType(prev, workspaceId, key, value));
               }}
             />
+            {form.scope === "all" ? (
+              <EventTypesSection
+                title="Notify me about"
+                description="Choose which events send an email."
+                idPrefix="notifications-type"
+                toggles={form.toggles}
+                error={typeError}
+                onToggle={(key, value) => {
+                  setTypeError("");
+                  setForm((prev) => ({
+                    ...prev,
+                    toggles: { ...prev.toggles, [key]: value },
+                  }));
+                }}
+              />
+            ) : null}
           </div>
         </FactorySettingsCard>
         <PermissionTooltip
@@ -220,6 +277,7 @@ interface WorkspaceScopeSectionProps {
   filters: WorkspaceFilterForm[];
   factories: { id?: string; name?: string }[];
   scopeError: string;
+  typeError: string;
   onScopeChange: (scope: WorkspaceScopeForm) => void;
   onAddWorkspace: (workspaceId: string) => void;
   onRemoveWorkspace: (workspaceId: string) => void;
@@ -231,6 +289,7 @@ function WorkspaceScopeSection({
   filters,
   factories,
   scopeError,
+  typeError,
   onScopeChange,
   onAddWorkspace,
   onRemoveWorkspace,
@@ -279,6 +338,7 @@ function WorkspaceScopeSection({
               workspaceId={filter.workspaceId}
               workspaceName={factoriesById.get(filter.workspaceId)?.name || filter.workspaceId}
               toggles={filter.toggles}
+              error={typeError && eventTypesFromToggles(filter.toggles).length === 0 ? typeError : undefined}
               onToggle={(key, value) => onToggleType(filter.workspaceId, key, value)}
             />
           ))}
@@ -322,32 +382,60 @@ function WorkspaceEventTypesSection({
   workspaceId,
   workspaceName,
   toggles,
+  error,
   onToggle,
 }: {
   workspaceId: string;
   workspaceName: string;
   toggles: NotificationTypeToggles;
+  error?: string;
+  onToggle: (key: ConfigurableNotificationType, value: boolean) => void;
+}) {
+  return (
+    <EventTypesSection
+      title={workspaceName}
+      description="Choose which events send an email for this workspace."
+      idPrefix={`notifications-type-${workspaceId}`}
+      toggles={toggles}
+      error={error}
+      onToggle={onToggle}
+    />
+  );
+}
+
+function EventTypesSection({
+  title,
+  description,
+  idPrefix,
+  toggles,
+  error,
+  onToggle,
+}: {
+  title: string;
+  description: string;
+  idPrefix: string;
+  toggles: NotificationTypeToggles;
+  error?: string;
   onToggle: (key: ConfigurableNotificationType, value: boolean) => void;
 }) {
   return (
     <div className="space-y-3">
       <div>
-        <Label>{workspaceName}</Label>
-        <p className="mt-0.5 text-[12px] text-muted-foreground">
-          Choose which events send an email for this workspace.
-        </p>
+        <Label>{title}</Label>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">{description}</p>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
         {NOTIFICATION_TYPE_OPTIONS.map((option) => (
           <NotificationTypeRow
             key={option.key}
             option={option}
-            checkboxId={`notifications-type-${workspaceId}-${option.key}`}
+            checkboxId={`${idPrefix}-${option.key}`}
             checked={toggles[option.key]}
             onToggle={(value) => onToggle(option.key, value)}
           />
         ))}
       </div>
+      {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
     </div>
   );
 }
