@@ -21,17 +21,17 @@ const (
 	NotificationTypeWorkOrderCommentCreated = "work_order_comment_created"
 	NotificationTypeWorkOrderStatusOwned    = "work_order_status_owned"
 	NotificationTypeWorkOrderArtifactOwned  = "work_order_artifact_owned"
+	NotificationTypeWorkOrderMention        = "work_order_mention"
 )
 
 // NotificationTypes lists every configurable notification type.
-// `work_order_mention` is reserved for a future release and is
-// intentionally not included.
 var NotificationTypes = []string{
 	NotificationTypeWorkOrderAssigned,
 	NotificationTypeWorkOrderCommentOwned,
 	NotificationTypeWorkOrderCommentCreated,
 	NotificationTypeWorkOrderStatusOwned,
 	NotificationTypeWorkOrderArtifactOwned,
+	NotificationTypeWorkOrderMention,
 }
 
 var ErrNotificationWorkspaceScopeInvalid = errors.New("workspace scope must be all, filtered, or none")
