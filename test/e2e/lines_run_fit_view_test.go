@@ -78,10 +78,12 @@ func (s *linesRunFitSteps) start() {
 }
 
 func (s *linesRunFitSteps) givenAFactory() {
-	factory, err := models.CreateFactory(database.Conn(), s.session.OrgID, support.RandomName("factory"), "", "")
+	tx := database.DB(s.t.Context())
+	factory, err := models.CreateFactory(tx, s.session.OrgID, support.RandomName("factory"), "", "")
 	require.NoError(s.t, err)
-	completeFactoryOnboarding(s.t, factory)
 	s.factory = factory
+	// OnboardingGate sends incomplete workspaces to /setup.
+	completeFactoryOnboarding(s.t, factory)
 }
 
 // Builds an app with a trigger followed by a long, linear chain of
@@ -163,12 +165,9 @@ func (s *linesRunFitSteps) givenALineDispatchedForThatApp() {
 
 	var result *models.FactoryLineStepResult
 	require.NoError(s.t, database.Conn().Transaction(func(tx *gorm.DB) error {
-		_, stepResult, dispatchErr := line.Dispatch(tx, order)
-		if dispatchErr != nil {
-			return dispatchErr
-		}
-		result = stepResult
-		return nil
+		var dispatchErr error
+		_, result, dispatchErr = line.Dispatch(tx, order)
+		return dispatchErr
 	}))
 	require.NotNil(s.t, result)
 	require.NotNil(s.t, result.Execution)
@@ -215,6 +214,7 @@ func (s *linesRunFitSteps) whenIVisitTheLineDetail() {
 func (s *linesRunFitSteps) whenIOpenThePhaseRunCard() {
 	s.session.Click(q.TestID("lines-phase-run-" + s.execution.ID.String()))
 	s.session.AssertURLContains("run=" + s.runID.String())
+	s.session.AssertVisible(q.TestID("factory-app-canvas-page"))
 }
 
 func (s *linesRunFitSteps) thenTheFirstAndLastParticipantsFitIntoView() {
