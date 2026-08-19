@@ -1,4 +1,4 @@
-import type { FactoryApp } from "@/api-client";
+import type { FactoriesFactoryLine, FactoryApp } from "@/api-client";
 import type { AutomationCardActions } from "./automationCardActions";
 import { AutomationsPageList, EmptyAutomationsState } from "./automationsPageParts";
 
@@ -11,6 +11,7 @@ type AutomationsPageBodyProps = {
   actionsForApp: (app: FactoryApp) => AutomationCardActions;
   canCreate: boolean;
   onCreate: () => void;
+  lines?: FactoriesFactoryLine[];
 };
 
 export function AutomationsPageBody({
@@ -22,6 +23,7 @@ export function AutomationsPageBody({
   actionsForApp,
   canCreate,
   onCreate,
+  lines,
 }: AutomationsPageBodyProps) {
   if (appsLoading) {
     return <p className="text-[13px] text-muted-foreground">Loading automations…</p>;
@@ -36,6 +38,7 @@ export function AutomationsPageBody({
       apps={apps}
       workOrders={workOrders}
       actionsForApp={actionsForApp}
+      lines={lines}
     />
   );
 }
