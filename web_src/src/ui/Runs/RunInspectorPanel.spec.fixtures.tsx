@@ -82,6 +82,7 @@ export function renderInspector({
   runNavigation,
   onNavigateRun,
   onNavigateOlder,
+  factoryContext = false,
   run: inspectedRun = run,
   workflowNodes: inspectedWorkflowNodes = workflowNodes,
   componentDefinitions: inspectedComponentDefinitions = componentDefinitions,
@@ -96,6 +97,7 @@ export function renderInspector({
   runNavigation?: { newerRunId?: string | null; olderRunId?: string | null; canNavigateOlder?: boolean } | null;
   onNavigateRun?: (runId: string) => void;
   onNavigateOlder?: () => void;
+  factoryContext?: boolean;
   run?: CanvasesCanvasRun;
   workflowNodes?: SuperplaneComponentsNode[];
   componentDefinitions?: ActionsAction[];
@@ -146,6 +148,7 @@ export function renderInspector({
             runNavigation={runNavigation}
             onNavigateRun={onNavigateRun}
             onNavigateOlder={onNavigateOlder}
+            factoryContext={factoryContext}
             onClose={onClose}
           />
         </ThemeProvider>

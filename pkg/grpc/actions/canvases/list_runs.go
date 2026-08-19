@@ -211,6 +211,7 @@ func serializeCanvasRunWithQueueItemInputs(
 		Result:     RunResultToProto(run.Result),
 		Executions: executionRefs,
 		QueueItems: serializedQueueItems,
+		Errors:     run.ErrorMessages(),
 		CreatedAt:  timestamppb.New(*run.CreatedAt),
 		UpdatedAt:  timestamppb.New(*run.UpdatedAt),
 	}
