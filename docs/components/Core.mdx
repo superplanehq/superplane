@@ -40,7 +40,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
-  <LinkCard title="Report Work Order Check" href="#report-work-order-check" description="Report a scored check (risk, coverage, confidence) on a work order" />
+  <LinkCard title="Report Work Order Check" href="#report-work-order-check" description="Report a scored or pass/fail check (risk, coverage, CI) on a work order" />
   <LinkCard title="Run App" href="#run-app" description="Run another SuperPlane app and wait for its run to finish" />
   <LinkCard title="Run Shell Commands" href="#run-shell-commands" description="Runs shell commands on a fleet runner (host or Docker container)" />
   <LinkCard title="Run Bash" href="#run-bash" description="Runs a Bash script on a fleet runner with upstream node data in SUPERPLANE_PAYLOAD_FILE" />
@@ -1205,7 +1205,12 @@ The Report Work Order Check component stores a scored check against a work order
 
 Each check is identified by its `checkKey` (for example `risk-review`). The first report creates the check. A later report with the same key updates the check in place and keeps the prior score, so the UI can show the movement between runs. Every report also adds an entry to the work order timeline.
 
-The check's level (healthy / neutral / needs attention / critical) is computed from the score and the thresholds you configure:
+A check is either scored or a pass/fail verdict, controlled by `format`:
+
+- `fraction` and `percent` are scored checks. Set `score` and `maxScore`.
+- `boolean` is a pass/fail verdict (e.g. CI status). Set `passed` to true or false instead of a score; a pass shows as healthy, a fail as critical.
+
+For scored checks, the level (healthy / neutral / needs attention / critical) is computed from the score and the thresholds you configure:
 
 - `direction` says which way is bad: `higherIsBetter` (e.g. coverage) or `lowerIsBetter` (e.g. risk).
 - `cautionAt` and `criticalAt` are score thresholds. When the score crosses a threshold in the bad direction, the check shows that level.
@@ -1213,7 +1218,7 @@ The check's level (healthy / neutral / needs attention / critical) is computed f
 
 For example, a risk score from 0 to 10 where lower is better, with `cautionAt: 5` and `criticalAt: 8`: a score of 3 is healthy, 6 needs attention, 9 is critical.
 
-`score` and `maxScore` accept expressions, so a preceding automation run can feed them (e.g. `{{ previous().data.risk.score }}`). Use `analysis` for the full markdown report — it renders when a user opens the check.
+`score`, `maxScore`, and `passed` accept expressions, so a preceding automation run can feed them (e.g. `{{ previous().data.risk.score }}`). Use `analysis` for the full markdown report — it renders when a user opens the check.
 
 `orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run. This component can only be used in factory-owned apps.
 
