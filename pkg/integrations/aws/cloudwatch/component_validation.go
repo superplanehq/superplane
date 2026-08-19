@@ -3,6 +3,7 @@ package cloudwatch
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 func requireRegion(value string) (string, error) {
@@ -97,6 +98,113 @@ func effectiveEvaluationPeriods(evaluationPeriods int) int {
 	}
 
 	return evaluationPeriods
+}
+
+func requireAlarmMuteRuleName(value string) (string, error) {
+	name := strings.TrimSpace(value)
+	if name == "" {
+		return "", fmt.Errorf("name is required")
+	}
+
+	return name, nil
+}
+
+// requireAlarmNames drops blank entries and enforces PutAlarmMuteRule's own
+// bounds on how many alarms a single mute rule can target.
+func requireAlarmNames(values []string) ([]string, error) {
+	names := make([]string, 0, len(values))
+	for _, value := range values {
+		if name := strings.TrimSpace(value); name != "" {
+			names = append(names, name)
+		}
+	}
+
+	if len(names) == 0 {
+		return nil, fmt.Errorf("at least one alarm is required")
+	}
+
+	if len(names) > maxMuteRuleAlarms {
+		return nil, fmt.Errorf("a mute rule can target at most %d alarms", maxMuteRuleAlarms)
+	}
+
+	return names, nil
+}
+
+func requireScheduleExpression(value string) (string, error) {
+	expression := strings.TrimSpace(value)
+	if expression == "" {
+		return "", fmt.Errorf("schedule expression is required")
+	}
+
+	if !strings.HasPrefix(expression, "cron(") && !strings.HasPrefix(expression, "at(") {
+		return "", fmt.Errorf(`schedule expression must be a recurring "cron(...)" or one-time "at(...)" expression`)
+	}
+
+	return expression, nil
+}
+
+func requireScheduleDuration(value string) (string, error) {
+	duration := strings.TrimSpace(value)
+	if duration == "" {
+		return "", fmt.Errorf("duration is required")
+	}
+
+	return duration, nil
+}
+
+// muteRuleDatetimeLayouts covers the value shape produced by the "datetime"
+// field's HTML datetime-local input, which carries no timezone of its own.
+var muteRuleDatetimeLayouts = []string{
+	"2006-01-02T15:04:05",
+	"2006-01-02T15:04",
+}
+
+// parseMuteRuleTimestamp accepts either a full RFC3339 timestamp, whose own
+// offset always wins, or a bare datetime-local value, interpreted in the
+// given timezone since it carries no offset of its own.
+func parseMuteRuleTimestamp(raw, timezone string) (time.Time, error) {
+	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+		return parsed.UTC(), nil
+	}
+
+	location, err := time.LoadLocation(timezone)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid timezone %q: %w", timezone, err)
+	}
+
+	for _, layout := range muteRuleDatetimeLayouts {
+		if parsed, err := time.ParseInLocation(layout, raw, location); err == nil {
+			return parsed.UTC(), nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("invalid timestamp %q: expected RFC3339 or YYYY-MM-DDTHH:MM", raw)
+}
+
+// parseOptionalMuteRuleTimestamp is parseMuteRuleTimestamp for a togglable
+// field: a blank value is left unset rather than treated as an error.
+func parseOptionalMuteRuleTimestamp(raw, timezone string) (*time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+
+	parsed, err := parseMuteRuleTimestamp(raw, timezone)
+	if err != nil {
+		return nil, err
+	}
+
+	return &parsed, nil
+}
+
+// effectiveTimezone mirrors the "timezone" field's own UI default, so
+// validation resolves the same value the client will send.
+func effectiveTimezone(value string) string {
+	if timezone := strings.TrimSpace(value); timezone != "" {
+		return timezone
+	}
+
+	return "UTC"
 }
 
 func hasConfigKey(configuration any, key string) bool {

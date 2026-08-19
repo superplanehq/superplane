@@ -286,6 +286,76 @@ func (c *Client) ListMetrics(namespace, metricName string) ([]Metric, error) {
 	return metrics, nil
 }
 
+// AlarmMuteRuleSchedule mirrors CloudWatch's Schedule shape: a recurring
+// cron(...) or one-time at(...) expression, how long each activation mutes
+// alarms for, and the timezone the expression is evaluated in.
+type AlarmMuteRuleSchedule struct {
+	Expression string
+	Duration   string
+	Timezone   string
+}
+
+type PutAlarmMuteRuleInput struct {
+	Name        string
+	Description string
+	Schedule    AlarmMuteRuleSchedule
+	AlarmNames  []string
+	StartDate   *time.Time
+	ExpireDate  *time.Time
+}
+
+type AlarmMuteRule struct {
+	Name                 string
+	AlarmMuteRuleArn     string
+	Description          string
+	Schedule             AlarmMuteRuleSchedule
+	AlarmNames           []string
+	StartDate            string
+	ExpireDate           string
+	Status               string
+	MuteType             string
+	LastUpdatedTimestamp string
+}
+
+func (c *Client) PutAlarmMuteRule(input PutAlarmMuteRuleInput) error {
+	params := url.Values{}
+	params.Set("Name", strings.TrimSpace(input.Name))
+	params.Set("Rule.Schedule.Expression", strings.TrimSpace(input.Schedule.Expression))
+	params.Set("Rule.Schedule.Duration", strings.TrimSpace(input.Schedule.Duration))
+
+	if description := strings.TrimSpace(input.Description); description != "" {
+		params.Set("Description", description)
+	}
+
+	if timezone := strings.TrimSpace(input.Schedule.Timezone); timezone != "" {
+		params.Set("Rule.Schedule.Timezone", timezone)
+	}
+
+	setActionMembers(params, "MuteTargets.AlarmNames", input.AlarmNames)
+
+	if input.StartDate != nil {
+		params.Set("StartDate", input.StartDate.UTC().Format(time.RFC3339))
+	}
+
+	if input.ExpireDate != nil {
+		params.Set("ExpireDate", input.ExpireDate.UTC().Format(time.RFC3339))
+	}
+
+	return c.postSignedForm("PutAlarmMuteRule", params, nil)
+}
+
+func (c *Client) GetAlarmMuteRule(name string) (*AlarmMuteRule, error) {
+	params := url.Values{}
+	params.Set("AlarmMuteRuleName", strings.TrimSpace(name))
+
+	response := getAlarmMuteRuleResponse{}
+	if err := c.postSignedForm("GetAlarmMuteRule", params, &response); err != nil {
+		return nil, err
+	}
+
+	return alarmMuteRuleFromXML(response.Result), nil
+}
+
 func setActionMembers(params url.Values, key string, arns []string) {
 	index := 0
 	for _, arn := range arns {
@@ -406,6 +476,78 @@ func alarmFromXML(x xmlMetricAlarm, region string) *MetricAlarm {
 		Region:                             region,
 		ConsoleURL:                         AlarmConsoleURL(region, x.AlarmName),
 		HasMetricQueries:                   len(x.Metrics) > 0,
+	}
+}
+
+type getAlarmMuteRuleResponse struct {
+	XMLName xml.Name               `xml:"GetAlarmMuteRuleResponse"`
+	Result  getAlarmMuteRuleResult `xml:"GetAlarmMuteRuleResult"`
+}
+
+type getAlarmMuteRuleResult struct {
+	Name                 string         `xml:"Name"`
+	AlarmMuteRuleArn     string         `xml:"AlarmMuteRuleArn"`
+	Description          string         `xml:"Description"`
+	Rule                 xmlMuteRule    `xml:"Rule"`
+	MuteTargets          xmlMuteTargets `xml:"MuteTargets"`
+	StartDate            string         `xml:"StartDate"`
+	ExpireDate           string         `xml:"ExpireDate"`
+	Status               string         `xml:"Status"`
+	LastUpdatedTimestamp string         `xml:"LastUpdatedTimestamp"`
+	MuteType             string         `xml:"MuteType"`
+}
+
+type xmlMuteRule struct {
+	Schedule xmlMuteSchedule `xml:"Schedule"`
+}
+
+type xmlMuteSchedule struct {
+	Expression string `xml:"Expression"`
+	Duration   string `xml:"Duration"`
+	Timezone   string `xml:"Timezone"`
+}
+
+type xmlMuteTargets struct {
+	AlarmNames []string `xml:"AlarmNames>member"`
+}
+
+func alarmMuteRuleFromXML(x getAlarmMuteRuleResult) *AlarmMuteRule {
+	return &AlarmMuteRule{
+		Name:             x.Name,
+		AlarmMuteRuleArn: x.AlarmMuteRuleArn,
+		Description:      x.Description,
+		Schedule: AlarmMuteRuleSchedule{
+			Expression: x.Rule.Schedule.Expression,
+			Duration:   x.Rule.Schedule.Duration,
+			Timezone:   x.Rule.Schedule.Timezone,
+		},
+		AlarmNames:           x.MuteTargets.AlarmNames,
+		StartDate:            x.StartDate,
+		ExpireDate:           x.ExpireDate,
+		Status:               x.Status,
+		MuteType:             x.MuteType,
+		LastUpdatedTimestamp: x.LastUpdatedTimestamp,
+	}
+}
+
+func alarmMuteRuleToMap(rule *AlarmMuteRule) map[string]any {
+	if rule == nil {
+		return map[string]any{}
+	}
+
+	return map[string]any{
+		"name":                 rule.Name,
+		"alarmMuteRuleArn":     rule.AlarmMuteRuleArn,
+		"description":          rule.Description,
+		"scheduleExpression":   rule.Schedule.Expression,
+		"scheduleDuration":     rule.Schedule.Duration,
+		"scheduleTimezone":     rule.Schedule.Timezone,
+		"alarmNames":           rule.AlarmNames,
+		"startDate":            rule.StartDate,
+		"expireDate":           rule.ExpireDate,
+		"status":               rule.Status,
+		"muteType":             rule.MuteType,
+		"lastUpdatedTimestamp": rule.LastUpdatedTimestamp,
 	}
 }
 
