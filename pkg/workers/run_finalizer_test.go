@@ -562,13 +562,11 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 
 	steps := []models.FactoryLineStep{
 		{
-			Name:       "step-one",
 			Type:       models.FactoryLineStepTypeRunApp,
 			AppID:      firstApp.ID,
 			Entrypoint: firstEntry,
 		},
 		{
-			Name:       "step-two",
 			Type:       models.FactoryLineStepTypeRunApp,
 			AppID:      secondApp.ID,
 			Entrypoint: secondEntry,
@@ -593,25 +591,25 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 
 	amqpURL, _ := config.RabbitMQURL()
 	finalizer := NewRunFinalizer(amqpURL, r.Registry)
-	var pending *factoryLinePendingRun
+	var pending []factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
-		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, firstResult.Run.ID)
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, firstResult.Run.ID)
 		return advanceErr
 	}))
 
-	require.NotNil(t, pending)
-	assert.Equal(t, secondApp.ID, pending.workflowID)
+	require.Len(t, pending, 1)
+	assert.Equal(t, secondApp.ID, pending[0].workflowID)
 
 	firstExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), firstResult.Run.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, firstExecution.Status)
 	assert.Equal(t, models.CanvasRunResultPassed, firstExecution.Result)
 
-	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), pending.runID)
+	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), pending[0].runID)
 	require.NoError(t, err)
 	assert.Equal(t, 1, secondExecution.StepIndex)
-	assert.Equal(t, "step-two", secondExecution.StepName)
+	assert.Equal(t, secondApp.Name, secondExecution.StepName)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, secondExecution.Status)
 	assert.Equal(t, firstExecution.LineDispatchID, secondExecution.LineDispatchID,
 		"both steps of the same traversal share one line dispatch")
@@ -641,7 +639,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__FinishesDispatchOnLastStepP
 
 	onlyApp, onlyEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
-		{Name: "step-one", Type: models.FactoryLineStepTypeRunApp, AppID: onlyApp.ID, Entrypoint: onlyEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: onlyApp.ID, Entrypoint: onlyEntry},
 	}))
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
@@ -662,13 +660,13 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__FinishesDispatchOnLastStepP
 
 	amqpURL, _ := config.RabbitMQURL()
 	finalizer := NewRunFinalizer(amqpURL, r.Registry)
-	var pending *factoryLinePendingRun
+	var pending []factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
-		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
 		return advanceErr
 	}))
-	assert.Nil(t, pending, "no next step, so nothing to run")
+	assert.Empty(t, pending, "no next step, so nothing to run")
 
 	reloaded, err := models.FindWorkOrderLineDispatch(database.Conn(), dispatch.ID)
 	require.NoError(t, err)
@@ -705,8 +703,8 @@ func testExecuteNextFactoryLineStepFinishesDispatchWithResult(t *testing.T, term
 	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
 	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
-		{Name: "step-one", Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
-		{Name: "step-two", Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
 	}))
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
@@ -727,13 +725,13 @@ func testExecuteNextFactoryLineStepFinishesDispatchWithResult(t *testing.T, term
 
 	amqpURL, _ := config.RabbitMQURL()
 	finalizer := NewRunFinalizer(amqpURL, r.Registry)
-	var pending *factoryLinePendingRun
+	var pending []factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
-		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
 		return advanceErr
 	}))
-	assert.Nil(t, pending, "a non-passed result never starts the next step")
+	assert.Empty(t, pending, "a non-passed result never starts the next step")
 
 	reloaded, err := models.FindWorkOrderLineDispatch(database.Conn(), dispatch.ID)
 	require.NoError(t, err)
@@ -761,8 +759,8 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__CancelsDispatchWhenOrderClo
 	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
 	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
-		{Name: "step-one", Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
-		{Name: "step-two", Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
 	}))
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
@@ -786,13 +784,13 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__CancelsDispatchWhenOrderClo
 
 	amqpURL, _ := config.RabbitMQURL()
 	finalizer := NewRunFinalizer(amqpURL, r.Registry)
-	var pending *factoryLinePendingRun
+	var pending []factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
-		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
 		return advanceErr
 	}))
-	assert.Nil(t, pending, "a closed order never starts the next step")
+	assert.Empty(t, pending, "a closed order never starts the next step")
 
 	reloaded, err := models.FindWorkOrderLineDispatch(database.Conn(), dispatch.ID)
 	require.NoError(t, err)
@@ -822,8 +820,8 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__LineEditMidTraversalDoesNot
 	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
 	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
-		{Name: "step-one", Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
-		{Name: "step-two", Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
 	}))
 
 	var result *models.FactoryLineStepResult
@@ -838,9 +836,9 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__LineEditMidTraversalDoesNot
 	// with the dispatch's snapshot about what "step two" is.
 	insertedApp, insertedEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "inserted", "start-inserted")
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
-		{Name: "inserted", Type: models.FactoryLineStepTypeRunApp, AppID: insertedApp.ID, Entrypoint: insertedEntry},
-		{Name: "step-one", Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
-		{Name: "step-two-renamed", Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: insertedApp.ID, Entrypoint: insertedEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
 	}))
 
 	now := time.Now()
@@ -853,22 +851,22 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__LineEditMidTraversalDoesNot
 
 	amqpURL, _ := config.RabbitMQURL()
 	finalizer := NewRunFinalizer(amqpURL, r.Registry)
-	var pending *factoryLinePendingRun
+	var pending []factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
-		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
 		return advanceErr
 	}))
 
-	require.NotNil(t, pending)
-	assert.Equal(t, secondApp.ID, pending.workflowID,
+	require.Len(t, pending, 1)
+	assert.Equal(t, secondApp.ID, pending[0].workflowID,
 		"advancement reads the dispatch's snapshot, not the edited live line")
 
-	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), pending.runID)
+	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), pending[0].runID)
 	require.NoError(t, err)
 	assert.Equal(t, 1, secondExecution.StepIndex)
-	assert.Equal(t, "step-two", secondExecution.StepName,
-		"the snapshot's original step name, unaffected by the later rename")
+	assert.Equal(t, secondApp.Name, secondExecution.StepName,
+		"the snapshot's original automation name, unaffected by the later line edit")
 }
 
 // dispatchWorkOrderForTest promotes a draft order to open, mirroring
@@ -900,13 +898,11 @@ func Test__RunFinalizer__FinalizeRunAdvancesFactoryLineInSameTransaction(t *test
 
 	steps := []models.FactoryLineStep{
 		{
-			Name:       "step-one",
 			Type:       models.FactoryLineStepTypeRunApp,
 			AppID:      firstApp.ID,
 			Entrypoint: firstEntry,
 		},
 		{
-			Name:       "step-two",
 			Type:       models.FactoryLineStepTypeRunApp,
 			AppID:      secondApp.ID,
 			Entrypoint: secondEntry,
@@ -946,7 +942,7 @@ func Test__RunFinalizer__FinalizeRunAdvancesFactoryLineInSameTransaction(t *test
 	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), secondRun.ID)
 	require.NoError(t, err)
 	assert.Equal(t, 1, secondExecution.StepIndex)
-	assert.Equal(t, "step-two", secondExecution.StepName)
+	assert.Equal(t, secondApp.Name, secondExecution.StepName)
 }
 
 func Test__RunFinalizer__FinalizeRunRollsBackWhenFactoryLineAdvanceFails(t *testing.T) {
@@ -968,13 +964,11 @@ func Test__RunFinalizer__FinalizeRunRollsBackWhenFactoryLineAdvanceFails(t *test
 
 	steps := []models.FactoryLineStep{
 		{
-			Name:       "step-one",
 			Type:       models.FactoryLineStepTypeRunApp,
 			AppID:      firstApp.ID,
 			Entrypoint: firstEntry,
 		},
 		{
-			Name:       "step-two",
 			Type:       models.FactoryLineStepTypeRunApp,
 			AppID:      secondApp.ID,
 			Entrypoint: "missing-entrypoint",

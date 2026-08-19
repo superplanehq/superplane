@@ -194,7 +194,6 @@ func createOnboardingResources(
 	require.NoError(t, database.DB(t.Context()).Model(app).Update("factory_id", factory.ID).Error)
 	line, err := factory.CreateLine(database.DB(t.Context()), support.RandomName("line"), []models.FactoryLineStep{
 		{
-			Name:       "Build",
 			Type:       models.FactoryLineStepTypeRunApp,
 			AppID:      app.ID,
 			Entrypoint: "work-order-dispatch",

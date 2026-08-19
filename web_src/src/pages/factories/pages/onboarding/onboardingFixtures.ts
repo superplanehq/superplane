@@ -3,6 +3,7 @@ export type VcsHostId = "github" | "gitlab";
 export type IntegrationId = "github" | "gitlab" | "claude" | "cursor" | "openai" | "linear" | "jira";
 export type AgentHarnessId = "claude-code" | "cursor" | "codex";
 export type IssuesChoiceId = "vcs" | "linear" | "jira" | "skip";
+export type WizardStepId = "vcs" | "repo" | "issues" | "agent" | "name" | "start";
 
 export type IntegrationOption = {
   id: IntegrationId;
@@ -13,8 +14,8 @@ export type IntegrationOption = {
 };
 
 export const VCS_OPTIONS: IntegrationOption[] = [
-  { id: "github", label: "GitHub", detail: "Connect the app repository on GitHub." },
-  { id: "gitlab", label: "GitLab", detail: "Connect the app repository on GitLab.", soon: true },
+  { id: "github", label: "GitHub", detail: "Connect GitHub to list repositories and open pull requests." },
+  { id: "gitlab", label: "GitLab", detail: "Connect GitLab to list repositories and open merge requests.", soon: true },
 ];
 
 export const AGENT_OPTIONS: {
@@ -110,14 +111,48 @@ export function fixtureIssueCount(repo: string): number {
   return 5 + (hash % 40);
 }
 
-export const FIXTURE_INVITE_URL = "https://app.superplane.dev/invite/storybook-demo-token";
-
-export const RAIL_STEPS = [
-  { id: "name", label: "Workspace", detail: "Name the workspace for continuous AI work" },
-  { id: "repo", label: "Version control", detail: "App repository agents analyze and change" },
-  { id: "issues", label: "Issues", detail: "Backlog SuperPlane can turn into work" },
-  { id: "agent", label: "Coding agent", detail: "Runs work in the app repository" },
+export const WIZARD_STEPS = [
+  {
+    id: "vcs" as const,
+    label: "VCS",
+    purpose: "Choose GitHub or GitLab and connect it. Agents use this host for the app repository.",
+  },
+  {
+    id: "repo" as const,
+    label: "Repository",
+    purpose: "Pick the app repository. SuperPlane analyzes that codebase. Agents change it and open pull requests.",
+  },
+  {
+    id: "issues" as const,
+    label: "Issues",
+    purpose:
+      "Optional. Point SuperPlane at a backlog so it can find small work that agents can solve. Or skip and create work orders yourself.",
+  },
+  {
+    id: "agent" as const,
+    label: "Agent",
+    purpose:
+      "Connect a cloud coding agent. It works issues in the app repository and opens pull requests without engineers watching each run.",
+  },
+  {
+    id: "name" as const,
+    label: "Name",
+    purpose: "Name the workspace for the app or product area you want to improve.",
+  },
+  {
+    id: "start" as const,
+    label: "Start",
+    purpose:
+      "Review the first work order. The coding agent will improve AGENTS.md so later work follows your repository conventions.",
+  },
 ] as const;
+
+/** First work order the Start step proposes after setup. */
+export const START_WORK_ORDER = {
+  title: "Improve AGENTS.md",
+  description:
+    "Improve AGENTS.md for this repo (create it if missing).\n\n- Review the repository to understand layout, build/test, and conventions\n- Cover build/test, key packages, and repo-specific guidance\n- Keep useful guidance; remove generic or outdated advice\n- One focused pass only — do not rewrite unrelated docs",
+} as const;
 
 export function vcsLabel(host: VcsHostId) {
   return host === "github" ? "GitHub" : "GitLab";
