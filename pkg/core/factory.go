@@ -92,7 +92,8 @@ type UpdateWorkOrderArtifactParams struct {
 }
 
 // ReportWorkOrderCheckParams carries one check report. Format must be
-// "fraction" or "percent" (empty defaults to fraction); Level must be
+// "fraction", "percent", or "boolean" (empty defaults to fraction; a
+// boolean check pins Score to 0/1 and MaxScore to 1); Level must be
 // "positive", "neutral", "caution", or "critical" (empty defaults to
 // neutral) — the reporting component computes it from its thresholds.
 type ReportWorkOrderCheckParams struct {
@@ -135,4 +136,7 @@ type WorkOrderCheck struct {
 	Format        string   `json:"format"`
 	Level         string   `json:"level"`
 	PreviousScore *float64 `json:"previousScore,omitempty"`
+	// RecentScores lists the latest report scores, oldest first and
+	// ending with Score, capped server-side.
+	RecentScores []float64 `json:"recentScores,omitempty"`
 }

@@ -80,6 +80,7 @@ func serializeCheck(check *models.FactoryWorkOrderCheck) (*pb.WorkOrderCheck, er
 		Format:        checkFormatToProto(check.Format),
 		Level:         checkLevelToProto(check.Level),
 		PreviousScore: check.PreviousScore,
+		RecentScores:  check.RecentScores,
 		Summary:       check.Summary,
 		Analysis:      check.Analysis,
 		CreatedAt:     timestamppb.New(check.CreatedAt),
@@ -100,6 +101,8 @@ func checkFormatToProto(format string) pb.WorkOrderCheck_Format {
 		return pb.WorkOrderCheck_FORMAT_FRACTION
 	case models.FactoryWorkOrderCheckFormatPercent:
 		return pb.WorkOrderCheck_FORMAT_PERCENT
+	case models.FactoryWorkOrderCheckFormatBoolean:
+		return pb.WorkOrderCheck_FORMAT_BOOLEAN
 	default:
 		return pb.WorkOrderCheck_FORMAT_UNSPECIFIED
 	}
