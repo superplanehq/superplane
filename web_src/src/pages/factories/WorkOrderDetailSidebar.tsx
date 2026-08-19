@@ -66,7 +66,7 @@ export function WorkOrderDetailSidebar({
       <WorkOrderSidebarFactoryLines
         organizationId={organizationId}
         factoryKey={factoryKey}
-        executions={order.executions ?? []}
+        lineDispatches={order.lineDispatches ?? []}
         factoryLines={factoryLines}
         canDispatch={canDispatch}
         permissionsLoading={permissionsLoading}

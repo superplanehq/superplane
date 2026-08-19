@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: PR Closure
+  description: Close the work order when the attached pull request merges or is closed without a merge.
+spec:
+  edges:
+    - channel: default
+      sourceId: on-pr-closed
+      targetId: find-work-order
+    - channel: found
+      sourceId: find-work-order
+      targetId: is-pr-merged
+    - channel: "true"
+      sourceId: is-pr-merged
+      targetId: complete-work-order
+    - channel: "false"
+      sourceId: is-pr-merged
+      targetId: reject-work-order
+  nodes:
+    - id: on-pr-closed
+      name: On Pull Request Closed
+      type: TYPE_TRIGGER
+      component: github.onPullRequest
+      configuration:
+        actions:
+          - closed
+        repository: '{{ install_params.appRepository }}'
+      position:
+        x: 1272
+        'y': 72
+      isCollapsed: true
+    - id: find-work-order
+      name: Find Work Order
+      type: TYPE_ACTION
+      component: findWorkOrder
+      configuration:
+        artifactKey: '{{ root().data.pull_request.html_url }}'
+        by: artifactKey
+      position:
+        x: 1272
+        'y': 432
+      isCollapsed: true
+    - id: is-pr-merged
+      name: PR Merged?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: root().data.pull_request.merged == true
+      position:
+        x: 1202
+        'y': 792
+      isCollapsed: true
+    - id: complete-work-order
+      name: Complete Work Order
+      type: TYPE_ACTION
+      component: updateWorkOrderStatus
+      configuration:
+        orderId: '{{ $["Find Work Order"].data.workOrder.id }}'
+        result: completed
+        status: closed
+      position:
+        x: 1132
+        'y': 1152
+      isCollapsed: true
+    - id: reject-work-order
+      name: Reject Work Order
+      type: TYPE_ACTION
+      component: updateWorkOrderStatus
+      configuration:
+        orderId: '{{ $["Find Work Order"].data.workOrder.id }}'
+        result: rejected
+        status: closed
+      position:
+        x: 1600
+        'y': 1152
+      isCollapsed: true

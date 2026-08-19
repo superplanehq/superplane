@@ -342,6 +342,10 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	log.Println("Starting Magic Code Email Consumer")
 	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
 	go magicCodeEmailConsumer.Start()
+
+	log.Println("Starting Factory Notification Consumer")
+	factoryNotificationConsumer := workers.NewFactoryNotificationConsumer(rabbitMQURL, emailService, baseURL)
+	go factoryNotificationConsumer.Start()
 }
 
 func buildGRPCServices(
@@ -594,7 +598,6 @@ func Start() {
 		panic("OIDC_KEYS_PATH must be set")
 	}
 
-	appEnv := os.Getenv("APP_ENV")
 	jwtSigner := jwt.NewSigner(jwtSecret)
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
 	oidcProvider, err := oidc.NewProviderFromKeyDir(webhooksBaseURL, oidcKeysPath)
@@ -610,7 +613,6 @@ func Start() {
 
 	registry, err := registry.NewRegistryWithOptions(registry.RegistryOptions{
 		Encryptor: encryptorInstance,
-		AppEnv:    appEnv,
 		HTTP: registry.HTTPOptions{
 			MaxResponseBytes: DefaultMaxHTTPResponseBytes,
 			PolicyResolver: func() (registry.HTTPPolicy, error) {

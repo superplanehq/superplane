@@ -25,6 +25,7 @@ type Story = StoryObj<typeof meta>;
 
 const defaultArgs = {
   organizationId: FACTORIES_ORGANIZATION_ID,
+  factoryKey: "RF",
   userName: "Storybook User",
   userEmail: "storybook@superplane.dev",
   userAvatarUrl: null,

@@ -26,6 +26,12 @@ type FactoryContext interface {
 	// PR artifact's `state` stays in sync with GitHub after the initial
 	// attach — see the updateWorkOrderArtifact component.
 	UpdateWorkOrderArtifact(params UpdateWorkOrderArtifactParams) (*WorkOrderArtifact, error)
+	// ReportWorkOrderCheck upserts a scored check on the work order,
+	// keyed by CheckKey: the first report creates the check, later
+	// reports with the same key update it in place and keep the prior
+	// score as PreviousScore. Every report also lands an
+	// `order.check.reported` timeline event.
+	ReportWorkOrderCheck(params ReportWorkOrderCheckParams) (*WorkOrderCheck, error)
 }
 
 type WorkOrderParams struct {
@@ -85,6 +91,26 @@ type UpdateWorkOrderArtifactParams struct {
 	Data map[string]any
 }
 
+// ReportWorkOrderCheckParams carries one check report. Format must be
+// "fraction", "percent", or "boolean" (empty defaults to fraction; a
+// boolean check pins Score to 0/1 and MaxScore to 1); Level must be
+// "positive", "neutral", "caution", or "critical" (empty defaults to
+// neutral) — the reporting component computes it from its thresholds.
+type ReportWorkOrderCheckParams struct {
+	// OrderID identifies the work order to target; see
+	// UpdateWorkOrderStatusParams.OrderID.
+	OrderID string
+	// CheckKey identifies the check across reports (e.g. "risk-review").
+	CheckKey string
+	Name     string
+	Score    float64
+	MaxScore float64
+	Format   string
+	Level    string
+	Summary  string
+	Analysis string
+}
+
 type WorkOrder struct {
 	ID          string `json:"id"`
 	Title       string `json:"title"`
@@ -98,4 +124,19 @@ type WorkOrderArtifact struct {
 	WorkOrderID string         `json:"workOrderId"`
 	Type        string         `json:"type"`
 	Data        map[string]any `json:"data,omitempty"`
+}
+
+type WorkOrderCheck struct {
+	ID            string   `json:"id"`
+	WorkOrderID   string   `json:"workOrderId"`
+	Key           string   `json:"key"`
+	Name          string   `json:"name"`
+	Score         float64  `json:"score"`
+	MaxScore      float64  `json:"maxScore"`
+	Format        string   `json:"format"`
+	Level         string   `json:"level"`
+	PreviousScore *float64 `json:"previousScore,omitempty"`
+	// RecentScores lists the latest report scores, oldest first and
+	// ending with Score, capped server-side.
+	RecentScores []float64 `json:"recentScores,omitempty"`
 }

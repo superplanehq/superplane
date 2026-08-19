@@ -1,14 +1,19 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createMutate, dispatchMutate } = vi.hoisted(() => ({
+const { createMutate, dispatchMutate, meResult } = vi.hoisted(() => ({
   createMutate: vi.fn(),
   dispatchMutate: vi.fn(),
+  meResult: { current: { data: null as { id: string; name: string } | null } },
 }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useCreateWorkOrder: () => ({ mutateAsync: createMutate, isPending: false }),
   useDispatchWorkOrder: () => ({ mutateAsync: dispatchMutate, isPending: false }),
+}));
+
+vi.mock("@/hooks/useMe", () => ({
+  useMe: () => meResult.current,
 }));
 
 vi.mock("@/lib/toast", () => ({
@@ -26,6 +31,7 @@ describe("useCreateWorkOrderComposer", () => {
     dispatchMutate.mockReset();
     onClose.mockReset();
     onCreated.mockReset();
+    meResult.current = { data: null };
   });
 
   it("marks Send to line as loading while the work order is created", async () => {
@@ -49,11 +55,10 @@ describe("useCreateWorkOrderComposer", () => {
 
     act(() => {
       result.current.updateTitle("Ship the refunds line");
-      result.current.setSelectedLineName("plan-and-implement");
     });
 
     act(() => {
-      void result.current.handleSendToLine();
+      void result.current.handleSendToLine("plan-and-implement");
     });
 
     expect(result.current.isSendingToLine).toBe(true);
@@ -62,6 +67,122 @@ describe("useCreateWorkOrderComposer", () => {
     await act(async () => {
       resolveCreate({ id: "order-1" });
     });
+  });
+
+  it("creates the order and dispatches it with the line name passed to handleSendToLine", async () => {
+    createMutate.mockResolvedValue({ id: "order-1", number: "101" });
+    dispatchMutate.mockResolvedValue({});
+
+    const { result } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    act(() => {
+      result.current.updateTitle("Ship the refunds line");
+    });
+
+    await act(async () => {
+      await result.current.handleSendToLine("hotfix");
+    });
+
+    expect(createMutate).toHaveBeenCalled();
+    expect(dispatchMutate).toHaveBeenCalledWith({ orderId: "order-1", lineName: "hotfix" });
+    expect(onCreated).toHaveBeenCalledWith("101");
+  });
+
+  it("does nothing when handleSendToLine is called without a line name", async () => {
+    const { result } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    act(() => {
+      result.current.updateTitle("Ship the refunds line");
+    });
+
+    await act(async () => {
+      await result.current.handleSendToLine("");
+    });
+
+    expect(createMutate).not.toHaveBeenCalled();
+  });
+
+  it("seeds assigneeIds with the current user once me resolves", () => {
+    meResult.current = { data: { id: "user-me", name: "Me" } };
+
+    const { result } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    expect(result.current.assigneeIds).toEqual(["user-me"]);
+  });
+
+  it("keeps assigneeIds empty when there is no current user", () => {
+    const { result } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    expect(result.current.assigneeIds).toEqual([]);
+  });
+
+  it("does not override a manual assignment made before me resolves", () => {
+    const { result, rerender } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    act(() => {
+      result.current.setAssigneeIds(["user-manual"]);
+    });
+
+    meResult.current = { data: { id: "user-me", name: "Me" } };
+    rerender();
+
+    expect(result.current.assigneeIds).toEqual(["user-manual"]);
+  });
+
+  it("does not clobber a manual change made after me resolves", () => {
+    meResult.current = { data: { id: "user-me", name: "Me" } };
+
+    const { result } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    expect(result.current.assigneeIds).toEqual(["user-me"]);
+
+    act(() => {
+      result.current.setAssigneeIds([]);
+    });
+
+    expect(result.current.assigneeIds).toEqual([]);
   });
 
   it("opens the new work order without closing to the list first", async () => {

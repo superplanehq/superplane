@@ -19,7 +19,6 @@ const (
 
 var (
 	ErrFactoryWorkOrderExecutionNotFound = errors.New("factory work order execution not found")
-	ErrFactoryWorkOrderExecutionActive   = errors.New("work order already has an active execution")
 	ErrFactoryWorkOrderNotDispatchable   = errors.New("work order cannot be dispatched in its current state")
 )
 
@@ -29,6 +28,11 @@ type FactoryWorkOrderExecution struct {
 	FactoryID      uuid.UUID
 	WorkOrderID    uuid.UUID
 	LineID         uuid.UUID
+	// LineDispatchID is the parent traversal this step run belongs to. Its
+	// steps snapshot is authoritative for what StepIndex refers to —
+	// see FactoryWorkOrderLineDispatch. StepName is the automation
+	// (canvas) name captured when the step started.
+	LineDispatchID uuid.UUID
 	StepIndex      int
 	StepName       string
 	RunID          uuid.UUID
@@ -100,12 +104,15 @@ func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) e
 		return err
 	}
 
-	line, err := f.FindLine(tx, e.LineID)
+	order, err := f.FindWorkOrder(tx, e.WorkOrderID)
 	if err != nil {
 		return err
 	}
 
-	order, err := f.FindWorkOrder(tx, e.WorkOrderID)
+	// The line ref comes from the dispatch's snapshot, not the live line —
+	// this event is a historical fact about the traversal, so a line
+	// rename/edit after dispatch shouldn't change what it says.
+	dispatch, err := FindWorkOrderLineDispatch(tx, e.LineDispatchID)
 	if err != nil {
 		return err
 	}
@@ -118,8 +125,8 @@ func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) e
 	data := factory.LineStepExecutionFinished{
 		StepName: e.StepName,
 		Order:    order.Ref(),
-		Line:     &factory.LineRef{ID: line.ID, Name: line.Name},
-		App:      &factory.AppRef{ID: run.WorkflowID},
+		Line:     dispatch.Ref(),
+		App:      &factory.AppRef{ID: run.WorkflowID, Name: e.StepName},
 		Run:      &factory.RunRef{ID: run.ID, State: run.State, Result: &run.Result},
 	}
 
@@ -139,24 +146,26 @@ func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) e
 	return tx.Create(event).Error
 }
 
+// FactoryWorkOrderExecutionRecord is a step execution enriched with the
+// canvas run details the API/UI need to render it. Its line/steps
+// information now lives on the parent FactoryWorkOrderLineDispatch instead
+// of being joined/serialized per execution.
 type FactoryWorkOrderExecutionRecord struct {
 	FactoryWorkOrderExecution
-	LineName   string
 	CanvasID   uuid.UUID
 	CanvasName string
 	RunState   string
 	RunResult  string
-	// Steps snapshot the containing line's step definitions so the UI can
-	// render the Intake -> Implement -> Verify sequence without a separate lookup.
-	LineSteps datatypes.JSONSlice[FactoryLineStep] `gorm:"column:line_steps"`
 }
 
-func ListFactoryWorkOrderExecutionsByWorkOrderIDs(
+// ListFactoryWorkOrderExecutionsByLineDispatchIDs bulk-loads step executions
+// for the given line dispatches, keyed by line_dispatch_id.
+func ListFactoryWorkOrderExecutionsByLineDispatchIDs(
 	tx *gorm.DB,
-	workOrderIDs []uuid.UUID,
+	lineDispatchIDs []uuid.UUID,
 ) (map[uuid.UUID][]FactoryWorkOrderExecutionRecord, error) {
-	result := make(map[uuid.UUID][]FactoryWorkOrderExecutionRecord, len(workOrderIDs))
-	if len(workOrderIDs) == 0 {
+	result := make(map[uuid.UUID][]FactoryWorkOrderExecutionRecord, len(lineDispatchIDs))
+	if len(lineDispatchIDs) == 0 {
 		return result, nil
 	}
 
@@ -165,17 +174,14 @@ func ListFactoryWorkOrderExecutionsByWorkOrderIDs(
 		Table("factory_work_order_executions AS e").
 		Select(`
 			e.*,
-			l.name AS line_name,
-			l.steps AS line_steps,
 			c.id AS canvas_id,
 			c.name AS canvas_name,
 			r.state AS run_state,
 			r.result AS run_result
 		`).
-		Joins("JOIN factory_lines l ON l.id = e.line_id").
 		Joins("JOIN workflow_runs r ON r.id = e.run_id").
 		Joins("JOIN workflows c ON c.id = r.workflow_id").
-		Where("e.work_order_id IN ?", workOrderIDs).
+		Where("e.line_dispatch_id IN ?", lineDispatchIDs).
 		Order("e.created_at ASC").
 		Order("e.id ASC").
 		Scan(&records).
@@ -185,7 +191,7 @@ func ListFactoryWorkOrderExecutionsByWorkOrderIDs(
 	}
 
 	for _, record := range records {
-		result[record.WorkOrderID] = append(result[record.WorkOrderID], record)
+		result[record.LineDispatchID] = append(result[record.LineDispatchID], record)
 	}
 
 	return result, nil

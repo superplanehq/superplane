@@ -81,9 +81,9 @@ func CreateIntegrationWithUsage(
 	})
 
 	//
-	// If the integration implementation supports the new flow, use it.
+	// If the integration and organization support the new flow, use it.
 	//
-	if registry.SupportsNewSetupFlow(integrationName) {
+	if registry.UseNewSetupFlow(org, integrationName) {
 		newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, nil)
 		if err != nil {
 			integrationLogger.WithError(err).Error("failed to create integration")

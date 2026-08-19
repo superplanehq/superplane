@@ -1,6 +1,7 @@
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { Badge } from "@/components/ui/badge";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date";
 import { ChevronRight, Loader2 } from "lucide-react";
@@ -19,6 +20,7 @@ const MAX_ROWS = 8;
 
 export function OverviewPage() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  usePageTitle(["Overview", factory?.name ?? "Workspace"]);
   const {
     data: workOrders = [],
     isLoading: workOrdersLoading,

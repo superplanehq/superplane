@@ -23,11 +23,15 @@ import {
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
+  FactorySettingsNotificationsPage,
+  FactorySettingsProfilePage,
   FactorySettingsSoonPage,
   FACTORY_SETTINGS_NAV_ITEMS,
+  isFactorySettingsComingSoon,
   LegacyWorkOrderDetailRedirect,
   LinesPage,
   MissionsPage,
+  NewWorkspacePage,
   OverviewPage,
   VelocityPage,
   WikiPage,
@@ -42,6 +46,7 @@ import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGat
 import { HomePage } from "@/pages/home";
 import { homePageIds, type HomePageFixture } from "@/pages/home/__fixtures__/handlers";
 import { NewAppPage } from "@/pages/home/NewAppPage";
+import { OrganizationSettings } from "@/pages/organization/settings";
 import type { AgentSuggestion } from "@/ui/CanvasPage";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -76,7 +81,7 @@ function fixtureFetchState(): FixtureFetchState {
 export interface OrgWorkspacePageOverrides {
   wiki?: ComponentType;
   overview?: ComponentType;
-  /** When set, mounts `/onboarding` and gates other factory pages while pending. */
+  /** When set, mounts `/setup` and gates other factory pages while pending. */
   onboarding?: ComponentType;
   /** Storybook-only Work Orders page. Live app ignores this. */
   workOrders?: ComponentType;
@@ -217,10 +222,11 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
         <Route path="apps/:appId" element={<AppPage />} />
         <Route path="workspaces">
           <Route index element={factoryRoute(<FactoriesIndexPage />)} />
+          <Route path="new" element={factoryRoute(<NewWorkspacePage />)} />
           <Route path=":factoryKey" element={factoryRoute(<FactoriesLayout />)}>
             <Route element={<OptionalOnboardingGate enabled={onboardingEnabled} />}>
               <Route index element={<Navigate to="overview" replace />} />
-              {OnboardingRoutePage ? <Route path="onboarding" element={<OnboardingRoutePage />} /> : null}
+              {OnboardingRoutePage ? <Route path="setup" element={<OnboardingRoutePage />} /> : null}
               <Route path="overview" element={<OverviewRoutePage />} />
               <Route path="missions" element={<MissionsPage />} />
               <Route path="missions/:missionId" element={<MissionDetailPage />} />
@@ -252,7 +258,9 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
           <Route path=":factoryKey/settings" element={factoryRoute(<FactorySettingsLayout />)}>
             <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
             <Route path="general" element={<FactorySettingsGeneralPage />} />
-            {FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.id !== "general").map((item) => (
+            <Route path="profile" element={<FactorySettingsProfilePage />} />
+            <Route path="notifications" element={<FactorySettingsNotificationsPage />} />
+            {FACTORY_SETTINGS_NAV_ITEMS.filter(isFactorySettingsComingSoon).map((item) => (
               <Route
                 key={item.id}
                 path={item.id}
@@ -271,6 +279,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
           path="settings/integrations/:integrationName/setup"
           element={<div data-testid="integration-setup-placeholder">Integration setup</div>}
         />
+        <Route path="settings/*" element={<OrganizationSettings />} />
       </Route>
     </Routes>
   );

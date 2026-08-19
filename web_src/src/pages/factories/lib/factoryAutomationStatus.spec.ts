@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CanvasesCanvasRun, FactoriesWorkOrder } from "@/api-client";
+import type { CanvasesCanvasRun, FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
 import {
   findWorkOrderForAutomationRun,
   listFactoryAutomationRuns,
@@ -7,8 +7,13 @@ import {
   resolveFactoryAutomationStatusFromCanvasRuns,
 } from "./factoryAutomationStatus";
 
-function order(id: string, title: string, executions: FactoriesWorkOrder["executions"]): FactoriesWorkOrder {
-  return { id, title, state: "STATE_OPEN", executions };
+function order(id: string, title: string, executions: FactoriesWorkOrderExecution[]): FactoriesWorkOrder {
+  return {
+    id,
+    title,
+    state: "STATE_OPEN",
+    lineDispatches: executions.length > 0 ? [{ id: `dispatch-${id}`, stepExecutions: executions }] : [],
+  };
 }
 
 function canvasRun(overrides: CanvasesCanvasRun): CanvasesCanvasRun {

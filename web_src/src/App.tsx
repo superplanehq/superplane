@@ -32,16 +32,22 @@ import {
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
+  FactorySettingsNotificationsPage,
+  FactorySettingsProfilePage,
   FactorySettingsSoonPage,
   FACTORY_SETTINGS_NAV_ITEMS,
+  isFactorySettingsComingSoon,
   LegacyWorkOrderDetailRedirect,
   LinesPage,
   MissionsPage,
-  OverviewPage,
+  NewWorkspacePage,
+  OnboardingGate,
+  OnboardingPage,
   VelocityPage,
   WikiPage,
   WorkOrderDetailPage,
   WorkOrdersPage,
+  WorkspaceOverviewPage,
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
 import { HomePage } from "./pages/home";
@@ -163,55 +169,49 @@ function AppRouter() {
                     element={withAuthPermissionAndFactoriesFeature(FactoriesIndexPage, "factories", "read")}
                   />
                   <Route
+                    path="new"
+                    element={withAuthPermissionAndFactoriesFeature(NewWorkspacePage, "factories", "create")}
+                  />
+                  <Route
                     path=":factoryKey"
                     element={withAuthPermissionAndFactoriesFeature(FactoriesLayout, "factories", "read")}
                   >
-                    <Route index element={<Navigate to="overview" replace />} />
-                    <Route path="overview" element={<OverviewPage />} />
-                    <Route path="missions" element={<MissionsPage />} />
-                    <Route path="wiki" element={<WikiPage />} />
-                    <Route path="velocity" element={<VelocityPage />} />
-                    <Route path="work-orders">
-                      <Route index element={<WorkOrdersPage />} />
-                      <Route path="new" element={<CreateWorkOrderComposeGate />} />
-                      {/* Legacy `/work-orders/:orderId` bookmark shape — redirects to `/work-order/:number`. */}
-                      <Route path=":orderId" element={<LegacyWorkOrderDetailRedirect />} />
+                    <Route element={<OnboardingGate />}>
+                      <Route index element={<Navigate to="overview" replace />} />
+                      <Route path="setup" element={<OnboardingPage />} />
+                      <Route path="onboarding" element={<Navigate to="../setup" replace />} />
+                      <Route path="overview" element={<WorkspaceOverviewPage />} />
+                      <Route path="missions" element={<MissionsPage />} />
+                      <Route path="wiki" element={<WikiPage />} />
+                      <Route path="velocity" element={<VelocityPage />} />
+                      <Route path="work-orders">
+                        <Route index element={<WorkOrdersPage />} />
+                        <Route path="new" element={<CreateWorkOrderComposeGate />} />
+                        {/* Legacy `/work-orders/:orderId` bookmark shape — redirects to `/work-order/:number`. */}
+                        <Route path=":orderId" element={<LegacyWorkOrderDetailRedirect />} />
+                      </Route>
+                      <Route path="work-order/:orderNumber" element={<WorkOrderDetailPage />} />
+                      <Route path="lines">
+                        <Route index element={<LinesPage />} />
+                        <Route path="new" element={<FactoryLineEditPageGate />} />
+                        <Route path=":lineId" element={<LinesPage />} />
+                        <Route path=":lineId/edit" element={<FactoryLineEditPageGate />} />
+                      </Route>
+                      <Route path="automations">
+                        <Route index element={<AutomationsPage />} />
+                        <Route path="new" element={<LegacyAutomationsNewLineRedirect />} />
+                        <Route path=":lineId/edit" element={<LegacyAutomationsLineEditRedirect />} />
+                        <Route path=":appId" element={<AutomationsPage />} />
+                      </Route>
+                      <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
                     </Route>
-                    <Route path="work-order/:orderNumber" element={<WorkOrderDetailPage />} />
-                    <Route path="lines">
-                      <Route index element={<LinesPage />} />
-                      <Route path="new" element={<FactoryLineEditPageGate />} />
-                      <Route path=":lineId" element={<LinesPage />} />
-                      <Route path=":lineId/edit" element={<FactoryLineEditPageGate />} />
-                    </Route>
-                    <Route path="automations">
-                      <Route index element={<AutomationsPage />} />
-                      <Route path="new" element={<LegacyAutomationsNewLineRedirect />} />
-                      <Route path=":lineId/edit" element={<LegacyAutomationsLineEditRedirect />} />
-                      <Route path=":appId" element={<AutomationsPage />} />
-                    </Route>
-                    <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
                     <Route path="settings/*" element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
                   </Route>
                   <Route
                     path=":factoryKey/settings"
                     element={withAuthPermissionAndFactoriesFeature(FactorySettingsLayout, "factories", "read")}
                   >
-                    <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
-                    <Route path="general" element={<FactorySettingsGeneralPage />} />
-                    {FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.id !== "general").map((item) => (
-                      <Route
-                        key={item.id}
-                        path={item.id}
-                        element={
-                          <FactorySettingsSoonPage
-                            title={item.label}
-                            description={`${item.label} settings for this workspace.`}
-                            Icon={item.Icon}
-                          />
-                        }
-                      />
-                    ))}
+                    {factorySettingsSectionRoutes}
                   </Route>
                 </Route>
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
@@ -264,6 +264,26 @@ function FactoryLineEditPageGate() {
     </RequirePermission>
   );
 }
+
+const factorySettingsSectionRoutes = [
+  <Route key="factory-settings-index" index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />,
+  <Route key="factory-settings-general" path="general" element={<FactorySettingsGeneralPage />} />,
+  <Route key="factory-settings-profile" path="profile" element={<FactorySettingsProfilePage />} />,
+  <Route key="factory-settings-notifications" path="notifications" element={<FactorySettingsNotificationsPage />} />,
+  ...FACTORY_SETTINGS_NAV_ITEMS.filter(isFactorySettingsComingSoon).map((item) => (
+    <Route
+      key={item.id}
+      path={item.id}
+      element={
+        <FactorySettingsSoonPage
+          title={item.label}
+          description={`${item.label} settings for this workspace.`}
+          Icon={item.Icon}
+        />
+      }
+    />
+  )),
+];
 
 function LegacyAutomationsNewLineRedirect() {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();

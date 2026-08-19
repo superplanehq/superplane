@@ -1013,8 +1013,8 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 
 // resolveOrderPayload exposes the work order driving this run via order().
 // Returns nil when the run is not attached to a factory work-order execution.
-// Artifacts and comments are loaded only when the expression AST references
-// order().artifacts / order().comments.
+// The url, artifacts, and comments are loaded only when the expression AST
+// references order().url / order().artifacts / order().comments.
 func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
 	if b.rootEventID == nil {
 		return nil, nil
@@ -1052,6 +1052,18 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 
 	if err := attachOrderSource(b.tx, order, payload); err != nil {
 		return nil, err
+	}
+
+	usesURL, err := expressionvalidation.ExpressionUsesOrderURL(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesURL {
+		url, err := b.buildWorkOrderURL(order)
+		if err != nil {
+			return nil, err
+		}
+		payload["url"] = url
 	}
 
 	usesArtifacts, err := expressionvalidation.ExpressionUsesOrderArtifacts(expression)
@@ -1136,26 +1148,17 @@ func artifactExpressionPayload(artifact *models.FactoryWorkOrderArtifact) (map[s
 	}, nil
 }
 
-func commentExpressionPayload(event *models.FactoryWorkOrderEvent) (map[string]any, error) {
-	var decoded factory.WorkOrderCommentAdded
-	if len(event.Data) > 0 {
-		if err := json.Unmarshal(event.Data, &decoded); err != nil {
-			return nil, fmt.Errorf("order() could not decode comment data: %w", err)
-		}
-	}
-
+func commentExpressionPayload(comment *models.FactoryWorkOrderComment) (map[string]any, error) {
+	author := comment.Author()
 	payload := map[string]any{
-		"id":         event.ID.String(),
-		"body":       decoded.Body,
-		"created_at": event.CreatedAt,
+		"id":         comment.ID.String(),
+		"body":       comment.Body,
+		"created_at": comment.CreatedAt,
+		"author":     commentAuthorExpressionPayload(&author),
 	}
 
-	if decoded.Author != nil {
-		payload["author"] = commentAuthorExpressionPayload(decoded.Author)
-	}
-
-	if decoded.Run != nil {
-		payload["run"] = map[string]any{"id": decoded.Run.ID.String()}
+	if run := comment.RunRef(); run != nil {
+		payload["run"] = map[string]any{"id": run.ID.String()}
 	}
 
 	return normalizeExpressionValue(payload).(map[string]any), nil
@@ -1200,6 +1203,17 @@ func commentAuthorExpressionPayload(author *factory.WorkOrderCommentAuthor) map[
 	}
 
 	return authorPayload
+}
+
+// buildWorkOrderURL resolves the work order permalink in the SuperPlane UI.
+// The factory key is part of that path, so the owning factory has to be loaded.
+func (b *NodeConfigurationBuilder) buildWorkOrderURL(order *models.FactoryWorkOrder) (string, error) {
+	owner, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
+	if err != nil {
+		return "", fmt.Errorf("order() could not resolve the factory that owns the work order: %w", err)
+	}
+
+	return uiBaseURL() + order.URLPath(owner.Key), nil
 }
 
 func (b *NodeConfigurationBuilder) buildRunURL(run *models.CanvasRun) (string, error) {

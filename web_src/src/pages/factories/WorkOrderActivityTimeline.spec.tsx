@@ -13,7 +13,7 @@ import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
 const ORDER: FactoriesWorkOrder = {
   id: "wo-1",
   title: "Refund retry",
-  executions: [],
+  lineDispatches: [],
 };
 
 const ARTIFACT_ADDED_EVENT: FactoriesWorkOrderEvent = {

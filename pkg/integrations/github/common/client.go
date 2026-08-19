@@ -391,6 +391,14 @@ func (c *Client) GetOrganizationUsageReport() (*github.UsageReport, *github.Resp
 	return c.underlying.Billing.GetOrganizationUsageReport(context.Background(), c.owner, nil)
 }
 
+// SearchIssues wraps the /search/issues endpoint. The Velocity page uses it to
+// list a repository's merged pull requests within a window; keeping the SDK
+// pass-through thin means callers can build any query GitHub Search supports
+// (issues, PRs, drafts, authors) without a new helper per shape.
+func (c *Client) SearchIssues(ctx context.Context, query string, opts *github.SearchOptions) (*github.IssuesSearchResult, *github.Response, error) {
+	return c.underlying.Search.Issues(ctx, query, opts)
+}
+
 type graphQLRequest struct {
 	Query     string         `json:"query"`
 	Variables map[string]any `json:"variables,omitempty"`
