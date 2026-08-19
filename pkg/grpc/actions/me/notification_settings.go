@@ -57,10 +57,16 @@ func serializeNotificationSettings(settings *models.UserNotificationSettings) *p
 		}
 	}
 
+	var eventTypes []pb.NotificationSettings_Type
+	if settings.WorkspaceScope == models.NotificationWorkspaceScopeAll {
+		eventTypes = serializeEventTypes(settings.EventTypes.Data())
+	}
+
 	return &pb.NotificationSettings{
 		Workspaces: &pb.NotificationSettings_Workspaces{
-			Scope:   notificationScopeToProto(settings.WorkspaceScope),
-			Filters: filters,
+			Scope:      notificationScopeToProto(settings.WorkspaceScope),
+			Filters:    filters,
+			EventTypes: eventTypes,
 		},
 	}
 }

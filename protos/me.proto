@@ -134,6 +134,8 @@ message NotificationSettings {
   message Workspaces {
     WorkspaceScope scope = 1;
     repeated WorkspaceFilter filters = 2;
+    // event_types applies when scope is ALL. An empty list means every type.
+    repeated Type event_types = 3;
   }
 
   Workspaces workspaces = 1;

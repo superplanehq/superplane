@@ -42,6 +42,13 @@ func UpdateNotificationSettings(
 	params := models.UserNotificationSettingsParams{
 		WorkspaceScope: scope,
 	}
+	if scope == models.NotificationWorkspaceScopeAll {
+		eventTypes, typeErr := notificationTypesFromProto(workspaces.GetEventTypes())
+		if typeErr != nil {
+			return nil, typeErr
+		}
+		params.EventTypes = eventTypes
+	}
 
 	var settings *models.UserNotificationSettings
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {

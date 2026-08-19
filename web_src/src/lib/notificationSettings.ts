@@ -54,6 +54,15 @@ export function togglesFromEventTypes(eventTypes: MeNotificationSettingsType[] |
   ) as NotificationTypeToggles;
 }
 
+export function togglesFromAllScopeEventTypes(
+  eventTypes: MeNotificationSettingsType[] | undefined,
+): NotificationTypeToggles {
+  if (!eventTypes || eventTypes.length === 0) {
+    return defaultNotificationTypeToggles(true);
+  }
+  return togglesFromEventTypes(eventTypes);
+}
+
 export function filtersFromSettings(
   settings: MeNotificationSettings | undefined,
 ): NotificationSettingsWorkspaceFilter[] {

@@ -143,6 +143,20 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		}
 	})
 
+	t.Run("all scope type list without comments blocks the email", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+			EventTypes:     []string{models.NotificationTypeWorkOrderAssigned},
+		})
+
+		emailService := services.NewNoopEmailService()
+		consume(t, newConsumer(emailService), commentMessage(creator.ID.String()))
+
+		for _, email := range emailService.SentWorkOrderNotificationEmails() {
+			assert.NotEqual(t, owner.GetEmail(), email.ToEmail)
+		}
+	})
+
 	t.Run("filtered type list without comments blocks the email", func(t *testing.T) {
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeFiltered,
