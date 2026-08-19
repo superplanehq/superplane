@@ -2865,6 +2865,7 @@ function CanvasContent({
     getNodes,
     getViewport,
     hasFitToViewRef,
+    hasReactFlowInitialized,
     isAutoFocusEnabled,
     isRunInspectionMode,
     reportZoom,
