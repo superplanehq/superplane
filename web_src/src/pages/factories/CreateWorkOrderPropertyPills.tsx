@@ -17,11 +17,6 @@ interface CreateWorkOrderPropertyPillsProps {
   onAssigneeChange: (ids: string[]) => void;
 }
 
-/**
- * The Owner pill shown in the create-work-order footer. Line selection now
- * lives in the "Send to line" popover in `CreateWorkOrderDialog`, so this
- * component only owns the assignee/owner picker.
- */
 export function CreateWorkOrderPropertyPills({
   organizationId,
   assigneeIds,
@@ -79,7 +74,7 @@ export function CreateWorkOrderPropertyPills({
   );
 }
 
-export function AssigneePickerPanel({
+function AssigneePickerPanel({
   organizationId,
   selectedIds,
   isSaving,
@@ -126,14 +121,12 @@ export function AssigneePickerPanel({
 
 export function LinePickerPanel({
   lines,
-  selectedLineName,
   isSaving,
   portalRoot,
   align = "start",
   onSelect,
 }: {
   lines: FactoriesFactoryLine[];
-  selectedLineName: string;
   isSaving: boolean;
   portalRoot: HTMLElement | null;
   align?: "start" | "center" | "end";
@@ -145,6 +138,7 @@ export function LinePickerPanel({
       side="top"
       container={portalRoot}
       className="z-20 w-72 p-1"
+      data-align={align}
       data-testid="work-order-line-picker-panel"
     >
       <p className="px-2 py-1.5 text-[11px] font-medium text-muted-foreground">Line</p>
@@ -154,7 +148,6 @@ export function LinePickerPanel({
           if (!name) {
             return null;
           }
-          const isSelected = name === selectedLineName;
           return (
             <Button
               key={line.id ?? name}
@@ -162,7 +155,7 @@ export function LinePickerPanel({
               variant="ghost"
               disabled={isSaving}
               data-testid={`work-order-line-option-${name}`}
-              className={cn("h-8 w-full justify-start px-2 text-[13px] font-normal", isSelected && "bg-accent")}
+              className="h-8 w-full justify-start px-2 text-[13px] font-normal"
               onClick={() => onSelect(name)}
             >
               {name}
@@ -174,7 +167,7 @@ export function LinePickerPanel({
   );
 }
 
-export function PropertyPill({
+function PropertyPill({
   children,
   disabled,
   testId,
@@ -202,7 +195,7 @@ export function PropertyPill({
   );
 }
 
-export function AssigneePillBody({
+function AssigneePillBody({
   assigneeIds,
   resolveUser,
 }: {

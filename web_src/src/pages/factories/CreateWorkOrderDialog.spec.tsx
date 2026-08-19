@@ -86,12 +86,9 @@ describe("CreateWorkOrderDialog", () => {
   it("keeps only expand and close controls in the header", () => {
     renderDialog();
 
-    const header = screen
-      .getByTestId("work-order-create-close-button")
-      .closest("div.flex.items-center.justify-between");
-    expect(header).not.toBeNull();
-    expect(within(header as HTMLElement).getByTestId("work-order-create-fullscreen-button")).toBeInTheDocument();
-    expect(within(header as HTMLElement).queryByTestId("work-order-create-draft-button")).not.toBeInTheDocument();
+    const header = screen.getByTestId("work-order-create-header");
+    expect(within(header).getByTestId("work-order-create-fullscreen-button")).toBeInTheDocument();
+    expect(within(header).queryByTestId("work-order-create-draft-button")).not.toBeInTheDocument();
   });
 
   it("renders Save as draft in the footer next to Send to line, with no separate Line control", () => {
@@ -148,11 +145,10 @@ describe("CreateWorkOrderDialog", () => {
   });
 
   it("disables Send to line with a tooltip when the workspace has no lines, while Save as draft stays enabled", async () => {
-    const user = userEvent.setup();
     canAct.mockReturnValue(true);
     renderDialog(EMPTY_FACTORY);
 
-    await user.type(screen.getByTestId("work-order-title-input"), "Draft only");
+    await userEvent.setup().type(screen.getByTestId("work-order-title-input"), "Draft only");
 
     expect(screen.getByTestId("work-order-create-send-to-line")).toBeDisabled();
     expect(screen.getByTestId("work-order-create-draft-button")).not.toBeDisabled();

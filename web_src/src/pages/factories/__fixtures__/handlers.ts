@@ -333,13 +333,7 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   ];
 }
 
-/**
- * Backs `useMe` for Factories-only stories/tests that exercise
- * `matchFactoryPageFixture` directly (without the Home fixture fallback
- * `OrgWorkspaceHarness` normally provides). Returns the same "me" identity
- * already used as `createdBy`/assignee across the factory fixtures, so the
- * Create Work Order dialog's default-owner behavior works everywhere.
- */
+/** Serves `/api/v1/me` so factory stories resolve `useMe` without the Home harness. */
 function meRoute(): FactoriesRoute {
   return {
     pattern: re("/api/v1/me"),

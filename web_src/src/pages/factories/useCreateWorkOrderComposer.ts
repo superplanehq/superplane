@@ -33,7 +33,6 @@ export function useCreateWorkOrderComposer({
 
   const isSaving = inFlightAction !== null;
   const canSaveDraft = Boolean(title.trim()) && !isSaving;
-  const canSendToLine = canSaveDraft;
 
   const setAssigneeIds = (ids: string[]) => {
     hasSeededOwner.current = true;
@@ -131,7 +130,6 @@ export function useCreateWorkOrderComposer({
     isSavingDraft: inFlightAction === "draft",
     isSendingToLine: inFlightAction === "send",
     canSaveDraft,
-    canSendToLine,
     maxDescriptionLength: MAX_DESCRIPTION_LENGTH,
     maxTitleLength: MAX_TITLE_LENGTH,
     setAssigneeIds,

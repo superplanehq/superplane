@@ -114,7 +114,6 @@ function CreateWorkOrderDialogSession({
           canDispatch={canDispatch}
           canSaveDraft={composer.canSaveDraft}
           isSavingDraft={composer.isSavingDraft}
-          canSendToLine={composer.canSendToLine}
           isSendingToLine={composer.isSendingToLine}
           onAssigneeChange={composer.setAssigneeIds}
           onSaveDraft={() => void composer.handleSaveDraft()}
@@ -137,7 +136,10 @@ function CreateWorkOrderDialogHeader({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
+    <div
+      className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5"
+      data-testid="work-order-create-header"
+    >
       <div className="flex min-w-0 items-center gap-2 text-[13px] text-muted-foreground">
         <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-muted">
           <FactoryIcon className="size-3" aria-hidden />
@@ -178,7 +180,6 @@ function CreateWorkOrderDialogFooter({
   canDispatch,
   canSaveDraft,
   isSavingDraft,
-  canSendToLine,
   isSendingToLine,
   onAssigneeChange,
   onSaveDraft,
@@ -191,7 +192,6 @@ function CreateWorkOrderDialogFooter({
   canDispatch: boolean;
   canSaveDraft: boolean;
   isSavingDraft: boolean;
-  canSendToLine: boolean;
   isSendingToLine: boolean;
   onAssigneeChange: (ids: string[]) => void;
   onSaveDraft: () => void;
@@ -224,7 +224,7 @@ function CreateWorkOrderDialogFooter({
           lines={lines}
           isSaving={isSaving}
           canDispatch={canDispatch}
-          canSendToLine={canSendToLine}
+          canSaveDraft={canSaveDraft}
           isSendingToLine={isSendingToLine}
           onSendToLine={onSendToLine}
         />
@@ -237,21 +237,21 @@ function SendToLinePopover({
   lines,
   isSaving,
   canDispatch,
-  canSendToLine,
+  canSaveDraft,
   isSendingToLine,
   onSendToLine,
 }: {
   lines: FactoriesFactoryLine[];
   isSaving: boolean;
   canDispatch: boolean;
-  canSendToLine: boolean;
+  canSaveDraft: boolean;
   isSendingToLine: boolean;
   onSendToLine: (lineName: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [portalRoot, setPortalRoot] = useState<HTMLDivElement | null>(null);
   const hasLines = lines.length > 0;
-  const isDisabled = !canDispatch || !canSendToLine || !hasLines;
+  const isDisabled = !canDispatch || !canSaveDraft || !hasLines;
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (isSaving || isDisabled) {
@@ -288,7 +288,6 @@ function SendToLinePopover({
           </PopoverTrigger>
           <LinePickerPanel
             lines={lines}
-            selectedLineName=""
             isSaving={isSaving}
             portalRoot={portalRoot}
             align="end"
