@@ -1,34 +1,33 @@
 const STORAGE_PREFIX = "integration-setup-return";
-const MAX_AGE_MS = 60 * 60 * 1000;
+const MAX_AGE_MS = 15 * 60 * 1000;
 
 interface StoredReturn {
   path: string;
   createdAt: number;
 }
 
-function storageKey(organizationId: string, integrationId: string): string {
-  return `${STORAGE_PREFIX}:${organizationId}:${integrationId}`;
+// Keyed by organization only, not by integration id: the legacy GitHub connect
+// creates a new integration during the round trip to the provider, so the id the
+// caller knows before leaving does not match the id the provider redirects to.
+function storageKey(organizationId: string): string {
+  return `${STORAGE_PREFIX}:${organizationId}`;
 }
 
 function isSafePath(path: string, organizationId: string): boolean {
   return path.startsWith(`/${organizationId}/`) && !path.startsWith("//");
 }
 
-export function rememberIntegrationSetupReturn(
-  organizationId: string,
-  integrationId: string,
-  path: string | undefined,
-): void {
-  if (!integrationId || !path || !isSafePath(path, organizationId)) return;
+export function rememberIntegrationSetupReturn(organizationId: string, path: string | undefined): void {
+  if (!organizationId || !path || !isSafePath(path, organizationId)) return;
 
   const value: StoredReturn = { path, createdAt: Date.now() };
-  window.localStorage.setItem(storageKey(organizationId, integrationId), JSON.stringify(value));
+  window.localStorage.setItem(storageKey(organizationId), JSON.stringify(value));
 }
 
-export function peekIntegrationSetupReturn(organizationId: string, integrationId: string): string | null {
-  if (!integrationId) return null;
+export function peekIntegrationSetupReturn(organizationId: string): string | null {
+  if (!organizationId) return null;
 
-  const key = storageKey(organizationId, integrationId);
+  const key = storageKey(organizationId);
   const raw = window.localStorage.getItem(key);
   if (!raw) return null;
 
@@ -50,6 +49,6 @@ export function peekIntegrationSetupReturn(organizationId: string, integrationId
   }
 }
 
-export function consumeIntegrationSetupReturn(organizationId: string, integrationId: string): void {
-  window.localStorage.removeItem(storageKey(organizationId, integrationId));
+export function consumeIntegrationSetupReturn(organizationId: string): void {
+  window.localStorage.removeItem(storageKey(organizationId));
 }

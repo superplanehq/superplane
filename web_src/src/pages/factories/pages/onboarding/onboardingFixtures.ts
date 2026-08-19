@@ -137,7 +137,7 @@ export const WIZARD_STEPS = [
   {
     id: "name" as const,
     label: "Name",
-    purpose: "The name comes from the repository. Change it if another name fits the app or product area better.",
+    purpose: "Name the workspace for the app or product area you want to improve.",
   },
   {
     id: "start" as const,

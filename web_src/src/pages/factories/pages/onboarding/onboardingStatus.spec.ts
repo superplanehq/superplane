@@ -19,7 +19,7 @@ describe("isFactoryOnboardingComplete", () => {
 });
 
 describe("initialWizardStep", () => {
-  it("starts a new workspace at version control", () => {
+  it("starts a new workspace at the VCS step", () => {
     expect(initialWizardStep({})).toBe("vcs");
   });
 

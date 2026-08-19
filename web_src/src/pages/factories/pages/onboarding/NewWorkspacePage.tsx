@@ -12,7 +12,7 @@ import { placeholderWorkspaceName } from "./workspaceNames";
 
 /**
  * Creates the workspace with a placeholder name and opens the setup wizard.
- * The wizard renames it on the last step, after the app repository is known.
+ * The wizard derives the real name from the selected repository.
  */
 export function NewWorkspacePage() {
   const { organizationId } = useParams<{ organizationId: string }>();

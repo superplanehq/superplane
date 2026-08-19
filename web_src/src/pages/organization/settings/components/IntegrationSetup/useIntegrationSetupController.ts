@@ -17,7 +17,6 @@ import {
   usePreviousIntegrationSetupStep,
 } from "@/hooks/useIntegrations";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
-import { rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
 import { useIntegrationSetupActions } from "./useIntegrationSetupActions";
 import { applyResumeDescribeIfChanged, canRevertSetupStep, getCurrentSetupStep, getNextIntegrationName } from "./lib";
 
@@ -40,7 +39,6 @@ export function useIntegrationSetupController(organizationId: string) {
     resumeIntegrationDescribe: queries.resumeIntegrationDescribe,
   });
   const progress = useIntegrationSetupProgress(state.createdIntegration, metadata.integrationLabel);
-  useRememberSetupReturn(organizationId, state.createdIntegration?.metadata?.id, route.returnTo);
   useSyncSelectedCapabilitiesForStep(progress.currentStep, state.setSelectedCapabilities);
   const mutations = useIntegrationSetupMutations(organizationId, state.createdIntegration);
   const actions = useIntegrationSetupActions({
@@ -74,26 +72,13 @@ function useIntegrationSetupRoute(organizationId: string) {
   const routeState = location.state as IntegrationSetupRouteState | null;
   // Query param supports opening setup in a new tab (location.state does not cross tabs).
   const integrationIdFromQuery = new URLSearchParams(location.search).get("integrationId") || undefined;
-  const returnTo = new URLSearchParams(location.search).get("returnTo") || undefined;
 
   return {
     navigate,
     integrationName,
     integrationsHref,
-    returnTo,
     setupIntegrationId: routeState?.integrationId || integrationIdFromQuery,
   };
-}
-
-function useRememberSetupReturn(
-  organizationId: string,
-  integrationId: string | undefined,
-  returnTo: string | undefined,
-) {
-  useEffect(() => {
-    if (!integrationId) return;
-    rememberIntegrationSetupReturn(organizationId, integrationId, returnTo);
-  }, [organizationId, integrationId, returnTo]);
 }
 
 function useIntegrationSetupQueries(organizationId: string, setupIntegrationId?: string) {

@@ -4,7 +4,8 @@ const MAX_PLACEHOLDER_ATTEMPTS = 500;
 /**
  * Workspace names are unique inside an organization, so the name the wizard
  * creates the workspace with must avoid the names already in use. The user
- * renames it on the last step.
+ * sets the final name after they pick a repository; until then SuperPlane
+ * keeps a placeholder.
  */
 export function placeholderWorkspaceName(existingNames: string[]): string {
   const taken = new Set(existingNames.map((name) => name.trim().toLowerCase()));
@@ -20,6 +21,13 @@ export function placeholderWorkspaceName(existingNames: string[]): string {
   }
 
   return `${PLACEHOLDER_BASE} ${Date.now()}`;
+}
+
+/** True for the temporary name used before the user confirms the real one. */
+export function isPlaceholderWorkspaceName(name: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  if (normalized === PLACEHOLDER_BASE.toLowerCase()) return true;
+  return new RegExp(`^${PLACEHOLDER_BASE.toLowerCase()} \\d+$`).test(normalized);
 }
 
 /** "acme/payments-service" becomes "Payments Service". */

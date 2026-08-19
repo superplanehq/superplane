@@ -8,6 +8,7 @@ import {
   type IssuesChoiceId,
   type VcsHostId,
 } from "./onboardingFixtures";
+import { isPlaceholderWorkspaceName, workspaceNameFromRepository } from "./workspaceNames";
 
 export type OnboardingSetupState = {
   workspaceName: string;
@@ -85,7 +86,11 @@ export function useOnboardingSetupState(
   },
 ) {
   const [workspaceName, setWorkspaceName] = useState(() => initialName.trim());
-  const [workspaceNameEdited, setWorkspaceNameEdited] = useState(false);
+  // A restored custom name must not be overwritten when the repository is
+  // restored. Placeholder names stay open to the repository-derived suggestion.
+  const [workspaceNameEdited, setWorkspaceNameEdited] = useState(
+    () => initialName.trim().length > 0 && !isPlaceholderWorkspaceName(initialName),
+  );
   const [localConnected, setLocalConnected] = useState<Set<IntegrationId>>(() => new Set());
   const [vcsHost, setVcsHost] = useState<VcsHostId | null>(null);
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
@@ -159,8 +164,9 @@ export function useOnboardingSetupState(
       setSelectedRepo(repo);
       setRepoCommitted(false);
       resetIssuesState();
+      suggestWorkspaceName(workspaceNameFromRepository(repo));
     },
-    [resetIssuesState],
+    [resetIssuesState, suggestWorkspaceName],
   );
 
   const commitRepoStep = useCallback(() => {

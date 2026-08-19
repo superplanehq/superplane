@@ -45,6 +45,7 @@ import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { IntegrationDetailsRoute } from "./components/IntegrationDetailsRoute";
 import { IntegrationSetup } from "./components/IntegrationSetup";
+import { IntegrationSetupReturn } from "./components/IntegrationSetupReturn";
 import { ThemePreferenceControl } from "@/components/ThemePreferenceControl";
 
 function settingsSidebarNavLinkClass(active: boolean) {
@@ -483,9 +484,11 @@ export function OrganizationSettings() {
             <Route
               path="integrations/:integrationId"
               element={
-                <RequirePermission resource="integrations" action="read">
-                  <IntegrationDetailsRoute organizationId={organizationId || ""} />
-                </RequirePermission>
+                <IntegrationSetupReturn organizationId={organizationId || ""}>
+                  <RequirePermission resource="integrations" action="read">
+                    <IntegrationDetailsRoute organizationId={organizationId || ""} />
+                  </RequirePermission>
+                </IntegrationSetupReturn>
               }
             />
             <Route

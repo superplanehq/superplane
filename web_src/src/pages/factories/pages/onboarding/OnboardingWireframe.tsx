@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Check, ChevronLeft } from "lucide-react";
+import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
+import { Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
@@ -13,6 +13,7 @@ import { DonePanel } from "./DonePanel";
 import { Shell } from "./OnboardingShell";
 import { WIZARD_STEPS, type IntegrationId, type VcsHostId, type WizardStepId } from "./onboardingFixtures";
 import { IssuesStep, NameStep, RepositoryStep, StartStep, VcsStep } from "./onboardingSteps";
+import { WizardStepFooter } from "./WizardStepFooter";
 import { useConnectDialog } from "./useConnectDialog";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
@@ -26,15 +27,6 @@ const WIZARD_STEP_INDEX: Record<WizardStepId, number> = {
   agent: 3,
   name: 4,
   start: 5,
-};
-
-const CONTINUE_LABELS: Record<WizardStepId, string> = {
-  vcs: "Next",
-  repo: "Next",
-  issues: "Next",
-  agent: "Next",
-  name: "Next",
-  start: "Create work order",
 };
 
 function stepComplete(setup: OnboardingSetupApi, step: WizardStepId): boolean {
@@ -151,7 +143,10 @@ function WizardStepBody({
   requestConnect,
   repos,
   onSelectRepository,
-  onSelectVcs,
+  githubConnections,
+  selectedVcsConnectionId,
+  onSelectVcsConnection,
+  onCreateVcsConnection,
   onEditVcsConnection,
 }: {
   step: WizardStepId;
@@ -159,12 +154,22 @@ function WizardStepBody({
   requestConnect: (id: IntegrationId) => void;
   repos?: string[];
   onSelectRepository: (repo: string) => void;
-  onSelectVcs: (host: VcsHostId) => void;
+  githubConnections: IntegrationInstanceSummary;
+  selectedVcsConnectionId?: string;
+  onSelectVcsConnection: (id: string, name: string) => void;
+  onCreateVcsConnection: () => void;
   onEditVcsConnection: () => void;
 }) {
   switch (step) {
     case "vcs":
-      return <VcsStep onSelect={onSelectVcs} />;
+      return (
+        <VcsStep
+          github={githubConnections}
+          selectedConnectionId={selectedVcsConnectionId}
+          onSelectConnection={onSelectVcsConnection}
+          onCreateConnection={onCreateVcsConnection}
+        />
+      );
     case "repo":
       return (
         <RepositoryStep
@@ -203,13 +208,67 @@ function useFurthestStepIndex(currentIndex: number): number {
   return Math.max(furthestIndex, currentIndex);
 }
 
+function useVcsStepNavigation(args: {
+  setup: OnboardingSetupApi;
+  selectedConnectionId?: string;
+  selectConnection: (integrationId: string) => void;
+  createConnection: () => void;
+  setOpenSection: (id: WizardStepId) => void;
+}) {
+  const { setup, selectedConnectionId, selectConnection, createConnection: startCreate, setOpenSection } = args;
+  const connectionBeforeCreate = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (connectionBeforeCreate.current === undefined || !setup.vcsReady || !selectedConnectionId) return;
+    if (selectedConnectionId === connectionBeforeCreate.current) return;
+    connectionBeforeCreate.current = undefined;
+    setOpenSection("repo");
+  }, [selectedConnectionId, setOpenSection, setup.vcsReady]);
+
+  const chooseConnection = (integrationId: string) => {
+    setup.selectVcsHost("github");
+    selectConnection(integrationId);
+    setOpenSection("repo");
+  };
+
+  const createConnection = () => {
+    setup.selectVcsHost("github");
+    connectionBeforeCreate.current = selectedConnectionId ?? null;
+    startCreate();
+  };
+
+  return { chooseConnection, createConnection };
+}
+
+function repositoryStepNavigation(args: {
+  setup: OnboardingSetupApi;
+  save?: (repository: string) => Promise<boolean>;
+  setOpenSection: (id: WizardStepId) => void;
+}) {
+  const continueFromRepository = (repository: string) => {
+    args.setup.commitRepoStep();
+    const save = args.save;
+    void continueToStep(save ? () => save(repository) : undefined, "issues", args.setOpenSection);
+  };
+  const selectRepository = (repository: string) => {
+    args.setup.selectRepo(repository);
+    continueFromRepository(repository);
+  };
+  return { continueFromRepository, selectRepository };
+}
+
 export function SetupSections({
   setup,
   openSection,
   setOpenSection,
   requestConnect,
+  createVcsConnection,
+  selectVcsConnection,
+  githubConnections,
+  selectedVcsConnectionId,
   requestConfigure,
   onFinish,
+  onContinueName,
   onContinueRepo,
   onContinueIssues,
   repos,
@@ -219,9 +278,14 @@ export function SetupSections({
   openSection: WizardStepId;
   setOpenSection: (id: WizardStepId) => void;
   requestConnect: (id: IntegrationId) => void;
+  createVcsConnection: () => void;
+  selectVcsConnection: (integrationId: string) => void;
+  githubConnections: IntegrationInstanceSummary;
+  selectedVcsConnectionId?: string;
   /** Opens the connected VCS integration so the user can grant missing repositories. */
   requestConfigure?: () => void;
   onFinish: () => void | Promise<void>;
+  onContinueName?: () => Promise<boolean>;
   onContinueRepo?: (repository: string) => Promise<boolean>;
   onContinueIssues?: () => Promise<boolean>;
   repos?: string[];
@@ -233,36 +297,14 @@ export function SetupSections({
   const previousStep = currentIndex > 0 ? WIZARD_STEPS[currentIndex - 1] : null;
   const nextStep = currentIndex < WIZARD_STEPS.length - 1 ? WIZARD_STEPS[currentIndex + 1] : null;
   const advanceEnabled = canAdvance(setup, openSection) && !saving;
-  // After Connect succeeds, continue once without bouncing when the user goes Back.
-  const advanceAfterVcsConnect = useRef(false);
-
-  useEffect(() => {
-    if (!advanceAfterVcsConnect.current || !setup.vcsReady) return;
-    advanceAfterVcsConnect.current = false;
-    setOpenSection("repo");
-  }, [setup.vcsReady, setOpenSection]);
-
-  // The repository travels as an argument because a click both selects it and
-  // continues, and the state update is not visible to this handler yet.
-  const continueFromRepository = (repository: string) => {
-    setup.commitRepoStep();
-    void continueToStep(onContinueRepo && (() => onContinueRepo(repository)), "issues", setOpenSection);
-  };
-
-  const selectRepository = (repository: string) => {
-    setup.selectRepo(repository);
-    continueFromRepository(repository);
-  };
-
-  const selectVcs = (host: VcsHostId) => {
-    setup.selectVcsHost(host);
-    if (setup.connected.has(host)) {
-      setOpenSection("repo");
-      return;
-    }
-    advanceAfterVcsConnect.current = true;
-    requestConnect(host);
-  };
+  const vcsNavigation = useVcsStepNavigation({
+    setup,
+    selectedConnectionId: selectedVcsConnectionId,
+    selectConnection: selectVcsConnection,
+    createConnection: createVcsConnection,
+    setOpenSection,
+  });
+  const repositoryNavigation = repositoryStepNavigation({ setup, save: onContinueRepo, setOpenSection });
 
   const editVcsConnection = () => {
     requestConfigure?.();
@@ -274,8 +316,12 @@ export function SetupSections({
       return;
     }
 
+    if (openSection === "name") {
+      void continueToStep(onContinueName, nextStep.id, setOpenSection);
+      return;
+    }
     if (openSection === "repo") {
-      if (setup.selectedRepo) continueFromRepository(setup.selectedRepo);
+      if (setup.selectedRepo) repositoryNavigation.continueFromRepository(setup.selectedRepo);
       return;
     }
     if (openSection === "issues") {
@@ -292,8 +338,11 @@ export function SetupSections({
       setup={setup}
       requestConnect={requestConnect}
       repos={repos}
-      onSelectRepository={selectRepository}
-      onSelectVcs={selectVcs}
+      onSelectRepository={repositoryNavigation.selectRepository}
+      githubConnections={githubConnections}
+      selectedVcsConnectionId={selectedVcsConnectionId}
+      onSelectVcsConnection={(integrationId) => vcsNavigation.chooseConnection(integrationId)}
+      onCreateVcsConnection={vcsNavigation.createConnection}
       onEditVcsConnection={editVcsConnection}
     />
   );
@@ -311,30 +360,21 @@ export function SetupSections({
         stepBody
       ) : (
         <section className="rounded-lg border border-border">
-          <div className="border-b border-border px-4 py-3">
-            <h2 className="text-[15px] font-medium tracking-[-0.01em]">{current.label}</h2>
-            <p className="mt-1 text-[13px] text-muted-foreground">{current.purpose}</p>
-          </div>
+          {openSection !== "name" && (
+            <div className="border-b border-border px-4 py-3">
+              <h2 className="text-[15px] font-medium tracking-[-0.01em]">{current.label}</h2>
+              <p className="mt-1 text-[13px] text-muted-foreground">{current.purpose}</p>
+            </div>
+          )}
           <div className="px-4 py-4">{stepBody}</div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
-            {previousStep ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                disabled={saving}
-                onClick={() => setOpenSection(previousStep.id)}
-              >
-                <ChevronLeft className="size-3.5" aria-hidden />
-                Back
-              </Button>
-            ) : (
-              <span />
-            )}
-            <Button type="button" size="sm" disabled={!advanceEnabled} onClick={goNext}>
-              {CONTINUE_LABELS[openSection]}
-            </Button>
-          </div>
+          <WizardStepFooter
+            step={openSection}
+            advanceEnabled={advanceEnabled}
+            saving={saving}
+            showBack={previousStep !== null}
+            onBack={() => previousStep && setOpenSection(previousStep.id)}
+            onNext={goNext}
+          />
         </section>
       )}
     </div>
@@ -384,6 +424,9 @@ export function OnboardingWireframe() {
             openSection={openSection}
             setOpenSection={setOpenSection}
             requestConnect={requestConnect}
+            createVcsConnection={() => requestConnect("github")}
+            selectVcsConnection={() => setup.selectVcsHost("github")}
+            githubConnections={{ name: "github", allInstances: [], readyInstances: [] }}
             requestConfigure={() => {
               if (setup.vcsHost) requestConfigure(setup.vcsHost);
             }}

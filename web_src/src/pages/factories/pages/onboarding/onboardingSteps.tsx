@@ -3,8 +3,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { Check, ListTodo, Loader2, Search } from "lucide-react";
+import { Check, ListTodo, Loader2, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { FIXTURE_REPOS, VCS_OPTIONS, vcsLabel, type IntegrationId, type VcsHostId } from "./onboardingFixtures";
@@ -140,7 +141,7 @@ export function NameStep({ setup }: { setup: OnboardingSetupApi }) {
         autoFocus
       />
       <p className="mt-1.5 text-[12px] text-muted-foreground">
-        Use a short name for the app or product area this workspace will improve.
+        Use a name for the app or product area this workspace will improve.
       </p>
     </div>
   );
@@ -261,42 +262,85 @@ function RepositoryPicker({
 }
 
 export function VcsStep({
-  onSelect,
+  github,
+  selectedConnectionId,
+  onSelectConnection,
+  onCreateConnection,
 }: {
-  /** Choosing a host also continues when that host is ready. */
-  onSelect: (host: VcsHostId) => void;
+  github: IntegrationInstanceSummary;
+  selectedConnectionId?: string;
+  onSelectConnection: (id: string, name: string) => void;
+  onCreateConnection: () => void;
 }) {
+  const githubOption = VCS_OPTIONS.find((option) => option.id === "github");
+  const gitlabOption = VCS_OPTIONS.find((option) => option.id === "gitlab");
+
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      {VCS_OPTIONS.map((option) => {
-        const optionId = option.id as VcsHostId;
-        const soon = Boolean(option.soon);
-        return (
-          <button
-            key={option.id}
-            type="button"
-            disabled={soon}
-            onClick={() => onSelect(optionId)}
-            className={cn(
-              "relative flex min-h-44 flex-col items-center justify-center gap-3 rounded-lg border px-6 py-12 transition-colors",
-              soon
-                ? "cursor-not-allowed overflow-hidden border-border/70 bg-muted/20 opacity-70"
-                : "border-border bg-background hover:border-foreground hover:bg-accent/30",
-            )}
-          >
-            {soon ? <ComingSoonRibbon /> : null}
-            <IntegrationIcon integrationName={option.id} className="size-10" size={40} />
-            <span
-              className={cn(
-                "text-[22px] font-semibold tracking-[-0.02em]",
-                soon ? "text-muted-foreground" : "text-foreground",
-              )}
-            >
-              {option.label}
-            </span>
-          </button>
-        );
-      })}
+      <section className="rounded-lg border border-border bg-background p-5">
+        <div className="flex items-center gap-3">
+          <IntegrationIcon integrationName="github" className="size-10" size={40} />
+          <div>
+            <h2 className="text-[22px] font-semibold tracking-[-0.02em]">{githubOption?.label ?? "GitHub"}</h2>
+            <p className="text-[12px] text-muted-foreground">
+              {github.readyInstances.length > 0
+                ? "Choose a connection or connect a new one."
+                : "Connect GitHub to continue."}
+            </p>
+          </div>
+        </div>
+
+        {github.readyInstances.length > 0 ? (
+          <div className="mt-5 space-y-2">
+            <p className="text-[12px] font-medium text-muted-foreground">Existing connections</p>
+            {github.readyInstances.map((connection) => {
+              const id = connection.metadata?.id;
+              const name = connection.metadata?.name || "Unnamed connection";
+              if (!id) return null;
+
+              const selected = id === selectedConnectionId;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => onSelectConnection(id, name)}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left transition-colors",
+                    selected
+                      ? "border-foreground bg-accent/50"
+                      : "border-border bg-background hover:border-foreground hover:bg-accent/30",
+                  )}
+                >
+                  <IntegrationIcon integrationName="github" className="size-4 shrink-0" size={16} />
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{name}</span>
+                  {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
+                </button>
+              );
+            })}
+            <Button type="button" variant="outline" className="mt-3 w-full" onClick={onCreateConnection}>
+              <Plus className="size-4" aria-hidden />
+              Connect new GitHub
+            </Button>
+          </div>
+        ) : (
+          <Button type="button" className="mt-5 w-full" onClick={onCreateConnection}>
+            Connect GitHub
+          </Button>
+        )}
+      </section>
+
+      {gitlabOption ? (
+        <div
+          className="relative flex min-h-44 flex-col items-center justify-center gap-3 overflow-hidden rounded-lg border border-border/70 bg-muted/20 px-6 py-12 opacity-70"
+          aria-disabled="true"
+        >
+          <ComingSoonRibbon />
+          <IntegrationIcon integrationName="gitlab" className="size-10" size={40} />
+          <span className="text-[22px] font-semibold tracking-[-0.02em] text-muted-foreground">
+            {gitlabOption.label}
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }

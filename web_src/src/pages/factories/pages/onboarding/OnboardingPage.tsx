@@ -55,7 +55,12 @@ export function OnboardingPage() {
             openSection={model.openSection}
             setOpenSection={model.setOpenSection}
             requestConnect={model.requestConnect}
+            createVcsConnection={model.createVcsConnection}
+            selectVcsConnection={model.selectVcsConnection}
+            githubConnections={model.githubConnections}
+            selectedVcsConnectionId={model.selectedVcsConnectionId}
             requestConfigure={model.requestConfigure}
+            onContinueName={model.saveName}
             onContinueRepo={model.saveRepository}
             onContinueIssues={model.saveIssues}
             onFinish={model.finish}
