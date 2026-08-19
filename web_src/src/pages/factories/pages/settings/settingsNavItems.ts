@@ -35,7 +35,7 @@ export const FACTORY_SETTINGS_NAV_ITEMS: FactorySettingsNavItem[] = [
   { id: "notifications", label: "Notifications", Icon: Bell, group: "you" },
 ];
 
-const IMPLEMENTED_SETTINGS_SECTIONS = new Set<FactorySettingsSection>(["general", "profile", "notifications"]);
+const IMPLEMENTED_SETTINGS_SECTIONS = new Set<FactorySettingsSection>(["general", "usage", "profile", "notifications"]);
 
 export function isFactorySettingsComingSoon(item: FactorySettingsNavItem) {
   return !IMPLEMENTED_SETTINGS_SECTIONS.has(item.id);

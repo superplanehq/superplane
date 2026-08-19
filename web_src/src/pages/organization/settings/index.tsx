@@ -18,6 +18,7 @@ import { SecretDetail } from "./SecretDetail";
 import { APIKeys } from "./ApiKeys";
 import { APIKeyDetail } from "./ApiKeyDetail";
 import { Usage } from "./Usage";
+import { LLMSpend } from "./LLMSpend";
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { isUsagePageForced } from "@/lib/env";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,7 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import {
   ArrowRightLeft,
   Gauge,
+  CircleDollarSign,
   CircleUser,
   Home,
   Key,
@@ -133,6 +135,7 @@ export function OrganizationSettings() {
     "secrets",
     "api-keys",
     "billing",
+    "llm-spend",
   ];
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
   const settingsIndex = pathSegments.indexOf("settings");
@@ -209,6 +212,13 @@ export function OrganizationSettings() {
       Icon: Key,
       permission: { resource: "secrets", action: "read" },
     },
+    {
+      id: "llm-spend",
+      label: "LLM spend",
+      href: `/${organizationId}/settings/llm-spend`,
+      Icon: CircleDollarSign,
+      permission: { resource: "org", action: "read" },
+    },
     { id: "change-org", label: "Change Organization", href: "/?select=true", Icon: ArrowRightLeft },
   ];
 
@@ -282,6 +292,10 @@ export function OrganizationSettings() {
     billing: {
       title: "Usage",
       description: "Review organization limits and tracked usage for this organization.",
+    },
+    "llm-spend": {
+      title: "LLM spend",
+      description: "Review factory token usage and estimated model cost for this organization.",
     },
     secrets: {
       title: "Secrets",
@@ -566,6 +580,14 @@ export function OrganizationSettings() {
               element={
                 <RequirePermission resource="org" action="read">
                   <Usage organizationId={organizationId || ""} />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="llm-spend"
+              element={
+                <RequirePermission resource="org" action="read">
+                  <LLMSpend organizationId={organizationId || ""} />
                 </RequirePermission>
               }
             />

@@ -1,11 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
-import {
-  defaultFactoriesFixture,
-  emptyWorkOrdersFactoriesFixture,
-  PRIMARY_FACTORY_KEY,
-} from "../__fixtures__/factoryPageResponses";
+import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
+import { emptyWorkOrdersFactoriesFixture } from "../__fixtures__/factoryPageFixtureVariants";
 import { OverviewPage } from "./OverviewPage";
 
 /**

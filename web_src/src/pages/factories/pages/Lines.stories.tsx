@@ -3,11 +3,10 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
-  emptyFactoriesFixture,
-  fiveStepLineFactoriesFixture,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
 } from "../__fixtures__/factoryPageResponses";
+import { emptyFactoriesFixture, fiveStepLineFactoriesFixture } from "../__fixtures__/factoryPageFixtureVariants";
 import { LinesPage } from "./LinesPage";
 
 /**
