@@ -1,6 +1,7 @@
 import type { SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import type { CanvasesCanvas, CanvasesCanvasEvent, CanvasesCanvasNodeExecution } from "@/api-client";
 import type { ActionsAction, TriggersTrigger } from "@/api-client";
+import { workOrderDetailPath } from "@/pages/factories/lib/factoryPagePaths";
 
 export type AutocompleteAppExample = {
   id: string;
@@ -48,6 +49,24 @@ function currentAppPath(): { origin: string; appPath: string } | null {
   return { origin, appPath };
 }
 
+// currentFactoryWorkspaceContext recovers the organization id / factory key
+// from the current location when previewing on a factory-embedded app page
+// (`/{org}/workspaces/{factoryKey}/apps/{appId}`), so order().url can be
+// previewed with a realistic permalink. Returns null outside that context.
+function currentFactoryWorkspaceContext(): { origin: string; organizationId: string; factoryKey: string } | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const { origin, pathname } = window.location;
+  const match = pathname.match(/^\/([^/]+)\/workspaces\/([^/]+)/);
+  if (!match) {
+    return null;
+  }
+
+  return { origin, organizationId: match[1], factoryKey: match[2] };
+}
+
 // buildAppExample mirrors the server's app() payload so the autocomplete can
 // surface app().id / app().name / app().description / app().url.
 function buildAppExample(app?: AutocompleteAppExample): Record<string, unknown> {
@@ -82,22 +101,14 @@ function buildRunExample(): Record<string, unknown> {
 // Real values come from the factory execution at runtime; this is only a stub.
 const EXAMPLE_ORDER_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
 const EXAMPLE_FACTORY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
-const EXAMPLE_ORDER_NUMBER = 12;
-
-// Work order permalinks are workspace-scoped
-// (`/{org}/workspaces/{workspaceKey}/work-order/{number}`), so the example is
-// only meaningful on a workspace app page, where order() also resolves.
-function exampleOrderUrl(): string {
-  if (typeof window === "undefined") {
-    return "";
-  }
-
-  const { origin, pathname } = window.location;
-  const workspacePath = pathname.match(/^\/[^/]+\/workspaces\/[^/]+/)?.[0];
-  return workspacePath ? `${origin}${workspacePath}/work-order/${EXAMPLE_ORDER_NUMBER}` : "";
-}
+const EXAMPLE_ORDER_NUMBER = 1;
 
 function buildOrderExample(): Record<string, unknown> {
+  const workspace = currentFactoryWorkspaceContext();
+  const url = workspace
+    ? `${workspace.origin}${workOrderDetailPath(workspace.organizationId, workspace.factoryKey, EXAMPLE_ORDER_NUMBER)}`
+    : "";
+
   return {
     id: EXAMPLE_ORDER_ID,
     title: "Ship feature",
@@ -105,7 +116,7 @@ function buildOrderExample(): Record<string, unknown> {
     factory_id: EXAMPLE_FACTORY_ID,
     state: "open",
     result: "",
-    url: exampleOrderUrl(),
+    url,
     source: {
       issue: { number: 42, title: "Fix login" },
     },

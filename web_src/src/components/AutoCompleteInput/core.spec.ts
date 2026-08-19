@@ -123,6 +123,7 @@ describe("getSuggestions", () => {
       __order: {
         id: "order-1",
         title: "Ship feature",
+        url: "https://app.superplane.com/org/workspaces/factory-1/work-order/1",
         artifacts: [{ type: "pr" }],
         comments: [{ body: "Looks good" }],
       },
@@ -130,6 +131,7 @@ describe("getSuggestions", () => {
     const labels = suggestions.map((item) => item.label);
     expect(labels).toContain("id");
     expect(labels).toContain("title");
+    expect(labels).toContain("url");
     expect(labels).toContain("artifacts");
     expect(labels).toContain("comments");
   });
