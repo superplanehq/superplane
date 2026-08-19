@@ -1,15 +1,10 @@
 export function resolveFactoryAppCanvasSubtitle({
-  isConfigure,
   description,
   factoryName,
 }: {
-  isConfigure: boolean;
   description?: string;
   factoryName?: string;
 }) {
-  if (isConfigure) {
-    return "Drag steps and reconnect edges to configure this automation.";
-  }
   if (description) {
     return description;
   }
@@ -22,6 +17,22 @@ export function resolveFactoryAppCanvasTitle(name?: string) {
 
 export function isFactoryAppConfigureMode(searchParams: URLSearchParams) {
   return searchParams.get("configure") === "1" || searchParams.get("edit") === "1";
+}
+
+export function isFactoryAppAgentPromptOpen(searchParams: URLSearchParams) {
+  return searchParams.get("agentPrompt") === "1";
+}
+
+export function isFactoryAppYamlViewOpen(searchParams: URLSearchParams) {
+  return searchParams.get("yaml") === "1";
+}
+
+export function isFactoryAppAgentPanelOpen(searchParams: URLSearchParams) {
+  return searchParams.get("agent") === "1";
+}
+
+export function isFactoryAppComponentsOpen(searchParams: URLSearchParams) {
+  return searchParams.get("blocks") === "1";
 }
 
 export function resolveFactoryLineName(

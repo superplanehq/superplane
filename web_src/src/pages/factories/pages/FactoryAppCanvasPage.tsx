@@ -1,18 +1,28 @@
 import { AppPage } from "@/pages/app";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { DEFAULT_SUPERPLANE_BASE_URL, buildAgentEditPrompt } from "../lib/agentEditPrompt";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { AgentSetupPromptDialog } from "./AgentSetupPromptDialog";
 import { FactoryAppCanvasHeader } from "./FactoryAppCanvasHeader";
 import { FactoryAppCanvasRedirect } from "./factoryAppCanvasGuards";
+import { FactoryCanvasYamlModal } from "./FactoryCanvasYamlModal";
 import { useFactoryAppCanvasPageModel } from "./useFactoryAppCanvasPageModel";
 
 /**
  * Factory-shell embed for a factory-owned app/canvas. Keeps the workspace
  * sidebar and a route-aware back header. View mode is read-only; `?configure=1`
- * opens Configure (edit mode) with Discard / Save.
+ * opens edit mode with Agent and Components toggles, plus More options.
  */
 export function FactoryAppCanvasPage() {
   const { factory } = useFactoriesLayout();
   const model = useFactoryAppCanvasPageModel();
+  const agentPrompt = buildAgentEditPrompt({
+    appName: model.title,
+    appId: model.appId,
+    baseUrl: DEFAULT_SUPERPLANE_BASE_URL,
+    runId: model.runId,
+    lineId: model.lineId,
+  });
 
   // `model.title` is already computed for the visible header (falls back to
   // "Untitled automation" while the canvas name loads); reuse it here so the
@@ -40,6 +50,19 @@ export function FactoryAppCanvasPage() {
         onDraftTitleChange={model.isConfigure ? model.handleDraftTitleChange : undefined}
         onDiscard={model.handleConfigureDiscard}
         onSave={model.handleConfigureSave}
+        onOpenVisualEditor={model.handleOpenVisualEditor}
+        workspace={
+          model.isConfigure
+            ? {
+                agentOpen: model.agentOpen,
+                componentsOpen: model.componentsOpen,
+                onAgentOpenChange: model.handleAgentOpenChange,
+                onComponentsOpenChange: model.handleComponentsOpenChange,
+                onViewYaml: model.handleViewYaml,
+                onEditWithLocalAgent: model.handleEditWithLocalAgent,
+              }
+            : undefined
+        }
       />
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {model.canvasLoading && !model.canvas ? (
@@ -48,12 +71,24 @@ export function FactoryAppCanvasPage() {
           <AppPage
             factoryEmbed
             factoryConfigure={model.isConfigure}
+            factoryAgentEnabled={model.isConfigure}
             factoryConfigureActionsRef={model.configureActionsRef}
             onFactoryConfigureBusyChange={model.handleConfigureBusyChange}
             onFactoryConfigureDone={model.handleConfigureDone}
+            onFactoryConfigureSaved={model.handleConfigureSaved}
           />
         )}
       </div>
+      <FactoryCanvasYamlModal
+        open={model.yamlViewOpen}
+        onOpenChange={model.handleYamlViewOpenChange}
+        canvas={model.canvas}
+      />
+      <AgentSetupPromptDialog
+        open={model.agentPromptOpen}
+        onOpenChange={model.handleAgentPromptOpenChange}
+        prompt={agentPrompt}
+      />
     </div>
   );
 }

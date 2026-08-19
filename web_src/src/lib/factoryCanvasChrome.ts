@@ -15,11 +15,12 @@ export type FactoryEdgePalette = {
   failed: { stroke: string; strokeWidth: number };
 };
 
-export function factoryCanvasBackground(isDark: boolean): FactoryCanvasBackground {
+export function factoryCanvasBackground(isDark: boolean, isEditing = false): FactoryCanvasBackground {
+  const size = isEditing ? 3 : 1;
   if (isDark) {
-    return { gap: 22, size: 1, color: "#33312b", bgColor: "#14120b" };
+    return { gap: 22, size, color: "#33312b", bgColor: "#14120b" };
   }
-  return { gap: 22, size: 1, color: "#e5e7eb", bgColor: "#f9fafb" };
+  return { gap: 22, size, color: "#e5e7eb", bgColor: "#f9fafb" };
 }
 
 export function factoryEdgePalette(isDark: boolean): FactoryEdgePalette {

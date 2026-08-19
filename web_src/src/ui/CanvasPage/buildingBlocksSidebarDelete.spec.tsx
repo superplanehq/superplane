@@ -70,6 +70,10 @@ vi.mock("@/components/CanvasToolSidebar", () => ({
   CanvasToolSidebar: () => null,
 }));
 
+vi.mock("@/pages/factories/agent/FactoryCanvasToolSidebar", () => ({
+  FactoryCanvasToolSidebar: () => null,
+}));
+
 vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({
   useCanvasToolSidebarState: () => ({
     canvasId: undefined,

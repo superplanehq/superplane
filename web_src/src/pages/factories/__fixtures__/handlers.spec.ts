@@ -29,4 +29,15 @@ describe("matchFactoryPageFixture", () => {
       apps: expect.arrayContaining([expect.objectContaining({ name: "Refund Planner" })]),
     });
   });
+
+  it("includes agent permissions on the factory me user", async () => {
+    const me = await fetchFactoryPageFixture("/api/v1/me");
+    const body = await me.json();
+    expect(body.user.permissions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ resource: "agents", action: "read" }),
+        expect.objectContaining({ resource: "agents", action: "create" }),
+      ]),
+    );
+  });
 });

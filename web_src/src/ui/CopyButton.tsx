@@ -8,8 +8,10 @@ const RESET_DELAY_MS = 2000;
 interface CopyButtonProps {
   text: string;
   /** "icon" (default) renders a compact icon-only button;
-   *  "button" renders a labeled outline button for primary copy actions. */
+   *  "button" renders a labeled button for copy actions. */
   variant?: "icon" | "button";
+  /** Button chrome when `variant` is `"button"`. Defaults to outline. */
+  buttonVariant?: "outline" | "default";
   children?: React.ReactNode;
   /** Label briefly shown after a successful copy (button variant). */
   copiedLabel?: React.ReactNode;
@@ -24,6 +26,7 @@ interface CopyButtonProps {
 export function CopyButton({
   text,
   variant = "icon",
+  buttonVariant = "outline",
   children,
   copiedLabel = "Copied!",
   dark,
@@ -57,7 +60,7 @@ export function CopyButton({
     return (
       <Button
         type="button"
-        variant="outline"
+        variant={buttonVariant}
         onClick={handleCopy}
         aria-live="polite"
         data-testid={dataTestId}

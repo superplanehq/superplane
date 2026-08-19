@@ -60,4 +60,44 @@ describe("resolveFactoryEmbedCanvasChrome", () => {
     expect(chrome.onRunNodeDetailClose).toBe(handleBackToRunList);
     expect(chrome.onBackToLiveCanvas).toBe(handleSelectLiveCanvas);
   });
+
+  it("hides the canvas tool sidebar in factory embed by default", () => {
+    const { input } = buildInput({ factoryEmbed: true });
+    const chrome = resolveFactoryEmbedCanvasChrome(input);
+
+    expect(chrome.hideCanvasToolSidebar).toBe(true);
+  });
+
+  it("shows the canvas tool sidebar when factory agents are enabled", () => {
+    const { input } = buildInput({ factoryEmbed: true, factoryAgentEnabled: true });
+    const chrome = resolveFactoryEmbedCanvasChrome(input);
+
+    expect(chrome.hideCanvasToolSidebar).toBe(false);
+  });
+
+  it("hides the right-side add rail in factory embed", () => {
+    const { input } = buildInput({ factoryEmbed: true });
+    const chrome = resolveFactoryEmbedCanvasChrome(input);
+
+    expect(chrome.hideRightSideControls).toBe(true);
+  });
+
+  it("hides add controls in factory view-only mode", () => {
+    const { input } = buildInput({ factoryEmbed: true, factoryViewOnly: true, hideAddControls: false });
+    const chrome = resolveFactoryEmbedCanvasChrome(input);
+
+    expect(chrome.hideAddControls).toBe(true);
+  });
+
+  it("keeps add controls in factory Configure even when run inspection would hide them", () => {
+    const { input } = buildInput({
+      factoryEmbed: true,
+      factoryViewOnly: false,
+      hideAddControls: true,
+      runInspectionChromeActive: true,
+    });
+    const chrome = resolveFactoryEmbedCanvasChrome(input);
+
+    expect(chrome.hideAddControls).toBe(false);
+  });
 });

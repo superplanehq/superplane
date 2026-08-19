@@ -2,6 +2,9 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 
+export const FACTORY_APP_CANVAS_TITLE_CLASS =
+  "text-[15px] font-semibold leading-[22.5px] tracking-[-0.01em] text-foreground";
+
 type FactoryAppCanvasTitleEditorProps = {
   title: string;
   renameEnabled: boolean;
@@ -96,7 +99,7 @@ export function FactoryAppCanvasTitleEditor({
         size={Math.max(draftName.length + 1, 8)}
         aria-label="Automation name"
         data-testid="factory-app-rename-input"
-        className="h-6 w-auto max-w-[16rem] px-1.5 py-0 text-[15px] font-semibold tracking-[-0.01em] leading-none"
+        className="h-[22.5px] w-auto max-w-[16rem] px-1.5 py-0 text-[15px] font-semibold leading-[22.5px] tracking-[-0.01em]"
       />
     );
   }
@@ -104,9 +107,9 @@ export function FactoryAppCanvasTitleEditor({
   return (
     <h2
       className={cn(
-        "text-[15px] font-semibold tracking-[-0.01em] text-foreground",
+        FACTORY_APP_CANVAS_TITLE_CLASS,
         renameEnabled
-          ? "cursor-text rounded-sm border border-transparent px-1 -mx-1 hover:border-border hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          ? "cursor-text rounded-sm hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           : undefined,
       )}
       title={renameEnabled ? "Click to rename" : undefined}
