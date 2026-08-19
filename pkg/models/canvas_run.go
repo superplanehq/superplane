@@ -322,10 +322,8 @@ func LockCanvasRun(db *gorm.DB, workflowID, runID uuid.UUID) (*CanvasRun, error)
 func (r *CanvasRun) DeleteChain(db *gorm.DB) (*RunDeletionSummary, error) {
 	summary := &RunDeletionSummary{}
 
-	// Factory work-order executions reference workflow_runs with ON DELETE RESTRICT.
-	if _, err := deleteRows(db, &FactoryWorkOrderExecution{}, "run_id = ?", r.ID); err != nil {
-		return nil, err
-	}
+	// factory_work_order_executions.run_id is ON DELETE SET NULL, so the
+	// work-order history row stays after this run is removed.
 
 	var executionIDs []uuid.UUID
 	err := db.
