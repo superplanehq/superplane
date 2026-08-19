@@ -248,6 +248,34 @@ describe("buildLinePhaseBoard", () => {
     expect(board[1].runs[0].workOrderId).toBe("wo-a");
   });
 
+  it("places a card on the live automation after a step is inserted ahead of it", () => {
+    const line: FactoriesFactoryLine = {
+      id: "line-1",
+      name: "poc",
+      steps: [{ app: { app: "app-new" } }, { app: { app: "app-plan" } }, { app: { app: "app-build" } }],
+    };
+    const orders = [
+      order("wo-a", "Alpha", [
+        {
+          id: "e1",
+          line: { id: "line-1", name: "poc" },
+          step: "plan",
+          stepIndex: 0,
+          state: "STATE_STARTED",
+          run: { appId: "app-plan" },
+          createdAt: "2026-08-11T12:00:00.000Z",
+          updatedAt: "2026-08-11T12:00:00.000Z",
+        },
+      ]),
+    ];
+
+    const board = buildLinePhaseBoard(line, orders, [...APPS, { id: "app-new", name: "new" }]);
+    expect(board[0].runs).toEqual([]);
+    expect(board[1].runs).toHaveLength(1);
+    expect(board[1].runs[0].workOrderId).toBe("wo-a");
+    expect(board[2].runs).toEqual([]);
+  });
+
   it("keeps phase idle when only finished failed runs exist", () => {
     const orders = [
       order("wo-f", "Failing", [

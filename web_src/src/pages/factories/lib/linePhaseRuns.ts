@@ -71,7 +71,7 @@ export function buildLinePhaseBoard(
     return [];
   }
 
-  const runsByStep = collectCurrentRunsByStep(lineId, steps.length, workOrders);
+  const runsByStep = collectCurrentRunsByStep(lineId, steps, workOrders);
 
   return steps.map((step, stepIndex) => {
     const runs = runsByStep.get(stepIndex) ?? [];
@@ -133,12 +133,12 @@ export function resolveRunGlyph(run: LinePhaseRunCard): PhaseGlyphKind {
 
 function collectCurrentRunsByStep(
   lineId: string,
-  stepCount: number,
+  steps: NonNullable<FactoriesFactoryLine["steps"]>,
   workOrders: FactoriesWorkOrder[],
 ): Map<number, LinePhaseRunCard[]> {
   const runsByStep = new Map<number, LinePhaseRunCard[]>();
   for (const order of workOrders) {
-    appendCurrentRunForOrder(order, lineId, stepCount, runsByStep);
+    appendCurrentRunForOrder(order, lineId, steps, runsByStep);
   }
   for (const runs of runsByStep.values()) {
     runs.sort(compareRunsNewestFirst);
@@ -153,10 +153,48 @@ function executionStepIndex(execution: FactoriesWorkOrderExecution): number | un
   return execution.stepIndex;
 }
 
+function liveColumnIndexForExecution(
+  steps: NonNullable<FactoriesFactoryLine["steps"]>,
+  execution: FactoriesWorkOrderExecution,
+): number | undefined {
+  const stepIndex = executionStepIndex(execution);
+  if (stepIndex == null) {
+    return undefined;
+  }
+
+  // Dispatch stepIndex is a snapshot. A later line edit can move that
+  // index onto a different automation. Keep the snapshot index when the
+  // app still matches; otherwise place the card on the live column with
+  // the same app.
+  const executionAppId = execution.run?.appId?.trim();
+  const liveAppId = steps[stepIndex]?.app?.app?.trim();
+  if (stepIndex < steps.length && (!executionAppId || liveAppId === executionAppId)) {
+    return stepIndex;
+  }
+
+  if (!executionAppId) {
+    return undefined;
+  }
+
+  const matches: number[] = [];
+  for (let index = 0; index < steps.length; index++) {
+    if (steps[index]?.app?.app?.trim() === executionAppId) {
+      matches.push(index);
+    }
+  }
+  if (matches.length === 0) {
+    return undefined;
+  }
+  if (matches.length === 1) {
+    return matches[0];
+  }
+  return matches.reduce((best, index) => (Math.abs(index - stepIndex) < Math.abs(best - stepIndex) ? index : best));
+}
+
 function appendCurrentRunForOrder(
   order: FactoriesWorkOrder,
   lineId: string,
-  stepCount: number,
+  steps: NonNullable<FactoriesFactoryLine["steps"]>,
   runsByStep: Map<number, LinePhaseRunCard[]>,
 ): void {
   if (!order.id) {
@@ -172,16 +210,15 @@ function appendCurrentRunForOrder(
   }
   const currentDispatch = pickMostRecentDispatch(dispatchesForLine);
 
-  const lineExecutions = (currentDispatch.stepExecutions ?? []).filter((execution) => {
-    const stepIndex = executionStepIndex(execution);
-    return stepIndex != null && stepIndex < stepCount;
-  });
+  const lineExecutions = (currentDispatch.stepExecutions ?? []).filter(
+    (execution) => liveColumnIndexForExecution(steps, execution) != null,
+  );
   if (lineExecutions.length === 0) {
     return;
   }
 
   const currentExecution = pickCurrentLineExecution(lineExecutions);
-  const stepIndex = currentExecution ? executionStepIndex(currentExecution) : undefined;
+  const stepIndex = currentExecution ? liveColumnIndexForExecution(steps, currentExecution) : undefined;
   if (!currentExecution || stepIndex == null) {
     return;
   }
