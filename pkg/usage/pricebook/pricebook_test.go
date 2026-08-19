@@ -48,6 +48,16 @@ func TestEstimateMicros_UnknownModelIsZero(t *testing.T) {
 	assert.Equal(t, int64(0), got)
 }
 
+func TestEstimateMicros_OpenAICacheReadIsPriced(t *testing.T) {
+	uncached := EstimateMicros("openai", "gpt-4o", 1_000_000, 0, 0, 0, 0)
+	cached := EstimateMicros("openai", "gpt-4o", 0, 0, 1_000_000, 0, 0)
+	miniCached := EstimateMicros("openai", "gpt-4o-mini", 0, 0, 1_000_000, 0, 0)
+
+	assert.Equal(t, int64(2_500_000), uncached)
+	assert.Equal(t, int64(250_000), cached)
+	assert.Equal(t, int64(10_000), miniCached)
+}
+
 func TestMicrosToCents(t *testing.T) {
 	assert.Equal(t, int64(3), MicrosToCents(30_000))
 	assert.Equal(t, int64(0), MicrosToCents(9_999))

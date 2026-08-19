@@ -229,25 +229,37 @@ func SummarizeUsage(tx *gorm.DB, filter UsageReportFilter) (UsageTotals, []Usage
 	return totals, byModel, nil
 }
 
-// RollupUsage sums ledger rows for this step into the cached execution columns.
+// RollupUsage copies ledger totals into the cached execution columns.
+// It locks the step row so concurrent RecordUsage calls cannot write a
+// stale sum over a newer one.
 func (e *FactoryWorkOrderExecution) RollupUsage(tx *gorm.DB) error {
-	var totals UsageTotals
-	err := tx.Model(&LLMUsageEvent{}).
-		Select("COALESCE(SUM(total_tokens), 0) AS total_tokens, COALESCE(SUM(cost_micros), 0) AS cost_micros").
-		Where("work_order_execution_id = ?", e.ID).
-		Scan(&totals).Error
-	if err != nil {
-		return err
-	}
+	return tx.Transaction(func(inner *gorm.DB) error {
+		var locked FactoryWorkOrderExecution
+		err := inner.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", e.ID).
+			First(&locked).Error
+		if err != nil {
+			return err
+		}
 
-	now := time.Now()
-	e.TotalTokens = totals.TotalTokens
-	e.CostCents = totals.CostCents()
-	e.UpdatedAt = now
+		var totals UsageTotals
+		err = inner.Model(&LLMUsageEvent{}).
+			Select("COALESCE(SUM(total_tokens), 0) AS total_tokens, COALESCE(SUM(cost_micros), 0) AS cost_micros").
+			Where("work_order_execution_id = ?", e.ID).
+			Scan(&totals).Error
+		if err != nil {
+			return err
+		}
 
-	return tx.Model(e).Updates(map[string]any{
-		"total_tokens": e.TotalTokens,
-		"cost_cents":   e.CostCents,
-		"updated_at":   now,
-	}).Error
+		now := time.Now()
+		e.TotalTokens = totals.TotalTokens
+		e.CostCents = totals.CostCents()
+		e.UpdatedAt = now
+
+		return inner.Model(e).Updates(map[string]any{
+			"total_tokens": e.TotalTokens,
+			"cost_cents":   e.CostCents,
+			"updated_at":   now,
+		}).Error
+	})
 }

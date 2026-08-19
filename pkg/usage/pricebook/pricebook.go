@@ -3,7 +3,7 @@ package pricebook
 import "strings"
 
 // Version is stored on every usage event priced by this book.
-const Version = "2026-08-19"
+const Version = "2026-08-19.2"
 
 const tokensPerMillion = 1_000_000
 const microsPerCent = 10_000
@@ -30,17 +30,18 @@ var (
 
 // Published approximate provider list prices. Longest prefix wins.
 // List cheaper siblings (mini/nano) as longer prefixes than the flagship id.
+// OpenAI cached input is billed at 0.1x the uncached input rate.
 var rates = []entry{
 	{prefix: "claude-opus", rate: rateClaudeOpus},
 	{prefix: "claude-sonnet", rate: rateClaudeSonnet},
 	{prefix: "claude-haiku", rate: rateClaudeHaiku},
-	{prefix: "gpt-4o-mini", rate: Rate{Input: 15, Output: 60}},
-	{prefix: "gpt-4o", rate: Rate{Input: 250, Output: 1000}},
-	{prefix: "gpt-5-mini", rate: Rate{Input: 25, Output: 200}},
-	{prefix: "gpt-5", rate: Rate{Input: 125, Output: 1000}},
-	{prefix: "o3-mini", rate: Rate{Input: 110, Output: 440}},
-	{prefix: "o3", rate: Rate{Input: 2000, Output: 8000}},
-	{prefix: "o4-mini", rate: Rate{Input: 110, Output: 440}},
+	{prefix: "gpt-4o-mini", rate: openAIRate(15, 60)},
+	{prefix: "gpt-4o", rate: openAIRate(250, 1000)},
+	{prefix: "gpt-5-mini", rate: openAIRate(25, 200)},
+	{prefix: "gpt-5", rate: openAIRate(125, 1000)},
+	{prefix: "o3-mini", rate: openAIRate(110, 440)},
+	{prefix: "o3", rate: openAIRate(2000, 8000)},
+	{prefix: "o4-mini", rate: openAIRate(110, 440)},
 }
 
 var familyRates = []struct {
@@ -126,4 +127,12 @@ func micros(tokens, centsPerMillion int64) int64 {
 		return 0
 	}
 	return tokens * centsPerMillion * microsPerCent / tokensPerMillion
+}
+
+func openAIRate(input, output int64) Rate {
+	return Rate{
+		Input:     input,
+		Output:    output,
+		CacheRead: input / 10,
+	}
 }

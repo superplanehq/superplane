@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -67,6 +68,38 @@ func Test__RecordUsage__SameNodeExecutionRecordsEachBilledCall(t *testing.T) {
 	require.NoError(t, models.RecordUsage(db, first))
 
 	assertInProgressExecutionUsage(t, db, execution.ID, 2_000_000, 600)
+}
+
+func Test__RecordUsage__ConcurrentCallsKeepFullSpend(t *testing.T) {
+	r := support.Setup(t)
+	execution := dispatchWorkOrderExecution(t, r)
+
+	const calls = 20
+	var wg sync.WaitGroup
+	errs := make(chan error, calls)
+	for range calls {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs <- models.RecordUsage(database.Conn(), models.LLMUsageEventInput{
+				OrganizationID:  r.Organization.ID,
+				CanvasRunID:     execution.RunID,
+				NodeExecutionID: uuid.New(),
+				NodeID:          "prompt",
+				Provider:        models.UsageProviderAnthropic,
+				Model:           "claude-sonnet-4-6",
+				InputTokens:     1_000_000,
+				TotalTokens:     1_000_000,
+			})
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		require.NoError(t, err)
+	}
+
+	assertInProgressExecutionUsage(t, database.Conn(), execution.ID, int64(calls)*1_000_000, int64(calls)*300)
 }
 
 func Test__RecordUsage__ChildRunUsesParentFactoryExecution(t *testing.T) {
