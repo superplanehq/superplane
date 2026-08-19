@@ -407,13 +407,12 @@ message Factory {
 
 message FactoryLine {
   message Step {
-    string name = 1;
-    string type = 2;
-    optional AppStep app = 3;
+    string type = 1;
+    optional AppStep app = 2;
     // Maximum in-flight runs for this step across all work orders on the
     // line. Work orders above this limit wait in the step's queue. Unset
     // means the server default (10); 0 means unlimited.
-    optional int32 max_parallelism = 4;
+    optional int32 max_parallelism = 3;
   }
 
   message AppStep {
@@ -716,6 +715,7 @@ message AddWorkOrderCommentRequest {
   string factory_id = 1;
   string order_id = 2;
   string body = 3;
+  repeated string mentioned_user_ids = 4;
 }
 
 message AddWorkOrderCommentResponse {
@@ -727,6 +727,7 @@ message WorkOrderComment {
   string body = 2;
   WorkOrderCommentAuthor author = 3;
   google.protobuf.Timestamp created_at = 4;
+  repeated string mentioned_user_ids = 5;
 }
 
 message WorkOrderCommentAuthor {
@@ -804,6 +805,8 @@ message WorkOrderCheck {
     FORMAT_UNSPECIFIED = 0;
     FORMAT_FRACTION = 1;
     FORMAT_PERCENT = 2;
+    // Pass/fail verdict: score is 1 (pass) or 0 (fail), max_score is 1.
+    FORMAT_BOOLEAN = 3;
   }
 
   enum Level {
@@ -830,6 +833,9 @@ message WorkOrderCheck {
   string run_id = 12;
   google.protobuf.Timestamp created_at = 13;
   google.protobuf.Timestamp updated_at = 14;
+  // Recent report scores, oldest first, ending with the current score.
+  // Capped server-side; powers the run-history strip on boolean checks.
+  repeated double recent_scores = 15;
 }
 
 // Internal AMQP message for factory work-order websocket fan-out.

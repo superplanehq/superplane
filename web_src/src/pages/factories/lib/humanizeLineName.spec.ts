@@ -18,14 +18,22 @@ describe("humanizeLineName", () => {
 });
 
 describe("formatLinePhaseDescription", () => {
-  it("joins humanized phase names as a flow", () => {
-    expect(formatLinePhaseDescription([{ name: "plan" }, { name: "implement" }, { name: "verify" }])).toBe(
-      "Plan → Implement → Verify",
-    );
+  it("joins automation names as a flow", () => {
+    expect(
+      formatLinePhaseDescription(
+        [{ app: { app: "app-plan" } }, { app: { app: "app-implement" } }, { app: { app: "app-verify" } }],
+        [
+          { id: "app-plan", name: "Refund Planner" },
+          { id: "app-implement", name: "Refund Implementer" },
+          { id: "app-verify", name: "Refund Verifier" },
+        ],
+      ),
+    ).toBe("Refund Planner → Refund Implementer → Refund Verifier");
   });
 
   it("returns undefined when there are no named phases", () => {
-    expect(formatLinePhaseDescription([])).toBeUndefined();
-    expect(formatLinePhaseDescription(undefined)).toBeUndefined();
+    expect(formatLinePhaseDescription([], [])).toBeUndefined();
+    expect(formatLinePhaseDescription(undefined, undefined)).toBeUndefined();
+    expect(formatLinePhaseDescription([{ app: { app: "missing" } }], [])).toBeUndefined();
   });
 });

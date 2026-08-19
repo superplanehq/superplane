@@ -279,3 +279,34 @@ describe("MarkdownContent", () => {
     expect(document.querySelector("blockquote")).toBeTruthy();
   });
 });
+
+describe("MarkdownContent mentions", () => {
+  it("highlights complete @Name mentions when mention people are provided", () => {
+    render(
+      <MarkdownContent
+        content="@test test dasdasd"
+        variant="workspace"
+        mentionPeople={[{ id: "u1", name: "test test", email: "test@test.com" }]}
+      />,
+    );
+
+    expect(screen.getByTestId("work-order-mention")).toHaveTextContent("@test test");
+    expect(screen.getByTestId("work-order-mention")).not.toHaveTextContent("dasdasd");
+  });
+
+  it("shows the member name and email on mention hover", async () => {
+    const user = userEvent.setup();
+    render(
+      <MarkdownContent
+        content="@test test dasdasd"
+        variant="workspace"
+        mentionPeople={[{ id: "u1", name: "test test", email: "test@test.com" }]}
+      />,
+    );
+
+    await user.hover(screen.getByTestId("work-order-mention"));
+    const card = await screen.findByTestId("work-order-mention-tooltip");
+    expect(card).toHaveTextContent("test test");
+    expect(card).toHaveTextContent("test@test.com");
+  });
+});

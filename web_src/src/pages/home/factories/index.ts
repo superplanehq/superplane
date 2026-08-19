@@ -6,9 +6,11 @@ import factoryParams from "./software-factory/params.json";
 import softwareFactoryCanvasYaml from "./software-factory/canvas.yaml?raw";
 import softwareFactoryConsoleYaml from "./software-factory/console.yaml?raw";
 import lineAppConsoleYaml from "./line-apps/console.yaml?raw";
+import eventAppConsoleYaml from "./line-apps/event-app.console.yaml?raw";
 import planningCanvasYaml from "./line-apps/planning.canvas.yaml?raw";
 import implementationCanvasYaml from "./line-apps/implementation.canvas.yaml?raw";
 import prCanvasYaml from "./line-apps/pr.canvas.yaml?raw";
+import prClosureCanvasYaml from "./line-apps/pr-closure.canvas.yaml?raw";
 
 export type { FactoryDefinition, FactoryStartingTask, FactoryRunDefinition } from "./types";
 export {
@@ -46,21 +48,24 @@ const LINE_APP_COMPONENT_INTEGRATIONS: Record<string, string> = {
   "github.createPullRequest": "github",
 };
 
-function buildLineApp(args: {
+function buildOnboardingApp(args: {
   id: string;
   title: string;
   description: string;
   canvasYaml: string;
+  consoleYaml: string;
+  integrations: string[];
+  componentIntegrations: Record<string, string>;
   entrypointNodeId: string;
 }): FactoryDefinition {
   return {
     id: args.id,
     title: args.title,
     description: args.description,
-    integrations: ["github", "claude"],
-    componentIntegrations: LINE_APP_COMPONENT_INTEGRATIONS,
+    integrations: args.integrations,
+    componentIntegrations: args.componentIntegrations,
     startingTasks: [],
-    // Onboarding never triggers the entrypoint directly; the factory line does.
+    // Onboarding never triggers the entrypoint directly.
     run: {
       nodeId: args.entrypointNodeId,
       hookName: "run",
@@ -70,8 +75,46 @@ function buildLineApp(args: {
     source: { type: "bundled" },
     installParams: factoryParams.install_params as InstallParam[],
     canvasYaml: args.canvasYaml,
-    consoleYaml: lineAppConsoleYaml,
+    consoleYaml: args.consoleYaml,
   };
+}
+
+function buildLineApp(args: {
+  id: string;
+  title: string;
+  description: string;
+  canvasYaml: string;
+  entrypointNodeId: string;
+}): FactoryDefinition {
+  return buildOnboardingApp({
+    ...args,
+    integrations: ["github", "claude"],
+    componentIntegrations: LINE_APP_COMPONENT_INTEGRATIONS,
+    consoleYaml: lineAppConsoleYaml,
+  });
+}
+
+const EVENT_APP_COMPONENT_INTEGRATIONS: Record<string, string> = {
+  "github.onPullRequest": "github",
+};
+
+function buildEventApp(args: {
+  id: string;
+  title: string;
+  description: string;
+  canvasYaml: string;
+  triggerNodeId: string;
+}): FactoryDefinition {
+  return buildOnboardingApp({
+    id: args.id,
+    title: args.title,
+    description: args.description,
+    canvasYaml: args.canvasYaml,
+    consoleYaml: eventAppConsoleYaml,
+    integrations: ["github"],
+    componentIntegrations: EVENT_APP_COMPONENT_INTEGRATIONS,
+    entrypointNodeId: args.triggerNodeId,
+  });
 }
 
 /**
@@ -81,14 +124,17 @@ function buildLineApp(args: {
 export interface OnboardingLineApp {
   factoryId: string;
   entrypointNodeId: string;
-  lineStepName: string;
 }
 
 export const ONBOARDING_LINE_APPS: OnboardingLineApp[] = [
-  { factoryId: "line-planning", entrypointNodeId: "onrun-create-plan", lineStepName: "Create Implementation Plan" },
-  { factoryId: "line-implementation", entrypointNodeId: "onrun-implement", lineStepName: "Implement" },
-  { factoryId: "line-pr", entrypointNodeId: "onrun-open-pr", lineStepName: "Open Pull Request" },
+  { factoryId: "line-planning", entrypointNodeId: "onrun-create-plan" },
+  { factoryId: "line-implementation", entrypointNodeId: "onrun-implement" },
+  { factoryId: "line-pr", entrypointNodeId: "onrun-open-pr" },
 ];
+
+// Event-driven factory apps provisioned during onboarding. These listen for
+// GitHub events; they are not factory line steps.
+export const ONBOARDING_EVENT_APPS = ["pr-closure"] as const;
 
 const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
   "software-factory": buildSoftwareFactory(),
@@ -112,6 +158,13 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
     description: "Generate a pull request title and body, then open a draft PR.",
     canvasYaml: prCanvasYaml,
     entrypointNodeId: "onrun-open-pr",
+  }),
+  "pr-closure": buildEventApp({
+    id: "pr-closure",
+    title: "PR Closure",
+    description: "Close the work order when the attached pull request merges or is closed without a merge.",
+    canvasYaml: prClosureCanvasYaml,
+    triggerNodeId: "on-pr-closed",
   }),
 };
 

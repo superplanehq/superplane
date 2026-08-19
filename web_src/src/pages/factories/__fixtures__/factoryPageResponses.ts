@@ -1,6 +1,7 @@
 import type {
   FactoriesFactory,
   FactoriesFactoryLine,
+  MeNotificationSettings,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderEvent,
@@ -76,9 +77,8 @@ export const ORGANIZATION_USERS = [
 
 const RUN_APP_TYPE = "runApp";
 
-function runAppStep(name: string, appId: string, entrypoint: string): FactoryLineStep {
+function runAppStep(appId: string, entrypoint: string): FactoryLineStep {
   return {
-    name,
     type: RUN_APP_TYPE,
     app: { app: appId, entrypoint },
   };
@@ -118,9 +118,9 @@ export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
     steps: [
-      runAppStep("plan", "app-refund-planner", "start-plan"),
-      runAppStep("implement", "app-refund-implementer", "start-implementation"),
-      runAppStep("verify", "app-refund-verifier", "start-verification"),
+      runAppStep("app-refund-planner", "start-plan"),
+      runAppStep("app-refund-implementer", "start-implementation"),
+      runAppStep("app-refund-verifier", "start-verification"),
     ],
   },
   {
@@ -128,7 +128,7 @@ export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
     name: "hotfix",
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
-    steps: [runAppStep("verify", "app-refund-verifier", "start-verification")],
+    steps: [runAppStep("app-refund-verifier", "start-verification")],
   },
 ];
 
@@ -149,13 +149,21 @@ export const EMPTY_FACTORY: FactoriesFactory = {
   lines: [],
 };
 
+const PLAN_STEP_INDEX: Record<string, number> = { plan: 0, implement: 1, verify: 2 };
+const PLAN_STEP_LABEL: Record<string, string> = {
+  plan: "Refund Planner",
+  implement: "Refund Implementer",
+  verify: "Refund Verifier",
+};
+
 function planLineExecution(
   step: string,
   overrides: Partial<FactoriesWorkOrderExecution> = {},
 ): FactoriesWorkOrderExecution {
   return {
     id: `exec-${step}-${overrides.id ?? Math.random().toString(36).slice(2, 8)}`,
-    step,
+    step: PLAN_STEP_LABEL[step] ?? step,
+    stepIndex: PLAN_STEP_INDEX[step] ?? 0,
     state: "STATE_FINISHED",
     result: "RESULT_PASSED",
     createdAt: TWO_HOURS_AGO,
@@ -193,9 +201,9 @@ function planLineDispatch(
     id: `dispatch-${REFUND_LINE_PLAN_ID}-${stepExecutions[0]?.id ?? "empty"}`,
     line: { id: REFUND_LINE_PLAN_ID, name: "plan-and-implement" },
     steps: [
-      { name: "plan", stepIndex: 0 },
-      { name: "implement", stepIndex: 1 },
-      { name: "verify", stepIndex: 2 },
+      { name: "Refund Planner", stepIndex: 0 },
+      { name: "Refund Implementer", stepIndex: 1 },
+      { name: "Refund Verifier", stepIndex: 2 },
     ],
     state,
     result,
@@ -467,6 +475,8 @@ export interface FactoriesFixture {
   factories: FactoriesFactory[];
   workOrdersByFactoryId: Record<string, FactoriesWorkOrder[]>;
   appsByFactoryId: Record<string, FactoryApp[]>;
+  /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
+  notificationSettings?: MeNotificationSettings;
   /**
    * Per-order activity timelines. When an order id is absent, the handlers
    * fall back to `DEFAULT_EVENTS_BY_ORDER_ID` from `factoryPageEventFixtures`.
@@ -524,8 +534,8 @@ export const fiveStepLineFactoriesFixture: FactoriesFixture = {
           ...line,
           steps: [
             ...(line.steps ?? []),
-            runAppStep("release", "app-refund-verifier", "start-verification"),
-            runAppStep("observe", "app-refund-planner", "start-plan"),
+            runAppStep("app-refund-verifier", "start-verification"),
+            runAppStep("app-refund-planner", "start-plan"),
           ],
         };
       }),

@@ -40,7 +40,6 @@ func setupStepQueueLine(t *testing.T, r *support.ResourceRegistry, stepMaxParall
 		name := support.RandomName("step")
 		app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, f.ID, name, "start-"+name)
 		steps[i] = models.FactoryLineStep{
-			Name:           name,
 			Type:           models.FactoryLineStepTypeRunApp,
 			AppID:          app.ID,
 			Entrypoint:     entrypoint,

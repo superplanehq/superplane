@@ -269,6 +269,7 @@ function FactoriesSidebar({
       </div>
       <SidebarUserMenu
         organizationId={organizationId}
+        factoryKey={factoryKey}
         userName={accountName ?? "You"}
         userEmail={accountEmail ?? undefined}
         userAvatarUrl={accountAvatarUrl}

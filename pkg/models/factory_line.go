@@ -29,7 +29,6 @@ var (
 )
 
 type FactoryLineStep struct {
-	Name       string    `json:"name"`
 	Type       string    `json:"type"`
 	AppID      uuid.UUID `json:"app_id"`
 	Entrypoint string    `json:"entrypoint"`

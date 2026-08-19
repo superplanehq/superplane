@@ -83,7 +83,7 @@ export interface WorkOrderTimelineCheck {
   name: string;
   score: number;
   maxScore: number;
-  format?: "fraction" | "percent";
+  format?: "fraction" | "percent" | "boolean";
   /** Score from the previous report of the same check, when one exists. */
   previousScore?: number;
 }

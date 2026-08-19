@@ -126,10 +126,16 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 }
 
 // enqueueStep parks the dispatch in the step's queue and records the
-// `step.execution.queued` timeline event. The step name comes from the
-// dispatch's snapshot — that is what will run on admission.
+// `step.execution.queued` timeline event. The step name is the app
+// (canvas) name, captured when the dispatch queues — the same name the
+// execution captures when the step starts.
 func (l *FactoryWorkOrderLineDispatch) enqueueStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int) (*FactoryLineStepResult, error) {
 	step := []FactoryLineStep(l.Steps)[stepIndex]
+
+	canvas, err := FindCanvasInTransaction(tx, l.OrganizationID, step.AppID)
+	if err != nil {
+		return nil, err
+	}
 
 	item := &FactoryWorkOrderQueueItem{
 		ID:             uuid.New(),
@@ -139,7 +145,7 @@ func (l *FactoryWorkOrderLineDispatch) enqueueStep(tx *gorm.DB, order *FactoryWo
 		LineID:         l.LineID,
 		LineDispatchID: l.ID,
 		StepIndex:      stepIndex,
-		StepName:       step.Name,
+		StepName:       canvas.Name,
 		CreatedAt:      time.Now(),
 	}
 
@@ -147,7 +153,7 @@ func (l *FactoryWorkOrderLineDispatch) enqueueStep(tx *gorm.DB, order *FactoryWo
 		return nil, err
 	}
 
-	if err := l.RecordStepExecutionQueued(tx, order, &step); err != nil {
+	if err := l.RecordStepExecutionQueued(tx, order, item, &step); err != nil {
 		return nil, err
 	}
 
@@ -179,6 +185,11 @@ func (l *FactoryWorkOrderLineDispatch) StartStep(tx *gorm.DB, order *FactoryWork
 	}
 
 	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, step.AppID)
+	if err != nil {
+		return nil, err
+	}
+
+	canvas, err := FindCanvasInTransaction(tx, l.OrganizationID, step.AppID)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +230,7 @@ func (l *FactoryWorkOrderLineDispatch) StartStep(tx *gorm.DB, order *FactoryWork
 		LineID:         l.LineID,
 		LineDispatchID: l.ID,
 		StepIndex:      stepIndex,
-		StepName:       step.Name,
+		StepName:       canvas.Name,
 		RunID:          run.ID,
 		Status:         FactoryWorkOrderExecutionStatusPending,
 		Result:         "",
@@ -231,7 +242,7 @@ func (l *FactoryWorkOrderLineDispatch) StartStep(tx *gorm.DB, order *FactoryWork
 		return nil, err
 	}
 
-	if err := l.RecordStepExecutionCreated(tx, order, execution, &step, run); err != nil {
+	if err := l.RecordStepExecutionCreated(tx, order, execution, run); err != nil {
 		return nil, err
 	}
 
@@ -244,13 +255,14 @@ func (l *FactoryWorkOrderLineDispatch) StartStep(tx *gorm.DB, order *FactoryWork
 func (l *FactoryWorkOrderLineDispatch) RecordStepExecutionQueued(
 	tx *gorm.DB,
 	order *FactoryWorkOrder,
+	item *FactoryWorkOrderQueueItem,
 	step *FactoryLineStep,
 ) error {
 	data := factory.LineStepExecutionQueued{
-		StepName: step.Name,
+		StepName: item.StepName,
 		Order:    order.Ref(),
 		Line:     l.Ref(),
-		App:      &factory.AppRef{ID: step.AppID},
+		App:      &factory.AppRef{ID: step.AppID, Name: item.StepName},
 	}
 
 	jsonData, err := json.Marshal(data)
@@ -273,14 +285,13 @@ func (l *FactoryWorkOrderLineDispatch) RecordStepExecutionCreated(
 	tx *gorm.DB,
 	order *FactoryWorkOrder,
 	execution *FactoryWorkOrderExecution,
-	step *FactoryLineStep,
 	run *CanvasRun,
 ) error {
 	data := factory.LineStepExecutionCreated{
-		StepName: step.Name,
+		StepName: execution.StepName,
 		Order:    order.Ref(),
 		Line:     l.Ref(),
-		App:      &factory.AppRef{ID: run.WorkflowID},
+		App:      &factory.AppRef{ID: run.WorkflowID, Name: execution.StepName},
 		Run:      &factory.RunRef{ID: run.ID, State: run.State},
 	}
 

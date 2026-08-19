@@ -108,7 +108,6 @@ func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 	steps := make([]*pb.FactoryLine_Step, len(line.Steps))
 	for i, step := range line.Steps {
 		steps[i] = &pb.FactoryLine_Step{
-			Name: step.Name,
 			Type: step.Type,
 			App: &pb.FactoryLine_AppStep{
 				App:        step.AppID.String(),
@@ -236,7 +235,7 @@ func serializeWorkOrderLineDispatch(dispatch models.FactoryWorkOrderLineDispatch
 			Id:   dispatch.LineID.String(),
 			Name: dispatch.LineName,
 		},
-		Steps:          serializeExecutionSteps(dispatch.Steps),
+		Steps:          serializeExecutionSteps(dispatch.Steps, dispatch.Executions),
 		State:          serializeLineDispatchState(dispatch.State),
 		Result:         serializeLineDispatchResult(dispatch.Result),
 		CreatedAt:      timestamppb.New(dispatch.CreatedAt),
@@ -316,14 +315,25 @@ func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecor
 	return item
 }
 
-func serializeExecutionSteps(steps []models.FactoryLineStep) []*pb.WorkOrderExecutionStep {
+func serializeExecutionSteps(
+	steps []models.FactoryLineStep,
+	executions []models.FactoryWorkOrderExecutionRecord,
+) []*pb.WorkOrderExecutionStep {
 	if len(steps) == 0 {
 		return nil
 	}
+
+	nameByIndex := make(map[int]string, len(executions))
+	for _, execution := range executions {
+		if execution.CanvasName != "" {
+			nameByIndex[execution.StepIndex] = execution.CanvasName
+		}
+	}
+
 	result := make([]*pb.WorkOrderExecutionStep, len(steps))
-	for i, step := range steps {
+	for i := range steps {
 		result[i] = &pb.WorkOrderExecutionStep{
-			Name:      step.Name,
+			Name:      nameByIndex[i],
 			StepIndex: int32(i),
 		}
 	}

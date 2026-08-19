@@ -29,11 +29,9 @@ func parseLineSteps(
 		return nil, invalidArgument("at least one step is required")
 	}
 
-	seenNames := make(map[string]struct{}, len(steps))
 	result := make([]models.FactoryLineStep, 0, len(steps))
-
 	for i, step := range steps {
-		parsed, err := parseLineStep(tx, organizationID, factoryID, step, i+1, seenNames)
+		parsed, err := parseLineStep(tx, organizationID, factoryID, step, i+1)
 		if err != nil {
 			return nil, err
 		}
@@ -48,37 +46,26 @@ func parseLineStep(
 	organizationID, factoryID uuid.UUID,
 	step *pb.FactoryLine_Step,
 	stepNumber int,
-	seenNames map[string]struct{},
 ) (models.FactoryLineStep, error) {
-	name := strings.TrimSpace(step.GetName())
-	if name == "" {
-		return models.FactoryLineStep{}, invalidArgument(fmt.Sprintf("step %d: name is required", stepNumber))
-	}
-
-	if _, exists := seenNames[name]; exists {
-		return models.FactoryLineStep{}, invalidArgument(fmt.Sprintf("duplicate step name %q", name))
-	}
-	seenNames[name] = struct{}{}
-
 	stepType := strings.TrimSpace(step.GetType())
 	if stepType != models.FactoryLineStepTypeRunApp {
 		return models.FactoryLineStep{}, invalidArgument(
-			fmt.Sprintf("step %q: unsupported type %q", name, stepType),
+			fmt.Sprintf("step %d: unsupported type %q", stepNumber, stepType),
 		)
 	}
 
 	appStep := step.GetApp()
 	if appStep == nil {
-		return models.FactoryLineStep{}, invalidArgument(fmt.Sprintf("step %q: app is required", name))
+		return models.FactoryLineStep{}, invalidArgument(fmt.Sprintf("step %d: app is required", stepNumber))
 	}
 
 	appRef := strings.TrimSpace(appStep.GetApp())
 	entrypoint := strings.TrimSpace(appStep.GetEntrypoint())
 	if appRef == "" {
-		return models.FactoryLineStep{}, invalidArgument(fmt.Sprintf("step %q: app is required", name))
+		return models.FactoryLineStep{}, invalidArgument(fmt.Sprintf("step %d: app is required", stepNumber))
 	}
 	if entrypoint == "" {
-		return models.FactoryLineStep{}, invalidArgument(fmt.Sprintf("step %q: entrypoint is required", name))
+		return models.FactoryLineStep{}, invalidArgument(fmt.Sprintf("step %d: entrypoint is required", stepNumber))
 	}
 
 	canvas, err := resolveFactoryOwnedApp(tx, organizationID, factoryID, appRef)
@@ -90,7 +77,7 @@ func parseLineStep(
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return models.FactoryLineStep{}, invalidArgument(
-				fmt.Sprintf("step %q: entrypoint %q not found", name, entrypoint),
+				fmt.Sprintf("step %d: entrypoint %q not found", stepNumber, entrypoint),
 			)
 		}
 		return models.FactoryLineStep{}, err
@@ -98,7 +85,7 @@ func parseLineStep(
 
 	if node.Type != models.NodeTypeTrigger {
 		return models.FactoryLineStep{}, invalidArgument(
-			fmt.Sprintf("step %q: entrypoint %q is not a trigger", name, entrypoint),
+			fmt.Sprintf("step %d: entrypoint %q is not a trigger", stepNumber, entrypoint),
 		)
 	}
 
@@ -106,7 +93,7 @@ func parseLineStep(
 	if step.MaxParallelism != nil {
 		if *step.MaxParallelism < 0 {
 			return models.FactoryLineStep{}, invalidArgument(
-				fmt.Sprintf("step %q: max_parallelism must be non-negative (0 means unlimited)", name),
+				fmt.Sprintf("step %d: max_parallelism must be non-negative (0 means unlimited)", stepNumber),
 			)
 		}
 		value := int(*step.MaxParallelism)
@@ -114,7 +101,6 @@ func parseLineStep(
 	}
 
 	return models.FactoryLineStep{
-		Name:           name,
 		Type:           models.FactoryLineStepTypeRunApp,
 		AppID:          canvas.ID,
 		Entrypoint:     entrypoint,

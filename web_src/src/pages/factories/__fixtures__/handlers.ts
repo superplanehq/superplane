@@ -1,7 +1,9 @@
 import {
   defaultFactoriesFixture,
   ORGANIZATION_USERS,
+  STORYBOOK_ME_USER_EMAIL,
   STORYBOOK_ME_USER_ID,
+  STORYBOOK_ME_USER_NAME,
   type FactoriesFixture,
 } from "./factoryPageResponses";
 import { DEFAULT_ARTIFACTS_BY_ORDER_ID, DEFAULT_EVENTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
@@ -12,7 +14,9 @@ import type {
   FactoriesWorkOrderEvent,
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
+import { defaultNotificationSettings } from "@/lib/notificationSettings";
 import { fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
+import { automationNameForLineStep } from "../lib/factoryLineFormShared";
 
 export type { FactoriesFixture };
 
@@ -189,23 +193,31 @@ function buildDispatchedLineDispatch(
   line: FactoriesFactoryLine | undefined,
   lineName: string,
   now: string,
+  apps: Array<{ id?: string; name?: string }> = [],
 ): FactoriesWorkOrderLineDispatch {
+  const firstStep = line?.steps?.[0];
+  const firstAppId = firstStep?.app?.app;
+  const firstName = automationNameForLineStep(firstStep, apps, 0);
   return {
     id: `dispatch-${Date.now()}`,
     line: line ? { id: line.id, name: line.name } : { id: "line-unknown", name: lineName },
-    steps: (line?.steps ?? []).map((step, index) => ({ name: step.name, stepIndex: index })),
+    steps: (line?.steps ?? []).map((step, index) => ({
+      name: automationNameForLineStep(step, apps, index),
+      stepIndex: index,
+    })),
     state: "STATE_ACTIVE",
     result: "RESULT_UNKNOWN",
     createdAt: now,
     stepExecutions: [
       {
         id: `exec-${Date.now()}`,
-        step: line?.steps?.[0]?.name ?? "start",
+        step: firstName,
         stepIndex: 0,
         state: "STATE_STARTED",
         result: "RESULT_UNKNOWN",
         createdAt: now,
         updatedAt: now,
+        run: firstAppId ? { appId: firstAppId, appName: firstName } : undefined,
       },
     ],
   };
@@ -224,7 +236,8 @@ function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: st
   const now = new Date().toISOString();
   order.updatedAt = now;
 
-  const newDispatch = buildDispatchedLineDispatch(line, lineName, now);
+  const apps = fixture.appsByFactoryId[factoryId] ?? [];
+  const newDispatch = buildDispatchedLineDispatch(line, lineName, now, apps);
   order.lineDispatches = [...(order.lineDispatches ?? []), newDispatch];
   return { json: { order } };
 }
@@ -330,10 +343,37 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   ];
 }
 
+/** Serves `/api/v1/me` so factory stories resolve `useMe` without the Home harness. */
+function meRoute(): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/me"),
+    resolve: () => ({
+      json: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME, email: STORYBOOK_ME_USER_EMAIL } },
+    }),
+  };
+}
+
+function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
+  const defaults = defaultNotificationSettings();
+
+  return {
+    pattern: re("/api/v1/me/notification-settings"),
+    resolve: (_match, method, body) => {
+      if (method === "PUT") {
+        const request = (body ?? {}) as { settings?: FactoriesFixture["notificationSettings"] };
+        fixture.notificationSettings = { ...defaults, ...(request.settings ?? {}) };
+      }
+      return { json: { settings: fixture.notificationSettings ?? defaults } };
+    },
+  };
+}
+
 /** Builds a resolvable factories route table for a fixture snapshot. */
 function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     factoriesCollectionRoute(fixture),
+    meRoute(),
+    notificationSettingsRoute(fixture),
     ...factoryDetailRoutes(fixture),
     ...factoryLinesRoutes(fixture),
     ...workOrderRoutes(fixture),
