@@ -272,17 +272,26 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 	require.NoError(t, err)
 
 	userIDStr := r.User.String()
-	require.NoError(t, order.RecordCommentAdded(database.Conn(), "Kicking this off", factory.WorkOrderCommentAuthor{
-		Kind:   factory.CommentAuthorKindUser,
-		UserID: &userIDStr,
-	}, nil))
-	require.NoError(t, order.RecordCommentAdded(database.Conn(), "Opened the PR", factory.WorkOrderCommentAuthor{
-		Kind: factory.CommentAuthorKindAutomation,
-		Automation: &factory.AutomationRef{
-			NodeID:   "implement",
-			NodeName: "Implement",
+	_, err = order.RecordCommentAdded(database.Conn(), models.FactoryWorkOrderCommentParams{
+		Body: "Kicking this off",
+		Author: factory.WorkOrderCommentAuthor{
+			Kind:   factory.CommentAuthorKindUser,
+			UserID: &userIDStr,
 		},
-	}, &factory.RunRef{ID: run.ID, State: "running"}))
+	})
+	require.NoError(t, err)
+	_, err = order.RecordCommentAdded(database.Conn(), models.FactoryWorkOrderCommentParams{
+		Body: "Opened the PR",
+		Author: factory.WorkOrderCommentAuthor{
+			Kind: factory.CommentAuthorKindAutomation,
+			Automation: &factory.AutomationRef{
+				NodeID:   "implement",
+				NodeName: "Implement",
+			},
+		},
+		Run: &factory.RunRef{ID: run.ID, State: "running"},
+	})
+	require.NoError(t, err)
 
 	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithRootEvent(&nodeExecution.RootEventID).
