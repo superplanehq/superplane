@@ -27,6 +27,7 @@ const (
 
 const (
 	linesRunFitTriggerNodeID = "kickoff"
+	linesRunFitStepName      = "Build"
 	// Factory run inspection re-lays a linear run out in a single vertical
 	// spine from a fixed, small origin (see layoutFactoryRunLeafGraph),
 	// independent of any saved editor position. A dozen chained steps stack
@@ -147,6 +148,7 @@ func (s *linesRunFitSteps) givenAFactoryAppWithAWideParticipantChain() {
 func (s *linesRunFitSteps) givenALineDispatchedForThatApp() {
 	line, err := s.factory.CreateLine(database.Conn(), support.RandomName("line"), []models.FactoryLineStep{
 		{
+			Name:       linesRunFitStepName,
 			Type:       models.FactoryLineStepTypeRunApp,
 			AppID:      s.canvas.ID,
 			Entrypoint: linesRunFitTriggerNodeID,
@@ -159,10 +161,8 @@ func (s *linesRunFitSteps) givenALineDispatchedForThatApp() {
 	require.NoError(s.t, err)
 	require.NoError(s.t, order.TransitionOnDispatch(database.Conn(), nil))
 
-	_, result, err := line.Dispatch(database.Conn(), order)
+	result, err := line.StartStep(database.Conn(), order, 0)
 	require.NoError(s.t, err)
-	require.NotNil(s.t, result.Execution)
-	require.NotNil(s.t, result.Run)
 	s.execution = result.Execution
 	s.runID = result.Run.ID
 
