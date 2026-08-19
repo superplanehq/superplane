@@ -9,10 +9,16 @@ import type {
 import { factoryAppPath, factoryAppRunPath, linesPath } from "./factoryPagePaths";
 import { buildLinePhaseBoard, linePhaseRunHref, resolvePhaseRunStatus } from "./linePhaseRuns";
 
+const APPS = [
+  { id: "app-plan", name: "plan" },
+  { id: "app-build", name: "build" },
+  { id: "app-demo", name: "demo" },
+];
+
 const LINE: FactoriesFactoryLine = {
   id: "line-1",
   name: "poc",
-  steps: [{ name: "plan" }, { name: "build" }, { name: "demo" }],
+  steps: [{ app: { app: "app-plan" } }, { app: { app: "app-build" } }, { app: { app: "app-demo" } }],
 };
 
 /** Fixture-only shape: a step execution plus which line it ran on, before
@@ -53,6 +59,7 @@ describe("buildLinePhaseBoard", () => {
           id: "e1",
           line: { id: "line-1", name: "poc" },
           step: "plan",
+          stepIndex: 0,
           state: "STATE_FINISHED",
           result: "RESULT_PASSED",
           createdAt: "2026-08-11T10:00:00.000Z",
@@ -64,6 +71,7 @@ describe("buildLinePhaseBoard", () => {
           id: "e2",
           line: { id: "line-1", name: "poc" },
           step: "plan",
+          stepIndex: 0,
           state: "STATE_STARTED",
           createdAt: "2026-08-11T11:00:00.000Z",
           updatedAt: "2026-08-11T12:00:00.000Z",
@@ -74,6 +82,7 @@ describe("buildLinePhaseBoard", () => {
           id: "e3",
           line: { id: "line-1", name: "poc" },
           step: "plan",
+          stepIndex: 0,
           state: "STATE_PENDING",
           createdAt: "2026-08-11T11:30:00.000Z",
           updatedAt: "2026-08-11T11:30:00.000Z",
@@ -84,6 +93,7 @@ describe("buildLinePhaseBoard", () => {
           id: "e4",
           line: { id: "line-1", name: "poc" },
           step: "plan",
+          stepIndex: 0,
           state: "STATE_PENDING",
           createdAt: "2026-08-11T09:00:00.000Z",
           updatedAt: "2026-08-11T09:00:00.000Z",
@@ -94,6 +104,7 @@ describe("buildLinePhaseBoard", () => {
           id: "e5",
           line: { id: "line-other", name: "other" },
           step: "plan",
+          stepIndex: 0,
           state: "STATE_STARTED",
           createdAt: "2026-08-11T13:00:00.000Z",
           updatedAt: "2026-08-11T13:00:00.000Z",
@@ -101,11 +112,11 @@ describe("buildLinePhaseBoard", () => {
       ]),
     ];
 
-    const board = buildLinePhaseBoard(LINE, orders);
+    const board = buildLinePhaseBoard(LINE, orders, APPS);
 
     expect(board).toHaveLength(3);
     expect(board[0].stepName).toBe("plan");
-    expect(board[0].appId).toBeUndefined();
+    expect(board[0].appId).toBe("app-plan");
     expect(board[0].runs.map((run) => run.order.title)).toEqual(["Beta", "Gamma", "Alpha", "Delta"]);
     expect(board[0].tick).toBe("running");
     expect(board[1].stepName).toBe("build");
@@ -122,6 +133,7 @@ describe("buildLinePhaseBoard", () => {
           id: "e-plan",
           line: { id: "line-1", name: "poc" },
           step: "plan",
+          stepIndex: 0,
           state: "STATE_FINISHED",
           result: "RESULT_PASSED",
           createdAt: "2026-08-11T10:00:00.000Z",
@@ -131,6 +143,7 @@ describe("buildLinePhaseBoard", () => {
           id: "e-build",
           line: { id: "line-1", name: "poc" },
           step: "build",
+          stepIndex: 1,
           state: "STATE_FINISHED",
           result: "RESULT_PASSED",
           createdAt: "2026-08-11T11:00:00.000Z",
@@ -140,6 +153,7 @@ describe("buildLinePhaseBoard", () => {
           id: "e-demo",
           line: { id: "line-1", name: "poc" },
           step: "demo",
+          stepIndex: 2,
           state: "STATE_STARTED",
           createdAt: "2026-08-11T12:00:00.000Z",
           updatedAt: "2026-08-11T12:30:00.000Z",
@@ -147,7 +161,7 @@ describe("buildLinePhaseBoard", () => {
       ]),
     ];
 
-    const board = buildLinePhaseBoard(LINE, orders);
+    const board = buildLinePhaseBoard(LINE, orders, APPS);
 
     expect(board[0].runs).toEqual([]);
     expect(board[1].runs).toEqual([]);
@@ -164,6 +178,7 @@ describe("buildLinePhaseBoard", () => {
           id: "e-plan",
           line: { id: "line-1", name: "poc" },
           step: "plan",
+          stepIndex: 0,
           state: "STATE_FINISHED",
           result: "RESULT_PASSED",
           createdAt: "2026-08-11T09:00:00.000Z",
@@ -173,6 +188,7 @@ describe("buildLinePhaseBoard", () => {
           id: "e-fail",
           line: { id: "line-1", name: "poc" },
           step: "build",
+          stepIndex: 1,
           state: "STATE_FINISHED",
           result: "RESULT_FAILED",
           createdAt: "2026-08-11T10:00:00.000Z",
@@ -181,7 +197,7 @@ describe("buildLinePhaseBoard", () => {
       ]),
     ];
 
-    const board = buildLinePhaseBoard(LINE, orders);
+    const board = buildLinePhaseBoard(LINE, orders, APPS);
 
     expect(board[0].runs).toEqual([]);
     expect(board[1].runs).toHaveLength(1);
@@ -196,11 +212,40 @@ describe("buildLinePhaseBoard", () => {
     const line: FactoriesFactoryLine = {
       id: "line-1",
       name: "poc",
-      steps: [{ name: "plan", app: { app: "app-planner", entrypoint: "start" } }],
+      steps: [{ app: { app: "app-planner", entrypoint: "start" } }],
     };
 
-    const board = buildLinePhaseBoard(line, []);
+    const board = buildLinePhaseBoard(line, [], [{ id: "app-planner", name: "plan" }]);
     expect(board[0]).toMatchObject({ stepName: "plan", appId: "app-planner" });
+  });
+
+  it("keeps two columns when the same automation appears twice", () => {
+    const line: FactoriesFactoryLine = {
+      id: "line-1",
+      name: "poc",
+      steps: [{ app: { app: "app-plan" } }, { app: { app: "app-plan" } }],
+    };
+    const orders = [
+      order("wo-a", "Alpha", [
+        {
+          id: "e-second",
+          line: { id: "line-1", name: "poc" },
+          step: "plan",
+          stepIndex: 1,
+          state: "STATE_STARTED",
+          createdAt: "2026-08-11T12:00:00.000Z",
+          updatedAt: "2026-08-11T12:00:00.000Z",
+        },
+      ]),
+    ];
+
+    const board = buildLinePhaseBoard(line, orders, APPS);
+    expect(board).toHaveLength(2);
+    expect(board[0]).toMatchObject({ stepName: "plan", stepIndex: 0, appId: "app-plan" });
+    expect(board[1]).toMatchObject({ stepName: "plan", stepIndex: 1, appId: "app-plan" });
+    expect(board[0].runs).toEqual([]);
+    expect(board[1].runs).toHaveLength(1);
+    expect(board[1].runs[0].workOrderId).toBe("wo-a");
   });
 
   it("keeps phase idle when only finished failed runs exist", () => {
@@ -210,6 +255,7 @@ describe("buildLinePhaseBoard", () => {
           id: "e-fail",
           line: { id: "line-1", name: "poc" },
           step: "build",
+          stepIndex: 1,
           state: "STATE_FINISHED",
           result: "RESULT_FAILED",
           createdAt: "2026-08-11T10:00:00.000Z",
@@ -218,7 +264,7 @@ describe("buildLinePhaseBoard", () => {
       ]),
     ];
 
-    const board = buildLinePhaseBoard(LINE, orders);
+    const board = buildLinePhaseBoard(LINE, orders, APPS);
     expect(board[1].tick).toBeNull();
   });
 });

@@ -4,6 +4,7 @@ import type {
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
+import { automationNameForLineStep } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, linesPath } from "./factoryPagePaths";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 
@@ -59,21 +60,24 @@ export function linePhaseRunHref(
  * appears once, in the column for its current (furthest active, else furthest
  * finished) step on this line — newest cards first within a column.
  */
-export function buildLinePhaseBoard(line: FactoriesFactoryLine, workOrders: FactoriesWorkOrder[]): LinePhaseColumn[] {
+export function buildLinePhaseBoard(
+  line: FactoriesFactoryLine,
+  workOrders: FactoriesWorkOrder[],
+  apps: Array<{ id?: string; name?: string }> = [],
+): LinePhaseColumn[] {
   const lineId = line.id;
   const steps = line.steps ?? [];
   if (!lineId || steps.length === 0) {
     return [];
   }
 
-  const runsByStep = collectCurrentRunsByStep(lineId, steps, workOrders);
+  const runsByStep = collectCurrentRunsByStep(lineId, steps.length, workOrders);
 
   return steps.map((step, stepIndex) => {
-    const stepName = step.name?.trim() || `Phase ${stepIndex + 1}`;
-    const runs = runsByStep.get(step.name ?? "") ?? [];
+    const runs = runsByStep.get(stepIndex) ?? [];
     const appId = step.app?.app?.trim() || undefined;
     return {
-      stepName,
+      stepName: automationNameForLineStep(step, apps, stepIndex),
       stepIndex,
       appId,
       runs,
@@ -129,19 +133,12 @@ export function resolveRunGlyph(run: LinePhaseRunCard): PhaseGlyphKind {
 
 function collectCurrentRunsByStep(
   lineId: string,
-  steps: NonNullable<FactoriesFactoryLine["steps"]>,
+  stepCount: number,
   workOrders: FactoriesWorkOrder[],
-): Map<string, LinePhaseRunCard[]> {
-  const stepIndexByName = new Map<string, number>();
-  for (const [index, step] of steps.entries()) {
-    if (step.name) {
-      stepIndexByName.set(step.name, index);
-    }
-  }
-
-  const runsByStep = new Map<string, LinePhaseRunCard[]>();
+): Map<number, LinePhaseRunCard[]> {
+  const runsByStep = new Map<number, LinePhaseRunCard[]>();
   for (const order of workOrders) {
-    appendCurrentRunForOrder(order, lineId, stepIndexByName, runsByStep);
+    appendCurrentRunForOrder(order, lineId, stepCount, runsByStep);
   }
   for (const runs of runsByStep.values()) {
     runs.sort(compareRunsNewestFirst);
@@ -149,11 +146,18 @@ function collectCurrentRunsByStep(
   return runsByStep;
 }
 
+function executionStepIndex(execution: FactoriesWorkOrderExecution): number | undefined {
+  if (execution.stepIndex == null || execution.stepIndex < 0) {
+    return undefined;
+  }
+  return execution.stepIndex;
+}
+
 function appendCurrentRunForOrder(
   order: FactoriesWorkOrder,
   lineId: string,
-  stepIndexByName: Map<string, number>,
-  runsByStep: Map<string, LinePhaseRunCard[]>,
+  stepCount: number,
+  runsByStep: Map<number, LinePhaseRunCard[]>,
 ): void {
   if (!order.id) {
     return;
@@ -168,30 +172,32 @@ function appendCurrentRunForOrder(
   }
   const currentDispatch = pickMostRecentDispatch(dispatchesForLine);
 
-  const lineExecutions = (currentDispatch.stepExecutions ?? []).filter(
-    (execution) => execution.step != null && stepIndexByName.has(execution.step),
-  );
+  const lineExecutions = (currentDispatch.stepExecutions ?? []).filter((execution) => {
+    const stepIndex = executionStepIndex(execution);
+    return stepIndex != null && stepIndex < stepCount;
+  });
   if (lineExecutions.length === 0) {
     return;
   }
 
-  const currentExecution = pickCurrentLineExecution(lineExecutions, stepIndexByName);
-  if (!currentExecution?.step) {
+  const currentExecution = pickCurrentLineExecution(lineExecutions);
+  const stepIndex = currentExecution ? executionStepIndex(currentExecution) : undefined;
+  if (!currentExecution || stepIndex == null) {
     return;
   }
 
   const card: LinePhaseRunCard = {
-    executionId: currentExecution.id ?? `${order.id}-${currentExecution.step}-${currentExecution.createdAt ?? ""}`,
+    executionId: currentExecution.id ?? `${order.id}-${stepIndex}-${currentExecution.createdAt ?? ""}`,
     workOrderId: order.id,
     order,
     execution: currentExecution,
   };
-  const existing = runsByStep.get(currentExecution.step);
+  const existing = runsByStep.get(stepIndex);
   if (existing) {
     existing.push(card);
     return;
   }
-  runsByStep.set(currentExecution.step, [card]);
+  runsByStep.set(stepIndex, [card]);
 }
 
 function pickMostRecentDispatch(dispatches: FactoriesWorkOrderLineDispatch[]): FactoriesWorkOrderLineDispatch {
@@ -209,10 +215,9 @@ function executionTimestamp(execution: FactoriesWorkOrderExecution): number {
 function isPreferableCurrentExecution(
   candidate: FactoriesWorkOrderExecution,
   incumbent: FactoriesWorkOrderExecution,
-  stepIndexByName: Map<string, number>,
 ): boolean {
-  const candidateStep = stepIndexByName.get(candidate.step ?? "") ?? -1;
-  const incumbentStep = stepIndexByName.get(incumbent.step ?? "") ?? -1;
+  const candidateStep = executionStepIndex(candidate) ?? -1;
+  const incumbentStep = executionStepIndex(incumbent) ?? -1;
   if (candidateStep !== incumbentStep) {
     return candidateStep > incumbentStep;
   }
@@ -224,20 +229,16 @@ function isPreferableCurrentExecution(
   return (candidate.id ?? "") > (incumbent.id ?? "");
 }
 
-function pickCurrentLineExecution(
-  executions: FactoriesWorkOrderExecution[],
-  stepIndexByName: Map<string, number>,
-): FactoriesWorkOrderExecution | null {
+function pickCurrentLineExecution(executions: FactoriesWorkOrderExecution[]): FactoriesWorkOrderExecution | null {
   const active = executions.filter(isActiveWorkOrderExecution);
   const candidates = active.length > 0 ? active : executions;
   let best: FactoriesWorkOrderExecution | null = null;
 
   for (const execution of candidates) {
-    const stepIndex = stepIndexByName.get(execution.step ?? "") ?? -1;
-    if (stepIndex < 0) {
+    if (executionStepIndex(execution) == null) {
       continue;
     }
-    if (!best || isPreferableCurrentExecution(execution, best, stepIndexByName)) {
+    if (!best || isPreferableCurrentExecution(execution, best)) {
       best = execution;
     }
   }

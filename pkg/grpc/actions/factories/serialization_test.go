@@ -58,26 +58,31 @@ func TestSerializeWorkOrderCreator_NoneReturnsNil(t *testing.T) {
 	assert.Nil(t, serializeWorkOrder(nil, order, nil, nil).GetCreatedBy())
 }
 
-func TestSerializeExecutionSteps_SnapshotsLineSteps(t *testing.T) {
+func TestSerializeExecutionSteps_UsesCanvasNames(t *testing.T) {
 	steps := []models.FactoryLineStep{
-		{Name: "plan"},
-		{Name: "implement"},
-		{Name: "verify"},
+		{Type: models.FactoryLineStepTypeRunApp},
+		{Type: models.FactoryLineStepTypeRunApp},
+		{Type: models.FactoryLineStepTypeRunApp},
+	}
+	executions := []models.FactoryWorkOrderExecutionRecord{
+		{FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{StepIndex: 0}, CanvasName: "plan-app"},
+		{FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{StepIndex: 1}, CanvasName: "implement-app"},
+		{FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{StepIndex: 2}, CanvasName: "verify-app"},
 	}
 
-	out := serializeExecutionSteps(steps)
+	out := serializeExecutionSteps(steps, executions)
 	require.Len(t, out, 3)
-	assert.Equal(t, "plan", out[0].GetName())
+	assert.Equal(t, "plan-app", out[0].GetName())
 	assert.EqualValues(t, 0, out[0].GetStepIndex())
-	assert.Equal(t, "implement", out[1].GetName())
+	assert.Equal(t, "implement-app", out[1].GetName())
 	assert.EqualValues(t, 1, out[1].GetStepIndex())
-	assert.Equal(t, "verify", out[2].GetName())
+	assert.Equal(t, "verify-app", out[2].GetName())
 	assert.EqualValues(t, 2, out[2].GetStepIndex())
 }
 
 func TestSerializeExecutionSteps_EmptyReturnsNil(t *testing.T) {
-	assert.Nil(t, serializeExecutionSteps(nil))
-	assert.Nil(t, serializeExecutionSteps([]models.FactoryLineStep{}))
+	assert.Nil(t, serializeExecutionSteps(nil, nil))
+	assert.Nil(t, serializeExecutionSteps([]models.FactoryLineStep{}, nil))
 }
 
 func TestSerializeWorkOrder_LineDispatchesReplaceFlatExecutions(t *testing.T) {
@@ -93,8 +98,8 @@ func TestSerializeWorkOrder_LineDispatchesReplaceFlatExecutions(t *testing.T) {
 				LineID:   lineID,
 				LineName: "ship",
 				Steps: datatypes.NewJSONSlice([]models.FactoryLineStep{
-					{Name: "step-one"},
-					{Name: "step-two"},
+					{Type: models.FactoryLineStepTypeRunApp},
+					{Type: models.FactoryLineStepTypeRunApp},
 				}),
 				State: models.FactoryWorkOrderLineDispatchStateActive,
 			},
@@ -127,8 +132,8 @@ func TestSerializeWorkOrder_LineDispatchesReplaceFlatExecutions(t *testing.T) {
 	assert.Equal(t, "ship", dispatch.Line.Name)
 	assert.Equal(t, pb.WorkOrderLineDispatch_STATE_ACTIVE, dispatch.State)
 	require.Len(t, dispatch.Steps, 2)
-	assert.Equal(t, "step-one", dispatch.Steps[0].Name)
-	assert.Equal(t, "step-two", dispatch.Steps[1].Name)
+	assert.Equal(t, "step-one-app", dispatch.Steps[0].Name)
+	assert.Equal(t, "", dispatch.Steps[1].Name)
 
 	require.Len(t, dispatch.StepExecutions, 1)
 	execution := dispatch.StepExecutions[0]

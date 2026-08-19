@@ -10,7 +10,7 @@ export type StepExecutionEventType = "step.execution.created" | "step.execution.
 export interface LineStepExecutionPayload {
   stepName?: string;
   line?: { id?: string; name?: string };
-  app?: { id?: string };
+  app?: { id?: string; name?: string };
   run?: { id?: string; state?: string; result?: string };
 }
 
@@ -48,7 +48,7 @@ export function appendStepExecutionEvent(
     return;
   }
 
-  const stepName = payload.stepName?.trim() || "Unnamed step";
+  const stepName = payload.app?.name?.trim() || payload.stepName?.trim() || "Unnamed step";
   const batch = findOrCreateDispatchBatch(ctx, {
     lineId: line.id,
     lineName: line.name?.trim() || "Unnamed line",
@@ -157,7 +157,7 @@ function executionFromStepPayload(
 
   return {
     id: run?.id,
-    step: payload.stepName,
+    step: payload.app?.name?.trim() || payload.stepName,
     state: mapExecutionState(run?.state, eventType),
     result: isFinished ? mapExecutionResult(run?.result) : "RESULT_UNKNOWN",
     createdAt: startedAt,
@@ -167,6 +167,7 @@ function executionFromStepPayload(
         ? {
             id: run.id,
             appId: payload.app.id,
+            appName: payload.app.name,
           }
         : undefined,
   };

@@ -23,11 +23,6 @@ describe("setup factory line apps", () => {
       "line-implementation",
       "line-pr",
     ]);
-    expect(ONBOARDING_LINE_APPS.map((app) => app.lineStepName)).toEqual([
-      "Create Implementation Plan",
-      "Implement",
-      "Open Pull Request",
-    ]);
   });
 
   it("exposes a single onRun entrypoint per app that the line calls", () => {
