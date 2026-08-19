@@ -168,7 +168,8 @@ type LineRef struct {
 }
 
 type AppRef struct {
-	ID uuid.UUID `json:"id"`
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name,omitempty"`
 }
 
 type RunRef struct {
