@@ -422,6 +422,7 @@ func (w *NodeExecutor) executeActionNode(
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
 			WithWorkOrderNotification(onFactoryWorkOrderNotification),
+		Usage: contexts.NewUsageContext(workflow.OrganizationID, execution),
 	}
 
 	if node.AppInstallationID != nil {
