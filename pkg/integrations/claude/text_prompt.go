@@ -347,6 +347,14 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
+	ctx.RecordUsageBestEffort(core.UsageRecord{
+		Provider:     "anthropic",
+		Model:        response.Model,
+		InputTokens:  int64(response.Usage.InputTokens),
+		OutputTokens: int64(response.Usage.OutputTokens),
+		TotalTokens:  int64(response.Usage.InputTokens + response.Usage.OutputTokens),
+	})
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		MessagePayloadType,

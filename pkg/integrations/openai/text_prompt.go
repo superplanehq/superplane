@@ -328,6 +328,8 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
+	recordOpenAIUsage(ctx, response)
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		ResponsePayloadType,
@@ -539,6 +541,19 @@ func extractRefusal(response *OpenAIResponse) string {
 		}
 	}
 	return ""
+}
+
+func recordOpenAIUsage(ctx core.ExecutionContext, response *OpenAIResponse) {
+	if response == nil || response.Usage == nil {
+		return
+	}
+	ctx.RecordUsageBestEffort(core.UsageRecord{
+		Provider:     "openai",
+		Model:        response.Model,
+		InputTokens:  int64(response.Usage.InputTokens),
+		OutputTokens: int64(response.Usage.OutputTokens),
+		TotalTokens:  int64(response.Usage.TotalTokens),
+	})
 }
 
 func (c *CreateResponse) Cleanup(ctx core.SetupContext) error {

@@ -12,7 +12,6 @@ import {
   LINE_RUN_IMPLEMENT_PASSED_ID,
   LINE_RUN_VERIFY_PASSED_ID,
   OPEN_WORK_ORDER,
-  OPEN_WORK_ORDER_ARTIFACTS,
   OPEN_WORK_ORDER_SECONDARY,
   OPERATOR_USER,
   REVIEWER_USER,
@@ -21,6 +20,7 @@ import {
   TWO_HOURS_AGO,
   YESTERDAY,
 } from "./factoryPageResponses";
+import { OPEN_WORK_ORDER_ARTIFACTS } from "./factoryPageFixtureVariants";
 
 const REFUND_LINE = { id: "line-plan-and-implement", name: "plan-and-implement" };
 
