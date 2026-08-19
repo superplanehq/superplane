@@ -447,3 +447,29 @@ func Test__RecordOpenAIUsage__IncludesCachedAndReasoningTokens(t *testing.T) {
 		t.Errorf("unexpected output/total: %+v", got)
 	}
 }
+
+func Test__RecordOpenAIUsage__FallbackTotalDoesNotDoubleCountReasoning(t *testing.T) {
+	recorder := &recordingUsage{}
+	ctx := core.ExecutionContext{Usage: recorder}
+
+	recordOpenAIUsage(ctx, &OpenAIResponse{
+		Model: "gpt-5",
+		Usage: &ResponseUsage{
+			InputTokens:         150,
+			OutputTokens:        40,
+			InputTokensDetails:  &ResponseUsageTokenDetails{CachedTokens: 50},
+			OutputTokensDetails: &ResponseUsageTokenDetails{ReasoningTokens: 10},
+		},
+	})
+
+	if len(recorder.records) != 1 {
+		t.Fatalf("expected 1 usage record, got %d", len(recorder.records))
+	}
+	got := recorder.records[0]
+	if got.TotalTokens != 190 {
+		t.Errorf("expected total 190, got %d", got.TotalTokens)
+	}
+	if got.ReasoningTokens != 10 {
+		t.Errorf("expected reasoning 10, got %d", got.ReasoningTokens)
+	}
+}

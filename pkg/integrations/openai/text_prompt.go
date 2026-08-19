@@ -561,7 +561,8 @@ func recordOpenAIUsage(ctx core.ExecutionContext, response *OpenAIResponse) {
 	}
 	total := int64(response.Usage.TotalTokens)
 	if total == 0 {
-		total = input + int64(response.Usage.OutputTokens) + cached + reasoning
+		// Reasoning tokens are a subset of output_tokens.
+		total = input + int64(response.Usage.OutputTokens) + cached
 	}
 	ctx.RecordUsageBestEffort(core.UsageRecord{
 		Provider:        "openai",
