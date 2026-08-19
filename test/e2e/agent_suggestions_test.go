@@ -99,11 +99,11 @@ func (s *agentSuggestionSteps) startWithSuggestions(suggestions []agentSuggestio
 	s.createCanvasWithoutVisit()
 
 	require.NoError(s.t, s.session.Page().AddInitScript(pw.Script{Content: pw.String(fmt.Sprintf(`
-		() => {
+		(() => {
 			window.localStorage.setItem("canvasAgentMode", "operator");
 			window.localStorage.setItem("canvasAgentSidebarOpen", "false");
 			window.localStorage.setItem(%q, "false");
-		}
+		})();
 	`, "canvasAgentSidebarOpen:"+s.canvas.WorkflowID.String()))}))
 
 	s.canvas.Visit()

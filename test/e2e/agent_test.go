@@ -168,12 +168,16 @@ func (s *agentSteps) start() {
 	s.session.Start()
 	s.session.Login()
 	require.NoError(s.t, models.EnableExperimentalFeature(s.session.OrgID, features.FeatureClaudeManagedAgents))
+	// The browser context is shared by every test in this package, so
+	// localStorage carries the agent mode a previous test left behind. This
+	// script must be an IIFE: init scripts are evaluated, not called, so a bare
+	// arrow function would never run and the mode would leak between tests.
 	require.NoError(s.t, s.session.Page().AddInitScript(pw.Script{Content: pw.String(`
-		() => {
+		(() => {
 			window.localStorage.setItem("canvasAgentMode", "operator");
 			window.localStorage.setItem("canvasAgentSidebarOpen", "false");
 			window.sessionStorage.clear();
-		}
+		})();
 	`)}))
 
 	s.canvas = shared.NewCanvasSteps("E2E Agent "+uuid.NewString(), s.t, s.session)
