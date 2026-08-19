@@ -100,7 +100,7 @@ function ListRow({
 
       {entry.usageLabel ? (
         <span
-          className="relative z-10 pointer-events-none hidden text-[11px] text-muted-foreground sm:inline"
+          className="relative z-10 pointer-events-none shrink-0 text-[11px] tabular-nums text-muted-foreground"
           title={entry.usageTooltip ?? undefined}
         >
           {entry.usageLabel}

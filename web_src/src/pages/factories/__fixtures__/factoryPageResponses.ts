@@ -15,6 +15,7 @@ import type {
 import { canvasAppIds } from "@/pages/app/__fixtures__/handlers";
 
 import type { FactoriesWorkOrderCheck } from "@/api-client";
+import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } from "./usageReportFixtures";
 
 /** Shared with the home fixture so routes stay in sync across HomePage → Factories navigation. */
 export const FACTORIES_ORGANIZATION_ID = "3ee1aa47-3a60-4c1f-b645-0b9859ab91f8";
@@ -301,6 +302,8 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
         state: "STATE_FINISHED",
         result: "RESULT_PASSED",
         updatedAt: TWO_HOURS_AGO,
+        totalTokens: "1800",
+        costCents: "45",
       }),
       planLineExecution("implement", {
         id: "2",
@@ -308,9 +311,13 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
         result: "RESULT_UNKNOWN",
         run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
         updatedAt: HOUR_AGO,
+        totalTokens: "900",
+        costCents: "28",
       }),
     ]),
   ],
+  totalTokens: "2700",
+  totalCostCents: "73",
 };
 
 // Storybook user is co-assigned so "mine + failed" surfaces this order.
@@ -337,6 +344,8 @@ export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
         state: "STATE_FINISHED",
         result: "RESULT_PASSED",
         updatedAt: TWO_HOURS_AGO,
+        totalTokens: "2200",
+        costCents: "55",
       }),
       planLineExecution("implement", {
         id: "4",
@@ -344,9 +353,13 @@ export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
         result: "RESULT_FAILED",
         run: { id: LINE_RUN_IMPLEMENT_FAILED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
         updatedAt: HOUR_AGO,
+        totalTokens: "6400",
+        costCents: "210",
       }),
     ]),
   ],
+  totalTokens: "8600",
+  totalCostCents: "265",
 };
 
 export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
@@ -409,13 +422,22 @@ export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     planLineDispatch([
-      planLineExecution("plan", { id: "5", state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: LAST_WEEK }),
+      planLineExecution("plan", {
+        id: "5",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        updatedAt: LAST_WEEK,
+        totalTokens: "1500",
+        costCents: "40",
+      }),
       planLineExecution("implement", {
         id: "6",
         state: "STATE_FINISHED",
         result: "RESULT_PASSED",
         run: { id: LINE_RUN_IMPLEMENT_PASSED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
         updatedAt: LAST_WEEK,
+        totalTokens: "12000",
+        costCents: "480",
       }),
       planLineExecution("verify", {
         id: "7",
@@ -423,44 +445,14 @@ export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
         result: "RESULT_PASSED",
         run: { id: LINE_RUN_VERIFY_PASSED_ID, appId: "app-refund-verifier", appName: "Refund Verifier" },
         updatedAt: YESTERDAY,
+        totalTokens: "800",
+        costCents: "18",
       }),
     ]),
   ],
+  totalTokens: "14300",
+  totalCostCents: "538",
 };
-
-export const OPEN_WORK_ORDER_ARTIFACTS: FactoriesWorkOrderArtifact[] = [
-  {
-    id: "art-pr-1",
-    type: "TYPE_PR",
-    data: {
-      url: "https://github.com/example/ledger/pull/482",
-      title: "Fix duplicate refund on retry",
-      number: 482,
-    },
-    createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-    createdAt: HOUR_AGO,
-  },
-  {
-    id: "art-md-1",
-    type: "TYPE_MARKDOWN",
-    data: {
-      title: "Investigation notes",
-      body: "Retry policy exceeded idempotency window when the ledger writer was under load; details captured in the design doc.",
-    },
-    createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-    createdAt: HOUR_AGO,
-  },
-  {
-    id: "art-branch-1",
-    type: "TYPE_BRANCH",
-    data: {
-      name: "feature/refund-retry",
-      url: "https://github.com/example/ledger/tree/feature/refund-retry",
-    },
-    createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-    createdAt: HOUR_AGO,
-  },
-];
 
 export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
   OPEN_WORK_ORDER,
@@ -477,6 +469,8 @@ export interface FactoriesFixture {
   factories: FactoriesFactory[];
   workOrdersByFactoryId: Record<string, FactoriesWorkOrder[]>;
   appsByFactoryId: Record<string, FactoryApp[]>;
+  usageByFactoryId?: Record<string, StorybookUsageReport>;
+  organizationLlmSpend?: StorybookUsageReport;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
   /**
@@ -501,6 +495,11 @@ export const defaultFactoriesFixture: FactoriesFixture = {
     [PRIMARY_FACTORY_ID]: REFUND_FACTORY_APPS,
     [EMPTY_FACTORY_ID]: [],
   },
+  usageByFactoryId: {
+    [PRIMARY_FACTORY_ID]: DEFAULT_FACTORY_USAGE,
+    [EMPTY_FACTORY_ID]: EMPTY_USAGE_REPORT,
+  },
+  organizationLlmSpend: DEFAULT_FACTORY_USAGE,
 };
 
 export const emptyFactoriesFixture: FactoriesFixture = {

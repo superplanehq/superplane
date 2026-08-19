@@ -82,30 +82,8 @@ func (s *linesRunFitSteps) givenAFactory() {
 	factory, err := models.CreateFactory(tx, s.session.OrgID, support.RandomName("factory"), "", "")
 	require.NoError(s.t, err)
 	s.factory = factory
-	s.completeFactoryOnboarding()
-}
-
-// OnboardingGate sends incomplete workspaces to /setup, so the line
-// detail page never mounts unless this factory is marked complete.
-func (s *linesRunFitSteps) completeFactoryOnboarding() {
-	vcsID := uuid.New().String()
-	agentID := uuid.New().String()
-	appRepository := "acme/app"
-	backlogRepository := "acme/backlog"
-	issuesSource := models.FactoryOnboardingIssuesSourceVCS
-	agentHarness := models.FactoryOnboardingAgentHarnessClaudeCode
-	appID := uuid.New().String()
-	lineID := uuid.New().String()
-	require.NoError(s.t, s.factory.CompleteOnboarding(database.DB(s.t.Context()), models.FactoryOnboardingPatch{
-		VCSIntegrationID:   &vcsID,
-		AgentIntegrationID: &agentID,
-		AppRepository:      &appRepository,
-		BacklogRepository:  &backlogRepository,
-		IssuesSource:       &issuesSource,
-		AgentHarness:       &agentHarness,
-		ProvisionedAppID:   &appID,
-		ProvisionedLineID:  &lineID,
-	}))
+	// OnboardingGate sends incomplete workspaces to /setup.
+	completeFactoryOnboarding(s.t, factory)
 }
 
 // Builds an app with a trigger followed by a long, linear chain of
