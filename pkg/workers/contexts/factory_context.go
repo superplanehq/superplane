@@ -358,7 +358,7 @@ func (c *FactoryContext) appRef() *factory.AppRef {
 		return nil
 	}
 
-	return &factory.AppRef{ID: c.canvas.ID}
+	return &factory.AppRef{ID: c.canvas.ID, Name: c.canvas.Name}
 }
 
 // automationRef captures node/app/line/step identity for timeline

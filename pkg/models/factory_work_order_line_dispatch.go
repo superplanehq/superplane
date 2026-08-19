@@ -125,6 +125,11 @@ func (l *FactoryWorkOrderLineDispatch) StartStep(tx *gorm.DB, order *FactoryWork
 		return nil, err
 	}
 
+	canvas, err := FindCanvasInTransaction(tx, l.OrganizationID, step.AppID)
+	if err != nil {
+		return nil, err
+	}
+
 	runInput, err := factoryWorkOrderRunInput(tx, order)
 	if err != nil {
 		return nil, err
@@ -161,7 +166,7 @@ func (l *FactoryWorkOrderLineDispatch) StartStep(tx *gorm.DB, order *FactoryWork
 		LineID:         l.LineID,
 		LineDispatchID: l.ID,
 		StepIndex:      stepIndex,
-		StepName:       step.Name,
+		StepName:       canvas.Name,
 		RunID:          run.ID,
 		Status:         FactoryWorkOrderExecutionStatusPending,
 		Result:         "",
@@ -173,7 +178,7 @@ func (l *FactoryWorkOrderLineDispatch) StartStep(tx *gorm.DB, order *FactoryWork
 		return nil, err
 	}
 
-	if err := l.RecordStepExecutionCreated(tx, order, execution, &step, run); err != nil {
+	if err := l.RecordStepExecutionCreated(tx, order, execution, run); err != nil {
 		return nil, err
 	}
 
@@ -187,14 +192,13 @@ func (l *FactoryWorkOrderLineDispatch) RecordStepExecutionCreated(
 	tx *gorm.DB,
 	order *FactoryWorkOrder,
 	execution *FactoryWorkOrderExecution,
-	step *FactoryLineStep,
 	run *CanvasRun,
 ) error {
 	data := factory.LineStepExecutionCreated{
-		StepName: step.Name,
+		StepName: execution.StepName,
 		Order:    order.Ref(),
 		Line:     l.Ref(),
-		App:      &factory.AppRef{ID: run.WorkflowID},
+		App:      &factory.AppRef{ID: run.WorkflowID, Name: execution.StepName},
 		Run:      &factory.RunRef{ID: run.ID, State: run.State},
 	}
 

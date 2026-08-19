@@ -407,9 +407,8 @@ message Factory {
 
 message FactoryLine {
   message Step {
-    string name = 1;
-    string type = 2;
-    optional AppStep app = 3;
+    string type = 1;
+    optional AppStep app = 2;
   }
 
   message AppStep {
