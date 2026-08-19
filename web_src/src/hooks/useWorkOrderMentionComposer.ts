@@ -108,6 +108,9 @@ function applyMentionMenuKeyDown(
     menu.onHighlight((menu.highlightIndex - 1 + menu.suggestions.length) % menu.suggestions.length);
     return true;
   }
+  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+    return false;
+  }
   if (event.key === "Enter" || event.key === "Tab") {
     event.preventDefault();
     const selected = menu.suggestions[menu.highlightIndex] ?? menu.suggestions[0];

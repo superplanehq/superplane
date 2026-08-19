@@ -57,6 +57,20 @@ describe("WorkOrderCommentComposer", () => {
     expect(onSubmit).toHaveBeenCalledWith("Hello @Alice Anderson", ["alice"]);
   });
 
+  it("submits with the send shortcut while the mention menu is open", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn(async () => undefined);
+    renderComposer(onSubmit);
+
+    const textarea = screen.getByLabelText("Add a comment");
+    await user.type(textarea, "@Ali");
+    expect(screen.getByTestId("work-order-mention-menu")).toBeInTheDocument();
+
+    await user.keyboard("{Meta>}{Enter}{/Meta}");
+
+    expect(onSubmit).toHaveBeenCalledWith("@Ali", []);
+  });
+
   it("keeps the mention menu closed after Escape when the caret moves", async () => {
     const user = userEvent.setup();
     renderComposer();
