@@ -683,9 +683,9 @@ CREATE TABLE public.user_notification_settings (
     user_id uuid NOT NULL,
     workspace_scope character varying(50) DEFAULT 'all'::character varying NOT NULL,
     workspace_filters jsonb DEFAULT '[]'::jsonb NOT NULL,
-    event_types jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    event_types jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
