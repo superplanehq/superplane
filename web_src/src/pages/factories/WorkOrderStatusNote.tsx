@@ -1,4 +1,5 @@
 import { ChevronDown, ExternalLink, Hourglass } from "lucide-react";
+import { Fragment } from "react";
 import { Link } from "react-router";
 
 import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
@@ -15,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 
+import { applyWorkOrderStatusAction, type WorkOrderStatusAction } from "./lib/workOrderStatusActions";
 import type { WorkOrderStatusNotePresentation } from "./lib/workOrderStatusNote";
 
 interface WorkOrderStatusNoteProps {
@@ -23,7 +25,7 @@ interface WorkOrderStatusNoteProps {
   canClose: boolean;
   canManage: boolean;
   isBusy: boolean;
-  showManualUpdate: boolean;
+  statusActions: WorkOrderStatusAction[];
   onClose: (result: FactoriesWorkOrderResult) => void;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
 }
@@ -34,7 +36,7 @@ export function WorkOrderStatusNote({
   canClose,
   canManage,
   isBusy,
-  showManualUpdate,
+  statusActions,
   onClose,
   onStatusChange,
 }: WorkOrderStatusNoteProps) {
@@ -58,7 +60,7 @@ export function WorkOrderStatusNote({
             <MarkdownContent content={note.text} variant="workspace" />
           </div>
 
-          {note.cta || showManualUpdate ? (
+          {note.cta || statusActions.length > 0 ? (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {note.cta ? (
                 <Button asChild size="sm">
@@ -68,8 +70,9 @@ export function WorkOrderStatusNote({
                   </a>
                 </Button>
               ) : null}
-              {showManualUpdate ? (
+              {statusActions.length > 0 ? (
                 <ManualUpdateMenu
+                  actions={statusActions}
                   canClose={canClose}
                   canManage={canManage}
                   isBusy={isBusy}
@@ -111,12 +114,15 @@ function NoteAttribution({ note, organizationId }: { note: WorkOrderStatusNotePr
 }
 
 function ManualUpdateMenu({
+  actions,
   canClose,
   canManage,
   isBusy,
   onClose,
   onStatusChange,
-}: Pick<WorkOrderStatusNoteProps, "canClose" | "canManage" | "isBusy" | "onClose" | "onStatusChange">) {
+}: Pick<WorkOrderStatusNoteProps, "canClose" | "canManage" | "isBusy" | "onClose" | "onStatusChange"> & {
+  actions: WorkOrderStatusAction[];
+}) {
   return (
     <DropdownMenu>
       <PermissionTooltip allowed={canClose || canManage} message="You don't have permission to manage this work order.">
@@ -134,16 +140,17 @@ function ManualUpdateMenu({
         </DropdownMenuTrigger>
       </PermissionTooltip>
       <DropdownMenuContent align="start" className="w-44">
-        <DropdownMenuItem disabled={!canClose} onSelect={() => onClose("RESULT_COMPLETED")}>
-          Complete
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={!canClose} onSelect={() => onClose("RESULT_REJECTED")}>
-          Reject
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem disabled={!canManage} onSelect={() => void onStatusChange("STATE_DRAFT")}>
-          Back to draft
-        </DropdownMenuItem>
+        {actions.map((action) => (
+          <Fragment key={action.kind}>
+            {action.separatorBefore ? <DropdownMenuSeparator /> : null}
+            <DropdownMenuItem
+              disabled={action.disabled}
+              onSelect={() => applyWorkOrderStatusAction(action.kind, { onClose, onStatusChange })}
+            >
+              {action.label}
+            </DropdownMenuItem>
+          </Fragment>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );

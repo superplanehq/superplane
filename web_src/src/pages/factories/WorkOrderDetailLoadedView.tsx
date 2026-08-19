@@ -18,6 +18,7 @@ import { WorkOrderDescription } from "./WorkOrderDescription";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
 import { WorkOrderDetailSidebar } from "./WorkOrderDetailSidebar";
 import type { WorkOrderStatusNotePresentation } from "./lib/workOrderStatusNote";
+import { buildWorkOrderStatusActions } from "./lib/workOrderStatusActions";
 import { WorkOrderStatusNote } from "./WorkOrderStatusNote";
 
 interface WorkOrderDetailLoadedViewProps {
@@ -122,6 +123,10 @@ function WorkOrderDetailMainColumn({
   checks,
   isChecksLoading,
   checksError,
+  displayStatus,
+  isOpen,
+  isDispatchable,
+  isClosed,
   canClose,
   isCompleting,
   isRejecting,
@@ -146,6 +151,10 @@ function WorkOrderDetailMainColumn({
           <WorkOrderStatusNotesSection
             notes={notesToShow}
             organizationId={organizationId}
+            displayStatus={displayStatus}
+            isOpen={isOpen}
+            isDispatchable={isDispatchable}
+            isClosed={isClosed}
             canClose={canClose}
             canManage={canManage}
             isCompleting={isCompleting}
@@ -254,6 +263,10 @@ function WorkOrderDetailBodyAside({
 function WorkOrderStatusNotesSection({
   notes,
   organizationId,
+  displayStatus,
+  isOpen,
+  isDispatchable,
+  isClosed,
   canClose,
   canManage,
   isCompleting,
@@ -265,6 +278,10 @@ function WorkOrderStatusNotesSection({
 }: Pick<
   WorkOrderDetailLoadedViewProps,
   | "organizationId"
+  | "displayStatus"
+  | "isOpen"
+  | "isDispatchable"
+  | "isClosed"
   | "canClose"
   | "canManage"
   | "isCompleting"
@@ -275,6 +292,16 @@ function WorkOrderStatusNotesSection({
   | "onStatusChange"
 > & { notes: WorkOrderStatusNotePresentation[] }) {
   const lastIndex = notes.length - 1;
+  const statusActions = buildWorkOrderStatusActions({
+    displayStatus,
+    isOpen,
+    isDispatchable,
+    isClosed,
+    canClose,
+    canManage,
+    isClosing,
+    isUpdatingStatus,
+  });
 
   return (
     <div className="flex flex-col gap-3">
@@ -286,7 +313,7 @@ function WorkOrderStatusNotesSection({
           canClose={canClose}
           canManage={canManage}
           isBusy={isCompleting || isRejecting || isClosing || isUpdatingStatus}
-          showManualUpdate={index === lastIndex}
+          statusActions={index === lastIndex ? statusActions : []}
           onClose={onClose}
           onStatusChange={onStatusChange}
         />
