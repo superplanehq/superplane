@@ -501,6 +501,10 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return nil, nil
 	}
 
+	if err := execution.RollupUsage(tx); err != nil {
+		w.logger.WithError(err).WithField("run_id", runID).Error("failed to roll up factory usage")
+	}
+
 	if err := execution.MarkFinished(tx, run.Result); err != nil {
 		return nil, err
 	}

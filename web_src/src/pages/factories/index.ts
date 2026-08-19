@@ -8,6 +8,7 @@ export {
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
   FactorySettingsSoonPage,
+  FactorySettingsUsagePage,
   FACTORY_SETTINGS_NAV_ITEMS,
   LegacyWorkOrderDetailRedirect,
   LinesPage,

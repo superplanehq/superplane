@@ -310,6 +310,10 @@ func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runI
 		return err
 	}
 
+	if err := execution.RollupUsage(tx); err != nil {
+		w.logger.WithError(err).WithField("run_id", runID).Error("failed to roll up factory usage")
+	}
+
 	if err := execution.MarkFinished(tx, result); err != nil {
 		return err
 	}

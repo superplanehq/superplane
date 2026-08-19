@@ -33,6 +33,7 @@ import {
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
   FactorySettingsSoonPage,
+  FactorySettingsUsagePage,
   FACTORY_SETTINGS_NAV_ITEMS,
   LegacyWorkOrderDetailRedirect,
   LinesPage,
@@ -204,26 +205,7 @@ function AppRouter() {
                     </Route>
                     <Route path="settings/*" element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
                   </Route>
-                  <Route
-                    path=":factoryKey/settings"
-                    element={withAuthPermissionAndFactoriesFeature(FactorySettingsLayout, "factories", "read")}
-                  >
-                    <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
-                    <Route path="general" element={<FactorySettingsGeneralPage />} />
-                    {FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.id !== "general").map((item) => (
-                      <Route
-                        key={item.id}
-                        path={item.id}
-                        element={
-                          <FactorySettingsSoonPage
-                            title={item.label}
-                            description={`${item.label} settings for this workspace.`}
-                            Icon={item.Icon}
-                          />
-                        }
-                      />
-                    ))}
-                  </Route>
+                  {factorySettingsRoutes()}
                 </Route>
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
               </Route>
@@ -235,6 +217,32 @@ function AppRouter() {
         </div>
       </div>
     </BrowserRouter>
+  );
+}
+
+function factorySettingsRoutes() {
+  return (
+    <Route
+      path=":factoryKey/settings"
+      element={withAuthPermissionAndFactoriesFeature(FactorySettingsLayout, "factories", "read")}
+    >
+      <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
+      <Route path="general" element={<FactorySettingsGeneralPage />} />
+      <Route path="usage" element={<FactorySettingsUsagePage />} />
+      {FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.id !== "general" && item.id !== "usage").map((item) => (
+        <Route
+          key={item.id}
+          path={item.id}
+          element={
+            <FactorySettingsSoonPage
+              title={item.label}
+              description={`${item.label} settings for this workspace.`}
+              Icon={item.Icon}
+            />
+          }
+        />
+      ))}
+    </Route>
   );
 }
 

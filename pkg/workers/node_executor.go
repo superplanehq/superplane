@@ -407,6 +407,7 @@ func (w *NodeExecutor) executeActionNode(
 		Runs:        contexts.NewRunExecutionContext(tx, workflow, node, execution).WithPendingRunCreated(onPendingRunCreated),
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated),
+		Usage: contexts.NewUsageContext(tx, workflow.OrganizationID, execution),
 	}
 
 	if node.AppInstallationID != nil {

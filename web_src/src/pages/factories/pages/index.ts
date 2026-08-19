@@ -17,4 +17,5 @@ export { WorkOrdersPage } from "./WorkOrdersPage";
 export { FactorySettingsLayout } from "./settings/FactorySettingsLayout";
 export { FactorySettingsGeneralPage } from "./settings/FactorySettingsGeneralPage";
 export { FactorySettingsSoonPage } from "./settings/FactorySettingsSoonPage";
+export { FactorySettingsUsagePage } from "./settings/FactorySettingsUsagePage";
 export { FACTORY_SETTINGS_NAV_ITEMS } from "./settings/settingsNavItems";
