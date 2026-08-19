@@ -333,12 +333,37 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   ];
 }
 
+const STORYBOOK_ME_PERMISSIONS = [
+  "canvases",
+  "integrations",
+  "secrets",
+  "groups",
+  "users",
+  "roles",
+  "organization",
+  "agents",
+  "factories",
+  "work_orders",
+  "notifications",
+].flatMap((resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action })));
+
 /** Serves `/api/v1/me` so factory stories resolve `useMe` without the Home harness. */
-function meRoute(): FactoriesRoute {
+function meRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
     pattern: re("/api/v1/me"),
     resolve: () => ({
-      json: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME, email: STORYBOOK_ME_USER_EMAIL } },
+      json: {
+        user: {
+          id: STORYBOOK_ME_USER_ID,
+          name: STORYBOOK_ME_USER_NAME,
+          email: STORYBOOK_ME_USER_EMAIL,
+          organizationId: fixture.organizationId,
+          hasToken: true,
+          roles: ["org_admin"],
+          groups: [],
+          permissions: STORYBOOK_ME_PERMISSIONS,
+        },
+      },
     }),
   };
 }
@@ -362,7 +387,7 @@ function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
 function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     factoriesCollectionRoute(fixture),
-    meRoute(),
+    meRoute(fixture),
     notificationSettingsRoute(fixture),
     ...factoryDetailRoutes(fixture),
     ...factoryLinesRoutes(fixture),

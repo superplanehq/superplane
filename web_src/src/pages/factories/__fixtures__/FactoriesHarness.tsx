@@ -2,6 +2,7 @@ import type { CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import { OrgWorkspaceHarness, type OrgWorkspacePageOverrides } from "@/pages/__fixtures__/OrgWorkspaceHarness";
 import type { HomePageFixture } from "@/pages/home/__fixtures__/handlers";
 import { defaultHomePageFixture } from "@/pages/home/__fixtures__/homePageResponses";
+import { FEATURE_CLAUDE_MANAGED_AGENTS, FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 
 import { OnboardingStorybookProvider } from "../pages/onboarding/OnboardingStorybookContext";
 import { OnboardingWireframe } from "../pages/onboarding/OnboardingWireframe";
@@ -62,7 +63,11 @@ export function FactoriesHarness({
   const homeFixture: HomePageFixture = {
     ...defaultHomePageFixture,
     organizationId: factoriesFixture.organizationId ?? FACTORIES_ORGANIZATION_ID,
-    enabledExperimentalFeatures: [...(defaultHomePageFixture.enabledExperimentalFeatures ?? []), "factories"],
+    enabledExperimentalFeatures: [
+      ...(defaultHomePageFixture.enabledExperimentalFeatures ?? []),
+      FEATURE_FACTORIES,
+      FEATURE_CLAUDE_MANAGED_AGENTS,
+    ],
     factories: factoriesFixture.factories.map((factory) => ({
       id: factory.id ?? "",
       name: factory.name ?? "",
