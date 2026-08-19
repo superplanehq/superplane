@@ -80,6 +80,7 @@ func (s *linesRunFitSteps) start() {
 func (s *linesRunFitSteps) givenAFactory() {
 	factory, err := models.CreateFactory(database.Conn(), s.session.OrgID, support.RandomName("factory"), "", "")
 	require.NoError(s.t, err)
+	completeFactoryOnboarding(s.t, factory)
 	s.factory = factory
 }
 
