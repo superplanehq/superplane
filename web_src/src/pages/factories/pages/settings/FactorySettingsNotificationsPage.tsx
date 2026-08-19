@@ -11,10 +11,12 @@ import {
   defaultNotificationTypeToggles,
   eventTypesFromToggles,
   filtersFromSettings,
+  NOTIFICATION_TYPE_OPTIONS,
   togglesFromAllScopeEventTypes,
   togglesFromEventTypes,
   workspaceScopeFromSettings,
   type ConfigurableNotificationType,
+  type NotificationTypeOption,
   type NotificationTypeToggles,
   type WorkspaceScopeForm,
 } from "@/lib/notificationSettings";
@@ -26,45 +28,6 @@ import { useEffect, useState } from "react";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { FactorySettingsNotificationWorkspacePicker } from "./FactorySettingsNotificationWorkspacePicker";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
-
-interface NotificationTypeOption {
-  key: ConfigurableNotificationType;
-  label: string;
-  description: string;
-}
-
-export const NOTIFICATION_TYPE_OPTIONS: NotificationTypeOption[] = [
-  {
-    key: "TYPE_WORK_ORDER_ASSIGNED",
-    label: "Added as a work order owner",
-    description: "You become an owner of a work order.",
-  },
-  {
-    key: "TYPE_WORK_ORDER_COMMENT_OWNED",
-    label: "Comments on work orders you own",
-    description: "Someone comments on a work order you own.",
-  },
-  {
-    key: "TYPE_WORK_ORDER_COMMENT_CREATED",
-    label: "Comments on work orders you created",
-    description: "Someone comments on a work order you created.",
-  },
-  {
-    key: "TYPE_WORK_ORDER_STATUS_OWNED",
-    label: "Status changes on work orders you own or created",
-    description: "A work order you own or created opens, closes, or moves back to draft.",
-  },
-  {
-    key: "TYPE_WORK_ORDER_ARTIFACT_OWNED",
-    label: "New artifacts on work orders you own",
-    description: "An artifact is added to a work order you own.",
-  },
-  {
-    key: "TYPE_WORK_ORDER_MENTIONED",
-    label: "Mentions in work order comments",
-    description: "Someone mentions you in a work order comment.",
-  },
-];
 
 const WORKSPACE_SCOPE_TO_PROTO: Record<WorkspaceScopeForm, NotificationSettingsWorkspaceScope> = {
   all: "WORKSPACE_SCOPE_ALL",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NOTIFICATION_TYPE_OPTIONS } from "./FactorySettingsNotificationsPage";
+import { NOTIFICATION_TYPE_OPTIONS } from "@/lib/notificationSettings";
 
 describe("NOTIFICATION_TYPE_OPTIONS", () => {
   it("states each event label without requiring the tooltip", () => {
