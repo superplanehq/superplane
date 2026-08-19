@@ -1,4 +1,5 @@
 import type { FactoryApp } from "@/api-client";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCanvas } from "@/hooks/useCanvasData";
@@ -34,7 +35,7 @@ export function FactoryLineStepEditor({
 
   return (
     <LineStepEditorShell>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className={cn("space-y-2", stepFieldClassName)}>
           <Label htmlFor={`factory-line-step-app-${index}`}>Automation</Label>
           <Select
@@ -77,6 +78,22 @@ export function FactoryLineStepEditor({
               {appById.get(step.appId)?.name ?? "This automation"} has no triggers yet.
             </p>
           ) : null}
+        </div>
+
+        <div className={cn("space-y-2", stepFieldClassName)}>
+          <Label htmlFor={`factory-line-step-max-parallelism-${index}`}>Max parallelism</Label>
+          <Input
+            id={`factory-line-step-max-parallelism-${index}`}
+            className={stepFieldClassName}
+            type="number"
+            min={1}
+            value={step.maxParallelism}
+            onChange={(event) => onChange({ ...step, maxParallelism: event.target.value })}
+            placeholder="10"
+          />
+          <p className="text-xs text-muted-foreground">
+            Maximum number of work orders to be processed in parallel at this step.
+          </p>
         </div>
       </div>
     </LineStepEditorShell>
