@@ -415,25 +415,6 @@ func (o *FactoryWorkOrder) ListEvents(tx *gorm.DB, limit int, before *time.Time)
 	return events, nil
 }
 
-// ListComments returns the work order's comment thread (`order.comment.added`
-// events), oldest first — unlike ListEvents (which is DESC for activity
-// feeds), a comment thread reads chronologically oldest→newest.
-func (o *FactoryWorkOrder) ListComments(tx *gorm.DB) ([]FactoryWorkOrderEvent, error) {
-	var events []FactoryWorkOrderEvent
-	err := tx.
-		Where("work_order_id = ?", o.ID).
-		Where("type = ?", factory.EventTypeOrderCommentAdded).
-		Order("created_at ASC").
-		Order("id ASC").
-		Find(&events).
-		Error
-	if err != nil {
-		return nil, err
-	}
-
-	return events, nil
-}
-
 func (o *FactoryWorkOrder) CountEvents(tx *gorm.DB) (int64, error) {
 	var count int64
 
@@ -486,22 +467,6 @@ func (o *FactoryWorkOrder) RecordStatusUpdated(tx *gorm.DB, r statusUpdatedRecor
 	}
 
 	return o.recordEvent(tx, factory.EventTypeOrderStatusUpdated, data)
-}
-
-func (o *FactoryWorkOrder) RecordCommentAdded(
-	tx *gorm.DB,
-	body string,
-	author factory.WorkOrderCommentAuthor,
-	run *factory.RunRef,
-) error {
-	data := factory.WorkOrderCommentAdded{
-		Order:  o.Ref(),
-		Body:   body,
-		Author: &author,
-		Run:    run,
-	}
-
-	return o.recordEvent(tx, factory.EventTypeOrderCommentAdded, data)
 }
 
 func (o *FactoryWorkOrder) RecordArtifactAdded(

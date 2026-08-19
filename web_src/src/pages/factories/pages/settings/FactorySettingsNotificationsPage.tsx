@@ -59,6 +59,11 @@ const NOTIFICATION_TYPE_OPTIONS: NotificationTypeOption[] = [
     label: "New artifacts",
     description: "An artifact is added to a work order you own.",
   },
+  {
+    key: "TYPE_WORK_ORDER_MENTIONED",
+    label: "Mentions",
+    description: "Someone mentions you in a work order comment.",
+  },
 ];
 
 const WORKSPACE_SCOPE_TO_PROTO: Record<WorkspaceScopeForm, NotificationSettingsWorkspaceScope> = {
