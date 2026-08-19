@@ -61,9 +61,9 @@ func (l *FactoryWorkOrderLineDispatch) Ref() *factory.LineRef {
 }
 
 // Dispatch creates the line dispatch for order's traversal of l — snapshotting
-// l's current name/steps — and starts step 0 inside it. Both writes happen
-// in the caller's transaction so a partial dispatch (parent created, step 0
-// failed) can never be observed.
+// l's current name/steps — and starts (or queues) step 0 inside it. Both
+// writes happen in the caller's transaction so a partial dispatch (parent
+// created, step 0 failed) can never be observed.
 func (l *FactoryLine) Dispatch(tx *gorm.DB, order *FactoryWorkOrder) (*FactoryWorkOrderLineDispatch, *FactoryLineStepResult, error) {
 	if len(l.Steps) == 0 {
 		return nil, nil, ErrFactoryLineHasNoSteps
@@ -88,12 +88,70 @@ func (l *FactoryLine) Dispatch(tx *gorm.DB, order *FactoryWorkOrder) (*FactoryWo
 		return nil, nil, err
 	}
 
-	result, err := dispatch.StartStep(tx, order, 0)
+	result, err := dispatch.EnqueueOrStartStep(tx, order, 0)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	return dispatch, result, nil
+}
+
+// EnqueueOrStartStep starts the step at stepIndex when it has a free slot,
+// or queues the dispatch for admission when the step is at its
+// maxParallelism. It takes the line's admission lock, so concurrent
+// decisions for the same line cannot both see the last free slot.
+func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int) (*FactoryLineStepResult, error) {
+	steps := []FactoryLineStep(l.Steps)
+	if stepIndex < 0 || stepIndex >= len(steps) {
+		return nil, fmt.Errorf("step index %d out of range", stepIndex)
+	}
+
+	line, err := lockFactoryLineForStepAdmission(tx, l.LineID)
+	if err != nil {
+		return nil, err
+	}
+
+	step := admissionStep(line, l, stepIndex)
+	if !step.UnlimitedParallelism() {
+		active, err := countActiveFactoryStepExecutions(tx, l.LineID, stepIndex)
+		if err != nil {
+			return nil, err
+		}
+		if active >= int64(step.EffectiveMaxParallelism()) {
+			return l.enqueueStep(tx, order, stepIndex)
+		}
+	}
+
+	return l.StartStep(tx, order, stepIndex)
+}
+
+// enqueueStep parks the dispatch in the step's queue and records the
+// `step.execution.queued` timeline event. The step name comes from the
+// dispatch's snapshot — that is what will run on admission.
+func (l *FactoryWorkOrderLineDispatch) enqueueStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int) (*FactoryLineStepResult, error) {
+	step := []FactoryLineStep(l.Steps)[stepIndex]
+
+	item := &FactoryWorkOrderQueueItem{
+		ID:             uuid.New(),
+		OrganizationID: l.OrganizationID,
+		FactoryID:      l.FactoryID,
+		WorkOrderID:    order.ID,
+		LineID:         l.LineID,
+		LineDispatchID: l.ID,
+		StepIndex:      stepIndex,
+		StepName:       step.Name,
+		CreatedAt:      time.Now(),
+	}
+
+	if err := tx.Clauses(clause.Returning{}).Create(item).Error; err != nil {
+		return nil, err
+	}
+
+	if err := l.RecordStepExecutionQueued(tx, order, &step); err != nil {
+		return nil, err
+	}
+
+	return &FactoryLineStepResult{QueueItem: item}, nil
 }
 
 // StartStep launches the step at stepIndex in the dispatch's steps
@@ -181,6 +239,34 @@ func (l *FactoryWorkOrderLineDispatch) StartStep(tx *gorm.DB, order *FactoryWork
 		Run:       run,
 		Execution: execution,
 	}, nil
+}
+
+func (l *FactoryWorkOrderLineDispatch) RecordStepExecutionQueued(
+	tx *gorm.DB,
+	order *FactoryWorkOrder,
+	step *FactoryLineStep,
+) error {
+	data := factory.LineStepExecutionQueued{
+		StepName: step.Name,
+		Order:    order.Ref(),
+		Line:     l.Ref(),
+		App:      &factory.AppRef{ID: step.AppID},
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	event := &FactoryWorkOrderEvent{
+		ID:          uuid.New(),
+		WorkOrderID: order.ID,
+		Type:        factory.EventTypeLineStepExecutionQueued,
+		Data:        datatypes.JSON(jsonData),
+		CreatedAt:   time.Now(),
+	}
+
+	return tx.Create(event).Error
 }
 
 func (l *FactoryWorkOrderLineDispatch) RecordStepExecutionCreated(
@@ -280,10 +366,12 @@ func FindWorkOrderLineDispatch(tx *gorm.DB, id uuid.UUID) (*FactoryWorkOrderLine
 }
 
 // FactoryWorkOrderLineDispatchRecord is a line dispatch with its child step
-// executions preloaded, as used by the serialization layer.
+// executions — and, when the dispatch is waiting for step admission, its
+// queue item — preloaded, as used by the serialization layer.
 type FactoryWorkOrderLineDispatchRecord struct {
 	FactoryWorkOrderLineDispatch
 	Executions []FactoryWorkOrderExecutionRecord
+	QueueItem  *FactoryWorkOrderQueueItemRecord
 }
 
 // ListWorkOrderLineDispatchesByWorkOrderIDs bulk-loads line dispatches (with
@@ -321,11 +409,19 @@ func ListWorkOrderLineDispatchesByWorkOrderIDs(
 		return nil, err
 	}
 
+	queueItemsByDispatchID, err := ListFactoryWorkOrderQueueItemsByLineDispatchIDs(tx, dispatchIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	for i := range dispatches {
 		dispatch := dispatches[i]
 		record := FactoryWorkOrderLineDispatchRecord{
 			FactoryWorkOrderLineDispatch: dispatch,
 			Executions:                   executionsByDispatchID[dispatch.ID],
+		}
+		if queueItem, ok := queueItemsByDispatchID[dispatch.ID]; ok {
+			record.QueueItem = &queueItem
 		}
 		result[dispatch.WorkOrderID] = append(result[dispatch.WorkOrderID], record)
 	}
