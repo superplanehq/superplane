@@ -86,7 +86,9 @@ describe("CreateWorkOrderDialog", () => {
   it("keeps only expand and close controls in the header", () => {
     renderDialog();
 
-    const header = screen.getByTestId("work-order-create-close-button").closest("div.flex.items-center.justify-between");
+    const header = screen
+      .getByTestId("work-order-create-close-button")
+      .closest("div.flex.items-center.justify-between");
     expect(header).not.toBeNull();
     expect(within(header as HTMLElement).getByTestId("work-order-create-fullscreen-button")).toBeInTheDocument();
     expect(within(header as HTMLElement).queryByTestId("work-order-create-draft-button")).not.toBeInTheDocument();
