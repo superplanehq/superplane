@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesFactory, FactoriesWorkOrder, FactoriesWorkOrderLineDispatch } from "@/api-client";
 
 import { buildWorkOrderListEntry, type WorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderLineStep } from "./WorkOrderLineStep";
@@ -16,28 +16,31 @@ function entry(overrides: Partial<FactoriesWorkOrder> = {}): WorkOrderListEntry 
       state: "STATE_OPEN",
       createdAt: "2024-06-01T00:00:00Z",
       updatedAt: "2024-06-02T00:00:00Z",
-      executions: [],
+      lineDispatches: [],
       ...overrides,
     },
     factory,
   );
 }
 
-const running = entry({
-  executions: [{ id: "e1", step: "verify", state: "STATE_STARTED", line: { id: "line-a", name: "hotfix" } }],
-});
+const runningDispatch: FactoriesWorkOrderLineDispatch = {
+  id: "dispatch-a",
+  line: { id: "line-a", name: "hotfix" },
+  state: "STATE_ACTIVE",
+  stepExecutions: [{ id: "e1", step: "verify", state: "STATE_STARTED" }],
+};
 
-const finished = entry({
-  executions: [
-    {
-      id: "e1",
-      step: "plan",
-      state: "STATE_FINISHED",
-      result: "RESULT_PASSED",
-      line: { id: "line-a", name: "review" },
-    },
-  ],
-});
+const running = entry({ lineDispatches: [runningDispatch] });
+
+const finishedDispatch: FactoriesWorkOrderLineDispatch = {
+  id: "dispatch-b",
+  line: { id: "line-a", name: "review" },
+  state: "STATE_FINISHED",
+  result: "RESULT_PASSED",
+  stepExecutions: [{ id: "e1", step: "plan", state: "STATE_FINISHED", result: "RESULT_PASSED" }],
+};
+
+const finished = entry({ lineDispatches: [finishedDispatch] });
 
 describe("WorkOrderLineStep", () => {
   it("shows the shared caption and spins only while running", () => {

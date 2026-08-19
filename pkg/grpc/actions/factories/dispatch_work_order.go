@@ -79,9 +79,9 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return models.ErrFactoryLineHasNoSteps
 		}
 
-		_, err = order.FindActiveExecution(tx)
+		_, err = order.FindActiveLineDispatch(tx)
 		if err == nil {
-			return models.ErrFactoryWorkOrderExecutionActive
+			return models.ErrFactoryWorkOrderLineDispatchActive
 		}
 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -94,7 +94,7 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return err
 		}
 
-		result, err := line.StartStep(tx, order, 0)
+		_, result, err := line.Dispatch(tx, order)
 		if err != nil {
 			return err
 		}

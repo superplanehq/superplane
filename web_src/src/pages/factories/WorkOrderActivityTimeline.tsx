@@ -6,7 +6,7 @@ import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
 import { useMemo, type ReactNode } from "react";
-import { FileText, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
+import { FileText, Gauge, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
 import { buildLatestArtifactDataById } from "./lib/workOrderArtifact";
 import {
   buildWorkOrderTimelineView,
@@ -17,8 +17,9 @@ import {
   type WorkOrderTimelineEventKind,
 } from "./lib/workOrderTimelineEvents";
 import { formatWorkOrderDateTime as formatTimelineDate } from "./lib/workOrderDateTime";
-import { getWorkOrderRunHref } from "./lib/workOrderExecutions";
+import { flattenWorkOrderExecutions, getWorkOrderRunHref } from "./lib/workOrderExecutions";
 import { ArtifactEventBody } from "./timeline/ArtifactEventBody";
+import { CheckReportedEventBody } from "./timeline/CheckReportedEventBody";
 import { CommentEventBody } from "./timeline/CommentEventBody";
 import { DispatchTimelineItem } from "./timeline/DispatchTimelineItem";
 import { TimelineAutomationActor } from "./timeline";
@@ -76,7 +77,7 @@ export function WorkOrderActivityTimeline({
   const pendingView = renderTimelinePendingView({ events, eventsError, isLoading, onRetryEvents });
   const timeline = pendingView
     ? { events: [] as WorkOrderTimelineEvent[] }
-    : buildWorkOrderTimelineView(events, resolveUserName, order.executions);
+    : buildWorkOrderTimelineView(events, resolveUserName, flattenWorkOrderExecutions(order));
 
   // Without a footer, keep the historical "single message" layout: the
   // pending/empty state occupies the whole slot on its own.
@@ -329,6 +330,18 @@ function TimelineItemBody({
     );
   }
 
+  if (event.kind === "checkReported") {
+    return (
+      <CheckReportedEventBody
+        event={event}
+        timeLabel={timeLabel}
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
+      />
+    );
+  }
+
   return (
     <UserActionEventDescription
       event={event}
@@ -438,6 +451,8 @@ function getFallbackMarkerIcon(kind: WorkOrderTimelineEventKind): LucideIcon {
   switch (kind) {
     case "artifactAdded":
       return FileText;
+    case "checkReported":
+      return Gauge;
     case "statusChanged":
     case "closed":
       return Play;

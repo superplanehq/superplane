@@ -1,6 +1,12 @@
 import type { FactoriesWorkOrder } from "@/api-client";
-import { hasActiveWorkOrderExecution } from "./workOrderExecutions";
 import { formatWorkOrderIdentifier } from "./workspaceKey";
+
+// A traversal's own stored `state` replaces scanning its step executions
+// for a pending/running one — the dispatch already knows whether it's
+// active.
+function hasActiveLineDispatch(order: FactoriesWorkOrder): boolean {
+  return (order.lineDispatches ?? []).some((dispatch) => dispatch.state === "STATE_ACTIVE");
+}
 
 /**
  * Display vocabulary for the Work Orders workspace. Mirrors the six labels
@@ -147,7 +153,7 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
     return "draft";
   }
 
-  if (hasActiveWorkOrderExecution(order.executions ?? [])) {
+  if (hasActiveLineDispatch(order)) {
     return "running";
   }
 
