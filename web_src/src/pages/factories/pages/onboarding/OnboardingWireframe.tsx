@@ -1,7 +1,7 @@
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Check, ChevronDown } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
+import { Check } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
@@ -11,29 +11,56 @@ import type { OnboardingRepo } from "./onboardingMocks";
 import { AnalysisSidePanel } from "./AnalysisSidePanel";
 import { DonePanel } from "./DonePanel";
 import { Shell } from "./OnboardingShell";
-import { AGENT_OPTIONS, type IntegrationId, type VcsHostId } from "./onboardingFixtures";
-import { IssuesStep, NameInviteStep, RepoStep } from "./onboardingSteps";
+import { WIZARD_STEPS, type IntegrationId, type VcsHostId, type WizardStepId } from "./onboardingFixtures";
+import { IssuesStep, NameStep, RepositoryStep, StartStep, VcsStep } from "./onboardingSteps";
+import { WizardStepFooter } from "./WizardStepFooter";
 import { useConnectDialog } from "./useConnectDialog";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
-export type SectionId = "name" | "repo" | "issues" | "agent";
+export type { WizardStepId };
 
-function issuesSectionSummary(setup: OnboardingSetupApi): string | undefined {
-  if (setup.issuesChoice === "skip") {
-    return "Skipped. Create work orders yourself.";
+const WIZARD_STEP_INDEX: Record<WizardStepId, number> = {
+  vcs: 0,
+  repo: 1,
+  issues: 2,
+  agent: 3,
+  name: 4,
+  start: 5,
+};
+
+function stepComplete(setup: OnboardingSetupApi, step: WizardStepId): boolean {
+  switch (step) {
+    case "vcs":
+      return setup.vcsReady;
+    case "repo":
+      return setup.repoReady;
+    case "issues":
+      return setup.issuesReady;
+    case "agent":
+      return setup.agentReady;
+    case "name":
+      return setup.nameReady;
+    case "start":
+      return setup.startReady;
   }
-  if (setup.issuesChoice === "vcs" && setup.vcsHost) {
-    const hostLabel = setup.vcsHost === "github" ? "GitHub" : "GitLab";
-    return `${hostLabel} Issues · ${setup.issuesRepo ?? setup.selectedRepo}`;
+}
+
+function canAdvance(setup: OnboardingSetupApi, step: WizardStepId): boolean {
+  switch (step) {
+    case "vcs":
+      return setup.vcsReady;
+    case "repo":
+      return setup.repoReady;
+    case "issues":
+      return setup.issuesReady;
+    case "agent":
+      return setup.agentReady;
+    case "name":
+      return setup.nameReady;
+    case "start":
+      return setup.canFinish;
   }
-  if (setup.issuesChoice === "linear") {
-    return "Linear";
-  }
-  if (setup.issuesChoice === "jira") {
-    return "Jira";
-  }
-  return undefined;
 }
 
 function onboardingReposFromSetup(selectedRepo: string | null, vcsHost: VcsHostId | null): OnboardingRepo[] {
@@ -47,217 +74,187 @@ function onboardingReposFromSetup(selectedRepo: string | null, vcsHost: VcsHostI
   return [{ id: `${vcsHost}-${org}-${name}`, name, org, provider: vcsHost }];
 }
 
-function Section({
-  id,
-  title,
-  purpose,
-  summary,
-  open,
-  complete,
-  locked,
-  onOpen,
-  children,
-}: {
-  id: SectionId;
-  title: string;
-  /** Short why text. Shown when open, and when collapsed if there is no summary. */
-  purpose: string;
-  summary?: string;
-  open: boolean;
-  complete: boolean;
-  locked?: boolean;
-  onOpen: (id: SectionId) => void;
-  children: ReactNode;
-}) {
-  const collapsedHint = summary ?? purpose;
-
-  return (
-    <section
-      className={cn(
-        "overflow-hidden rounded-lg border",
-        open ? "border-foreground/40" : "border-border",
-        locked && "opacity-50",
-      )}
-    >
-      <button
-        type="button"
-        disabled={locked}
-        onClick={() => onOpen(id)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-      >
-        <span className="flex min-w-0 items-center gap-2">
-          <span
-            className={cn(
-              "flex size-5 shrink-0 items-center justify-center rounded-full border text-[11px]",
-              complete
-                ? "border-emerald-600 bg-emerald-600 text-white"
-                : "border-border bg-background text-muted-foreground",
-            )}
-          >
-            {complete ? <Check className="size-3" strokeWidth={2.5} aria-hidden /> : null}
-          </span>
-          <span className="min-w-0">
-            <span className="block text-[13px] font-medium">{title}</span>
-            {!open ? <span className="mt-0.5 block text-[12px] text-muted-foreground">{collapsedHint}</span> : null}
-          </span>
-        </span>
-        <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition", open && "rotate-180")} />
-      </button>
-      {open ? (
-        <div className="border-t border-border px-4 py-4">
-          <p className="mb-4 text-[13px] text-muted-foreground">{purpose}</p>
-          {children}
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function NameAndRepoSections({
+function WizardProgress({
+  currentStep,
+  furthestIndex,
   setup,
-  openSection,
-  setOpenSection,
-  requestConnect,
-  inviteUrl,
-  inviteLoading,
-  canInvite,
-  repos,
-  saving,
-  lockAfterName,
-  continueName,
-  continueRepo,
+  onSelectStep,
 }: {
+  currentStep: WizardStepId;
+  /** Highest step the user has opened. Later steps are not selectable yet. */
+  furthestIndex: number;
   setup: OnboardingSetupApi;
-  openSection: SectionId;
-  setOpenSection: (id: SectionId) => void;
-  requestConnect: (id: IntegrationId) => void;
-  inviteUrl?: string | null;
-  inviteLoading?: boolean;
-  canInvite?: boolean;
-  repos?: string[];
-  saving: boolean;
-  lockAfterName?: boolean;
-  continueName: () => void;
-  continueRepo: () => void;
+  onSelectStep: (step: WizardStepId) => void;
 }) {
+  const currentIndex = WIZARD_STEP_INDEX[currentStep];
+
   return (
-    <>
-      <Section
-        id="name"
-        title="Name and invite"
-        purpose="Name this workspace for continuous AI work on your app. Invite people who will collaborate on work orders."
-        summary={setup.nameReady ? setup.workspaceName.trim() : undefined}
-        open={openSection === "name"}
-        complete={setup.nameReady}
-        onOpen={setOpenSection}
-      >
-        <NameInviteStep setup={setup} inviteUrl={inviteUrl} inviteLoading={inviteLoading} canInvite={canInvite} />
-        <div className="mt-4">
-          <Button type="button" size="sm" disabled={!setup.nameReady || saving} onClick={continueName}>
-            Continue to version control
-          </Button>
-        </div>
-      </Section>
-      <Section
-        id="repo"
-        title="Version control"
-        purpose="Connect version control and pick the app repository. SuperPlane analyzes that codebase. Agents change it and open pull requests."
-        summary={setup.selectedRepo ?? undefined}
-        open={openSection === "repo"}
-        complete={setup.repoReady}
-        locked={!setup.nameReady || lockAfterName}
-        onOpen={setOpenSection}
-      >
-        <RepoStep setup={setup} onRequestConnect={requestConnect} repos={repos} />
-        <div className="mt-4">
-          <Button type="button" size="sm" disabled={!setup.repoReady || saving} onClick={continueRepo}>
-            Continue to issues
-          </Button>
-        </div>
-      </Section>
-    </>
+    <nav aria-label="Setup steps" className="overflow-x-auto">
+      <ol className="flex items-center">
+        {WIZARD_STEPS.map((step, index) => {
+          const current = step.id === currentStep;
+          // Only the steps behind the current one are done. An answer that is
+          // already known (a connected agent, the placeholder name) must not
+          // mark the step the user is on, or a step still ahead of it.
+          const complete = index < currentIndex && stepComplete(setup, step.id);
+          const reachable = index <= furthestIndex;
+
+          return (
+            <li key={step.id} className={cn("flex items-center", index > 0 && "min-w-4 flex-1")}>
+              {index > 0 ? <span className="mx-2 h-px flex-1 bg-border" aria-hidden /> : null}
+              <button
+                type="button"
+                disabled={!reachable}
+                onClick={() => onSelectStep(step.id)}
+                className={cn("flex shrink-0 items-center gap-2", !reachable && "cursor-not-allowed opacity-50")}
+              >
+                <span
+                  className={cn(
+                    "flex size-5 shrink-0 items-center justify-center rounded-full border text-[11px]",
+                    complete
+                      ? "border-emerald-600 bg-emerald-600 text-white"
+                      : current
+                        ? "border-foreground text-foreground"
+                        : "border-border bg-background text-muted-foreground",
+                  )}
+                >
+                  {complete ? <Check className="size-3" strokeWidth={2.5} aria-hidden /> : index + 1}
+                </span>
+                <span
+                  className={cn(
+                    "whitespace-nowrap text-[12px]",
+                    current ? "font-medium text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {step.label}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
   );
 }
 
-function IssuesAndAgentSections({
+function WizardStepBody({
+  step,
   setup,
-  openSection,
-  setOpenSection,
   requestConnect,
   repos,
-  saving,
-  continueIssues,
-  onFinish,
+  onSelectRepository,
+  githubConnections,
+  selectedVcsConnectionId,
+  onSelectVcsConnection,
+  onCreateVcsConnection,
+  onEditVcsConnection,
 }: {
+  step: WizardStepId;
   setup: OnboardingSetupApi;
-  openSection: SectionId;
-  setOpenSection: (id: SectionId) => void;
   requestConnect: (id: IntegrationId) => void;
   repos?: string[];
-  saving: boolean;
-  continueIssues: () => void;
-  onFinish: () => void | Promise<void>;
+  onSelectRepository: (repo: string) => void;
+  githubConnections: IntegrationInstanceSummary;
+  selectedVcsConnectionId?: string;
+  onSelectVcsConnection: (id: string, name: string) => void;
+  onCreateVcsConnection: () => void;
+  onEditVcsConnection: () => void;
 }) {
-  return (
-    <>
-      <Section
-        id="issues"
-        title="Issues"
-        purpose="Optional. Point SuperPlane at a backlog so it can find small work that agents can solve. Or skip and create work orders yourself."
-        summary={issuesSectionSummary(setup)}
-        open={openSection === "issues"}
-        complete={setup.issuesReady}
-        locked={!setup.repoReady}
-        onOpen={(id) => {
-          if (id === "issues" && setup.repoReady) {
-            setup.commitRepoStep();
-          }
-          setOpenSection(id);
-        }}
-      >
-        <IssuesStep setup={setup} onRequestConnect={requestConnect} autoDiscover repos={repos} />
-        <div className="mt-4">
-          <Button type="button" size="sm" disabled={!setup.issuesReady || saving} onClick={continueIssues}>
-            Continue to coding agent
-          </Button>
-        </div>
-      </Section>
-
-      <Section
-        id="agent"
-        title="Coding agent"
-        purpose="Connect a cloud coding agent. It works issues in the app repository and opens pull requests without engineers watching each run."
-        summary={
-          setup.agentReady ? (AGENT_OPTIONS.find((option) => option.id === setup.agent)?.label ?? undefined) : undefined
-        }
-        open={openSection === "agent"}
-        complete={setup.agentReady}
-        locked={!setup.issuesReady}
-        onOpen={(id) => {
-          if (id === "agent" && setup.issuesReady) {
-            setup.commitIssuesStep();
-          }
-          setOpenSection(id);
-        }}
-      >
-        <AgentStep setup={setup} onRequestConnect={requestConnect} />
-        <div className="mt-4">
-          <Button type="button" size="sm" disabled={!setup.canFinish || saving} onClick={() => void onFinish()}>
-            Finish setup
-          </Button>
-        </div>
-      </Section>
-    </>
-  );
+  switch (step) {
+    case "vcs":
+      return (
+        <VcsStep
+          github={githubConnections}
+          selectedConnectionId={selectedVcsConnectionId}
+          onSelectConnection={onSelectVcsConnection}
+          onCreateConnection={onCreateVcsConnection}
+        />
+      );
+    case "repo":
+      return (
+        <RepositoryStep
+          setup={setup}
+          repos={repos}
+          onSelect={onSelectRepository}
+          onEditConnection={onEditVcsConnection}
+        />
+      );
+    case "issues":
+      return <IssuesStep setup={setup} onRequestConnect={requestConnect} autoDiscover repos={repos} />;
+    case "agent":
+      return <AgentStep setup={setup} onRequestConnect={requestConnect} />;
+    case "name":
+      return <NameStep setup={setup} />;
+    case "start":
+      return <StartStep setup={setup} />;
+  }
 }
 
-async function continueToSection(
+async function continueToStep(
   save: (() => Promise<boolean>) | undefined,
-  section: SectionId,
-  setOpenSection: (id: SectionId) => void,
+  step: WizardStepId,
+  setStep: (step: WizardStepId) => void,
 ) {
   if (save && !(await save())) return;
-  setOpenSection(section);
+  setStep(step);
+}
+
+// Going back must keep the later steps reachable from the rail.
+function useFurthestStepIndex(currentIndex: number): number {
+  const [furthestIndex, setFurthestIndex] = useState(currentIndex);
+  useEffect(() => {
+    setFurthestIndex((reached) => Math.max(reached, currentIndex));
+  }, [currentIndex]);
+  return Math.max(furthestIndex, currentIndex);
+}
+
+function useVcsStepNavigation(args: {
+  setup: OnboardingSetupApi;
+  selectedConnectionId?: string;
+  selectConnection: (integrationId: string) => void;
+  createConnection: () => void;
+  setOpenSection: (id: WizardStepId) => void;
+}) {
+  const { setup, selectedConnectionId, selectConnection, createConnection: startCreate, setOpenSection } = args;
+  const connectionBeforeCreate = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (connectionBeforeCreate.current === undefined || !setup.vcsReady || !selectedConnectionId) return;
+    if (selectedConnectionId === connectionBeforeCreate.current) return;
+    connectionBeforeCreate.current = undefined;
+    setOpenSection("repo");
+  }, [selectedConnectionId, setOpenSection, setup.vcsReady]);
+
+  const chooseConnection = (integrationId: string) => {
+    setup.selectVcsHost("github");
+    selectConnection(integrationId);
+    setOpenSection("repo");
+  };
+
+  const createConnection = () => {
+    setup.selectVcsHost("github");
+    connectionBeforeCreate.current = selectedConnectionId ?? null;
+    startCreate();
+  };
+
+  return { chooseConnection, createConnection };
+}
+
+function repositoryStepNavigation(args: {
+  setup: OnboardingSetupApi;
+  save?: (repository: string) => Promise<boolean>;
+  setOpenSection: (id: WizardStepId) => void;
+}) {
+  const continueFromRepository = (repository: string) => {
+    args.setup.commitRepoStep();
+    const save = args.save;
+    void continueToStep(save ? () => save(repository) : undefined, "issues", args.setOpenSection);
+  };
+  const selectRepository = (repository: string) => {
+    args.setup.selectRepo(repository);
+    continueFromRepository(repository);
+  };
+  return { continueFromRepository, selectRepository };
 }
 
 export function SetupSections({
@@ -265,72 +262,127 @@ export function SetupSections({
   openSection,
   setOpenSection,
   requestConnect,
+  createVcsConnection,
+  selectVcsConnection,
+  githubConnections,
+  selectedVcsConnectionId,
+  requestConfigure,
   onFinish,
   onContinueName,
   onContinueRepo,
   onContinueIssues,
-  inviteUrl,
-  inviteLoading,
-  canInvite,
   repos,
   saving = false,
-  lockAfterName,
 }: {
   setup: OnboardingSetupApi;
-  openSection: SectionId;
-  setOpenSection: (id: SectionId) => void;
+  openSection: WizardStepId;
+  setOpenSection: (id: WizardStepId) => void;
   requestConnect: (id: IntegrationId) => void;
+  createVcsConnection: () => void;
+  selectVcsConnection: (integrationId: string) => void;
+  githubConnections: IntegrationInstanceSummary;
+  selectedVcsConnectionId?: string;
+  /** Opens the connected VCS integration so the user can grant missing repositories. */
+  requestConfigure?: () => void;
   onFinish: () => void | Promise<void>;
   onContinueName?: () => Promise<boolean>;
-  onContinueRepo?: () => Promise<boolean>;
+  onContinueRepo?: (repository: string) => Promise<boolean>;
   onContinueIssues?: () => Promise<boolean>;
-  inviteUrl?: string | null;
-  inviteLoading?: boolean;
-  canInvite?: boolean;
   repos?: string[];
   saving?: boolean;
-  /** The workspace does not exist yet: keep every section after the name locked. */
-  lockAfterName?: boolean;
 }) {
+  const current = WIZARD_STEPS[WIZARD_STEP_INDEX[openSection]];
+  const currentIndex = WIZARD_STEP_INDEX[openSection];
+  const furthestIndex = useFurthestStepIndex(currentIndex);
+  const previousStep = currentIndex > 0 ? WIZARD_STEPS[currentIndex - 1] : null;
+  const nextStep = currentIndex < WIZARD_STEPS.length - 1 ? WIZARD_STEPS[currentIndex + 1] : null;
+  const advanceEnabled = canAdvance(setup, openSection) && !saving;
+  const vcsNavigation = useVcsStepNavigation({
+    setup,
+    selectedConnectionId: selectedVcsConnectionId,
+    selectConnection: selectVcsConnection,
+    createConnection: createVcsConnection,
+    setOpenSection,
+  });
+  const repositoryNavigation = repositoryStepNavigation({ setup, save: onContinueRepo, setOpenSection });
+
+  const editVcsConnection = () => {
+    requestConfigure?.();
+  };
+
+  const goNext = () => {
+    if (!nextStep) {
+      void onFinish();
+      return;
+    }
+
+    if (openSection === "name") {
+      void continueToStep(onContinueName, nextStep.id, setOpenSection);
+      return;
+    }
+    if (openSection === "repo") {
+      if (setup.selectedRepo) repositoryNavigation.continueFromRepository(setup.selectedRepo);
+      return;
+    }
+    if (openSection === "issues") {
+      setup.commitIssuesStep();
+      void continueToStep(onContinueIssues, nextStep.id, setOpenSection);
+      return;
+    }
+    setOpenSection(nextStep.id);
+  };
+
+  const stepBody = (
+    <WizardStepBody
+      step={openSection}
+      setup={setup}
+      requestConnect={requestConnect}
+      repos={repos}
+      onSelectRepository={repositoryNavigation.selectRepository}
+      githubConnections={githubConnections}
+      selectedVcsConnectionId={selectedVcsConnectionId}
+      onSelectVcsConnection={(integrationId) => vcsNavigation.chooseConnection(integrationId)}
+      onCreateVcsConnection={vcsNavigation.createConnection}
+      onEditVcsConnection={editVcsConnection}
+    />
+  );
+
   return (
-    <div className="space-y-3">
-      <NameAndRepoSections
+    <div className="space-y-6">
+      <WizardProgress
+        currentStep={openSection}
+        furthestIndex={furthestIndex}
         setup={setup}
-        openSection={openSection}
-        setOpenSection={setOpenSection}
-        requestConnect={requestConnect}
-        inviteUrl={inviteUrl}
-        inviteLoading={inviteLoading}
-        canInvite={canInvite}
-        repos={repos}
-        saving={saving}
-        lockAfterName={lockAfterName}
-        continueName={() => void continueToSection(onContinueName, "repo", setOpenSection)}
-        continueRepo={() => {
-          setup.commitRepoStep();
-          void continueToSection(onContinueRepo, "issues", setOpenSection);
-        }}
+        onSelectStep={setOpenSection}
       />
 
-      <IssuesAndAgentSections
-        setup={setup}
-        openSection={openSection}
-        setOpenSection={setOpenSection}
-        requestConnect={requestConnect}
-        repos={repos}
-        saving={saving}
-        continueIssues={() => {
-          setup.commitIssuesStep();
-          void continueToSection(onContinueIssues, "agent", setOpenSection);
-        }}
-        onFinish={onFinish}
-      />
+      {openSection === "vcs" ? (
+        stepBody
+      ) : (
+        <section className="rounded-lg border border-border">
+          {openSection !== "name" && (
+            <div className="border-b border-border px-4 py-3">
+              <h2 className="text-[15px] font-medium tracking-[-0.01em]">{current.label}</h2>
+              <p className="mt-1 text-[13px] text-muted-foreground">{current.purpose}</p>
+            </div>
+          )}
+          <div className="px-4 py-4">{stepBody}</div>
+          <WizardStepFooter
+            step={openSection}
+            advanceEnabled={advanceEnabled}
+            saving={saving}
+            showBack={previousStep !== null}
+            onBack={() => previousStep && setOpenSection(previousStep.id)}
+            onNext={goNext}
+          />
+        </section>
+      )}
     </div>
   );
 }
 
 /**
- * Storybook-only workspace setup: progressive stack + setup.log side panel.
+ * Storybook-only workspace setup: progressive wizard + setup.log side panel.
  * Connect uses the real IntegrationCreateDialog. Not mounted on production routes.
  */
 export function OnboardingWireframe() {
@@ -338,8 +390,8 @@ export function OnboardingWireframe() {
   const { organizationId, factoryId, factoryKey } = useFactoriesLayout();
   const onboarding = useOnboardingStorybook();
   const setup = useOnboardingSetupState(onboarding?.pending?.workspaceName ?? "");
-  const { requestConnect, dialog } = useConnectDialog(setup);
-  const [openSection, setOpenSection] = useState<SectionId>("name");
+  const { requestConnect, requestConfigure, dialog } = useConnectDialog(setup);
+  const [openSection, setOpenSection] = useState<WizardStepId>("vcs");
 
   const finishSetup = () => {
     if (onboarding && factoryId) {
@@ -366,18 +418,18 @@ export function OnboardingWireframe() {
   return (
     <Shell className="w-full">
       <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8">
-        <h1 className="text-[22px] font-semibold tracking-[-0.02em]">Set up your workspace</h1>
-        <p className="mt-1.5 max-w-2xl text-[13px] text-muted-foreground">
-          Hand off small engineering work to AI. SuperPlane finds candidate work in your app and backlog, then a coding
-          agent opens pull requests. Finish one section to unlock the next.
-        </p>
-
-        <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
           <SetupSections
             setup={setup}
             openSection={openSection}
             setOpenSection={setOpenSection}
             requestConnect={requestConnect}
+            createVcsConnection={() => requestConnect("github")}
+            selectVcsConnection={() => setup.selectVcsHost("github")}
+            githubConnections={{ name: "github", allInstances: [], readyInstances: [] }}
+            requestConfigure={() => {
+              if (setup.vcsHost) requestConfigure(setup.vcsHost);
+            }}
             onFinish={finishSetup}
           />
           <div className="lg:sticky lg:top-6 lg:self-start">

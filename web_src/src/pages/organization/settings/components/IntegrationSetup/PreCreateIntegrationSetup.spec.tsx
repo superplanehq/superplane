@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import type * as SdkGen from "@/api-client/sdk.gen";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -57,16 +56,10 @@ describe("PreCreateIntegrationSetup", () => {
     organizationsDescribeIntegration.mockResolvedValue({ data: { integration: null } });
   });
 
-  it("lets users clear the default instance name before typing a replacement", async () => {
-    const user = userEvent.setup();
+  it("does not ask users to name a GitHub connection", async () => {
     renderIntegrationSetup();
 
-    const input = await screen.findByLabelText("Name");
-    await waitFor(() => expect(input).toHaveValue("github"));
-
-    await user.clear(input);
-    await user.type(input, "production");
-
-    expect(input).toHaveValue("production");
+    expect(await screen.findByRole("button", { name: "Next" })).toBeEnabled();
+    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
   });
 });
