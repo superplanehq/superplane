@@ -87,7 +87,7 @@ function stepExecutionCreatedEvent(input: StepExecutionEventFixture): FactoriesW
       stepName,
       order: { id: order.id, title: order.title },
       line: REFUND_LINE,
-      app: { id: appId },
+      app: { id: appId, name: stepName },
       run: { id: runId, state: "pending" },
     },
   };
@@ -104,7 +104,7 @@ function stepExecutionFinishedEvent(
       stepName,
       order: { id: order.id, title: order.title },
       line: REFUND_LINE,
-      app: { id: appId },
+      app: { id: appId, name: stepName },
       run: { id: runId, state: "finished", result },
     },
   };
@@ -268,7 +268,7 @@ export const CLOSED_FAILED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     nodeName: "node-close",
     appName: "Refund Diagnostics",
     lineName: "Plan",
-    stepName: "step-01",
+    stepName: "Refund Diagnostics",
   }),
 ];
 
@@ -276,14 +276,14 @@ export const RUNNING_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
   openedWorkOrderEvent(RUNNING_WORK_ORDER, YESTERDAY),
   stepExecutionCreatedEvent({
     order: RUNNING_WORK_ORDER,
-    stepName: "plan",
+    stepName: "Refund Planner",
     at: TWO_HOURS_AGO,
     runId: "run-plan",
     appId: "app-refund-planner",
   }),
   stepExecutionFinishedEvent({
     order: RUNNING_WORK_ORDER,
-    stepName: "plan",
+    stepName: "Refund Planner",
     at: TWO_HOURS_AGO,
     runId: "run-plan",
     appId: "app-refund-planner",
@@ -291,7 +291,7 @@ export const RUNNING_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
   }),
   stepExecutionCreatedEvent({
     order: RUNNING_WORK_ORDER,
-    stepName: "implement",
+    stepName: "Refund Implementer",
     at: HOUR_AGO,
     runId: LINE_RUN_IMPLEMENT_ID,
     appId: "app-refund-implementer",
@@ -313,7 +313,7 @@ export const RUNNING_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
         appName: "Refund Implementer",
         lineId: REFUND_LINE.id,
         lineName: REFUND_LINE.name,
-        stepName: "implement",
+        stepName: "Refund Implementer",
       },
     },
     { id: LINE_RUN_IMPLEMENT_ID },
@@ -324,14 +324,14 @@ export const FAILED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
   openedWorkOrderEvent(FAILED_WORK_ORDER, YESTERDAY),
   stepExecutionCreatedEvent({
     order: FAILED_WORK_ORDER,
-    stepName: "plan",
+    stepName: "Refund Planner",
     at: TWO_HOURS_AGO,
     runId: "run-plan-2",
     appId: "app-refund-planner",
   }),
   stepExecutionFinishedEvent({
     order: FAILED_WORK_ORDER,
-    stepName: "plan",
+    stepName: "Refund Planner",
     at: TWO_HOURS_AGO,
     runId: "run-plan-2",
     appId: "app-refund-planner",
@@ -339,14 +339,14 @@ export const FAILED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
   }),
   stepExecutionCreatedEvent({
     order: FAILED_WORK_ORDER,
-    stepName: "implement",
+    stepName: "Refund Implementer",
     at: HOUR_AGO,
     runId: LINE_RUN_IMPLEMENT_FAILED_ID,
     appId: "app-refund-implementer",
   }),
   stepExecutionFinishedEvent({
     order: FAILED_WORK_ORDER,
-    stepName: "implement",
+    stepName: "Refund Implementer",
     at: HOUR_AGO,
     runId: LINE_RUN_IMPLEMENT_FAILED_ID,
     appId: "app-refund-implementer",
@@ -358,14 +358,14 @@ export const CLOSED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
   openedWorkOrderEvent(CLOSED_WORK_ORDER, LAST_WEEK),
   stepExecutionCreatedEvent({
     order: CLOSED_WORK_ORDER,
-    stepName: "plan",
+    stepName: "Refund Planner",
     at: LAST_WEEK,
     runId: "run-plan-3",
     appId: "app-refund-planner",
   }),
   stepExecutionFinishedEvent({
     order: CLOSED_WORK_ORDER,
-    stepName: "plan",
+    stepName: "Refund Planner",
     at: LAST_WEEK,
     runId: "run-plan-3",
     appId: "app-refund-planner",
@@ -373,14 +373,14 @@ export const CLOSED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
   }),
   stepExecutionCreatedEvent({
     order: CLOSED_WORK_ORDER,
-    stepName: "implement",
+    stepName: "Refund Implementer",
     at: LAST_WEEK,
     runId: LINE_RUN_IMPLEMENT_PASSED_ID,
     appId: "app-refund-implementer",
   }),
   stepExecutionFinishedEvent({
     order: CLOSED_WORK_ORDER,
-    stepName: "implement",
+    stepName: "Refund Implementer",
     at: LAST_WEEK,
     runId: LINE_RUN_IMPLEMENT_PASSED_ID,
     appId: "app-refund-implementer",
@@ -388,14 +388,14 @@ export const CLOSED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
   }),
   stepExecutionCreatedEvent({
     order: CLOSED_WORK_ORDER,
-    stepName: "verify",
+    stepName: "Refund Verifier",
     at: YESTERDAY,
     runId: LINE_RUN_VERIFY_PASSED_ID,
     appId: "app-refund-verifier",
   }),
   stepExecutionFinishedEvent({
     order: CLOSED_WORK_ORDER,
-    stepName: "verify",
+    stepName: "Refund Verifier",
     at: YESTERDAY,
     runId: LINE_RUN_VERIFY_PASSED_ID,
     appId: "app-refund-verifier",
@@ -472,7 +472,7 @@ export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
       },
     },
     null,
-    { nodeName: "attach-artifact", appName: "Refund Diagnostics", lineName: "Plan", stepName: "step-01" },
+    { nodeName: "attach-artifact", appName: "Refund Diagnostics", lineName: "Plan", stepName: "Refund Diagnostics" },
   ),
   // Check history: the first risk score landed before the PR, follow-up
   // commits addressed the concerns, and the re-score dropped 82 → 65 — the

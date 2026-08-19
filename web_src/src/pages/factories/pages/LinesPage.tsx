@@ -3,7 +3,7 @@ import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryApps, useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
@@ -40,6 +40,7 @@ import {
   factoryLineDetailPath,
   linesPath,
 } from "../lib/factoryPagePaths";
+import { automationNameForLineStep } from "../lib/factoryLineFormShared";
 import { formatLinePhaseDescription, humanizeLineName } from "../lib/humanizeLineName";
 import {
   factoryKanbanPageClassName,
@@ -54,6 +55,7 @@ export function LinesPage() {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId } = useParams<{ lineId: string }>();
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
+  const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
 
   const canUpdate = canAct("factories", "update");
@@ -84,6 +86,7 @@ export function LinesPage() {
             organizationId={organizationId}
             factoryKey={factoryKey}
             line={selectedLine}
+            apps={factoryApps}
             canUpdate={canUpdate}
           />
         </div>
@@ -93,6 +96,7 @@ export function LinesPage() {
             organizationId={organizationId}
             factoryKey={factoryKey}
             line={selectedLine}
+            apps={factoryApps}
             workOrders={workOrders}
             workOrderCardContext={{
               organizationId,
@@ -142,11 +146,12 @@ export function LinesPage() {
               if (!line.id) {
                 return null;
               }
-              const board = buildLinePhaseBoard(line, workOrders);
+              const board = buildLinePhaseBoard(line, workOrders, factoryApps);
               return (
                 <li key={line.id}>
                   <LineCard
                     line={line}
+                    apps={factoryApps}
                     href={factoryLineDetailPath(organizationId, factoryKey, line.id)}
                     ticks={board.map((column) => column.tick)}
                   />
@@ -164,11 +169,13 @@ function LineDetailHeader({
   organizationId,
   factoryKey,
   line,
+  apps,
   canUpdate,
 }: {
   organizationId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
+  apps: Array<{ id?: string; name?: string }>;
   canUpdate: boolean;
 }) {
   const editHref = line.id ? editFactoryLinePath(organizationId, factoryKey, line.id) : "#";
@@ -180,7 +187,7 @@ function LineDetailHeader({
       backLabel="Lines"
       backTestId="lines-back-to-list"
       title={humanizeLineName(line.name)}
-      subtitle={formatLinePhaseDescription(line.steps)}
+      subtitle={formatLinePhaseDescription(line.steps, apps)}
       actions={
         canUpdate ? (
           <Button type="button" variant="outline" size="sm" asChild data-testid="lines-edit-button">
@@ -199,17 +206,19 @@ function LineDetail({
   organizationId,
   factoryKey,
   line,
+  apps,
   workOrders,
   workOrderCardContext,
 }: {
   organizationId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
+  apps: Array<{ id?: string; name?: string }>;
   workOrders: FactoriesWorkOrder[];
   workOrderCardContext: WorkOrderCardContext;
 }) {
   const steps = line.steps ?? [];
-  const board = useMemo(() => buildLinePhaseBoard(line, workOrders ?? []), [line, workOrders]);
+  const board = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
@@ -228,10 +237,20 @@ function LineDetail({
   );
 }
 
-function LineCard({ line, href, ticks }: { line: FactoriesFactoryLine; href: string; ticks: LinePhaseTick[] }) {
+function LineCard({
+  line,
+  apps,
+  href,
+  ticks,
+}: {
+  line: FactoriesFactoryLine;
+  apps: Array<{ id?: string; name?: string }>;
+  href: string;
+  ticks: LinePhaseTick[];
+}) {
   const navigate = useNavigate();
   const steps = line.steps ?? [];
-  const description = formatLinePhaseDescription(steps);
+  const description = formatLinePhaseDescription(steps, apps);
 
   return (
     <div
@@ -261,16 +280,27 @@ function LineCard({ line, href, ticks }: { line: FactoriesFactoryLine; href: str
           {description ? <p className="mt-1 text-[12px] leading-snug text-muted-foreground">{description}</p> : null}
         </div>
       </div>
-      {steps.length > 0 ? <PhaseStrip steps={steps} ticks={ticks} /> : null}
+      {steps.length > 0 ? <PhaseStrip steps={steps} apps={apps} ticks={ticks} /> : null}
     </div>
   );
 }
 
-function PhaseStrip({ steps, ticks }: { steps: FactoryLineStep[]; ticks: LinePhaseTick[] }) {
+function PhaseStrip({
+  steps,
+  apps,
+  ticks,
+}: {
+  steps: FactoryLineStep[];
+  apps: Array<{ id?: string; name?: string }>;
+  ticks: LinePhaseTick[];
+}) {
   return (
     <ol className="mt-3.5 flex w-full items-start" aria-label="Phases">
       {steps.map((step, index) => (
-        <li key={`${step.name}-${index}`} className="relative flex min-w-0 flex-1 flex-col items-center text-center">
+        <li
+          key={`${step.app?.app ?? "step"}-${index}`}
+          className="relative flex min-w-0 flex-1 flex-col items-center text-center"
+        >
           {index < steps.length - 1 ? (
             <span
               className="absolute top-[7px] left-[calc(50%+8px)] right-[calc(-50%+8px)] h-px bg-border"
@@ -281,7 +311,7 @@ function PhaseStrip({ steps, ticks }: { steps: FactoryLineStep[]; ticks: LinePha
             <PhaseTickDot tick={ticks[index] ?? null} />
           </span>
           <span className="mt-1.5 max-w-full truncate px-1 text-[12px] leading-tight text-muted-foreground">
-            {step.name || `Phase ${index + 1}`}
+            {automationNameForLineStep(step, apps, index)}
           </span>
         </li>
       ))}
@@ -377,7 +407,7 @@ function PhaseColumn({
 
   return (
     <WorkOrderBoardLane
-      title={humanizeLineName(column.stepName)}
+      title={column.stepName}
       label={`${column.stepName} phase`}
       count={totalRuns}
       tone={PHASE_LANE_TONE[glyph]}

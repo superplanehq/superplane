@@ -23,13 +23,16 @@ export function humanizeLineName(name: string | undefined | null): string {
 
 /**
  * Short line description when the API has no description field:
- * humanized phase names joined as a flow, e.g. `Plan → Implement → Verify`.
+ * automation names joined as a flow, e.g. `Refund Planner → Refund Implementer`.
  */
-export function formatLinePhaseDescription(steps: Array<{ name?: string }> | undefined | null): string | undefined {
+export function formatLinePhaseDescription(
+  steps: Array<{ app?: { app?: string } }> | undefined | null,
+  apps: Array<{ id?: string; name?: string }> | undefined | null,
+): string | undefined {
   const names = (steps ?? [])
     .map((step) => {
-      const trimmed = step.name?.trim();
-      return trimmed ? humanizeLineName(trimmed) : null;
+      const appId = step.app?.app?.trim();
+      return apps?.find((app) => app.id === appId)?.name?.trim();
     })
     .filter((name): name is string => Boolean(name));
 
