@@ -17,7 +17,7 @@ function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
   return {
     id: "node-1",
     name: "Get Alarm Node",
-    componentName: "aws.ec2.getAlarm",
+    componentName: "aws.cloudwatch.getAlarm",
     isCollapsed: false,
     configuration: {},
     metadata: {},
@@ -27,7 +27,7 @@ function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
 
 function buildOutput(data: unknown): OutputPayload {
   return {
-    type: "aws.ec2.alarm",
+    type: "aws.cloudwatch.alarm",
     timestamp: new Date().toISOString(),
     data,
   };
@@ -36,8 +36,8 @@ function buildOutput(data: unknown): OutputPayload {
 function buildExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
   return {
     id: "exec-1",
-    createdAt: "2026-06-01T10:00:00.000Z",
-    updatedAt: "2026-06-01T10:00:05.000Z",
+    createdAt: "2026-06-04T09:12:40.000Z",
+    updatedAt: "2026-06-04T09:12:45.000Z",
     state: "STATE_FINISHED",
     result: "RESULT_PASSED",
     resultReason: "RESULT_REASON_OK",
@@ -58,10 +58,10 @@ function buildDetailsCtx(overrides?: {
 }
 
 const defaultDefinition: ComponentDefinition = {
-  name: "aws.ec2.getAlarm",
-  label: "EC2 • Get Alarm",
+  name: "aws.cloudwatch.getAlarm",
+  label: "CloudWatch • Get Alarm",
   description: "",
-  icon: "aws",
+  icon: "aws.cloudwatch",
   color: "gray",
 };
 
@@ -78,22 +78,18 @@ function buildPropsContext(overrides?: Partial<ComponentBaseContext>): Component
 }
 
 const alarmOutputData = {
-  alarmName: "HighCPU",
-  alarmArn: "arn:aws:cloudwatch:us-east-1:123456789012:alarm:HighCPU",
-  alarmDescription: "High CPU utilization alarm",
+  alarmName: "api-high-cpu",
   namespace: "AWS/EC2",
   metricName: "CPUUtilization",
   statistic: "Average",
-  period: 300,
-  evaluationPeriods: 1,
-  threshold: 80,
   comparisonOperator: "GreaterThanThreshold",
+  threshold: 90,
   stateValue: "ALARM",
-  stateReason: "Threshold Crossed: 1 datapoint (85.3) was greater than the threshold (80.0).",
-  treatMissingData: "missing",
-  dimensions: [{ name: "InstanceId", value: "i-abc123" }],
   region: "us-east-1",
+  consoleUrl: "https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#alarmsV2:alarm/api-high-cpu",
 };
+
+const configuration = { region: "us-east-1", alarm: "api-high-cpu" };
 
 // ── getExecutionDetails ───────────────────────────────────────────────────────
 
@@ -108,49 +104,73 @@ describe("getAlarmMapper.getExecutionDetails", () => {
     expect(() => getAlarmMapper.getExecutionDetails(ctx)).not.toThrow();
   });
 
-  it("uses configuration and node metadata when output is absent", () => {
+  it("shows at most six rows, starting with the timestamp", () => {
     const ctx = buildDetailsCtx({
-      node: {
-        configuration: { region: "eu-west-1", alarm: "HighCPU" },
-        metadata: { alarmName: "HighCPU", region: "eu-west-1" },
-      },
-      execution: { outputs: undefined },
+      execution: { outputs: { default: [buildOutput(alarmOutputData)] } },
     });
-    const details = getAlarmMapper.getExecutionDetails(ctx);
-    expect(details["Alarm Name"]).toBe("HighCPU");
-    expect(details["Region"]).toBe("eu-west-1");
-    expect(details["Metric"]).toBe("-");
-    expect(details["State"]).toBe("-");
+    const keys = Object.keys(getAlarmMapper.getExecutionDetails(ctx));
+    expect(keys.length).toBeLessThanOrEqual(6);
+    expect(keys[0]).toBe("Retrieved At");
   });
 
   it("extracts alarm fields from output", () => {
     const ctx = buildDetailsCtx({
+      node: { configuration },
       execution: { outputs: { default: [buildOutput(alarmOutputData)] } },
     });
     const details = getAlarmMapper.getExecutionDetails(ctx);
-    expect(details["Alarm Name"]).toBe("HighCPU");
-    expect(details["Metric"]).toBe("CPUUtilization");
+    expect(details["Alarm Name"]).toBe("api-high-cpu");
+    expect(details["Metric"]).toBe("AWS/EC2 / CPUUtilization");
+    expect(details["Condition"]).toBe("Average > 90");
     expect(details["State"]).toBe("ALARM");
-    expect(details["Region"]).toBe("us-east-1");
   });
 
-  it("includes retrieved at timestamp", () => {
+  it("uses the console URL from the output", () => {
     const ctx = buildDetailsCtx({
       execution: { outputs: { default: [buildOutput(alarmOutputData)] } },
     });
-    expect(getAlarmMapper.getExecutionDetails(ctx)["Retrieved At"]).toBeDefined();
+    expect(getAlarmMapper.getExecutionDetails(ctx)["CloudWatch Console"]).toBe(alarmOutputData.consoleUrl);
   });
 
-  it("prefers updatedAt over createdAt for retrieved timestamp", () => {
+  it("builds the console URL from configuration when the output has none", () => {
     const ctx = buildDetailsCtx({
-      execution: {
-        createdAt: "2026-06-01T10:00:00.000Z",
-        updatedAt: "2026-06-01T10:00:05.000Z",
-        outputs: { default: [buildOutput(alarmOutputData)] },
-      },
+      node: { configuration },
+      execution: { outputs: { default: [buildOutput({ ...alarmOutputData, consoleUrl: undefined })] } },
     });
-    const retrievedAt = getAlarmMapper.getExecutionDetails(ctx)["Retrieved At"];
-    expect(retrievedAt).toBe(new Date("2026-06-01T10:00:05.000Z").toLocaleString());
+    expect(getAlarmMapper.getExecutionDetails(ctx)["CloudWatch Console"]).toBe(
+      "https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#alarmsV2:alarm/api-high-cpu",
+    );
+  });
+
+  it("builds a China partition console URL", () => {
+    const ctx = buildDetailsCtx({
+      node: { configuration: { region: "cn-north-1", alarm: "api-high-cpu" } },
+      execution: { outputs: undefined },
+    });
+    expect(getAlarmMapper.getExecutionDetails(ctx)["CloudWatch Console"]).toBe(
+      "https://cn-north-1.console.amazonaws.cn/cloudwatch/home?region=cn-north-1#alarmsV2:alarm/api-high-cpu",
+    );
+  });
+
+  it("falls back to configuration and node metadata when output is absent", () => {
+    const ctx = buildDetailsCtx({
+      node: { configuration, metadata: { alarmName: "api-high-cpu", region: "us-east-1" } },
+      execution: { outputs: undefined },
+    });
+    const details = getAlarmMapper.getExecutionDetails(ctx);
+    expect(details["Alarm Name"]).toBe("api-high-cpu");
+    expect(details["Metric"]).toBe("-");
+    expect(details["Condition"]).toBe("-");
+    expect(details["State"]).toBe("-");
+  });
+
+  it("prefers updatedAt over createdAt for the timestamp", () => {
+    const ctx = buildDetailsCtx({
+      execution: { outputs: { default: [buildOutput(alarmOutputData)] } },
+    });
+    expect(getAlarmMapper.getExecutionDetails(ctx)["Retrieved At"]).toBe(
+      new Date("2026-06-04T09:12:45.000Z").toLocaleString(),
+    );
   });
 });
 
@@ -158,34 +178,24 @@ describe("getAlarmMapper.getExecutionDetails", () => {
 
 describe("getAlarmMapper.props", () => {
   it("uses node name as title", () => {
-    const props = getAlarmMapper.props(buildPropsContext());
-    expect(props.title).toBe("Get Alarm Node");
+    expect(getAlarmMapper.props(buildPropsContext()).title).toBe("Get Alarm Node");
   });
 
   it("falls back to component label when node name is empty", () => {
     const props = getAlarmMapper.props(buildPropsContext({ node: buildNode({ name: "" }) }));
-    expect(props.title).toBe("EC2 • Get Alarm");
+    expect(props.title).toBe("CloudWatch • Get Alarm");
   });
 
-  it("includes alarm name from configuration in metadata", () => {
-    const props = getAlarmMapper.props(
-      buildPropsContext({
-        node: buildNode({ configuration: { alarm: "HighCPU", region: "us-east-1" } }),
-      }),
-    );
-    const labels = props.metadata?.map((m) => m.label) ?? [];
-    expect(labels).toContain("HighCPU");
-    expect(labels).toContain("us-east-1");
+  it("shows the alarm and the region", () => {
+    const props = getAlarmMapper.props(buildPropsContext({ node: buildNode({ configuration }) }));
+    expect(props.metadata?.map((item) => item.label)).toEqual(["api-high-cpu", "us-east-1"]);
   });
 
-  it("includes alarm name from node metadata when configuration has none", () => {
+  it("falls back to node metadata for the alarm name", () => {
     const props = getAlarmMapper.props(
-      buildPropsContext({
-        node: buildNode({ metadata: { alarmName: "StatusCheckFailed" } }),
-      }),
+      buildPropsContext({ node: buildNode({ configuration: {}, metadata: { alarmName: "api-high-cpu" } }) }),
     );
-    const labels = props.metadata?.map((m) => m.label) ?? [];
-    expect(labels).toContain("StatusCheckFailed");
+    expect(props.metadata?.map((item) => item.label)).toEqual(["api-high-cpu"]);
   });
 
   it("returns empty metadata when configuration and metadata are empty", () => {
@@ -194,8 +204,7 @@ describe("getAlarmMapper.props", () => {
   });
 
   it("sets includeEmptyState when no executions", () => {
-    const props = getAlarmMapper.props(buildPropsContext({ lastExecutions: [] }));
-    expect(props.includeEmptyState).toBe(true);
+    expect(getAlarmMapper.props(buildPropsContext({ lastExecutions: [] })).includeEmptyState).toBe(true);
   });
 
   it("clears includeEmptyState when there is an execution", () => {
@@ -206,9 +215,9 @@ describe("getAlarmMapper.props", () => {
 
 // ── eventStateRegistry ────────────────────────────────────────────────────────
 
-describe("eventStateRegistry['ec2.getAlarm']", () => {
+describe("eventStateRegistry['cloudwatch.getAlarm']", () => {
   it("maps finished success to retrieved", () => {
-    expect(eventStateRegistry["ec2.getAlarm"].getState(buildExecution())).toBe("retrieved");
+    expect(eventStateRegistry["cloudwatch.getAlarm"].getState(buildExecution())).toBe("retrieved");
   });
 
   it("returns running when execution is in progress", () => {
@@ -217,7 +226,7 @@ describe("eventStateRegistry['ec2.getAlarm']", () => {
       result: "RESULT_UNSPECIFIED" as ExecutionInfo["result"],
       resultReason: "RESULT_REASON_UNSPECIFIED" as ExecutionInfo["resultReason"],
     });
-    expect(eventStateRegistry["ec2.getAlarm"].getState(running)).toBe("running");
+    expect(eventStateRegistry["cloudwatch.getAlarm"].getState(running)).toBe("running");
   });
 
   it("returns failed when execution fails", () => {
@@ -226,6 +235,6 @@ describe("eventStateRegistry['ec2.getAlarm']", () => {
       result: "RESULT_FAILED" as ExecutionInfo["result"],
       resultReason: "RESULT_REASON_COMPONENT_FAILED" as ExecutionInfo["resultReason"],
     });
-    expect(eventStateRegistry["ec2.getAlarm"].getState(failed)).toBe("failed");
+    expect(eventStateRegistry["cloudwatch.getAlarm"].getState(failed)).toBe("failed");
   });
 });

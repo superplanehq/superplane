@@ -149,7 +149,11 @@ func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentPara
 		Automation: c.automationRef(),
 	}
 
-	if err := order.RecordCommentAdded(c.tx, body, author, c.runRef()); err != nil {
+	if _, err := order.RecordCommentAdded(c.tx, models.FactoryWorkOrderCommentParams{
+		Body:   body,
+		Author: author,
+		Run:    c.runRef(),
+	}); err != nil {
 		return err
 	}
 
@@ -354,7 +358,7 @@ func (c *FactoryContext) appRef() *factory.AppRef {
 		return nil
 	}
 
-	return &factory.AppRef{ID: c.canvas.ID}
+	return &factory.AppRef{ID: c.canvas.ID, Name: c.canvas.Name}
 }
 
 // automationRef captures node/app/line/step identity for timeline
@@ -460,5 +464,6 @@ func checkToCore(check *models.FactoryWorkOrderCheck) *core.WorkOrderCheck {
 		Format:        check.Format,
 		Level:         check.Level,
 		PreviousScore: check.PreviousScore,
+		RecentScores:  check.RecentScores,
 	}
 }

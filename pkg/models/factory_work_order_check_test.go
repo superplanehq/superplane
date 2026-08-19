@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models/factory"
+	"gorm.io/datatypes"
 )
 
 func TestFactoryWorkOrder_ReportCheck_Validation(t *testing.T) {
@@ -39,6 +40,16 @@ func TestFactoryWorkOrder_ReportCheck_Validation(t *testing.T) {
 		{"zero max score", func(p *FactoryWorkOrderCheckParams) { p.MaxScore = 0 }},
 		{"unknown format", func(p *FactoryWorkOrderCheckParams) { p.Format = "ratio" }},
 		{"unknown level", func(p *FactoryWorkOrderCheckParams) { p.Level = "bad" }},
+		{"boolean with fractional score", func(p *FactoryWorkOrderCheckParams) {
+			p.Format = FactoryWorkOrderCheckFormatBoolean
+			p.Score = 0.5
+			p.MaxScore = 1
+		}},
+		{"boolean with max score above one", func(p *FactoryWorkOrderCheckParams) {
+			p.Format = FactoryWorkOrderCheckFormatBoolean
+			p.Score = 1
+			p.MaxScore = 2
+		}},
 	}
 
 	for _, tc := range cases {
@@ -161,6 +172,54 @@ func TestFactoryWorkOrder_ReportCheck_ReReportUpdatesInPlace(t *testing.T) {
 	require.NotNil(t, reported[0].Check.PreviousScore)
 	assert.Equal(t, float64(7), *reported[0].Check.PreviousScore)
 	assert.Nil(t, reported[1].Check.PreviousScore)
+}
+
+func TestFactoryWorkOrder_ReportCheck_TracksRecentScores(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "check-recent-scores")
+
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Check target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	report := func(score float64) *FactoryWorkOrderCheck {
+		check, reportErr := order.ReportCheck(database.Conn(), FactoryWorkOrderCheckParams{
+			Key:      "ci",
+			Name:     "CI",
+			Score:    score,
+			MaxScore: 1,
+			Format:   FactoryWorkOrderCheckFormatBoolean,
+			Level:    FactoryWorkOrderCheckLevelPositive,
+		})
+		require.NoError(t, reportErr)
+		return check
+	}
+
+	first := report(0)
+	assert.Equal(t, []float64{0}, []float64(first.RecentScores))
+
+	second := report(0)
+	assert.Equal(t, []float64{0, 0}, []float64(second.RecentScores))
+
+	third := report(1)
+	assert.Equal(t, []float64{0, 0, 1}, []float64(third.RecentScores))
+	assert.Equal(t, FactoryWorkOrderCheckFormatBoolean, third.Format)
+}
+
+func TestAppendRecentCheckScore_CapsAndSeedsHistory(t *testing.T) {
+	// A row created before the history column existed seeds the history
+	// with the score it held, so the strip does not start mid-stream.
+	seeded := appendRecentCheckScore(nil, 7, 3)
+	assert.Equal(t, []float64{7, 3}, []float64(seeded))
+
+	long := make([]float64, MaxFactoryWorkOrderCheckRecentScores)
+	for i := range long {
+		long[i] = float64(i)
+	}
+	capped := appendRecentCheckScore(datatypes.NewJSONSlice(long), 0, 99)
+	require.Len(t, []float64(capped), MaxFactoryWorkOrderCheckRecentScores)
+	assert.Equal(t, float64(1), capped[0])
+	assert.Equal(t, float64(99), capped[MaxFactoryWorkOrderCheckRecentScores-1])
 }
 
 // The retry in ReportCheck keys off this detection: a raced first report

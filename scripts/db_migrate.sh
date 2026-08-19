@@ -15,9 +15,3 @@ migrate -lock-timeout "$DB_MIGRATION_LOCK_TIMEOUT" -source file://db/data_migrat
 pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d "$DB_NAME" > db/structure.sql
 pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d "$DB_NAME" >> db/structure.sql
 pg_dump --data-only --restrict-key abcdef123 --table data_migrations -h db -p 5432 -U postgres -d "$DB_NAME" >> db/structure.sql
-
-# pg_dump embeds the exact client/server version it was run with in header
-# comments. These drift independently of any real schema change (e.g. when
-# the dev image's postgresql-client package gets a minor version bump), so
-# strip them to keep db/structure.sql deterministic across environments/runs.
-sed -i '/^-- Dumped from database version /d; /^-- Dumped by pg_dump version /d' db/structure.sql

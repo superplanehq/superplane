@@ -50,7 +50,7 @@ interface EventCheckPayload {
   name?: string;
   score?: number;
   maxScore?: number;
-  format?: "fraction" | "percent";
+  format?: "fraction" | "percent" | "boolean";
   previousScore?: number;
 }
 

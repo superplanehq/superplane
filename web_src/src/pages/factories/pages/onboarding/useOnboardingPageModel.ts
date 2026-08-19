@@ -190,7 +190,6 @@ async function provisionLineApps(args: {
       installFactory: args.installFactory,
     });
     steps.push({
-      name: app.lineStepName,
       type: "runApp",
       app: { app: installed.canvasId, entrypoint: app.entrypointNodeId },
     });
