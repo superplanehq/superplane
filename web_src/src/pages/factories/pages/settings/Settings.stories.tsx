@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
-import { defaultNotificationTypeToggles, notificationTypesFromToggles } from "@/lib/notificationSettings";
+import { eventTypesFromToggles, defaultNotificationTypeToggles } from "@/lib/notificationSettings";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
 
 /**
@@ -45,22 +45,27 @@ export const Notifications: Story = {
   ),
 };
 
-export const NotificationsEnabled: Story = {
-  name: "Notifications (Enabled)",
+export const NotificationsFiltered: Story = {
+  name: "Notifications (Filtered)",
   render: () => (
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/notifications`}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         notificationSettings: {
-          enabled: true,
-          workspaceScope: "WORKSPACE_SCOPE_SELECTED",
-          factoryIds: [defaultFactoriesFixture.factories[0]?.id ?? ""],
-          types: notificationTypesFromToggles({
-            ...defaultNotificationTypeToggles(),
-            TYPE_WORK_ORDER_COMMENT_CREATED: false,
-            TYPE_WORK_ORDER_ARTIFACT_OWNED: false,
-          }),
+          workspaces: {
+            scope: "WORKSPACE_SCOPE_FILTERED",
+            filters: [
+              {
+                workspaceId: defaultFactoriesFixture.factories[0]?.id ?? "",
+                eventTypes: eventTypesFromToggles({
+                  ...defaultNotificationTypeToggles(),
+                  TYPE_WORK_ORDER_COMMENT_CREATED: false,
+                  TYPE_WORK_ORDER_ARTIFACT_OWNED: false,
+                }),
+              },
+            ],
+          },
         },
       }}
     />

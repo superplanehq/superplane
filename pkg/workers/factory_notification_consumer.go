@@ -206,10 +206,7 @@ func (c *FactoryNotificationConsumer) resolveRecipients(
 		if !ok {
 			settings = models.DefaultUserNotificationSettings()
 		}
-		if !settings.NotifiesType(notificationType) {
-			continue
-		}
-		if !settings.AppliesToFactory(factoryID) {
+		if !settings.Notifies(factoryID, notificationType) {
 			continue
 		}
 		allowedIDs = append(allowedIDs, userID.String())

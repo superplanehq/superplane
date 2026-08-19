@@ -681,10 +681,8 @@ CREATE TABLE public.user_notification_settings (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     organization_id uuid NOT NULL,
     user_id uuid NOT NULL,
-    enabled boolean DEFAULT true NOT NULL,
     workspace_scope character varying(50) DEFAULT 'all'::character varying NOT NULL,
-    factory_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
-    types jsonb DEFAULT '{}'::jsonb NOT NULL,
+    workspace_filters jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
 );
@@ -2939,7 +2937,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260818210337	f
+20260819001210	f
 \.
 
 

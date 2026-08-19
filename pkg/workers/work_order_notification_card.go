@@ -69,10 +69,15 @@ var workOrderEmailStatusStyles = map[string]workOrderEmailStatusStyle{
 	},
 }
 
+type workOrderEmailExecution struct {
+	models.FactoryWorkOrderExecutionRecord
+	LineName string
+}
+
 func applyWorkOrderEmailCard(
 	data *services.WorkOrderNotificationTemplateData,
 	order *models.FactoryWorkOrder,
-	executions []models.FactoryWorkOrderExecutionRecord,
+	executions []workOrderEmailExecution,
 	now time.Time,
 ) {
 	style := workOrderEmailStatusStyleFor(workOrderEmailDisplayStatus(order, executions))
@@ -86,18 +91,28 @@ func applyWorkOrderEmailCard(
 	data.AssigneeInitials, data.AssigneeOverflow = workOrderEmailAssignees(order)
 }
 
-func loadWorkOrderExecutionsForEmail(db *gorm.DB, orderID uuid.UUID) []models.FactoryWorkOrderExecutionRecord {
-	byOrder, err := models.ListFactoryWorkOrderExecutionsByWorkOrderIDs(db, []uuid.UUID{orderID})
+func loadWorkOrderExecutionsForEmail(db *gorm.DB, orderID uuid.UUID) []workOrderEmailExecution {
+	byOrder, err := models.ListWorkOrderLineDispatchesByWorkOrderIDs(db, []uuid.UUID{orderID})
 	if err != nil {
 		log.Warnf("Failed to load work order executions for notification email: %v", err)
 		return nil
 	}
-	return byOrder[orderID]
+
+	executions := make([]workOrderEmailExecution, 0)
+	for _, dispatch := range byOrder[orderID] {
+		for _, execution := range dispatch.Executions {
+			executions = append(executions, workOrderEmailExecution{
+				FactoryWorkOrderExecutionRecord: execution,
+				LineName:                        dispatch.LineName,
+			})
+		}
+	}
+	return executions
 }
 
 func workOrderEmailDisplayStatus(
 	order *models.FactoryWorkOrder,
-	executions []models.FactoryWorkOrderExecutionRecord,
+	executions []workOrderEmailExecution,
 ) string {
 	if order.State == models.FactoryWorkOrderStateClosed {
 		switch order.Result {
@@ -128,7 +143,7 @@ func workOrderEmailStatusStyleFor(status string) workOrderEmailStatusStyle {
 	return workOrderEmailStatusStyles["waiting"]
 }
 
-func workOrderEmailHasActiveExecution(executions []models.FactoryWorkOrderExecutionRecord) bool {
+func workOrderEmailHasActiveExecution(executions []workOrderEmailExecution) bool {
 	for _, execution := range executions {
 		if isActiveWorkOrderEmailExecution(execution) {
 			return true
@@ -137,12 +152,12 @@ func workOrderEmailHasActiveExecution(executions []models.FactoryWorkOrderExecut
 	return false
 }
 
-func isActiveWorkOrderEmailExecution(execution models.FactoryWorkOrderExecutionRecord) bool {
+func isActiveWorkOrderEmailExecution(execution workOrderEmailExecution) bool {
 	return execution.Status == models.FactoryWorkOrderExecutionStatusPending ||
 		execution.Status == models.FactoryWorkOrderExecutionStatusRunning
 }
 
-func workOrderEmailLineStepLabel(executions []models.FactoryWorkOrderExecutionRecord) string {
+func workOrderEmailLineStepLabel(executions []workOrderEmailExecution) string {
 	latest := latestWorkOrderEmailExecution(executions)
 	if latest == nil {
 		return ""
@@ -164,8 +179,8 @@ func workOrderEmailLineStepLabel(executions []models.FactoryWorkOrderExecutionRe
 }
 
 func latestWorkOrderEmailExecution(
-	executions []models.FactoryWorkOrderExecutionRecord,
-) *models.FactoryWorkOrderExecutionRecord {
+	executions []workOrderEmailExecution,
+) *workOrderEmailExecution {
 	if len(executions) == 0 {
 		return nil
 	}
@@ -182,14 +197,14 @@ func latestWorkOrderEmailExecution(
 	return &winner
 }
 
-func workOrderEmailExecutionTime(execution models.FactoryWorkOrderExecutionRecord) time.Time {
+func workOrderEmailExecutionTime(execution workOrderEmailExecution) time.Time {
 	if !execution.UpdatedAt.IsZero() {
 		return execution.UpdatedAt
 	}
 	return execution.CreatedAt
 }
 
-func distinctWorkOrderEmailLineCount(executions []models.FactoryWorkOrderExecutionRecord) int {
+func distinctWorkOrderEmailLineCount(executions []workOrderEmailExecution) int {
 	seen := map[uuid.UUID]struct{}{}
 	for _, execution := range executions {
 		if execution.LineID == uuid.Nil {

@@ -1,4 +1,8 @@
-import type { MeNotificationSettings, MeNotificationSettingsType, NotificationSettingsTypeToggle } from "@/api-client";
+import type {
+  MeNotificationSettings,
+  MeNotificationSettingsType,
+  NotificationSettingsWorkspaceFilter,
+} from "@/api-client";
 
 export const NOTIFICATION_SETTINGS_TYPES = [
   "TYPE_WORK_ORDER_ASSIGNED",
@@ -12,34 +16,50 @@ export type ConfigurableNotificationType = (typeof NOTIFICATION_SETTINGS_TYPES)[
 
 export type NotificationTypeToggles = Record<ConfigurableNotificationType, boolean>;
 
-export function defaultNotificationTypeToggles(): NotificationTypeToggles {
-  return Object.fromEntries(NOTIFICATION_SETTINGS_TYPES.map((type) => [type, true])) as NotificationTypeToggles;
+export type WorkspaceScopeForm = "all" | "filtered" | "none";
+
+export function defaultNotificationTypeToggles(enabled = true): NotificationTypeToggles {
+  return Object.fromEntries(NOTIFICATION_SETTINGS_TYPES.map((type) => [type, enabled])) as NotificationTypeToggles;
 }
 
 export function defaultNotificationSettings(): MeNotificationSettings {
   return {
-    enabled: true,
-    workspaceScope: "WORKSPACE_SCOPE_ALL",
-    factoryIds: [],
-    types: notificationTypesFromToggles(defaultNotificationTypeToggles()),
+    workspaces: {
+      scope: "WORKSPACE_SCOPE_ALL",
+      filters: [],
+    },
   };
 }
 
-export function notificationTypeTogglesFromSettings(
-  settings: MeNotificationSettings | undefined,
-): NotificationTypeToggles {
-  const toggles = defaultNotificationTypeToggles();
-  for (const toggle of settings?.types ?? []) {
-    if (!isConfigurableNotificationType(toggle.type) || toggle.enabled === undefined) {
-      continue;
-    }
-    toggles[toggle.type] = toggle.enabled;
+export function workspaceScopeFromSettings(settings: MeNotificationSettings | undefined): WorkspaceScopeForm {
+  switch (settings?.workspaces?.scope) {
+    case "WORKSPACE_SCOPE_FILTERED":
+      return "filtered";
+    case "WORKSPACE_SCOPE_NONE":
+      return "none";
+    default:
+      return "all";
   }
-  return toggles;
 }
 
-export function notificationTypesFromToggles(toggles: NotificationTypeToggles): NotificationSettingsTypeToggle[] {
-  return NOTIFICATION_SETTINGS_TYPES.map((type) => ({ type, enabled: toggles[type] }));
+export function eventTypesFromToggles(toggles: NotificationTypeToggles): ConfigurableNotificationType[] {
+  return NOTIFICATION_SETTINGS_TYPES.filter((type) => toggles[type]);
+}
+
+export function togglesFromEventTypes(eventTypes: MeNotificationSettingsType[] | undefined): NotificationTypeToggles {
+  const selected = new Set((eventTypes ?? []).filter(isConfigurableNotificationType));
+  return Object.fromEntries(
+    NOTIFICATION_SETTINGS_TYPES.map((type) => [type, selected.has(type)]),
+  ) as NotificationTypeToggles;
+}
+
+export function filtersFromSettings(
+  settings: MeNotificationSettings | undefined,
+): NotificationSettingsWorkspaceFilter[] {
+  if (settings?.workspaces?.scope !== "WORKSPACE_SCOPE_FILTERED") {
+    return [];
+  }
+  return settings.workspaces.filters ?? [];
 }
 
 export function isConfigurableNotificationType(

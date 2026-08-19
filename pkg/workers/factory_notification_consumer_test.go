@@ -59,10 +59,9 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		assert.Equal(t, owner.GetEmail(), sent[0].ToEmail)
 	})
 
-	t.Run("master switch off blocks the email", func(t *testing.T) {
+	t.Run("none scope blocks the email", func(t *testing.T) {
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
-			Enabled:        false,
-			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+			WorkspaceScope: models.NotificationWorkspaceScopeNone,
 		})
 
 		emailService := services.NewNoopEmailService()
@@ -75,11 +74,9 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 
 	t.Run("comment notifies the owner but never the actor", func(t *testing.T) {
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
-			Enabled:        true,
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
 		})
 		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
-			Enabled:        true,
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
 		})
 
@@ -100,11 +97,13 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		assert.NotEmpty(t, sent[0].Data.AssigneeInitials)
 	})
 
-	t.Run("type toggle off blocks the email", func(t *testing.T) {
+	t.Run("filtered type list without comments blocks the email", func(t *testing.T) {
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
-			Enabled:        true,
-			WorkspaceScope: models.NotificationWorkspaceScopeAll,
-			Types:          map[string]bool{models.NotificationTypeWorkOrderCommentOwned: false},
+			WorkspaceScope: models.NotificationWorkspaceScopeFiltered,
+			WorkspaceFilters: []models.NotificationWorkspaceFilter{{
+				WorkspaceID: factoryModel.ID.String(),
+				EventTypes:  []string{models.NotificationTypeWorkOrderAssigned},
+			}},
 		})
 
 		emailService := services.NewNoopEmailService()
@@ -115,11 +114,13 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		}
 	})
 
-	t.Run("selected workspace scope excludes other factories", func(t *testing.T) {
+	t.Run("filtered workspace scope excludes other factories", func(t *testing.T) {
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
-			Enabled:        true,
-			WorkspaceScope: models.NotificationWorkspaceScopeSelected,
-			FactoryIDs:     []string{uuid.NewString()},
+			WorkspaceScope: models.NotificationWorkspaceScopeFiltered,
+			WorkspaceFilters: []models.NotificationWorkspaceFilter{{
+				WorkspaceID: uuid.NewString(),
+				EventTypes:  []string{models.NotificationTypeWorkOrderCommentOwned},
+			}},
 		})
 
 		emailService := services.NewNoopEmailService()
@@ -132,7 +133,6 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 
 	t.Run("assignment notifies only the newly assigned user", func(t *testing.T) {
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
-			Enabled:        true,
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
 		})
 
@@ -154,7 +154,6 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 
 	t.Run("initial transition into draft sends nothing", func(t *testing.T) {
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
-			Enabled:        true,
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
 		})
 
@@ -173,7 +172,6 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 
 	t.Run("status change notifies owners and creator", func(t *testing.T) {
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
-			Enabled:        true,
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
 		})
 
@@ -200,7 +198,6 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 	t.Run("soft-deleted members are not emailed", func(t *testing.T) {
 		left := support.CreateUser(t, r, r.Organization.ID)
 		enableNotifications(t, left.ID, models.UserNotificationSettingsParams{
-			Enabled:        true,
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
 		})
 		require.NoError(t, left.Delete())
