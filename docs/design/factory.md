@@ -50,6 +50,11 @@ Expressions on a dispatched run should prefer `order()` over
 `root().data.work_order`. `order()` resolves the live work order for the
 current run (`id`, `title`, `description`, `factory_id`, `state`, `result`,
 `source`) and returns `nil` when the run is not attached to a work order.
+`order().url` is the work order permalink
+(`{BASE_URL}/{orgId}/workspaces/{factoryKey}/work-order/{number}`), resolved
+lazily only when the expression references it, because the factory that owns
+the order has to be loaded for its key. Use it to link back from anything an
+automation creates, e.g. a pull request description.
 `order().artifacts` is a list field loaded lazily only when the expression
 references it (e.g. `none(order().artifacts, {#.type == "pr"})`).
 `order().comments` is likewise a list field loaded lazily only when the
