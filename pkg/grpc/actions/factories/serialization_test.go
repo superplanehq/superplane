@@ -161,29 +161,34 @@ func TestSerializeWorkOrder_LineDispatchesReplaceFlatExecutions(t *testing.T) {
 	assert.EqualValues(t, 5, serialized.TotalCostCents)
 }
 
-func TestSerializeWorkOrder_StatusNote(t *testing.T) {
+func TestSerializeWorkOrder_StatusNotes(t *testing.T) {
 	appID := uuid.New()
 	runID := uuid.New()
-	note, err := json.Marshal(models.FactoryWorkOrderStatusNote{
-		Kind:     models.FactoryWorkOrderStatusNoteKindInfo,
-		Headline: "Review the pull request",
-		Body:     "Merging PR #42 completes this work order.",
-		CtaLabel: "Review PR #42",
-		CtaURL:   "https://github.com/acme/app/pull/42",
-		Automation: &factory.AutomationRef{
-			AppID:   appID,
-			AppName: "PR Closure",
+	note, err := json.Marshal([]models.FactoryWorkOrderStatusNote{
+		{
+			Key:      "pr-closure",
+			Kind:     models.FactoryWorkOrderStatusNoteKindInfo,
+			Headline: "Review the pull request",
+			Body:     "Merging PR #42 completes this work order.",
+			CtaLabel: "Review PR #42",
+			CtaURL:   "https://github.com/acme/app/pull/42",
+			Automation: &factory.AutomationRef{
+				AppID:   appID,
+				AppName: "PR Closure",
+			},
+			Run:       &factory.RunRef{ID: runID},
+			UpdatedAt: time.Now(),
 		},
-		Run:       &factory.RunRef{ID: runID},
-		UpdatedAt: time.Now(),
 	})
 	require.NoError(t, err)
 
 	order := &models.FactoryWorkOrder{ID: uuid.New(), StatusNote: note}
 	serialized := mustSerializeWorkOrder(t, nil, order, nil, nil)
 
-	statusNote := serialized.GetStatusNote()
-	require.NotNil(t, statusNote)
+	statusNotes := serialized.GetStatusNotes()
+	require.Len(t, statusNotes, 1)
+	statusNote := statusNotes[0]
+	assert.Equal(t, "pr-closure", statusNote.GetKey())
 	assert.Equal(t, "info", statusNote.GetKind())
 	assert.Equal(t, "Review the pull request", statusNote.GetHeadline())
 	assert.Equal(t, "Review PR #42", statusNote.GetCtaLabel())
@@ -193,7 +198,7 @@ func TestSerializeWorkOrder_StatusNote(t *testing.T) {
 	assert.Equal(t, runID.String(), statusNote.GetRunId())
 	assert.NotNil(t, statusNote.GetUpdatedAt())
 
-	// No note stored serializes as absent, not as an empty message.
+	// No notes stored serializes as absent, not as an empty list.
 	bare := &models.FactoryWorkOrder{ID: uuid.New()}
-	assert.Nil(t, mustSerializeWorkOrder(t, nil, bare, nil, nil).GetStatusNote())
+	assert.Empty(t, mustSerializeWorkOrder(t, nil, bare, nil, nil).GetStatusNotes())
 }

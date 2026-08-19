@@ -246,6 +246,7 @@ func (c *FactoryContext) SetWorkOrderStatusNote(params core.SetWorkOrderStatusNo
 	}
 
 	note, err := order.SetStatusNote(c.tx, models.FactoryWorkOrderStatusNoteParams{
+		Key:        params.NoteKey,
 		Kind:       params.Kind,
 		Headline:   params.Headline,
 		Body:       params.Body,
@@ -479,6 +480,7 @@ func artifactToCore(artifact *models.FactoryWorkOrderArtifact) (*core.WorkOrderA
 func statusNoteToCore(order *models.FactoryWorkOrder, note *models.FactoryWorkOrderStatusNote) *core.WorkOrderStatusNote {
 	return &core.WorkOrderStatusNote{
 		WorkOrderID: order.ID.String(),
+		Key:         note.Key,
 		Kind:        note.Kind,
 		Headline:    note.Headline,
 		Body:        note.Body,

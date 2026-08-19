@@ -19,6 +19,7 @@ type SetWorkOrderStatusNote struct{}
 
 type SetWorkOrderStatusNoteConfiguration struct {
 	OrderID  string `json:"orderId" mapstructure:"orderId"`
+	NoteKey  string `json:"noteKey" mapstructure:"noteKey"`
 	Headline string `json:"headline" mapstructure:"headline"`
 	Body     string `json:"body" mapstructure:"body"`
 	CtaLabel string `json:"ctaLabel" mapstructure:"ctaLabel"`
@@ -40,7 +41,7 @@ func (c *SetWorkOrderStatusNote) Description() string {
 func (c *SetWorkOrderStatusNote) Documentation() string {
 	return `The Set Work Order Status Note component announces what a waiting work order is blocked on and what resolves it. The note shows as a "next step" panel on the work order page while the order waits — for example, a PR watcher can announce "Review the pull request: when it merges, this work order completes automatically."
 
-A work order carries at most one note: setting a new one replaces the previous one, and any state change (close, reopen, back to draft) clears it. This keeps the note always about the current wait. The work order must be open.
+Each note is identified by its ` + "`noteKey`" + ` (for example ` + "`pr-closure`" + `). The first set creates the note. A later set with the same key updates that note in place. A different key sits beside it, so one work order can carry several waits at once (a PR review and a later decision prompt). Any state change (close, reopen, back to draft) clears every note. The work order must be open.
 
 - ` + "`headline`" + ` is the short instruction shown as the panel title (e.g. "Review the pull request").
 - ` + "`body`" + ` is an optional markdown paragraph with the details — what happens on each outcome.
@@ -63,6 +64,7 @@ func (c *SetWorkOrderStatusNote) ExampleOutput() map[string]any {
 		"type":      "workOrder.statusNoteSet",
 		"data": map[string]any{
 			"statusNote": map[string]any{
+				"key":      "pr-closure",
 				"kind":     "info",
 				"headline": "Review the pull request",
 				"body":     "When PR #42 merges, this work order completes automatically.",
@@ -86,6 +88,13 @@ func (c *SetWorkOrderStatusNote) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Default:     "{{ order().id }}",
+		},
+		{
+			Name:        "noteKey",
+			Label:       "Note Key",
+			Description: "Stable identifier for this note on the work order (e.g. pr-closure). Sets with the same key update the same note.",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
 		},
 		{
 			Name:        "headline",
@@ -126,6 +135,7 @@ func (c *SetWorkOrderStatusNote) Execute(ctx core.ExecutionContext) error {
 
 	note, err := ctx.Factory.SetWorkOrderStatusNote(core.SetWorkOrderStatusNoteParams{
 		OrderID:  config.OrderID,
+		NoteKey:  config.NoteKey,
 		Headline: config.Headline,
 		Body:     config.Body,
 		CtaLabel: config.CtaLabel,

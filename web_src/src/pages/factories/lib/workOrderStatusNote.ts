@@ -3,10 +3,11 @@ import type { FactoriesWorkOrderStatusNote } from "@/api-client";
 /**
  * A "what happens next" panel set by an automation while the order is
  * Waiting — e.g. a PR watcher announcing that merging the tracked pull
- * request completes the order. One note per order, latest wins; cleared
- * on any state transition so it always describes the current wait.
+ * request completes the order. Notes are latest-only per key; a
+ * different key sits beside it. Cleared on any state transition.
  */
 export interface WorkOrderStatusNotePresentation {
+  key: string;
   /** Action-first heading, e.g. "Review the pull request". */
   headline: string;
   /** Markdown body explaining what resolves the wait. */
@@ -25,16 +26,26 @@ function emptyToUndefined(value: string | undefined): string | undefined {
 export function presentWorkOrderStatusNote(
   note: FactoriesWorkOrderStatusNote | undefined,
 ): WorkOrderStatusNotePresentation | undefined {
-  if (!note?.headline) {
+  if (!note?.key || !note.headline) {
     return undefined;
   }
 
   const sourceName = emptyToUndefined(note.automation?.appName) ?? emptyToUndefined(note.automation?.nodeName);
   return {
+    key: note.key,
     headline: note.headline,
     text: note.body ?? "",
     cta: note.ctaLabel && note.ctaUrl ? { label: note.ctaLabel, href: note.ctaUrl } : undefined,
     source: sourceName ? { name: sourceName, appId: emptyToUndefined(note.automation?.appId) } : undefined,
     updatedAt: note.updatedAt,
   };
+}
+
+export function presentWorkOrderStatusNotes(
+  notes: FactoriesWorkOrderStatusNote[] | undefined,
+): WorkOrderStatusNotePresentation[] {
+  return (notes ?? []).flatMap((note) => {
+    const presented = presentWorkOrderStatusNote(note);
+    return presented ? [presented] : [];
+  });
 }

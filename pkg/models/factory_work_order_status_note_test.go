@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -33,6 +34,7 @@ func TestFactoryWorkOrder_SetStatusNote_Validation(t *testing.T) {
 	order, _ := openWorkOrderForStatusNote(t, "note-validation")
 
 	valid := FactoryWorkOrderStatusNoteParams{
+		Key:      "pr-closure",
 		Headline: "Review the pull request",
 		Body:     "Merging PR #42 completes this work order.",
 		CtaLabel: "Review PR #42",
@@ -43,6 +45,7 @@ func TestFactoryWorkOrder_SetStatusNote_Validation(t *testing.T) {
 		name   string
 		mutate func(params *FactoryWorkOrderStatusNoteParams)
 	}{
+		{"missing key", func(p *FactoryWorkOrderStatusNoteParams) { p.Key = "  " }},
 		{"missing headline", func(p *FactoryWorkOrderStatusNoteParams) { p.Headline = "  " }},
 		{"unknown kind", func(p *FactoryWorkOrderStatusNoteParams) { p.Kind = "decision" }},
 		{"cta label without url", func(p *FactoryWorkOrderStatusNoteParams) { p.CtaURL = "" }},
@@ -71,18 +74,22 @@ func TestFactoryWorkOrder_SetStatusNote_RequiresOpenOrder(t *testing.T) {
 	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Draft order", "", &userID, nil, nil)
 	require.NoError(t, err)
 
-	_, err = order.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{Headline: "Waiting"})
+	_, err = order.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{
+		Key:      "pr-closure",
+		Headline: "Waiting",
+	})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrFactoryWorkOrderStatusNoteInvalid)
 }
 
-func TestFactoryWorkOrder_SetStatusNote_StoresAndReplaces(t *testing.T) {
+func TestFactoryWorkOrder_SetStatusNote_UpsertsByKey(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	order, _ := openWorkOrderForStatusNote(t, "note-store")
 
 	appID := uuid.New()
 	note, err := order.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{
+		Key:      "pr-closure",
 		Headline: "Review the pull request",
 		Body:     "Merging PR #42 completes this work order.",
 		CtaLabel: "Review PR #42",
@@ -93,40 +100,90 @@ func TestFactoryWorkOrder_SetStatusNote_StoresAndReplaces(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+	assert.Equal(t, "pr-closure", note.Key)
 	assert.Equal(t, FactoryWorkOrderStatusNoteKindInfo, note.Kind)
 	assert.False(t, note.UpdatedAt.IsZero())
 
 	reloaded, err := FindUnscopedWorkOrder(database.Conn(), order.ID)
 	require.NoError(t, err)
 
-	stored, err := reloaded.StatusNoteRef()
+	stored, err := reloaded.StatusNotes()
 	require.NoError(t, err)
-	require.NotNil(t, stored)
-	assert.Equal(t, "Review the pull request", stored.Headline)
-	assert.Equal(t, "Review PR #42", stored.CtaLabel)
-	require.NotNil(t, stored.Automation)
-	assert.Equal(t, appID, stored.Automation.AppID)
+	require.Len(t, stored, 1)
+	assert.Equal(t, "pr-closure", stored[0].Key)
+	assert.Equal(t, "Review the pull request", stored[0].Headline)
+	require.NotNil(t, stored[0].Automation)
+	assert.Equal(t, appID, stored[0].Automation.AppID)
 
-	// Latest wins: a second set replaces the note wholesale.
 	_, err = reloaded.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{
-		Headline: "Waiting on CI",
+		Key:      "pr-closure",
+		Headline: "Review PR #43",
 	})
 	require.NoError(t, err)
 
-	replaced, err := reloaded.StatusNoteRef()
+	replaced, err := reloaded.StatusNotes()
 	require.NoError(t, err)
-	require.NotNil(t, replaced)
-	assert.Equal(t, "Waiting on CI", replaced.Headline)
-	assert.Empty(t, replaced.CtaLabel)
-	assert.Nil(t, replaced.Automation)
+	require.Len(t, replaced, 1)
+	assert.Equal(t, "Review PR #43", replaced[0].Headline)
+	assert.Empty(t, replaced[0].CtaLabel)
+	assert.Nil(t, replaced[0].Automation)
 }
 
-func TestFactoryWorkOrder_StatusNote_ClearedOnTransition(t *testing.T) {
+func TestFactoryWorkOrder_SetStatusNote_KeepsDistinctKeys(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	order, _ := openWorkOrderForStatusNote(t, "note-multi")
+
+	_, err := order.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{
+		Key:      "pr-closure",
+		Headline: "Review the pull request",
+	})
+	require.NoError(t, err)
+
+	_, err = order.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{
+		Key:      "deploy-window",
+		Headline: "Waiting on the deploy window",
+	})
+	require.NoError(t, err)
+
+	reloaded, err := FindUnscopedWorkOrder(database.Conn(), order.ID)
+	require.NoError(t, err)
+
+	notes, err := reloaded.StatusNotes()
+	require.NoError(t, err)
+	require.Len(t, notes, 2)
+	assert.Equal(t, "pr-closure", notes[0].Key)
+	assert.Equal(t, "deploy-window", notes[1].Key)
+}
+
+func TestFactoryWorkOrder_SetStatusNote_RejectsOverCap(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	order, _ := openWorkOrderForStatusNote(t, "note-cap")
+
+	for i := range MaxFactoryWorkOrderStatusNotes {
+		_, err := order.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{
+			Key:      fmt.Sprintf("note-%d", i),
+			Headline: "Waiting",
+		})
+		require.NoError(t, err)
+	}
+
+	_, err := order.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{
+		Key:      "overflow",
+		Headline: "One more",
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrFactoryWorkOrderStatusNoteInvalid)
+}
+
+func TestFactoryWorkOrder_StatusNotes_ClearedOnTransition(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	order, userID := openWorkOrderForStatusNote(t, "note-transition")
 
 	_, err := order.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{
+		Key:      "pr-closure",
 		Headline: "Review the pull request",
 	})
 	require.NoError(t, err)
@@ -141,27 +198,55 @@ func TestFactoryWorkOrder_StatusNote_ClearedOnTransition(t *testing.T) {
 	reloaded, err := FindUnscopedWorkOrder(database.Conn(), order.ID)
 	require.NoError(t, err)
 
-	note, err := reloaded.StatusNoteRef()
+	notes, err := reloaded.StatusNotes()
 	require.NoError(t, err)
-	assert.Nil(t, note)
+	assert.Empty(t, notes)
 }
 
-func TestFactoryWorkOrder_ClearStatusNote(t *testing.T) {
+func TestFactoryWorkOrder_ClearStatusNote_RemovesOneKey(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
-	order, _ := openWorkOrderForStatusNote(t, "note-clear")
+	order, _ := openWorkOrderForStatusNote(t, "note-clear-one")
 
 	_, err := order.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{
+		Key:      "pr-closure",
 		Headline: "Review the pull request",
 	})
 	require.NoError(t, err)
+	_, err = order.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{
+		Key:      "deploy-window",
+		Headline: "Waiting on the deploy window",
+	})
+	require.NoError(t, err)
 
-	require.NoError(t, order.ClearStatusNote(database.Conn()))
+	require.NoError(t, order.ClearStatusNote(database.Conn(), "pr-closure"))
 
 	reloaded, err := FindUnscopedWorkOrder(database.Conn(), order.ID)
 	require.NoError(t, err)
 
-	note, err := reloaded.StatusNoteRef()
+	notes, err := reloaded.StatusNotes()
 	require.NoError(t, err)
-	assert.Nil(t, note)
+	require.Len(t, notes, 1)
+	assert.Equal(t, "deploy-window", notes[0].Key)
+}
+
+func TestFactoryWorkOrder_ClearStatusNotes(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	order, _ := openWorkOrderForStatusNote(t, "note-clear-all")
+
+	_, err := order.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{
+		Key:      "pr-closure",
+		Headline: "Review the pull request",
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, order.ClearStatusNotes(database.Conn()))
+
+	reloaded, err := FindUnscopedWorkOrder(database.Conn(), order.ID)
+	require.NoError(t, err)
+
+	notes, err := reloaded.StatusNotes()
+	require.NoError(t, err)
+	assert.Empty(t, notes)
 }

@@ -532,25 +532,27 @@ message WorkOrder {
   // first. A line dispatched twice (e.g. a failed traversal re-dispatched)
   // produces two separate entries here, each with its own step executions.
   repeated WorkOrderLineDispatch line_dispatches = 14;
-  // Current-wait announcement set by an automation: what a waiting order
-  // is blocked on and what resolves it. Absent unless an automation set
-  // one while the order is open; any state transition clears it.
-  WorkOrderStatusNote status_note = 15;
+  // Current-wait announcements set by automations: what a waiting order
+  // is blocked on and what resolves it. One entry per note key; any
+  // state transition clears the whole set.
+  repeated WorkOrderStatusNote status_notes = 15;
 }
 
 // WorkOrderStatusNote announces what a waiting work order is blocked on
-// and what resolves it. Latest-only: setting a new note replaces the
-// previous one, and any state transition clears it.
+// and what resolves it. Notes are latest-only per key: setting a note
+// with the same key updates it in place, and a different key sits
+// beside it. Any state transition clears the whole set.
 message WorkOrderStatusNote {
-  string kind = 1;
-  string headline = 2;
-  string body = 3;
-  string cta_label = 4;
-  string cta_url = 5;
+  string key = 1;
+  string kind = 2;
+  string headline = 3;
+  string body = 4;
+  string cta_label = 5;
+  string cta_url = 6;
   // Automation that set the note and the run that produced it.
-  AutomationRef automation = 6;
-  string run_id = 7;
-  google.protobuf.Timestamp updated_at = 8;
+  AutomationRef automation = 7;
+  string run_id = 8;
+  google.protobuf.Timestamp updated_at = 9;
 }
 
 message WorkOrderCreator {

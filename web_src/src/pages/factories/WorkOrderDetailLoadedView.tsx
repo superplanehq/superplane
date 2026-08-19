@@ -34,8 +34,8 @@ interface WorkOrderDetailLoadedViewProps {
   artifacts: FactoriesWorkOrderArtifact[];
   isArtifactsLoading: boolean;
   artifactsError?: Error | null;
-  /** Why the order is waiting, announced by an automation. */
-  statusNote?: WorkOrderStatusNotePresentation;
+  /** Why the order is waiting, announced by automations. */
+  statusNotes?: WorkOrderStatusNotePresentation[];
   /** Scores reported by automations (risk review, coverage, …). */
   checks?: WorkOrderCheckPresentation[];
   isChecksLoading?: boolean;
@@ -94,112 +94,124 @@ export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps)
 }
 
 function WorkOrderDetailBody(props: WorkOrderDetailLoadedViewProps) {
-  const {
-    organizationId,
-    factoryKey,
-    order,
-    events,
-    eventsError,
-    isEventsLoading,
-    hasMoreEvents,
-    isLoadingMoreEvents,
-    onLoadMoreEvents,
-    onRetryEvents,
-    artifacts,
-    statusNote,
-    checks,
-    isChecksLoading,
-    checksError,
-    canClose,
-    isCompleting,
-    isRejecting,
-    isClosing,
-    isUpdatingStatus,
-    onClose,
-    onStatusChange,
-    displayStatus,
-    canManage,
-    isAddingComment,
-    onAddComment,
-  } = props;
-  const hasChecksSection = Boolean(checks?.length) || Boolean(isChecksLoading) || Boolean(checksError);
-  // The note describes what a waiting order is blocked on; other display
-  // statuses (running, closed, …) already explain themselves.
-  const statusNoteToShow = displayStatus === "waiting" ? statusNote : undefined;
-  const showStatusNote = Boolean(statusNoteToShow);
-
   return (
     // pt-2: the entity header already ends with pb-6, so the shared body's
     // pt-8 would stack to a 56px title-to-content gap.
     <div className={cn(factoryContentBodyClassName, "pt-2")}>
       <div className="grid gap-x-[var(--workspace-column-gap)] gap-y-0 lg:grid-cols-[minmax(0,1fr)_var(--workspace-detail-sidebar-width)]">
-        <div className="min-w-0">
-          {order.description ? <WorkOrderDescription description={order.description} /> : null}
-
-          {statusNoteToShow ? (
-            <div className={order.description ? "mt-10" : undefined}>
-              <WorkOrderStatusNotePanel
-                note={statusNoteToShow}
-                organizationId={organizationId}
-                canClose={canClose}
-                canManage={canManage}
-                isCompleting={isCompleting}
-                isRejecting={isRejecting}
-                isClosing={isClosing}
-                isUpdatingStatus={isUpdatingStatus}
-                onClose={onClose}
-                onStatusChange={onStatusChange}
-              />
-            </div>
-          ) : null}
-
-          {hasChecksSection ? (
-            <WorkOrderChecksSection
-              checks={checks ?? []}
-              isLoading={isChecksLoading}
-              error={checksError}
-              organizationId={organizationId}
-              factoryKey={factoryKey}
-              orderNumber={order.number}
-              className={order.description || showStatusNote ? "mt-10" : undefined}
-            />
-          ) : null}
-
-          <section className={order.description || hasChecksSection || showStatusNote ? "mt-10" : undefined}>
-            <h2 className="workspace-section-title">Activity</h2>
-            <p className="workspace-body-text mt-1 text-muted-foreground">
-              Actions and comments on the work order, plus factory line runs.
-            </p>
-            <div className="mt-4">
-              <WorkOrderActivityTimeline
-                organizationId={organizationId}
-                factoryKey={factoryKey}
-                order={order}
-                events={events}
-                eventsError={eventsError}
-                isLoading={isEventsLoading}
-                hasMoreEvents={hasMoreEvents}
-                isLoadingMoreEvents={isLoadingMoreEvents}
-                onLoadMoreEvents={onLoadMoreEvents}
-                onRetryEvents={onRetryEvents}
-                artifacts={artifacts}
-                footer={
-                  <WorkOrderCommentComposer
-                    organizationId={organizationId}
-                    canComment={canManage}
-                    isSubmitting={isAddingComment}
-                    onSubmit={onAddComment}
-                  />
-                }
-              />
-            </div>
-          </section>
-        </div>
-
+        <WorkOrderDetailMainColumn {...props} />
         <WorkOrderDetailBodyAside {...props} />
       </div>
     </div>
   );
+}
+
+function WorkOrderDetailMainColumn({
+  organizationId,
+  factoryKey,
+  order,
+  events,
+  eventsError,
+  isEventsLoading,
+  hasMoreEvents,
+  isLoadingMoreEvents,
+  onLoadMoreEvents,
+  onRetryEvents,
+  artifacts,
+  statusNotes,
+  checks,
+  isChecksLoading,
+  checksError,
+  canClose,
+  isCompleting,
+  isRejecting,
+  isClosing,
+  isUpdatingStatus,
+  onClose,
+  onStatusChange,
+  displayStatus,
+  canManage,
+  isAddingComment,
+  onAddComment,
+}: WorkOrderDetailLoadedViewProps) {
+  const hasChecksSection = Boolean(checks?.length) || Boolean(isChecksLoading) || Boolean(checksError);
+  const statusNotesToShow = waitingStatusNotes(displayStatus, statusNotes);
+  const showStatusNotes = statusNotesToShow.length > 0;
+
+  return (
+    <div className="min-w-0">
+      {order.description ? <WorkOrderDescription description={order.description} /> : null}
+
+      {showStatusNotes ? (
+        <div className={order.description ? "mt-10" : undefined}>
+          <WorkOrderStatusNotesSection
+            notes={statusNotesToShow}
+            organizationId={organizationId}
+            canClose={canClose}
+            canManage={canManage}
+            isCompleting={isCompleting}
+            isRejecting={isRejecting}
+            isClosing={isClosing}
+            isUpdatingStatus={isUpdatingStatus}
+            onClose={onClose}
+            onStatusChange={onStatusChange}
+          />
+        </div>
+      ) : null}
+
+      {hasChecksSection ? (
+        <WorkOrderChecksSection
+          checks={checks ?? []}
+          isLoading={isChecksLoading}
+          error={checksError}
+          organizationId={organizationId}
+          factoryKey={factoryKey}
+          orderNumber={order.number}
+          className={order.description || showStatusNotes ? "mt-10" : undefined}
+        />
+      ) : null}
+
+      <section className={order.description || hasChecksSection || showStatusNotes ? "mt-10" : undefined}>
+        <h2 className="workspace-section-title">Activity</h2>
+        <p className="workspace-body-text mt-1 text-muted-foreground">
+          Actions and comments on the work order, plus factory line runs.
+        </p>
+        <div className="mt-4">
+          <WorkOrderActivityTimeline
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            order={order}
+            events={events}
+            eventsError={eventsError}
+            isLoading={isEventsLoading}
+            hasMoreEvents={hasMoreEvents}
+            isLoadingMoreEvents={isLoadingMoreEvents}
+            onLoadMoreEvents={onLoadMoreEvents}
+            onRetryEvents={onRetryEvents}
+            artifacts={artifacts}
+            footer={
+              <WorkOrderCommentComposer
+                organizationId={organizationId}
+                canComment={canManage}
+                isSubmitting={isAddingComment}
+                onSubmit={onAddComment}
+              />
+            }
+          />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function waitingStatusNotes(
+  displayStatus: WorkOrderDisplayStatus,
+  notes: WorkOrderStatusNotePresentation[] | undefined,
+): WorkOrderStatusNotePresentation[] {
+  if (displayStatus !== "waiting" || !notes?.length) {
+    return [];
+  }
+  return notes;
 }
 
 function WorkOrderDetailBodyAside({
@@ -250,8 +262,8 @@ function WorkOrderDetailBodyAside({
   );
 }
 
-function WorkOrderStatusNotePanel({
-  note,
+function WorkOrderStatusNotesSection({
+  notes,
   organizationId,
   canClose,
   canManage,
@@ -272,16 +284,24 @@ function WorkOrderStatusNotePanel({
   | "isUpdatingStatus"
   | "onClose"
   | "onStatusChange"
-> & { note: WorkOrderStatusNotePresentation }) {
+> & { notes: WorkOrderStatusNotePresentation[] }) {
+  const lastIndex = notes.length - 1;
+
   return (
-    <WorkOrderStatusNote
-      note={note}
-      organizationId={organizationId}
-      canClose={canClose}
-      canManage={canManage}
-      isBusy={isCompleting || isRejecting || isClosing || isUpdatingStatus}
-      onClose={onClose}
-      onStatusChange={onStatusChange}
-    />
+    <div className="flex flex-col gap-3">
+      {notes.map((note, index) => (
+        <WorkOrderStatusNote
+          key={note.key}
+          note={note}
+          organizationId={organizationId}
+          canClose={canClose}
+          canManage={canManage}
+          isBusy={isCompleting || isRejecting || isClosing || isUpdatingStatus}
+          showManualUpdate={index === lastIndex}
+          onClose={onClose}
+          onStatusChange={onStatusChange}
+        />
+      ))}
+    </div>
   );
 }

@@ -1556,7 +1556,7 @@ def main(payload):
 
 The Set Work Order Status Note component announces what a waiting work order is blocked on and what resolves it. The note shows as a "next step" panel on the work order page while the order waits — for example, a PR watcher can announce "Review the pull request: when it merges, this work order completes automatically."
 
-A work order carries at most one note: setting a new one replaces the previous one, and any state change (close, reopen, back to draft) clears it. This keeps the note always about the current wait. The work order must be open.
+Each note is identified by its `noteKey` (for example `pr-closure`). The first set creates the note. A later set with the same key updates that note in place. A different key sits beside it, so one work order can carry several waits at once (a PR review and a later decision prompt). Any state change (close, reopen, back to draft) clears every note. The work order must be open.
 
 - `headline` is the short instruction shown as the panel title (e.g. "Review the pull request").
 - `body` is an optional markdown paragraph with the details — what happens on each outcome.
@@ -1574,6 +1574,7 @@ A work order carries at most one note: setting a new one replaces the previous o
       "ctaLabel": "Review PR #42",
       "ctaUrl": "https://github.com/acme/app/pull/42",
       "headline": "Review the pull request",
+      "key": "pr-closure",
       "kind": "info"
     }
   },

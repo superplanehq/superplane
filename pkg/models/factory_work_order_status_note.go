@@ -10,12 +10,14 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/models/factory"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 const (
 	FactoryWorkOrderStatusNoteKindInfo = factory.StatusNoteKindInfo
 
+	MaxFactoryWorkOrderStatusNoteKeyBytes      = 255
 	MaxFactoryWorkOrderStatusNoteHeadlineBytes = 255
 
 	// MaxFactoryWorkOrderStatusNoteBodyBytes caps the markdown body; a
@@ -24,6 +26,10 @@ const (
 
 	MaxFactoryWorkOrderStatusNoteCtaLabelBytes = 255
 	MaxFactoryWorkOrderStatusNoteCtaURLBytes   = 2048
+
+	// MaxFactoryWorkOrderStatusNotes caps how many notes one order can
+	// carry. Notes are latest-only per key; this is a payload-size bound.
+	MaxFactoryWorkOrderStatusNotes = 20
 )
 
 var ErrFactoryWorkOrderStatusNoteInvalid = errors.New("invalid work order status note")
@@ -32,13 +38,14 @@ var factoryWorkOrderStatusNoteKinds = []string{
 	FactoryWorkOrderStatusNoteKindInfo,
 }
 
-// FactoryWorkOrderStatusNote is the current-wait announcement stored on
-// the work order row (jsonb column, latest wins). It explains what a
-// Waiting order is blocked on and what resolves it — e.g. a PR watcher
-// announcing that merging the tracked pull request completes the order.
-// Any lifecycle transition clears it (see FactoryWorkOrder.UpdateStatus),
-// so it always describes the current wait.
+// FactoryWorkOrderStatusNote is one current-wait announcement. Notes live
+// as a jsonb array on the work order row, keyed like checks: the first
+// set of a key creates the note, a later set with the same key updates
+// it in place, and a different key sits beside it. Kind is the payload
+// shape (`info` today), not the identity. Any lifecycle transition
+// clears the whole set (see FactoryWorkOrder.UpdateStatus).
 type FactoryWorkOrderStatusNote struct {
+	Key      string `json:"key"`
 	Kind     string `json:"kind"`
 	Headline string `json:"headline"`
 	Body     string `json:"body,omitempty"`
@@ -52,6 +59,7 @@ type FactoryWorkOrderStatusNote struct {
 }
 
 type FactoryWorkOrderStatusNoteParams struct {
+	Key        string
 	Kind       string
 	Headline   string
 	Body       string
@@ -61,24 +69,24 @@ type FactoryWorkOrderStatusNoteParams struct {
 	Run        *factory.RunRef
 }
 
-// StatusNoteRef decodes the note stored on the row. Returns nil when the
-// order has no status note.
-func (o *FactoryWorkOrder) StatusNoteRef() (*FactoryWorkOrderStatusNote, error) {
+// StatusNotes decodes the notes stored on the row. Returns nil when the
+// order has no status notes.
+func (o *FactoryWorkOrder) StatusNotes() ([]FactoryWorkOrderStatusNote, error) {
 	if len(o.StatusNote) == 0 {
 		return nil, nil
 	}
 
-	var note FactoryWorkOrderStatusNote
-	if err := json.Unmarshal(o.StatusNote, &note); err != nil {
+	var notes []FactoryWorkOrderStatusNote
+	if err := json.Unmarshal(o.StatusNote, &notes); err != nil {
 		return nil, err
 	}
 
-	return &note, nil
+	return notes, nil
 }
 
-// SetStatusNote validates and stores the note, replacing any previous
-// one. Only open orders can carry a note: a draft was never dispatched
-// and a closed order is not waiting on anything.
+// SetStatusNote validates and upserts the note by Key. Only open orders
+// can carry notes: a draft was never dispatched and a closed order is
+// not waiting on anything.
 func (o *FactoryWorkOrder) SetStatusNote(
 	tx *gorm.DB,
 	params FactoryWorkOrderStatusNoteParams,
@@ -92,34 +100,64 @@ func (o *FactoryWorkOrder) SetStatusNote(
 		return nil, err
 	}
 
-	encoded, err := json.Marshal(note)
+	notes, err := o.StatusNotes()
 	if err != nil {
 		return nil, err
 	}
 
-	// UpdateColumn: setting a note is metadata, not a lifecycle edit —
-	// it must not move `updated_at` (the close-instant heuristic).
-	if err := tx.Model(o).UpdateColumn("status_note", encoded).Error; err != nil {
+	notes, err = upsertStatusNote(notes, *note)
+	if err != nil {
 		return nil, err
 	}
 
-	o.StatusNote = encoded
+	if err := o.persistStatusNotes(tx, notes); err != nil {
+		return nil, err
+	}
+
 	return note, nil
 }
 
-// ClearStatusNote removes the note without a state transition, for waits
-// that resolve while the order stays open. Lifecycle transitions clear
-// the note themselves in UpdateStatus.
-func (o *FactoryWorkOrder) ClearStatusNote(tx *gorm.DB) error {
-	if err := tx.Model(o).UpdateColumn("status_note", nil).Error; err != nil {
+// ClearStatusNote removes the note with the given key. Unknown keys are
+// a no-op. Lifecycle transitions clear the whole set in UpdateStatus.
+func (o *FactoryWorkOrder) ClearStatusNote(tx *gorm.DB, key string) error {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return fmt.Errorf("%w: key is required", ErrFactoryWorkOrderStatusNoteInvalid)
+	}
+
+	notes, err := o.StatusNotes()
+	if err != nil {
 		return err
 	}
 
-	o.StatusNote = nil
-	return nil
+	kept := slices.DeleteFunc(notes, func(note FactoryWorkOrderStatusNote) bool {
+		return note.Key == key
+	})
+	if len(kept) == len(notes) {
+		return nil
+	}
+
+	return o.persistStatusNotes(tx, kept)
+}
+
+// ClearStatusNotes removes every note without a state transition, for
+// waits that all resolve while the order stays open.
+func (o *FactoryWorkOrder) ClearStatusNotes(tx *gorm.DB) error {
+	return o.persistStatusNotes(tx, nil)
 }
 
 func normalizeStatusNoteParams(params FactoryWorkOrderStatusNoteParams) (*FactoryWorkOrderStatusNote, error) {
+	key := strings.TrimSpace(params.Key)
+	if key == "" {
+		return nil, fmt.Errorf("%w: key is required", ErrFactoryWorkOrderStatusNoteInvalid)
+	}
+	if len(key) > MaxFactoryWorkOrderStatusNoteKeyBytes {
+		return nil, fmt.Errorf(
+			"%w: key exceeds %d bytes",
+			ErrFactoryWorkOrderStatusNoteInvalid, MaxFactoryWorkOrderStatusNoteKeyBytes,
+		)
+	}
+
 	kind := params.Kind
 	if kind == "" {
 		kind = FactoryWorkOrderStatusNoteKindInfo
@@ -153,6 +191,7 @@ func normalizeStatusNoteParams(params FactoryWorkOrderStatusNoteParams) (*Factor
 	}
 
 	return &FactoryWorkOrderStatusNote{
+		Key:        key,
 		Kind:       kind,
 		Headline:   headline,
 		Body:       body,
@@ -195,6 +234,44 @@ func normalizeStatusNoteCta(label, rawURL string) (string, string, error) {
 	}
 
 	return label, rawURL, nil
+}
+
+func upsertStatusNote(notes []FactoryWorkOrderStatusNote, note FactoryWorkOrderStatusNote) ([]FactoryWorkOrderStatusNote, error) {
+	for i := range notes {
+		if notes[i].Key == note.Key {
+			notes[i] = note
+			return notes, nil
+		}
+	}
+
+	if len(notes) >= MaxFactoryWorkOrderStatusNotes {
+		return nil, fmt.Errorf(
+			"%w: cannot store more than %d notes",
+			ErrFactoryWorkOrderStatusNoteInvalid, MaxFactoryWorkOrderStatusNotes,
+		)
+	}
+
+	return append(notes, note), nil
+}
+
+func (o *FactoryWorkOrder) persistStatusNotes(tx *gorm.DB, notes []FactoryWorkOrderStatusNote) error {
+	var encoded datatypes.JSON
+	if len(notes) > 0 {
+		raw, err := json.Marshal(notes)
+		if err != nil {
+			return err
+		}
+		encoded = raw
+	}
+
+	// UpdateColumn: setting a note is metadata, not a lifecycle edit —
+	// it must not move `updated_at` (the close-instant heuristic).
+	if err := tx.Model(o).UpdateColumn("status_note", encoded).Error; err != nil {
+		return err
+	}
+
+	o.StatusNote = encoded
+	return nil
 }
 
 func IsValidWorkOrderStatusNoteKind(kind string) bool {

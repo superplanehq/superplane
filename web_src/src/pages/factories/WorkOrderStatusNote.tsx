@@ -23,6 +23,7 @@ interface WorkOrderStatusNoteProps {
   canClose: boolean;
   canManage: boolean;
   isBusy: boolean;
+  showManualUpdate: boolean;
   onClose: (result: FactoriesWorkOrderResult) => void;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
 }
@@ -33,6 +34,7 @@ export function WorkOrderStatusNote({
   canClose,
   canManage,
   isBusy,
+  showManualUpdate,
   onClose,
   onStatusChange,
 }: WorkOrderStatusNoteProps) {
@@ -56,23 +58,27 @@ export function WorkOrderStatusNote({
             <MarkdownContent content={note.text} variant="workspace" />
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {note.cta ? (
-              <Button asChild size="sm">
-                <a href={note.cta.href} target="_blank" rel="noreferrer">
-                  {note.cta.label}
-                  <ExternalLink className="size-3.5" aria-hidden />
-                </a>
-              </Button>
-            ) : null}
-            <ManualUpdateMenu
-              canClose={canClose}
-              canManage={canManage}
-              isBusy={isBusy}
-              onClose={onClose}
-              onStatusChange={onStatusChange}
-            />
-          </div>
+          {note.cta || showManualUpdate ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {note.cta ? (
+                <Button asChild size="sm">
+                  <a href={note.cta.href} target="_blank" rel="noreferrer">
+                    {note.cta.label}
+                    <ExternalLink className="size-3.5" aria-hidden />
+                  </a>
+                </Button>
+              ) : null}
+              {showManualUpdate ? (
+                <ManualUpdateMenu
+                  canClose={canClose}
+                  canManage={canManage}
+                  isBusy={isBusy}
+                  onClose={onClose}
+                  onStatusChange={onStatusChange}
+                />
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
     </aside>
