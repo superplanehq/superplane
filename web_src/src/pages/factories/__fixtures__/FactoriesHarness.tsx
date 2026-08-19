@@ -19,7 +19,7 @@ import { WorkOrderOverviewMissionSlotContext } from "../sidebar/workOrderOvervie
 interface FactoriesHarnessProps {
   /** Path under the org. Defaults to `workspaces` (list page). */
   pathSuffix?: string;
-  /** Fixture backing the factories API. Defaults to the populated Refunds Factory dataset. */
+  /** Fixture backing the factories API. Defaults to the populated Semaphore dataset. */
   factoriesFixture?: FactoriesFixture;
   /** Canvas fixture for factory-embedded AppPage routes. Defaults to a factory-owned canvas so in-story clicks do not redirect to Overview. */
   appFixture?: CanvasAppFixture;

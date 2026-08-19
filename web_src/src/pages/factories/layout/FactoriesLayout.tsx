@@ -194,7 +194,6 @@ function FactoriesLayoutContent({
             factories={factories}
             organizationName={organization?.metadata?.name ?? ""}
             accountName={account?.name}
-            accountEmail={account?.email}
             accountAvatarUrl={account?.avatar_url}
             canOpenSettings={canAct("factories", "update")}
             canCreateFactory={canAct("factories", "create")}
@@ -226,7 +225,6 @@ interface FactoriesSidebarProps {
   factories: FactoriesFactory[];
   organizationName: string;
   accountName?: string | null;
-  accountEmail?: string | null;
   accountAvatarUrl?: string | null;
   canOpenSettings: boolean;
   canCreateFactory: boolean;
@@ -242,7 +240,6 @@ function FactoriesSidebar({
   factories,
   organizationName,
   accountName,
-  accountEmail,
   accountAvatarUrl,
   canOpenSettings,
   canCreateFactory,
@@ -271,7 +268,6 @@ function FactoriesSidebar({
         organizationId={organizationId}
         factoryKey={factoryKey}
         userName={accountName ?? "You"}
-        userEmail={accountEmail ?? undefined}
         userAvatarUrl={accountAvatarUrl}
         organizationName={organizationName || "Organization"}
       />

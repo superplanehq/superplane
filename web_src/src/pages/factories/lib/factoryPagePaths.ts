@@ -145,6 +145,14 @@ export function factorySettingsSectionPath(organizationId: string, factoryKey: s
   return `${factorySettingsPath(organizationId, factoryKey)}/${section}`;
 }
 
+export function organizationSettingsPath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/organization`;
+}
+
+export function organizationSettingsSectionPath(organizationId: string, factoryKey: string, section: string) {
+  return `${organizationSettingsPath(organizationId, factoryKey)}/${section}`;
+}
+
 /** Settings General URL after a workspace key change, or `null` when the key did not change. */
 export function factorySettingsGeneralPathAfterKeyChange(
   organizationId: string,

@@ -27,7 +27,7 @@ type Story = StoryObj<typeof meta>;
 const factoryBase = `workspaces/${PRIMARY_FACTORY_KEY}`;
 
 const pendingSeed = {
-  pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" },
+  pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Semaphore" },
 };
 
 export const Default: Story = {
