@@ -22,6 +22,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/buildinfo"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -378,6 +379,8 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 
+	s.Router.HandleFunc("/api/v1/version", serveVersion).Methods("GET")
+
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
 		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogSession)),
@@ -599,6 +602,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 			next.ServeHTTP(w, withOtelMetricRoute(r))
 		})
 	})
+	r.Use(middleware.VersionHeaderMiddleware(buildinfo.Version))
 	r.Use(middleware.CriticalHTTPTraceMiddleware(resolveCriticalHTTPRoute))
 	r.Use(otelmux.Middleware(
 		"superplane-public-api",

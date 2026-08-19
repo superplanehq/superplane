@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -108,6 +109,10 @@ func defaultBindOptions() core.BindOptions {
 	return core.BindOptions{
 		NewAPIClient:        DefaultClient,
 		DefaultOutputFormat: GetOutputFormat,
+		CLIVersion:          Version,
+		ServerVersion: func(ctx context.Context) (string, error) {
+			return ServerVersion()
+		},
 		NewConfigContext: func() core.ConfigContext {
 			if context, ok := GetEnvironmentContext(); ok {
 				return NewEnvironmentContext(context)
