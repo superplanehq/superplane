@@ -134,6 +134,7 @@ REST gateway on `protos/factories.proto`:
 
 - Factories: list, create, describe (includes lines).
 - Lines: create, update.
+- Line metrics: list trailing 30-day success, completions, duration, and cost per line.
 - Apps: list factory-owned canvases.
 - Work orders: list (filters: state, result, assignees, unassigned), create, describe, update assignees, dispatch, close, **update status**, **add comment**, **list artifacts**, **create artifact**, list events.
 
@@ -148,6 +149,21 @@ New RPCs (all under `/api/v1/factories/{factoryId}/orders/{orderId}/…`):
 
 Factory structure (create/update/delete factory + lines) uses the `factories` resource.
 Work-order lifecycle (create/list/describe orders, status, assignees, dispatch, close, comments, artifacts, events) uses the separate `work_orders` resource (`read`, `create`, `update`). That lets limited tokens (runners/agents) mutate work orders without `factories:update`. All endpoints stay behind the `factories` experimental feature flag.
+
+## Line metrics
+
+`DescribeFactory` and `UpdateFactory` return trailing 30-day summary numbers on each `FactoryLine` (`metrics`). Auth is `factories:read` or `factories:update`. The window is 30 local calendar days, including today. The prior window is the 30 days before that (deltas). When a line has no closed work orders in the current window, `metrics` is unset. The UI shows dashes. Create-line and update-line responses do not include metrics.
+
+Rules:
+
+- Population: work orders currently `closed`, with at least one execution, whose latest `order.status.updated` event with `toState=closed` falls in the window. Close time is that event, not `updated_at`.
+- Line attribution: `line_id` of the latest execution (`created_at`, then `id`).
+- Success: a closed work order counts as merged when it has a PR artifact with `data.state=merged` or a set `merged_at`. Success rate is merged / closed. Work order `result=completed` is not a merge proxy.
+- Completions: `mergedCount / 30`. `throughputTrend` is daily merged counts by close day, oldest first.
+- Duration: median minutes from first execution `created_at` to PR `merged_at` among merged work orders. Omitted when nothing merged.
+- Cost per success: `SUM(execution.cost_cents) / mergedCount / 100` across all executions of those closed work orders. Omitted when the sum is 0 (usage is not written yet).
+- `successTrendPct` is the cumulative success rate from the start of the window through each day.
+- Deltas compare current vs prior window. A delta is omitted when the prior window has no comparable data.
 
 ## Canvas components
 
