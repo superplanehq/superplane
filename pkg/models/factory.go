@@ -216,6 +216,27 @@ func FindFactory(tx *gorm.DB, organizationID, factoryID uuid.UUID) (*Factory, er
 	return &factory, nil
 }
 
+func FindFactoryByKey(tx *gorm.DB, organizationID uuid.UUID, key string) (*Factory, error) {
+	normalized := NormalizeFactoryKey(key)
+	if err := ValidateFactoryKey(normalized); err != nil {
+		return nil, err
+	}
+
+	var factory Factory
+	err := tx.
+		Where("organization_id = ? AND key = ?", organizationID, normalized).
+		First(&factory).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryNotFound
+		}
+		return nil, err
+	}
+
+	return &factory, nil
+}
+
 func ListFactories(tx *gorm.DB, organizationID uuid.UUID) ([]Factory, error) {
 	var factories []Factory
 	err := tx.
@@ -406,6 +427,23 @@ func (f *Factory) SoftDeleteCanvases(tx *gorm.DB) error {
 	}
 
 	return nil
+}
+
+// CountFactoriesByIDs counts the active factories in the organization
+// matching the given IDs. Callers use it to verify a caller-provided
+// workspace list before persisting references to it.
+func CountFactoriesByIDs(tx *gorm.DB, organizationID uuid.UUID, ids []uuid.UUID) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	var count int64
+	err := tx.Model(&Factory{}).
+		Where("organization_id = ?", organizationID).
+		Where("id IN ?", ids).
+		Count(&count).
+		Error
+	return count, err
 }
 
 func CountFactoriesByOrganization(tx *gorm.DB, organizationID uuid.UUID) (int64, error) {

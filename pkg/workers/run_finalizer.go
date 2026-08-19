@@ -505,19 +505,21 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return nil, err
 	}
 
-	if run.Result != models.CanvasRunResultPassed {
-		return nil, nil
-	}
-
 	//
-	// Start next step in the factory line.
+	// Advance (or finish) the line dispatch this step run belongs to. The
+	// dispatch's steps snapshot — not the live line — is authoritative for
+	// what comes next, so a mid-traversal line edit can't change it.
 	//
-	factory, err := models.FindFactory(tx, execution.OrganizationID, execution.FactoryID)
+	dispatch, err := models.FindWorkOrderLineDispatch(tx, execution.LineDispatchID)
 	if err != nil {
 		return nil, err
 	}
 
-	line, err := factory.FindLine(tx, execution.LineID)
+	if run.Result != models.CanvasRunResultPassed {
+		return nil, dispatch.Finish(tx, run.Result)
+	}
+
+	factory, err := models.FindFactory(tx, execution.OrganizationID, execution.FactoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -527,16 +529,20 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return nil, err
 	}
 
+	// The order closed while this step was running. The traversal is
+	// abandoned, not just paused: finish it as cancelled so the order
+	// doesn't keep a zombie active dispatch (which would block any
+	// re-dispatch after a reopen).
 	if !workOrder.IsOpen() {
-		return nil, nil
+		return nil, dispatch.Finish(tx, models.CanvasRunResultCancelled)
 	}
 
 	nextIndex := execution.StepIndex + 1
-	if nextIndex >= len(line.Steps) {
-		return nil, nil
+	if nextIndex >= len(dispatch.Steps) {
+		return nil, dispatch.Finish(tx, models.CanvasRunResultPassed)
 	}
 
-	result, err := line.StartStep(tx, workOrder, nextIndex)
+	result, err := dispatch.StartStep(tx, workOrder, nextIndex)
 	if err != nil {
 		return nil, err
 	}

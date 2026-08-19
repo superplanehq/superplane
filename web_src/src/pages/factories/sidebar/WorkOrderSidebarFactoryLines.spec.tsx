@@ -2,16 +2,17 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import type { FactoriesWorkOrderExecution } from "@/api-client";
+import type { FactoriesWorkOrderLineDispatch } from "@/api-client";
 
 import { WorkOrderSidebarFactoryLines } from "./WorkOrderSidebarFactoryLines";
 
-const EXECUTIONS: FactoriesWorkOrderExecution[] = [
+const LINE_DISPATCHES: FactoriesWorkOrderLineDispatch[] = [
   {
-    id: "execution-1",
+    id: "dispatch-1",
     line: { id: "line-1", name: "Refund Line" },
     state: "STATE_FINISHED",
     result: "RESULT_PASSED",
+    createdAt: "2024-01-01T00:00:00.000Z",
   },
 ];
 
@@ -21,7 +22,7 @@ function renderSidebar() {
       <WorkOrderSidebarFactoryLines
         organizationId="org"
         factoryKey="factory"
-        executions={EXECUTIONS}
+        lineDispatches={LINE_DISPATCHES}
         factoryLines={[]}
         canDispatch={false}
         permissionsLoading={false}
@@ -47,7 +48,14 @@ describe("WorkOrderSidebarFactoryLines", () => {
         <WorkOrderSidebarFactoryLines
           organizationId="org"
           factoryKey="factory"
-          executions={[{ id: "execution-2", state: "STATE_FINISHED", result: "RESULT_PASSED" }]}
+          lineDispatches={[
+            {
+              id: "dispatch-2",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2024-01-01T00:00:00.000Z",
+            },
+          ]}
           factoryLines={[]}
           canDispatch={false}
           permissionsLoading={false}
@@ -60,5 +68,41 @@ describe("WorkOrderSidebarFactoryLines", () => {
 
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(screen.getByText("Unnamed line")).toBeInTheDocument();
+  });
+
+  it("shows two rows when the same line has two separate dispatches, tone from the most recent", () => {
+    render(
+      <MemoryRouter>
+        <WorkOrderSidebarFactoryLines
+          organizationId="org"
+          factoryKey="factory"
+          lineDispatches={[
+            {
+              id: "dispatch-old",
+              line: { id: "line-1", name: "Refund Line" },
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              createdAt: "2024-01-01T00:00:00.000Z",
+            },
+            {
+              id: "dispatch-new",
+              line: { id: "line-1", name: "Refund Line" },
+              state: "STATE_ACTIVE",
+              result: "RESULT_UNKNOWN",
+              createdAt: "2024-01-02T00:00:00.000Z",
+            },
+          ]}
+          factoryLines={[]}
+          canDispatch={false}
+          permissionsLoading={false}
+          isDispatchable={false}
+          isDispatching={false}
+          onDispatch={async () => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    // The sidebar collapses to one row per line, summarizing the latest dispatch.
+    expect(screen.getAllByRole("link", { name: "View Refund Line" })).toHaveLength(1);
   });
 });

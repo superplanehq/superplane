@@ -23,7 +23,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Add Memory" href="#add-memory" description="Add a namespaced JSON value to canvas memory" />
-  <LinkCard title="Add Work Order Artifact" href="#add-work-order-artifact" description="Attach a typed artifact (PR, markdown note, or branch) to a work order" />
+  <LinkCard title="Add Work Order Artifact" href="#add-work-order-artifact" description="Attach a typed artifact (PR, markdown note, branch, or link) to a work order" />
   <LinkCard title="Add Work Order Comment" href="#add-work-order-comment" description="Append a comment to a work order timeline" />
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
   <LinkCard title="Broadcast Message" href="#broadcast-message" description="Broadcast a message to other SuperPlane apps" />
@@ -40,6 +40,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
+  <LinkCard title="Report Work Order Check" href="#report-work-order-check" description="Report a scored check (risk, coverage, confidence) on a work order" />
   <LinkCard title="Run App" href="#run-app" description="Run another SuperPlane app and wait for its run to finish" />
   <LinkCard title="Run Shell Commands" href="#run-shell-commands" description="Runs shell commands on a fleet runner (host or Docker container)" />
   <LinkCard title="Run Bash" href="#run-bash" description="Runs a Bash script on a fleet runner with upstream node data in SUPERPLANE_PAYLOAD_FILE" />
@@ -434,11 +435,12 @@ The Add Work Order Artifact component stores a typed artifact against a work ord
 
 Supported types:
 
-- **Pull request** (`pr`): requires `url`; optional `number`, `title`, and `state` (`open`/`draft`/`closed`/`merged`, defaults to `open`) which drives the icon/color of the artifact chip in the work order UI.
+- **Pull request** (`pr`): requires `url`; optional `number`, `title`, `state`, `merged`, `draft`, `mergedAt`, and `closedAt`. The `state` field (`open`/`draft`/`closed`/`merged`, defaults to `open`) drives the icon/color of the artifact chip in the work order UI. `state`, `merged`, and `draft` all accept expressions, so a flow can wire them straight to a `github.onPullRequest` payload: a GitHub-shaped `state: "closed"` + `merged: true` folds into SuperPlane's `state: "merged"` before it hits the artifact. Set `mergedAt` / `closedAt` (RFC3339, usually from the GitHub event) when you attach an already-merged or closed PR so Velocity uses the real day instead of now.
 - **Markdown note** (`markdown`): requires `body`; optional `title`.
-- **Branch** (`branch`): requires `name` (the branch name); optional `url` to link to the branch on its provider (e.g. a GitHub tree URL).
+- **Branch** (`branch`): requires `name` (the branch name). Set `url` when you attach the branch — SuperPlane does not wait for a pull request. If you set `repository` (`owner/repo` or a repository http(s) URL) and leave `url` blank, SuperPlane writes a GitHub tree URL from that repository and the branch name.
+- **Link** (`link`): requires `url` (must be http or https); optional `title` for the artifact chip's label — e.g. attach a preview-environment URL as "Preview".
 
-PR and markdown types accept a free-form `data` list of `{name, value}` entries that gets merged into the artifact's `data` map. Typed inputs take precedence over free-form entries with the same key.
+PR, markdown, and link types accept a free-form `data` list of `{name, value}` entries that gets merged into the artifact's `data` map. Typed inputs take precedence over free-form entries with the same key.
 
 Set `artifactKey` to tag the artifact with a queryable key (e.g. the pull request's URL) so a later `findWorkOrder` (`by: artifactKey`) step can resolve this work order from it — useful in flows that aren't dispatched from a factory line, such as closing a work order from a `github.onPullRequest` merged event. Keys are unique per factory.
 
@@ -1193,6 +1195,48 @@ The Read Memory component looks up values from canvas-level memory storage.
 }
 ```
 
+<a id="report-work-order-check"></a>
+
+## Report Work Order Check
+
+**Component key:** `reportWorkOrderCheck`
+
+The Report Work Order Check component stores a scored check against a work order. Checks appear as scorecards on the work order page, next to the description.
+
+Each check is identified by its `checkKey` (for example `risk-review`). The first report creates the check. A later report with the same key updates the check in place and keeps the prior score, so the UI can show the movement between runs. Every report also adds an entry to the work order timeline.
+
+The check's level (healthy / neutral / needs attention / critical) is computed from the score and the thresholds you configure:
+
+- `direction` says which way is bad: `higherIsBetter` (e.g. coverage) or `lowerIsBetter` (e.g. risk).
+- `cautionAt` and `criticalAt` are score thresholds. When the score crosses a threshold in the bad direction, the check shows that level.
+- With no thresholds set, the check stays neutral.
+
+For example, a risk score from 0 to 10 where lower is better, with `cautionAt: 5` and `criticalAt: 8`: a score of 3 is healthy, 6 needs attention, 9 is critical.
+
+`score` and `maxScore` accept expressions, so a preceding automation run can feed them (e.g. `{{ previous().data.risk.score }}`). Use `analysis` for the full markdown report — it renders when a user opens the check.
+
+`orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run. This component can only be used in factory-owned apps.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "check": {
+      "format": "fraction",
+      "id": "chk-123",
+      "key": "risk-review",
+      "level": "positive",
+      "maxScore": 10,
+      "name": "Risk review",
+      "score": 3
+    }
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "workOrder.checkReported"
+}
+```
+
 <a id="run-app"></a>
 
 ## Run App
@@ -1661,7 +1705,9 @@ The Update Work Order Artifact component keeps an already-attached artifact's da
 
 This does not add a new timeline entry: the work order's "attached" line and the sidebar artifact list both update in place so the chip's icon/color track the pull request's current state without spamming the timeline on every open → draft → merged flip.
 
-Typical wiring to stay in sync with GitHub: a `github.onPullRequest` trigger (actions: opened, ready_for_review, converted_to_draft, closed) → `findWorkOrder` (`by: artifactKey`, `artifactKey: {{ event.data.pull_request.html_url }}`) → this component, with `state` derived from the webhook action: `opened`/`reopened` → `open`, `converted_to_draft` → `draft`, `ready_for_review` → `open`, `closed` with `pull_request.merged == true` → `merged`, `closed` with `merged == false` → `closed`.
+Typical wiring to stay in sync with GitHub: a `github.onPullRequest` trigger (actions: opened, ready_for_review, converted_to_draft, closed) → `findWorkOrder` (`by: artifactKey`, `artifactKey: {{ event.data.pull_request.html_url }}`) → this component.
+
+The `state`, `merged`, and `draft` fields all accept expressions, so you can pass the webhook payload through as-is instead of writing an if-node per branch. Set `state: "{{ event.data.pull_request.state }}"` and `merged: "{{ event.data.pull_request.merged }}"` (plus optional `draft: "{{ event.data.pull_request.draft }}"`); the component folds a GitHub-shaped payload (`state: "closed"` + `merged: true`) into SuperPlane's `state: "merged"` before it hits the artifact, so the chip flips to purple as soon as the merge event lands.
 
 `orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event such as `github.onPullRequest`, replace it with `{{ previous().data.workOrder.id }}` after a `findWorkOrder` step. This component can only be used in factory-owned apps.
 

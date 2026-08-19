@@ -1,4 +1,4 @@
-import type { FactoriesWorkOrderExecution } from "@/api-client";
+import type { FactoriesWorkOrderLineDispatch } from "@/api-client";
 
 export type FactoryLineRowTone = "success" | "warning" | "danger" | "muted";
 
@@ -8,47 +8,37 @@ export interface FactoryLineRowModel {
   tone: FactoryLineRowTone;
 }
 
-// Groups a work order's executions by factory line, collapsing multiple runs
-// on the same line into the worst tone so the sidebar surfaces failures over
-// successes.
-export function deriveFactoryLineRows(executions: FactoriesWorkOrderExecution[]): FactoryLineRowModel[] {
-  const map = new Map<string, FactoryLineRowModel>();
-  for (const execution of executions) {
-    const lineId = execution.line?.id ?? "unknown";
-    const lineName = execution.line?.name?.trim() || "Unnamed line";
-    const tone = executionTone(execution);
-    const existing = map.get(lineId);
-    if (!existing) {
-      map.set(lineId, { lineId, lineName, tone });
+// One row per line, summarizing that line's most recent dispatch. The
+// sidebar is a compact status summary, not a history view — every dispatch
+// (including earlier, superseded ones) shows up separately in
+// WorkOrderExecutionsList instead.
+export function deriveFactoryLineRows(dispatches: FactoriesWorkOrderLineDispatch[]): FactoryLineRowModel[] {
+  const latestByLineId = new Map<string, { model: FactoryLineRowModel; createdAt: number }>();
+
+  for (const dispatch of dispatches) {
+    const lineId = dispatch.line?.id ?? "unknown";
+    const lineName = dispatch.line?.name?.trim() || "Unnamed line";
+    const createdAt = Date.parse(dispatch.createdAt ?? "") || 0;
+
+    const existing = latestByLineId.get(lineId);
+    if (existing && existing.createdAt > createdAt) {
       continue;
     }
-    existing.tone = worstTone(existing.tone, tone);
+
+    latestByLineId.set(lineId, {
+      model: { lineId, lineName, tone: dispatchTone(dispatch) },
+      createdAt,
+    });
   }
-  return [...map.values()];
+
+  return [...latestByLineId.values()].map(({ model }) => model);
 }
 
-function executionTone(execution: FactoriesWorkOrderExecution): FactoryLineRowTone {
-  if (execution.result === "RESULT_FAILED") return "danger";
-  if (
-    execution.state === "STATE_PENDING" ||
-    execution.state === "STATE_STARTED" ||
-    execution.state === "STATE_CANCELLING"
-  ) {
-    return "warning";
-  }
-  if (execution.result === "RESULT_PASSED") return "success";
+function dispatchTone(dispatch: FactoriesWorkOrderLineDispatch): FactoryLineRowTone {
+  if (dispatch.result === "RESULT_FAILED") return "danger";
+  if (dispatch.state === "STATE_ACTIVE") return "warning";
+  if (dispatch.result === "RESULT_PASSED") return "success";
   return "muted";
-}
-
-const TONE_PRIORITY: Record<FactoryLineRowTone, number> = {
-  danger: 3,
-  warning: 2,
-  success: 1,
-  muted: 0,
-};
-
-function worstTone(a: FactoryLineRowTone, b: FactoryLineRowTone): FactoryLineRowTone {
-  return TONE_PRIORITY[a] >= TONE_PRIORITY[b] ? a : b;
 }
 
 export const FACTORY_LINE_TONE_DOT_CLASS: Record<FactoryLineRowTone, string> = {

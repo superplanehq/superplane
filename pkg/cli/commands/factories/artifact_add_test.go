@@ -53,6 +53,26 @@ func TestArtifactAddCommand_BuildData(t *testing.T) {
 		assert.Contains(t, err.Error(), "--name")
 	})
 
+	t.Run("link requires url", func(t *testing.T) {
+		cmd := &cobra.Command{}
+		c := &artifactAddCommand{}
+		_, _, err := c.buildData(core.CommandContext{Cmd: cmd}, "link")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--url")
+	})
+
+	t.Run("link builds url and title", func(t *testing.T) {
+		url := "https://preview.example.com/pr-42"
+		title := "Preview"
+		cmd := &cobra.Command{}
+		c := &artifactAddCommand{url: &url, title: &title}
+		data, typ, err := c.buildData(core.CommandContext{Cmd: cmd}, "link")
+		require.NoError(t, err)
+		assert.Equal(t, openapi_client.FACTORIESWORKORDERARTIFACTTYPE_TYPE_LINK, typ)
+		assert.Equal(t, url, data["url"])
+		assert.Equal(t, title, data["title"])
+	})
+
 	t.Run("unknown type", func(t *testing.T) {
 		cmd := &cobra.Command{}
 		c := &artifactAddCommand{}

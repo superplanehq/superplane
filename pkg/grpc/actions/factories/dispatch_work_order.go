@@ -50,6 +50,7 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 	var order *models.FactoryWorkOrder
 	var pendingRun *models.CanvasRun
 	var logger *log.Entry
+	var fromState string
 
 	db := database.DB(ctx)
 	err = db.Transaction(func(tx *gorm.DB) error {
@@ -78,9 +79,9 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return models.ErrFactoryLineHasNoSteps
 		}
 
-		_, err = order.FindActiveExecution(tx)
+		_, err = order.FindActiveLineDispatch(tx)
 		if err == nil {
-			return models.ErrFactoryWorkOrderExecutionActive
+			return models.ErrFactoryWorkOrderLineDispatchActive
 		}
 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -88,11 +89,12 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		}
 
 		// Promote draft → open before the first step; no-op if already open.
+		fromState = order.State
 		if err := order.TransitionOnDispatch(tx, actor); err != nil {
 			return err
 		}
 
-		result, err := line.StartStep(tx, order, 0)
+		_, result, err := line.Dispatch(tx, order)
 		if err != nil {
 			return err
 		}
@@ -117,6 +119,23 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		factoryevents.EventTypeLineStepExecutionCreated,
 	); err != nil {
 		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
+	}
+
+	if fromState != order.State {
+		notification := messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID: orgID.String(),
+			FactoryID:      factoryID.String(),
+			OrderID:        order.ID.String(),
+			EventType:      factoryevents.EventTypeOrderStatusUpdated,
+			FromState:      fromState,
+			ToState:        order.State,
+		}
+		if actor != nil {
+			notification.ActorUserID = actor.String()
+		}
+		if err := notification.Publish(); err != nil {
+			logger.WithError(err).Warnf("Failed to publish work order notification for order %s", order.ID)
+		}
 	}
 
 	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
