@@ -1,19 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { Check, Copy, ListTodo, Loader2, Search } from "lucide-react";
+import { Check, ListTodo, Loader2, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import {
-  FIXTURE_INVITE_URL,
-  FIXTURE_REPOS,
-  VCS_OPTIONS,
-  vcsLabel,
-  type IntegrationId,
-  type VcsHostId,
-} from "./onboardingFixtures";
+import { FIXTURE_REPOS, VCS_OPTIONS, vcsLabel, type IntegrationId, type VcsHostId } from "./onboardingFixtures";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
 export function IntegrationChoiceIcon({ name, size = 20 }: { name: IntegrationId | VcsHostId; size?: number }) {
@@ -131,63 +126,55 @@ export function ConnectOptionRow({
   );
 }
 
-export function NameInviteStep({
-  setup,
-  inviteUrl = FIXTURE_INVITE_URL,
-  inviteLoading = false,
-  canInvite = true,
-}: {
-  setup: OnboardingSetupApi;
-  inviteUrl?: string | null;
-  inviteLoading?: boolean;
-  canInvite?: boolean;
-}) {
-  const copyInviteLink = () => {
-    if (!inviteUrl) return;
-    void navigator.clipboard?.writeText(inviteUrl);
-    setup.setInviteCopied(true);
-  };
-
+export function NameStep({ setup }: { setup: OnboardingSetupApi }) {
   return (
-    <div className="space-y-6">
+    <div>
+      <Label htmlFor="workspace-name" className="text-[13px] font-medium">
+        Workspace name
+      </Label>
+      <Input
+        id="workspace-name"
+        value={setup.workspaceName}
+        onChange={(event) => setup.editWorkspaceName(event.target.value)}
+        placeholder="Payments Service"
+        className="mt-2 h-10"
+        autoFocus
+      />
+      <p className="mt-1.5 text-[12px] text-muted-foreground">
+        Use a name for the app or product area this workspace will improve.
+      </p>
+    </div>
+  );
+}
+
+export function StartStep({ setup }: { setup: OnboardingSetupApi }) {
+  return (
+    <div className="space-y-4">
       <div>
-        <Label htmlFor="workspace-name" className="text-[13px] font-medium">
-          Workspace name
+        <Label htmlFor="start-work-order-title" className="text-[13px] font-medium">
+          Work order title
         </Label>
         <Input
-          id="workspace-name"
-          value={setup.workspaceName}
-          onChange={(event) => setup.setWorkspaceName(event.target.value)}
-          placeholder="Tempered Loom"
+          id="start-work-order-title"
+          value={setup.workOrderTitle}
+          onChange={(event) => setup.setWorkOrderTitle(event.target.value)}
           className="mt-2 h-10"
           autoFocus
         />
-        <p className="mt-1.5 text-[12px] text-muted-foreground">
-          Starter name is editable. Use a short name for the app or product area this workspace will improve.
-        </p>
       </div>
-
-      <div className="rounded-lg border border-border p-4">
-        <div className="text-[13px] font-medium">Invite teammates</div>
-        <p className="mt-1 text-[12px] text-muted-foreground">
-          Optional. Share the organization invite link so teammates can collaborate on work orders. People join as
-          viewers. You can change roles later.
+      <div>
+        <Label htmlFor="start-work-order-description" className="text-[13px] font-medium">
+          Description
+        </Label>
+        <Textarea
+          id="start-work-order-description"
+          value={setup.workOrderDescription}
+          onChange={(event) => setup.setWorkOrderDescription(event.target.value)}
+          className="mt-2 min-h-40"
+        />
+        <p className="mt-1.5 text-[12px] text-muted-foreground">
+          The agent uses this description when it improves AGENTS.md in the app repository.
         </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <code className="max-w-full truncate rounded-md border border-border bg-accent/40 px-2 py-1.5 text-[12px]">
-            {inviteLoading ? "Loading invite link…" : (inviteUrl ?? "Invite link is not available.")}
-          </code>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={!canInvite || inviteLoading || !inviteUrl}
-            onClick={copyInviteLink}
-          >
-            <Copy className="size-3.5" aria-hidden />
-            {setup.inviteCopied ? "Copied" : "Copy link"}
-          </Button>
-        </div>
       </div>
     </div>
   );
@@ -198,13 +185,14 @@ function RepositoryPicker({
   repos,
   selectedRepo,
   onSelect,
-  title = "Select repository",
-  description = "Choose the app repository SuperPlane will analyze and agents will change. Pull requests open here.",
+  title,
+  description,
 }: {
   host: VcsHostId;
   repos: string[];
   selectedRepo: string | null;
   onSelect: (repo: string) => void;
+  /** Only for pickers that need their own heading, such as the backlog picker. */
   title?: string;
   description?: string;
 }) {
@@ -221,9 +209,9 @@ function RepositoryPicker({
   }, [repos, query]);
 
   return (
-    <div className="space-y-3 rounded-lg border border-border p-4">
-      <div className="text-[13px] font-medium">{title}</div>
-      <p className="text-[12px] text-muted-foreground">{description}</p>
+    <div className="space-y-3">
+      {title ? <div className="text-[13px] font-medium">{title}</div> : null}
+      {description ? <p className="text-[12px] text-muted-foreground">{description}</p> : null}
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -269,58 +257,126 @@ function RepositoryPicker({
           </ul>
         )}
       </div>
-      <p className="text-[11px] text-muted-foreground">
-        {filtered.length} of {repos.length} repositories
-      </p>
     </div>
   );
 }
 
-export function RepoStep({
-  setup,
-  onRequestConnect,
-  repos,
+export function VcsStep({
+  github,
+  selectedConnectionId,
+  onSelectConnection,
+  onCreateConnection,
 }: {
-  setup: OnboardingSetupApi;
-  onRequestConnect: (id: IntegrationId) => void;
-  repos?: string[];
+  github: IntegrationInstanceSummary;
+  selectedConnectionId?: string;
+  onSelectConnection: (id: string, name: string) => void;
+  onCreateConnection: () => void;
 }) {
-  const host = setup.vcsHost;
-  const hostConnected = host ? setup.connected.has(host) : false;
-  const availableRepos = repos ?? (host && hostConnected ? FIXTURE_REPOS[host] : []);
+  const githubOption = VCS_OPTIONS.find((option) => option.id === "github");
+  const gitlabOption = VCS_OPTIONS.find((option) => option.id === "gitlab");
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-2">
-        {VCS_OPTIONS.map((option) => {
-          const optionId = option.id as VcsHostId;
-          const connected = setup.connected.has(optionId);
-          const selected = setup.vcsHost === optionId;
-          return (
-            <ConnectOptionRow
-              key={option.id}
-              icon={<IntegrationChoiceIcon name={option.id} />}
-              title={option.label}
-              detail={option.detail}
-              selected={selected}
-              connectLabel={vcsLabel(optionId)}
-              connected={connected}
-              soon={option.soon}
-              onSelect={() => setup.selectVcsHost(optionId)}
-              onConnect={() => onRequestConnect(optionId)}
-            />
-          );
-        })}
-      </div>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <section className="rounded-lg border border-border bg-background p-5">
+        <div className="flex items-center gap-3">
+          <IntegrationIcon integrationName="github" className="size-10" size={40} />
+          <div>
+            <h2 className="text-[22px] font-semibold tracking-[-0.02em]">{githubOption?.label ?? "GitHub"}</h2>
+            <p className="text-[12px] text-muted-foreground">
+              {github.readyInstances.length > 0
+                ? "Choose a connection or connect a new one."
+                : "Connect GitHub to continue."}
+            </p>
+          </div>
+        </div>
 
-      {host && hostConnected ? (
-        <RepositoryPicker
-          host={host}
-          repos={availableRepos}
-          selectedRepo={setup.selectedRepo}
-          onSelect={setup.selectRepo}
-        />
+        {github.readyInstances.length > 0 ? (
+          <div className="mt-5 space-y-2">
+            <p className="text-[12px] font-medium text-muted-foreground">Existing connections</p>
+            {github.readyInstances.map((connection) => {
+              const id = connection.metadata?.id;
+              const name = connection.metadata?.name || "Unnamed connection";
+              if (!id) return null;
+
+              const selected = id === selectedConnectionId;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => onSelectConnection(id, name)}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left transition-colors",
+                    selected
+                      ? "border-foreground bg-accent/50"
+                      : "border-border bg-background hover:border-foreground hover:bg-accent/30",
+                  )}
+                >
+                  <IntegrationIcon integrationName="github" className="size-4 shrink-0" size={16} />
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{name}</span>
+                  {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
+                </button>
+              );
+            })}
+            <Button type="button" variant="outline" className="mt-3 w-full" onClick={onCreateConnection}>
+              <Plus className="size-4" aria-hidden />
+              Connect new GitHub
+            </Button>
+          </div>
+        ) : (
+          <Button type="button" className="mt-5 w-full" onClick={onCreateConnection}>
+            Connect GitHub
+          </Button>
+        )}
+      </section>
+
+      {gitlabOption ? (
+        <div
+          className="relative flex min-h-44 flex-col items-center justify-center gap-3 overflow-hidden rounded-lg border border-border/70 bg-muted/20 px-6 py-12 opacity-70"
+          aria-disabled="true"
+        >
+          <ComingSoonRibbon />
+          <IntegrationIcon integrationName="gitlab" className="size-10" size={40} />
+          <span className="text-[22px] font-semibold tracking-[-0.02em] text-muted-foreground">
+            {gitlabOption.label}
+          </span>
+        </div>
       ) : null}
+    </div>
+  );
+}
+
+export function RepositoryStep({
+  setup,
+  repos,
+  onSelect,
+  onEditConnection,
+}: {
+  setup: OnboardingSetupApi;
+  repos?: string[];
+  /** Selecting a repository is the answer for this step, so it also continues. */
+  onSelect: (repo: string) => void;
+  onEditConnection: () => void;
+}) {
+  const host = setup.vcsHost;
+  if (!host || !setup.connected.has(host)) {
+    return <p className="text-[13px] text-muted-foreground">Connect version control first.</p>;
+  }
+
+  const availableRepos = repos ?? FIXTURE_REPOS[host];
+
+  return (
+    <div className="space-y-3">
+      <RepositoryPicker host={host} repos={availableRepos} selectedRepo={setup.selectedRepo} onSelect={onSelect} />
+      <p className="text-[13px] text-muted-foreground">
+        Do not see your repo?{" "}
+        <button
+          type="button"
+          onClick={onEditConnection}
+          className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
+        >
+          Edit {vcsLabel(host)} connection
+        </button>
+      </p>
     </div>
   );
 }

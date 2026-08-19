@@ -103,7 +103,8 @@ func (g *GitHub) Configuration() []configuration.Field {
 			Name:        "organization",
 			Label:       "Organization",
 			Type:        configuration.FieldTypeString,
-			Description: "Organization to install the app into. If not specified, the app will be installed into the user's account.",
+			Placeholder: "e.g. superplanehq",
+			Description: "Organization to install the app into. You must be an owner of the organization, because SuperPlane creates the GitHub App in it. If you leave this empty, the app goes into your personal account.",
 		},
 	}
 }
@@ -180,6 +181,16 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 	//
 	if metadata.InstallationID != "" {
 		return nil
+	}
+
+	if config.Organization != "" {
+		if err := validateOrganizationName(config.Organization); err != nil {
+			return err
+		}
+
+		if err := checkOrganizationExists(ctx.HTTP, ctx.Logger, config.Organization); err != nil {
+			return err
+		}
 	}
 
 	state, err := crypto.Base64String(32)
