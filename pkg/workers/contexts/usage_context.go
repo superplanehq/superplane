@@ -2,28 +2,30 @@ package contexts
 
 import (
 	"github.com/google/uuid"
+
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	"gorm.io/gorm"
 )
 
 // UsageContext records LLM spend for the current node execution.
+// Inserts use a committed connection, not the node-executor transaction.
+// The provider already billed the tokens; a later Emit/Fail/rollback must
+// not drop the ledger row.
 type UsageContext struct {
-	tx             *gorm.DB
 	organizationID uuid.UUID
 	execution      *models.CanvasNodeExecution
 }
 
-func NewUsageContext(tx *gorm.DB, organizationID uuid.UUID, execution *models.CanvasNodeExecution) *UsageContext {
+func NewUsageContext(organizationID uuid.UUID, execution *models.CanvasNodeExecution) *UsageContext {
 	return &UsageContext{
-		tx:             tx,
 		organizationID: organizationID,
 		execution:      execution,
 	}
 }
 
 func (c *UsageContext) Record(record core.UsageRecord) error {
-	return models.RecordUsage(c.tx, models.LLMUsageEventInput{
+	return models.RecordUsage(database.Conn(), models.LLMUsageEventInput{
 		OrganizationID:   c.organizationID,
 		CanvasRunID:      c.execution.RunID,
 		NodeExecutionID:  c.execution.ID,
