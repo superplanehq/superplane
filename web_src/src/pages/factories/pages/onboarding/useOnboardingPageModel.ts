@@ -12,7 +12,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
-import { ONBOARDING_LINE_APPS } from "@/pages/home/factories";
+import { ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS } from "@/pages/home/factories";
 import { useInstallFactory, type InstallFactoryInput } from "@/pages/home/useInstallFactory";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
@@ -139,6 +139,34 @@ function findProvisionedLine(factory: FactoriesFactory | null): FactoriesFactory
   );
 }
 
+type InstallOnboardingApp = (
+  input: InstallFactoryInput,
+) => Promise<{ canvasId: string; canvasName: string } | undefined>;
+
+async function installOnboardingApp(args: {
+  factoryId: string;
+  appFactoryId: string;
+  selections: IntegrationSelections;
+  appRepository: string;
+  backlogRepository: string;
+  installFactory: InstallOnboardingApp;
+}): Promise<{ canvasId: string; canvasName: string }> {
+  const installed = await args.installFactory({
+    factoryId: args.appFactoryId,
+    workspaceFactoryId: args.factoryId,
+    integrations: args.selections,
+    installParams: {
+      appRepository: args.appRepository,
+      backlogRepository: args.backlogRepository,
+    },
+    startingTaskPrompt: "",
+    navigateOnComplete: false,
+    startInitialRun: false,
+  });
+  if (!installed?.canvasId) throw new Error(`Failed to create the ${args.appFactoryId} app`);
+  return installed;
+}
+
 // Install each bundled app in order and return the line steps that call them.
 // installFactory clears its pending-canvas ref after each success, so the
 // sequential calls create distinct canvases.
@@ -147,23 +175,18 @@ async function provisionLineApps(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
-  installFactory: (input: InstallFactoryInput) => Promise<{ canvasId: string; canvasName: string } | undefined>;
+  installFactory: InstallOnboardingApp;
 }): Promise<FactoryLineStep[]> {
   const steps: FactoryLineStep[] = [];
   for (const app of ONBOARDING_LINE_APPS) {
-    const installed = await args.installFactory({
-      factoryId: app.factoryId,
-      workspaceFactoryId: args.factoryId,
-      integrations: args.selections,
-      installParams: {
-        appRepository: args.appRepository,
-        backlogRepository: args.backlogRepository,
-      },
-      startingTaskPrompt: "",
-      navigateOnComplete: false,
-      startInitialRun: false,
+    const installed = await installOnboardingApp({
+      factoryId: args.factoryId,
+      appFactoryId: app.factoryId,
+      selections: args.selections,
+      appRepository: args.appRepository,
+      backlogRepository: args.backlogRepository,
+      installFactory: args.installFactory,
     });
-    if (!installed?.canvasId) throw new Error(`Failed to create the ${app.factoryId} app`);
     steps.push({
       name: app.lineStepName,
       type: "runApp",
@@ -171,6 +194,28 @@ async function provisionLineApps(args: {
     });
   }
   return steps;
+}
+
+// Event apps listen for GitHub events and are not factory line steps. Install
+// them even when the line already exists, so a retry after a failed finish
+// still creates PR Closure.
+async function provisionEventApps(args: {
+  factoryId: string;
+  selections: IntegrationSelections;
+  appRepository: string;
+  backlogRepository: string;
+  installFactory: InstallOnboardingApp;
+}): Promise<void> {
+  for (const appFactoryId of ONBOARDING_EVENT_APPS) {
+    await installOnboardingApp({
+      factoryId: args.factoryId,
+      appFactoryId,
+      selections: args.selections,
+      appRepository: args.appRepository,
+      backlogRepository: args.backlogRepository,
+      installFactory: args.installFactory,
+    });
+  }
 }
 
 interface ProvisionedLine {
@@ -185,7 +230,7 @@ async function provisionLine(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
-  installFactory: (input: InstallFactoryInput) => Promise<{ canvasId: string; canvasName: string } | undefined>;
+  installFactory: InstallOnboardingApp;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   updateOnboarding: UpdateOnboarding;
 }): Promise<ProvisionedLine> {
@@ -252,7 +297,7 @@ function useFinishOnboarding(args: {
   selections: IntegrationSelections;
   setSaving: (saving: boolean) => void;
   updateOnboarding: UpdateOnboarding;
-  installFactory: (input: InstallFactoryInput) => Promise<{ canvasId: string; canvasName: string } | undefined>;
+  installFactory: InstallOnboardingApp;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
 }) {
   const navigate = useNavigate();
@@ -286,6 +331,13 @@ function useFinishOnboarding(args: {
         installFactory: args.installFactory,
         createLine: args.createLine,
         updateOnboarding: args.updateOnboarding,
+      });
+      await provisionEventApps({
+        factoryId: args.factoryId,
+        selections: args.selections,
+        appRepository,
+        backlogRepository,
+        installFactory: args.installFactory,
       });
       await args.updateOnboarding({
         provisionedAppId: primaryAppId,
