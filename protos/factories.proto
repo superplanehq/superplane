@@ -286,6 +286,17 @@ service Factories {
     };
   }
 
+  rpc DescribeFactoryUsage(DescribeFactoryUsageRequest) returns (DescribeFactoryUsageResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/usage"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe factory LLM spend";
+      description: "Returns token and estimated dollar spend for a workspace, grouped by model";
+      tags: "Factory";
+    };
+  }
+
 }
 
 // Factories
@@ -876,4 +887,26 @@ message DescribeFactoryVelocityTotals {
   int32 superplane_share_pct = 4;
   // Waste as a percentage of SuperPlane closes (merged + waste), 0-100.
   int32 waste_pct = 5;
+}
+
+// LLM spend
+
+message DescribeFactoryUsageRequest {
+  string factory_id = 1;
+  // Period window in days. Defaults to 30. Maximum is 90.
+  int32 period_days = 2;
+}
+
+message DescribeFactoryUsageResponse {
+  int64 total_tokens = 1;
+  int64 total_cost_cents = 2;
+  int32 period_days = 3;
+  repeated UsageByModel by_model = 4;
+}
+
+message UsageByModel {
+  string provider = 1;
+  string model = 2;
+  int64 total_tokens = 3;
+  int64 cost_cents = 4;
 }

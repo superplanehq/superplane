@@ -60,6 +60,44 @@ func FindWorkOrderExecutionByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryWorkOr
 	return &execution, nil
 }
 
+const maxFactoryExecutionRunAncestors = 32
+
+// FindWorkOrderExecutionForRun returns the factory step for this run or an
+// ancestor. Child runs created by ctx.Runs.Create keep a different run ID
+// than the factory line step, so a direct lookup would drop their spend.
+func FindWorkOrderExecutionForRun(tx *gorm.DB, runID uuid.UUID) (*FactoryWorkOrderExecution, error) {
+	seen := make(map[uuid.UUID]struct{}, 8)
+	current := runID
+	for range maxFactoryExecutionRunAncestors {
+		if _, visited := seen[current]; visited {
+			return nil, ErrFactoryWorkOrderExecutionNotFound
+		}
+		seen[current] = struct{}{}
+
+		execution, err := FindWorkOrderExecutionByRunID(tx, current)
+		if err == nil {
+			return execution, nil
+		}
+		if !errors.Is(err, ErrFactoryWorkOrderExecutionNotFound) {
+			return nil, err
+		}
+
+		run, err := FindUnscopedCanvasRun(tx, current)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, ErrFactoryWorkOrderExecutionNotFound
+			}
+			return nil, err
+		}
+		if run.ParentRunID == nil || *run.ParentRunID == uuid.Nil {
+			return nil, ErrFactoryWorkOrderExecutionNotFound
+		}
+		current = *run.ParentRunID
+	}
+
+	return nil, ErrFactoryWorkOrderExecutionNotFound
+}
+
 func (e *FactoryWorkOrderExecution) MarkRunning(tx *gorm.DB) error {
 	if e.Status != FactoryWorkOrderExecutionStatusPending {
 		return nil

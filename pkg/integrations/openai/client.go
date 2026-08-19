@@ -116,9 +116,16 @@ type ResponseOutput struct {
 }
 
 type ResponseUsage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
-	TotalTokens  int `json:"total_tokens"`
+	InputTokens         int                        `json:"input_tokens"`
+	InputTokensDetails  *ResponseUsageTokenDetails `json:"input_tokens_details,omitempty"`
+	OutputTokens        int                        `json:"output_tokens"`
+	OutputTokensDetails *ResponseUsageTokenDetails `json:"output_tokens_details,omitempty"`
+	TotalTokens         int                        `json:"total_tokens"`
+}
+
+type ResponseUsageTokenDetails struct {
+	CachedTokens    int `json:"cached_tokens,omitempty"`
+	ReasoningTokens int `json:"reasoning_tokens,omitempty"`
 }
 
 type OpenAIResponse struct {
