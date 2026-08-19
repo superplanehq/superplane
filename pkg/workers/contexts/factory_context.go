@@ -239,6 +239,29 @@ func (c *FactoryContext) ReportWorkOrderCheck(params core.ReportWorkOrderCheckPa
 	return checkToCore(check), nil
 }
 
+func (c *FactoryContext) SetWorkOrderStatusNote(params core.SetWorkOrderStatusNoteParams) (*core.WorkOrderStatusNote, error) {
+	order, err := c.resolveWorkOrder(params.OrderID)
+	if err != nil {
+		return nil, err
+	}
+
+	note, err := order.SetStatusNote(c.tx, models.FactoryWorkOrderStatusNoteParams{
+		Kind:       params.Kind,
+		Headline:   params.Headline,
+		Body:       params.Body,
+		CtaLabel:   params.CtaLabel,
+		CtaURL:     params.CtaURL,
+		Automation: c.automationRef(),
+		Run:        c.runRef(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderStatusNoteUpdated)
+	return statusNoteToCore(order, note), nil
+}
+
 // FindWorkOrder resolves a work order by id or by an artifact key,
 // independent of the current run's `factory_work_order_executions` row.
 // This is what lets a plain webhook-triggered run (e.g. github.onPullRequest)
@@ -451,6 +474,17 @@ func artifactToCore(artifact *models.FactoryWorkOrderArtifact) (*core.WorkOrderA
 		Type:        artifact.Type,
 		Data:        data,
 	}, nil
+}
+
+func statusNoteToCore(order *models.FactoryWorkOrder, note *models.FactoryWorkOrderStatusNote) *core.WorkOrderStatusNote {
+	return &core.WorkOrderStatusNote{
+		WorkOrderID: order.ID.String(),
+		Kind:        note.Kind,
+		Headline:    note.Headline,
+		Body:        note.Body,
+		CtaLabel:    note.CtaLabel,
+		CtaURL:      note.CtaURL,
+	}
 }
 
 func checkToCore(check *models.FactoryWorkOrderCheck) *core.WorkOrderCheck {
