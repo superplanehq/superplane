@@ -140,18 +140,10 @@ func (s *invitationSteps) followInviteLinkToLogin(token string) {
 
 // openSignupForm navigates from the login page to the signup form.
 //
-// The Login page renders its content only after an async /auth/config
-// fetch resolves, and which form is shown first depends on whether
-// magic-code login is the primary method: if so, a "Sign in with
-// password instead" toggle must be clicked before "Create an account"
-// becomes visible; if not, "Create an account" is already visible.
-//
-// Because /auth/config resolution time depends on backend/DB latency,
-// we can't assume either state appears within a fixed short window -
-// we race both locators with the same generous timeout used elsewhere
-// in this suite, rather than guessing a fixed wait and silently
-// swallowing a timeout (which previously caused this test to flake
-// under DB load).
+// Depending on which login method is primary, "Create an account" may
+// already be visible, or a "Sign in with password instead" toggle may
+// need to be clicked first. This waits for whichever appears first and
+// clicks the toggle only if needed.
 func (s *invitationSteps) openSignupForm() {
 	page := s.session.Page()
 	const timeout = 15000 * time.Millisecond
@@ -166,15 +158,11 @@ func (s *invitationSteps) openSignupForm() {
 			break
 		}
 		if visible, err := createAccount.IsVisible(); err == nil && visible {
-			// Password signup is already the primary form; no toggle needed.
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	// Whether or not the toggle needed clicking, "Create an account" must
-	// become visible. If it never does, this fails fast with a clear,
-	// bounded locator-timeout error instead of hanging on a default wait.
 	if err := createAccount.WaitFor(pw.LocatorWaitForOptions{
 		State:   pw.WaitForSelectorStateVisible,
 		Timeout: pw.Float(float64(timeout / time.Millisecond)),
