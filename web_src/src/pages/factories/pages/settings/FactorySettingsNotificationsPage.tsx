@@ -326,9 +326,7 @@ function WorkspaceScopeSection({
               workspaceId={filter.workspaceId}
               workspaceName={factoriesById.get(filter.workspaceId)?.name || filter.workspaceId}
               toggles={filter.toggles}
-              error={
-                typeError && eventTypesFromToggles(filter.toggles).length === 0 ? typeError : undefined
-              }
+              error={typeError && eventTypesFromToggles(filter.toggles).length === 0 ? typeError : undefined}
               onToggle={(key, value) => onToggleType(filter.workspaceId, key, value)}
             />
           ))}
