@@ -1,7 +1,9 @@
 import {
   defaultFactoriesFixture,
   ORGANIZATION_USERS,
+  STORYBOOK_ME_USER_EMAIL,
   STORYBOOK_ME_USER_ID,
+  STORYBOOK_ME_USER_NAME,
   type FactoriesFixture,
 } from "./factoryPageResponses";
 import { DEFAULT_ARTIFACTS_BY_ORDER_ID, DEFAULT_EVENTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
@@ -331,6 +333,16 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   ];
 }
 
+/** Serves `/api/v1/me` so factory stories resolve `useMe` without the Home harness. */
+function meRoute(): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/me"),
+    resolve: () => ({
+      json: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME, email: STORYBOOK_ME_USER_EMAIL } },
+    }),
+  };
+}
+
 function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
   const defaults = defaultNotificationSettings();
 
@@ -350,6 +362,7 @@ function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
 function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     factoriesCollectionRoute(fixture),
+    meRoute(),
     notificationSettingsRoute(fixture),
     ...factoryDetailRoutes(fixture),
     ...factoryLinesRoutes(fixture),
