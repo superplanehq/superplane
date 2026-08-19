@@ -57,10 +57,16 @@ func serializeNotificationSettings(settings *models.UserNotificationSettings) *p
 		}
 	}
 
+	var eventTypes []pb.NotificationSettings_Type
+	if settings.WorkspaceScope == models.NotificationWorkspaceScopeAll {
+		eventTypes = serializeEventTypes(settings.EventTypes.Data())
+	}
+
 	return &pb.NotificationSettings{
 		Workspaces: &pb.NotificationSettings_Workspaces{
-			Scope:   notificationScopeToProto(settings.WorkspaceScope),
-			Filters: filters,
+			Scope:      notificationScopeToProto(settings.WorkspaceScope),
+			Filters:    filters,
+			EventTypes: eventTypes,
 		},
 	}
 }
@@ -103,6 +109,7 @@ var notificationTypeProto = map[string]pb.NotificationSettings_Type{
 	models.NotificationTypeWorkOrderCommentCreated: pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_CREATED,
 	models.NotificationTypeWorkOrderStatusOwned:    pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_OWNED,
 	models.NotificationTypeWorkOrderArtifactOwned:  pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED,
+	models.NotificationTypeWorkOrderMention:        pb.NotificationSettings_TYPE_WORK_ORDER_MENTIONED,
 }
 
 func notificationTypeToProto(notificationType string) (pb.NotificationSettings_Type, bool) {

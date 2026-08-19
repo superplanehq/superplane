@@ -10,6 +10,7 @@ export const NOTIFICATION_SETTINGS_TYPES = [
   "TYPE_WORK_ORDER_COMMENT_CREATED",
   "TYPE_WORK_ORDER_STATUS_OWNED",
   "TYPE_WORK_ORDER_ARTIFACT_OWNED",
+  "TYPE_WORK_ORDER_MENTIONED",
 ] as const satisfies readonly Exclude<MeNotificationSettingsType, "TYPE_UNSPECIFIED">[];
 
 export type ConfigurableNotificationType = (typeof NOTIFICATION_SETTINGS_TYPES)[number];
@@ -51,6 +52,15 @@ export function togglesFromEventTypes(eventTypes: MeNotificationSettingsType[] |
   return Object.fromEntries(
     NOTIFICATION_SETTINGS_TYPES.map((type) => [type, selected.has(type)]),
   ) as NotificationTypeToggles;
+}
+
+export function togglesFromAllScopeEventTypes(
+  eventTypes: MeNotificationSettingsType[] | undefined,
+): NotificationTypeToggles {
+  if (!eventTypes || eventTypes.length === 0) {
+    return defaultNotificationTypeToggles(true);
+  }
+  return togglesFromEventTypes(eventTypes);
 }
 
 export function filtersFromSettings(

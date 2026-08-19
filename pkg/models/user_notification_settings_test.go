@@ -27,9 +27,11 @@ func Test__UserNotificationSettings(t *testing.T) {
 
 		created, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, userID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+			EventTypes:     []string{models.NotificationTypeWorkOrderAssigned},
 		})
 		require.NoError(t, err)
 		assert.Equal(t, models.NotificationWorkspaceScopeAll, created.WorkspaceScope)
+		assert.Equal(t, []string{models.NotificationTypeWorkOrderAssigned}, created.EventTypes.Data())
 
 		factoryID := uuid.New().String()
 		updated, err := models.UpsertUserNotificationSettings(db, r.Organization.ID, userID, models.UserNotificationSettingsParams{
@@ -42,6 +44,7 @@ func Test__UserNotificationSettings(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, created.ID, updated.ID)
 		assert.Equal(t, models.NotificationWorkspaceScopeFiltered, updated.WorkspaceScope)
+		assert.Empty(t, updated.EventTypes.Data())
 		require.Len(t, updated.WorkspaceFilters.Data(), 1)
 		assert.Equal(t, factoryID, updated.WorkspaceFilters.Data()[0].WorkspaceID)
 		assert.Equal(t, []string{models.NotificationTypeWorkOrderAssigned}, updated.WorkspaceFilters.Data()[0].EventTypes)
@@ -88,6 +91,16 @@ func Test__UserNotificationSettings__Notifies(t *testing.T) {
 	t.Run("all scope keeps a missing type on", func(t *testing.T) {
 		settings := models.UserNotificationSettings{WorkspaceScope: models.NotificationWorkspaceScopeAll}
 		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderCommentOwned))
+	})
+
+	t.Run("all scope with a type list honors the list", func(t *testing.T) {
+		settings := models.UserNotificationSettings{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+			EventTypes:     datatypes.NewJSONType([]string{models.NotificationTypeWorkOrderAssigned}),
+		}
+		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAssigned))
+		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderCommentOwned))
+		assert.True(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderAssigned))
 	})
 
 	t.Run("filtered scope requires the workspace and the type", func(t *testing.T) {

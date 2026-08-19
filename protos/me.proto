@@ -115,6 +115,7 @@ message NotificationSettings {
     TYPE_WORK_ORDER_COMMENT_CREATED = 3;
     TYPE_WORK_ORDER_STATUS_OWNED = 4;
     TYPE_WORK_ORDER_ARTIFACT_OWNED = 5;
+    TYPE_WORK_ORDER_MENTIONED = 6;
   }
 
   enum WorkspaceScope {
@@ -133,6 +134,8 @@ message NotificationSettings {
   message Workspaces {
     WorkspaceScope scope = 1;
     repeated WorkspaceFilter filters = 2;
+    // event_types applies when scope is ALL. An empty list means every type.
+    repeated Type event_types = 3;
   }
 
   Workspaces workspaces = 1;
