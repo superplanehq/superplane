@@ -14,4 +14,9 @@ describe("setSearchParamFlag", () => {
     expect(next.get("yaml")).toBeNull();
     expect(next.get("from")).toBe("lines");
   });
+
+  it("returns the same params when the flag already matches", () => {
+    const current = new URLSearchParams("yaml=1");
+    expect(setSearchParamFlag(current, "yaml", true)).toBe(current);
+  });
 });

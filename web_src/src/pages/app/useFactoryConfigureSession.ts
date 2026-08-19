@@ -25,6 +25,8 @@ type UseFactoryConfigureSessionOptions = {
   factoryConfigureActionsRef?: MutableRefObject<FactoryConfigureActions | null>;
   onFactoryConfigureBusyChange?: (busy: boolean) => void;
   onFactoryConfigureDone?: () => void;
+  /** Called after Configure Save. Discard still uses onFactoryConfigureDone. */
+  onFactoryConfigureSaved?: () => void;
   editSessionActive: boolean;
   setEditSessionActive: Dispatch<SetStateAction<boolean>>;
   canStageCanvasVersion: boolean;
@@ -69,6 +71,7 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
     factoryConfigureActionsRef,
     onFactoryConfigureBusyChange,
     onFactoryConfigureDone,
+    onFactoryConfigureSaved,
     editSessionActive,
     setEditSessionActive,
     canStageCanvasVersion,
@@ -91,9 +94,11 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
 
   const onFactoryConfigureDoneRef = useRef(onFactoryConfigureDone);
   onFactoryConfigureDoneRef.current = onFactoryConfigureDone;
+  const onFactoryConfigureSavedRef = useRef(onFactoryConfigureSaved);
+  onFactoryConfigureSavedRef.current = onFactoryConfigureSaved;
   const [factoryConfigureSavePending, setFactoryConfigureSavePending] = useState(false);
 
-  useFactoryConfigureEnter(options);
+  const { allowNextConfigureEnter } = useFactoryConfigureEnter(options);
 
   const factoryConfigureBusy = commitStagingPending || resetStagingPending || factoryConfigureSavePending;
   const hasUncommittedChanges = hasStagingChanges || hasUncommittedCanvasDraftChanges;
@@ -129,7 +134,8 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
               setLastSavedWorkflowSnapshot,
               handleCommitStaging,
               canvasName: saveOptions?.canvasName,
-              onDone: () => onFactoryConfigureDoneRef.current?.(),
+              onAfterCommit: allowNextConfigureEnter,
+              onDone: () => onFactoryConfigureSavedRef.current?.(),
             });
           },
           discard: () => {
@@ -147,4 +153,6 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
           },
         };
   }
+
+  return { allowNextConfigureEnter };
 }

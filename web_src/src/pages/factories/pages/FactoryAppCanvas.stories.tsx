@@ -61,7 +61,7 @@ export const ConfigureEditMode: Story = {
   name: "Configure edit mode",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${plannerAppId}?configure=1&from=automations`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${plannerAppId}?configure=1&blocks=1&from=automations`}
       factoriesFixture={defaultFactoriesFixture}
       appFixture={plannerCanvasFixture}
     />
@@ -79,11 +79,11 @@ export const WithRun: Story = {
   ),
 };
 
-export const DesktopAgentPrompt: Story = {
-  name: "Desktop agent prompt",
+export const EditWithLocalAgent: Story = {
+  name: "Edit with a local agent",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`${fromLinesPath}&agentPrompt=1`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${implementerAppId}?configure=1&agentPrompt=1&from=lines&lineId=${planAndImplementLineId}`}
       factoriesFixture={defaultFactoriesFixture}
       appFixture={refundLineCanvasFixture()}
     />
@@ -94,21 +94,20 @@ export const ViewYaml: Story = {
   name: "View YAML",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`${fromLinesPath}&yaml=1`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${implementerAppId}?configure=1&yaml=1&from=lines&lineId=${planAndImplementLineId}`}
       factoriesFixture={defaultFactoriesFixture}
       appFixture={refundLineCanvasFixture()}
     />
   ),
 };
 
-export const WithAgentSidebar: Story = {
-  name: "With agent sidebar",
+export const EditWorkspacePanels: Story = {
+  name: "Edit workspace panels",
   render: () => (
     <FactoriesHarness
-      pathSuffix={fromLinesPath}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${implementerAppId}?configure=1&agent=1&blocks=1&from=lines&lineId=${planAndImplementLineId}`}
       factoriesFixture={defaultFactoriesFixture}
       appFixture={refundLineCanvasFixture()}
-      openAgentSidebar
     />
   ),
 };

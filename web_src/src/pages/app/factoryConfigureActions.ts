@@ -40,6 +40,8 @@ export type FactoryConfigureSaveDeps = {
   setLastSavedWorkflowSnapshot: (workflow: CanvasesCanvas | null) => void;
   handleCommitStaging: (commitMessage: string, options?: { versionId?: string }) => Promise<boolean | void>;
   onDone?: () => void;
+  /** After a real commit tears down the edit session, allow Configure to seed again. */
+  onAfterCommit?: () => void;
   canvasName?: string;
 };
 
@@ -105,6 +107,7 @@ async function stageAndCommitFactoryConfigure(
 
   const committed = await deps.handleCommitStaging("Update automation", { versionId: savingVersionId });
   if (committed) {
+    deps.onAfterCommit?.();
     deps.onDone?.();
   }
 }

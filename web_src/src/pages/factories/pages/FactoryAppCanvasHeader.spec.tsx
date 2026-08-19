@@ -91,12 +91,9 @@ describe("FactoryAppCanvasHeader", () => {
     expect(onDraftTitleChange).not.toHaveBeenCalled();
   });
 
-  it("shows Edit and View YAML in view mode", async () => {
+  it("shows Edit in view mode", async () => {
     const user = userEvent.setup();
     const onOpenVisualEditor = vi.fn();
-    const onAskAgent = vi.fn();
-    const onOpenDesktopAgentSetup = vi.fn();
-    const onViewYaml = vi.fn();
 
     render(
       <MemoryRouter>
@@ -110,27 +107,60 @@ describe("FactoryAppCanvasHeader", () => {
           onDiscard={vi.fn()}
           onSave={vi.fn()}
           onOpenVisualEditor={onOpenVisualEditor}
-          onAskAgent={onAskAgent}
-          onOpenDesktopAgentSetup={onOpenDesktopAgentSetup}
-          onViewYaml={onViewYaml}
         />
       </MemoryRouter>,
     );
 
-    expect(screen.getByTestId("factory-app-view-yaml")).toHaveTextContent("View YAML");
+    expect(screen.queryByTestId("factory-app-view-yaml")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("factory-app-edit"));
+    expect(onOpenVisualEditor).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks edit mode with workspace toggles and more options", async () => {
+    const user = userEvent.setup();
+    const onAgentOpenChange = vi.fn();
+    const onComponentsOpenChange = vi.fn();
+    const onViewYaml = vi.fn();
+    const onEditWithLocalAgent = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <FactoryAppCanvasHeader
+          backHref="/back"
+          backLabel="Plan and Implement"
+          title="Refund Implementer"
+          subtitle="Drag steps"
+          isConfigure
+          configureBusy={false}
+          onDiscard={vi.fn()}
+          onSave={vi.fn()}
+          workspace={{
+            agentOpen: false,
+            componentsOpen: true,
+            onAgentOpenChange,
+            onComponentsOpenChange,
+            onViewYaml,
+            onEditWithLocalAgent,
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("factory-app-canvas-header")).toHaveAttribute("data-editing", "true");
+    expect(screen.getByTestId("factory-app-editing-badge")).toHaveTextContent("Editing");
+    expect(screen.getByTestId("factory-app-workspace-components")).toHaveAttribute("aria-pressed", "true");
+
+    const save = screen.getByTestId("factory-app-save");
+    const discard = screen.getByTestId("factory-app-discard");
+    const toggles = screen.getByTestId("factory-app-workspace-toggles");
+    expect(save.compareDocumentPosition(toggles) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(discard.compareDocumentPosition(toggles) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.click(screen.getByTestId("factory-app-more-options"));
     await user.click(screen.getByTestId("factory-app-view-yaml"));
     expect(onViewYaml).toHaveBeenCalledTimes(1);
-
-    await user.click(screen.getByTestId("factory-app-edit-menu"));
-    await user.click(screen.getByTestId("factory-app-edit-visual"));
-    expect(onOpenVisualEditor).toHaveBeenCalledTimes(1);
-
-    await user.click(screen.getByTestId("factory-app-edit-menu"));
-    await user.click(screen.getByTestId("factory-app-edit-ask-agent"));
-    expect(onAskAgent).toHaveBeenCalledTimes(1);
-
-    await user.click(screen.getByTestId("factory-app-edit-menu"));
-    await user.click(screen.getByTestId("factory-app-edit-desktop-agent"));
-    expect(onOpenDesktopAgentSetup).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByTestId("factory-app-more-options"));
+    await user.click(screen.getByTestId("factory-app-edit-local-agent"));
+    expect(onEditWithLocalAgent).toHaveBeenCalledTimes(1);
   });
 });

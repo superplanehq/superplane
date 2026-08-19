@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { getInstallCommand } from "@/lib/cli";
 
-import { API_TOKEN_PLACEHOLDER, DEFAULT_SUPERPLANE_BASE_URL, buildAgentEditPrompt } from "./agentEditPrompt";
+import {
+  API_TOKEN_DISPLAY,
+  API_TOKEN_PLACEHOLDER,
+  DEFAULT_SUPERPLANE_BASE_URL,
+  buildAgentEditPrompt,
+  redactAgentEditPromptForDisplay,
+} from "./agentEditPrompt";
 
 describe("buildAgentEditPrompt", () => {
   const baseInput = {
@@ -47,5 +53,15 @@ describe("buildAgentEditPrompt", () => {
     const prompt = buildAgentEditPrompt({ ...baseInput, lineId: "line-plan-and-implement" });
 
     expect(prompt).toContain("This canvas belongs to line line-plan-and-implement.");
+  });
+
+  it("redacts the API token for display and keeps the placeholder for copy", () => {
+    const prompt = buildAgentEditPrompt(baseInput);
+    const displayed = redactAgentEditPromptForDisplay(prompt);
+
+    expect(prompt).toContain(API_TOKEN_PLACEHOLDER);
+    expect(displayed).toContain(API_TOKEN_DISPLAY);
+    expect(displayed).not.toContain(API_TOKEN_PLACEHOLDER);
+    expect(displayed).toContain(`superplane connect ${DEFAULT_SUPERPLANE_BASE_URL} ${API_TOKEN_DISPLAY}`);
   });
 });

@@ -77,6 +77,17 @@ describe("CopyButton", () => {
     expect(screen.getByRole("button", { name: "Copied to clipboard" })).toBeInTheDocument();
   });
 
+  it("labeled default variant uses the primary button chrome", () => {
+    render(
+      <CopyButton variant="button" buttonVariant="default" text="secret-token">
+        Copy prompt
+      </CopyButton>,
+    );
+
+    expect(screen.getByRole("button", { name: /copy prompt/i })).toHaveAttribute("data-slot", "button");
+    expect(screen.getByRole("button", { name: /copy prompt/i }).className).toMatch(/bg-primary/);
+  });
+
   it("invokes onCopyError and leaves the idle label in place when clipboard fails", async () => {
     mockClipboard(() => Promise.reject(new Error("denied")));
     const onCopyError = vi.fn();

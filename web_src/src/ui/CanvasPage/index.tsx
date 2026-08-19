@@ -104,6 +104,7 @@ import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { enrichCanvasNodes, type EnrichedCanvasNodeCacheEntry } from "./enrichCanvasNodes";
 import { buildStyledCanvasEdges } from "./factoryCanvasEdgeStyle";
 import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
+import { publishBuildingBlocksSidebarChanged, useBuildingBlocksSidebarRequest } from "./buildingBlocksSidebarRequest";
 import { RightSideControls } from "./RightSideControls";
 import { computeAppendFromNodePlacement } from "./appendFromNodePlacement";
 import { selectCreatedRerun } from "./runInspectionRerunSelection";
@@ -276,6 +277,10 @@ export interface CanvasPageProps {
   hideAddControls?: boolean;
   /** Hide the Agent / Versions left panel toggle (templates only). */
   hideCanvasToolSidebar?: boolean;
+  /** Hide the + / note rail. Factory edit mode uses header workspace toggles instead. */
+  hideRightSideControls?: boolean;
+  /** Overlay on the canvas column (factory YAML workspace). */
+  canvasOverlay?: ReactNode;
   /** Hide the top PageHeader / SecondaryHeader chrome (factory embed shell owns the header). */
   hidePageChrome?: boolean;
   /** Enables managed agent chat controls when the user has the required RBAC permissions. */
@@ -1115,9 +1120,14 @@ function CanvasPage(props: CanvasPageProps) {
       if (typeof window !== "undefined") {
         window.localStorage.setItem(CANVAS_SIDEBAR_STORAGE_KEY, JSON.stringify(open));
       }
+      if (props.canvasId) {
+        publishBuildingBlocksSidebarChanged(props.canvasId, open);
+      }
     },
-    [hasUserToggledSidebarRef, isSidebarOpenRef],
+    [hasUserToggledSidebarRef, isSidebarOpenRef, props.canvasId],
   );
+
+  useBuildingBlocksSidebarRequest(props.canvasId, handleSidebarToggle);
 
   /**
    * Keyboard equivalent of dropping a block onto the canvas via drag-and-drop.
@@ -1470,7 +1480,7 @@ function CanvasPage(props: CanvasPageProps) {
           {props.toolSidebarVersionsContent ?? null}
         </CanvasVersionsSidebar>
 
-        {isPanelHeaderMode(workflowHeaderMode) ? null : props.isEditing ? (
+        {props.hideRightSideControls || isPanelHeaderMode(workflowHeaderMode) ? null : props.isEditing ? (
           props.headerMode === "console" ? null : (
             <RightSideControls
               mode="edit"
@@ -1488,7 +1498,11 @@ function CanvasPage(props: CanvasPageProps) {
         )}
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
           <BuildingBlocksSidebar
-            isOpen={isBuildingBlocksSidebarOpen && !!props.isEditing && allowsBuildingBlocksSidebar(workflowHeaderMode)}
+            isOpen={
+              isBuildingBlocksSidebarOpen &&
+              allowsBuildingBlocksSidebar(workflowHeaderMode) &&
+              (!!props.isEditing || Boolean(props.factoryEmbed))
+            }
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
             integrations={props.integrations}
@@ -1595,6 +1609,11 @@ function CanvasPage(props: CanvasPageProps) {
             {isComponentSidebarVisibleMode(props.headerMode) && !props.isRunInspectionMode && props.isEditing
               ? renderInspectorSidebar("sidebar")
               : null}
+            {props.canvasOverlay ? (
+              <div className="absolute inset-0 z-20 flex flex-col bg-background" data-testid="canvas-center-overlay">
+                {props.canvasOverlay}
+              </div>
+            ) : null}
           </div>
         </div>
         {runInspectorOpen && props.runNodeDetailRun ? (

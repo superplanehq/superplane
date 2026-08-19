@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   factoryAppConfigurePath,
   factoryAppPath,
+  factoryAppViewPath,
   factoryDetailPath,
   factorySettingsGeneralPathAfterKeyChange,
   legacyWorkOrderDetailPath,
@@ -55,8 +56,24 @@ describe("factorySettingsGeneralPathAfterKeyChange", () => {
 });
 
 describe("factoryAppConfigurePath", () => {
-  it("adds configure=1", () => {
-    expect(factoryAppConfigurePath("org-1", "SP", "app-1")).toBe("/org-1/workspaces/SP/apps/app-1?configure=1");
+  it("adds configure=1 and opens components", () => {
+    expect(factoryAppConfigurePath("org-1", "SP", "app-1")).toBe(
+      "/org-1/workspaces/SP/apps/app-1?configure=1&blocks=1",
+    );
+  });
+
+  it("keeps the run when entering edit from a run page", () => {
+    expect(factoryAppConfigurePath("org-1", "SP", "app-1", { from: "lines", lineId: "line-1", runId: "run-9" })).toBe(
+      "/org-1/workspaces/SP/apps/app-1?run=run-9&configure=1&blocks=1&from=lines&lineId=line-1",
+    );
+  });
+});
+
+describe("factoryAppViewPath", () => {
+  it("returns the canvas run page without edit chrome", () => {
+    expect(factoryAppViewPath("org-1", "SP", "app-1", { from: "lines", lineId: "line-1", runId: "run-9" })).toBe(
+      "/org-1/workspaces/SP/apps/app-1?run=run-9&from=lines&lineId=line-1",
+    );
   });
 });
 

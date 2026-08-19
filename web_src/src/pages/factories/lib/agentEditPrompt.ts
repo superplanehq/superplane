@@ -2,6 +2,12 @@ import { getInstallCommand } from "@/lib/cli";
 
 export const DEFAULT_SUPERPLANE_BASE_URL = "https://app.superplane.com";
 export const API_TOKEN_PLACEHOLDER = "<YOUR_API_TOKEN>";
+export const API_TOKEN_DISPLAY = "***REDACTED***";
+
+/** Replace the copyable token placeholder so the on-screen prompt does not show it. */
+export function redactAgentEditPromptForDisplay(prompt: string): string {
+  return prompt.replaceAll(API_TOKEN_PLACEHOLDER, API_TOKEN_DISPLAY);
+}
 
 export type AgentEditPromptInput = {
   appName: string;

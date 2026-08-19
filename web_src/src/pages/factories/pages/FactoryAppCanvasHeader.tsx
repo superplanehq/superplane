@@ -3,6 +3,16 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { FactoryAppCanvasTitleEditor } from "./FactoryAppCanvasTitleEditor";
 import { FactoryAppCanvasViewActions } from "./FactoryAppCanvasViewActions";
+import { FactoryAppCanvasMoreOptions } from "./FactoryAppCanvasMoreOptions";
+import {
+  FactoryAppCanvasWorkspaceToggles,
+  type FactoryAppCanvasWorkspaceTogglesProps,
+} from "./FactoryAppCanvasWorkspaceToggles";
+
+type FactoryAppCanvasWorkspaceChrome = FactoryAppCanvasWorkspaceTogglesProps & {
+  onViewYaml: () => void;
+  onEditWithLocalAgent: () => void;
+};
 
 type FactoryAppCanvasHeaderProps = {
   backHref: string;
@@ -16,11 +26,8 @@ type FactoryAppCanvasHeaderProps = {
   onSave: () => void;
   /** Local draft only — persisted when the user clicks Save. */
   onDraftTitleChange?: (name: string) => void;
-  yamlDisabled?: boolean;
   onOpenVisualEditor?: () => void;
-  onAskAgent?: () => void;
-  onOpenDesktopAgentSetup?: () => void;
-  onViewYaml?: () => void;
+  workspace?: FactoryAppCanvasWorkspaceChrome;
 };
 
 export function FactoryAppCanvasHeader({
@@ -34,16 +41,17 @@ export function FactoryAppCanvasHeader({
   onDiscard,
   onSave,
   onDraftTitleChange,
-  yamlDisabled = false,
   onOpenVisualEditor,
-  onAskAgent,
-  onOpenDesktopAgentSetup,
-  onViewYaml,
+  workspace,
 }: FactoryAppCanvasHeaderProps) {
   const renameEnabled = Boolean(isConfigure && canRename && onDraftTitleChange);
 
   return (
-    <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-3">
+    <div
+      className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-3"
+      data-testid="factory-app-canvas-header"
+      data-editing={isConfigure ? "true" : undefined}
+    >
       <div className="min-w-0">
         <Link
           href={backHref}
@@ -69,39 +77,69 @@ export function FactoryAppCanvasHeader({
               {title}
             </h2>
           )}
+          {isConfigure ? (
+            <span className="text-[13px] font-medium text-foreground" data-testid="factory-app-editing-badge">
+              Editing
+            </span>
+          ) : null}
         </div>
-        <p
-          className={
-            isConfigure ? "mt-1 text-[12px] text-muted-foreground" : "mt-0.5 text-[13px] text-muted-foreground"
-          }
-        >
-          {subtitle}
-        </p>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">{subtitle}</p>
       </div>
       {isConfigure ? (
-        <div className="flex shrink-0 items-center gap-2 pt-0.5">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={configureBusy}
-            onClick={onDiscard}
-            data-testid="factory-app-discard"
-          >
-            Discard changes
-          </Button>
-          <Button type="button" size="sm" disabled={configureBusy} onClick={onSave} data-testid="factory-app-save">
-            Save
-          </Button>
-        </div>
-      ) : onOpenVisualEditor && onAskAgent && onOpenDesktopAgentSetup && onViewYaml ? (
-        <FactoryAppCanvasViewActions
-          yamlDisabled={yamlDisabled}
-          onOpenVisualEditor={onOpenVisualEditor}
-          onAskAgent={onAskAgent}
-          onOpenDesktopAgentSetup={onOpenDesktopAgentSetup}
-          onViewYaml={onViewYaml}
+        <FactoryAppCanvasConfigureActions
+          configureBusy={configureBusy}
+          workspace={workspace}
+          onDiscard={onDiscard}
+          onSave={onSave}
         />
+      ) : onOpenVisualEditor ? (
+        <FactoryAppCanvasViewActions onOpenVisualEditor={onOpenVisualEditor} />
+      ) : null}
+    </div>
+  );
+}
+
+function FactoryAppCanvasConfigureActions({
+  configureBusy,
+  workspace,
+  onDiscard,
+  onSave,
+}: {
+  configureBusy: boolean;
+  workspace?: FactoryAppCanvasWorkspaceChrome;
+  onDiscard: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <div className="flex shrink-0 flex-col items-end gap-2 pt-0.5">
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={configureBusy}
+          onClick={onDiscard}
+          data-testid="factory-app-discard"
+        >
+          Discard changes
+        </Button>
+        <Button type="button" size="sm" disabled={configureBusy} onClick={onSave} data-testid="factory-app-save">
+          Save
+        </Button>
+      </div>
+      {workspace ? (
+        <div className="flex items-center gap-1.5">
+          <FactoryAppCanvasWorkspaceToggles
+            agentOpen={workspace.agentOpen}
+            componentsOpen={workspace.componentsOpen}
+            onAgentOpenChange={workspace.onAgentOpenChange}
+            onComponentsOpenChange={workspace.onComponentsOpenChange}
+          />
+          <FactoryAppCanvasMoreOptions
+            onViewYaml={workspace.onViewYaml}
+            onEditWithLocalAgent={workspace.onEditWithLocalAgent}
+          />
+        </div>
       ) : null}
     </div>
   );

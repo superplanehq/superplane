@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { persistAgentMode, readInitialAgentMode, type AgentMode } from "@/components/AgentSidebar/agentMode";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import type { CanvasPageHeaderMode } from "@/pages/app/viewState";
-import { subscribeCanvasAgentSidebarOpen } from "./canvasAgentSidebarOpenRequest";
+import {
+  lastCanvasAgentSidebarRequest,
+  publishCanvasAgentSidebarChanged,
+  subscribeCanvasAgentSidebarState,
+} from "./canvasAgentSidebarOpenRequest";
 
 // Keep in sync with pkg/features/features.go.
 export const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
@@ -103,6 +107,7 @@ export function useCanvasToolSidebarState({
     (open: boolean) => {
       if (typeof window === "undefined") return;
       window.localStorage.setItem(canvasAgentSidebarOpenStorageKey(canvasId), open ? "true" : "false");
+      if (canvasId) publishCanvasAgentSidebarChanged(canvasId, open);
     },
     [canvasId],
   );
@@ -121,6 +126,7 @@ export function useCanvasToolSidebarState({
     canvasId,
     enabled: Boolean(!hideCanvasToolSidebar && (agentEnabled || forceEnable)),
     openToolSidebar,
+    closeToolSidebar,
   });
 
   const handleToolSidebarToggle = useCallback(() => {
@@ -254,16 +260,27 @@ function useOpenCanvasAgentSidebarOnRequest({
   canvasId,
   enabled,
   openToolSidebar,
+  closeToolSidebar,
 }: {
   canvasId?: string;
   enabled: boolean;
   openToolSidebar: () => void;
+  closeToolSidebar: () => void;
 }) {
   useEffect(() => {
     if (!enabled) return;
-    return subscribeCanvasAgentSidebarOpen((requestedCanvasId) => {
+    if (canvasId) {
+      const pending = lastCanvasAgentSidebarRequest(canvasId);
+      if (pending === true) openToolSidebar();
+      if (pending === false) closeToolSidebar();
+    }
+    return subscribeCanvasAgentSidebarState((requestedCanvasId, open) => {
       if (requestedCanvasId !== canvasId) return;
-      openToolSidebar();
+      if (open) {
+        openToolSidebar();
+        return;
+      }
+      closeToolSidebar();
     });
-  }, [canvasId, enabled, openToolSidebar]);
+  }, [canvasId, closeToolSidebar, enabled, openToolSidebar]);
 }

@@ -74,4 +74,11 @@ describe("resolveFactoryEmbedCanvasChrome", () => {
 
     expect(chrome.hideCanvasToolSidebar).toBe(false);
   });
+
+  it("hides the right-side add rail in factory embed", () => {
+    const { input } = buildInput({ factoryEmbed: true });
+    const chrome = resolveFactoryEmbedCanvasChrome(input);
+
+    expect(chrome.hideRightSideControls).toBe(true);
+  });
 });

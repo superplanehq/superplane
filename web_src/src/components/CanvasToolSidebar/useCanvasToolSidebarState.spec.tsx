@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { requestCanvasAgentSidebarOpen } from "./canvasAgentSidebarOpenRequest";
+import { requestCanvasAgentSidebarClose, requestCanvasAgentSidebarOpen } from "./canvasAgentSidebarOpenRequest";
 import { useCanvasToolSidebarState } from "./useCanvasToolSidebarState";
 
 const featureFlags = vi.hoisted(() => ({ enabled: false, isLoading: false }));
@@ -213,5 +213,19 @@ describe("useCanvasToolSidebarState", () => {
     });
 
     expect(screen.getByTestId("open-state")).toHaveTextContent("open");
+  });
+
+  it("closes the sidebar when a matching canvas close request is dispatched", () => {
+    featureFlags.enabled = true;
+    window.localStorage.setItem("canvasAgentSidebarOpen:canvas-a", "true");
+    render(<Harness onBeforeClose={vi.fn()} canvasId="canvas-a" canUseAgents forceEnable={false} />);
+
+    expect(screen.getByTestId("open-state")).toHaveTextContent("open");
+
+    act(() => {
+      requestCanvasAgentSidebarClose("canvas-a");
+    });
+
+    expect(screen.getByTestId("open-state")).toHaveTextContent("closed");
   });
 });

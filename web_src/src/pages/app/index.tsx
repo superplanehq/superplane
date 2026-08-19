@@ -4,7 +4,7 @@ import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import type {
@@ -276,6 +276,8 @@ export function AppPage({
   factoryConfigureActionsRef,
   onFactoryConfigureBusyChange,
   onFactoryConfigureDone,
+  onFactoryConfigureSaved,
+  factoryCanvasOverlay,
 }: {
   factoryEmbed?: boolean;
   /** Factory-shell Configure: same chrome as embed, but canvas edit session allowed. */
@@ -286,6 +288,10 @@ export function AppPage({
   factoryConfigureActionsRef?: MutableRefObject<FactoryConfigureActions | null>;
   onFactoryConfigureBusyChange?: (busy: boolean) => void;
   onFactoryConfigureDone?: () => void;
+  /** After Configure Save: keep the editor open. Discard still uses onFactoryConfigureDone. */
+  onFactoryConfigureSaved?: () => void;
+  /** Overlay on the canvas column (factory YAML workspace). */
+  factoryCanvasOverlay?: ReactNode;
 } = {}) {
   const factoryViewOnly = factoryEmbed && !factoryConfigure;
   const {
@@ -3016,10 +3022,10 @@ export function AppPage({
       await handleCommitStaging(commitMessage);
       setCommitDialogOpen(false);
       if (factoryConfigure) {
-        onFactoryConfigureDone?.();
+        onFactoryConfigureSaved?.();
       }
     },
-    [factoryConfigure, handleCommitStaging, onFactoryConfigureDone],
+    [factoryConfigure, handleCommitStaging, onFactoryConfigureSaved],
   );
 
   const handleAgentSidebarStagingCommit = useCallback(
@@ -3443,6 +3449,7 @@ export function AppPage({
     factoryConfigureActionsRef,
     onFactoryConfigureBusyChange,
     onFactoryConfigureDone,
+    onFactoryConfigureSaved,
     editSessionActive,
     setEditSessionActive,
     canStageCanvasVersion,
@@ -3867,6 +3874,7 @@ export function AppPage({
           onTriggerModalHostReady={registerTriggerModalHost}
           title={canvas?.metadata?.name || liveCanvas?.metadata?.name || "Canvas"}
           {...factoryEmbedCanvasChrome}
+          canvasOverlay={factoryCanvasOverlay}
           canvasStateMode={canvasStateMode}
           onSeeCurrentVersion={handleSeeCurrentVersion}
           nodes={nodes}

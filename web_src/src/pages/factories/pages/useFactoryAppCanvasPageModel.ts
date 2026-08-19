@@ -2,6 +2,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import type { FactoryConfigureActions } from "@/pages/app";
 import { useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { factoryAppViewPath, parseFactoryAppNavFrom } from "../lib/factoryPagePaths";
 import { useFactoryAppCanvasEditActions } from "./useFactoryAppCanvasEditActions";
 import { useFactoryAppCanvasRoute } from "./useFactoryAppCanvasRoute";
 import { useFactoryAppConfigureTitle } from "./useFactoryAppConfigureTitle";
@@ -21,8 +22,24 @@ export function useFactoryAppCanvasPageModel() {
   const [configureBusy, setConfigureBusy] = useState(false);
   const canRename = resolveCanRenameAutomation(permissionsLoading, canAct);
   const navigateDone = useCallback(() => {
-    navigate(route.back.href);
-  }, [navigate, route.back.href]);
+    navigate(
+      factoryAppViewPath(route.organizationId, route.factoryKey, route.appId, {
+        from: parseFactoryAppNavFrom(route.from),
+        lineId: route.lineId ?? undefined,
+        orderNumber: route.orderNumber ?? undefined,
+        runId: route.runId ?? undefined,
+      }),
+    );
+  }, [
+    navigate,
+    route.appId,
+    route.factoryKey,
+    route.from,
+    route.lineId,
+    route.orderNumber,
+    route.organizationId,
+    route.runId,
+  ]);
   const {
     title,
     configureBusy: titleConfigureBusy,
@@ -39,12 +56,14 @@ export function useFactoryAppCanvasPageModel() {
     savedName: route.canvas?.metadata?.name,
     configureBusy,
     configureActionsRef,
-    onDone: navigateDone,
   });
   const handleConfigureDone = useCallback(() => {
     clearDraftTitle();
     navigateDone();
   }, [clearDraftTitle, navigateDone]);
+  const handleConfigureSaved = useCallback(() => {
+    clearDraftTitle();
+  }, [clearDraftTitle]);
   const handleConfigureBusyChange = useCallback((busy: boolean) => {
     setConfigureBusy(busy);
   }, []);
@@ -55,6 +74,10 @@ export function useFactoryAppCanvasPageModel() {
     from: route.from,
     lineId: route.lineId,
     orderNumber: route.orderNumber,
+    runId: route.runId,
+    isConfigure: route.isConfigure,
+    agentOpen: route.agentOpen,
+    componentsOpen: route.componentsOpen,
     setSearchParams: route.setSearchParams,
     navigate,
   });
@@ -78,11 +101,14 @@ export function useFactoryAppCanvasPageModel() {
     handleConfigureSave,
     handleConfigureDiscard,
     handleConfigureDone,
+    handleConfigureSaved,
     handleConfigureBusyChange,
     runId: route.runId,
     lineId: route.lineId,
     agentPromptOpen: route.agentPromptOpen,
     yamlViewOpen: route.yamlViewOpen,
+    agentOpen: route.agentOpen,
+    componentsOpen: route.componentsOpen,
     ...editActions,
   };
 }

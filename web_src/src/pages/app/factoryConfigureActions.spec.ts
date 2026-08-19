@@ -56,6 +56,7 @@ describe("runFactoryConfigureSave", () => {
       setLastSavedWorkflowSnapshot: vi.fn(),
       handleCommitStaging: vi.fn().mockResolvedValue(true),
       onDone: vi.fn(),
+      onAfterCommit: vi.fn(),
       ...overrides,
     } satisfies Parameters<typeof runFactoryConfigureSave>[0];
   }
@@ -75,6 +76,7 @@ describe("runFactoryConfigureSave", () => {
     expect(stagedYaml).toContain("name: Renamed");
     expect(stagedYaml).not.toContain("name: Old");
     expect(deps.handleCommitStaging).toHaveBeenCalled();
+    expect(deps.onAfterCommit).toHaveBeenCalled();
     expect(deps.onDone).toHaveBeenCalled();
     expect(deps.setLastSavedWorkflowSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({ metadata: expect.objectContaining({ name: "Renamed" }) }),
@@ -92,6 +94,7 @@ describe("runFactoryConfigureSave", () => {
     await runFactoryConfigureSave(deps);
 
     expect(deps.handleCommitStaging).not.toHaveBeenCalled();
+    expect(deps.onAfterCommit).not.toHaveBeenCalled();
     expect(deps.onDone).toHaveBeenCalled();
   });
 });

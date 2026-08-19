@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { requestCanvasAgentSidebarOpen, subscribeCanvasAgentSidebarOpen } from "./canvasAgentSidebarOpenRequest";
+import {
+  requestCanvasAgentSidebarClose,
+  requestCanvasAgentSidebarOpen,
+  subscribeCanvasAgentSidebarOpen,
+  subscribeCanvasAgentSidebarState,
+} from "./canvasAgentSidebarOpenRequest";
 
 describe("canvasAgentSidebarOpenRequest", () => {
   it("notifies subscribers for the requested canvas", () => {
@@ -11,6 +16,16 @@ describe("canvasAgentSidebarOpenRequest", () => {
     unsubscribe();
 
     expect(onOpen).toHaveBeenCalledWith("canvas-a");
+  });
+
+  it("notifies state subscribers for close requests", () => {
+    const onChange = vi.fn();
+    const unsubscribe = subscribeCanvasAgentSidebarState(onChange);
+
+    requestCanvasAgentSidebarClose("canvas-a");
+    unsubscribe();
+
+    expect(onChange).toHaveBeenCalledWith("canvas-a", false);
   });
 
   it("ignores empty canvas ids", () => {

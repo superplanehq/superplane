@@ -43,6 +43,7 @@ function resolveFactoryShellVisibility(input: FactoryEmbedCanvasChromeInput) {
     hideAddControls: input.hideAddControls || input.factoryViewOnly,
     hidePageChrome: input.factoryEmbed,
     hideCanvasToolSidebar: input.factoryEmbed && !input.factoryAgentEnabled,
+    hideRightSideControls: input.factoryEmbed,
     factoryEmbed: input.factoryEmbed,
   };
 }

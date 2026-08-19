@@ -90,6 +90,8 @@ export type FactoryAppNavOptions = {
    * AppPage auto-edit cleanup does not tear down the Configure UI mid-bootstrap.
    */
   configure?: boolean;
+  /** Open the components panel in factory edit mode (`blocks=1`). */
+  blocks?: boolean;
 };
 
 function buildFactoryAppSearchParams(options?: FactoryAppNavOptions): string {
@@ -102,6 +104,9 @@ function buildFactoryAppSearchParams(options?: FactoryAppNavOptions): string {
   }
   if (options.configure) {
     params.set("configure", "1");
+  }
+  if (options.blocks) {
+    params.set("blocks", "1");
   }
   if (options.from) {
     params.set("from", options.from);
@@ -120,9 +125,23 @@ export function factoryAppConfigurePath(
   organizationId: string,
   factoryKey: string,
   appId: string,
-  options?: Omit<FactoryAppNavOptions, "configure" | "runId">,
+  options?: Omit<FactoryAppNavOptions, "configure">,
 ) {
-  return factoryAppPath(organizationId, factoryKey, appId, { ...options, configure: true });
+  return factoryAppPath(organizationId, factoryKey, appId, {
+    ...options,
+    configure: true,
+    blocks: options?.blocks ?? true,
+  });
+}
+
+/** Factory canvas view URL. Keeps run/from context and omits edit chrome. */
+export function factoryAppViewPath(
+  organizationId: string,
+  factoryKey: string,
+  appId: string,
+  options?: Pick<FactoryAppNavOptions, "from" | "lineId" | "orderNumber" | "runId">,
+) {
+  return factoryAppPath(organizationId, factoryKey, appId, options);
 }
 
 export function factoryAppPath(
