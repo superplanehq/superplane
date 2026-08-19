@@ -59,6 +59,9 @@ const (
 const (
 	CheckFormatFraction = "fraction"
 	CheckFormatPercent  = "percent"
+	// CheckFormatBoolean is a pass/fail verdict: score 1 (pass) or 0
+	// (fail) on a max score of 1.
+	CheckFormatBoolean = "boolean"
 )
 
 // Events
@@ -108,10 +111,12 @@ type WorkOrderCommentAuthor struct {
 }
 
 type WorkOrderCommentAdded struct {
-	Order  *WorkOrderRef           `json:"order,omitempty"`
-	Body   string                  `json:"body"`
-	Author *WorkOrderCommentAuthor `json:"author,omitempty"`
-	Run    *RunRef                 `json:"run,omitempty"`
+	Order          *WorkOrderRef           `json:"order,omitempty"`
+	CommentID      uuid.UUID               `json:"commentId,omitempty"`
+	Body           string                  `json:"body"`
+	Author         *WorkOrderCommentAuthor `json:"author,omitempty"`
+	Run            *RunRef                 `json:"run,omitempty"`
+	MentionedUsers []UserRef               `json:"mentionedUsers,omitempty"`
 }
 
 type WorkOrderArtifactAdded struct {

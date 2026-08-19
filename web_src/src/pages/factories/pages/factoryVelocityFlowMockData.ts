@@ -22,14 +22,16 @@ export type FactoryVelocityFlowPeriod = {
   timeTrend: FactoryVelocityFlowTrendPoint[];
 };
 
+// A sub-hour-heavy week: most days finish in minutes, so the chart axis and
+// scorecards must show minute labels instead of a flat, repeated "0h".
 const WEEK_TREND: FactoryVelocityFlowTrendPoint[] = [
-  { day: "Fri", runningHours: 16, waitingHours: 12 },
-  { day: "Sat", runningHours: 14, waitingHours: 16 },
-  { day: "Sun", runningHours: 12, waitingHours: 20 },
-  { day: "Mon", runningHours: 12, waitingHours: 22 },
-  { day: "Tue", runningHours: 12, waitingHours: 26 },
-  { day: "Wed", runningHours: 12, waitingHours: 28 },
-  { day: "Thu", runningHours: 14, waitingHours: 22 },
+  { day: "Fri", runningHours: 0.2, waitingHours: 0.1 },
+  { day: "Sat", runningHours: 0.25, waitingHours: 0.15 },
+  { day: "Sun", runningHours: 0.15, waitingHours: 0.2 },
+  { day: "Mon", runningHours: 0.3, waitingHours: 0.25 },
+  { day: "Tue", runningHours: 0.4, waitingHours: 0.3 },
+  { day: "Wed", runningHours: 0.35, waitingHours: 0.35 },
+  { day: "Thu", runningHours: 0.4, waitingHours: 0.3 },
 ];
 
 function buildMonthTimeTrend(): FactoryVelocityFlowTrendPoint[] {
@@ -46,11 +48,11 @@ export const FACTORY_VELOCITY_FLOW_BY_PERIOD: Record<FactoryVelocityPeriodDays, 
   7: {
     days: 7,
     label: "Last 7 days",
-    medianCycleHours: 36,
-    medianRunningHours: 14,
-    medianWaitingHours: 22,
-    runningShareOfCyclePct: 39,
-    waitingShareOfCyclePct: 61,
+    medianCycleHours: 0.5,
+    medianRunningHours: 0.3,
+    medianWaitingHours: 0.2,
+    runningShareOfCyclePct: 60,
+    waitingShareOfCyclePct: 40,
     timeTrend: WEEK_TREND,
   },
   30: {

@@ -10,6 +10,7 @@ export const NOTIFICATION_SETTINGS_TYPES = [
   "TYPE_WORK_ORDER_COMMENT_CREATED",
   "TYPE_WORK_ORDER_STATUS_OWNED",
   "TYPE_WORK_ORDER_ARTIFACT_OWNED",
+  "TYPE_WORK_ORDER_MENTIONED",
 ] as const satisfies readonly Exclude<MeNotificationSettingsType, "TYPE_UNSPECIFIED">[];
 
 export type ConfigurableNotificationType = (typeof NOTIFICATION_SETTINGS_TYPES)[number];

@@ -220,6 +220,29 @@ func (c *Client) DescribeAlarm(alarmName string) (*MetricAlarm, error) {
 	return alarmFromXML(response.Result.MetricAlarms[0], c.region), nil
 }
 
+// DeleteAlarms removes the named alarms. CloudWatch accepts up to 100 per call
+// and deletes none of them if any name is syntactically invalid.
+func (c *Client) DeleteAlarms(alarmNames ...string) error {
+	params := url.Values{}
+
+	index := 0
+	for _, alarmName := range alarmNames {
+		alarmName = strings.TrimSpace(alarmName)
+		if alarmName == "" {
+			continue
+		}
+
+		index++
+		params.Set(fmt.Sprintf("AlarmNames.member.%d", index), alarmName)
+	}
+
+	if index == 0 {
+		return fmt.Errorf("at least one alarm name is required")
+	}
+
+	return c.postSignedForm("DeleteAlarms", params, nil)
+}
+
 func (c *Client) ListAlarms() ([]MetricAlarm, error) {
 	alarms := []MetricAlarm{}
 	nextToken := ""

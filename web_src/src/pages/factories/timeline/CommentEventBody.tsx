@@ -1,5 +1,7 @@
 import { Link } from "@/components/Link/link";
+import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
+import { mentionCandidatesFromOrgUsers } from "@/lib/workOrderMentions";
 import { MarkdownContent } from "@/pages/app/Markdown";
 
 import { getWorkOrderRunHref } from "../lib/workOrderExecutions";
@@ -27,8 +29,10 @@ export function CommentEventBody({
   factoryKey: string;
   orderNumber?: string;
 }) {
+  const { data: users = [] } = useOrganizationUsers(organizationId);
   const comment = event.comment;
   if (!comment) return null;
+  const mentionPeople = mentionCandidatesFromOrgUsers(users);
   const isAutomation = (comment.authorKind ?? "").toLowerCase() === "automation";
   const runHref = getWorkOrderRunHref(organizationId, factoryKey, event.sourceAppId, event.sourceRunId, {
     orderNumber,
@@ -60,7 +64,7 @@ export function CommentEventBody({
         </span>
       </p>
       <div className="mt-1" data-testid="work-order-timeline-comment-body">
-        <MarkdownContent content={comment.body} variant="workspace" />
+        <MarkdownContent content={comment.body} variant="workspace" mentionPeople={mentionPeople} />
       </div>
     </>
   );

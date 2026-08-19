@@ -24,6 +24,26 @@ func regionField() configuration.Field {
 	}
 }
 
+// alarmField picks one of the metric alarms that exist in the selected region.
+func alarmField(description string) configuration.Field {
+	return configuration.Field{
+		Name:        "alarm",
+		Label:       "Alarm",
+		Type:        configuration.FieldTypeIntegrationResource,
+		Required:    true,
+		Description: description,
+		VisibilityConditions: []configuration.VisibilityCondition{
+			{Field: "region", Values: []string{"*"}},
+		},
+		TypeOptions: &configuration.TypeOptions{
+			Resource: &configuration.ResourceTypeOptions{
+				Type:       "cloudwatch.alarm",
+				Parameters: []configuration.ParameterRef{regionParameter()},
+			},
+		},
+	}
+}
+
 // unitField offers the metric units. Only Update Alarm can clear a unit, so
 // only it gets the "No unit" option; on create, leaving the field off is the
 // same thing.

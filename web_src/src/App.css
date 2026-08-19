@@ -473,6 +473,9 @@
 
   --status-done-lane-bg: #f9fafb;
 
+  --work-order-mention-fg: #0969da;
+  --work-order-mention-bg: #ddf4ff;
+
   font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   font-size: 14px;
@@ -547,6 +550,9 @@
   --status-cancelled-dot: #71717a;
 
   --status-done-lane-bg: rgba(255, 255, 255, 0.02);
+
+  --work-order-mention-fg: #4493f8;
+  --work-order-mention-bg: rgba(56, 139, 253, 0.15);
 }
 
 @layer components {
@@ -723,6 +729,21 @@
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+.work-order-mention {
+  color: var(--work-order-mention-fg);
+  background-color: var(--work-order-mention-bg);
+  border-radius: 6px;
+  padding: 0 0.15em;
+  margin: 0 -0.15em;
+  font-weight: 600;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.work-order-mention-in-composer {
+  font-weight: inherit;
 }
 
 .theme-factories [data-slot="button"]:not([data-size^="icon"]) {

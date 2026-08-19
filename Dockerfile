@@ -170,7 +170,6 @@ LABEL org.opencontainers.image.title="superplane" \
 
 # postgresql-client needs to be installed here too,
 # otherwise the createdb command won't work.
-# Install PostgreSQL 17.5 client tools
 COPY scripts/docker/install-postgresql-client.sh install-postgresql-client.sh
 RUN bash install-postgresql-client.sh
 
