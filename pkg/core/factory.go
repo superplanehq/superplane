@@ -32,6 +32,11 @@ type FactoryContext interface {
 	// score as PreviousScore. Every report also lands an
 	// `order.check.reported` timeline event.
 	ReportWorkOrderCheck(params ReportWorkOrderCheckParams) (*WorkOrderCheck, error)
+	// SetWorkOrderStatusNote replaces the work order's status note — the
+	// announcement of what a waiting order is blocked on and what
+	// resolves it. Latest note wins; any lifecycle transition clears it.
+	// The order must be open.
+	SetWorkOrderStatusNote(params SetWorkOrderStatusNoteParams) (*WorkOrderStatusNote, error)
 }
 
 type WorkOrderParams struct {
@@ -111,6 +116,20 @@ type ReportWorkOrderCheckParams struct {
 	Analysis string
 }
 
+// SetWorkOrderStatusNoteParams carries one status note. Kind is "info"
+// (the default when empty); Headline is required; CtaLabel and CtaURL
+// must be set together and the URL must be absolute http(s).
+type SetWorkOrderStatusNoteParams struct {
+	// OrderID identifies the work order to target; see
+	// UpdateWorkOrderStatusParams.OrderID.
+	OrderID  string
+	Kind     string
+	Headline string
+	Body     string
+	CtaLabel string
+	CtaURL   string
+}
+
 type WorkOrder struct {
 	ID          string `json:"id"`
 	Title       string `json:"title"`
@@ -124,6 +143,15 @@ type WorkOrderArtifact struct {
 	WorkOrderID string         `json:"workOrderId"`
 	Type        string         `json:"type"`
 	Data        map[string]any `json:"data,omitempty"`
+}
+
+type WorkOrderStatusNote struct {
+	WorkOrderID string `json:"workOrderId"`
+	Kind        string `json:"kind"`
+	Headline    string `json:"headline"`
+	Body        string `json:"body,omitempty"`
+	CtaLabel    string `json:"ctaLabel,omitempty"`
+	CtaURL      string `json:"ctaUrl,omitempty"`
 }
 
 type WorkOrderCheck struct {
