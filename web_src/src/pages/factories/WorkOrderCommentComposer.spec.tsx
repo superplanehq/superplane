@@ -111,4 +111,26 @@ describe("WorkOrderCommentComposer", () => {
     await user.keyboard("{ArrowLeft}");
     expect(screen.queryByTestId("work-order-mention-menu")).not.toBeInTheDocument();
   });
+
+  it("stacks the submit button above the mention overlay so a scrolled mention can't swallow the click", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn(async () => undefined);
+    renderComposer(onSubmit);
+
+    // The mention overlay renders `@mention` pills with pointer-events
+    // re-enabled (so hover cards work while composing) and it scrolls with
+    // the textarea, so a pill can end up sitting right under the send
+    // button. The button's wrapper must have a higher z-index than the
+    // overlay or that pill would intercept clicks meant for the button.
+    const submitButton = screen.getByTestId("work-order-comment-submit");
+    const overlay = screen.getByTestId("work-order-comment-mention-overlay");
+    expect(submitButton.closest(".z-\\[3\\]")).toBeInTheDocument();
+    expect(overlay).toHaveClass("z-[2]");
+
+    await user.type(screen.getByLabelText("Add a comment"), "cc @Ali");
+    await user.keyboard("{Enter}");
+    await user.click(submitButton);
+
+    expect(onSubmit).toHaveBeenCalledWith("cc @Alice Anderson", ["alice"]);
+  });
 });

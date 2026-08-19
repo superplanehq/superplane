@@ -101,7 +101,15 @@ function WorkOrderCommentComposerView({
         canSubmit={canSubmit}
         onSubmit={() => void handleSubmit()}
       />
-      <div className="absolute right-1.5 bottom-1.5 flex items-center gap-1">
+      {/*
+        z-[3] keeps the submit button above the mention overlay (z-[2]).
+        The overlay renders `@mention` pills with `pointer-events-auto` so
+        hover cards work while composing, and the overlay scrolls with the
+        textarea. Without a higher z-index here, a mention pill that scrolls
+        under this corner intercepts the click meant for the button, making
+        it look like "Send" silently does nothing.
+      */}
+      <div className="absolute right-1.5 bottom-1.5 z-[3] flex items-center gap-1">
         <PermissionTooltip allowed={canComment} message="You do not have permission to comment.">
           <Button
             type="button"
