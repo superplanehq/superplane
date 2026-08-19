@@ -19,11 +19,11 @@ export function formatUsdCents(cents: number): string {
 
 export function formatWorkOrderUsage(totalTokens: number, totalCostCents: number): string | null {
   const parts: string[] = [];
-  if (totalTokens > 0) {
-    parts.push(formatCompactTokens(totalTokens));
-  }
   if (totalCostCents > 0) {
     parts.push(formatUsdCents(totalCostCents));
+  }
+  if (totalTokens > 0) {
+    parts.push(formatCompactTokens(totalTokens));
   }
   return parts.length > 0 ? parts.join(" · ") : null;
 }

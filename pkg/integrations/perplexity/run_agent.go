@@ -2,6 +2,7 @@ package perplexity
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"strings"
 
@@ -269,11 +270,31 @@ func (c *runAgent) Execute(ctx core.ExecutionContext) error {
 		Response:  response,
 	}
 
+	recordPerplexityUsage(ctx, response)
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		AgentPayloadType,
 		[]any{payload},
 	)
+}
+
+func recordPerplexityUsage(ctx core.ExecutionContext, response *AgentResponse) {
+	if response == nil || response.Usage == nil {
+		return
+	}
+	record := core.UsageRecord{
+		Provider:     "perplexity",
+		Model:        response.Model,
+		InputTokens:  int64(response.Usage.InputTokens),
+		OutputTokens: int64(response.Usage.OutputTokens),
+		TotalTokens:  int64(response.Usage.TotalTokens),
+	}
+	if response.Usage.Cost.TotalCost > 0 {
+		micros := int64(math.Round(response.Usage.Cost.TotalCost * 1_000_000))
+		record.CostMicros = &micros
+	}
+	ctx.RecordUsageBestEffort(record)
 }
 
 func (c *runAgent) Cancel(ctx core.ExecutionContext) error {

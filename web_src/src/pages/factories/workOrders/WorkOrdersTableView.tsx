@@ -5,6 +5,7 @@ import { Link } from "react-router";
 import { workOrderDetailPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
+import { formatCompactTokens, formatUsdCents } from "../lib/workOrderUsage";
 import { WorkOrderLineStep } from "./WorkOrderLineStep";
 import { AssigneeGroup, InlineDispatchButton } from "./WorkOrderRowActions";
 
@@ -31,14 +32,13 @@ interface WorkOrdersTableViewProps {
  * referencing this constant so the two templates can never drift apart.
  */
 const TABLE_GRID_COLS =
-  "grid-cols-[110px_60px_1fr_120px] md:grid-cols-[110px_60px_1fr_140px_120px_120px] lg:grid-cols-[110px_70px_1fr_180px_120px_120px]";
+  "grid-cols-[90px_52px_1fr_88px_96px] md:grid-cols-[110px_60px_1fr_120px_96px_100px_110px] lg:grid-cols-[110px_70px_1fr_160px_110px_110px_120px]";
 
 /**
  * Responsive table. Columns collapse gracefully on narrower viewports —
- * Updated hides first, Line hides second. Status/ID/Title/Owner stay
- * visible in every layout. There is no Spend column here — usage data is
- * empty in practice, so it's only shown as an optional chip in the list
- * and board layouts.
+ * Updated and Line hide below md. Status, ID, Title, Spend, and Owner stay
+ * visible in every layout so token and USD cost stay visible on the main
+ * work-order list.
  */
 export function WorkOrdersTableView(props: WorkOrdersTableViewProps) {
   return (
@@ -53,6 +53,7 @@ export function WorkOrdersTableView(props: WorkOrdersTableViewProps) {
         <span>ID</span>
         <span>Title</span>
         <span className="hidden md:inline">Line</span>
+        <span className="text-right">Spend</span>
         <span className="hidden md:inline">Updated</span>
         <span className="text-right">Owner</span>
       </div>
@@ -117,6 +118,8 @@ function TableRow({
         fallback="—"
       />
 
+      <SpendCell entry={entry} />
+
       <span className="relative z-10 pointer-events-none hidden text-[11px] text-muted-foreground md:inline">
         {timeLabel}
       </span>
@@ -139,5 +142,27 @@ function TableRow({
         />
       </div>
     </article>
+  );
+}
+
+function SpendCell({ entry }: { entry: WorkOrderListEntry }) {
+  const usd = entry.totalCostCents > 0 ? formatUsdCents(entry.totalCostCents) : null;
+  const tokens = entry.totalTokens > 0 ? formatCompactTokens(entry.totalTokens) : null;
+  if (!usd && !tokens) {
+    return (
+      <span className="relative z-10 pointer-events-none text-right text-[11px] tabular-nums text-muted-foreground">
+        —
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="relative z-10 pointer-events-none text-right text-[11px] leading-tight tabular-nums text-muted-foreground"
+      title={entry.usageTooltip ?? undefined}
+    >
+      {usd ? <span className="block">{usd}</span> : null}
+      {tokens ? <span className="block">{tokens}</span> : null}
+    </span>
   );
 }

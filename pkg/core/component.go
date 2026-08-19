@@ -49,6 +49,7 @@ type ExecutionContext struct {
 	Apps           AppExecutionContext
 	Runs           RunExecutionContext
 	Factory        FactoryContext
+	Usage          UsageRecorder
 }
 
 type AppExecutionContext interface {

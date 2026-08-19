@@ -1,7 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
+import {
+  defaultFactoriesFixture,
+  EMPTY_FACTORY_KEY,
+  PRIMARY_FACTORY_KEY,
+} from "../../__fixtures__/factoryPageResponses";
 import { eventTypesFromToggles, defaultNotificationTypeToggles } from "@/lib/notificationSettings";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
 
@@ -77,6 +81,25 @@ export const RepositoriesSoon: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/repositories`}
+      factoriesFixture={defaultFactoriesFixture}
+    />
+  ),
+};
+
+export const Usage: Story = {
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/usage`}
+      factoriesFixture={defaultFactoriesFixture}
+    />
+  ),
+};
+
+export const UsageEmpty: Story = {
+  name: "Usage (empty)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${EMPTY_FACTORY_KEY}/settings/usage`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),
