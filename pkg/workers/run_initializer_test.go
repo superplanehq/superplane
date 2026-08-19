@@ -155,7 +155,7 @@ func Test__RunInitializer__FinishesFactoryWorkOrderExecutionWhenInitializationFa
 		LineDispatchID: dispatch.ID,
 		StepIndex:      0,
 		StepName:       "step-one",
-		RunID:          run.ID,
+		RunID:          &run.ID,
 		Status:         models.FactoryWorkOrderExecutionStatusPending,
 		CreatedAt:      now,
 		UpdatedAt:      now,
