@@ -94,7 +94,8 @@ func (s *factorySteps) visitFactoryOverview(factory *models.Factory) {
 	s.session.Visit("/" + s.session.OrgID.String() + "/workspaces/" + factory.Key + "/overview")
 }
 
-func (s *factorySteps) completeFactoryOnboarding(factory *models.Factory) {
+func completeFactoryOnboarding(t *testing.T, factory *models.Factory) {
+	t.Helper()
 	vcsID := uuid.New().String()
 	agentID := uuid.New().String()
 	appRepository := "acme/app"
@@ -103,7 +104,7 @@ func (s *factorySteps) completeFactoryOnboarding(factory *models.Factory) {
 	agentHarness := models.FactoryOnboardingAgentHarnessClaudeCode
 	appID := uuid.New().String()
 	lineID := uuid.New().String()
-	require.NoError(s.t, factory.CompleteOnboarding(database.DB(s.t.Context()), models.FactoryOnboardingPatch{
+	require.NoError(t, factory.CompleteOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
 		VCSIntegrationID:   &vcsID,
 		AgentIntegrationID: &agentID,
 		AppRepository:      &appRepository,
@@ -113,6 +114,10 @@ func (s *factorySteps) completeFactoryOnboarding(factory *models.Factory) {
 		ProvisionedAppID:   &appID,
 		ProvisionedLineID:  &lineID,
 	}))
+}
+
+func (s *factorySteps) completeFactoryOnboarding(factory *models.Factory) {
+	completeFactoryOnboarding(s.t, factory)
 }
 
 func (s *factorySteps) fillFactorySettingsName(name string) {
