@@ -114,6 +114,10 @@ func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 				Entrypoint: step.Entrypoint,
 			},
 		}
+		if step.MaxParallelism != nil {
+			value := int32(*step.MaxParallelism)
+			steps[i].MaxParallelism = &value
+		}
 	}
 
 	return &pb.FactoryLine{
@@ -240,7 +244,20 @@ func serializeWorkOrderLineDispatch(dispatch models.FactoryWorkOrderLineDispatch
 	if dispatch.FinishedAt != nil {
 		item.FinishedAt = timestamppb.New(*dispatch.FinishedAt)
 	}
+	if dispatch.QueueItem != nil {
+		item.QueueItem = serializeWorkOrderQueueItem(dispatch.QueueItem)
+	}
 	return item
+}
+
+func serializeWorkOrderQueueItem(item *models.FactoryWorkOrderQueueItemRecord) *pb.WorkOrderQueueItem {
+	return &pb.WorkOrderQueueItem{
+		Id:        item.ID.String(),
+		StepName:  item.StepName,
+		StepIndex: int32(item.StepIndex),
+		Position:  int32(item.Position),
+		CreatedAt: timestamppb.New(item.CreatedAt),
+	}
 }
 
 func serializeLineDispatchState(state string) pb.WorkOrderLineDispatch_State {
