@@ -1,5 +1,6 @@
 import type { FactoriesWorkOrderCheck } from "@/api-client";
 
+import type { BooleanCheckPresentation } from "../lib/workOrderChecks";
 import { OPEN_WORK_ORDER, RUNNING_WORK_ORDER } from "./factoryPageResponses";
 
 /**
@@ -167,3 +168,69 @@ export const CRITICAL_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
     updatedAt: minutesAgo(2),
   },
 ];
+
+/**
+ * Storybook-only: boolean (pass/fail) checks — gate-style automations like
+ * CI or a security scan that report a verdict instead of a score. Fed
+ * through `WorkOrderChecksPrototypeSlotContext` so the live Checks section
+ * merges them in without any change to real check loading.
+ */
+
+export const BOOLEAN_CHECK_CI_PASS: BooleanCheckPresentation = {
+  id: "check-ci",
+  type: "boolean",
+  name: "CI",
+  passed: true,
+  level: "positive",
+  summary: "All 214 required jobs passed on the latest commit.",
+  sourceName: "GitHub Actions",
+  appId: "app-ci",
+  runId: "run-ci-3841",
+  updatedAt: minutesAgo(6),
+};
+
+export const BOOLEAN_CHECK_SECURITY_SCAN_FAIL: BooleanCheckPresentation = {
+  id: "check-security-scan",
+  type: "boolean",
+  name: "Security scan",
+  passed: false,
+  level: "critical",
+  summary: 'A new dependency ("node-fetch") introduces a known critical CVE.',
+  analysis:
+    "### Finding\n\n`node-fetch@2.6.1` was added transitively by the new retry client and carries CVE-2022-0235 (information exposure via the `Fetch` implementation).\n\n### Recommended fix\n\nBump to `node-fetch@2.6.7` or later, or replace the retry client's HTTP dependency with the existing `undici` client already used elsewhere in the service.",
+  sourceName: "Security Scan",
+  appId: "app-security-scan",
+  runId: "run-security-2091",
+  updatedAt: minutesAgo(3),
+};
+
+export const BOOLEAN_CHECK_FLAKY_GATE_FAIL: BooleanCheckPresentation = {
+  id: "check-flaky-gate",
+  type: "boolean",
+  name: "Flaky gate",
+  passed: false,
+  level: "caution",
+  summary: "The end-to-end smoke gate failed once; it has a 4% historical flake rate.",
+  sourceName: "Smoke Gate",
+  runId: "run-smoke-552",
+  updatedAt: minutesAgo(15),
+};
+
+/** Realistic mixed set for the open work order — CI passes, security scan fails critical. */
+export const OPEN_WORK_ORDER_BOOLEAN_CHECKS: BooleanCheckPresentation[] = [
+  BOOLEAN_CHECK_CI_PASS,
+  BOOLEAN_CHECK_SECURITY_SCAN_FAIL,
+];
+
+/** A single passing boolean check while the order is still running. */
+export const RUNNING_WORK_ORDER_BOOLEAN_CHECKS: BooleanCheckPresentation[] = [
+  { ...BOOLEAN_CHECK_CI_PASS, id: "check-ci-running", updatedAt: minutesAgo(22) },
+];
+
+/** Fallback map the Storybook-only checks prototype slot reads from — mirrors
+ * `DEFAULT_CHECKS_BY_ORDER_ID` so the open order shows a realistic mix of
+ * scored and boolean checks and every other order is unaffected. */
+export const DEFAULT_BOOLEAN_CHECKS_BY_ORDER_ID: Record<string, BooleanCheckPresentation[]> = {
+  [OPEN_WORK_ORDER.id!]: OPEN_WORK_ORDER_BOOLEAN_CHECKS,
+  [RUNNING_WORK_ORDER.id!]: RUNNING_WORK_ORDER_BOOLEAN_CHECKS,
+};

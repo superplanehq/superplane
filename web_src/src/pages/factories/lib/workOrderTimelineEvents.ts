@@ -78,7 +78,8 @@ export interface WorkOrderTimelineArtifact {
 }
 
 /** Score snapshot carried by an `order.check.reported` event. */
-export interface WorkOrderTimelineCheck {
+export interface WorkOrderTimelineScoreCheck {
+  type?: "score";
   name: string;
   score: number;
   maxScore: number;
@@ -86,6 +87,17 @@ export interface WorkOrderTimelineCheck {
   /** Score from the previous report of the same check, when one exists. */
   previousScore?: number;
 }
+
+/** Pass/fail snapshot carried by an `order.check.reported` event for a boolean check. */
+export interface WorkOrderTimelineBooleanCheck {
+  type: "boolean";
+  name: string;
+  passed: boolean;
+  /** Previous pass/fail state, when one exists — powers the "Pass → Fail" phrasing. */
+  previousPassed?: boolean;
+}
+
+export type WorkOrderTimelineCheck = WorkOrderTimelineScoreCheck | WorkOrderTimelineBooleanCheck;
 
 export interface WorkOrderTimelineEvent {
   id: string;

@@ -5,27 +5,48 @@ import type { FactoriesWorkOrderCheck, WorkOrderCheckLevel as ApiWorkOrderCheckL
  * number is good (coverage) or bad (risk). */
 export type WorkOrderCheckLevel = "positive" | "neutral" | "caution" | "critical";
 
-export interface WorkOrderCheckPresentation {
+interface WorkOrderCheckPresentationBase {
   id: string;
-  /** Short human name, e.g. "Risk review" or "Code coverage". */
+  /** Short human name, e.g. "Risk review" or "CI". */
   name: string;
+  level: WorkOrderCheckLevel;
+  /** One-line result, shown in the expanded dialog under the score/badge. */
+  summary?: string;
+  /** Full markdown analysis behind the score/badge. */
+  analysis?: string;
+  /** Automation that produced the check, e.g. "PR Risk Review". */
+  sourceName?: string;
+  /** App + run that reported the check — powers the "View run" link. */
+  appId?: string;
+  runId?: string;
+  updatedAt?: string;
+}
+
+export interface ScoreCheckPresentation extends WorkOrderCheckPresentationBase {
+  /** Absent (or "score") means the check reports a numeric score. */
+  type?: "score";
   score: number;
   maxScore: number;
   /** "percent" renders `82%`; "fraction" (default) renders `65/100`. */
   format?: "fraction" | "percent";
-  level: WorkOrderCheckLevel;
   /** Score from the previous report of the same check — powers the trend delta. */
   previousScore?: number;
-  /** One-line result, shown in the expanded dialog under the score. */
-  summary?: string;
-  /** Full markdown analysis behind the score. */
-  analysis?: string;
-  /** Automation that produced the check, e.g. "PR Risk Review". */
-  sourceName?: string;
-  /** App + run that reported the score — powers the "View run" link. */
-  appId?: string;
-  runId?: string;
-  updatedAt?: string;
+}
+
+export interface BooleanCheckPresentation extends WorkOrderCheckPresentationBase {
+  /** Gate-style check that reports pass/fail instead of a score — no
+   * maxScore, format, or thresholds. Renders as a Pass/Fail badge. */
+  type: "boolean";
+  passed: boolean;
+  /** Previous pass/fail state, when known — powers a "Pass → Fail" timeline phrasing. */
+  previousPassed?: boolean;
+}
+
+/** A check is either a numeric score (default) or a pass/fail boolean. */
+export type WorkOrderCheckPresentation = ScoreCheckPresentation | BooleanCheckPresentation;
+
+export function isBooleanCheck(check: WorkOrderCheckPresentation): check is BooleanCheckPresentation {
+  return check.type === "boolean";
 }
 
 /** Textual verdict next to the score — color alone must not carry the meaning
@@ -53,7 +74,7 @@ export const LEVEL_LABEL: Record<WorkOrderCheckLevel, { label: string; className
   },
 };
 
-export function formatCheckScore(check: Pick<WorkOrderCheckPresentation, "score" | "maxScore" | "format">): {
+export function formatCheckScore(check: Pick<ScoreCheckPresentation, "score" | "maxScore" | "format">): {
   value: string;
   scale: string;
 } {
@@ -78,7 +99,7 @@ function emptyToUndefined(value: string | undefined): string | undefined {
   return value || undefined;
 }
 
-export function presentWorkOrderCheck(check: FactoriesWorkOrderCheck): WorkOrderCheckPresentation {
+export function presentWorkOrderCheck(check: FactoriesWorkOrderCheck): ScoreCheckPresentation {
   const automation = check.automation;
   return {
     id: check.id ?? check.key ?? "",

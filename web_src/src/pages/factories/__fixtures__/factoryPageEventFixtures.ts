@@ -184,13 +184,18 @@ function artifactAddedEvent(
   };
 }
 
-// A score reported by a dedicated automation (`order.check.reported`).
-// `previousScore` marks a re-score, which the timeline renders as a trend
-// ("82 → 65") instead of a bare number.
+type CheckReportedFixturePayload =
+  | { name: string; score: number; maxScore: number; format?: "fraction" | "percent"; previousScore?: number }
+  | { name: string; type: "boolean"; passed: boolean; previousPassed?: boolean };
+
+// A score (or boolean pass/fail) reported by a dedicated automation
+// (`order.check.reported`). `previousScore`/`previousPassed` marks a
+// re-report whose value changed, which the timeline renders as a trend
+// ("82 → 65") or a flip ("Pass → Fail") instead of a bare value.
 function checkReportedEvent(
   order: FactoriesWorkOrder,
   at: string,
-  check: { name: string; score: number; maxScore: number; format?: "fraction" | "percent"; previousScore?: number },
+  check: CheckReportedFixturePayload,
   automation: AutomationRefFixture,
   run?: { id: string },
 ): FactoriesWorkOrderEvent {
@@ -481,6 +486,40 @@ export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     { name: "Risk review", score: 65, maxScore: 100, previousScore: 82 },
     RISK_REVIEW_AUTOMATION,
     { id: "run-risk-review-101" },
+  ),
+];
+
+const CI_AUTOMATION = { appId: "app-ci", appName: "GitHub Actions" };
+const SECURITY_SCAN_AUTOMATION = { appId: "app-security-scan", appName: "Security Scan" };
+
+/**
+ * Storybook-only: a boolean check reported, then flipping from pass to
+ * fail — the interesting event `appendCheckReportedEvent` calls out with
+ * "flipped" instead of "reported". Used by the WorkOrderActivityTimeline
+ * boolean-checks story, not wired into any harnessed page's event fixture.
+ */
+export const BOOLEAN_CHECK_TIMELINE_EVENTS: FactoriesWorkOrderEvent[] = [
+  openedWorkOrderEvent(OPEN_WORK_ORDER, HOUR_AGO),
+  checkReportedEvent(
+    OPEN_WORK_ORDER,
+    TWO_HOURS_AGO,
+    { name: "Security scan", type: "boolean", passed: true },
+    SECURITY_SCAN_AUTOMATION,
+    { id: "run-security-2090" },
+  ),
+  checkReportedEvent(
+    OPEN_WORK_ORDER,
+    TWELVE_MINUTES_AGO,
+    { name: "Security scan", type: "boolean", passed: false, previousPassed: true },
+    SECURITY_SCAN_AUTOMATION,
+    { id: "run-security-2091" },
+  ),
+  checkReportedEvent(
+    OPEN_WORK_ORDER,
+    TWELVE_MINUTES_AGO,
+    { name: "CI", type: "boolean", passed: true },
+    CI_AUTOMATION,
+    { id: "run-ci-3841" },
   ),
 ];
 

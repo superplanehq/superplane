@@ -12,6 +12,7 @@ import {
   RUNNING_WORK_ORDER,
 } from "./__fixtures__/factoryPageResponses";
 import {
+  BOOLEAN_CHECK_TIMELINE_EVENTS,
   CLOSED_FAILED_WORK_ORDER_EVENTS,
   CLOSED_WORK_ORDER_EVENTS,
   DRAFT_WORK_ORDER_EVENTS,
@@ -111,6 +112,19 @@ export const ClosedFailed: Story = {
     organizationId: FACTORIES_ORGANIZATION_ID,
     order: CLOSED_FAILED_WORK_ORDER,
     events: CLOSED_FAILED_WORK_ORDER_EVENTS,
+  },
+};
+
+/**
+ * Prototype: a boolean check reported, then flipping pass → fail. Pass/fail
+ * checks reuse the same `CheckReportedEventBody` as scored checks, just
+ * with "Pass"/"Fail" phrasing instead of a numeric value.
+ */
+export const BooleanChecks: Story = {
+  args: {
+    organizationId: FACTORIES_ORGANIZATION_ID,
+    order: OPEN_WORK_ORDER,
+    events: BOOLEAN_CHECK_TIMELINE_EVENTS,
   },
 };
 

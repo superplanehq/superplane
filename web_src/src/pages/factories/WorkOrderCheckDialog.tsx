@@ -6,10 +6,16 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 
-import { formatCheckScore, LEVEL_LABEL, type WorkOrderCheckPresentation } from "./lib/workOrderChecks";
+import {
+  formatCheckScore,
+  isBooleanCheck,
+  LEVEL_LABEL,
+  type ScoreCheckPresentation,
+  type WorkOrderCheckPresentation,
+} from "./lib/workOrderChecks";
 import { WorkOrderCheckAttribution } from "./WorkOrderCheckAttribution";
 
-/** Expanded view of one check: score, summary, and the full markdown analysis. */
+/** Expanded view of one check: score (or pass/fail badge), summary, and the full markdown analysis. */
 export function WorkOrderCheckDialog({
   open,
   onClose,
@@ -21,7 +27,6 @@ export function WorkOrderCheckDialog({
   check: WorkOrderCheckPresentation;
   runHref?: string | null;
 }) {
-  const { value, scale } = formatCheckScore(check);
   const level = LEVEL_LABEL[check.level];
 
   return (
@@ -32,16 +37,15 @@ export function WorkOrderCheckDialog({
       >
         <DialogTitle>{check.name}</DialogTitle>
 
-        <div className="mt-3 flex items-center gap-3">
-          <span className="flex items-baseline gap-0.5">
-            <span className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">{value}</span>
-            <span className="text-sm text-muted-foreground">{scale}</span>
-          </span>
-          <Badge variant="outline" className={cn("border", level.badgeClassName)}>
-            {level.label}
-          </Badge>
-        </div>
-        <CheckTrendLine check={check} />
+        {isBooleanCheck(check) ? (
+          <div className="mt-3 flex items-center gap-3">
+            <Badge variant="outline" className={cn("border text-[13px]", level.badgeClassName)}>
+              {check.passed ? "Pass" : "Fail"}
+            </Badge>
+          </div>
+        ) : (
+          <ScoreDialogHeader check={check} badgeClassName={level.badgeClassName} label={level.label} />
+        )}
 
         {check.summary ? <p className="mt-3 text-sm text-foreground">{check.summary}</p> : null}
 
@@ -70,8 +74,35 @@ export function WorkOrderCheckDialog({
   );
 }
 
+/** Score, level badge, and trend line — scored checks only. */
+function ScoreDialogHeader({
+  check,
+  badgeClassName,
+  label,
+}: {
+  check: ScoreCheckPresentation;
+  badgeClassName: string;
+  label: string;
+}) {
+  const { value, scale } = formatCheckScore(check);
+  return (
+    <>
+      <div className="mt-3 flex items-center gap-3">
+        <span className="flex items-baseline gap-0.5">
+          <span className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">{value}</span>
+          <span className="text-sm text-muted-foreground">{scale}</span>
+        </span>
+        <Badge variant="outline" className={cn("border", badgeClassName)}>
+          {label}
+        </Badge>
+      </div>
+      <CheckTrendLine check={check} />
+    </>
+  );
+}
+
 /** Trend versus the previous report, spelled out in text. */
-function CheckTrendLine({ check }: { check: WorkOrderCheckPresentation }) {
+function CheckTrendLine({ check }: { check: ScoreCheckPresentation }) {
   if (check.previousScore === undefined || check.previousScore === check.score) {
     return null;
   }

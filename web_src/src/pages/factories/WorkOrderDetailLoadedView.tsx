@@ -137,6 +137,7 @@ function WorkOrderDetailBody({
               error={checksError}
               organizationId={organizationId}
               factoryKey={factoryKey}
+              workOrderId={order.id}
               orderNumber={order.number}
               className={order.description ? "mt-10" : undefined}
             />

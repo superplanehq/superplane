@@ -15,6 +15,8 @@ import { MissionAssignmentProvider } from "../pages/missions/MissionAssignmentCo
 import { MissionsWorkOrdersPage } from "../pages/missions/MissionsWorkOrdersPage";
 import { WorkOrderMissionOverviewRow } from "../pages/missions/WorkOrderMissionOverviewRow";
 import { WorkOrderOverviewMissionSlotContext } from "../sidebar/workOrderOverviewSlots";
+import { DEFAULT_BOOLEAN_CHECKS_BY_ORDER_ID } from "./workOrderCheckFixtures";
+import { WorkOrderChecksPrototypeSlotContext } from "../workOrderChecksPrototypeSlot";
 
 interface FactoriesHarnessProps {
   /** Path under the org. Defaults to `workspaces` (list page). */
@@ -39,6 +41,13 @@ interface FactoriesHarnessProps {
 
 function DefaultWikiWireframe() {
   return <WikiWireframe initialDocuments={WIKI_DOCUMENTS_DEFAULT} refreshedDocuments={WIKI_DOCUMENTS_REFRESHED} />;
+}
+
+/** Storybook-only: feeds boolean (pass/fail) checks into the Checks section
+ * via `WorkOrderChecksPrototypeSlotContext`. The live app never provides
+ * this context, so production checks are unaffected. */
+function booleanChecksPrototypeSlot(workOrderId: string) {
+  return DEFAULT_BOOLEAN_CHECKS_BY_ORDER_ID[workOrderId] ?? [];
 }
 
 const defaultFactoryAppFixture = refundLineCanvasFixture();
@@ -96,9 +105,15 @@ export function FactoriesHarness({
     </MissionAssignmentProvider>
   );
 
+  const withChecksPrototype = (
+    <WorkOrderChecksPrototypeSlotContext.Provider value={booleanChecksPrototypeSlot}>
+      {withMissions}
+    </WorkOrderChecksPrototypeSlotContext.Provider>
+  );
+
   if (!enableOnboarding) {
-    return withMissions;
+    return withChecksPrototype;
   }
 
-  return <OnboardingStorybookProvider initial={onboardingSeed}>{withMissions}</OnboardingStorybookProvider>;
+  return <OnboardingStorybookProvider initial={onboardingSeed}>{withChecksPrototype}</OnboardingStorybookProvider>;
 }

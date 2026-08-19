@@ -48,10 +48,14 @@ interface EventArtifactPayload {
 
 interface EventCheckPayload {
   name?: string;
+  /** Absent (or "score") reports a numeric score; "boolean" reports pass/fail. */
+  type?: "score" | "boolean";
   score?: number;
   maxScore?: number;
   format?: "fraction" | "percent";
   previousScore?: number;
+  passed?: boolean;
+  previousPassed?: boolean;
 }
 
 interface EventPayload extends LineStepExecutionPayload {
@@ -341,22 +345,58 @@ function appendArtifactEvent(
 // Check reports stay top-level: they come from dedicated automations
 // (risk review, coverage), not from a dispatched line step.
 function appendCheckReportedEvent(state: TimelineBuildState, index: number, payload: EventPayload, at: string): void {
-  const check = payload.check;
-  if (!check?.name || check.score === undefined || check.maxScore === undefined) {
+  const rawCheck = payload.check;
+  if (!rawCheck?.name) {
     return;
   }
+  const check = rawCheck as EventCheckPayload & { name: string };
 
   const automationActor = toAutomationActor(payload.automation);
-  // Same wording rule as CheckReportedEventBody: a re-report with an
-  // unchanged score still reads as "reported".
-  const isRescore = check.previousScore !== undefined && check.previousScore !== check.score;
-  state.events.push({
+  const base = {
     id: `check-${index}`,
-    kind: "checkReported",
+    kind: "checkReported" as const,
     at,
     actorAutomation: automationActor,
     sourceRunId: payload.run?.id,
     sourceAppId: automationActor?.appId ?? payload.app?.id,
+  };
+
+  const event = check.type === "boolean" ? buildBooleanCheckEvent(base, check) : buildScoreCheckEvent(base, check);
+  if (event) {
+    state.events.push(event);
+  }
+}
+
+type CheckEventBase = Pick<
+  WorkOrderTimelineEvent,
+  "id" | "kind" | "at" | "actorAutomation" | "sourceRunId" | "sourceAppId"
+>;
+
+function buildBooleanCheckEvent(base: CheckEventBase, check: EventCheckPayload & { name: string }) {
+  if (check.passed === undefined) {
+    return undefined;
+  }
+
+  // A pass → fail (or fail → pass) flip is the interesting event; an
+  // unchanged repeat still reads as "reported".
+  const isFlip = check.previousPassed !== undefined && check.previousPassed !== check.passed;
+  return {
+    ...base,
+    check: { type: "boolean" as const, name: check.name, passed: check.passed, previousPassed: check.previousPassed },
+    title: isFlip ? `flipped ${check.name}` : `reported ${check.name}`,
+  };
+}
+
+function buildScoreCheckEvent(base: CheckEventBase, check: EventCheckPayload & { name: string }) {
+  if (check.score === undefined || check.maxScore === undefined) {
+    return undefined;
+  }
+
+  // Same wording rule as CheckReportedEventBody: a re-report with an
+  // unchanged score still reads as "reported".
+  const isRescore = check.previousScore !== undefined && check.previousScore !== check.score;
+  return {
+    ...base,
     check: {
       name: check.name,
       score: check.score,
@@ -365,7 +405,7 @@ function appendCheckReportedEvent(state: TimelineBuildState, index: number, payl
       previousScore: check.previousScore,
     },
     title: isRescore ? `re-scored ${check.name}` : `reported ${check.name}`,
-  });
+  };
 }
 
 function findAutomationStep(
