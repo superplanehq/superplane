@@ -127,7 +127,14 @@ spec:
       component: github.createPullRequest
       configuration:
         base: main
-        body: '{{ fromBase64(previous().data.result.description) }}'
+        body: |-
+          [Work Order]({{ order().url }}).
+
+          {{ fromBase64(previous().data.result.description) }}
+
+          <hr>
+
+          Created via [SuperPlane](https://superplane.com).
         draft: true
         head: '{{ find(order().artifacts, {.type == "branch"}).data.name }}'
         repository: '{{ install_params.appRepository }}'
