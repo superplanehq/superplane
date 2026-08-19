@@ -30,6 +30,7 @@ import {
   RUNNING_WORK_ORDER_CHECKS,
 } from "./__fixtures__/workOrderCheckFixtures";
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "./lib/workOrderChecks";
+import { presentWorkOrderStatusNotes } from "./lib/workOrderStatusNote";
 import { WorkOrderDetailLoadedView } from "./WorkOrderDetailLoadedView";
 import { getWorkOrderDetailDerived } from "./lib/workOrderProgress";
 
@@ -76,6 +77,7 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     order,
     events: overrides.events ?? [],
     artifacts: overrides.artifacts ?? [],
+    statusNotes: presentWorkOrderStatusNotes(order.statusNotes),
     checks: overrides.checks,
     isArtifactsLoading: false,
     displayStatus: derived.displayStatus!,
@@ -176,6 +178,41 @@ export const WithCriticalCheck: Story = {
     events: OPEN_WORK_ORDER_EVENTS,
     checks: presentWorkOrderChecks(CRITICAL_WORK_ORDER_CHECKS),
   }),
+};
+
+/**
+ * Status notes — watcher automations announce why the order is Waiting
+ * and what resolves it, so first-time users know the next step. Set by
+ * the setWorkOrderStatusNote component, keyed so several notes can sit
+ * side by side; cleared on any state change.
+ */
+export const WithStatusNote: Story = {
+  name: "With Status Note",
+  args: buildLoadedViewArgs(OPEN_WORK_ORDER, {
+    events: RICH_OPEN_WORK_ORDER_EVENTS,
+    artifacts: OPEN_WORK_ORDER_ARTIFACTS,
+  }),
+};
+
+/** Two notes with distinct keys — PR review plus a second informational wait. */
+export const WithTwoStatusNotes: Story = {
+  name: "With Two Status Notes",
+  args: {
+    ...buildLoadedViewArgs(OPEN_WORK_ORDER, {
+      events: RICH_OPEN_WORK_ORDER_EVENTS,
+      artifacts: OPEN_WORK_ORDER_ARTIFACTS,
+    }),
+    statusNotes: presentWorkOrderStatusNotes([
+      ...(OPEN_WORK_ORDER.statusNotes ?? []),
+      {
+        key: "deploy-window",
+        kind: "info",
+        headline: "Waiting on the deploy window",
+        body: "The change is ready. SuperPlane will complete this work order after the next deploy window.",
+        updatedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      },
+    ]),
+  },
 };
 
 /** Closed as failed — failed badge, reopen actions, markdown artifact + failed close. */

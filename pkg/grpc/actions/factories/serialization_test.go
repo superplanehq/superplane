@@ -1,7 +1,9 @@
 package factories
 
 import (
+	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -13,6 +15,19 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
+func mustSerializeWorkOrder(
+	t *testing.T,
+	f *models.Factory,
+	order *models.FactoryWorkOrder,
+	dispatches []models.FactoryWorkOrderLineDispatchRecord,
+	createdByAutomation *factory.AutomationRef,
+) *pb.WorkOrder {
+	t.Helper()
+	serialized, err := serializeWorkOrder(f, order, dispatches, createdByAutomation)
+	require.NoError(t, err)
+	return serialized
+}
+
 func TestSerializeWorkOrderCreator_UserBranch(t *testing.T) {
 	userID := uuid.New()
 	order := &models.FactoryWorkOrder{
@@ -21,7 +36,7 @@ func TestSerializeWorkOrderCreator_UserBranch(t *testing.T) {
 		CreatedBy:   &models.User{Name: "Alice"},
 	}
 
-	creator := serializeWorkOrder(nil, order, nil, nil).GetCreatedBy()
+	creator := mustSerializeWorkOrder(t, nil, order, nil, nil).GetCreatedBy()
 	require.NotNil(t, creator)
 	assert.Nil(t, creator.GetAutomation())
 	require.NotNil(t, creator.GetUser())
@@ -44,7 +59,7 @@ func TestSerializeWorkOrderCreator_AutomationBranchWinsOverUser(t *testing.T) {
 		AppName:  "Release automation",
 	}
 
-	creator := serializeWorkOrder(nil, order, nil, automation).GetCreatedBy()
+	creator := mustSerializeWorkOrder(t, nil, order, nil, automation).GetCreatedBy()
 	require.NotNil(t, creator)
 	assert.Nil(t, creator.GetUser())
 	require.NotNil(t, creator.GetAutomation())
@@ -55,7 +70,7 @@ func TestSerializeWorkOrderCreator_AutomationBranchWinsOverUser(t *testing.T) {
 
 func TestSerializeWorkOrderCreator_NoneReturnsNil(t *testing.T) {
 	order := &models.FactoryWorkOrder{ID: uuid.New()}
-	assert.Nil(t, serializeWorkOrder(nil, order, nil, nil).GetCreatedBy())
+	assert.Nil(t, mustSerializeWorkOrder(t, nil, order, nil, nil).GetCreatedBy())
 }
 
 func TestSerializeExecutionSteps_UsesCanvasNames(t *testing.T) {
@@ -123,7 +138,7 @@ func TestSerializeWorkOrder_LineDispatchesReplaceFlatExecutions(t *testing.T) {
 	}
 
 	order := &models.FactoryWorkOrder{ID: uuid.New()}
-	serialized := serializeWorkOrder(nil, order, dispatches, nil)
+	serialized := mustSerializeWorkOrder(t, nil, order, dispatches, nil)
 
 	require.Len(t, serialized.LineDispatches, 1)
 	dispatch := serialized.LineDispatches[0]
@@ -144,4 +159,46 @@ func TestSerializeWorkOrder_LineDispatchesReplaceFlatExecutions(t *testing.T) {
 	// Aggregate usage sums across every dispatch's step executions.
 	assert.EqualValues(t, 10, serialized.TotalTokens)
 	assert.EqualValues(t, 5, serialized.TotalCostCents)
+}
+
+func TestSerializeWorkOrder_StatusNotes(t *testing.T) {
+	appID := uuid.New()
+	runID := uuid.New()
+	note, err := json.Marshal([]models.FactoryWorkOrderStatusNote{
+		{
+			Key:      "pr-closure",
+			Kind:     models.FactoryWorkOrderStatusNoteKindInfo,
+			Headline: "Review the pull request",
+			Body:     "Merging PR #42 completes this work order.",
+			CtaLabel: "Review PR #42",
+			CtaURL:   "https://github.com/acme/app/pull/42",
+			Automation: &factory.AutomationRef{
+				AppID:   appID,
+				AppName: "PR Closure",
+			},
+			Run:       &factory.RunRef{ID: runID},
+			UpdatedAt: time.Now(),
+		},
+	})
+	require.NoError(t, err)
+
+	order := &models.FactoryWorkOrder{ID: uuid.New(), StatusNote: note}
+	serialized := mustSerializeWorkOrder(t, nil, order, nil, nil)
+
+	statusNotes := serialized.GetStatusNotes()
+	require.Len(t, statusNotes, 1)
+	statusNote := statusNotes[0]
+	assert.Equal(t, "pr-closure", statusNote.GetKey())
+	assert.Equal(t, "info", statusNote.GetKind())
+	assert.Equal(t, "Review the pull request", statusNote.GetHeadline())
+	assert.Equal(t, "Review PR #42", statusNote.GetCtaLabel())
+	assert.Equal(t, "https://github.com/acme/app/pull/42", statusNote.GetCtaUrl())
+	require.NotNil(t, statusNote.GetAutomation())
+	assert.Equal(t, appID.String(), statusNote.GetAutomation().GetAppId())
+	assert.Equal(t, runID.String(), statusNote.GetRunId())
+	assert.NotNil(t, statusNote.GetUpdatedAt())
+
+	// No notes stored serializes as absent, not as an empty list.
+	bare := &models.FactoryWorkOrder{ID: uuid.New()}
+	assert.Empty(t, mustSerializeWorkOrder(t, nil, bare, nil, nil).GetStatusNotes())
 }
