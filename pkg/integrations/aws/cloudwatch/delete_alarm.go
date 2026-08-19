@@ -1,4 +1,4 @@
-package ec2
+package cloudwatch
 
 import (
 	"fmt"
@@ -23,35 +23,42 @@ type DeleteAlarmNodeMetadata struct {
 }
 
 func (c *DeleteAlarm) Name() string {
-	return "aws.ec2.deleteAlarm"
+	return "aws.cloudwatch.deleteAlarm"
 }
 
 func (c *DeleteAlarm) Label() string {
-	return "EC2 • Delete Alarm"
+	return "CloudWatch • Delete Alarm"
 }
 
 func (c *DeleteAlarm) Description() string {
-	return "Delete a CloudWatch metric alarm for an EC2 instance"
+	return "Delete a CloudWatch metric alarm"
 }
 
 func (c *DeleteAlarm) Documentation() string {
 	return `The Delete Alarm component removes a CloudWatch metric alarm.
 
+The alarm is read before it is deleted, so the emitted payload is a snapshot of what was removed —
+for a single-metric alarm, enough to recreate it with Create Alarm if the deletion needs to be undone.
+
 ## Use Cases
 
-- **Cleanup**: Remove temporary alarms created by automation workflows
-- **Decommissioning**: Delete monitoring for instances being retired
-- **Rollback**: Undo alarm creation steps in failed provisioning runs
+- **Cleanup**: Remove temporary alarms raised by automation workflows
+- **Decommissioning**: Delete monitoring for resources being retired
+- **Rollback**: Undo alarm creation steps in a failed provisioning run
 
 ## Configuration
 
-- **Region**: AWS region where the alarm resides
-- **Alarm**: CloudWatch alarm to delete (` + "`ec2.alarm`" + ` resource picker)
+- **Region**: AWS region where the alarm lives
+- **Alarm**: CloudWatch alarm to delete (` + "`cloudwatch.alarm`" + ` resource picker)
 
 ## Output
 
-Emits a deletion confirmation on the default output channel:
-- ` + "`alarmName`" + `, ` + "`deleted`" + `, ` + "`region`" + `
+Emits the alarm as it was immediately before deletion on the default output channel, with the same
+fields as Get Alarm plus ` + "`deleted`" + `. The console URL is omitted, since it no longer resolves.
+
+Deleting an alarm that does not exist fails. This component deletes metric alarms; composite alarms
+are not handled. An alarm driven by metric math, anomaly detection or a Metrics Insights query is
+deleted, but its metric definition is not captured in the snapshot, so Create Alarm cannot restore it.
 `
 }
 
@@ -69,41 +76,8 @@ func (c *DeleteAlarm) OutputChannels(_ any) []core.OutputChannel {
 
 func (c *DeleteAlarm) Configuration() []configuration.Field {
 	return []configuration.Field{
-		{
-			Name:     "region",
-			Label:    "Region",
-			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			Default:  "us-east-1",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: common.AllRegions,
-				},
-			},
-		},
-		{
-			Name:        "alarm",
-			Label:       "Alarm",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "CloudWatch alarm to delete",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "region", Values: []string{"*"}},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: "ec2.alarm",
-					Parameters: []configuration.ParameterRef{
-						{
-							Name: "region",
-							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "region",
-							},
-						},
-					},
-				},
-			},
-		},
+		regionField(),
+		alarmField("CloudWatch alarm to delete"),
 	}
 }
 
@@ -150,7 +124,14 @@ func (c *DeleteAlarm) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to get AWS credentials: %w", err)
 	}
 
+	// Snapshot the alarm first: DeleteAlarms returns nothing, and a deletion that
+	// cannot be described is a deletion nothing downstream can act on.
 	client := NewClient(ctx.HTTP, creds, region)
+	alarm, err := client.DescribeAlarm(alarmName)
+	if err != nil {
+		return fmt.Errorf("failed to describe alarm: %w", err)
+	}
+
 	if err := client.DeleteAlarms(alarmName); err != nil {
 		return fmt.Errorf("failed to delete alarm: %w", err)
 	}
@@ -158,14 +139,18 @@ func (c *DeleteAlarm) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		DeleteAlarmPayloadType,
-		[]any{
-			map[string]any{
-				"alarmName": alarmName,
-				"deleted":   true,
-				"region":    region,
-			},
-		},
+		[]any{deletedAlarmToMap(alarm)},
 	)
+}
+
+// deletedAlarmToMap describes the alarm that was removed. The console URL is
+// dropped because it no longer resolves once the alarm is gone.
+func deletedAlarmToMap(alarm *MetricAlarm) map[string]any {
+	payload := alarmToMap(alarm)
+	delete(payload, "consoleUrl")
+	payload["deleted"] = true
+
+	return payload
 }
 
 func (c *DeleteAlarm) Hooks() []core.Hook {
