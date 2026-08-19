@@ -4,12 +4,13 @@ import type {
   FactoriesUpdateFactoryOnboardingBody,
   FactoryLineStep,
 } from "@/api-client";
+import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
-import { useIntegrationResources } from "@/hooks/useIntegrations";
-import { useOrganizationInviteLink } from "@/hooks/useOrganizationData";
+import { useCreateFactoryLine, useCreateWorkOrder, useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
+import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
-import { showErrorToast } from "@/lib/toast";
+import { githubInstallationUrl } from "@/lib/githubInstallation";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS } from "@/pages/home/factories";
@@ -17,12 +18,19 @@ import { useInstallFactory, type InstallFactoryInput } from "@/pages/home/useIns
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 
-import { factoryOverviewPath } from "../../lib/factoryPagePaths";
+import {
+  factoryListPath,
+  factoryOverviewPath,
+  factorySetupPath,
+  workOrderDetailPath,
+} from "../../lib/factoryPagePaths";
+import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
-import type { SectionId } from "./OnboardingWireframe";
-import type { IntegrationId, IssuesChoiceId } from "./onboardingFixtures";
+import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
+import { initialWizardStep } from "./onboardingStatus";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
+import { workspaceNameFromRepository } from "./workspaceNames";
 
 const DEFAULT_LINE_NAME = "Software delivery";
 const ONBOARDING_INTEGRATIONS = ["github", "claude"];
@@ -44,14 +52,6 @@ function initialSelections(onboarding: FactoriesFactory["onboarding"]): Integrat
     };
   }
   return selections;
-}
-
-// The workspace already has a name when this page opens, so setup resumes at
-// the first section that still needs an answer.
-function initialSection(onboarding: FactoriesFactory["onboarding"]): SectionId {
-  if (onboarding?.agentHarness || onboarding?.issuesSource) return "agent";
-  if (onboarding?.appRepository) return "issues";
-  return "repo";
 }
 
 function localIssuesSource(source?: string): IssuesChoiceId | null {
@@ -111,6 +111,16 @@ function useRestoreSetup(
     if (!selections.claude?.ready) return;
     setup.setAgent("claude-code");
   }, [onboarding?.agentHarness, selections.claude?.ready, setup]);
+}
+
+// The workspace is created with a placeholder name before the repository is
+// known, so the app repository provides the name the last step shows.
+function useNameFromRepository(setup: OnboardingSetupApi) {
+  useEffect(() => {
+    if (!setup.selectedRepo) return;
+    const suggestion = workspaceNameFromRepository(setup.selectedRepo);
+    if (suggestion) setup.suggestWorkspaceName(suggestion);
+  }, [setup]);
 }
 
 async function runSave(setSaving: (saving: boolean) => void, action: () => Promise<unknown>): Promise<boolean> {
@@ -260,17 +270,15 @@ function useSectionSaves(args: {
   setup: OnboardingSetupApi;
   selections: IntegrationSelections;
   setSaving: (saving: boolean) => void;
-  updateFactory: (input: { name: string }) => Promise<unknown>;
   updateOnboarding: UpdateOnboarding;
 }) {
-  const saveName = () => runSave(args.setSaving, () => args.updateFactory({ name: args.setup.workspaceName.trim() }));
-  const saveRepository = () => {
+  const saveRepository = (repository: string) => {
     const integrationId = args.selections.github?.id;
-    if (!args.setup.selectedRepo || !integrationId) return Promise.resolve(false);
+    if (!repository || !integrationId) return Promise.resolve(false);
     return runSave(args.setSaving, () =>
       args.updateOnboarding({
         vcsIntegrationId: integrationId,
-        appRepository: args.setup.selectedRepo!,
+        appRepository: repository,
       }),
     );
   };
@@ -284,7 +292,7 @@ function useSectionSaves(args: {
       }),
     );
   };
-  return { saveName, saveRepository, saveIssues };
+  return { saveRepository, saveIssues };
 }
 
 function useFinishOnboarding(args: {
@@ -295,23 +303,39 @@ function useFinishOnboarding(args: {
   setup: OnboardingSetupApi;
   selections: IntegrationSelections;
   setSaving: (saving: boolean) => void;
+  updateFactory: (input: { name: string }) => Promise<unknown>;
   updateOnboarding: UpdateOnboarding;
   installFactory: InstallOnboardingApp;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
+  createWorkOrder: (input: { title: string; description: string }) => Promise<{ number?: number | string | null }>;
 }) {
   const navigate = useNavigate();
   return async () => {
     const appRepository = args.setup.selectedRepo;
     const backlogRepository = args.setup.issuesRepo ?? appRepository;
+    const workspaceName = args.setup.workspaceName.trim();
+    const workOrderTitle = args.setup.workOrderTitle.trim();
+    const workOrderDescription = args.setup.workOrderDescription.trim();
     const github = args.selections.github;
     const claude = args.selections.claude;
     if (!appRepository || !backlogRepository || !github?.ready || !claude?.ready) {
       showErrorToast("Connect GitHub and Claude, then select both repositories.");
       return;
     }
+    if (!workspaceName) {
+      showErrorToast("Enter a workspace name.");
+      return;
+    }
+    if (!workOrderTitle || !workOrderDescription) {
+      showErrorToast("Enter a work order title and description.");
+      return;
+    }
 
     args.setSaving(true);
     try {
+      if (workspaceName !== args.factory?.name) {
+        await args.updateFactory({ name: workspaceName });
+      }
       await args.updateOnboarding({
         vcsIntegrationId: github.id,
         agentIntegrationId: claude.id,
@@ -343,13 +367,52 @@ function useFinishOnboarding(args: {
         provisionedLineId: lineId,
         complete: true,
       });
+      const order = await args.createWorkOrder({
+        title: workOrderTitle,
+        description: workOrderDescription,
+      });
       markWorkspaceGettingStarted(args.organizationId, args.factoryId);
+      if (order.number != null && order.number !== "") {
+        navigate(workOrderDetailPath(args.organizationId, args.factoryKey, order.number), { replace: true });
+        return;
+      }
       navigate(factoryOverviewPath(args.organizationId, args.factoryKey), { replace: true });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
     } finally {
       args.setSaving(false);
     }
+  };
+}
+
+function useCancelOnboarding(args: { organizationId: string; factoryId: string; canDelete: boolean }) {
+  const { account } = useAccount();
+  const navigate = useNavigate();
+  const deleteFactory = useDeleteFactory(args.organizationId);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const cancelSetup = async () => {
+    if (!args.canDelete) {
+      showErrorToast("You do not have permission to delete this workspace.");
+      throw new Error("Missing permission to delete workspace");
+    }
+    try {
+      await deleteFactory.mutateAsync(args.factoryId);
+      clearLastVisitedFactory(account?.id ?? "", args.organizationId, args.factoryId);
+      showSuccessToast("Workspace deleted.");
+      navigate(factoryListPath(args.organizationId), { replace: true });
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to delete workspace"));
+      throw error;
+    }
+  };
+
+  return {
+    canDeleteWorkspace: args.canDelete,
+    deleteOpen,
+    setDeleteOpen,
+    deleting: deleteFactory.isPending,
+    cancelSetup,
   };
 }
 
@@ -364,6 +427,7 @@ export function useOnboardingPageModel(args: {
   const integrations = useIntegrationSelections(onboarding);
   const connect = useIntegrationConnectDialog({
     organizationId: args.organizationId,
+    returnTo: factorySetupPath(args.organizationId, args.factoryKey),
     integrationNames: ONBOARDING_INTEGRATIONS,
     selections: integrations.selections,
     onSelectionsChange: integrations.setSelections,
@@ -373,16 +437,17 @@ export function useOnboardingPageModel(args: {
     simulateDiscovery: false,
   });
   useRestoreSetup(setup, onboarding, integrations.selections);
+  useNameFromRepository(setup);
 
-  const [openSection, setOpenSection] = useState<SectionId>(() => initialSection(onboarding));
+  const [openSection, setOpenSection] = useState<WizardStepId>(() => initialWizardStep(onboarding));
   const [saving, setSaving] = useState(false);
   const updateFactory = useUpdateFactory(args.organizationId, args.factoryId);
   const updateOnboarding = useFactoryOnboarding(args.organizationId, args.factoryId);
   const createLine = useCreateFactoryLine(args.organizationId, args.factoryId);
+  const createWorkOrder = useCreateWorkOrder(args.organizationId, args.factoryId);
   const installer = useInstallFactory();
-  const canInvite = canAct("members", "create");
-  const invite = useOrganizationInviteLink(args.organizationId, canInvite);
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
+  const githubIntegration = useIntegration(args.organizationId, githubIntegrationId);
   const resources = useIntegrationResources(args.organizationId, githubIntegrationId, "repository");
   const repositories = useMemo(
     () =>
@@ -391,14 +456,11 @@ export function useOnboardingPageModel(args: {
         .filter((repository): repository is string => Boolean(repository)),
     [resources.data],
   );
-  const inviteUrl =
-    invite.data?.enabled && invite.data.token ? `${window.location.origin}/invite/${invite.data.token}` : null;
 
   const saves = useSectionSaves({
     setup,
     selections: integrations.selections,
     setSaving,
-    updateFactory: updateFactory.mutateAsync,
     updateOnboarding: updateOnboarding.mutateAsync,
   });
   const finish = useFinishOnboarding({
@@ -406,9 +468,16 @@ export function useOnboardingPageModel(args: {
     setup,
     selections: integrations.selections,
     setSaving,
+    updateFactory: updateFactory.mutateAsync,
     updateOnboarding: updateOnboarding.mutateAsync,
     installFactory: installer.installFactory,
     createLine: createLine.mutateAsync,
+    createWorkOrder: createWorkOrder.mutateAsync,
+  });
+  const cancel = useCancelOnboarding({
+    organizationId: args.organizationId,
+    factoryId: args.factoryId,
+    canDelete: canAct("factories", "delete"),
   });
 
   return {
@@ -416,20 +485,22 @@ export function useOnboardingPageModel(args: {
     openSection,
     setOpenSection,
     requestConnect: connect.requestConnect,
+    requestConfigure: () => {
+      // Manage which repositories the GitHub App can access, on GitHub itself.
+      window.open(githubInstallationUrl(githubIntegration.data), "_blank", "noopener,noreferrer");
+    },
     integrationDialogs: connect.dialogs,
     repositories,
     repositoriesLoading: resources.isLoading,
     repositoriesError: resources.error,
-    inviteUrl,
-    inviteLoading: invite.isLoading,
-    canInvite,
     canConfigureWorkspace:
       canAct("factories", "update") &&
       canAct("integrations", "create") &&
       canAct("canvases", "create") &&
       canAct("canvases", "update"),
-    saving: saving || installer.isInstalling,
+    saving: saving || installer.isInstalling || createWorkOrder.isPending,
     ...saves,
     finish,
+    ...cancel,
   };
 }

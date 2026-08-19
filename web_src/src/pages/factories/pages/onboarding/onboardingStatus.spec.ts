@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { FactoriesFactory } from "@/api-client";
 
-import { isFactoryOnboardingComplete } from "./onboardingStatus";
+import { initialWizardStep, isFactoryOnboardingComplete } from "./onboardingStatus";
 
 describe("isFactoryOnboardingComplete", () => {
   it("returns false while completion time is absent", () => {
@@ -15,5 +15,42 @@ describe("isFactoryOnboardingComplete", () => {
         onboarding: { completedAt: "2026-08-17T12:00:00Z" },
       } as FactoriesFactory),
     ).toBe(true);
+  });
+});
+
+describe("initialWizardStep", () => {
+  it("starts a new workspace at version control", () => {
+    expect(initialWizardStep({})).toBe("vcs");
+  });
+
+  it("treats the enum zero values the API sends as unanswered", () => {
+    expect(
+      initialWizardStep({
+        vcsIntegrationId: "",
+        appRepository: "",
+        issuesSource: "ISSUES_SOURCE_UNSPECIFIED",
+        agentHarness: "AGENT_HARNESS_UNSPECIFIED",
+      }),
+    ).toBe("vcs");
+  });
+
+  it("resumes at the first unanswered step", () => {
+    expect(initialWizardStep({ vcsIntegrationId: "github-1" })).toBe("repo");
+    expect(initialWizardStep({ vcsIntegrationId: "github-1", appRepository: "acme/web" })).toBe("issues");
+    expect(
+      initialWizardStep({
+        vcsIntegrationId: "github-1",
+        appRepository: "acme/web",
+        issuesSource: "ISSUES_SOURCE_VCS",
+      }),
+    ).toBe("agent");
+    expect(
+      initialWizardStep({
+        vcsIntegrationId: "github-1",
+        appRepository: "acme/web",
+        issuesSource: "ISSUES_SOURCE_VCS",
+        agentHarness: "AGENT_HARNESS_CLAUDE_CODE",
+      }),
+    ).toBe("name");
   });
 });
