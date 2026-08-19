@@ -24,6 +24,7 @@ const (
 
 	FactoryWorkOrderCheckFormatFraction = factory.CheckFormatFraction
 	FactoryWorkOrderCheckFormatPercent  = factory.CheckFormatPercent
+	FactoryWorkOrderCheckFormatBoolean  = factory.CheckFormatBoolean
 
 	// MaxFactoryWorkOrderCheckKeyBytes and name match the column widths.
 	MaxFactoryWorkOrderCheckKeyBytes  = 255
@@ -32,6 +33,11 @@ const (
 	// MaxFactoryWorkOrderCheckAnalysisBytes caps the markdown analysis,
 	// mirroring the artifact data cap.
 	MaxFactoryWorkOrderCheckAnalysisBytes = 64 * 1024
+
+	// MaxFactoryWorkOrderCheckRecentScores caps the per-check score
+	// history kept on the row; older entries fall off the front. Full
+	// history stays in `order.check.reported` timeline events.
+	MaxFactoryWorkOrderCheckRecentScores = 10
 )
 
 var ErrFactoryWorkOrderCheckInvalid = errors.New("invalid work order check")
@@ -53,12 +59,15 @@ type FactoryWorkOrderCheck struct {
 	Format         string
 	Level          string
 	PreviousScore  *float64
-	Summary        string
-	Analysis       string
-	Automation     datatypes.JSON
-	RunID          *uuid.UUID
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	// RecentScores holds the latest report scores, oldest first and
+	// ending with Score, capped at MaxFactoryWorkOrderCheckRecentScores.
+	RecentScores datatypes.JSONSlice[float64]
+	Summary      string
+	Analysis     string
+	Automation   datatypes.JSON
+	RunID        *uuid.UUID
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 func (FactoryWorkOrderCheck) TableName() string {
@@ -162,7 +171,9 @@ func IsValidWorkOrderCheckLevel(level string) bool {
 // IsValidWorkOrderCheckFormat reports whether ReportCheck accepts the format.
 func IsValidWorkOrderCheckFormat(format string) bool {
 	switch format {
-	case FactoryWorkOrderCheckFormatFraction, FactoryWorkOrderCheckFormatPercent:
+	case FactoryWorkOrderCheckFormatFraction,
+		FactoryWorkOrderCheckFormatPercent,
+		FactoryWorkOrderCheckFormatBoolean:
 		return true
 	}
 	return false
@@ -190,6 +201,7 @@ func (o *FactoryWorkOrder) reportCheck(
 			existing.Format = normalized.Format
 			existing.Level = normalized.Level
 			existing.PreviousScore = &previousScore
+			existing.RecentScores = appendRecentCheckScore(existing.RecentScores, previousScore, normalized.Score)
 			existing.Summary = normalized.Summary
 			existing.Analysis = normalized.Analysis
 			existing.Automation = automationJSON
@@ -211,6 +223,7 @@ func (o *FactoryWorkOrder) reportCheck(
 				MaxScore:       normalized.MaxScore,
 				Format:         normalized.Format,
 				Level:          normalized.Level,
+				RecentScores:   datatypes.NewJSONSlice([]float64{normalized.Score}),
 				Summary:        normalized.Summary,
 				Analysis:       normalized.Analysis,
 				Automation:     automationJSON,
@@ -321,7 +334,40 @@ func normalizeCheckParams(params FactoryWorkOrderCheckParams) (FactoryWorkOrderC
 		return params, fmt.Errorf("%w: unknown level %q", ErrFactoryWorkOrderCheckInvalid, params.Level)
 	}
 
+	// A boolean check is a verdict, not a scale — pin it to 0/1 so the
+	// data cannot drift into "0.7 out of 1".
+	if params.Format == FactoryWorkOrderCheckFormatBoolean {
+		if params.Score != 0 && params.Score != 1 {
+			return params, fmt.Errorf("%w: boolean score must be 0 or 1", ErrFactoryWorkOrderCheckInvalid)
+		}
+		if params.MaxScore != 1 {
+			return params, fmt.Errorf("%w: boolean maxScore must be 1", ErrFactoryWorkOrderCheckInvalid)
+		}
+	}
+
 	return params, nil
+}
+
+// appendRecentCheckScore extends the capped score history with the new
+// report. Rows created before the history column existed have an empty
+// slice; seed it with the score they held so the history does not start
+// mid-stream.
+func appendRecentCheckScore(
+	history datatypes.JSONSlice[float64],
+	previousScore float64,
+	score float64,
+) datatypes.JSONSlice[float64] {
+	scores := []float64(history)
+	if len(scores) == 0 {
+		scores = []float64{previousScore}
+	}
+
+	scores = append(scores, score)
+	if overflow := len(scores) - MaxFactoryWorkOrderCheckRecentScores; overflow > 0 {
+		scores = scores[overflow:]
+	}
+
+	return datatypes.NewJSONSlice(scores)
 }
 
 func isFiniteCheckNumber(value float64) bool {

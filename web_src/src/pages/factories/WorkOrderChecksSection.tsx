@@ -1,9 +1,10 @@
-import { MoveDown, MoveUp } from "lucide-react";
+import { CircleCheck, CircleX, MoveDown, MoveUp } from "lucide-react";
 import { useState } from "react";
 
 import { cn } from "@/lib/utils";
 
 import {
+  booleanCheckVerdict,
   formatCheckScore,
   LEVEL_LABEL,
   type WorkOrderCheckLevel,
@@ -75,8 +76,6 @@ export function WorkOrderChecksSection({
 
 function WorkOrderCheckCard({ check, runHref }: { check: WorkOrderCheckPresentation; runHref: string | null }) {
   const [open, setOpen] = useState(false);
-  const { value, scale } = formatCheckScore(check);
-  const ratio = check.maxScore > 0 ? Math.min(Math.max(check.score / check.maxScore, 0), 1) : 0;
 
   return (
     <>
@@ -87,22 +86,7 @@ function WorkOrderCheckCard({ check, runHref }: { check: WorkOrderCheckPresentat
         data-testid={`work-order-check-${check.id}`}
       >
         <span className="block truncate text-[12px] font-medium text-muted-foreground">{check.name}</span>
-        <span className="mt-1 flex items-baseline justify-between gap-2">
-          <span className="flex items-baseline gap-0.5">
-            <span className="text-xl font-semibold tabular-nums tracking-tight text-foreground">{value}</span>
-            <span className="text-[12px] text-muted-foreground">{scale}</span>
-            <CheckTrendDelta check={check} />
-          </span>
-          <span className={cn("truncate text-[11px] font-medium", LEVEL_LABEL[check.level].className)}>
-            {LEVEL_LABEL[check.level].label}
-          </span>
-        </span>
-        <span aria-hidden className="mt-2 block h-1 overflow-hidden rounded-full bg-muted">
-          <span
-            className={cn("block h-full rounded-full", LEVEL_METER_CLASSNAME[check.level])}
-            style={{ width: `${ratio * 100}%` }}
-          />
-        </span>
+        {check.format === "boolean" ? <BooleanCheckCardBody check={check} /> : <ScoredCheckCardBody check={check} />}
         <span className="mt-2 block truncate text-[11px] text-muted-foreground">
           <WorkOrderCheckAttribution check={check} />
         </span>
@@ -112,10 +96,87 @@ function WorkOrderCheckCard({ check, runHref }: { check: WorkOrderCheckPresentat
   );
 }
 
+/** Numeric score: value with scale, trend delta, and a proportional meter. */
+function ScoredCheckCardBody({ check }: { check: WorkOrderCheckPresentation }) {
+  const { value, scale } = formatCheckScore(check);
+  const ratio = check.maxScore > 0 ? Math.min(Math.max(check.score / check.maxScore, 0), 1) : 0;
+
+  return (
+    <>
+      <span className="mt-1 flex items-baseline justify-between gap-2">
+        <span className="flex items-baseline gap-0.5">
+          <span className="text-xl font-semibold tabular-nums tracking-tight text-foreground">{value}</span>
+          <span className="text-[12px] text-muted-foreground">{scale}</span>
+          <CheckTrendDelta check={check} />
+        </span>
+        <span className={cn("truncate text-[11px] font-medium", LEVEL_LABEL[check.level].className)}>
+          {LEVEL_LABEL[check.level].label}
+        </span>
+      </span>
+      <span aria-hidden className="mt-2 block h-1 overflow-hidden rounded-full bg-muted">
+        <span
+          className={cn("block h-full rounded-full", LEVEL_METER_CLASSNAME[check.level])}
+          style={{ width: `${ratio * 100}%` }}
+        />
+      </span>
+    </>
+  );
+}
+
+/**
+ * Boolean verdict: a level-colored status icon next to Pass/Fail, and a
+ * segmented run-history strip instead of the proportional meter — one
+ * segment per recent run (red, red, green = two failures, now passing),
+ * echoing status-page uptime ticks.
+ */
+function BooleanCheckCardBody({ check }: { check: WorkOrderCheckPresentation }) {
+  const passing = check.score > 0;
+  const VerdictIcon = passing ? CircleCheck : CircleX;
+
+  return (
+    <>
+      <span className="mt-1 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5">
+          <VerdictIcon className={cn("size-5 shrink-0", LEVEL_LABEL[check.level].className)} aria-hidden />
+          <span className="text-xl font-semibold tracking-tight text-foreground">
+            {booleanCheckVerdict(check.score)}
+          </span>
+        </span>
+        <span className={cn("truncate text-[11px] font-medium", LEVEL_LABEL[check.level].className)}>
+          {LEVEL_LABEL[check.level].label}
+        </span>
+      </span>
+      <BooleanRunHistory check={check} />
+    </>
+  );
+}
+
+/** Cap the run-history strip so segments stay readable at card width. */
+const RUN_HISTORY_LIMIT = 5;
+
+function BooleanRunHistory({ check }: { check: Pick<WorkOrderCheckPresentation, "score" | "recentScores"> }) {
+  const runs = (check.recentScores?.length ? check.recentScores : [check.score]).slice(-RUN_HISTORY_LIMIT);
+  const verdicts = runs.map(booleanCheckVerdict);
+
+  return (
+    <span className="mt-2 flex gap-1" title={`Recent runs, oldest first: ${verdicts.join(", ")}`}>
+      {runs.map((score, index) => (
+        <span
+          key={index}
+          className={cn("h-1 flex-1 rounded-full", score > 0 ? "bg-emerald-500" : "bg-red-500")}
+          aria-hidden
+        />
+      ))}
+      <span className="sr-only">Recent runs, oldest first: {verdicts.join(", ")}</span>
+    </span>
+  );
+}
+
 /**
  * Direction of travel since the previous report ("↓ 17"). The arrow stays
  * neutral muted — whether a move is good or bad is the level's job, since
- * lower is better for risk but worse for coverage.
+ * lower is better for risk but worse for coverage. (Boolean checks show run
+ * history instead — see BooleanRunHistory.)
  */
 function CheckTrendDelta({ check }: { check: Pick<WorkOrderCheckPresentation, "score" | "previousScore"> }) {
   if (check.previousScore === undefined || check.previousScore === check.score) {

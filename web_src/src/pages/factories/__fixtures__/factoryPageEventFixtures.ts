@@ -26,8 +26,11 @@ const REFUND_LINE = { id: "line-plan-and-implement", name: "plan-and-implement" 
 
 /** Fresh timestamp for the risk re-score, matching the checks fixture's "updated 12 minutes ago". */
 const TWELVE_MINUTES_AGO = new Date(Date.now() - 12 * 60_000).toISOString();
+/** Fresh timestamp for the CI pass, matching the checks fixture's "updated 3 minutes ago". */
+const THREE_MINUTES_AGO = new Date(Date.now() - 3 * 60_000).toISOString();
 
 const RISK_REVIEW_AUTOMATION = { appId: "app-pr-risk-review", appName: "PR Risk Review" };
+const CI_LOOP_AUTOMATION = { appId: "app-ci-loop", appName: "CI Loop" };
 
 interface StepExecutionEventFixture {
   order: FactoriesWorkOrder;
@@ -190,7 +193,13 @@ function artifactAddedEvent(
 function checkReportedEvent(
   order: FactoriesWorkOrder,
   at: string,
-  check: { name: string; score: number; maxScore: number; format?: "fraction" | "percent"; previousScore?: number },
+  check: {
+    name: string;
+    score: number;
+    maxScore: number;
+    format?: "fraction" | "percent" | "boolean";
+    previousScore?: number;
+  },
   automation: AutomationRefFixture,
   run?: { id: string },
 ): FactoriesWorkOrderEvent {
@@ -481,6 +490,22 @@ export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     { name: "Risk review", score: 65, maxScore: 100, previousScore: 82 },
     RISK_REVIEW_AUTOMATION,
     { id: "run-risk-review-101" },
+  ),
+  // Boolean check history: CI failed first, the loop's automated fix landed,
+  // and the re-report flipped Fail → Pass.
+  checkReportedEvent(
+    OPEN_WORK_ORDER,
+    HOUR_AGO,
+    { name: "CI", score: 0, maxScore: 1, format: "boolean" },
+    CI_LOOP_AUTOMATION,
+    { id: "run-ci-100" },
+  ),
+  checkReportedEvent(
+    OPEN_WORK_ORDER,
+    THREE_MINUTES_AGO,
+    { name: "CI", score: 1, maxScore: 1, format: "boolean", previousScore: 0 },
+    CI_LOOP_AUTOMATION,
+    { id: "run-ci-101" },
   ),
 ];
 
