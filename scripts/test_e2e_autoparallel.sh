@@ -85,48 +85,13 @@ regex="^($(printf '%s\n' "${selected_tests[@]}" | paste -sd '|' -))$"
 # Use a per-shard JUnit file so CI can aggregate results.
 junit_file="junit-report.xml"
 
-run_tests() {
-  gotestsum \
-    --format short \
-    --junitfile "${junit_file}" \
-    --rerun-fails=3 \
-    --rerun-fails-max-failures=1 \
-    --packages="./test/e2e/..." \
-    -- \
-    -p 1 \
-    -timeout 15m \
-    -run "${regex}"
-}
-
-# gotestsum's --rerun-fails reruns individual failing tests, but it can't
-# rerun anything if the test binary itself never finished building: `go
-# test` reports that as "FAIL <package> [build failed]" with no per-test
-# results at all. We've seen this happen on a single CI shard while every
-# other shard, compiling the exact same commit, built and ran fine - the
-# signature of a transient CI infra hiccup (e.g. the compiler getting
-# killed for resources), not a real compile error. A real compile error is
-# deterministic and reproduces on every attempt, so retrying the whole
-# shard a bounded number of times only in this specific case rides out the
-# transient failures without masking a genuine build break.
-max_build_attempts=3
-attempt=1
-while true; do
-  status=0
-  run_tests || status=$?
-
-  if [[ "${status}" -eq 0 ]]; then
-    exit 0
-  fi
-
-  if ! grep -q '\[build failed\]' "${junit_file}" 2>/dev/null; then
-    exit "${status}"
-  fi
-
-  if [[ "${attempt}" -ge "${max_build_attempts}" ]]; then
-    echo "test/e2e failed to build after ${attempt} attempts; giving up." >&2
-    exit "${status}"
-  fi
-
-  attempt=$((attempt + 1))
-  echo "test/e2e failed to build (attempt $((attempt - 1))/${max_build_attempts}); retrying the shard in case this is a transient CI issue..." >&2
-done
+gotestsum \
+  --format short \
+  --junitfile "${junit_file}" \
+  --rerun-fails=3 \
+  --rerun-fails-max-failures=1 \
+  --packages="./test/e2e/..." \
+  -- \
+  -p 1 \
+  -timeout 15m \
+  -run "${regex}"
