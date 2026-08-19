@@ -15,6 +15,8 @@ import { MissionAssignmentProvider } from "../pages/missions/MissionAssignmentCo
 import { MissionsWorkOrdersPage } from "../pages/missions/MissionsWorkOrdersPage";
 import { WorkOrderMissionOverviewRow } from "../pages/missions/WorkOrderMissionOverviewRow";
 import { WorkOrderOverviewMissionSlotContext } from "../sidebar/workOrderOverviewSlots";
+import { CreateWorkOrderCombinedFooter } from "../pages/createWorkOrder/CreateWorkOrderCombinedFooter";
+import { CreateWorkOrderActionSlotContext } from "../createWorkOrderActionSlot";
 
 interface FactoriesHarnessProps {
   /** Path under the org. Defaults to `workspaces` (list page). */
@@ -47,6 +49,9 @@ const defaultFactoryAppFixture = refundLineCanvasFixture();
  * Mounts the org home routes with the factories feature enabled and a fixture
  * backend for factory list/detail/orders/lines/apps endpoints. Shares the same
  * `OrgWorkspaceHarness` shell so links between Home → Workspaces → App work.
+ * Also supplies the Storybook-only Mission overview row and the combined
+ * New work order footer (issue #6791) through their slot contexts; the live
+ * app leaves both slots empty.
  */
 export function FactoriesHarness({
   pathSuffix = "workspaces",
@@ -91,7 +96,9 @@ export function FactoriesHarness({
   const withMissions = (
     <MissionAssignmentProvider>
       <WorkOrderOverviewMissionSlotContext.Provider value={WorkOrderMissionOverviewRow}>
-        {harness}
+        <CreateWorkOrderActionSlotContext.Provider value={CreateWorkOrderCombinedFooter}>
+          {harness}
+        </CreateWorkOrderActionSlotContext.Provider>
       </WorkOrderOverviewMissionSlotContext.Provider>
     </MissionAssignmentProvider>
   );

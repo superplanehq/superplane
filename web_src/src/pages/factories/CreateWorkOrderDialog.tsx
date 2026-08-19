@@ -12,6 +12,7 @@ import { useState, type ReactNode } from "react";
 
 import { useFactoriesLayout } from "./layout/factoriesLayoutContext";
 import { CreateWorkOrderPropertyPills } from "./CreateWorkOrderPropertyPills";
+import { useCreateWorkOrderActionSlot } from "./createWorkOrderActionSlot";
 import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
 
@@ -39,6 +40,7 @@ function CreateWorkOrderDialogSession({
   const { organizationId, factoryId, factory } = useFactoriesLayout();
   const { canAct } = usePermissions();
   const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });
+  const ActionSlot = useCreateWorkOrderActionSlot();
   const lines = factory?.lines ?? [];
   const [isExpanded, setIsExpanded] = useState(false);
   const canDispatch = canAct("work_orders", "update");
@@ -72,6 +74,7 @@ function CreateWorkOrderDialogSession({
           canSaveDraft={composer.canSaveDraft}
           isSavingDraft={composer.isSavingDraft}
           isExpanded={isExpanded}
+          showSaveDraft={!ActionSlot}
           onSaveDraft={() => void composer.handleSaveDraft()}
           onToggleExpanded={() => setIsExpanded((current) => !current)}
         >
@@ -108,19 +111,35 @@ function CreateWorkOrderDialogSession({
           </div>
         </div>
 
-        <CreateWorkOrderDialogFooter
-          organizationId={organizationId}
-          assigneeIds={composer.assigneeIds}
-          lines={lines}
-          selectedLineName={composer.selectedLineName}
-          isSaving={composer.isSaving}
-          canDispatch={canDispatch}
-          canSendToLine={composer.canSendToLine}
-          isSendingToLine={composer.isSendingToLine}
-          onAssigneeChange={composer.setAssigneeIds}
-          onLineSelect={composer.setSelectedLineName}
-          onSendToLine={() => void composer.handleSendToLine()}
-        />
+        {ActionSlot ? (
+          <ActionSlot
+            organizationId={organizationId}
+            assigneeIds={composer.assigneeIds}
+            lines={lines}
+            isSaving={composer.isSaving}
+            canDispatch={canDispatch}
+            canSaveDraft={composer.canSaveDraft}
+            isSavingDraft={composer.isSavingDraft}
+            isSendingToLine={composer.isSendingToLine}
+            onAssigneeChange={composer.setAssigneeIds}
+            onSaveDraft={() => void composer.handleSaveDraft()}
+            onSendToLine={(lineName) => void composer.handleSendToLine(lineName)}
+          />
+        ) : (
+          <CreateWorkOrderDialogFooter
+            organizationId={organizationId}
+            assigneeIds={composer.assigneeIds}
+            lines={lines}
+            selectedLineName={composer.selectedLineName}
+            isSaving={composer.isSaving}
+            canDispatch={canDispatch}
+            canSendToLine={composer.canSendToLine}
+            isSendingToLine={composer.isSendingToLine}
+            onAssigneeChange={composer.setAssigneeIds}
+            onLineSelect={composer.setSelectedLineName}
+            onSendToLine={() => void composer.handleSendToLine()}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -131,6 +150,7 @@ function CreateWorkOrderDialogHeader({
   canSaveDraft,
   isSavingDraft,
   isExpanded,
+  showSaveDraft,
   onSaveDraft,
   onToggleExpanded,
   children,
@@ -139,6 +159,8 @@ function CreateWorkOrderDialogHeader({
   canSaveDraft: boolean;
   isSavingDraft: boolean;
   isExpanded: boolean;
+  /** False when the footer owns Save as draft, e.g. the combined-actions prototype. */
+  showSaveDraft: boolean;
   onSaveDraft: () => void;
   onToggleExpanded: () => void;
   children: ReactNode;
@@ -154,19 +176,21 @@ function CreateWorkOrderDialogHeader({
         {children}
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <LoadingButton
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={!canSaveDraft}
-          loading={isSavingDraft}
-          loadingText="Saving..."
-          onClick={onSaveDraft}
-          className="h-7 rounded-full px-3 text-[12px] font-medium"
-          data-testid="work-order-create-draft-button"
-        >
-          Save as draft
-        </LoadingButton>
+        {showSaveDraft ? (
+          <LoadingButton
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!canSaveDraft}
+            loading={isSavingDraft}
+            loadingText="Saving..."
+            onClick={onSaveDraft}
+            className="h-7 rounded-full px-3 text-[12px] font-medium"
+            data-testid="work-order-create-draft-button"
+          >
+            Save as draft
+          </LoadingButton>
+        ) : null}
         <Button
           type="button"
           variant="ghost"

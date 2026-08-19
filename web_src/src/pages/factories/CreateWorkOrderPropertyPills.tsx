@@ -119,7 +119,7 @@ export function CreateWorkOrderPropertyPills({
   );
 }
 
-function AssigneePickerPanel({
+export function AssigneePickerPanel({
   organizationId,
   selectedIds,
   isSaving,
@@ -164,7 +164,7 @@ function AssigneePickerPanel({
   );
 }
 
-function LinePickerPanel({
+export function LinePickerPanel({
   lines,
   selectedLineName,
   isSaving,
@@ -212,7 +212,7 @@ function LinePickerPanel({
   );
 }
 
-function PropertyPill({
+export function PropertyPill({
   children,
   disabled,
   testId,
@@ -240,7 +240,7 @@ function PropertyPill({
   );
 }
 
-function AssigneePillBody({
+export function AssigneePillBody({
   assigneeIds,
   resolveUser,
 }: {

@@ -72,9 +72,13 @@ export function useCreateWorkOrderComposer({
     }
   };
 
-  const handleSendToLine = async () => {
-    if (!selectedLineName) {
+  const handleSendToLine = async (lineNameOverride?: string) => {
+    const lineName = lineNameOverride ?? selectedLineName;
+    if (!lineName) {
       return;
+    }
+    if (lineNameOverride && lineNameOverride !== selectedLineName) {
+      setSelectedLineName(lineNameOverride);
     }
 
     setInFlightAction("send");
@@ -85,7 +89,7 @@ export function useCreateWorkOrderComposer({
       }
 
       try {
-        await dispatchWorkOrder.mutateAsync({ orderId: order.id, lineName: selectedLineName });
+        await dispatchWorkOrder.mutateAsync({ orderId: order.id, lineName });
         goToOrder(order);
       } catch (error) {
         showErrorToast(getApiErrorMessage(error, "Failed to send work order to line"));
