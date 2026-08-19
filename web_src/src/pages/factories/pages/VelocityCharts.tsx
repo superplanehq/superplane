@@ -11,6 +11,7 @@ import {
 
 import {
   formatDurationHours,
+  pickVelocityChartUnit,
   type FactoryVelocityFlow,
   type FactoryVelocityFlowPeriodDays,
 } from "../lib/factoryVelocityFlow";
@@ -186,6 +187,7 @@ export function TimeTrendChart({
   days: VelocityChartsPeriodDays;
 }) {
   const height = days === 7 ? 240 : 220;
+  const chartUnit = pickVelocityChartUnit(trend.map((point) => point.runningHours + point.waitingHours));
 
   return (
     <ChartContainer
@@ -200,10 +202,10 @@ export function TimeTrendChart({
         <YAxis
           tickLine={false}
           axisLine={false}
-          width={36}
+          width={40}
           tickMargin={4}
           className="text-[11px]"
-          tickFormatter={(value: number) => `${Number(value).toFixed(0)}h`}
+          tickFormatter={(value: number) => chartUnit.formatTick(Number(value))}
         />
         <ChartTooltip content={<ChartTooltipContent formatter={formatTimeTrendTooltip} />} />
         <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" />
