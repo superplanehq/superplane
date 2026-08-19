@@ -289,6 +289,14 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 			return err
 		}
 
+		// A closing order abandons any traversal still waiting in a step's
+		// queue; a queued dispatch has no run to finish it later.
+		if toState == FactoryWorkOrderStateClosed {
+			if err := o.dropQueuedLineWork(tx); err != nil {
+				return err
+			}
+		}
+
 		run, app := update.Run, update.App
 		if fromState == FactoryWorkOrderStateDraft && toState == FactoryWorkOrderStateOpen && o.SourceRunID != nil {
 			// Snapshot the originating canvas run so downstream consumers can

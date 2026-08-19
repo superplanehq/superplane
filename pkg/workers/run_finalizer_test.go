@@ -591,22 +591,22 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 
 	amqpURL, _ := config.RabbitMQURL()
 	finalizer := NewRunFinalizer(amqpURL, r.Registry)
-	var pending *factoryLinePendingRun
+	var pending []factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
-		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, firstResult.Run.ID)
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, firstResult.Run.ID)
 		return advanceErr
 	}))
 
-	require.NotNil(t, pending)
-	assert.Equal(t, secondApp.ID, pending.workflowID)
+	require.Len(t, pending, 1)
+	assert.Equal(t, secondApp.ID, pending[0].workflowID)
 
 	firstExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), firstResult.Run.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, firstExecution.Status)
 	assert.Equal(t, models.CanvasRunResultPassed, firstExecution.Result)
 
-	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), pending.runID)
+	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), pending[0].runID)
 	require.NoError(t, err)
 	assert.Equal(t, 1, secondExecution.StepIndex)
 	assert.Equal(t, secondApp.Name, secondExecution.StepName)
@@ -660,13 +660,13 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__FinishesDispatchOnLastStepP
 
 	amqpURL, _ := config.RabbitMQURL()
 	finalizer := NewRunFinalizer(amqpURL, r.Registry)
-	var pending *factoryLinePendingRun
+	var pending []factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
-		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
 		return advanceErr
 	}))
-	assert.Nil(t, pending, "no next step, so nothing to run")
+	assert.Empty(t, pending, "no next step, so nothing to run")
 
 	reloaded, err := models.FindWorkOrderLineDispatch(database.Conn(), dispatch.ID)
 	require.NoError(t, err)
@@ -725,13 +725,13 @@ func testExecuteNextFactoryLineStepFinishesDispatchWithResult(t *testing.T, term
 
 	amqpURL, _ := config.RabbitMQURL()
 	finalizer := NewRunFinalizer(amqpURL, r.Registry)
-	var pending *factoryLinePendingRun
+	var pending []factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
-		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
 		return advanceErr
 	}))
-	assert.Nil(t, pending, "a non-passed result never starts the next step")
+	assert.Empty(t, pending, "a non-passed result never starts the next step")
 
 	reloaded, err := models.FindWorkOrderLineDispatch(database.Conn(), dispatch.ID)
 	require.NoError(t, err)
@@ -784,13 +784,13 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__CancelsDispatchWhenOrderClo
 
 	amqpURL, _ := config.RabbitMQURL()
 	finalizer := NewRunFinalizer(amqpURL, r.Registry)
-	var pending *factoryLinePendingRun
+	var pending []factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
-		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
 		return advanceErr
 	}))
-	assert.Nil(t, pending, "a closed order never starts the next step")
+	assert.Empty(t, pending, "a closed order never starts the next step")
 
 	reloaded, err := models.FindWorkOrderLineDispatch(database.Conn(), dispatch.ID)
 	require.NoError(t, err)
@@ -851,18 +851,18 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__LineEditMidTraversalDoesNot
 
 	amqpURL, _ := config.RabbitMQURL()
 	finalizer := NewRunFinalizer(amqpURL, r.Registry)
-	var pending *factoryLinePendingRun
+	var pending []factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
-		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
 		return advanceErr
 	}))
 
-	require.NotNil(t, pending)
-	assert.Equal(t, secondApp.ID, pending.workflowID,
+	require.Len(t, pending, 1)
+	assert.Equal(t, secondApp.ID, pending[0].workflowID,
 		"advancement reads the dispatch's snapshot, not the edited live line")
 
-	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), pending.runID)
+	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), pending[0].runID)
 	require.NoError(t, err)
 	assert.Equal(t, 1, secondExecution.StepIndex)
 	assert.Equal(t, secondApp.Name, secondExecution.StepName,

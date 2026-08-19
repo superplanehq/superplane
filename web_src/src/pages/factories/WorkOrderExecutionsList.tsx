@@ -1,8 +1,12 @@
-import type { FactoriesWorkOrderExecution, FactoriesWorkOrderLineDispatch } from "@/api-client";
+import type {
+  FactoriesWorkOrderExecution,
+  FactoriesWorkOrderLineDispatch,
+  FactoriesWorkOrderQueueItem,
+} from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
-import { Check, CircleDashed, Loader2, MinusCircle, XCircle } from "lucide-react";
+import { Check, CircleDashed, Clock, Loader2, MinusCircle, XCircle } from "lucide-react";
 import {
   getExecutionStepTimestamp,
   getWorkOrderExecutionDisplayMeta,
@@ -42,8 +46,8 @@ export function WorkOrderExecutionsList({
   if (variant === "inline") {
     return (
       <ul className="space-y-1.5">
-        {groups.flatMap((dispatch) =>
-          (dispatch.stepExecutions ?? []).map((execution, index) => (
+        {groups.flatMap((dispatch) => [
+          ...(dispatch.stepExecutions ?? []).map((execution, index) => (
             <CompactExecutionRow
               key={execution.id ?? `${dispatch.id}-${execution.step}-${index}`}
               organizationId={organizationId}
@@ -52,7 +56,8 @@ export function WorkOrderExecutionsList({
               execution={execution}
             />
           )),
-        )}
+          ...(dispatch.queueItem ? [<QueuedStepRow key={dispatch.queueItem.id} queueItem={dispatch.queueItem} />] : []),
+        ])}
       </ul>
     );
   }
@@ -90,6 +95,11 @@ export function WorkOrderExecutionsList({
                 execution={execution}
               />
             ))}
+            {dispatch.queueItem ? (
+              <li className="px-4 py-3">
+                <QueuedStepMeta queueItem={dispatch.queueItem} size="md" />
+              </li>
+            ) : null}
           </ul>
         </li>
       ))}
@@ -123,8 +133,38 @@ function CompactLineGroup({
             execution={execution}
           />
         ))}
+        {dispatch.queueItem ? <QueuedStepRow queueItem={dispatch.queueItem} /> : null}
       </ul>
     </li>
+  );
+}
+
+function QueuedStepRow({ queueItem }: { queueItem: FactoriesWorkOrderQueueItem }) {
+  return (
+    <li className="flex min-w-0 items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+      <QueuedStepMeta queueItem={queueItem} />
+    </li>
+  );
+}
+
+// A step the traversal is waiting to enter: the step is at its parallelism
+// limit, so no run exists yet. Position is the 1-based place in the step's
+// queue across all work orders of the line.
+function QueuedStepMeta({ queueItem, size = "sm" }: { queueItem: FactoriesWorkOrderQueueItem; size?: "sm" | "md" }) {
+  const stepLabel = queueItem.stepName?.trim() || "Unnamed step";
+  const iconClassName = cn("shrink-0 text-amber-500", size === "md" ? "h-4 w-4" : "h-3.5 w-3.5");
+  const position = queueItem.position ?? 0;
+
+  return (
+    <div className="inline-flex w-fit max-w-full items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+      <Clock className={iconClassName} aria-label="Queued" />
+      <span className="min-w-0 font-medium">
+        {stepLabel}{" "}
+        <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
+          Queued{position > 0 ? ` · position ${position}` : ""}
+        </span>
+      </span>
+    </div>
   );
 }
 

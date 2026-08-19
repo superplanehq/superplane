@@ -409,6 +409,10 @@ message FactoryLine {
   message Step {
     string type = 1;
     optional AppStep app = 2;
+    // Maximum in-flight runs for this step across all work orders on the
+    // line. Work orders above this limit wait in the step's queue. Unset
+    // means the server default (10). Must be at least 1 when set.
+    optional int32 max_parallelism = 3;
   }
 
   message AppStep {
@@ -579,6 +583,29 @@ message WorkOrderLineDispatch {
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp finished_at = 7;
   repeated WorkOrderExecution step_executions = 8;
+  // Set while the dispatch waits for admission into a step that is at
+  // its maxParallelism. A dispatch waits at no more than one step at a
+  // time; no run or step execution exists for a queued step yet.
+  optional WorkOrderQueueItem queue_item = 9;
+}
+
+// WorkOrderQueueItem is a line dispatch waiting for admission into a step
+// that is at its maxParallelism. The run and step execution are created
+// when the step admits the work order.
+message WorkOrderQueueItem {
+  string id = 1;
+  string step_name = 2;
+  // Zero-based index of the step inside the parent dispatch's `steps`
+  // snapshot.
+  int32 step_index = 3;
+  // 1-based position in the step's FIFO queue across all work orders of
+  // the line.
+  int32 position = 4;
+  google.protobuf.Timestamp created_at = 5;
+  // App (canvas) id of the queued step, from the parent dispatch's steps
+  // snapshot. Lets the UI place the queued work order on the correct
+  // board column even after a line edit moved the step.
+  string app_id = 6;
 }
 
 message WorkOrderExecution {

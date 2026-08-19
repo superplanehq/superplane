@@ -81,6 +81,7 @@ interface TimelineBuildState {
 const WORK_ORDER_EVENT_TYPE_ORDER: Record<string, number> = {
   "order.status.updated": 15,
   "order.assignees.updated": 20,
+  "step.execution.queued": 25,
   "step.execution.created": 30,
   "step.execution.finished": 40,
   "order.comment.added": 45,
@@ -141,6 +142,9 @@ function applyApiEventToTimeline(
     case "order.assignees.updated":
       appendAssigneesUpdatedEvent(state.events, index, payload, at, resolveUserName);
       return;
+    case "step.execution.queued":
+      appendStepQueuedEvent(state.events, index, payload, at);
+      return;
     case "step.execution.created":
       appendStepExecutionEvent(toDispatchBatchContext(state), payload, at, "step.execution.created");
       return;
@@ -163,6 +167,26 @@ function toDispatchBatchContext(state: TimelineBuildState): DispatchBatchContext
     timelineEvents: state.events,
     dispatchBatchByLine: state.dispatchBatchByLine,
   };
+}
+
+// The step is at its max parallelism: the work order waits in the step
+// queue until a run completes and frees a slot.
+function appendStepQueuedEvent(
+  events: WorkOrderTimelineEvent[],
+  index: number,
+  payload: EventPayload,
+  at: string,
+): void {
+  const stepName = payload.stepName?.trim() || "Unnamed step";
+  const lineName = payload.line?.name?.trim();
+  events.push({
+    id: `step-queued-${index}`,
+    kind: "queued",
+    at,
+    lineId: payload.line?.id,
+    lineName,
+    title: `Queued at ${stepName} — waiting for a free slot`,
+  });
 }
 
 function appendAssigneesUpdatedEvent(
