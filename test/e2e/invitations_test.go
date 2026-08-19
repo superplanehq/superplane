@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/assert"
@@ -137,17 +138,50 @@ func (s *invitationSteps) followInviteLinkToLogin(token string) {
 	require.NoError(s.t, waitErr)
 }
 
+// openSignupForm navigates from the login page to the signup form.
+//
+// The Login page renders its content only after an async /auth/config
+// fetch resolves, and which form is shown first depends on whether
+// magic-code login is the primary method: if so, a "Sign in with
+// password instead" toggle must be clicked before "Create an account"
+// becomes visible; if not, "Create an account" is already visible.
+//
+// Because /auth/config resolution time depends on backend/DB latency,
+// we can't assume either state appears within a fixed short window -
+// we race both locators with the same generous timeout used elsewhere
+// in this suite, rather than guessing a fixed wait and silently
+// swallowing a timeout (which previously caused this test to flake
+// under DB load).
 func (s *invitationSteps) openSignupForm() {
-	// With magic code enabled, toggle to password login first
-	// so the "Create an account" link becomes visible.
-	toggle := s.session.Page().Locator("text=Sign in with password instead").First()
-	if err := toggle.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(3000)}); err == nil {
-		require.NoError(s.t, toggle.Click())
+	page := s.session.Page()
+	const timeout = 15000 * time.Millisecond
+
+	toggle := page.Locator("text=Sign in with password instead").First()
+	createAccount := page.Locator("text=Create an account").First()
+
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if visible, err := toggle.IsVisible(); err == nil && visible {
+			require.NoError(s.t, toggle.Click())
+			break
+		}
+		if visible, err := createAccount.IsVisible(); err == nil && visible {
+			// Password signup is already the primary form; no toggle needed.
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 
-	button := s.session.Page().Locator("text=Create an account").First()
-	require.NoError(s.t, button.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}))
-	require.NoError(s.t, button.Click())
+	// Whether or not the toggle needed clicking, "Create an account" must
+	// become visible. If it never does, this fails fast with a clear,
+	// bounded locator-timeout error instead of hanging on a default wait.
+	if err := createAccount.WaitFor(pw.LocatorWaitForOptions{
+		State:   pw.WaitForSelectorStateVisible,
+		Timeout: pw.Float(float64(timeout / time.Millisecond)),
+	}); err != nil {
+		s.t.Fatalf("neither the password-login toggle nor \"Create an account\" appeared within %s: %v", timeout, err)
+	}
+	require.NoError(s.t, createAccount.Click())
 }
 
 func (s *invitationSteps) fillSignupForm(firstName, lastName, email, password string) {
