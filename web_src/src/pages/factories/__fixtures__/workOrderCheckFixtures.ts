@@ -1,6 +1,14 @@
-import type { FactoriesWorkOrderCheck } from "@/api-client";
+import type { FactoriesWorkOrderCheck, WorkOrderCheckFormat } from "@/api-client";
 
 import { OPEN_WORK_ORDER, RUNNING_WORK_ORDER } from "./factoryPageResponses";
+
+/** The backend adds FORMAT_BOOLEAN with the boolean-checks feature; cast
+ * until `make pb.gen` regenerates the SDK union. */
+const FORMAT_BOOLEAN = "FORMAT_BOOLEAN" as string as WorkOrderCheckFormat;
+
+/** `recentScores` also lands with the boolean-checks backend change —
+ * typed locally until the SDK regenerates. */
+type WorkOrderCheckFixture = FactoriesWorkOrderCheck & { recentScores?: number[] };
 
 /**
  * Mock checks for Storybook — scores that dedicated automations attach to a
@@ -50,7 +58,24 @@ const CONFIDENCE_ANALYSIS = `The agent completed all planned steps without human
 
 Confidence is not higher because the change modifies retry behavior that only manifests under provider degradation, which no automated test simulates.`;
 
-export const OPEN_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
+const CI_PASSED_ANALYSIS = `### Pipeline
+
+[Semaphore run #4182](https://superplanehq.semaphoreci.com/) on \`fix/refund-retry-policy\`, all 6 blocks green.
+
+The previous run failed on \`Test__RefundDispatcher__RetriesOnProviderTimeout\`; the fix landed in the follow-up commit and the full suite now passes.`;
+
+const CI_FAILED_ANALYSIS = `### Pipeline
+
+[Semaphore run #4190](https://superplanehq.semaphoreci.com/) on \`fix/reconciliation-worker\`, failed in the **Backend tests** block.
+
+\`\`\`
+--- FAIL: Test__ReconciliationWorker__SkipsSettledLedgerEntries (0.42s)
+    reconciliation_worker_test.go:88: expected 0 dispatched refunds, got 2
+\`\`\`
+
+The CI loop is retrying after an automated fix attempt.`;
+
+export const OPEN_WORK_ORDER_CHECKS: WorkOrderCheckFixture[] = [
   {
     id: "check-risk-review",
     key: "risk-review",
@@ -108,10 +133,28 @@ export const OPEN_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
     runId: "run-confidence-101",
     updatedAt: minutesAgo(4),
   },
+  // Boolean check — pass/fail rather than a score. The run history reads
+  // fail, fail, pass: two red segments, then the current green one.
+  {
+    id: "check-ci",
+    key: "ci",
+    name: "CI",
+    score: 1,
+    maxScore: 1,
+    format: FORMAT_BOOLEAN,
+    level: "LEVEL_POSITIVE",
+    previousScore: 0,
+    recentScores: [0, 0, 1],
+    summary: "The full Semaphore pipeline passed after two automated fix attempts.",
+    analysis: CI_PASSED_ANALYSIS,
+    automation: { appId: "app-ci-loop", appName: "CI Loop" },
+    runId: "run-ci-101",
+    updatedAt: minutesAgo(3),
+  },
 ];
 
 /** Two checks only — the risk review has landed, coverage is still running. */
-export const RUNNING_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
+export const RUNNING_WORK_ORDER_CHECKS: WorkOrderCheckFixture[] = [
   {
     id: "check-risk-review-running",
     key: "risk-review",
@@ -140,6 +183,23 @@ export const RUNNING_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
     automation: { appId: "app-line-confidence", appName: "Line Confidence" },
     runId: "run-confidence-102",
     updatedAt: minutesAgo(11),
+  },
+  // Failing boolean check — the CI loop is mid-retry on this running order,
+  // with two failed runs in the history strip.
+  {
+    id: "check-ci-running",
+    key: "ci",
+    name: "CI",
+    score: 0,
+    maxScore: 1,
+    format: FORMAT_BOOLEAN,
+    level: "LEVEL_CRITICAL",
+    recentScores: [0, 0],
+    summary: "Backend tests failed on the reconciliation worker; the CI loop is retrying.",
+    analysis: CI_FAILED_ANALYSIS,
+    automation: { appId: "app-ci-loop", appName: "CI Loop" },
+    runId: "run-ci-102",
+    updatedAt: minutesAgo(6),
   },
 ];
 
