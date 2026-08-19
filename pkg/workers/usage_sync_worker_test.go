@@ -57,7 +57,12 @@ func (s *fakeUsageSyncWorkerService) CheckAccountLimits(context.Context, string,
 	return &pb.CheckAccountLimitsResponse{Allowed: true}, nil
 }
 
-func (s *fakeUsageSyncWorkerService) CheckOrganizationLimits(context.Context, string, *pb.OrganizationState, *pb.CanvasState) (*pb.CheckOrganizationLimitsResponse, error) {
+func (s *fakeUsageSyncWorkerService) CheckOrganizationLimits(
+	context.Context,
+	string,
+	*pb.OrganizationState,
+	*pb.CanvasState,
+) (*pb.CheckOrganizationLimitsResponse, error) {
 	return &pb.CheckOrganizationLimitsResponse{Allowed: true}, nil
 }
 

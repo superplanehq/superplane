@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status
+.PHONY: lint test test.coverage test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -24,6 +24,7 @@ E2E_TEST_PACKAGES := ./test/e2e/...
 
 COMPOSE=docker compose -f docker-compose.dev.yml
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client api/swagger/superplane.swagger.json
+OPENAPI_GENERATOR_IMAGE := openapitools/openapi-generator-cli:v7.13.0
 
 #
 # Long sausage command to run tests with gotestsum
@@ -117,6 +118,10 @@ dev.setup.npm:
 dev.setup.go:
 	@$(COMPOSE) exec app bash /app/scripts/go-mod-download
 	@$(COMPOSE) exec app go build cmd/server/main.go
+
+dev.clean.go.cache:
+	@$(MAKE) dev.test.is.running
+	$(COMPOSE) exec app go clean -modcache -cache
 
 dev.setup.no.cache:
 	rm -rf tmp
@@ -315,8 +320,8 @@ check.components.docs:
 	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
 	git diff --exit-code docs/components
 
-MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents,usage
-REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents
+MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents,usage,runners
+REST_API_MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents
 
 pb.gen: dev.test.is.running
 	$(MAKE) pb.gen.models
@@ -337,9 +342,10 @@ openapi.spec.gen: dev.test.is.running
 
 openapi.client.gen: dev.test.is.running
 	@rm -rf pkg/openapi_client
+	@./scripts/docker-pull-retry $(OPENAPI_GENERATOR_IMAGE)
 	@log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
 	if ! docker run --rm --user $(shell id -u):$(shell id -g) \
-		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
+		-v ${PWD}:/local $(OPENAPI_GENERATOR_IMAGE) generate \
 		-i /local/api/swagger/superplane.swagger.json \
 		-g go \
 		-o /local/pkg/openapi_client \

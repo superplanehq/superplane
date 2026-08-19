@@ -52,8 +52,12 @@ describe("createFixtureFetch repository routes", () => {
     const response = await fixtureFetch("http://localhost/api/v1/canvases/any/repository/file?path=console.yaml");
     const text = await response.text();
     expect(text).toContain("kind: Console");
-    expect(text).toContain("markdown-showcase");
-    expect(text).toContain("Software Factory");
+    expect(text).toContain("submit-task");
+    expect(text).toContain("how-it-works");
+    expect(text).toContain("pipeline-board");
+    expect(text).toContain("Create a task");
+    expect(text).toContain("How it works");
+    expect(text).toContain("Your Factory Pipeline");
   });
 
   it("honors an explicit repositoryFilePaths override", async () => {
@@ -144,7 +148,7 @@ describe("createFixtureFetch agent routes", () => {
     expect(body.messages[0]).toEqual(expect.objectContaining({ role: "user" }));
   });
 
-  it("echoes POST message content for send acknowledgements", async () => {
+  it("echoes POST message content and persists it for later GETs", async () => {
     const { createFixtureFetch: createDefaultFixtureFetch } = await import("./handlers");
     const fallback = vi.fn() as unknown as typeof fetch;
     const fixtureFetch = createDefaultFixtureFetch(fallback);
@@ -155,6 +159,13 @@ describe("createFixtureFetch agent routes", () => {
     await expect(response.json()).resolves.toMatchObject({
       message: expect.objectContaining({ role: "user", content: "Hello agent" }),
     });
+
+    const listed = await fixtureFetch("http://localhost/api/v1/agents/chats/storybook-agent-chat/messages");
+    const body = await listed.json();
+    expect(body.messages.at(-2)).toEqual(expect.objectContaining({ role: "user", content: "Hello agent" }));
+    expect(body.messages.at(-1)).toEqual(
+      expect.objectContaining({ role: "assistant", content: expect.stringContaining("Storybook simulation") }),
+    );
   });
 });
 

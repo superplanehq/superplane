@@ -2,14 +2,17 @@ package contexts
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
@@ -79,6 +82,449 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	assert.Equal(t, "42", result["count"])
 }
 
+func Test_NodeConfigurationBuilder_RunFunction(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Name:   triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: componentNode,
+				Name:   componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"user": "john"})
+
+	//
+	// Associate the root event with a run so run() can resolve it.
+	//
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), rootEvent)
+	require.NoError(t, err)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{triggerNode: map[string]any{"user": "john"}})
+
+	t.Run("returns id, url, and started_at", func(t *testing.T) {
+		result, err := builder.ResolveExpression(`run()`)
+		require.NoError(t, err)
+
+		payload, ok := result.(map[string]any)
+		require.True(t, ok)
+
+		assert.Equal(t, run.ID.String(), payload["id"])
+
+		expectedURLSuffix := fmt.Sprintf("/%s/apps/%s?run=%s", canvas.OrganizationID.String(), canvas.ID.String(), run.ID.String())
+		assert.Contains(t, payload["url"], expectedURLSuffix)
+		assert.NotContains(t, payload["url"], "view=runs")
+
+		startedAt, ok := payload["started_at"].(time.Time)
+		require.True(t, ok)
+		require.NotNil(t, run.CreatedAt)
+		assert.WithinDuration(t, *run.CreatedAt, startedAt, time.Second)
+	})
+
+	t.Run("fields are usable in templates", func(t *testing.T) {
+		result, err := builder.Build(map[string]any{
+			"runID":  "{{ run().id }}",
+			"runURL": "{{ run().url }}",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, run.ID.String(), result["runID"])
+		assert.Contains(t, result["runURL"], run.ID.String())
+		assert.Contains(t, result["runURL"], "?run=")
+		assert.NotContains(t, result["runURL"], "view=runs")
+	})
+}
+
+func Test_NodeConfigurationBuilder_AppFunction(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "trigger-1",
+				Name:   "trigger-1",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+	require.NoError(t, database.Conn().Model(canvas).Update("description", "Deploy pipeline").Error)
+	canvas.Description = "Deploy pipeline"
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithInput(map[string]any{})
+
+	t.Run("returns id, name, description, and url", func(t *testing.T) {
+		result, err := builder.ResolveExpression(`app()`)
+		require.NoError(t, err)
+
+		payload, ok := result.(map[string]any)
+		require.True(t, ok)
+
+		assert.Equal(t, canvas.ID.String(), payload["id"])
+		assert.Equal(t, canvas.Name, payload["name"])
+		assert.Equal(t, "Deploy pipeline", payload["description"])
+
+		expectedURLSuffix := fmt.Sprintf("/%s/apps/%s", canvas.OrganizationID.String(), canvas.ID.String())
+		assert.Contains(t, payload["url"], expectedURLSuffix)
+		assert.NotContains(t, payload["url"], "?run=")
+	})
+
+	t.Run("fields are usable in templates", func(t *testing.T) {
+		result, err := builder.Build(map[string]any{
+			"appName": "{{ app().name }}",
+			"appURL":  "{{ app().url }}",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, canvas.Name, result["appName"])
+		assert.Contains(t, result["appURL"], canvas.ID.String())
+	})
+}
+
+func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	sourceCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "source-trigger",
+				Name:   "source-trigger",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+		},
+		nil,
+	)
+	sourceRoot := support.EmitCanvasEventForNodeWithData(
+		t,
+		sourceCanvas.ID,
+		"source-trigger",
+		"default",
+		nil,
+		map[string]any{
+			"type": "github.issues",
+			"data": map[string]any{
+				"issue": map[string]any{"number": 42, "title": "Fix login"},
+			},
+		},
+	)
+	sourceRun, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), sourceRoot)
+	require.NoError(t, err)
+	sourceExecution := support.CreateCanvasNodeExecution(t, sourceCanvas.ID, "source-trigger", sourceRoot.ID, sourceRoot.ID)
+	sourceExecution.RunID = sourceRun.ID
+	require.NoError(t, database.Conn().Save(sourceExecution).Error)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factoryModel.ID)
+
+	order, err := factoryModel.CreateWorkOrder(
+		database.Conn(),
+		"Ship feature",
+		"Implement and open PR",
+		&r.User,
+		nil,
+		&sourceRun.ID,
+	)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factoryModel, order.ID, run.ID)
+
+	markdownArtifact, err := order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
+		Type: models.FactoryWorkOrderArtifactTypeMarkdown,
+		Data: map[string]any{"body": "notes from implement"},
+	})
+	require.NoError(t, err)
+
+	prArtifact, err := order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
+		Type: models.FactoryWorkOrderArtifactTypePR,
+		Data: map[string]any{"url": "https://github.com/org/repo/pull/7", "number": 7},
+	})
+	require.NoError(t, err)
+
+	userIDStr := r.User.String()
+	_, err = order.RecordCommentAdded(database.Conn(), models.FactoryWorkOrderCommentParams{
+		Body: "Kicking this off",
+		Author: factory.WorkOrderCommentAuthor{
+			Kind:   factory.CommentAuthorKindUser,
+			UserID: &userIDStr,
+		},
+	})
+	require.NoError(t, err)
+	_, err = order.RecordCommentAdded(database.Conn(), models.FactoryWorkOrderCommentParams{
+		Body: "Opened the PR",
+		Author: factory.WorkOrderCommentAuthor{
+			Kind: factory.CommentAuthorKindAutomation,
+			Automation: &factory.AutomationRef{
+				NodeID:   "implement",
+				NodeName: "Implement",
+			},
+		},
+		Run: &factory.RunRef{ID: run.ID, State: "running"},
+	})
+	require.NoError(t, err)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithRootEvent(&nodeExecution.RootEventID).
+		WithInput(map[string]any{})
+
+	t.Run("returns live work order fields and source", func(t *testing.T) {
+		result, err := builder.ResolveExpression(`order()`)
+		require.NoError(t, err)
+
+		payload, ok := result.(map[string]any)
+		require.True(t, ok)
+
+		assert.Equal(t, order.ID.String(), payload["id"])
+		assert.Equal(t, "Ship feature", payload["title"])
+		assert.Equal(t, "Implement and open PR", payload["description"])
+		assert.Equal(t, factoryModel.ID.String(), payload["factory_id"])
+		assert.Equal(t, models.FactoryWorkOrderStateDraft, payload["state"])
+		assert.Equal(t, "", payload["result"])
+		assert.NotContains(t, payload, "url")
+		assert.NotContains(t, payload, "artifacts")
+		assert.NotContains(t, payload, "comments")
+
+		source, ok := payload["source"].(map[string]any)
+		require.True(t, ok)
+		issue, ok := source["issue"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, float64(42), issue["number"])
+		assert.Equal(t, "Fix login", issue["title"])
+	})
+
+	t.Run("field access and templates", func(t *testing.T) {
+		id, err := builder.ResolveExpression(`order().id`)
+		require.NoError(t, err)
+		assert.Equal(t, order.ID.String(), id)
+
+		title, err := builder.ResolveExpression(`order().title`)
+		require.NoError(t, err)
+		assert.Equal(t, "Ship feature", title)
+
+		issueNumber, err := builder.ResolveExpression(`order().source.issue.number`)
+		require.NoError(t, err)
+		assert.Equal(t, float64(42), issueNumber)
+
+		built, err := builder.Build(map[string]any{
+			"orderID": "{{ order().id }}",
+			"title":   "{{ order().title }}",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, order.ID.String(), built["orderID"])
+		assert.Equal(t, "Ship feature", built["title"])
+	})
+
+	t.Run("permalink back to the work order", func(t *testing.T) {
+		expectedSuffix := fmt.Sprintf(
+			"/%s/workspaces/%s/work-order/%d",
+			r.Organization.ID.String(), factoryModel.Key, order.Number,
+		)
+
+		url, err := builder.ResolveExpression(`order().url`)
+		require.NoError(t, err)
+		assert.Contains(t, url, expectedSuffix)
+
+		bracket, err := builder.ResolveExpression(`order()["url"]`)
+		require.NoError(t, err)
+		assert.Equal(t, url, bracket)
+
+		built, err := builder.Build(map[string]any{
+			"body": "[Work Order]({{ order().url }})",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, fmt.Sprintf("[Work Order](%s)", url), built["body"])
+	})
+
+	t.Run("artifacts equivalents", func(t *testing.T) {
+		// ListArtifacts orders created_at DESC, id DESC — PR was created last.
+		full, err := builder.ResolveExpression(`order().artifacts`)
+		require.NoError(t, err)
+		artifacts, ok := full.([]any)
+		require.True(t, ok)
+		require.Len(t, artifacts, 2)
+
+		bracket, err := builder.ResolveExpression(`order()["artifacts"]`)
+		require.NoError(t, err)
+		assert.Equal(t, full, bracket)
+
+		count, err := builder.ResolveExpression(`len(order().artifacts)`)
+		require.NoError(t, err)
+		assert.Equal(t, 2, count)
+
+		firstType, err := builder.ResolveExpression(`order().artifacts[0].type`)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderArtifactTypePR, firstType)
+
+		firstID, err := builder.ResolveExpression(`order().artifacts[0].id`)
+		require.NoError(t, err)
+		assert.Equal(t, prArtifact.ID.String(), firstID)
+
+		prURL, err := builder.ResolveExpression(`order().artifacts[0].data.url`)
+		require.NoError(t, err)
+		assert.Equal(t, "https://github.com/org/repo/pull/7", prURL)
+
+		bracketType, err := builder.ResolveExpression(`order()["artifacts"][0]["type"]`)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderArtifactTypePR, bracketType)
+
+		secondType, err := builder.ResolveExpression(`order().artifacts[1].type`)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderArtifactTypeMarkdown, secondType)
+
+		body, err := builder.ResolveExpression(`order().artifacts[1].data.body`)
+		require.NoError(t, err)
+		assert.Equal(t, "notes from implement", body)
+		assert.Equal(t, markdownArtifact.ID.String(), mustResolveString(t, builder, `order().artifacts[1].id`))
+	})
+
+	t.Run("comments equivalents", func(t *testing.T) {
+		// ListComments orders created_at ASC, id ASC — oldest first.
+		full, err := builder.ResolveExpression(`order().comments`)
+		require.NoError(t, err)
+		comments, ok := full.([]any)
+		require.True(t, ok)
+		require.Len(t, comments, 2)
+
+		bracket, err := builder.ResolveExpression(`order()["comments"]`)
+		require.NoError(t, err)
+		assert.Equal(t, full, bracket)
+
+		count, err := builder.ResolveExpression(`len(order().comments)`)
+		require.NoError(t, err)
+		assert.Equal(t, 2, count)
+
+		firstBody, err := builder.ResolveExpression(`order().comments[0].body`)
+		require.NoError(t, err)
+		assert.Equal(t, "Kicking this off", firstBody)
+
+		firstAuthorKind, err := builder.ResolveExpression(`order().comments[0].author.kind`)
+		require.NoError(t, err)
+		assert.Equal(t, factory.CommentAuthorKindUser, firstAuthorKind)
+
+		bracketBody, err := builder.ResolveExpression(`order()["comments"][0]["body"]`)
+		require.NoError(t, err)
+		assert.Equal(t, "Kicking this off", bracketBody)
+
+		secondAuthorKind, err := builder.ResolveExpression(`order().comments[1].author.kind`)
+		require.NoError(t, err)
+		assert.Equal(t, factory.CommentAuthorKindAutomation, secondAuthorKind)
+
+		secondAutomationNodeID, err := builder.ResolveExpression(`order().comments[1].author.automation.node_id`)
+		require.NoError(t, err)
+		assert.Equal(t, "implement", secondAutomationNodeID)
+
+		secondRunID, err := builder.ResolveExpression(`order().comments[1].run.id`)
+		require.NoError(t, err)
+		assert.Equal(t, run.ID.String(), secondRunID)
+	})
+
+	t.Run("none and any over artifact types", func(t *testing.T) {
+		hasNoPR, err := builder.ResolveExpression(`none(order().artifacts, {#.type == "pr"})`)
+		require.NoError(t, err)
+		assert.Equal(t, false, hasNoPR)
+
+		hasPR, err := builder.ResolveExpression(`any(order().artifacts, {#.type == "pr"})`)
+		require.NoError(t, err)
+		assert.Equal(t, true, hasPR)
+
+		orderWithoutPR, err := factoryModel.CreateWorkOrder(database.Conn(), "No PR yet", "", &r.User, nil, nil)
+		require.NoError(t, err)
+		_, err = orderWithoutPR.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
+			Type: models.FactoryWorkOrderArtifactTypeMarkdown,
+			Data: map[string]any{"body": "still implementing"},
+		})
+		require.NoError(t, err)
+
+		canvas2, nodeExecution2, run2 := setupFactoryAppExecution(t, r, factoryModel.ID)
+		linkRunToWorkOrder(t, r, factoryModel, orderWithoutPR.ID, run2.ID)
+		builderNoPR := NewNodeConfigurationBuilder(database.Conn(), canvas2.ID).
+			WithRootEvent(&nodeExecution2.RootEventID)
+
+		nonePR, err := builderNoPR.ResolveExpression(`none(order().artifacts, {#.type == "pr"})`)
+		require.NoError(t, err)
+		assert.Equal(t, true, nonePR)
+
+		// A work order with no comments should still resolve order().comments
+		// as an empty list, not nil, matching artifacts' behavior.
+		noComments, err := builderNoPR.ResolveExpression(`order().comments`)
+		require.NoError(t, err)
+		assert.Equal(t, []any{}, noComments)
+	})
+}
+
+func Test_NodeConfigurationBuilder_OrderFunction_NilWhenAbsent(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "trigger-1",
+				Name:   "trigger-1",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+		},
+		nil,
+	)
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "trigger-1", "default", nil, map[string]any{"user": "john"})
+	_, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), rootEvent)
+	require.NoError(t, err)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithRootEvent(&rootEvent.ID)
+
+	result, err := builder.ResolveExpression(`order()`)
+	require.NoError(t, err)
+	assert.Nil(t, result)
+
+	nilCheck, err := builder.ResolveExpression(`order() == nil`)
+	require.NoError(t, err)
+	assert.Equal(t, true, nilCheck)
+}
+
+func mustResolveString(t *testing.T, builder *NodeConfigurationBuilder, expression string) string {
+	t.Helper()
+	value, err := builder.ResolveExpression(expression)
+	require.NoError(t, err)
+	asString, ok := value.(string)
+	require.True(t, ok)
+	return asString
+}
+
 func Test_NodeConfigurationBuilder_JSONNumberTemplateUsesOriginalToken(t *testing.T) {
 	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
 		WithInput(map[string]any{
@@ -112,6 +558,150 @@ func Test_NodeConfigurationBuilder_JSONNumberExpressionsUseNumericTypes(t *testi
 
 	require.NoError(t, err)
 	assert.Equal(t, true, result)
+}
+
+func Test_NodeConfigurationBuilder_ObjectFieldPreservesWholeTemplateTypes(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"enabled": true,
+				"poolID":  "pool-a",
+				"weight":  json.Number("0.1"),
+			},
+		}).
+		WithConfigurationFields([]configuration.Field{
+			{Name: "json", Type: configuration.FieldTypeObject},
+			{Name: "name", Type: configuration.FieldTypeString},
+		})
+
+	result, err := builder.Build(map[string]any{
+		"json": map[string]any{
+			"enabled": "{{ previous().enabled }}",
+			"label":   "pool-{{ previous().poolID }}",
+			"nested": map[string]any{
+				"weight": "{{ previous().weight }}",
+			},
+			"weights": []any{"{{ previous().weight }}"},
+		},
+		"name": "{{ previous().weight }}",
+	})
+
+	require.NoError(t, err)
+
+	payload := result["json"].(map[string]any)
+	assert.Equal(t, true, payload["enabled"])
+	assert.Equal(t, "pool-pool-a", payload["label"])
+
+	nested := payload["nested"].(map[string]any)
+	assert.Equal(t, 0.1, nested["weight"])
+
+	weights := payload["weights"].([]any)
+	assert.Equal(t, 0.1, weights[0])
+
+	assert.Equal(t, "0.1", result["name"])
+}
+
+func Test_NodeConfigurationBuilder_ObjectFieldResolvesRawJSONTemplateString(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"canary": true,
+			},
+		}).
+		WithConfigurationFields([]configuration.Field{
+			{Name: "json", Type: configuration.FieldTypeObject},
+		})
+
+	result, err := builder.Build(map[string]any{
+		"json": `{
+			"pool_weights": {
+				"pool-a": {{ previous().canary ? 0.1 : 0.9 }},
+				"pool-b": {{ previous().canary ? 0.9 : 0.1 }}
+			},
+			"enabled": {{ previous().canary }}
+		}`,
+	})
+
+	require.NoError(t, err)
+
+	payload := result["json"].(map[string]any)
+	assert.Equal(t, true, payload["enabled"])
+
+	poolWeights := payload["pool_weights"].(map[string]any)
+	assert.Equal(t, json.Number("0.1"), poolWeights["pool-a"])
+	assert.Equal(t, json.Number("0.9"), poolWeights["pool-b"])
+}
+
+func Test_NodeConfigurationBuilder_ObjectFieldDoesNotReevaluateExpressionOutput(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"note":    "use {{ name }} in templates",
+				"payload": map[string]any{"hint": "keep {{ value }} literal"},
+			},
+		}).
+		WithConfigurationFields([]configuration.Field{
+			{Name: "json", Type: configuration.FieldTypeObject},
+		})
+
+	fromJSONString, err := builder.Build(map[string]any{
+		"json": `{"note": "{{ previous().note }}"}`,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "use {{ name }} in templates", fromJSONString["json"].(map[string]any)["note"])
+
+	fromWholeExpression, err := builder.Build(map[string]any{
+		"json": "{{ previous().payload }}",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "keep {{ value }} literal", fromWholeExpression["json"].(map[string]any)["hint"])
+
+	fromWholeString, err := builder.Build(map[string]any{
+		"json": "{{ previous().note }}",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "use {{ name }} in templates", fromWholeString["json"])
+}
+
+func Test_NodeConfigurationBuilder_SchemedObjectFallsBackForNonMapExpression(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"token": "secret-token",
+				"auth": map[string]any{
+					"type":  "bearer",
+					"token": "from-map",
+				},
+			},
+		}).
+		WithConfigurationFields([]configuration.Field{
+			{
+				Name: "authorization",
+				Type: configuration.FieldTypeObject,
+				TypeOptions: &configuration.TypeOptions{
+					Object: &configuration.ObjectTypeOptions{
+						Schema: []configuration.Field{
+							{Name: "type", Type: configuration.FieldTypeString},
+							{Name: "token", Type: configuration.FieldTypeString},
+						},
+					},
+				},
+			},
+		})
+
+	nonMap, err := builder.Build(map[string]any{
+		"authorization": "{{ previous().token }}",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "secret-token", nonMap["authorization"])
+
+	asMap, err := builder.Build(map[string]any{
+		"authorization": "{{ previous().auth }}",
+	})
+	require.NoError(t, err)
+	auth := asMap["authorization"].(map[string]any)
+	assert.Equal(t, "bearer", auth["type"])
+	assert.Equal(t, "from-map", auth["token"])
 }
 
 func Test_NodeConfigurationBuilder_JSONNumberDivisionUsesFloatSemantics(t *testing.T) {

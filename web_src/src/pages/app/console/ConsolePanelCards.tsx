@@ -1,5 +1,6 @@
 import type { ConsolePanel } from "@/hooks/useCanvasData";
 
+import { BoardPanelCard } from "./BoardPanelCard";
 import { ChartPanelCard } from "./ChartPanelCard";
 import { HtmlPanelCard } from "./HtmlPanelCard";
 import { MarkdownPanelCard } from "./MarkdownPanelCard";
@@ -39,6 +40,16 @@ export function PanelCardRouter({
     case "table":
       return (
         <TablePanelCard
+          panel={panel}
+          readOnly={readOnly}
+          onDelete={onDelete}
+          onChange={onChange}
+          onEditingChange={onEditingChange}
+        />
+      );
+    case "board":
+      return (
+        <BoardPanelCard
           panel={panel}
           readOnly={readOnly}
           onDelete={onDelete}

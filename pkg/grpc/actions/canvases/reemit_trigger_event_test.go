@@ -43,26 +43,20 @@ func Test__ReemitTriggerEvent(t *testing.T) {
 
 	ctx := context.Background()
 
-	t.Run("canvas not found -> error", func(t *testing.T) {
-		_, err := ReemitTriggerEvent(ctx, r.Organization.ID, uuid.New(), triggerNodeID, uuid.New())
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "canvas not found")
-	})
-
 	t.Run("trigger node not found -> error", func(t *testing.T) {
-		_, err := ReemitTriggerEvent(ctx, r.Organization.ID, canvas.ID, "missing-node", uuid.New())
+		_, err := ReemitTriggerEvent(ctx, database.DB(t.Context()), canvas, "missing-node", uuid.New())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "node not found")
 	})
 
 	t.Run("node is not trigger -> error", func(t *testing.T) {
-		_, err := ReemitTriggerEvent(ctx, r.Organization.ID, canvas.ID, componentNodeID, uuid.New())
+		_, err := ReemitTriggerEvent(ctx, database.DB(t.Context()), canvas, componentNodeID, uuid.New())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not a trigger")
 	})
 
 	t.Run("event not found -> error", func(t *testing.T) {
-		_, err := ReemitTriggerEvent(ctx, r.Organization.ID, canvas.ID, triggerNodeID, uuid.New())
+		_, err := ReemitTriggerEvent(ctx, database.DB(t.Context()), canvas, triggerNodeID, uuid.New())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "event not found")
 	})
@@ -79,7 +73,7 @@ func Test__ReemitTriggerEvent(t *testing.T) {
 		}
 		require.NoError(t, database.Conn().Create(&sourceEvent).Error)
 
-		_, err := ReemitTriggerEvent(ctx, r.Organization.ID, canvas.ID, triggerNodeID, sourceEvent.ID)
+		_, err := ReemitTriggerEvent(ctx, database.DB(t.Context()), canvas, triggerNodeID, sourceEvent.ID)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "does not belong to trigger node")
 	})
@@ -111,7 +105,7 @@ func Test__ReemitTriggerEvent(t *testing.T) {
 				Error,
 		)
 
-		_, err := ReemitTriggerEvent(ctx, r.Organization.ID, canvas.ID, triggerNodeID, sourceEvent.ID)
+		_, err := ReemitTriggerEvent(ctx, database.DB(t.Context()), canvas, triggerNodeID, sourceEvent.ID)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "root trigger events")
 	})
@@ -134,7 +128,7 @@ func Test__ReemitTriggerEvent(t *testing.T) {
 		}
 		require.NoError(t, database.Conn().Create(&sourceEvent).Error)
 
-		response, err := ReemitTriggerEvent(ctx, r.Organization.ID, canvas.ID, triggerNodeID, sourceEvent.ID)
+		response, err := ReemitTriggerEvent(ctx, database.DB(t.Context()), canvas, triggerNodeID, sourceEvent.ID)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotEmpty(t, response.EventId)

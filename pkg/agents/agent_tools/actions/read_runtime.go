@@ -124,6 +124,11 @@ func (a readRuntimeAction) checkReadPermission(ctx context.Context, session agen
 }
 
 func (a readRuntimeAction) read(ctx context.Context, session agents.AgentSessionContext, input Input, resource string) (any, error) {
+	orgID, err := uuid.Parse(session.OrganizationID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid session organization id: %w", err)
+	}
+
 	canvasID, err := uuid.Parse(session.CanvasID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid session canvas id: %w", err)
@@ -134,9 +139,14 @@ func (a readRuntimeAction) read(ctx context.Context, session agents.AgentSession
 		return nil, err
 	}
 
+	canvas, err := models.FindCanvasInTransaction(database.DB(ctx), orgID, canvasID)
+	if err != nil {
+		return nil, fmt.Errorf("find canvas: %w", err)
+	}
+
 	switch resource {
 	case "memory":
-		response, err := canvasactions.ListCanvasMemories(ctx, a.registry, session.OrganizationID, session.CanvasID)
+		response, err := canvasactions.ListCanvasMemories(ctx, database.DB(ctx), canvas)
 		if err != nil {
 			return nil, err
 		}
@@ -150,12 +160,12 @@ func (a readRuntimeAction) read(ctx context.Context, session agents.AgentSession
 		if err != nil {
 			return nil, err
 		}
-		return protoPayload(canvasactions.ListRuns(ctx, a.registry, canvasID, input.Limit, before, states, results))
+		return protoPayload(canvasactions.ListRuns(ctx, database.DB(ctx), canvas, input.Limit, before, states, results))
 	case "event_executions":
 		if strings.TrimSpace(input.EventID) == "" {
 			return nil, fmt.Errorf("event_id is required for event_executions")
 		}
-		return protoPayload(canvasactions.ListEventExecutions(ctx, a.registry, session.CanvasID, input.EventID))
+		return protoPayload(canvasactions.ListEventExecutions(ctx, database.DB(ctx), canvas, input.EventID))
 	case "node_executions":
 		if strings.TrimSpace(input.NodeID) == "" {
 			return nil, fmt.Errorf("node_id is required for node_executions")
@@ -168,17 +178,17 @@ func (a readRuntimeAction) read(ctx context.Context, session agents.AgentSession
 		if err != nil {
 			return nil, err
 		}
-		return protoPayload(canvasactions.ListNodeExecutions(ctx, a.registry, session.CanvasID, input.NodeID, states, results, input.Limit, before))
+		return protoPayload(canvasactions.ListNodeExecutions(ctx, database.DB(ctx), canvas, input.NodeID, states, results, input.Limit, before))
 	case "node_queue_items":
 		if strings.TrimSpace(input.NodeID) == "" {
 			return nil, fmt.Errorf("node_id is required for node_queue_items")
 		}
-		return protoPayload(canvasactions.ListNodeQueueItems(ctx, a.registry, session.CanvasID, input.NodeID, input.Limit, before))
+		return protoPayload(canvasactions.ListNodeQueueItems(ctx, database.DB(ctx), canvas, input.NodeID, input.Limit, before))
 	case "node_events":
 		if strings.TrimSpace(input.NodeID) == "" {
 			return nil, fmt.Errorf("node_id is required for node_events")
 		}
-		return protoPayload(canvasactions.ListNodeEvents(ctx, a.registry, canvasID, input.NodeID, input.Limit, before))
+		return protoPayload(canvasactions.ListNodeEvents(ctx, database.DB(ctx), canvas, input.NodeID, input.Limit, before))
 	case "runner_logs":
 		return a.readRunnerLogs(ctx, session, canvasID, input)
 	default:

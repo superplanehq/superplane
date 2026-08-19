@@ -1,7 +1,7 @@
 /* eslint-disable max-lines */
 import { act, fireEvent, render as testingLibraryRender, screen, waitFor } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type { BlockData } from "./Block";
@@ -20,6 +20,7 @@ const { captureException, fitViewMock, getNodesMock, reactFlowPropsRef } = vi.ho
       onEdgeMouseLeave?: (...args: unknown[]) => unknown;
       onInit?: (instance: { setViewport: (viewport: unknown) => void }) => void;
       onlyRenderVisibleElements?: boolean;
+      nodesDraggable?: boolean;
     },
   },
 }));
@@ -36,6 +37,12 @@ vi.mock("@/sentry", () => ({
 }));
 
 vi.mock("@xyflow/react", () => ({
+  Position: {
+    Left: "left",
+    Right: "right",
+    Top: "top",
+    Bottom: "bottom",
+  },
   Background: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   Panel: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   ReactFlow: (props: { children?: ReactNode; nodes?: unknown }) => {
@@ -217,6 +224,68 @@ describe("CanvasPage connection drop", () => {
     expect(reactFlowPropsRef.current?.onlyRenderVisibleElements).not.toBe(true);
   });
 
+  it("locks nodes only in Factory auto-layout mode", () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Factory automation"
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing
+          activeCanvasVersionId="version-live"
+          layoutMode="factory-auto"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(reactFlowPropsRef.current?.nodesDraggable).toBe(false);
+
+    rerender(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing
+          activeCanvasVersionId="version-live"
+          layoutMode="manual"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(reactFlowPropsRef.current?.nodesDraggable).toBe(true);
+  });
+
+  it("hides the auto-layout preference in Factory auto-layout mode", () => {
+    const commonProps = {
+      title: "Factory automation",
+      nodes: [],
+      edges: [],
+      buildingBlocks: [],
+      isEditing: true,
+      activeCanvasVersionId: "version-live",
+      isAutoLayoutOnUpdateEnabled: true,
+      onToggleAutoLayoutOnUpdate: vi.fn(),
+    };
+    const { rerender } = render(
+      <MemoryRouter>
+        <CanvasPage {...commonProps} layoutMode="factory-auto" />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("button", { pressed: true })).not.toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <CanvasPage {...commonProps} layoutMode="manual" />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("button", { pressed: true })).toBeInTheDocument();
+  });
+
   it("does not open the versions sidebar as the initial edit-session view", () => {
     render(
       <MemoryRouter>
@@ -278,7 +347,7 @@ describe("CanvasPage connection drop", () => {
     expect(screen.getByTestId("building-blocks-sidebar")).toBeInTheDocument();
   });
 
-  it("creates a placeholder when appending from an end-node connector", () => {
+  it("creates a placeholder when appending from an end-node connector", async () => {
     const onPlaceholderAdd = vi.fn(async () => "placeholder-node");
 
     render(
@@ -317,14 +386,14 @@ describe("CanvasPage connection drop", () => {
       data: {
         _callbacksRef?: {
           current?: {
-            onAppendFromNode?: (nodeId: string, sourceHandleId?: string | null) => void;
+            onAppendFromNode?: (nodeId: string, sourceHandleId?: string | null) => void | Promise<void>;
           };
         };
       };
     }>;
 
-    act(() => {
-      nodes[0].data._callbacksRef?.current?.onAppendFromNode?.("source-node", "default");
+    await act(async () => {
+      await nodes[0].data._callbacksRef?.current?.onAppendFromNode?.("source-node", "default");
     });
 
     expect(onPlaceholderAdd).toHaveBeenCalledWith({

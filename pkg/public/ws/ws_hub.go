@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"io"
 	"net"
 	"sync"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 )
 
 const (
@@ -39,7 +41,7 @@ type Hub struct {
 	// Unregister requests from clients
 	unregister chan *Client
 
-	// Guards access to maps
+	// Guards access to maps and client.send close
 	mutex sync.RWMutex
 }
 
@@ -82,63 +84,78 @@ func (h *Hub) registerClient(client *Client) {
 	log.Debugf("Client subscribed to workflow: %s", client.workflowID)
 
 	log.Debugf("New client registered %v, total clients: %d", client, len(h.clients))
+	telemetry.RecordWebSocketConnectionOpened(context.Background(), KindFromTopic(client.workflowID))
 }
 
 // unregisterClient removes a client from the hub
 func (h *Hub) unregisterClient(client *Client) {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
+	h.unregisterClientLocked(client)
+}
 
-	// If this client has a connection, close it
-	if _, ok := h.clients[client]; ok {
-		delete(h.clients, client)
-		close(client.send)
+// unregisterClientLocked removes a client. Caller must hold h.mutex.
+func (h *Hub) unregisterClientLocked(client *Client) {
+	if _, ok := h.clients[client]; !ok {
+		return
+	}
 
-		// Also remove from workflow subscriptions
-		if client.workflowID != "" {
-			if clients, ok := h.workflowSubscriptions[client.workflowID]; ok {
-				delete(clients, client)
+	delete(h.clients, client)
+	close(client.send)
 
-				// If this was the last client for this workflow, remove the workflow entry
-				if len(clients) == 0 {
-					delete(h.workflowSubscriptions, client.workflowID)
-				}
+	if client.workflowID != "" {
+		if clients, ok := h.workflowSubscriptions[client.workflowID]; ok {
+			delete(clients, client)
+			if len(clients) == 0 {
+				delete(h.workflowSubscriptions, client.workflowID)
 			}
 		}
-		log.Debugf("Client unregistered, remaining clients: %d", len(h.clients))
 	}
+
+	log.Debugf("Client unregistered, remaining clients: %d", len(h.clients))
+	telemetry.RecordWebSocketConnectionClosed(context.Background(), KindFromTopic(client.workflowID))
 }
 
 // BroadcastAll sends a message to all connected clients
 func (h *Hub) BroadcastAll(message []byte) {
-	h.mutex.RLock()
-	defer h.mutex.RUnlock()
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
 
 	for client := range h.clients {
 		select {
 		case client.send <- message:
 		default:
-			// If the client's buffer is full, assume it's gone and unregister it
-			h.unregisterClient(client)
+			// Buffer full — drop client under the same lock that owns send close.
+			h.unregisterClientLocked(client)
 		}
 	}
 }
 
 func (h *Hub) BroadcastToWorkflow(workflowID string, message []byte) {
-	h.mutex.RLock()
-	defer h.mutex.RUnlock()
+	kind := KindFromTopic(workflowID)
 
-	// Get clients subscribed to this workflow
-	if clients, ok := h.workflowSubscriptions[workflowID]; ok {
-		for client := range clients {
-			select {
-			case client.send <- message:
-			default:
-				// If the client's buffer is full, assume it's gone and unregister it
-				h.unregisterClient(client)
-			}
+	// Hold the write lock for the whole send pass so unregister cannot close
+	// client.send concurrently (send on a closed channel panics).
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+
+	clients := h.workflowSubscriptions[workflowID]
+	if len(clients) == 0 {
+		telemetry.RecordWebSocketBroadcast(context.Background(), kind, 0)
+		return
+	}
+
+	recipients := 0
+	for client := range clients {
+		select {
+		case client.send <- message:
+			recipients++
+		default:
+			h.unregisterClientLocked(client)
 		}
 	}
+
+	telemetry.RecordWebSocketBroadcast(context.Background(), kind, recipients)
 }
 
 func (h *Hub) WorkflowSubscriberCount(workflowID string) int {

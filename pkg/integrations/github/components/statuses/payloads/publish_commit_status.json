@@ -1,9 +1,17 @@
 {
   "data": {
+    "id": 15384176900,
+    "node_id": "S_kwDOQ7c2jM6qX9zZ",
+    "url": "https://api.github.com/repos/acme-labs/snaketoy/statuses/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
     "state": "success",
     "description": "All checks passed",
     "context": "ci/build",
     "target_url": "https://ci.example.com/builds/123",
+    "creator": {
+      "login": "octocat",
+      "id": 583231,
+      "html_url": "https://github.com/octocat"
+    },
     "created_at": "2026-01-16T17:45:00Z",
     "updated_at": "2026-01-16T17:45:10Z"
   },

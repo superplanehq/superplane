@@ -11,6 +11,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to branch creation events from GitLab" />
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events from GitLab" />
+  <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events from GitLab" />
+  <LinkCard title="On Job" href="#on-job" description="Listen to job events from GitLab" />
+  <LinkCard title="On MR Diff Note" href="#on-mr-diff-note" description="Listen to merge request diff (inline code review) comment events from GitLab" />
   <LinkCard title="On Merge Comment" href="#on-merge-comment" description="Listen to merge request comment events from GitLab" />
   <LinkCard title="On Merge Request" href="#on-merge-request" description="Listen to merge request events from GitLab" />
   <LinkCard title="On Milestone" href="#on-milestone" description="Listen to milestone events from GitLab" />
@@ -25,6 +28,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Accept Merge Request" href="#accept-merge-request" description="Merge an open GitLab merge request" />
+  <LinkCard title="Add Issue Label" href="#add-issue-label" description="Add labels to a GitLab issue" />
+  <LinkCard title="Add Merge Request Reviewers" href="#add-merge-request-reviewers" description="Add reviewers to a GitLab merge request" />
   <LinkCard title="Add Reaction" href="#add-reaction" description="Add an award emoji reaction to a GitLab merge request or comment" />
   <LinkCard title="Approve Merge Request" href="#approve-merge-request" description="Approve a GitLab merge request" />
   <LinkCard title="Create Deployment" href="#create-deployment" description="Create a deployment for a GitLab environment" />
@@ -32,33 +37,35 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitLab project" />
   <LinkCard title="Create Issue Comment" href="#create-issue-comment" description="Add a comment to a GitLab issue" />
   <LinkCard title="Create Merge Request Comment" href="#create-merge-request-comment" description="Add a comment to a GitLab merge request" />
+  <LinkCard title="Create Merge Request" href="#create-merge-request" description="Create a new merge request in a GitLab project" />
+  <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitLab project" />
+  <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitLab project" />
+  <LinkCard title="Get Commit Status" href="#get-commit-status" description="Get the overall CI status of a GitLab commit, branch, or tag" />
   <LinkCard title="Get Issue" href="#get-issue" description="Fetch a single GitLab issue by its IID" />
   <LinkCard title="Get Latest Pipeline" href="#get-latest-pipeline" description="Get the latest GitLab pipeline for a project" />
   <LinkCard title="Get Pipeline" href="#get-pipeline" description="Get a GitLab pipeline" />
+  <LinkCard title="Get Pipeline Minutes Usage" href="#get-pipeline-minutes-usage" description="Retrieve CI/CD compute (pipeline) minutes usage for the connected GitLab namespace" />
+  <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitLab project" />
   <LinkCard title="Get Test Report Summary" href="#get-test-report-summary" description="Get GitLab pipeline test report summary" />
+  <LinkCard title="Mark Merge Request Ready for Review" href="#mark-merge-request-ready-for-review" description="Take a draft merge request out of the draft state in a GitLab project" />
+  <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a build/CI status on a GitLab commit" />
+  <LinkCard title="Remove Merge Request Reviewers" href="#remove-merge-request-reviewers" description="Remove reviewers from a GitLab merge request" />
   <LinkCard title="Run Pipeline" href="#run-pipeline" description="Run a GitLab pipeline and wait for completion" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update an existing GitLab issue" />
+  <LinkCard title="Update Issue Comment" href="#update-issue-comment" description="Update an existing comment on a GitLab issue" />
+  <LinkCard title="Update Merge Request" href="#update-merge-request" description="Update an existing merge request in a GitLab project" />
+  <LinkCard title="Update Release" href="#update-release" description="Update an existing release in a GitLab project" />
 </CardGrid>
 
 ## Instructions
 
 **Setup steps:**
-1. Optionally enter a **Group ID** to work with a group's projects: in GitLab, open your group's page and select **Actions (⋮) → Copy Group ID**. The group path (e.g. `my-org/my-subgroup`) also works. Leave it empty to use your personal projects.
-2. Choose an **Auth Type** and connect:
+1. Optionally set a **Group ID** (ID or full path, e.g. `my-org/my-subgroup`) to work with a group's projects. Leave it empty to use your personal projects.
+2. Pick an **Auth Type** and connect:
+   - **App OAuth**: leave **Application ID** and **Secret** empty and click **Save** to start the setup wizard.
+   - **Personal Access Token**: [create a token](https://gitlab.com/-/user_settings/personal_access_tokens?name=SuperPlane&scopes=api,read_user,read_api,write_repository,read_repository) with scopes api, read_user, read_api, write_repository, read_repository (the link prefills them), paste it into **Access Token**, and click **Save**.
 
-To connect with **App OAuth**:
-1. Leave **Client ID** and **Client Secret** empty and click **Save** to start the setup wizard. It guides you through creating a GitLab OAuth application and authorizing SuperPlane.
-
-To connect with a **Personal Access Token**:
-1. [Create a personal access token](https://gitlab.com/-/user_settings/personal_access_tokens?name=SuperPlane&scopes=api,read_user,read_api,write_repository,read_repository) — the link prefills the name and scopes (api, read_user, read_api, write_repository, read_repository), so you only need to click **Create personal access token**. On a self-managed instance, use the same path on your GitLab URL.
-2. Paste the token into the **Access Token** field and click **Save**.
-
-**Note:** Triggers (On Push, On Branch Created, On Issue, On Merge Request, On Merge Comment, etc.) create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. On Push and On Branch Created subscribe to the project's push events, which are covered by the scopes above — no extra permissions are required.
-
-**Component permissions:** components act as the connected user, so that user needs the matching project role:
-- **Accept Merge Request** requires permission to merge into the target branch. Protected branches (e.g. the default branch) allow only **Maintainers** to merge by default; allow Developers via the branch's **Allowed to merge** setting if needed.
-- **Approve Merge Request** requires the user to be an eligible approver: a direct project or group member with at least the **Developer** role. By default, users cannot approve their own merge requests.
-- **Create Deployment** and **Create Deployment Status** require at least the **Developer** role on the project. For protected environments, the connected user must also be in the environment's **Allowed to deploy** list.
+**Note:** Triggers create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor. Components act as that user as well: creating, updating, or merging merge requests, approving, deploying, publishing commit statuses, and editing issue comments follow the project's roles and protected branch/environment rules.
 
 <a id="on-branch-created"></a>
 
@@ -160,7 +167,7 @@ The On Issue trigger starts a workflow execution when issue events occur in a Gi
 ### Configuration
 
 - **Project** (required): GitLab project to monitor
-- **Actions** (required): Select which issue actions to listen for (opened, closed, reopened, etc.). Default: opened.
+- **Actions** (required): Select which issue actions to listen for. Default: opened.
 - **Labels** (optional): Only trigger for issues with specific labels
 
 ### Outputs
@@ -240,6 +247,381 @@ This trigger automatically sets up a GitLab webhook when configured. The webhook
   },
   "timestamp": "2026-02-05T14:00:00.000000000Z",
   "type": "gitlab.issue"
+}
+```
+
+<a id="on-issue-comment"></a>
+
+## On Issue Comment
+
+**Trigger key:** `gitlab.onIssueComment`
+
+The On Issue Comment trigger starts a workflow execution when a comment is added to an issue in a GitLab project.
+
+### Use Cases
+
+- **Command processing**: Process slash commands in issue comments (e.g., `/sp-investigate` to trigger an agent that investigates whether the issue is worth fixing and rates its urgency)
+- **Bot interactions**: Respond to issue comments with automated actions
+- **Notification systems**: Notify teams when important issue comments are added
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Content Filter** (optional): Regex pattern to filter comments by content (e.g., `/sp-investigate` to only trigger on comments containing "/sp-investigate")
+
+### Event Data
+
+Each comment event includes:
+- **object_attributes**: Comment information including note body, author, and URL
+- **issue**: Issue the comment was added to
+- **user**: User who added the comment
+- **project**: Project information
+
+Common expression paths:
+- Issue IID: `root().data.issue.iid`
+- Issue title: `root().data.issue.title`
+- Comment body: `root().data.object_attributes.note`
+- Comment URL: `root().data.object_attributes.url`
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event_type": "note",
+    "issue": {
+      "author_id": 1,
+      "created_at": "2026-02-10 09:00:00 UTC",
+      "description": "Steps to reproduce: submit the login form with a wrong password.",
+      "id": 45,
+      "iid": 8,
+      "labels": [
+        "bug"
+      ],
+      "state": "opened",
+      "title": "Login page throws 500 on invalid credentials",
+      "updated_at": "2026-02-12 20:40:00 UTC",
+      "url": "https://gitlab.example.com/group/example/-/issues/8"
+    },
+    "object_attributes": {
+      "action": "create",
+      "attachment": null,
+      "author_id": 1,
+      "created_at": "2026-02-12 20:40:00 UTC",
+      "discussion_id": "6c2bb44bdc7f5c8f21b9ff8422f3d60cc0e5e719",
+      "id": 1355,
+      "note": "/sp-investigate",
+      "noteable_id": 45,
+      "noteable_type": "Issue",
+      "project_id": 1,
+      "system": false,
+      "updated_at": "2026-02-12 20:40:00 UTC",
+      "url": "https://gitlab.example.com/group/example/-/issues/8#note_1355"
+    },
+    "object_kind": "note",
+    "project": {
+      "avatar_url": null,
+      "ci_config_path": null,
+      "default_branch": "main",
+      "description": "Project used to demonstrate issue comment webhook payloads.",
+      "git_http_url": "https://gitlab.example.com/group/example.git",
+      "git_ssh_url": "ssh://git@gitlab.example.com:group/example.git",
+      "id": 1,
+      "name": "Example Project",
+      "namespace": "group",
+      "path_with_namespace": "group/example",
+      "visibility_level": 20,
+      "web_url": "https://gitlab.example.com/group/example"
+    },
+    "project_id": 1,
+    "repository": {
+      "description": "Project used to demonstrate issue comment webhook payloads.",
+      "homepage": "https://gitlab.example.com/group/example",
+      "name": "Example Project",
+      "url": "ssh://git@gitlab.example.com/group/example.git"
+    },
+    "user": {
+      "avatar_url": "https://www.gravatar.com/avatar/1a29da0ccd099482194440fac762f5ccb4ec53227761d1859979367644a889a5?s=80\u0026d=identicon",
+      "email": "agarcia@example.com",
+      "id": 1,
+      "name": "Alex Garcia",
+      "username": "agarcia"
+    }
+  },
+  "timestamp": "2026-02-12T20:40:00.000000000Z",
+  "type": "gitlab.issueComment"
+}
+```
+
+<a id="on-job"></a>
+
+## On Job
+
+**Trigger key:** `gitlab.onJob`
+
+The On Job trigger starts a workflow execution when the status of a CI/CD job changes in a GitLab project.
+
+Jobs are the individual units of work inside a pipeline. Where the On Pipeline trigger fires once for the pipeline as a whole, this trigger fires for each job, so you can react to one specific job - a deploy, a scan, a migration - without waiting for the rest of the pipeline.
+
+### Use Cases
+
+- **Per-job automation**: Run a workflow the moment the `deploy` job succeeds, without waiting for the whole pipeline
+- **Targeted failure handling**: Page or open an issue when a named job fails
+- **Stage gates**: React when a job in a specific stage finishes
+- **Build observability**: Record durations, runners, and failure reasons per job
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Statuses** (required): Job statuses to listen for. Default: success, failed.
+- **Names** *(optional)*: Filter on the job name, e.g. equals `deploy` or matches `test-.*`
+- **Refs** *(optional)*: Filter on the branch or tag the job ran for
+
+### Event Data
+
+Each event includes:
+- **build_name**, **build_stage**, **build_status**: The job, its stage, and its new status
+- **build_started_at**, **build_finished_at**, **build_duration**, **build_queued_duration**: Job timings
+- **build_failure_reason**, **build_allow_failure**, **retries_count**: Failure and retry details
+- **pipeline_id**, **ref**, **sha**, **tag**: The pipeline and ref the job belongs to
+- **runner**: The runner that executed the job
+- **commit**, **project**, **repository**, **user**, **environment**: Surrounding context
+
+Note that GitLab excludes trigger jobs from this event, and commit statuses published by external systems are not jobs, so they do not produce job events.
+
+### Permissions
+
+The connected token needs the `api` scope, and the connected user needs at least the **Maintainer** role on the project so SuperPlane can create the webhook.
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "before_sha": "9d1a3c4e7b2f8a6d5c0e1b3a7f9d2c4e6b8a0f13",
+    "build_allow_failure": false,
+    "build_created_at": "2026-02-13T17:56:00.412Z",
+    "build_duration": 120.166,
+    "build_failure_reason": "unknown_failure",
+    "build_finished_at": "2026-02-13T17:59:30.284Z",
+    "build_id": 998876,
+    "build_name": "unit-tests",
+    "build_queued_duration": 3.204,
+    "build_stage": "test",
+    "build_started_at": "2026-02-13T17:57:30.118Z",
+    "build_status": "success",
+    "commit": {
+      "author_email": "jrivera@example.com",
+      "author_name": "Jamie Rivera",
+      "author_url": "https://gitlab.com/jrivera",
+      "duration": 240,
+      "finished_at": "2026-02-13T18:00:00.000Z",
+      "id": 12345,
+      "message": "Cache dependencies between CI jobs\n",
+      "name": "Pipeline for branch: main",
+      "sha": "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+      "started_at": "2026-02-13T17:56:04.000Z",
+      "status": "success"
+    },
+    "environment": null,
+    "object_kind": "build",
+    "pipeline_id": 12345,
+    "project": {
+      "avatar_url": null,
+      "ci_config_path": ".gitlab-ci.yml",
+      "default_branch": "main",
+      "description": "Example project used by SuperPlane workflows.",
+      "git_http_url": "https://gitlab.com/group/example-project.git",
+      "git_ssh_url": "git@gitlab.com:group/example-project.git",
+      "id": 987,
+      "name": "example-project",
+      "namespace": "group",
+      "path_with_namespace": "group/example-project",
+      "visibility_level": 20,
+      "web_url": "https://gitlab.com/group/example-project"
+    },
+    "project_id": 987,
+    "project_name": "group/example-project",
+    "ref": "main",
+    "repository": {
+      "description": "Example project used by SuperPlane workflows.",
+      "git_http_url": "https://gitlab.com/group/example-project.git",
+      "git_ssh_url": "git@gitlab.com:group/example-project.git",
+      "homepage": "https://gitlab.com/group/example-project",
+      "name": "example-project",
+      "url": "git@gitlab.com:group/example-project.git",
+      "visibility_level": 20
+    },
+    "retries_count": 0,
+    "runner": {
+      "active": true,
+      "description": "shared-runners-manager-6.gitlab.com",
+      "id": 380987,
+      "is_shared": true,
+      "runner_type": "instance_type",
+      "tags": [
+        "linux",
+        "docker",
+        "shared-runner"
+      ]
+    },
+    "sha": "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+    "tag": false,
+    "user": {
+      "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/22/avatar.png",
+      "email": "jrivera@example.com",
+      "id": 22,
+      "name": "Jamie Rivera",
+      "username": "jrivera"
+    }
+  },
+  "timestamp": "2026-02-13T17:59:30.284000000Z",
+  "type": "gitlab.job"
+}
+```
+
+<a id="on-mr-diff-note"></a>
+
+## On MR Diff Note
+
+**Trigger key:** `gitlab.onMRDiffNote`
+
+The On MR Diff Note trigger starts a workflow execution when an inline comment is added to a merge request's diff in a GitLab project.
+
+Diff notes (also known as inline comments) are comments left on a specific line of a merge request's changes, as opposed to a regular top-level merge request comment. Use `gitlab.onMergeComment` if you want to react to regular merge request discussion comments instead.
+
+### Use Cases
+
+- **Review triage**: Have an agent triage a merge request review by reading the diff note together with the file and line it was left on
+- **Command processing**: Process slash commands left as inline review comments (e.g., /fix, /explain)
+- **Notification systems**: Notify teams when important inline review comments are added
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Content Filter** (optional): Regex pattern to filter comments by content (e.g., `/fix` to only trigger on comments containing "/fix")
+
+### Event Data
+
+Each diff note event includes:
+- **object_attributes**: Comment information including note body, author, URL, and the diff **position** (file paths, line numbers, and commit SHAs the comment is anchored to)
+- **merge_request**: Merge request the comment was added to
+- **user**: User who added the comment
+- **project**: Project information
+
+Common expression paths:
+- Merge request IID: `root().data.merge_request.iid`
+- Merge request title: `root().data.merge_request.title`
+- Comment body: `root().data.object_attributes.note`
+- Diff file path: `root().data.object_attributes.position.new_path`
+- Diff line number: `root().data.object_attributes.position.new_line`
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event_type": "note",
+    "merge_request": {
+      "author_id": 1,
+      "created_at": "2026-02-12 18:30:00 UTC",
+      "description": "Adds support for additional GitLab webhook trigger types.",
+      "draft": false,
+      "id": 93,
+      "iid": 12,
+      "last_commit": {
+        "author": {
+          "email": "agarcia@example.com",
+          "name": "Alex Garcia"
+        },
+        "id": "372fa8f809fe161ee0f22e04d1a4074e0be6ac47",
+        "message": "Add merge request trigger",
+        "timestamp": "2026-02-12T18:25:00Z",
+        "url": "https://gitlab.example.com/group/example/-/commit/372fa8f809fe161ee0f22e04d1a4074e0be6ac47"
+      },
+      "merge_status": "can_be_merged",
+      "source_branch": "feature/merge-request-trigger",
+      "source_project_id": 1,
+      "state": "opened",
+      "target_branch": "main",
+      "target_project_id": 1,
+      "title": "Add merge request trigger",
+      "updated_at": "2026-02-13 10:15:00 UTC",
+      "url": "https://gitlab.example.com/group/example/-/merge_requests/12",
+      "work_in_progress": false
+    },
+    "object_attributes": {
+      "action": "create",
+      "attachment": null,
+      "author_id": 1,
+      "commit_id": "372fa8f809fe161ee0f22e04d1a4074e0be6ac47",
+      "created_at": "2026-02-13 10:15:00 UTC",
+      "discussion_id": "b4f2a7d4c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9",
+      "id": 1401,
+      "line_code": "a5cc2925ca8258af241be7e5b0381edf30266302_10_10",
+      "note": "This variable name is misleading, can we rename it?",
+      "noteable_id": 93,
+      "noteable_type": "MergeRequest",
+      "position": {
+        "base_sha": "1234567890abcdef1234567890abcdef12345678",
+        "head_sha": "372fa8f809fe161ee0f22e04d1a4074e0be6ac47",
+        "new_line": 10,
+        "new_path": "src/handlers/login.go",
+        "old_line": 10,
+        "old_path": "src/handlers/login.go",
+        "position_type": "text",
+        "start_sha": "234567890abcdef1234567890abcdef123456789"
+      },
+      "project_id": 1,
+      "system": false,
+      "type": "DiffNote",
+      "updated_at": "2026-02-13 10:15:00 UTC",
+      "url": "https://gitlab.example.com/group/example/-/merge_requests/12#note_1401"
+    },
+    "object_kind": "note",
+    "project": {
+      "avatar_url": null,
+      "ci_config_path": null,
+      "default_branch": "main",
+      "description": "Project used to demonstrate merge request diff note webhook payloads.",
+      "git_http_url": "https://gitlab.example.com/group/example.git",
+      "git_ssh_url": "ssh://git@gitlab.example.com:group/example.git",
+      "id": 1,
+      "name": "Example Project",
+      "namespace": "group",
+      "path_with_namespace": "group/example",
+      "visibility_level": 20,
+      "web_url": "https://gitlab.example.com/group/example"
+    },
+    "project_id": 1,
+    "repository": {
+      "description": "Project used to demonstrate merge request diff note webhook payloads.",
+      "homepage": "https://gitlab.example.com/group/example",
+      "name": "Example Project",
+      "url": "ssh://git@gitlab.example.com/group/example.git"
+    },
+    "user": {
+      "avatar_url": "https://www.gravatar.com/avatar/1a29da0ccd099482194440fac762f5ccb4ec53227761d1859979367644a889a5?s=80\u0026d=identicon",
+      "email": "agarcia@example.com",
+      "id": 1,
+      "name": "Alex Garcia",
+      "username": "agarcia"
+    }
+  },
+  "timestamp": "2026-02-13T10:15:00.000000000Z",
+  "type": "gitlab.mrDiffNote"
 }
 ```
 
@@ -1073,6 +1455,137 @@ Returns the merged merge request object, including state, merge commit SHA, sour
 }
 ```
 
+<a id="add-issue-label"></a>
+
+## Add Issue Label
+
+**Component key:** `gitlab.addIssueLabel`
+
+The Add Issue Label component adds one or more labels to an existing GitLab issue without affecting existing labels.
+
+### Use Cases
+
+- **Triage automation**: Automatically label issues based on content or source
+- **Status tracking**: Add status labels as issues move through workflows
+- **Priority tagging**: Apply priority labels based on external signals
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the issue
+- **Issue IID** (required): The internal ID (IID) of the issue to add labels to (supports expressions)
+- **Labels** (required): List of label names to add to the issue. If a label does not already exist, GitLab creates it.
+
+### Output
+
+Returns the full list of labels currently on the issue after the addition.
+
+### Example Output
+
+```json
+{
+  "data": [
+    "bug",
+    "urgent",
+    "needs-triage"
+  ],
+  "timestamp": "2026-02-13T11:16:17.520Z",
+  "type": "gitlab.labels"
+}
+```
+
+<a id="add-merge-request-reviewers"></a>
+
+## Add Merge Request Reviewers
+
+**Component key:** `gitlab.addMergeRequestReviewers`
+
+The Add Merge Request Reviewers component requests reviews from additional users on an existing GitLab merge request. Existing reviewers are kept.
+
+### Use Cases
+
+- **Automated review assignment**: Add reviewers after a merge request is opened as part of a workflow
+- **Escalation**: Add a senior reviewer when checks fail or a change touches sensitive areas
+- **Round-robin**: Assign reviewers from a rotation once a merge request is ready
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the merge request
+- **Merge Request IID** (required): The internal ID (IID) of the merge request (supports expressions)
+- **Reviewers** (required): Users to request a review from. These are added to any existing reviewers.
+
+### Permissions
+
+The connected user needs at least the **Developer** role on the project to change reviewers.
+
+### Output
+
+Returns the updated merge request object, including its full reviewer list and URL.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/abc123",
+      "id": 22,
+      "name": "Jamie Rivera",
+      "state": "active",
+      "username": "jrivera",
+      "web_url": "https://gitlab.example.com/jrivera"
+    },
+    "closed_at": null,
+    "closed_by": null,
+    "created_at": "2026-02-13T08:46:00.000Z",
+    "description": "Adds the new login page with SSO support",
+    "detailed_merge_status": "mergeable",
+    "draft": false,
+    "id": 1,
+    "iid": 42,
+    "labels": [
+      "feature"
+    ],
+    "merge_commit_sha": null,
+    "merge_error": null,
+    "merge_user": null,
+    "merged_at": null,
+    "milestone": null,
+    "project_id": 3,
+    "reviewers": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/def456",
+        "id": 30,
+        "name": "Alex Morgan",
+        "state": "active",
+        "username": "amorgan",
+        "web_url": "https://gitlab.example.com/amorgan"
+      },
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/ghi789",
+        "id": 31,
+        "name": "Sam Chen",
+        "state": "active",
+        "username": "schen",
+        "web_url": "https://gitlab.example.com/schen"
+      }
+    ],
+    "sha": "8888888888888888888888888888888888888888",
+    "should_remove_source_branch": true,
+    "source_branch": "feature/login-page",
+    "squash": false,
+    "squash_commit_sha": null,
+    "state": "opened",
+    "target_branch": "main",
+    "title": "feat: add login page",
+    "updated_at": "2026-02-13T09:30:00.000Z",
+    "web_url": "https://gitlab.example.com/my-group/my-project/-/merge_requests/42"
+  },
+  "timestamp": "2026-02-13T09:30:00.000Z",
+  "type": "gitlab.mergeRequest"
+}
+```
+
 <a id="add-reaction"></a>
 
 ## Add Reaction
@@ -1547,6 +2060,425 @@ Returns the created note object, including:
 }
 ```
 
+<a id="create-merge-request"></a>
+
+## Create Merge Request
+
+**Component key:** `gitlab.createMergeRequest`
+
+The Create Merge Request component opens a new merge request in a specified GitLab project.
+
+### Use Cases
+
+- **Automated fixes**: An agent commits a fix on a branch and opens a merge request for review
+- **Dependency updates**: Open a merge request when a dependency or changelog bump is generated
+- **Release automation**: Open a merge request to promote a branch into a release branch
+
+### Configuration
+
+- **Project** (required): The GitLab project where the merge request will be created
+- **Source Branch** (required): The branch containing the changes (supports expressions)
+- **Target Branch** (required): The branch you want the changes merged into (e.g. main)
+- **Title** (required): The title of the new merge request
+- **Description** (optional): The description/body of the merge request
+- **Assignees** (optional): Users to assign the merge request to
+- **Reviewers** (optional): Users to request a review from
+- **Labels** (optional): Labels to apply to the merge request
+- **Milestone** (optional): Milestone to associate with the merge request
+- **Remove Source Branch** (optional): Remove the source branch when the merge request is merged
+- **Squash** (optional): Squash commits into a single commit when merging
+
+### Permissions
+
+The connected user needs at least the **Developer** role on the project to create a merge request.
+
+### Output
+
+The component outputs the created merge request object, including:
+- **iid**: The project-relative ID of the merge request
+- **web_url**: The URL to view the merge request in GitLab
+- **source_branch** and **target_branch**: The branches involved
+- **state**: The current state of the merge request (opened)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/abc123",
+        "id": 22,
+        "name": "Jamie Rivera",
+        "state": "active",
+        "username": "jrivera",
+        "web_url": "https://gitlab.example.com/jrivera"
+      }
+    ],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/abc123",
+      "id": 22,
+      "name": "Jamie Rivera",
+      "state": "active",
+      "username": "jrivera",
+      "web_url": "https://gitlab.example.com/jrivera"
+    },
+    "closed_at": null,
+    "closed_by": null,
+    "created_at": "2026-02-13T08:46:00.000Z",
+    "description": "Adds the new login page with SSO support",
+    "detailed_merge_status": "mergeable",
+    "draft": false,
+    "id": 1,
+    "iid": 42,
+    "labels": [
+      "feature"
+    ],
+    "merge_commit_sha": null,
+    "merge_error": null,
+    "merge_user": null,
+    "merged_at": null,
+    "milestone": null,
+    "project_id": 3,
+    "reviewers": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/def456",
+        "id": 30,
+        "name": "Alex Morgan",
+        "state": "active",
+        "username": "amorgan",
+        "web_url": "https://gitlab.example.com/amorgan"
+      }
+    ],
+    "sha": "8888888888888888888888888888888888888888",
+    "should_remove_source_branch": true,
+    "source_branch": "feature/login-page",
+    "squash": false,
+    "squash_commit_sha": null,
+    "state": "opened",
+    "target_branch": "main",
+    "title": "feat: add login page",
+    "updated_at": "2026-02-13T08:46:00.000Z",
+    "web_url": "https://gitlab.example.com/my-group/my-project/-/merge_requests/42"
+  },
+  "timestamp": "2026-02-13T08:46:00.000Z",
+  "type": "gitlab.mergeRequest"
+}
+```
+
+<a id="create-release"></a>
+
+## Create Release
+
+**Component key:** `gitlab.createRelease`
+
+The Create Release component creates a new release in a GitLab project, optionally creating the underlying tag at the same time.
+
+### Use Cases
+
+- **Automated releases**: Cut a release automatically after a pipeline succeeds
+- **Tag and release together**: Create the git tag and its release notes in one step
+- **Scheduled releases**: Set a future release date to publish an upcoming release
+
+### Configuration
+
+- **Project** (required): The GitLab project to release in
+- **Tag Name** (required): The tag to create the release for (supports expressions)
+- **Ref** (optional): Branch, tag, or commit SHA to create the tag from. Required if the tag doesn't already exist
+- **Release Name** (optional): The release title
+- **Description** (optional): Release notes, in Markdown
+- **Milestones** (optional): Project milestones to associate with the release
+- **Released At** (optional): Set a date in the future to schedule an upcoming release, or in the past to backdate it. Defaults to now
+
+### Output
+
+Returns the created release object.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "_links": {
+      "closed_issues_url": "https://gitlab.com/root/example-project/-/issues?release_tag=v1.0.0\u0026scope=all\u0026state=closed",
+      "closed_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=closed",
+      "edit_url": "https://gitlab.com/root/example-project/-/releases/v1.0.0/edit",
+      "merged_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=merged",
+      "opened_issues_url": "https://gitlab.com/root/example-project/-/issues?release_tag=v1.0.0\u0026scope=all\u0026state=opened",
+      "opened_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=opened",
+      "self": "https://gitlab.com/root/example-project/-/releases/v1.0.0"
+    },
+    "assets": {
+      "count": 2,
+      "links": [],
+      "sources": [
+        {
+          "format": "zip",
+          "url": "https://gitlab.com/root/example-project/-/archive/v1.0.0/example-project-v1.0.0.zip"
+        },
+        {
+          "format": "tar.gz",
+          "url": "https://gitlab.com/root/example-project/-/archive/v1.0.0/example-project-v1.0.0.tar.gz"
+        }
+      ]
+    },
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/0?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "https://gitlab.com/root"
+    },
+    "commit": {
+      "author_email": "admin@example.com",
+      "author_name": "Administrator",
+      "authored_date": "2026-01-03T01:55:18.000Z",
+      "committed_date": "2026-01-03T01:55:18.000Z",
+      "committer_email": "admin@example.com",
+      "committer_name": "Administrator",
+      "created_at": "2026-01-03T01:55:18.000Z",
+      "id": "588440f66559714280628a4f9799f0c4eb880a7",
+      "message": "Merge branch 'feature' into 'main'\n",
+      "parent_ids": [
+        "281d3a76f31c812dbf48abce82ccf6860adedd81"
+      ],
+      "short_id": "588440f6",
+      "title": "Merge branch 'feature' into 'main'"
+    },
+    "commit_path": "/root/example-project/-/commit/588440f66559714280628a4f9799f0c4eb880a7",
+    "created_at": "2026-01-03T01:56:19.539Z",
+    "description": "## What's Changed\n\n- Added new feature\n- Fixed a bug",
+    "evidence_sha": "760d6cdfb0879c95bc55d7b072f1252c8cdcf5cf",
+    "evidences": [
+      {
+        "collected_at": "2026-01-03T01:56:19.552Z",
+        "filepath": "https://gitlab.com/root/example-project/-/releases/v1.0.0/evidences/1.json",
+        "sha": "760d6cdfb0879c95bc55d7b072f1252c8cdcf5cf"
+      }
+    ],
+    "milestones": [
+      {
+        "created_at": "2025-12-01T09:30:00.000Z",
+        "description": "",
+        "due_date": "2026-01-01",
+        "id": 51,
+        "iid": 1,
+        "issue_stats": {
+          "closed": 5,
+          "total": 5
+        },
+        "project_id": 24,
+        "start_date": "2025-12-01",
+        "state": "closed",
+        "title": "v1.0",
+        "updated_at": "2026-01-02T10:00:00.000Z",
+        "web_url": "https://gitlab.com/root/example-project/-/milestones/1"
+      }
+    ],
+    "name": "Release 1.0.0",
+    "released_at": "2026-01-03T01:56:19.539Z",
+    "tag_name": "v1.0.0",
+    "tag_path": "/root/example-project/-/tags/v1.0.0",
+    "upcoming_release": false
+  },
+  "timestamp": "2026-01-03T01:56:19.552000000Z",
+  "type": "gitlab.release"
+}
+```
+
+<a id="delete-release"></a>
+
+## Delete Release
+
+**Component key:** `gitlab.deleteRelease`
+
+The Delete Release component removes a release from a GitLab project.
+
+### Use Cases
+
+- **Cleanup**: Remove draft or test releases created in error
+- **Rollback**: Delete a release that shouldn't have been published
+- **Automated maintenance**: Remove releases as part of a cleanup workflow
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the release
+- **Release Strategy** (required): Identify the release by a specific tag, or use the project's latest release
+- **Tag Name** (required if strategy is "Specific tag"): The tag of the release to delete
+- **Also delete Git tag** (optional): GitLab does not delete the underlying tag when a release is deleted, so enable this to remove it too
+
+### Output
+
+Returns the deleted release object, plus a "tag_deleted" field that is true only if the Git tag was also requested and successfully removed.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "_links": {
+      "closed_issues_url": "https://gitlab.com/root/example-project/-/issues?release_tag=v1.0.0\u0026scope=all\u0026state=closed",
+      "closed_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=closed",
+      "edit_url": "https://gitlab.com/root/example-project/-/releases/v1.0.0/edit",
+      "merged_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=merged",
+      "opened_issues_url": "https://gitlab.com/root/example-project/-/issues?release_tag=v1.0.0\u0026scope=all\u0026state=opened",
+      "opened_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=opened",
+      "self": "https://gitlab.com/root/example-project/-/releases/v1.0.0"
+    },
+    "assets": {
+      "count": 2,
+      "links": [],
+      "sources": [
+        {
+          "format": "zip",
+          "url": "https://gitlab.com/root/example-project/-/archive/v1.0.0/example-project-v1.0.0.zip"
+        },
+        {
+          "format": "tar.gz",
+          "url": "https://gitlab.com/root/example-project/-/archive/v1.0.0/example-project-v1.0.0.tar.gz"
+        }
+      ]
+    },
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/0?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "https://gitlab.com/root"
+    },
+    "commit": {
+      "author_email": "admin@example.com",
+      "author_name": "Administrator",
+      "authored_date": "2026-01-03T01:55:18.000Z",
+      "committed_date": "2026-01-03T01:55:18.000Z",
+      "committer_email": "admin@example.com",
+      "committer_name": "Administrator",
+      "created_at": "2026-01-03T01:55:18.000Z",
+      "id": "588440f66559714280628a4f9799f0c4eb880a7",
+      "message": "Merge branch 'feature' into 'main'\n",
+      "parent_ids": [
+        "281d3a76f31c812dbf48abce82ccf6860adedd81"
+      ],
+      "short_id": "588440f6",
+      "title": "Merge branch 'feature' into 'main'"
+    },
+    "commit_path": "/root/example-project/-/commit/588440f66559714280628a4f9799f0c4eb880a7",
+    "created_at": "2026-01-03T01:56:19.539Z",
+    "description": "## What's Changed\n\n- Added new feature\n- Fixed a bug",
+    "evidence_sha": "760d6cdfb0879c95bc55d7b072f1252c8cdcf5cf",
+    "evidences": [
+      {
+        "collected_at": "2026-01-03T01:56:19.552Z",
+        "filepath": "https://gitlab.com/root/example-project/-/releases/v1.0.0/evidences/1.json",
+        "sha": "760d6cdfb0879c95bc55d7b072f1252c8cdcf5cf"
+      }
+    ],
+    "milestones": [
+      {
+        "created_at": "2025-12-01T09:30:00.000Z",
+        "description": "",
+        "due_date": "2026-01-01",
+        "id": 51,
+        "iid": 1,
+        "issue_stats": {
+          "closed": 5,
+          "total": 5
+        },
+        "project_id": 24,
+        "start_date": "2025-12-01",
+        "state": "closed",
+        "title": "v1.0",
+        "updated_at": "2026-01-02T10:00:00.000Z",
+        "web_url": "https://gitlab.com/root/example-project/-/milestones/1"
+      }
+    ],
+    "name": "Release 1.0.0",
+    "released_at": "2026-01-03T01:56:19.539Z",
+    "tag_deleted": true,
+    "tag_name": "v1.0.0",
+    "tag_path": "/root/example-project/-/tags/v1.0.0",
+    "upcoming_release": false
+  },
+  "timestamp": "2026-01-03T01:56:19.552000000Z",
+  "type": "gitlab.release"
+}
+```
+
+<a id="get-commit-status"></a>
+
+## Get Commit Status
+
+**Component key:** `gitlab.getCommitStatus`
+
+The Get Commit Status component reads a commit's overall CI status.
+
+In GitLab a commit's statuses are jobs grouped under pipelines, and GitLab rolls them up for you: every commit carries a single overall **status** and a **last_pipeline**. This component returns that native result - one meaningful state plus a link to the pipeline - rather than a list of every job.
+
+### Use Cases
+
+- **Status gates**: Check whether a commit is green before continuing
+- **Follow-up to Publish Commit Status**: Read back a commit's overall state
+- **Notifications**: Report a commit's CI outcome with a link to the pipeline
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the commit
+- **Ref** (required): Commit SHA, branch name, or tag name to inspect (supports expressions)
+
+### Permissions
+
+The connected token needs the `read_api` (or `api`) scope and at least the **Reporter** role on the project.
+
+### Output
+
+Emits the commit object, including its overall **status** and **last_pipeline** (id, ref, sha, status, web_url).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author_email": "admin@example.com",
+    "author_name": "Administrator",
+    "authored_date": "2026-02-13T17:55:00.000Z",
+    "committed_date": "2026-02-13T17:55:00.000Z",
+    "committer_email": "admin@example.com",
+    "committer_name": "Administrator",
+    "created_at": "2026-02-13T17:55:00.000Z",
+    "id": "18f3e63d05582537db6d183d9d557be09e1f90c8",
+    "last_pipeline": {
+      "created_at": "2026-02-13T18:00:00.000Z",
+      "id": 1024,
+      "iid": 21,
+      "project_id": 84237809,
+      "ref": "main",
+      "sha": "18f3e63d05582537db6d183d9d557be09e1f90c8",
+      "source": "push",
+      "status": "failed",
+      "updated_at": "2026-02-13T18:04:12.000Z",
+      "web_url": "https://gitlab.com/my-group/my-project/-/pipelines/1024"
+    },
+    "message": "feat: add health endpoint\n",
+    "parent_ids": [
+      "a91957a858320c0e17f3a0eca7cfacbff50ea29a"
+    ],
+    "short_id": "18f3e63d",
+    "stats": {
+      "additions": 24,
+      "deletions": 2,
+      "total": 26
+    },
+    "status": "failed",
+    "title": "feat: add health endpoint",
+    "web_url": "https://gitlab.com/my-group/my-project/-/commit/18f3e63d05582537db6d183d9d557be09e1f90c8"
+  },
+  "timestamp": "2026-02-13T18:04:12.000Z",
+  "type": "gitlab.commit"
+}
+```
+
 <a id="get-issue"></a>
 
 ## Get Issue
@@ -1739,6 +2671,200 @@ Returns pipeline data including status, ref, SHA, and pipeline URL.
 }
 ```
 
+<a id="get-pipeline-minutes-usage"></a>
+
+## Get Pipeline Minutes Usage
+
+**Component key:** `gitlab.getPipelineMinutesUsage`
+
+The Get Pipeline Minutes Usage component retrieves CI/CD compute minutes usage for the current calendar month, for the namespace configured on the connected GitLab integration (its group, or the personal namespace if no group is set).
+
+### Prerequisites
+
+This action calls GitLab's GraphQL API, which requires the connected user to have access to the namespace's usage quota data (at least the Owner role for groups).
+
+### Behavior
+
+- Returns usage for the current calendar month
+- Includes a per-project breakdown of minutes and shared runner duration
+- When Projects are selected, only usage for those projects is included in the totals
+- If the integration's Group is a subgroup, usage is reported for its root group, since GitLab only tracks compute minutes at the root namespace
+
+### Configuration
+
+- **Projects** (optional, multiselect): Limit the per-project breakdown and totals to specific projects. Leave empty to include all projects with usage.
+
+### Output
+
+Returns:
+- `month`: The usage month name, e.g. "July"
+- `monthIso8601`: The usage month as an ISO date, e.g. "2026-07-01"
+- `minutes`: Total compute minutes used
+- `sharedRunnersDuration`: Total shared runner duration, in seconds
+- `projects`: Per-project breakdown (minutes, shared runner duration, and project details)
+
+### Use Cases
+
+- **Billing monitoring**: Track CI/CD minutes usage against the namespace's quota
+- **Cost control**: Alert when usage approaches a budget threshold
+- **Usage reporting**: Generate periodic usage reports
+
+### References
+
+- [GitLab compute minutes](https://docs.gitlab.com/ci/pipelines/compute_minutes/)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "minutes": 245,
+    "month": "July",
+    "monthIso8601": "2026-07-01",
+    "projects": [
+      {
+        "minutes": 180,
+        "project": {
+          "fullPath": "felixgateru/hello-world",
+          "id": "gid://gitlab/Project/80508544",
+          "name": "hello-world"
+        },
+        "sharedRunnersDuration": 10800
+      },
+      {
+        "minutes": 65,
+        "project": {
+          "fullPath": "felixgateru/another-project",
+          "id": "gid://gitlab/Project/80508999",
+          "name": "another-project"
+        },
+        "sharedRunnersDuration": 3900
+      }
+    ],
+    "sharedRunnersDuration": 14700
+  },
+  "timestamp": "2026-07-01T00:00:00.000000000Z",
+  "type": "gitlab.pipelineMinutesUsage"
+}
+```
+
+<a id="get-release"></a>
+
+## Get Release
+
+**Component key:** `gitlab.getRelease`
+
+The Get Release component retrieves release information from a GitLab project.
+
+### Use Cases
+
+- **Release monitoring**: Fetch release details for use in downstream steps
+- **Deployment pipelines**: Read release assets and metadata for deployment
+- **Version tracking**: Check the project's latest published release
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the release
+- **Release Strategy** (required): Identify the release by a specific tag, or use the project's latest release
+- **Tag Name** (required if strategy is "Specific tag"): The tag of the release to retrieve
+
+### Output
+
+Returns the release object.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "_links": {
+      "closed_issues_url": "https://gitlab.com/root/example-project/-/issues?release_tag=v1.0.0\u0026scope=all\u0026state=closed",
+      "closed_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=closed",
+      "edit_url": "https://gitlab.com/root/example-project/-/releases/v1.0.0/edit",
+      "merged_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=merged",
+      "opened_issues_url": "https://gitlab.com/root/example-project/-/issues?release_tag=v1.0.0\u0026scope=all\u0026state=opened",
+      "opened_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=opened",
+      "self": "https://gitlab.com/root/example-project/-/releases/v1.0.0"
+    },
+    "assets": {
+      "count": 2,
+      "links": [],
+      "sources": [
+        {
+          "format": "zip",
+          "url": "https://gitlab.com/root/example-project/-/archive/v1.0.0/example-project-v1.0.0.zip"
+        },
+        {
+          "format": "tar.gz",
+          "url": "https://gitlab.com/root/example-project/-/archive/v1.0.0/example-project-v1.0.0.tar.gz"
+        }
+      ]
+    },
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/0?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "https://gitlab.com/root"
+    },
+    "commit": {
+      "author_email": "admin@example.com",
+      "author_name": "Administrator",
+      "authored_date": "2026-01-03T01:55:18.000Z",
+      "committed_date": "2026-01-03T01:55:18.000Z",
+      "committer_email": "admin@example.com",
+      "committer_name": "Administrator",
+      "created_at": "2026-01-03T01:55:18.000Z",
+      "id": "588440f66559714280628a4f9799f0c4eb880a7",
+      "message": "Merge branch 'feature' into 'main'\n",
+      "parent_ids": [
+        "281d3a76f31c812dbf48abce82ccf6860adedd81"
+      ],
+      "short_id": "588440f6",
+      "title": "Merge branch 'feature' into 'main'"
+    },
+    "commit_path": "/root/example-project/-/commit/588440f66559714280628a4f9799f0c4eb880a7",
+    "created_at": "2026-01-03T01:56:19.539Z",
+    "description": "## What's Changed\n\n- Added new feature\n- Fixed a bug",
+    "evidence_sha": "760d6cdfb0879c95bc55d7b072f1252c8cdcf5cf",
+    "evidences": [
+      {
+        "collected_at": "2026-01-03T01:56:19.552Z",
+        "filepath": "https://gitlab.com/root/example-project/-/releases/v1.0.0/evidences/1.json",
+        "sha": "760d6cdfb0879c95bc55d7b072f1252c8cdcf5cf"
+      }
+    ],
+    "milestones": [
+      {
+        "created_at": "2025-12-01T09:30:00.000Z",
+        "description": "",
+        "due_date": "2026-01-01",
+        "id": 51,
+        "iid": 1,
+        "issue_stats": {
+          "closed": 5,
+          "total": 5
+        },
+        "project_id": 24,
+        "start_date": "2025-12-01",
+        "state": "closed",
+        "title": "v1.0",
+        "updated_at": "2026-01-02T10:00:00.000Z",
+        "web_url": "https://gitlab.com/root/example-project/-/milestones/1"
+      }
+    ],
+    "name": "Release 1.0.0",
+    "released_at": "2026-01-03T01:56:19.539Z",
+    "tag_name": "v1.0.0",
+    "tag_path": "/root/example-project/-/tags/v1.0.0",
+    "upcoming_release": false
+  },
+  "timestamp": "2026-01-03T01:56:19.552000000Z",
+  "type": "gitlab.release"
+}
+```
+
 <a id="get-test-report-summary"></a>
 
 ## Get Test Report Summary
@@ -1797,6 +2923,234 @@ The Get Test Report Summary component fetches the test report summary for a GitL
   },
   "timestamp": "2026-02-13T19:26:01.000Z",
   "type": "gitlab.testReportSummary"
+}
+```
+
+<a id="mark-merge-request-ready-for-review"></a>
+
+## Mark Merge Request Ready for Review
+
+**Component key:** `gitlab.markMergeRequestReadyForReview`
+
+The Mark Merge Request Ready for Review component takes a draft merge request out of the draft state, the same as clicking "Mark as ready" on GitLab.
+
+### Use Cases
+
+- **Promote drafts automatically**: Mark a draft merge request ready once CI checks pass
+- **Release trains**: Open drafts early and promote them for review when the branch is ready
+- **Bot workflows**: Let an automation open work as a draft and hand it to reviewers when complete
+
+### Configuration
+
+- **Project**: Select the GitLab project containing the merge request
+- **Merge Request IID**: The internal ID (IID) of the merge request to mark ready for review. Expressions are supported.
+
+### Behavior
+
+This component is idempotent: if the merge request is already out of the draft state, it succeeds without calling GitLab again and emits the merge request as it is.
+
+### Permissions
+
+GitLab does not expose a dedicated REST field for clearing draft status, so the component applies the same `/ready` quick action the GitLab UI uses. This is submitted as a note on the merge request, so the connected user needs permission to comment on it.
+
+### Output
+
+Returns the merge request object after it has been marked ready for review.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/abc123",
+      "id": 22,
+      "name": "Jamie Rivera",
+      "state": "active",
+      "username": "jrivera",
+      "web_url": "https://gitlab.example.com/jrivera"
+    },
+    "closed_at": null,
+    "closed_by": null,
+    "created_at": "2026-02-13T08:46:00.000Z",
+    "description": "Adds the new login page with SSO support",
+    "detailed_merge_status": "mergeable",
+    "draft": false,
+    "id": 1,
+    "iid": 42,
+    "labels": [],
+    "merge_commit_sha": null,
+    "merge_error": null,
+    "merge_user": null,
+    "merged_at": null,
+    "milestone": null,
+    "project_id": 3,
+    "reviewers": [],
+    "sha": "8888888888888888888888888888888888888888",
+    "should_remove_source_branch": false,
+    "source_branch": "feature/login-page",
+    "squash": false,
+    "squash_commit_sha": null,
+    "state": "opened",
+    "target_branch": "main",
+    "title": "feat: add login page",
+    "updated_at": "2026-02-13T09:02:11.000Z",
+    "web_url": "https://gitlab.example.com/my-group/my-project/-/merge_requests/42"
+  },
+  "timestamp": "2026-02-13T09:02:11.000Z",
+  "type": "gitlab.mergeRequest"
+}
+```
+
+<a id="publish-commit-status"></a>
+
+## Publish Commit Status
+
+**Component key:** `gitlab.publishCommitStatus`
+
+The Publish Commit Status component sets a build/CI status on a specific commit, the way GitLab CI and external CI systems report per-commit check results.
+
+### Use Cases
+
+- **External CI reporting**: Report the outcome of a build, test, or scan run outside GitLab back onto the commit
+- **Gate signalling**: Mark a commit pending while a workflow runs, then success or failed when it finishes
+- **Custom checks**: Surface a workflow's own pass/fail state on the commit and merge request
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the commit
+- **Commit SHA** (required): The commit to attach the status to (supports expressions)
+- **State** (required): One of pending, running, success, failed, canceled, skipped
+- **Name** (optional): Label distinguishing this status from others on the same commit (GitLab defaults to `default`)
+- **Target URL** (optional): URL the status links to, e.g. the build or job page
+- **Description** (optional): Short description shown alongside the status
+- **Ref** (optional): Branch or tag the status is reported for
+- **Coverage** (optional): Total code coverage percentage
+- **Pipeline ID** (optional): Attach the status to a specific pipeline when several ran on the commit
+
+### Permissions
+
+The connected token needs the `api` scope and at least the **Developer** role on the project.
+
+### Output
+
+Returns the created commit status object.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "allow_failure": false,
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "https://gitlab.com/root"
+    },
+    "coverage": 92.5,
+    "created_at": "2026-02-13T18:00:00.000Z",
+    "description": "Build passed",
+    "finished_at": "2026-02-13T18:04:12.000Z",
+    "id": 93,
+    "name": "ci/superplane",
+    "pipeline_id": 1024,
+    "ref": "main",
+    "sha": "18f3e63d05582537db6d183d9d557be09e1f90c8",
+    "started_at": "2026-02-13T18:00:05.000Z",
+    "status": "success",
+    "target_url": "https://gitlab.com/my-group/my-project/-/pipelines/1024"
+  },
+  "timestamp": "2026-02-13T18:04:12.000Z",
+  "type": "gitlab.commitStatus"
+}
+```
+
+<a id="remove-merge-request-reviewers"></a>
+
+## Remove Merge Request Reviewers
+
+**Component key:** `gitlab.removeMergeRequestReviewers`
+
+The Remove Merge Request Reviewers component removes reviewers from an existing GitLab merge request. Reviewers that are not listed are kept.
+
+### Use Cases
+
+- **Automated cleanup**: Remove a reviewer once their review is no longer needed
+- **Reassignment**: Remove a reviewer before adding a different one as part of a workflow
+- **Rotation**: Drop an out-of-office reviewer from an open merge request
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the merge request
+- **Merge Request IID** (required): The internal ID (IID) of the merge request (supports expressions)
+- **Reviewers** (required): Users to remove from the merge request's reviewers. Reviewers not listed are kept.
+
+### Permissions
+
+The connected user needs at least the **Developer** role on the project to change reviewers.
+
+### Output
+
+Returns the updated merge request object, including its remaining reviewer list and URL.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/abc123",
+      "id": 22,
+      "name": "Jamie Rivera",
+      "state": "active",
+      "username": "jrivera",
+      "web_url": "https://gitlab.example.com/jrivera"
+    },
+    "closed_at": null,
+    "closed_by": null,
+    "created_at": "2026-02-13T08:46:00.000Z",
+    "description": "Adds the new login page with SSO support",
+    "detailed_merge_status": "mergeable",
+    "draft": false,
+    "id": 1,
+    "iid": 42,
+    "labels": [
+      "feature"
+    ],
+    "merge_commit_sha": null,
+    "merge_error": null,
+    "merge_user": null,
+    "merged_at": null,
+    "milestone": null,
+    "project_id": 3,
+    "reviewers": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/def456",
+        "id": 30,
+        "name": "Alex Morgan",
+        "state": "active",
+        "username": "amorgan",
+        "web_url": "https://gitlab.example.com/amorgan"
+      }
+    ],
+    "sha": "8888888888888888888888888888888888888888",
+    "should_remove_source_branch": true,
+    "source_branch": "feature/login-page",
+    "squash": false,
+    "squash_commit_sha": null,
+    "state": "opened",
+    "target_branch": "main",
+    "title": "feat: add login page",
+    "updated_at": "2026-02-13T09:45:00.000Z",
+    "web_url": "https://gitlab.example.com/my-group/my-project/-/merge_requests/42"
+  },
+  "timestamp": "2026-02-13T09:45:00.000Z",
+  "type": "gitlab.mergeRequest"
 }
 ```
 
@@ -1883,11 +3237,23 @@ The Update Issue component modifies an existing GitLab issue: its title, descrip
 - **Title** (toggle): New title for the issue
 - **Description** (toggle): New description for the issue
 - **State** (toggle): Close or reopen the issue
-- **Labels** (toggle): Labels to set on the issue, replacing any existing labels
+- **Labels to Add** (toggle): Labels to add to the issue, keeping any existing labels
 - **Assignees** (toggle): Users to assign the issue to, replacing any existing assignees
 - **Milestone** (toggle): Milestone to associate with the issue
 
-Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Enabling a field with an empty value clears it - e.g. toggling on Labels or Assignees with nothing selected removes all of them, and toggling on Milestone with nothing selected unassigns the milestone. Title is the exception: GitLab does not allow blank titles, so it must have a value when enabled.
+Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Title is the exception: GitLab does not allow blank titles, so it must have a value when enabled.
+
+#### List and reference fields: append vs. replace
+
+These fields behave differently, because GitLab's API exposes them differently:
+
+| Field | Behaviour | Enabled with nothing selected |
+| --- | --- | --- |
+| **Labels to Add** | **Appends** — sent as `add_labels`, so labels already on the issue are kept | No change |
+| **Assignees** | **Replaces** — sent as `assignee_ids`, which overwrites the whole list | Clears all assignees |
+| **Milestone** | **Replaces** — a single `milestone_id` | Unassigns the milestone |
+
+Because labels only ever append, this component cannot remove a label. Use GitLab's own label controls when you need to take one off.
 
 ### Output
 
@@ -1943,6 +3309,307 @@ Returns the updated issue object.
   },
   "timestamp": "2023-01-01T10:05:00.000Z",
   "type": "gitlab.updateIssue"
+}
+```
+
+<a id="update-issue-comment"></a>
+
+## Update Issue Comment
+
+**Component key:** `gitlab.updateIssueComment`
+
+The Update Issue Comment component edits an existing comment (note) on a GitLab issue.
+
+### Use Cases
+
+- **Status updates**: Update a summary comment on an issue instead of posting new comments on every run
+- **Living reports**: Keep a single comment with the latest deployment status, test results, or remediation steps
+- **Avoid spam**: Update one comment instead of flooding an issue with repeated bot comments
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the issue
+- **Issue IID** (required): The internal ID (IID) of the issue the comment belongs to (supports expressions)
+- **Comment ID** (required): The numeric ID of the comment (note) to update (supports expressions)
+- **Body** (toggle): The new comment text (supports Markdown and expressions). It is the only editable field on a GitLab note, so it must be enabled for the update to change anything, and cannot be empty when enabled.
+
+### Permissions
+
+The connected user must be the comment's author, or have at least the **Maintainer** role on the project, to edit it.
+
+### Output
+
+Returns the updated note object, including its ID, body, author, and timestamps.
+
+### Notes
+
+- The comment ID is returned in the output of `gitlab.createIssueComment` as `id`
+- You can store the comment ID in canvas memory on the first run, then reuse it for subsequent updates
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "body": "Updated: deployment finished successfully at 10:15 UTC",
+    "confidential": false,
+    "created_at": "2023-01-01T10:00:00.000Z",
+    "id": 302,
+    "internal": false,
+    "noteable_id": 1,
+    "noteable_iid": 1,
+    "noteable_type": "Issue",
+    "project_id": 1,
+    "resolvable": false,
+    "system": false,
+    "updated_at": "2023-01-01T10:15:00.000Z"
+  },
+  "timestamp": "2023-01-01T10:15:00.000Z",
+  "type": "gitlab.updateIssueComment"
+}
+```
+
+<a id="update-merge-request"></a>
+
+## Update Merge Request
+
+**Component key:** `gitlab.updateMergeRequest`
+
+The Update Merge Request component modifies an existing GitLab merge request: its title, description, target branch, state, labels, or assignees.
+
+### Use Cases
+
+- **Retitle/redescribe automation**: Update a merge request's title or description as a workflow progresses
+- **Open/close automation**: Close a merge request when it is superseded, or reopen one automatically
+- **Retargeting**: Change the target branch a merge request merges into
+- **Label and assignee management**: Add labels to a merge request or set its assignees from a workflow
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the merge request
+- **Merge Request IID** (required): The internal ID (IID) of the merge request to update (supports expressions)
+- **Title** (toggle): New title for the merge request
+- **Description** (toggle): New description for the merge request
+- **Target Branch** (toggle): Retarget the merge request onto a different branch
+- **State** (toggle): Close or reopen the merge request
+- **Labels to Add** (toggle): Labels to add, keeping any existing labels
+- **Assignees** (toggle): Users to assign, replacing any existing assignees
+
+Each field besides Project and Merge Request IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Title and Target Branch are the exception: GitLab rejects a blank title, and an empty target branch cannot resolve to a real branch, so both must have a value when enabled.
+
+#### List fields: append vs. replace
+
+The two list fields behave differently, because GitLab's API exposes them differently:
+
+| Field | Behaviour | Enabled with nothing selected |
+| --- | --- | --- |
+| **Labels to Add** | **Appends** — sent as `add_labels`, so labels already on the merge request are kept | No change |
+| **Assignees** | **Replaces** — sent as `assignee_ids`, which overwrites the whole list | Clears all assignees |
+
+Because labels only ever append, this component cannot remove a label. Use GitLab's own label controls, or a dedicated label action, when you need to take one off.
+
+### Permissions
+
+The connected user needs at least the **Developer** role on the project (or be the merge request author) to update a merge request.
+
+### Output
+
+Returns the updated merge request object.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignees": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/def456",
+        "id": 30,
+        "name": "Alex Morgan",
+        "state": "active",
+        "username": "amorgan",
+        "web_url": "https://gitlab.example.com/amorgan"
+      }
+    ],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/abc123",
+      "id": 22,
+      "name": "Jamie Rivera",
+      "state": "active",
+      "username": "jrivera",
+      "web_url": "https://gitlab.example.com/jrivera"
+    },
+    "closed_at": null,
+    "closed_by": null,
+    "created_at": "2026-02-13T08:46:00.000Z",
+    "description": "Adds the new login page with SSO support and MFA",
+    "detailed_merge_status": "mergeable",
+    "draft": false,
+    "id": 155,
+    "iid": 42,
+    "labels": [
+      "feature",
+      "needs-review"
+    ],
+    "merge_commit_sha": null,
+    "merge_error": null,
+    "merge_user": null,
+    "merged_at": null,
+    "milestone": null,
+    "project_id": 3,
+    "reviewers": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/def456",
+        "id": 30,
+        "name": "Alex Morgan",
+        "state": "active",
+        "username": "amorgan",
+        "web_url": "https://gitlab.example.com/amorgan"
+      }
+    ],
+    "sha": "8888888888888888888888888888888888888888",
+    "should_remove_source_branch": true,
+    "source_branch": "feature/login-page",
+    "squash": false,
+    "squash_commit_sha": null,
+    "state": "opened",
+    "target_branch": "develop",
+    "title": "feat: add login page (updated)",
+    "updated_at": "2026-02-14T09:12:33.000Z",
+    "web_url": "https://gitlab.example.com/my-group/my-project/-/merge_requests/42"
+  },
+  "timestamp": "2026-02-14T09:12:33.000Z",
+  "type": "gitlab.mergeRequest"
+}
+```
+
+<a id="update-release"></a>
+
+## Update Release
+
+**Component key:** `gitlab.updateRelease`
+
+The Update Release component modifies an existing GitLab release: its name, description, milestones, or release date.
+
+### Use Cases
+
+- **Release notes updates**: Fill in release notes after the release has been cut
+- **Milestone linking**: Associate a release with milestones once they're finalized
+- **Rescheduling**: Move an upcoming release's date
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the release
+- **Release Strategy** (required): Identify the release by a specific tag, or use the project's latest release
+- **Tag Name** (required if strategy is "Specific tag"): The tag of the release to update
+- **Release Name** (toggle): New release title
+- **Description** (toggle): New release notes, in Markdown
+- **Milestones** (toggle): Milestones to associate with the release, replacing any existing ones
+- **Released At** (toggle): New release date
+
+Each field besides Project, Release Strategy and Tag Name is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Enabling Milestones with nothing selected clears them. Released At is the exception: GitLab requires a valid date, so it must have a value when enabled.
+
+### Output
+
+Returns the updated release object.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "_links": {
+      "closed_issues_url": "https://gitlab.com/root/example-project/-/issues?release_tag=v1.0.0\u0026scope=all\u0026state=closed",
+      "closed_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=closed",
+      "edit_url": "https://gitlab.com/root/example-project/-/releases/v1.0.0/edit",
+      "merged_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=merged",
+      "opened_issues_url": "https://gitlab.com/root/example-project/-/issues?release_tag=v1.0.0\u0026scope=all\u0026state=opened",
+      "opened_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0\u0026scope=all\u0026state=opened",
+      "self": "https://gitlab.com/root/example-project/-/releases/v1.0.0"
+    },
+    "assets": {
+      "count": 2,
+      "links": [],
+      "sources": [
+        {
+          "format": "zip",
+          "url": "https://gitlab.com/root/example-project/-/archive/v1.0.0/example-project-v1.0.0.zip"
+        },
+        {
+          "format": "tar.gz",
+          "url": "https://gitlab.com/root/example-project/-/archive/v1.0.0/example-project-v1.0.0.tar.gz"
+        }
+      ]
+    },
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/0?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "https://gitlab.com/root"
+    },
+    "commit": {
+      "author_email": "admin@example.com",
+      "author_name": "Administrator",
+      "authored_date": "2026-01-03T01:55:18.000Z",
+      "committed_date": "2026-01-03T01:55:18.000Z",
+      "committer_email": "admin@example.com",
+      "committer_name": "Administrator",
+      "created_at": "2026-01-03T01:55:18.000Z",
+      "id": "588440f66559714280628a4f9799f0c4eb880a7",
+      "message": "Merge branch 'feature' into 'main'\n",
+      "parent_ids": [
+        "281d3a76f31c812dbf48abce82ccf6860adedd81"
+      ],
+      "short_id": "588440f6",
+      "title": "Merge branch 'feature' into 'main'"
+    },
+    "commit_path": "/root/example-project/-/commit/588440f66559714280628a4f9799f0c4eb880a7",
+    "created_at": "2026-01-03T01:56:19.539Z",
+    "description": "## What's Changed\n\n- Added new feature\n- Fixed a bug\n- Updated release notes",
+    "evidences": [
+      {
+        "collected_at": "2026-01-03T01:56:19.552Z",
+        "filepath": "https://gitlab.com/root/example-project/-/releases/v1.0.0/evidences/1.json",
+        "sha": "760d6cdfb0879c95bc55d7b072f1252c8cdcf5cf"
+      }
+    ],
+    "milestones": [
+      {
+        "created_at": "2025-12-01T09:30:00.000Z",
+        "description": "",
+        "due_date": "2026-01-01",
+        "id": 51,
+        "iid": 1,
+        "issue_stats": {
+          "closed": 5,
+          "total": 5
+        },
+        "project_id": 24,
+        "start_date": "2025-12-01",
+        "state": "closed",
+        "title": "v1.0",
+        "updated_at": "2026-01-02T10:00:00.000Z",
+        "web_url": "https://gitlab.com/root/example-project/-/milestones/1"
+      }
+    ],
+    "name": "Release 1.0.0",
+    "released_at": "2026-01-03T01:56:19.539Z",
+    "tag_name": "v1.0.0",
+    "tag_path": "/root/example-project/-/tags/v1.0.0",
+    "upcoming_release": false
+  },
+  "timestamp": "2026-01-03T02:10:00.000000000Z",
+  "type": "gitlab.release"
 }
 ```
 

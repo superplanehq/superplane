@@ -1,20 +1,54 @@
-import type { CanvasesCanvasVersion } from "@/api-client";
+import type { CanvasesCanvasVersion, CanvasesCanvasVersionMetadata } from "@/api-client";
 
-export function sortVersionsDesc(versions: CanvasesCanvasVersion[]): CanvasesCanvasVersion[] {
+export type CanvasVersionListItem = CanvasesCanvasVersionMetadata;
+
+export function canvasVersionId(version?: CanvasesCanvasVersion | CanvasVersionListItem | null): string | undefined {
+  if (!version) {
+    return undefined;
+  }
+
+  if ("metadata" in version) {
+    return version.metadata?.id;
+  }
+
+  return (version as CanvasVersionListItem).id;
+}
+
+export function canvasVersionShell(metadata?: CanvasVersionListItem | null): CanvasesCanvasVersion | null {
+  if (!metadata?.id) {
+    return null;
+  }
+
+  return { metadata };
+}
+
+export function toCanvasVersionShell(
+  version?: CanvasesCanvasVersion | CanvasVersionListItem,
+): CanvasesCanvasVersion | undefined {
+  if (!version) {
+    return undefined;
+  }
+
+  if ("metadata" in version && version.metadata) {
+    return version;
+  }
+
+  return canvasVersionShell(version as CanvasVersionListItem) ?? undefined;
+}
+
+export function sortVersionsDesc(versions: CanvasVersionListItem[]): CanvasVersionListItem[] {
   return [...versions].sort(
-    (a, b) =>
-      versionSortValue(b.metadata?.updatedAt || b.metadata?.createdAt) -
-      versionSortValue(a.metadata?.updatedAt || a.metadata?.createdAt),
+    (a, b) => versionSortValue(b.updatedAt || b.createdAt) - versionSortValue(a.updatedAt || a.createdAt),
   );
 }
 
 /** @deprecated All versions are main-branch commits; use sortVersionsDesc. */
-export function sortPublishedVersionsDesc(versions: CanvasesCanvasVersion[]): CanvasesCanvasVersion[] {
+export function sortPublishedVersionsDesc(versions: CanvasVersionListItem[]): CanvasVersionListItem[] {
   return sortVersionsDesc(versions);
 }
 
-export function formatVersionTimestamp(version?: CanvasesCanvasVersion | null): string | undefined {
-  const raw = version?.metadata?.updatedAt || version?.metadata?.createdAt;
+export function formatVersionTimestamp(version?: CanvasVersionListItem | null): string | undefined {
+  const raw = version?.updatedAt || version?.createdAt;
   if (!raw) {
     return undefined;
   }
@@ -27,8 +61,8 @@ export function formatVersionTimestamp(version?: CanvasesCanvasVersion | null): 
   return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
-function formatLegacyVersionLabel(version?: CanvasesCanvasVersion | null): string | undefined {
-  const raw = version?.metadata?.createdAt;
+function formatLegacyVersionLabel(version?: CanvasVersionListItem | null): string | undefined {
+  const raw = version?.createdAt;
   if (!raw) {
     return undefined;
   }
@@ -42,8 +76,8 @@ function formatLegacyVersionLabel(version?: CanvasesCanvasVersion | null): strin
   return `Update from ${formatted}`;
 }
 
-export function formatVersionLabel(version?: CanvasesCanvasVersion | null): string {
-  const message = version?.metadata?.commitMessage?.trim();
+export function formatVersionLabel(version?: CanvasVersionListItem | null): string {
+  const message = version?.commitMessage?.trim();
   if (message) {
     return message;
   }
@@ -51,8 +85,8 @@ export function formatVersionLabel(version?: CanvasesCanvasVersion | null): stri
   return formatLegacyVersionLabel(version) ?? "Untitled update";
 }
 
-export function formatVersionLabelWithTimestamp(version?: CanvasesCanvasVersion | null): string {
-  const message = version?.metadata?.commitMessage?.trim();
+export function formatVersionLabelWithTimestamp(version?: CanvasVersionListItem | null): string {
+  const message = version?.commitMessage?.trim();
   if (message) {
     const timestamp = formatVersionTimestamp(version);
     if (!timestamp) {

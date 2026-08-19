@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
@@ -353,6 +355,8 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	}
 
 	var finalized bool
+	var nextFactoryLineRuns []factoryLinePendingRun
+	var factoryOrderUpdates []factoryWorkOrderUpdate
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var skipReason string
 		var err error
@@ -361,6 +365,14 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 			outcome = executorOutcomeSkipped
 			reason = skipReason
 		}
+		if err != nil {
+			return err
+		}
+		if !finalized {
+			return nil
+		}
+
+		nextFactoryLineRuns, factoryOrderUpdates, err = w.executeNextFactoryLineStep(tx, runID)
 		return err
 	})
 
@@ -390,6 +402,26 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	for _, execution := range executionUpdates {
 		if err := messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).PublishFinished(); err != nil {
 			return err
+		}
+	}
+
+	for _, nextFactoryLineRun := range nextFactoryLineRuns {
+		if err := messages.NewCanvasRunMessage(nextFactoryLineRun.workflowID.String(), nextFactoryLineRun.runID.String()).PublishPending(); err != nil {
+			w.logger.WithError(err).Warnf("Failed to publish pending run message for run %s", nextFactoryLineRun.runID)
+			return err
+		}
+	}
+
+	// The finished run's own work order is refreshed by the run-state
+	// fan-out above; admitted orders are other work orders whose queued →
+	// started transition the UI would otherwise miss until their run starts.
+	for _, update := range factoryOrderUpdates {
+		if err := messages.PublishFactoryWorkOrderUpdated(
+			update.factoryID.String(),
+			update.orderID.String(),
+			factoryevents.EventTypeLineStepExecutionCreated,
+		); err != nil {
+			w.logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", update.orderID)
 		}
 	}
 
@@ -456,4 +488,127 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 	}
 
 	return true, "", nil
+}
+
+type factoryLinePendingRun struct {
+	workflowID uuid.UUID
+	runID      uuid.UUID
+}
+
+// factoryWorkOrderUpdate identifies a work order whose factory websocket
+// clients must refresh after the finalize transaction commits.
+type factoryWorkOrderUpdate struct {
+	factoryID uuid.UUID
+	orderID   uuid.UUID
+}
+
+// factoryAdmissionOutcomes converts admitted step results into the pending
+// run and work-order update fan-outs the caller publishes after commit.
+func factoryAdmissionOutcomes(admitted []*models.FactoryLineStepResult) ([]factoryLinePendingRun, []factoryWorkOrderUpdate) {
+	var pendingRuns []factoryLinePendingRun
+	var orderUpdates []factoryWorkOrderUpdate
+	for _, admission := range admitted {
+		if admission.Run != nil {
+			pendingRuns = append(pendingRuns, factoryLinePendingRun{
+				workflowID: admission.Run.WorkflowID,
+				runID:      admission.Run.ID,
+			})
+		}
+		if admission.Execution != nil {
+			orderUpdates = append(orderUpdates, factoryWorkOrderUpdate{
+				factoryID: admission.Execution.FactoryID,
+				orderID:   admission.Execution.WorkOrderID,
+			})
+		}
+	}
+	return pendingRuns, orderUpdates
+}
+
+func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) ([]factoryLinePendingRun, []factoryWorkOrderUpdate, error) {
+	//
+	// Finish current factory work order execution.
+	//
+	execution, err := models.FindWorkOrderExecutionByRunID(tx, runID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil, nil, nil
+		}
+		return nil, nil, err
+	}
+
+	run, err := models.LockCanvasRunInTransaction(tx, runID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if execution.Status == models.FactoryWorkOrderExecutionStatusFinished {
+		return nil, nil, nil
+	}
+
+	if err := execution.MarkFinished(tx, run.Result); err != nil {
+		return nil, nil, err
+	}
+
+	//
+	// The finished run freed a slot at its step: admit queued work orders
+	// while slots are free. Failed and cancelled runs free their slot the
+	// same way passed runs do.
+	//
+	admitted, err := models.AdmitQueuedForStep(tx, execution.LineID, execution.StepIndex)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pendingRuns, orderUpdates := factoryAdmissionOutcomes(admitted)
+
+	//
+	// Advance (or finish) the line dispatch this step run belongs to. The
+	// dispatch's steps snapshot — not the live line — is authoritative for
+	// what comes next, so a mid-traversal line edit can't change it.
+	//
+	dispatch, err := models.FindWorkOrderLineDispatch(tx, execution.LineDispatchID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if run.Result != models.CanvasRunResultPassed {
+		return pendingRuns, orderUpdates, dispatch.Finish(tx, run.Result)
+	}
+
+	factory, err := models.FindFactory(tx, execution.OrganizationID, execution.FactoryID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	workOrder, err := factory.FindWorkOrder(tx, execution.WorkOrderID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// The order closed while this step was running. The traversal is
+	// abandoned, not just paused: finish it as cancelled so the order
+	// doesn't keep a zombie active dispatch (which would block any
+	// re-dispatch after a reopen).
+	if !workOrder.IsOpen() {
+		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultCancelled)
+	}
+
+	nextIndex := execution.StepIndex + 1
+	if nextIndex >= len(dispatch.Steps) {
+		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultPassed)
+	}
+
+	result, err := dispatch.EnqueueOrStartStep(tx, workOrder, nextIndex)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if result.Run != nil {
+		pendingRuns = append(pendingRuns, factoryLinePendingRun{
+			workflowID: result.Run.WorkflowID,
+			runID:      result.Run.ID,
+		})
+	}
+
+	return pendingRuns, orderUpdates, nil
 }

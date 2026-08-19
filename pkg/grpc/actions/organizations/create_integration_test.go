@@ -11,7 +11,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/features"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/test/support"
@@ -68,7 +69,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify integration exists with the correct name
 		//
-		integration, err := models.FindIntegrationByName(r.Organization.ID, name)
+		integration, err := models.FindIntegrationByName(database.Conn(), r.Organization.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, integrationID, integration.ID.String())
 		assert.Equal(t, name, integration.InstallationName)
@@ -91,7 +92,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify we cannot find it by the original name anymore
 		//
-		_, err = models.FindIntegrationByName(r.Organization.ID, name)
+		_, err = models.FindIntegrationByName(database.Conn(), r.Organization.ID, name)
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 		//
@@ -106,7 +107,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify we can find the new installation by name
 		//
-		newIntegration, err := models.FindIntegrationByName(r.Organization.ID, name)
+		newIntegration, err := models.FindIntegrationByName(database.Conn(), r.Organization.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, name, newIntegration.InstallationName)
 		assert.Equal(t, response2.Integration.Metadata.Id, newIntegration.ID.String())
@@ -143,11 +144,11 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify both integrations exist and can be found by name in their respective organizations
 		//
-		integration1, err := models.FindIntegrationByName(r.Organization.ID, name)
+		integration1, err := models.FindIntegrationByName(database.Conn(), r.Organization.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, response1.Integration.Metadata.Id, integration1.ID.String())
 
-		integration2, err := models.FindIntegrationByName(org2.ID, name)
+		integration2, err := models.FindIntegrationByName(database.Conn(), org2.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, response2.Integration.Metadata.Id, integration2.ID.String())
 	})
@@ -193,7 +194,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify integration was created
 		//
-		integration, err := models.FindIntegrationByName(r.Organization.ID, name)
+		integration, err := models.FindIntegrationByName(database.Conn(), r.Organization.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, name, integration.InstallationName)
 
@@ -236,7 +237,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify integration was created
 		//
-		integration, err := models.FindIntegrationByName(r.Organization.ID, name)
+		integration, err := models.FindIntegrationByName(database.Conn(), r.Organization.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, name, integration.InstallationName)
 		assert.Equal(t, "dummy", integration.AppName)
@@ -292,5 +293,29 @@ func Test__CreateIntegration(t *testing.T) {
 		assert.Equal(t, "organization integration limit exceeded", status.Convert(err).Message())
 		require.Len(t, service.checkOrganizationCalls, 1)
 		assert.Equal(t, int32(integrationCount+1), service.checkOrganizationCalls[0].state.Integrations)
+	})
+
+	t.Run("github uses legacy create when new setup flow feature is off", func(t *testing.T) {
+		name := support.RandomName("integration")
+		appConfig, err := structpb.NewStruct(map[string]any{"organization": "test-org"})
+		require.NoError(t, err)
+
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "github", name, appConfig)
+		require.NoError(t, err)
+		require.NotNil(t, response.Integration)
+		assert.Nil(t, response.Integration.Status.SetupState)
+	})
+
+	t.Run("github uses setup provider when new setup flow feature is on", func(t *testing.T) {
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureNewIntegrationSetupFlow))
+
+		name := support.RandomName("integration")
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, nil)
+		require.NoError(t, err)
+		require.NotNil(t, response.Integration)
+		require.NotNil(t, response.Integration.Status.SetupState)
+		require.NotNil(t, response.Integration.Status.SetupState.CurrentStep)
 	})
 }

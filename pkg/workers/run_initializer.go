@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -166,6 +167,8 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 	}
 
 	stateUpdated := false
+	var pendingFactoryRuns []factoryLinePendingRun
+	var factoryOrderUpdates []factoryWorkOrderUpdate
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		locked, err := models.LockCanvasRunInTransaction(tx, runID)
 		if err != nil {
@@ -197,9 +200,11 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		//
 		if err != nil {
 			logger.WithError(err).Errorf("Error dispatching pending run callback")
-			if err := w.failRun(tx, locked, eventCollector, executionCollector, err.Error()); err != nil {
-				return err
+			admitted, failErr := w.failRun(tx, locked, eventCollector, executionCollector, err.Error())
+			if failErr != nil {
+				return failErr
 			}
+			pendingFactoryRuns, factoryOrderUpdates = factoryAdmissionOutcomes(admitted)
 			stateUpdated = true
 			return nil
 		}
@@ -209,6 +214,13 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		//
 		if err := locked.Start(tx); err != nil {
 			return fmt.Errorf("start run: %w", err)
+		}
+
+		//
+		// If this run is part of a factory work order execution, we mark the execution as running.
+		//
+		if err := w.markFactoryWorkOrderExecutionRunning(tx, runID); err != nil {
+			return fmt.Errorf("mark factory work order execution running: %w", err)
 		}
 
 		stateUpdated = true
@@ -237,6 +249,26 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		}
 	}
 
+	// A failed factory step run frees its slot: kick off the runs of the
+	// queued dispatches admitted in its place and refresh their work
+	// orders. The pending-run sweep is the safety net when a publish here
+	// is lost.
+	for _, pendingRun := range pendingFactoryRuns {
+		if err := messages.NewCanvasRunMessage(pendingRun.workflowID.String(), pendingRun.runID.String()).PublishPending(); err != nil {
+			logger.WithError(err).Warnf("Failed to publish pending run message for run %s", pendingRun.runID)
+		}
+	}
+
+	for _, update := range factoryOrderUpdates {
+		if err := messages.PublishFactoryWorkOrderUpdated(
+			update.factoryID.String(),
+			update.orderID.String(),
+			factoryevents.EventTypeLineStepExecutionCreated,
+		); err != nil {
+			logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", update.orderID)
+		}
+	}
+
 	return nil
 }
 
@@ -245,10 +277,10 @@ func (w *RunInitializer) failRun(
 	run *models.CanvasRun,
 	eventCollector func([]models.CanvasEvent),
 	executionCollector func([]models.CanvasNodeExecution),
-	message string,
-) error {
-	if err := run.AddError(tx, message, config.MaxPayloadSize()); err != nil {
-		return fmt.Errorf("record run error: %w", err)
+	resultMessage string,
+) ([]*models.FactoryLineStepResult, error) {
+	if err := run.AddError(tx, resultMessage, config.MaxPayloadSize()); err != nil {
+		return nil, fmt.Errorf("record run error: %w", err)
 	}
 
 	now := time.Now()
@@ -266,11 +298,68 @@ func (w *RunInitializer) failRun(
 		Error
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return NewRunCallbackDispatcher(tx, w.registry, run).
+	admitted, err := w.finishFactoryWorkOrderExecutionForRun(tx, run.ID, models.CanvasRunResultFailed)
+	if err != nil {
+		return nil, err
+	}
+
+	err = NewRunCallbackDispatcher(tx, w.registry, run).
 		WithEventCollector(eventCollector).
 		WithExecutionCollector(executionCollector).
 		DispatchFinished()
+	if err != nil {
+		return nil, err
+	}
+
+	return admitted, nil
+}
+
+func (w *RunInitializer) markFactoryWorkOrderExecutionRunning(tx *gorm.DB, runID uuid.UUID) error {
+	execution, err := models.FindWorkOrderExecutionByRunID(tx, runID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	return execution.MarkRunning(tx)
+}
+
+// finishFactoryWorkOrderExecutionForRun marks the step execution finished
+// and — since it's only ever called with a terminal (non-passed) result,
+// from failRun — also finishes the parent line dispatch, matching the
+// finishing run_finalizer.executeNextFactoryLineStep does for the normal
+// advancement path. Without this, a run that fails before it ever starts
+// would leave its traversal stuck `active` forever.
+//
+// The failed run never reaches the run finalizer (it is already finished),
+// so its freed step slot must be refilled here: queued dispatches at the
+// step are admitted and returned for the post-commit fan-out.
+func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runID uuid.UUID, result string) ([]*models.FactoryLineStepResult, error) {
+	execution, err := models.FindWorkOrderExecutionByRunID(tx, runID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if err := execution.MarkFinished(tx, result); err != nil {
+		return nil, err
+	}
+
+	dispatch, err := models.FindWorkOrderLineDispatch(tx, execution.LineDispatchID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := dispatch.Finish(tx, result); err != nil {
+		return nil, err
+	}
+
+	return models.AdmitQueuedForStep(tx, execution.LineID, execution.StepIndex)
 }

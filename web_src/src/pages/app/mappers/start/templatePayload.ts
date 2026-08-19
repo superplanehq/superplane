@@ -1,4 +1,4 @@
-export type StartTemplateParameterType = "string" | "number" | "boolean" | "select";
+export type StartTemplateParameterType = "string" | "text" | "number" | "boolean" | "select";
 
 export interface StartTemplateParameterOption {
   label: string;
@@ -88,7 +88,8 @@ export function parameterDefaultValue(param: StartTemplateParameter): unknown | 
       return value === null || value === undefined ? undefined : value;
     }
     case "select":
-    case "string": {
+    case "string":
+    case "text": {
       const value = param.defaultString;
       if (value === null || value === undefined) return undefined;
       if (typeof value === "string" && value === "") return undefined;
@@ -131,6 +132,7 @@ export function coerceParameterValue(param: StartTemplateParameter, raw: unknown
       return raw === true || raw === "true" || raw === "1";
     case "select":
     case "string":
+    case "text":
       return raw == null ? "" : String(raw);
   }
 }
@@ -144,7 +146,9 @@ export function initialParameterValue(param: StartTemplateParameter): string | n
     const firstOption = selectOptionValues(param)[0];
     return firstOption ?? "";
   }
-  return param.type === "boolean" ? false : param.type === "number" ? 0 : "";
+  if (param.type === "boolean") return false;
+  if (param.type === "number") return 0;
+  return "";
 }
 
 export function validateSubmittedParameterValue(param: StartTemplateParameter, coerced: unknown): string | null {

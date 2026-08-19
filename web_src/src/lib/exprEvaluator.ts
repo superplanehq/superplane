@@ -926,6 +926,15 @@ function evaluate(node: ASTNode, context: Record<string, unknown>): unknown {
           return null;
         };
       }
+      if (node.name === "run") {
+        return () => (context.__run as unknown) ?? null;
+      }
+      if (node.name === "app") {
+        return () => (context.__app as unknown) ?? null;
+      }
+      if (node.name === "order") {
+        return () => (context.__order as unknown) ?? null;
+      }
       if (node.name in BUILTIN_FUNCTIONS) {
         return BUILTIN_FUNCTIONS[node.name];
       }

@@ -42,6 +42,37 @@ export interface GitLabNodeMetadata {
   };
 }
 
+export interface CommitStatus {
+  id: number;
+  sha: string;
+  ref?: string;
+  status: string;
+  name?: string;
+  target_url?: string;
+  description?: string;
+  created_at?: string;
+  coverage?: number | null;
+  pipeline_id?: number;
+  author?: User;
+}
+
+export interface CommitPipeline {
+  id?: number;
+  ref?: string;
+  sha?: string;
+  status?: string;
+  web_url?: string;
+}
+
+export interface Commit {
+  id?: string;
+  short_id?: string;
+  title?: string;
+  status?: string;
+  web_url?: string;
+  last_pipeline?: CommitPipeline;
+}
+
 export interface Note {
   id: number;
   body: string;
@@ -74,6 +105,8 @@ export interface MergeRequest {
   draft?: boolean;
   labels?: string[];
   author?: User;
+  assignees?: User[];
+  reviewers?: User[];
   web_url?: string;
 }
 
@@ -118,4 +151,110 @@ export interface Deployment {
   updated_at?: string;
   user?: User;
   environment?: DeploymentEnvironment;
+}
+
+export interface ReleaseCommit {
+  id: string;
+  short_id: string;
+  title: string;
+  created_at: string;
+  parent_ids?: string[];
+  message: string;
+  author_name: string;
+  author_email: string;
+  authored_date: string;
+  committer_name: string;
+  committer_email: string;
+  committed_date: string;
+}
+
+export interface ReleaseMilestoneIssueStats {
+  total: number;
+  closed: number;
+}
+
+export interface ReleaseMilestone {
+  id: number;
+  iid: number;
+  project_id: number;
+  title: string;
+  description: string;
+  state: string;
+  created_at: string;
+  updated_at: string;
+  due_date?: string;
+  start_date?: string;
+  web_url: string;
+  issue_stats?: ReleaseMilestoneIssueStats;
+}
+
+export interface ReleaseAssetSource {
+  format: string;
+  url: string;
+}
+
+export interface ReleaseAssetLink {
+  id: number;
+  name: string;
+  url: string;
+  link_type: string;
+}
+
+export interface ReleaseAssets {
+  count: number;
+  sources?: ReleaseAssetSource[];
+  links?: ReleaseAssetLink[];
+}
+
+export interface ReleaseEvidence {
+  sha: string;
+  filepath: string;
+  collected_at: string;
+}
+
+export interface ReleaseLinks {
+  closed_issues_url?: string;
+  closed_merge_requests_url?: string;
+  edit_url?: string;
+  merged_merge_requests_url?: string;
+  opened_issues_url?: string;
+  opened_merge_requests_url?: string;
+  self?: string;
+}
+
+export interface Release {
+  tag_name: string;
+  name: string;
+  description: string;
+  created_at: string;
+  released_at: string;
+  author?: User;
+  commit?: ReleaseCommit;
+  milestones?: ReleaseMilestone[];
+  commit_path?: string;
+  tag_path?: string;
+  assets?: ReleaseAssets;
+  evidences?: ReleaseEvidence[];
+  evidence_sha?: string;
+  _links?: ReleaseLinks;
+}
+
+export interface PipelineMinutesUsageProjectRef {
+  id: string;
+  name: string;
+  fullPath: string;
+}
+
+export interface PipelineMinutesUsageProject {
+  minutes: number;
+  sharedRunnersDuration: number;
+  project?: PipelineMinutesUsageProjectRef;
+}
+
+export interface PipelineMinutesUsage {
+  month: string;
+  monthIso8601: string;
+  minutes: number;
+  sharedRunnersDuration: number;
+  projects: PipelineMinutesUsageProject[];
 }

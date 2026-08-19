@@ -39,11 +39,11 @@ func ResolveLiveVersionID(ctx core.CommandContext, appID, versionID string) (str
 	}
 
 	versions := response.GetVersions()
-	if len(versions) == 0 || versions[0].Metadata == nil {
+	if len(versions) == 0 || strings.TrimSpace(versions[0].GetId()) == "" {
 		return "", fmt.Errorf("app %q has no committed versions", appID)
 	}
 
-	liveVersionID := strings.TrimSpace(versions[0].Metadata.GetId())
+	liveVersionID := strings.TrimSpace(versions[0].GetId())
 	if liveVersionID == "" {
 		return "", fmt.Errorf("live version id was not returned by the API")
 	}

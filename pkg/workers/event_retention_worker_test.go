@@ -47,7 +47,12 @@ func (s *fakeEventRetentionUsageService) CheckAccountLimits(context.Context, str
 	return &pb.CheckAccountLimitsResponse{Allowed: true}, nil
 }
 
-func (s *fakeEventRetentionUsageService) CheckOrganizationLimits(context.Context, string, *pb.OrganizationState, *pb.CanvasState) (*pb.CheckOrganizationLimitsResponse, error) {
+func (s *fakeEventRetentionUsageService) CheckOrganizationLimits(
+	context.Context,
+	string,
+	*pb.OrganizationState,
+	*pb.CanvasState,
+) (*pb.CheckOrganizationLimitsResponse, error) {
 	return &pb.CheckOrganizationLimitsResponse{Allowed: true}, nil
 }
 

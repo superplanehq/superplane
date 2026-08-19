@@ -1,6 +1,27 @@
 import type { SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import type { CanvasesCanvasEvent, CanvasesCanvasNodeExecution } from "@/api-client";
+import type { CanvasesCanvas, CanvasesCanvasEvent, CanvasesCanvasNodeExecution } from "@/api-client";
 import type { ActionsAction, TriggersTrigger } from "@/api-client";
+
+export type AutocompleteAppExample = {
+  id: string;
+  name: string;
+  description?: string;
+};
+
+export function buildAutocompleteAppExample(
+  canvas: CanvasesCanvas | null | undefined,
+): AutocompleteAppExample | undefined {
+  const id = canvas?.metadata?.id;
+  if (!id) {
+    return undefined;
+  }
+
+  return {
+    id,
+    name: canvas?.metadata?.name ?? "",
+    description: canvas?.metadata?.description ?? "",
+  };
+}
 
 export type AutocompleteExampleContext = {
   canvasNodes: ComponentsNode[];
@@ -10,7 +31,101 @@ export type AutocompleteExampleContext = {
   visibleNodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
   allComponentsByName: Map<string | undefined, ActionsAction>;
   allTriggersByName: Map<string | undefined, TriggersTrigger>;
+  app?: AutocompleteAppExample;
 };
+
+// Representative run id used purely to preview the shape of run() in the editor;
+// the real id is only known at runtime.
+const EXAMPLE_RUN_ID = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+
+function currentAppPath(): { origin: string; appPath: string } | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const { origin, pathname } = window.location;
+  const appPath = pathname.match(/^\/[^/]+\/apps\/[^/]+/)?.[0] ?? pathname;
+  return { origin, appPath };
+}
+
+// buildAppExample mirrors the server's app() payload so the autocomplete can
+// surface app().id / app().name / app().description / app().url.
+function buildAppExample(app?: AutocompleteAppExample): Record<string, unknown> {
+  const location = currentAppPath();
+  const id = app?.id || location?.appPath.split("/").pop() || "";
+  const url = location ? `${location.origin}${location.appPath}` : "";
+
+  return {
+    id,
+    name: app?.name ?? "Example App",
+    description: app?.description ?? "",
+    url,
+  };
+}
+
+// buildRunExample mirrors the server's run() payload so the autocomplete can
+// surface run().id / run().url / run().started_at and show a representative preview.
+// The example url is derived from the current app page location
+// (`/{org}/apps/{appId}`), which matches the real run link format.
+function buildRunExample(): Record<string, unknown> {
+  const location = currentAppPath();
+  const url = location ? `${location.origin}${location.appPath}?run=${EXAMPLE_RUN_ID}` : "";
+
+  return {
+    id: EXAMPLE_RUN_ID,
+    url,
+    started_at: new Date().toISOString(),
+  };
+}
+
+// Representative work-order shape for order() autocomplete / preview.
+// Real values come from the factory execution at runtime; this is only a stub.
+const EXAMPLE_ORDER_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+const EXAMPLE_FACTORY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
+const EXAMPLE_ORDER_NUMBER = 12;
+
+// Work order permalinks are workspace-scoped
+// (`/{org}/workspaces/{workspaceKey}/work-order/{number}`), so the example is
+// only meaningful on a workspace app page, where order() also resolves.
+function exampleOrderUrl(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const { origin, pathname } = window.location;
+  const workspacePath = pathname.match(/^\/[^/]+\/workspaces\/[^/]+/)?.[0];
+  return workspacePath ? `${origin}${workspacePath}/work-order/${EXAMPLE_ORDER_NUMBER}` : "";
+}
+
+function buildOrderExample(): Record<string, unknown> {
+  return {
+    id: EXAMPLE_ORDER_ID,
+    title: "Ship feature",
+    description: "Implement and open PR",
+    factory_id: EXAMPLE_FACTORY_ID,
+    state: "open",
+    result: "",
+    url: exampleOrderUrl(),
+    source: {
+      issue: { number: 42, title: "Fix login" },
+    },
+    artifacts: [
+      {
+        id: "c3d4e5f6-a7b8-9012-cdef-123456789012",
+        type: "pr",
+        data: { url: "https://github.com/org/repo/pull/7", number: 7 },
+      },
+    ],
+    comments: [
+      {
+        id: "d4e5f6a7-b8c9-0123-defa-234567890123",
+        body: "Looks good, merging.",
+        author: { kind: "user", user_id: "e5f6a7b8-c9d0-1234-efab-345678901234" },
+        created_at: "2024-01-01T00:00:00Z",
+      },
+    ],
+  };
+}
 
 function collectChainNodeIds(
   nodeId: string,
@@ -182,6 +297,9 @@ type BuildNamedExampleObjInput = {
   previousByDepth: Record<string, unknown>;
   canvasNodes: ComponentsNode[];
   incomingNodeIdsByTargetId: Map<string, string[]>;
+  appExample: Record<string, unknown>;
+  runExample: Record<string, unknown>;
+  orderExample: Record<string, unknown>;
 };
 
 function buildNamedExampleObj({
@@ -193,6 +311,9 @@ function buildNamedExampleObj({
   previousByDepth,
   canvasNodes,
   incomingNodeIdsByTargetId,
+  appExample,
+  runExample,
+  orderExample,
 }: BuildNamedExampleObjInput): Record<string, unknown> | null {
   const rootNodeId = canvasNodes.find((node) => {
     if (!node.id || !chainNodeIds.has(node.id)) return false;
@@ -239,6 +360,10 @@ function buildNamedExampleObj({
   if (exampleObj.__previousByDepth) {
     namedExampleObj.__previousByDepth = exampleObj.__previousByDepth;
   }
+
+  namedExampleObj.__app = appExample;
+  namedExampleObj.__run = runExample;
+  namedExampleObj.__order = orderExample;
 
   const currentNodeName = currentNode?.name?.trim();
   const currentNodeId = currentNode?.id;
@@ -289,6 +414,9 @@ export function buildAutocompleteExampleObj(
     nodeNamesById,
     nodeMetadata,
     previousByDepth,
+    appExample: buildAppExample(context.app),
+    runExample: buildRunExample(),
+    orderExample: buildOrderExample(),
     canvasNodes: context.canvasNodes,
     incomingNodeIdsByTargetId: context.incomingNodeIdsByTargetId,
   });

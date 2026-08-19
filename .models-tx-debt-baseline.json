@@ -1,6 +1,6 @@
 {
-  "maxAllowedInTransactionDefinitions": 160,
-  "maxAllowedDatabaseConnCalls": 188,
+  "maxAllowedInTransactionDefinitions": 159,
+  "maxAllowedDatabaseConnCalls": 178,
   "inTransactionDefinitionKeys": [
     "pkg/models/account.go:MarkPasswordChangedInTransaction",
     "pkg/models/account.go:CreateAccountInTransaction",
@@ -63,7 +63,6 @@
     "pkg/models/canvas_node_execution.go:ListParentExecutionsForRootEventsInTransaction",
     "pkg/models/canvas_node_execution.go:ListAllExecutionsForRootEventInTransaction",
     "pkg/models/canvas_node_execution.go:CountActiveNodeExecutionsForRootEventInTransaction",
-    "pkg/models/canvas_node_execution.go:CountRunningExecutionsForNodeInTransaction",
     "pkg/models/canvas_node_execution.go:FindNodeExecutionInTransaction",
     "pkg/models/canvas_node_execution.go:FindNodeExecutionWithNodeIDInTransaction",
     "pkg/models/canvas_node_execution.go:FindNodeExecutionsByIDsInTransaction",
@@ -208,10 +207,7 @@
     "pkg/models/canvas.go:ListCanvases:database.Conn()#1",
     "pkg/models/canvas.go:CountCanvasesByOrganizationIDs:database.Conn()#1",
     "pkg/models/canvas.go:CountCanvasesByOrganization:database.Conn()#1",
-    "pkg/models/canvas_event.go:FindCanvasEventForCanvas:database.Conn()#1",
     "pkg/models/canvas_event.go:FindCanvasEvent:database.Conn()#1",
-    "pkg/models/canvas_event.go:ListCanvasEvents:database.Conn()#1",
-    "pkg/models/canvas_event.go:CountCanvasEvents:database.Conn()#1",
     "pkg/models/canvas_event.go:ListPendingCanvasEvents:database.Conn()#1",
     "pkg/models/canvas_event.go:Routed:database.Conn()#1",
     "pkg/models/canvas_folder.go:ListCanvasFolders:database.Conn()#1",
@@ -233,17 +229,11 @@
     "pkg/models/canvas_memory.go:DeleteCanvasMemoriesByNamespaceAndMatches:database.Conn()#1",
     "pkg/models/canvas_memory.go:UpdateCanvasMemoriesByNamespaceAndMatches:database.Conn()#1",
     "pkg/models/canvas_memory.go:UpdateCanvasMemoriesByNamespace:database.Conn()#1",
-    "pkg/models/canvas_node.go:ListCanvasNodesReady:database.Conn()#1",
     "pkg/models/canvas_node.go:ListReadyTriggers:database.Conn()#1",
-    "pkg/models/canvas_node.go:ListNodeQueueItems:database.Conn()#1",
-    "pkg/models/canvas_node.go:CountNodeQueueItems:database.Conn()#1",
     "pkg/models/canvas_node.go:FindNodeQueueItem:database.Conn()#1",
     "pkg/models/canvas_node_execution.go:ListPendingNodeExecutions:database.Conn()#1",
-    "pkg/models/canvas_node_execution.go:ListNodeExecutions:database.Conn()#1",
     "pkg/models/canvas_node_execution.go:ListParentExecutionsForRootEvents:database.Conn()#1",
     "pkg/models/canvas_node_execution.go:ListAllExecutionsForRootEvent:database.Conn()#1",
-    "pkg/models/canvas_node_execution.go:CountNodeExecutions:database.Conn()#1",
-    "pkg/models/canvas_node_execution.go:CountRunningExecutionsForNode:database.Conn()#1",
     "pkg/models/canvas_node_execution.go:FindNodeExecution:database.Conn()#1",
     "pkg/models/canvas_node_execution.go:FindNodeExecutionWithNodeID:database.Conn()#1",
     "pkg/models/canvas_node_execution.go:FindNodeExecutionsByIDs:database.Conn()#1",
@@ -272,7 +262,6 @@
     "pkg/models/integration.go:ListIntegrationNodeReferences:database.Conn()#1",
     "pkg/models/integration.go:FindUnscopedIntegration:database.Conn()#1",
     "pkg/models/integration.go:FindIntegration:database.Conn()#1",
-    "pkg/models/integration.go:FindIntegrationByName:database.Conn()#1",
     "pkg/models/integration.go:ListDeletedIntegrations:database.Conn()#1",
     "pkg/models/integration.go:SoftDelete:database.Conn()#1",
     "pkg/models/integration.go:GetRequest:database.Conn()#1",
@@ -353,5 +342,5 @@
     "pkg/models/webhook.go:ListDeletedWebhooks:database.Conn()#1",
     "pkg/models/webhook.go:ResetStuckProvisioningWebhooks:database.Conn()#1"
   ],
-  "updatedAt": "2026-07-19T12:05:26Z"
+  "updatedAt": "2026-08-17T23:48:46Z"
 }

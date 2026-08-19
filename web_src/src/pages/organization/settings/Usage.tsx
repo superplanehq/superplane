@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { Navigate } from "react-router-dom";
-import { Activity, Bot, Gauge, type LucideIcon } from "lucide-react";
+import { Navigate } from "react-router";
+import { Activity, Bot, Gauge, Timer, type LucideIcon } from "lucide-react";
 import type { OrganizationsDescribeUsageResponse, OrganizationsOrganizationLimits } from "@/api-client/types.gen";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
@@ -86,6 +86,7 @@ function UsageContent({ data, isPreviewMode }: { data: OrganizationsDescribeUsag
   const usageCards = useMemo(() => buildLimitCards(data.limits), [data.limits]);
   const eventUsage = useMemo(() => buildEventUsage(data), [data]);
   const agentTokenUsage = useMemo(() => buildAgentTokenUsage(data), [data]);
+  const runnerMinutesUsage = useMemo(() => buildRunnerMinutesUsage(data), [data]);
 
   return (
     <div className="pt-6 space-y-6">
@@ -119,6 +120,13 @@ function UsageContent({ data, isPreviewMode }: { data: OrganizationsDescribeUsag
           subtitle={agentTokenUsage.subtitle}
           progress={agentTokenUsage.progress}
           icon={Bot}
+        />
+        <UsageMetricCard
+          title="Runner Minutes"
+          value={runnerMinutesUsage.value}
+          subtitle={runnerMinutesUsage.subtitle}
+          progress={runnerMinutesUsage.progress}
+          icon={Timer}
         />
       </div>
 
@@ -225,6 +233,16 @@ function buildAgentTokenUsage(data: OrganizationsDescribeUsageResponse | null | 
   );
 }
 
+function buildRunnerMinutesUsage(data: OrganizationsDescribeUsageResponse | null | undefined) {
+  return buildBucketUsage(
+    data?.usage?.runnerMinutesBucketLevel ?? 0,
+    data?.usage?.runnerMinutesBucketCapacity,
+    data?.usage?.runnerMinutesBucketLastUpdatedAt,
+    data?.usage?.nextRunnerMinutesBucketDecreaseAt,
+    "Rolling runner minutes for the current 30-day window.",
+  );
+}
+
 function buildLimitCards(limits: OrganizationsOrganizationLimits | undefined): LimitCard[] {
   return [
     {
@@ -244,6 +262,12 @@ function buildLimitCards(limits: OrganizationsOrganizationLimits | undefined): L
       value: formatStringLimit(limits?.maxAgentTokensPerMonth),
       icon: Bot,
       description: "Rolling 30-day agent token allowance.",
+    },
+    {
+      label: "Runner minutes per month",
+      value: formatStringLimit(limits?.maxRunnerMinutesPerMonth),
+      icon: Timer,
+      description: "Rolling 30-day runner minutes allowance.",
     },
   ];
 }

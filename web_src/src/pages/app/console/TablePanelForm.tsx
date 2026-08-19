@@ -12,7 +12,7 @@ import {
   TablePanelTitleField,
 } from "./tablePanelForm/TablePanelFormSections";
 import { useTablePanelFormActions } from "./tablePanelForm/useTablePanelFormActions";
-import { useTablePanelPayloadDrafts } from "./tablePanelForm/useTablePanelPayloadDrafts";
+import { useRowActionPayloadDrafts } from "./tablePanelForm/useRowActionPayloadDrafts";
 import { staticFieldsForDataSource } from "./widget/staticFieldCatalogs";
 import { sampleRowFromFields, useMemoryCatalog, type MemoryFieldSummary } from "./widget/useMemoryCatalog";
 
@@ -33,7 +33,7 @@ export function TablePanelForm({ value, onChange }: TablePanelFormProps) {
   const fields = resolveFieldCatalog(value, memoryFields);
   const fieldOptions = fields.map((f) => f.field);
   const sampleRow = sampleRowFromFields(fields);
-  const payloadDrafts = useTablePanelPayloadDrafts(value);
+  const payloadDrafts = useRowActionPayloadDrafts(value.render.rowActions);
   const actions = useTablePanelFormActions({ value, onChange, fields, triggerNodes, payloadDrafts });
 
   return (

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -154,10 +153,6 @@ func (c *CreateSnapshot) Execute(ctx core.ExecutionContext) error {
 
 func (c *CreateSnapshot) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *CreateSnapshot) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateSnapshot) Hooks() []core.Hook {

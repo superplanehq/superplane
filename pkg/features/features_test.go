@@ -29,6 +29,7 @@ func Test__Get(t *testing.T) {
 
 func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureClaudeManagedAgents))
+	assert.True(t, Exists(FeatureFactories))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }

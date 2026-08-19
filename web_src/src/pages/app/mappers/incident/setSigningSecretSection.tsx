@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   canvasesDescribeCanvas,
@@ -19,7 +19,7 @@ import { registerLocalStagingWrite } from "@/lib/canvasStagingEcho";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { useCanvasId } from "@/hooks/useCanvasId";
 import { encodeRepositoryFileContent } from "../../files/lib/repository-files";
-import { fetchCommittedCanvasVersionWithSpec } from "../../lib/repository-spec-files";
+import { fetchCanvasVersionWithSpec } from "../../lib/repository-spec-files";
 import { materializeCanvasSpec } from "../../lib/workflow-spec-files";
 import { CANVAS_YAML_PATH } from "../../lib/workflow-spec-paths";
 
@@ -113,7 +113,7 @@ export function SetSigningSecretSection({ nodeId }: { nodeId: string }) {
 
       const freshVersion = await queryClient.fetchQuery({
         queryKey: canvasKeys.versionDetail(canvasId, versionId),
-        queryFn: async () => fetchCommittedCanvasVersionWithSpec(canvasId, versionId),
+        queryFn: async () => fetchCanvasVersionWithSpec(canvasId, versionId),
       });
 
       if (!freshVersion) {

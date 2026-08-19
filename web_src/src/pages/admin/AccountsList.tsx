@@ -9,14 +9,16 @@ import { AccountRow } from "./AccountRow";
 import AdminPagination from "./AdminPagination";
 import AdminSearchHeader from "./AdminSearchHeader";
 import ConfirmAdminDialog from "./ConfirmAdminDialog";
+import { ConfirmBlockDialog } from "./ConfirmBlockDialog";
 import { SortableHeader, type SortDirection } from "./SortableHeader";
-import { startImpersonation, toggleAdmin } from "./useAccountActions";
+import { startImpersonation, toggleAdmin, toggleBlock } from "./useAccountActions";
 
 interface AdminAccount {
   id: string;
   name: string;
   email: string;
   installation_admin: boolean;
+  blocked: boolean;
   created_at?: string;
 }
 
@@ -32,6 +34,7 @@ interface AccountsTableProps {
   sortDirection: SortDirection;
   onSort: (field: SortField) => void;
   onPromoteDemote: (account: AdminAccount) => void;
+  onBlockUnblock: (account: AdminAccount) => void;
 }
 
 function AccountsTable({
@@ -42,6 +45,7 @@ function AccountsTable({
   sortDirection,
   onSort,
   onPromoteDemote,
+  onBlockUnblock,
 }: AccountsTableProps) {
   return (
     <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden dark:bg-gray-900 dark:outline-gray-700/70">
@@ -81,6 +85,7 @@ function AccountsTable({
               isSelf={acc.id === currentAccountId}
               toggling={togglingAccountId === acc.id}
               onPromoteDemote={() => onPromoteDemote(acc)}
+              onBlockUnblock={() => onBlockUnblock(acc)}
               impersonateButton={
                 <Button variant="outline" size="sm" onClick={() => startImpersonation(acc.id)}>
                   <span className="flex items-center gap-1">
@@ -97,6 +102,48 @@ function AccountsTable({
   );
 }
 
+interface AccountsListContentProps extends AccountsTableProps {
+  loading: boolean;
+  search: string;
+  offset: number;
+  total: number;
+  onPageChange: (offset: number) => void;
+}
+
+function AccountsListContent({
+  loading,
+  accounts,
+  search,
+  offset,
+  total,
+  onPageChange,
+  ...tableProps
+}: AccountsListContentProps) {
+  if (loading && accounts.length === 0) {
+    return (
+      <div className="flex flex-col items-center space-y-4 py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500 dark:border-gray-400"></div>
+        <Text className="text-gray-500 dark:text-gray-400">Loading accounts...</Text>
+      </div>
+    );
+  }
+
+  if (accounts.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Text className="text-gray-500 dark:text-gray-400">{search ? "No accounts match." : "No accounts found."}</Text>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <AccountsTable accounts={accounts} {...tableProps} />
+      <AdminPagination offset={offset} total={total} pageSize={PAGE_SIZE} onPageChange={onPageChange} />
+    </>
+  );
+}
+
 const AccountsList: React.FC = () => {
   const { account: currentAccount } = useAccount();
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
@@ -106,6 +153,7 @@ const AccountsList: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<AdminAccount | null>(null);
+  const [blockTarget, setBlockTarget] = useState<AdminAccount | null>(null);
   const [sortBy, setSortBy] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
@@ -144,6 +192,13 @@ const AccountsList: React.FC = () => {
     setToggling(null);
   };
 
+  const onToggleBlock = async (acc: AdminAccount) => {
+    setBlockTarget(null);
+    setToggling(acc.id);
+    await toggleBlock(acc, () => fetchAccounts(search, offset, sortBy, sortDirection));
+    setToggling(null);
+  };
+
   const handleSort = (field: SortField) => {
     if (field === sortBy) {
       setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -155,14 +210,6 @@ const AccountsList: React.FC = () => {
 
   useReportPageReady(!loading || accounts.length > 0);
 
-  if (loading && accounts.length === 0)
-    return (
-      <div className="flex flex-col items-center space-y-4 py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500 dark:border-gray-400"></div>
-        <Text className="text-gray-500 dark:text-gray-400">Loading accounts...</Text>
-      </div>
-    );
-
   return (
     <div>
       <ConfirmAdminDialog
@@ -173,6 +220,14 @@ const AccountsList: React.FC = () => {
         accountEmail={confirmTarget?.email ?? ""}
         isPromoting={confirmTarget != null && !confirmTarget.installation_admin}
       />
+      <ConfirmBlockDialog
+        open={blockTarget !== null}
+        onClose={() => setBlockTarget(null)}
+        onConfirm={() => blockTarget && onToggleBlock(blockTarget)}
+        accountName={blockTarget?.name ?? ""}
+        accountEmail={blockTarget?.email ?? ""}
+        isBlocking={blockTarget != null && !blockTarget.blocked}
+      />
       <AdminSearchHeader
         title="Accounts"
         subtitle={`${total} account${total !== 1 ? "s" : ""}`}
@@ -180,34 +235,24 @@ const AccountsList: React.FC = () => {
         onSearchChange={setSearch}
         placeholder="Search by name or email..."
       />
-      {accounts.length === 0 ? (
-        <div className="text-center py-12">
-          <Text className="text-gray-500 dark:text-gray-400">
-            {search ? "No accounts match." : "No accounts found."}
-          </Text>
-        </div>
-      ) : (
-        <>
-          <AccountsTable
-            accounts={accounts}
-            currentAccountId={currentAccount?.id}
-            togglingAccountId={toggling}
-            sortBy={sortBy}
-            sortDirection={sortDirection}
-            onSort={handleSort}
-            onPromoteDemote={setConfirmTarget}
-          />
-          <AdminPagination
-            offset={offset}
-            total={total}
-            pageSize={PAGE_SIZE}
-            onPageChange={(o: number) => {
-              setOffset(o);
-              fetchAccounts(search, o, sortBy, sortDirection);
-            }}
-          />
-        </>
-      )}
+      <AccountsListContent
+        loading={loading}
+        accounts={accounts}
+        search={search}
+        offset={offset}
+        total={total}
+        currentAccountId={currentAccount?.id}
+        togglingAccountId={toggling}
+        sortBy={sortBy}
+        sortDirection={sortDirection}
+        onSort={handleSort}
+        onPromoteDemote={setConfirmTarget}
+        onBlockUnblock={setBlockTarget}
+        onPageChange={(nextOffset) => {
+          setOffset(nextOffset);
+          fetchAccounts(search, nextOffset, sortBy, sortDirection);
+        }}
+      />
     </div>
   );
 };

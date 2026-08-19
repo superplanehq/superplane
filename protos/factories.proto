@@ -1,0 +1,906 @@
+syntax = "proto3";
+
+package Superplane.Factories;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/factories";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Factories API";
+    version: "1.0";
+    description: "API for Superplane Factories";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTPS;
+  schemes: HTTP;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Factories {
+  rpc ListFactories(ListFactoriesRequest) returns (ListFactoriesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factories";
+      description: "Returns a list of factories";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateFactory(CreateFactoryRequest) returns (CreateFactoryResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create factory";
+      description: "Creates a new factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc DescribeFactory(DescribeFactoryRequest) returns (DescribeFactoryResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe factory";
+      description: "Returns a factory by its ID";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactory(UpdateFactoryRequest) returns (UpdateFactoryResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/factories/{id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory";
+      description: "Updates factory metadata";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryOnboarding(UpdateFactoryOnboardingRequest) returns (UpdateFactoryOnboardingResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{id}/onboarding"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory onboarding";
+      description: "Saves workspace onboarding progress and optionally marks setup complete";
+      tags: "Factory";
+    };
+  }
+
+  rpc DeleteFactory(DeleteFactoryRequest) returns (DeleteFactoryResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete factory";
+      description: "Soft-deletes an existing factory";
+      tags: "Factory";
+    };
+  }
+
+  // Factory line APIs
+
+  rpc CreateFactoryLine(CreateFactoryLineRequest) returns (CreateFactoryLineResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/lines"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create factory line";
+      description: "Creates a new line for a factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryLine(UpdateFactoryLineRequest) returns (UpdateFactoryLineResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/lines/{line_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory line";
+      description: "Updates a factory line";
+      tags: "Factory";
+    };
+  }
+
+  // Factory app APIs
+
+  rpc ListFactoryApps(ListFactoryAppsRequest) returns (ListFactoryAppsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/apps"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory apps";
+      description: "Returns canvases owned by a factory";
+      tags: "Factory";
+    };
+  }
+
+  // Work orders APIs
+
+  rpc ListWorkOrders(ListWorkOrdersRequest) returns (ListWorkOrdersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/orders"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory work orders";
+      description: "Returns a list of work orders for a factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateWorkOrder(CreateWorkOrderRequest) returns (CreateWorkOrderResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create factory work order";
+      description: "Creates a new work order for a factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc DescribeWorkOrder(DescribeWorkOrderRequest) returns (DescribeWorkOrderResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/orders/{order_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe factory work order";
+      description: "Returns a work order by its ID";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListWorkOrderEvents(ListWorkOrderEventsRequest) returns (ListWorkOrderEventsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/orders/{order_id}/events"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory work order events";
+      description: "Returns a list of events for a work order";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateWorkOrderAssignees(UpdateWorkOrderAssigneesRequest) returns (UpdateWorkOrderAssigneesResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/assignees"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update a work order's assignees";
+      description: "Updates the assignees of a work order";
+      tags: "Factory";
+    };
+  }
+
+  rpc DispatchWorkOrder(DispatchWorkOrderRequest) returns (DispatchWorkOrderResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/dispatch"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Dispatch a work order";
+      description: "Dispatches a work order to a factory line";
+      tags: "Factory";
+    };
+  }
+
+  rpc CloseWorkOrder(CloseWorkOrderRequest) returns (CloseWorkOrderResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/close"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Close factory work order";
+      description: "Closes a work order";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateWorkOrderStatus(UpdateWorkOrderStatusRequest) returns (UpdateWorkOrderStatusResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/status"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update work order status";
+      description: "Transitions a work order between lifecycle states";
+      tags: "Factory";
+    };
+  }
+
+  rpc AddWorkOrderComment(AddWorkOrderCommentRequest) returns (AddWorkOrderCommentResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/comments"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Add work order comment";
+      description: "Appends a comment to the work order timeline";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListWorkOrderArtifacts(ListWorkOrderArtifactsRequest) returns (ListWorkOrderArtifactsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/orders/{order_id}/artifacts"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List work order artifacts";
+      description: "Returns artifacts attached to a work order";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateWorkOrderArtifact(CreateWorkOrderArtifactRequest) returns (CreateWorkOrderArtifactResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/artifacts"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create work order artifact";
+      description: "Attaches a typed artifact to a work order";
+      tags: "Factory";
+    };
+  }
+
+  rpc DescribeFactoryVelocity(DescribeFactoryVelocityRequest) returns (DescribeFactoryVelocityResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/velocity"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe factory velocity";
+      description: "Returns SuperPlane vs People merge counts and waste for a factory over a period";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListWorkOrderChecks(ListWorkOrderChecksRequest) returns (ListWorkOrderChecksResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/orders/{order_id}/checks"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List work order checks";
+      description: "Returns scored checks reported on a work order";
+      tags: "Factory";
+    };
+  }
+
+}
+
+// Factories
+
+message ListFactoriesRequest {}
+
+message ListFactoriesResponse {
+  repeated Factory factories = 1;
+}
+
+message CreateFactoryRequest {
+  string name = 1;
+  string description = 2;
+  // Workspace key. 2 to 5 uppercase letters, unique per organization.
+  // Used with the sequence number to render identifiers such as `SP-1`.
+  string key = 3;
+}
+
+message CreateFactoryResponse {
+  Factory factory = 1;
+}
+
+message DescribeFactoryRequest {
+  string id = 1;
+}
+
+message DescribeFactoryResponse {
+  Factory factory = 1;
+}
+
+message UpdateFactoryRequest {
+  string id = 1;
+  optional string name = 2;
+  optional string description = 3;
+  // New workspace key. 2 to 5 uppercase letters, unique per organization.
+  // Updating this changes the identifier shown for every work order.
+  optional string key = 4;
+}
+
+message UpdateFactoryResponse {
+  Factory factory = 1;
+}
+
+message UpdateFactoryOnboardingRequest {
+  string id = 1;
+  // Organization integration used for version control.
+  optional string vcs_integration_id = 2;
+  // Organization integration used for the coding agent.
+  optional string agent_integration_id = 3;
+  // App repository slug (for example `acme/api`).
+  optional string app_repository = 4;
+  // Backlog repository slug. May differ from the app repository.
+  optional string backlog_repository = 5;
+  optional FactoryOnboarding.IssuesSource issues_source = 6;
+  optional FactoryOnboarding.AgentHarness agent_harness = 7;
+  // Canvas ID created during Software Factory provisioning.
+  optional string provisioned_app_id = 8;
+  // Default factory line ID created after the app is ready.
+  optional string provisioned_line_id = 9;
+  // When true, validate readiness and set onboarding_completed_at.
+  optional bool complete = 10;
+}
+
+message UpdateFactoryOnboardingResponse {
+  Factory factory = 1;
+}
+
+message DeleteFactoryRequest {
+  string id = 1;
+}
+
+message DeleteFactoryResponse {}
+
+message FactoryOnboarding {
+  enum IssuesSource {
+    ISSUES_SOURCE_UNSPECIFIED = 0;
+    ISSUES_SOURCE_VCS = 1;
+    ISSUES_SOURCE_LINEAR = 2;
+    ISSUES_SOURCE_JIRA = 3;
+    ISSUES_SOURCE_SKIP = 4;
+  }
+
+  enum AgentHarness {
+    AGENT_HARNESS_UNSPECIFIED = 0;
+    AGENT_HARNESS_CLAUDE_CODE = 1;
+    AGENT_HARNESS_CURSOR = 2;
+    AGENT_HARNESS_CODEX = 3;
+  }
+
+  // Set when workspace setup finished. Null while onboarding is open.
+  google.protobuf.Timestamp completed_at = 1;
+  string vcs_integration_id = 2;
+  string agent_integration_id = 3;
+  string app_repository = 4;
+  string backlog_repository = 5;
+  IssuesSource issues_source = 6;
+  AgentHarness agent_harness = 7;
+  string provisioned_app_id = 8;
+  string provisioned_line_id = 9;
+}
+
+message Factory {
+  message App {
+    string id = 1;
+    string name = 2;
+    string description = 3;
+    google.protobuf.Timestamp created_at = 4;
+    google.protobuf.Timestamp updated_at = 5;
+  }
+
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  repeated FactoryLine lines = 4;
+  // Workspace key. 2 to 5 uppercase letters, unique per organization.
+  string key = 5;
+  FactoryOnboarding onboarding = 6;
+}
+
+message FactoryLine {
+  message Step {
+    string type = 1;
+    optional AppStep app = 2;
+    // Maximum in-flight runs for this step across all work orders on the
+    // line. Work orders above this limit wait in the step's queue. Unset
+    // means the server default (10). Must be at least 1 when set.
+    optional int32 max_parallelism = 3;
+  }
+
+  message AppStep {
+    string app = 1;
+    string entrypoint = 2;
+  }
+
+  string id = 1;
+  string name = 2;
+  repeated Step steps = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message CreateFactoryLineRequest {
+  string factory_id = 1;
+  string name = 2;
+  repeated FactoryLine.Step steps = 3;
+}
+
+message CreateFactoryLineResponse {
+  FactoryLine line = 1;
+}
+
+message UpdateFactoryLineRequest {
+  string factory_id = 1;
+  string line_id = 2;
+  optional string name = 3;
+  repeated FactoryLine.Step steps = 4;
+}
+
+message UpdateFactoryLineResponse {
+  FactoryLine line = 1;
+}
+
+message ListFactoryAppsRequest {
+  string factory_id = 1;
+}
+
+message ListFactoryAppsResponse {
+  repeated Factory.App apps = 1;
+}
+
+// Work orders
+
+message ListWorkOrdersRequest {
+  string factory_id = 1;
+  repeated string assignee_ids = 2;
+  repeated WorkOrder.State states = 3;
+  repeated WorkOrder.Result results = 4;
+  optional bool unassigned = 5;
+}
+
+message ListWorkOrdersResponse {
+  repeated WorkOrder orders = 1;
+}
+
+message CreateWorkOrderRequest {
+  string factory_id = 1;
+  string title = 2;
+  string description = 3;
+  repeated string assignee_ids = 4;
+}
+
+message CreateWorkOrderResponse {
+  WorkOrder order = 1;
+}
+
+message CloseWorkOrderRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  WorkOrder.Result result = 3;
+}
+
+message CloseWorkOrderResponse {
+  WorkOrder order = 1;
+}
+
+message WorkOrder {
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_DRAFT = 1;
+    STATE_OPEN = 2;
+    STATE_CLOSED = 3;
+  }
+
+  enum Result {
+    RESULT_UNSPECIFIED = 0;
+    RESULT_COMPLETED = 1;
+    RESULT_REJECTED = 2;
+    RESULT_FAILED = 3;
+  }
+
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  State state = 4;
+  Result result = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  repeated UserRef assignees = 8;
+  // Author of the work order: either a member (`user`) or the canvas
+  // automation (`automation`) that opened the order from a source run.
+  WorkOrderCreator created_by = 9;
+  // Aggregate usage summed across all step executions of all line
+  // dispatches. UI hides values that are zero.
+  int64 total_tokens = 10;
+  int64 total_cost_cents = 11;
+  // Immutable factory-scoped sequence number, allocated atomically at
+  // creation time. Combined with the parent factory's key to render the
+  // display identifier (for example `SP-42`).
+  int64 number = 12;
+  // Display identifier composed of the parent factory's key and this
+  // order's `number` (for example `SP-42`). Populated by the server.
+  string key = 13;
+  // Every traversal of this work order through a factory line, oldest
+  // first. A line dispatched twice (e.g. a failed traversal re-dispatched)
+  // produces two separate entries here, each with its own step executions.
+  repeated WorkOrderLineDispatch line_dispatches = 14;
+}
+
+message WorkOrderCreator {
+  oneof kind {
+    UserRef user = 1;
+    AutomationRef automation = 2;
+  }
+}
+
+message UserRef {
+  string id = 1;
+  string name = 2;
+}
+
+// LineRef identifies a factory line as it was at the time it was
+// referenced — used both for a line dispatch's own line and (denormalized)
+// on the canvas run/automation refs that trace back to it.
+message LineRef {
+  string id = 1;
+  string name = 2;
+}
+
+// WorkOrderLineDispatch is one traversal of a work order through a factory
+// line: a dispatch creates one, and every step run started while walking
+// the line hangs off it as a `step_executions` entry.
+message WorkOrderLineDispatch {
+  enum State {
+    STATE_UNKNOWN = 0;
+    STATE_ACTIVE = 1;
+    STATE_FINISHED = 2;
+  }
+
+  enum Result {
+    RESULT_UNKNOWN = 0;
+    RESULT_PASSED = 1;
+    RESULT_FAILED = 2;
+    RESULT_CANCELLED = 3;
+  }
+
+  string id = 1;
+  LineRef line = 2;
+  // Steps snapshotted from the line's definition at dispatch time, so a
+  // line edited mid-traversal doesn't change what an in-flight or
+  // historical dispatch shows. Serialized once here instead of once per
+  // step execution.
+  repeated WorkOrderExecutionStep steps = 3;
+  State state = 4;
+  Result result = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp finished_at = 7;
+  repeated WorkOrderExecution step_executions = 8;
+  // Set while the dispatch waits for admission into a step that is at
+  // its maxParallelism. A dispatch waits at no more than one step at a
+  // time; no run or step execution exists for a queued step yet.
+  optional WorkOrderQueueItem queue_item = 9;
+}
+
+// WorkOrderQueueItem is a line dispatch waiting for admission into a step
+// that is at its maxParallelism. The run and step execution are created
+// when the step admits the work order.
+message WorkOrderQueueItem {
+  string id = 1;
+  string step_name = 2;
+  // Zero-based index of the step inside the parent dispatch's `steps`
+  // snapshot.
+  int32 step_index = 3;
+  // 1-based position in the step's FIFO queue across all work orders of
+  // the line.
+  int32 position = 4;
+  google.protobuf.Timestamp created_at = 5;
+  // App (canvas) id of the queued step, from the parent dispatch's steps
+  // snapshot. Lets the UI place the queued work order on the correct
+  // board column even after a line edit moved the step.
+  string app_id = 6;
+}
+
+message WorkOrderExecution {
+  enum State {
+    STATE_UNKNOWN = 0;
+    STATE_PENDING = 1;
+    STATE_STARTED = 2;
+    STATE_CANCELLING = 3;
+    STATE_FINISHED = 4;
+  }
+
+  enum Result {
+    RESULT_UNKNOWN = 0;
+    RESULT_PASSED = 1;
+    RESULT_FAILED = 2;
+    RESULT_CANCELLED = 3;
+  }
+
+  message RunRef {
+    string id = 1;
+    string app_id = 2;
+    string app_name = 3;
+  }
+
+  string id = 1;
+  string step = 2;
+  State state = 3;
+  Result result = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  RunRef run = 7;
+  // Zero-based index of the step inside the parent WorkOrderLineDispatch's
+  // `steps` snapshot; matches the position there so the UI can highlight
+  // the active step.
+  int32 step_index = 8;
+  // Optional aggregate usage; UI hides zero values.
+  int64 total_tokens = 9;
+  int64 cost_cents = 10;
+  // When the execution finished (set for finished executions only).
+  google.protobuf.Timestamp finished_at = 11;
+}
+
+message WorkOrderExecutionStep {
+  string name = 1;
+  int32 step_index = 2;
+}
+
+message DescribeWorkOrderRequest {
+  string factory_id = 1;
+  string order_id = 2;
+}
+
+message DescribeWorkOrderResponse {
+  WorkOrder order = 1;
+}
+
+message UpdateWorkOrderAssigneesRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  repeated string assignee_ids = 3;
+}
+
+message UpdateWorkOrderAssigneesResponse {
+  WorkOrder order = 1;
+}
+
+message DispatchWorkOrderRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  string line_name = 3;
+}
+
+message DispatchWorkOrderResponse {
+  WorkOrder order = 1;
+}
+
+message ListWorkOrderEventsRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  uint32 limit = 3;
+  google.protobuf.Timestamp before = 4;
+}
+
+message ListWorkOrderEventsResponse {
+  repeated WorkOrderEvent events = 1;
+  uint32 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp last_timestamp = 4;
+}
+
+message WorkOrderEvent {
+  google.protobuf.Timestamp timestamp = 1;
+  string type = 2;
+  google.protobuf.Struct event = 3;
+}
+
+// Status / comments / artifacts
+
+message UpdateWorkOrderStatusRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  WorkOrder.State state = 3;
+  WorkOrder.Result result = 4;
+}
+
+message UpdateWorkOrderStatusResponse {
+  WorkOrder order = 1;
+}
+
+message AddWorkOrderCommentRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  string body = 3;
+  repeated string mentioned_user_ids = 4;
+}
+
+message AddWorkOrderCommentResponse {
+  WorkOrderComment comment = 1;
+}
+
+message WorkOrderComment {
+  string id = 1;
+  string body = 2;
+  WorkOrderCommentAuthor author = 3;
+  google.protobuf.Timestamp created_at = 4;
+  repeated string mentioned_user_ids = 5;
+}
+
+message WorkOrderCommentAuthor {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_USER = 1;
+    KIND_AUTOMATION = 2;
+  }
+
+  Kind kind = 1;
+  string user_id = 2;
+  // Populated for `automation` comments: identifies the canvas node
+  // (and app) that wrote the comment.
+  AutomationRef automation = 3;
+}
+
+message AutomationRef {
+  string node_id = 1;
+  string node_name = 2;
+  string app_id = 3;
+  string app_name = 4;
+}
+
+message ListWorkOrderArtifactsRequest {
+  string factory_id = 1;
+  string order_id = 2;
+}
+
+message ListWorkOrderArtifactsResponse {
+  repeated WorkOrderArtifact artifacts = 1;
+}
+
+message CreateWorkOrderArtifactRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  WorkOrderArtifact.Type type = 3;
+  google.protobuf.Struct data = 4;
+}
+
+message CreateWorkOrderArtifactResponse {
+  WorkOrderArtifact artifact = 1;
+}
+
+message WorkOrderArtifact {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    TYPE_PR = 1;
+    TYPE_MARKDOWN = 2;
+    TYPE_BRANCH = 3;
+    TYPE_LINK = 4;
+  }
+
+  string id = 1;
+  Type type = 2;
+  google.protobuf.Struct data = 3;
+  UserRef created_by = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message ListWorkOrderChecksRequest {
+  string factory_id = 1;
+  string order_id = 2;
+}
+
+message ListWorkOrderChecksResponse {
+  repeated WorkOrderCheck checks = 1;
+}
+
+// WorkOrderCheck is a scored assessment an automation reported on a work
+// order (risk review, coverage, confidence). Latest-only state: one entry
+// per key, updated in place on every report; history lives in
+// `order.check.reported` timeline events.
+message WorkOrderCheck {
+  enum Format {
+    FORMAT_UNSPECIFIED = 0;
+    FORMAT_FRACTION = 1;
+    FORMAT_PERCENT = 2;
+    // Pass/fail verdict: score is 1 (pass) or 0 (fail), max_score is 1.
+    FORMAT_BOOLEAN = 3;
+  }
+
+  enum Level {
+    LEVEL_UNSPECIFIED = 0;
+    LEVEL_POSITIVE = 1;
+    LEVEL_NEUTRAL = 2;
+    LEVEL_CAUTION = 3;
+    LEVEL_CRITICAL = 4;
+  }
+
+  string id = 1;
+  string key = 2;
+  string name = 3;
+  double score = 4;
+  double max_score = 5;
+  Format format = 6;
+  Level level = 7;
+  // Score the same check key held before the latest report, if any.
+  optional double previous_score = 8;
+  string summary = 9;
+  string analysis = 10;
+  // Automation that reported the check and the run that produced it.
+  AutomationRef automation = 11;
+  string run_id = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+  // Recent report scores, oldest first, ending with the current score.
+  // Capped server-side; powers the run-history strip on boolean checks.
+  repeated double recent_scores = 15;
+}
+
+// Internal AMQP message for factory work-order websocket fan-out.
+message FactoryWorkOrderUpdatedMessage {
+  string factory_id = 1;
+  string order_id = 2;
+  string reason = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+// Velocity
+
+message DescribeFactoryVelocityRequest {
+  string factory_id = 1;
+  // Period window in days. Only 7 and 30 are supported by the UI today; any
+  // other positive value is clamped server-side.
+  int32 period_days = 2;
+  // Optional GitHub integration and `owner/repo` to include the People cohort.
+  // When either is empty the response returns SuperPlane data only and sets
+  // `has_people_cohort = false` so the UI can hide the People series.
+  string integration_id = 3;
+  string repository = 4;
+}
+
+message DescribeFactoryVelocityResponse {
+  DescribeFactoryVelocityYesterday yesterday = 1;
+  DescribeFactoryVelocityTotals totals = 2;
+  repeated DescribeFactoryVelocityDay points = 3;
+  // Repository the People cohort was computed for (`owner/repo`), or empty when
+  // no repository was selected.
+  string repository = 4;
+  // True when GitHub search succeeded for the selected repository.
+  bool has_people_cohort = 5;
+  // True when a repository was selected and GitHub search failed.
+  // SuperPlane counts are still present; the People series is omitted.
+  bool people_search_failed = 6;
+}
+
+message DescribeFactoryVelocityDay {
+  // Local-day label ready to render on the chart axis.
+  string day = 1;
+  google.protobuf.Timestamp date = 2;
+  int32 superplane_merged = 3;
+  int32 people_merged = 4;
+  // Waste = SuperPlane PRs closed without merging on that day.
+  int32 waste = 5;
+}
+
+message DescribeFactoryVelocityYesterday {
+  google.protobuf.Timestamp date = 1;
+  int32 superplane_merged = 2;
+  int32 waste = 3;
+}
+
+message DescribeFactoryVelocityTotals {
+  int32 superplane_merged = 1;
+  int32 people_merged = 2;
+  int32 waste = 3;
+  // SuperPlane share of merged PRs, as a rounded percentage (0-100).
+  // Zero when there are no merges in the window.
+  int32 superplane_share_pct = 4;
+  // Waste as a percentage of SuperPlane closes (merged + waste), 0-100.
+  int32 waste_pct = 5;
+}

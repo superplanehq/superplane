@@ -186,11 +186,13 @@ function ShowTrendToggle({
 export function ColumnRow({
   col,
   fieldOptions,
+  formats = COLUMN_FORMATS,
   onChange,
   onRemove,
 }: {
   col: WidgetTableColumn;
   fieldOptions: string[];
+  formats?: WidgetColumnFormat[];
   onChange: (patch: Partial<WidgetTableColumn>) => void;
   onRemove: () => void;
 }) {
@@ -203,10 +205,13 @@ export function ColumnRow({
           onChange={(e) => {
             const next = e.target.value;
             const known = fieldOptions.includes(next);
+            const suggestedFormat = suggestColumnFormat(next);
             onChange({
               field: next,
               ...(known && !col.label ? { label: next } : {}),
-              ...(known && col.format == null ? { format: suggestColumnFormat(next) } : {}),
+              ...(known && col.format == null
+                ? { format: formats.includes(suggestedFormat) ? suggestedFormat : undefined }
+                : {}),
             });
           }}
           placeholder="field (e.g. payload.user_id) or {{ expr }}"
@@ -231,7 +236,7 @@ export function ColumnRow({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__none__">Default</SelectItem>
-            {COLUMN_FORMATS.map((fmt) => (
+            {formats.map((fmt) => (
               <SelectItem key={fmt} value={fmt}>
                 {fmt}
               </SelectItem>

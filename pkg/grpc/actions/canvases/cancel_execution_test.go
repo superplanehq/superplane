@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
@@ -46,7 +47,7 @@ func Test__CancelExecution__RequestsCancellation(t *testing.T) {
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	response, err := CancelExecution(ctx, r.AuthService, r.Encryptor, r.Organization.ID.String(), r.Registry, canvas.ID, execution.ID)
+	response, err := CancelExecution(ctx, r.AuthService, r.Encryptor, database.DB(t.Context()), canvas, execution.ID)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.True(t, cancellingConsumer.HasReceivedMessage())
@@ -82,10 +83,10 @@ func Test__CancelExecution__IsIdempotent(t *testing.T) {
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	_, err := CancelExecution(ctx, r.AuthService, r.Encryptor, r.Organization.ID.String(), r.Registry, canvas.ID, execution.ID)
+	_, err := CancelExecution(ctx, r.AuthService, r.Encryptor, database.DB(t.Context()), canvas, execution.ID)
 	require.NoError(t, err)
 
-	_, err = CancelExecution(ctx, r.AuthService, r.Encryptor, r.Organization.ID.String(), r.Registry, canvas.ID, execution.ID)
+	_, err = CancelExecution(ctx, r.AuthService, r.Encryptor, database.DB(t.Context()), canvas, execution.ID)
 	require.NoError(t, err)
 
 	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
@@ -114,6 +115,6 @@ func Test__CancelExecution__ReturnsNotFoundForNonExistentExecution(t *testing.T)
 	)
 
 	nonExistentID := uuid.New()
-	_, err := CancelExecution(context.Background(), r.AuthService, r.Encryptor, r.Organization.ID.String(), r.Registry, canvas.ID, nonExistentID)
+	_, err := CancelExecution(context.Background(), r.AuthService, r.Encryptor, database.DB(t.Context()), canvas, nonExistentID)
 	require.Error(t, err)
 }

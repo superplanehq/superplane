@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 )
 
 func afterRunnerTaskCreated(ctx core.ExecutionContext, taskID string) error {
@@ -17,7 +20,10 @@ func afterRunnerTaskCreated(ctx core.ExecutionContext, taskID string) error {
 	if err := mergeRunnerBrokerTaskID(ctx.Metadata, taskID); err != nil {
 		return fmt.Errorf("runner execution metadata: %w", err)
 	}
-	return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
+	return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{
+		"task_id":         taskID,
+		"organization_id": ctx.OrganizationID,
+	}, pollInterval)
 }
 
 func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error {
@@ -29,6 +35,7 @@ func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error 
 	if !ok {
 		return fmt.Errorf("task_id is missing from parameters")
 	}
+	organizationID, _ := ctx.Parameters["organization_id"].(string)
 
 	broker, err := NewBrokerClient(ctx.HTTP)
 	if err != nil {
@@ -38,7 +45,10 @@ func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error 
 	task, err := broker.FetchTaskStatus(taskID)
 	if err != nil {
 		ctx.Logger.WithError(err).Warn("runner: broker poll failed, will retry")
-		return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
+		return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{
+			"task_id":         taskID,
+			"organization_id": organizationID,
+		}, pollInterval)
 	}
 
 	sink := taskLogFromBrokerTask(task)
@@ -47,10 +57,13 @@ func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error 
 	}
 
 	if task.IsInTerminalState() {
-		return processBrokerTaskStatus(ctx.ExecutionState, task, finishedEventType)
+		return processBrokerTaskStatus(ctx.ExecutionState, task, finishedEventType, organizationID, ctx.Logger)
 	}
 
-	return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
+	return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{
+		"task_id":         taskID,
+		"organization_id": organizationID,
+	}, pollInterval)
 }
 
 func handleBrokerWebhook(ctx core.WebhookRequestContext, finishedEventType string) (int, *core.WebhookResponseBody, error) {
@@ -73,7 +86,8 @@ func handleBrokerWebhook(ctx core.WebhookRequestContext, finishedEventType strin
 		ctx.Logger.Warn("runner: broker webhook received non-terminal state")
 	}
 
-	executionCtx, err := ctx.FindExecutionByKV("task_id", task.TaskID)
+	taskID := task.brokerTaskID()
+	executionCtx, err := ctx.FindExecutionByKV("task_id", taskID)
 	if err != nil {
 		return http.StatusNotFound, nil, nil
 	}
@@ -83,19 +97,25 @@ func handleBrokerWebhook(ctx core.WebhookRequestContext, finishedEventType strin
 		sink = taskLogFromRawWebhook(raw)
 	}
 	if executionCtx.Metadata != nil {
-		if err := mergeRunnerTaskLog(executionCtx.Metadata, task.TaskID, sink); err != nil {
+		if err := mergeRunnerTaskLog(executionCtx.Metadata, taskID, sink); err != nil {
 			ctx.Logger.WithError(err).Warn("runner: execution metadata update failed")
 		}
 	}
 
-	if err := processBrokerTaskStatus(executionCtx.ExecutionState, task, finishedEventType); err != nil {
+	if err := processBrokerTaskStatus(executionCtx.ExecutionState, task, finishedEventType, executionCtx.OrganizationID, ctx.Logger); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("process task status: %w", err)
 	}
 
 	return http.StatusOK, nil, nil
 }
 
-func processBrokerTaskStatus(state core.ExecutionStateContext, task *Task, finishedEventType string) error {
+func processBrokerTaskStatus(
+	state core.ExecutionStateContext,
+	task *Task,
+	finishedEventType string,
+	organizationID string,
+	logger *log.Entry,
+) error {
 	if state.IsFinished() {
 		return nil
 	}
@@ -104,16 +124,58 @@ func processBrokerTaskStatus(state core.ExecutionStateContext, task *Task, finis
 		return fmt.Errorf("task is not in terminal state")
 	}
 
+	publishRunnerUsage(organizationID, task, logger)
+
 	channel := FailedOutputChannel
 	if strings.ToLower(strings.TrimSpace(task.Status)) == "succeeded" && task.effectiveExitCode() == 0 {
 		channel = PassedOutputChannel
 	}
 
 	out := map[string]any{"status": task.Status, "exit_code": task.effectiveExitCode()}
+	if errMsg := strings.TrimSpace(task.Error); errMsg != "" {
+		out["error"] = errMsg
+	}
 	if v := brokerResultAsAny(task.Result); v != nil {
 		out["result"] = v
 	}
 	return state.Emit(channel, finishedEventType, []any{out})
+}
+
+func publishRunnerUsage(organizationID string, task *Task, logger *log.Entry) {
+	organizationID = strings.TrimSpace(organizationID)
+	taskID := task.brokerTaskID()
+	if organizationID == "" || taskID == "" {
+		return
+	}
+	if task.ClaimedAt == nil || task.FinishedAt == nil {
+		return
+	}
+
+	seconds := billableSeconds(task.FinishedAt.Sub(*task.ClaimedAt))
+	if seconds == 0 {
+		return
+	}
+
+	if err := messages.NewRunnerTaskFinishedMessage(organizationID, taskID, seconds).Publish(); err != nil {
+		if logger != nil {
+			logger.WithError(err).Warn("runner: failed to publish usage")
+		}
+	}
+}
+
+// billableSeconds rounds a task duration up to the next whole second. Clock skew
+// between the runner and the broker can put finished_at before claimed_at, so
+// non-positive durations bill nothing rather than rounding up to one second.
+func billableSeconds(duration time.Duration) int64 {
+	if duration <= 0 {
+		return 0
+	}
+
+	seconds := int64(duration / time.Second)
+	if duration%time.Second != 0 {
+		seconds++
+	}
+	return seconds
 }
 
 func cancelBrokerTask(ctx core.ExecutionContext) error {

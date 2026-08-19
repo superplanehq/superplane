@@ -1,0 +1,18 @@
+{
+  "data": {
+    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+    "identifier": "ENG-142",
+    "number": 142,
+    "title": "Deploy pipeline fails on retry",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry",
+    "priority": 2,
+    "priorityLabel": "High",
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "updatedAt": "2026-03-27T16:45:02.981Z",
+    "state": { "id": "9f0c2f1a-3b4c-4d5e-8f60-a1b2c3d4e5f6", "name": "In Progress", "type": "started" },
+    "team": { "id": "9cfb482a-1d2e-4f30-8a5b-6c7d8e9f0a1b", "key": "ENG", "name": "Engineering" },
+    "labels": [{ "id": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e", "name": "bug" }]
+  },
+  "timestamp": "2026-03-27T16:45:02.981456789Z",
+  "type": "linear.issue"
+}

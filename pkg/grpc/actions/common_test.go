@@ -138,6 +138,29 @@ func TestConfigurationFieldToProto(t *testing.T) {
 		require.NotNil(t, field2.TypeOptions.List.MaxItems, "expected MaxItems to be set after roundtrip")
 		assert.Equal(t, maxItems, *field2.TypeOptions.List.MaxItems)
 	})
+
+	t.Run("roundtrip integration type options preserves field", func(t *testing.T) {
+		field := configuration.Field{
+			Name:  "integration",
+			Label: "Integration",
+			Type:  configuration.FieldTypeIntegration,
+			TypeOptions: &configuration.TypeOptions{
+				Integration: &configuration.IntegrationTypeOptions{
+					Integration: "claude",
+				},
+			},
+		}
+
+		pbField := ConfigurationFieldToProto(field)
+		require.NotNil(t, pbField.TypeOptions)
+		require.NotNil(t, pbField.TypeOptions.Integration)
+		assert.Equal(t, "claude", pbField.TypeOptions.Integration.Integration)
+
+		field2 := ProtoToConfigurationField(pbField)
+		require.NotNil(t, field2.TypeOptions)
+		require.NotNil(t, field2.TypeOptions.Integration)
+		assert.Equal(t, "claude", field2.TypeOptions.Integration.Integration)
+	})
 }
 
 func TestSerializeTriggersAddsDefaultRunTitleExpression(t *testing.T) {
@@ -169,6 +192,54 @@ func TestDefaultRunTitleExpressionsResolveAgainstExampleData(t *testing.T) {
 			require.NotContains(t, resolved, "<no value>")
 		})
 	}
+}
+
+// Linear's attachment payload carries only issueId, and the trigger adds the
+// issue object on a best-effort basis. The default title must fall back to the
+// attachment title when that enrichment was skipped or failed.
+func TestLinearOnIssueAttachmentRunTitleFallsBackWithoutIssue(t *testing.T) {
+	expression := defaultRunTitleExpression("linear.onIssueAttachment")
+	require.NotEmpty(t, expression)
+
+	cases := map[string]map[string]any{
+		"missing issue": {"id": "a1", "title": "Deploy - staging", "issueId": "2174add1"},
+		"nil issue":     {"id": "a1", "title": "Deploy - staging", "issueId": "2174add1", "issue": nil},
+	}
+
+	for name, attachment := range cases {
+		t.Run(name, func(t *testing.T) {
+			resolved, err := contexts.NewNodeConfigurationBuilder(nil, uuid.Nil).
+				WithRootPayload(map[string]any{
+					"type":      "linear.attachment",
+					"timestamp": time.Now(),
+					"data":      map[string]any{"action": "create", "data": attachment},
+				}).
+				ResolveTemplateExpressions(expression)
+
+			require.NoError(t, err)
+			require.Equal(t, "Deploy - staging", resolved)
+		})
+	}
+
+	t.Run("enriched issue is used", func(t *testing.T) {
+		resolved, err := contexts.NewNodeConfigurationBuilder(nil, uuid.Nil).
+			WithRootPayload(map[string]any{
+				"type":      "linear.attachment",
+				"timestamp": time.Now(),
+				"data": map[string]any{
+					"action": "create",
+					"data": map[string]any{
+						"id":    "a1",
+						"title": "Deploy - staging",
+						"issue": map[string]any{"identifier": "ENG-142"},
+					},
+				},
+			}).
+			ResolveTemplateExpressions(expression)
+
+		require.NoError(t, err)
+		require.Equal(t, "ENG-142 - Deploy - staging", resolved)
+	})
 }
 
 // GitLab sends push events for valid pushes that carry no commits (or omit the

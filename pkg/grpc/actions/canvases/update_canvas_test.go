@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -16,37 +16,16 @@ import (
 func Test__UpdateCanvas(t *testing.T) {
 	r := support.Setup(t)
 
-	t.Run("invalid canvas id -> error", func(t *testing.T) {
-		name := "name"
-		description := "description"
-		_, err := UpdateCanvas(context.Background(), r.Organization.ID.String(), "invalid-id", &name, &description)
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, code)
-	})
-
-	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		_, err := UpdateCanvas(
-			context.Background(),
-			r.Organization.ID.String(),
-			uuid.New().String(),
-			stringPointer("updated-name"),
-			stringPointer("updated-description"),
-		)
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, code)
-	})
-
 	t.Run("empty name -> error", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
 		_, err := UpdateCanvas(
 			context.Background(),
-			r.Organization.ID.String(),
-			canvas.ID.String(),
+			database.DB(t.Context()),
+			canvas,
 			stringPointer("   "),
 			stringPointer("description"),
+			nil,
 		)
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
@@ -60,10 +39,11 @@ func Test__UpdateCanvas(t *testing.T) {
 
 		response, err := UpdateCanvas(
 			context.Background(),
-			r.Organization.ID.String(),
-			canvas.ID.String(),
+			database.DB(t.Context()),
+			canvas,
 			&newName,
 			&newDescription,
+			nil,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -79,16 +59,43 @@ func Test__UpdateCanvas(t *testing.T) {
 		assert.Equal(t, newDescription, updatedCanvas.Description)
 	})
 
+	t.Run("dismisses agent suggestion for the canvas", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+		suggestionID := "add-ci"
+
+		response, err := UpdateCanvas(
+			context.Background(),
+			database.DB(t.Context()),
+			canvas,
+			nil,
+			nil,
+			&suggestionID,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, response.Canvas)
+		require.NotNil(t, response.Canvas.Metadata)
+
+		reloaded, err := models.FindCanvas(r.Organization.ID, canvas.ID)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"add-ci"}, []string(reloaded.DismissedAgentSuggestionIDs))
+		assert.Equal(t, []string{"add-ci"}, response.Canvas.Metadata.DismissedAgentSuggestionIds)
+
+		described, err := DescribeCanvas(context.Background(), database.DB(t.Context()), reloaded)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"add-ci"}, described.Canvas.Metadata.DismissedAgentSuggestionIds)
+	})
+
 	t.Run("duplicate name -> error", func(t *testing.T) {
 		existingCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		targetCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
 		_, err := UpdateCanvas(
 			context.Background(),
-			r.Organization.ID.String(),
-			targetCanvas.ID.String(),
+			database.DB(t.Context()),
+			targetCanvas,
 			&existingCanvas.Name,
 			&targetCanvas.Description,
+			nil,
 		)
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)

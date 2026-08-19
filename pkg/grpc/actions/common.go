@@ -121,6 +121,10 @@ func textTypeOptionsToProto(opts *configuration.TextTypeOptions) *configpb.TextT
 		pbOpts.Language = &opts.Language
 	}
 
+	if opts.AllowExpressions != nil {
+		pbOpts.AllowExpressions = opts.AllowExpressions
+	}
+
 	return pbOpts
 }
 
@@ -193,6 +197,16 @@ func appTypeOptionsToProto(opts *configuration.AppTypeOptions) *configpb.AppType
 
 	return &configpb.AppTypeOptions{
 		AllowSelf: opts.AllowSelf,
+	}
+}
+
+func integrationTypeOptionsToProto(opts *configuration.IntegrationTypeOptions) *configpb.IntegrationTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	return &configpb.IntegrationTypeOptions{
+		Integration: opts.Integration,
 	}
 }
 
@@ -323,6 +337,7 @@ func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 		Datetime:         dateTimeTypeOptionsToProto(opts.DateTime),
 		AppCanvasNode:    appCanvasNodeTypeOptionsToProto(opts.AppCanvasNode),
 		App:              appTypeOptionsToProto(opts.App),
+		Integration:      integrationTypeOptionsToProto(opts.Integration),
 	}
 }
 
@@ -444,6 +459,10 @@ func protoToTextTypeOptions(pbOpts *configpb.TextTypeOptions) *configuration.Tex
 		opts.Language = *pbOpts.Language
 	}
 
+	if pbOpts.AllowExpressions != nil {
+		opts.AllowExpressions = pbOpts.AllowExpressions
+	}
+
 	return opts
 }
 
@@ -516,6 +535,16 @@ func protoToAppTypeOptions(pbOpts *configpb.AppTypeOptions) *configuration.AppTy
 
 	return &configuration.AppTypeOptions{
 		AllowSelf: pbOpts.AllowSelf,
+	}
+}
+
+func protoToIntegrationTypeOptions(pbOpts *configpb.IntegrationTypeOptions) *configuration.IntegrationTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	return &configuration.IntegrationTypeOptions{
+		Integration: pbOpts.Integration,
 	}
 }
 
@@ -688,6 +717,7 @@ func protoToTypeOptions(pbOpts *configpb.TypeOptions) *configuration.TypeOptions
 		DateTime:         protoToDateTimeTypeOptions(pbOpts.Datetime),
 		AppCanvasNode:    protoToAppCanvasNodeTypeOptions(pbOpts.AppCanvasNode),
 		App:              protoToAppTypeOptions(pbOpts.App),
+		Integration:      protoToIntegrationTypeOptions(pbOpts.Integration),
 	}
 }
 
@@ -773,10 +803,46 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			Configuration:  node.Configuration.AsMap(),
 			Position:       ProtoToPosition(node.Position),
 			IsCollapsed:    node.IsCollapsed,
+			Concurrency:    ProtoToConcurrencySpec(node.Concurrency),
 			IntegrationID:  integrationID,
 			ErrorMessage:   errorMessage,
 			WarningMessage: warningMessage,
 		}
+	}
+
+	return result
+}
+
+func ProtoToConcurrencySpec(spec *componentpb.ConcurrencySpec) *models.ConcurrencySpec {
+	if spec == nil {
+		return nil
+	}
+
+	result := &models.ConcurrencySpec{
+		Key: spec.GetKey(),
+	}
+
+	if spec.Max != nil {
+		max := int(*spec.Max)
+		result.Max = &max
+	}
+
+	return result
+}
+
+func ConcurrencySpecToProto(spec *models.ConcurrencySpec) *componentpb.ConcurrencySpec {
+	if spec == nil {
+		return nil
+	}
+
+	result := &componentpb.ConcurrencySpec{}
+	if spec.Key != "" {
+		result.Key = &spec.Key
+	}
+
+	if spec.Max != nil {
+		max := int32(*spec.Max)
+		result.Max = &max
 	}
 
 	return result
@@ -816,6 +882,7 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 			Type:        NodeTypeToProto(node.Type),
 			Position:    PositionToProto(node.Position),
 			IsCollapsed: node.IsCollapsed,
+			Concurrency: ConcurrencySpecToProto(node.Concurrency),
 		}
 
 		if node.Ref.Component != nil {

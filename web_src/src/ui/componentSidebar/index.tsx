@@ -20,11 +20,13 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
   ComponentsIntegrationRef,
+  ComponentsConcurrencySpec,
 } from "@/api-client";
 import type { EventState, EventStateMap } from "../componentBase";
 import type { ReactNode } from "react";
 import { HistoryQueuePage, PageHeader } from "./pages";
 import { analytics } from "@/lib/analytics";
+import { FactorySidebarHeading } from "@/ui/factoryNodeChrome";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 
 /** Optional create-dialog overrides per integration (two-step API + webhook flow). Key = integration name. */
@@ -118,6 +120,8 @@ interface ComponentSidebarProps {
   hideRunsTab?: boolean; // Hide the "Runs" tab when showing only settings
   hideDocsTab?: boolean; // Hide the "Info" tab (e.g. for annotation nodes)
   hideNodeId?: boolean; // Hide the node ID with copy functionality
+  /** Factory canvases: label · gray name title; close in same header row. */
+  factoryChrome?: boolean;
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
 
@@ -137,7 +141,11 @@ interface ComponentSidebarProps {
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
     integrationRef?: ComponentsIntegrationRef,
+    concurrency?: ComponentsConcurrencySpec,
   ) => void | Promise<void>;
+  showNodeConcurrency?: boolean;
+  nodeConcurrency?: ComponentsConcurrencySpec;
+  nodeConcurrencyMaxOnly?: boolean;
   onNodeConfigCancel?: () => void;
   domainId?: string;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
@@ -189,6 +197,7 @@ export const ComponentSidebar = ({
   hideRunsTab = false,
   hideDocsTab = false,
   hideNodeId = false,
+  factoryChrome = false,
   currentTab = "latest",
   onTabChange,
   nodeConfigMode = "edit",
@@ -198,6 +207,9 @@ export const ComponentSidebar = ({
   nodeConfiguration = {},
   nodeConfigurationFields = [],
   onNodeConfigSave,
+  showNodeConcurrency = false,
+  nodeConcurrency,
+  nodeConcurrencyMaxOnly = false,
   onNodeConfigCancel,
   domainId,
   customField,
@@ -515,7 +527,9 @@ export const ComponentSidebar = ({
           className={
             isBottomLayout
               ? "flex h-9 shrink-0 items-stretch justify-between border-b border-slate-200 pl-3 dark:border-gray-800/70"
-              : "flex items-center justify-between gap-3 px-4 pt-3 relative" + (hideNodeId ? " pb-3" : " pb-8")
+              : factoryChrome
+                ? "flex items-center justify-between gap-3 px-4 py-3"
+                : "flex items-center justify-between gap-3 px-4 pt-3 relative" + (hideNodeId ? " pb-3" : " pb-8")
           }
         >
           {isBottomLayout ? (
@@ -539,6 +553,31 @@ export const ComponentSidebar = ({
                 </div>
               </div>
             </>
+          ) : factoryChrome ? (
+            <div className="flex w-full items-center gap-2">
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => onClose?.()}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-slate-950/5 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800/50 dark:hover:text-gray-100"
+                data-testid="factory-sidebar-close"
+              >
+                <X size={16} />
+              </button>
+              <div className={`flex h-7 shrink-0 items-center justify-center overflow-hidden rounded-full`}>
+                {headerIconSrc ? (
+                  <img src={headerIconSrc} alt={nodeName} className="h-4 w-4 object-contain" />
+                ) : (
+                  <Icon size={16} />
+                )}
+              </div>
+              <FactorySidebarHeading
+                componentLabel={nodeLabel}
+                nodeName={nodeName}
+                className="text-base"
+                testId="factory-sidebar-title"
+              />
+            </div>
           ) : (
             <div className="flex flex-col items-start gap-3 w-full">
               <div className="flex justify-between gap-3 w-full">
@@ -713,6 +752,9 @@ export const ComponentSidebar = ({
                     configuration={nodeConfiguration}
                     configurationFields={nodeConfigurationFields}
                     onSave={onNodeConfigSave || (() => {})}
+                    showConcurrency={showNodeConcurrency}
+                    concurrency={nodeConcurrency}
+                    concurrencyMaxOnly={nodeConcurrencyMaxOnly}
                     onCancel={onNodeConfigCancel}
                     domainId={domainId}
                     customField={customField}

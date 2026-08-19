@@ -40,6 +40,32 @@ func (p *panickingIntegration) ListResources(resourceType string, ctx core.ListR
 func (p *panickingIntegration) HandleRequest(ctx core.HTTPRequestContext) {
 	panic("handle request panic")
 }
+
+type secretProvidingIntegration struct {
+	panickingIntegration
+}
+
+func (p *secretProvidingIntegration) ResolveSecrets(_ core.IntegrationSecretContext) (map[string][]byte, error) {
+	return map[string][]byte{"TOKEN": []byte("value")}, nil
+}
+
+func TestUnwrapIntegration_UnwrapsPanicableIntegration(t *testing.T) {
+	t.Parallel()
+
+	provider := &secretProvidingIntegration{}
+	wrapped := NewPanicableIntegration(provider)
+
+	_, ok := wrapped.(core.IntegrationSecretProvider)
+	assert.False(t, ok)
+
+	unwrapped, ok := UnwrapIntegration(wrapped).(core.IntegrationSecretProvider)
+	require.True(t, ok)
+
+	secrets, err := unwrapped.ResolveSecrets(core.IntegrationSecretContext{})
+	require.NoError(t, err)
+	assert.Equal(t, []byte("value"), secrets["TOKEN"])
+}
+
 func TestPanicableIntegration_Sync_CatchesPanic(t *testing.T) {
 	integration := &panickingIntegration{}
 	panicable := NewPanicableIntegration(integration)

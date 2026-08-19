@@ -261,7 +261,9 @@ export const ConfigurationFieldRenderer = ({
   }
 
   const fieldAllowsExpressions =
-    allowExpressions && !(field.type === "string" && field.typeOptions?.string?.allowExpressions === false);
+    allowExpressions &&
+    !(field.type === "string" && field.typeOptions?.string?.allowExpressions === false) &&
+    !(field.type === "text" && field.typeOptions?.text?.allowExpressions === false);
   const runTitlePresentation = getRunTitlePresentation(field.name, isEnabled);
   // `field.label` arrives as an empty string (not undefined) when a component omits it,
   // so fall back to the field name whenever the label is blank.
@@ -456,16 +458,21 @@ export const ConfigurationFieldRenderer = ({
 };
 
 function shouldRenderFieldForReadOnly(field: ConfigurationField): boolean {
+  const types = [
+    "list",
+    "select",
+    "multi-select",
+    "user",
+    "role",
+    "group",
+    "app",
+    "app-canvas-node",
+    "integration",
+    "secret",
+    "run-parameters",
+  ];
+
   return (
-    field.type === "list" ||
-    field.type === "select" ||
-    field.type === "multi-select" ||
-    field.type === "user" ||
-    field.type === "role" ||
-    field.type === "group" ||
-    field.type === "app" ||
-    field.type === "app-canvas-node" ||
-    field.type === "run-parameters" ||
-    (field.type === "object" && Boolean(field.typeOptions?.object?.schema?.length))
+    types.includes(field.type ?? "") || (field.type === "object" && Boolean(field.typeOptions?.object?.schema?.length))
   );
 }

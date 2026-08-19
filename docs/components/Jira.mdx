@@ -6,6 +6,15 @@ Manage issues in Jira
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Alert" href="#on-alert" description="Listen to alert created, acknowledged, closed, or deleted events in JSM Ops" />
+  <LinkCard title="On Incident" href="#on-incident" description="Listen to incident created, updated, or deleted events in Jira Service Management" />
+  <LinkCard title="On Issue" href="#on-issue" description="Listen to issue created, updated, or deleted events in Jira" />
+  <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to comment created, updated, or deleted events on Jira issues" />
+</CardGrid>
+
 ## Actions
 
 <CardGrid>
@@ -31,13 +40,335 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-To connect Jira to SuperPlane:
+SuperPlane connects to Jira with OAuth.
 
-1. Open [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
-2. Click **Create API token**, give it a recognizable label, and copy the generated token.
-3. Paste your **Jira Site URL** into SuperPlane. For Jira Cloud, this usually looks like `https://your-domain.atlassian.net`.
-4. Paste the Atlassian account **Email** that owns the API token.
-5. Paste the generated **API Token**.
+1. Click the **Connect** button with Client ID and Client Secret empty to see the steps for creating an Atlassian OAuth app.
+
+<a id="on-alert"></a>
+
+## On Alert
+
+**Trigger key:** `jira.onAlert`
+
+The On Alert trigger starts a workflow execution when an alert changes state in Jira Service Management Operations (Ops).
+
+### Use Cases
+
+- **Escalation automation**: Notify a channel or page someone when a new alert fires
+- **Incident linkage**: Open a Jira incident when a high-priority alert is created
+- **Reporting**: Track alert volume and acknowledgement time
+
+### Configuration
+
+- **Team** (optional): JSM Operations team to scope alerts to; leave empty to listen for alerts from every team
+- **Events**: Which alert events to listen for (Created, Acknowledged, Closed, Deleted)
+
+### Webhook Setup
+
+This is provisioned automatically as a dedicated outgoing Webhook integration in JSM Ops for this
+trigger - unlike `jira.onIssue`, JSM Ops has no "one URL per connection" limit, so each
+`jira.onAlert` trigger gets its own registration, removed automatically when the trigger is deleted.
+
+**Requires a Premium or Enterprise Jira Service Management plan** - Atlassian gates outgoing
+webhook integrations to those tiers, and requires the `enableOpsFeatures` option on this connection
+to be turned on (Settings tab), since it needs the JSM Ops OAuth scopes.
+
+### Output
+
+Emits one event per matching alert webhook with:
+- **action**: `created`, `acknowledged`, `closed`, or `deleted`
+- **alert**: The alert (alertId, tinyId, alias, message, priority, tags, source, username)
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "created",
+    "alert": {
+      "alertId": "9e1c6a9e-1234-4a1a-8f1a-0a1b2c3d4e5f",
+      "message": "CPU usage above 90% on payments-api",
+      "priority": "P2",
+      "source": "Datadog",
+      "tags": [
+        "production",
+        "payments"
+      ],
+      "tinyId": "123"
+    }
+  },
+  "timestamp": "2026-07-17T09:30:00Z",
+  "type": "jira.alert"
+}
+```
+
+<a id="on-incident"></a>
+
+## On Incident
+
+**Trigger key:** `jira.onIncident`
+
+The On Incident trigger starts a workflow execution when an incident is created, updated, or deleted on a Jira Service Management service desk.
+
+An incident is a Jira issue on a request type that belongs to the Incident management work
+category (the same request types `jira.createIncident` can open) - this trigger reuses the
+project-wide issue webhook every `jira.onIssue` trigger shares, and matches events to the
+request types you select here by their underlying issue type.
+
+### Use Cases
+
+- **Incident response automation**: Page a team or open a channel when a new incident is created
+- **Status sync**: Mirror incident updates into another tool
+- **Reporting**: Track incident volume and resolution over time
+
+### Configuration
+
+- **Service Desk**: The Jira Service Management service desk to listen for incidents on
+- **Request Types**: One or more incident request types on that service desk to listen for
+- **Events**: Which incident events to listen for (Created, Updated, Deleted)
+
+### Webhook Setup
+
+This is provisioned automatically, sharing the same webhook registration `jira.onIssue` uses - see that trigger's documentation for how Jira's dynamic webhook registration works.
+
+### Output
+
+Emits one event per matching incident webhook with:
+- **action**: `created`, `updated`, or `deleted`
+- **issue**: The full issue (id, key, self, fields)
+- **user**: The user who triggered the event
+- **changelog**: The list of changed fields (only present for updates)
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "created",
+    "issue": {
+      "fields": {
+        "assignee": {
+          "accountId": "5f8a1c2b3d4e5f6a7b8c9d0e",
+          "displayName": "Alice Smith",
+          "emailAddress": "alice@example.com"
+        },
+        "created": "2026-07-17T09:30:00.000+0000",
+        "issuetype": {
+          "name": "IT Help"
+        },
+        "labels": [
+          "auth",
+          "regression"
+        ],
+        "priority": {
+          "name": "High"
+        },
+        "project": {
+          "id": "10000",
+          "key": "ENG",
+          "name": "Engineering"
+        },
+        "reporter": {
+          "accountId": "5f8a1c2b3d4e5f6a7b8c9d0f",
+          "displayName": "Bob Jones",
+          "emailAddress": "bob@example.com"
+        },
+        "status": {
+          "name": "To Do",
+          "statusCategory": {
+            "key": "new",
+            "name": "To Do"
+          }
+        },
+        "summary": "Login page returns 500 on invalid password",
+        "updated": "2026-07-17T09:30:00.000+0000"
+      },
+      "id": "10001",
+      "key": "ENG-42",
+      "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
+    },
+    "user": {
+      "accountId": "5f8a1c2b3d4e5f6a7b8c9d0f",
+      "displayName": "Bob Jones",
+      "emailAddress": "bob@example.com"
+    }
+  },
+  "timestamp": "2026-07-17T09:30:00Z",
+  "type": "jira.incident"
+}
+```
+
+<a id="on-issue"></a>
+
+## On Issue
+
+**Trigger key:** `jira.onIssue`
+
+The On Issue trigger starts a workflow execution when issue events occur in a Jira project.
+
+### Use Cases
+
+- **Issue automation**: Automate responses to new or updated Jira issues
+- **Notification workflows**: Send notifications when issues are created or updated
+- **Sync workflows**: Mirror Jira issues into other tools
+
+### Configuration
+
+- **Project**: The Jira project to listen for issue events in
+- **Events**: Which issue events to listen for (Created, Updated, Deleted)
+
+### Webhook Setup
+
+This is provisioned automatically. Jira's dynamic webhook registration API (`POST /rest/api/3/webhook`) only allows a single registered callback URL per OAuth connection, so SuperPlane registers one shared webhook per Jira integration - every `jira.onIssue` trigger on that connection listens through it, each matching only the events for its own configured project. The shared webhook is removed automatically once the last trigger using it is deleted.
+
+### Output
+
+Emits one event per matching issue webhook with:
+- **action**: `created`, `updated`, or `deleted`
+- **issue**: The full issue (id, key, self, fields)
+- **user**: The user who triggered the event
+- **changelog**: The list of changed fields (only present for updates)
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "created",
+    "issue": {
+      "fields": {
+        "assignee": {
+          "accountId": "5f8a1c2b3d4e5f6a7b8c9d0e",
+          "displayName": "Alice Smith",
+          "emailAddress": "alice@example.com"
+        },
+        "created": "2026-07-17T09:30:00.000+0000",
+        "issuetype": {
+          "name": "Bug"
+        },
+        "labels": [
+          "auth",
+          "regression"
+        ],
+        "priority": {
+          "name": "High"
+        },
+        "project": {
+          "id": "10000",
+          "key": "ENG",
+          "name": "Engineering"
+        },
+        "reporter": {
+          "accountId": "5f8a1c2b3d4e5f6a7b8c9d0f",
+          "displayName": "Bob Jones",
+          "emailAddress": "bob@example.com"
+        },
+        "status": {
+          "name": "To Do",
+          "statusCategory": {
+            "key": "new",
+            "name": "To Do"
+          }
+        },
+        "summary": "Login page returns 500 on invalid password",
+        "updated": "2026-07-17T09:30:00.000+0000"
+      },
+      "id": "10001",
+      "key": "ENG-42",
+      "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
+    },
+    "user": {
+      "accountId": "5f8a1c2b3d4e5f6a7b8c9d0f",
+      "displayName": "Bob Jones",
+      "emailAddress": "bob@example.com"
+    }
+  },
+  "timestamp": "2026-07-17T09:30:00Z",
+  "type": "jira.issue"
+}
+```
+
+<a id="on-issue-comment"></a>
+
+## On Issue Comment
+
+**Trigger key:** `jira.onIssueComment`
+
+The On Issue Comment trigger starts a workflow execution when a comment is added, edited, or removed on an issue in a Jira project.
+
+### Use Cases
+
+- **Customer response workflows**: React when a customer comments on a service desk request
+- **Notification workflows**: Send notifications when someone comments on an issue
+- **Sync workflows**: Mirror Jira comments into other tools
+
+### Configuration
+
+- **Project**: The Jira project to listen for comment events in
+- **Events**: Which comment events to listen for (Created, Updated, Deleted)
+- **Content Filter** (optional): Regex pattern to filter comments by content, e.g. `urgent` to
+  only trigger on comments containing "urgent". A comment with no extractable text never matches
+  when a filter is set.
+
+### Webhook Setup
+
+This is provisioned automatically, sharing the same webhook registration `jira.onIssue` uses - see that trigger's documentation for how Jira's dynamic webhook registration works.
+
+### Output
+
+Emits one event per matching comment webhook with:
+- **action**: `created`, `updated`, or `deleted`
+- **comment**: The comment (id, body, author, updateAuthor)
+- **issue**: The full issue the comment belongs to (id, key, self, fields)
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "created",
+    "comment": {
+      "author": {
+        "accountId": "5f8a1c2b3d4e5f6a7b8c9d0e",
+        "displayName": "Alice Smith",
+        "emailAddress": "alice@example.com"
+      },
+      "body": "Thanks for the update, looking into this now.",
+      "id": "10019",
+      "updateAuthor": {
+        "accountId": "5f8a1c2b3d4e5f6a7b8c9d0e",
+        "displayName": "Alice Smith",
+        "emailAddress": "alice@example.com"
+      }
+    },
+    "issue": {
+      "fields": {
+        "issuetype": {
+          "name": "Bug"
+        },
+        "project": {
+          "id": "10000",
+          "key": "ENG",
+          "name": "Engineering"
+        },
+        "status": {
+          "name": "To Do",
+          "statusCategory": {
+            "key": "new",
+            "name": "To Do"
+          }
+        },
+        "summary": "Login page returns 500 on invalid password"
+      },
+      "id": "10001",
+      "key": "ENG-42",
+      "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
+    }
+  },
+  "timestamp": "2026-07-17T09:30:00Z",
+  "type": "jira.issueComment"
+}
+```
 
 <a id="approve-workflow"></a>
 

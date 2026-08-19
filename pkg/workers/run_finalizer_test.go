@@ -21,6 +21,7 @@ import (
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__RunFinalizer_FinalizesRunAfterTerminalExecutionEvent(t *testing.T) {
@@ -58,7 +59,7 @@ func Test__RunFinalizer_FinalizesRunAfterTerminalExecutionEvent(t *testing.T) {
 	_, err = execution.Pass(map[string][]any{"default": {map[string]any{}}})
 	require.NoError(t, err)
 
-	events, err := models.ListCanvasEvents(canvas.ID, node, 10, nil)
+	events, err := models.ListCanvasEvents(database.Conn(), canvas.ID, node, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 
@@ -520,7 +521,7 @@ func Test__RunFinalizer__CallsFinishedCallbackWhenConfigured(t *testing.T) {
 	_, err = childExecution.Pass(map[string][]any{"default": {map[string]any{}}})
 	require.NoError(t, err)
 
-	events, err := models.ListCanvasEvents(childCanvas.ID, "component", 10, nil)
+	events, err := models.ListCanvasEvents(database.Conn(), childCanvas.ID, "component", 10, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 
@@ -540,4 +541,462 @@ func Test__RunFinalizer__CallsFinishedCallbackWhenConfigured(t *testing.T) {
 	assert.Equal(t, childCanvas.ID, receivedCallback.Run.AppID)
 	assert.Equal(t, models.CanvasRunResultPassed, receivedCallback.Run.Result)
 	assert.Equal(t, "runApp", parentExecution.NodeID)
+}
+
+func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
+
+	line, err := factory.CreateLine(database.Conn(), "ship", nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
+	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
+
+	steps := []models.FactoryLineStep{
+		{
+			Type:       models.FactoryLineStepTypeRunApp,
+			AppID:      firstApp.ID,
+			Entrypoint: firstEntry,
+		},
+		{
+			Type:       models.FactoryLineStepTypeRunApp,
+			AppID:      secondApp.ID,
+			Entrypoint: secondEntry,
+		},
+	}
+	require.NoError(t, line.Update(database.Conn(), nil, steps))
+
+	var firstResult *models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var startErr error
+		_, firstResult, startErr = line.Dispatch(tx, order)
+		return startErr
+	}))
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(firstResult.Run).Updates(map[string]any{
+		"state":       models.CanvasRunStateFinished,
+		"result":      models.CanvasRunResultPassed,
+		"updated_at":  &now,
+		"finished_at": &now,
+	}).Error)
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	var pending []factoryLinePendingRun
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var advanceErr error
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, firstResult.Run.ID)
+		return advanceErr
+	}))
+
+	require.Len(t, pending, 1)
+	assert.Equal(t, secondApp.ID, pending[0].workflowID)
+
+	firstExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), firstResult.Run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, firstExecution.Status)
+	assert.Equal(t, models.CanvasRunResultPassed, firstExecution.Result)
+
+	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), pending[0].runID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, secondExecution.StepIndex)
+	assert.Equal(t, secondApp.Name, secondExecution.StepName)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, secondExecution.Status)
+	assert.Equal(t, firstExecution.LineDispatchID, secondExecution.LineDispatchID,
+		"both steps of the same traversal share one line dispatch")
+
+	dispatch, err := models.FindWorkOrderLineDispatch(database.Conn(), firstExecution.LineDispatchID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateActive, dispatch.State,
+		"a passed step with a next step in the snapshot leaves the traversal active")
+}
+
+// Test__RunFinalizer__ExecuteNextFactoryLineStep__FinishesDispatchOnLastStepPass
+// covers acceptance criterion 2: a traversal whose steps all pass finishes
+// as passed.
+func Test__RunFinalizer__ExecuteNextFactoryLineStep__FinishesDispatchOnLastStepPass(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
+
+	line, err := factory.CreateLine(database.Conn(), "ship", nil)
+	require.NoError(t, err)
+
+	onlyApp, onlyEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
+	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: onlyApp.ID, Entrypoint: onlyEntry},
+	}))
+
+	var dispatch *models.FactoryWorkOrderLineDispatch
+	var result *models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var dispatchErr error
+		dispatch, result, dispatchErr = line.Dispatch(tx, order)
+		return dispatchErr
+	}))
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(result.Run).Updates(map[string]any{
+		"state":       models.CanvasRunStateFinished,
+		"result":      models.CanvasRunResultPassed,
+		"updated_at":  &now,
+		"finished_at": &now,
+	}).Error)
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	var pending []factoryLinePendingRun
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var advanceErr error
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		return advanceErr
+	}))
+	assert.Empty(t, pending, "no next step, so nothing to run")
+
+	reloaded, err := models.FindWorkOrderLineDispatch(database.Conn(), dispatch.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateFinished, reloaded.State)
+	assert.Equal(t, models.CanvasRunResultPassed, reloaded.Result)
+	assert.NotNil(t, reloaded.FinishedAt)
+}
+
+// Test__RunFinalizer__ExecuteNextFactoryLineStep__FinishesDispatchOnFailure
+// and Test__RunFinalizer__ExecuteNextFactoryLineStep__FinishesDispatchOnCancellation
+// cover acceptance criterion 2's other two outcomes.
+func Test__RunFinalizer__ExecuteNextFactoryLineStep__FinishesDispatchOnFailure(t *testing.T) {
+	testExecuteNextFactoryLineStepFinishesDispatchWithResult(t, models.CanvasRunResultFailed)
+}
+
+func Test__RunFinalizer__ExecuteNextFactoryLineStep__FinishesDispatchOnCancellation(t *testing.T) {
+	testExecuteNextFactoryLineStepFinishesDispatchWithResult(t, models.CanvasRunResultCancelled)
+}
+
+func testExecuteNextFactoryLineStepFinishesDispatchWithResult(t *testing.T, terminalResult string) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
+
+	line, err := factory.CreateLine(database.Conn(), "ship", nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
+	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
+	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+	}))
+
+	var dispatch *models.FactoryWorkOrderLineDispatch
+	var result *models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var dispatchErr error
+		dispatch, result, dispatchErr = line.Dispatch(tx, order)
+		return dispatchErr
+	}))
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(result.Run).Updates(map[string]any{
+		"state":       models.CanvasRunStateFinished,
+		"result":      terminalResult,
+		"updated_at":  &now,
+		"finished_at": &now,
+	}).Error)
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	var pending []factoryLinePendingRun
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var advanceErr error
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		return advanceErr
+	}))
+	assert.Empty(t, pending, "a non-passed result never starts the next step")
+
+	reloaded, err := models.FindWorkOrderLineDispatch(database.Conn(), dispatch.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateFinished, reloaded.State)
+	assert.Equal(t, terminalResult, reloaded.Result)
+}
+
+// A work order can close while a step run is still executing. When that run
+// later passes, the traversal must not advance — and it must not stay active
+// either, or the reopened order could never dispatch again.
+func Test__RunFinalizer__ExecuteNextFactoryLineStep__CancelsDispatchWhenOrderClosedMidTraversal(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
+
+	line, err := factory.CreateLine(database.Conn(), "ship", nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
+	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
+	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+	}))
+
+	var dispatch *models.FactoryWorkOrderLineDispatch
+	var result *models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var dispatchErr error
+		dispatch, result, dispatchErr = line.Dispatch(tx, order)
+		return dispatchErr
+	}))
+
+	_, err = order.Close(database.Conn(), models.FactoryWorkOrderResultCompleted, &r.User)
+	require.NoError(t, err)
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(result.Run).Updates(map[string]any{
+		"state":       models.CanvasRunStateFinished,
+		"result":      models.CanvasRunResultPassed,
+		"updated_at":  &now,
+		"finished_at": &now,
+	}).Error)
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	var pending []factoryLinePendingRun
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var advanceErr error
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		return advanceErr
+	}))
+	assert.Empty(t, pending, "a closed order never starts the next step")
+
+	reloaded, err := models.FindWorkOrderLineDispatch(database.Conn(), dispatch.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateFinished, reloaded.State,
+		"an abandoned traversal must not stay active")
+	assert.Equal(t, models.CanvasRunResultCancelled, reloaded.Result)
+	assert.NotNil(t, reloaded.FinishedAt)
+}
+
+// Test__RunFinalizer__ExecuteNextFactoryLineStep__LineEditMidTraversalDoesNotChangeNextStep
+// covers acceptance criterion 3: editing a line's steps while a work order
+// is mid-traversal doesn't change which step runs next for that traversal.
+func Test__RunFinalizer__ExecuteNextFactoryLineStep__LineEditMidTraversalDoesNotChangeNextStep(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
+
+	line, err := factory.CreateLine(database.Conn(), "ship", nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
+	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
+	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+	}))
+
+	var result *models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var dispatchErr error
+		_, result, dispatchErr = line.Dispatch(tx, order)
+		return dispatchErr
+	}))
+
+	// Edit the line mid-traversal: insert a new first step and rename the
+	// steps the snapshot already captured. The live line no longer agrees
+	// with the dispatch's snapshot about what "step two" is.
+	insertedApp, insertedEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "inserted", "start-inserted")
+	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: insertedApp.ID, Entrypoint: insertedEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+	}))
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(result.Run).Updates(map[string]any{
+		"state":       models.CanvasRunStateFinished,
+		"result":      models.CanvasRunResultPassed,
+		"updated_at":  &now,
+		"finished_at": &now,
+	}).Error)
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	var pending []factoryLinePendingRun
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var advanceErr error
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		return advanceErr
+	}))
+
+	require.Len(t, pending, 1)
+	assert.Equal(t, secondApp.ID, pending[0].workflowID,
+		"advancement reads the dispatch's snapshot, not the edited live line")
+
+	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), pending[0].runID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, secondExecution.StepIndex)
+	assert.Equal(t, secondApp.Name, secondExecution.StepName,
+		"the snapshot's original automation name, unaffected by the later line edit")
+}
+
+// dispatchWorkOrderForTest promotes a draft order to open, mirroring
+// the dispatch API — needed by tests that poke `StartStep` directly.
+func dispatchWorkOrderForTest(t *testing.T, order *models.FactoryWorkOrder) {
+	t.Helper()
+	_, err := order.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateOpen,
+	})
+	require.NoError(t, err)
+}
+
+func Test__RunFinalizer__FinalizeRunAdvancesFactoryLineInSameTransaction(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
+
+	line, err := factory.CreateLine(database.Conn(), "ship", nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
+	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
+
+	steps := []models.FactoryLineStep{
+		{
+			Type:       models.FactoryLineStepTypeRunApp,
+			AppID:      firstApp.ID,
+			Entrypoint: firstEntry,
+		},
+		{
+			Type:       models.FactoryLineStepTypeRunApp,
+			AppID:      secondApp.ID,
+			Entrypoint: secondEntry,
+		},
+	}
+	require.NoError(t, line.Update(database.Conn(), nil, steps))
+
+	var firstResult *models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var startErr error
+		_, firstResult, startErr = line.Dispatch(tx, order)
+		return startErr
+	}))
+
+	require.NoError(t, database.Conn().Model(firstResult.Run).Updates(map[string]any{
+		"state": models.CanvasRunStateStarted,
+	}).Error)
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	require.NoError(t, finalizer.finalizeRun(firstApp.ID, firstResult.Run.ID, runFinalizerTriggerEventTerminal))
+
+	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), firstApp.ID, firstResult.Run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
+	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)
+
+	firstExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), firstResult.Run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, firstExecution.Status)
+
+	var secondRun models.CanvasRun
+	require.NoError(t, database.Conn().
+		Where("workflow_id = ? AND state = ?", secondApp.ID, models.CanvasRunStatePending).
+		First(&secondRun).Error)
+
+	secondExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), secondRun.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, secondExecution.StepIndex)
+	assert.Equal(t, secondApp.Name, secondExecution.StepName)
+}
+
+func Test__RunFinalizer__FinalizeRunRollsBackWhenFactoryLineAdvanceFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
+
+	line, err := factory.CreateLine(database.Conn(), "ship", nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
+	secondApp, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
+
+	steps := []models.FactoryLineStep{
+		{
+			Type:       models.FactoryLineStepTypeRunApp,
+			AppID:      firstApp.ID,
+			Entrypoint: firstEntry,
+		},
+		{
+			Type:       models.FactoryLineStepTypeRunApp,
+			AppID:      secondApp.ID,
+			Entrypoint: "missing-entrypoint",
+		},
+	}
+	require.NoError(t, line.Update(database.Conn(), nil, steps))
+
+	var firstResult *models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var startErr error
+		_, firstResult, startErr = line.Dispatch(tx, order)
+		return startErr
+	}))
+
+	require.NoError(t, database.Conn().Model(firstResult.Run).Updates(map[string]any{
+		"state": models.CanvasRunStateStarted,
+	}).Error)
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	err = finalizer.finalizeRun(firstApp.ID, firstResult.Run.ID, runFinalizerTriggerEventTerminal)
+	require.Error(t, err)
+
+	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), firstApp.ID, firstResult.Run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateStarted, updatedRun.State)
+
+	firstExecution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), firstResult.Run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, firstExecution.Status)
 }

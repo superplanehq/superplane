@@ -27,7 +27,7 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <MockConsoleProvider>
+      <MockConsoleProvider value={{ canvasId: "" }}>
         <PanelFrame height={260}>
           <Story />
         </PanelFrame>
@@ -102,6 +102,63 @@ export const WithLabelOverrides: Story = {
       nodes: [
         { node: "deploy-prod", label: "Production deploy", showRun: true },
         { node: "run-tests", label: "QA gate", description: "Must pass before deploy" },
+      ],
+    }),
+  },
+};
+
+/**
+ * Prompt-submission layout with the redundant in-body node heading and
+ * visible field labels removed. The trigger placeholder still explains the
+ * textarea, while its associated label remains available to screen readers.
+ */
+export const PersonalizedInlineForm: Story = {
+  args: {
+    panel: panel({
+      title: "Create work item",
+      nodes: [
+        {
+          node: "deploy-prod",
+          description: "Turn a short prompt into a queued delivery task.",
+          showRun: true,
+          triggerName: "manual",
+          formMode: "inline",
+          showNodeLabel: false,
+          showFieldLabels: false,
+          submitLabel: "Create task",
+        },
+      ],
+    }),
+  },
+};
+
+/** Draft node/template changes must be committed before runtime actions use them. */
+export const InlineFormWithUncommittedCanvasChanges: Story = {
+  render: (args) => (
+    <MockConsoleProvider
+      value={{
+        canvasId: "",
+        canRunNodes: false,
+        runNodesDisabledReason: "uncommitted-canvas-changes",
+      }}
+    >
+      <NodesPanelCard {...args} />
+    </MockConsoleProvider>
+  ),
+  args: {
+    panel: panel({
+      title: "Create work item",
+      nodes: [
+        {
+          node: "deploy-prod",
+          description: "Turn a short prompt into a queued delivery task.",
+          showRun: true,
+          triggerName: "manual",
+          formMode: "inline",
+          showNodeLabel: false,
+          showFieldLabels: false,
+          submitLabel: "Create task",
+        },
       ],
     }),
   },

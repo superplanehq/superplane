@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -610,10 +609,6 @@ var chunkingAlgorithmOptions = []configuration.FieldOption{
 
 func (c *CreateKnowledgeBase) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *CreateKnowledgeBase) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 // indexJobState normalises a DO indexing job status to a simple lowercase keyword.

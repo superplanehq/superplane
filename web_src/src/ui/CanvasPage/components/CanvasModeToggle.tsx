@@ -2,7 +2,7 @@ import { appPath } from "@/lib/appPaths";
 import { isNormalClick } from "@/lib/linkHelpers";
 import { segmentedNavTabClassName } from "@/lib/segmentedNav";
 import { cn } from "@/lib/utils";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router";
 
 import { DraftChangeDots } from "./DraftChangeDots";
 

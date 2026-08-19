@@ -48,6 +48,7 @@ import type {
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
   CanvasesCanvasVersion,
+  CanvasesCanvasVersionMetadata,
   CanvasesCanvasRepositoryFileOperation,
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
@@ -55,12 +56,13 @@ import { registerLocalStagingWrite } from "../lib/canvasStagingEcho";
 import { analytics } from "../lib/analytics";
 import {
   canvasVersionWithSpecFromYaml,
-  fetchCommittedCanvasVersionWithSpec,
+  fetchCanvasVersionWithSpec,
   fetchStagedCanvasVersionWithSpec,
   fetchCanvasStagingSummary,
   fetchConsoleSpecFromRepository,
   fetchRepositorySpecFileContent,
 } from "../pages/app/lib/repository-spec-files";
+import { canvasVersionId } from "../pages/app/lib/canvas-versions";
 import { encodeRepositoryFileContent } from "../pages/app/files/lib/repository-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "../pages/app/lib/workflow-spec-paths";
 import { matchesCommittedCanvasYaml, matchesCommittedConsoleYaml } from "../pages/app/lib/staging-content-match";
@@ -133,11 +135,12 @@ export const canvasKeys = {
   details: () => [...canvasKeys.all, "detail"] as const,
   detail: (orgId: string, id: string) => [...canvasKeys.details(), orgId, id] as const,
   versions: () => [...canvasKeys.all, "versions"] as const,
-  versionList: (canvasId: string) => [...canvasKeys.versions(), canvasId] as const,
   versionHistory: (canvasId: string) => [...canvasKeys.versions(), canvasId, "history"] as const,
   versionDetails: () => [...canvasKeys.versions(), "detail"] as const,
   versionDetail: (canvasId: string, versionId: string) =>
     [...canvasKeys.versionDetails(), canvasId, versionId] as const,
+  versionDescribe: (canvasId: string, versionId: string) =>
+    [...canvasKeys.versions(), canvasId, "describe", versionId] as const,
   // Canvas-scoped staging reads. Staging belongs to the canvas/user, not a version.
   stagedCanvasSpec: (canvasId: string) => [...canvasKeys.all, "stagedCanvasSpec", canvasId] as const,
   canvasStaging: (canvasId: string) => [...canvasKeys.versions(), "staging", canvasId] as const,
@@ -354,19 +357,19 @@ export const useCanvas = (organizationId: string, canvasId: string, options: Use
   });
 };
 
-export const useCanvasVersions = (organizationId: string, canvasId: string) => {
+export const useDescribeCanvasVersion = (canvasId: string, versionId: string | undefined, enabled = true) => {
   return useQuery({
-    queryKey: canvasKeys.versionList(canvasId),
+    queryKey: canvasKeys.versionDescribe(canvasId, versionId ?? ""),
     queryFn: async () => {
-      const response = await canvasesListCanvasVersions(
+      const response = await canvasesDescribeCanvasVersion(
         withOrganizationHeader({
-          path: { canvasId },
-          query: { limit: 1 },
+          path: { canvasId, versionId: versionId! },
         }),
       );
-      return response.data?.versions || [];
+      return response.data?.version;
     },
-    enabled: !!organizationId && !!canvasId,
+    enabled: !!canvasId && !!versionId && enabled,
+    staleTime: Number.POSITIVE_INFINITY,
   });
 };
 
@@ -407,7 +410,7 @@ export const useInfiniteCanvasLiveVersions = (
 export const useCanvasVersion = (organizationId: string, canvasId: string, versionId: string, enabled = true) => {
   return useQuery({
     queryKey: canvasKeys.versionDetail(canvasId, versionId),
-    queryFn: async () => fetchCommittedCanvasVersionWithSpec(canvasId, versionId),
+    queryFn: async () => fetchCanvasVersionWithSpec(canvasId, versionId),
     enabled: !!organizationId && !!canvasId && !!versionId && enabled,
     staleTime: Number.POSITIVE_INFINITY,
   });
@@ -415,10 +418,10 @@ export const useCanvasVersion = (organizationId: string, canvasId: string, versi
 
 export const useStagedCanvasSpec = (
   canvasId: string,
-  versionMetadata: CanvasesCanvasVersion | null | undefined,
+  versionMetadata: CanvasesCanvasVersion | CanvasesCanvasVersionMetadata | null | undefined,
   enabled = true,
 ) => {
-  const versionId = versionMetadata?.metadata?.id;
+  const versionId = canvasVersionId(versionMetadata);
   return useQuery({
     queryKey: canvasKeys.stagedCanvasSpec(canvasId),
     queryFn: async () => {
@@ -457,6 +460,7 @@ export const useCreateCanvas = (organizationId: string) => {
       data: {
         name: string;
         description?: string;
+        factoryId?: string;
         method?: "ui" | "cli" | "yaml_import" | "template";
         templateId?: string;
       } & CanvasGraphData,
@@ -466,6 +470,7 @@ export const useCreateCanvas = (organizationId: string) => {
           body: {
             name: data.name,
             description: data.description || "",
+            factoryId: data.factoryId,
           },
         }),
       );
@@ -478,18 +483,20 @@ export const useCreateCanvas = (organizationId: string) => {
       if (response?.data?.canvas?.metadata?.id) {
         const canvasId = response.data.canvas.metadata.id;
         queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), response.data.canvas);
-        void queryClient.prefetchQuery({
-          queryKey: canvasKeys.versionList(canvasId),
-          queryFn: async () => {
-            const listResponse = await canvasesListCanvasVersions(
-              withOrganizationHeader({
-                path: { canvasId },
-                query: { limit: 1 },
-              }),
-            );
-            return listResponse.data?.versions || [];
-          },
-        });
+        const liveVersionId = response.data?.canvas?.metadata?.liveVersionId;
+        if (liveVersionId) {
+          void queryClient.prefetchQuery({
+            queryKey: canvasKeys.versionDescribe(canvasId, liveVersionId),
+            queryFn: async () => {
+              const describeResponse = await canvasesDescribeCanvasVersion(
+                withOrganizationHeader({
+                  path: { canvasId, versionId: liveVersionId },
+                }),
+              );
+              return describeResponse.data?.version;
+            },
+          });
+        }
         analytics.canvasCreate(
           canvasId,
           organizationId,
@@ -502,32 +509,52 @@ export const useCreateCanvas = (organizationId: string) => {
   });
 };
 
+type UpdateCanvasInput = {
+  name?: string;
+  description?: string;
+  dismissAgentSuggestionId?: string;
+};
+
 export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { name?: string; description?: string }) => {
+    mutationFn: async (data: UpdateCanvasInput) => {
       return await canvasesUpdateCanvas(
         withOrganizationHeader({
           path: { id: canvasId },
           body: {
             name: data.name,
             description: data.description,
+            dismissAgentSuggestionId: data.dismissAgentSuggestionId,
           },
         }),
       );
     },
+    onMutate: async (data) => {
+      if (!data.dismissAgentSuggestionId) return {};
+      await queryClient.cancelQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+      const previousCanvas = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
+      queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) =>
+        mergeDismissedAgentSuggestionId(current, data.dismissAgentSuggestionId),
+      );
+      return { previousCanvas };
+    },
+    onError: (_error, data, context) => {
+      if (data.dismissAgentSuggestionId && context?.previousCanvas) {
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), context.previousCanvas);
+      }
+    },
     onSuccess: (response, variables) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
 
       const updatedCanvas = response?.data?.canvas;
       if (updatedCanvas) {
         queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: CanvasesCanvas | undefined) => {
           if (!current) {
-            return current;
+            return updatedCanvas;
           }
 
           const updatedMetadata = updatedCanvas.metadata;
@@ -537,8 +564,15 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
             ...current,
             metadata: {
               ...current.metadata,
+              ...updatedMetadata,
               name: updatedMetadata?.name ?? variables.name ?? current.metadata?.name,
               description: updatedMetadata?.description ?? variables.description ?? current.metadata?.description,
+              dismissedAgentSuggestionIds: Array.from(
+                new Set([
+                  ...(current.metadata?.dismissedAgentSuggestionIds ?? []),
+                  ...(updatedMetadata?.dismissedAgentSuggestionIds ?? []),
+                ]),
+              ),
             },
             spec: updatedSpec ?? current.spec,
           };
@@ -588,6 +622,24 @@ export const useUpdateCanvasPreference = (organizationId: string) => {
     },
   });
 };
+
+function mergeDismissedAgentSuggestionId(
+  current: CanvasesCanvas | undefined,
+  suggestionId: string | undefined,
+): CanvasesCanvas | undefined {
+  if (!current || !suggestionId) return current;
+  const dismissedAgentSuggestionIds = [...(current.metadata?.dismissedAgentSuggestionIds ?? [])];
+  if (!dismissedAgentSuggestionIds.includes(suggestionId)) {
+    dismissedAgentSuggestionIds.push(suggestionId);
+  }
+  return {
+    ...current,
+    metadata: {
+      ...current.metadata,
+      dismissedAgentSuggestionIds,
+    },
+  };
+}
 
 function applyCanvasPreferenceToSummary(
   canvas: CanvasesCanvasSummary,
@@ -937,7 +989,6 @@ export const useUpdateCanvasVersion = (canvasId: string) => {
       }
 
       if (!version) {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
         queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
         return;
       }

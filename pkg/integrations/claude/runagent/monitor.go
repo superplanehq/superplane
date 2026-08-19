@@ -92,8 +92,23 @@ func (a *RunAgent) handleTerminalSession(ctx core.ActionHookContext, client *Cli
 		return a.scheduleNextPoll(ctx, attempt+1, errs)
 	}
 
+	if sm != nil && sm.Err != nil {
+		ctx.Logger.Errorf("Managed session %s failed: %s", metadata.Session.ID, sm.Err.Message)
+		mergeSessionIntoMetadata(metadata, sess)
+		_ = ctx.Metadata.Set(*metadata)
+		reclaimSession(client, metadata.Session.ID, persist, ctx.Logger)
+		cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
+		cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("managed agent session failed: %s", sm.Err.Message))
+	}
+
 	out := buildOutputFromSessionMessages(sess.Status, metadata.Session.ID, sm)
 	if sm != nil {
+		// Only trust structured output once events are confirmed complete —
+		// past the poll budget, LastMessage may not be the real final message.
+		if sm.Complete {
+			applyStructuredOutput(&out, sess.Status, schemaFromConfiguration(ctx.Configuration))
+		}
 		out.Artifacts = CollectSessionArtifacts(client, metadata.Session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
 	}
 	if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {

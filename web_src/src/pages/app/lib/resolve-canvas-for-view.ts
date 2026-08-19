@@ -145,3 +145,30 @@ export function syncLoadedVersionToCanvasDetail({
 
   lastAppliedVersionSnapshotRef.current = snapshotKey;
 }
+
+export function isHistoricalVersionSpecLoading({
+  activeCanvasVersionId,
+  liveCanvasVersionId,
+  shouldReadStagedCanvasVersion,
+  loadedCanvasVersion,
+  loadedCanvasVersionLoading,
+  loadedCanvasVersionFetching,
+}: {
+  activeCanvasVersionId: string;
+  liveCanvasVersionId?: string;
+  shouldReadStagedCanvasVersion: boolean;
+  loadedCanvasVersion?: CanvasesCanvasVersion | null;
+  loadedCanvasVersionLoading: boolean;
+  loadedCanvasVersionFetching: boolean;
+}): boolean {
+  if (!activeCanvasVersionId || activeCanvasVersionId === liveCanvasVersionId || shouldReadStagedCanvasVersion) {
+    return false;
+  }
+
+  const loadedVersionId = loadedCanvasVersion?.metadata?.id;
+  if (loadedVersionId === activeCanvasVersionId && loadedCanvasVersion?.spec) {
+    return false;
+  }
+
+  return loadedCanvasVersionLoading || loadedCanvasVersionFetching || loadedVersionId !== activeCanvasVersionId;
+}

@@ -2,20 +2,16 @@ package canvases
 
 import (
 	"context"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"github.com/superplanehq/superplane/pkg/registry"
+	"gorm.io/gorm"
 )
 
-func ListEventExecutions(ctx context.Context, registry *registry.Registry, workflowID, eventID string) (*pb.ListEventExecutionsResponse, error) {
-	workflowUUID, err := uuid.Parse(workflowID)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
-	}
-
+func ListEventExecutions(ctx context.Context, db *gorm.DB, canvas *models.Canvas, eventID string) (*pb.ListEventExecutionsResponse, error) {
 	eventUUID, err := uuid.Parse(eventID)
 	if err != nil {
 		return nil, grpcerrors.InvalidArgument(err, "invalid event id")
@@ -23,7 +19,7 @@ func ListEventExecutions(ctx context.Context, registry *registry.Registry, workf
 
 	var executions []models.CanvasNodeExecution
 	query := database.Conn().
-		Where("workflow_id = ?", workflowUUID).
+		Where("workflow_id = ?", canvas.ID).
 		Where("root_event_id = ?", eventUUID).
 		Order("created_at ASC")
 
@@ -31,8 +27,6 @@ func ListEventExecutions(ctx context.Context, registry *registry.Registry, workf
 	if err != nil {
 		return nil, err
 	}
-
-	db := database.DB(ctx)
 
 	resources, err := LoadNodeExecutionResources(db, executions)
 	if err != nil {

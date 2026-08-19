@@ -1,9 +1,8 @@
-import type { CanvasesCanvasVersion } from "@/api-client";
 import { Timestamp } from "@/components/Timestamp";
 import { cn } from "@/lib/utils";
+import { formatVersionLabel, type CanvasVersionListItem } from "@/pages/app/lib/canvas-versions";
 import { useCallback } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { formatVersionLabel } from "@/pages/app/lib/canvas-versions";
 import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 
 export function VersionRow({
@@ -14,7 +13,7 @@ export function VersionRow({
   rowTestId,
   onUseVersion,
 }: {
-  version: CanvasesCanvasVersion;
+  version: CanvasVersionListItem;
   isActive?: boolean;
   isCurrentLive?: boolean;
   isFirstCanvasVersion?: boolean;
@@ -80,12 +79,12 @@ export function VersionRow({
   );
 }
 
-function deriveVersionRowFields(version: CanvasesCanvasVersion, isFirstCanvasVersion: boolean) {
+function deriveVersionRowFields(version: CanvasVersionListItem, isFirstCanvasVersion: boolean) {
   return {
-    versionID: version.metadata?.id ?? "",
-    ownerName: version.metadata?.owner?.name || "Unknown owner",
+    versionID: version.id ?? "",
+    ownerName: version.owner?.name || "Unknown owner",
     versionLabel: isFirstCanvasVersion ? "v1" : formatVersionLabel(version),
-    timestamp: version.metadata?.updatedAt || version.metadata?.createdAt,
+    timestamp: version.updatedAt || version.createdAt,
   };
 }
 

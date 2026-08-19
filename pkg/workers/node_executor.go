@@ -235,6 +235,27 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		})
 	}
 
+	type pendingFactoryWorkOrderUpdate struct {
+		factoryID string
+		orderID   string
+		reason    string
+	}
+	pendingFactoryWorkOrderUpdates := []pendingFactoryWorkOrderUpdate{}
+	onFactoryWorkOrderUpdated := func(factoryID, orderID, reason string) {
+		pendingFactoryWorkOrderUpdates = append(pendingFactoryWorkOrderUpdates, pendingFactoryWorkOrderUpdate{
+			factoryID: factoryID,
+			orderID:   orderID,
+			reason:    reason,
+		})
+	}
+
+	// Notification payloads are collected during the transaction and
+	// published after commit, so no email is sent for rolled-back work.
+	pendingWorkOrderNotifications := []messages.FactoryWorkOrderNotificationMessage{}
+	onFactoryWorkOrderNotification := func(notification messages.FactoryWorkOrderNotificationMessage) {
+		pendingWorkOrderNotifications = append(pendingWorkOrderNotifications, notification)
+	}
+
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		//
 		// Try to lock the execution record for update.
@@ -271,7 +292,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 
 		metricComponent = node.ComponentName()
-		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated)
+		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyAttemptFailure(processErr, execution)
@@ -306,6 +327,18 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 	}
 
+	for _, update := range pendingFactoryWorkOrderUpdates {
+		if err := messages.PublishFactoryWorkOrderUpdated(update.factoryID, update.orderID, update.reason); err != nil {
+			w.logger.Errorf("failed to publish factory work order updated RabbitMQ message: %v", err)
+		}
+	}
+
+	for _, notification := range pendingWorkOrderNotifications {
+		if err := notification.Publish(); err != nil {
+			w.logger.Errorf("failed to publish factory work order notification RabbitMQ message: %v", err)
+		}
+	}
+
 	return nil
 }
 
@@ -316,6 +349,8 @@ func (w *NodeExecutor) executeActionNode(
 	onNewEvents func([]models.CanvasEvent),
 	onMemoryChanged func(uuid.UUID),
 	onPendingRunCreated func(workflowID, runID uuid.UUID),
+	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
+	onFactoryWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage),
 ) error {
 	logger := logging.WithExecution(
 		logging.WithNode(w.logger, *node),
@@ -375,7 +410,7 @@ func (w *NodeExecutor) executeActionNode(
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
-		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
+		Secrets:        contexts.NewSecretsContext(tx, w.registry, workflow.OrganizationID, w.encryptor),
 		CanvasMemory: contexts.NewCanvasMemoryContext(tx, execution.WorkflowID).
 			WithChangeCallback(func() { onMemoryChanged(execution.WorkflowID) }),
 		Files:       contexts.NewRepositoryFilesContext(w.gitProvider, execution.WorkflowID),
@@ -383,8 +418,10 @@ func (w *NodeExecutor) executeActionNode(
 		Expressions: contexts.NewExpressionContext(builder),
 		OIDC:        w.oidcProvider,
 		Apps:        contexts.NewAppExecutionContext(tx, workflow, node, execution),
-		Runs: contexts.NewRunExecutionContext(tx, workflow, node, execution).
-			WithPendingRunCreated(onPendingRunCreated),
+		Runs:        contexts.NewRunExecutionContext(tx, workflow, node, execution).WithPendingRunCreated(onPendingRunCreated),
+		Factory: contexts.NewFactoryContext(tx, workflow, execution).
+			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
+			WithWorkOrderNotification(onFactoryWorkOrderNotification),
 	}
 
 	if node.AppInstallationID != nil {

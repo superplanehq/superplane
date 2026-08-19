@@ -10,14 +10,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"gorm.io/gorm"
 )
 
 func InvokeNodeExecutionHook(
@@ -25,8 +25,8 @@ func InvokeNodeExecutionHook(
 	authService authorization.Authorization,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
-	orgID uuid.UUID,
-	canvasID uuid.UUID,
+	db *gorm.DB,
+	canvas *models.Canvas,
 	executionID uuid.UUID,
 	hookName string,
 	parameters map[string]any,
@@ -34,11 +34,6 @@ func InvokeNodeExecutionHook(
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
-	}
-
-	canvas, err := models.FindCanvas(orgID, canvasID)
-	if err != nil {
-		return nil, fmt.Errorf("canvas not found: %w", err)
 	}
 
 	execution, err := models.FindNodeExecution(canvas.ID, executionID)
@@ -68,7 +63,7 @@ func InvokeNodeExecutionHook(
 		return nil, fmt.Errorf("hook parameters validation failed: %w", err)
 	}
 
-	user, err := models.FindActiveUserByID(orgID.String(), userID)
+	user, err := models.FindActiveUserByIDInTransaction(db, canvas.OrganizationID.String(), userID)
 	if err != nil {
 		return nil, fmt.Errorf("user not found: %w", err)
 	}
@@ -78,29 +73,28 @@ func InvokeNodeExecutionHook(
 		newEvents = append(newEvents, events...)
 	}
 
-	tx := database.Conn()
 	logger := logging.ForExecution(execution)
 	actionCtx := core.ActionHookContext{
 		Name:           hookName,
 		Parameters:     parameters,
 		Configuration:  node.Configuration.Data(),
 		HTTP:           registry.HTTPContext(),
-		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
-		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
-		Auth:           contexts.NewAuthReader(tx, orgID, authService, user),
-		Requests:       contexts.NewExecutionRequestContext(tx, execution),
-		Runs:           contexts.NewRunExecutionContext(tx, canvas, node, execution),
+		Metadata:       contexts.NewExecutionMetadataContext(db, execution),
+		ExecutionState: contexts.NewExecutionStateContext(db, execution, onNewEvents),
+		Auth:           contexts.NewAuthReader(db, canvas.OrganizationID, authService, user),
+		Requests:       contexts.NewExecutionRequestContext(db, execution),
+		Runs:           contexts.NewRunExecutionContext(db, canvas, node, execution),
 	}
 
 	if node.AppInstallationID != nil {
-		integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+		integration, err := models.FindUnscopedIntegrationInTransaction(db, *node.AppInstallationID)
 		if err != nil {
 			logger.Errorf("error finding app installation: %v", err)
 			return nil, grpcerrors.Internal(err, "error building context")
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
-		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry, onNewEvents)
+		actionCtx.Integration = contexts.NewIntegrationContext(db, node, integration, encryptor, registry, onNewEvents)
 	}
 
 	actionCtx.Logger = logger

@@ -161,6 +161,8 @@ export interface HomePageFixture {
   organizationName: string;
   canvases: CanvasesCanvasSummary[];
   folders: CanvasFoldersCanvasFolder[];
+  enabledExperimentalFeatures?: string[];
+  factories?: Array<{ id: string; name: string; description?: string }>;
 }
 
 export const defaultHomePageFixture: HomePageFixture = {
@@ -170,7 +172,7 @@ export const defaultHomePageFixture: HomePageFixture = {
   folders,
 };
 
-/** Fresh org: no apps or folders — HomePage redirects to the create/onboarding screen. */
+/** Fresh org: no apps or folders — HomePage redirects to the create/setup screen. */
 export const emptyHomePageFixture: HomePageFixture = {
   organizationId: HOME_ORGANIZATION_ID,
   organizationName: "Acme",

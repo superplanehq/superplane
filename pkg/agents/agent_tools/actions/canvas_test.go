@@ -32,7 +32,7 @@ import (
 )
 
 func TestResolveToolAutoLayoutInput_DefaultsNodeIDsToConnectedComponent(t *testing.T) {
-	autoLayout := resolveToolAutoLayoutInput(&AutoLayoutInput{NodeIDs: []string{"node-1"}})
+	autoLayout := resolveToolAutoLayoutInput(&AutoLayoutInput{NodeIDs: []string{"node-1"}}, nil)
 
 	require.NotNil(t, autoLayout)
 	assert.Equal(t, canvaslayout.AlgorithmHorizontal, autoLayout.Algorithm)
@@ -44,12 +44,23 @@ func TestResolveToolAutoLayoutInput_PreservesExplicitSettings(t *testing.T) {
 	autoLayout := resolveToolAutoLayoutInput(&AutoLayoutInput{
 		Scope:   "connected_component",
 		NodeIDs: []string{"node-1"},
-	})
+	}, nil)
 
 	require.NotNil(t, autoLayout)
 	assert.Equal(t, canvaslayout.AlgorithmHorizontal, autoLayout.Algorithm)
 	assert.Equal(t, canvaslayout.ScopeConnectedComponent, autoLayout.Scope)
 	assert.Equal(t, []string{"node-1"}, autoLayout.NodeIDs)
+}
+
+func TestResolveToolAutoLayoutInput_UsesVerticalForFactoryApps(t *testing.T) {
+	factoryID := uuid.New()
+	autoLayout := resolveToolAutoLayoutInput(
+		&AutoLayoutInput{NodeIDs: []string{"node-1"}},
+		&models.Canvas{FactoryID: &factoryID},
+	)
+
+	require.NotNil(t, autoLayout)
+	assert.Equal(t, canvaslayout.AlgorithmVertical, autoLayout.Algorithm)
 }
 
 func TestResolvePatchDraftAutoLayout_DefaultsToAffectedConnectedComponents(t *testing.T) {
@@ -73,6 +84,7 @@ func TestResolvePatchDraftAutoLayout_DefaultsToAffectedConnectedComponents(t *te
 		changeset,
 		[]models.Edge{{SourceID: "kept-node", TargetID: "deleted-node", Channel: "default"}},
 		[]models.Node{{ID: "new-node"}, {ID: "kept-node"}},
+		nil,
 	)
 
 	require.NotNil(t, autoLayout)
@@ -84,6 +96,7 @@ func TestResolvePatchDraftAutoLayout_DefaultsToAffectedConnectedComponents(t *te
 func TestResolvePatchDraftAutoLayout_PreservesExplicitSettings(t *testing.T) {
 	autoLayout := resolvePatchStagingAutoLayout(
 		&AutoLayoutInput{Scope: "full_canvas"},
+		nil,
 		nil,
 		nil,
 		nil,
@@ -112,6 +125,7 @@ func TestResolvePatchDraftAutoLayout_TreatsEmptyInputLikeOmitted(t *testing.T) {
 		changeset,
 		nil,
 		[]models.Node{{ID: "new-node"}},
+		nil,
 	)
 
 	require.NotNil(t, autoLayout)
@@ -120,7 +134,7 @@ func TestResolvePatchDraftAutoLayout_TreatsEmptyInputLikeOmitted(t *testing.T) {
 }
 
 func TestResolvePatchDraftAutoLayout_DefaultsLayoutOnlyUpdatesToFullCanvas(t *testing.T) {
-	autoLayout := resolvePatchStagingAutoLayout(&AutoLayoutInput{}, nil, nil, []models.Node{{ID: "node-1"}})
+	autoLayout := resolvePatchStagingAutoLayout(&AutoLayoutInput{}, nil, nil, []models.Node{{ID: "node-1"}}, nil)
 
 	require.NotNil(t, autoLayout)
 	assert.Equal(t, canvaslayout.AlgorithmHorizontal, autoLayout.Algorithm)
@@ -144,6 +158,7 @@ func TestResolvePatchDraftAutoLayout_DisabledInputSkipsLayout(t *testing.T) {
 		changeset,
 		nil,
 		[]models.Node{{ID: "node-1"}},
+		nil,
 	)
 
 	assert.Nil(t, autoLayout)
@@ -300,7 +315,7 @@ func TestAppAgentTool_PatchStagingStagesSmallGraphEdits(t *testing.T) {
 	assert.Equal(t, 2, update.Summary.NodeCount)
 	assert.Equal(t, 1, update.Summary.EdgeCount)
 
-	staging, err := canvasRepository.GetCanvasStaging(ctx, r.Organization.ID.String(), canvas.ID.String())
+	staging, err := canvasRepository.GetCanvasStaging(ctx, database.DB(t.Context()), canvas)
 	require.NoError(t, err)
 	assert.True(t, staging.GetHasStaging())
 	assert.Contains(t, staging.GetStagedPaths(), canvasRepository.CanvasYAMLRepositoryPath)
@@ -415,7 +430,7 @@ func TestAppAgentTool_PatchStagingStagesConsoleYAML(t *testing.T) {
 	// patch_staging writes to the UI staging layer instead of committing into the
 	// live version row, so the edit shows up as pending staging that the user
 	// reviews and publishes, exactly like an edit made in the UI editor.
-	staging, err := canvasRepository.GetCanvasStaging(ctx, r.Organization.ID.String(), canvas.ID.String())
+	staging, err := canvasRepository.GetCanvasStaging(ctx, database.DB(t.Context()), canvas)
 	require.NoError(t, err)
 	assert.True(t, staging.GetHasStaging())
 	assert.Contains(t, staging.GetStagedPaths(), canvasRepository.ConsoleYAMLRepositoryPath)

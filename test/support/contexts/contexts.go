@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -99,6 +100,8 @@ type IntegrationContext struct {
 	ResyncRequests    []time.Duration
 	ActionRequests    []ActionRequest
 	Subscriptions     []Subscription
+	// ScheduleActionCallErr, when set, is returned from ScheduleActionCall after recording the request.
+	ScheduleActionCallErr error
 }
 
 type ActionRequest struct {
@@ -197,6 +200,9 @@ func (c *IntegrationContext) ScheduleResync(interval time.Duration) error {
 
 func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters any, interval time.Duration) error {
 	c.ActionRequests = append(c.ActionRequests, ActionRequest{ActionName: actionName, Parameters: parameters, Interval: interval})
+	if c.ScheduleActionCallErr != nil {
+		return c.ScheduleActionCallErr
+	}
 	return nil
 }
 
@@ -425,7 +431,9 @@ func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
 }
 
 type SecretsContext struct {
-	Values map[string][]byte
+	Values          map[string][]byte
+	SecretKeys      map[string]map[string][]byte
+	IntegrationKeys map[string]map[string][]byte
 }
 
 func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
@@ -435,6 +443,33 @@ func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
 	}
 
 	return value, nil
+}
+
+func (c *SecretsContext) GetSecretKeys(secretName string) (map[string][]byte, error) {
+	if c.SecretKeys == nil {
+		return nil, fmt.Errorf("secret keys not configured")
+	}
+
+	keys, ok := c.SecretKeys[secretName]
+	if !ok {
+		return nil, fmt.Errorf("secret keys not found for %q", secretName)
+	}
+
+	return keys, nil
+}
+
+func (c *SecretsContext) GetIntegrationKeys(installationName string) (map[string][]byte, error) {
+	if c.IntegrationKeys == nil {
+		return nil, fmt.Errorf("integration secrets not configured")
+	}
+
+	name := strings.TrimSpace(installationName)
+	keys, ok := c.IntegrationKeys[name]
+	if !ok {
+		return nil, fmt.Errorf("integration secrets not found for ref %q", name)
+	}
+
+	return keys, nil
 }
 
 type ExpressionContext struct {
@@ -682,15 +717,13 @@ func (c *AppContext) Unsubscribe() error {
 }
 
 type RunExecutionContext struct {
-	CreateRunID       uuid.UUID
-	CreateErr         error
-	CancelErr         error
-	CancelCalled      bool
-	LastCreateParams  *core.RunCreationParams
-	AssignOutputCalls []map[string]any
-	AssignOutputErr   error
-	AddErrorCalls     []string
-	AddErrorErr       error
+	CreateRunID      uuid.UUID
+	CreateErr        error
+	CancelErr        error
+	CancelCalled     bool
+	LastCreateParams *core.RunCreationParams
+	AddErrorCalls    []string
+	AddErrorErr      error
 }
 
 func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, error) {
@@ -714,11 +747,6 @@ func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, 
 func (c *RunExecutionContext) Cancel() error {
 	c.CancelCalled = true
 	return c.CancelErr
-}
-
-func (c *RunExecutionContext) AssignOutput(output map[string]any) error {
-	c.AssignOutputCalls = append(c.AssignOutputCalls, output)
-	return c.AssignOutputErr
 }
 
 func (c *RunExecutionContext) AddError(message string) error {

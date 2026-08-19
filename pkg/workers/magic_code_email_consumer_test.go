@@ -73,10 +73,10 @@ type failingEmailService struct {
 	err error
 }
 
-func (s *failingEmailService) SendInvitationEmail(_, _, _, _ string) error {
+func (s *failingEmailService) SendMagicCodeEmail(_, _, _ string) error {
 	return s.err
 }
 
-func (s *failingEmailService) SendMagicCodeEmail(_, _, _ string) error {
+func (s *failingEmailService) SendWorkOrderNotificationEmail(_, _ string, _ services.WorkOrderNotificationTemplateData) error {
 	return s.err
 }

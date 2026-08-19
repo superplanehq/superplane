@@ -48,6 +48,7 @@ type ExecutionContext struct {
 	OIDC           oidc.Provider
 	Apps           AppExecutionContext
 	Runs           RunExecutionContext
+	Factory        FactoryContext
 }
 
 type AppExecutionContext interface {
@@ -186,17 +187,20 @@ type ProcessQueueContext struct {
 	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
 
 	//
-	// HasRunningExecutions reports whether this node currently has any
-	// unfinished (running) executions.
+	// MaxConcurrency is the node's effective concurrency max.
+	// Self-managed components use it to gate how much concurrent work
+	// they start, since the queue worker does not capacity-gate their
+	// queue items.
 	//
-	HasRunningExecutions func() (bool, error)
+	MaxConcurrency int
 
 	//
-	// DefaultProcessing performs the default processing for the queue item.
-	// Convenience method to avoid boilerplate in components that just want default behavior,
-	// where an execution is created and the item is dequeued.
+	// CountRunningExecutions returns how many executions of this node
+	// currently occupy a concurrency slot: pending, started, or
+	// cancelling. Pending counts so that items processed in the same
+	// pass cannot all pass a limit check before any execution starts.
 	//
-	DefaultProcessing func() (*uuid.UUID, error)
+	CountRunningExecutions func() (int64, error)
 
 	//
 	// DistinctIncomingSources returns the distinct upstream
@@ -208,6 +212,8 @@ type ProcessQueueContext struct {
 
 type SecretsContext interface {
 	GetKey(secretName, keyName string) ([]byte, error)
+	GetSecretKeys(secretName string) (map[string][]byte, error)
+	GetIntegrationKeys(installationName string) (map[string][]byte, error)
 }
 
 type User struct {

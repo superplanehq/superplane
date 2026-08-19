@@ -51,8 +51,19 @@ type CanvasPublisher struct {
 	//
 	allNodes map[string]models.CanvasNode
 
+	// pendingSetups holds nodes that were created or updated and still need
+	// Setup(). Deferred until every AddNode has inserted its workflow_nodes
+	// row so self-referential components (e.g. runApp → onRun on the same
+	// canvas) can resolve sibling nodes during first publish.
+	pendingSetups []pendingNodeSetup
+
 	cancelledExecutionIDs []uuid.UUID
 	deletedQueueItems     []models.CanvasNodeQueueItem
+}
+
+type pendingNodeSetup struct {
+	canvasNode models.CanvasNode
+	draftID    string
 }
 
 type CanvasPublishResult struct {
@@ -144,6 +155,10 @@ func (p *CanvasPublisher) Publish(ctx context.Context) error {
 		if err := p.processChange(ctx, change); err != nil {
 			return err
 		}
+	}
+
+	if err := p.runPendingSetups(ctx); err != nil {
+		return err
 	}
 
 	finalNodes := make([]models.Node, 0, len(p.finalNodes))
@@ -250,6 +265,7 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *Change) error {
 		CreatedAt:         &now,
 		UpdatedAt:         &now,
 	}
+	newNode.SetConcurrencySpec(node.Concurrency)
 
 	//
 	// If node update led to an error, set the node to error state.
@@ -264,14 +280,16 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *Change) error {
 	}
 
 	//
-	// When adding a node, we need to insert it first,
-	// so when we Setup() it, the contexts can create
-	// records pointing to the new workflow_node record.
+	// Insert first so Setup() (and sibling lookups during a later Setup) can
+	// find the workflow_node row. Setup itself is deferred until every AddNode
+	// has been inserted — see pendingSetups / runPendingSetups.
 	//
 	err = p.tx.Create(&newNode).Error
 	if err != nil {
 		return err
 	}
+
+	p.allNodes[newNode.NodeID] = newNode
 
 	//
 	// If node is already in error state, no need to run Setup() for it.
@@ -282,23 +300,12 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *Change) error {
 		return nil
 	}
 
-	//
-	// Otherwise, run Setup() for the node.
-	//
-	// If an error happens when setting up the node, we propagate that into
-	// the finalNodes that are going to be saved into workflow_versions.nodes.
-	//
-	err = p.setupNode(ctx, &newNode)
-	if err != nil {
-		errorMsg := err.Error()
-		newNode.State = models.CanvasNodeStateError
-		newNode.StateReason = &errorMsg
-		node.ErrorMessage = &errorMsg
-	}
-
-	node.Metadata = newNode.Metadata.Data()
+	p.pendingSetups = append(p.pendingSetups, pendingNodeSetup{
+		canvasNode: newNode,
+		draftID:    node.ID,
+	})
 	p.finalNodes[node.ID] = node
-	return p.tx.Save(&newNode).Error
+	return nil
 }
 
 func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error {
@@ -353,34 +360,60 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error 
 	existingNode.Configuration = datatypes.NewJSONType(updatedNode.Configuration)
 	existingNode.Position = datatypes.NewJSONType(updatedNode.Position)
 	existingNode.IsCollapsed = updatedNode.IsCollapsed
+	existingNode.SetConcurrencySpec(updatedNode.Concurrency)
 	existingNode.AppInstallationID = appInstallationID
 	existingNode.UpdatedAt = &now
 
 	//
-	// If node is already in error state, no need to run Setup() for it.
+	// Persist field updates now so later Setups see the new configuration.
+	// Setup itself is deferred with AddNode setups (see runPendingSetups).
 	//
 	if existingNode.State == models.CanvasNodeStateError {
 		updatedNode.Metadata = existingNode.Metadata.Data()
 		p.finalNodes[existingNode.NodeID] = updatedNode
+		p.allNodes[existingNode.NodeID] = existingNode
 		return p.tx.Save(&existingNode).Error
 	}
 
-	//
-	// If an error happens when setting up the node,
-	// we propagate that into the finalNodes that are
-	// going to be saved into workflow_versions.nodes.
-	//
-	err = p.setupNode(ctx, &existingNode)
-	if err != nil {
-		errorMsg := err.Error()
-		existingNode.State = models.CanvasNodeStateError
-		existingNode.StateReason = &errorMsg
-		updatedNode.ErrorMessage = &errorMsg
+	if err := p.tx.Save(&existingNode).Error; err != nil {
+		return err
 	}
 
-	updatedNode.Metadata = existingNode.Metadata.Data()
+	p.allNodes[existingNode.NodeID] = existingNode
+	p.pendingSetups = append(p.pendingSetups, pendingNodeSetup{
+		canvasNode: existingNode,
+		draftID:    existingNode.NodeID,
+	})
 	p.finalNodes[existingNode.NodeID] = updatedNode
-	return p.tx.Save(&existingNode).Error
+	return nil
+}
+
+func (p *CanvasPublisher) runPendingSetups(ctx context.Context) error {
+	for i := range p.pendingSetups {
+		pending := &p.pendingSetups[i]
+		node := pending.canvasNode
+		draftNode, ok := p.finalNodes[pending.draftID]
+		if !ok {
+			return fmt.Errorf("pending setup for unknown draft node %s", pending.draftID)
+		}
+
+		err := p.setupNode(ctx, &node)
+		if err != nil {
+			errorMsg := err.Error()
+			node.State = models.CanvasNodeStateError
+			node.StateReason = &errorMsg
+			draftNode.ErrorMessage = &errorMsg
+		}
+
+		draftNode.Metadata = node.Metadata.Data()
+		p.finalNodes[pending.draftID] = draftNode
+		p.allNodes[node.NodeID] = node
+		if err := p.tx.Save(&node).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (p *CanvasPublisher) deleteNode(change *Change) error {

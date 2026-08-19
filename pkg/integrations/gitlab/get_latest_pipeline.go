@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -110,10 +109,6 @@ func (c *GetLatestPipeline) Execute(ctx core.ExecutionContext) error {
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "gitlab.pipeline", []any{pipeline})
-}
-
-func (c *GetLatestPipeline) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *GetLatestPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

@@ -2,7 +2,10 @@ package contexts
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -15,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/exprruntime"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/gorm"
 )
 
@@ -154,13 +158,16 @@ func (b *NodeConfigurationBuilder) resolveWithSchema(config map[string]any, fiel
 }
 
 func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configuration.Field) (any, error) {
-	if field.TypeOptions != nil {
-		if field.TypeOptions.Object != nil && len(field.TypeOptions.Object.Schema) > 0 {
-			if obj, ok := asAnyMap(value); ok {
-				return b.resolveWithSchema(obj, field.TypeOptions.Object.Schema)
-			}
+	switch field.Type {
+	case configuration.FieldTypeObject:
+		return b.resolveObjectFieldValue(value, field)
+	case configuration.FieldTypeNumber, configuration.FieldTypeBool:
+		if text, ok := value.(string); ok {
+			return b.resolveTemplatePreservingWholeValue(text)
 		}
+	}
 
+	if field.TypeOptions != nil {
 		if field.TypeOptions.List != nil && field.TypeOptions.List.ItemDefinition != nil {
 			if list, ok := value.([]any); ok {
 				return b.resolveListItems(list, field.TypeOptions.List.ItemDefinition)
@@ -168,24 +175,40 @@ func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configurat
 		}
 	}
 
+	if _, ok := value.(string); ok && !fieldAllowsExpressionResolution(field) {
+		return value, nil
+	}
+
 	return b.resolveValue(value)
 }
 
+// fieldAllowsExpressionResolution reports whether {{ }} placeholders in this
+// field should be evaluated. Text fields can opt out via
+// TypeOptions.Text.AllowExpressions=false; placeholders are then left as
+// literal text (e.g. runner scripts).
+func fieldAllowsExpressionResolution(field configuration.Field) bool {
+	if field.Type != configuration.FieldTypeText || field.TypeOptions == nil || field.TypeOptions.Text == nil {
+		return true
+	}
+
+	if field.TypeOptions.Text.AllowExpressions == nil {
+		return true
+	}
+
+	return *field.TypeOptions.Text.AllowExpressions
+}
+
 func (b *NodeConfigurationBuilder) resolveListItems(list []any, itemDef *configuration.ListItemDefinition) ([]any, error) {
+	itemField := configuration.Field{Type: itemDef.Type}
+	if itemDef.Type == configuration.FieldTypeObject && len(itemDef.Schema) > 0 {
+		itemField.TypeOptions = &configuration.TypeOptions{
+			Object: &configuration.ObjectTypeOptions{Schema: itemDef.Schema},
+		}
+	}
+
 	result := make([]any, len(list))
 	for i, item := range list {
-		if itemDef.Type == configuration.FieldTypeObject && len(itemDef.Schema) > 0 {
-			if itemMap, ok := asAnyMap(item); ok {
-				resolved, err := b.resolveWithSchema(itemMap, itemDef.Schema)
-				if err != nil {
-					return nil, fmt.Errorf("list item %d: %w", i, err)
-				}
-				result[i] = resolved
-				continue
-			}
-		}
-
-		resolved, err := b.resolveValue(item)
+		resolved, err := b.resolveFieldValue(item, itemField)
 		if err != nil {
 			return nil, fmt.Errorf("list item %d: %w", i, err)
 		}
@@ -195,25 +218,47 @@ func (b *NodeConfigurationBuilder) resolveListItems(list []any, itemDef *configu
 	return result, nil
 }
 
+// resolveValue walks configuration values and stringifies every template result.
 func (b *NodeConfigurationBuilder) resolveValue(value any) (any, error) {
+	return b.walkResolvedValue(value, false)
+}
+
+// resolveValuePreservingTypes walks object/JSON trees and keeps native types
+// when a leaf is a whole {{ ... }} expression (e.g. JSON body numbers/bools).
+func (b *NodeConfigurationBuilder) resolveValuePreservingTypes(value any) (any, error) {
+	return b.walkResolvedValue(value, true)
+}
+
+func (b *NodeConfigurationBuilder) walkResolvedValue(value any, preserveTypes bool) (any, error) {
 	switch v := value.(type) {
 	case string:
+		if preserveTypes {
+			return b.resolveTemplatePreservingWholeValue(v)
+		}
 		return b.ResolveTemplateExpressions(v)
 
 	case map[string]any:
-		return b.resolve(v)
+		result := make(map[string]any, len(v))
+		for key, nested := range v {
+			resolved, err := b.walkResolvedValue(nested, preserveTypes)
+			if err != nil {
+				return nil, err
+			}
+			result[key] = resolved
+		}
+		return result, nil
 
 	case map[string]string:
 		anyMap := make(map[string]any, len(v))
-		for key, value := range v {
-			anyMap[key] = value
+		for key, nested := range v {
+			anyMap[key] = nested
 		}
+		return b.walkResolvedValue(anyMap, preserveTypes)
 
-		return b.resolve(anyMap)
 	case []any:
 		result := make([]any, len(v))
 		for i, item := range v {
-			resolved, err := b.resolveValue(item)
+			resolved, err := b.walkResolvedValue(item, preserveTypes)
 			if err != nil {
 				return nil, err
 			}
@@ -224,6 +269,125 @@ func (b *NodeConfigurationBuilder) resolveValue(value any) (any, error) {
 	default:
 		return v, nil
 	}
+}
+
+func (b *NodeConfigurationBuilder) resolveObjectFieldValue(value any, field configuration.Field) (any, error) {
+	normalized, templatesResolved, err := b.normalizeObjectFieldInput(value)
+	if err != nil {
+		return nil, err
+	}
+
+	// String inputs (raw JSON templates or whole {{ … }} expressions) already
+	// had templates evaluated in normalizeObjectFieldInput. Walking again would
+	// re-evaluate mustache-like text that came from expression output.
+	if templatesResolved {
+		return normalized, nil
+	}
+
+	schema := objectFieldSchema(field)
+	if len(schema) == 0 {
+		return b.resolveValuePreservingTypes(normalized)
+	}
+
+	// Schemed objects normally resolve key-by-key. If the value is not a map
+	// (e.g. a whole {{ … }} expression that returned something else), fall back
+	// to generic resolution — same as before type-preserving object handling.
+	obj, ok := asAnyMap(normalized)
+	if !ok {
+		return b.resolveValue(normalized)
+	}
+
+	return b.resolveWithSchema(obj, schema)
+}
+
+func objectFieldSchema(field configuration.Field) []configuration.Field {
+	if field.TypeOptions == nil || field.TypeOptions.Object == nil {
+		return nil
+	}
+
+	return field.TypeOptions.Object.Schema
+}
+
+// normalizeObjectFieldInput turns an object field's stored value into a
+// structured value. Maps/arrays pass through unresolved; strings may be a whole
+// expression or a JSON template that still needs expression substitution.
+// templatesResolved is true when the returned value already had templates applied.
+func (b *NodeConfigurationBuilder) normalizeObjectFieldInput(value any) (any, bool, error) {
+	if obj, ok := asAnyMap(value); ok {
+		return obj, false, nil
+	}
+	if list, ok := value.([]any); ok {
+		return list, false, nil
+	}
+
+	text, ok := value.(string)
+	if !ok {
+		return value, false, nil
+	}
+
+	resolved, err := b.resolveTemplatePreservingWholeValue(text)
+	if err != nil {
+		return nil, false, err
+	}
+
+	resolvedText, ok := resolved.(string)
+	if !ok {
+		return resolved, true, nil
+	}
+
+	decoded, err := decodeJSONValue(resolvedText)
+	if err != nil {
+		// A whole {{ … }} that evaluated to a non-JSON string is kept so schemed
+		// object fields can fall back to generic resolution (pre-existing behavior).
+		if _, isWholeExpression := unwrapExpressionTemplate(text); isWholeExpression {
+			return resolvedText, true, nil
+		}
+		return nil, false, fmt.Errorf("resolved object field must be valid JSON: %w", err)
+	}
+
+	return decoded, true, nil
+}
+
+// resolveTemplatePreservingWholeValue returns the native expression result when
+// the entire string is a single {{ ... }} template; otherwise stringifies.
+func (b *NodeConfigurationBuilder) resolveTemplatePreservingWholeValue(value string) (any, error) {
+	if expression, ok := unwrapExpressionTemplate(value); ok {
+		return b.ResolveExpression(expression)
+	}
+
+	return b.ResolveTemplateExpressions(value)
+}
+
+func unwrapExpressionTemplate(value string) (string, bool) {
+	trimmed := strings.TrimSpace(value)
+	matches := expressionRegex.FindStringSubmatch(trimmed)
+	if len(matches) != 2 || matches[0] != trimmed {
+		return "", false
+	}
+
+	expression := strings.TrimSpace(matches[1])
+	if expression == "" {
+		return "", false
+	}
+
+	return expression, true
+}
+
+func decodeJSONValue(value string) (any, error) {
+	decoder := json.NewDecoder(strings.NewReader(value))
+	decoder.UseNumber()
+
+	var decoded any
+	if err := decoder.Decode(&decoded); err != nil {
+		return nil, err
+	}
+
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return nil, fmt.Errorf("must contain a single JSON value")
+	}
+
+	return decoded, nil
 }
 
 func asAnyMap(value any) (map[string]any, bool) {
@@ -329,6 +493,27 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 			}
 
 			return b.resolvePreviousPayload(depth)
+		}),
+		expr.Function("run", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("run() takes no arguments")
+			}
+
+			return b.resolveRunPayload()
+		}),
+		expr.Function("app", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("app() takes no arguments")
+			}
+
+			return b.resolveAppPayload()
+		}),
+		expr.Function("order", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("order() takes no arguments")
+			}
+
+			return b.resolveOrderPayload(expression)
 		}),
 	}
 
@@ -775,6 +960,293 @@ func (b *NodeConfigurationBuilder) resolveRootPayload() (any, error) {
 	return payload, nil
 }
 
+// resolveAppPayload exposes the current app (canvas) to expressions via app().
+// It returns id, name, description, and url for the workflow this node belongs to.
+func (b *NodeConfigurationBuilder) resolveAppPayload() (any, error) {
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return nil, fmt.Errorf("app() could not resolve the current app: %w", err)
+	}
+
+	return map[string]any{
+		"id":          canvas.ID.String(),
+		"name":        canvas.Name,
+		"description": canvas.Description,
+		"url": fmt.Sprintf(
+			"%s/%s/apps/%s",
+			uiBaseURL(),
+			canvas.OrganizationID.String(),
+			canvas.ID.String(),
+		),
+	}, nil
+}
+
+// resolveRunPayload exposes the current run to expressions via run().
+// It returns id, url, and started_at (a time.Time) for the run that the
+// current node belongs to, resolved from the builder's root event.
+func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
+	if b.rootEventID == nil {
+		return nil, fmt.Errorf("run() is not available in this context: no run found")
+	}
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(b.tx, *b.rootEventID)
+	if err != nil {
+		return nil, fmt.Errorf("run() could not resolve the current run: %w", err)
+	}
+
+	payload := map[string]any{
+		"id": run.ID.String(),
+	}
+
+	if run.CreatedAt != nil {
+		payload["started_at"] = *run.CreatedAt
+	}
+
+	url, err := b.buildRunURL(run)
+	if err != nil {
+		return nil, err
+	}
+	payload["url"] = url
+
+	return payload, nil
+}
+
+// resolveOrderPayload exposes the work order driving this run via order().
+// Returns nil when the run is not attached to a factory work-order execution.
+// The url, artifacts, and comments are loaded only when the expression AST
+// references order().url / order().artifacts / order().comments.
+func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
+	if b.rootEventID == nil {
+		return nil, nil
+	}
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(b.tx, *b.rootEventID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("order() could not resolve the current run: %w", err)
+	}
+
+	execution, err := models.FindWorkOrderExecutionByRunID(b.tx, run.ID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("order() could not resolve the work order execution: %w", err)
+	}
+
+	order, err := models.FindUnscopedWorkOrder(b.tx, execution.WorkOrderID)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not resolve the work order: %w", err)
+	}
+
+	payload := map[string]any{
+		"id":          order.ID.String(),
+		"title":       order.Title,
+		"description": order.Description,
+		"factory_id":  order.FactoryID.String(),
+		"state":       order.State,
+		"result":      order.Result,
+	}
+
+	if err := attachOrderSource(b.tx, order, payload); err != nil {
+		return nil, err
+	}
+
+	usesURL, err := expressionvalidation.ExpressionUsesOrderURL(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesURL {
+		url, err := b.buildWorkOrderURL(order)
+		if err != nil {
+			return nil, err
+		}
+		payload["url"] = url
+	}
+
+	usesArtifacts, err := expressionvalidation.ExpressionUsesOrderArtifacts(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesArtifacts {
+		artifacts, err := order.ListArtifacts(b.tx)
+		if err != nil {
+			return nil, fmt.Errorf("order() could not load artifacts: %w", err)
+		}
+
+		artifactPayloads := make([]any, 0, len(artifacts))
+		for i := range artifacts {
+			item, err := artifactExpressionPayload(&artifacts[i])
+			if err != nil {
+				return nil, err
+			}
+			artifactPayloads = append(artifactPayloads, item)
+		}
+		payload["artifacts"] = artifactPayloads
+	}
+
+	usesComments, err := expressionvalidation.ExpressionUsesOrderComments(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesComments {
+		comments, err := order.ListComments(b.tx)
+		if err != nil {
+			return nil, fmt.Errorf("order() could not load comments: %w", err)
+		}
+
+		commentPayloads := make([]any, 0, len(comments))
+		for i := range comments {
+			item, err := commentExpressionPayload(&comments[i])
+			if err != nil {
+				return nil, err
+			}
+			commentPayloads = append(commentPayloads, item)
+		}
+		payload["comments"] = commentPayloads
+	}
+
+	return payload, nil
+}
+
+func attachOrderSource(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
+	if order.SourceRunID == nil {
+		return nil
+	}
+
+	rootEvent, err := models.FindRootEventForRun(tx, *order.SourceRunID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return fmt.Errorf("order() could not resolve source: %w", err)
+	}
+	if rootEvent == nil {
+		return nil
+	}
+
+	if source := models.RootEventSourcePayload(rootEvent.Data.Data()); source != nil {
+		payload["source"] = normalizeExpressionValue(source)
+	}
+	return nil
+}
+
+func artifactExpressionPayload(artifact *models.FactoryWorkOrderArtifact) (map[string]any, error) {
+	data := map[string]any{}
+	if len(artifact.Data) > 0 {
+		if err := json.Unmarshal(artifact.Data, &data); err != nil {
+			return nil, fmt.Errorf("order() could not decode artifact data: %w", err)
+		}
+	}
+
+	return map[string]any{
+		"id":   artifact.ID.String(),
+		"type": artifact.Type,
+		"data": normalizeExpressionValue(data),
+	}, nil
+}
+
+func commentExpressionPayload(comment *models.FactoryWorkOrderComment) (map[string]any, error) {
+	author := comment.Author()
+	payload := map[string]any{
+		"id":         comment.ID.String(),
+		"body":       comment.Body,
+		"created_at": comment.CreatedAt,
+		"author":     commentAuthorExpressionPayload(&author),
+	}
+
+	if run := comment.RunRef(); run != nil {
+		payload["run"] = map[string]any{"id": run.ID.String()}
+	}
+
+	return normalizeExpressionValue(payload).(map[string]any), nil
+}
+
+func commentAuthorExpressionPayload(author *factory.WorkOrderCommentAuthor) map[string]any {
+	authorPayload := map[string]any{
+		"kind": author.Kind,
+	}
+
+	if author.UserID != nil {
+		authorPayload["user_id"] = *author.UserID
+	}
+
+	if automation := author.Automation; automation != nil {
+		automationPayload := map[string]any{}
+		if automation.NodeID != "" {
+			automationPayload["node_id"] = automation.NodeID
+		}
+		if automation.NodeName != "" {
+			automationPayload["node_name"] = automation.NodeName
+		}
+		if automation.AppID != uuid.Nil {
+			automationPayload["app_id"] = automation.AppID.String()
+		}
+		if automation.AppName != "" {
+			automationPayload["app_name"] = automation.AppName
+		}
+		if automation.LineID != uuid.Nil {
+			automationPayload["line_id"] = automation.LineID.String()
+		}
+		if automation.LineName != "" {
+			automationPayload["line_name"] = automation.LineName
+		}
+		if automation.StepIndex != nil {
+			automationPayload["step_index"] = *automation.StepIndex
+		}
+		if automation.StepName != "" {
+			automationPayload["step_name"] = automation.StepName
+		}
+		authorPayload["automation"] = automationPayload
+	}
+
+	return authorPayload
+}
+
+// buildWorkOrderURL resolves the work order permalink in the SuperPlane UI.
+// The factory key is part of that path, so the owning factory has to be loaded.
+func (b *NodeConfigurationBuilder) buildWorkOrderURL(order *models.FactoryWorkOrder) (string, error) {
+	owner, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
+	if err != nil {
+		return "", fmt.Errorf("order() could not resolve the factory that owns the work order: %w", err)
+	}
+
+	return uiBaseURL() + order.URLPath(owner.Key), nil
+}
+
+func (b *NodeConfigurationBuilder) buildRunURL(run *models.CanvasRun) (string, error) {
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return "", fmt.Errorf("run() could not resolve the organization for the run: %w", err)
+	}
+
+	return fmt.Sprintf(
+		"%s/%s/apps/%s?run=%s",
+		uiBaseURL(),
+		canvas.OrganizationID.String(),
+		b.workflowID.String(),
+		run.ID.String(),
+	), nil
+}
+
+// uiBaseURL mirrors the server's base URL resolution so app()/run() URLs
+// point at the SuperPlane UI both in production (BASE_URL) and local development.
+func uiBaseURL() string {
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL != "" {
+		return baseURL
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8000"
+	}
+
+	return fmt.Sprintf("http://localhost:%s", port)
+}
+
 func populateFromInputOrRoot(messageChain map[string]any, inputMap map[string]any, rootEvent *models.CanvasEvent, refToNodeID map[string]string) map[string]string {
 	chainRefs := make(map[string]string, len(refToNodeID))
 	for nodeRef, nodeID := range refToNodeID {
@@ -892,6 +1364,9 @@ var reservedExpressionIdentifiers = map[string]struct{}{
 	"config":   {},
 	"root":     {},
 	"previous": {},
+	"run":      {},
+	"app":      {},
+	"order":    {},
 	"ctx":      {},
 }
 

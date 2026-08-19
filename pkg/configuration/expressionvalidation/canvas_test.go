@@ -98,6 +98,26 @@ func TestValidateNodeExpressions_FieldTypes(t *testing.T) {
 			t.Fatalf("expected no errors, got %+v", errs)
 		}
 	})
+
+	t.Run("text with allowExpressions false leaves placeholders unvalidated", func(t *testing.T) {
+		allow := false
+		fields := []configuration.Field{{
+			Name: "script",
+			Type: configuration.FieldTypeText,
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language:         "javascript",
+					AllowExpressions: &allow,
+				},
+			},
+		}}
+		errs := validateNodeExpressions("n1", "Run JS", map[string]any{
+			"script": `console.log({{ root().timestamp }});`,
+		}, fields, knownSet())
+		if len(errs) != 0 {
+			t.Fatalf("expected no errors for literal placeholders in code fields, got %+v", errs)
+		}
+	})
 }
 
 func TestValidateNodeExpressions_NestedPaths(t *testing.T) {

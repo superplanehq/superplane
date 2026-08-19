@@ -150,6 +150,91 @@ func ensureProjectInMetadata(ctx core.MetadataWriter, app core.IntegrationContex
 	})
 }
 
+// matchesNoteContentFilter checks whether a Note Hook payload's comment body
+// matches the given regex filter. An empty filter always matches.
+func matchesNoteContentFilter(filter string, data map[string]any) (bool, error) {
+	if filter == "" {
+		return true, nil
+	}
+
+	attrs, ok := data["object_attributes"].(map[string]any)
+	if !ok {
+		return false, nil
+	}
+
+	note, ok := attrs["note"].(string)
+	if !ok {
+		return false, nil
+	}
+
+	matched, err := regexp.MatchString(filter, note)
+	if err != nil {
+		return false, fmt.Errorf("invalid content filter pattern: %w", err)
+	}
+
+	return matched, nil
+}
+
+// parseUserIDs converts a list of stringified GitLab user IDs (as produced by
+// member resource selectors) into ints, skipping any that are not numeric.
+func parseUserIDs(ids []string) []int {
+	var result []int
+	for _, s := range ids {
+		var id int
+		if _, err := fmt.Sscanf(s, "%d", &id); err == nil {
+			result = append(result, id)
+		}
+	}
+	return result
+}
+
+// reviewerIDsOf returns the user IDs of a merge request's current reviewers.
+func reviewerIDsOf(mr *MergeRequest) []int {
+	ids := make([]int, 0, len(mr.Reviewers))
+	for _, r := range mr.Reviewers {
+		ids = append(ids, r.ID)
+	}
+	return ids
+}
+
+// mergeReviewerIDs returns the union of existing and added IDs, preserving the
+// existing order and appending new IDs that are not already present.
+func mergeReviewerIDs(existing, add []int) []int {
+	seen := make(map[int]struct{}, len(existing))
+	result := make([]int, 0, len(existing)+len(add))
+	for _, id := range existing {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+	for _, id := range add {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+	return result
+}
+
+// removeReviewerIDs returns the existing IDs with any of the given IDs removed.
+func removeReviewerIDs(existing, remove []int) []int {
+	toRemove := make(map[int]struct{}, len(remove))
+	for _, id := range remove {
+		toRemove[id] = struct{}{}
+	}
+	result := make([]int, 0, len(existing))
+	for _, id := range existing {
+		if _, ok := toRemove[id]; ok {
+			continue
+		}
+		result = append(result, id)
+	}
+	return result
+}
+
 func normalizePipelineRef(ref string) string {
 	if strings.HasPrefix(ref, "refs/heads/") {
 		return strings.TrimPrefix(ref, "refs/heads/")

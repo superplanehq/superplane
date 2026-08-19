@@ -19,7 +19,7 @@ func TestEnsureLiveVersionIDReturnsNewestVersion(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/api/v1/canvases/canvas-123/versions" {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"version-1"}}]}`))
+			_, _ = w.Write([]byte(`{"versions":[{"id":"version-1"}]}`))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)

@@ -78,7 +78,7 @@ describe("useExperimentalFeature", () => {
       wrapper: createWrapper(queryClient),
     });
 
-    expect(Object.keys(result.current).sort()).toEqual(["enabledExperimentalFeatures", "has"]);
+    expect(Object.keys(result.current).sort()).toEqual(["enabledExperimentalFeatures", "has", "isLoading"]);
     expect(result.current.has).toEqual(expect.any(Function));
     expect(result.current.enabledExperimentalFeatures).toEqual(expect.any(Array));
   });
@@ -192,7 +192,43 @@ describe("useExperimentalFeature", () => {
       wrapper: createWrapper(queryClient),
     });
 
+    expect(result.current.isLoading).toBe(true);
     expect(result.current.has("alpha")).toBe(false);
+  });
+
+  it("returns true for isLoading while the organization has not loaded yet", () => {
+    const queryClient = createQueryClient();
+    seedQueries(queryClient, {
+      registry: {
+        features: [makeFeature({ id: "alpha" })],
+      },
+    });
+
+    const { result } = renderHook(() => useExperimentalFeature(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.has("alpha")).toBe(false);
+  });
+
+  it("returns false for isLoading once organization and registry are loaded", () => {
+    const queryClient = createQueryClient();
+    seedQueries(queryClient, {
+      organization: {
+        spec: { enabledExperimentalFeatures: ["alpha"] },
+      } as OrganizationsOrganization,
+      registry: {
+        features: [makeFeature({ id: "alpha" })],
+      },
+    });
+
+    const { result } = renderHook(() => useExperimentalFeature(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.has("alpha")).toBe(true);
   });
 
   it("lists released features and features the organization opted into", () => {

@@ -27,9 +27,11 @@ type fakeConfig struct {
 	activeApp string
 }
 
-func (f *fakeConfig) GetActiveApp() string      { return f.activeApp }
-func (f *fakeConfig) SetActiveApp(string) error { return nil }
-func (f *fakeConfig) GetURL() string            { return "" }
+func (f *fakeConfig) GetActiveApp() string          { return f.activeApp }
+func (f *fakeConfig) SetActiveApp(string) error     { return nil }
+func (f *fakeConfig) GetActiveFactory() string      { return "" }
+func (f *fakeConfig) SetActiveFactory(string) error { return nil }
+func (f *fakeConfig) GetURL() string                { return "" }
 
 type apiTestServer struct {
 	t            *testing.T

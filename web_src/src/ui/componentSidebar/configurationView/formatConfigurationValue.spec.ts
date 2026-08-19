@@ -58,6 +58,16 @@ describe("formatConfigurationValue", () => {
     });
   });
 
+  it("formats integration references by installation name", () => {
+    const field: ConfigurationField = { name: "integration", label: "Integration", type: "integration" };
+    expect(formatConfigurationValue(field, { name: "GitHub Production" }).displayText).toBe("GitHub Production");
+  });
+
+  it("formats secret references", () => {
+    const field: ConfigurationField = { name: "secret", label: "Secret", type: "secret" };
+    expect(formatConfigurationValue(field, { secret: "some-other-secret" }).displayText).toBe("some-other-secret");
+  });
+
   it("masks secret-key references", () => {
     const field: ConfigurationField = { name: "credential", label: "Credential", type: "secret-key" };
     expect(formatConfigurationValue(field, { secret: "prod", key: "api-token" }).displayText).toBe(

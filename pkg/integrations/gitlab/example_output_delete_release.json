@@ -1,0 +1,87 @@
+{
+  "data": {
+    "tag_name": "v1.0.0",
+    "name": "Release 1.0.0",
+    "description": "## What's Changed\n\n- Added new feature\n- Fixed a bug",
+    "created_at": "2026-01-03T01:56:19.539Z",
+    "released_at": "2026-01-03T01:56:19.539Z",
+    "upcoming_release": false,
+    "author": {
+      "id": 1,
+      "name": "Administrator",
+      "username": "root",
+      "state": "active",
+      "avatar_url": "https://www.gravatar.com/avatar/0?s=80&d=identicon",
+      "web_url": "https://gitlab.com/root"
+    },
+    "commit": {
+      "id": "588440f66559714280628a4f9799f0c4eb880a7",
+      "short_id": "588440f6",
+      "title": "Merge branch 'feature' into 'main'",
+      "created_at": "2026-01-03T01:55:18.000Z",
+      "parent_ids": ["281d3a76f31c812dbf48abce82ccf6860adedd81"],
+      "message": "Merge branch 'feature' into 'main'\n",
+      "author_name": "Administrator",
+      "author_email": "admin@example.com",
+      "authored_date": "2026-01-03T01:55:18.000Z",
+      "committer_name": "Administrator",
+      "committer_email": "admin@example.com",
+      "committed_date": "2026-01-03T01:55:18.000Z"
+    },
+    "milestones": [
+      {
+        "id": 51,
+        "iid": 1,
+        "project_id": 24,
+        "title": "v1.0",
+        "description": "",
+        "state": "closed",
+        "created_at": "2025-12-01T09:30:00.000Z",
+        "updated_at": "2026-01-02T10:00:00.000Z",
+        "due_date": "2026-01-01",
+        "start_date": "2025-12-01",
+        "web_url": "https://gitlab.com/root/example-project/-/milestones/1",
+        "issue_stats": {
+          "total": 5,
+          "closed": 5
+        }
+      }
+    ],
+    "commit_path": "/root/example-project/-/commit/588440f66559714280628a4f9799f0c4eb880a7",
+    "tag_path": "/root/example-project/-/tags/v1.0.0",
+    "evidence_sha": "760d6cdfb0879c95bc55d7b072f1252c8cdcf5cf",
+    "assets": {
+      "count": 2,
+      "sources": [
+        {
+          "format": "zip",
+          "url": "https://gitlab.com/root/example-project/-/archive/v1.0.0/example-project-v1.0.0.zip"
+        },
+        {
+          "format": "tar.gz",
+          "url": "https://gitlab.com/root/example-project/-/archive/v1.0.0/example-project-v1.0.0.tar.gz"
+        }
+      ],
+      "links": []
+    },
+    "evidences": [
+      {
+        "sha": "760d6cdfb0879c95bc55d7b072f1252c8cdcf5cf",
+        "filepath": "https://gitlab.com/root/example-project/-/releases/v1.0.0/evidences/1.json",
+        "collected_at": "2026-01-03T01:56:19.552Z"
+      }
+    ],
+    "_links": {
+      "closed_issues_url": "https://gitlab.com/root/example-project/-/issues?release_tag=v1.0.0&scope=all&state=closed",
+      "closed_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0&scope=all&state=closed",
+      "edit_url": "https://gitlab.com/root/example-project/-/releases/v1.0.0/edit",
+      "merged_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0&scope=all&state=merged",
+      "opened_issues_url": "https://gitlab.com/root/example-project/-/issues?release_tag=v1.0.0&scope=all&state=opened",
+      "opened_merge_requests_url": "https://gitlab.com/root/example-project/-/merge_requests?release_tag=v1.0.0&scope=all&state=opened",
+      "self": "https://gitlab.com/root/example-project/-/releases/v1.0.0"
+    },
+    "tag_deleted": true
+  },
+  "timestamp": "2026-01-03T01:56:19.552000000Z",
+  "type": "gitlab.release"
+}

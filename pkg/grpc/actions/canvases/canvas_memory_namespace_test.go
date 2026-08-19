@@ -6,7 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -29,7 +30,7 @@ func Test__CreateCanvasMemoryNamespace(t *testing.T) {
 	t.Run("empty entries -> error and no namespace persisted", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		_, err := CreateCanvasMemoryNamespace(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String(), "empty-namespace", nil)
+		_, err := CreateCanvasMemoryNamespace(context.Background(), database.DB(t.Context()), canvas, "empty-namespace", nil)
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
@@ -44,9 +45,8 @@ func Test__CreateCanvasMemoryNamespace(t *testing.T) {
 
 		resp, err := CreateCanvasMemoryNamespace(
 			context.Background(),
-			r.Registry,
-			r.Organization.ID.String(),
-			canvas.ID.String(),
+			database.DB(t.Context()),
+			canvas,
 			"release-cache",
 			structpbEntries(t, map[string]any{"key": "value"}),
 		)
@@ -67,9 +67,8 @@ func Test__UpdateCanvasMemoryNamespace(t *testing.T) {
 
 		_, err := CreateCanvasMemoryNamespace(
 			context.Background(),
-			r.Registry,
-			r.Organization.ID.String(),
-			canvas.ID.String(),
+			database.DB(t.Context()),
+			canvas,
 			"durable-namespace",
 			structpbEntries(t, map[string]any{"key": "value"}),
 		)
@@ -77,9 +76,8 @@ func Test__UpdateCanvasMemoryNamespace(t *testing.T) {
 
 		_, err = UpdateCanvasMemoryNamespace(
 			context.Background(),
-			r.Registry,
-			r.Organization.ID.String(),
-			canvas.ID.String(),
+			database.DB(t.Context()),
+			canvas,
 			"durable-namespace",
 			"",
 			nil,
@@ -98,9 +96,8 @@ func Test__UpdateCanvasMemoryNamespace(t *testing.T) {
 
 		_, err := CreateCanvasMemoryNamespace(
 			context.Background(),
-			r.Registry,
-			r.Organization.ID.String(),
-			canvas.ID.String(),
+			database.DB(t.Context()),
+			canvas,
 			"replace-namespace",
 			structpbEntries(t, map[string]any{"key": "v1"}),
 		)
@@ -108,9 +105,8 @@ func Test__UpdateCanvasMemoryNamespace(t *testing.T) {
 
 		resp, err := UpdateCanvasMemoryNamespace(
 			context.Background(),
-			r.Registry,
-			r.Organization.ID.String(),
-			canvas.ID.String(),
+			database.DB(t.Context()),
+			canvas,
 			"replace-namespace",
 			"",
 			structpbEntries(t, map[string]any{"key": "v2"}, map[string]any{"key": "v3"}),

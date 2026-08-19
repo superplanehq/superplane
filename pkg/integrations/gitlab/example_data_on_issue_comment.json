@@ -1,0 +1,63 @@
+{
+  "data": {
+    "object_kind": "note",
+    "event_type": "note",
+    "user": {
+      "id": 1,
+      "name": "Alex Garcia",
+      "username": "agarcia",
+      "avatar_url": "https://www.gravatar.com/avatar/1a29da0ccd099482194440fac762f5ccb4ec53227761d1859979367644a889a5?s=80&d=identicon",
+      "email": "agarcia@example.com"
+    },
+    "project_id": 1,
+    "project": {
+      "id": 1,
+      "name": "Example Project",
+      "description": "Project used to demonstrate issue comment webhook payloads.",
+      "web_url": "https://gitlab.example.com/group/example",
+      "avatar_url": null,
+      "git_ssh_url": "ssh://git@gitlab.example.com:group/example.git",
+      "git_http_url": "https://gitlab.example.com/group/example.git",
+      "namespace": "group",
+      "visibility_level": 20,
+      "path_with_namespace": "group/example",
+      "default_branch": "main",
+      "ci_config_path": null
+    },
+    "repository": {
+      "name": "Example Project",
+      "url": "ssh://git@gitlab.example.com/group/example.git",
+      "description": "Project used to demonstrate issue comment webhook payloads.",
+      "homepage": "https://gitlab.example.com/group/example"
+    },
+    "object_attributes": {
+      "id": 1355,
+      "note": "/sp-investigate",
+      "noteable_type": "Issue",
+      "author_id": 1,
+      "created_at": "2026-02-12 20:40:00 UTC",
+      "updated_at": "2026-02-12 20:40:00 UTC",
+      "project_id": 1,
+      "attachment": null,
+      "discussion_id": "6c2bb44bdc7f5c8f21b9ff8422f3d60cc0e5e719",
+      "noteable_id": 45,
+      "system": false,
+      "url": "https://gitlab.example.com/group/example/-/issues/8#note_1355",
+      "action": "create"
+    },
+    "issue": {
+      "id": 45,
+      "iid": 8,
+      "title": "Login page throws 500 on invalid credentials",
+      "description": "Steps to reproduce: submit the login form with a wrong password.",
+      "state": "opened",
+      "author_id": 1,
+      "created_at": "2026-02-10 09:00:00 UTC",
+      "updated_at": "2026-02-12 20:40:00 UTC",
+      "url": "https://gitlab.example.com/group/example/-/issues/8",
+      "labels": ["bug"]
+    }
+  },
+  "timestamp": "2026-02-12T20:40:00.000000000Z",
+  "type": "gitlab.issueComment"
+}

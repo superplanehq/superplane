@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 
-import { useConsoleContext, type resolveConsoleNode } from "./ConsoleContext";
+import { useConsoleContext, type ConsoleRunDisabledReason, type resolveConsoleNode } from "./ConsoleContext";
 import { confirmConsoleTriggerNode } from "./confirmConsoleTriggerNode";
 import { buildConsoleTriggerParameters, triggerHasParameters } from "./consoleTriggerParameters";
 import { isManualRunNode } from "./manualRunTriggers";
@@ -20,6 +20,13 @@ interface UseConsoleRunTriggerArgs {
    * for the websocket-driven `STATE_STARTED` refresh to catch up.
    */
   lock: ConsoleTriggerLock;
+  /**
+   * Widget-level opt-in for concurrent run submissions. When true, the
+   * in-flight / pending trigger locks are ignored so the Run button stays
+   * enabled during an active run and operators can enqueue multiple runs.
+   * Defaults to `false`, preserving the "block while running" behavior.
+   */
+  allowConcurrentRuns?: boolean;
 }
 
 export interface UseConsoleRunTriggerResult {
@@ -36,7 +43,14 @@ export interface UseConsoleRunTriggerResult {
    * Explains a `disabled` state so the button can surface a helpful
    * tooltip. `null` when the button is enabled.
    */
-  disabledReason: null | "no-perm" | "no-resolved-node" | "not-manual-run" | "run-in-flight" | "submitting";
+  disabledReason:
+    | null
+    | ConsoleRunDisabledReason
+    | "no-perm"
+    | "no-resolved-node"
+    | "not-manual-run"
+    | "run-in-flight"
+    | "submitting";
   dialogOpen: boolean;
   setDialogOpen: (next: boolean) => void;
   handleClick: () => void;
@@ -67,6 +81,7 @@ export function useConsoleRunTrigger({
   triggerName,
   promptConfirmation,
   lock,
+  allowConcurrentRuns = false,
 }: UseConsoleRunTriggerArgs): UseConsoleRunTriggerResult {
   const ctx = useConsoleContext();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -79,12 +94,13 @@ export function useConsoleRunTrigger({
   // Panel entries lock per trigger — disable while the trigger has a run in
   // flight regardless of the originating source, so navigating to a canvas
   // where a different widget kicked off the same trigger also reflects the
-  // "run in progress" state.
-  const runInFlight = Boolean(triggerNodeId && lock.runInFlightIds.has(triggerNodeId));
-  const submitting = Boolean(triggerNodeId && lock.pendingLockKeys.has(triggerNodeId));
+  // "run in progress" state. When the widget opts into concurrent runs, both
+  // signals are ignored so the button stays enabled during an active run.
+  const { runInFlight, submitting } = resolveLockSignals(lock, triggerNodeId, allowConcurrentRuns);
 
   const disabledReason = resolveDisabledReason({
     canRunNodes: ctx?.canRunNodes ?? false,
+    runNodesDisabledReason: ctx?.runNodesDisabledReason,
     hasResolved,
     isManualRun,
     submitting: running || submitting,
@@ -102,13 +118,14 @@ export function useConsoleRunTrigger({
     (parameters: Record<string, unknown>) => {
       const nodeId = resolved?.node?.id;
       if (!nodeId) return;
+      if (!ctx?.canRunNodes) return;
       if (runningRef.current) return;
       // A confirm dialog can outlive the state that opened it — e.g. another
       // widget fires the same trigger while the dialog is up. Re-check the
       // shared lock at fire time so a stale confirm can't enqueue a
-      // duplicate run.
-      if (lock.runInFlightIds.has(nodeId)) return;
-      if (lock.pendingLockKeys.has(nodeId)) return;
+      // duplicate run. Skipped when the widget allows concurrent runs.
+      if (!allowConcurrentRuns && lock.runInFlightIds.has(nodeId)) return;
+      if (!allowConcurrentRuns && lock.pendingLockKeys.has(nodeId)) return;
       runningRef.current = true;
       setRunning(true);
       lock.beginSubmission(nodeId, nodeId);
@@ -126,7 +143,7 @@ export function useConsoleRunTrigger({
         }
       })();
     },
-    [ctx, resolved, triggerName, lock],
+    [ctx, resolved, triggerName, lock, allowConcurrentRuns],
   );
 
   const handleClick = useCallback(() => {
@@ -142,19 +159,41 @@ export function useConsoleRunTrigger({
   return { canRun, running, disabled, disabledReason, dialogOpen, setDialogOpen, handleClick, runTrigger };
 }
 
+/**
+ * Read the per-trigger in-flight and pending signals from the shared lock.
+ * When the widget allows concurrent runs, both collapse to `false` so the
+ * Run button stays enabled during an active run.
+ */
+function resolveLockSignals(
+  lock: ConsoleTriggerLock,
+  triggerNodeId: string | undefined,
+  allowConcurrentRuns: boolean,
+): { runInFlight: boolean; submitting: boolean } {
+  if (allowConcurrentRuns || !triggerNodeId) {
+    return { runInFlight: false, submitting: false };
+  }
+  return {
+    runInFlight: lock.runInFlightIds.has(triggerNodeId),
+    submitting: lock.pendingLockKeys.has(triggerNodeId),
+  };
+}
+
 function resolveDisabledReason({
   canRunNodes,
+  runNodesDisabledReason,
   hasResolved,
   isManualRun,
   submitting,
   runInFlight,
 }: {
   canRunNodes: boolean;
+  runNodesDisabledReason?: ConsoleRunDisabledReason;
   hasResolved: boolean;
   isManualRun: boolean;
   submitting: boolean;
   runInFlight: boolean;
 }): UseConsoleRunTriggerResult["disabledReason"] {
+  if (runNodesDisabledReason) return runNodesDisabledReason;
   if (!canRunNodes) return "no-perm";
   if (!hasResolved) return "no-resolved-node";
   if (!isManualRun) return "not-manual-run";

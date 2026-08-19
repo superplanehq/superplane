@@ -5,7 +5,6 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/google/uuid"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -13,27 +12,9 @@ import (
 	"gorm.io/gorm"
 )
 
-func ListCanvasRepositoryFiles(ctx context.Context, gitProvider git.Provider, organizationID string, id string) (*pb.ListCanvasRepositoryFilesResponse, error) {
-	canvasID, err := uuid.Parse(id)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
-	}
-
-	orgID, err := uuid.Parse(organizationID)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
-	}
-
-	_, err = models.FindCanvas(orgID, canvasID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, grpcerrors.NotFound(err, "canvas not found")
-		}
-		return nil, grpcerrors.Internal(err, "failed to load canvas")
-	}
-
+func ListCanvasRepositoryFiles(ctx context.Context, gitProvider git.Provider, canvas *models.Canvas) (*pb.ListCanvasRepositoryFilesResponse, error) {
 	repositoryPaths := []string{}
-	repository, err := models.FindRepository(orgID, canvasID)
+	repository, err := models.FindRepository(canvas.OrganizationID, canvas.ID)
 	if err == nil {
 		files, listErr := gitProvider.ListFiles(ctx, repository.RepoID, "")
 		if listErr != nil {

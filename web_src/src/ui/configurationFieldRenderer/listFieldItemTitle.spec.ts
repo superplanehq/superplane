@@ -19,6 +19,12 @@ describe("listFieldItemTitle", () => {
     expect(listFieldItemTitle({ type: "boolean" }, 1, "Parameter")).toBe("Parameter (Boolean)");
   });
 
+  it("uses the type alone for generic step/item labels", () => {
+    expect(listFieldItemTitle({ type: "prompt" }, 0, "Step")).toBe("Prompt");
+    expect(listFieldItemTitle({ type: "bash" }, 1, "Step")).toBe("Bash");
+    expect(listFieldItemTitle({ type: "file" }, 0, "Item")).toBe("File");
+  });
+
   it("falls back to numbered item label", () => {
     expect(listFieldItemTitle({}, 2, "Parameter")).toBe("Parameter 3");
   });

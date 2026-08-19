@@ -756,6 +756,21 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         return `__previousByDepth["${depth}"]${expr.slice(previousMatch[0].length)}`;
       }
 
+      const runMatch = expr.match(/^run\(\)/);
+      if (runMatch) {
+        return `__run${expr.slice(runMatch[0].length)}`;
+      }
+
+      const appMatch = expr.match(/^app\(\)/);
+      if (appMatch) {
+        return `__app${expr.slice(appMatch[0].length)}`;
+      }
+
+      const orderMatch = expr.match(/^order\(\)/);
+      if (orderMatch) {
+        return `__order${expr.slice(orderMatch[0].length)}`;
+      }
+
       return expr;
     };
 

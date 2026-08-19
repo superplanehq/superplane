@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateCanvas, useUpdateCanvasFolderMembership } from "@/hooks/useCanvasData";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
@@ -15,6 +15,14 @@ import type { CanvasFolderData } from "./types";
 interface UseCreateAppOptions {
   folder?: CanvasFolderData;
   onCreated?: () => void;
+}
+
+function applyBlankAppBootContext(canvasId: string) {
+  writeCanvasAgentSidebarOpen(canvasId, true);
+  writeCanvasRunsSidebarOpen(canvasId, false);
+  localStorage.setItem("canvasSidebarOpen", "false");
+  setAgentBootContext(canvasId, "blank");
+  sessionStorage.setItem(PLACEHOLDER_NODE_CONTEXT_KEY, canvasId);
 }
 
 export function useCreateApp({ folder, onCreated }: UseCreateAppOptions = {}) {
@@ -48,24 +56,19 @@ export function useCreateApp({ folder, onCreated }: UseCreateAppOptions = {}) {
         });
 
         const canvasId = result?.data?.canvas?.metadata?.id;
-        if (canvasId) {
-          if (folder) {
-            try {
-              await updateCanvasFolderMembership(appendCanvasToFolderMembership(folder, canvasId));
-            } catch (error) {
-              showErrorToast(getApiErrorMessage(error, "App created, but failed to add it to folder"));
-            }
-          }
+        if (!canvasId) return;
 
-          onCreated?.();
-          // A new app always starts with the agent panel open (stored per canvas).
-          writeCanvasAgentSidebarOpen(canvasId, true);
-          writeCanvasRunsSidebarOpen(canvasId, false);
-          localStorage.setItem("canvasSidebarOpen", "false");
-          setAgentBootContext(canvasId, "blank");
-          sessionStorage.setItem(PLACEHOLDER_NODE_CONTEXT_KEY, canvasId);
-          navigate(appPath(organizationId, canvasId, "?edit=1"));
+        if (folder) {
+          try {
+            await updateCanvasFolderMembership(appendCanvasToFolderMembership(folder, canvasId));
+          } catch (error) {
+            showErrorToast(getApiErrorMessage(error, "App created, but failed to add it to folder"));
+          }
         }
+
+        onCreated?.();
+        applyBlankAppBootContext(canvasId);
+        navigate(appPath(organizationId, canvasId, "?edit=1"));
       } catch (error) {
         showErrorToast(getUsageLimitToastMessage(error, "Failed to create app"));
         throw error;

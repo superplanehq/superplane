@@ -6,13 +6,18 @@ export function flattenBuildingBlocks(categories: BuildingBlockCategory[]): Buil
   return categories.flatMap((c) => c.blocks);
 }
 
+export type BuildBuildingBlockCategoriesOptions = {
+  isFactoryApp?: boolean;
+};
+
 export function buildBuildingBlockCategories(
   triggers: TriggersTrigger[],
   components: ActionsAction[],
   integrations: IntegrationsIntegrationDefinition[],
+  options: BuildBuildingBlockCategoriesOptions = {},
 ): BuildingBlockCategory[] {
   const runnerCategory = runners(triggers, components);
-  const superplaneCategory = superplane(triggers, components);
+  const superplaneCategory = superplane(triggers, components, options.isFactoryApp ?? false);
 
   return [
     core(triggers, components),
@@ -24,10 +29,16 @@ export function buildBuildingBlockCategories(
   ];
 }
 
-function superplane(triggers: TriggersTrigger[], components: ActionsAction[]): BuildingBlockCategory | null {
+function superplane(
+  triggers: TriggersTrigger[],
+  components: ActionsAction[],
+  isFactoryApp: boolean,
+): BuildingBlockCategory | null {
   const blocks: BuildingBlock[] = [
     ...triggers.filter((t) => isSuperPlaneBlock(t)).map((t) => toTriggerBlock(t)),
-    ...components.filter((c) => isSuperPlaneBlock(c)).map((c) => toComponentBlock(c)),
+    ...components
+      .filter((c) => isSuperPlaneBlock(c) || (isFactoryApp && isFactoryBlock(c)))
+      .map((c) => toComponentBlock(c)),
   ];
 
   if (blocks.length === 0) {
@@ -173,6 +184,7 @@ const RUNNER_BLOCK_ORDER: Record<string, number> = {
   runnerBash: 1,
   runnerJS: 2,
   runnerPython: 3,
+  runnerClaudeCode: 4,
 };
 
 function sortRunnerBlocks(a: BuildingBlock, b: BuildingBlock): number {
@@ -188,20 +200,32 @@ function sortRunnerBlocks(a: BuildingBlock, b: BuildingBlock): number {
 
 function isRunnerBlock(component: { name?: string }): boolean {
   const name = component.name || "";
-  return name === "runner" || name === "runnerJS" || name === "runnerBash" || name === "runnerPython";
+  return (
+    name === "runner" ||
+    name === "runnerJS" ||
+    name === "runnerBash" ||
+    name === "runnerPython" ||
+    name === "runnerClaudeCode"
+  );
 }
 
-const SUPERPLANE_BLOCK_NAMES = new Set([
-  "onbroadcast",
-  "broadcastmessage",
-  "onrun",
-  "runapp",
-  "assignrunoutput",
-  "addrunerror",
+const SUPERPLANE_BLOCK_NAMES = new Set(["onBroadcast", "broadcastMessage", "onRun", "runApp", "addRunError"]);
+const FACTORY_BLOCK_NAMES = new Set([
+  "createWorkOrder",
+  "findWorkOrder",
+  "updateWorkOrderStatus",
+  "addWorkOrderComment",
+  "addWorkOrderArtifact",
+  "updateWorkOrderArtifact",
+  "reportWorkOrderCheck",
 ]);
 
 function isSuperPlaneBlock(component: { name?: string }): boolean {
-  return SUPERPLANE_BLOCK_NAMES.has((component.name || "").toLowerCase());
+  return SUPERPLANE_BLOCK_NAMES.has(component.name || "");
+}
+
+function isFactoryBlock(component: { name?: string }): boolean {
+  return FACTORY_BLOCK_NAMES.has(component.name || "");
 }
 
 function isCoreComponent(component: { name?: string }): boolean {
@@ -209,6 +233,7 @@ function isCoreComponent(component: { name?: string }): boolean {
     !isMemoryBlock(component) &&
     !isDebuggingBlock(component) &&
     !isRunnerBlock(component) &&
-    !isSuperPlaneBlock(component)
+    !isSuperPlaneBlock(component) &&
+    !isFactoryBlock(component)
   );
 }

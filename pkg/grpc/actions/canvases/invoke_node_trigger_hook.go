@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -18,6 +16,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"gorm.io/gorm"
 )
 
 func InvokeNodeTriggerHook(
@@ -25,8 +24,8 @@ func InvokeNodeTriggerHook(
 	authService authorization.Authorization,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
-	orgID uuid.UUID,
-	canvasID uuid.UUID,
+	db *gorm.DB,
+	canvas *models.Canvas,
 	nodeID string,
 	hookName string,
 	parameters map[string]any,
@@ -35,11 +34,6 @@ func InvokeNodeTriggerHook(
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
-	}
-
-	canvas, err := models.FindCanvas(orgID, canvasID)
-	if err != nil {
-		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
 
 	node, err := canvas.FindNode(nodeID)
@@ -66,12 +60,11 @@ func InvokeNodeTriggerHook(
 		return nil, grpcerrors.InvalidArgument(err, "hook parameter validation failed")
 	}
 
-	_, err = models.FindActiveUserByID(orgID.String(), userID)
+	_, err = models.FindActiveUserByIDInTransaction(db, canvas.OrganizationID.String(), userID)
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "user not found")
 	}
 
-	tx := database.Conn()
 	logger := logging.ForNode(*node)
 
 	newEvents := []models.CanvasEvent{}
@@ -81,7 +74,7 @@ func InvokeNodeTriggerHook(
 
 	expressionParameters := buildHookExpressionParameters(node.Ref.Data().Trigger.Name, hookName, node.Configuration.Data(), parameters)
 
-	resolvedConfiguration, err := contexts.NewNodeConfigurationBuilder(tx, node.WorkflowID).
+	resolvedConfiguration, err := contexts.NewNodeConfigurationBuilder(db, node.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithExpressionVariables(map[string]any{
 			"parameters": expressionParameters,
@@ -97,26 +90,27 @@ func InvokeNodeTriggerHook(
 		Parameters:    parameters,
 		Configuration: resolvedConfiguration,
 		HTTP:          registry.HTTPContext(),
-		Metadata:      contexts.NewNodeMetadataContext(tx, node),
-		Requests:      contexts.NewNodeRequestContext(tx, node),
-		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
-		Events:        contexts.NewEventContext(tx, node, nil, onNewEvents),
+		Metadata:      contexts.NewNodeMetadataContext(db, node),
+		Requests:      contexts.NewNodeRequestContext(db, node),
+		Webhook:       contexts.NewNodeWebhookContext(ctx, db, encryptor, node, webhookBaseURL),
+		Events:        contexts.NewEventContext(db, node, nil, onNewEvents),
 	}
 
 	if node.AppInstallationID != nil {
-		integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+		integration, err := models.FindUnscopedIntegrationInTransaction(db, *node.AppInstallationID)
 		if err != nil {
 			logger.Errorf("error finding app installation: %v", err)
 			return nil, grpcerrors.Internal(err, "error building context")
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
-		hookCtx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry, onNewEvents)
+		hookCtx.Integration = contexts.NewIntegrationContext(db, node, integration, encryptor, registry, onNewEvents)
 	}
 
 	hookCtx.Logger = logger
 	result, err := hookProvider.HandleHook(hookCtx)
 	if err != nil {
+		logger.Errorf("trigger hook %q execution failed: %v", hookName, err)
 		return nil, grpcerrors.InvalidArgument(err, "hook execution failed")
 	}
 
@@ -210,7 +204,7 @@ func defaultsFromTemplateParameters(template map[string]any) map[string]any {
 			if value, exists := parameter["defaultBoolean"]; exists && value != nil {
 				parameters[name] = value
 			}
-		case configuration.FieldTypeString, configuration.FieldTypeSelect:
+		case configuration.FieldTypeString, configuration.FieldTypeText, configuration.FieldTypeSelect:
 			if value, exists := parameter["defaultString"]; exists && value != nil {
 				if textValue, isString := value.(string); isString && textValue == "" {
 					continue

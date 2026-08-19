@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -131,10 +130,6 @@ func (c *EnableImageDeprecation) Setup(ctx core.SetupContext) error {
 	}
 
 	return nil
-}
-
-func (c *EnableImageDeprecation) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *EnableImageDeprecation) Execute(ctx core.ExecutionContext) error {

@@ -2,33 +2,19 @@ package canvases
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/gorm"
 )
 
-func UpdateCanvasMemoryNamespace(ctx context.Context, registry *registry.Registry, organizationID, canvasID, namespace, newNamespace string, entries []*structpb.Value) (*pb.UpdateCanvasMemoryNamespaceResponse, error) {
-	orgUUID, err := uuid.Parse(organizationID)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid organization_id")
-	}
-
-	canvasUUID, err := uuid.Parse(canvasID)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid canvas_id")
-	}
-
+func UpdateCanvasMemoryNamespace(ctx context.Context, db *gorm.DB, canvas *models.Canvas, namespace, newNamespace string, entries []*structpb.Value) (*pb.UpdateCanvasMemoryNamespaceResponse, error) {
 	namespace = strings.TrimSpace(namespace)
 	if namespace == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "namespace is required")
@@ -44,28 +30,20 @@ func UpdateCanvasMemoryNamespace(ctx context.Context, registry *registry.Registr
 		return nil, grpcerrors.InvalidArgument(nil, "at least one entry is required")
 	}
 
-	_, err = models.FindCanvas(orgUUID, canvasUUID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, grpcerrors.NotFound(err, "canvas not found")
-		}
-		return nil, grpcerrors.Internal(err, "failed to load canvas")
-	}
-
 	decodedEntries := make([]any, 0, len(entries))
 	for _, value := range entries {
 		decodedEntries = append(decodedEntries, value.AsInterface())
 	}
 
 	var stored []models.CanvasMemory
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		existingSource, txErr := models.CanvasMemoryNamespaceSourceInTransaction(tx, canvasUUID, namespace)
+	err := db.Transaction(func(tx *gorm.DB) error {
+		existingSource, txErr := models.CanvasMemoryNamespaceSourceInTransaction(tx, canvas.ID, namespace)
 		if txErr != nil {
 			return txErr
 		}
 
 		if existingSource == "" {
-			return grpcerrors.NotFound(err, fmt.Sprintf("memory namespace %q not found", namespace))
+			return grpcerrors.NotFound(nil, fmt.Sprintf("memory namespace %q not found", namespace))
 		}
 
 		if existingSource != models.CanvasMemorySourceManual {
@@ -73,7 +51,7 @@ func UpdateCanvasMemoryNamespace(ctx context.Context, registry *registry.Registr
 		}
 
 		if targetNamespace != namespace {
-			conflict, txErr := models.CanvasMemoryNamespaceSourceInTransaction(tx, canvasUUID, targetNamespace)
+			conflict, txErr := models.CanvasMemoryNamespaceSourceInTransaction(tx, canvas.ID, targetNamespace)
 			if txErr != nil {
 				return txErr
 			}
@@ -83,18 +61,18 @@ func UpdateCanvasMemoryNamespace(ctx context.Context, registry *registry.Registr
 			}
 
 			if txErr := tx.
-				Where("canvas_id = ? AND namespace = ? AND source = ?", canvasUUID, namespace, models.CanvasMemorySourceManual).
+				Where("canvas_id = ? AND namespace = ? AND source = ?", canvas.ID, namespace, models.CanvasMemorySourceManual).
 				Delete(&models.CanvasMemory{}).
 				Error; txErr != nil {
 				return txErr
 			}
 		}
 
-		if txErr := models.ReplaceManualCanvasMemoryNamespaceInTransaction(tx, canvasUUID, targetNamespace, decodedEntries); txErr != nil {
+		if txErr := models.ReplaceManualCanvasMemoryNamespaceInTransaction(tx, canvas.ID, targetNamespace, decodedEntries); txErr != nil {
 			return txErr
 		}
 
-		records, txErr := models.ListCanvasMemoriesByNamespaceInTransaction(tx, canvasUUID, targetNamespace)
+		records, txErr := models.ListCanvasMemoriesByNamespaceInTransaction(tx, canvas.ID, targetNamespace)
 		if txErr != nil {
 			return txErr
 		}
@@ -110,7 +88,7 @@ func UpdateCanvasMemoryNamespace(ctx context.Context, registry *registry.Registr
 		return nil, grpcerrors.Internal(err, "failed to update canvas memory namespace")
 	}
 
-	if err := messages.NewCanvasMemoryUpdatedMessage(canvasUUID.String()).PublishMemoryUpdated(); err != nil {
+	if err := messages.NewCanvasMemoryUpdatedMessage(canvas.ID.String()).PublishMemoryUpdated(); err != nil {
 		log.Errorf("failed to publish canvas memory updated RabbitMQ message: %v", err)
 	}
 

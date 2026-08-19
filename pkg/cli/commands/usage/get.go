@@ -77,6 +77,15 @@ func renderUsageText(stdout io.Writer, response *openapi_client.OrganizationsDes
 		if updatedAt, ok := usage.GetAgentTokenBucketLastUpdatedAtOk(); ok {
 			_, _ = fmt.Fprintf(writer, "Agent token bucket updated\t%s\n", updatedAt.Format(time.RFC3339))
 		}
+		_, _ = fmt.Fprintf(
+			writer,
+			"Runner minutes bucket\t%s / %s\n",
+			formatFloat64Value(usage.GetRunnerMinutesBucketLevelOk()),
+			formatFloat64Value(usage.GetRunnerMinutesBucketCapacityOk()),
+		)
+		if updatedAt, ok := usage.GetRunnerMinutesBucketLastUpdatedAtOk(); ok {
+			_, _ = fmt.Fprintf(writer, "Runner minutes bucket updated\t%s\n", updatedAt.Format(time.RFC3339))
+		}
 		if err := writer.Flush(); err != nil {
 			return err
 		}
@@ -94,6 +103,7 @@ func renderUsageText(stdout io.Writer, response *openapi_client.OrganizationsDes
 		_, _ = fmt.Fprintf(writer, "Max events per month\t%s\n", formatStringLimit(limits.GetMaxEventsPerMonthOk()))
 		_, _ = fmt.Fprintf(writer, "Max integrations\t%s\n", formatInt32Limit(limits.GetMaxIntegrationsOk()))
 		_, _ = fmt.Fprintf(writer, "Max agent tokens per month\t%s\n", formatStringLimit(limits.GetMaxAgentTokensPerMonthOk()))
+		_, _ = fmt.Fprintf(writer, "Max runner minutes per month\t%s\n", formatStringLimit(limits.GetMaxRunnerMinutesPerMonthOk()))
 		return writer.Flush()
 	}
 
@@ -175,6 +185,18 @@ func normalizeUsageResponse(response *openapi_client.OrganizationsDescribeUsageR
 		if v, ok := usage.GetNextAgentTokenBucketDecreaseAtOk(); ok {
 			usageMap["nextAgentTokenBucketDecreaseAt"] = *v
 		}
+		if v, ok := usage.GetRunnerMinutesBucketLevelOk(); ok {
+			usageMap["runnerMinutesBucketLevel"] = *v
+		}
+		if v, ok := usage.GetRunnerMinutesBucketCapacityOk(); ok {
+			usageMap["runnerMinutesBucketCapacity"] = *v
+		}
+		if v, ok := usage.GetRunnerMinutesBucketLastUpdatedAtOk(); ok {
+			usageMap["runnerMinutesBucketLastUpdatedAt"] = *v
+		}
+		if v, ok := usage.GetNextRunnerMinutesBucketDecreaseAtOk(); ok {
+			usageMap["nextRunnerMinutesBucketDecreaseAt"] = *v
+		}
 		result["usage"] = usageMap
 	}
 
@@ -208,6 +230,13 @@ func normalizeUsageResponse(response *openapi_client.OrganizationsDescribeUsageR
 				limitsMap["maxAgentTokensPerMonth"] = parsed
 			} else {
 				limitsMap["maxAgentTokensPerMonth"] = *v
+			}
+		}
+		if v, ok := limits.GetMaxRunnerMinutesPerMonthOk(); ok {
+			if parsed, err := strconv.ParseInt(*v, 10, 64); err == nil {
+				limitsMap["maxRunnerMinutesPerMonth"] = parsed
+			} else {
+				limitsMap["maxRunnerMinutesPerMonth"] = *v
 			}
 		}
 		result["limits"] = limitsMap

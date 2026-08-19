@@ -1,4 +1,5 @@
 import type { MouseEvent } from "react";
+import type { CanvasFlowDirection } from "@/lib/canvasFlowDirection";
 import type { ComponentActionsProps } from "../../types/componentActions";
 import type { AnnotationComponentProps } from "../../annotationComponent";
 import type { ComponentBaseProps } from "../../componentBase";
@@ -47,6 +48,16 @@ export interface BlockInternalData {
   _hasHighlightedNodes?: boolean;
   _dimBodyBelowHeader?: boolean;
   _draftDiffStatus?: "added" | "updated" | "removed";
+  /** Factory apps use vertical (top→bottom) handles and edges. */
+  _flowDirection?: CanvasFlowDirection;
+  /** Factory run-inspection leaf layout: show Right side source handle. */
+  _factorySideSource?: boolean;
+  /** Factory run-inspection leaf layout: use Left target handle. */
+  _factorySideTarget?: boolean;
+  /** Factory run display uses route-based ports instead of channel stems. */
+  _factoryRunDisplaySource?: boolean;
+  /** Factory run display source needs a centered `__factorySpine` bottom handle. */
+  _factorySpineSource?: boolean;
   isTemplate?: boolean;
   isPendingConnection?: boolean;
 }
@@ -61,6 +72,10 @@ export interface BlockProps extends ComponentActionsProps {
   selected?: boolean;
   showHeader?: boolean;
   canvasMode?: "live" | "edit";
+  /** False on factory Live without a selected run (topology only). */
+  showRuntimeStatus?: boolean;
+  /** Factory run inspection: selected run still active (default true). */
+  runIsActive?: boolean;
   onAnnotationUpdate?: (
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },

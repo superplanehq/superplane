@@ -722,6 +722,38 @@ func validateFieldValue(field Field, value any) error {
 
 	case FieldTypeTimezone:
 		return validateTimezone(field, value)
+
+	case FieldTypeIntegration:
+		return validateIntegration(value)
+
+	case FieldTypeSecret:
+		return validateSecret(value)
+	}
+
+	return nil
+}
+
+func validateIntegration(value any) error {
+	ref, err := DecodeIntegrationRef(value)
+	if err != nil {
+		return err
+	}
+
+	if !ref.IsSet() {
+		return fmt.Errorf("integration is required")
+	}
+
+	return nil
+}
+
+func validateSecret(value any) error {
+	ref, err := DecodeSecretRef(value)
+	if err != nil {
+		return err
+	}
+
+	if !ref.IsSet() {
+		return fmt.Errorf("secret is required")
 	}
 
 	return nil
@@ -729,12 +761,20 @@ func validateFieldValue(field Field, value any) error {
 
 func isRequiredByCondition(field Field, config map[string]any) bool {
 	for _, condition := range field.RequiredConditions {
-		conditionValue, exists := config[condition.Field]
-		if !exists {
-			continue
+		// A missing or nil field compares as the empty string, matching
+		// the frontend evaluator (isFieldVisible in web_src) — so a
+		// condition can include "" to also match configs that omit the
+		// field and rely on its default.
+		value := ""
+		if conditionValue, exists := config[condition.Field]; exists && conditionValue != nil {
+			value = fmt.Sprintf("%v", conditionValue)
 		}
 
-		return slices.Contains(condition.Values, fmt.Sprintf("%v", conditionValue))
+		// Any satisfied condition makes the field required (OR logic),
+		// matching isFieldRequired in web_src.
+		if slices.Contains(condition.Values, value) {
+			return true
+		}
 	}
 
 	return false

@@ -10,7 +10,6 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -19,7 +18,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UUID, limit uint32, before *timestamppb.Timestamp, states []pb.CanvasRun_State, results []pb.CanvasRun_Result) (*pb.ListRunsResponse, error) {
+func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uint32, before *timestamppb.Timestamp, states []pb.CanvasRun_State, results []pb.CanvasRun_Result) (*pb.ListRunsResponse, error) {
 	limit = getLimit(limit)
 	beforeTime := getBefore(before)
 	filters, err := buildCanvasRunFilters(states, results)
@@ -27,17 +26,17 @@ func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UU
 		return nil, err
 	}
 
-	runs, err := listCanvasRuns(ctx, canvasID, int(limit), beforeTime, filters)
+	runs, err := listCanvasRuns(ctx, db, canvas.ID, int(limit), beforeTime, filters)
 	if err != nil {
 		return nil, err
 	}
 
-	count, err := countCanvasRuns(ctx, canvasID, filters)
+	count, err := countCanvasRuns(ctx, db, canvas.ID, filters)
 	if err != nil {
 		return nil, err
 	}
 
-	runDetails, err := loadRunDetailsForRuns(ctx, canvasID, runs)
+	runDetails, err := loadRunDetailsForRuns(ctx, db, canvas.ID, runs)
 	if err != nil {
 		return nil, err
 	}
@@ -90,14 +89,14 @@ func buildCanvasRunFilters(states []pb.CanvasRun_State, results []pb.CanvasRun_R
 	}, nil
 }
 
-func listRootEventsForRuns(ctx context.Context, canvasID uuid.UUID, runIDs []uuid.UUID) (map[string]models.CanvasEvent, error) {
+func listRootEventsForRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, runIDs []uuid.UUID) (map[string]models.CanvasEvent, error) {
 	eventsByRunID := map[string]models.CanvasEvent{}
 	if len(runIDs) == 0 {
 		return eventsByRunID, nil
 	}
 
 	var events []models.CanvasEvent
-	err := database.DB(ctx).
+	err := db.
 		Where("workflow_id = ?", canvasID).
 		Where("run_id IN ?", runIDs).
 		Where("execution_id IS NULL").
@@ -310,7 +309,7 @@ type runDetailsForRuns struct {
 	childRunsByExecutionID map[string][]models.CanvasRun
 }
 
-func loadRunDetailsForRuns(ctx context.Context, canvasID uuid.UUID, runs []models.CanvasRun) (*runDetailsForRuns, error) {
+func loadRunDetailsForRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, runs []models.CanvasRun) (*runDetailsForRuns, error) {
 	runIDs := make([]uuid.UUID, len(runs))
 	for i, run := range runs {
 		runIDs[i] = run.ID
@@ -335,7 +334,7 @@ func loadRunDetailsForRuns(ctx context.Context, canvasID uuid.UUID, runs []model
 
 	g.Go(func() error {
 		var err error
-		rootEventsByRunID, err = loadRootEventsForRunsSpan(gctx, canvasID, runIDs)
+		rootEventsByRunID, err = loadRootEventsForRunsSpan(gctx, db, canvasID, runIDs)
 		if err != nil {
 			return err
 		}
@@ -344,7 +343,7 @@ func loadRunDetailsForRuns(ctx context.Context, canvasID uuid.UUID, runs []model
 	})
 
 	g.Go(func() error {
-		executions, err := listExecutionsForRuns(gctx, canvasID, runIDs)
+		executions, err := listExecutionsForRuns(gctx, db, canvasID, runIDs)
 		if err != nil {
 			return err
 		}
@@ -367,7 +366,7 @@ func loadRunDetailsForRuns(ctx context.Context, canvasID uuid.UUID, runs []model
 
 	g.Go(func() error {
 		var err error
-		queueItemsByRunID, err = loadQueueItemsForRuns(gctx, canvasID, runIDs)
+		queueItemsByRunID, err = loadQueueItemsForRuns(gctx, db, canvasID, runIDs)
 		if err != nil {
 			return err
 		}
@@ -377,7 +376,7 @@ func loadRunDetailsForRuns(ctx context.Context, canvasID uuid.UUID, runs []model
 
 	g.Go(func() error {
 		var err error
-		parentRunsByRunID, err = loadParentRunsForRuns(gctx, runs)
+		parentRunsByRunID, err = loadParentRunsForRuns(gctx, db, runs)
 		return err
 	})
 
@@ -443,41 +442,41 @@ func serializeCanvasRuns(
 	return serialized, nil
 }
 
-func listCanvasRuns(ctx context.Context, canvasID uuid.UUID, limit int, beforeTime *time.Time, filters models.CanvasRunFilters) (runs []models.CanvasRun, err error) {
+func listCanvasRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, limit int, beforeTime *time.Time, filters models.CanvasRunFilters) (runs []models.CanvasRun, err error) {
 	ctx, done := telemetry.Span(ctx, "runs.list")
 	defer done(&err)
 
-	return models.ListCanvasRunsInTransaction(database.DB(ctx), canvasID, limit, beforeTime, filters)
+	return models.ListCanvasRunsInTransaction(db, canvasID, limit, beforeTime, filters)
 }
 
-func countCanvasRuns(ctx context.Context, canvasID uuid.UUID, filters models.CanvasRunFilters) (count int64, err error) {
+func countCanvasRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, filters models.CanvasRunFilters) (count int64, err error) {
 	ctx, done := telemetry.Span(ctx, "runs.count")
 	defer done(&err)
 
-	return models.CountCanvasRunsInTransaction(database.DB(ctx), canvasID, filters)
+	return models.CountCanvasRunsInTransaction(db, canvasID, filters)
 }
 
-func loadRootEventsForRunsSpan(ctx context.Context, canvasID uuid.UUID, runIDs []uuid.UUID) (events map[string]models.CanvasEvent, err error) {
+func loadRootEventsForRunsSpan(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, runIDs []uuid.UUID) (events map[string]models.CanvasEvent, err error) {
 	ctx, done := telemetry.Span(ctx, "runs.load_root_events")
 	defer done(&err)
 
-	return listRootEventsForRuns(ctx, canvasID, runIDs)
+	return listRootEventsForRuns(ctx, db, canvasID, runIDs)
 }
 
-func listExecutionsForRuns(ctx context.Context, canvasID uuid.UUID, runIDs []uuid.UUID) (executions []models.CanvasNodeExecution, err error) {
+func listExecutionsForRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, runIDs []uuid.UUID) (executions []models.CanvasNodeExecution, err error) {
 	ctx, done := telemetry.Span(ctx, "runs.load_executions")
 	defer done(&err)
 
-	return models.ListExecutionsForRunsInTransaction(database.DB(ctx), canvasID, runIDs)
+	return models.ListExecutionsForRunsInTransaction(db, canvasID, runIDs)
 }
 
-func loadQueueItemsForRuns(ctx context.Context, canvasID uuid.UUID, runIDs []uuid.UUID) (map[string][]models.CanvasNodeQueueItem, error) {
+func loadQueueItemsForRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, runIDs []uuid.UUID) (map[string][]models.CanvasNodeQueueItem, error) {
 	queueItemsByRunID := make(map[string][]models.CanvasNodeQueueItem, len(runIDs))
 	if len(runIDs) == 0 {
 		return queueItemsByRunID, nil
 	}
 
-	queueItems, err := listQueueItemsForRuns(ctx, canvasID, runIDs)
+	queueItems, err := listQueueItemsForRuns(ctx, db, canvasID, runIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -489,11 +488,11 @@ func loadQueueItemsForRuns(ctx context.Context, canvasID uuid.UUID, runIDs []uui
 	return queueItemsByRunID, nil
 }
 
-func loadParentRunsForRuns(ctx context.Context, runs []models.CanvasRun) (map[string]models.CanvasRun, error) {
+func loadParentRunsForRuns(ctx context.Context, db *gorm.DB, runs []models.CanvasRun) (map[string]models.CanvasRun, error) {
 	ctx, done := telemetry.Span(ctx, "runs.load_parent_runs")
 	defer done(nil)
 
-	parents, err := models.FindCanvasRunsByKeys(database.DB(ctx), models.CollectParentRunKeys(runs))
+	parents, err := models.FindCanvasRunsByKeys(db, models.CollectParentRunKeys(runs))
 	if err != nil {
 		return nil, err
 	}
@@ -508,9 +507,9 @@ func listChildRunsForExecutions(ctx context.Context, canvasID uuid.UUID, executi
 	return models.ListChildRunsByParentExecutions(database.DB(ctx), canvasID, executionIDs)
 }
 
-func listQueueItemsForRuns(ctx context.Context, canvasID uuid.UUID, runIDs []uuid.UUID) (queueItems []models.CanvasNodeQueueItem, err error) {
+func listQueueItemsForRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID, runIDs []uuid.UUID) (queueItems []models.CanvasNodeQueueItem, err error) {
 	ctx, done := telemetry.Span(ctx, "runs.load_queue_items")
 	defer done(&err)
 
-	return models.ListNodeQueueItemsForRuns(database.DB(ctx), canvasID, runIDs)
+	return models.ListNodeQueueItemsForRuns(db, canvasID, runIDs)
 }

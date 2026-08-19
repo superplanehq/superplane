@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -225,10 +224,6 @@ func hostsForCertificatePack(logger *log.Entry, client *Client, zoneID, packID s
 
 func (c *DeleteCertificatePack) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *DeleteCertificatePack) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *DeleteCertificatePack) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

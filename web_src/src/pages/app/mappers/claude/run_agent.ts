@@ -10,6 +10,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
+import type { MetadataItem } from "@/ui/metadataList";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
@@ -27,6 +28,15 @@ type RunAgentPayloadData = {
   lastMessage?: string;
   messages?: unknown[];
   artifacts?: SessionArtifact[];
+  parsed?: unknown;
+};
+
+type RunAgentNodeMetadata = {
+  structuredOutput?: boolean;
+};
+
+type RunAgentConfiguration = {
+  outputSchema?: string;
 };
 
 function addDetail(details: Record<string, string>, key: string, value: string | undefined) {
@@ -45,6 +55,40 @@ function formatArtifacts(artifacts?: SessionArtifact[]): string | undefined {
   return names.length > 0 ? names.join(", ") : undefined;
 }
 
+// formatParsed renders the structured-output JSON extracted from the agent's
+// final message. Best-effort: the backend only sets this when a schema is
+// configured and the session finished normally, so it's absent otherwise.
+function formatParsed(parsed?: unknown): string | undefined {
+  if (parsed === undefined || parsed === null) {
+    return undefined;
+  }
+  try {
+    return JSON.stringify(parsed);
+  } catch {
+    return undefined;
+  }
+}
+
+function hasSchema(schema: unknown): boolean {
+  return typeof schema === "string" && schema.trim().length > 0;
+}
+
+// metadataList shows the structured-output badge on the canvas node tile. It's
+// derived from the live configuration when available, since autosave updates
+// configuration only, not metadata (which can lag behind).
+function metadataList(node: NodeInfo): MetadataItem[] {
+  const items: MetadataItem[] = [];
+  const meta = node.metadata as RunAgentNodeMetadata | undefined;
+  const config = node.configuration as RunAgentConfiguration | undefined;
+
+  const structured = config ? hasSchema(config.outputSchema) : Boolean(meta?.structuredOutput);
+  if (structured) {
+    items.push({ icon: "braces", label: "Structured output" });
+  }
+
+  return items;
+}
+
 export const runAgentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
@@ -61,6 +105,7 @@ export const runAgentMapper: ComponentBaseMapper = {
         context.componentDefinition?.name ||
         "Run Managed Agent",
       eventSections: lastExecution ? runAgentEventSections(context.nodes, lastExecution, componentName) : undefined,
+      metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -79,6 +124,7 @@ export const runAgentMapper: ComponentBaseMapper = {
 
     addDetail(details, "Status", data.status);
     addDetail(details, "Session ID", data.sessionId);
+    addDetail(details, "Parsed Output", formatParsed(data.parsed));
     addDetail(details, "Artifacts", formatArtifacts(data.artifacts));
 
     return details;

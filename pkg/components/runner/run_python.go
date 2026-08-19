@@ -3,7 +3,6 @@ package runner
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -186,10 +185,12 @@ func (c *RunPython) Configuration() []configuration.Field {
 			Description: "Python executed by Python 3. Define def main(payload) and return a JSON-serializable value.",
 			TypeOptions: &configuration.TypeOptions{
 				Text: &configuration.TextTypeOptions{
-					Language: "python",
+					Language:         "python",
+					AllowExpressions: boolPtr(false),
 				},
 			},
 		},
+		environmentFromConfigurationField(),
 		{
 			Name:        "environment",
 			Label:       "Environment variables",
@@ -281,10 +282,6 @@ func (c *RunPython) Setup(ctx core.SetupContext) error {
 	return err
 }
 
-func (c *RunPython) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
-
 func (c *RunPython) Execute(ctx core.ExecutionContext) error {
 	spec, err := decodeRunPythonSpec(ctx.Configuration)
 	if err != nil {
@@ -295,7 +292,7 @@ func (c *RunPython) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := resolveEnvironment(ctx.Secrets, spec.Environment)
+	environment, err := ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
 		return err
 	}
@@ -307,6 +304,10 @@ func (c *RunPython) Execute(ctx core.ExecutionContext) error {
 
 	messageChain, err := messageChainJSON(ctx.Expressions)
 	if err != nil {
+		return err
+	}
+
+	if err := ensureRunnerMinutesAvailable(ctx); err != nil {
 		return err
 	}
 
@@ -332,6 +333,7 @@ func (c *RunPython) Execute(ctx core.ExecutionContext) error {
 		ExecutionMode:  mode,
 		DockerImage:    resolvedRunPythonDockerImageRef(spec),
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
+		Labels:         OriginLabelsForTask(ctx),
 	}
 
 	taskID, err := broker.CreateTask(params)

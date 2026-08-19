@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router";
 import superplaneLogo from "@/assets/superplane.svg";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAccount } from "../../contexts/useAccount";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
+import { ACCOUNT_BLOCKED_MESSAGE } from "@/lib/account-blocked";
 import {
   readLastUsedLoginMethod,
   recordLastUsedLoginMethod,
@@ -86,6 +87,10 @@ interface LoginProps {
 }
 
 const getAuthErrorMessage = (authError: string | null, signupUnavailableReason: SignupUnavailableReason) => {
+  if (authError === "account_blocked") {
+    return ACCOUNT_BLOCKED_MESSAGE;
+  }
+
   if (authError === "signup_required") {
     if (signupUnavailableReason === "waitlist") {
       return "No account exists for that provider yet. Join the waitlist to request access.";
@@ -192,7 +197,10 @@ const getMagicCodeVerifyError = async (response: Response) => {
   }
 
   if (response.status === 403) {
-    const errorText = await response.text();
+    const errorText = (await response.text()).trim();
+    if (errorText === ACCOUNT_BLOCKED_MESSAGE) {
+      return ACCOUNT_BLOCKED_MESSAGE;
+    }
     return errorText || "Sign-up is not allowed.";
   }
 
@@ -581,7 +589,10 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
+        if (response.status === 403) {
+          const errorText = (await response.text()).trim();
+          setFormError(errorText || ACCOUNT_BLOCKED_MESSAGE);
+        } else if (response.status === 401) {
           setFormError("Invalid email or password");
         } else {
           setFormError("Login failed. Please try again.");

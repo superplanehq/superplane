@@ -42,7 +42,6 @@ type CanvasRun struct {
 	Input             JSONValue
 	State             string
 	Result            string
-	Output            JSONValue
 	Errors            datatypes.JSONSlice[RunError]
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
@@ -68,9 +67,9 @@ func (r *CanvasRun) TableName() string {
 	return "workflow_runs"
 }
 
-func FindCanvasRunInTransaction(tx *gorm.DB, workflowID, runID uuid.UUID) (*CanvasRun, error) {
+func FindCanvasRunInTransaction(db *gorm.DB, workflowID, runID uuid.UUID) (*CanvasRun, error) {
 	var run CanvasRun
-	err := tx.
+	err := db.
 		Where("workflow_id = ?", workflowID).
 		Where("id = ?", runID).
 		First(&run).
@@ -82,9 +81,19 @@ func FindCanvasRunInTransaction(tx *gorm.DB, workflowID, runID uuid.UUID) (*Canv
 	return &run, nil
 }
 
-func FindCanvasRunByRootEventInTransaction(tx *gorm.DB, rootEventID uuid.UUID) (*CanvasRun, error) {
+func FindUnscopedCanvasRun(db *gorm.DB, runID uuid.UUID) (*CanvasRun, error) {
 	var run CanvasRun
-	err := tx.
+	err := db.Where("id = ?", runID).First(&run).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &run, nil
+}
+
+func FindCanvasRunByRootEventInTransaction(db *gorm.DB, rootEventID uuid.UUID) (*CanvasRun, error) {
+	var run CanvasRun
+	err := db.
 		Joins("INNER JOIN workflow_events ON workflow_events.run_id = workflow_runs.id").
 		Where("workflow_events.id = ?", rootEventID).
 		First(&run).
@@ -94,6 +103,20 @@ func FindCanvasRunByRootEventInTransaction(tx *gorm.DB, rootEventID uuid.UUID) (
 	}
 
 	return &run, nil
+}
+
+func FindRootEventForRun(tx *gorm.DB, runID uuid.UUID) (*CanvasEvent, error) {
+	var execution CanvasNodeExecution
+	err := tx.
+		Select("root_event_id").
+		Where("run_id = ?", runID).
+		First(&execution).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return FindCanvasEventInTransaction(tx, execution.RootEventID)
 }
 
 func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *CanvasEvent) (*CanvasRun, error) {
@@ -300,6 +323,11 @@ func LockCanvasRun(db *gorm.DB, workflowID, runID uuid.UUID) (*CanvasRun, error)
 
 func (r *CanvasRun) DeleteChain(db *gorm.DB) (*RunDeletionSummary, error) {
 	summary := &RunDeletionSummary{}
+
+	// Factory work-order executions reference workflow_runs with ON DELETE RESTRICT.
+	if _, err := deleteRows(db, &FactoryWorkOrderExecution{}, "run_id = ?", r.ID); err != nil {
+		return nil, err
+	}
 
 	var executionIDs []uuid.UUID
 	err := db.
@@ -1063,84 +1091,4 @@ func (r *CanvasRun) AddError(tx *gorm.DB, message string, maxSize int) error {
 
 	r.Errors = next
 	return tx.Model(r).Update("errors", r.Errors).Error
-}
-
-/*
- * Shallow-merges patch into the run's accumulated output.
- * Caller must lock the run first to ensure concurrent callers do not overwrite each other's changes.
- */
-func (r *CanvasRun) AssignRunOutput(tx *gorm.DB, patch map[string]any, maxSize int) error {
-	if patch == nil {
-		return ErrRunOutputPatchInvalid
-	}
-
-	current, err := runOutputAsMap(r.Output)
-	if err != nil {
-		return err
-	}
-
-	merged := ShallowMergeObjects(current, patch)
-	size, err := runOutputSize(merged)
-	if err != nil {
-		return err
-	}
-
-	if size > maxSize {
-		return fmt.Errorf("%w: %d bytes (max %d)", ErrRunOutputTooLarge, size, maxSize)
-	}
-
-	return tx.Model(r).Update("output", NewJSONValue(merged)).Error
-}
-
-var ErrRunOutputTooLarge = errors.New("run output exceeds maximum size")
-var ErrRunOutputPatchInvalid = errors.New("run output patch must be a JSON object")
-
-// ShallowMergeObjects merges patch into base using Object.assign semantics.
-// Top-level keys from patch replace keys in base; nested objects are not merged recursively.
-func ShallowMergeObjects(base, patch map[string]any) map[string]any {
-	if len(patch) == 0 {
-		if base == nil {
-			return map[string]any{}
-		}
-
-		merged := make(map[string]any, len(base))
-		for key, value := range base {
-			merged[key] = value
-		}
-
-		return merged
-	}
-
-	merged := make(map[string]any, len(base)+len(patch))
-	for key, value := range base {
-		merged[key] = value
-	}
-	for key, value := range patch {
-		merged[key] = value
-	}
-
-	return merged
-}
-
-func runOutputAsMap(output JSONValue) (map[string]any, error) {
-	data := output.Data()
-	if data == nil {
-		return map[string]any{}, nil
-	}
-
-	asMap, ok := data.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("run output must be a JSON object")
-	}
-
-	return asMap, nil
-}
-
-func runOutputSize(output map[string]any) (int, error) {
-	encoded, err := json.Marshal(output)
-	if err != nil {
-		return 0, fmt.Errorf("marshal run output: %w", err)
-	}
-
-	return len(encoded), nil
 }

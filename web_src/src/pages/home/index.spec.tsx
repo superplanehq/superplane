@@ -2,7 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CanvasFoldersCanvasFolder, CanvasesCanvasSummary } from "@/api-client";
 import type { ReactNode } from "react";
@@ -81,6 +81,14 @@ vi.mock("@/contexts/useAccount", () => ({
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({
     canAct: permissionMocks.canAct,
+    isLoading: false,
+  }),
+}));
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => false,
+    enabledExperimentalFeatures: [],
     isLoading: false,
   }),
 }));
@@ -246,7 +254,7 @@ describe("HomePage canvas folders", () => {
     });
   });
 
-  it("uses the zero-state as the canvas creation entrypoint", async () => {
+  it("uses the factory-first landing as the canvas creation entrypoint", async () => {
     const user = userEvent.setup();
     mutationMocks.createCanvasAsync.mockResolvedValue({
       data: { canvas: { metadata: { id: "canvas-new" } } },
@@ -256,7 +264,7 @@ describe("HomePage canvas folders", () => {
 
     renderHome();
 
-    await user.click(screen.getByRole("button", { name: /start from scratch/i }));
+    await user.click(await screen.findByRole("button", { name: /create a blank app/i }));
 
     await waitFor(() => {
       expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith(
@@ -278,7 +286,7 @@ describe("HomePage canvas folders", () => {
     expect(screen.getByRole("heading", { name: "Apps" })).toBeInTheDocument();
     expect(screen.getByText("No apps yet")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create new app" })).toBeDisabled();
-    expect(screen.queryByRole("button", { name: /start from scratch/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /create a blank app/i })).not.toBeInTheDocument();
   });
 
   it("blocks direct navigation to the new app page without create permission", () => {
@@ -289,7 +297,7 @@ describe("HomePage canvas folders", () => {
     renderHome(["/org-123/apps/new"]);
 
     expect(screen.getByRole("heading", { name: "404" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /start from scratch/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /create a blank app/i })).not.toBeInTheDocument();
   });
 
   it("does not install an app without create permission if the install action is invoked", async () => {
@@ -309,7 +317,7 @@ describe("HomePage canvas folders", () => {
       agentInstructions: "",
     });
 
-    await user.click(screen.getByRole("button", { name: "Just take me there" }));
+    await user.click(screen.getByRole("button", { name: "Take me to the app without connecting" }));
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(showErrorToast).toHaveBeenCalledWith("You don't have permission to create canvases.");
@@ -487,7 +495,7 @@ describe("HomePage canvas folders", () => {
     await user.click(within(deploymentsSection).getByLabelText("Create app in folder Deployments"));
     expect(await screen.findByRole("heading", { name: "Create New App in Deployments Folder" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /start from scratch/i }));
+    await user.click(screen.getByRole("button", { name: /create a blank app/i }));
 
     await waitFor(() => {
       expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith({
@@ -519,7 +527,7 @@ describe("HomePage canvas folders", () => {
     renderHome();
     const deploymentsSection = screen.getByText("Deployments").closest("section")!;
     await user.click(within(deploymentsSection).getByLabelText("Create app in folder Deployments"));
-    await user.click(await screen.findByRole("button", { name: /start from scratch/i }));
+    await user.click(await screen.findByRole("button", { name: /create a blank app/i }));
 
     expect(await screen.findByText("Canvas editor")).toBeInTheDocument();
     expect(showErrorToast).toHaveBeenCalledWith("App created, but failed to add it to folder");
@@ -543,8 +551,9 @@ describe("HomePage canvas folders", () => {
     });
 
     renderHome(["/org-123/apps/new?folderId=folder-1"]);
-    await user.click((await screen.findAllByRole("button", { name: "Install" }))[0]);
-    await user.click(await screen.findByRole("button", { name: "Just take me there" }));
+    await user.click(await screen.findByRole("button", { name: /browse starter apps/i }));
+    await user.click((await screen.findAllByRole("button", { name: "Setup" }))[0]);
+    await user.click(await screen.findByRole("button", { name: "Take me to the app without connecting" }));
 
     expect(await screen.findByText("Canvas editor")).toBeInTheDocument();
     expect(showErrorToast).toHaveBeenCalledWith("App installed, but failed to add it to folder");
@@ -576,7 +585,7 @@ describe("HomePage canvas folders", () => {
     });
 
     renderHome(["/org-123/apps/new?folderId=folder-1"]);
-    await user.click(await screen.findByRole("button", { name: /start from scratch/i }));
+    await user.click(await screen.findByRole("button", { name: /create a blank app/i }));
 
     expect(mutationMocks.createCanvasAsync).not.toHaveBeenCalled();
     expect(showErrorToast).toHaveBeenCalledWith("You don't have permission to update canvases.");
@@ -592,8 +601,8 @@ describe("HomePage canvas folders", () => {
 
     renderHome(["/org-123/apps/new?folderId=folder-1"]);
 
-    expect(await screen.findByRole("button", { name: /start from scratch/i })).toBeDisabled();
-    expect(screen.getAllByRole("button", { name: "Install" })[0]).toBeDisabled();
+    expect(await screen.findByRole("button", { name: /create a blank app/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /setup factory/i })).toBeDisabled();
     expect(mutationMocks.createCanvasAsync).not.toHaveBeenCalled();
   });
 

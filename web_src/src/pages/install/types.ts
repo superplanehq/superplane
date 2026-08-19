@@ -15,6 +15,8 @@ export interface InstallParam {
   integration?: string; // integration type name (e.g. "digitalocean")
   resourceType?: string; // resource type (e.g. "region", "size", "image")
   useNameAsValue?: boolean; // when true, substitute the resource name instead of the ID
+  // For type "secret_picker": prefill this key name in the create-secret dialog
+  secretKey?: string;
 }
 
 export interface InstallPreview {

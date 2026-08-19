@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 
@@ -17,6 +17,14 @@ vi.mock("@/contexts/useAccount", () => ({
 vi.mock("@/hooks/useOrganizationData", () => ({
   useOrganization: () => ({ data: null }),
   useOrganizationUsage: () => ({ data: null, error: null }),
+}));
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => false,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({

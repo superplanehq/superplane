@@ -5,18 +5,19 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 )
 
 func Test__PutCanvasStaging__StagesCanvasYAML(t *testing.T) {
 	r, ctx, canvas, version := setupLiveCanvasStaging(t)
-	orgID := r.Organization.ID.String()
+	defer r.Close()
 
 	baseline, err := ReadRepositorySpecFile(ctx, canvas, version, CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
 	staged := baseline + "\n# staged edit\n"
-	state, err := PutCanvasStaging(ctx, orgID, canvas.ID.String(), []*pb.CanvasRepositoryFileOperation{
+	state, err := PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
 		{Path: CanvasYAMLRepositoryPath, Content: []byte(staged)},
 	})
 	require.NoError(t, err)
@@ -36,9 +37,9 @@ func Test__PutCanvasStaging__StagesCanvasYAML(t *testing.T) {
 
 func Test__PutCanvasStaging__RejectsReservedPath(t *testing.T) {
 	r, ctx, canvas, _ := setupLiveCanvasStaging(t)
-	orgID := r.Organization.ID.String()
+	defer r.Close()
 
-	_, err := PutCanvasStaging(ctx, orgID, canvas.ID.String(), []*pb.CanvasRepositoryFileOperation{
+	_, err := PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
 		{Path: ".superplane/config", Content: []byte("nope")},
 	})
 	require.Error(t, err)

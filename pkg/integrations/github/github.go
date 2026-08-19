@@ -132,6 +132,7 @@ func (g *GitHub) Actions() []core.Action {
 		&pulls.MergePullRequest{},
 		&pulls.MarkPullRequestReadyForReview{},
 		&pulls.AddPullRequestReviewers{},
+		&pulls.UpdatePullRequest{},
 		&pulls.AddReaction{},
 		&statuses.GetCombinedCommitStatus{},
 		&statuses.PublishCommitStatus{},
@@ -1027,4 +1028,15 @@ func findAppPrivateKey(ctx core.IntegrationContext) (string, error) {
 	}
 
 	return ctx.Secrets().Get(common.SecretAppPEM)
+}
+
+func (g *GitHub) ResolveSecrets(ctx core.IntegrationSecretContext) (map[string][]byte, error) {
+	token, err := resolveAccessToken(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string][]byte{
+		integrationSecretGitHubToken: []byte(token),
+	}, nil
 }

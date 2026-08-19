@@ -32,7 +32,8 @@ func TestGetCommandExecuteText(t *testing.T) {
 					"retentionWindowDays": 30,
 					"maxEventsPerMonth": "100000",
 					"maxIntegrations": -1,
-					"maxAgentTokensPerMonth": "50000"
+					"maxAgentTokensPerMonth": "50000",
+					"maxRunnerMinutesPerMonth": "300"
 				},
 				"usage": {
 					"canvases": 3,
@@ -41,7 +42,10 @@ func TestGetCommandExecuteText(t *testing.T) {
 					"eventBucketLastUpdatedAt": "2026-03-19T15:04:05Z",
 					"agentTokenBucketLevel": 500,
 					"agentTokenBucketCapacity": 10000,
-					"agentTokenBucketLastUpdatedAt": "2026-03-19T15:04:05Z"
+					"agentTokenBucketLastUpdatedAt": "2026-03-19T15:04:05Z",
+					"runnerMinutesBucketLevel": 8.5,
+					"runnerMinutesBucketCapacity": 300,
+					"runnerMinutesBucketLastUpdatedAt": "2026-03-19T15:04:05Z"
 				}
 			}`))
 		default:
@@ -62,10 +66,14 @@ func TestGetCommandExecuteText(t *testing.T) {
 	require.Contains(t, stdout.String(), "12 / 100")
 	require.Contains(t, stdout.String(), "Agent token bucket")
 	require.Contains(t, stdout.String(), "500 / 10000")
+	require.Contains(t, stdout.String(), "Runner minutes bucket")
+	require.Contains(t, stdout.String(), "8.50 / 300")
 	require.Contains(t, stdout.String(), "Max integrations")
 	require.Contains(t, stdout.String(), "unlimited")
 	require.Contains(t, stdout.String(), "Max agent tokens per month")
 	require.Contains(t, stdout.String(), "50000")
+	require.Contains(t, stdout.String(), "Max runner minutes per month")
+	require.Contains(t, stdout.String(), "300")
 }
 
 func TestGetCommandExecuteJSON(t *testing.T) {
@@ -113,7 +121,8 @@ func TestGetCommandExecuteJSONWithLimits(t *testing.T) {
 					"retentionWindowDays": 30,
 					"maxEventsPerMonth": "100000",
 					"maxIntegrations": -1,
-					"maxAgentTokensPerMonth": "50000"
+					"maxAgentTokensPerMonth": "50000",
+					"maxRunnerMinutesPerMonth": "300"
 				},
 				"usage": {
 					"canvases": 3,
@@ -122,7 +131,11 @@ func TestGetCommandExecuteJSONWithLimits(t *testing.T) {
 					"eventBucketLastUpdatedAt": "2026-03-19T15:04:05Z",
 					"agentTokenBucketLevel": 500,
 					"agentTokenBucketCapacity": 10000,
-					"agentTokenBucketLastUpdatedAt": "2026-03-19T15:04:05Z"
+					"agentTokenBucketLastUpdatedAt": "2026-03-19T15:04:05Z",
+					"runnerMinutesBucketLevel": 8.5,
+					"runnerMinutesBucketCapacity": 300,
+					"runnerMinutesBucketLastUpdatedAt": "2026-03-19T15:04:05Z",
+					"nextRunnerMinutesBucketDecreaseAt": "2026-04-18T00:00:00Z"
 				}
 			}`))
 		default:
@@ -146,9 +159,18 @@ func TestGetCommandExecuteJSONWithLimits(t *testing.T) {
 	require.Contains(t, output, `"maxAgentTokensPerMonth": 50000`)
 	require.NotContains(t, output, `"maxAgentTokensPerMonth": "50000"`)
 
+	// maxRunnerMinutesPerMonth should be numeric, not a string
+	require.Contains(t, output, `"maxRunnerMinutesPerMonth": 300`)
+	require.NotContains(t, output, `"maxRunnerMinutesPerMonth": "300"`)
+
 	// agent token usage fields present
 	require.Contains(t, output, `"agentTokenBucketLevel": 500`)
 	require.Contains(t, output, `"agentTokenBucketCapacity": 10000`)
+
+	// runner minutes usage fields present
+	require.Contains(t, output, `"runnerMinutesBucketLevel": 8.5`)
+	require.Contains(t, output, `"runnerMinutesBucketCapacity": 300`)
+	require.Contains(t, output, `"nextRunnerMinutesBucketDecreaseAt"`)
 
 	// other limits remain numeric
 	require.Contains(t, output, `"maxCanvases": 10`)
@@ -170,7 +192,8 @@ func TestGetCommandExecuteJSONUnlimitedSentinel(t *testing.T) {
 				"limits": {
 					"maxCanvases": -1,
 					"maxEventsPerMonth": "-1",
-					"maxAgentTokensPerMonth": "-1"
+					"maxAgentTokensPerMonth": "-1",
+					"maxRunnerMinutesPerMonth": "-1"
 				}
 			}`))
 		default:
@@ -192,6 +215,8 @@ func TestGetCommandExecuteJSONUnlimitedSentinel(t *testing.T) {
 	require.NotContains(t, output, `"maxEventsPerMonth": "-1"`)
 	require.Contains(t, output, `"maxAgentTokensPerMonth": -1`)
 	require.NotContains(t, output, `"maxAgentTokensPerMonth": "-1"`)
+	require.Contains(t, output, `"maxRunnerMinutesPerMonth": -1`)
+	require.NotContains(t, output, `"maxRunnerMinutesPerMonth": "-1"`)
 }
 
 func TestGetCommandExecuteRequiresOrganizationID(t *testing.T) {

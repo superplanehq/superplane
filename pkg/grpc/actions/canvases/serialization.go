@@ -28,16 +28,29 @@ func SerializeCanvas(
 		canvasFolderID = canvas.CanvasFolderID.String()
 	}
 
+	liveVersionID := ""
+	if canvas.LiveVersionID != nil {
+		liveVersionID = canvas.LiveVersionID.String()
+	}
+
+	factoryID := ""
+	if canvas.FactoryID != nil {
+		factoryID = canvas.FactoryID.String()
+	}
+
 	return &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Id:             canvas.ID.String(),
-			OrganizationId: canvas.OrganizationID.String(),
-			Name:           canvas.Name,
-			Description:    canvas.Description,
-			CreatedAt:      timestamppb.New(*canvas.CreatedAt),
-			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
-			CreatedBy:      createdBy,
-			FolderId:       canvasFolderID,
+			Id:                          canvas.ID.String(),
+			OrganizationId:              canvas.OrganizationID.String(),
+			Name:                        canvas.Name,
+			Description:                 canvas.Description,
+			CreatedAt:                   timestamppb.New(*canvas.CreatedAt),
+			UpdatedAt:                   timestamppb.New(*canvas.UpdatedAt),
+			CreatedBy:                   createdBy,
+			FolderId:                    canvasFolderID,
+			LiveVersionId:               liveVersionID,
+			FactoryId:                   factoryID,
+			DismissedAgentSuggestionIds: append([]string(nil), canvas.DismissedAgentSuggestionIDs...),
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: actions.NodesToProto(liveVersion.Nodes),

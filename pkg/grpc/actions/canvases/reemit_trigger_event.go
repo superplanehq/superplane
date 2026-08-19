@@ -11,20 +11,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"gorm.io/gorm"
 )
 
 func ReemitTriggerEvent(
-	_ context.Context,
-	orgID uuid.UUID,
-	canvasID uuid.UUID,
+	ctx context.Context,
+	db *gorm.DB,
+	canvas *models.Canvas,
 	nodeID string,
 	eventID uuid.UUID,
 ) (*pb.ReemitTriggerEventResponse, error) {
-	canvas, err := models.FindCanvas(orgID, canvasID)
-	if err != nil {
-		return nil, fmt.Errorf("canvas not found: %w", err)
-	}
-
 	node, err := canvas.FindNode(nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("canvas node not found: %w", err)
@@ -34,7 +30,7 @@ func ReemitTriggerEvent(
 		return nil, fmt.Errorf("canvas node is not a trigger")
 	}
 
-	sourceEvent, err := models.FindCanvasEventForCanvas(canvasID, eventID)
+	sourceEvent, err := models.FindCanvasEventForCanvas(db, canvas.ID, eventID)
 	if err != nil {
 		return nil, fmt.Errorf("canvas event not found: %w", err)
 	}
@@ -63,7 +59,7 @@ func ReemitTriggerEvent(
 		return nil, fmt.Errorf("failed to create workflow event: %w", err)
 	}
 
-	err = messages.NewCanvasEventCreatedMessage(canvasID.String(), canvas.OrganizationID.String(), &reemittedEvent).Publish()
+	err = messages.NewCanvasEventCreatedMessage(canvas.ID.String(), canvas.OrganizationID.String(), &reemittedEvent).Publish()
 	if err != nil {
 		log.Errorf("failed to publish re-emitted workflow event RabbitMQ message: %v", err)
 	}

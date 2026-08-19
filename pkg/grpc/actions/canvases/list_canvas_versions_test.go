@@ -4,45 +4,21 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
-	"google.golang.org/grpc/codes"
 )
 
 func Test__ListCanvasVersionsPaginated(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	t.Run("invalid canvas id -> error", func(t *testing.T) {
-		_, err := ListCanvasVersionsPaginated(ctx, r.Organization.ID.String(), "invalid-id", 0, nil)
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, code)
-	})
-
-	t.Run("invalid organization id -> error", func(t *testing.T) {
-		_, err := ListCanvasVersionsPaginated(ctx, "invalid-id", uuid.New().String(), 0, nil)
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, code)
-	})
-
-	t.Run("canvas not found -> error", func(t *testing.T) {
-		_, err := ListCanvasVersionsPaginated(ctx, r.Organization.ID.String(), uuid.New().String(), 0, nil)
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, code)
-	})
-
 	t.Run("lists committed versions newest first", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-		orgID := r.Organization.ID.String()
 
 		liveVersion, err := models.FindLiveCanvasVersion(canvas.ID)
 		require.NoError(t, err)
@@ -50,27 +26,27 @@ func Test__ListCanvasVersionsPaginated(t *testing.T) {
 		baseline, err := ReadRepositorySpecFile(ctx, canvas, liveVersion, CanvasYAMLRepositoryPath)
 		require.NoError(t, err)
 
-		_, err = PutCanvasStaging(ctx, orgID, canvas.ID.String(), []*pb.CanvasRepositoryFileOperation{
+		_, err = PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# first commit\n")},
 		})
 		require.NoError(t, err)
 
-		firstCommit, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvas.ID.String(), "First", "", r.AuthService)
+		firstCommit, err := CommitCanvasStaging(ctx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "First", "", r.AuthService)
 		require.NoError(t, err)
 
-		_, err = PutCanvasStaging(ctx, orgID, canvas.ID.String(), []*pb.CanvasRepositoryFileOperation{
+		_, err = PutCanvasStaging(ctx, database.DB(t.Context()), canvas, []*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# second commit\n")},
 		})
 		require.NoError(t, err)
 
-		secondCommit, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvas.ID.String(), "Second", "", r.AuthService)
+		secondCommit, err := CommitCanvasStaging(ctx, database.DB(t.Context()), r.GitProvider, nil, r.Encryptor, r.Registry, canvas, "Second", "", r.AuthService)
 		require.NoError(t, err)
 
-		response, err := ListCanvasVersionsPaginated(ctx, orgID, canvas.ID.String(), 0, nil)
+		response, err := ListCanvasVersionsPaginated(ctx, database.DB(t.Context()), canvas, 0, nil)
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, len(response.GetVersions()), 2)
-		assert.Equal(t, secondCommit.GetVersion().GetMetadata().GetId(), response.GetVersions()[0].GetMetadata().GetId())
-		assert.Equal(t, firstCommit.GetVersion().GetMetadata().GetId(), response.GetVersions()[1].GetMetadata().GetId())
+		assert.Equal(t, secondCommit.GetVersion().GetMetadata().GetId(), response.GetVersions()[0].GetId())
+		assert.Equal(t, firstCommit.GetVersion().GetMetadata().GetId(), response.GetVersions()[1].GetId())
 		assert.GreaterOrEqual(t, response.GetTotalCount(), uint32(2))
 	})
 }

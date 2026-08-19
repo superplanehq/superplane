@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
-import { ExternalLink, Loader2, Play, Plus, RefreshCw, Square, Table2, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, type UIEvent } from "react";
+import { Loader2, Plus, Table2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -8,16 +8,15 @@ import { useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
 import { CONSOLE_WIDGET_TABLE_HEAD_CLASSES, CONSOLE_TABLE_HEAD_BORDER_DARK_CLASSES } from "../consoleTableStyles";
 import { isManualRunNode } from "../manualRunTriggers";
 import { applyTableWhere } from "./evalTableWhere";
-import { mergeTriggerParameters } from "./mergeTriggerPayload";
-import { RowActionConfirmDialog } from "./RowActionConfirmDialog";
 import { evaluateRowShow } from "./rowVisibility";
 import { makeRowStyleResolver } from "./rowStyles";
 import { applyFilters, applySort } from "./widgetData";
 import { WidgetEmptyState } from "../WidgetEmptyState";
 import { WidgetTableActionLockProvider } from "./WidgetTableActionLock";
-import { useWidgetTableActionLock } from "./WidgetTableActionLockContext";
 import { WidgetTableCell } from "./WidgetTableCell";
-import type { WidgetRowAction, WidgetTableRender } from "./types";
+import { WidgetRowActionButton } from "./WidgetRowActionButton";
+import { rowKeyForRow } from "./rowKey";
+import type { WidgetTableRender } from "./types";
 
 interface WidgetTableProps {
   render: WidgetTableRender;
@@ -39,14 +38,6 @@ interface WidgetTableProps {
    */
   displayCount?: number;
 }
-
-const ACTION_ICONS = {
-  play: Play,
-  stop: Square,
-  trash: Trash2,
-  refresh: RefreshCw,
-  "external-link": ExternalLink,
-} as const;
 
 /** Distance from the bottom (px) at which scrolling auto-requests more rows. */
 const AUTO_LOAD_SCROLL_THRESHOLD_PX = 160;
@@ -144,7 +135,7 @@ export function WidgetTable({
           {render.emptyMessage ?? "No data to display."}
         </div>
         {hasMore && onLoadMore ? (
-          <LoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
+          <WidgetLoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
         ) : null}
       </div>
     );
@@ -253,7 +244,7 @@ function WidgetTableGrid({
                       {rowActions
                         .filter((action) => evaluateRowShow(action.show, row))
                         .map((action, ai) => (
-                          <RowActionButton key={ai} action={action} row={row} rowKey={rowKey} />
+                          <WidgetRowActionButton key={ai} action={action} row={row} rowKey={rowKey} />
                         ))}
                     </div>
                   </td>
@@ -264,13 +255,19 @@ function WidgetTableGrid({
         </tbody>
       </table>
       {hasMore && onLoadMore ? (
-        <LoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
+        <WidgetLoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
       ) : null}
     </div>
   );
 }
 
-function LoadMoreFooter({ isFetchingMore, onLoadMore }: { isFetchingMore: boolean; onLoadMore: () => void }) {
+export function WidgetLoadMoreFooter({
+  isFetchingMore,
+  onLoadMore,
+}: {
+  isFetchingMore: boolean;
+  onLoadMore: () => void;
+}) {
   return (
     <div
       className="flex items-center justify-center border-t border-slate-100 bg-slate-50/60 px-3 py-2 dark:border-gray-800 dark:bg-gray-800/60"
@@ -288,227 +285,6 @@ function LoadMoreFooter({ isFetchingMore, onLoadMore }: { isFetchingMore: boolea
         {isFetchingMore ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
         {isFetchingMore ? "Loading…" : "Load more"}
       </Button>
-    </div>
-  );
-}
-
-type ActionDisabledReason = "no-perm" | "no-node" | "not-manual-run" | "run-in-flight" | "submitting" | null;
-
-// `not-manual-run` is defense in depth: `WidgetTableGrid` already hides
-// non-manual-run actions upstream. This branch covers the transient case
-// before the trigger catalog resolves — the action then renders disabled
-// rather than as a button that would fail server-side.
-function disabledReason(
-  canRun: boolean,
-  hasResolvedNode: boolean,
-  isManualRun: boolean,
-  runInFlight: boolean,
-  submitting: boolean,
-): ActionDisabledReason {
-  if (!canRun) return "no-perm";
-  if (!hasResolvedNode) return "no-node";
-  if (!isManualRun) return "not-manual-run";
-  if (runInFlight) return "run-in-flight";
-  if (submitting) return "submitting";
-  return null;
-}
-
-/**
- * Stable per-row key used to scope action locks. Prefers the row's `id`
- * when present (memory rows, executions, runs all expose one) and falls
- * back to a deterministic JSON encoding when the source rows don't carry
- * identifiers. The index is only used as a last-resort tiebreaker so
- * locks don't bleed across rows on re-render.
- */
-function rowKeyForRow(row: Record<string, unknown>, index: number): string {
-  const id = row.id;
-  if (typeof id === "string" && id.length > 0) return id;
-  if (typeof id === "number") return String(id);
-  if (typeof id === "bigint") return id.toString();
-  try {
-    return `row:${index}:${JSON.stringify(row, jsonBigIntReplacer)}`;
-  } catch {
-    return `row:${index}`;
-  }
-}
-
-function jsonBigIntReplacer(_key: string, value: unknown): unknown {
-  return typeof value === "bigint" ? value.toString() : value;
-}
-
-function disabledTooltip(reason: ActionDisabledReason, node: string): string | undefined {
-  switch (reason) {
-    case "no-perm":
-      return "You do not have permission to run actions in this canvas";
-    case "no-node":
-      return `Node "${node}" not found on this canvas`;
-    case "not-manual-run":
-      return "Only trigger nodes with a manual run can be fired from the console.";
-    case "run-in-flight":
-      return "A run for this trigger is already in progress.";
-    case "submitting":
-      return "Submitting trigger…";
-    default:
-      return undefined;
-  }
-}
-
-type ResolvedNode = NonNullable<ReturnType<typeof resolveConsoleNode>>;
-
-function useRowActionFire({
-  action,
-  row,
-  rowKey,
-  resolved,
-  hookName,
-  label,
-  setConfirmOpen,
-}: {
-  action: WidgetRowAction;
-  row: Record<string, unknown>;
-  rowKey: string;
-  resolved: ResolvedNode | undefined;
-  hookName: string;
-  label: string;
-  setConfirmOpen: (open: boolean) => void;
-}) {
-  const ctx = useConsoleContext();
-  const lock = useWidgetTableActionLock();
-  const [error, setError] = useState<string | undefined>();
-  const [pending, setPending] = useState(false);
-
-  const fire = async () => {
-    if (!ctx?.onTriggerNode || !resolved?.node.id) return;
-    const triggerNodeId = resolved.node.id;
-    setError(undefined);
-    setPending(true);
-    lock.beginSubmission(triggerNodeId, rowKey);
-    let succeeded = false;
-    try {
-      const parameters = mergeTriggerParameters(resolved.node, hookName, action.template, row, action.payload);
-      await ctx.onTriggerNode(triggerNodeId, {
-        hookName,
-        templateName: action.template,
-        parameters,
-        successLabel: label,
-      });
-      succeeded = true;
-      setConfirmOpen(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to trigger");
-    } finally {
-      setPending(false);
-      lock.endSubmission(triggerNodeId, rowKey, succeeded);
-    }
-  };
-
-  return { fire, error, pending };
-}
-
-function useRowActionGate(action: WidgetRowAction, rowKey: string) {
-  const ctx = useConsoleContext();
-  const lock = useWidgetTableActionLock();
-  const canRun = ctx?.canRunNodes ?? false;
-  const resolved = resolveConsoleNode(ctx, action.node);
-  // WidgetTable hides non-manual actions upstream; at this level `true` is
-  // the normal case, unresolved nodes render disabled with a tooltip.
-  const isManualRun = isManualRunNode(resolved?.node);
-  const triggerNodeId = resolved?.node.id;
-  // Per-row locking: a row's button is disabled by `runInFlight` only when
-  // its own submission produced the in-flight run (i.e. the mapping points
-  // back to this row's key). Other rows sharing the same trigger stay
-  // clickable, matching the "lock only the affected row" model.
-  const runInFlight = Boolean(
-    triggerNodeId && lock.runInFlightIds.has(triggerNodeId) && lock.inFlightRowByTrigger.get(triggerNodeId) === rowKey,
-  );
-  const submitting = lock.pendingRowKeys.has(rowKey);
-  const reason = disabledReason(canRun, Boolean(resolved), isManualRun, runInFlight, submitting);
-  return {
-    resolved,
-    isManualRun,
-    disabled: reason !== null,
-    reason,
-    tooltip: disabledTooltip(reason, action.node),
-  };
-}
-
-function RowActionButton({
-  action,
-  row,
-  rowKey,
-}: {
-  action: WidgetRowAction;
-  row: Record<string, unknown>;
-  rowKey: string;
-}) {
-  const [confirmOpen, setConfirmOpen] = useState(false);
-
-  const { resolved, isManualRun, disabled, reason, tooltip } = useRowActionGate(action, rowKey);
-  const label = action.label ?? "Run";
-  const hookName = action.hook ?? "run";
-  const Icon = action.icon ? ACTION_ICONS[action.icon] : undefined;
-
-  const { fire, error, pending } = useRowActionFire({
-    action,
-    row,
-    rowKey,
-    resolved,
-    hookName,
-    label,
-    setConfirmOpen,
-  });
-
-  const handleClick = () => {
-    if (disabled) return;
-    if (action.confirm?.trim()) {
-      setConfirmOpen(true);
-      return;
-    }
-    void fire();
-  };
-
-  const testId = `widget-row-action-${action.node || "trigger"}`;
-
-  return (
-    <div className="inline-flex flex-col items-end gap-0.5">
-      <Button
-        type="button"
-        size="xs"
-        variant="outline"
-        onClick={handleClick}
-        disabled={disabled || pending}
-        aria-disabled={disabled}
-        title={tooltip}
-        data-testid={testId}
-        data-variant={action.variant ?? "default"}
-        data-disabled-reason={reason ?? undefined}
-      >
-        {Icon ? <Icon className="mr-1 h-3 w-3" /> : null}
-        {label}
-      </Button>
-      {error ? (
-        <span
-          className="max-w-48 text-right text-[10px] text-red-600 dark:text-red-400"
-          data-testid={`${testId}-error`}
-        >
-          {error}
-        </span>
-      ) : null}
-      {action.confirm ? (
-        <RowActionConfirmDialog
-          action={action}
-          row={row}
-          resolved={resolved}
-          isManualRun={isManualRun}
-          hookName={hookName}
-          label={label}
-          open={confirmOpen}
-          onOpenChange={setConfirmOpen}
-          confirmDisabled={pending || disabled}
-          onConfirm={() => void fire()}
-          testId={testId}
-        />
-      ) : null}
     </div>
   );
 }

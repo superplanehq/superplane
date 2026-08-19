@@ -1,10 +1,18 @@
+import type { CSSProperties } from "react";
 import { Handle, Position } from "@xyflow/react";
+import { isVerticalCanvasFlow } from "@/lib/canvasFlowDirection";
 import { AppendHandlePreview, AppendSourceHandle, type AppendFromNodeHandler } from "./appendHandle";
 import { isAlreadyConnectedToNode } from "./connectionState";
 import { getOutputChannels } from "./data";
-import { HANDLE_STYLE } from "./handleStyle";
+import { FACTORY_SIDE_HANDLE_ID, FACTORY_SPINE_HANDLE_ID } from "@/lib/layout/factoryRunLeafLayout";
+import { FACTORY_HANDLE_OUTSET_PX, resolveHandleStyle } from "./handleStyle";
+import { MultiBottomHandle } from "./multiBottomHandle";
 import { MultiRightHandle } from "./multiRightHandle";
 import type { BlockConnectionState, BlockEdgeState, BlockProps, CanvasBlockData } from "./types";
+
+function connectionPointerEvents(isConnectionInteractive: boolean): CSSProperties["pointerEvents"] {
+  return isConnectionInteractive ? "auto" : "none";
+}
 
 function getBlockEdges(data: CanvasBlockData): BlockEdgeState[] {
   return data._allEdges || [];
@@ -25,14 +33,14 @@ function isDisconnectedNode(stats: { hasIncoming: boolean; hasOutgoing: boolean 
   return !stats.hasIncoming && !stats.hasOutgoing;
 }
 
-function shouldHideInactiveLeftHandle(
+function shouldHideInactiveTargetHandle(
   isConnectionInteractive: boolean,
   stats: { hasIncoming: boolean; hasOutgoing: boolean },
 ) {
   return !isConnectionInteractive && isDisconnectedNode(stats);
 }
 
-function getLeftHandleHighlight({
+function getTargetHandleHighlight({
   isConnectionInteractive,
   hoveredEdge,
   connectingFrom,
@@ -56,11 +64,11 @@ function getLeftHandleHighlight({
   return connectingFrom?.nodeId !== nodeId && connectingFrom?.handleType === "source" && !isAlreadyConnected;
 }
 
-function shouldHideLeftHandle(data: CanvasBlockData) {
+function shouldHideTargetHandle(data: CanvasBlockData) {
   return data.type === "trigger" || data.type === "annotation";
 }
 
-function shouldHideRightHandle(data: CanvasBlockData) {
+function shouldHideSourceHandle(data: CanvasBlockData) {
   return data.isTemplate || data.isPendingConnection || data.type === "annotation";
 }
 
@@ -90,13 +98,14 @@ function getSingleChannelHighlight(args: {
   );
 }
 
-function SingleRightHandle({
+function SingleSourceHandle({
   channel,
   hoveredEdge,
   connectingFrom,
   nodeId,
   allEdges,
   isConnectionInteractive,
+  isVertical,
 }: {
   channel: string;
   hoveredEdge?: BlockEdgeState;
@@ -104,6 +113,7 @@ function SingleRightHandle({
   nodeId?: string;
   allEdges: BlockEdgeState[];
   isConnectionInteractive: boolean;
+  isVertical: boolean;
 }) {
   const isHighlighted =
     isConnectionInteractive &&
@@ -118,12 +128,20 @@ function SingleRightHandle({
   return (
     <Handle
       type="source"
-      position={Position.Right}
+      position={isVertical ? Position.Bottom : Position.Right}
       id={channel}
       style={{
-        ...HANDLE_STYLE,
-        right: -15,
-        top: 18,
+        ...resolveHandleStyle(isVertical),
+        ...(isVertical
+          ? {
+              bottom: -FACTORY_HANDLE_OUTSET_PX,
+              left: "50%",
+              transform: "translateX(-50%)",
+            }
+          : {
+              right: -15,
+              top: 18,
+            }),
         pointerEvents: isConnectionInteractive ? "auto" : "none",
       }}
       className={isHighlighted ? "highlighted" : undefined}
@@ -139,6 +157,7 @@ function EndNodeAppendConnector({
   connectingFrom,
   allEdges,
   isConnectionInteractive,
+  isVertical,
 }: {
   nodeId?: string;
   channel: string;
@@ -147,6 +166,7 @@ function EndNodeAppendConnector({
   connectingFrom?: BlockConnectionState;
   allEdges: BlockEdgeState[];
   isConnectionInteractive: boolean;
+  isVertical: boolean;
 }) {
   if (!nodeId || !onAppendFromNode) {
     return null;
@@ -161,6 +181,36 @@ function EndNodeAppendConnector({
       channel,
       allEdges,
     });
+
+  if (isVertical) {
+    return (
+      <>
+        <AppendSourceHandle
+          channel={channel}
+          label="Add next component"
+          onAppend={() => onAppendFromNode(nodeId, channel)}
+          isHighlighted={isHighlighted}
+          orientation="vertical"
+          style={{
+            bottom: -FACTORY_HANDLE_OUTSET_PX,
+            left: "50%",
+            transform: "translateX(-50%)",
+          }}
+          buttonLeft={-9}
+          buttonTop={54}
+        />
+        <AppendHandlePreview
+          orientation="vertical"
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: "calc(100% + 85px)",
+            transform: "translateX(-50%)",
+          }}
+        />
+      </>
+    );
+  }
 
   return (
     <>
@@ -186,6 +236,7 @@ function EndNodeAppendConnector({
   );
 }
 
+/** Target handle: left for horizontal canvases, top for vertical (factory) canvases. */
 export function LeftHandle({
   data,
   nodeId,
@@ -193,12 +244,14 @@ export function LeftHandle({
 }: Pick<BlockProps, "data" | "nodeId"> & { isConnectionInteractive?: boolean }) {
   const allEdges = getBlockEdges(data);
   const connectionStats = getNodeConnectionStats(allEdges, nodeId);
+  const isVertical = isVerticalCanvasFlow(data._flowDirection);
+  const useSideTarget = Boolean(data._factorySideTarget);
 
-  if (shouldHideInactiveLeftHandle(isConnectionInteractive, connectionStats)) {
+  if (shouldHideInactiveTargetHandle(isConnectionInteractive, connectionStats)) {
     return null;
   }
 
-  if (shouldHideLeftHandle(data)) return null;
+  if (shouldHideTargetHandle(data)) return null;
 
   const hoveredEdge = data._hoveredEdge;
   const connectingFrom = data._connectingFrom;
@@ -209,7 +262,7 @@ export function LeftHandle({
     nodeId,
     connectingFrom?.handleId,
   );
-  const isHighlighted = getLeftHandleHighlight({
+  const isHighlighted = getTargetHandleHighlight({
     isConnectionInteractive,
     hoveredEdge,
     connectingFrom,
@@ -217,21 +270,70 @@ export function LeftHandle({
     isAlreadyConnected,
   });
 
+  const position = useSideTarget ? Position.Left : isVertical ? Position.Top : Position.Left;
+  const style: CSSProperties = useSideTarget
+    ? {
+        ...resolveHandleStyle(isVertical),
+        left: -FACTORY_HANDLE_OUTSET_PX,
+        top: "50%",
+        transform: "translateY(-50%)",
+        pointerEvents: connectionPointerEvents(isConnectionInteractive),
+      }
+    : {
+        ...resolveHandleStyle(isVertical),
+        ...(isVertical
+          ? {
+              top: -FACTORY_HANDLE_OUTSET_PX,
+              left: "50%",
+              transform: "translateX(-50%)",
+            }
+          : {
+              left: -15,
+              top: 18,
+            }),
+        pointerEvents: connectionPointerEvents(isConnectionInteractive),
+      };
+
+  return (
+    <Handle type="target" position={position} style={style} className={isHighlighted ? "highlighted" : undefined} />
+  );
+}
+
+function FactorySideSourceHandle({ isConnectionInteractive }: { isConnectionInteractive: boolean }) {
   return (
     <Handle
-      type="target"
-      position={Position.Left}
+      type="source"
+      position={Position.Right}
+      id={FACTORY_SIDE_HANDLE_ID}
       style={{
-        ...HANDLE_STYLE,
-        left: -15,
-        top: 18,
-        pointerEvents: isConnectionInteractive ? "auto" : "none",
+        ...resolveHandleStyle(true),
+        right: -FACTORY_HANDLE_OUTSET_PX,
+        top: "50%",
+        transform: "translateY(-50%)",
+        pointerEvents: connectionPointerEvents(isConnectionInteractive),
       }}
-      className={isHighlighted ? "highlighted" : undefined}
     />
   );
 }
 
+function FactorySpineSourceHandle({ isConnectionInteractive }: { isConnectionInteractive: boolean }) {
+  return (
+    <Handle
+      type="source"
+      position={Position.Bottom}
+      id={FACTORY_SPINE_HANDLE_ID}
+      style={{
+        ...resolveHandleStyle(true),
+        bottom: -FACTORY_HANDLE_OUTSET_PX,
+        left: "50%",
+        transform: "translateX(-50%)",
+        pointerEvents: connectionPointerEvents(isConnectionInteractive),
+      }}
+    />
+  );
+}
+
+/** Source handle: right for horizontal canvases, bottom for vertical (factory) canvases. */
 export function RightHandle({
   data,
   nodeId,
@@ -241,12 +343,13 @@ export function RightHandle({
   const allEdges = getBlockEdges(data);
   const { hasIncoming, hasOutgoing } = getNodeConnectionStats(allEdges, nodeId);
   const isDisconnected = isDisconnectedNode({ hasIncoming, hasOutgoing });
+  const isVertical = isVerticalCanvasFlow(data._flowDirection);
 
   if (!isConnectionInteractive && (!hasOutgoing || isDisconnected)) {
     return null;
   }
 
-  if (shouldHideRightHandle(data)) return null;
+  if (shouldHideSourceHandle(data)) return null;
 
   const channels = getOutputChannels(data);
   const hoveredEdge = data._hoveredEdge;
@@ -262,32 +365,74 @@ export function RightHandle({
         connectingFrom={connectingFrom}
         allEdges={allEdges}
         isConnectionInteractive={isConnectionInteractive}
+        isVertical={isVertical}
       />
+    );
+  }
+
+  const sideSource = data._factorySideSource ? (
+    <FactorySideSourceHandle isConnectionInteractive={isConnectionInteractive} />
+  ) : null;
+
+  // Run inspection uses only the ports required by route geometry. Channel
+  // names stay on edge badges instead of rendering edit-style stems.
+  if (data._factoryRunDisplaySource) {
+    return (
+      <>
+        {data._factorySpineSource ? (
+          <FactorySpineSourceHandle isConnectionInteractive={isConnectionInteractive} />
+        ) : null}
+        {sideSource}
+      </>
     );
   }
 
   if (channels.length === 1) {
     return (
-      <SingleRightHandle
-        channel={channels[0]}
+      <>
+        <SingleSourceHandle
+          channel={channels[0]}
+          hoveredEdge={hoveredEdge}
+          connectingFrom={connectingFrom}
+          nodeId={nodeId}
+          allEdges={allEdges}
+          isConnectionInteractive={isConnectionInteractive}
+          isVertical={isVertical}
+        />
+        {sideSource}
+      </>
+    );
+  }
+
+  if (isVertical) {
+    return (
+      <>
+        <MultiBottomHandle
+          channels={channels}
+          hoveredEdge={hoveredEdge}
+          connectingFrom={connectingFrom}
+          nodeId={nodeId}
+          allEdges={allEdges}
+          isConnectionInteractive={isConnectionInteractive}
+          onAppendFromNode={onAppendFromNode}
+        />
+        {sideSource}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <MultiRightHandle
+        channels={channels}
         hoveredEdge={hoveredEdge}
         connectingFrom={connectingFrom}
         nodeId={nodeId}
         allEdges={allEdges}
         isConnectionInteractive={isConnectionInteractive}
+        onAppendFromNode={onAppendFromNode}
       />
-    );
-  }
-
-  return (
-    <MultiRightHandle
-      channels={channels}
-      hoveredEdge={hoveredEdge}
-      connectingFrom={connectingFrom}
-      nodeId={nodeId}
-      allEdges={allEdges}
-      isConnectionInteractive={isConnectionInteractive}
-      onAppendFromNode={onAppendFromNode}
-    />
+      {sideSource}
+    </>
   );
 }

@@ -158,6 +158,28 @@ func (s *SMTPEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) e
 	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
 }
 
+func (s *SMTPEmailService) SendWorkOrderNotificationEmail(
+	toEmail, subject string,
+	data WorkOrderNotificationTemplateData,
+) error {
+	settings, err := s.settingsProvider.GetSMTPSettings(context.Background())
+	if err != nil {
+		return err
+	}
+
+	plainTextContent, err := s.renderTemplate("work_order_notification.txt", data)
+	if err != nil {
+		return fmt.Errorf("failed to render work order notification plain text template: %w", err)
+	}
+
+	htmlContent, err := s.renderTemplate("work_order_notification.html", data)
+	if err != nil {
+		return fmt.Errorf("failed to render work order notification HTML template: %w", err)
+	}
+
+	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
+}
+
 func (s *SMTPEmailService) renderTemplate(templateName string, data any) (string, error) {
 	return renderEmailTemplate(s.templateDir, templateName, data)
 }
@@ -244,14 +266,14 @@ func buildMultipartEmail(from string, to []string, bcc []string, subject, textBo
 	}
 
 	headers := []string{
-		fmt.Sprintf("From: %s", from),
-		fmt.Sprintf("Subject: %s", subject),
+		fmt.Sprintf("From: %s", sanitizeSMTPHeaderValue(from)),
+		fmt.Sprintf("Subject: %s", sanitizeSMTPHeaderValue(subject)),
 		"MIME-Version: 1.0",
 		fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"", boundary),
 	}
 
 	if len(to) > 0 {
-		headers = append(headers, fmt.Sprintf("To: %s", strings.Join(to, ", ")))
+		headers = append(headers, fmt.Sprintf("To: %s", sanitizeSMTPHeaderValue(strings.Join(to, ", "))))
 	}
 
 	message := strings.Join(headers, "\r\n") + "\r\n\r\n"
@@ -272,6 +294,11 @@ func formatFrom(name, email string) string {
 	}
 
 	return fmt.Sprintf("%s <%s>", name, email)
+}
+
+// sanitizeSMTPHeaderValue strips CR/LF so caller-influenced values cannot inject SMTP headers.
+func sanitizeSMTPHeaderValue(value string) string {
+	return strings.NewReplacer("\r", "", "\n", "").Replace(value)
 }
 
 func randomBoundary() (string, error) {

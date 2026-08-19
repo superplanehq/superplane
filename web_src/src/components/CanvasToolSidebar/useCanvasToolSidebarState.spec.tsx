@@ -5,7 +5,11 @@ import { useCanvasToolSidebarState } from "./useCanvasToolSidebarState";
 const featureFlags = vi.hoisted(() => ({ enabled: false }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({ has: () => featureFlags.enabled, enabledExperimentalFeatures: [] }),
+  useExperimentalFeature: () => ({
+    has: () => featureFlags.enabled,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
 }));
 
 function Harness({

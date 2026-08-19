@@ -5,6 +5,26 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
+func ForFactory(factory models.Factory) *log.Entry {
+	return WithFactory(log.NewEntry(log.StandardLogger()), factory)
+}
+
+func WithFactory(logger *log.Entry, factory models.Factory) *log.Entry {
+	return logger.WithFields(log.Fields{
+		"factory_id": factory.ID,
+	})
+}
+
+func ForWorkOrder(workOrder models.FactoryWorkOrder) *log.Entry {
+	return WithWorkOrder(log.NewEntry(log.StandardLogger()), workOrder)
+}
+
+func WithWorkOrder(logger *log.Entry, workOrder models.FactoryWorkOrder) *log.Entry {
+	return logger.WithFields(log.Fields{
+		"order_id": workOrder.ID,
+	})
+}
+
 func ForEvent(logger *log.Entry, event models.CanvasEvent) *log.Entry {
 	return logger.WithFields(log.Fields{
 		"event_id": event.ID,

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -115,10 +114,6 @@ func (c *RunApp) OutputChannels(configuration any) []core.OutputChannel {
 	}
 }
 
-func (c *RunApp) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
-
 func (c *RunApp) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -139,6 +134,12 @@ func (c *RunApp) Configuration() []configuration.Field {
 			Description: "The On Run trigger in the target app",
 			Type:        configuration.FieldTypeAppCanvasNode,
 			Required:    true,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "app",
+					Values: []string{"*"},
+				},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				AppCanvasNode: &configuration.AppCanvasNodeTypeOptions{
 					NodeTypes:      []string{"trigger"},
@@ -155,11 +156,19 @@ func (c *RunApp) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "parameters",
-			Label:       "Parameters",
-			Description: "The run parameters to pass to the target app",
-			Type:        configuration.FieldTypeRunParameters,
-			Required:    true,
+			Name:  "parameters",
+			Label: "Parameters",
+			Type:  configuration.FieldTypeRunParameters,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "app",
+					Values: []string{"*"},
+				},
+				{
+					Field:  "node",
+					Values: []string{"*"},
+				},
+			},
 		},
 		{
 			Name:        "timeout",

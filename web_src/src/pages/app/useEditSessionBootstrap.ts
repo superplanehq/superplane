@@ -8,6 +8,22 @@ import {
 } from "./lib/edit-staging-ready";
 import { useCommittedDraftBaselines } from "./useCommittedDraftBaselines";
 
+function resolveStableCanvasViewKey(
+  stableCanvasViewKeyRef: { current: string },
+  canvasViewKey: string,
+  pinCanvasViewKey: boolean,
+) {
+  if (!pinCanvasViewKey) {
+    stableCanvasViewKeyRef.current = canvasViewKey;
+  }
+  return pinCanvasViewKey ? stableCanvasViewKeyRef.current : canvasViewKey;
+}
+
+function buildCanvasRenderKey(stableCanvasViewKey: string, isRunInspectionMode: boolean, stagingResetNonce: number) {
+  const mode = isRunInspectionMode ? "runs" : "canvas";
+  return `${stableCanvasViewKey}:${mode}:reset-${stagingResetNonce}`;
+}
+
 type UseEditSessionBootstrapOptions = {
   canvasId: string;
   isEditing: boolean;
@@ -22,6 +38,7 @@ type UseEditSessionBootstrapOptions = {
   selectedCanvasVersion: CanvasesCanvasVersion | null;
   liveCanvasVersionId?: string;
   isRunInspectionMode: boolean;
+  includeConsoleBaseline?: boolean;
 };
 
 export function useEditSessionBootstrap({
@@ -38,6 +55,7 @@ export function useEditSessionBootstrap({
   selectedCanvasVersion,
   liveCanvasVersionId,
   isRunInspectionMode,
+  includeConsoleBaseline = true,
 }: UseEditSessionBootstrapOptions) {
   const stableCanvasViewKeyRef = useRef("live");
   const committedBaselinesForEdit = useCommittedDraftBaselines({
@@ -45,6 +63,7 @@ export function useEditSessionBootstrap({
     versionId: activeCanvasVersionId || undefined,
     enabled: isEditing,
     stagingResetNonce,
+    includeConsole: includeConsoleBaseline,
   });
   const isEditBootstrapReady = resolveEditBootstrapReady({
     isEditing,
@@ -66,11 +85,8 @@ export function useEditSessionBootstrap({
   const isEditSessionUiReady = !isEditing || (isEditBootstrapReady && !isDraftCanvasLoading);
   const canvasViewKey = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "live";
   const pinCanvasViewKey = isEnteringEditSession || (isEditing && !isEditBootstrapReady);
-  if (!pinCanvasViewKey) {
-    stableCanvasViewKeyRef.current = canvasViewKey;
-  }
-  const stableCanvasViewKey = pinCanvasViewKey ? stableCanvasViewKeyRef.current : canvasViewKey;
-  const canvasRenderKey = `${stableCanvasViewKey}:${isRunInspectionMode ? "runs" : "canvas"}:reset-${stagingResetNonce}`;
+  const stableCanvasViewKey = resolveStableCanvasViewKey(stableCanvasViewKeyRef, canvasViewKey, pinCanvasViewKey);
+  const canvasRenderKey = buildCanvasRenderKey(stableCanvasViewKey, isRunInspectionMode, stagingResetNonce);
 
   return {
     committedBaselinesForEdit,

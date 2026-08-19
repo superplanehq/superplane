@@ -4,41 +4,33 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
-func ListNodeQueueItems(ctx context.Context, registry *registry.Registry, workflowID, nodeID string, limit uint32, before *timestamppb.Timestamp) (*pb.ListNodeQueueItemsResponse, error) {
-	wfID, err := uuid.Parse(workflowID)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
-	}
-
+func ListNodeQueueItems(ctx context.Context, db *gorm.DB, canvas *models.Canvas, nodeID string, limit uint32, before *timestamppb.Timestamp) (*pb.ListNodeQueueItemsResponse, error) {
 	limit = getLimit(limit)
 	beforeTime := getBefore(before)
 
 	//
 	// List and count queue items
 	//
-	queueItems, err := models.ListNodeQueueItems(wfID, nodeID, int(limit), beforeTime)
+	queueItems, err := models.ListNodeQueueItems(db, canvas.ID, nodeID, int(limit), beforeTime)
 	if err != nil {
 		return nil, err
 	}
 
-	totalCount, err := models.CountNodeQueueItems(wfID, nodeID)
+	totalCount, err := models.CountNodeQueueItems(db, canvas.ID, nodeID)
 	if err != nil {
 		return nil, err
 	}
 
-	serialized, err := SerializeNodeQueueItems(database.DB(ctx), queueItems)
+	serialized, err := SerializeNodeQueueItems(db, queueItems)
 	if err != nil {
 		return nil, err
 	}

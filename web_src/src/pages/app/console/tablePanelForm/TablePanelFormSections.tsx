@@ -10,7 +10,7 @@ import { ActionRow } from "../TablePanelFormActionRow";
 import { ColumnRow, FilterRow, RowStyleRow } from "../TablePanelFormRows";
 import { WIDGET_SORT_ORDERS, type WidgetSortOrder } from "../widget/types";
 import type { TablePanelFormActions } from "./useTablePanelFormActions";
-import type { TablePanelPayloadDrafts } from "./useTablePanelPayloadDrafts";
+import type { RowActionPayloadDrafts } from "./useRowActionPayloadDrafts";
 
 export function TablePanelTitleField({
   value,
@@ -282,7 +282,7 @@ export function TablePanelRowActionsSection({
   triggerNodes: SuperplaneComponentsNode[];
   fieldOptions: string[];
   sampleRow: Record<string, unknown>;
-  payloadDrafts: TablePanelPayloadDrafts;
+  payloadDrafts: RowActionPayloadDrafts;
   actions: TablePanelFormActions;
 }) {
   return (

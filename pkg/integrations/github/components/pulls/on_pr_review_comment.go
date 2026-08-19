@@ -52,6 +52,22 @@ Common expression paths:
 - Review comment body: ` + "`root().data.comment.body`" + ` (pull_request_review_comment)
 - Review submission body: ` + "`root().data.review.body`" + ` (pull_request_review)
 
+The Example Data below shows the pull_request_review_comment shape. A pull_request_review submission replaces ` + "`comment`" + ` with a ` + "`review`" + ` object instead, e.g.:
+
+` + "```json" + `
+{
+  "action": "submitted",
+  "review": {
+    "id": 987654321,
+    "body": "LGTM! Nice cleanup on the title rename.",
+    "state": "approved",
+    "html_url": "https://github.com/acme-labs/snaketoy/pull/42#pullrequestreview-987654321",
+    "user": { "login": "jules-ramirez" }
+  },
+  "pull_request": { "number": 42, "html_url": "https://github.com/acme-labs/snaketoy/pull/42" }
+}
+` + "```" + `
+
 ## Webhook Setup
 
 This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.`

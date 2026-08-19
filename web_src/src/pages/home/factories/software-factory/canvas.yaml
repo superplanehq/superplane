@@ -1,0 +1,1500 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Software Factory
+  description: Automate coding work with agents, from issue to pull request.
+spec:
+  nodes:
+    - id: onrun-onrun-2nvcpr
+      name: Update Progress
+      type: TYPE_TRIGGER
+      component: onRun
+      configuration:
+        parameters:
+          - label: Pull Request Number
+            name: PullRequestNumber
+            required: true
+            type: string
+          - label: Check Name
+            name: CheckName
+            required: true
+            type: string
+      position:
+        x: 72
+        'y': 3504
+      isCollapsed: false
+    - id: annotation-note-8-5f4dam
+      name: Note 8
+      type: TYPE_WIDGET
+      component: annotation
+      configuration:
+        color: yellow
+        text: |-
+          ## Bookkeeping
+
+          When a PR is closed, we either mark it a success or a failure and move it to the appropriate column.
+      position:
+        x: 72
+        'y': 1296
+      isCollapsed: false
+    - id: component-node-vwmzg2
+      name: Too many retries
+      type: TYPE_ACTION
+      component: github.createIssueComment
+      configuration:
+        body: Stopping work.Tried to fix the CI, but it is still failing after 5 attempts.
+        issueNumber: '{{ root().data.parameters.PullRequestNumber }}'
+        repository: '{{ install_params.appRepository }}'
+      position:
+        x: 1920
+        'y': 2448
+      isCollapsed: true
+    - id: factory-pr-review-comment-filter
+      name: Factory PR (review comment)?
+      type: TYPE_ACTION
+      component: filter
+      configuration:
+        expression: any(root().data.pull_request.labels, {.name == "factory"})
+      position:
+        x: 672
+        'y': 1080
+      isCollapsed: true
+    - id: component-node-t3n3jn
+      name: Get Pull Request Description
+      type: TYPE_ACTION
+      component: github.getIssue
+      configuration:
+        issueNumber: '{{ root().data.parameters.PullRequestNumber }}'
+        repository: '{{ install_params.appRepository }}'
+      position:
+        x: 612
+        'y': 3504
+      isCollapsed: false
+    - id: annotation-note-9-loirus
+      name: Note 9
+      type: TYPE_WIDGET
+      component: annotation
+      configuration:
+        color: yellow
+        text: |-
+          ## Babysitting
+
+          Call this workflow when a PR is ready with implementation and needs to be babysitted
+      position:
+        x: 72
+        'y': 2184
+      isCollapsed: false
+    - id: create-task-start
+      name: Create Task
+      type: TYPE_TRIGGER
+      component: start
+      configuration:
+        templates:
+          - name: Create Task
+            parameters:
+              - name: description
+                placeholder: Describe the task the factory should work on...
+                title: Task description
+                type: text
+            payload:
+              description: '{{ parameters["description"] }}'
+      position:
+        x: 72
+        'y': 4200
+      isCollapsed: false
+    - id: factory-pr-merged-filter
+      name: Factory PR (merged)?
+      type: TYPE_ACTION
+      component: filter
+      configuration:
+        expression: any(root().data.pull_request.labels, {.name == "factory"})
+      position:
+        x: 1320
+        'y': 1320
+      isCollapsed: true
+    - id: label-is-factory-filter
+      name: Label is factory?
+      type: TYPE_ACTION
+      component: filter
+      configuration:
+        expression: root().data.label.name == "factory" && root().data.issue.pull_request == nil
+      position:
+        x: 552
+        'y': -216
+      isCollapsed: false
+    - id: mark-rejected-memory
+      name: Mark Rejected Memory
+      type: TYPE_ACTION
+      component: upsertMemory
+      configuration:
+        matchList:
+          - name: pr_number
+            value: '{{ root().data.pull_request.number }}'
+        namespace: factory_tasks
+        valueList:
+          - name: status
+            value: failed
+          - name: failure_reason
+            value: '"PR closed without merging"'
+          - name: finished_at
+            value: '{{ now().UTC().Format("2006-01-02T15:04:05Z") }}'
+      position:
+        x: 1920
+        'y': 1776
+      isCollapsed: true
+    - id: apply-user-request-claude
+      name: Apply user request
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      configuration:
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
+        environment:
+          - name: REPO
+            value: '{{ root().data.repository.full_name }}'
+            valueSource: literal
+          - name: PR_NUMBER
+            value: '{{ split(split(root().data.comment.html_url, "/pull/")[1], "#")[0] }}'
+            valueSource: literal
+        executionTimeoutSeconds: 3600
+        machineType: e1-large-amd64
+        steps:
+          - command: 'echo "REPLACE ME WITH: git user.name and user.email for automation commits"'
+            name: Set Up Git User
+            type: bash
+          - command: |-
+              export GH_TOKEN="$GITHUB_TOKEN"
+              gh repo clone "$REPO" repo
+              cd repo
+              gh pr checkout "$PR_NUMBER"
+              # Embed the token so later git push is non-interactive (gh clone leaves a bare https remote).
+              git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git"
+            name: Checkout PR
+            type: bash
+          - command: 'echo "REPLACE ME WITH: commit signing / DCO prepare-commit-msg hook for your org"'
+            name: Set Up DCO Signing
+            type: bash
+          - name: Apply requested changes
+            prompt: |-
+              You are addressing a reviewer's requested changes on an open pull request. The repository is already checked out in your current working directory, on the PR branch.
+
+              Repository: {{ root().data.repository.full_name }}
+              Pull Request: #{{ split(split(root().data.comment.html_url, "/pull/")[1], "#")[0] }}
+
+              The comment that triggered this run:
+              ---
+              {{ root().data.comment.body }}
+              ---
+
+              1/ Read the PR conversation and review comments for context.
+              2/ Implement the requested changes described in the comment above.
+              3/ Keep the change focused and commit your work to the current branch with clear commit messages.
+
+              Guidelines:
+
+              1/ Focus on clean code.
+              2/ Make long term fixes, not fast patches.
+              3/ Add tests where it makes sense.
+            type: prompt
+          - command: |-
+              export GIT_TERMINAL_PROMPT=0
+              git add -A
+              git commit -s -m "chore: apply requested changes on PR #${PR_NUMBER}" || echo "Nothing new to commit"
+              git push origin HEAD
+              echo "Pushed changes for PR #${PR_NUMBER}"
+            name: Commit and push
+            type: bash
+        credentials:
+          source: integration
+          integration:
+            name: claude
+      position:
+        x: 672
+        'y': 816
+      isCollapsed: false
+    - id: component-node-tfqihq
+      name: Mark Plan Done
+      type: TYPE_ACTION
+      component: runApp
+      configuration:
+        app: __FACTORY_CANVAS_ID__
+        node: onrun-onrun-2nvcpr
+        parameters:
+          CheckName: Write implementation plan
+          PullRequestNumber: '{{ $["Open Draft PR"].data.number }}'
+        timeout: 60
+      metadata:
+        node:
+          id: onrun-onrun-2nvcpr
+          name: Update Progress
+      position:
+        x: 3000
+        'y': 168
+      isCollapsed: true
+    - id: mark-implementation-done-mark-implementation-done-2-qpudc5
+      name: Mark CI Done
+      type: TYPE_ACTION
+      component: runApp
+      configuration:
+        app: __FACTORY_CANVAS_ID__
+        node: onrun-onrun-2nvcpr
+        parameters:
+          CheckName: Confirmed CI passes
+          PullRequestNumber: '{{ $["Open Draft PR"].data.number }}'
+        timeout: 60
+      metadata:
+        node:
+          id: onrun-onrun-2nvcpr
+          name: Update Progress
+      position:
+        x: 4320
+        'y': 96
+      isCollapsed: true
+    - id: on-issue-assigned-trigger
+      name: On Issue Assigned
+      type: TYPE_TRIGGER
+      component: github.onIssue
+      configuration:
+        actions:
+          - assigned
+        repository: '{{ install_params.backlogRepository }}'
+      position:
+        x: 72
+        'y': -432
+      isCollapsed: false
+    - id: annotation-note-3-1lzl4r
+      name: Note 3
+      type: TYPE_WIDGET
+      component: annotation
+      configuration:
+        color: yellow
+        text: |-
+          ## Writing a plan
+
+          An implementation plan describes both to agents and people how we are going to tackle this problem.
+      position:
+        x: 2304
+        'y': -744
+      isCollapsed: false
+    - id: correlate-issue-memory
+      name: Correlate Issue Memory
+      type: TYPE_ACTION
+      component: upsertMemory
+      configuration:
+        matchList:
+          - name: task_key
+            value: '{{ root().timestamp }}'
+        namespace: factory_tasks
+        valueList:
+          - name: issue_number
+            value: '{{ $["Create Issue"].data.number }}'
+          - name: issue_url
+            value: '{{ $["Create Issue"].data.html_url }}'
+          - name: title
+            value: '{{ $["Create Issue"].data.title }}'
+      position:
+        x: 1872
+        'y': 4392
+      isCollapsed: true
+    - id: mark-implementation-failed-memory
+      name: Mark Implementation Failed Memory
+      type: TYPE_ACTION
+      component: upsertMemory
+      configuration:
+        matchList:
+          - name: pr_number
+            value: '{{ $["Open Draft PR"].data.number }}'
+        namespace: factory_tasks
+        valueList:
+          - name: status
+            value: failed
+          - name: failure_reason
+            value: '"Implementation failed"'
+          - name: finished_at
+            value: '{{ now().UTC().Format("2006-01-02T15:04:05Z") }}'
+      position:
+        x: 3624
+        'y': 400
+      isCollapsed: true
+    - id: on-pr-comment-trigger
+      name: On mention on PR
+      type: TYPE_TRIGGER
+      component: github.onPRComment
+      configuration:
+        contentFilter: '@superplaneagent'
+        repository: '{{ install_params.appRepository }}'
+      position:
+        x: 72
+        'y': 816
+      isCollapsed: false
+    - id: annotation-note-6-nys1uq
+      name: Note 6
+      type: TYPE_WIDGET
+      component: annotation
+      configuration:
+        color: yellow
+        text: |-
+          ## Ready for review
+
+          Mark the PR as ready for review, and wait for either human guidance, or merge.
+      position:
+        x: 4848
+        'y': -744
+      isCollapsed: false
+    - id: implementation-implementation-2-ilbopr
+      name: Write Plan
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      configuration:
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
+        environment:
+          - name: REPO
+            value: '{{ install_params.appRepository }}'
+            valueSource: literal
+          - name: BRANCH
+            value: '{{ $["Create Branch"].data.result.branch }}'
+            valueSource: literal
+          - name: PR_NUMBER
+            value: '{{ $["Open Draft PR"].data.number }}'
+            valueSource: literal
+        executionTimeoutSeconds: 3600
+        machineType: e1-large-amd64
+        steps:
+          - command: |-
+              export GH_TOKEN="$GITHUB_TOKEN"
+              git clone --depth 1 --branch "$BRANCH" "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
+              cd repo
+            name: Checkout branch
+            type: bash
+          - name: Write implementation plan
+            prompt: |-
+              You are writing an implementation plan for a GitHub issue. The repository is checked out in your current working directory on the working branch.
+
+              Repository: {{ install_params.appRepository }}
+              Issue number: {{ root().data.issue.number }}
+              Issue title: {{ root().data.issue.title }}
+
+              1/ Gather context: using the GitHub token in the GITHUB_TOKEN environment variable, read the FULL issue and all of its comments, and inspect the codebase as needed.
+              2/ Write the plan to the file /tmp/plan.md. Do NOT create any files inside the repository, and do NOT commit anything.
+
+              Format the plan EXACTLY like this, and output nothing else to the file:
+              - Start with a very short, high-level summary: 1-3 concise sentences or a few bullets. Clear and to the point. No heading above it.
+              - Then a collapsed details section that covers everything else (approach, concrete steps, architecture, tradeoffs, pros/cons, and mermaid diagrams if helpful), using exactly this structure:
+
+              <details>
+              <summary>Implementation plan</summary>
+
+              ...full details here...
+
+              </details>
+
+              Write clearly, for humans. Keep the top summary genuinely short.
+            type: prompt
+          - command: |-
+              export GH_TOKEN="$GITHUB_TOKEN"
+              [ -s /tmp/plan.md ] || { echo "No plan produced at /tmp/plan.md" >&2; exit 1; }
+              CUR="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json body -q .body)"
+              NEW="$(CUR="$CUR" python3 -c 'import os
+              cur=os.environ["CUR"]
+              plan=open("/tmp/plan.md").read().strip()
+              marker="### Summary\n\nTODO"
+              if marker in cur:
+                  print(cur.replace(marker, "### Summary\n\n"+plan, 1))
+              else:
+                  print(cur.replace("TODO", plan, 1))')"
+              gh pr edit "$PR_NUMBER" --repo "$REPO" --body "$NEW"
+              echo "Updated PR #$PR_NUMBER description with the implementation plan"
+            name: Update PR description
+            type: bash
+        credentials:
+          source: integration
+          integration:
+            name: claude
+      position:
+        x: 2304
+        'y': 0
+      isCollapsed: false
+    - id: annotation-note-5-j7yo5a
+      name: Note 5
+      type: TYPE_WIDGET
+      component: annotation
+      configuration:
+        color: yellow
+        text: |-
+          ## Babysit
+
+          Starting the CI process. The agents attempts 5 times to fix any issue that was pointed out by CI.
+      position:
+        x: 3600
+        'y': -744
+      isCollapsed: false
+    - id: assigned-to-agent-filter
+      name: Assigned to agent?
+      type: TYPE_ACTION
+      component: filter
+      configuration:
+        expression: root().data.assignee.login == "superplaneagent"
+      position:
+        x: 552
+        'y': -432
+      isCollapsed: false
+    - id: factory-pr-comment-filter
+      name: Factory PR (comment)?
+      type: TYPE_ACTION
+      component: filter
+      configuration:
+        expression: any(root().data.issue.labels, {.name == "factory"})
+      position:
+        x: 720
+        'y': 696
+      isCollapsed: true
+    - id: mark-merged-memory
+      name: Mark Merged Memory
+      type: TYPE_ACTION
+      component: upsertMemory
+      configuration:
+        matchList:
+          - name: pr_number
+            value: '{{ root().data.pull_request.number }}'
+        namespace: factory_tasks
+        valueList:
+          - name: status
+            value: done
+          - name: finished_at
+            value: '{{ now().UTC().Format("2006-01-02T15:04:05Z") }}'
+      position:
+        x: 1824
+        'y': 1320
+      isCollapsed: true
+    - id: run-claude-code-implementation
+      name: Implementation
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      configuration:
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
+        environment:
+          - name: REPO
+            value: '{{ install_params.appRepository }}'
+            valueSource: literal
+          - name: ISSUE_NUMBER
+            value: '{{ root().data.issue.number }}'
+            valueSource: literal
+          - name: BRANCH
+            value: '{{ $["Create Branch"].data.result.branch }}'
+            valueSource: literal
+        executionTimeoutSeconds: 3600
+        machineType: e1-large-amd64
+        steps:
+          - command: 'echo "REPLACE ME WITH: git user.name and user.email for automation commits"'
+            name: Set Up Git User
+            type: bash
+          - command: |-
+              git clone --depth 1 --branch "$BRANCH" "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
+              cd repo
+            name: Checkout branch
+            type: bash
+          - command: 'echo "REPLACE ME WITH: commit signing / DCO prepare-commit-msg hook for your org"'
+            name: Set Up DCO Signing
+            type: bash
+          - command: 'echo "REPLACE ME WITH: project setup commands (install deps, start services, etc.)"'
+            name: Set up DevEnv
+            type: bash
+          - name: Implementation
+            prompt: |-
+              You are implementing a fix for a GitHub issue. The repository is already checked out in your current working directory, on the branch to work on.
+
+              Repository: {{ install_params.appRepository }}
+              Issue number: {{ root().data.issue.number }}
+              Issue title: {{ root().data.issue.title }}
+
+              1/ Gather context. Using the GitHub token in the GITHUB_TOKEN environment variable, read the FULL issue and ALL of its comments before writing any code.
+              2/ Implement. Make the code changes required to resolve the issue and address the discussion in the comments.
+              3/ Keep the change focused and commit your work to the current branch with clear commit messages.
+
+              Guidelines:
+
+              1/ Focus on clean code.
+              2/ Make long term fixes, not fast patches.
+              3/ Add tests where it makes sense.
+            type: prompt
+          - command: 'echo "REPLACE ME WITH: project format/lint commands"'
+            name: Format JS and Go code
+            type: bash
+          - command: |
+              git add -A
+              git commit -s -m "fix: implement issue #${ISSUE_NUMBER} via Claude Code" || echo "Nothing new to commit"
+              git push origin "$BRANCH"
+              echo "Pushed implementation to $BRANCH"
+            name: Commit and push
+            type: bash
+        credentials:
+          source: integration
+          integration:
+            name: claude
+      position:
+        x: 3000
+        'y': 0
+      isCollapsed: false
+    - id: annotation-create-task
+      name: Note Create Task
+      type: TYPE_WIDGET
+      component: annotation
+      configuration:
+        color: green
+        text: |-
+          ## Create Task
+
+          File a clear, well-formed issue for the factory from a short description.
+          Applying the "factory" label starts the factory on it.
+
+          Also reachable from the Work Order Dispatch onRun entrypoint when a factory line
+          sends a work order (title and description).
+      position:
+        x: 72
+        'y': 3960
+      isCollapsed: false
+    - id: create-task-add-label
+      name: Add factory label
+      type: TYPE_ACTION
+      component: github.addIssueLabel
+      configuration:
+        issueNumber: '{{ $["Create Issue"].data.number }}'
+        labels:
+          - factory
+        repository: '{{ install_params.backlogRepository }}'
+      position:
+        x: 1872
+        'y': 4200
+      isCollapsed: false
+    - id: mark-ci-done-mark-ci-done-2-ru37ew
+      name: Mark Human Review Requested
+      type: TYPE_ACTION
+      component: runApp
+      configuration:
+        app: __FACTORY_CANVAS_ID__
+        node: onrun-onrun-2nvcpr
+        parameters:
+          CheckName: Human review requested
+          PullRequestNumber: '{{ $["Open Draft PR"].data.number }}'
+        timeout: 60
+      metadata:
+        node:
+          id: onrun-onrun-2nvcpr
+          name: Update Progress
+      position:
+        x: 4968
+        'y': -24
+      isCollapsed: true
+    - id: ci-green
+      name: All Checks Green?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: $["Wait for PR Checks"].data.result.status == "success"
+      position:
+        x: 1296
+        'y': 2448
+      isCollapsed: true
+    - id: fix-ci-claude
+      name: Review & Fix PR Checks
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      configuration:
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
+        environment:
+          - name: REPO
+            value: '{{ root().data.parameters.Repository }}'
+            valueSource: literal
+          - name: PR_NUMBER
+            value: '{{ root().data.parameters.PullRequestNumber }}'
+            valueSource: literal
+        executionTimeoutSeconds: 3600
+        machineType: e1-large-amd64
+        steps:
+          - command: 'echo "REPLACE ME WITH: git user.name and user.email for automation commits"'
+            name: Set Up Git User
+            type: bash
+          - command: |-
+              export GH_TOKEN="$GITHUB_TOKEN"
+              gh repo clone "$REPO" repo
+              cd repo
+              gh pr checkout "$PR_NUMBER"
+              # Embed the token so later git push is non-interactive (gh clone leaves a bare https remote).
+              git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git"
+            name: Checkout PR
+            type: bash
+          - command: 'echo "REPLACE ME WITH: commit signing / DCO prepare-commit-msg hook for your org"'
+            name: Set Up DCO Signing
+            type: bash
+          - name: Review and fix failing checks
+            prompt: |-
+              One or more checks are failing on this pull request. The repository is already checked out in your current working directory, on the PR branch.
+
+              Repository: {{ root().data.parameters.Repository }}
+              Pull Request: #{{ root().data.parameters.PullRequestNumber }}
+
+              1/ List every check on this PR and identify the failing ones:
+                 gh pr checks "{{ root().data.parameters.PullRequestNumber }}" --repo "{{ root().data.parameters.Repository }}"
+                 This includes GitHub Actions runs, third-party check apps, and commit statuses. Review ALL of them, not just "CI".
+
+              2/ Understand each failure:
+                 - For GitHub Actions checks, inspect the logs: find the run id and run `gh run view <run-id> --repo "$REPO" --log-failed`.
+                 - For other checks/statuses, open the check's details URL from `gh pr checks`, and/or reproduce locally by running the project's build, tests, linters, or type checks.
+
+              3/ Fix the relevant, legitimate failures at the root cause. Keep changes focused and clean; prefer long-term fixes over quick patches; add or update tests where it makes sense.
+                 - If a failure is clearly unrelated to this PR, flaky, or depends on a secret/service you cannot access, skip it and briefly note why rather than forcing a change.
+
+              4/ Commit your work to the current branch with clear commit messages.
+
+              Guidelines:
+
+              1/ Focus on clean code.
+              2/ Make long term fixes, not fast patches.
+              3/ Add tests where it makes sense.
+            type: prompt
+          - command: |-
+              export GIT_TERMINAL_PROMPT=0
+              git add -A
+              git commit -s -m "fix: address failing checks on PR #${PR_NUMBER}" || echo "Nothing new to commit"
+              git push origin HEAD
+              echo "Pushed fixes for PR #${PR_NUMBER}"
+            name: Commit and push
+            type: bash
+        credentials:
+          source: integration
+          integration:
+            name: claude
+      position:
+        x: 1920
+        'y': 2688
+      isCollapsed: false
+    - id: github-markpullrequestreadyforreview-github-markpullrequestreadyforreview-wie92w
+      name: Mark PR Ready
+      type: TYPE_ACTION
+      component: github.markPullRequestReadyForReview
+      configuration:
+        pullNumber: '{{ $["Open Draft PR"].data.number }}'
+        repository: '{{ install_params.appRepository }}'
+      position:
+        x: 4968
+        'y': 24
+      isCollapsed: true
+    - id: mark-ci-failed-memory
+      name: Mark CI Failed Memory
+      type: TYPE_ACTION
+      component: upsertMemory
+      configuration:
+        matchList:
+          - name: pr_number
+            value: '{{ root().data.parameters.PullRequestNumber }}'
+        namespace: factory_tasks
+        valueList:
+          - name: status
+            value: failed
+          - name: failure_reason
+            value: '"CI still failing after 5 attempts"'
+          - name: finished_at
+            value: '{{ now().UTC().Format("2006-01-02T15:04:05Z") }}'
+      position:
+        x: 1920
+        'y': 2360
+      isCollapsed: true
+    - id: reopen-followup-memory
+      name: Reopen Followup Memory
+      type: TYPE_ACTION
+      component: upsertMemory
+      configuration:
+        matchList:
+          - name: pr_number
+            value: '{{ split(split(root().data.comment.html_url, "/pull/")[1], "#")[0] }}'
+        namespace: factory_tasks
+        valueList:
+          - name: pr_number
+            value: '{{ split(split(root().data.comment.html_url, "/pull/")[1], "#")[0] }}'
+          - name: pr_url
+            value: '{{ split(root().data.comment.html_url, "#")[0] }}'
+          - name: status
+            value: in_progress
+      position:
+        x: 1392
+        'y': 1056
+      isCollapsed: true
+    - id: runner-create-branch-2
+      name: Create Branch
+      type: TYPE_ACTION
+      component: runnerBash
+      configuration:
+        enable_setup_commands: false
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
+        environment:
+          - name: REPO
+            value: '{{ install_params.appRepository }}'
+            valueSource: literal
+          - name: ISSUE_TITLE
+            value: '{{ root().data.issue.title }}'
+            valueSource: literal
+        execution_mode: host
+        execution_timeout_seconds: 600
+        machine_type: e1-large-amd64
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          export GH_TOKEN="$GITHUB_TOKEN"
+          : "${REPO:?REPO is required}"
+
+          # Resolve the repository default branch (not every repo uses main).
+          BASE="$(gh api "repos/${REPO}" --jq .default_branch)"
+          : "${BASE:?failed to resolve default branch}"
+
+          # Build branch name: fix/<slug-of-issue-title>-<unix-timestamp>-<randbytes>
+          SLUG="$(printf '%s' "${ISSUE_TITLE:-}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-50 | sed -E 's/-+$//')"
+          [ -n "$SLUG" ] || SLUG="task"
+          TIMESTAMP="$(date +%s)"
+          RAND="$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+          BRANCH="fix/${SLUG}-${TIMESTAMP}-${RAND}"
+
+          GITURL="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git"
+          WORKDIR="repo"
+
+          echo "REPLACE ME WITH: git user.name and user.email for automation commits"
+          git config --global user.email "automation@example.com"
+          git config --global user.name "Factory Automation"
+
+          git clone --depth 1 --branch "$BASE" "$GITURL" "$WORKDIR"
+          cd "$WORKDIR"
+
+          # Create an empty branch off the base: a single empty commit so a draft PR can be opened,
+          # with no files added.
+          git checkout -b "$BRANCH"
+          git commit -s --allow-empty -m "chore: initialize ${BRANCH}"
+          git push -u origin "$BRANCH"
+
+          echo "Pushed empty branch ${BRANCH} (base ${BASE})"
+
+          # Respond with branch metadata
+          printf '{"branch":"%s","base":"%s","session":"%s","slug":"%s","rand":"%s"}\n' "$BRANCH" "$BASE" "$TIMESTAMP" "$SLUG" "$RAND" > "$SUPERPLANE_RESULT_FILE"
+      position:
+        x: 1104
+        'y': 0
+      isCollapsed: false
+    - id: annotation-note-7-6yj5de
+      name: Note 7
+      type: TYPE_WIDGET
+      component: annotation
+      configuration:
+        color: green
+        text: |-
+          ## Human Review
+
+          On any PR opened with the factory, humans can ask for followups by mentioning @superplaneagent in a comment. 
+      position:
+        x: 72
+        'y': 576
+      isCollapsed: false
+    - id: annotation-note-10-ov982x
+      name: Note 10
+      type: TYPE_WIDGET
+      component: annotation
+      configuration:
+        color: yellow
+        text: |-
+          ## Update progress
+
+          Utility workflow to update the progress in the PR descriptuion
+      position:
+        x: 72
+        'y': 3168
+      isCollapsed: false
+    - id: annotation-note-2-ykr28z
+      name: Note 2
+      type: TYPE_WIDGET
+      component: annotation
+      configuration:
+        color: yellow
+        text: |-
+          ## Creating a working branch
+
+          We are creating a branch to have checkpoints, and imidiately opening a PR
+          as a place where to store session logs
+      position:
+        x: 1104
+        'y': -744
+      isCollapsed: false
+    - id: annotation-note-zhb4b5
+      name: Note
+      type: TYPE_WIDGET
+      component: annotation
+      configuration:
+        color: green
+        text: |-
+          ## Main Entrypoint
+
+          Two ways to trigger:
+
+          1/ Mention @superplaneagent
+          2/ Add "factory" label
+      position:
+        x: 72
+        'y': -744
+      isCollapsed: false
+    - id: component-node-wla304
+      name: github.createIssueComment
+      type: TYPE_ACTION
+      component: github.createIssueComment
+      configuration:
+        body: |-
+          Taking a look!
+          Follow my progress: {{ $["Open Draft PR"].data.html_url }}
+        issueNumber: '{{ root().data.issue.number }}'
+        repository: '{{ install_params.backlogRepository }}'
+      position:
+        x: 2304
+        'y': 192
+      isCollapsed: true
+    - id: factory-pr-rejected-filter
+      name: Factory PR (rejected)?
+      type: TYPE_ACTION
+      component: filter
+      configuration:
+        expression: any(root().data.pull_request.labels, {.name == "factory"})
+      position:
+        x: 1320
+        'y': 1776
+      isCollapsed: true
+    - id: mark-implementation-done-mark-implementation-done-2-8ukxus
+      name: Mark Check as Done
+      type: TYPE_ACTION
+      component: github.updateIssue
+      configuration:
+        body: '{{ replace($["Get Pull Request Description"].data.body, "- [ ] " + root().data.parameters.CheckName, "- [x] " + root().data.parameters.CheckName)  }}'
+        issueNumber: '{{ root().data.parameters.PullRequestNumber }}'
+        repository: '{{ install_params.appRepository }}'
+        state: open
+      position:
+        x: 1152
+        'y': 3504
+      isCollapsed: false
+    - id: mark-plan-done-mark-plan-done-2-9a4m74
+      name: Mark Implementation Done
+      type: TYPE_ACTION
+      component: runApp
+      configuration:
+        app: __FACTORY_CANVAS_ID__
+        node: onrun-onrun-2nvcpr
+        parameters:
+          CheckName: Complete implementation
+          PullRequestNumber: '{{ $["Open Draft PR"].data.number }}'
+        timeout: 60
+      metadata:
+        node:
+          id: onrun-onrun-2nvcpr
+          name: Update Progress
+      position:
+        x: 3624
+        'y': 216
+      isCollapsed: true
+    - id: pr-closed-trigger
+      name: On PR Closed
+      type: TYPE_TRIGGER
+      component: github.onPullRequest
+      configuration:
+        actions:
+          - closed
+        repository: '{{ install_params.appRepository }}'
+      position:
+        x: 72
+        'y': 1536
+      isCollapsed: false
+    - id: create-task-issue
+      name: Create Issue
+      type: TYPE_ACTION
+      component: github.createIssue
+      configuration:
+        body: |-
+          {{ fromJSON($["Draft Issue"].data.result.result[indexOf($["Draft Issue"].data.result.result, "{"):lastIndexOf($["Draft Issue"].data.result.result, "}") + 1]).body }}
+
+          ---
+
+          Automatically created by the Software Factory
+        repository: '{{ install_params.backlogRepository }}'
+        title: '{{ fromJSON($["Draft Issue"].data.result.result[indexOf($["Draft Issue"].data.result.result, "{"):lastIndexOf($["Draft Issue"].data.result.result, "}") + 1]).title }}'
+      position:
+        x: 1272
+        'y': 4200
+      isCollapsed: false
+    - id: github-create-pr-2
+      name: Open Draft PR
+      type: TYPE_ACTION
+      component: github.createPullRequest
+      configuration:
+        base: '{{ $["Create Branch"].data.result.base }}'
+        body: |-
+          fixes {{ install_params.backlogRepository }}#{{ root().data.issue.number }}
+
+          ### Summary
+
+          TODO
+
+          ### Progress
+
+          - [ ] Write implementation plan
+          - [ ] Complete implementation
+          - [ ] Confirmed CI passes
+          - [ ] Human review requested
+
+          ---
+
+          Automatically created by the Software Factory
+        draft: true
+        head: '{{ $["Create Branch"].data.result.branch }}'
+        repository: '{{ install_params.appRepository }}'
+        title: 'fix: {{ root().data.issue.title }}'
+      position:
+        x: 1728
+        'y': 0
+      isCollapsed: false
+    - id: on-issue-labeled-trigger
+      name: On Issue Labeled
+      type: TYPE_TRIGGER
+      component: github.onIssue
+      configuration:
+        actions:
+          - labeled
+        repository: '{{ install_params.backlogRepository }}'
+      position:
+        x: 72
+        'y': -216
+      isCollapsed: false
+    - id: pr-merged-if
+      name: PR Merged?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: root().data.pull_request.merged == true
+      position:
+        x: 696
+        'y': 1536
+      isCollapsed: false
+    - id: submit-task-memory
+      name: Submit Task Memory
+      type: TYPE_ACTION
+      component: addMemory
+      configuration:
+        namespace: factory_tasks
+        valueList:
+          - name: task_key
+            value: '{{ root().timestamp }}'
+          - name: status
+            value: in_progress
+          - name: title
+            value: '{{ order() != nil ? order().title + (order().description != "" ? "\n\n" + order().description : "") : root().data.description }}'
+          - name: description
+            value: '{{ order() != nil ? order().title + (order().description != "" ? "\n\n" + order().description : "") : root().data.description }}'
+      position:
+        x: 672
+        'y': 4392
+      isCollapsed: true
+    - id: component-node-4m9qti
+      name: On mention on Issue
+      type: TYPE_TRIGGER
+      component: github.onIssueComment
+      configuration:
+        contentFilter: '@superplaneagent'
+        repository: '{{ install_params.backlogRepository }}'
+      position:
+        x: 72
+        'y': 0
+      isCollapsed: false
+    - id: component-node-nbf347
+      name: Babysit
+      type: TYPE_ACTION
+      component: runApp
+      configuration:
+        app: __FACTORY_CANVAS_ID__
+        node: onrun-onrun-u02eup
+        parameters:
+          PullRequestNumber: '{{ $["Open Draft PR"].data.number }}'
+          Repository: '{{ install_params.appRepository }}'
+        timeout: 3600
+      metadata:
+        node:
+          id: onrun-onrun-u02eup
+          name: Start Babysitting
+      position:
+        x: 3624
+        'y': 0
+      isCollapsed: false
+    - id: component-node-x9cztq
+      name: github.addIssueLabel
+      type: TYPE_ACTION
+      component: github.addIssueLabel
+      configuration:
+        issueNumber: '{{ $["Open Draft PR"].data.number }}'
+        labels:
+          - factory
+        repository: '{{ install_params.appRepository }}'
+      position:
+        x: 2304
+        'y': 288
+      isCollapsed: true
+    - id: on-pr-review-comment-trigger
+      name: On mention on PR Review
+      type: TYPE_TRIGGER
+      component: github.onPRReviewComment
+      configuration:
+        contentFilter: '@superplaneagent'
+        repository: '{{ install_params.appRepository }}'
+      position:
+        x: 72
+        'y': 1080
+      isCollapsed: false
+    - id: onrun-onrun-u02eup
+      name: Start Babysitting
+      type: TYPE_TRIGGER
+      component: onRun
+      configuration:
+        parameters:
+          - label: PullRequestNumber
+            name: PullRequestNumber
+            required: true
+            type: string
+          - label: Repository
+            name: Repository
+            required: true
+            type: string
+      position:
+        x: 72
+        'y': 2568
+      isCollapsed: false
+    - id: wait-for-pr-checks
+      name: Wait for PR Checks
+      type: TYPE_ACTION
+      component: runnerBash
+      configuration:
+        enable_setup_commands: false
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
+        environment:
+          - name: REPO
+            value: '{{ root().data.parameters.Repository }}'
+            valueSource: literal
+          - name: PR_NUMBER
+            value: '{{ root().data.parameters.PullRequestNumber }}'
+            valueSource: literal
+        execution_mode: host
+        execution_timeout_seconds: 3600
+        machine_type: e1-tiny-amd64
+        script: |
+          #!/usr/bin/env bash
+          set -uo pipefail
+
+          : "${REPO:?REPO is required}"
+          : "${PR_NUMBER:?PR_NUMBER is required}"
+          export GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+          export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
+
+          # Ensure the GitHub CLI is available on the runner host; install a static build if missing.
+          if ! command -v gh >/dev/null 2>&1; then
+            echo "gh not found; installing GitHub CLI..."
+            GH_VERSION="2.62.0"
+            ARCH="$(uname -m)"
+            case "$ARCH" in
+              x86_64|amd64) GH_ARCH="amd64" ;;
+              aarch64|arm64) GH_ARCH="arm64" ;;
+              *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
+            esac
+            TMP="$(mktemp -d)"
+            curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz" -o "$TMP/gh.tgz"
+            tar -xzf "$TMP/gh.tgz" -C "$TMP"
+            SRC="$TMP/gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh"
+            if ! install -m 0755 "$SRC" /usr/local/bin/gh 2>/dev/null; then
+              mkdir -p "$HOME/.local/bin"
+              install -m 0755 "$SRC" "$HOME/.local/bin/gh"
+            fi
+            command -v gh >/dev/null 2>&1 || { echo "gh install failed" >&2; exit 1; }
+            echo "Installed $(gh --version | head -1)"
+          fi
+
+          # Phase 1: wait up to a 1 minute grace for at least one check to REGISTER on the PR
+          # head. gh pr checks --watch only waits for checks that already exist, so right after
+          # a push there is a window with zero checks; we must wait for them to appear.
+          GRACE_DEADLINE=$(( $(date +%s) + 60 ))
+          while :; do
+            PROBE="$(gh pr checks "$PR_NUMBER" --repo "$REPO" 2>&1)" || true
+            if ! printf '%s' "$PROBE" | grep -qiE "no checks reported|no check runs"; then
+              echo "Checks are registered on PR #${PR_NUMBER}; waiting for them to complete."
+              break
+            fi
+            if [ "$(date +%s)" -ge "$GRACE_DEADLINE" ]; then
+              echo "No checks appeared within the 1 minute grace for PR #${PR_NUMBER}; treating as no CI configured."
+              printf '{"status":"success","failing_count":0,"note":"no_checks"}\n' > "$SUPERPLANE_RESULT_FILE"
+              exit 0
+            fi
+            echo "No checks registered yet on PR #${PR_NUMBER}; waiting for them to appear..."
+            sleep 10
+          done
+
+          # Phase 2: wait for all registered checks to finish. gh exits 0 when all pass,
+          # non-zero when any fail.
+          OUT="$(gh pr checks "$PR_NUMBER" --repo "$REPO" --watch --interval 30 2>&1)"
+          RC=$?
+
+          echo "$OUT"
+
+          if [ "$RC" -eq 0 ]; then
+            echo "All checks passed for PR #${PR_NUMBER}."
+            printf '{"status":"success","failing_count":0}\n' > "$SUPERPLANE_RESULT_FILE"
+            exit 0
+          fi
+
+          FAILING_COUNT="$(printf '%s\n' "$OUT" | awk -F '\t' 'tolower($2) ~ /fail|error|cancel|timed_out|action_required/ {c++} END{print c+0}')"
+          echo "Detected ${FAILING_COUNT} failing check(s) for PR #${PR_NUMBER}."
+          printf '{"status":"failure","failing_count":%s}\n' "$FAILING_COUNT" > "$SUPERPLANE_RESULT_FILE"
+          exit 1
+      position:
+        x: 1296
+        'y': 2664
+      isCollapsed: false
+    - id: analyze-create-issue
+      name: Draft Issue
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      configuration:
+        executionTimeoutSeconds: 3600
+        machineType: e1-large-amd64
+        steps:
+          - command: |-
+              gh repo clone "$REPO" repo -- --depth=1
+              cd repo
+            name: Clone Repository
+            type: bash
+          - name: Draft issue
+            prompt: |
+              Analyze the task description below and produce a GitHub issue.
+
+              Task description:
+              ---
+              {{ order() != nil ? order().title + (order().description != "" ? "\n\n" + order().description : "") : root().data.description }}
+              ---
+
+              ## What are you analyzing 
+
+              1. The repository is already cloned on this machine in the current directory
+              2. You are on the main branch, latest commit
+
+              ## Issue title
+
+              The issue title should be:
+
+              1. Short, max 80 chars
+              2. To the point
+              3. No markdown
+              4. No leading '#'
+              5. No surrounding quotes
+
+              ## Issue body
+
+              1. Should be clear, to the point and concise, and use GitHub flavored markdown
+              2. It should start with the original user request
+              3. Then a short problem statement
+              4. Prefer 3-5 bullet points over long paragraphs
+              4. Concrete acceptance criteria, flat bullet points, no checkboxes
+              5. And any relevant context you can infer
+              6. Do NOT include a title heading, footer, attribution, or links.
+
+              ## Output
+
+              Output ONLY a single valid JSON object and nothing else. Do NOT add any prose, explanation, or logging before or after it, and do NOT wrap it in markdown code fences (no ```).
+
+              The JSON must be strictly parseable:
+              1. Put double quotes around every key and every string value.
+              2. Include exactly two keys: "title" and "body".
+              3. Escape every character that would otherwise break JSON — in particular, encode newlines inside "body" as \n and escape any double quotes as \".
+              4. No trailing commas, and no text before or after the object.
+
+              The output must be exactly this shape (keys quoted; a single line is fine):
+
+              {"title": "Issue Title", "body": "Issue Body"}
+            type: prompt
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
+        environment:
+          - name: REPO
+            value: '{{ install_params.appRepository }}'
+            valueSource: literal
+        credentials:
+          source: integration
+          integration:
+            name: claude
+      position:
+        x: 672
+        'y': 4200
+      isCollapsed: false
+    - id: babysit-babysit-2-4jpsyy
+      name: Babysit 2
+      type: TYPE_ACTION
+      component: runApp
+      configuration:
+        app: __FACTORY_CANVAS_ID__
+        node: onrun-onrun-u02eup
+        parameters:
+          PullRequestNumber: '{{ split(split(root().data.comment.html_url, "/pull/")[1], "#")[0] }}'
+          Repository: '{{ root().data.repository.full_name }}'
+        timeout: 3600
+      metadata:
+        node:
+          id: onrun-onrun-u02eup
+          name: Start Babysitting
+      position:
+        x: 1320
+        'y': 816
+      isCollapsed: false
+    - id: ci-loop
+      name: Checks Loop (max 5)
+      type: TYPE_ACTION
+      component: loop
+      configuration:
+        maxIterations: 5
+        timeoutSeconds: 21600
+        untilExpression: $["Wait for PR Checks"].data.result.status == "success"
+      position:
+        x: 696
+        'y': 2568
+      isCollapsed: false
+    - id: mark-human-review-memory
+      name: Mark Human Review Memory
+      type: TYPE_ACTION
+      component: upsertMemory
+      configuration:
+        matchList:
+          - name: pr_number
+            value: '{{ root().data.parameters.PullRequestNumber }}'
+        namespace: factory_tasks
+        valueList:
+          - name: status
+            value: human_review
+          - name: review_requested_at
+            value: '{{ now().UTC().Format("2006-01-02T15:04:05Z") }}'
+      position:
+        x: 1920
+        'y': 2304
+      isCollapsed: true
+    - id: annotation-note-4-8jc28r
+      name: Note 4
+      type: TYPE_WIDGET
+      component: annotation
+      configuration:
+        color: yellow
+        text: |-
+          ## Implementation
+
+          Implement the changes and push to the branch
+      position:
+        x: 3000
+        'y': -744
+      isCollapsed: false
+    - id: correlate-pr-memory
+      name: Correlate PR Memory
+      type: TYPE_ACTION
+      component: upsertMemory
+      configuration:
+        matchList:
+          - name: issue_number
+            value: '{{ root().data.issue.number }}'
+        namespace: factory_tasks
+        valueList:
+          - name: pr_number
+            value: '{{ $["Open Draft PR"].data.number }}'
+          - name: pr_url
+            value: '{{ $["Open Draft PR"].data.html_url }}'
+          - name: title
+            value: '{{ root().data.issue.title }}'
+          - name: issue_number
+            value: '{{ root().data.issue.number }}'
+          - name: issue_url
+            value: '{{ root().data.issue.html_url }}'
+          - name: description
+            value: '{{ root().data.issue.body }}'
+          - name: status
+            value: in_progress
+      position:
+        x: 2304
+        'y': 380
+      isCollapsed: true
+    - id: work-order-dispatch
+      name: Work Order Dispatch
+      type: TYPE_TRIGGER
+      component: onRun
+      configuration:
+        parameters: []
+      position:
+        x: 72
+        'y': 4440
+      isCollapsed: false
+  edges:
+    - sourceId: analyze-create-issue
+      targetId: create-task-issue
+      channel: passed
+    - sourceId: apply-user-request-claude
+      targetId: babysit-babysit-2-4jpsyy
+      channel: passed
+    - sourceId: assigned-to-agent-filter
+      targetId: runner-create-branch-2
+      channel: default
+    - sourceId: ci-green
+      targetId: component-node-vwmzg2
+      channel: 'false'
+    - sourceId: ci-green
+      targetId: mark-ci-failed-memory
+      channel: 'false'
+    - sourceId: ci-green
+      targetId: mark-human-review-memory
+      channel: 'true'
+    - sourceId: ci-loop
+      targetId: ci-green
+      channel: done
+    - sourceId: ci-loop
+      targetId: wait-for-pr-checks
+      channel: next
+    - sourceId: component-node-4m9qti
+      targetId: runner-create-branch-2
+      channel: default
+    - sourceId: component-node-nbf347
+      targetId: github-markpullrequestreadyforreview-github-markpullrequestreadyforreview-wie92w
+      channel: passed
+    - sourceId: component-node-nbf347
+      targetId: mark-ci-done-mark-ci-done-2-ru37ew
+      channel: passed
+    - sourceId: component-node-nbf347
+      targetId: mark-implementation-done-mark-implementation-done-2-qpudc5
+      channel: passed
+    - sourceId: component-node-t3n3jn
+      targetId: mark-implementation-done-mark-implementation-done-2-8ukxus
+      channel: default
+    - sourceId: create-task-issue
+      targetId: correlate-issue-memory
+      channel: default
+    - sourceId: create-task-issue
+      targetId: create-task-add-label
+      channel: default
+    - sourceId: create-task-start
+      targetId: analyze-create-issue
+      channel: default
+    - sourceId: create-task-start
+      targetId: submit-task-memory
+      channel: default
+    - sourceId: factory-pr-comment-filter
+      targetId: reopen-followup-memory
+      channel: default
+    - sourceId: factory-pr-merged-filter
+      targetId: mark-merged-memory
+      channel: default
+    - sourceId: factory-pr-rejected-filter
+      targetId: mark-rejected-memory
+      channel: default
+    - sourceId: factory-pr-review-comment-filter
+      targetId: reopen-followup-memory
+      channel: default
+    - sourceId: fix-ci-claude
+      targetId: ci-loop
+      channel: failed
+    - sourceId: fix-ci-claude
+      targetId: ci-loop
+      channel: passed
+    - sourceId: github-create-pr-2
+      targetId: component-node-wla304
+      channel: default
+    - sourceId: github-create-pr-2
+      targetId: component-node-x9cztq
+      channel: default
+    - sourceId: github-create-pr-2
+      targetId: correlate-pr-memory
+      channel: default
+    - sourceId: github-create-pr-2
+      targetId: implementation-implementation-2-ilbopr
+      channel: default
+    - sourceId: implementation-implementation-2-ilbopr
+      targetId: component-node-tfqihq
+      channel: passed
+    - sourceId: implementation-implementation-2-ilbopr
+      targetId: run-claude-code-implementation
+      channel: passed
+    - sourceId: label-is-factory-filter
+      targetId: runner-create-branch-2
+      channel: default
+    - sourceId: on-issue-assigned-trigger
+      targetId: assigned-to-agent-filter
+      channel: default
+    - sourceId: on-issue-labeled-trigger
+      targetId: label-is-factory-filter
+      channel: default
+    - sourceId: on-pr-comment-trigger
+      targetId: apply-user-request-claude
+      channel: default
+    - sourceId: on-pr-comment-trigger
+      targetId: factory-pr-comment-filter
+      channel: default
+    - sourceId: on-pr-review-comment-trigger
+      targetId: apply-user-request-claude
+      channel: default
+    - sourceId: on-pr-review-comment-trigger
+      targetId: factory-pr-review-comment-filter
+      channel: default
+    - sourceId: onrun-onrun-2nvcpr
+      targetId: component-node-t3n3jn
+      channel: default
+    - sourceId: onrun-onrun-u02eup
+      targetId: ci-loop
+      channel: default
+    - sourceId: pr-closed-trigger
+      targetId: pr-merged-if
+      channel: default
+    - sourceId: pr-merged-if
+      targetId: factory-pr-merged-filter
+      channel: 'true'
+    - sourceId: pr-merged-if
+      targetId: factory-pr-rejected-filter
+      channel: 'false'
+    - sourceId: run-claude-code-implementation
+      targetId: component-node-nbf347
+      channel: passed
+    - sourceId: run-claude-code-implementation
+      targetId: mark-implementation-failed-memory
+      channel: failed
+    - sourceId: run-claude-code-implementation
+      targetId: mark-plan-done-mark-plan-done-2-9a4m74
+      channel: passed
+    - sourceId: runner-create-branch-2
+      targetId: github-create-pr-2
+      channel: passed
+    - sourceId: wait-for-pr-checks
+      targetId: ci-loop
+      channel: passed
+    - sourceId: wait-for-pr-checks
+      targetId: fix-ci-claude
+      channel: failed
+    - sourceId: work-order-dispatch
+      targetId: analyze-create-issue
+      channel: default
+    - sourceId: work-order-dispatch
+      targetId: submit-task-memory
+      channel: default

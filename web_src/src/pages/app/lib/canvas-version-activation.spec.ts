@@ -12,7 +12,6 @@ describe("activateCanvasVersionForEditing", () => {
       versionID: "version-live",
       version: { metadata: { id: "version-live" }, spec: {} },
       options: { preserveStagedLayer: true },
-      effectiveLiveCanvasVersionId: "version-live",
       liveCanvasVersionId: "version-live",
       queryClient: {
         cancelQueries: vi.fn(),
@@ -43,5 +42,35 @@ describe("activateCanvasVersionForEditing", () => {
     expect(next.get("sidebar")).toBeNull();
     expect(next.get("node")).toBeNull();
     expect(next.get("version")).toBeNull();
+  });
+
+  it("returns the same searchParams instance when activation is a no-op rewrite", () => {
+    const setSearchParams = vi.fn();
+    const current = new URLSearchParams("configure=1&from=automations");
+
+    activateCanvasVersionForEditing({
+      organizationId: "org-1",
+      canvasId: "canvas-1",
+      versionID: "version-live",
+      version: { metadata: { id: "version-live" }, spec: {} },
+      options: { preserveStagedLayer: true },
+      liveCanvasVersionId: "version-live",
+      queryClient: {
+        cancelQueries: vi.fn(),
+      } as never,
+      draftCanvasSpec: null,
+      draftCanvasSpecsRef: { current: new Map() },
+      activeCanvasVersionIdRef: { current: "" },
+      lastAppliedVersionSnapshotRef: { current: "" },
+      clearPendingAutoSaveWork: vi.fn(),
+      setDraftCanvasSpec: vi.fn(),
+      setActiveCanvasVersion: vi.fn(),
+      setLastSavedWorkflowSnapshot: vi.fn(),
+      setSearchParams,
+      initializeFromWorkflow: vi.fn(),
+    });
+
+    const updater = setSearchParams.mock.calls[0]?.[0] as (current: URLSearchParams) => URLSearchParams;
+    expect(updater(current)).toBe(current);
   });
 });

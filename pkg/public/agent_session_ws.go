@@ -10,6 +10,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"github.com/superplanehq/superplane/pkg/public/ws"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
 )
 
@@ -18,12 +20,22 @@ import (
 func (s *Server) handleAgentSessionWebSocket(w http.ResponseWriter, r *http.Request) {
 	user, ok := middleware.GetUserFromContext(r.Context())
 	if !ok {
+		telemetry.RecordWebSocketConnectionOutcome(
+			r.Context(),
+			ws.KindAgent,
+			telemetry.WebSocketConnectionOutcomeAuthError,
+		)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	sessionID, err := uuid.Parse(mux.Vars(r)["sessionId"])
 	if err != nil {
+		telemetry.RecordWebSocketConnectionOutcome(
+			r.Context(),
+			ws.KindAgent,
+			telemetry.WebSocketConnectionOutcomeAuthError,
+		)
 		http.Error(w, "invalid session id", http.StatusBadRequest)
 		return
 	}
@@ -34,17 +46,32 @@ func (s *Server) handleAgentSessionWebSocket(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	if !enabled {
+		telemetry.RecordWebSocketConnectionOutcome(
+			r.Context(),
+			ws.KindAgent,
+			telemetry.WebSocketConnectionOutcomeAuthError,
+		)
 		http.Error(w, "agent chat is not enabled", http.StatusForbidden)
 		return
 	}
 
 	if _, err := models.FindAgentSessionForUser(user.OrganizationID, user.ID, sessionID); err != nil {
+		telemetry.RecordWebSocketConnectionOutcome(
+			r.Context(),
+			ws.KindAgent,
+			telemetry.WebSocketConnectionOutcomeAuthError,
+		)
 		http.Error(w, "agent session not found", http.StatusNotFound)
 		return
 	}
 
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		telemetry.RecordWebSocketConnectionOutcome(
+			r.Context(),
+			ws.KindAgent,
+			telemetry.WebSocketConnectionOutcomeUpgradeError,
+		)
 		if _, ok := err.(websocket.HandshakeError); !ok {
 			log.WithError(err).Error("failed to upgrade agent session websocket")
 		}

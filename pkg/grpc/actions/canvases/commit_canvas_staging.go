@@ -3,7 +3,6 @@ package canvases
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -15,7 +14,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/database"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -33,37 +31,22 @@ import (
 
 func CommitCanvasStaging(
 	ctx context.Context,
+	db *gorm.DB,
 	gitProvider gitprovider.Provider,
 	usageService usage.Service,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
-	organizationID string,
-	canvasID string,
+	canvas *models.Canvas,
 	commitMessage string,
 	webhookBaseURL string,
 	authService authorization.Authorization,
 ) (*pb.CommitCanvasStagingResponse, error) {
-	db := database.DB(ctx)
-
 	user, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	userID := uuid.MustParse(user)
-	canvasUUID, err := uuid.Parse(canvasID)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
-	}
-
-	canvas, err := models.FindCanvasInTransaction(db, uuid.MustParse(organizationID), canvasUUID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, grpcerrors.NotFound(err, "canvas not found")
-		}
-		return nil, grpcerrors.Internal(err, "failed to load canvas")
-	}
-
 	stagedFiles, err := models.ListStagedFilesForUser(db, canvas.ID, userID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to load staging")
@@ -98,7 +81,7 @@ func CommitCanvasStaging(
 			ctx,
 			gitProvider,
 			canvas,
-			organizationID,
+			canvas.OrganizationID.String(),
 			userID.String(),
 			resolvedStagingCommitMessage(commitMessage),
 			gitOps,
@@ -128,7 +111,7 @@ func CommitCanvasStaging(
 			tx,
 			usageService,
 			registry,
-			organizationID,
+			canvas.OrganizationID.String(),
 			canvas,
 			liveVersion,
 			specOps,
@@ -181,8 +164,8 @@ func CommitCanvasStaging(
 	//
 	if err != nil {
 		if len(gitRevertOps) > 0 {
-			if revertErr := revertGitFileCommit(ctx, gitProvider, canvas, organizationID, userID.String(), gitRevertOps); revertErr != nil {
-				log.Errorf("failed to revert git commit after spec apply failure for canvas %s: %v", canvasID, revertErr)
+			if revertErr := revertGitFileCommit(ctx, gitProvider, canvas, canvas.OrganizationID.String(), userID.String(), gitRevertOps); revertErr != nil {
+				log.Errorf("failed to revert git commit after spec apply failure for canvas %s: %v", canvas.ID.String(), revertErr)
 			}
 		}
 
@@ -194,7 +177,7 @@ func CommitCanvasStaging(
 		return nil, grpcerrors.Internal(err, "failed to commit staging")
 	}
 
-	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String(), organizationID).PublishUpdated(); err != nil {
+	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishUpdated(); err != nil {
 		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", err)
 	}
 
@@ -204,10 +187,10 @@ func CommitCanvasStaging(
 
 	publishDeletedNodeCleanupMessages(canvas.ID, publishResult)
 
-	ownersByID, _ := ownersByIDForCanvasVersions(ctx, organizationID, []models.CanvasVersion{*newLiveVersion})
+	ownersByID, _ := ownersByIDForCanvasVersions(ctx, canvas.OrganizationID.String(), []models.CanvasVersion{*newLiveVersion})
 
 	return &pb.CommitCanvasStagingResponse{
-		Version:        SerializeCanvasVersionMetadata(newLiveVersion, organizationID, ownersByID),
+		Version:        SerializeCanvasVersion(newLiveVersion, canvas.OrganizationID.String(), ownersByID),
 		StagingSummary: buildStagingSummary(canvas, []models.WorkflowStagedFile{}),
 	}, nil
 }

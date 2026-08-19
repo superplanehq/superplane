@@ -2,7 +2,6 @@ package jira
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,84 +14,358 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-// Client speaks to Jira Cloud directly using the user's site URL and Basic
-// Auth (email + API token). Endpoints resolve to `{siteUrl}/rest/api/3/...`.
+const (
+	// AuthorizeURL is where the user approves the OAuth application.
+	AuthorizeURL = "https://auth.atlassian.com/authorize"
+
+	// TokenURL exchanges authorization codes and refresh tokens for access tokens.
+	TokenURL = "https://auth.atlassian.com/oauth/token"
+
+	// AccessibleResourcesURL lists the Jira Cloud sites the OAuth grant has access to.
+	AccessibleResourcesURL = "https://api.atlassian.com/oauth/token/accessible-resources"
+
+	// APIProxyHost is how OAuth apps reach Jira's REST APIs - the site's own domain rejects OAuth bearer tokens.
+	APIProxyHost = "https://api.atlassian.com/ex/jira"
+
+	// coreScopeList is always requested on the authorize URL - every jira integration feature
+	// except the optional JSM Ops ones (incidents, alerts, heartbeats) needs only these.
+	// offline_access isn't selectable in the Developer Console's Permissions tab, but it's still
+	// required to get a refresh token, so it's requested here directly rather than shown in the
+	// setup instructions.
+	coreScopeList = "read:jira-work write:jira-work manage:jira-webhook read:jira-user " +
+		"read:servicedesk-request write:servicedesk-request offline_access"
+
+	// jsmOpsScopeList is appended to coreScopeList only when the "Enable Ops features" config
+	// option is on (see jira.go's Configuration() and jsmOpsFeaturesEnabled). Most Jira Cloud
+	// sites don't have the JSM Ops product (incidents, alerts, heartbeats) enabled at all, and
+	// requesting scopes for a product the Atlassian app was never configured with makes
+	// Atlassian's own authorize page reject the whole request outright - before the user even
+	// sees a consent screen - so these are opt-in rather than always requested.
+	jsmOpsScopeList = "read:incident:jira-service-management write:incident:jira-service-management " +
+		"read:ops-alert:jira-service-management write:ops-alert:jira-service-management delete:ops-alert:jira-service-management " +
+		"read:ops-config:jira-service-management write:ops-config:jira-service-management delete:ops-config:jira-service-management"
+)
+
+// Client speaks to Jira Cloud through Atlassian's OAuth API proxy (api.atlassian.com/ex/jira/{cloudId}/...).
 type Client struct {
-	SiteURL string
-	Email   string
-	Token   string
-	http    core.HTTPContext
+	CloudID     string
+	AccessToken string
+	http        core.HTTPContext
+	integration core.IntegrationContext
 }
 
 func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
-	siteURL, err := ctx.GetConfig("siteUrl")
+	cloudID, err := cloudIDFromIntegration(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error reading site URL: %v", err)
+		return nil, err
 	}
 
-	email, err := ctx.GetConfig("email")
+	accessToken, err := findSecret(ctx, SecretOAuthAccessToken)
 	if err != nil {
-		return nil, fmt.Errorf("error reading email: %v", err)
+		return nil, fmt.Errorf("error reading access token: %v", err)
 	}
-
-	token, err := ctx.GetConfig("apiToken")
-	if err != nil {
-		return nil, fmt.Errorf("error reading API token: %v", err)
-	}
-
-	if len(siteURL) == 0 {
-		return nil, fmt.Errorf("missing Jira site URL")
-	}
-	if len(email) == 0 {
-		return nil, fmt.Errorf("missing Jira email")
-	}
-	if len(token) == 0 {
-		return nil, fmt.Errorf("missing API token")
+	if accessToken == "" {
+		return nil, fmt.Errorf("missing Jira OAuth access token; connect Jira via OAuth first")
 	}
 
 	return &Client{
-		SiteURL: strings.TrimRight(string(siteURL), "/"),
-		Email:   string(email),
-		Token:   string(token),
-		http:    httpCtx,
+		CloudID:     cloudID,
+		AccessToken: accessToken,
+		http:        httpCtx,
+		integration: ctx,
 	}, nil
 }
 
 func (c *Client) apiURL(path string) string {
-	return c.SiteURL + path
+	return APIProxyHost + "/" + c.CloudID + path
 }
 
-func (c *Client) basicAuthHeader() string {
-	creds := c.Email + ":" + c.Token
-	return "Basic " + base64.StdEncoding.EncodeToString([]byte(creds))
-}
+// execRequest sends the request with a Bearer token, refreshing once and retrying on a 401.
+func (c *Client) execRequest(method, requestURL string, body io.Reader) ([]byte, error) {
+	var bodyBytes []byte
+	if body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(body)
+		if err != nil {
+			return nil, fmt.Errorf("error reading request body: %v", err)
+		}
+	}
 
-func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error) {
-	req, err := http.NewRequest(method, url, body)
+	responseBody, status, err := c.doRequest(method, requestURL, bodyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
+		return nil, err
+	}
+
+	if status == http.StatusUnauthorized {
+		if err := c.recoverFromUnauthorized(); err != nil {
+			return nil, err
+		}
+		responseBody, status, err = c.doRequest(method, requestURL, bodyBytes)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, fmt.Errorf("request got %d code: %s", status, string(responseBody))
+	}
+
+	return responseBody, nil
+}
+
+// recoverFromUnauthorized refreshes the access token after a 401. Atlassian's refresh tokens are
+// single-use, so a concurrent Sync or request can rotate the pair first and make this refresh
+// fail even though the connection is fine - in that case, adopt the token it just stored instead
+// of failing the caller.
+func (c *Client) recoverFromUnauthorized() error {
+	if refreshErr := c.Refresh(); refreshErr != nil {
+		if c.integration != nil {
+			if current, findErr := findSecret(c.integration, SecretOAuthAccessToken); findErr == nil && current != "" && current != c.AccessToken {
+				c.AccessToken = current
+				return nil
+			}
+		}
+		return fmt.Errorf("request got 401 and token refresh failed: %w", refreshErr)
+	}
+	return nil
+}
+
+func (c *Client) doRequest(method, requestURL string, body []byte) ([]byte, int, error) {
+	var reader io.Reader
+	if body != nil {
+		reader = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequest(method, requestURL, reader)
+	if err != nil {
+		return nil, 0, fmt.Errorf("error building request: %v", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", c.basicAuthHeader())
+	req.Header.Set("Authorization", "Bearer "+c.AccessToken)
 
 	res, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
+		return nil, 0, fmt.Errorf("error executing request: %v", err)
 	}
 	defer res.Body.Close()
 
 	responseBody, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
+		return nil, 0, fmt.Errorf("error reading body: %v", err)
+	}
+
+	return responseBody, res.StatusCode, nil
+}
+
+// Refresh exchanges the stored refresh token for a new access/refresh token pair and persists them,
+// along with when the new access token expires so Sync can proactively refresh ahead of that point.
+func (c *Client) Refresh() error {
+	if c.integration == nil {
+		return fmt.Errorf("no integration context available to refresh the OAuth token")
+	}
+
+	clientID, err := c.integration.GetConfig("clientId")
+	if err != nil {
+		return fmt.Errorf("error reading OAuth client id: %w", err)
+	}
+	clientSecret, err := c.integration.GetConfig("clientSecret")
+	if err != nil {
+		return fmt.Errorf("error reading OAuth client secret: %w", err)
+	}
+	refreshToken, err := findSecret(c.integration, SecretOAuthRefreshToken)
+	if err != nil {
+		return fmt.Errorf("error reading OAuth refresh token: %w", err)
+	}
+	if refreshToken == "" {
+		return fmt.Errorf("missing Jira OAuth refresh token; connect Jira via OAuth first")
+	}
+
+	token, err := NewAuth(c.http).RefreshToken(string(clientID), string(clientSecret), refreshToken)
+	if err != nil {
+		return err
+	}
+
+	// Atlassian's refresh tokens are single-use: this call already invalidated the one just sent,
+	// whether or not the writes below succeed. A missing replacement leaves no way to ever
+	// refresh again, so treat it as a hard failure rather than silently keeping the (now dead)
+	// old one. Persist it before the access token: if a crash or write failure happens between
+	// the two, losing the access token just means the next near-expiry attempt retries normally,
+	// but losing the new refresh token means every future refresh fails until the user reconnects.
+	if token.RefreshToken == "" {
+		return fmt.Errorf("token refresh response did not include a new refresh token")
+	}
+	if err := c.integration.SetSecret(SecretOAuthRefreshToken, []byte(token.RefreshToken)); err != nil {
+		return fmt.Errorf("error storing refreshed refresh token: %w", err)
+	}
+	if err := c.integration.SetSecret(SecretOAuthAccessToken, []byte(token.AccessToken)); err != nil {
+		return fmt.Errorf("error storing refreshed access token: %w", err)
+	}
+
+	metadata := readMetadata(c.integration)
+	metadata.AccessTokenExpiresAt = ""
+	if expiresAt := token.ExpiresAt(); !expiresAt.IsZero() {
+		metadata.AccessTokenExpiresAt = expiresAt.Format(time.RFC3339)
+	}
+	c.integration.SetMetadata(metadata)
+
+	c.AccessToken = token.AccessToken
+	return nil
+}
+
+type Auth struct {
+	client core.HTTPContext
+}
+
+func NewAuth(client core.HTTPContext) *Auth {
+	return &Auth{client: client}
+}
+
+// TokenResponse is Atlassian's OAuth token endpoint response. Refresh tokens
+// rotate on every use, so both fields are replaced together on refresh.
+type TokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int    `json:"expires_in"`
+}
+
+// GetExpiration returns how long to wait before resyncing to refresh the
+// token: half its lifetime, so one failed resync still leaves time to retry.
+func (t *TokenResponse) GetExpiration() time.Duration {
+	if t.ExpiresIn > 0 {
+		seconds := max(t.ExpiresIn/2, 1)
+		return time.Duration(seconds) * time.Second
+	}
+	return 30 * time.Minute
+}
+
+// ExpiresAt returns when the access token stops working, or the zero time when
+// Atlassian did not report a lifetime.
+func (t *TokenResponse) ExpiresAt() time.Time {
+	if t.ExpiresIn <= 0 {
+		return time.Time{}
+	}
+	return time.Now().Add(time.Duration(t.ExpiresIn) * time.Second)
+}
+
+func (a *Auth) ExchangeCode(clientID, clientSecret, code, redirectURI string) (*TokenResponse, error) {
+	return a.requestToken(map[string]string{
+		"grant_type":    "authorization_code",
+		"client_id":     clientID,
+		"client_secret": clientSecret,
+		"code":          code,
+		"redirect_uri":  redirectURI,
+	})
+}
+
+func (a *Auth) RefreshToken(clientID, clientSecret, refreshToken string) (*TokenResponse, error) {
+	return a.requestToken(map[string]string{
+		"grant_type":    "refresh_token",
+		"client_id":     clientID,
+		"client_secret": clientSecret,
+		"refresh_token": refreshToken,
+	})
+}
+
+func (a *Auth) requestToken(body map[string]string) (*TokenResponse, error) {
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling token request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, TokenURL, bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("error building token request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	res, err := a.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error exchanging token: %w", err)
+	}
+	defer res.Body.Close()
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading token response: %w", err)
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+		return nil, fmt.Errorf("token request got %d: %s", res.StatusCode, string(responseBody))
 	}
 
-	return responseBody, nil
+	var token TokenResponse
+	if err := json.Unmarshal(responseBody, &token); err != nil {
+		return nil, fmt.Errorf("error parsing token response: %w", err)
+	}
+	if token.AccessToken == "" {
+		return nil, fmt.Errorf("token response missing access_token")
+	}
+
+	return &token, nil
+}
+
+// HandleCallback validates the OAuth callback request and exchanges its code for tokens.
+func (a *Auth) HandleCallback(req *http.Request, clientID, clientSecret, expectedState, redirectURI string) (*TokenResponse, error) {
+	query := req.URL.Query()
+	code := query.Get("code")
+	state := query.Get("state")
+
+	if errParam := query.Get("error"); errParam != "" {
+		return nil, fmt.Errorf("OAuth error: %s - %s", errParam, query.Get("error_description"))
+	}
+	if code == "" || state == "" {
+		return nil, fmt.Errorf("missing code or state")
+	}
+	if expectedState == "" || state != expectedState {
+		return nil, fmt.Errorf("invalid state")
+	}
+
+	return a.ExchangeCode(clientID, clientSecret, code, redirectURI)
+}
+
+// AccessibleResource is one Jira Cloud site the OAuth grant has access to.
+type AccessibleResource struct {
+	ID     string   `json:"id"`
+	Name   string   `json:"name"`
+	URL    string   `json:"url"`
+	Scopes []string `json:"scopes"`
+}
+
+func (a *Auth) AccessibleResources(accessToken string) ([]AccessibleResource, error) {
+	req, err := http.NewRequest(http.MethodGet, AccessibleResourcesURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error building accessible-resources request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/json")
+
+	res, err := a.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching accessible resources: %w", err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading accessible resources response: %w", err)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return nil, fmt.Errorf("accessible resources request got %d: %s", res.StatusCode, string(body))
+	}
+
+	var resources []AccessibleResource
+	if err := json.Unmarshal(body, &resources); err != nil {
+		return nil, fmt.Errorf("error parsing accessible resources response: %w", err)
+	}
+	if len(resources) == 0 {
+		return nil, fmt.Errorf("no accessible Jira sites were granted to this OAuth app")
+	}
+
+	return resources, nil
 }
 
 type User struct {
@@ -758,6 +1031,109 @@ type CreateIssueResponse struct {
 	Self string `json:"self"`
 }
 
+// IssueWebhookRegistration is one entry of the "webhooks" array in a dynamic webhook registration
+// request. JQLFilter has no omitempty: Atlassian's schema requires the key to be present even when
+// its value is an empty string (which matches every issue in every project), so dropping the key
+// entirely for an unfiltered registration makes the whole request fail.
+type IssueWebhookRegistration struct {
+	JQLFilter string   `json:"jqlFilter"`
+	Events    []string `json:"events"`
+}
+
+type createIssueWebhookRequest struct {
+	URL      string                     `json:"url"`
+	Webhooks []IssueWebhookRegistration `json:"webhooks"`
+}
+
+type createIssueWebhookResult struct {
+	CreatedWebhookID *int64   `json:"createdWebhookId,omitempty"`
+	Errors           []string `json:"errors,omitempty"`
+}
+
+// createIssueWebhookResponse wraps results under "webhookRegistrationResult", not a bare array.
+type createIssueWebhookResponse struct {
+	WebhookRegistrationResult []createIssueWebhookResult `json:"webhookRegistrationResult"`
+}
+
+// CreateIssueWebhook registers a dynamic webhook for issue events, scoped by an optional JQL filter.
+func (c *Client) CreateIssueWebhook(callbackURL, jqlFilter string, events []string) (int64, error) {
+	req := createIssueWebhookRequest{
+		URL: callbackURL,
+		Webhooks: []IssueWebhookRegistration{
+			{JQLFilter: jqlFilter, Events: events},
+		},
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return 0, fmt.Errorf("marshal create webhook request: %w", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, c.apiURL("/rest/api/3/webhook"), bytes.NewReader(body))
+	if err != nil {
+		return 0, err
+	}
+
+	results, err := parseCreateIssueWebhookResponse(responseBody)
+	if err != nil {
+		return 0, err
+	}
+	if len(results[0].Errors) > 0 {
+		return 0, fmt.Errorf("failed to create webhook: %s", strings.Join(results[0].Errors, "; "))
+	}
+	if results[0].CreatedWebhookID == nil {
+		return 0, fmt.Errorf("create webhook response missing createdWebhookId: %s", string(responseBody))
+	}
+
+	return *results[0].CreatedWebhookID, nil
+}
+
+// parseCreateIssueWebhookResponse accepts either the wrapped shape or a bare array.
+func parseCreateIssueWebhookResponse(responseBody []byte) ([]createIssueWebhookResult, error) {
+	var wrapped createIssueWebhookResponse
+	if err := json.Unmarshal(responseBody, &wrapped); err == nil && len(wrapped.WebhookRegistrationResult) > 0 {
+		return wrapped.WebhookRegistrationResult, nil
+	}
+
+	var results []createIssueWebhookResult
+	if err := json.Unmarshal(responseBody, &results); err == nil && len(results) > 0 {
+		return results, nil
+	}
+
+	return nil, fmt.Errorf("unrecognized create webhook response: %s", string(responseBody))
+}
+
+// DeleteIssueWebhooks removes previously-registered dynamic webhooks by id.
+func (c *Client) DeleteIssueWebhooks(webhookIDs []int64) error {
+	if len(webhookIDs) == 0 {
+		return nil
+	}
+
+	body, err := json.Marshal(map[string][]int64{"webhookIds": webhookIDs})
+	if err != nil {
+		return fmt.Errorf("marshal delete webhook request: %w", err)
+	}
+
+	_, err = c.execRequest(http.MethodDelete, c.apiURL("/rest/api/3/webhook"), bytes.NewReader(body))
+	return err
+}
+
+// RefreshIssueWebhooks extends the life of previously-registered dynamic webhooks by another 30
+// days from now - Atlassian expires them 30 days after creation or after their last refresh.
+func (c *Client) RefreshIssueWebhooks(webhookIDs []int64) error {
+	if len(webhookIDs) == 0 {
+		return nil
+	}
+
+	body, err := json.Marshal(map[string][]int64{"webhookIds": webhookIDs})
+	if err != nil {
+		return fmt.Errorf("marshal refresh webhook request: %w", err)
+	}
+
+	_, err = c.execRequest(http.MethodPut, c.apiURL("/rest/api/3/webhook/refresh"), bytes.NewReader(body))
+	return err
+}
+
 func (c *Client) CreateIssue(req *CreateIssueRequest) (*CreateIssueResponse, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -872,8 +1248,7 @@ func (c *Client) searchIssuesPage(jql string, startAt, maxResults int) (issueSea
 		return empty, fmt.Errorf("marshal search body: %w", err)
 	}
 
-	base := strings.TrimSuffix(c.SiteURL, "/")
-	u := fmt.Sprintf("%s/rest/api/3/search", base)
+	u := c.apiURL("/rest/api/3/search")
 	responseBody, err := c.execRequest(http.MethodPost, u, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return empty, err
@@ -963,7 +1338,7 @@ func (c *Client) ListCustomerRequestsByServiceDesk(serviceDeskID string, maxTota
 		maxTotal = 500
 	}
 
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	const limit = 100
 	var out []CustomerRequestListed
 	start := 0
@@ -1014,7 +1389,7 @@ type CustomerRequest struct {
 }
 
 func (c *Client) GetCustomerRequest(issueKey string) (*CustomerRequest, error) {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	u := fmt.Sprintf("%s/rest/servicedeskapi/request/%s", base, url.PathEscape(issueKey))
 	responseBody, err := c.execRequest(http.MethodGet, u, nil)
 	if err != nil {
@@ -1049,7 +1424,7 @@ type approvalsPage struct {
 }
 
 func (c *Client) ListApprovals(issueKey string) ([]Approval, error) {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	var out []Approval
 	start := 0
 	const pageSize = 50
@@ -1081,7 +1456,7 @@ func (c *Client) ListApprovals(issueKey string) ([]Approval, error) {
 }
 
 func (c *Client) SubmitApprovalDecision(issueKey, approvalID, decision string) (*Approval, error) {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	u := fmt.Sprintf(
 		"%s/rest/servicedeskapi/request/%s/approval/%s",
 		base,
@@ -1107,7 +1482,7 @@ func (c *Client) SubmitApprovalDecision(issueKey, approvalID, decision string) (
 }
 
 func (c *Client) AddCustomerRequestComment(issueKey, body string, public bool) error {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	u := fmt.Sprintf("%s/rest/servicedeskapi/request/%s/comment", base, url.PathEscape(issueKey))
 
 	requestBody, err := json.Marshal(map[string]any{
@@ -1129,28 +1504,6 @@ func jqlQuotedProjectKey(projectKey string) string {
 
 const atlassianIncidentAPIHost = "https://api.atlassian.com"
 
-type tenantInfoResponse struct {
-	CloudID string `json:"cloudId"`
-}
-
-// FetchCloudID returns the Atlassian cloud id for the configured Jira site (required for the JSM Incidents API).
-func (c *Client) FetchCloudID() (string, error) {
-	tenantURL := strings.TrimSuffix(c.SiteURL, "/") + "/_edge/tenant_info"
-	responseBody, err := c.execRequest(http.MethodGet, tenantURL, nil)
-	if err != nil {
-		return "", fmt.Errorf("fetch tenant_info: %w", err)
-	}
-
-	var info tenantInfoResponse
-	if err := json.Unmarshal(responseBody, &info); err != nil {
-		return "", fmt.Errorf("parse tenant_info: %w", err)
-	}
-	if info.CloudID == "" {
-		return "", fmt.Errorf("tenant_info response missing cloudId")
-	}
-	return info.CloudID, nil
-}
-
 // ServiceDesk is returned by GET /rest/servicedeskapi/servicedesk (Jira Service Management).
 type ServiceDesk struct {
 	ID          string `json:"id"`
@@ -1160,9 +1513,10 @@ type ServiceDesk struct {
 
 // RequestType is returned by GET /rest/servicedeskapi/servicedesk/{id}/requesttype (use expand=practice for the practice field).
 type RequestType struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Practice string `json:"practice,omitempty"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Practice    string `json:"practice,omitempty"`
+	IssueTypeID string `json:"issueTypeId,omitempty"`
 }
 
 type pagedServiceDesks struct {
@@ -1172,7 +1526,7 @@ type pagedServiceDesks struct {
 
 // ListServiceDesks returns service desks the authenticated user can access.
 func (c *Client) ListServiceDesks() ([]ServiceDesk, error) {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	var out []ServiceDesk
 	start := 0
 	const pageSize = 50
@@ -1205,7 +1559,7 @@ type pagedRequestTypes struct {
 
 // ListRequestTypes returns customer request types for a service desk.
 func (c *Client) ListRequestTypes(serviceDeskID string) ([]RequestType, error) {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	var out []RequestType
 	start := 0
 	const pageSize = 50
@@ -1323,7 +1677,7 @@ type requestTypeFieldsResponse struct {
 
 // ListRequestTypeFields returns fields for a service desk request type (including hidden fields).
 func (c *Client) ListRequestTypeFields(serviceDeskID, requestTypeID string) ([]RequestTypeField, error) {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	u := fmt.Sprintf(
 		"%s/rest/servicedeskapi/servicedesk/%s/requesttype/%s/field",
 		base,
@@ -1444,7 +1798,7 @@ func (c *Client) listCustomFieldOptionsDirect(fieldID string) []RequestTypeField
 		return nil
 	}
 
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	var out []RequestTypeFieldValue
 	startAt := 0
 	const pageSize = 100
@@ -1482,7 +1836,7 @@ func (c *Client) listCustomFieldOptionsDirect(fieldID string) []RequestTypeField
 }
 
 func (c *Client) listCustomFieldOptionsFromContexts(fieldID string) []RequestTypeFieldValue {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	var contexts []customFieldContext
 	startAt := 0
 	const pageSize = 50
@@ -1555,7 +1909,7 @@ func contextIncludesProject(ctx customFieldContext, projectID string) bool {
 }
 
 func (c *Client) listCustomFieldOptionsForContext(fieldID, contextID string) []RequestTypeFieldValue {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	var out []RequestTypeFieldValue
 	startAt := 0
 	const pageSize = 100
@@ -1617,7 +1971,7 @@ func pageValuesToFieldOptions(values []customFieldOption) []RequestTypeFieldValu
 
 // ListFields returns all fields visible to the integration (Jira REST API v3).
 func (c *Client) ListFields() ([]JiraFieldInfo, error) {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	body, err := c.execRequest(http.MethodGet, base+"/rest/api/3/field", nil)
 	if err != nil {
 		return nil, err
@@ -1688,7 +2042,7 @@ func (c *Client) listFieldAllowedValuesFromCreateMetaModern(projectKey, fieldLab
 		return nil, ""
 	}
 
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	issueTypesURL := fmt.Sprintf("%s/rest/api/3/issue/createmeta/%s/issuetypes", base, url.PathEscape(projectKey))
 	body, status, err := c.execRequestWithStatus(http.MethodGet, issueTypesURL, nil)
 	if err != nil || status < 200 || status >= 300 {
@@ -1732,7 +2086,7 @@ func (c *Client) listFieldAllowedValuesFromCreateMetaLegacy(projectKey, fieldLab
 		return nil, ""
 	}
 
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	q := url.Values{}
 	q.Set("projectKeys", projectKey)
 	q.Set("expand", "projects.issuetypes.fields")
@@ -1793,33 +2147,40 @@ func allowedValuesFromCreateMetaFields(fields map[string]createMetaField, fieldL
 	return nil, ""
 }
 
+// execRequestWithStatus behaves like execRequest (refreshing once and retrying on a 401), but
+// returns whatever status code came back instead of treating every non-2xx as an error, since
+// its callers (createmeta/custom-field option lookups) fall back to an empty result on failure.
 func (c *Client) execRequestWithStatus(method, requestURL string, body io.Reader) ([]byte, int, error) {
-	req, err := http.NewRequest(method, requestURL, body)
-	if err != nil {
-		return nil, 0, fmt.Errorf("error building request: %v", err)
+	var bodyBytes []byte
+	if body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(body)
+		if err != nil {
+			return nil, 0, fmt.Errorf("error reading request body: %v", err)
+		}
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", c.basicAuthHeader())
-
-	res, err := c.http.Do(req)
+	responseBody, status, err := c.doRequest(method, requestURL, bodyBytes)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error executing request: %v", err)
-	}
-	defer res.Body.Close()
-
-	responseBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, res.StatusCode, fmt.Errorf("error reading body: %v", err)
+		return nil, status, err
 	}
 
-	return responseBody, res.StatusCode, nil
+	if status == http.StatusUnauthorized {
+		if err := c.recoverFromUnauthorized(); err != nil {
+			return nil, status, err
+		}
+		responseBody, status, err = c.doRequest(method, requestURL, bodyBytes)
+		if err != nil {
+			return nil, status, err
+		}
+	}
+
+	return responseBody, status, nil
 }
 
 // GetRequestType returns one request type, optionally expanded (always requests expand=practice).
 func (c *Client) GetRequestType(serviceDeskID, requestTypeID string) (*RequestType, error) {
-	base := strings.TrimSuffix(c.SiteURL, "/")
+	base := c.apiURL("")
 	q := url.Values{}
 	q.Add("expand", "practice")
 	u := fmt.Sprintf(
@@ -2531,4 +2892,68 @@ func (c *Client) ResolveAlertIDAfterOpsRequest(cloudID, requestID, knownAlertID 
 		"timed out waiting for Ops alert async request %s to finish processing",
 		requestID,
 	)
+}
+
+// opsIntegrationsBasePath is the JSM Ops "Integrations" API - a separate resource from alerts
+// themselves, used to register an outgoing webhook that Atlassian POSTs alert activity to.
+func (c *Client) opsIntegrationsBasePath(cloudID string) string {
+	return fmt.Sprintf(
+		"https://api.atlassian.com/jsm/ops/api/%s/v1/integrations",
+		url.PathEscape(strings.TrimSpace(cloudID)),
+	)
+}
+
+type createAlertWebhookIntegrationRequest struct {
+	Name                   string                            `json:"name"`
+	Type                   string                            `json:"type"`
+	Enabled                bool                              `json:"enabled"`
+	TeamID                 string                            `json:"teamId,omitempty"`
+	TypeSpecificProperties alertWebhookIntegrationProperties `json:"typeSpecificProperties"`
+}
+
+type alertWebhookIntegrationProperties struct {
+	URL string `json:"url"`
+}
+
+// AlertWebhookIntegration is the JSM Ops integration CreateAlertWebhookIntegration registers.
+type AlertWebhookIntegration struct {
+	ID string `json:"id"`
+}
+
+// CreateAlertWebhookIntegration registers an outgoing Webhook-type JSM Ops integration that
+// Atlassian POSTs alert activity to - unlike Jira's dynamic issue webhook, each trigger gets its
+// own dedicated integration here, since this API has no "one URL per connection" restriction.
+func (c *Client) CreateAlertWebhookIntegration(cloudID, name, callbackURL, teamID string) (*AlertWebhookIntegration, error) {
+	req := createAlertWebhookIntegrationRequest{
+		Name:                   name,
+		Type:                   "Webhook",
+		Enabled:                true,
+		TeamID:                 teamID,
+		TypeSpecificProperties: alertWebhookIntegrationProperties{URL: callbackURL},
+	}
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal create integration body: %w", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, c.opsIntegrationsBasePath(cloudID), bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var out AlertWebhookIntegration
+	if err := json.Unmarshal(responseBody, &out); err != nil {
+		return nil, fmt.Errorf("parse create integration response: %w", err)
+	}
+	if out.ID == "" {
+		return nil, fmt.Errorf("create integration response missing id: %s", string(responseBody))
+	}
+	return &out, nil
+}
+
+// DeleteAlertWebhookIntegration removes a previously-registered JSM Ops integration.
+func (c *Client) DeleteAlertWebhookIntegration(cloudID, integrationID string) error {
+	u := fmt.Sprintf("%s/%s", c.opsIntegrationsBasePath(cloudID), url.PathEscape(integrationID))
+	_, err := c.execRequest(http.MethodDelete, u, nil)
+	return err
 }

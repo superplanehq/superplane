@@ -3,7 +3,6 @@ package runner
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -191,10 +190,12 @@ func (c *RunJS) Configuration() []configuration.Field {
 			Description: "JavaScript executed by Node.js. Define function main() and return a JSON-serializable value.",
 			TypeOptions: &configuration.TypeOptions{
 				Text: &configuration.TextTypeOptions{
-					Language: "javascript",
+					Language:         "javascript",
+					AllowExpressions: boolPtr(false),
 				},
 			},
 		},
+		environmentFromConfigurationField(),
 		{
 			Name:        "environment",
 			Label:       "Environment variables",
@@ -286,10 +287,6 @@ func (c *RunJS) Setup(ctx core.SetupContext) error {
 	return err
 }
 
-func (c *RunJS) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
-
 func (c *RunJS) Execute(ctx core.ExecutionContext) error {
 	spec, err := decodeRunJSSpec(ctx.Configuration)
 	if err != nil {
@@ -300,7 +297,7 @@ func (c *RunJS) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := resolveEnvironment(ctx.Secrets, spec.Environment)
+	environment, err := ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
 		return err
 	}
@@ -312,6 +309,10 @@ func (c *RunJS) Execute(ctx core.ExecutionContext) error {
 
 	messageChain, err := messageChainJSON(ctx.Expressions)
 	if err != nil {
+		return err
+	}
+
+	if err := ensureRunnerMinutesAvailable(ctx); err != nil {
 		return err
 	}
 
@@ -337,6 +338,7 @@ func (c *RunJS) Execute(ctx core.ExecutionContext) error {
 		ExecutionMode:  mode,
 		DockerImage:    resolvedRunJSDockerImageRef(spec),
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
+		Labels:         OriginLabelsForTask(ctx),
 	}
 
 	taskID, err := broker.CreateTask(params)

@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, Link, useLocation, matchPath } from "react-router-dom";
+import { Routes, Route, Navigate, Link, useLocation, matchPath } from "react-router";
 import { Sidebar, SidebarBody, SidebarSection } from "../../../components/Sidebar/sidebar";
 import { General } from "./General";
 import { Groups } from "./Groups";
@@ -7,9 +7,10 @@ import { GroupMembersPage } from "./GroupMembersPage";
 import { CreateGroupPage } from "./CreateGroupPage";
 import { CreateRolePage } from "./CreateRolePage";
 import { Profile } from "./Profile";
+import { Notifications } from "./Notifications";
 import { useOrganization } from "../../../hooks/useOrganizationData";
 import { useAccount } from "../../../contexts/useAccount";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { Members } from "./Members";
 import { Integrations } from "./Integrations";
 import { Secrets } from "./Secrets";
@@ -39,9 +40,12 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { usePermissions } from "@/contexts/usePermissions";
 import { PermissionTooltip, RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
+import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
+import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { IntegrationDetailsRoute } from "./components/IntegrationDetailsRoute";
 import { IntegrationSetup } from "./components/IntegrationSetup";
+import { IntegrationSetupReturn } from "./components/IntegrationSetupReturn";
 import { ThemePreferenceControl } from "@/components/ThemePreferenceControl";
 
 function settingsSidebarNavLinkClass(active: boolean) {
@@ -480,9 +484,11 @@ export function OrganizationSettings() {
             <Route
               path="integrations/:integrationId"
               element={
-                <RequirePermission resource="integrations" action="read">
-                  <IntegrationDetailsRoute organizationId={organizationId || ""} />
-                </RequirePermission>
+                <IntegrationSetupReturn organizationId={organizationId || ""}>
+                  <RequirePermission resource="integrations" action="read">
+                    <IntegrationDetailsRoute organizationId={organizationId || ""} />
+                  </RequirePermission>
+                </IntegrationSetupReturn>
               }
             />
             <Route
@@ -550,6 +556,14 @@ export function OrganizationSettings() {
               }
             />
             <Route path="profile" element={<Profile />} />
+            <Route
+              path="notifications"
+              element={
+                <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>
+                  <Notifications />
+                </RequireExperimentalFeature>
+              }
+            />
             <Route
               path="billing"
               element={

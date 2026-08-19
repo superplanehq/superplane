@@ -7,7 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
@@ -33,7 +34,7 @@ func Test__DescribeRun(t *testing.T) {
 		run := createFinishedRun(t, rootEvent, models.CanvasRunResultPassed)
 		execution := createRunExecution(t, run, rootEvent.ID, "node-1", models.CanvasNodeExecutionResultPassed)
 
-		response, err := DescribeRun(context.Background(), r.Registry, canvas.ID, run.ID.String())
+		response, err := DescribeRun(context.Background(), database.DB(t.Context()), canvas, run.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Run)
@@ -67,7 +68,7 @@ func Test__DescribeRun(t *testing.T) {
 		run := createStartedRun(t, rootEvent)
 		queueItem := support.CreateQueueItem(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID)
 
-		response, err := DescribeRun(context.Background(), r.Registry, canvas.ID, run.ID.String())
+		response, err := DescribeRun(context.Background(), database.DB(t.Context()), canvas, run.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Run)
 		require.Len(t, response.Run.QueueItems, 1)
@@ -116,7 +117,7 @@ func Test__DescribeRun(t *testing.T) {
 			"",
 		)
 
-		response, err := DescribeRun(context.Background(), r.Registry, childCanvas.ID, childRun.ID.String())
+		response, err := DescribeRun(context.Background(), database.DB(t.Context()), childCanvas, childRun.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Run)
 		assert.Equal(t, childRun.ID.String(), response.Run.Id)
@@ -133,7 +134,7 @@ func Test__DescribeRun(t *testing.T) {
 		rootEventTwo := support.EmitCanvasEventForNode(t, canvasTwo.ID, "trigger", "default", nil)
 		runTwo := createFinishedRun(t, rootEventTwo, models.CanvasRunResultPassed)
 
-		_, err := DescribeRun(context.Background(), r.Registry, canvasOne.ID, runTwo.ID.String())
+		_, err := DescribeRun(context.Background(), database.DB(t.Context()), canvasOne, runTwo.ID.String())
 		require.Error(t, err)
 		assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
 	})
@@ -141,7 +142,7 @@ func Test__DescribeRun(t *testing.T) {
 	t.Run("invalid run id -> error", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, []models.Edge{})
 
-		_, err := DescribeRun(context.Background(), r.Registry, canvas.ID, "not-a-uuid")
+		_, err := DescribeRun(context.Background(), database.DB(t.Context()), canvas, "not-a-uuid")
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	})
@@ -149,7 +150,7 @@ func Test__DescribeRun(t *testing.T) {
 	t.Run("missing run -> error", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, []models.Edge{})
 
-		_, err := DescribeRun(context.Background(), r.Registry, canvas.ID, uuid.New().String())
+		_, err := DescribeRun(context.Background(), database.DB(t.Context()), canvas, uuid.New().String())
 		require.Error(t, err)
 		assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
 	})

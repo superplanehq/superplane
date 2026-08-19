@@ -12,6 +12,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+
+	_ "github.com/superplanehq/superplane/pkg/components/messages"
+	_ "github.com/superplanehq/superplane/pkg/triggers/messages"
 )
 
 func Test__CanvasPublisherOptions_Validate(t *testing.T) {
@@ -229,7 +232,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
 
-		queueItems, err := models.ListNodeQueueItems(canvas.ID, "approval-node", 10, nil)
+		queueItems, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, "approval-node", 10, nil)
 		require.NoError(t, err)
 		require.Empty(t, queueItems)
 
@@ -438,6 +441,65 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NotNil(t, request.Spec.Data().InvokeAction)
 		require.Equal(t, "emitEvent", request.Spec.Data().InvokeAction.ActionName)
 		require.Equal(t, map[string]any{}, request.Spec.Data().InvokeAction.Parameters)
+	})
+
+	t.Run("self-referential runApp resolves onRun added in the same publish", func(t *testing.T) {
+		r := support.Setup(t)
+
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{},
+			nil,
+		)
+
+		// runApp listed before its target onRun — previously Setup ran immediately
+		// after each insert, so GetNode failed with "record not found".
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
+			database.Conn(),
+			canvas.ID,
+			r.User,
+			"Add babysit flow",
+			[]models.Node{
+				componentNode("babysit", "Babysit", "runApp", map[string]any{
+					"app":        canvas.ID.String(),
+					"node":       "start-babysitting",
+					"parameters": map[string]any{},
+					"timeout":    3600,
+				}),
+				triggerNode("start-babysitting", "Start Babysitting", "onRun", map[string]any{
+					"parameters": []any{},
+				}),
+			},
+			[]models.Edge{
+				{SourceID: "start-babysitting", TargetID: "babysit", Channel: "default"},
+			},
+		)
+		require.NoError(t, err)
+
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+		require.NoError(t, err)
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
+		require.NoError(t, err)
+
+		err = publisher.Publish(context.Background())
+		require.NoError(t, err)
+
+		activeNodes, err := models.FindCanvasNodes(canvas.ID)
+		require.NoError(t, err)
+		babysit := findCanvasNode(t, activeNodes, "babysit")
+		require.Equal(t, models.CanvasNodeStateReady, babysit.State)
+		require.Nil(t, babysit.StateReason)
+
+		metadata := babysit.Metadata.Data()
+		appMeta, ok := metadata["app"].(map[string]any)
+		require.True(t, ok)
+		require.Equal(t, canvas.ID.String(), appMeta["id"])
+		nodeMeta, ok := metadata["node"].(map[string]any)
+		require.True(t, ok)
+		require.Equal(t, "start-babysitting", nodeMeta["id"])
+		require.Equal(t, "Start Babysitting", nodeMeta["name"])
 	})
 
 	t.Run("add node skips setup when node already has error", func(t *testing.T) {

@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -180,10 +179,6 @@ func (c *CreateDeploymentStatus) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *CreateDeploymentStatus) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
-
 func (c *CreateDeploymentStatus) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }
@@ -204,15 +199,19 @@ func (c *CreateDeploymentStatus) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 
-// parseDeploymentID converts the configured deployment ID (which may come from an
-// expression that resolves to a number) into an int. Expressions can coerce
-// deployment IDs through JSON numbers, which stringify as floats or scientific
-// notation (e.g. "42" -> "4.2e+01"), so a whole-number float is also accepted -
-// but fractional values like "42.9" are rejected rather than silently truncated.
 func parseDeploymentID(value string) (int, error) {
+	return parseWholeNumberID(value, "deployment ID")
+}
+
+// parseWholeNumberID converts a configured numeric ID (which may come from an
+// expression that resolves to a number) into an int. Expressions can coerce IDs
+// through JSON numbers, which stringify as floats or scientific notation
+// (e.g. "42" -> "4.2e+01"), so a whole-number float is also accepted - but
+// fractional values like "42.9" are rejected rather than silently truncated.
+func parseWholeNumberID(value, label string) (int, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
-		return 0, fmt.Errorf("deployment ID is required")
+		return 0, fmt.Errorf("%s is required", label)
 	}
 
 	if id, err := strconv.Atoi(trimmed); err == nil {
@@ -221,7 +220,7 @@ func parseDeploymentID(value string) (int, error) {
 
 	f, err := strconv.ParseFloat(trimmed, 64)
 	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) || math.Trunc(f) != f {
-		return 0, fmt.Errorf("invalid deployment ID %q: must be a whole number", value)
+		return 0, fmt.Errorf("invalid %s %q: must be a whole number", label, value)
 	}
 
 	return int(f), nil

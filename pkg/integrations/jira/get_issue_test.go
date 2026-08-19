@@ -106,7 +106,7 @@ func Test__GetIssue__Execute(t *testing.T) {
 		assert.True(t, execCtx.Passed)
 		assert.Equal(t, GetIssuePayloadType, execCtx.Type)
 		require.Len(t, execCtx.Payloads, 1)
-		assert.Contains(t, httpContext.Requests[0].URL.String(), testSiteURL+"/rest/api/3/issue/TEST-123")
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testProxyURL("/rest/api/3/issue/TEST-123"))
 	})
 
 	t.Run("expand parameter is forwarded", func(t *testing.T) {

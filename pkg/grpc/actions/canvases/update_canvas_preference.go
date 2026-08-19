@@ -15,7 +15,8 @@ import (
 
 func UpdateCanvasPreference(
 	ctx context.Context,
-	organizationID string,
+	db *gorm.DB,
+	canvas *models.Canvas,
 	userID string,
 	req *pb.UpdateCanvasPreferenceRequest,
 ) (*pb.UpdateCanvasPreferenceResponse, error) {
@@ -23,19 +24,9 @@ func UpdateCanvasPreference(
 		return nil, grpcerrors.InvalidArgument(nil, "request is required")
 	}
 
-	organizationUUID, err := uuid.Parse(organizationID)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
-	}
-
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
 		return nil, grpcerrors.InvalidArgument(err, "invalid user id")
-	}
-
-	canvasID, err := uuid.Parse(req.CanvasId)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
 	var preference *models.UserCanvasPreference
@@ -43,9 +34,9 @@ func UpdateCanvasPreference(
 		var err error
 		preference, err = models.SetUserCanvasPreference(
 			tx,
-			organizationUUID,
+			canvas.OrganizationID,
 			userUUID,
-			canvasID,
+			canvas.ID,
 			req.Starred,
 		)
 		return err
@@ -64,6 +55,10 @@ func UpdateCanvasPreference(
 }
 
 func serializeCanvasPreference(preference *models.UserCanvasPreference) *pb.CanvasPreference {
+	if preference == nil {
+		return nil
+	}
+
 	serialized := &pb.CanvasPreference{
 		CanvasId: preference.CanvasID.String(),
 		Starred:  preference.StarredAt != nil,

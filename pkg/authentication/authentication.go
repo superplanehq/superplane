@@ -184,6 +184,11 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 	account, wasCreated, err := a.findOrCreateAccountForProvider(mockUser, a.allowSignupFromRequest(r))
 
 	if err != nil {
+		if errors.Is(err, models.ErrAccountBlocked) {
+			redirectAccountBlocked(w, r)
+			return
+		}
+
 		if errors.Is(err, errSignupRequired) {
 			http.Redirect(w, r, getSignupRequiredRedirectURL(r), http.StatusSeeOther)
 			return
@@ -217,6 +222,11 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 
 	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.allowSignupFromRequest(r))
 	if err != nil {
+		if errors.Is(err, models.ErrAccountBlocked) {
+			redirectAccountBlocked(w, r)
+			return
+		}
+
 		if errors.Is(err, errSignupRequired) {
 			http.Redirect(w, r, getSignupRequiredRedirectURL(r), http.StatusSeeOther)
 			return
@@ -245,6 +255,11 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 	account, err := models.FindAccountByEmail(gothUser.Email)
 	if err != nil {
 		http.Error(w, "Account not found", http.StatusNotFound)
+		return
+	}
+
+	if account.IsBlocked() {
+		redirectAccountBlocked(w, r)
 		return
 	}
 
@@ -333,6 +348,11 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 	if !crypto.VerifyPassword(passwordAuth.PasswordHash, password) {
 		log.Warnf("Invalid password attempt for account: %s", email)
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	if account.IsBlocked() {
+		http.Error(w, models.AccountBlockedMessage, http.StatusForbidden)
 		return
 	}
 
@@ -456,6 +476,17 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 		json.NewEncoder(w).Encode(map[string]string{
 			"message": "If an account exists with this email, a sign-in code has been sent.",
 		})
+	}
+
+	account, err := models.FindAccountByEmail(email)
+	if err == nil && account.IsBlocked() {
+		successResponse()
+		return
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Errorf("Failed to look up account before issuing magic code for %s: %v", email, err)
+		successResponse()
+		return
 	}
 
 	count, err := models.CountRecentMagicCodes(email, time.Now().Add(-magicCodeRateWindow))
@@ -636,13 +667,15 @@ var errSignupRequired = fmt.Errorf("signup must be started from the signup page"
 var errInviteLinkInvalid = fmt.Errorf("invite link not found or disabled")
 var errAccountError = fmt.Errorf("Internal server error")
 
-// checkSignupPolicy verifies that a new-user signup would be allowed for
-// the given email without creating any records. For existing accounts this
-// is always a no-op.
+// checkSignupPolicy verifies account access and whether a new-user signup
+// would be allowed without creating records or consuming a magic code.
 func (a *Handler) checkSignupPolicy(email string, r *http.Request) error {
-	_, err := models.FindAccountByEmail(email)
+	account, err := models.FindAccountByEmail(email)
 	if err == nil {
-		return nil // existing user — no signup gate
+		if account.IsBlocked() {
+			return models.ErrAccountBlocked
+		}
+		return nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Errorf("Error finding account for %s: %v", email, err)
@@ -696,7 +729,7 @@ func (a *Handler) findOrCreateAccountForMagicCode(email string, r *http.Request)
 
 func errorStatusForAccountError(err error) int {
 	switch err {
-	case errSignupDisabled, errSignupRequired, errInviteLinkInvalid:
+	case errSignupDisabled, errSignupRequired, errInviteLinkInvalid, models.ErrAccountBlocked:
 		return http.StatusForbidden
 	default:
 		return http.StatusInternalServerError
@@ -704,6 +737,15 @@ func errorStatusForAccountError(err error) int {
 }
 
 func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request, account *models.Account, wasCreated bool) {
+	if account.IsBlocked() {
+		if strings.Contains(r.Header.Get("Accept"), jsonContentType) {
+			http.Error(w, models.AccountBlockedMessage, http.StatusForbidden)
+			return
+		}
+		redirectAccountBlocked(w, r)
+		return
+	}
+
 	if err := IssueAccountSession(w, r, a.jwtSigner, account.ID.String()); err != nil {
 		log.Errorf("Failed to generate token for magic code login: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -712,6 +754,10 @@ func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request
 
 	redirectURL := a.getPostAuthRedirectURL(r, wasCreated)
 	writePostAuthRedirect(w, r, redirectURL)
+}
+
+func redirectAccountBlocked(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/login?auth_error=account_blocked", http.StatusSeeOther)
 }
 
 func writePostAuthRedirect(w http.ResponseWriter, r *http.Request, redirectURL string) {
@@ -861,6 +907,10 @@ func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup
 	account, err := models.FindAccountByProvider(gothUser.Provider, gothUser.UserID)
 
 	if err == nil {
+		if account.IsBlocked() {
+			return nil, false, models.ErrAccountBlocked
+		}
+
 		if account.Email != utils.NormalizeEmail(gothUser.Email) {
 			log.Infof("Updating email for account %s from %s to %s", account.ID, account.Email, gothUser.Email)
 			err = account.UpdateEmailForProvider(gothUser.Email, gothUser.Provider, gothUser.UserID)
@@ -879,6 +929,9 @@ func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup
 
 	account, err = models.FindAccountByEmail(gothUser.Email)
 	if err == nil {
+		if account.IsBlocked() {
+			return nil, false, models.ErrAccountBlocked
+		}
 		return account, false, nil
 	}
 

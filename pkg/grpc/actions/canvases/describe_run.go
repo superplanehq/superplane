@@ -6,23 +6,19 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/gorm"
 )
 
-func DescribeRun(ctx context.Context, registry *registry.Registry, canvasID uuid.UUID, runID string) (*pb.DescribeRunResponse, error) {
+func DescribeRun(ctx context.Context, db *gorm.DB, canvas *models.Canvas, runID string) (*pb.DescribeRunResponse, error) {
 	runUUID, err := uuid.Parse(runID)
 	if err != nil {
 		return nil, grpcerrors.InvalidArgument(err, "invalid run id")
 	}
 
-	db := database.DB(ctx)
-
-	run, err := models.FindCanvasRunInTransaction(db, canvasID, runUUID)
+	run, err := models.FindCanvasRunInTransaction(db, canvas.ID, runUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, grpcerrors.NotFound(err, "run not found")
@@ -32,7 +28,7 @@ func DescribeRun(ctx context.Context, registry *registry.Registry, canvasID uuid
 		return nil, grpcerrors.Internal(err, "failed to find run")
 	}
 
-	runDetails, err := loadRunDetailsForRuns(ctx, canvasID, []models.CanvasRun{*run})
+	runDetails, err := loadRunDetailsForRuns(ctx, db, canvas.ID, []models.CanvasRun{*run})
 	if err != nil {
 		return nil, err
 	}

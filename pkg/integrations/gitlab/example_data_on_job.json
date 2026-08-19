@@ -1,0 +1,78 @@
+{
+  "data": {
+    "object_kind": "build",
+    "ref": "main",
+    "tag": false,
+    "before_sha": "9d1a3c4e7b2f8a6d5c0e1b3a7f9d2c4e6b8a0f13",
+    "sha": "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+    "retries_count": 0,
+    "build_id": 998876,
+    "build_name": "unit-tests",
+    "build_stage": "test",
+    "build_status": "success",
+    "build_created_at": "2026-02-13T17:56:00.412Z",
+    "build_started_at": "2026-02-13T17:57:30.118Z",
+    "build_finished_at": "2026-02-13T17:59:30.284Z",
+    "build_duration": 120.166,
+    "build_queued_duration": 3.204,
+    "build_allow_failure": false,
+    "build_failure_reason": "unknown_failure",
+    "pipeline_id": 12345,
+    "runner": {
+      "id": 380987,
+      "description": "shared-runners-manager-6.gitlab.com",
+      "runner_type": "instance_type",
+      "active": true,
+      "is_shared": true,
+      "tags": ["linux", "docker", "shared-runner"]
+    },
+    "project_id": 987,
+    "project_name": "group/example-project",
+    "user": {
+      "id": 22,
+      "name": "Jamie Rivera",
+      "username": "jrivera",
+      "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/22/avatar.png",
+      "email": "jrivera@example.com"
+    },
+    "commit": {
+      "id": 12345,
+      "name": "Pipeline for branch: main",
+      "sha": "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+      "message": "Cache dependencies between CI jobs\n",
+      "author_name": "Jamie Rivera",
+      "author_email": "jrivera@example.com",
+      "author_url": "https://gitlab.com/jrivera",
+      "status": "success",
+      "duration": 240,
+      "started_at": "2026-02-13T17:56:04.000Z",
+      "finished_at": "2026-02-13T18:00:00.000Z"
+    },
+    "repository": {
+      "name": "example-project",
+      "url": "git@gitlab.com:group/example-project.git",
+      "description": "Example project used by SuperPlane workflows.",
+      "homepage": "https://gitlab.com/group/example-project",
+      "git_ssh_url": "git@gitlab.com:group/example-project.git",
+      "git_http_url": "https://gitlab.com/group/example-project.git",
+      "visibility_level": 20
+    },
+    "project": {
+      "id": 987,
+      "name": "example-project",
+      "description": "Example project used by SuperPlane workflows.",
+      "web_url": "https://gitlab.com/group/example-project",
+      "avatar_url": null,
+      "git_ssh_url": "git@gitlab.com:group/example-project.git",
+      "git_http_url": "https://gitlab.com/group/example-project.git",
+      "namespace": "group",
+      "visibility_level": 20,
+      "path_with_namespace": "group/example-project",
+      "default_branch": "main",
+      "ci_config_path": ".gitlab-ci.yml"
+    },
+    "environment": null
+  },
+  "timestamp": "2026-02-13T17:59:30.284000000Z",
+  "type": "gitlab.job"
+}

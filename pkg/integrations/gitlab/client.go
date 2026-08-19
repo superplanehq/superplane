@@ -231,6 +231,7 @@ type UpdateIssueRequest struct {
 	Description *string `json:"description,omitempty"`
 	StateEvent  *string `json:"state_event,omitempty"`
 	Labels      *string `json:"labels,omitempty"`
+	AddLabels   *string `json:"add_labels,omitempty"`
 	AssigneeIDs *[]int  `json:"assignee_ids,omitempty"`
 	MilestoneID *int    `json:"milestone_id,omitempty"`
 	DueDate     *string `json:"due_date,omitempty"`
@@ -288,8 +289,50 @@ func (c *Client) CreateIssueNote(ctx context.Context, projectID, issueIID string
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusAccepted {
+		var quickAction quickActionNoteResponse
+		if err := json.NewDecoder(resp.Body).Decode(&quickAction); err != nil {
+			return nil, fmt.Errorf("failed to decode quick action response: %v", err)
+		}
+		return &Note{Body: strings.Join(quickAction.Summary, "; ")}, nil
+	}
+
 	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("failed to create issue note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var note Note
+	if err := json.NewDecoder(resp.Body).Decode(&note); err != nil {
+		return nil, fmt.Errorf("failed to decode note: %v", err)
+	}
+
+	return &note, nil
+}
+
+// UpdateIssueNote edits an existing note (comment) on an issue.
+// See https://docs.gitlab.com/api/notes/#modify-existing-issue-note
+func (c *Client) UpdateIssueNote(ctx context.Context, projectID, issueIID, noteID string, req *UpdateNoteRequest) (*Note, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/issues/%s/notes/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(issueIID), url.PathEscape(noteID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update issue note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
 	}
 
 	var note Note
@@ -585,12 +628,27 @@ type Note struct {
 	CreatedAt    string `json:"created_at"`
 	UpdatedAt    string `json:"updated_at"`
 	System       bool   `json:"system"`
+	ProjectID    int    `json:"project_id,omitempty"`
 	NoteableID   int    `json:"noteable_id,omitempty"`
 	NoteableIID  int    `json:"noteable_iid,omitempty"`
 	NoteableType string `json:"noteable_type,omitempty"`
+	Resolvable   bool   `json:"resolvable"`
+	Confidential bool   `json:"confidential"`
+	Internal     bool   `json:"internal"`
+}
+
+// quickActionNoteResponse is what GitLab returns instead of a Note when a
+// note's body is only quick actions (e.g. "/ready") and has no visible
+// comment content: status 202 with a summary of the applied commands.
+type quickActionNoteResponse struct {
+	Summary []string `json:"summary"`
 }
 
 type CreateNoteRequest struct {
+	Body string `json:"body"`
+}
+
+type UpdateNoteRequest struct {
 	Body string `json:"body"`
 }
 
@@ -613,6 +671,14 @@ func (c *Client) CreateMergeRequestNote(ctx context.Context, projectID, mergeReq
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusAccepted {
+		var quickAction quickActionNoteResponse
+		if err := json.NewDecoder(resp.Body).Decode(&quickAction); err != nil {
+			return nil, fmt.Errorf("failed to decode quick action response: %v", err)
+		}
+		return &Note{Body: strings.Join(quickAction.Summary, "; ")}, nil
+	}
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("failed to create merge request note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
@@ -699,6 +765,175 @@ func (c *Client) AcceptMergeRequest(ctx context.Context, projectID, mergeRequest
 		return nil, fmt.Errorf("branch cannot be merged: %s", parseGitlabErrorMessage(readResponseBody(resp)))
 	default:
 		return nil, fmt.Errorf("failed to accept merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var mergeRequest MergeRequest
+	if err := json.NewDecoder(resp.Body).Decode(&mergeRequest); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request: %v", err)
+	}
+
+	return &mergeRequest, nil
+}
+
+type CreateMergeRequestRequest struct {
+	SourceBranch       string `json:"source_branch"`
+	TargetBranch       string `json:"target_branch"`
+	Title              string `json:"title"`
+	Description        string `json:"description,omitempty"`
+	AssigneeIDs        []int  `json:"assignee_ids,omitempty"`
+	ReviewerIDs        []int  `json:"reviewer_ids,omitempty"`
+	Labels             string `json:"labels,omitempty"`
+	MilestoneID        *int   `json:"milestone_id,omitempty"`
+	RemoveSourceBranch *bool  `json:"remove_source_branch,omitempty"`
+	Squash             *bool  `json:"squash,omitempty"`
+}
+
+// CreateMergeRequest opens a new merge request in a project.
+// See https://docs.gitlab.com/api/merge_requests/#create-mr
+func (c *Client) CreateMergeRequest(ctx context.Context, projectID string, req *CreateMergeRequestRequest) (*MergeRequest, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests", c.baseURL, apiVersion, url.PathEscape(projectID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var mergeRequest MergeRequest
+	if err := json.NewDecoder(resp.Body).Decode(&mergeRequest); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request: %v", err)
+	}
+
+	return &mergeRequest, nil
+}
+
+// GetMergeRequest fetches a single merge request, including its current reviewers.
+func (c *Client) GetMergeRequest(ctx context.Context, projectID, mergeRequestIID string) (*MergeRequest, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var mergeRequest MergeRequest
+	if err := json.NewDecoder(resp.Body).Decode(&mergeRequest); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request: %v", err)
+	}
+
+	return &mergeRequest, nil
+}
+
+// UpdateMergeRequestRequest mirrors GitLab's PUT /projects/:id/merge_requests/:merge_request_iid
+// body. Fields are pointers so a nil field is omitted (left unchanged) while a
+// non-nil field is always sent, even when it points to a zero value - e.g. a
+// non-nil pointer to "" clears the description, and a non-nil pointer to an
+// empty slice clears the assignees.
+type UpdateMergeRequestRequest struct {
+	Title        *string `json:"title,omitempty"`
+	Description  *string `json:"description,omitempty"`
+	TargetBranch *string `json:"target_branch,omitempty"`
+	StateEvent   *string `json:"state_event,omitempty"`
+	Labels       *string `json:"labels,omitempty"`
+	AddLabels    *string `json:"add_labels,omitempty"`
+	AssigneeIDs  *[]int  `json:"assignee_ids,omitempty"`
+}
+
+// UpdateMergeRequest edits an existing merge request's fields.
+// See https://docs.gitlab.com/api/merge_requests/#update-mr
+func (c *Client) UpdateMergeRequest(ctx context.Context, projectID, mergeRequestIID string, req *UpdateMergeRequestRequest) (*MergeRequest, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var mergeRequest MergeRequest
+	if err := json.NewDecoder(resp.Body).Decode(&mergeRequest); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request: %v", err)
+	}
+
+	return &mergeRequest, nil
+}
+
+// UpdateMergeRequestReviewersRequest sets the full reviewer list of a merge
+// request. GitLab replaces the existing reviewers with the given IDs, so an
+// empty (but non-nil) slice clears all reviewers.
+type UpdateMergeRequestReviewersRequest struct {
+	ReviewerIDs []int `json:"reviewer_ids"`
+}
+
+// UpdateMergeRequestReviewers replaces the reviewers of a merge request with the
+// given set of user IDs.
+// See https://docs.gitlab.com/api/merge_requests/#update-mr
+func (c *Client) UpdateMergeRequestReviewers(ctx context.Context, projectID, mergeRequestIID string, reviewerIDs []int) (*MergeRequest, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+
+	if reviewerIDs == nil {
+		reviewerIDs = []int{}
+	}
+
+	body, err := json.Marshal(&UpdateMergeRequestReviewersRequest{ReviewerIDs: reviewerIDs})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update merge request reviewers: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
 	}
 
 	var mergeRequest MergeRequest
@@ -987,6 +1222,422 @@ func (c *Client) UpdateDeployment(ctx context.Context, projectID string, deploym
 	return &deployment, nil
 }
 
+type ReleaseCommit struct {
+	ID             string   `json:"id"`
+	ShortID        string   `json:"short_id"`
+	Title          string   `json:"title"`
+	CreatedAt      string   `json:"created_at"`
+	ParentIDs      []string `json:"parent_ids,omitempty"`
+	Message        string   `json:"message"`
+	AuthorName     string   `json:"author_name"`
+	AuthorEmail    string   `json:"author_email"`
+	AuthoredDate   string   `json:"authored_date"`
+	CommitterName  string   `json:"committer_name"`
+	CommitterEmail string   `json:"committer_email"`
+	CommittedDate  string   `json:"committed_date"`
+}
+
+type ReleaseMilestoneIssueStats struct {
+	Total  int `json:"total"`
+	Closed int `json:"closed"`
+}
+
+// ReleaseMilestone is kept separate from Milestone (used by issues) since the releases API returns a fuller shape.
+type ReleaseMilestone struct {
+	ID          int                         `json:"id"`
+	IID         int                         `json:"iid"`
+	ProjectID   int                         `json:"project_id"`
+	Title       string                      `json:"title"`
+	Description string                      `json:"description"`
+	State       string                      `json:"state"`
+	CreatedAt   string                      `json:"created_at"`
+	UpdatedAt   string                      `json:"updated_at"`
+	DueDate     string                      `json:"due_date,omitempty"`
+	StartDate   string                      `json:"start_date,omitempty"`
+	WebURL      string                      `json:"web_url"`
+	IssueStats  *ReleaseMilestoneIssueStats `json:"issue_stats,omitempty"`
+}
+
+type ReleaseAssetSource struct {
+	Format string `json:"format"`
+	URL    string `json:"url"`
+}
+
+type ReleaseAssetLink struct {
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	URL      string `json:"url"`
+	LinkType string `json:"link_type"`
+}
+
+type ReleaseAssets struct {
+	Count   int                  `json:"count"`
+	Sources []ReleaseAssetSource `json:"sources,omitempty"`
+	Links   []ReleaseAssetLink   `json:"links,omitempty"`
+}
+
+type ReleaseEvidence struct {
+	SHA         string `json:"sha"`
+	Filepath    string `json:"filepath"`
+	CollectedAt string `json:"collected_at"`
+}
+
+type ReleaseLinks struct {
+	ClosedIssuesURL        string `json:"closed_issues_url,omitempty"`
+	ClosedMergeRequestsURL string `json:"closed_merge_requests_url,omitempty"`
+	EditURL                string `json:"edit_url,omitempty"`
+	MergedMergeRequestsURL string `json:"merged_merge_requests_url,omitempty"`
+	OpenedIssuesURL        string `json:"opened_issues_url,omitempty"`
+	OpenedMergeRequestsURL string `json:"opened_merge_requests_url,omitempty"`
+	Self                   string `json:"self,omitempty"`
+}
+
+type Release struct {
+	TagName         string             `json:"tag_name"`
+	Name            string             `json:"name"`
+	Description     string             `json:"description"`
+	CreatedAt       string             `json:"created_at"`
+	ReleasedAt      string             `json:"released_at"`
+	UpcomingRelease bool               `json:"upcoming_release"`
+	Author          *User              `json:"author,omitempty"`
+	Commit          *ReleaseCommit     `json:"commit,omitempty"`
+	Milestones      []ReleaseMilestone `json:"milestones,omitempty"`
+	CommitPath      string             `json:"commit_path,omitempty"`
+	TagPath         string             `json:"tag_path,omitempty"`
+	Assets          *ReleaseAssets     `json:"assets,omitempty"`
+	Evidences       []ReleaseEvidence  `json:"evidences,omitempty"`
+	EvidenceSHA     string             `json:"evidence_sha,omitempty"`
+	Links           *ReleaseLinks      `json:"_links,omitempty"`
+}
+
+type CreateReleaseRequest struct {
+	TagName     string   `json:"tag_name"`
+	Ref         string   `json:"ref,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Milestones  []string `json:"milestones,omitempty"`
+	ReleasedAt  string   `json:"released_at,omitempty"`
+}
+
+// CreateRelease creates a release, tagging Ref first if TagName doesn't already exist.
+func (c *Client) CreateRelease(ctx context.Context, projectID string, req *CreateReleaseRequest) (*Release, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases", c.baseURL, apiVersion, url.PathEscape(projectID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create release: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var release Release
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to decode release: %v", err)
+	}
+
+	return &release, nil
+}
+
+// UpdateReleaseRequest fields are pointers so a nil field is left unchanged while a non-nil field (even a zero value) is always sent.
+type UpdateReleaseRequest struct {
+	Name        *string   `json:"name,omitempty"`
+	Description *string   `json:"description,omitempty"`
+	Milestones  *[]string `json:"milestones,omitempty"`
+	ReleasedAt  *string   `json:"released_at,omitempty"`
+}
+
+// UpdateRelease edits an existing release's name, description, milestones, or released-at date; the tag and assets can't be changed here.
+func (c *Client) UpdateRelease(ctx context.Context, projectID, tagName string, req *UpdateReleaseRequest) (*Release, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(tagName))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update release: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var release Release
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to decode release: %v", err)
+	}
+
+	return &release, nil
+}
+
+// GetRelease fetches a single release by tag name.
+func (c *Client) GetRelease(ctx context.Context, projectID, tagName string) (*Release, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(tagName))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get release: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var release Release
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to decode release: %v", err)
+	}
+
+	return &release, nil
+}
+
+// DeleteRelease deletes a release and returns the deleted release; it does not delete the underlying tag.
+func (c *Client) DeleteRelease(ctx context.Context, projectID, tagName string) (*Release, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(tagName))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to delete release: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var release Release
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to decode release: %v", err)
+	}
+
+	return &release, nil
+}
+
+// DeleteTag deletes a Git tag from the project's repository.
+func (c *Client) DeleteTag(ctx context.Context, projectID, tagName string) error {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/repository/tags/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(tagName))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, apiURL, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to delete tag: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	return nil
+}
+
+// GetLatestRelease returns the most recently published release, skipping upcoming (scheduled) ones.
+func (c *Client) GetLatestRelease(ctx context.Context, projectID string) (*Release, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/releases?order_by=released_at&sort=desc&per_page=100", c.baseURL, apiVersion, url.PathEscape(projectID))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to list releases: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var releases []Release
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return nil, fmt.Errorf("failed to decode releases: %v", err)
+	}
+
+	for _, release := range releases {
+		if !release.UpcomingRelease {
+			return &release, nil
+		}
+	}
+
+	return nil, errors.New("no published releases found")
+}
+
+// CommitStatus is a GitLab commit build/CI status.
+// See https://docs.gitlab.com/api/commits/#set-the-pipeline-status-of-a-commit
+type CommitStatus struct {
+	ID           int      `json:"id"`
+	SHA          string   `json:"sha"`
+	Ref          string   `json:"ref"`
+	Status       string   `json:"status"`
+	Name         string   `json:"name"`
+	TargetURL    string   `json:"target_url"`
+	Description  string   `json:"description"`
+	CreatedAt    string   `json:"created_at"`
+	StartedAt    string   `json:"started_at"`
+	FinishedAt   string   `json:"finished_at"`
+	AllowFailure bool     `json:"allow_failure"`
+	Coverage     *float64 `json:"coverage"`
+	PipelineID   int      `json:"pipeline_id,omitempty"`
+	Author       *User    `json:"author,omitempty"`
+}
+
+// CreateCommitStatusRequest mirrors GitLab's POST /projects/:id/statuses/:sha body.
+// Only State is required; the rest are omitted when empty.
+type CreateCommitStatusRequest struct {
+	State       string   `json:"state"`
+	Ref         string   `json:"ref,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	TargetURL   string   `json:"target_url,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Coverage    *float64 `json:"coverage,omitempty"`
+	PipelineID  *int     `json:"pipeline_id,omitempty"`
+}
+
+// CreateCommitStatus sets (publishes) a build/CI status on a commit.
+func (c *Client) CreateCommitStatus(ctx context.Context, projectID, sha string, req *CreateCommitStatusRequest) (*CommitStatus, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/statuses/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(sha))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create commit status: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var status CommitStatus
+	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+		return nil, fmt.Errorf("failed to decode commit status: %v", err)
+	}
+
+	return &status, nil
+}
+
+// CommitPipeline is the last pipeline associated with a commit - GitLab's native
+// rolled-up CI status for that commit.
+type CommitPipeline struct {
+	ID        int    `json:"id"`
+	IID       int    `json:"iid,omitempty"`
+	ProjectID int    `json:"project_id,omitempty"`
+	Ref       string `json:"ref"`
+	SHA       string `json:"sha"`
+	Status    string `json:"status"`
+	Source    string `json:"source,omitempty"`
+	CreatedAt string `json:"created_at,omitempty"`
+	UpdatedAt string `json:"updated_at,omitempty"`
+	WebURL    string `json:"web_url,omitempty"`
+}
+
+// CommitStats is the line-change summary of a commit.
+type CommitStats struct {
+	Additions int `json:"additions"`
+	Deletions int `json:"deletions"`
+	Total     int `json:"total"`
+}
+
+// Commit is a GitLab repository commit. Its top-level Status and LastPipeline are
+// GitLab's native overall CI status for the commit (rolled up from its pipeline).
+// See https://docs.gitlab.com/api/commits/#get-a-single-commit
+type Commit struct {
+	ID             string          `json:"id"`
+	ShortID        string          `json:"short_id"`
+	Title          string          `json:"title"`
+	Message        string          `json:"message"`
+	AuthorName     string          `json:"author_name"`
+	AuthorEmail    string          `json:"author_email"`
+	AuthoredDate   string          `json:"authored_date"`
+	CommitterName  string          `json:"committer_name"`
+	CommitterEmail string          `json:"committer_email"`
+	CommittedDate  string          `json:"committed_date"`
+	CreatedAt      string          `json:"created_at"`
+	ParentIDs      []string        `json:"parent_ids"`
+	WebURL         string          `json:"web_url"`
+	Status         string          `json:"status"`
+	LastPipeline   *CommitPipeline `json:"last_pipeline,omitempty"`
+	Stats          *CommitStats    `json:"stats,omitempty"`
+}
+
+// GetCommit returns a single commit, including its top-level Status and LastPipeline
+// (GitLab's native overall CI status). The ref may be a SHA, branch, or tag name.
+func (c *Client) GetCommit(ctx context.Context, projectID, ref string) (*Commit, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/repository/commits/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(ref))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get commit: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var commit Commit
+	if err := json.NewDecoder(resp.Body).Decode(&commit); err != nil {
+		return nil, fmt.Errorf("failed to decode commit: %v", err)
+	}
+
+	return &commit, nil
+}
+
 // mergeRequestConflictMessage extracts GitLab's error message from a 409
 // response to a merge request accept/approve call. GitLab returns 409 not only
 // for a sha guard mismatch but also e.g. when the merge request is locked or
@@ -1018,4 +1669,213 @@ func readResponseBody(resp *http.Response) string {
 		return ""
 	}
 	return string(body)
+}
+
+type graphQLRequest struct {
+	Query     string         `json:"query"`
+	Variables map[string]any `json:"variables,omitempty"`
+}
+
+type graphQLError struct {
+	Message string `json:"message"`
+}
+
+type graphQLResponse struct {
+	Data   json.RawMessage `json:"data"`
+	Errors []graphQLError  `json:"errors,omitempty"`
+}
+
+// graphQL executes a query against GitLab's GraphQL API and decodes the "data" field into out.
+func (c *Client) graphQL(ctx context.Context, query string, variables map[string]any, out any) error {
+	body, err := json.Marshal(graphQLRequest{Query: query, Variables: variables})
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/api/graphql", c.baseURL)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("graphql request failed: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var gqlResp graphQLResponse
+	if err := json.NewDecoder(resp.Body).Decode(&gqlResp); err != nil {
+		return fmt.Errorf("failed to decode graphql response: %v", err)
+	}
+
+	if len(gqlResp.Errors) > 0 {
+		return fmt.Errorf("graphql error: %s", gqlResp.Errors[0].Message)
+	}
+
+	if out == nil {
+		return nil
+	}
+
+	return json.Unmarshal(gqlResp.Data, out)
+}
+
+type Group struct {
+	ID       int    `json:"id"`
+	FullPath string `json:"full_path"`
+}
+
+// GetGroup fetches a single group by numeric ID or full path.
+func (c *Client) GetGroup(groupID string) (*Group, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/groups/%s", c.baseURL, apiVersion, url.PathEscape(groupID))
+
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get group: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var group Group
+	if err := json.NewDecoder(resp.Body).Decode(&group); err != nil {
+		return nil, fmt.Errorf("failed to decode group: %v", err)
+	}
+
+	return &group, nil
+}
+
+type CiMinutesNamespaceUsage struct {
+	Month                 string `json:"month"`
+	MonthIso8601          string `json:"monthIso8601"`
+	Minutes               int    `json:"minutes"`
+	SharedRunnersDuration int    `json:"sharedRunnersDuration"`
+}
+
+type CiMinutesProjectRef struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	FullPath string `json:"fullPath"`
+}
+
+type CiMinutesProjectUsage struct {
+	Minutes               int                  `json:"minutes"`
+	SharedRunnersDuration int                  `json:"sharedRunnersDuration"`
+	Project               *CiMinutesProjectRef `json:"project"`
+}
+
+const ciMinutesNamespaceUsageQuery = `
+query($namespaceId: NamespaceID, $date: Date) {
+  ciMinutesUsage(namespaceId: $namespaceId, date: $date) {
+    nodes {
+      month
+      monthIso8601
+      minutes
+      sharedRunnersDuration
+    }
+  }
+}`
+
+const ciMinutesProjectUsageQuery = `
+query($namespaceId: NamespaceID, $date: Date, $after: String) {
+  ciMinutesProjectMonthlyUsage(namespaceId: $namespaceId, date: $date, first: 100, after: $after) {
+    nodes {
+      minutes
+      sharedRunnersDuration
+      project {
+        id
+        name
+        fullPath
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}`
+
+type ciMinutesNamespaceUsageResponse struct {
+	CiMinutesUsage struct {
+		Nodes []CiMinutesNamespaceUsage `json:"nodes"`
+	} `json:"ciMinutesUsage"`
+}
+
+type graphQLPageInfo struct {
+	HasNextPage bool   `json:"hasNextPage"`
+	EndCursor   string `json:"endCursor"`
+}
+
+type ciMinutesProjectUsageResponse struct {
+	CiMinutesProjectMonthlyUsage struct {
+		Nodes    []CiMinutesProjectUsage `json:"nodes"`
+		PageInfo graphQLPageInfo         `json:"pageInfo"`
+	} `json:"ciMinutesProjectMonthlyUsage"`
+}
+
+// GetCiMinutesUsage returns a namespace's CI/CD minutes usage for the given month with a per-project breakdown, a nil namespaceGID for the current user's personal namespace, and a nil usage if GitLab has no namespace-level record for that month.
+func (c *Client) GetCiMinutesUsage(ctx context.Context, namespaceGID *string, date string) (*CiMinutesNamespaceUsage, []CiMinutesProjectUsage, error) {
+	variables := map[string]any{"date": date}
+	if namespaceGID != nil {
+		variables["namespaceId"] = *namespaceGID
+	}
+
+	var namespaceResp ciMinutesNamespaceUsageResponse
+	if err := c.graphQL(ctx, ciMinutesNamespaceUsageQuery, variables, &namespaceResp); err != nil {
+		return nil, nil, err
+	}
+
+	var usage *CiMinutesNamespaceUsage
+	if len(namespaceResp.CiMinutesUsage.Nodes) > 0 {
+		usage = &namespaceResp.CiMinutesUsage.Nodes[0]
+	}
+
+	projects, err := c.getAllCiMinutesProjectUsage(ctx, variables)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return usage, projects, nil
+}
+
+// getAllCiMinutesProjectUsage pages through the full per-project usage breakdown, since GitLab caps each response at 100 nodes.
+func (c *Client) getAllCiMinutesProjectUsage(ctx context.Context, baseVariables map[string]any) ([]CiMinutesProjectUsage, error) {
+	var allProjects []CiMinutesProjectUsage
+	after := ""
+
+	for {
+		variables := make(map[string]any, len(baseVariables)+1)
+		for k, v := range baseVariables {
+			variables[k] = v
+		}
+		if after != "" {
+			variables["after"] = after
+		}
+
+		var resp ciMinutesProjectUsageResponse
+		if err := c.graphQL(ctx, ciMinutesProjectUsageQuery, variables, &resp); err != nil {
+			return nil, err
+		}
+
+		allProjects = append(allProjects, resp.CiMinutesProjectMonthlyUsage.Nodes...)
+
+		if !resp.CiMinutesProjectMonthlyUsage.PageInfo.HasNextPage {
+			break
+		}
+		after = resp.CiMinutesProjectMonthlyUsage.PageInfo.EndCursor
+	}
+
+	return allProjects, nil
 }

@@ -41,6 +41,21 @@ export interface WorkspaceNodeMetadata {
   workspaceAlias?: string;
 }
 
+export interface RuleGroupNamespace {
+  arn?: string;
+  name?: string;
+  status?: WorkspaceStatus;
+  data?: string;
+  createdAt?: string;
+  modifiedAt?: string;
+  tags?: Record<string, string>;
+}
+
+export interface RuleGroupNamespaceOutput {
+  workspaceId?: string;
+  namespace?: RuleGroupNamespace;
+}
+
 export interface QueryConfiguration {
   region?: string;
   workspace?: string;
@@ -140,6 +155,36 @@ export function workspaceExecutionDetails(
   if (workspace.kmsKeyArn) {
     details["KMS Key ARN"] = workspace.kmsKeyArn;
   }
+
+  return details;
+}
+
+export interface RuleGroupNamespaceExecutionDetailsOptions {
+  timestampLabel: string;
+  fallbackName?: string;
+  fallbackWorkspaceAlias?: string;
+  timestampSource?: "created" | "completed";
+}
+
+export function ruleGroupNamespaceExecutionDetails(
+  namespace: RuleGroupNamespace | undefined,
+  execution: ExecutionInfo,
+  options: RuleGroupNamespaceExecutionDetailsOptions,
+): Record<string, string> {
+  const { timestampLabel, fallbackName, fallbackWorkspaceAlias, timestampSource = "completed" } = options;
+  const details: Record<string, string> = {
+    [timestampLabel]: stringOrDash(formatExecutionTimestamp(execution, timestampSource)),
+    Workspace: stringOrDash(fallbackWorkspaceAlias),
+  };
+
+  if (!namespace) {
+    details.Name = stringOrDash(fallbackName);
+    return details;
+  }
+
+  details.Name = stringOrDash(namespace.name ?? fallbackName);
+  details.Status = stringOrDash(namespace.status?.statusCode);
+  details.ARN = stringOrDash(namespace.arn);
 
   return details;
 }

@@ -5,9 +5,9 @@ import { AppPageHarness } from "./__fixtures__/AppPageHarness";
 import { consoleFixtures } from "./__fixtures__/consoleFixtures";
 
 /**
- * Full-`AppPage` stories that render the **console tab** of four production
- * apps against captured fixture data. Each fixture is a sanitized snapshot of
- * a real app on app.superplane.com (canvas describe, runs, memory, versions,
+ * Full-`AppPage` stories that render the **console tab** of production apps
+ * against captured fixture data. Each fixture is a sanitized snapshot of a
+ * real app on app.superplane.com (canvas describe, runs, memory, versions,
  * and the `console.yaml` that drives the dashboard) so we can iterate on the
  * console UI against realistic layouts without needing network access or a
  * running backend.
@@ -38,6 +38,16 @@ type Story = StoryObj<typeof meta>;
 const consoleQuery = "view=console";
 
 const { superplaneSaas, prRiskReview, docsReviewer, superplaneRelease } = consoleFixtures;
+
+/**
+ * Software Factory — Create a task inline form beside a 3-column PR pipeline
+ * board (In progress · Human review · Done). Uses the default LiveCanvas
+ * fixture (same app capture as Pages/AppPage → Live Canvas).
+ */
+export const SoftwareFactory: Story = {
+  name: "Software Factory",
+  render: () => <AppPageHarness query={consoleQuery} />,
+};
 
 /**
  * SuperPlane SaaS — production deployment pipeline console.

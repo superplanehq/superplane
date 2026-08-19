@@ -42,3 +42,37 @@ func ListWorkspaces(ctx core.ListResourcesContext, resourceType string) ([]core.
 
 	return resources, nil
 }
+
+func ListRuleGroupsNamespaces(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		return nil, fmt.Errorf("region is required")
+	}
+
+	workspaceID := strings.TrimSpace(ctx.Parameters["workspace"])
+	if workspaceID == "" {
+		return nil, fmt.Errorf("workspace is required")
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	namespaces, err := client.ListRuleGroupsNamespaces(workspaceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list Prometheus rule groups namespaces: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(namespaces))
+	for _, namespace := range namespaces {
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: namespace.Name,
+			ID:   namespace.Name,
+		})
+	}
+
+	return resources, nil
+}

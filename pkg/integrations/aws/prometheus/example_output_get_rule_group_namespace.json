@@ -1,0 +1,20 @@
+{
+  "data": {
+    "namespace": {
+      "arn": "arn:aws:aps:us-east-1:123456789012:rulegroupsnamespace/ws-11111111-1111-4111-8111-111111111111/example-alerts",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "data": "groups:\n  - name: example-alerts\n    rules:\n      - alert: HighErrorRate\n        expr: rate(http_requests_total{status=\"500\"}[5m]) > 0.05\n        for: 5m\n        labels:\n          severity: critical\n        annotations:\n          summary: High error rate detected\n",
+      "modifiedAt": "2026-01-01T00:00:00Z",
+      "name": "example-alerts",
+      "status": {
+        "statusCode": "ACTIVE"
+      },
+      "tags": {
+        "environment": "example"
+      }
+    },
+    "workspaceId": "ws-11111111-1111-4111-8111-111111111111"
+  },
+  "timestamp": "2026-01-01T00:05:00.000000000Z",
+  "type": "aws.prometheus.ruleGroupNamespace"
+}

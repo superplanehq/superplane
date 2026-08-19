@@ -8,30 +8,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
-	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 func Test__DeleteCanvas(t *testing.T) {
 	r := support.Setup(t)
-
-	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		_, err := DeleteCanvas(context.Background(), r.Registry, r.Organization.ID, uuid.New().String())
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, code)
-	})
-
-	t.Run("invalid canvas id -> error", func(t *testing.T) {
-		_, err := DeleteCanvas(context.Background(), r.Registry, r.Organization.ID, "invalid-id")
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, code)
-	})
 
 	t.Run("canvas is soft deleted, data remains until cleanup", func(t *testing.T) {
 		//
@@ -77,10 +61,12 @@ func Test__DeleteCanvas(t *testing.T) {
 		support.VerifyNodeExecutionsCount(t, canvas.ID, 1)
 		support.VerifyNodeQueueCount(t, canvas.ID, 1)
 
+		originalName := canvas.Name
+
 		//
 		// Delete the canvas (soft delete).
 		//
-		_, err = DeleteCanvas(context.Background(), r.Registry, r.Organization.ID, canvas.ID.String())
+		_, err = DeleteCanvas(context.Background(), database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 
 		//
@@ -97,7 +83,7 @@ func Test__DeleteCanvas(t *testing.T) {
 
 		// Verify the name has been updated with deleted timestamp suffix
 		assert.Contains(t, canvasUnscoped.Name, "(deleted-")
-		assert.NotEqual(t, canvas.Name, canvasUnscoped.Name)
+		assert.NotEqual(t, originalName, canvasUnscoped.Name)
 
 		// Associated data should still exist (cleanup worker handles this)
 		nodes, err = models.FindCanvasNodes(canvas.ID)
@@ -144,7 +130,7 @@ func Test__DeleteCanvas(t *testing.T) {
 		//
 		// Delete the canvas (soft delete).
 		//
-		_, err := DeleteCanvas(context.Background(), r.Registry, r.Organization.ID, canvas.ID.String())
+		_, err := DeleteCanvas(context.Background(), database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 
 		//

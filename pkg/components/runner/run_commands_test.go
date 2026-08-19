@@ -384,7 +384,7 @@ func TestValidateEnvironment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := validateEnvironment(tt.environment)
+			err := ValidateEnvironment(tt.environment)
 			if tt.errContains == "" {
 				require.NoError(t, err)
 				return
@@ -410,6 +410,10 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 	component := &Runner{}
 
 	err := component.Execute(core.ExecutionContext{
+		WorkflowID:     "canvas-1",
+		OrganizationID: "org-1",
+		CanvasName:     "release-train",
+		NodeName:       "Run commands",
 		Configuration: map[string]any{
 			"machine_type": testRunnerMachineType,
 			"commands":     "echo hello",
@@ -448,6 +452,12 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 	assert.Equal(t, testRunnerMachineType, req.FleetID)
 	assert.Equal(t, []BrokerCommand{{Command: "echo hello"}}, req.Commands)
 	assert.Equal(t, config.MaxWebhookPayloadSize, req.WebhookPayloadSizeLimit)
+	assert.Equal(t, map[string]string{
+		"canvas_id":       "canvas-1",
+		"organization_id": "org-1",
+		"canvas_name":     "release-train",
+		"node_name":       "Run commands",
+	}, req.Labels)
 }
 
 func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {
@@ -556,7 +566,7 @@ func TestRunnerProcessTaskStatusIncludesResult(t *testing.T) {
 		ExitCode: &exit,
 		Result:   json.RawMessage(`{"items":[1,2],"ok":true}`),
 	}
-	require.NoError(t, (&Runner{}).processTaskStatus(state, task))
+	require.NoError(t, (&Runner{}).processTaskStatus(state, task, ""))
 	require.Equal(t, PassedOutputChannel, state.Channel)
 
 	wrapped := state.Payloads[0].(map[string]any)
@@ -578,7 +588,7 @@ func TestRunnerProcessTaskStatusOmitsInvalidResult(t *testing.T) {
 		ExitCode: &exit,
 		Result:   json.RawMessage(`not-json`),
 	}
-	require.NoError(t, (&Runner{}).processTaskStatus(state, task))
+	require.NoError(t, (&Runner{}).processTaskStatus(state, task, ""))
 	wrapped := state.Payloads[0].(map[string]any)
 	data := wrapped["data"].(map[string]any)
 	_, ok := data["result"]
@@ -594,7 +604,7 @@ func TestRunnerProcessTaskStatusCanceledUsesFailedChannel(t *testing.T) {
 		Status:   "canceled",
 		ExitCode: &exit,
 	}
-	require.NoError(t, (&Runner{}).processTaskStatus(state, task))
+	require.NoError(t, (&Runner{}).processTaskStatus(state, task, ""))
 	require.Equal(t, FailedOutputChannel, state.Channel)
 }
 

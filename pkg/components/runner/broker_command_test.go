@@ -11,10 +11,10 @@ import (
 func TestBrokerCommandJSONRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	t.Run("unnamed command marshals as a plain string", func(t *testing.T) {
+	t.Run("unnamed command marshals as an object", func(t *testing.T) {
 		b, err := json.Marshal(BrokerCommand{Command: "echo hi"})
 		require.NoError(t, err)
-		assert.JSONEq(t, `"echo hi"`, string(b))
+		assert.JSONEq(t, `{"command":"echo hi"}`, string(b))
 
 		var got BrokerCommand
 		require.NoError(t, json.Unmarshal(b, &got))

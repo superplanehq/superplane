@@ -77,34 +77,35 @@ func Test__NodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeStateReady, node.State)
 
-	queueItems, err := models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, queueItems, 1)
 
 	//
 	// Process the node and verify the happy path:
-	// - Pending execution is created
-	// - Node state is updated to processing
+	// - Pending execution is created, stamped with the implicit queue name
 	// - Queue item is deleted
 	//
 	err = worker.LockAndProcessNode(logger, *node, time.Now())
 	require.NoError(t, err)
 
 	// Verify execution was created with pending state
-	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	executions, err := models.ListNodeExecutions(database.Conn(), canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, executions, 1)
 	assert.Equal(t, models.CanvasNodeExecutionStatePending, executions[0].State)
 	assert.Equal(t, rootEvent.ID, executions[0].EventID)
 	assert.Equal(t, rootEvent.ID, executions[0].RootEventID)
+	require.NotNil(t, executions[0].QueueName)
+	assert.Equal(t, componentNode, *executions[0].QueueName)
 
-	// Verify node state was updated to processing
+	// Node state no longer flips to a processing state
 	node, err = models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
 	require.NoError(t, err)
-	assert.Equal(t, models.CanvasNodeStateProcessing, node.State)
+	assert.Equal(t, models.CanvasNodeStateReady, node.State)
 
 	// Verify queue item was deleted
-	queueItems, err = models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
+	queueItems, err = models.ListNodeQueueItems(database.Conn(), canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, queueItems, 0)
 
@@ -147,7 +148,7 @@ func Test__NodeQueueWorker_DoesNotProcessQueueForSoftDeletedOrganization(t *test
 
 	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
 
-	nodes, err := models.ListCanvasNodesReady()
+	nodes, err := models.ListCanvasNodesReady(database.Conn())
 	require.NoError(t, err)
 	for _, node := range nodes {
 		assert.False(t, node.WorkflowID == canvas.ID && node.NodeID == componentNode)
@@ -158,11 +159,11 @@ func Test__NodeQueueWorker_DoesNotProcessQueueForSoftDeletedOrganization(t *test
 
 	require.NoError(t, worker.LockAndProcessNode(logger, *node, time.Now()))
 
-	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	executions, err := models.ListNodeExecutions(database.Conn(), canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	assert.Empty(t, executions)
 
-	queueItems, err := models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, queueItems, 1)
 
@@ -266,13 +267,13 @@ func Test__NodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the execution was created with the oldest event
-	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	executions, err := models.ListNodeExecutions(database.Conn(), canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, executions, 1)
 	assert.Equal(t, oldEvent.ID, executions[0].EventID)
 
 	// Verify the oldest queue item was deleted, but the other two remain
-	queueItems, err := models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, queueItems, 2)
 
@@ -332,7 +333,7 @@ func Test__NodeQueueWorker_EmptyQueue(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify no executions were created
-	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	executions, err := models.ListNodeExecutions(database.Conn(), canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, executions, 0)
 
@@ -416,14 +417,14 @@ func Test__NodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	// Verify only one execution was created (not two).
 	// This proves that only one worker actually processed the node.
 	//
-	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	executions, err := models.ListNodeExecutions(database.Conn(), canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, executions, 1, "Only one execution should be created, not two")
 
 	//
 	// Verify the queue item was deleted.
 	//
-	queueItems, err := models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, queueItems, 0, "Queue item should be deleted")
 
@@ -487,7 +488,7 @@ func Test__NodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeStateReady, node.State)
 
-	queueItems, err := models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, queueItems, 1)
 
@@ -501,7 +502,7 @@ func Test__NodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify execution was created with finished state and failed result
-	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	executions, err := models.ListNodeExecutions(database.Conn(), canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, executions, 1)
 	assert.Equal(t, models.CanvasNodeExecutionStateFinished, executions[0].State)
@@ -518,7 +519,7 @@ func Test__NodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 	assert.Equal(t, models.CanvasNodeStateReady, node.State)
 
 	// Verify queue item was deleted
-	queueItems, err = models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
+	queueItems, err = models.ListNodeQueueItems(database.Conn(), canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, queueItems, 0)
 
@@ -581,17 +582,13 @@ func Test__NodeQueueWorker_ProcessesNextQueueItemOnExecutionFinished(t *testing.
 	//
 	require.NoError(t, worker.LockAndProcessNode(logger, *node, time.Now()))
 
-	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	executions, err := models.ListNodeExecutions(database.Conn(), canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, executions, 1)
 	require.Equal(t, oldEvent.ID, executions[0].EventID)
 	require.Equal(t, models.CanvasNodeExecutionStatePending, executions[0].State)
 
-	node, err = models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
-	require.NoError(t, err)
-	assert.Equal(t, models.CanvasNodeStateProcessing, node.State)
-
-	queueItems, err := models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(database.Conn(), canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, queueItems, 1)
 	assert.Equal(t, newEvent.ID, queueItems[0].EventID)
@@ -620,13 +617,13 @@ func Test__NodeQueueWorker_ProcessesNextQueueItemOnExecutionFinished(t *testing.
 
 	require.NoError(t, worker.ConsumeExecutionFinished(tackle.NewFakeDelivery(finishedMessage)))
 
-	executions, err = models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	executions, err = models.ListNodeExecutions(database.Conn(), canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, executions, 2)
 	assert.Equal(t, newEvent.ID, executions[0].EventID)
 	assert.Equal(t, models.CanvasNodeExecutionStatePending, executions[0].State)
 
-	queueItems, err = models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
+	queueItems, err = models.ListNodeQueueItems(database.Conn(), canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Empty(t, queueItems)
 }
@@ -693,7 +690,7 @@ func Test__NodeQueueWorker_DeferredQueueItemDoesNotPublishConsumed(t *testing.T)
 	require.NoError(t, err)
 	assert.Equal(t, queueItem.ID, storedQueueItem.ID)
 
-	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	executions, err := models.ListNodeExecutions(database.Conn(), canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	assert.Empty(t, executions)
 
@@ -769,7 +766,7 @@ func Test__NodeQueueWorker_SkipsQueueItemForCancellingRun(t *testing.T) {
 	err = worker.LockAndProcessNode(logger, *node, time.Now())
 	require.NoError(t, err)
 
-	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	executions, err := models.ListNodeExecutions(database.Conn(), canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	assert.Empty(t, executions)
 
@@ -853,7 +850,7 @@ func Test__NodeQueueWorker_SkipsConfigurationErrorQueueItemForCancellingRun(t *t
 	err = worker.LockAndProcessNode(logger, *node, time.Now())
 	require.NoError(t, err)
 
-	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	executions, err := models.ListNodeExecutions(database.Conn(), canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	assert.Empty(t, executions)
 

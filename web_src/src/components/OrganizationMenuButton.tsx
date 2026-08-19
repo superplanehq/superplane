@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import {
   ArrowRightLeft,
   CircleUser,
+  Factory,
   Gauge,
   Key,
   KeyRound,
@@ -20,7 +21,7 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/usePermissions";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
@@ -29,6 +30,8 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { posthog } from "@/posthog";
 import { ThemePreferenceControl } from "@/components/ThemePreferenceControl";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 
 interface OrganizationMenuButtonProps {
   organizationId?: string;
@@ -39,6 +42,8 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
   const { account } = useAccount();
   const { data: organization } = useOrganization(organizationId || "");
   const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const factoriesEnabled = hasExperimentalFeature(FEATURE_FACTORIES);
   const canReadOrg = permissionsLoading || canAct("org", "read");
   const { data: usageStatus, error: usageError } = useOrganizationUsage(
     organizationId || "",
@@ -102,6 +107,16 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
   ];
 
   const sidebarOrganizationLinks = [
+    ...(factoriesEnabled
+      ? [
+          {
+            label: "Workspaces",
+            href: organizationId ? `/${organizationId}/workspaces` : "#",
+            Icon: Factory,
+            permission: { resource: "factories", action: "read" },
+          },
+        ]
+      : []),
     {
       label: "Settings",
       href: organizationId ? `/${organizationId}/settings/general` : "#",

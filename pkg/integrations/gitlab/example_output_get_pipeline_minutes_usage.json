@@ -1,0 +1,30 @@
+{
+  "data": {
+    "month": "July",
+    "monthIso8601": "2026-07-01",
+    "minutes": 245,
+    "sharedRunnersDuration": 14700,
+    "projects": [
+      {
+        "minutes": 180,
+        "sharedRunnersDuration": 10800,
+        "project": {
+          "id": "gid://gitlab/Project/80508544",
+          "name": "hello-world",
+          "fullPath": "felixgateru/hello-world"
+        }
+      },
+      {
+        "minutes": 65,
+        "sharedRunnersDuration": 3900,
+        "project": {
+          "id": "gid://gitlab/Project/80508999",
+          "name": "another-project",
+          "fullPath": "felixgateru/another-project"
+        }
+      }
+    ]
+  },
+  "timestamp": "2026-07-01T00:00:00.000000000Z",
+  "type": "gitlab.pipelineMinutesUsage"
+}

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -64,6 +63,8 @@ The expression has access to:
 - **$**: The run context data
 - **root()**: Access to the root event data
 - **previous()**: Access to previous node outputs (optionally with depth parameter)
+- **app()**: Access to the current app's metadata — ` + "`app().id`" + `, ` + "`app().name`" + `, ` + "`app().description`" + `, and ` + "`app().url`" + `
+- **run()**: Access to the current run's metadata — ` + "`run().id`" + `, ` + "`run().url`" + ` (a direct link to the run in the SuperPlane UI), and ` + "`run().started_at`" + ` (a timestamp)
 
 ## Examples
 
@@ -133,10 +134,6 @@ func (f *If) Execute(ctx core.ExecutionContext) error {
 
 func (f *If) Setup(ctx core.SetupContext) error {
 	return nil
-}
-
-func (f *If) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (f *If) Cancel(ctx core.ExecutionContext) error {

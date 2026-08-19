@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -51,7 +50,7 @@ func (c *SendTextMessage) Documentation() string {
 ## Configuration
 
 - **Channel**: Select the Slack channel to send the message to
-- **Text**: The message text to send (supports expressions and Slack markdown formatting)
+- **Text**: The message text to send (supports expressions and Slack markdown formatting). For example, link to the current run with ` + "`{{ app().name }} deploy started: <{{ run().url }}|view run>`" + `.
 
 ## Output
 
@@ -130,10 +129,6 @@ func (c *SendTextMessage) Setup(ctx core.SetupContext) error {
 	}
 
 	return ctx.Metadata.Set(metadata)
-}
-
-func (c *SendTextMessage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *SendTextMessage) Execute(ctx core.ExecutionContext) error {

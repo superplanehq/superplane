@@ -170,7 +170,7 @@ service Canvases {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe canvas version";
-      description: "Returns one canvas version by ID";
+      description: "Returns one canvas version by ID, including its workflow spec";
       tags: "CanvasVersion";
     };
   }
@@ -401,6 +401,8 @@ message UpdateCanvasRequest {
   string id = 1;
   optional string name = 2;
   optional string description = 3;
+  // When set, appends this id to the canvas's dismissed Agent suggestion ids.
+  optional string dismiss_agent_suggestion_id = 4;
 }
 
 message UpdateCanvasResponse {
@@ -419,6 +421,7 @@ message UpdateCanvasPreferenceResponse {
 message CreateCanvasRequest {
   string name = 1;
   string description = 2;
+  optional string factory_id = 3;
 }
 
 message CreateCanvasResponse {
@@ -507,7 +510,7 @@ message ListCanvasVersionsRequest {
 }
 
 message ListCanvasVersionsResponse {
-  repeated CanvasVersion versions = 1;
+  repeated CanvasVersion.Metadata versions = 1;
   uint32 total_count = 2;
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;
@@ -568,6 +571,7 @@ message CanvasSummary {
   repeated Components.Edge edges = 9;
   bool starred = 10;
   google.protobuf.Timestamp starred_at = 11;
+  string factory_id = 12;
 }
 
 message CanvasPreference {
@@ -586,6 +590,9 @@ message Canvas {
     google.protobuf.Timestamp updated_at = 6;
     UserRef created_by = 7;
     string folder_id = 8;
+    string live_version_id = 9;
+    repeated string dismissed_agent_suggestion_ids = 10;
+    string factory_id = 11;
   }
 
   message Spec {

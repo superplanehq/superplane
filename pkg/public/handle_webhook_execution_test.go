@@ -29,6 +29,9 @@ func Test__HandleWebhook_PublishesExecutionStateForFinalizedExecution(t *testing
 	const actionName = "dummy-webhook-action"
 	const taskID = "task-123"
 
+	// Usage metering (publishRunnerUsage) silently skips when the webhook
+	// execution context has no organization ID, so capture it for assertion.
+	var seenOrganizationID string
 	r.Registry.Actions[actionName] = impl.NewDummyAction(impl.DummyActionOptions{
 		Name: actionName,
 		HandleWebhookFunc: func(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
@@ -36,6 +39,8 @@ func Test__HandleWebhook_PublishesExecutionStateForFinalizedExecution(t *testing
 			if err != nil {
 				return http.StatusNotFound, nil, nil
 			}
+
+			seenOrganizationID = execCtx.OrganizationID
 
 			if err := execCtx.ExecutionState.Pass(); err != nil {
 				return http.StatusInternalServerError, nil, err
@@ -123,6 +128,10 @@ func Test__HandleWebhook_PublishesExecutionStateForFinalizedExecution(t *testing
 		body:   []byte(`{"ok": true}`),
 	})
 	require.Equal(t, http.StatusOK, response.Code)
+
+	// The webhook execution context carries the organization ID (runner usage
+	// metering depends on it).
+	assert.Equal(t, r.Organization.ID.String(), seenOrganizationID)
 
 	// The execution is finished in the DB...
 	updated, err := models.FindNodeExecution(canvas.ID, execution.ID)

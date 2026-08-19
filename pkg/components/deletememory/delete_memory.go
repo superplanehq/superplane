@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -246,10 +245,6 @@ func extractFieldNames(matchList []MatchPair) []string {
 		fields = append(fields, name)
 	}
 	return fields
-}
-
-func (c *DeleteMemory) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *DeleteMemory) Cancel(ctx core.ExecutionContext) error {

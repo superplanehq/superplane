@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { makeCanvas } from "@/test/factories";
 
-import { resolveCanvasForView, shouldSyncLoadedVersionToCanvasDetail } from "./resolve-canvas-for-view";
+import {
+  resolveCanvasForView,
+  shouldSyncLoadedVersionToCanvasDetail,
+  isHistoricalVersionSpecLoading,
+} from "./resolve-canvas-for-view";
 
 describe("resolveCanvasForView", () => {
   const liveCanvas = makeCanvas({
@@ -69,6 +73,66 @@ describe("resolveCanvasForView", () => {
     });
 
     expect(canvas?.spec).toEqual(historicalSpec);
+  });
+});
+
+describe("isHistoricalVersionSpecLoading", () => {
+  it("returns false for the live version", () => {
+    expect(
+      isHistoricalVersionSpecLoading({
+        activeCanvasVersionId: "live-version",
+        liveCanvasVersionId: "live-version",
+        shouldReadStagedCanvasVersion: false,
+        loadedCanvasVersion: null,
+        loadedCanvasVersionLoading: true,
+        loadedCanvasVersionFetching: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("returns true while the selected historical version spec is loading", () => {
+    expect(
+      isHistoricalVersionSpecLoading({
+        activeCanvasVersionId: "old-version",
+        liveCanvasVersionId: "live-version",
+        shouldReadStagedCanvasVersion: false,
+        loadedCanvasVersion: null,
+        loadedCanvasVersionLoading: true,
+        loadedCanvasVersionFetching: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false once the matching historical spec has loaded", () => {
+    expect(
+      isHistoricalVersionSpecLoading({
+        activeCanvasVersionId: "old-version",
+        liveCanvasVersionId: "live-version",
+        shouldReadStagedCanvasVersion: false,
+        loadedCanvasVersion: {
+          metadata: { id: "old-version" },
+          spec: { nodes: [], edges: [] },
+        },
+        loadedCanvasVersionLoading: false,
+        loadedCanvasVersionFetching: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("returns true while a stale loaded version still belongs to another selection", () => {
+    expect(
+      isHistoricalVersionSpecLoading({
+        activeCanvasVersionId: "new-version",
+        liveCanvasVersionId: "live-version",
+        shouldReadStagedCanvasVersion: false,
+        loadedCanvasVersion: {
+          metadata: { id: "old-version" },
+          spec: { nodes: [], edges: [] },
+        },
+        loadedCanvasVersionLoading: false,
+        loadedCanvasVersionFetching: false,
+      }),
+    ).toBe(true);
   });
 });
 

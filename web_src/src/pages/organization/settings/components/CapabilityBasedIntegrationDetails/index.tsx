@@ -11,7 +11,7 @@ import { Header } from "./Header";
 import { IntegrationTabs } from "./IntegrationTabs";
 import { useIntegrationDetailsState } from "./useIntegrationDetailsState";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 
 interface CapabilityBasedIntegrationDetailsProps {
   organizationId: string;

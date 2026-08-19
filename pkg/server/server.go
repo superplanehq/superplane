@@ -18,6 +18,7 @@ import (
 	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/git"
@@ -277,6 +278,13 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_FACTORY_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Factory Cleanup Worker")
+
+		w := workers.NewFactoryCleanupWorker()
+		go w.Start(context.Background())
+	}
+
 	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
 		log.Println("Starting Agent Stream Worker")
 		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{
@@ -334,6 +342,10 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	log.Println("Starting Magic Code Email Consumer")
 	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
 	go magicCodeEmailConsumer.Start()
+
+	log.Println("Starting Factory Notification Consumer")
+	factoryNotificationConsumer := workers.NewFactoryNotificationConsumer(rabbitMQURL, emailService, baseURL)
+	go factoryNotificationConsumer.Start()
 }
 
 func buildGRPCServices(
@@ -412,14 +424,23 @@ func startPublicAPI(
 		log.Println("Event Distributer not started (START_EVENT_DISTRIBUTER != yes)")
 	}
 
-	log.Println("Registering gRPC gateway handlers on Public API")
-
-	err = server.RegisterGRPCGateway(grpcServices)
-	if err != nil {
-		log.Fatalf("Failed to register gRPC gateway: %v", err)
+	if shouldRegisterGRPCGateway() {
+		log.Println("Registering gRPC gateway handlers on Public API")
+		err = server.RegisterGRPCGateway(grpcServices)
+		if err != nil {
+			log.Fatalf("Failed to register gRPC gateway: %v", err)
+		}
+		server.RegisterOpenAPIHandler()
+	} else {
+		log.Println("gRPC gateway not registered (START_GRPC_GATEWAY=no)")
 	}
 
-	server.RegisterOpenAPIHandler()
+	if shouldRegisterWebSocketRoutes() {
+		log.Println("Registering websocket routes on Public API")
+		server.RegisterWebSocketRoutes()
+	} else {
+		log.Println("Websocket routes not registered")
+	}
 
 	// Register web routes only if START_WEB_SERVER is set to "yes"
 	if os.Getenv("START_WEB_SERVER") == "yes" {
@@ -434,6 +455,26 @@ func startPublicAPI(
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+// shouldRegisterWebSocketRoutes decides whether /ws routes are mounted.
+// START_WEBSOCKET_SERVER=yes|no is explicit; unset keeps single-process
+// compat by following START_WEB_SERVER.
+func shouldRegisterWebSocketRoutes() bool {
+	switch os.Getenv("START_WEBSOCKET_SERVER") {
+	case "yes":
+		return true
+	case "no":
+		return false
+	default:
+		return os.Getenv("START_WEB_SERVER") == "yes"
+	}
+}
+
+// shouldRegisterGRPCGateway registers the REST gateway unless explicitly disabled.
+// Unset defaults to on so existing deployments keep current behavior.
+func shouldRegisterGRPCGateway() bool {
+	return os.Getenv("START_GRPC_GATEWAY") != "no"
 }
 
 func lookupPublicAPIPort() int {
@@ -557,7 +598,6 @@ func Start() {
 		panic("OIDC_KEYS_PATH must be set")
 	}
 
-	appEnv := os.Getenv("APP_ENV")
 	jwtSigner := jwt.NewSigner(jwtSecret)
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
 	oidcProvider, err := oidc.NewProviderFromKeyDir(webhooksBaseURL, oidcKeysPath)
@@ -573,7 +613,6 @@ func Start() {
 
 	registry, err := registry.NewRegistryWithOptions(registry.RegistryOptions{
 		Encryptor: encryptorInstance,
-		AppEnv:    appEnv,
 		HTTP: registry.HTTPOptions{
 			MaxResponseBytes: DefaultMaxHTTPResponseBytes,
 			PolicyResolver: func() (registry.HTTPPolicy, error) {
@@ -607,6 +646,14 @@ func Start() {
 	}
 
 	agentProvider, agentService := buildAgentService(authService)
+
+	runnerUsageService, err := usage.NewServiceFromEnv()
+	if err != nil {
+		log.Fatalf("failed to initialize usage service for runner limits: %v", err)
+	}
+	runner.SetRunnerMinutesLimitChecker(func(organizationID string) error {
+		return usage.EnsureCanStartRunnerTask(context.Background(), runnerUsageService, organizationID)
+	})
 
 	var grpcServices *grpc.Services
 	if os.Getenv("START_PUBLIC_API") == "yes" {

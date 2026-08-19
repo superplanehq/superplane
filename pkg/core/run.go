@@ -16,7 +16,6 @@ const (
 type RunExecutionContext interface {
 	Create(params RunCreationParams) (*Run, error)
 	Cancel() error
-	AssignOutput(output map[string]any) error
 	AddError(message string) error
 }
 

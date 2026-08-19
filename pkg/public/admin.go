@@ -316,6 +316,7 @@ func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
 		Name              string  `json:"name"`
 		Email             string  `json:"email"`
 		InstallationAdmin bool    `json:"installation_admin"`
+		Blocked           bool    `json:"blocked"`
 		CreatedAt         *string `json:"created_at,omitempty"`
 	}
 
@@ -326,6 +327,7 @@ func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
 			Name:              a.Name,
 			Email:             a.Email,
 			InstallationAdmin: a.IsInstallationAdmin(),
+			Blocked:           a.IsBlocked(),
 		}
 
 		if a.CreatedAt != nil {
@@ -502,6 +504,10 @@ func (s *Server) startImpersonation(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Account not found", http.StatusNotFound)
 		return
 	}
+	if target.IsBlocked() {
+		http.Error(w, "Cannot impersonate a blocked account", http.StatusBadRequest)
+		return
+	}
 
 	token, err := impersonation.GenerateToken(s.jwt, admin.ID.String(), target.ID.String())
 	if err != nil {
@@ -586,15 +592,18 @@ func (s *Server) impersonationStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userName := ""
-	if target, err := models.FindAccountByID(claims.ImpersonatedAccountID); err == nil {
-		userName = target.Name
+	target, err := models.FindAccountByID(claims.ImpersonatedAccountID)
+	if err != nil || target.IsBlocked() {
+		impersonation.ClearCookie(w, r)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"active": false})
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"active":           true,
-		"user_name":        userName,
+		"user_name":        target.Name,
 		"admin_account_id": claims.AdminAccountID,
 	})
 }
@@ -673,6 +682,87 @@ func (s *Server) demoteAdmin(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "demoted"})
+}
+
+// blocks an account and invalidates its sessions and credentials.
+func (s *Server) blockAccount(w http.ResponseWriter, r *http.Request) {
+	admin, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	targetID := mux.Vars(r)["accountId"]
+	if admin.ID.String() == targetID {
+		http.Error(w, "Cannot block yourself", http.StatusBadRequest)
+		return
+	}
+
+	target, err := models.FindAccountByID(targetID)
+	if err != nil {
+		http.Error(w, "Account not found", http.StatusNotFound)
+		return
+	}
+
+	if err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+		return target.Block(tx, time.Now())
+	}); err != nil {
+		log.Errorf("admin: failed to block %s: %v", targetID, err)
+		http.Error(w, "Failed to block account", http.StatusInternalServerError)
+		return
+	}
+
+	log.WithFields(log.Fields{
+		"admin_account_id":  admin.ID.String(),
+		"admin_email":       admin.Email,
+		"target_account_id": target.ID.String(),
+		"target_email":      target.Email,
+		"action":            "block_account",
+		"client_ip":         r.RemoteAddr,
+	}).Info("account blocked")
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "blocked"})
+}
+
+func (s *Server) unblockAccount(w http.ResponseWriter, r *http.Request) {
+	admin, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	targetID := mux.Vars(r)["accountId"]
+	if admin.ID.String() == targetID {
+		http.Error(w, "Cannot unblock yourself", http.StatusBadRequest)
+		return
+	}
+
+	target, err := models.FindAccountByID(targetID)
+	if err != nil {
+		http.Error(w, "Account not found", http.StatusNotFound)
+		return
+	}
+
+	if err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+		return target.Unblock(tx)
+	}); err != nil {
+		log.Errorf("admin: failed to unblock %s: %v", targetID, err)
+		http.Error(w, "Failed to unblock account", http.StatusInternalServerError)
+		return
+	}
+
+	log.WithFields(log.Fields{
+		"admin_account_id":  admin.ID.String(),
+		"admin_email":       admin.Email,
+		"target_account_id": target.ID.String(),
+		"target_email":      target.Email,
+		"action":            "unblock_account",
+		"client_ip":         r.RemoteAddr,
+	}).Info("account unblocked")
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "unblocked"})
 }
 
 // adminEnableOrgExperimentalFeature toggles an experimental feature on for

@@ -12,12 +12,38 @@ const OPTIONS: Array<{ value: ThemePreference; label: string; Icon: typeof Sun }
   { value: "system", label: "System", Icon: Monitor },
 ];
 
-export function ThemePreferenceControl() {
+interface ThemePreferenceControlProps {
+  /** `org` matches organization settings. `workspace` uses workspace sidebar tokens. */
+  variant?: "org" | "workspace";
+}
+
+function toggleButtonClass(isActive: boolean, isWorkspace: boolean) {
+  if (isWorkspace) {
+    return isActive ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground";
+  }
+  return isActive ? SEGMENTED_NAV_TAB_ACTIVE_CLASSES : SEGMENTED_NAV_TAB_INACTIVE_CLASSES;
+}
+
+export function ThemePreferenceControl({ variant = "org" }: ThemePreferenceControlProps) {
   const { preference, setPreference } = useTheme();
+  const isWorkspace = variant === "workspace";
 
   return (
-    <div className={cn("-mx-4 mt-2 border-t px-4 pt-4 pb-3", appDarkModeClasses.sidebarDivider)}>
-      <div className="inline-flex h-8 w-fit gap-1 rounded-full bg-slate-100 p-1 dark:bg-gray-800">
+    <div
+      className={
+        isWorkspace
+          ? "mt-2 flex justify-center border-t border-sidebar-border pt-3"
+          : cn("-mx-4 mt-2 border-t px-4 pt-4 pb-3", appDarkModeClasses.sidebarDivider)
+      }
+    >
+      <div
+        className={cn(
+          "inline-flex h-8 w-fit gap-1 rounded-full p-1",
+          isWorkspace ? "bg-muted" : "bg-slate-100 dark:bg-gray-800",
+        )}
+        role="group"
+        aria-label="Appearance"
+      >
         {OPTIONS.map(({ value, label, Icon }) => {
           const isActive = preference === value;
 
@@ -28,10 +54,11 @@ export function ThemePreferenceControl() {
                   type="button"
                   aria-label={label}
                   aria-pressed={isActive}
+                  data-testid={`theme-preference-${value}`}
                   onClick={() => setPreference(value)}
                   className={cn(
                     "flex size-6 items-center justify-center rounded-full transition-colors",
-                    isActive ? SEGMENTED_NAV_TAB_ACTIVE_CLASSES : SEGMENTED_NAV_TAB_INACTIVE_CLASSES,
+                    toggleButtonClass(isActive, isWorkspace),
                   )}
                 >
                   <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />

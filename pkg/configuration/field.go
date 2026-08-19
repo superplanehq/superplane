@@ -34,6 +34,8 @@ const (
 	FieldTypeAnyPredicateList    = "any-predicate-list"
 	FieldTypeGitRef              = "git-ref"
 	FieldTypeSecretKey           = "secret-key"
+	FieldTypeSecret              = "secret"
+	FieldTypeIntegration         = "integration"
 	FieldTypeApp                 = "app"
 	FieldTypeAppCanvasNode       = "app-canvas-node"
 	FieldTypeRunParameters       = "run-parameters"
@@ -107,6 +109,11 @@ type TypeOptions struct {
 	DateTime         *DateTimeTypeOptions         `json:"dateTime,omitempty"`
 	App              *AppTypeOptions              `json:"app,omitempty"`
 	AppCanvasNode    *AppCanvasNodeTypeOptions    `json:"appCanvasNode,omitempty"`
+	Integration      *IntegrationTypeOptions      `json:"integration,omitempty"`
+}
+
+type IntegrationTypeOptions struct {
+	Integration string `json:"integration"`
 }
 
 type AppTypeOptions struct {
@@ -177,6 +184,9 @@ type TextTypeOptions struct {
 	MaxLength *int `json:"maxLength,omitempty"`
 	// Language is the Monaco editor language id (e.g. "javascript", "python").
 	Language string `json:"language,omitempty"`
+
+	// When false, expressions stay literal and autocomplete is disabled.
+	AllowExpressions *bool `json:"allowExpressions,omitempty"`
 }
 
 /*

@@ -141,10 +141,23 @@ func (a *RunCodeAgent) handleTerminalSession(ctx core.ActionHookContext, client 
 		return a.scheduleNextPoll(ctx, attempt+1, errs)
 	}
 
+	if sm != nil && sm.Err != nil {
+		ctx.Logger.Errorf("Session %s failed: %s", meta.Session.ID, sm.Err.Message)
+		mergeSessionIntoMetadata(meta, sess)
+		_ = ctx.Metadata.Set(*meta)
+		a.teardown(client, meta, false, persist, ctx.Logger.Warnf)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("code agent session failed: %s", sm.Err.Message))
+	}
+
 	out := buildOutput(sess.Status, meta.Session.ID, meta.Branch, sm, meta.PrURL)
 	// Past the poll budget the events may still be unavailable (sm == nil);
 	// emit what we have and only look for artifacts when events were read.
 	if sm != nil {
+		// Only trust structured output once events are confirmed complete —
+		// past the poll budget, LastMessage may not be the real final message.
+		if sm.Complete {
+			applyStructuredOutput(&out, sess.Status, schemaFromConfiguration(ctx.Configuration))
+		}
 		out.Artifacts = runagent.CollectSessionArtifacts(client, meta.Session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
 	}
 	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {

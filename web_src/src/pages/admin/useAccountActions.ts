@@ -4,6 +4,7 @@ interface AdminAccount {
   id: string;
   name: string;
   installation_admin: boolean;
+  blocked?: boolean;
 }
 
 export async function toggleAdmin(acc: AdminAccount, onDone: () => void) {
@@ -15,6 +16,21 @@ export async function toggleAdmin(acc: AdminAccount, onDone: () => void) {
       return;
     }
     showSuccessToast(acc.installation_admin ? `${acc.name} removed as admin` : `${acc.name} promoted to admin`);
+    onDone();
+  } catch {
+    showErrorToast(`Failed to ${action}`);
+  }
+}
+
+export async function toggleBlock(acc: AdminAccount, onDone: () => void) {
+  const action = acc.blocked ? "unblock" : "block";
+  try {
+    const res = await fetch(`/admin/api/accounts/${acc.id}/${action}`, { method: "POST", credentials: "include" });
+    if (!res.ok) {
+      showErrorToast((await res.text()) || `Failed to ${action}`);
+      return;
+    }
+    showSuccessToast(acc.blocked ? `${acc.name} unblocked` : `${acc.name} blocked`);
     onDone();
   } catch {
     showErrorToast(`Failed to ${action}`);

@@ -1,15 +1,110 @@
 {
   "data": {
     "action": "opened",
-    "assignee": null,
     "number": 101,
     "pull_request": {
-      "number": 101,
-      "title": "Add new endpoint",
-      "state": "open",
+      "_links": {
+        "comments": {
+          "href": "https://api.github.com/repos/acme/widgets/issues/101/comments"
+        },
+        "commits": {
+          "href": "https://api.github.com/repos/acme/widgets/pulls/101/commits"
+        },
+        "html": {
+          "href": "https://github.com/acme/widgets/pull/101"
+        },
+        "issue": {
+          "href": "https://api.github.com/repos/acme/widgets/issues/101"
+        },
+        "review_comment": {
+          "href": "https://api.github.com/repos/acme/widgets/pulls/comments{/number}"
+        },
+        "review_comments": {
+          "href": "https://api.github.com/repos/acme/widgets/pulls/101/comments"
+        },
+        "self": {
+          "href": "https://api.github.com/repos/acme/widgets/pulls/101"
+        },
+        "statuses": {
+          "href": "https://api.github.com/repos/acme/widgets/statuses/9c1f3e2a7b6d4c5e8f9a0b1c2d3e4f5a6b7c8d9e"
+        }
+      },
+      "active_lock_reason": null,
+      "assignee": null,
+      "assignees": [],
+      "author_association": "CONTRIBUTOR",
+      "auto_merge": null,
+      "base": {
+        "label": "acme:main",
+        "ref": "main",
+        "sha": "5e6f708192a3b4c5d6e7f8090a1b2c3d4e5f6a7b",
+        "repo": {
+          "full_name": "acme/widgets",
+          "html_url": "https://github.com/acme/widgets",
+          "id": 123456
+        },
+        "user": {
+          "login": "acme",
+          "id": 200001,
+          "html_url": "https://github.com/acme"
+        }
+      },
+      "body": "Adds a new `/status` endpoint for health checks.",
+      "closed_at": null,
+      "comments_url": "https://api.github.com/repos/acme/widgets/issues/101/comments",
+      "commits_url": "https://api.github.com/repos/acme/widgets/pulls/101/commits",
+      "created_at": "2026-01-16T17:50:00Z",
+      "diff_url": "https://github.com/acme/widgets/pull/101.diff",
+      "draft": false,
+      "head": {
+        "label": "octocat:add-status-endpoint",
+        "ref": "add-status-endpoint",
+        "sha": "9c1f3e2a7b6d4c5e8f9a0b1c2d3e4f5a6b7c8d9e",
+        "repo": {
+          "full_name": "acme/widgets",
+          "html_url": "https://github.com/acme/widgets",
+          "id": 123456
+        },
+        "user": {
+          "login": "octocat",
+          "id": 101,
+          "html_url": "https://github.com/octocat"
+        }
+      },
       "html_url": "https://github.com/acme/widgets/pull/101",
+      "id": 987654321,
+      "issue_url": "https://api.github.com/repos/acme/widgets/issues/101",
+      "labels": [
+        {
+          "id": 1362934389,
+          "node_id": "MDU6TGFiZWwxMzYyOTM0Mzg5",
+          "url": "https://api.github.com/repos/acme/widgets/labels/enhancement",
+          "name": "enhancement",
+          "color": "a2eeef",
+          "default": true,
+          "description": "New feature or request"
+        }
+      ],
+      "locked": false,
+      "merge_commit_sha": null,
+      "merged_at": null,
+      "milestone": null,
+      "node_id": "PR_kwDOQ7c2jM7hY2qC",
+      "number": 101,
+      "patch_url": "https://github.com/acme/widgets/pull/101.patch",
+      "requested_reviewers": [],
+      "requested_teams": [],
+      "review_comment_url": "https://api.github.com/repos/acme/widgets/pulls/comments{/number}",
+      "review_comments_url": "https://api.github.com/repos/acme/widgets/pulls/101/comments",
+      "state": "open",
+      "statuses_url": "https://api.github.com/repos/acme/widgets/statuses/9c1f3e2a7b6d4c5e8f9a0b1c2d3e4f5a6b7c8d9e",
+      "title": "Add new endpoint",
+      "updated_at": "2026-01-16T17:50:00Z",
+      "url": "https://api.github.com/repos/acme/widgets/pulls/101",
       "user": {
-        "login": "octocat"
+        "login": "octocat",
+        "id": 101,
+        "html_url": "https://github.com/octocat"
       }
     },
     "repository": {

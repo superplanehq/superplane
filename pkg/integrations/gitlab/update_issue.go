@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -99,11 +98,23 @@ func (c *UpdateIssue) Documentation() string {
 - **Title** (toggle): New title for the issue
 - **Description** (toggle): New description for the issue
 - **State** (toggle): Close or reopen the issue
-- **Labels** (toggle): Labels to set on the issue, replacing any existing labels
+- **Labels to Add** (toggle): Labels to add to the issue, keeping any existing labels
 - **Assignees** (toggle): Users to assign the issue to, replacing any existing assignees
 - **Milestone** (toggle): Milestone to associate with the issue
 
-Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Enabling a field with an empty value clears it - e.g. toggling on Labels or Assignees with nothing selected removes all of them, and toggling on Milestone with nothing selected unassigns the milestone. Title is the exception: GitLab does not allow blank titles, so it must have a value when enabled.
+Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Title is the exception: GitLab does not allow blank titles, so it must have a value when enabled.
+
+### List and reference fields: append vs. replace
+
+These fields behave differently, because GitLab's API exposes them differently:
+
+| Field | Behaviour | Enabled with nothing selected |
+| --- | --- | --- |
+| **Labels to Add** | **Appends** — sent as ` + "`add_labels`" + `, so labels already on the issue are kept | No change |
+| **Assignees** | **Replaces** — sent as ` + "`assignee_ids`" + `, which overwrites the whole list | Clears all assignees |
+| **Milestone** | **Replaces** — a single ` + "`milestone_id`" + ` | Unassigns the milestone |
+
+Because labels only ever append, this component cannot remove a label. Use GitLab's own label controls when you need to take one off.
 
 ## Output
 
@@ -180,11 +191,12 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:      "labels",
-			Label:     "Labels",
-			Type:      configuration.FieldTypeList,
-			Required:  false,
-			Togglable: true,
+			Name:        "labels",
+			Label:       "Labels to Add",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Labels to add to the issue. Existing labels are kept, not replaced.",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Label",
@@ -195,11 +207,12 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:      "assignees",
-			Label:     "Assignees",
-			Type:      configuration.FieldTypeIntegrationResource,
-			Required:  false,
-			Togglable: true,
+			Name:        "assignees",
+			Label:       "Assignees",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Togglable:   true,
+			Description: "Users to assign. Replaces the existing assignees; selecting none clears them.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:  ResourceTypeMember,
@@ -214,11 +227,12 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:      "milestone",
-			Label:     "Milestone",
-			Type:      configuration.FieldTypeIntegrationResource,
-			Required:  false,
-			Togglable: true,
+			Name:        "milestone",
+			Label:       "Milestone",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Togglable:   true,
+			Description: "Milestone to associate. Replaces the existing milestone; selecting none unassigns it.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: ResourceTypeMilestone,
@@ -248,18 +262,8 @@ func (c *UpdateIssue) Setup(ctx core.SetupContext) error {
 		return errors.New("issue IID is required")
 	}
 
-	if config.State != "" && config.State != IssueStateEventClose && config.State != IssueStateEventReopen {
-		return fmt.Errorf("invalid state: %s", config.State)
-	}
-
-	raw, _ := ctx.Configuration.(map[string]any)
-	toggles := newUpdateIssueToggles(raw)
-	if !toggles.hasUpdates() {
-		return errors.New("at least one field must be enabled to update")
-	}
-
-	if toggles.Title && config.Title == "" {
-		return errors.New("title cannot be empty")
+	if err := validateUpdateIssue(ctx.Configuration, config); err != nil {
+		return err
 	}
 
 	return ensureProjectInMetadata(
@@ -275,19 +279,12 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if config.State != "" && config.State != IssueStateEventClose && config.State != IssueStateEventReopen {
-		return fmt.Errorf("invalid state: %s", config.State)
+	if err := validateUpdateIssue(ctx.Configuration, config); err != nil {
+		return err
 	}
 
 	raw, _ := ctx.Configuration.(map[string]any)
 	toggles := newUpdateIssueToggles(raw)
-	if !toggles.hasUpdates() {
-		return errors.New("at least one field must be enabled to update")
-	}
-
-	if toggles.Title && config.Title == "" {
-		return errors.New("title cannot be empty")
-	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
@@ -309,8 +306,8 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if toggles.Labels {
-		labels := strings.Join(config.Labels, ",")
-		req.Labels = &labels
+		addLabels := strings.Join(config.Labels, ",")
+		req.AddLabels = &addLabels
 	}
 
 	if toggles.Assignees {
@@ -351,8 +348,22 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *UpdateIssue) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
+func validateUpdateIssue(rawConfig any, config UpdateIssueConfiguration) error {
+	if config.State != "" && config.State != IssueStateEventClose && config.State != IssueStateEventReopen {
+		return fmt.Errorf("invalid state: %s", config.State)
+	}
+
+	raw, _ := rawConfig.(map[string]any)
+	toggles := newUpdateIssueToggles(raw)
+	if !toggles.hasUpdates() {
+		return errors.New("at least one field must be enabled to update")
+	}
+
+	if toggles.Title && config.Title == "" {
+		return errors.New("title cannot be empty")
+	}
+
+	return nil
 }
 
 func (c *UpdateIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

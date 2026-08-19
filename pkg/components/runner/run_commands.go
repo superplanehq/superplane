@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -173,10 +172,12 @@ func (c *Runner) Configuration() []configuration.Field {
 			Description: "One shell command per line.",
 			TypeOptions: &configuration.TypeOptions{
 				Text: &configuration.TextTypeOptions{
-					Language: "shell",
+					Language:         "shell",
+					AllowExpressions: boolPtr(false),
 				},
 			},
 		},
+		environmentFromConfigurationField(),
 		{
 			Name:        "environment",
 			Label:       "Environment variables",
@@ -258,6 +259,10 @@ func intPtr(v int) *int {
 	return &v
 }
 
+func boolPtr(v bool) *bool {
+	return &v
+}
+
 func (c *Runner) Setup(ctx core.SetupContext) error {
 	spec, err := decodeRunnerSpec(ctx.Configuration)
 	if err != nil {
@@ -272,10 +277,6 @@ func (c *Runner) Setup(ctx core.SetupContext) error {
 	return err
 }
 
-func (c *Runner) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
-
 func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	spec, err := decodeRunnerSpec(ctx.Configuration)
 	if err != nil {
@@ -286,7 +287,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := resolveEnvironment(ctx.Secrets, spec.Environment)
+	environment, err := ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
 		return err
 	}
@@ -297,6 +298,10 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	}
 
 	cmds := normalizeCommands(spec.Commands)
+	if err := ensureRunnerMinutesAvailable(ctx); err != nil {
+		return err
+	}
+
 	broker, err := NewBrokerClient(ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("new broker client: %w", err)
@@ -311,6 +316,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		ExecutionMode:  mode,
 		DockerImage:    resolvedDockerImageRef(spec),
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
+		Labels:         OriginLabelsForTask(ctx),
 	}
 
 	taskID, err := broker.CreateTask(params)
@@ -338,8 +344,8 @@ func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 	return handleBrokerWebhook(ctx, RunnerFinishedEventType)
 }
 
-func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *Task) error {
-	return processBrokerTaskStatus(state, task, RunnerFinishedEventType)
+func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *Task, organizationID string) error {
+	return processBrokerTaskStatus(state, task, RunnerFinishedEventType, organizationID, nil)
 }
 
 func brokerResultAsAny(raw json.RawMessage) any {

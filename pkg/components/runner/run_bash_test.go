@@ -143,9 +143,29 @@ func TestRunBashProcessTaskStatusIncludesResult(t *testing.T) {
 		ExitCode: &exit,
 		Result:   json.RawMessage(`{"ok":true}`),
 	}
-	require.NoError(t, processBrokerTaskStatus(state, task, RunBashFinishedEventType))
+	require.NoError(t, processBrokerTaskStatus(state, task, RunBashFinishedEventType, "", nil))
 	require.Equal(t, PassedOutputChannel, state.Channel)
 
 	wrapped := state.Payloads[0].(map[string]any)
 	assert.Equal(t, RunBashFinishedEventType, wrapped["type"])
+}
+
+func TestRunBashProcessTaskStatusIncludesError(t *testing.T) {
+	t.Parallel()
+
+	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	exit := 1
+	task := &Task{
+		Status:   "failed",
+		ExitCode: &exit,
+		Error:    "runner lost before completion",
+	}
+	require.NoError(t, processBrokerTaskStatus(state, task, RunBashFinishedEventType, "", nil))
+	require.Equal(t, FailedOutputChannel, state.Channel)
+
+	wrapped := state.Payloads[0].(map[string]any)
+	data := wrapped["data"].(map[string]any)
+	assert.Equal(t, "failed", data["status"])
+	assert.Equal(t, 1, data["exit_code"])
+	assert.Equal(t, "runner lost before completion", data["error"])
 }

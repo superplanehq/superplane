@@ -3,7 +3,6 @@ package runner
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -193,10 +192,12 @@ func (c *RunBash) Configuration() []configuration.Field {
 			Description: "Bash executed by the runner. Write JSON to SUPERPLANE_RESULT_FILE; read upstream data from SUPERPLANE_PAYLOAD_FILE.",
 			TypeOptions: &configuration.TypeOptions{
 				Text: &configuration.TextTypeOptions{
-					Language: "shell",
+					Language:         "shell",
+					AllowExpressions: boolPtr(false),
 				},
 			},
 		},
+		environmentFromConfigurationField(),
 		{
 			Name:        "environment",
 			Label:       "Environment variables",
@@ -288,10 +289,6 @@ func (c *RunBash) Setup(ctx core.SetupContext) error {
 	return err
 }
 
-func (c *RunBash) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
-
 func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 	spec, err := decodeRunBashSpec(ctx.Configuration)
 	if err != nil {
@@ -302,7 +299,7 @@ func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := resolveEnvironment(ctx.Secrets, spec.Environment)
+	environment, err := ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
 		return err
 	}
@@ -314,6 +311,10 @@ func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 
 	messageChain, err := messageChainJSON(ctx.Expressions)
 	if err != nil {
+		return err
+	}
+
+	if err := ensureRunnerMinutesAvailable(ctx); err != nil {
 		return err
 	}
 
@@ -339,6 +340,7 @@ func (c *RunBash) Execute(ctx core.ExecutionContext) error {
 		ExecutionMode:  mode,
 		DockerImage:    resolvedRunBashDockerImageRef(spec),
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
+		Labels:         OriginLabelsForTask(ctx),
 	}
 
 	taskID, err := broker.CreateTask(params)

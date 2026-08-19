@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	defaultRootVolumeSizeGiB  = 8
+	defaultVolumeSizeGiB      = 8
 	defaultRootVolumeType     = "gp3"
 	defaultWaitTimeoutSeconds = 300
 	maxWaitTimeoutSeconds     = 1800
@@ -26,6 +26,7 @@ const (
 	securityGroupModeExisting = "existing"
 	createInstanceCreated     = "created"
 	createInstanceFailed      = "failed"
+	volumeIopsDescription     = "Provisioned IOPS for io1 or io2 volume types"
 )
 
 var rootVolumeTypeOptions = []configuration.FieldOption{
@@ -423,7 +424,6 @@ func (c *CreateInstance) Configuration() []configuration.Field {
 			Label:       "Configure Root Volume",
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
-			Togglable:   true,
 			Default:     false,
 			Description: "Override the AMI root volume size and type",
 		},
@@ -443,7 +443,7 @@ func (c *CreateInstance) Configuration() []configuration.Field {
 			Label:       "Volume Size (GiB)",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
-			Default:     defaultRootVolumeSizeGiB,
+			Default:     defaultVolumeSizeGiB,
 			Description: "Root volume size in GiB",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "configureRootVolume", Values: []string{"true"}},
@@ -481,7 +481,7 @@ func (c *CreateInstance) Configuration() []configuration.Field {
 			Label:       "Volume IOPS",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
-			Description: "Provisioned IOPS for io1 or io2 volume types. io1 minimum 100, maximum 64000; io2 minimum 100, maximum 256000.",
+			Description: volumeIopsDescription,
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "configureRootVolume", Values: []string{"true"}},
 				{Field: "volumeType", Values: []string{"io1", "io2"}},
@@ -693,7 +693,7 @@ func (c *CreateInstance) Execute(ctx core.ExecutionContext) error {
 
 		volumeSize := config.VolumeSizeGiB
 		if volumeSize < 1 {
-			volumeSize = defaultRootVolumeSizeGiB
+			volumeSize = defaultVolumeSizeGiB
 		}
 
 		volumeType := strings.TrimSpace(config.VolumeType)
@@ -852,10 +852,6 @@ func (c *CreateInstance) poll(ctx core.ActionHookContext) error {
 		}
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, instancePollInterval)
 	}
-}
-
-func (c *CreateInstance) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateInstance) Cancel(ctx core.ExecutionContext) error {
@@ -1074,6 +1070,7 @@ func blockDeviceFieldSchema() []configuration.Field {
 			Label:       "Volume Size (GiB)",
 			Type:        configuration.FieldTypeNumber,
 			Required:    true,
+			Default:     defaultVolumeSizeGiB,
 			TypeOptions: &configuration.TypeOptions{Number: &configuration.NumberTypeOptions{Min: intPtr(1)}},
 		},
 		{
@@ -1091,7 +1088,7 @@ func blockDeviceFieldSchema() []configuration.Field {
 			Label:       "Volume IOPS",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
-			Description: "Provisioned IOPS for io1 or io2 volume types",
+			Description: volumeIopsDescription,
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "volumeType", Values: []string{"io1", "io2"}},
 			},

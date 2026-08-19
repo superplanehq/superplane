@@ -50,6 +50,53 @@ func findProject(projects []Project, projectKey string) (*Project, error) {
 	return nil, fmt.Errorf("project %s not found", projectKey)
 }
 
+func requireOpsTeam(httpCtx core.HTTPContext, integration core.IntegrationContext, teamID string) (*OpsTeam, error) {
+	cloudID, err := cloudIDFromIntegration(integration)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := NewClient(httpCtx, integration)
+	if err != nil {
+		return nil, err
+	}
+
+	teams, err := client.ListOpsTeams(cloudID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, team := range teams {
+		if team.TeamID == teamID {
+			t := team
+			return &t, nil
+		}
+	}
+
+	return nil, fmt.Errorf("team %s not found", teamID)
+}
+
+func requireServiceDesk(httpCtx core.HTTPContext, integration core.IntegrationContext, serviceDeskID string) (*ServiceDesk, error) {
+	client, err := NewClient(httpCtx, integration)
+	if err != nil {
+		return nil, err
+	}
+
+	desks, err := client.ListServiceDesks()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, desk := range desks {
+		if desk.ID == serviceDeskID {
+			d := desk
+			return &d, nil
+		}
+	}
+
+	return nil, fmt.Errorf("service desk %s not found", serviceDeskID)
+}
+
 // CreateIncidentNodeMetadata is stored on create-incident nodes at setup for canvas labels and field mapping.
 type CreateIncidentNodeMetadata struct {
 	ServiceDeskName string `json:"serviceDeskName,omitempty"`
@@ -160,25 +207,9 @@ func applyStatusWithOptions(client *Client, issueKey, status string, opts DoTran
 	)
 }
 
-// resolveCloudID returns the Atlassian cloud id from integration metadata, or fetches it from
-// the site tenant_info endpoint when metadata was not populated (e.g. integrations connected
-// before cloud id was stored during sync).
+// resolveCloudID returns the Atlassian cloud id stored during the OAuth connect flow.
 func resolveCloudID(httpCtx core.HTTPContext, integration core.IntegrationContext) (string, error) {
-	if cloudID, err := cloudIDFromIntegration(integration); err == nil {
-		return cloudID, nil
-	}
-	if httpCtx == nil {
-		return "", fmt.Errorf("integration is missing cloud id; re-sync the Jira integration")
-	}
-	client, err := NewClient(httpCtx, integration)
-	if err != nil {
-		return "", err
-	}
-	cloudID, err := client.FetchCloudID()
-	if err != nil {
-		return "", fmt.Errorf("resolve cloud id: %w", err)
-	}
-	return cloudID, nil
+	return cloudIDFromIntegration(integration)
 }
 
 // heartbeatAlertTagsFromList converts a raw list of any values into a slice of

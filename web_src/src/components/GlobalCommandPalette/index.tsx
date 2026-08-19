@@ -19,7 +19,7 @@ function CommandPaletteDialog({ model }: { model: CommandPaletteModel }) {
       onOpenChange={pageProps.handleOpenChange}
       title="Command Palette"
       description="Search apps, settings, and commands."
-      className="top-[12vh] max-h-[min(760px,80vh)] w-[calc(100vw-2rem)] max-w-3xl translate-y-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-0 shadow-2xl sm:top-[14vh]"
+      className="top-[12vh] max-h-[min(760px,80vh)] w-[calc(100vw-2rem)] max-w-3xl translate-y-0 overflow-hidden rounded-xl border-border bg-popover p-0 text-popover-foreground shadow-2xl sm:top-[14vh]"
       showCloseButton={false}
     >
       <CommandInput

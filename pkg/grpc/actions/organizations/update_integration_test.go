@@ -10,7 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
@@ -57,7 +58,7 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		// Verify integration was updated
 		//
-		integration, err := models.FindIntegrationByName(r.Organization.ID, integrationName)
+		integration, err := models.FindIntegrationByName(database.Conn(), r.Organization.ID, integrationName)
 		require.NoError(t, err)
 		assert.Equal(t, models.IntegrationStateReady, integration.State)
 		assert.Empty(t, integration.StateDescription)
@@ -113,7 +114,7 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		// Verify integration is in error state
 		//
-		integration, err := models.FindIntegrationByName(r.Organization.ID, integrationName)
+		integration, err := models.FindIntegrationByName(database.Conn(), r.Organization.ID, integrationName)
 		require.NoError(t, err)
 		assert.Equal(t, models.IntegrationStateError, integration.State)
 		assert.Contains(t, integration.StateDescription, "sync failed on update")
@@ -180,7 +181,7 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		// Verify all keys are preserved, and only the updated key changed
 		//
-		integration, err := models.FindIntegrationByName(r.Organization.ID, integrationName)
+		integration, err := models.FindIntegrationByName(database.Conn(), r.Organization.ID, integrationName)
 		require.NoError(t, err)
 		config := integration.Configuration.Data()
 		assert.Equal(t, "value1", config["key1"], "key1 should be preserved")
@@ -210,10 +211,10 @@ func Test__UpdateIntegration(t *testing.T) {
 		require.NotNil(t, updateResponse)
 		require.NotNil(t, updateResponse.Integration)
 
-		_, err = models.FindIntegrationByName(r.Organization.ID, integrationName)
+		_, err = models.FindIntegrationByName(database.Conn(), r.Organization.ID, integrationName)
 		require.Error(t, err)
 
-		integration, err := models.FindIntegrationByName(r.Organization.ID, updatedName)
+		integration, err := models.FindIntegrationByName(database.Conn(), r.Organization.ID, updatedName)
 		require.NoError(t, err)
 		assert.Equal(t, updatedName, integration.InstallationName)
 		assert.Equal(t, updatedName, updateResponse.Integration.Metadata.Name)

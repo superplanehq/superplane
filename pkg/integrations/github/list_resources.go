@@ -35,9 +35,15 @@ func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContex
 func toIntegrationResources(repositories []*github.Repository) []core.IntegrationResource {
 	resources := make([]core.IntegrationResource, 0, len(repositories))
 	for _, repo := range repositories {
+		// Prefer owner/repo so consumers like claude.runCodeAgent get a cloneable
+		// repository identifier (short names are ambiguous across owners).
+		name := repo.GetFullName()
+		if name == "" {
+			name = repo.GetName()
+		}
 		resources = append(resources, core.IntegrationResource{
 			Type: "repository",
-			Name: repo.GetName(),
+			Name: name,
 			ID:   fmt.Sprintf("%d", repo.GetID()),
 		})
 	}

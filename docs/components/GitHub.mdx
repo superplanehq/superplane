@@ -52,6 +52,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
   <LinkCard title="Update Issue Comment" href="#update-issue-comment" description="Update an existing comment on a GitHub issue or pull request" />
+  <LinkCard title="Update Pull Request" href="#update-pull-request" description="Update a pull request's title, body, state, base branch, labels, or assignees in a GitHub repository" />
   <LinkCard title="Update Release" href="#update-release" description="Update an existing release in a GitHub repository" />
 </CardGrid>
 
@@ -332,7 +333,6 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 {
   "data": {
     "action": "opened",
-    "assignee": null,
     "issue": {
       "html_url": "https://github.com/acme/widgets/issues/42",
       "number": 42,
@@ -765,6 +765,22 @@ Common expression paths:
 - Head SHA: `root().data.pull_request.head.sha`
 - Review comment body: `root().data.comment.body` (pull_request_review_comment)
 - Review submission body: `root().data.review.body` (pull_request_review)
+
+The Example Data below shows the pull_request_review_comment shape. A pull_request_review submission replaces `comment` with a `review` object instead, e.g.:
+
+```json
+{
+  "action": "submitted",
+  "review": {
+    "id": 987654321,
+    "body": "LGTM! Nice cleanup on the title rename.",
+    "state": "approved",
+    "html_url": "https://github.com/acme-labs/snaketoy/pull/42#pullrequestreview-987654321",
+    "user": { "login": "jules-ramirez" }
+  },
+  "pull_request": { "number": 42, "html_url": "https://github.com/acme-labs/snaketoy/pull/42" }
+}
+```
 
 ### Webhook Setup
 
@@ -1224,14 +1240,109 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 {
   "data": {
     "action": "opened",
-    "assignee": null,
     "number": 101,
     "pull_request": {
+      "_links": {
+        "comments": {
+          "href": "https://api.github.com/repos/acme/widgets/issues/101/comments"
+        },
+        "commits": {
+          "href": "https://api.github.com/repos/acme/widgets/pulls/101/commits"
+        },
+        "html": {
+          "href": "https://github.com/acme/widgets/pull/101"
+        },
+        "issue": {
+          "href": "https://api.github.com/repos/acme/widgets/issues/101"
+        },
+        "review_comment": {
+          "href": "https://api.github.com/repos/acme/widgets/pulls/comments{/number}"
+        },
+        "review_comments": {
+          "href": "https://api.github.com/repos/acme/widgets/pulls/101/comments"
+        },
+        "self": {
+          "href": "https://api.github.com/repos/acme/widgets/pulls/101"
+        },
+        "statuses": {
+          "href": "https://api.github.com/repos/acme/widgets/statuses/9c1f3e2a7b6d4c5e8f9a0b1c2d3e4f5a6b7c8d9e"
+        }
+      },
+      "active_lock_reason": null,
+      "assignee": null,
+      "assignees": [],
+      "author_association": "CONTRIBUTOR",
+      "auto_merge": null,
+      "base": {
+        "label": "acme:main",
+        "ref": "main",
+        "repo": {
+          "full_name": "acme/widgets",
+          "html_url": "https://github.com/acme/widgets",
+          "id": 123456
+        },
+        "sha": "5e6f708192a3b4c5d6e7f8090a1b2c3d4e5f6a7b",
+        "user": {
+          "html_url": "https://github.com/acme",
+          "id": 200001,
+          "login": "acme"
+        }
+      },
+      "body": "Adds a new `/status` endpoint for health checks.",
+      "closed_at": null,
+      "comments_url": "https://api.github.com/repos/acme/widgets/issues/101/comments",
+      "commits_url": "https://api.github.com/repos/acme/widgets/pulls/101/commits",
+      "created_at": "2026-01-16T17:50:00Z",
+      "diff_url": "https://github.com/acme/widgets/pull/101.diff",
+      "draft": false,
+      "head": {
+        "label": "octocat:add-status-endpoint",
+        "ref": "add-status-endpoint",
+        "repo": {
+          "full_name": "acme/widgets",
+          "html_url": "https://github.com/acme/widgets",
+          "id": 123456
+        },
+        "sha": "9c1f3e2a7b6d4c5e8f9a0b1c2d3e4f5a6b7c8d9e",
+        "user": {
+          "html_url": "https://github.com/octocat",
+          "id": 101,
+          "login": "octocat"
+        }
+      },
       "html_url": "https://github.com/acme/widgets/pull/101",
+      "id": 987654321,
+      "issue_url": "https://api.github.com/repos/acme/widgets/issues/101",
+      "labels": [
+        {
+          "color": "a2eeef",
+          "default": true,
+          "description": "New feature or request",
+          "id": 1362934389,
+          "name": "enhancement",
+          "node_id": "MDU6TGFiZWwxMzYyOTM0Mzg5",
+          "url": "https://api.github.com/repos/acme/widgets/labels/enhancement"
+        }
+      ],
+      "locked": false,
+      "merge_commit_sha": null,
+      "merged_at": null,
+      "milestone": null,
+      "node_id": "PR_kwDOQ7c2jM7hY2qC",
       "number": 101,
+      "patch_url": "https://github.com/acme/widgets/pull/101.patch",
+      "requested_reviewers": [],
+      "requested_teams": [],
+      "review_comment_url": "https://api.github.com/repos/acme/widgets/pulls/comments{/number}",
+      "review_comments_url": "https://api.github.com/repos/acme/widgets/pulls/101/comments",
       "state": "open",
+      "statuses_url": "https://api.github.com/repos/acme/widgets/statuses/9c1f3e2a7b6d4c5e8f9a0b1c2d3e4f5a6b7c8d9e",
       "title": "Add new endpoint",
+      "updated_at": "2026-01-16T17:50:00Z",
+      "url": "https://api.github.com/repos/acme/widgets/pulls/101",
       "user": {
+        "html_url": "https://github.com/octocat",
+        "id": 101,
         "login": "octocat"
       }
     },
@@ -2354,25 +2465,490 @@ Returns the created pull request object with details including:
 ```json
 {
   "data": {
+    "_links": {
+      "comments": {
+        "href": "https://api.github.com/repos/acme/widgets/issues/42/comments"
+      },
+      "commits": {
+        "href": "https://api.github.com/repos/acme/widgets/pulls/42/commits"
+      },
+      "html": {
+        "href": "https://github.com/acme/widgets/pull/42"
+      },
+      "issue": {
+        "href": "https://api.github.com/repos/acme/widgets/issues/42"
+      },
+      "review_comment": {
+        "href": "https://api.github.com/repos/acme/widgets/pulls/comments{/number}"
+      },
+      "review_comments": {
+        "href": "https://api.github.com/repos/acme/widgets/pulls/42/comments"
+      },
+      "self": {
+        "href": "https://api.github.com/repos/acme/widgets/pulls/42"
+      },
+      "statuses": {
+        "href": "https://api.github.com/repos/acme/widgets/statuses/a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+      }
+    },
+    "additions": 10,
+    "assignee": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4",
+      "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+      "followers_url": "https://api.github.com/users/octocat/followers",
+      "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+      "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat",
+      "node_id": "U_kgDOA000001",
+      "organizations_url": "https://api.github.com/users/octocat/orgs",
+      "received_events_url": "https://api.github.com/users/octocat/received_events",
+      "repos_url": "https://api.github.com/users/octocat/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/octocat"
+    },
+    "assignees": [
+      {
+        "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4",
+        "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+        "followers_url": "https://api.github.com/users/octocat/followers",
+        "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+        "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/octocat",
+        "id": 1,
+        "login": "octocat",
+        "node_id": "U_kgDOA000001",
+        "organizations_url": "https://api.github.com/users/octocat/orgs",
+        "received_events_url": "https://api.github.com/users/octocat/received_events",
+        "repos_url": "https://api.github.com/users/octocat/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/octocat"
+      }
+    ],
+    "author_association": "CONTRIBUTOR",
     "base": {
       "label": "acme:main",
-      "ref": "main"
+      "ref": "main",
+      "repo": {
+        "allow_auto_merge": false,
+        "allow_forking": true,
+        "allow_merge_commit": true,
+        "allow_rebase_merge": true,
+        "allow_squash_merge": true,
+        "allow_update_branch": false,
+        "archive_url": "https://api.github.com/repos/acme/widgets/{archive_format}{/ref}",
+        "archived": false,
+        "assignees_url": "https://api.github.com/repos/acme/widgets/assignees{/user}",
+        "blobs_url": "https://api.github.com/repos/acme/widgets/git/blobs{/sha}",
+        "branches_url": "https://api.github.com/repos/acme/widgets/branches{/branch}",
+        "clone_url": "https://github.com/acme/widgets.git",
+        "collaborators_url": "https://api.github.com/repos/acme/widgets/collaborators{/collaborator}",
+        "comments_url": "https://api.github.com/repos/acme/widgets/comments{/number}",
+        "commits_url": "https://api.github.com/repos/acme/widgets/commits{/sha}",
+        "compare_url": "https://api.github.com/repos/acme/widgets/compare/{base}...{head}",
+        "contents_url": "https://api.github.com/repos/acme/widgets/contents/{+path}",
+        "contributors_url": "https://api.github.com/repos/acme/widgets/contributors",
+        "created_at": "2025-01-10T08:00:00Z",
+        "default_branch": "main",
+        "delete_branch_on_merge": false,
+        "deployments_url": "https://api.github.com/repos/acme/widgets/deployments",
+        "description": "Widgets automation platform",
+        "disabled": false,
+        "downloads_url": "https://api.github.com/repos/acme/widgets/downloads",
+        "events_url": "https://api.github.com/repos/acme/widgets/events",
+        "fork": false,
+        "forks_count": 8,
+        "forks_url": "https://api.github.com/repos/acme/widgets/forks",
+        "full_name": "acme/widgets",
+        "git_commits_url": "https://api.github.com/repos/acme/widgets/git/commits{/sha}",
+        "git_refs_url": "https://api.github.com/repos/acme/widgets/git/refs{/sha}",
+        "git_tags_url": "https://api.github.com/repos/acme/widgets/git/tags{/sha}",
+        "git_url": "git://github.com/acme/widgets.git",
+        "has_discussions": false,
+        "has_downloads": true,
+        "has_issues": true,
+        "has_pages": false,
+        "has_projects": true,
+        "has_wiki": true,
+        "homepage": "https://widgets.acme.example",
+        "hooks_url": "https://api.github.com/repos/acme/widgets/hooks",
+        "html_url": "https://github.com/acme/widgets",
+        "id": 123456,
+        "is_template": false,
+        "issue_comment_url": "https://api.github.com/repos/acme/widgets/issues/comments{/number}",
+        "issue_events_url": "https://api.github.com/repos/acme/widgets/issues/events{/number}",
+        "issues_url": "https://api.github.com/repos/acme/widgets/issues{/number}",
+        "keys_url": "https://api.github.com/repos/acme/widgets/keys{/key_id}",
+        "labels_url": "https://api.github.com/repos/acme/widgets/labels{/name}",
+        "language": "Go",
+        "languages_url": "https://api.github.com/repos/acme/widgets/languages",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit"
+        },
+        "merge_commit_message": "PR_TITLE",
+        "merge_commit_title": "MERGE_MESSAGE",
+        "merges_url": "https://api.github.com/repos/acme/widgets/merges",
+        "milestones_url": "https://api.github.com/repos/acme/widgets/milestones{/number}",
+        "name": "widgets",
+        "node_id": "R_kgDOAB1234",
+        "notifications_url": "https://api.github.com/repos/acme/widgets/notifications{?since,all,participating}",
+        "open_issues": 5,
+        "open_issues_count": 5,
+        "owner": {
+          "avatar_url": "https://avatars.githubusercontent.com/u/200001?v=4",
+          "events_url": "https://api.github.com/users/acme/events{/privacy}",
+          "followers_url": "https://api.github.com/users/acme/followers",
+          "following_url": "https://api.github.com/users/acme/following{/other_user}",
+          "gists_url": "https://api.github.com/users/acme/gists{/gist_id}",
+          "gravatar_id": "",
+          "html_url": "https://github.com/acme",
+          "id": 200001,
+          "login": "acme",
+          "node_id": "U_kgDOA200001",
+          "organizations_url": "https://api.github.com/users/acme/orgs",
+          "received_events_url": "https://api.github.com/users/acme/received_events",
+          "repos_url": "https://api.github.com/users/acme/repos",
+          "site_admin": false,
+          "starred_url": "https://api.github.com/users/acme/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/acme/subscriptions",
+          "type": "User",
+          "url": "https://api.github.com/users/acme"
+        },
+        "permissions": {
+          "admin": false,
+          "maintain": false,
+          "pull": true,
+          "push": true,
+          "triage": true
+        },
+        "private": false,
+        "pulls_url": "https://api.github.com/repos/acme/widgets/pulls{/number}",
+        "pushed_at": "2026-04-22T09:58:00Z",
+        "releases_url": "https://api.github.com/repos/acme/widgets/releases{/id}",
+        "size": 2048,
+        "squash_merge_commit_message": "COMMIT_MESSAGES",
+        "squash_merge_commit_title": "COMMIT_OR_PR_TITLE",
+        "ssh_url": "git@github.com:acme/widgets.git",
+        "stargazers_count": 120,
+        "stargazers_url": "https://api.github.com/repos/acme/widgets/stargazers",
+        "statuses_url": "https://api.github.com/repos/acme/widgets/statuses/{sha}",
+        "subscribers_url": "https://api.github.com/repos/acme/widgets/subscribers",
+        "subscription_url": "https://api.github.com/repos/acme/widgets/subscription",
+        "svn_url": "https://github.com/acme/widgets",
+        "tags_url": "https://api.github.com/repos/acme/widgets/tags",
+        "teams_url": "https://api.github.com/repos/acme/widgets/teams",
+        "topics": [
+          "automation",
+          "widgets"
+        ],
+        "trees_url": "https://api.github.com/repos/acme/widgets/git/trees{/sha}",
+        "updated_at": "2026-04-22T09:58:00Z",
+        "url": "https://api.github.com/repos/acme/widgets",
+        "visibility": "public",
+        "watchers": 120,
+        "watchers_count": 120,
+        "web_commit_signoff_required": false
+      },
+      "sha": "5e6f708192a3b4c5d6e7f8090a1b2c3d4e5f6a7b",
+      "user": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/200001?v=4",
+        "events_url": "https://api.github.com/users/acme/events{/privacy}",
+        "followers_url": "https://api.github.com/users/acme/followers",
+        "following_url": "https://api.github.com/users/acme/following{/other_user}",
+        "gists_url": "https://api.github.com/users/acme/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/acme",
+        "id": 200001,
+        "login": "acme",
+        "node_id": "U_kgDOA200001",
+        "organizations_url": "https://api.github.com/users/acme/orgs",
+        "received_events_url": "https://api.github.com/users/acme/received_events",
+        "repos_url": "https://api.github.com/users/acme/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/acme/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/acme/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/acme"
+      }
     },
+    "body": "Adds the new feature described in the linked issue.",
+    "changed_files": 3,
+    "comments": 2,
+    "comments_url": "https://api.github.com/repos/acme/widgets/issues/42/comments",
+    "commits": 3,
+    "commits_url": "https://api.github.com/repos/acme/widgets/pulls/42/commits",
     "created_at": "2026-04-22T10:00:00Z",
+    "deletions": 2,
+    "diff_url": "https://github.com/acme/widgets/pull/42.diff",
     "draft": false,
     "head": {
       "label": "acme:feature-branch",
-      "ref": "feature-branch"
+      "ref": "feature-branch",
+      "repo": {
+        "allow_auto_merge": false,
+        "allow_forking": true,
+        "allow_merge_commit": true,
+        "allow_rebase_merge": true,
+        "allow_squash_merge": true,
+        "allow_update_branch": false,
+        "archive_url": "https://api.github.com/repos/acme/widgets/{archive_format}{/ref}",
+        "archived": false,
+        "assignees_url": "https://api.github.com/repos/acme/widgets/assignees{/user}",
+        "blobs_url": "https://api.github.com/repos/acme/widgets/git/blobs{/sha}",
+        "branches_url": "https://api.github.com/repos/acme/widgets/branches{/branch}",
+        "clone_url": "https://github.com/acme/widgets.git",
+        "collaborators_url": "https://api.github.com/repos/acme/widgets/collaborators{/collaborator}",
+        "comments_url": "https://api.github.com/repos/acme/widgets/comments{/number}",
+        "commits_url": "https://api.github.com/repos/acme/widgets/commits{/sha}",
+        "compare_url": "https://api.github.com/repos/acme/widgets/compare/{base}...{head}",
+        "contents_url": "https://api.github.com/repos/acme/widgets/contents/{+path}",
+        "contributors_url": "https://api.github.com/repos/acme/widgets/contributors",
+        "created_at": "2025-01-10T08:00:00Z",
+        "default_branch": "main",
+        "delete_branch_on_merge": false,
+        "deployments_url": "https://api.github.com/repos/acme/widgets/deployments",
+        "description": "Widgets automation platform",
+        "disabled": false,
+        "downloads_url": "https://api.github.com/repos/acme/widgets/downloads",
+        "events_url": "https://api.github.com/repos/acme/widgets/events",
+        "fork": false,
+        "forks_count": 8,
+        "forks_url": "https://api.github.com/repos/acme/widgets/forks",
+        "full_name": "acme/widgets",
+        "git_commits_url": "https://api.github.com/repos/acme/widgets/git/commits{/sha}",
+        "git_refs_url": "https://api.github.com/repos/acme/widgets/git/refs{/sha}",
+        "git_tags_url": "https://api.github.com/repos/acme/widgets/git/tags{/sha}",
+        "git_url": "git://github.com/acme/widgets.git",
+        "has_discussions": false,
+        "has_downloads": true,
+        "has_issues": true,
+        "has_pages": false,
+        "has_projects": true,
+        "has_wiki": true,
+        "homepage": "https://widgets.acme.example",
+        "hooks_url": "https://api.github.com/repos/acme/widgets/hooks",
+        "html_url": "https://github.com/acme/widgets",
+        "id": 123456,
+        "is_template": false,
+        "issue_comment_url": "https://api.github.com/repos/acme/widgets/issues/comments{/number}",
+        "issue_events_url": "https://api.github.com/repos/acme/widgets/issues/events{/number}",
+        "issues_url": "https://api.github.com/repos/acme/widgets/issues{/number}",
+        "keys_url": "https://api.github.com/repos/acme/widgets/keys{/key_id}",
+        "labels_url": "https://api.github.com/repos/acme/widgets/labels{/name}",
+        "language": "Go",
+        "languages_url": "https://api.github.com/repos/acme/widgets/languages",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit"
+        },
+        "merge_commit_message": "PR_TITLE",
+        "merge_commit_title": "MERGE_MESSAGE",
+        "merges_url": "https://api.github.com/repos/acme/widgets/merges",
+        "milestones_url": "https://api.github.com/repos/acme/widgets/milestones{/number}",
+        "name": "widgets",
+        "node_id": "R_kgDOAB1234",
+        "notifications_url": "https://api.github.com/repos/acme/widgets/notifications{?since,all,participating}",
+        "open_issues": 5,
+        "open_issues_count": 5,
+        "owner": {
+          "avatar_url": "https://avatars.githubusercontent.com/u/200001?v=4",
+          "events_url": "https://api.github.com/users/acme/events{/privacy}",
+          "followers_url": "https://api.github.com/users/acme/followers",
+          "following_url": "https://api.github.com/users/acme/following{/other_user}",
+          "gists_url": "https://api.github.com/users/acme/gists{/gist_id}",
+          "gravatar_id": "",
+          "html_url": "https://github.com/acme",
+          "id": 200001,
+          "login": "acme",
+          "node_id": "U_kgDOA200001",
+          "organizations_url": "https://api.github.com/users/acme/orgs",
+          "received_events_url": "https://api.github.com/users/acme/received_events",
+          "repos_url": "https://api.github.com/users/acme/repos",
+          "site_admin": false,
+          "starred_url": "https://api.github.com/users/acme/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/acme/subscriptions",
+          "type": "User",
+          "url": "https://api.github.com/users/acme"
+        },
+        "permissions": {
+          "admin": false,
+          "maintain": false,
+          "pull": true,
+          "push": true,
+          "triage": true
+        },
+        "private": false,
+        "pulls_url": "https://api.github.com/repos/acme/widgets/pulls{/number}",
+        "pushed_at": "2026-04-22T09:58:00Z",
+        "releases_url": "https://api.github.com/repos/acme/widgets/releases{/id}",
+        "size": 2048,
+        "squash_merge_commit_message": "COMMIT_MESSAGES",
+        "squash_merge_commit_title": "COMMIT_OR_PR_TITLE",
+        "ssh_url": "git@github.com:acme/widgets.git",
+        "stargazers_count": 120,
+        "stargazers_url": "https://api.github.com/repos/acme/widgets/stargazers",
+        "statuses_url": "https://api.github.com/repos/acme/widgets/statuses/{sha}",
+        "subscribers_url": "https://api.github.com/repos/acme/widgets/subscribers",
+        "subscription_url": "https://api.github.com/repos/acme/widgets/subscription",
+        "svn_url": "https://github.com/acme/widgets",
+        "tags_url": "https://api.github.com/repos/acme/widgets/tags",
+        "teams_url": "https://api.github.com/repos/acme/widgets/teams",
+        "topics": [
+          "automation",
+          "widgets"
+        ],
+        "trees_url": "https://api.github.com/repos/acme/widgets/git/trees{/sha}",
+        "updated_at": "2026-04-22T09:58:00Z",
+        "url": "https://api.github.com/repos/acme/widgets",
+        "visibility": "public",
+        "watchers": 120,
+        "watchers_count": 120,
+        "web_commit_signoff_required": false
+      },
+      "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "user": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/200001?v=4",
+        "events_url": "https://api.github.com/users/acme/events{/privacy}",
+        "followers_url": "https://api.github.com/users/acme/followers",
+        "following_url": "https://api.github.com/users/acme/following{/other_user}",
+        "gists_url": "https://api.github.com/users/acme/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/acme",
+        "id": 200001,
+        "login": "acme",
+        "node_id": "U_kgDOA200001",
+        "organizations_url": "https://api.github.com/users/acme/orgs",
+        "received_events_url": "https://api.github.com/users/acme/received_events",
+        "repos_url": "https://api.github.com/users/acme/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/acme/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/acme/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/acme"
+      }
     },
     "html_url": "https://github.com/acme/widgets/pull/42",
     "id": 1234567890,
+    "issue_url": "https://api.github.com/repos/acme/widgets/issues/42",
+    "labels": [
+      {
+        "color": "a2eeef",
+        "default": true,
+        "description": "New feature or request",
+        "id": 208045946,
+        "name": "enhancement",
+        "node_id": "MDU6TGFiZWwyMDgwNDU5NDY=",
+        "url": "https://api.github.com/repos/acme/widgets/labels/enhancement"
+      }
+    ],
+    "locked": false,
+    "maintainer_can_modify": true,
+    "mergeable": true,
+    "mergeable_state": "clean",
+    "merged": false,
+    "milestone": {
+      "closed_issues": 8,
+      "created_at": "2026-01-05T10:00:00Z",
+      "creator": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4",
+        "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+        "followers_url": "https://api.github.com/users/octocat/followers",
+        "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+        "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/octocat",
+        "id": 1,
+        "login": "octocat",
+        "node_id": "U_kgDOA000001",
+        "organizations_url": "https://api.github.com/users/octocat/orgs",
+        "received_events_url": "https://api.github.com/users/octocat/received_events",
+        "repos_url": "https://api.github.com/users/octocat/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/octocat"
+      },
+      "description": "First stable release",
+      "due_on": "2026-03-01T08:00:00Z",
+      "html_url": "https://github.com/acme/widgets/milestone/1",
+      "id": 1002604,
+      "labels_url": "https://api.github.com/repos/acme/widgets/milestones/1/labels",
+      "node_id": "MDk6TWlsZXN0b25lMTAwMjYwNA==",
+      "number": 1,
+      "open_issues": 4,
+      "state": "open",
+      "title": "v1.0",
+      "updated_at": "2026-01-16T17:40:00Z",
+      "url": "https://api.github.com/repos/acme/widgets/milestones/1"
+    },
+    "node_id": "PR_kwDOABCD12MAAAABCDEFGH",
     "number": 42,
+    "patch_url": "https://github.com/acme/widgets/pull/42.patch",
+    "rebaseable": true,
+    "requested_reviewers": [
+      {
+        "avatar_url": "https://avatars.githubusercontent.com/u/2?v=4",
+        "events_url": "https://api.github.com/users/hubot/events{/privacy}",
+        "followers_url": "https://api.github.com/users/hubot/followers",
+        "following_url": "https://api.github.com/users/hubot/following{/other_user}",
+        "gists_url": "https://api.github.com/users/hubot/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/hubot",
+        "id": 2,
+        "login": "hubot",
+        "node_id": "U_kgDOA000002",
+        "organizations_url": "https://api.github.com/users/hubot/orgs",
+        "received_events_url": "https://api.github.com/users/hubot/received_events",
+        "repos_url": "https://api.github.com/users/hubot/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/hubot/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/hubot/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/hubot"
+      }
+    ],
+    "review_comment_url": "https://api.github.com/repos/acme/widgets/pulls/comments{/number}",
+    "review_comments": 1,
+    "review_comments_url": "https://api.github.com/repos/acme/widgets/pulls/42/comments",
     "state": "open",
+    "statuses_url": "https://api.github.com/repos/acme/widgets/statuses/a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
     "title": "Add new feature",
+    "updated_at": "2026-04-22T10:00:00Z",
+    "url": "https://api.github.com/repos/acme/widgets/pulls/42",
     "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4",
+      "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+      "followers_url": "https://api.github.com/users/octocat/followers",
+      "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+      "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+      "gravatar_id": "",
       "html_url": "https://github.com/octocat",
       "id": 1,
-      "login": "octocat"
+      "login": "octocat",
+      "node_id": "U_kgDOA000001",
+      "organizations_url": "https://api.github.com/users/octocat/orgs",
+      "received_events_url": "https://api.github.com/users/octocat/received_events",
+      "repos_url": "https://api.github.com/users/octocat/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/octocat"
     }
   },
   "timestamp": "2026-04-22T10:00:00.000000000Z",
@@ -2415,12 +2991,34 @@ Returns the created release object with all release information including tag, a
 ```json
 {
   "data": {
+    "assets": [
+      {
+        "browser_download_url": "https://github.com/acme/widgets/releases/download/v1.2.3/app-v1.2.3.zip",
+        "content_type": "application/zip",
+        "download_count": 42,
+        "id": 1,
+        "label": "Application Bundle",
+        "name": "app-v1.2.3.zip",
+        "size": 1024000,
+        "state": "uploaded"
+      }
+    ],
+    "author": {
+      "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat"
+    },
+    "body": "## What's Changed\n\n- Feature A\n- Bug fix B",
+    "created_at": "2026-01-15T10:00:00Z",
     "draft": false,
     "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
     "id": 3001,
     "name": "Release 1.2.3",
     "prerelease": false,
-    "tag_name": "v1.2.3"
+    "published_at": "2026-01-16T12:00:00Z",
+    "tag_name": "v1.2.3",
+    "target_commitish": "main"
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
@@ -2623,14 +3221,174 @@ Returns the complete issue object including:
 ```json
 {
   "data": {
+    "assignee": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4",
+      "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+      "followers_url": "https://api.github.com/users/octocat/followers",
+      "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+      "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat",
+      "node_id": "U_kgDOA000001",
+      "organizations_url": "https://api.github.com/users/octocat/orgs",
+      "received_events_url": "https://api.github.com/users/octocat/received_events",
+      "repos_url": "https://api.github.com/users/octocat/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/octocat"
+    },
+    "assignees": [
+      {
+        "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4",
+        "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+        "followers_url": "https://api.github.com/users/octocat/followers",
+        "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+        "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/octocat",
+        "id": 1,
+        "login": "octocat",
+        "node_id": "U_kgDOA000001",
+        "organizations_url": "https://api.github.com/users/octocat/orgs",
+        "received_events_url": "https://api.github.com/users/octocat/received_events",
+        "repos_url": "https://api.github.com/users/octocat/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/octocat"
+      }
+    ],
+    "author_association": "CONTRIBUTOR",
+    "body": "The CI build fails intermittently on the integration test suite. Steps to reproduce are in the linked run.",
+    "closed_at": "2026-01-16T17:50:00Z",
+    "closed_by": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4",
+      "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+      "followers_url": "https://api.github.com/users/octocat/followers",
+      "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+      "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat",
+      "node_id": "U_kgDOA000001",
+      "organizations_url": "https://api.github.com/users/octocat/orgs",
+      "received_events_url": "https://api.github.com/users/octocat/received_events",
+      "repos_url": "https://api.github.com/users/octocat/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/octocat"
+    },
     "comments": 3,
+    "comments_url": "https://api.github.com/repos/acme/widgets/issues/42/comments",
+    "created_at": "2026-01-15T09:30:00Z",
+    "events_url": "https://api.github.com/repos/acme/widgets/issues/42/events",
     "html_url": "https://github.com/acme/widgets/issues/42",
-    "id": 101,
+    "id": 1,
+    "labels": [
+      {
+        "color": "d73a4a",
+        "default": true,
+        "description": "Something isn't working",
+        "id": 1362934389,
+        "name": "bug",
+        "node_id": "MDU6TGFiZWwxMzYyOTM0Mzg5",
+        "url": "https://api.github.com/repos/acme/widgets/labels/bug"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/acme/widgets/issues/42/labels{/name}",
+    "locked": false,
+    "milestone": {
+      "closed_issues": 8,
+      "created_at": "2026-01-05T10:00:00Z",
+      "creator": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4",
+        "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+        "followers_url": "https://api.github.com/users/octocat/followers",
+        "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+        "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/octocat",
+        "id": 1,
+        "login": "octocat",
+        "node_id": "U_kgDOA000001",
+        "organizations_url": "https://api.github.com/users/octocat/orgs",
+        "received_events_url": "https://api.github.com/users/octocat/received_events",
+        "repos_url": "https://api.github.com/users/octocat/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/octocat"
+      },
+      "description": "First stable release",
+      "due_on": "2026-03-01T08:00:00Z",
+      "html_url": "https://github.com/acme/widgets/milestone/1",
+      "id": 1002604,
+      "labels_url": "https://api.github.com/repos/acme/widgets/milestones/1/labels",
+      "node_id": "MDk6TWlsZXN0b25lMTAwMjYwNA==",
+      "number": 1,
+      "open_issues": 4,
+      "state": "open",
+      "title": "v1.0",
+      "updated_at": "2026-01-16T17:40:00Z",
+      "url": "https://api.github.com/repos/acme/widgets/milestones/1"
+    },
+    "node_id": "I_kwDOAB1234M5abcde",
     "number": 42,
-    "state": "open",
+    "reactions": {
+      "+1": 3,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 1,
+      "hooray": 0,
+      "laugh": 1,
+      "rocket": 0,
+      "total_count": 5,
+      "url": "https://api.github.com/repos/acme/widgets/issues/42/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/acme/widgets",
+    "state": "closed",
+    "state_reason": "completed",
     "title": "Fix flaky build",
+    "type": {
+      "color": "red",
+      "created_at": "2025-01-10T08:00:00Z",
+      "description": "An unexpected problem or behavior",
+      "id": 1,
+      "name": "Bug",
+      "node_id": "IT_kwDOAB1234",
+      "updated_at": "2025-01-10T08:00:00Z"
+    },
+    "updated_at": "2026-01-16T17:50:00Z",
+    "url": "https://api.github.com/repos/acme/widgets/issues/42",
     "user": {
-      "login": "octocat"
+      "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4",
+      "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+      "followers_url": "https://api.github.com/users/octocat/followers",
+      "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+      "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat",
+      "node_id": "U_kgDOA000001",
+      "organizations_url": "https://api.github.com/users/octocat/orgs",
+      "received_events_url": "https://api.github.com/users/octocat/received_events",
+      "repos_url": "https://api.github.com/users/octocat/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/octocat"
     }
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
@@ -3040,10 +3798,18 @@ Returns the created status object with all status information.
   "data": {
     "context": "ci/build",
     "created_at": "2026-01-16T17:45:00Z",
+    "creator": {
+      "html_url": "https://github.com/octocat",
+      "id": 583231,
+      "login": "octocat"
+    },
     "description": "All checks passed",
+    "id": 15384176900,
+    "node_id": "S_kwDOQ7c2jM6qX9zZ",
     "state": "success",
     "target_url": "https://ci.example.com/builds/123",
-    "updated_at": "2026-01-16T17:45:10Z"
+    "updated_at": "2026-01-16T17:45:10Z",
+    "url": "https://api.github.com/repos/acme-labs/snaketoy/statuses/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.commitStatus"
@@ -3179,12 +3945,10 @@ The Run Workflow component triggers a GitHub Actions workflow and waits for it t
 ```json
 {
   "data": {
-    "workflow_run": {
-      "conclusion": "success",
-      "html_url": "https://github.com/acme/widgets/actions/runs/9001",
-      "id": 9001,
-      "status": "completed"
-    }
+    "conclusion": "success",
+    "html_url": "https://github.com/acme/widgets/actions/runs/9001",
+    "id": 9001,
+    "status": "completed"
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.workflow.finished"
@@ -3309,6 +4073,533 @@ Returns the updated comment object including comment ID, URL, body, and timestam
 }
 ```
 
+<a id="update-pull-request"></a>
+
+## Update Pull Request
+
+**Component key:** `github.updatePullRequest`
+
+The Update Pull Request component updates an existing pull request in a GitHub repository. Use it instead of Update Issue when the change is about a pull request - GitHub models a pull request's title, body, state, labels, and assignees on its underlying issue, but "Update Issue" is confusing to reach for when working with pull requests.
+
+### Use Cases
+
+- **Retitle/rebody automation**: Update a pull request's title or description as a workflow progresses
+- **Open/close automation**: Close a pull request when it is superseded, or reopen one automatically
+- **Retargeting**: Change the base branch a pull request merges into
+- **Label and assignee management**: Replace a pull request's labels or assignees from a workflow
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the pull request
+- **Pull Request Number**: Pull request number to update. Supports expressions.
+- **Title**, **Body**, **State**, **Base Branch**, **Replace Assignees**, **Replace Labels**: each field has its own toggle. Only toggled-on fields are changed; toggled-off fields are left untouched on the pull request.
+
+At least one field must be toggled on.
+
+### Replacing labels and assignees
+
+**Replace Assignees** and **Replace Labels** replace the pull request's full set when toggled on, including replacing it with an empty list to clear all assignees or labels.
+
+### Output
+
+Returns the updated pull request object with all current information.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "_links": {
+      "comments": {
+        "href": "https://api.github.com/repos/acme/widgets/issues/42/comments"
+      },
+      "commits": {
+        "href": "https://api.github.com/repos/acme/widgets/pulls/42/commits"
+      },
+      "html": {
+        "href": "https://github.com/acme/widgets/pull/42"
+      },
+      "issue": {
+        "href": "https://api.github.com/repos/acme/widgets/issues/42"
+      },
+      "review_comment": {
+        "href": "https://api.github.com/repos/acme/widgets/pulls/comments{/number}"
+      },
+      "review_comments": {
+        "href": "https://api.github.com/repos/acme/widgets/pulls/42/comments"
+      },
+      "self": {
+        "href": "https://api.github.com/repos/acme/widgets/pulls/42"
+      },
+      "statuses": {
+        "href": "https://api.github.com/repos/acme/widgets/statuses/a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+      }
+    },
+    "additions": 10,
+    "assignee": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4",
+      "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+      "followers_url": "https://api.github.com/users/octocat/followers",
+      "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+      "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat",
+      "node_id": "U_kgDOA000001",
+      "organizations_url": "https://api.github.com/users/octocat/orgs",
+      "received_events_url": "https://api.github.com/users/octocat/received_events",
+      "repos_url": "https://api.github.com/users/octocat/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/octocat"
+    },
+    "assignees": [
+      {
+        "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4",
+        "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+        "followers_url": "https://api.github.com/users/octocat/followers",
+        "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+        "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/octocat",
+        "id": 1,
+        "login": "octocat",
+        "node_id": "U_kgDOA000001",
+        "organizations_url": "https://api.github.com/users/octocat/orgs",
+        "received_events_url": "https://api.github.com/users/octocat/received_events",
+        "repos_url": "https://api.github.com/users/octocat/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/octocat"
+      }
+    ],
+    "author_association": "CONTRIBUTOR",
+    "base": {
+      "label": "acme:release",
+      "ref": "release",
+      "repo": {
+        "allow_auto_merge": false,
+        "allow_forking": true,
+        "allow_merge_commit": true,
+        "allow_rebase_merge": true,
+        "allow_squash_merge": true,
+        "allow_update_branch": false,
+        "archive_url": "https://api.github.com/repos/acme/widgets/{archive_format}{/ref}",
+        "archived": false,
+        "assignees_url": "https://api.github.com/repos/acme/widgets/assignees{/user}",
+        "blobs_url": "https://api.github.com/repos/acme/widgets/git/blobs{/sha}",
+        "branches_url": "https://api.github.com/repos/acme/widgets/branches{/branch}",
+        "clone_url": "https://github.com/acme/widgets.git",
+        "collaborators_url": "https://api.github.com/repos/acme/widgets/collaborators{/collaborator}",
+        "comments_url": "https://api.github.com/repos/acme/widgets/comments{/number}",
+        "commits_url": "https://api.github.com/repos/acme/widgets/commits{/sha}",
+        "compare_url": "https://api.github.com/repos/acme/widgets/compare/{base}...{head}",
+        "contents_url": "https://api.github.com/repos/acme/widgets/contents/{+path}",
+        "contributors_url": "https://api.github.com/repos/acme/widgets/contributors",
+        "created_at": "2025-01-10T08:00:00Z",
+        "default_branch": "main",
+        "delete_branch_on_merge": false,
+        "deployments_url": "https://api.github.com/repos/acme/widgets/deployments",
+        "description": "Widgets automation platform",
+        "disabled": false,
+        "downloads_url": "https://api.github.com/repos/acme/widgets/downloads",
+        "events_url": "https://api.github.com/repos/acme/widgets/events",
+        "fork": false,
+        "forks_count": 8,
+        "forks_url": "https://api.github.com/repos/acme/widgets/forks",
+        "full_name": "acme/widgets",
+        "git_commits_url": "https://api.github.com/repos/acme/widgets/git/commits{/sha}",
+        "git_refs_url": "https://api.github.com/repos/acme/widgets/git/refs{/sha}",
+        "git_tags_url": "https://api.github.com/repos/acme/widgets/git/tags{/sha}",
+        "git_url": "git://github.com/acme/widgets.git",
+        "has_discussions": false,
+        "has_downloads": true,
+        "has_issues": true,
+        "has_pages": false,
+        "has_projects": true,
+        "has_wiki": true,
+        "homepage": "https://widgets.acme.example",
+        "hooks_url": "https://api.github.com/repos/acme/widgets/hooks",
+        "html_url": "https://github.com/acme/widgets",
+        "id": 123456,
+        "is_template": false,
+        "issue_comment_url": "https://api.github.com/repos/acme/widgets/issues/comments{/number}",
+        "issue_events_url": "https://api.github.com/repos/acme/widgets/issues/events{/number}",
+        "issues_url": "https://api.github.com/repos/acme/widgets/issues{/number}",
+        "keys_url": "https://api.github.com/repos/acme/widgets/keys{/key_id}",
+        "labels_url": "https://api.github.com/repos/acme/widgets/labels{/name}",
+        "language": "Go",
+        "languages_url": "https://api.github.com/repos/acme/widgets/languages",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit"
+        },
+        "merge_commit_message": "PR_TITLE",
+        "merge_commit_title": "MERGE_MESSAGE",
+        "merges_url": "https://api.github.com/repos/acme/widgets/merges",
+        "milestones_url": "https://api.github.com/repos/acme/widgets/milestones{/number}",
+        "name": "widgets",
+        "node_id": "R_kgDOAB1234",
+        "notifications_url": "https://api.github.com/repos/acme/widgets/notifications{?since,all,participating}",
+        "open_issues": 5,
+        "open_issues_count": 5,
+        "owner": {
+          "avatar_url": "https://avatars.githubusercontent.com/u/200001?v=4",
+          "events_url": "https://api.github.com/users/acme/events{/privacy}",
+          "followers_url": "https://api.github.com/users/acme/followers",
+          "following_url": "https://api.github.com/users/acme/following{/other_user}",
+          "gists_url": "https://api.github.com/users/acme/gists{/gist_id}",
+          "gravatar_id": "",
+          "html_url": "https://github.com/acme",
+          "id": 200001,
+          "login": "acme",
+          "node_id": "U_kgDOA200001",
+          "organizations_url": "https://api.github.com/users/acme/orgs",
+          "received_events_url": "https://api.github.com/users/acme/received_events",
+          "repos_url": "https://api.github.com/users/acme/repos",
+          "site_admin": false,
+          "starred_url": "https://api.github.com/users/acme/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/acme/subscriptions",
+          "type": "User",
+          "url": "https://api.github.com/users/acme"
+        },
+        "permissions": {
+          "admin": false,
+          "maintain": false,
+          "pull": true,
+          "push": true,
+          "triage": true
+        },
+        "private": false,
+        "pulls_url": "https://api.github.com/repos/acme/widgets/pulls{/number}",
+        "pushed_at": "2026-04-22T09:58:00Z",
+        "releases_url": "https://api.github.com/repos/acme/widgets/releases{/id}",
+        "size": 2048,
+        "squash_merge_commit_message": "COMMIT_MESSAGES",
+        "squash_merge_commit_title": "COMMIT_OR_PR_TITLE",
+        "ssh_url": "git@github.com:acme/widgets.git",
+        "stargazers_count": 120,
+        "stargazers_url": "https://api.github.com/repos/acme/widgets/stargazers",
+        "statuses_url": "https://api.github.com/repos/acme/widgets/statuses/{sha}",
+        "subscribers_url": "https://api.github.com/repos/acme/widgets/subscribers",
+        "subscription_url": "https://api.github.com/repos/acme/widgets/subscription",
+        "svn_url": "https://github.com/acme/widgets",
+        "tags_url": "https://api.github.com/repos/acme/widgets/tags",
+        "teams_url": "https://api.github.com/repos/acme/widgets/teams",
+        "topics": [
+          "automation",
+          "widgets"
+        ],
+        "trees_url": "https://api.github.com/repos/acme/widgets/git/trees{/sha}",
+        "updated_at": "2026-04-22T09:58:00Z",
+        "url": "https://api.github.com/repos/acme/widgets",
+        "visibility": "public",
+        "watchers": 120,
+        "watchers_count": 120,
+        "web_commit_signoff_required": false
+      },
+      "sha": "7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f901",
+      "user": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/200001?v=4",
+        "events_url": "https://api.github.com/users/acme/events{/privacy}",
+        "followers_url": "https://api.github.com/users/acme/followers",
+        "following_url": "https://api.github.com/users/acme/following{/other_user}",
+        "gists_url": "https://api.github.com/users/acme/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/acme",
+        "id": 200001,
+        "login": "acme",
+        "node_id": "U_kgDOA200001",
+        "organizations_url": "https://api.github.com/users/acme/orgs",
+        "received_events_url": "https://api.github.com/users/acme/received_events",
+        "repos_url": "https://api.github.com/users/acme/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/acme/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/acme/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/acme"
+      }
+    },
+    "body": "Adds the new feature described in the linked issue.",
+    "changed_files": 3,
+    "comments": 2,
+    "comments_url": "https://api.github.com/repos/acme/widgets/issues/42/comments",
+    "commits": 3,
+    "commits_url": "https://api.github.com/repos/acme/widgets/pulls/42/commits",
+    "created_at": "2026-04-22T10:00:00Z",
+    "deletions": 2,
+    "diff_url": "https://github.com/acme/widgets/pull/42.diff",
+    "draft": false,
+    "head": {
+      "label": "acme:feature-branch",
+      "ref": "feature-branch",
+      "repo": {
+        "allow_auto_merge": false,
+        "allow_forking": true,
+        "allow_merge_commit": true,
+        "allow_rebase_merge": true,
+        "allow_squash_merge": true,
+        "allow_update_branch": false,
+        "archive_url": "https://api.github.com/repos/acme/widgets/{archive_format}{/ref}",
+        "archived": false,
+        "assignees_url": "https://api.github.com/repos/acme/widgets/assignees{/user}",
+        "blobs_url": "https://api.github.com/repos/acme/widgets/git/blobs{/sha}",
+        "branches_url": "https://api.github.com/repos/acme/widgets/branches{/branch}",
+        "clone_url": "https://github.com/acme/widgets.git",
+        "collaborators_url": "https://api.github.com/repos/acme/widgets/collaborators{/collaborator}",
+        "comments_url": "https://api.github.com/repos/acme/widgets/comments{/number}",
+        "commits_url": "https://api.github.com/repos/acme/widgets/commits{/sha}",
+        "compare_url": "https://api.github.com/repos/acme/widgets/compare/{base}...{head}",
+        "contents_url": "https://api.github.com/repos/acme/widgets/contents/{+path}",
+        "contributors_url": "https://api.github.com/repos/acme/widgets/contributors",
+        "created_at": "2025-01-10T08:00:00Z",
+        "default_branch": "main",
+        "delete_branch_on_merge": false,
+        "deployments_url": "https://api.github.com/repos/acme/widgets/deployments",
+        "description": "Widgets automation platform",
+        "disabled": false,
+        "downloads_url": "https://api.github.com/repos/acme/widgets/downloads",
+        "events_url": "https://api.github.com/repos/acme/widgets/events",
+        "fork": false,
+        "forks_count": 8,
+        "forks_url": "https://api.github.com/repos/acme/widgets/forks",
+        "full_name": "acme/widgets",
+        "git_commits_url": "https://api.github.com/repos/acme/widgets/git/commits{/sha}",
+        "git_refs_url": "https://api.github.com/repos/acme/widgets/git/refs{/sha}",
+        "git_tags_url": "https://api.github.com/repos/acme/widgets/git/tags{/sha}",
+        "git_url": "git://github.com/acme/widgets.git",
+        "has_discussions": false,
+        "has_downloads": true,
+        "has_issues": true,
+        "has_pages": false,
+        "has_projects": true,
+        "has_wiki": true,
+        "homepage": "https://widgets.acme.example",
+        "hooks_url": "https://api.github.com/repos/acme/widgets/hooks",
+        "html_url": "https://github.com/acme/widgets",
+        "id": 123456,
+        "is_template": false,
+        "issue_comment_url": "https://api.github.com/repos/acme/widgets/issues/comments{/number}",
+        "issue_events_url": "https://api.github.com/repos/acme/widgets/issues/events{/number}",
+        "issues_url": "https://api.github.com/repos/acme/widgets/issues{/number}",
+        "keys_url": "https://api.github.com/repos/acme/widgets/keys{/key_id}",
+        "labels_url": "https://api.github.com/repos/acme/widgets/labels{/name}",
+        "language": "Go",
+        "languages_url": "https://api.github.com/repos/acme/widgets/languages",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit"
+        },
+        "merge_commit_message": "PR_TITLE",
+        "merge_commit_title": "MERGE_MESSAGE",
+        "merges_url": "https://api.github.com/repos/acme/widgets/merges",
+        "milestones_url": "https://api.github.com/repos/acme/widgets/milestones{/number}",
+        "name": "widgets",
+        "node_id": "R_kgDOAB1234",
+        "notifications_url": "https://api.github.com/repos/acme/widgets/notifications{?since,all,participating}",
+        "open_issues": 5,
+        "open_issues_count": 5,
+        "owner": {
+          "avatar_url": "https://avatars.githubusercontent.com/u/200001?v=4",
+          "events_url": "https://api.github.com/users/acme/events{/privacy}",
+          "followers_url": "https://api.github.com/users/acme/followers",
+          "following_url": "https://api.github.com/users/acme/following{/other_user}",
+          "gists_url": "https://api.github.com/users/acme/gists{/gist_id}",
+          "gravatar_id": "",
+          "html_url": "https://github.com/acme",
+          "id": 200001,
+          "login": "acme",
+          "node_id": "U_kgDOA200001",
+          "organizations_url": "https://api.github.com/users/acme/orgs",
+          "received_events_url": "https://api.github.com/users/acme/received_events",
+          "repos_url": "https://api.github.com/users/acme/repos",
+          "site_admin": false,
+          "starred_url": "https://api.github.com/users/acme/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/acme/subscriptions",
+          "type": "User",
+          "url": "https://api.github.com/users/acme"
+        },
+        "permissions": {
+          "admin": false,
+          "maintain": false,
+          "pull": true,
+          "push": true,
+          "triage": true
+        },
+        "private": false,
+        "pulls_url": "https://api.github.com/repos/acme/widgets/pulls{/number}",
+        "pushed_at": "2026-04-22T09:58:00Z",
+        "releases_url": "https://api.github.com/repos/acme/widgets/releases{/id}",
+        "size": 2048,
+        "squash_merge_commit_message": "COMMIT_MESSAGES",
+        "squash_merge_commit_title": "COMMIT_OR_PR_TITLE",
+        "ssh_url": "git@github.com:acme/widgets.git",
+        "stargazers_count": 120,
+        "stargazers_url": "https://api.github.com/repos/acme/widgets/stargazers",
+        "statuses_url": "https://api.github.com/repos/acme/widgets/statuses/{sha}",
+        "subscribers_url": "https://api.github.com/repos/acme/widgets/subscribers",
+        "subscription_url": "https://api.github.com/repos/acme/widgets/subscription",
+        "svn_url": "https://github.com/acme/widgets",
+        "tags_url": "https://api.github.com/repos/acme/widgets/tags",
+        "teams_url": "https://api.github.com/repos/acme/widgets/teams",
+        "topics": [
+          "automation",
+          "widgets"
+        ],
+        "trees_url": "https://api.github.com/repos/acme/widgets/git/trees{/sha}",
+        "updated_at": "2026-04-22T09:58:00Z",
+        "url": "https://api.github.com/repos/acme/widgets",
+        "visibility": "public",
+        "watchers": 120,
+        "watchers_count": 120,
+        "web_commit_signoff_required": false
+      },
+      "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "user": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/200001?v=4",
+        "events_url": "https://api.github.com/users/acme/events{/privacy}",
+        "followers_url": "https://api.github.com/users/acme/followers",
+        "following_url": "https://api.github.com/users/acme/following{/other_user}",
+        "gists_url": "https://api.github.com/users/acme/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/acme",
+        "id": 200001,
+        "login": "acme",
+        "node_id": "U_kgDOA200001",
+        "organizations_url": "https://api.github.com/users/acme/orgs",
+        "received_events_url": "https://api.github.com/users/acme/received_events",
+        "repos_url": "https://api.github.com/users/acme/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/acme/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/acme/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/acme"
+      }
+    },
+    "html_url": "https://github.com/acme/widgets/pull/42",
+    "id": 1234567890,
+    "issue_url": "https://api.github.com/repos/acme/widgets/issues/42",
+    "labels": [
+      {
+        "color": "a2eeef",
+        "default": true,
+        "description": "New feature or request",
+        "id": 208045946,
+        "name": "enhancement",
+        "node_id": "MDU6TGFiZWwyMDgwNDU5NDY=",
+        "url": "https://api.github.com/repos/acme/widgets/labels/enhancement"
+      }
+    ],
+    "locked": false,
+    "maintainer_can_modify": true,
+    "mergeable": true,
+    "mergeable_state": "clean",
+    "merged": false,
+    "milestone": {
+      "closed_issues": 8,
+      "created_at": "2026-01-05T10:00:00Z",
+      "creator": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4",
+        "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+        "followers_url": "https://api.github.com/users/octocat/followers",
+        "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+        "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/octocat",
+        "id": 1,
+        "login": "octocat",
+        "node_id": "U_kgDOA000001",
+        "organizations_url": "https://api.github.com/users/octocat/orgs",
+        "received_events_url": "https://api.github.com/users/octocat/received_events",
+        "repos_url": "https://api.github.com/users/octocat/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/octocat"
+      },
+      "description": "First stable release",
+      "due_on": "2026-03-01T08:00:00Z",
+      "html_url": "https://github.com/acme/widgets/milestone/1",
+      "id": 1002604,
+      "labels_url": "https://api.github.com/repos/acme/widgets/milestones/1/labels",
+      "node_id": "MDk6TWlsZXN0b25lMTAwMjYwNA==",
+      "number": 1,
+      "open_issues": 4,
+      "state": "open",
+      "title": "v1.0",
+      "updated_at": "2026-01-16T17:40:00Z",
+      "url": "https://api.github.com/repos/acme/widgets/milestones/1"
+    },
+    "node_id": "PR_kwDOABCD12MAAAABCDEFGH",
+    "number": 42,
+    "patch_url": "https://github.com/acme/widgets/pull/42.patch",
+    "rebaseable": true,
+    "requested_reviewers": [
+      {
+        "avatar_url": "https://avatars.githubusercontent.com/u/2?v=4",
+        "events_url": "https://api.github.com/users/hubot/events{/privacy}",
+        "followers_url": "https://api.github.com/users/hubot/followers",
+        "following_url": "https://api.github.com/users/hubot/following{/other_user}",
+        "gists_url": "https://api.github.com/users/hubot/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/hubot",
+        "id": 2,
+        "login": "hubot",
+        "node_id": "U_kgDOA000002",
+        "organizations_url": "https://api.github.com/users/hubot/orgs",
+        "received_events_url": "https://api.github.com/users/hubot/received_events",
+        "repos_url": "https://api.github.com/users/hubot/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/hubot/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/hubot/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/hubot"
+      }
+    ],
+    "review_comment_url": "https://api.github.com/repos/acme/widgets/pulls/comments{/number}",
+    "review_comments": 1,
+    "review_comments_url": "https://api.github.com/repos/acme/widgets/pulls/42/comments",
+    "state": "open",
+    "statuses_url": "https://api.github.com/repos/acme/widgets/statuses/a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+    "title": "Add new feature",
+    "updated_at": "2026-04-22T11:15:00Z",
+    "url": "https://api.github.com/repos/acme/widgets/pulls/42",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4",
+      "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+      "followers_url": "https://api.github.com/users/octocat/followers",
+      "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+      "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat",
+      "node_id": "U_kgDOA000001",
+      "organizations_url": "https://api.github.com/users/octocat/orgs",
+      "received_events_url": "https://api.github.com/users/octocat/received_events",
+      "repos_url": "https://api.github.com/users/octocat/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/octocat"
+    }
+  },
+  "timestamp": "2026-04-22T11:15:00.000000000Z",
+  "type": "github.pullRequest"
+}
+```
+
 <a id="update-release"></a>
 
 ## Update Release
@@ -3349,8 +4640,7 @@ Returns the updated release object with all current information.
     "id": 3001,
     "name": "Release 1.2.3",
     "prerelease": false,
-    "tag_name": "v1.2.3",
-    "updated_at": "2026-01-16T17:50:00Z"
+    "tag_name": "v1.2.3"
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"

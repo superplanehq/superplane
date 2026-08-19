@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -41,7 +42,7 @@ func handleWorkflowEventState(canvasID string, eventID string, wsHub *ws.Hub, ev
 		return fmt.Errorf("failed to parse event id: %w", err)
 	}
 
-	event, err := models.FindCanvasEventForCanvas(canvasUUID, eventUUID)
+	event, err := models.FindCanvasEventForCanvas(database.Conn(), canvasUUID, eventUUID)
 	if err != nil {
 		return fmt.Errorf("failed to find event: %w", err)
 	}

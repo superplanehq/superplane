@@ -104,9 +104,9 @@ export function useCanvasStagingResync(options: UseCanvasStagingResyncOptions) {
         const versionShell = queryClient.getQueryData<CanvasesCanvasVersion>(
           canvasKeys.versionDetail(canvasId, versionId),
         ) ??
-          queryClient
-            .getQueryData<CanvasesCanvasVersion[]>(canvasKeys.versionList(canvasId))
-            ?.find((item) => item.metadata?.id === versionId) ?? { metadata: { id: versionId } };
+          queryClient.getQueryData<CanvasesCanvasVersion>(canvasKeys.versionDescribe(canvasId, versionId)) ?? {
+            metadata: { id: versionId },
+          };
 
         const stagedCanvasSpecKey = canvasKeys.stagedCanvasSpec(canvasId);
         const cachedStaged = preferCachedStagedSpec

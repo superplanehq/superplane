@@ -1,0 +1,1167 @@
+---
+title: "Linear"
+---
+
+Manage and react to issues in Linear
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events from Linear" />
+  <LinkCard title="On Issue Attachment" href="#on-issue-attachment" description="Listen to attachment events on Linear issues" />
+  <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to comment events on Linear issues" />
+  <LinkCard title="On Issue Label" href="#on-issue-label" description="Listen for a target label being added to a Linear issue" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Add Issue Comment" href="#add-issue-comment" description="Add a comment to an issue in Linear" />
+  <LinkCard title="Add Issue Label" href="#add-issue-label" description="Add labels to an issue in Linear" />
+  <LinkCard title="Add Reaction" href="#add-reaction" description="Add an emoji reaction to an issue or comment in Linear" />
+  <LinkCard title="Create Attachment" href="#create-attachment" description="Attach a link to an issue in Linear" />
+  <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Linear" />
+  <LinkCard title="Delete Attachment" href="#delete-attachment" description="Remove an attachment from an issue in Linear" />
+  <LinkCard title="Get Issue" href="#get-issue" description="Fetch a single issue from Linear" />
+  <LinkCard title="Remove Issue Label" href="#remove-issue-label" description="Remove labels from an issue in Linear" />
+  <LinkCard title="Update Issue" href="#update-issue" description="Update an existing issue in Linear" />
+  <LinkCard title="Update Issue Comment" href="#update-issue-comment" description="Update an existing comment on an issue in Linear" />
+</CardGrid>
+
+## Instructions
+
+SuperPlane connects to Linear with OAuth.
+
+1. Click the **Connect** button with client id and secret empty to start the setup wizard.
+
+The connection requests the **read**, **write** and **admin** scopes. Write covers creating and editing
+issues, comments, attachments and reactions; admin is needed because the triggers register webhooks,
+which Linear restricts to workspace admins.
+
+Components act as the user who authorizes the connection, so that user needs access to the teams you
+automate. Linear also lets only a comment's own author edit it, so **Update Issue Comment** can only
+change comments that this same connection posted.
+
+<a id="on-issue"></a>
+
+## On Issue
+
+**Trigger key:** `linear.onIssue`
+
+The On Issue trigger starts a workflow execution when issue events occur in a Linear team.
+
+### Use Cases
+
+- **Notify Slack** when an issue is created so the team can triage it
+- **Create a GitHub issue** when a Linear issue is created, for traceability
+- **Update external dashboards** when an issue is completed or deleted
+
+### Configuration
+
+- **Team** (required): Linear team to monitor
+- **Actions** (required): Which issue actions to listen for (created, updated, deleted). Default: created.
+- **Labels** (optional): Only trigger for issues carrying specific labels
+
+### Outputs
+
+- **Default channel**: Emits the Linear webhook payload, including `action`, `actor`, the issue
+  `url`, and a `data` object with the issue `identifier`, `title`, `state`, `team` and `labels`.
+
+### Webhook Setup
+
+This trigger registers a Linear webhook automatically when configured, and removes it when the
+trigger is deleted. Linear only allows webhook management for workspace admins or OAuth tokens with
+the **admin** scope, so the Linear connection must be authorized by a **workspace admin**.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "create",
+    "actor": {
+      "email": "john@example.com",
+      "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "name": "John Doe",
+      "type": "user",
+      "url": "https://linear.app/acme/profiles/john"
+    },
+    "createdAt": "2026-03-26T19:29:35.841Z",
+    "data": {
+      "assigneeId": "aacdca22-6266-4c0a-ab3c-8fa70a26765c",
+      "createdAt": "2026-03-26T19:29:35.841Z",
+      "creatorId": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "description": "The deploy job fails when retried after a timeout.",
+      "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+      "identifier": "ENG-142",
+      "labelIds": [
+        "3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5"
+      ],
+      "labels": [
+        {
+          "id": "3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5",
+          "name": "bug"
+        }
+      ],
+      "number": 142,
+      "parentId": null,
+      "previousIdentifiers": [],
+      "priority": 2,
+      "priorityLabel": "High",
+      "projectId": "7a1e6b70-1b5c-4a9c-9b1e-0d2f4a8e3c11",
+      "state": {
+        "id": "f2f2b3d1-6a55-4f22-9f70-1a2b3c4d5e6f",
+        "name": "Todo",
+        "type": "unstarted"
+      },
+      "stateId": "f2f2b3d1-6a55-4f22-9f70-1a2b3c4d5e6f",
+      "subscriberIds": [
+        "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba"
+      ],
+      "team": {
+        "id": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+        "key": "ENG",
+        "name": "Engineering"
+      },
+      "teamId": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+      "title": "Deploy pipeline fails on retry",
+      "updatedAt": "2026-03-26T19:29:35.841Z"
+    },
+    "organizationId": "dc844923-f9a4-40a3-825c-dea7747e57d6",
+    "type": "Issue",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry",
+    "webhookId": "000042e3-d123-4980-b49f-8e140eef9329",
+    "webhookTimestamp": 1774553375841
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "linear.issue"
+}
+```
+
+<a id="on-issue-attachment"></a>
+
+## On Issue Attachment
+
+**Trigger key:** `linear.onIssueAttachment`
+
+The On Issue Attachment trigger starts a workflow execution when a link attachment is
+added, updated or removed on an issue in a Linear team.
+
+### Use Cases
+
+- **Triage on evidence**: Raise priority when an alert or error report is attached to an issue
+- **React to linked work**: Start a workflow when a pull request is attached
+- **Clean-up**: Act when an attachment is removed from an issue
+
+### Configuration
+
+- **Team** (required): Linear team to monitor
+- **Actions** (required): Which attachment actions to listen for (added, updated, removed).
+  Default: added.
+
+### Outputs
+
+- **Default channel**: Emits the Linear webhook payload, including `action`,
+`actor`, and a `data` object with the attachment `title`,
+`subtitle`, `url` and `id`.
+
+Linear's attachment payload identifies the issue only by `issueId`, so this trigger looks
+the issue up and adds an `issue` object with its `identifier`, `title`
+and `url`. If that lookup fails the event is still delivered, without the `issue`
+object.
+
+### Deduplication
+
+Linear deduplicates attachments by URL within an issue, so re-attaching an existing URL arrives as an
+`update` rather than a `create`. Select **Updated** to catch those.
+
+### Webhook Setup
+
+This trigger registers a Linear webhook automatically when configured, and removes it when the
+trigger is deleted. Linear only allows webhook management for workspace admins or OAuth tokens with
+the **admin** scope, so the Linear connection must be authorized by a **workspace admin**.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "create",
+    "actor": {
+      "email": "ada@example.com",
+      "id": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "name": "Ada Lovelace",
+      "type": "user",
+      "url": "https://linear.app/acme/profiles/ada"
+    },
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "data": {
+      "createdAt": "2026-03-27T16:42:11.123Z",
+      "creatorId": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "groupBySource": false,
+      "id": "a7c41e88-1b2d-4f6a-9c3e-5d8f0a1b2c3d",
+      "issue": {
+        "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+        "identifier": "ENG-142",
+        "title": "Deploy pipeline fails on retry",
+        "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+      },
+      "issueId": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+      "metadata": {},
+      "sourceType": "unknown",
+      "subtitle": "Succeeded in 4m 12s",
+      "title": "Deploy - staging",
+      "updatedAt": "2026-03-27T16:42:11.123Z",
+      "url": "https://app.superplane.com/runs/8f21c4d0"
+    },
+    "organizationId": "dc844923-1f0a-4b6e-9d7c-2a3b4c5d6e7f",
+    "type": "Attachment",
+    "webhookId": "000042e3-5c6d-4e8f-9a0b-1c2d3e4f5a6b",
+    "webhookTimestamp": 1774629731123
+  },
+  "timestamp": "2026-03-27T16:42:11.123456789Z",
+  "type": "linear.attachment"
+}
+```
+
+<a id="on-issue-comment"></a>
+
+## On Issue Comment
+
+**Trigger key:** `linear.onIssueComment`
+
+The On Issue Comment trigger starts a workflow execution when a comment is created,
+updated or deleted on an issue in a Linear team.
+
+### Use Cases
+
+- **Run a command** when someone comments a keyword like `/deploy` on an issue
+- **Sync discussion** to another tool when a comment is added
+- **Notify a channel** when an issue gets new activity
+
+### Configuration
+
+- **Team** (required): Linear team to monitor
+- **Actions** (required): Which comment actions to listen for (created, updated, deleted). Default: created.
+- **Content Filter** (optional): Regex pattern to filter comments by content, e.g. `/deploy` to
+  only trigger on comments containing "/deploy". A comment delivered without a body never matches.
+
+### Outputs
+
+- **Default channel**: Emits the Linear webhook payload, including `action`, `actor`, the comment
+  `url`, and a `data` object with the comment `body`, its `user`, and the `issue` it belongs to.
+
+### Webhook Setup
+
+This trigger registers a Linear webhook automatically when configured, and removes it when the
+trigger is deleted. Linear only allows webhook management for workspace admins or OAuth tokens with
+the **admin** scope, so the Linear connection must be authorized by a **workspace admin**.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "create",
+    "actor": {
+      "email": "ada@example.com",
+      "id": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "name": "Ada Lovelace",
+      "type": "user",
+      "url": "https://linear.app/acme/profiles/ada"
+    },
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "data": {
+      "body": "Deploy pipeline is green again — root cause was a flaky runner.",
+      "createdAt": "2026-03-27T16:42:11.123Z",
+      "id": "d3f9b0a2-4c1e-4b6a-9f2e-8a1b2c3d4e5f",
+      "issue": {
+        "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+        "identifier": "ENG-142",
+        "teamId": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+        "title": "Deploy pipeline fails on retry",
+        "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+      },
+      "issueId": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+      "reactionData": [],
+      "updatedAt": "2026-03-27T16:42:11.123Z",
+      "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry#comment-d3f9b0a2",
+      "user": {
+        "displayName": "ada",
+        "email": "ada@example.com",
+        "id": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+        "name": "Ada Lovelace"
+      },
+      "userId": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d"
+    },
+    "organizationId": "dc844923-f9a4-40a3-825c-dea7747e57d6",
+    "type": "Comment",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry#comment-d3f9b0a2",
+    "webhookId": "000042e3-d123-4980-b49f-8e140eef9329",
+    "webhookTimestamp": 1774629731123
+  },
+  "timestamp": "2026-03-27T16:42:11.123456789Z",
+  "type": "linear.comment"
+}
+```
+
+<a id="on-issue-label"></a>
+
+## On Issue Label
+
+**Trigger key:** `linear.onIssueLabel`
+
+The On Issue Label trigger starts a workflow execution when one of the selected labels is
+added to an issue in a Linear team.
+
+### Use Cases
+
+- **Kick off automation** when a `factory` label is added to an issue
+- **Route work** to a pipeline when a `ready-for-deploy` label is applied
+- **Notify a team** when a triage label lands on an issue
+
+### Configuration
+
+- **Team** (required): Linear team to monitor
+- **Labels** (required): The label(s) to watch for. The trigger fires only when one of these is
+  added to an issue, not on later edits of an already-labelled issue.
+
+### Outputs
+
+- **Default channel**: Emits the Linear webhook payload, including `action`, `actor`, the issue
+  `url`, and a `data` object with the issue `identifier`, `title`, `state`, `team` and `labels`.
+
+### Webhook Setup
+
+This trigger registers a Linear webhook automatically when configured, and removes it when the
+trigger is deleted. Linear only allows webhook management for workspace admins or OAuth tokens with
+the **admin** scope, so the Linear connection must be authorized by a **workspace admin**.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "update",
+    "actor": {
+      "email": "john@example.com",
+      "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "name": "John Doe",
+      "type": "user",
+      "url": "https://linear.app/acme/profiles/john"
+    },
+    "createdAt": "2026-03-26T19:29:35.841Z",
+    "data": {
+      "assigneeId": "aacdca22-6266-4c0a-ab3c-8fa70a26765c",
+      "createdAt": "2026-03-26T19:20:11.004Z",
+      "creatorId": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "description": "The deploy job fails when retried after a timeout.",
+      "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+      "identifier": "ENG-142",
+      "labelIds": [
+        "3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5",
+        "8b1d2c3e-4f5a-6b7c-8d9e-0f1a2b3c4d5e"
+      ],
+      "labels": [
+        {
+          "id": "3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5",
+          "name": "bug"
+        },
+        {
+          "id": "8b1d2c3e-4f5a-6b7c-8d9e-0f1a2b3c4d5e",
+          "name": "factory"
+        }
+      ],
+      "number": 142,
+      "parentId": null,
+      "previousIdentifiers": [],
+      "priority": 2,
+      "priorityLabel": "High",
+      "projectId": "7a1e6b70-1b5c-4a9c-9b1e-0d2f4a8e3c11",
+      "state": {
+        "id": "f2f2b3d1-6a55-4f22-9f70-1a2b3c4d5e6f",
+        "name": "Todo",
+        "type": "unstarted"
+      },
+      "stateId": "f2f2b3d1-6a55-4f22-9f70-1a2b3c4d5e6f",
+      "subscriberIds": [
+        "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba"
+      ],
+      "team": {
+        "id": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+        "key": "ENG",
+        "name": "Engineering"
+      },
+      "teamId": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+      "title": "Deploy pipeline fails on retry",
+      "updatedAt": "2026-03-26T19:29:35.841Z"
+    },
+    "organizationId": "dc844923-f9a4-40a3-825c-dea7747e57d6",
+    "type": "Issue",
+    "updatedFrom": {
+      "labelIds": [
+        "3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5"
+      ],
+      "updatedAt": "2026-03-26T19:20:11.004Z"
+    },
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry",
+    "webhookId": "000042e3-d123-4980-b49f-8e140eef9329",
+    "webhookTimestamp": 1774553375841
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "linear.issue"
+}
+```
+
+<a id="add-issue-comment"></a>
+
+## Add Issue Comment
+
+**Component key:** `linear.addIssueComment`
+
+The Add Issue Comment component adds a comment to an existing Linear issue.
+
+### Use Cases
+
+- **Automated updates**: Post deployment status or workflow results onto the issue
+- **Runbook linking**: Drop runbook links, error details, or context for responders
+- **Cross-tool sync**: Mirror notes from Slack or another tracker into Linear
+
+### Configuration
+
+- **Issue** (required): The issue to comment on, by identifier (e.g. ENG-142) or ID. Supports
+  expressions.
+- **Body** (required): The comment text, written in Markdown. Supports expressions.
+
+### Output
+
+Returns the created comment, including its `id`, `body`, `url`,
+`createdAt`, the `user` who authored it, and the `issue` it was added to.
+
+### Permissions
+
+The user who authorized the Linear connection must be able to comment on the issue. SuperPlane's
+OAuth connection includes the **write** scope, which covers creating comments.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "body": "Deploy pipeline is green again — root cause was a flaky runner.",
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "id": "d3f9b0a2-4c1e-4b6a-9f2e-8a1b2c3d4e5f",
+    "issue": {
+      "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+      "identifier": "ENG-142",
+      "title": "Deploy pipeline fails on retry",
+      "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+    },
+    "updatedAt": "2026-03-27T16:42:11.123Z",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry#comment-d3f9b0a2",
+    "user": {
+      "displayName": "ada",
+      "email": "ada@example.com",
+      "id": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "name": "Ada Lovelace"
+    }
+  },
+  "timestamp": "2026-03-27T16:42:11.123456789Z",
+  "type": "linear.comment"
+}
+```
+
+<a id="add-issue-label"></a>
+
+## Add Issue Label
+
+**Component key:** `linear.addIssueLabel`
+
+The Add Issue Label component adds one or more labels to an existing Linear issue,
+keeping any labels already on it.
+
+### Use Cases
+
+- **Triage automation**: Label issues automatically based on workflow signals
+- **Status tracking**: Add labels as an issue moves through a workflow
+- **Cross-tool sync**: Apply labels from another system onto a Linear issue
+
+### Configuration
+
+- **Team** (required): The Linear team whose labels populate the picker. Select the team the
+  issue belongs to.
+- **Issue** (required): The issue to label, by identifier (e.g. ENG-142) or ID. Supports expressions.
+- **Labels** (optional): One or more existing labels to add. Existing labels on the issue are kept.
+- **New Labels** (optional): Names of labels to create if they don't exist yet, then add. A name
+  that already matches a team or workspace label is reused instead of creating a duplicate. New
+  labels are created in the selected team.
+
+At least one label must be provided across the two fields.
+
+### Output
+
+Returns the updated issue, including its `identifier`, `url`, `title`,
+`state`, `team`, `assignee`, `priorityLabel` and the full
+set of `labels` after the addition.
+
+### Permissions
+
+The user who authorized the Linear connection must be able to edit the issue. SuperPlane's OAuth
+connection includes the **write** scope, which covers adding and creating labels. Labels are added
+one at a time, so a mid-way failure may leave some already applied.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignee": {
+      "displayName": "jane",
+      "email": "jane@example.com",
+      "id": "aacdca22-6266-4c0a-ab3c-8fa70a26765c",
+      "name": "Jane Doe"
+    },
+    "branchName": "jane/eng-142-deploy-pipeline-fails-on-retry",
+    "createdAt": "2026-03-26T19:29:35.841Z",
+    "creator": {
+      "displayName": "john",
+      "email": "john@example.com",
+      "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "name": "John Doe"
+    },
+    "description": "The deploy job fails when retried after a timeout.",
+    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+    "identifier": "ENG-142",
+    "labels": [
+      {
+        "id": "3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5",
+        "name": "bug"
+      },
+      {
+        "id": "8b2d4e66-1c3a-4f5b-9d7e-2a4c6e8f0b12",
+        "name": "regression"
+      }
+    ],
+    "number": 142,
+    "priority": 1,
+    "priorityLabel": "Urgent",
+    "project": {
+      "id": "7a1e6b70-1b5c-4a9c-9b1e-0d2f4a8e3c11",
+      "name": "Q3 Reliability"
+    },
+    "state": {
+      "id": "a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "In Progress",
+      "type": "started"
+    },
+    "team": {
+      "id": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+      "key": "ENG",
+      "name": "Engineering"
+    },
+    "title": "Deploy pipeline fails on retry",
+    "updatedAt": "2026-03-27T14:05:52.238Z",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+  },
+  "timestamp": "2026-03-27T14:05:52.238104773Z",
+  "type": "linear.issue"
+}
+```
+
+<a id="add-reaction"></a>
+
+## Add Reaction
+
+**Component key:** `linear.addReaction`
+
+The Add Reaction component adds an emoji reaction to a Linear issue or to a comment on one.
+
+### Use Cases
+
+- **Acknowledge commands**: React with 👀 so the author sees a `/deploy` comment was picked up
+- **Signal results**: React with ✅ or ❌ when the run finishes, without another notification
+- **Quiet status**: Reactions notify nobody, unlike a comment per run
+
+### Configuration
+
+- **Target** (required): React to the issue itself, or to a comment on it. Default: issue.
+- **Issue** (required for the issue target): The issue, by identifier (e.g. ENG-142) or ID
+- **Comment** (required for the comment target): The comment ID to react to
+- **Reaction** (required): The emoji to add. Default: eyes.
+
+### Re-running
+
+Adding a reaction that is already present is treated as success, so this component is safe to
+re-run. Linear also normalizes emoji aliases - thumbsup is stored as `+1` - which this
+component accounts for.
+
+### Output
+
+Returns the created reaction, including its `id`, `emoji` and the
+`user` it is attributed to. Keep the `id` if a later step needs to remove it.
+
+### Permissions
+
+The user who authorized the Linear connection must be able to see the issue. SuperPlane's OAuth
+connection includes the **write** scope, which covers adding reactions.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "emoji": "eyes",
+    "id": "c9e1f7a3-5b2d-4e8c-9a0f-1b2c3d4e5f60",
+    "user": {
+      "displayName": "ada",
+      "email": "ada@example.com",
+      "id": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "name": "Ada Lovelace"
+    }
+  },
+  "timestamp": "2026-03-27T16:42:11.123456789Z",
+  "type": "linear.reaction"
+}
+```
+
+<a id="create-attachment"></a>
+
+## Create Attachment
+
+**Component key:** `linear.createAttachment`
+
+The Create Attachment component adds a link attachment to an existing Linear issue.
+Attachments render as cards on the issue instead of messages in the comment thread.
+
+### Use Cases
+
+- **Status tiles**: Attach a deploy or pipeline run and keep it current as the run progresses
+- **Cross-linking**: Attach the pull request, dashboard, or alert behind an issue
+- **Traceability**: Attach the SuperPlane run that acted on the issue
+
+### Configuration
+
+- **Issue** (required): The issue to attach to, by identifier (e.g. ENG-142) or ID. Supports
+  expressions.
+- **Title** (required): The attachment's headline. Supports expressions.
+- **URL** (required): The link the attachment points to. Supports expressions.
+- **Subtitle** (optional): Secondary line shown under the title. Supports expressions.
+- **Icon URL** (optional): Icon shown on the attachment card. Linear downloads the image when the
+  attachment is created, so the URL must be publicly reachable — an unreachable one fails the whole
+  step, not just the icon. Linear does not expose the icon on the attachment afterwards, so it is not
+  part of this component's output.
+
+### Deduplication
+
+Linear deduplicates attachments by URL within an issue. Creating an attachment with a URL that is
+already attached **updates that attachment in place** rather than adding a second one, and Linear
+sends an `update` webhook action rather than `create`. This makes the component
+safe to run repeatedly: keep the URL stable and vary the title or subtitle to show progress, without
+the notification noise a new comment per run would cause.
+
+### Output
+
+Returns the created attachment, including its `id`, `title`, `subtitle`,
+`url`, the `creator`, and the `issue` it belongs to. Keep the
+`id` if a later step needs to delete the attachment.
+
+### Permissions
+
+The user who authorized the Linear connection must be able to edit the issue. SuperPlane's OAuth
+connection includes the **write** scope, which covers creating attachments.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "creator": {
+      "displayName": "ada",
+      "email": "ada@example.com",
+      "id": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "name": "Ada Lovelace"
+    },
+    "id": "a7c41e88-1b2d-4f6a-9c3e-5d8f0a1b2c3d",
+    "issue": {
+      "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+      "identifier": "ENG-142",
+      "title": "Deploy pipeline fails on retry",
+      "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+    },
+    "subtitle": "Succeeded in 4m 12s",
+    "title": "Deploy - staging",
+    "updatedAt": "2026-03-27T16:42:11.123Z",
+    "url": "https://app.superplane.com/runs/8f21c4d0"
+  },
+  "timestamp": "2026-03-27T16:42:11.123456789Z",
+  "type": "linear.attachment"
+}
+```
+
+<a id="create-issue"></a>
+
+## Create Issue
+
+**Component key:** `linear.createIssue`
+
+The Create Issue component creates a new issue in a Linear team.
+
+### Use Cases
+
+- **Bug tracking**: Open a Linear issue when an alert fires or a pipeline fails
+- **Task creation**: Turn incoming requests into tracked work automatically
+- **Traceability**: Mirror an issue from another tracker into Linear
+
+### Configuration
+
+- **Team** (required): The Linear team to create the issue in
+- **Title** (required): The issue title
+- **Description** (optional): Issue description, written in Markdown
+- **Project** (optional): Project to add the issue to
+- **Status** (optional): Workflow state for the new issue. Leave empty to use the team's default — Linear
+  puts new issues in the first Backlog state, or in Triage when the team has triage enabled.
+- **Assignee** (optional): Team member to assign the issue to
+- **Priority** (optional): No priority, Urgent, High, Medium or Low
+- **Labels** (optional): Labels to apply to the issue
+
+### Output
+
+Returns the created issue, including its `identifier` (e.g. ENG-142), `url`, `title`,
+`state`, `team`, `assignee`, `priorityLabel` and `labels`.
+
+### Permissions
+
+The user who authorized the Linear connection must be a member of the selected team. SuperPlane's
+OAuth connection includes the **write** scope, which covers creating issues.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignee": {
+      "displayName": "jane",
+      "email": "jane@example.com",
+      "id": "aacdca22-6266-4c0a-ab3c-8fa70a26765c",
+      "name": "Jane Doe"
+    },
+    "branchName": "jane/eng-142-deploy-pipeline-fails-on-retry",
+    "createdAt": "2026-03-26T19:29:35.841Z",
+    "creator": {
+      "displayName": "john",
+      "email": "john@example.com",
+      "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "name": "John Doe"
+    },
+    "description": "The deploy job fails when retried after a timeout.",
+    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+    "identifier": "ENG-142",
+    "labels": [
+      {
+        "id": "3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5",
+        "name": "bug"
+      }
+    ],
+    "number": 142,
+    "priority": 2,
+    "priorityLabel": "High",
+    "project": {
+      "id": "7a1e6b70-1b5c-4a9c-9b1e-0d2f4a8e3c11",
+      "name": "Q3 Reliability"
+    },
+    "state": {
+      "id": "f2f2b3d1-6a55-4f22-9f70-1a2b3c4d5e6f",
+      "name": "Todo",
+      "type": "unstarted"
+    },
+    "team": {
+      "id": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+      "key": "ENG",
+      "name": "Engineering"
+    },
+    "title": "Deploy pipeline fails on retry",
+    "updatedAt": "2026-03-26T19:29:35.841Z",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "linear.issue"
+}
+```
+
+<a id="delete-attachment"></a>
+
+## Delete Attachment
+
+**Component key:** `linear.deleteAttachment`
+
+The Delete Attachment component removes a link attachment from a Linear issue.
+
+### Use Cases
+
+- **Clear stale links**: Drop a preview environment attachment once the environment is torn down
+- **Tidy up**: Remove an attachment a workflow added earlier in the run
+- **Replace**: Delete an attachment before attaching a different URL in its place
+
+### Configuration
+
+- **Issue** (optional): The issue whose attachments fill the picker below. Only used to populate the
+  picker, so it can be left empty when the attachment comes from an expression.
+- **Attachment** (required): The attachment to delete. Pick one from the issue, or switch the field
+  to an expression to supply an ID resolved at run time.
+
+### Finding the attachment ID
+
+Linear has no delete-by-URL, so this component needs the attachment's ID. Either pick it from the
+issue, or carry it through from a previous step: the **Create Attachment** output and the
+**On Issue Attachment** trigger payload both expose `id`.
+
+### Output
+
+Returns the deleted attachment's `id` and a `deleted` flag.
+
+### Permissions
+
+The user who authorized the Linear connection must be able to edit the issue. SuperPlane's OAuth
+connection includes the **write** scope, which covers deleting attachments.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "id": "a7c41e88-1b2d-4f6a-9c3e-5d8f0a1b2c3d"
+  },
+  "timestamp": "2026-03-27T16:42:11.123456789Z",
+  "type": "linear.attachment"
+}
+```
+
+<a id="get-issue"></a>
+
+## Get Issue
+
+**Component key:** `linear.getIssue`
+
+The Get Issue component fetches a single issue from Linear by its identifier or ID.
+
+### Use Cases
+
+- **Read state, then act**: Look up an issue's current status, assignee, or labels before deciding what to do next
+- **Data enrichment**: Pull issue details into a workflow to combine with other information
+- **Status checking**: Check whether an issue is done before performing an action
+
+### Configuration
+
+- **Issue** (required): The issue to fetch. Accepts either the human-readable identifier (e.g. ENG-142)
+  or the issue's UUID. Supports expressions, so the value can come from an upstream event.
+
+### Output
+
+Returns the issue, including its `identifier` (e.g. ENG-142), `url`, `title`,
+`description`, `state`, `team`, `assignee`, `creator`, `project`,
+`priorityLabel` and `labels`.
+
+### Permissions
+
+SuperPlane's OAuth connection includes the **read** scope, which covers reading issues. The issue must
+be visible to the user who authorized the Linear connection.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignee": {
+      "displayName": "jane",
+      "email": "jane@example.com",
+      "id": "aacdca22-6266-4c0a-ab3c-8fa70a26765c",
+      "name": "Jane Doe"
+    },
+    "branchName": "jane/eng-142-deploy-pipeline-fails-on-retry",
+    "createdAt": "2026-03-26T19:29:35.841Z",
+    "creator": {
+      "displayName": "john",
+      "email": "john@example.com",
+      "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "name": "John Doe"
+    },
+    "description": "The deploy job fails when retried after a timeout.",
+    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+    "identifier": "ENG-142",
+    "labels": [
+      {
+        "id": "3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5",
+        "name": "bug"
+      }
+    ],
+    "number": 142,
+    "priority": 2,
+    "priorityLabel": "High",
+    "project": {
+      "id": "7a1e6b70-1b5c-4a9c-9b1e-0d2f4a8e3c11",
+      "name": "Q3 Reliability"
+    },
+    "state": {
+      "id": "a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "In Progress",
+      "type": "started"
+    },
+    "team": {
+      "id": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+      "key": "ENG",
+      "name": "Engineering"
+    },
+    "title": "Deploy pipeline fails on retry",
+    "updatedAt": "2026-03-27T08:12:04.512Z",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+  },
+  "timestamp": "2026-03-27T08:12:04.512873941Z",
+  "type": "linear.issue"
+}
+```
+
+<a id="remove-issue-label"></a>
+
+## Remove Issue Label
+
+**Component key:** `linear.removeIssueLabel`
+
+The Remove Issue Label component removes one or more labels from an existing Linear issue,
+leaving its other labels untouched.
+
+### Use Cases
+
+- **Status transitions**: Clear `in-progress` once a workflow finishes
+- **Triage cleanup**: Strip a temporary triage label after processing
+- **Undo**: Remove a label a previous step added
+
+### Configuration
+
+- **Team** (required): The Linear team whose labels populate the picker below
+- **Issue** (required): The issue to remove labels from, by identifier (e.g. ENG-142) or ID. Supports
+  expressions.
+- **Labels** (required): One or more labels to remove. Other labels on the issue are kept.
+- **Fail if not found** (optional): By default a label that is not on the issue is skipped, so the
+  component is safe to re-run. Turn this on to fail the execution instead.
+
+### Output
+
+Returns the updated issue, including its full remaining set of `labels`.
+
+### Permissions
+
+The user who authorized the Linear connection must be able to edit the issue. SuperPlane's OAuth
+connection includes the **write** scope, which covers removing labels.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+    "identifier": "ENG-142",
+    "labels": [
+      {
+        "id": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
+        "name": "bug"
+      }
+    ],
+    "number": 142,
+    "priority": 2,
+    "priorityLabel": "High",
+    "state": {
+      "id": "9f0c2f1a-3b4c-4d5e-8f60-a1b2c3d4e5f6",
+      "name": "In Progress",
+      "type": "started"
+    },
+    "team": {
+      "id": "9cfb482a-1d2e-4f30-8a5b-6c7d8e9f0a1b",
+      "key": "ENG",
+      "name": "Engineering"
+    },
+    "title": "Deploy pipeline fails on retry",
+    "updatedAt": "2026-03-27T16:45:02.981Z",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+  },
+  "timestamp": "2026-03-27T16:45:02.981456789Z",
+  "type": "linear.issue"
+}
+```
+
+<a id="update-issue"></a>
+
+## Update Issue
+
+**Component key:** `linear.updateIssue`
+
+The Update Issue component modifies an existing Linear issue: its title, description, status,
+assignee, priority, labels, or project.
+
+### Use Cases
+
+- **Status updates**: Move an issue to a new workflow state based on workflow results
+- **Automated triage**: Set the priority, assignee, or labels when a workflow processes the issue
+- **Cross-tool sync**: Mirror state from another system into Linear
+
+### Configuration
+
+- **Team** (required): The Linear team whose statuses, members, labels and projects populate the pickers
+  below. Select the team the issue belongs to.
+- **Issue** (required): The issue to update, by identifier (e.g. ENG-142) or ID. Supports expressions.
+- **Title** (toggle): New title for the issue
+- **Description** (toggle): New description, written in Markdown
+- **Status** (toggle): New workflow state for the issue
+- **Assignee** (toggle): Team member to assign the issue to
+- **Priority** (toggle): No priority, Urgent, High, Medium or Low
+- **Labels** (toggle): Labels to set on the issue, replacing any existing labels
+- **Project** (toggle): Project to move the issue to
+
+Each field besides Team and Issue is toggled on individually, so only the fields you enable are sent in
+the update. At least one must be enabled. Enabling a field with an empty value clears it - toggling on
+Assignee with no one selected unassigns the issue, toggling on Labels with nothing selected removes all
+of them, and toggling on Project with nothing selected removes the issue from its project. Title and
+Status are the exception: Linear does not allow a blank title or a missing status, so they must have a
+value when enabled.
+
+### Output
+
+Returns the updated issue, including its `identifier`, `url`, `title`, `state`,
+`team`, `assignee`, `priorityLabel`, `project` and `labels`.
+
+### Permissions
+
+The user who authorized the Linear connection must be able to edit the issue. SuperPlane's OAuth
+connection includes the **write** scope, which covers updating issues.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignee": {
+      "displayName": "jane",
+      "email": "jane@example.com",
+      "id": "aacdca22-6266-4c0a-ab3c-8fa70a26765c",
+      "name": "Jane Doe"
+    },
+    "branchName": "jane/eng-142-deploy-pipeline-fails-on-retry",
+    "createdAt": "2026-03-26T19:29:35.841Z",
+    "creator": {
+      "displayName": "john",
+      "email": "john@example.com",
+      "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "name": "John Doe"
+    },
+    "description": "The deploy job fails when retried after a timeout.",
+    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+    "identifier": "ENG-142",
+    "labels": [
+      {
+        "id": "3f0c1a55-9d2e-4a1b-8c3f-77a1b2c3d4e5",
+        "name": "bug"
+      }
+    ],
+    "number": 142,
+    "priority": 1,
+    "priorityLabel": "Urgent",
+    "project": {
+      "id": "7a1e6b70-1b5c-4a9c-9b1e-0d2f4a8e3c11",
+      "name": "Q3 Reliability"
+    },
+    "state": {
+      "id": "a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "In Progress",
+      "type": "started"
+    },
+    "team": {
+      "id": "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
+      "key": "ENG",
+      "name": "Engineering"
+    },
+    "title": "Deploy pipeline fails on retry",
+    "updatedAt": "2026-03-27T14:05:52.238Z",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+  },
+  "timestamp": "2026-03-27T14:05:52.238104773Z",
+  "type": "linear.issue"
+}
+```
+
+<a id="update-issue-comment"></a>
+
+## Update Issue Comment
+
+**Component key:** `linear.updateIssueComment`
+
+The Update Issue Comment component edits an existing comment on a Linear issue.
+
+### Use Cases
+
+- **Living status**: Keep one comment up to date with the latest deployment or test results instead of
+  posting a new one on every run
+- **Progressive detail**: Start with a short note and append findings as a workflow discovers them
+- **Correct mistakes**: Fix a comment an earlier step posted with incomplete information
+
+### Configuration
+
+- **Issue** (optional): The issue whose comments fill the picker below. Only used to populate the
+  picker, so it can be left empty when the comment comes from an expression.
+- **Comment** (required): The comment to update. Pick one from the issue, or switch the field to an
+  expression to supply an ID resolved at run time.
+- **Body** (required): The new comment text, written in Markdown. It is the only field Linear lets a
+  comment update change, and it cannot be empty. Supports expressions.
+
+### Finding the comment ID
+
+Comments have no human-readable identifier, so this component needs the comment's UUID. Either pick it
+from the issue, or carry it through from a previous step: the **Add Issue Comment** output and the
+**On Issue Comment** trigger payload both expose `id`.
+
+### Output
+
+Returns the updated comment, including its `id`, `body`, `url`,
+`createdAt`, `updatedAt`, `editedAt`, the `user` who authored
+it, and the `issue` it belongs to. Linear sets `editedAt` on the first edit, so it
+marks the comment as edited from then on.
+
+### Permissions
+
+Linear only lets the comment's author edit it, so the user who authorized the Linear connection must be
+the one who posted the comment. SuperPlane's OAuth connection includes the **write** scope, which
+covers editing comments.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "body": "Deploy pipeline is green again — root cause was a flaky runner. Retried 3 times, all passing.",
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "editedAt": "2026-03-27T18:05:47.482Z",
+    "id": "d3f9b0a2-4c1e-4b6a-9f2e-8a1b2c3d4e5f",
+    "issue": {
+      "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+      "identifier": "ENG-142",
+      "title": "Deploy pipeline fails on retry",
+      "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+    },
+    "updatedAt": "2026-03-27T18:05:47.482Z",
+    "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry#comment-d3f9b0a2",
+    "user": {
+      "displayName": "ada",
+      "email": "ada@example.com",
+      "id": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "name": "Ada Lovelace"
+    }
+  },
+  "timestamp": "2026-03-27T18:05:47.482913204Z",
+  "type": "linear.comment"
+}
+```
+
