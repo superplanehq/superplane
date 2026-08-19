@@ -1,0 +1,20 @@
+{
+    "type": "openrouter.getCredits.result",
+    "data": {
+        "totalCredits": 100.5,
+        "totalUsage": 25.75,
+        "balance": 74.75,
+        "key": {
+            "label": "sk-or-v1-...c0de",
+            "limit": 50,
+            "limitRemaining": 24.25,
+            "limitReset": null,
+            "usage": 25.75,
+            "usageDaily": 1.2,
+            "usageWeekly": 8.4,
+            "usageMonthly": 25.75,
+            "isFreeTier": false
+        }
+    },
+    "timestamp": "2026-08-18T12:00:00Z"
+}
