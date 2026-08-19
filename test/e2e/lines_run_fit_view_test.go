@@ -78,7 +78,8 @@ func (s *linesRunFitSteps) start() {
 }
 
 func (s *linesRunFitSteps) givenAFactory() {
-	factory, err := models.CreateFactory(database.Conn(), s.session.OrgID, support.RandomName("factory"), "", "")
+	tx := database.DB(s.t.Context())
+	factory, err := models.CreateFactory(tx, s.session.OrgID, support.RandomName("factory"), "", "")
 	require.NoError(s.t, err)
 	support.CompleteFactoryOnboarding(s.t, factory)
 	s.factory = factory
@@ -212,6 +213,7 @@ func (s *linesRunFitSteps) whenIVisitTheLineDetail() {
 func (s *linesRunFitSteps) whenIOpenThePhaseRunCard() {
 	s.session.Click(q.TestID("work-order-card-" + s.order.ID.String()))
 	s.session.AssertURLContains("run=" + s.runID.String())
+	s.session.AssertVisible(q.TestID("factory-app-canvas-page"))
 }
 
 func (s *linesRunFitSteps) thenTheFirstAndLastParticipantsFitIntoView() {
