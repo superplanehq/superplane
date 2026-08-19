@@ -319,6 +319,21 @@ func TestReportWorkOrderCheck_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
+	t.Run("requires score when format is omitted", func(t *testing.T) {
+		// Configs saved before the format field existed omit it and rely
+		// on the fraction default — score must still be required at save
+		// time, not only at run time.
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":  "{{ order().id }}",
+			"checkKey": "risk-review",
+			"name":     "Risk review",
+			"maxScore": "10",
+		})
+		if err == nil {
+			t.Fatal("expected error for missing score")
+		}
+	})
+
 	t.Run("requires passed for the boolean format", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":  "{{ order().id }}",

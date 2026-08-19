@@ -1,7 +1,7 @@
 import { Link } from "@/components/Link/link";
 import { cn } from "@/lib/utils";
 
-import { booleanCheckVerdict } from "../lib/workOrderChecks";
+import { booleanCheckVerdict, formatCheckScore } from "../lib/workOrderChecks";
 import { getWorkOrderRunHref } from "../lib/workOrderExecutions";
 import type { WorkOrderTimelineEvent } from "../lib/workOrderTimelineEvents";
 import { TimelineAutomationActor } from "./TimelineAutomationActor";
@@ -36,9 +36,8 @@ export function CheckReportedEventBody({
   const runHref = getWorkOrderRunHref(organizationId, factoryKey, event.sourceAppId, event.sourceRunId, {
     orderNumber,
   });
+  const { value: scoreLabel, scale } = formatCheckScore(check);
   const isBoolean = check.format === "boolean";
-  const scale = isBoolean ? "" : check.format === "percent" ? "%" : `/${check.maxScore}`;
-  const scoreLabel = isBoolean ? booleanCheckVerdict(check.score) : check.score;
   const previousScoreLabel =
     isBoolean && check.previousScore !== undefined ? booleanCheckVerdict(check.previousScore) : check.previousScore;
   const isRescore = check.previousScore !== undefined && check.previousScore !== check.score;
