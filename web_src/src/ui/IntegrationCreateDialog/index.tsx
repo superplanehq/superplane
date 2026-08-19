@@ -140,7 +140,7 @@ export function IntegrationCreateDialog({
       }
       onOpenChange(next);
     },
-    [onOpenChange, onReset],
+    [onOpenChange, onReset, setCreatedName],
   );
 
   const handleClose = useCallback(() => {
@@ -185,6 +185,7 @@ export function IntegrationCreateDialog({
     initialCreatedIntegrationId,
     initialConfiguration,
     resetBrowserAction,
+    setCreatedName,
   ]);
 
   const handleSubmit = useCallback(async () => {
@@ -262,6 +263,7 @@ export function IntegrationCreateDialog({
     onCreated,
     onCapabilitySetupRequired,
     setCreateIntegrationBrowserAction,
+    setCreatedName,
   ]);
 
   const handleCompleteWebhookSetup = useCallback(async () => {

@@ -45,8 +45,10 @@ func TestFactories(t *testing.T) {
 
 		recreated := steps.givenFactoryExists(name, "reused after delete")
 		require.NotEqual(t, factory.ID, recreated.ID)
-		steps.visitFactoriesList()
-		steps.assertFactoryVisibleInList(name)
+		// The workspaces index opens the remaining workspace. Incomplete
+		// setup hides the sidebar, so the name is not on that page.
+		steps.visitFactorySettings(recreated)
+		steps.assertFactorySettingsName(name)
 	})
 
 	t.Run("persists setup completion across reload", func(t *testing.T) {
@@ -81,11 +83,6 @@ func (s *factorySteps) givenFactoryExists(name, description string) *models.Fact
 	factory, err := models.CreateFactory(database.DB(s.t.Context()), s.session.OrgID, name, description, "")
 	require.NoError(s.t, err)
 	return factory
-}
-
-func (s *factorySteps) visitFactoriesList() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/workspaces")
-	s.session.Sleep(500)
 }
 
 func (s *factorySteps) visitFactorySettings(factory *models.Factory) {
@@ -141,6 +138,13 @@ func (s *factorySteps) assertFactoryVisibleInSidebar(name string) {
 	s.session.AssertText(name)
 }
 
+func (s *factorySteps) assertFactorySettingsName(name string) {
+	page := s.session.Page()
+	value, err := page.GetByTestId("factory-settings-name").InputValue()
+	require.NoError(s.t, err)
+	require.Equal(s.t, name, value)
+}
+
 func (s *factorySteps) assertFactorySavedInDB(factoryID uuid.UUID, name, description string) {
 	factory, err := models.FindFactory(database.DB(s.t.Context()), s.session.OrgID, factoryID)
 	require.NoError(s.t, err)
@@ -161,10 +165,6 @@ func (s *factorySteps) confirmDeleteFactory() {
 
 func (s *factorySteps) assertRedirectedToFactoriesList() {
 	s.session.WaitForBrowserPath("/" + s.session.OrgID.String() + "/workspaces")
-}
-
-func (s *factorySteps) assertFactoryVisibleInList(name string) {
-	s.session.AssertText(name)
 }
 
 func (s *factorySteps) assertFactoryNotVisibleInList(name string) {

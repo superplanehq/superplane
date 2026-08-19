@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { Check, ListTodo, Loader2, Plus, Search } from "lucide-react";
+import { Check, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { FIXTURE_REPOS, VCS_OPTIONS, vcsLabel, type IntegrationId, type VcsHostId } from "./onboardingFixtures";
@@ -180,7 +180,7 @@ export function StartStep({ setup }: { setup: OnboardingSetupApi }) {
   );
 }
 
-function RepositoryPicker({
+export function RepositoryPicker({
   host,
   repos,
   selectedRepo,
@@ -377,147 +377,6 @@ export function RepositoryStep({
           Edit {vcsLabel(host)} connection
         </button>
       </p>
-    </div>
-  );
-}
-
-export function IssuesStep({
-  setup,
-  onRequestConnect,
-  autoDiscover,
-  repos,
-}: {
-  setup: OnboardingSetupApi;
-  onRequestConnect: (id: IntegrationId) => void;
-  autoDiscover?: boolean;
-  repos?: string[];
-}) {
-  const {
-    selectedRepo,
-    issuesRepo,
-    issuesDiscovered,
-    issuesDiscovering,
-    issuesChoice,
-    startIssuesDiscovery,
-    selectIssuesRepo,
-  } = setup;
-  const [pickingBacklogRepo, setPickingBacklogRepo] = useState(false);
-
-  useEffect(() => {
-    if (!autoDiscover) return;
-    if (!selectedRepo || issuesDiscovered || issuesDiscovering || issuesChoice) return;
-    startIssuesDiscovery();
-  }, [autoDiscover, selectedRepo, issuesDiscovered, issuesDiscovering, issuesChoice, startIssuesDiscovery]);
-
-  useEffect(() => {
-    setPickingBacklogRepo(false);
-  }, [selectedRepo]);
-
-  const host = setup.vcsHost;
-  if (!host || !selectedRepo) {
-    return <p className="text-[13px] text-muted-foreground">Select an app repository first.</p>;
-  }
-
-  const backlogRepo = issuesRepo ?? selectedRepo;
-  const availableRepos = repos ?? FIXTURE_REPOS[host];
-  const showDiscoveryResult = setup.issuesDiscovered || Boolean(setup.issuesChoice);
-
-  return (
-    <div className="space-y-4">
-      {(setup.issuesDiscovering || (!showDiscoveryResult && !pickingBacklogRepo)) && (
-        <div className="flex items-center gap-2 rounded-lg border border-border bg-accent/30 px-4 py-3 text-[13px]">
-          <Loader2 className="size-3.5 animate-spin" aria-hidden />
-          Looking for backlog issues on {backlogRepo}…
-        </div>
-      )}
-
-      {showDiscoveryResult && !setup.issuesDiscovering ? (
-        <>
-          <div className="rounded-lg border border-border px-4 py-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-[13px] font-medium">
-                  {setup.issueCount === undefined
-                    ? `Use ${vcsLabel(host)} Issues`
-                    : `Found ${setup.issueCount} open issues on ${vcsLabel(host)}`}
-                </div>
-                <p className="mt-1 text-[12px] text-muted-foreground">
-                  Select the repository that SuperPlane will use for work orders.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPickingBacklogRepo((open) => !open)}
-                className={cn(
-                  "inline-flex max-w-[55%] shrink-0 items-center gap-1.5 rounded-md border border-border bg-accent/40 px-2 py-1 text-left text-[12px] font-medium tracking-[-0.01em] transition-colors hover:bg-accent",
-                  pickingBacklogRepo && "border-foreground bg-accent",
-                )}
-                aria-label="Change backlog repository"
-                aria-expanded={pickingBacklogRepo}
-              >
-                <IntegrationChoiceIcon name={host} size={14} />
-                <span className="truncate">{backlogRepo}</span>
-              </button>
-            </div>
-            {pickingBacklogRepo ? (
-              <div className="mt-3">
-                <RepositoryPicker
-                  host={host}
-                  repos={availableRepos}
-                  selectedRepo={backlogRepo}
-                  title="Select backlog repository"
-                  description="Choose the repository that holds the issue backlog. The app repository does not change."
-                  onSelect={(repo) => {
-                    selectIssuesRepo(repo);
-                    setPickingBacklogRepo(false);
-                  }}
-                />
-              </div>
-            ) : null}
-          </div>
-
-          <div className="grid gap-2">
-            <ConnectOptionRow
-              icon={<IntegrationChoiceIcon name={host} />}
-              title={`Use ${vcsLabel(host)} Issues`}
-              detail={`Find agent-ready work in open issues on ${backlogRepo}.`}
-              selected={setup.issuesChoice === "vcs"}
-              connectLabel={vcsLabel(host)}
-              connected
-              onSelect={() => setup.setIssuesChoice("vcs")}
-            />
-            <ConnectOptionRow
-              icon={<IntegrationChoiceIcon name="linear" />}
-              title="Linear"
-              detail="Find agent-ready work in your Linear backlog."
-              selected={setup.issuesChoice === "linear"}
-              connectLabel="Linear"
-              connected={setup.connected.has("linear")}
-              soon
-              onSelect={() => setup.setIssuesChoice("linear")}
-              onConnect={() => onRequestConnect("linear")}
-            />
-            <ConnectOptionRow
-              icon={<IntegrationChoiceIcon name="jira" />}
-              title="Jira"
-              detail="Find agent-ready work in your Jira backlog."
-              selected={setup.issuesChoice === "jira"}
-              connectLabel="Jira"
-              connected={setup.connected.has("jira")}
-              soon
-              onSelect={() => setup.setIssuesChoice("jira")}
-              onConnect={() => onRequestConnect("jira")}
-            />
-            <ConnectOptionRow
-              icon={<ListTodo className="size-5 text-muted-foreground" aria-hidden />}
-              title="Skip for now"
-              detail="Do not import a backlog. Create work orders yourself for selected tasks."
-              selected={setup.issuesChoice === "skip"}
-              onSelect={() => setup.setIssuesChoice("skip")}
-            />
-          </div>
-        </>
-      ) : null}
     </div>
   );
 }

@@ -1,9 +1,4 @@
-import type {
-  FactoriesFactory,
-  FactoriesFactoryLine,
-  FactoriesUpdateFactoryOnboardingBody,
-  FactoryLineStep,
-} from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryLine, FactoryLineStep } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateFactoryLine, useCreateWorkOrder, useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
@@ -14,8 +9,7 @@ import { githubInstallationUrl } from "@/lib/githubInstallation";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
-import { ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS } from "@/pages/home/factories";
-import { useInstallFactory, type InstallFactoryInput } from "@/pages/home/useInstallFactory";
+import { useInstallFactory } from "@/pages/home/useInstallFactory";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -27,57 +21,24 @@ import {
 } from "../../lib/factoryPagePaths";
 import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
-import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
-import { initialWizardStep, isWizardStepId } from "./onboardingStatus";
+import type { IntegrationId, WizardStepId } from "./onboardingFixtures";
+import {
+  apiIssuesSource,
+  initialOnboardingSelections,
+  initialWizardStep,
+  isWizardStepId,
+  localIssuesSource,
+} from "./onboardingStatus";
+import { DEFAULT_LINE_NAME, provisionEventApps, provisionLine, type UpdateOnboarding } from "./onboardingProvision";
 import { createAndDispatchInitialWorkOrder } from "./onboardingWorkOrder";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
 
-const DEFAULT_LINE_NAME = "Software delivery";
 const ONBOARDING_INTEGRATIONS = ["github", "claude"];
 
-function initialSelections(onboarding: FactoriesFactory["onboarding"]): IntegrationSelections {
-  const selections: IntegrationSelections = {};
-  if (onboarding?.vcsIntegrationId) {
-    selections.github = {
-      id: onboarding.vcsIntegrationId,
-      name: onboarding.vcsIntegrationId,
-      ready: false,
-    };
-  }
-  if (onboarding?.agentIntegrationId) {
-    selections.claude = {
-      id: onboarding.agentIntegrationId,
-      name: onboarding.agentIntegrationId,
-      ready: false,
-    };
-  }
-  return selections;
-}
-
-function localIssuesSource(source?: string): IssuesChoiceId | null {
-  const sources: Record<string, IssuesChoiceId> = {
-    ISSUES_SOURCE_VCS: "vcs",
-    ISSUES_SOURCE_LINEAR: "linear",
-    ISSUES_SOURCE_JIRA: "jira",
-    ISSUES_SOURCE_SKIP: "skip",
-  };
-  return source ? (sources[source] ?? null) : null;
-}
-
-function apiIssuesSource(source: IssuesChoiceId | null): FactoriesUpdateFactoryOnboardingBody["issuesSource"] {
-  const sources: Partial<Record<IssuesChoiceId, FactoriesUpdateFactoryOnboardingBody["issuesSource"]>> = {
-    vcs: "ISSUES_SOURCE_VCS",
-    linear: "ISSUES_SOURCE_LINEAR",
-    jira: "ISSUES_SOURCE_JIRA",
-    skip: "ISSUES_SOURCE_SKIP",
-  };
-  return source ? sources[source] : "ISSUES_SOURCE_UNSPECIFIED";
-}
-
 function useIntegrationSelections(onboarding: FactoriesFactory["onboarding"]) {
-  const [selections, setSelections] = useState<IntegrationSelections>(() => initialSelections(onboarding));
+  const [selections, setSelections] = useState<IntegrationSelections>(() => initialOnboardingSelections(onboarding));
   const connected = useMemo(() => {
     const ready = new Set<IntegrationId>();
     if (selections.github?.ready) ready.add("github");
@@ -126,136 +87,6 @@ async function runSave(setSaving: (saving: boolean) => void, action: () => Promi
   } finally {
     setSaving(false);
   }
-}
-
-type UpdateOnboarding = (input: FactoriesUpdateFactoryOnboardingBody) => Promise<unknown>;
-
-const PRIMARY_LINE_APP_ENTRYPOINT = ONBOARDING_LINE_APPS[0].entrypointNodeId;
-
-// A finished line has one step per bundled app, each calling the app onRun
-// entrypoint. Match on the first entrypoint to recover a line provisioned by an
-// earlier, interrupted attempt.
-function findProvisionedLine(factory: FactoriesFactory | null): FactoriesFactoryLine | undefined {
-  return factory?.lines?.find((line) =>
-    line.steps?.some((step) => step.app?.entrypoint === PRIMARY_LINE_APP_ENTRYPOINT),
-  );
-}
-
-type InstallOnboardingApp = (
-  input: InstallFactoryInput,
-) => Promise<{ canvasId: string; canvasName: string } | undefined>;
-
-async function installOnboardingApp(args: {
-  factoryId: string;
-  appFactoryId: string;
-  selections: IntegrationSelections;
-  appRepository: string;
-  backlogRepository: string;
-  installFactory: InstallOnboardingApp;
-}): Promise<{ canvasId: string; canvasName: string }> {
-  const installed = await args.installFactory({
-    factoryId: args.appFactoryId,
-    workspaceFactoryId: args.factoryId,
-    integrations: args.selections,
-    installParams: {
-      appRepository: args.appRepository,
-      backlogRepository: args.backlogRepository,
-    },
-    startingTaskPrompt: "",
-    navigateOnComplete: false,
-    startInitialRun: false,
-  });
-  if (!installed?.canvasId) throw new Error(`Failed to create the ${args.appFactoryId} app`);
-  return installed;
-}
-
-// Install each bundled app in order and return the line steps that call them.
-// installFactory clears its pending-canvas ref after each success, so the
-// sequential calls create distinct canvases.
-async function provisionLineApps(args: {
-  factoryId: string;
-  selections: IntegrationSelections;
-  appRepository: string;
-  backlogRepository: string;
-  installFactory: InstallOnboardingApp;
-}): Promise<FactoryLineStep[]> {
-  const steps: FactoryLineStep[] = [];
-  for (const app of ONBOARDING_LINE_APPS) {
-    const installed = await installOnboardingApp({
-      factoryId: args.factoryId,
-      appFactoryId: app.factoryId,
-      selections: args.selections,
-      appRepository: args.appRepository,
-      backlogRepository: args.backlogRepository,
-      installFactory: args.installFactory,
-    });
-    steps.push({
-      type: "runApp",
-      app: { app: installed.canvasId, entrypoint: app.entrypointNodeId },
-    });
-  }
-  return steps;
-}
-
-// Event apps listen for GitHub events and are not factory line steps. Install
-// them even when the line already exists, so a retry after a failed finish
-// still creates PR Closure.
-async function provisionEventApps(args: {
-  factoryId: string;
-  selections: IntegrationSelections;
-  appRepository: string;
-  backlogRepository: string;
-  installFactory: InstallOnboardingApp;
-}): Promise<void> {
-  for (const appFactoryId of ONBOARDING_EVENT_APPS) {
-    await installOnboardingApp({
-      factoryId: args.factoryId,
-      appFactoryId,
-      selections: args.selections,
-      appRepository: args.appRepository,
-      backlogRepository: args.backlogRepository,
-      installFactory: args.installFactory,
-    });
-  }
-}
-
-interface ProvisionedLine {
-  lineId: string;
-  primaryAppId: string;
-}
-
-async function provisionLine(args: {
-  factory: FactoriesFactory | null;
-  savedLineId?: string;
-  savedAppId?: string;
-  selections: IntegrationSelections;
-  appRepository: string;
-  backlogRepository: string;
-  installFactory: InstallOnboardingApp;
-  createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
-  updateOnboarding: UpdateOnboarding;
-}): Promise<ProvisionedLine> {
-  const existing = findProvisionedLine(args.factory);
-  const lineId = args.savedLineId ?? existing?.id;
-  if (lineId) {
-    const primaryAppId = args.savedAppId ?? existing?.steps?.[0]?.app?.app;
-    if (primaryAppId) return { lineId, primaryAppId };
-  }
-
-  const steps = await provisionLineApps({
-    factoryId: args.factory?.id ?? "",
-    selections: args.selections,
-    appRepository: args.appRepository,
-    backlogRepository: args.backlogRepository,
-    installFactory: args.installFactory,
-  });
-  const primaryAppId = steps[0]?.app?.app;
-  if (!primaryAppId) throw new Error("Software delivery apps were not created");
-
-  const line = await args.createLine({ name: DEFAULT_LINE_NAME, steps });
-  if (!line.id) throw new Error("Software delivery line was not created");
-  await args.updateOnboarding({ provisionedAppId: primaryAppId, provisionedLineId: line.id });
-  return { lineId: line.id, primaryAppId };
 }
 
 function useSectionSaves(args: {
