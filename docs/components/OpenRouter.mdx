@@ -17,26 +17,18 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Connecting
 
-Connecting sends you to OpenRouter to approve access. OpenRouter issues an API key back to SuperPlane automatically, so there is no key to copy for **Chat Completion**.
+Connection to OpenRouter is done through OAuth. Clicking connect will guide you through the process.
 
-- You need an OpenRouter account with credits available.
-- The connection uses OAuth with PKCE, so there is no app to register.
-- To disconnect, delete the key under [Keys](https://openrouter.ai/settings/keys) and re-connect here.
+You need an OpenRouter account with credits available. Free model variants (IDs ending in `:free`) draw from a shared upstream pool and are rate limited independently of your balance.
 
 ## Provisioning API Key (optional)
 
-Only required by the **Get Credits** component. OpenRouter's OAuth cannot issue this kind of key, so it is entered by hand.
+Only required by the **Get Credits** component. OpenRouter's OAuth only issues keys for calling models, so this one is created and pasted by hand.
 
 Create one at [Provisioning Keys](https://openrouter.ai/settings/provisioning-keys) and paste it below.
 
 - Provisioning keys read account credits and manage keys, but cannot call model endpoints.
 - Leave it empty if you only use Chat Completion.
-
-## Credits
-
-Chat Completion spends credits from your OpenRouter account. Free model variants (IDs ending in `:free`) draw from a shared upstream pool and are rate limited independently of your balance.
-
-> **Note:** The provisioning key is shown only once — store it somewhere safe before continuing.
 
 <a id="chat-completion"></a>
 
@@ -58,7 +50,7 @@ The Chat Completion component sends a prompt to any of the models OpenRouter bro
 - **Model**: The model to prompt. Picked from the models OpenRouter currently lists.
 - **Prompt**: The user message (supports expressions)
 - **System Prompt**: (Optional) System-level instructions
-- **Files**: (Optional) Files from the Files tab to attach. Images require a vision model; PDFs are parsed by OpenRouter and work with any model.
+- **Files**: (Optional) Files from the Files tab to attach. Text files are added to the prompt directly. Images require a vision model. PDFs are parsed by OpenRouter and work with any model, but parsing is a paid feature and the request is rejected below a minimum account balance.
 - **Max Tokens**: (Optional) Upper bound on generated tokens. Reasoning models bill their reasoning against this budget, so a low value can return an empty response.
 - **Temperature**: (Optional) Sampling temperature
 - **Fallback Models**: (Optional) Models to try when the primary fails at runtime. Tried in order.
@@ -90,6 +82,7 @@ Returns the completion including:
 - Fallback models cover runtime failures such as rate limits and provider outages. An invalid model ID still fails the request outright.
 - Free model variants (IDs ending in `:free`) draw from a shared upstream pool and are rate limited independently of your balance.
 - Attachments are inlined into the request body rather than uploaded, so the combined size is capped at 8MB.
+- Only PDFs and images are sent as attachments. Text files become part of the prompt, so they cost prompt tokens and are not subject to OpenRouter's document parsing.
 
 ### Example Output
 

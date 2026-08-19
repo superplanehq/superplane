@@ -102,7 +102,7 @@ func (c *ChatCompletion) Documentation() string {
 - **Model**: The model to prompt. Picked from the models OpenRouter currently lists.
 - **Prompt**: The user message (supports expressions)
 - **System Prompt**: (Optional) System-level instructions
-- **Files**: (Optional) Files from the Files tab to attach. Images require a vision model; PDFs are parsed by OpenRouter and work with any model.
+- **Files**: (Optional) Files from the Files tab to attach. Text files are added to the prompt directly. Images require a vision model. PDFs are parsed by OpenRouter and work with any model, but parsing is a paid feature and the request is rejected below a minimum account balance.
 - **Max Tokens**: (Optional) Upper bound on generated tokens. Reasoning models bill their reasoning against this budget, so a low value can return an empty response.
 - **Temperature**: (Optional) Sampling temperature
 - **Fallback Models**: (Optional) Models to try when the primary fails at runtime. Tried in order.
@@ -133,7 +133,8 @@ Returns the completion including:
 
 - Fallback models cover runtime failures such as rate limits and provider outages. An invalid model ID still fails the request outright.
 - Free model variants (IDs ending in ` + "`:free`" + `) draw from a shared upstream pool and are rate limited independently of your balance.
-- Attachments are inlined into the request body rather than uploaded, so the combined size is capped at 8MB.`
+- Attachments are inlined into the request body rather than uploaded, so the combined size is capped at 8MB.
+- Only PDFs and images are sent as attachments. Text files become part of the prompt, so they cost prompt tokens and are not subject to OpenRouter's document parsing.`
 }
 
 func (c *ChatCompletion) Icon() string {
@@ -555,18 +556,34 @@ func buildMessages(systemPrompt, prompt string, atts []attachments.Attachment) [
 	parts := make([]ContentPart, 0, len(atts)+1)
 	parts = append(parts, ContentPart{Type: "text", Text: prompt})
 	for _, att := range atts {
-		dataURL := "data:" + att.UploadMIME() + ";base64," + base64.StdEncoding.EncodeToString(att.Data)
 		if att.IsImage() {
-			parts = append(parts, ContentPart{Type: "image_url", ImageURL: &ImageURL{URL: dataURL}})
+			parts = append(parts, ContentPart{Type: "image_url", ImageURL: &ImageURL{URL: dataURL(att)}})
 			continue
 		}
+
+		if att.IsPDF() {
+			parts = append(parts, ContentPart{
+				Type: "file",
+				File: &FilePart{Filename: att.Name, FileData: dataURL(att)},
+			})
+			continue
+		}
+
+		// Text goes in as prompt text rather than a file part. File parts run
+		// through OpenRouter's document parser, which is a paid feature that
+		// rejects the request below a minimum balance, and text needs no parsing.
 		parts = append(parts, ContentPart{
-			Type: "file",
-			File: &FilePart{Filename: att.Name, FileData: dataURL},
+			Type: "text",
+			Text: fmt.Sprintf("--- %s ---\n%s", att.Name, att.Data),
 		})
 	}
 
 	return append(messages, Message{Role: "user", Content: parts})
+}
+
+// dataURL inlines an attachment, since OpenRouter has no Files API to upload to.
+func dataURL(att attachments.Attachment) string {
+	return "data:" + att.UploadMIME() + ";base64," + base64.StdEncoding.EncodeToString(att.Data)
 }
 
 // buildPayload flattens the first choice into the node output. Content is null

@@ -227,7 +227,7 @@ func Test__ChatCompletion__Execute(t *testing.T) {
 		assert.Equal(t, []any{"openai/gpt-4o-mini", "anthropic/claude-sonnet-4.5"}, body["models"])
 	})
 
-	t.Run("attachments are inlined as base64 data URLs", func(t *testing.T) {
+	t.Run("pdfs are inlined as base64 file parts", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{Responses: []*http.Response{response(http.StatusOK, completionBody)}}
 		ctx := execContext(map[string]any{
 			"model":  "openai/gpt-4o-mini",
@@ -250,6 +250,49 @@ func Test__ChatCompletion__Execute(t *testing.T) {
 		assert.Equal(t, "file", file["type"])
 		assert.Equal(t, "doc.pdf", file["file"].(map[string]any)["filename"])
 		assert.Equal(t, "data:application/pdf;base64,JVBERi0xLjQ=", file["file"].(map[string]any)["file_data"])
+	})
+
+	t.Run("images are inlined as image parts", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{response(http.StatusOK, completionBody)}}
+		ctx := execContext(map[string]any{
+			"model":  "openai/gpt-4o-mini",
+			"prompt": "Describe",
+			"files":  []any{"shot.png"},
+		}, httpContext, &contexts.ExecutionStateContext{})
+		ctx.Files = &fakeFiles{data: map[string][]byte{"shot.png": []byte("\x89PNG\r\n\x1a\n")}}
+
+		require.NoError(t, c.Execute(ctx))
+
+		body := requestBody(t, httpContext.Requests[0])
+		parts := body["messages"].([]any)[0].(map[string]any)["content"].([]any)
+		require.Len(t, parts, 2)
+
+		image := parts[1].(map[string]any)
+		assert.Equal(t, "image_url", image["type"])
+		assert.Contains(t, image["image_url"].(map[string]any)["url"], "data:image/png;base64,")
+	})
+
+	// A file part would route plain text through OpenRouter's document parser,
+	// which is a paid feature that rejects the request below a minimum balance.
+	t.Run("text files become prompt text rather than file parts", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{response(http.StatusOK, completionBody)}}
+		ctx := execContext(map[string]any{
+			"model":  "openai/gpt-4o-mini",
+			"prompt": "Summarize",
+			"files":  []any{"notes.md"},
+		}, httpContext, &contexts.ExecutionStateContext{})
+		ctx.Files = &fakeFiles{data: map[string][]byte{"notes.md": []byte("the codeword is BANANA")}}
+
+		require.NoError(t, c.Execute(ctx))
+
+		body := requestBody(t, httpContext.Requests[0])
+		parts := body["messages"].([]any)[0].(map[string]any)["content"].([]any)
+		require.Len(t, parts, 2)
+
+		attached := parts[1].(map[string]any)
+		assert.Equal(t, "text", attached["type"])
+		assert.NotContains(t, attached, "file")
+		assert.Equal(t, "--- notes.md ---\nthe codeword is BANANA", attached["text"])
 	})
 
 	t.Run("reasoning stands in when content is null", func(t *testing.T) {
