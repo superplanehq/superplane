@@ -693,6 +693,7 @@ message AddWorkOrderCommentRequest {
   string factory_id = 1;
   string order_id = 2;
   string body = 3;
+  repeated string mentioned_user_ids = 4;
 }
 
 message AddWorkOrderCommentResponse {
@@ -704,6 +705,7 @@ message WorkOrderComment {
   string body = 2;
   WorkOrderCommentAuthor author = 3;
   google.protobuf.Timestamp created_at = 4;
+  repeated string mentioned_user_ids = 5;
 }
 
 message WorkOrderCommentAuthor {

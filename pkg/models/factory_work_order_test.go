@@ -307,24 +307,34 @@ func TestFactoryWorkOrder_RecordCommentAdded(t *testing.T) {
 	require.NoError(t, err)
 
 	userIDStr := userID.String()
-	require.NoError(t, order.RecordCommentAdded(database.Conn(), "Hello there", factory.WorkOrderCommentAuthor{
-		Kind:   factory.CommentAuthorKindUser,
-		UserID: &userIDStr,
-	}, nil))
+	comment, err := order.RecordCommentAdded(database.Conn(), FactoryWorkOrderCommentParams{
+		Body: "Hello there",
+		Author: factory.WorkOrderCommentAuthor{
+			Kind:   factory.CommentAuthorKindUser,
+			UserID: &userIDStr,
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, comment)
+	assert.Equal(t, "Hello there", comment.Body)
+	assert.Equal(t, factory.CommentAuthorKindUser, comment.AuthorKind)
+	require.NotNil(t, comment.AuthorUserID)
+	assert.Equal(t, userID, *comment.AuthorUserID)
 
 	events, err := order.ListEvents(database.Conn(), 10, nil)
 	require.NoError(t, err)
 	assert.Contains(t, eventTypes(events), factory.EventTypeOrderCommentAdded)
 
-	var comment factory.WorkOrderCommentAdded
+	var payload factory.WorkOrderCommentAdded
 	for _, e := range events {
 		if e.Type == factory.EventTypeOrderCommentAdded {
-			require.NoError(t, json.Unmarshal(e.Data, &comment))
+			require.NoError(t, json.Unmarshal(e.Data, &payload))
 		}
 	}
-	assert.Equal(t, "Hello there", comment.Body)
-	require.NotNil(t, comment.Author)
-	assert.Equal(t, factory.CommentAuthorKindUser, comment.Author.Kind)
+	assert.Equal(t, "Hello there", payload.Body)
+	assert.Equal(t, comment.ID, payload.CommentID)
+	require.NotNil(t, payload.Author)
+	assert.Equal(t, factory.CommentAuthorKindUser, payload.Author.Kind)
 }
 
 func TestFactoryWorkOrder_ListComments(t *testing.T) {
@@ -343,18 +353,27 @@ func TestFactoryWorkOrder_ListComments(t *testing.T) {
 	})
 
 	userIDStr := userID.String()
-	require.NoError(t, order.RecordCommentAdded(database.Conn(), "First comment", factory.WorkOrderCommentAuthor{
-		Kind:   factory.CommentAuthorKindUser,
-		UserID: &userIDStr,
-	}, nil))
-
-	require.NoError(t, order.RecordCommentAdded(database.Conn(), "Second comment", factory.WorkOrderCommentAuthor{
-		Kind: factory.CommentAuthorKindAutomation,
-		Automation: &factory.AutomationRef{
-			NodeID:   "node-1",
-			NodeName: "Node One",
+	_, err = order.RecordCommentAdded(database.Conn(), FactoryWorkOrderCommentParams{
+		Body: "First comment",
+		Author: factory.WorkOrderCommentAuthor{
+			Kind:   factory.CommentAuthorKindUser,
+			UserID: &userIDStr,
 		},
-	}, &factory.RunRef{ID: uuid.New(), State: "finished"}))
+	})
+	require.NoError(t, err)
+
+	_, err = order.RecordCommentAdded(database.Conn(), FactoryWorkOrderCommentParams{
+		Body: "Second comment",
+		Author: factory.WorkOrderCommentAuthor{
+			Kind: factory.CommentAuthorKindAutomation,
+			Automation: &factory.AutomationRef{
+				NodeID:   "node-1",
+				NodeName: "Node One",
+			},
+		},
+		Run: &factory.RunRef{ID: uuid.New(), State: "finished"},
+	})
+	require.NoError(t, err)
 
 	// A status update event should never show up in the comment thread.
 	require.NoError(t, order.RecordStatusUpdated(database.Conn(), statusUpdatedRecord{
@@ -366,25 +385,68 @@ func TestFactoryWorkOrder_ListComments(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, comments, 2)
 
-	for _, e := range comments {
-		assert.Equal(t, factory.EventTypeOrderCommentAdded, e.Type)
+	assert.Equal(t, "First comment", comments[0].Body)
+	assert.Equal(t, factory.CommentAuthorKindUser, comments[0].AuthorKind)
+
+	assert.Equal(t, "Second comment", comments[1].Body)
+	assert.Equal(t, factory.CommentAuthorKindAutomation, comments[1].AuthorKind)
+	require.NotNil(t, comments[1].Author().Automation)
+	assert.Equal(t, "node-1", comments[1].Author().Automation.NodeID)
+	require.NotNil(t, comments[1].SourceRunID)
+}
+
+func TestFactoryWorkOrder_RecordCommentAdded_Mentions(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	organization, userID, factoryModel := setupFactoryWithUser(t, "mentions")
+	mentioned := createUserInOrganization(t, organization.ID, "mentioned")
+	outsiderOrg, _, _ := setupFactoryWithUser(t, "mentions-outsider")
+	outsider := createUserInOrganization(t, outsiderOrg.ID, "outsider")
+
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Mention target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	userIDStr := userID.String()
+	comment, err := order.RecordCommentAdded(database.Conn(), FactoryWorkOrderCommentParams{
+		Body: "Hello @Mentioned",
+		Author: factory.WorkOrderCommentAuthor{
+			Kind:   factory.CommentAuthorKindUser,
+			UserID: &userIDStr,
+		},
+		MentionedUserIDs: []uuid.UUID{mentioned.ID, mentioned.ID, outsider.ID, uuid.New()},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []uuid.UUID{mentioned.ID}, comment.MentionedUserIDs)
+
+	events, err := order.ListEvents(database.Conn(), 10, nil)
+	require.NoError(t, err)
+	var payload factory.WorkOrderCommentAdded
+	for _, event := range events {
+		if event.Type == factory.EventTypeOrderCommentAdded {
+			require.NoError(t, json.Unmarshal(event.Data, &payload))
+		}
 	}
+	assert.Equal(t, []factory.UserRef{{ID: mentioned.ID}}, payload.MentionedUsers)
 
-	var first, second factory.WorkOrderCommentAdded
-	require.NoError(t, json.Unmarshal(comments[0].Data, &first))
-	require.NoError(t, json.Unmarshal(comments[1].Data, &second))
+	var stored []FactoryWorkOrderCommentMention
+	require.NoError(t, database.Conn().Where("comment_id = ?", comment.ID).Find(&stored).Error)
+	require.Len(t, stored, 1)
+	assert.Equal(t, mentioned.ID, stored[0].UserID)
+}
 
-	// Oldest first — chronological reading order.
-	assert.Equal(t, "First comment", first.Body)
-	require.NotNil(t, first.Author)
-	assert.Equal(t, factory.CommentAuthorKindUser, first.Author.Kind)
+func createUserInOrganization(t *testing.T, organizationID uuid.UUID, prefix string) *User {
+	t.Helper()
 
-	assert.Equal(t, "Second comment", second.Body)
-	require.NotNil(t, second.Author)
-	assert.Equal(t, factory.CommentAuthorKindAutomation, second.Author.Kind)
-	require.NotNil(t, second.Author.Automation)
-	assert.Equal(t, "node-1", second.Author.Automation.NodeID)
-	require.NotNil(t, second.Run)
+	nonce := time.Now().UnixNano()
+	account, err := CreateAccount(
+		fmt.Sprintf("%s %d", prefix, nonce),
+		fmt.Sprintf("%s-%d@example.com", prefix, nonce),
+	)
+	require.NoError(t, err)
+
+	user, err := CreateUser(organizationID, account.ID, account.Email, account.Name)
+	require.NoError(t, err)
+	return user
 }
 
 func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
