@@ -63,11 +63,11 @@ type linesRunFitSteps struct {
 	t       *testing.T
 	session *session.TestSession
 
-	canvas    *models.Canvas
-	factory   *models.Factory
-	line      *models.FactoryLine
-	execution *models.FactoryWorkOrderExecution
-	runID     uuid.UUID
+	canvas  *models.Canvas
+	factory *models.Factory
+	line    *models.FactoryLine
+	order   *models.FactoryWorkOrder
+	runID   uuid.UUID
 }
 
 func (s *linesRunFitSteps) start() {
@@ -80,6 +80,7 @@ func (s *linesRunFitSteps) start() {
 func (s *linesRunFitSteps) givenAFactory() {
 	factory, err := models.CreateFactory(database.Conn(), s.session.OrgID, support.RandomName("factory"), "", "")
 	require.NoError(s.t, err)
+	support.CompleteFactoryOnboarding(s.t, factory)
 	s.factory = factory
 }
 
@@ -159,6 +160,7 @@ func (s *linesRunFitSteps) givenALineDispatchedForThatApp() {
 	order, err := s.factory.CreateWorkOrder(database.Conn(), support.RandomName("work order"), "", nil, nil, nil)
 	require.NoError(s.t, err)
 	require.NoError(s.t, order.TransitionOnDispatch(database.Conn(), nil))
+	s.order = order
 
 	var result *models.FactoryLineStepResult
 	require.NoError(s.t, database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -169,7 +171,6 @@ func (s *linesRunFitSteps) givenALineDispatchedForThatApp() {
 	require.NotNil(s.t, result)
 	require.NotNil(s.t, result.Execution)
 	require.NotNil(s.t, result.Run)
-	s.execution = result.Execution
 	s.runID = result.Run.ID
 
 	createdAt := time.Now()
@@ -209,7 +210,7 @@ func (s *linesRunFitSteps) whenIVisitTheLineDetail() {
 }
 
 func (s *linesRunFitSteps) whenIOpenThePhaseRunCard() {
-	s.session.Click(q.TestID("lines-phase-run-" + s.execution.ID.String()))
+	s.session.Click(q.TestID("work-order-card-" + s.order.ID.String()))
 	s.session.AssertURLContains("run=" + s.runID.String())
 }
 
