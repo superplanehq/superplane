@@ -51,4 +51,21 @@ describe("lineListMetricsFormat", () => {
   it("formats 60 minutes or more as hours", () => {
     expect(formatDuration({ ...sample, durationMinutes: 90 })).toBe("1.5h");
   });
+
+  it("dashes duration and cost when those fields are omitted", () => {
+    const withoutOptional: LineListMetrics = {
+      successRatePct: 0,
+      mergedCount: 0,
+      totalClosedCount: 2,
+      successTrendPct: [0, 0],
+      throughputPerDay: 0,
+      throughputTrend: [0, 0],
+    };
+    expect(formatDuration(withoutOptional)).toBe(LINE_LIST_METRICS_EMPTY);
+    expect(formatCostPerSuccess(withoutOptional)).toBe(LINE_LIST_METRICS_EMPTY);
+    expect(formatSuccessDelta(withoutOptional)).toBe("");
+    expect(formatDurationDelta(withoutOptional)).toBe("");
+    expect(formatCostDelta(withoutOptional)).toBe("");
+    expect(formatSuccessRate(withoutOptional)).toBe("0%");
+  });
 });
