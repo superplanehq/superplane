@@ -158,6 +158,28 @@ func (s *SMTPEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) e
 	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
 }
 
+func (s *SMTPEmailService) SendWorkOrderNotificationEmail(
+	toEmail, subject string,
+	data WorkOrderNotificationTemplateData,
+) error {
+	settings, err := s.settingsProvider.GetSMTPSettings(context.Background())
+	if err != nil {
+		return err
+	}
+
+	plainTextContent, err := s.renderTemplate("work_order_notification.txt", data)
+	if err != nil {
+		return fmt.Errorf("failed to render work order notification plain text template: %w", err)
+	}
+
+	htmlContent, err := s.renderTemplate("work_order_notification.html", data)
+	if err != nil {
+		return fmt.Errorf("failed to render work order notification HTML template: %w", err)
+	}
+
+	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
+}
+
 func (s *SMTPEmailService) renderTemplate(templateName string, data any) (string, error) {
 	return renderEmailTemplate(s.templateDir, templateName, data)
 }

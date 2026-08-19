@@ -1,9 +1,9 @@
 import { useAccount } from "@/contexts/useAccount";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
-import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
+import type { ReactNode } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useParams } from "react-router";
 import {
   factoryRouteNeedsCanonicalRedirect,
@@ -11,10 +11,10 @@ import {
   resolveFactoryByKey,
 } from "../../lib/factoryKeyResolution";
 import { factoryDetailPath, factoryListPath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
-import { SidebarUserMenu } from "../../layout/SidebarUserMenu";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
-import { FACTORY_SETTINGS_NAV_ITEMS } from "./settingsNavItems";
+import { FactorySettingsYouSection } from "./FactorySettingsYouSection";
+import { FACTORY_SETTINGS_NAV_ITEMS, type FactorySettingsNavItem } from "./settingsNavItems";
 
 export function FactorySettingsLayout() {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
@@ -73,7 +73,6 @@ function FactorySettingsLayoutContent({
 }) {
   useFactoriesThemeClass();
   const { account } = useAccount();
-  const { data: organization } = useOrganization(organizationId);
   const { data: factory, isLoading, error } = useFactory(organizationId, factoryId);
 
   // See the matching comment in `FactoriesLayout`: once `factory` has loaded
@@ -121,23 +120,50 @@ function FactorySettingsLayoutContent({
               {factory.name}
             </p>
           </div>
-          <nav className="flex flex-1 flex-col gap-4 px-2 py-4">
-            <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={workspaceGroup} />
-            <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={governanceGroup} />
+          <nav className="flex min-h-0 flex-1 flex-col">
+            <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-2 py-4">
+              <SettingsNavSection badge="Workspace" badgeClassName="bg-foreground text-background">
+                <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={workspaceGroup} />
+                <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={governanceGroup} />
+              </SettingsNavSection>
+            </div>
+            <FactorySettingsYouSection
+              organizationId={organizationId}
+              factoryKey={factoryKey}
+              userName={account?.name ?? "You"}
+              userEmail={account?.email}
+              userAvatarUrl={account?.avatar_url}
+            />
           </nav>
-          <SidebarUserMenu
-            organizationId={organizationId}
-            userName={account?.name ?? "You"}
-            userEmail={account?.email}
-            userAvatarUrl={account?.avatar_url}
-            organizationName={organization?.metadata?.name ?? "Organization"}
-          />
         </aside>
         <main className="flex min-h-screen min-w-0 flex-1 flex-col bg-background">
           <Outlet />
         </main>
       </div>
     </FactorySettingsLayoutContext.Provider>
+  );
+}
+
+function SettingsNavSection({
+  badge,
+  badgeClassName,
+  children,
+}: {
+  badge: string;
+  badgeClassName: string;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <p className="px-2.5 pb-2">
+        <span
+          className={cn("inline rounded px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide", badgeClassName)}
+        >
+          {badge}
+        </span>
+      </p>
+      <div className="flex flex-col gap-4">{children}</div>
+    </div>
   );
 }
 
@@ -148,7 +174,7 @@ function SettingsNavGroup({
 }: {
   organizationId: string;
   factoryKey: string;
-  items: typeof FACTORY_SETTINGS_NAV_ITEMS;
+  items: FactorySettingsNavItem[];
 }) {
   return (
     <ul className="flex flex-col gap-0.5">
@@ -165,6 +191,7 @@ function SettingsNavGroup({
                 )
               }
               data-testid={`factory-settings-nav-${item.id}`}
+              aria-label={item.id === "profile" ? "Profile" : undefined}
             >
               <Icon className="size-[15px] shrink-0 opacity-80" strokeWidth={1.75} aria-hidden />
               <span>{item.label}</span>
