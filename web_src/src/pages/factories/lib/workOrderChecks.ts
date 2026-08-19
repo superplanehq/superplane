@@ -90,9 +90,7 @@ function presentCheckLevel(level: ApiWorkOrderCheckLevel | undefined): WorkOrder
 }
 
 function presentCheckFormat(format: FactoriesWorkOrderCheck["format"]): WorkOrderCheckScoreFormat {
-  // Widened: the SDK union gains FORMAT_BOOLEAN once the backend proto lands
-  // and `make pb.gen` regenerates the client.
-  switch (format as string) {
+  switch (format) {
     case "FORMAT_PERCENT":
       return "percent";
     case "FORMAT_BOOLEAN":
@@ -116,9 +114,7 @@ export function presentWorkOrderCheck(check: FactoriesWorkOrderCheck): WorkOrder
     format: presentCheckFormat(check.format),
     level: presentCheckLevel(check.level),
     previousScore: check.previousScore,
-    // Widened: the SDK gains recentScores with the boolean-checks backend
-    // change and a `make pb.gen` regeneration.
-    recentScores: (check as { recentScores?: number[] }).recentScores,
+    recentScores: check.recentScores,
     summary: emptyToUndefined(check.summary),
     analysis: emptyToUndefined(check.analysis),
     sourceName: emptyToUndefined(automation?.appName) ?? emptyToUndefined(automation?.nodeName),
