@@ -12,7 +12,7 @@ export const DEFAULT_LINE_NAME = "Software delivery";
 
 const PRIMARY_LINE_APP_ENTRYPOINT = ONBOARDING_LINE_APPS[0].entrypointNodeId;
 
-type InstallOnboardingApp = (
+export type InstallOnboardingApp = (
   input: InstallFactoryInput,
 ) => Promise<{ canvasId: string; canvasName: string } | undefined>;
 

@@ -29,7 +29,13 @@ import {
   isWizardStepId,
   localIssuesSource,
 } from "./onboardingStatus";
-import { DEFAULT_LINE_NAME, provisionEventApps, provisionLine, type UpdateOnboarding } from "./onboardingProvision";
+import {
+  DEFAULT_LINE_NAME,
+  provisionEventApps,
+  provisionLine,
+  type InstallOnboardingApp,
+  type UpdateOnboarding,
+} from "./onboardingProvision";
 import { createAndDispatchInitialWorkOrder } from "./onboardingWorkOrder";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
