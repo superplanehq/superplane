@@ -11,14 +11,14 @@ export function formatSuccessRate(metrics: LineListMetrics | null): string {
 
 /** Median cycle time. Example: `15m`. */
 export function formatDuration(metrics: LineListMetrics | null): string {
-  if (!metrics) {
+  if (!metrics || metrics.durationMinutes == null) {
     return LINE_LIST_METRICS_EMPTY;
   }
   return compactDurationMinutes(metrics.durationMinutes);
 }
 
 export function formatCostPerSuccess(metrics: LineListMetrics | null): string {
-  if (!metrics) {
+  if (!metrics || metrics.costPerSuccessUsd == null) {
     return LINE_LIST_METRICS_EMPTY;
   }
   return `$${metrics.costPerSuccessUsd.toFixed(2)}`;
@@ -40,6 +40,9 @@ export function formatSuccessDelta(metrics: LineListMetrics | null): string {
   if (!metrics) {
     return LINE_LIST_METRICS_EMPTY;
   }
+  if (metrics.successDeltaPts == null) {
+    return "";
+  }
   return `${signedNumber(metrics.successDeltaPts, 0)} pts`;
 }
 
@@ -47,6 +50,9 @@ export function formatSuccessDelta(metrics: LineListMetrics | null): string {
 export function formatDurationDelta(metrics: LineListMetrics | null): string {
   if (!metrics) {
     return LINE_LIST_METRICS_EMPTY;
+  }
+  if (metrics.durationDeltaMinutes == null) {
+    return "";
   }
   const minutes = metrics.durationDeltaMinutes;
   const formatted = compactDurationMinutes(Math.abs(minutes));
@@ -63,6 +69,9 @@ export function formatDurationDelta(metrics: LineListMetrics | null): string {
 export function formatCostDelta(metrics: LineListMetrics | null): string {
   if (!metrics) {
     return LINE_LIST_METRICS_EMPTY;
+  }
+  if (metrics.costDeltaUsd == null) {
+    return "";
   }
   const abs = `$${Math.abs(metrics.costDeltaUsd).toFixed(2)}`;
   if (metrics.costDeltaUsd > 0) {

@@ -34,7 +34,12 @@ func UpdateFactory(ctx context.Context, organizationID string, req *pb.UpdateFac
 		return nil, factoryErrorToStatus(err, "failed to update factory")
 	}
 
+	serialized, err := serializeFactoryWithLineMetrics(db, factory, lines)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update factory")
+	}
+
 	return &pb.UpdateFactoryResponse{
-		Factory: serializeFactoryWithLines(factory, lines),
+		Factory: serialized,
 	}, nil
 }
