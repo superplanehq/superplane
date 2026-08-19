@@ -63,4 +63,11 @@ describe("retainMentions", () => {
   it("keeps the shorter name when only that mention is tracked", () => {
     expect(retainMentions([aliceShort], "Thanks @Alice Anderson")).toEqual([aliceShort]);
   });
+
+  it("keeps one ID per @Name when two members share that name", () => {
+    const aliceA = { id: "alice-a", name: "Alice Anderson" };
+    const aliceB = { id: "alice-b", name: "Alice Anderson" };
+    expect(retainMentions([aliceA, aliceB], "Thanks @Alice Anderson")).toEqual([aliceA]);
+    expect(retainMentions([aliceA, aliceB], "Thanks @Alice Anderson and @Alice Anderson")).toEqual([aliceA, aliceB]);
+  });
 });

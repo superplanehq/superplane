@@ -58,34 +58,50 @@ export function insertMentionAtCursor(
 }
 
 export function retainMentions(mentions: WorkOrderMentionCandidate[], body: string): WorkOrderMentionCandidate[] {
-  return mentions.filter((mention) => bodyContainsMentionToken(body, mention, mentions));
+  const remaining = mentionTokenCounts(body, mentions);
+  const kept: WorkOrderMentionCandidate[] = [];
+  for (const mention of mentions) {
+    const count = remaining.get(mention.name) ?? 0;
+    if (count < 1) {
+      continue;
+    }
+    remaining.set(mention.name, count - 1);
+    kept.push(mention);
+  }
+  return kept;
 }
 
-function bodyContainsMentionToken(
-  body: string,
-  mention: WorkOrderMentionCandidate,
-  tracked: WorkOrderMentionCandidate[],
-): boolean {
-  const token = `@${mention.name}`;
+function mentionTokenCounts(body: string, tracked: WorkOrderMentionCandidate[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  const names = [...new Set(tracked.map((mention) => mention.name))];
+  for (const name of names) {
+    counts.set(name, countCompleteMentionTokens(body, name, tracked));
+  }
+  return counts;
+}
+
+function countCompleteMentionTokens(body: string, name: string, tracked: WorkOrderMentionCandidate[]): number {
+  const token = `@${name}`;
   let from = 0;
+  let count = 0;
   while (from <= body.length) {
     const index = body.indexOf(token, from);
     if (index < 0) {
-      return false;
+      return count;
     }
-    if (isCompleteMentionToken(body, index, token.length, mention, tracked)) {
-      return true;
+    if (isCompleteMentionToken(body, index, token.length, name, tracked)) {
+      count += 1;
     }
     from = index + 1;
   }
-  return false;
+  return count;
 }
 
 function isCompleteMentionToken(
   body: string,
   start: number,
   tokenLength: number,
-  mention: WorkOrderMentionCandidate,
+  mentionName: string,
   tracked: WorkOrderMentionCandidate[],
 ): boolean {
   if (!isMentionTrigger(body, start)) {
@@ -99,8 +115,8 @@ function isCompleteMentionToken(
 
   return !tracked.some(
     (other) =>
-      other.name.length > mention.name.length &&
-      other.name.startsWith(mention.name) &&
+      other.name.length > mentionName.length &&
+      other.name.startsWith(mentionName) &&
       body.startsWith(`@${other.name}`, start),
   );
 }
