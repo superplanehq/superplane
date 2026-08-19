@@ -29,8 +29,8 @@ func Test__FactoryLine__Dispatch__SnapshotsLineAndStartsStepZero(t *testing.T) {
 	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
 	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
 	steps := []models.FactoryLineStep{
-		{Name: "step-one", Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
-		{Name: "step-two", Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
 	}
 	require.NoError(t, line.Update(db, nil, steps))
 
@@ -49,14 +49,14 @@ func Test__FactoryLine__Dispatch__SnapshotsLineAndStartsStepZero(t *testing.T) {
 	assert.Empty(t, dispatch.Result)
 	assert.Nil(t, dispatch.FinishedAt)
 	require.Len(t, []models.FactoryLineStep(dispatch.Steps), 2)
-	assert.Equal(t, "step-one", dispatch.Steps[0].Name)
-	assert.Equal(t, "step-two", dispatch.Steps[1].Name)
+	assert.Equal(t, firstApp.ID, dispatch.Steps[0].AppID)
+	assert.Equal(t, secondApp.ID, dispatch.Steps[1].AppID)
 
 	require.NotNil(t, result)
 	execution := result.Execution
 	assert.Equal(t, dispatch.ID, execution.LineDispatchID)
 	assert.Equal(t, 0, execution.StepIndex)
-	assert.Equal(t, "step-one", execution.StepName)
+	assert.Equal(t, firstApp.Name, execution.StepName)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, execution.Status)
 }
 
@@ -102,8 +102,8 @@ func Test__FactoryWorkOrderLineDispatch__StartStep__UsesSnapshotNotLiveLine(t *t
 	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
 	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
 	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
-		{Name: "step-one", Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
-		{Name: "step-two", Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
 	}))
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
@@ -116,8 +116,8 @@ func Test__FactoryWorkOrderLineDispatch__StartStep__UsesSnapshotNotLiveLine(t *t
 	// Replace the live line's steps entirely with a different app at index 1.
 	thirdApp, thirdEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two-replaced", "start-replaced")
 	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
-		{Name: "step-one", Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
-		{Name: "step-two-replaced", Type: models.FactoryLineStepTypeRunApp, AppID: thirdApp.ID, Entrypoint: thirdEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: thirdApp.ID, Entrypoint: thirdEntry},
 	}))
 
 	var result *models.FactoryLineStepResult
@@ -129,7 +129,7 @@ func Test__FactoryWorkOrderLineDispatch__StartStep__UsesSnapshotNotLiveLine(t *t
 
 	assert.Equal(t, secondApp.ID, result.Run.WorkflowID,
 		"the dispatch's own snapshot still points at the originally dispatched app")
-	assert.Equal(t, "step-two", result.Execution.StepName)
+	assert.Equal(t, secondApp.Name, result.Execution.StepName)
 }
 
 func Test__FactoryWorkOrderLineDispatch__Finish(t *testing.T) {

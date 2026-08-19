@@ -78,9 +78,8 @@ export const ORGANIZATION_USERS = [
 
 const RUN_APP_TYPE = "runApp";
 
-function runAppStep(name: string, appId: string, entrypoint: string): FactoryLineStep {
+function runAppStep(appId: string, entrypoint: string): FactoryLineStep {
   return {
-    name,
     type: RUN_APP_TYPE,
     app: { app: appId, entrypoint },
   };
@@ -110,8 +109,10 @@ export const REFUND_FACTORY_APPS: FactoryApp[] = [
   },
 ];
 
-const REFUND_LINE_PLAN_ID = "line-plan-and-implement";
-const REFUND_LINE_HOTFIX_ID = "line-hotfix";
+export const REFUND_LINE_PLAN_ID = "line-plan-and-implement";
+export const REFUND_LINE_HOTFIX_ID = "line-hotfix";
+export const REFUND_LINE_ONBOARDING_ID = "line-onboarding";
+export const REFUND_LINE_FEATURE_ID = "line-feature-delivery";
 
 export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
   {
@@ -120,9 +121,9 @@ export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
     steps: [
-      runAppStep("plan", "app-refund-planner", "start-plan"),
-      runAppStep("implement", "app-refund-implementer", "start-implementation"),
-      runAppStep("verify", "app-refund-verifier", "start-verification"),
+      runAppStep("app-refund-planner", "start-plan"),
+      runAppStep("app-refund-implementer", "start-implementation"),
+      runAppStep("app-refund-verifier", "start-verification"),
     ],
   },
   {
@@ -130,7 +131,7 @@ export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
     name: "hotfix",
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
-    steps: [runAppStep("verify", "app-refund-verifier", "start-verification")],
+    steps: [runAppStep("app-refund-verifier", "start-verification")],
   },
 ];
 
@@ -151,13 +152,21 @@ export const EMPTY_FACTORY: FactoriesFactory = {
   lines: [],
 };
 
+const PLAN_STEP_INDEX: Record<string, number> = { plan: 0, implement: 1, verify: 2 };
+const PLAN_STEP_LABEL: Record<string, string> = {
+  plan: "Refund Planner",
+  implement: "Refund Implementer",
+  verify: "Refund Verifier",
+};
+
 function planLineExecution(
   step: string,
   overrides: Partial<FactoriesWorkOrderExecution> = {},
 ): FactoriesWorkOrderExecution {
   return {
     id: `exec-${step}-${overrides.id ?? Math.random().toString(36).slice(2, 8)}`,
-    step,
+    step: PLAN_STEP_LABEL[step] ?? step,
+    stepIndex: PLAN_STEP_INDEX[step] ?? 0,
     state: "STATE_FINISHED",
     result: "RESULT_PASSED",
     createdAt: TWO_HOURS_AGO,
@@ -195,9 +204,9 @@ function planLineDispatch(
     id: `dispatch-${REFUND_LINE_PLAN_ID}-${stepExecutions[0]?.id ?? "empty"}`,
     line: { id: REFUND_LINE_PLAN_ID, name: "plan-and-implement" },
     steps: [
-      { name: "plan", stepIndex: 0 },
-      { name: "implement", stepIndex: 1 },
-      { name: "verify", stepIndex: 2 },
+      { name: "Refund Planner", stepIndex: 0 },
+      { name: "Refund Implementer", stepIndex: 1 },
+      { name: "Refund Verifier", stepIndex: 2 },
     ],
     state,
     result,
@@ -491,4 +500,20 @@ export const defaultFactoriesFixture: FactoriesFixture = {
     [EMPTY_FACTORY_ID]: EMPTY_USAGE_REPORT,
   },
   organizationLlmSpend: DEFAULT_FACTORY_USAGE,
+};
+
+export const emptyFactoriesFixture: FactoriesFixture = {
+  organizationId: FACTORIES_ORGANIZATION_ID,
+  factories: [],
+  workOrdersByFactoryId: {},
+  appsByFactoryId: {},
+};
+
+/** Same shape as {@link defaultFactoriesFixture} but with only closed orders in the primary factory. */
+export const emptyWorkOrdersFactoriesFixture: FactoriesFixture = {
+  ...defaultFactoriesFixture,
+  workOrdersByFactoryId: {
+    [PRIMARY_FACTORY_ID]: [CLOSED_WORK_ORDER],
+    [EMPTY_FACTORY_ID]: [],
+  },
 };

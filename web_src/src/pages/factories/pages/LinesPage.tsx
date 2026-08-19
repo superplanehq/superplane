@@ -1,15 +1,15 @@
-import type { FactoriesFactoryLine, FactoriesWorkOrder, FactoryLineStep } from "@/api-client";
+import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryApps, useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Layers, MoreHorizontal, Pencil, Plus, Workflow } from "lucide-react";
+import { Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
@@ -21,7 +21,6 @@ import {
   resolveColumnGlyph,
   type LinePhaseColumn,
   type LinePhaseRunCard,
-  type LinePhaseTick,
   type PhaseGlyphKind,
 } from "../lib/linePhaseRuns";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
@@ -47,13 +46,18 @@ import {
   factorySectionHeaderClassName,
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
+import { LineListCard } from "./LineListCard";
+import { descriptionForLine, metricsForLine } from "./lineListMetricsMockData";
 import { PhaseGlyph } from "./linePhaseGlyph";
+
+const LIST_SUBTITLE = "Last 30 days. Success rate, completions per day, duration, and cost per merged work order.";
 
 export function LinesPage() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId } = useParams<{ lineId: string }>();
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
+  const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
 
   const canUpdate = canAct("factories", "update");
@@ -84,6 +88,7 @@ export function LinesPage() {
             organizationId={organizationId}
             factoryKey={factoryKey}
             line={selectedLine}
+            apps={factoryApps}
             canUpdate={canUpdate}
           />
         </div>
@@ -93,6 +98,7 @@ export function LinesPage() {
             organizationId={organizationId}
             factoryKey={factoryKey}
             line={selectedLine}
+            apps={factoryApps}
             workOrders={workOrders}
             workOrderCardContext={{
               organizationId,
@@ -113,7 +119,7 @@ export function LinesPage() {
       <WorkspacePageHeader
         className={factorySectionHeaderClassName}
         title="Lines"
-        subtitle="Factory lines specialize how work moves through the workspace. Each phase is backed by a canvas that runs work orders."
+        subtitle={LIST_SUBTITLE}
         actions={
           <PermissionTooltip
             allowed={canUpdate || permissionsLoading}
@@ -137,18 +143,18 @@ export function LinesPage() {
             canUpdate={canUpdate || permissionsLoading}
           />
         ) : (
-          <ul className="flex flex-col gap-2" data-testid="lines-list">
+          <ul className="flex flex-col gap-4" data-testid="lines-list">
             {lines.map((line) => {
               if (!line.id) {
                 return null;
               }
-              const board = buildLinePhaseBoard(line, workOrders);
               return (
                 <li key={line.id}>
-                  <LineCard
+                  <LineListCard
                     line={line}
                     href={factoryLineDetailPath(organizationId, factoryKey, line.id)}
-                    ticks={board.map((column) => column.tick)}
+                    metrics={metricsForLine(line.id)}
+                    description={descriptionForLine(line.id)}
                   />
                 </li>
               );
@@ -164,11 +170,13 @@ function LineDetailHeader({
   organizationId,
   factoryKey,
   line,
+  apps,
   canUpdate,
 }: {
   organizationId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
+  apps: Array<{ id?: string; name?: string }>;
   canUpdate: boolean;
 }) {
   const editHref = line.id ? editFactoryLinePath(organizationId, factoryKey, line.id) : "#";
@@ -180,7 +188,7 @@ function LineDetailHeader({
       backLabel="Lines"
       backTestId="lines-back-to-list"
       title={humanizeLineName(line.name)}
-      subtitle={formatLinePhaseDescription(line.steps)}
+      subtitle={formatLinePhaseDescription(line.steps, apps)}
       actions={
         canUpdate ? (
           <Button type="button" variant="outline" size="sm" asChild data-testid="lines-edit-button">
@@ -199,17 +207,19 @@ function LineDetail({
   organizationId,
   factoryKey,
   line,
+  apps,
   workOrders,
   workOrderCardContext,
 }: {
   organizationId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
+  apps: Array<{ id?: string; name?: string }>;
   workOrders: FactoriesWorkOrder[];
   workOrderCardContext: WorkOrderCardContext;
 }) {
   const steps = line.steps ?? [];
-  const board = useMemo(() => buildLinePhaseBoard(line, workOrders ?? []), [line, workOrders]);
+  const board = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
@@ -225,67 +235,6 @@ function LineDetail({
         />
       )}
     </div>
-  );
-}
-
-function LineCard({ line, href, ticks }: { line: FactoriesFactoryLine; href: string; ticks: LinePhaseTick[] }) {
-  const navigate = useNavigate();
-  const steps = line.steps ?? [];
-  const description = formatLinePhaseDescription(steps);
-
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      className={cn(
-        "group/line w-full cursor-pointer rounded-lg border border-border bg-background px-3.5 py-3 text-left transition-colors",
-        "hover:border-foreground/25 hover:bg-accent/40",
-      )}
-      onClick={() => navigate(href)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          navigate(href);
-        }
-      }}
-      data-testid={`lines-card-${line.id}`}
-    >
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <Workflow className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden />
-            <span className="text-[13px] font-medium tracking-[-0.01em] text-foreground">
-              {humanizeLineName(line.name)}
-            </span>
-          </div>
-          {description ? <p className="mt-1 text-[12px] leading-snug text-muted-foreground">{description}</p> : null}
-        </div>
-      </div>
-      {steps.length > 0 ? <PhaseStrip steps={steps} ticks={ticks} /> : null}
-    </div>
-  );
-}
-
-function PhaseStrip({ steps, ticks }: { steps: FactoryLineStep[]; ticks: LinePhaseTick[] }) {
-  return (
-    <ol className="mt-3.5 flex w-full items-start" aria-label="Phases">
-      {steps.map((step, index) => (
-        <li key={`${step.name}-${index}`} className="relative flex min-w-0 flex-1 flex-col items-center text-center">
-          {index < steps.length - 1 ? (
-            <span
-              className="absolute top-[7px] left-[calc(50%+8px)] right-[calc(-50%+8px)] h-px bg-border"
-              aria-hidden
-            />
-          ) : null}
-          <span className="relative z-[1] flex h-3.5 items-center justify-center">
-            <PhaseTickDot tick={ticks[index] ?? null} />
-          </span>
-          <span className="mt-1.5 max-w-full truncate px-1 text-[12px] leading-tight text-muted-foreground">
-            {step.name || `Phase ${index + 1}`}
-          </span>
-        </li>
-      ))}
-    </ol>
   );
 }
 
@@ -377,7 +326,7 @@ function PhaseColumn({
 
   return (
     <WorkOrderBoardLane
-      title={humanizeLineName(column.stepName)}
+      title={column.stepName}
       label={`${column.stepName} phase`}
       count={totalRuns}
       tone={PHASE_LANE_TONE[glyph]}
@@ -452,21 +401,6 @@ function PhaseRunCard({
     stepAppId,
   );
   return <WorkOrderCard {...workOrderCardContext} entry={entry} href={href} />;
-}
-
-function PhaseTickDot({ tick }: { tick: LinePhaseTick }) {
-  return (
-    <span
-      className={cn(
-        "size-2 shrink-0 rounded-full bg-[#c4c4c4]",
-        tick === "running" && "bg-[#3b82f6] animate-pulse",
-        tick === "waiting" && "bg-[#f59e0b]",
-        tick === "failed" && "bg-[#ef4444]",
-        tick === "queued" && "bg-[#a3a3a3]",
-      )}
-      aria-hidden
-    />
-  );
 }
 
 function EmptyLinesState({

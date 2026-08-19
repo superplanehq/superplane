@@ -29,8 +29,9 @@ type FactoryWorkOrderExecution struct {
 	WorkOrderID    uuid.UUID
 	LineID         uuid.UUID
 	// LineDispatchID is the parent traversal this step run belongs to. Its
-	// steps snapshot is authoritative for what StepIndex/StepName refer to
-	// — see FactoryWorkOrderLineDispatch.
+	// steps snapshot is authoritative for what StepIndex refers to —
+	// see FactoryWorkOrderLineDispatch. StepName is the automation
+	// (canvas) name captured when the step started.
 	LineDispatchID uuid.UUID
 	StepIndex      int
 	StepName       string
@@ -163,7 +164,7 @@ func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) e
 		StepName: e.StepName,
 		Order:    order.Ref(),
 		Line:     dispatch.Ref(),
-		App:      &factory.AppRef{ID: run.WorkflowID},
+		App:      &factory.AppRef{ID: run.WorkflowID, Name: e.StepName},
 		Run:      &factory.RunRef{ID: run.ID, State: run.State, Result: &run.Result},
 	}
 

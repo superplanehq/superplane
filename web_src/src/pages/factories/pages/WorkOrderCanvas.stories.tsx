@@ -26,7 +26,7 @@ export const ConfigurePhase: Story = {
   name: "Configure phase",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
-    const phase = line.steps?.[0]?.name ?? "plan";
+    const phase = line.steps?.[0]?.app?.app ?? "plan";
     return (
       <FactoriesHarness
         enableOnboarding={false}
