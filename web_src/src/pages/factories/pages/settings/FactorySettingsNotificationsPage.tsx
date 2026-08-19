@@ -151,6 +151,13 @@ export function FactorySettingsNotificationsPage() {
       setTypeError("Select at least one event type, or choose none.");
       return;
     }
+    if (
+      form.scope === "filtered" &&
+      form.filters.some((filter) => eventTypesFromToggles(filter.toggles).length === 0)
+    ) {
+      setTypeError("Select at least one event type for each workspace.");
+      return;
+    }
     try {
       const saved = await updateSettings.mutateAsync(settingsFromFormState(form));
       const next = formStateFromSettings(saved);
@@ -175,6 +182,7 @@ export function FactorySettingsNotificationsPage() {
               filters={form.filters}
               factories={factories}
               scopeError={scopeError}
+              typeError={typeError}
               onScopeChange={(scope) => {
                 setScopeError("");
                 setTypeError("");
@@ -199,6 +207,7 @@ export function FactorySettingsNotificationsPage() {
                 }));
               }}
               onToggleType={(workspaceId, key, value) => {
+                setTypeError("");
                 setForm((prev) => ({
                   ...prev,
                   filters: prev.filters.map((filter) =>
@@ -251,6 +260,7 @@ interface WorkspaceScopeSectionProps {
   filters: WorkspaceFilterForm[];
   factories: { id?: string; name?: string }[];
   scopeError: string;
+  typeError: string;
   onScopeChange: (scope: WorkspaceScopeForm) => void;
   onAddWorkspace: (workspaceId: string) => void;
   onRemoveWorkspace: (workspaceId: string) => void;
@@ -262,6 +272,7 @@ function WorkspaceScopeSection({
   filters,
   factories,
   scopeError,
+  typeError,
   onScopeChange,
   onAddWorkspace,
   onRemoveWorkspace,
@@ -310,6 +321,9 @@ function WorkspaceScopeSection({
               workspaceId={filter.workspaceId}
               workspaceName={factoriesById.get(filter.workspaceId)?.name || filter.workspaceId}
               toggles={filter.toggles}
+              error={
+                typeError && eventTypesFromToggles(filter.toggles).length === 0 ? typeError : undefined
+              }
               onToggle={(key, value) => onToggleType(filter.workspaceId, key, value)}
             />
           ))}
@@ -353,11 +367,13 @@ function WorkspaceEventTypesSection({
   workspaceId,
   workspaceName,
   toggles,
+  error,
   onToggle,
 }: {
   workspaceId: string;
   workspaceName: string;
   toggles: NotificationTypeToggles;
+  error?: string;
   onToggle: (key: ConfigurableNotificationType, value: boolean) => void;
 }) {
   return (
@@ -366,6 +382,7 @@ function WorkspaceEventTypesSection({
       description="Choose which events send an email for this workspace."
       idPrefix={`notifications-type-${workspaceId}`}
       toggles={toggles}
+      error={error}
       onToggle={onToggle}
     />
   );
