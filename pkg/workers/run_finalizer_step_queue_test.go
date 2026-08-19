@@ -93,16 +93,28 @@ func finishRun(t *testing.T, run *models.CanvasRun, result string) {
 func advanceFactoryLine(t *testing.T, r *support.ResourceRegistry, runID uuid.UUID) []factoryLinePendingRun {
 	t.Helper()
 
+	pending, _ := advanceFactoryLineWithUpdates(t, r, runID)
+	return pending
+}
+
+func advanceFactoryLineWithUpdates(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	runID uuid.UUID,
+) ([]factoryLinePendingRun, []factoryWorkOrderUpdate) {
+	t.Helper()
+
 	amqpURL, _ := config.RabbitMQURL()
 	finalizer := NewRunFinalizer(amqpURL, r.Registry)
 
 	var pending []factoryLinePendingRun
+	var updates []factoryWorkOrderUpdate
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var err error
-		pending, err = finalizer.executeNextFactoryLineStep(tx, runID)
+		pending, updates, err = finalizer.executeNextFactoryLineStep(tx, runID)
 		return err
 	}))
-	return pending
+	return pending, updates
 }
 
 func queueItemForDispatch(t *testing.T, dispatchID uuid.UUID) *models.FactoryWorkOrderQueueItemRecord {
@@ -304,6 +316,65 @@ func Test__StepQueue_ClosedWorkOrderIsSkippedAtAdmission(t *testing.T) {
 	require.Len(t, admitted, 1)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, admitted[0].Status)
 	assert.Equal(t, pending[0].runID, admitted[0].RunID)
+}
+
+// A raised maxParallelism can leave free slots while dispatches wait in
+// the step's queue. Newcomers must not take those slots ahead of queued
+// work (the queue is FIFO), and the next finished run at the step must
+// admit as many queued dispatches as capacity allows, not just one.
+func Test__StepQueue_RaisedCapacityKeepsFifoOrder(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	fixture := setupStepQueueLine(t, r, []*int{stepMaxParallelism(1)})
+
+	first := fixture.createOpenWorkOrder(t, r, "First")
+	second := fixture.createOpenWorkOrder(t, r, "Second")
+	third := fixture.createOpenWorkOrder(t, r, "Third")
+
+	_, firstResult := fixture.dispatchLine(t, first)
+	require.NotNil(t, firstResult.Run)
+
+	secondDispatch, secondResult := fixture.dispatchLine(t, second)
+	require.NotNil(t, secondResult.QueueItem)
+
+	// Raise the step's capacity while First runs and Second waits.
+	steps := []models.FactoryLineStep(fixture.line.Steps)
+	steps[0].MaxParallelism = stepMaxParallelism(2)
+	require.NoError(t, fixture.line.Update(database.Conn(), nil, steps))
+
+	// The free slot must not let Third jump ahead of Second.
+	thirdDispatch, thirdResult := fixture.dispatchLine(t, third)
+	assert.Nil(t, thirdResult.Run)
+	require.NotNil(t, thirdResult.QueueItem)
+
+	secondItem := queueItemForDispatch(t, secondDispatch.ID)
+	require.NotNil(t, secondItem)
+	assert.Equal(t, 1, secondItem.Position)
+	thirdItem := queueItemForDispatch(t, thirdDispatch.ID)
+	require.NotNil(t, thirdItem)
+	assert.Equal(t, 2, thirdItem.Position)
+
+	// First finishes: both free slots fill from the queue, oldest first.
+	finishRun(t, firstResult.Run, models.CanvasRunResultPassed)
+	pending, updates := advanceFactoryLineWithUpdates(t, r, firstResult.Run.ID)
+	require.Len(t, pending, 2)
+
+	assert.Nil(t, queueItemForDispatch(t, secondDispatch.ID))
+	assert.Nil(t, queueItemForDispatch(t, thirdDispatch.ID))
+
+	secondExecutions := executionsForOrder(t, second.ID)
+	require.Len(t, secondExecutions, 1)
+	assert.Equal(t, pending[0].runID, secondExecutions[0].RunID)
+
+	thirdExecutions := executionsForOrder(t, third.ID)
+	require.Len(t, thirdExecutions, 1)
+	assert.Equal(t, pending[1].runID, thirdExecutions[0].RunID)
+
+	// Each admitted order is reported for a websocket update after commit.
+	require.Len(t, updates, 2)
+	assert.Equal(t, second.ID, updates[0].orderID)
+	assert.Equal(t, third.ID, updates[1].orderID)
 }
 
 func Test__StepQueue_AdvancementQueuesWhenNextStepAtCapacity(t *testing.T) {

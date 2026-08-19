@@ -594,7 +594,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 	var pending []factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
-		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, firstResult.Run.ID)
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, firstResult.Run.ID)
 		return advanceErr
 	}))
 
@@ -663,7 +663,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__FinishesDispatchOnLastStepP
 	var pending []factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
-		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
 		return advanceErr
 	}))
 	assert.Empty(t, pending, "no next step, so nothing to run")
@@ -728,7 +728,7 @@ func testExecuteNextFactoryLineStepFinishesDispatchWithResult(t *testing.T, term
 	var pending []factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
-		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
 		return advanceErr
 	}))
 	assert.Empty(t, pending, "a non-passed result never starts the next step")
@@ -787,7 +787,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__CancelsDispatchWhenOrderClo
 	var pending []factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
-		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
 		return advanceErr
 	}))
 	assert.Empty(t, pending, "a closed order never starts the next step")
@@ -854,7 +854,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__LineEditMidTraversalDoesNot
 	var pending []factoryLinePendingRun
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var advanceErr error
-		pending, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+		pending, _, advanceErr = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
 		return advanceErr
 	}))
 

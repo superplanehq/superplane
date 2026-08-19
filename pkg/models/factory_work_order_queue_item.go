@@ -98,6 +98,23 @@ func lockFactoryLineForStepAdmission(tx *gorm.DB, lineID uuid.UUID) (*FactoryLin
 	return &line, nil
 }
 
+// countQueuedFactoryStepItems counts the dispatches waiting in the step's
+// queue across all work orders of the line.
+func countQueuedFactoryStepItems(tx *gorm.DB, lineID uuid.UUID, stepIndex int) (int64, error) {
+	var count int64
+	err := tx.
+		Model(&FactoryWorkOrderQueueItem{}).
+		Where("line_id = ?", lineID).
+		Where("step_index = ?", stepIndex).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 // countActiveFactoryStepExecutions counts the step's in-flight runs across
 // all work orders and dispatches of the line — the number a step's
 // maxParallelism caps.
@@ -185,24 +202,27 @@ func (o *FactoryWorkOrder) dropQueuedLineWork(tx *gorm.DB) error {
 	return nil
 }
 
-// AdmitNextQueuedForStep pops the oldest queued dispatch of (lineID,
-// stepIndex) and starts its step, if the step has a free slot. Queue items
+// AdmitQueuedForStep admits queued dispatches of (lineID, stepIndex) in
+// FIFO order, oldest first, while the step has free slots — normally one
+// per finished run, more when the step's maxParallelism was raised
+// mid-flight and a finished run reveals the extra capacity. Queue items
 // whose work order is no longer open are dropped (their dispatch finishes
-// as cancelled) and the next item is considered instead. Returns nil when
-// nothing was admitted.
-func AdmitNextQueuedForStep(tx *gorm.DB, lineID uuid.UUID, stepIndex int) (*FactoryLineStepResult, error) {
+// as cancelled) without using a slot. Returns one result per admitted
+// dispatch, oldest first; empty when nothing was admitted.
+func AdmitQueuedForStep(tx *gorm.DB, lineID uuid.UUID, stepIndex int) ([]*FactoryLineStepResult, error) {
 	line, err := lockFactoryLineForStepAdmission(tx, lineID)
 	if err != nil {
 		return nil, err
 	}
 
+	var admitted []*FactoryLineStepResult
 	for {
 		item, err := findOldestFactoryWorkOrderQueueItem(tx, lineID, stepIndex)
 		if err != nil {
 			return nil, err
 		}
 		if item == nil {
-			return nil, nil
+			return admitted, nil
 		}
 
 		dispatch, err := FindWorkOrderLineDispatch(tx, item.LineDispatchID)
@@ -216,7 +236,7 @@ func AdmitNextQueuedForStep(tx *gorm.DB, lineID uuid.UUID, stepIndex int) (*Fact
 			return nil, err
 		}
 		if active >= int64(step.EffectiveMaxParallelism()) {
-			return nil, nil
+			return admitted, nil
 		}
 
 		if err := item.Delete(tx); err != nil {
@@ -243,6 +263,10 @@ func AdmitNextQueuedForStep(tx *gorm.DB, lineID uuid.UUID, stepIndex int) (*Fact
 			continue
 		}
 
-		return dispatch.StartStep(tx, order, item.StepIndex)
+		result, err := dispatch.StartStep(tx, order, item.StepIndex)
+		if err != nil {
+			return nil, err
+		}
+		admitted = append(admitted, result)
 	}
 }

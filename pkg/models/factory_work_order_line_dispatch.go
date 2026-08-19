@@ -98,8 +98,11 @@ func (l *FactoryLine) Dispatch(tx *gorm.DB, order *FactoryWorkOrder) (*FactoryWo
 
 // EnqueueOrStartStep starts the step at stepIndex when it has a free slot,
 // or queues the dispatch for admission when the step is at its
-// maxParallelism. It takes the line's admission lock, so concurrent
-// decisions for the same line cannot both see the last free slot.
+// maxParallelism. The step's queue is FIFO: when other dispatches already
+// wait for the step, the newcomer joins the back of the queue even if a
+// slot is free (a raised maxParallelism can leave free slots behind queued
+// work). It takes the line's admission lock, so concurrent decisions for
+// the same line cannot both see the last free slot.
 func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int) (*FactoryLineStepResult, error) {
 	steps := []FactoryLineStep(l.Steps)
 	if stepIndex < 0 || stepIndex >= len(steps) {
@@ -109,6 +112,14 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 	line, err := lockFactoryLineForStepAdmission(tx, l.LineID)
 	if err != nil {
 		return nil, err
+	}
+
+	queued, err := countQueuedFactoryStepItems(tx, l.LineID, stepIndex)
+	if err != nil {
+		return nil, err
+	}
+	if queued > 0 {
+		return l.enqueueStep(tx, order, stepIndex)
 	}
 
 	step := admissionStep(line, l, stepIndex)
