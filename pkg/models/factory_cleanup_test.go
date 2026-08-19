@@ -156,7 +156,7 @@ func Test__FactoryResourceCleaner__HardDeletesFactoryDomain(t *testing.T) {
 		LineDispatchID: dispatch.ID,
 		StepIndex:      0,
 		StepName:       "step",
-		RunID:          run.ID,
+		RunID:          &run.ID,
 		Status:         models.FactoryWorkOrderExecutionStatusFinished,
 		CreatedAt:      now,
 		UpdatedAt:      now,
@@ -310,7 +310,7 @@ func Test__FactoryResourceCleaner__LargeFactoryStaysWithinBudget(t *testing.T) {
 	assert.Equal(t, int64(0), factoryCount)
 }
 
-func Test__CanvasRun__DeleteChain__RemovesFactoryWorkOrderExecution(t *testing.T) {
+func Test__CanvasRun__DeleteChain__NullsFactoryWorkOrderExecutionRunID(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
@@ -346,8 +346,9 @@ func Test__CanvasRun__DeleteChain__RemovesFactoryWorkOrderExecution(t *testing.T
 		LineDispatchID: dispatch.ID,
 		StepIndex:      0,
 		StepName:       "step",
-		RunID:          run.ID,
+		RunID:          &run.ID,
 		Status:         models.FactoryWorkOrderExecutionStatusFinished,
+		Result:         models.CanvasRunResultPassed,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
@@ -357,6 +358,12 @@ func Test__CanvasRun__DeleteChain__RemovesFactoryWorkOrderExecution(t *testing.T
 		_, err := run.DeleteChain(tx)
 		return err
 	}))
+
+	var persisted models.FactoryWorkOrderExecution
+	require.NoError(t, db.Where("id = ?", execution.ID).First(&persisted).Error)
+	assert.Nil(t, persisted.RunID)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, persisted.Status)
+	assert.Equal(t, models.CanvasRunResultPassed, persisted.Result)
 
 	_, err = models.FindWorkOrderExecutionByRunID(db, run.ID)
 	assert.ErrorIs(t, err, models.ErrFactoryWorkOrderExecutionNotFound)
@@ -448,7 +455,7 @@ func Test__FactoryWorkOrder__UpdateStatus__OpenToDraft__RejectsWhenExecutionActi
 		LineDispatchID: dispatch.ID,
 		StepIndex:      0,
 		StepName:       "step",
-		RunID:          run.ID,
+		RunID:          &run.ID,
 		Status:         models.FactoryWorkOrderExecutionStatusPending,
 		CreatedAt:      now,
 		UpdatedAt:      now,
