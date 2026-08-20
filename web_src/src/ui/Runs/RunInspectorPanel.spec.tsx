@@ -7,6 +7,7 @@ import {
   firePointerEvent,
   renderInspector,
   renderInteractiveInspector,
+  run,
   runningExecutions,
   runningRun,
   cancellingRun,
@@ -569,5 +570,29 @@ describe("RunInspectorPanel", () => {
     firePointerEvent(window, "pointerUp", 680);
 
     expect(localStorage.getItem("superplane.runInspector.width.v3")).toBe("520");
+  });
+});
+
+describe("RunInspectorPanel run errors", () => {
+  it("shows run errors at the top of the inspector", () => {
+    renderInspector({
+      run: { ...run, errors: ["pipeline failed", "tests failed"] },
+    });
+
+    expect(screen.getByTestId("run-errors-card")).toHaveTextContent("This run has errors");
+    expect(screen.getByText("pipeline failed")).toBeInTheDocument();
+    expect(screen.getByText("tests failed")).toBeInTheDocument();
+  });
+
+  it("shows run errors in the factory inspector", () => {
+    renderInspector({
+      factoryContext: true,
+      selectedNodeId: "action-2",
+      run: { ...run, errors: ["work order check failed"] },
+    });
+
+    expect(screen.getByTestId("factory-run-node-detail")).toBeInTheDocument();
+    expect(screen.getByTestId("run-errors-card")).toHaveTextContent("This run has an error");
+    expect(screen.getByText("work order check failed")).toBeInTheDocument();
   });
 });
