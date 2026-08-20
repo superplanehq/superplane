@@ -17,6 +17,16 @@ describe("factoryCanvasChrome", () => {
     });
   });
 
+  it("uses 3px dots while editing so the grid reads as the edit surface", () => {
+    expect(factoryCanvasBackground(true, true)).toEqual({
+      gap: 22,
+      size: 3,
+      color: "#33312b",
+      bgColor: "#14120b",
+    });
+    expect(factoryCanvasBackground(false, true)).toMatchObject({ gap: 22, size: 3, color: "#e5e7eb" });
+  });
+
   it("uses thin slate edges in light mode", () => {
     expect(factoryEdgePalette(false).default).toEqual({ stroke: "#cbd5e1", strokeWidth: 1.5 });
   });

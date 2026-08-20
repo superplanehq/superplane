@@ -1,23 +1,12 @@
 import { usePermissions } from "@/contexts/usePermissions";
-import { useCanvas } from "@/hooks/useCanvasData";
-import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import type { FactoryConfigureActions } from "@/pages/app";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
-import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { resolveFactoryAppBackNav } from "../lib/factoryAppNav";
-import {
-  isFactoryAppConfigureMode,
-  resolveFactoryAppCanvasSubtitle,
-  resolveFactoryLineName,
-} from "../lib/factoryAppCanvasCopy";
-import { shouldRedirectFactoryAppCanvas } from "../lib/factoryAppCanvasRedirect";
-import { resolveWorkOrderByNumber } from "../lib/workOrderNumberResolution";
+import { useCallback, useRef, useState } from "react";
+import { useNavigate } from "react-router";
+import { factoryAppViewPath, parseFactoryAppNavFrom } from "../lib/factoryPagePaths";
+import { useFactoryAppCanvasEditActions } from "./useFactoryAppCanvasEditActions";
+import { useFactoryAppCanvasRoute } from "./useFactoryAppCanvasRoute";
 import { useFactoryAppConfigureTitle } from "./useFactoryAppConfigureTitle";
-
-function readFactoryAppOrderRef(searchParams: URLSearchParams): string | null {
-  return searchParams.get("orderNumber") ?? searchParams.get("orderId");
-}
+import { useFactoryCanvasEditWorkspace } from "./factoryCanvasEditWorkspaceContext";
 
 function resolveCanRenameAutomation(
   permissionsLoading: boolean,
@@ -27,55 +16,32 @@ function resolveCanRenameAutomation(
 }
 
 export function useFactoryAppCanvasPageModel() {
-  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
-  const { appId = "" } = useParams<{ appId: string }>();
-  const [searchParams] = useSearchParams();
+  const storybookEditWorkspace = useFactoryCanvasEditWorkspace();
+  const route = useFactoryAppCanvasRoute();
   const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const configureActionsRef = useRef<FactoryConfigureActions | null>(null);
   const [configureBusy, setConfigureBusy] = useState(false);
-
-  const {
-    data: canvas,
-    isLoading: canvasLoading,
-    error: canvasError,
-  } = useCanvas(organizationId, appId, {
-    enabled: Boolean(appId),
-  });
   const canRename = resolveCanRenameAutomation(permissionsLoading, canAct);
-  const from = searchParams.get("from");
-  const lineId = searchParams.get("lineId");
-  const orderNumber = readFactoryAppOrderRef(searchParams);
-  const isConfigure = isFactoryAppConfigureMode(searchParams);
-  const lineName = useMemo(() => resolveFactoryLineName(factory?.lines, lineId), [factory?.lines, lineId]);
-
-  // Reads the already-fetched work orders list (same query the sidebar's
-  // "recent orders" section uses) rather than fetching this one order by id,
-  // since all we need here is its title for the back-link label.
-  const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
-  const order = useMemo(
-    () => resolveWorkOrderByNumber(workOrders, orderNumber ?? undefined, false).order,
-    [workOrders, orderNumber],
-  );
-
-  const back = useMemo(
-    () =>
-      resolveFactoryAppBackNav(organizationId, factoryKey, {
-        from,
-        appId,
-        appName: canvas?.metadata?.name,
-        lineId,
-        orderNumber,
-        lineName,
-        orderTitle: order?.title,
-      }),
-    [appId, canvas?.metadata?.name, factoryKey, from, lineId, lineName, order?.title, organizationId, orderNumber],
-  );
-
   const navigateDone = useCallback(() => {
-    navigate(back.href);
-  }, [back.href, navigate]);
-
+    navigate(
+      factoryAppViewPath(route.organizationId, route.factoryKey, route.appId, {
+        from: parseFactoryAppNavFrom(route.from),
+        lineId: route.lineId ?? undefined,
+        orderNumber: route.orderNumber ?? undefined,
+        runId: route.runId ?? undefined,
+      }),
+    );
+  }, [
+    navigate,
+    route.appId,
+    route.factoryKey,
+    route.from,
+    route.lineId,
+    route.orderNumber,
+    route.organizationId,
+    route.runId,
+  ]);
   const {
     title,
     configureBusy: titleConfigureBusy,
@@ -84,60 +50,69 @@ export function useFactoryAppCanvasPageModel() {
     handleConfigureDiscard,
     clearDraftTitle,
   } = useFactoryAppConfigureTitle({
-    organizationId,
-    factoryId,
-    appId,
-    isConfigure,
+    organizationId: route.organizationId,
+    factoryId: route.factoryId,
+    appId: route.appId,
+    isConfigure: route.isConfigure,
     canRename,
-    savedName: canvas?.metadata?.name,
+    savedName: route.canvas?.metadata?.name,
     configureBusy,
     configureActionsRef,
-    onDone: navigateDone,
   });
-
   const handleConfigureDone = useCallback(() => {
     clearDraftTitle();
     navigateDone();
   }, [clearDraftTitle, navigateDone]);
-
+  const handleConfigureSaved = useCallback(() => {
+    clearDraftTitle();
+  }, [clearDraftTitle]);
   const handleConfigureBusyChange = useCallback((busy: boolean) => {
     setConfigureBusy(busy);
   }, []);
-
-  const belongsToFactory = canvas?.metadata?.factoryId === factoryId;
-  const shouldRedirect = shouldRedirectFactoryAppCanvas({
-    appId,
-    canvasLoading,
-    canvasError,
-    belongsToFactory,
-    hasCanvas: Boolean(canvas),
-  });
-
-  const subtitle = resolveFactoryAppCanvasSubtitle({
-    isConfigure,
-    description: canvas?.metadata?.description?.trim(),
-    factoryName: factory?.name,
+  const editActions = useFactoryAppCanvasEditActions({
+    organizationId: route.organizationId,
+    factoryKey: route.factoryKey,
+    appId: route.appId,
+    from: route.from,
+    lineId: route.lineId,
+    orderNumber: route.orderNumber,
+    runId: route.runId,
+    isConfigure: route.isConfigure,
+    agentOpen: route.agentOpen,
+    componentsOpen: route.componentsOpen,
+    setSearchParams: route.setSearchParams,
+    navigate,
+    enabled: storybookEditWorkspace,
   });
 
   return {
-    organizationId,
-    factoryId,
-    factoryKey,
-    appId,
-    canvas,
-    canvasLoading,
-    isConfigure,
+    storybookEditWorkspace,
+    organizationId: route.organizationId,
+    factoryId: route.factoryId,
+    factoryKey: route.factoryKey,
+    appId: route.appId,
+    canvas: route.canvas,
+    canvasLoading: route.canvasLoading,
+    isConfigure: route.isConfigure,
     configureBusy: titleConfigureBusy,
     configureActionsRef,
-    back,
+    back: route.back,
     title,
-    subtitle,
-    shouldRedirect,
+    subtitle: route.subtitle,
+    shouldRedirect: route.shouldRedirect,
     canRename,
     handleDraftTitleChange,
     handleConfigureSave,
     handleConfigureDiscard,
     handleConfigureDone,
+    handleConfigureSaved,
     handleConfigureBusyChange,
+    runId: route.runId,
+    lineId: route.lineId,
+    agentPromptOpen: route.agentPromptOpen,
+    yamlViewOpen: route.yamlViewOpen,
+    agentOpen: route.agentOpen,
+    componentsOpen: route.componentsOpen,
+    ...editActions,
   };
 }

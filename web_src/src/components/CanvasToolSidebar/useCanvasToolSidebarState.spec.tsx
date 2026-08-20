@@ -1,14 +1,15 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { requestCanvasAgentSidebarClose, requestCanvasAgentSidebarOpen } from "./canvasAgentSidebarOpenRequest";
 import { useCanvasToolSidebarState } from "./useCanvasToolSidebarState";
 
-const featureFlags = vi.hoisted(() => ({ enabled: false }));
+const featureFlags = vi.hoisted(() => ({ enabled: false, isLoading: false }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
     has: () => featureFlags.enabled,
     enabledExperimentalFeatures: [],
-    isLoading: false,
+    isLoading: featureFlags.isLoading,
   }),
 }));
 
@@ -54,6 +55,7 @@ function Harness({
 describe("useCanvasToolSidebarState", () => {
   beforeEach(() => {
     featureFlags.enabled = false;
+    featureFlags.isLoading = false;
     window.localStorage.clear();
   });
 
@@ -177,6 +179,52 @@ describe("useCanvasToolSidebarState", () => {
     input.focus();
 
     fireEvent.keyDown(input, { key: "b", metaKey: true });
+
+    expect(screen.getByTestId("open-state")).toHaveTextContent("closed");
+  });
+
+  it("restores the stored open preference after the agent feature loads", () => {
+    window.localStorage.setItem("canvasAgentSidebarOpen:canvas-a", "true");
+    featureFlags.isLoading = true;
+    featureFlags.enabled = false;
+
+    const { rerender } = render(
+      <Harness onBeforeClose={vi.fn()} canvasId="canvas-a" canUseAgents forceEnable={false} />,
+    );
+    expect(screen.getByTestId("open-state")).toHaveTextContent("open");
+
+    featureFlags.isLoading = false;
+    rerender(<Harness onBeforeClose={vi.fn()} canvasId="canvas-a" canUseAgents forceEnable={false} />);
+    expect(screen.getByTestId("open-state")).toHaveTextContent("closed");
+
+    featureFlags.enabled = true;
+    rerender(<Harness onBeforeClose={vi.fn()} canvasId="canvas-a" canUseAgents forceEnable={false} />);
+    expect(screen.getByTestId("open-state")).toHaveTextContent("open");
+  });
+
+  it("opens the sidebar when a matching canvas open request is dispatched", () => {
+    featureFlags.enabled = true;
+    render(<Harness onBeforeClose={vi.fn()} canvasId="canvas-a" canUseAgents forceEnable={false} />);
+
+    expect(screen.getByTestId("open-state")).toHaveTextContent("closed");
+
+    act(() => {
+      requestCanvasAgentSidebarOpen("canvas-a");
+    });
+
+    expect(screen.getByTestId("open-state")).toHaveTextContent("open");
+  });
+
+  it("closes the sidebar when a matching canvas close request is dispatched", () => {
+    featureFlags.enabled = true;
+    window.localStorage.setItem("canvasAgentSidebarOpen:canvas-a", "true");
+    render(<Harness onBeforeClose={vi.fn()} canvasId="canvas-a" canUseAgents forceEnable={false} />);
+
+    expect(screen.getByTestId("open-state")).toHaveTextContent("open");
+
+    act(() => {
+      requestCanvasAgentSidebarClose("canvas-a");
+    });
 
     expect(screen.getByTestId("open-state")).toHaveTextContent("closed");
   });
