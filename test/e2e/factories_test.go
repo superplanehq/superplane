@@ -26,7 +26,8 @@ func TestFactories(t *testing.T) {
 		steps.fillFactorySettingsName(updatedName)
 		steps.fillFactorySettingsDescription("updated description")
 		steps.submitFactorySettings()
-		steps.assertFactoryVisibleInSidebar(updatedName)
+		steps.visitFactorySettings(factory)
+		steps.assertFactorySettingsName(updatedName)
 		steps.assertFactorySavedInDB(factory.ID, updatedName, "updated description")
 	})
 
@@ -115,10 +116,6 @@ func (s *factorySteps) fillFactorySettingsDescription(description string) {
 func (s *factorySteps) submitFactorySettings() {
 	s.session.Click(q.TestID("factory-settings-save"))
 	s.session.Sleep(1000)
-}
-
-func (s *factorySteps) assertFactoryVisibleInSidebar(name string) {
-	s.session.AssertText(name)
 }
 
 func (s *factorySteps) assertFactorySettingsName(name string) {
