@@ -148,7 +148,7 @@ export const POPULATED_OVERVIEW: OverviewRedesignData = {
       lineName: "Backend",
       stepName: "Plan review",
       waitingFor: "4h",
-      owner: { name: "Storybook User", initials: "SU" },
+      owner: { name: "Leonardo DiCaprio", initials: "LD" },
       mine: true,
     },
     {

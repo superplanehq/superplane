@@ -52,6 +52,7 @@ export function FactorySettingsProfilePage() {
           isLoading={isLoading}
           errorMessage={errorMessage}
           user={user}
+          avatarUrl={account?.avatar_url}
           canChangePassword={canChangePassword}
           token={token}
           tokenVisible={tokenVisible}
@@ -68,6 +69,7 @@ export function FactorySettingsProfilePage() {
 
 interface ProfileUser {
   id?: string;
+  name?: string;
   email?: string;
   createdAt?: string;
   hasToken?: boolean;
@@ -77,6 +79,7 @@ function ProfileBody({
   isLoading,
   errorMessage,
   user,
+  avatarUrl,
   canChangePassword,
   token,
   tokenVisible,
@@ -88,6 +91,7 @@ function ProfileBody({
   isLoading: boolean;
   errorMessage: string | null;
   user: ProfileUser | null | undefined;
+  avatarUrl?: string | null;
   canChangePassword: boolean;
   token: string;
   tokenVisible: boolean;
@@ -108,7 +112,12 @@ function ProfileBody({
 
   return (
     <div className="contents">
-      <ProfileInformationCard user={user} canChangePassword={canChangePassword} onChangePassword={onChangePassword} />
+      <ProfileInformationCard
+        user={user}
+        avatarUrl={avatarUrl}
+        canChangePassword={canChangePassword}
+        onChangePassword={onChangePassword}
+      />
       <ApiTokenCard
         hasToken={Boolean(user.hasToken)}
         token={token}
@@ -121,27 +130,47 @@ function ProfileBody({
   );
 }
 
+function initialsFor(name: string): string {
+  const parts = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() ?? "");
+  if (parts.length === 0) {
+    return "?";
+  }
+  if (parts.length === 1) {
+    return parts[0];
+  }
+  return `${parts[0]}${parts[parts.length - 1]}`;
+}
+
 function ProfileInformationCard({
   user,
+  avatarUrl,
   canChangePassword,
   onChangePassword,
 }: {
   user: ProfileUser;
+  avatarUrl?: string | null;
   canChangePassword: boolean;
   onChangePassword: () => void;
 }) {
+  const displayName = user.name?.trim() || user.email || "User";
+
   return (
     <section className="space-y-6" data-testid="factory-settings-profile-form">
       <h2 className="text-[13px] font-medium tracking-[-0.01em] text-foreground">Profile information</h2>
       <div className="flex items-center gap-4">
         <Avatar
-          initials={user.email ? user.email.charAt(0).toUpperCase() : "U"}
-          alt="User Avatar"
+          src={avatarUrl || undefined}
+          initials={avatarUrl ? undefined : initialsFor(displayName)}
+          alt={displayName}
           className="size-16"
         />
-        <p className="text-[15px] font-medium text-foreground">{user.email}</p>
+        <p className="text-[15px] font-medium text-foreground">{displayName}</p>
       </div>
       <dl className="space-y-4">
+        <ProfileField label="Name" value={user.name?.trim() || "Not available"} />
         <ProfileField label="User ID" value={user.id ?? ""} />
         <ProfileField label="Email address" value={user.email ?? ""} />
         <ProfileField
