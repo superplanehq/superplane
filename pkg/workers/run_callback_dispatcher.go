@@ -323,7 +323,14 @@ func (d *RunCallbackDispatcher) runInputParameters() (map[string]any, error) {
 }
 
 func (d *RunCallbackDispatcher) runFinishedParameters() (map[string]any, error) {
-	params, err := core.NewRunFinishedCallback(core.NewRun(d.run.ID, d.run.WorkflowID, d.run.Result, &d.run.ResultMessage)).ToParameters()
+	run := core.Run{
+		ID:     d.run.ID,
+		AppID:  d.run.WorkflowID,
+		Result: d.run.Result,
+		Errors: d.run.ErrorMessages(),
+	}
+
+	params, err := core.NewRunFinishedCallback(run).ToParameters()
 	if err != nil {
 		return nil, fmt.Errorf("build run finished callback: %w", err)
 	}

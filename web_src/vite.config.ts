@@ -78,6 +78,9 @@ export default defineConfig(() => {
         "@": path.resolve(import.meta.dirname, "src"),
       },
     },
+    optimizeDeps: {
+      include: ["@pierre/diffs/react", "@pierre/trees/react"],
+    },
     build: {
       target: "es2020",
       outDir: "../pkg/web/assets/dist", // emit assets to pkg/web/assets/dist

@@ -4,6 +4,7 @@ import { fetchFactoryPageFixture } from "./handlers";
 import { lineMetricsFactoriesFixture } from "./lineMetricsFactoriesFixture";
 import {
   CLOSED_WORK_ORDER,
+  FACTORIES_ORGANIZATION_ID,
   OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
   REFUND_LINE_ONBOARDING_ID,
@@ -32,6 +33,21 @@ describe("matchFactoryPageFixture", () => {
     const body = (await orders.json()) as { orders: Array<{ id?: string; state?: string }> };
     const ids = body.orders.map((entry) => entry.id);
     expect(ids).toEqual(expect.arrayContaining([OPEN_WORK_ORDER.id, RUNNING_WORK_ORDER.id, CLOSED_WORK_ORDER.id]));
+  });
+
+  it("serves factory usage and organization LLM spend reports", async () => {
+    const usage = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/usage`);
+    await expect(usage.json()).resolves.toMatchObject({
+      totalTokens: "25600",
+      totalCostCents: "876",
+      byModel: expect.arrayContaining([expect.objectContaining({ provider: "anthropic" })]),
+    });
+
+    const spend = await fetchFactoryPageFixture(`/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/llm-spend`);
+    await expect(spend.json()).resolves.toMatchObject({
+      totalTokens: "25600",
+      totalCostCents: "876",
+    });
   });
 
   it("returns factory apps for the populated factory", async () => {

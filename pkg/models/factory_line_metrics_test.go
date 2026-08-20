@@ -180,6 +180,7 @@ func createMetricExecution(
 ) {
 	t.Helper()
 	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factoryID, workOrderID, lineID, lineName, nil)
+	runID := createMetricRun(t, r)
 	execution := models.FactoryWorkOrderExecution{
 		ID:             uuid.New(),
 		OrganizationID: r.Organization.ID,
@@ -189,7 +190,7 @@ func createMetricExecution(
 		LineDispatchID: dispatch.ID,
 		StepIndex:      0,
 		StepName:       lineName,
-		RunID:          createMetricRun(t, r),
+		RunID:          &runID,
 		Status:         models.FactoryWorkOrderExecutionStatusFinished,
 		Result:         models.CanvasRunResultPassed,
 		CostCents:      costCents,

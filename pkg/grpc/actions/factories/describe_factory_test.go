@@ -113,6 +113,7 @@ func createDescribeMetricsExecution(
 ) {
 	t.Helper()
 	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factoryID, workOrderID, lineID, lineName, nil)
+	runID := createDescribeMetricsRun(t, db, r)
 	execution := models.FactoryWorkOrderExecution{
 		ID:             uuid.New(),
 		OrganizationID: r.Organization.ID,
@@ -122,7 +123,7 @@ func createDescribeMetricsExecution(
 		LineDispatchID: dispatch.ID,
 		StepIndex:      0,
 		StepName:       lineName,
-		RunID:          createDescribeMetricsRun(t, db, r),
+		RunID:          &runID,
 		Status:         models.FactoryWorkOrderExecutionStatusFinished,
 		Result:         models.CanvasRunResultPassed,
 		CreatedAt:      createdAt,

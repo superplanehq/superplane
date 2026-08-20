@@ -13,7 +13,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 
-	_ "github.com/superplanehq/superplane/pkg/components/messages"
+	_ "github.com/superplanehq/superplane/pkg/components/runs"
 	_ "github.com/superplanehq/superplane/pkg/triggers/messages"
 )
 

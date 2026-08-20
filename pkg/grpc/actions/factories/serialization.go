@@ -332,11 +332,16 @@ func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecor
 		UpdatedAt:   timestamppb.New(execution.UpdatedAt),
 		TotalTokens: execution.TotalTokens,
 		CostCents:   execution.CostCents,
-		Run: &pb.WorkOrderExecution_RunRef{
+	}
+	if execution.RunID != nil {
+		runRef := &pb.WorkOrderExecution_RunRef{
 			Id:      execution.RunID.String(),
-			AppId:   execution.CanvasID.String(),
 			AppName: execution.CanvasName,
-		},
+		}
+		if execution.CanvasID != nil {
+			runRef.AppId = execution.CanvasID.String()
+		}
+		item.Run = runRef
 	}
 	if execution.FinishedAt != nil {
 		item.FinishedAt = timestamppb.New(*execution.FinishedAt)
@@ -354,8 +359,12 @@ func serializeExecutionSteps(
 
 	nameByIndex := make(map[int]string, len(executions))
 	for _, execution := range executions {
-		if execution.CanvasName != "" {
-			nameByIndex[execution.StepIndex] = execution.CanvasName
+		name := execution.CanvasName
+		if name == "" {
+			name = execution.StepName
+		}
+		if name != "" {
+			nameByIndex[execution.StepIndex] = name
 		}
 	}
 

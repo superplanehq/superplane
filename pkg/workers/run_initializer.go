@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -166,6 +167,8 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 	}
 
 	stateUpdated := false
+	alreadyInitialized := false
+	failedBeforeStart := false
 	var pendingFactoryRuns []factoryLinePendingRun
 	var factoryOrderUpdates []factoryWorkOrderUpdate
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -185,6 +188,7 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 
 		if locked.State != models.CanvasRunStatePending {
 			logger.Infof("Run already initialized - skipping")
+			alreadyInitialized = true
 			return nil
 		}
 
@@ -203,6 +207,7 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 			if failErr != nil {
 				return failErr
 			}
+			failedBeforeStart = true
 			pendingFactoryRuns, factoryOrderUpdates = factoryAdmissionOutcomes(admitted)
 			stateUpdated = true
 			return nil
@@ -228,6 +233,10 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 
 	if err != nil {
 		return err
+	}
+
+	if alreadyInitialized || failedBeforeStart {
+		rollUpFactoryUsageBestEffort(logger, database.Conn(), runID)
 	}
 
 	if stateUpdated {
@@ -278,19 +287,21 @@ func (w *RunInitializer) failRun(
 	executionCollector func([]models.CanvasNodeExecution),
 	resultMessage string,
 ) ([]*models.FactoryLineStepResult, error) {
+	if err := run.AddError(tx, resultMessage, config.MaxPayloadSize()); err != nil {
+		return nil, fmt.Errorf("record run error: %w", err)
+	}
+
 	now := time.Now()
 	run.State = models.CanvasRunStateFinished
 	run.Result = models.CanvasRunResultFailed
-	run.ResultMessage = resultMessage
 	run.UpdatedAt = &now
 	run.FinishedAt = &now
 	err := tx.Model(run).
 		Updates(map[string]any{
-			"state":          models.CanvasRunStateFinished,
-			"result":         models.CanvasRunResultFailed,
-			"result_message": &resultMessage,
-			"updated_at":     &now,
-			"finished_at":    &now,
+			"state":       models.CanvasRunStateFinished,
+			"result":      models.CanvasRunResultFailed,
+			"updated_at":  &now,
+			"finished_at": &now,
 		}).
 		Error
 
@@ -343,6 +354,16 @@ func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runI
 			return nil, nil
 		}
 		return nil, err
+	}
+
+	if err := execution.RollupUsage(tx); err != nil {
+		w.logger.WithError(err).WithField("run_id", runID).Error("failed to roll up factory usage")
+	}
+
+	// A later initializer pass can find this step already finished after a
+	// rollup error. Still copy ledger totals, but do not finish the line twice.
+	if execution.Status == models.FactoryWorkOrderExecutionStatusFinished {
+		return nil, nil
 	}
 
 	if err := execution.MarkFinished(tx, result); err != nil {
