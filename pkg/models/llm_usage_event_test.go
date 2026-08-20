@@ -23,7 +23,7 @@ func Test__RecordUsage__FactoryLinkedRunPersistsAndRollsUp(t *testing.T) {
 
 	err := models.RecordUsage(db, models.LLMUsageEventInput{
 		OrganizationID:  r.Organization.ID,
-		CanvasRunID:     execution.RunID,
+		CanvasRunID:     requireExecutionRunID(t, execution),
 		NodeExecutionID: nodeExecutionID,
 		NodeID:          "prompt",
 		Provider:        models.UsageProviderAnthropic,
@@ -56,7 +56,7 @@ func Test__RecordUsage__SameNodeExecutionRecordsEachBilledCall(t *testing.T) {
 
 	first := models.LLMUsageEventInput{
 		OrganizationID:  r.Organization.ID,
-		CanvasRunID:     execution.RunID,
+		CanvasRunID:     requireExecutionRunID(t, execution),
 		NodeExecutionID: nodeExecutionID,
 		NodeID:          "prompt",
 		Provider:        models.UsageProviderAnthropic,
@@ -83,7 +83,7 @@ func Test__RecordUsage__ConcurrentCallsKeepFullSpend(t *testing.T) {
 			defer wg.Done()
 			errs <- models.RecordUsage(database.Conn(), models.LLMUsageEventInput{
 				OrganizationID:  r.Organization.ID,
-				CanvasRunID:     execution.RunID,
+				CanvasRunID:     requireExecutionRunID(t, execution),
 				NodeExecutionID: uuid.New(),
 				NodeID:          "prompt",
 				Provider:        models.UsageProviderAnthropic,
@@ -106,7 +106,7 @@ func Test__RecordUsage__ChildRunUsesParentFactoryExecution(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	execution := dispatchWorkOrderExecution(t, r)
-	parentRun, err := models.FindUnscopedCanvasRun(db, execution.RunID)
+	parentRun, err := models.FindUnscopedCanvasRun(db, requireExecutionRunID(t, execution))
 	require.NoError(t, err)
 
 	now := parentRun.CreatedAt
@@ -176,6 +176,12 @@ func assertInProgressExecutionUsage(t *testing.T, db *gorm.DB, executionID uuid.
 	assert.NotEqual(t, models.FactoryWorkOrderExecutionStatusFinished, updated.Status)
 	assert.Equal(t, tokens, updated.TotalTokens)
 	assert.Equal(t, cents, updated.CostCents)
+}
+
+func requireExecutionRunID(t *testing.T, execution *models.FactoryWorkOrderExecution) uuid.UUID {
+	t.Helper()
+	require.NotNil(t, execution.RunID)
+	return *execution.RunID
 }
 
 func dispatchWorkOrderExecution(t *testing.T, r *support.ResourceRegistry) *models.FactoryWorkOrderExecution {
