@@ -1,8 +1,14 @@
-import type { FactoriesFactory, FactoriesFactoryLine, FactoryLineStep } from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryLine, FactoryApp, FactoryLineStep } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useCreateFactoryLine, useCreateWorkOrder, useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
-import { useDispatchWorkOrder } from "@/hooks/useFactoryData";
+import {
+  useCreateFactoryLine,
+  useCreateWorkOrder,
+  useDeleteFactory,
+  useDispatchWorkOrder,
+  useFactoryApps,
+  useUpdateFactory,
+} from "@/hooks/useFactoryData";
 import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { githubInstallationUrl } from "@/lib/githubInstallation";
@@ -158,6 +164,7 @@ async function provisionWorkspace(args: {
   workOrderDescription: string;
   github: { id: string };
   claude: { id: string };
+  loadFactoryApps: () => Promise<FactoryApp[]>;
 }): Promise<{ number?: number | string | null }> {
   if (args.workspaceName !== args.factory?.name) {
     await args.updateFactory({ name: args.workspaceName });
@@ -187,6 +194,7 @@ async function provisionWorkspace(args: {
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
     installFactory: args.installFactory,
+    loadExistingApps: args.loadFactoryApps,
   });
   await args.updateOnboarding({
     provisionedAppId: primaryAppId,
@@ -232,6 +240,7 @@ function useFinishOnboarding(args: {
     description: string;
   }) => Promise<{ id?: string | null; number?: number | string | null }>;
   dispatchWorkOrder: (input: { orderId: string; lineName: string }) => Promise<unknown>;
+  loadFactoryApps: () => Promise<FactoryApp[]>;
 }) {
   const navigate = useNavigate();
   return async () => {
@@ -347,6 +356,7 @@ export function useOnboardingPageModel(args: {
   const createLine = useCreateFactoryLine(args.organizationId, args.factoryId);
   const createWorkOrder = useCreateWorkOrder(args.organizationId, args.factoryId);
   const dispatchWorkOrder = useDispatchWorkOrder(args.organizationId, args.factoryId);
+  const factoryApps = useFactoryApps(args.organizationId, args.factoryId);
   const installer = useInstallFactory();
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
   const githubConnections = useOnboardingGithubConnections({
@@ -385,6 +395,7 @@ export function useOnboardingPageModel(args: {
     createLine: createLine.mutateAsync,
     createWorkOrder: createWorkOrder.mutateAsync,
     dispatchWorkOrder: dispatchWorkOrder.mutateAsync,
+    loadFactoryApps: async () => factoryApps.data ?? (await factoryApps.refetch()).data ?? [],
   });
   const cancel = useCancelOnboarding({
     organizationId: args.organizationId,

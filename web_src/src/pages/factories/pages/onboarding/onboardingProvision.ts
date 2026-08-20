@@ -1,11 +1,12 @@
 import type {
+  FactoryApp,
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesUpdateFactoryOnboardingBody,
   FactoryLineStep,
 } from "@/api-client";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
-import { ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS } from "@/pages/home/factories";
+import { getFactoryDefinition, ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS } from "@/pages/home/factories";
 import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
 
 export const DEFAULT_LINE_NAME = "Software delivery";
@@ -22,6 +23,8 @@ export interface ProvisionedLine {
   lineId: string;
   primaryAppId: string;
 }
+
+type OnboardingEventAppId = (typeof ONBOARDING_EVENT_APPS)[number];
 
 // A finished line has one step per bundled app, each calling the app onRun
 // entrypoint. Match on the first entrypoint to recover a line provisioned by an
@@ -54,6 +57,25 @@ async function installOnboardingApp(args: {
   });
   if (!installed?.canvasId) throw new Error(`Failed to create the ${args.appFactoryId} app`);
   return installed;
+}
+
+function isMatchingEventAppName(name: string | undefined, expectedName: string): boolean {
+  if (!name) return false;
+  if (name === expectedName) return true;
+  const escapedName = expectedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^${escapedName} \\(\\d+\\)$`).test(name);
+}
+
+function findProvisionedEventApp(
+  apps: FactoryApp[],
+  appFactoryId: OnboardingEventAppId,
+): FactoryApp | undefined {
+  const definition = getFactoryDefinition(appFactoryId);
+  return apps.find(
+    (app) =>
+      app.description === definition.description &&
+      isMatchingEventAppName(app.name ?? undefined, definition.title),
+  );
 }
 
 // Install each bundled app in order and return the line steps that call them.
@@ -93,15 +115,29 @@ export async function provisionEventApps(args: {
   appRepository: string;
   backlogRepository: string;
   installFactory: InstallOnboardingApp;
+  existingApps?: FactoryApp[];
+  loadExistingApps?: () => Promise<FactoryApp[]>;
 }): Promise<void> {
+  const provisionedApps = [...(args.existingApps ?? (args.loadExistingApps ? await args.loadExistingApps() : []))];
+
   for (const appFactoryId of ONBOARDING_EVENT_APPS) {
-    await installOnboardingApp({
+    if (findProvisionedEventApp(provisionedApps, appFactoryId)) {
+      continue;
+    }
+
+    const installed = await installOnboardingApp({
       factoryId: args.factoryId,
       appFactoryId,
       selections: args.selections,
       appRepository: args.appRepository,
       backlogRepository: args.backlogRepository,
       installFactory: args.installFactory,
+    });
+
+    provisionedApps.push({
+      id: installed.canvasId,
+      name: installed.canvasName,
+      description: getFactoryDefinition(appFactoryId).description,
     });
   }
 }

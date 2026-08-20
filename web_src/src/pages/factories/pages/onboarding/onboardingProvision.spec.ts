@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory } from "@/api-client";
+import { getFactoryDefinition } from "@/pages/home/factories";
 
 import { DEFAULT_LINE_NAME, provisionEventApps, provisionLine } from "./onboardingProvision";
 
@@ -98,5 +99,91 @@ describe("provisionEventApps", () => {
         workspaceFactoryId: "factory-1",
       }),
     );
+  });
+
+  it("skips issue intake when a prior setup attempt already installed it", async () => {
+    const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
+      canvasId: `canvas-${factoryId}`,
+      canvasName: factoryId,
+    }));
+
+    await provisionEventApps({
+      factoryId: "factory-1",
+      selections: {},
+      appRepository: "acme/app",
+      backlogRepository: "acme/backlog",
+      installFactory,
+      existingApps: [
+        {
+          id: "canvas-existing",
+          name: "Issue Intake",
+          description: getFactoryDefinition("issue-intake").description,
+        },
+      ],
+    });
+
+    expect(installFactory).toHaveBeenCalledTimes(1);
+    expect(installFactory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        factoryId: "pr-closure",
+        workspaceFactoryId: "factory-1",
+      }),
+    );
+  });
+
+  it("skips PR closure when a prior setup attempt already installed it", async () => {
+    const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
+      canvasId: `canvas-${factoryId}`,
+      canvasName: factoryId,
+    }));
+
+    await provisionEventApps({
+      factoryId: "factory-1",
+      selections: {},
+      appRepository: "acme/app",
+      backlogRepository: "acme/backlog",
+      installFactory,
+      existingApps: [
+        {
+          id: "canvas-existing",
+          name: "PR Closure",
+          description: getFactoryDefinition("pr-closure").description,
+        },
+      ],
+    });
+
+    expect(installFactory).toHaveBeenCalledTimes(1);
+    expect(installFactory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        factoryId: "issue-intake",
+        workspaceFactoryId: "factory-1",
+      }),
+    );
+  });
+
+  it("reuses a uniquely renamed event app from an earlier attempt", async () => {
+    const installFactory = vi.fn();
+
+    await provisionEventApps({
+      factoryId: "factory-1",
+      selections: {},
+      appRepository: "acme/app",
+      backlogRepository: "acme/backlog",
+      installFactory,
+      existingApps: [
+        {
+          id: "canvas-existing",
+          name: "Issue Intake (2)",
+          description: getFactoryDefinition("issue-intake").description,
+        },
+        {
+          id: "canvas-existing-2",
+          name: "PR Closure",
+          description: getFactoryDefinition("pr-closure").description,
+        },
+      ],
+    });
+
+    expect(installFactory).not.toHaveBeenCalled();
   });
 });
