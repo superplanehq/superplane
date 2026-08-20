@@ -921,11 +921,11 @@ message DescribeFactoryVelocityTotals {
 // Trailing 30-day line summary nested on FactoryLine.
 
 message FactoryLineMetrics {
-  // Share of closed work orders whose pull request merged, 0-100.
+  // Share of closed work orders that completed or that have a merged pull request, 0-100.
   double success_rate_pct = 1;
   int32 merged_count = 2;
   int32 total_closed_count = 3;
-  // Median minutes from first execution to merge. Unset when nothing merged.
+  // Median minutes from first execution to merge. Uses close time when merge time is missing. Unset when nothing merged.
   optional double duration_minutes = 4;
   // Execution cost in USD divided by merged work orders. Unset when cost is untracked.
   optional double cost_per_success_usd = 5;

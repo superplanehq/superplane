@@ -63,15 +63,43 @@ func Test__ListClosedWorkOrderMetricRows(t *testing.T) {
 		assert.WithinDuration(t, closedAt, row.ClosedAt, time.Second)
 	})
 
-	t.Run("completed without a merged PR is not success", func(t *testing.T) {
+	t.Run("completed close is success and merge time falls back to close", func(t *testing.T) {
 		order := createClosedMetricOrder(t, db, factoryModel, r)
 		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-time.Hour), 0)
-		closeWorkOrderAt(t, db, order, now.Add(-time.Hour))
+		closedAt := now.Add(-time.Hour)
+		closeWorkOrderAt(t, db, order, closedAt)
+
+		rows := listMetricRows(t, db, factoryModel.ID, windowFrom, windowTo)
+		row := requireMetricRow(t, rows, order.ID)
+		assert.True(t, row.Merged)
+		require.NotNil(t, row.MergedAt)
+		assert.WithinDuration(t, closedAt, *row.MergedAt, time.Second)
+	})
+
+	t.Run("rejected close with an unmerged PR is not success", func(t *testing.T) {
+		order := createClosedMetricOrder(t, db, factoryModel, r)
+		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-time.Hour), 0)
+		attachOpenPR(t, db, order, "https://github.com/example/repo/pull/metrics-rejected")
+		closeWorkOrderAtWithResult(t, db, order, now.Add(-time.Hour), models.FactoryWorkOrderResultRejected)
 
 		rows := listMetricRows(t, db, factoryModel.ID, windowFrom, windowTo)
 		row := requireMetricRow(t, rows, order.ID)
 		assert.False(t, row.Merged)
 		assert.Nil(t, row.MergedAt)
+	})
+
+	t.Run("GitHub-shaped closed merged PR counts as success without merged_at", func(t *testing.T) {
+		order := createClosedMetricOrder(t, db, factoryModel, r)
+		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-time.Hour), 0)
+		attachGitHubMergedPR(t, db, order, "https://github.com/example/repo/pull/metrics-github")
+		closedAt := now.Add(-45 * time.Minute)
+		closeWorkOrderAtWithResult(t, db, order, closedAt, models.FactoryWorkOrderResultFailed)
+
+		rows := listMetricRows(t, db, factoryModel.ID, windowFrom, windowTo)
+		row := requireMetricRow(t, rows, order.ID)
+		assert.True(t, row.Merged)
+		require.NotNil(t, row.MergedAt)
+		assert.WithinDuration(t, closedAt, *row.MergedAt, time.Second)
 	})
 
 	t.Run("merged PR artifact counts as success", func(t *testing.T) {
@@ -146,9 +174,14 @@ func createClosedMetricOrder(t *testing.T, db *gorm.DB, factoryModel *models.Fac
 
 func closeWorkOrderAt(t *testing.T, db *gorm.DB, order *models.FactoryWorkOrder, closedAt time.Time) {
 	t.Helper()
+	closeWorkOrderAtWithResult(t, db, order, closedAt, models.FactoryWorkOrderResultCompleted)
+}
+
+func closeWorkOrderAtWithResult(t *testing.T, db *gorm.DB, order *models.FactoryWorkOrder, closedAt time.Time, result string) {
+	t.Helper()
 	_, err := order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
 		ToState: models.FactoryWorkOrderStateClosed,
-		Result:  models.FactoryWorkOrderResultCompleted,
+		Result:  result,
 	})
 	require.NoError(t, err)
 	require.NoError(t, db.Model(&models.FactoryWorkOrderEvent{}).
@@ -212,4 +245,32 @@ func attachMergedPR(t *testing.T, db *gorm.DB, order *models.FactoryWorkOrder, u
 		},
 	})
 	require.NoError(t, err)
+}
+
+func attachOpenPR(t *testing.T, db *gorm.DB, order *models.FactoryWorkOrder, url string) {
+	t.Helper()
+	_, err := order.CreateArtifact(db, models.FactoryWorkOrderArtifactParams{
+		Type: models.FactoryWorkOrderArtifactTypePR,
+		Key:  url,
+		Data: map[string]any{
+			"url":   url,
+			"state": models.PrArtifactStateOpen,
+		},
+	})
+	require.NoError(t, err)
+}
+
+func attachGitHubMergedPR(t *testing.T, db *gorm.DB, order *models.FactoryWorkOrder, url string) {
+	t.Helper()
+	artifact, err := order.CreateArtifact(db, models.FactoryWorkOrderArtifactParams{
+		Type: models.FactoryWorkOrderArtifactTypePR,
+		Key:  url,
+		Data: map[string]any{
+			"url":    url,
+			"state":  models.PrArtifactStateClosed,
+			"merged": true,
+		},
+	})
+	require.NoError(t, err)
+	require.Nil(t, artifact.MergedAt, "GitHub-shaped payload must not stamp merged_at")
 }

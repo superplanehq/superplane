@@ -78,6 +78,9 @@ describe("setup factory event apps", () => {
     expect(canvasYaml).toMatch(/component: github\.onPullRequest[\s\S]*repository: acme\/app/);
     expect(canvasYaml).toContain("component: findWorkOrder");
     expect(canvasYaml).toContain("by: artifactKey");
+    expect(canvasYaml).toContain("component: updateWorkOrderArtifact");
+    expect(canvasYaml).toContain("mergedAt: '{{ root().data.pull_request.merged_at }}'");
+    expect(canvasYaml).toContain("closedAt: '{{ root().data.pull_request.closed_at }}'");
     expect(canvasYaml).toContain("result: completed");
     expect(canvasYaml).toContain("result: rejected");
     expect(canvasYaml).toContain("id: int-1");
