@@ -258,6 +258,7 @@ func (d *RunCallbackDispatcher) dispatchActionHook(
 		ExecutionState: contexts.NewExecutionStateContext(d.tx, execution, d.eventCollector),
 		Requests:       contexts.NewExecutionRequestContext(d.tx, execution),
 		Runs:           contexts.NewRunExecutionContext(d.tx, parentCanvas, node, execution),
+		Usage:          contexts.NewUsageContext(parentCanvas.OrganizationID, execution),
 		Parameters:     params,
 	})
 	if err != nil {

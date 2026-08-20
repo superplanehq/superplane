@@ -128,6 +128,17 @@ service Organizations {
     };
   }
 
+  rpc ListHostedLLMModels(ListHostedLLMModelsRequest) returns (ListHostedLLMModelsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/hosted-llm-models"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List hosted LLM models";
+      description: "Returns the SuperPlane-hosted model allowlist for one provider";
+      tags: "Organization";
+    };
+  }
+
   rpc AcceptInviteLink(InviteLink) returns (google.protobuf.Struct) {
     option (google.api.http) = {
       post: "/api/v1/invite-links/{token}/accept"
@@ -392,6 +403,25 @@ message DescribeOrganizationLLMSpendResponse {
   int64 total_cost_cents = 2;
   int32 period_days = 3;
   repeated LLMSpendByModel by_model = 4;
+  int64 remaining_credit_cents = 5;
+  int64 grant_total_cents = 6;
+  int64 hosted_billed_cents = 7;
+  bool remaining_credit_warning = 8;
+}
+
+message ListHostedLLMModelsRequest {
+  string id = 1;
+  string provider = 2;
+}
+
+message ListHostedLLMModelsResponse {
+  bool enabled = 1;
+  repeated HostedLLMModel models = 2;
+}
+
+message HostedLLMModel {
+  string id = 1;
+  string name = 2;
 }
 
 message LLMSpendByModel {

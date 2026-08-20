@@ -929,6 +929,10 @@ message DescribeFactoryUsageResponse {
   int64 total_cost_cents = 2;
   int32 period_days = 3;
   repeated UsageByModel by_model = 4;
+  int64 remaining_credit_cents = 5;
+  int64 grant_total_cents = 6;
+  int64 hosted_billed_cents = 7;
+  bool remaining_credit_warning = 8;
 }
 
 message UsageByModel {
