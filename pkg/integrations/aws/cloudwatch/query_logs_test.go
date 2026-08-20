@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -298,12 +299,16 @@ func TestQueryLogs_HandleHook(t *testing.T) {
 		assert.Contains(t, execState.FailureMessage, "Failed")
 	})
 
-	t.Run("exceeds max poll attempts -> fails execution", func(t *testing.T) {
+	t.Run("exceeds max poll attempts -> fails execution and stops the query", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"status": "Running", "results": []}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"success": true}`)),
 				},
 			},
 		}
@@ -313,6 +318,7 @@ func TestQueryLogs_HandleHook(t *testing.T) {
 			Name:           queryLogsPollHook,
 			ExecutionState: execState,
 			HTTP:           httpContext,
+			Logger:         logrus.NewEntry(logrus.New()),
 			Metadata: &contexts.MetadataContext{Metadata: QueryLogsExecutionMetadata{
 				QueryID:      "query-123",
 				Region:       "us-east-1",
@@ -324,5 +330,70 @@ func TestQueryLogs_HandleHook(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, execState.Passed)
 		assert.Contains(t, execState.FailureMessage, "timed out")
+
+		require.Len(t, httpContext.Requests, 2)
+		assert.Equal(t, "Logs_20140328.StopQuery", httpContext.Requests[1].Header.Get("X-Amz-Target"))
+	})
+}
+
+func TestQueryLogs_Cancel(t *testing.T) {
+	component := &QueryLogs{}
+
+	t.Run("no query started -> no-op", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		err := component.Cancel(core.ExecutionContext{
+			HTTP:        httpContext,
+			Logger:      logrus.NewEntry(logrus.New()),
+			Metadata:    &contexts.MetadataContext{},
+			Integration: &contexts.IntegrationContext{CurrentSecrets: credentialSecrets()},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, httpContext.Requests)
+	})
+
+	t.Run("query running -> stops it", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"success": true}`))},
+			},
+		}
+
+		err := component.Cancel(core.ExecutionContext{
+			HTTP:   httpContext,
+			Logger: logrus.NewEntry(logrus.New()),
+			Metadata: &contexts.MetadataContext{Metadata: QueryLogsExecutionMetadata{
+				QueryID: "query-123",
+				Region:  "us-east-1",
+			}},
+			Integration: &contexts.IntegrationContext{CurrentSecrets: credentialSecrets()},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "Logs_20140328.StopQuery", httpContext.Requests[0].Header.Get("X-Amz-Target"))
+	})
+
+	t.Run("stopping the query fails -> cancel still succeeds", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusBadRequest,
+					Body:       io.NopCloser(strings.NewReader(`{"__type": "ResourceNotFoundException", "message": "query not found"}`)),
+				},
+			},
+		}
+
+		err := component.Cancel(core.ExecutionContext{
+			HTTP:   httpContext,
+			Logger: logrus.NewEntry(logrus.New()),
+			Metadata: &contexts.MetadataContext{Metadata: QueryLogsExecutionMetadata{
+				QueryID: "query-123",
+				Region:  "us-east-1",
+			}},
+			Integration: &contexts.IntegrationContext{CurrentSecrets: credentialSecrets()},
+		})
+
+		require.NoError(t, err)
 	})
 }

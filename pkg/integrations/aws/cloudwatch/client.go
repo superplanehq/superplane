@@ -726,6 +726,13 @@ func (c *LogsClient) GetQueryResults(queryID string) (*QueryResults, error) {
 	return results, nil
 }
 
+// StopQuery cancels a running Logs Insights query so it stops consuming the
+// account's concurrent query quota.
+func (c *LogsClient) StopQuery(queryID string) error {
+	payload := map[string]any{"queryId": queryID}
+	return c.postJSON("StopQuery", payload, nil)
+}
+
 // CreateLogStream creates a log stream in a log group. Callers should treat
 // common.IsAlreadyExistsErr(err) as success since streams only need to exist once.
 func (c *LogsClient) CreateLogStream(logGroupName, logStreamName string) error {
