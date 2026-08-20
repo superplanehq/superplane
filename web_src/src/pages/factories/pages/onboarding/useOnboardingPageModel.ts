@@ -1,12 +1,19 @@
-import type { FactoriesFactory, FactoriesFactoryLine, FactoryLineStep } from "@/api-client";
+import { canvasesDescribeCanvas, type FactoriesFactory, type FactoriesFactoryLine, type FactoryLineStep } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useCreateFactoryLine, useCreateWorkOrder, useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
-import { useDispatchWorkOrder } from "@/hooks/useFactoryData";
+import {
+  useCreateFactoryLine,
+  useCreateWorkOrder,
+  useDeleteFactory,
+  useDispatchWorkOrder,
+  useFactoryApps,
+  useUpdateFactory,
+} from "@/hooks/useFactoryData";
 import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { githubInstallationUrl } from "@/lib/githubInstallation";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
@@ -31,6 +38,7 @@ import {
 } from "./onboardingStatus";
 import {
   DEFAULT_LINE_NAME,
+  identifyProvisionedEventApp,
   provisionEventApps,
   provisionLine,
   type InstallOnboardingApp,
@@ -158,6 +166,7 @@ async function provisionWorkspace(args: {
   workOrderDescription: string;
   github: { id: string };
   claude: { id: string };
+  loadExistingAppFactoryIds: () => Promise<Set<"issue-intake" | "pr-closure">>;
 }): Promise<{ number?: number | string | null }> {
   if (args.workspaceName !== args.factory?.name) {
     await args.updateFactory({ name: args.workspaceName });
@@ -187,6 +196,7 @@ async function provisionWorkspace(args: {
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
     installFactory: args.installFactory,
+    loadExistingAppFactoryIds: args.loadExistingAppFactoryIds,
   });
   await args.updateOnboarding({
     provisionedAppId: primaryAppId,
@@ -232,6 +242,7 @@ function useFinishOnboarding(args: {
     description: string;
   }) => Promise<{ id?: string | null; number?: number | string | null }>;
   dispatchWorkOrder: (input: { orderId: string; lineName: string }) => Promise<unknown>;
+  loadExistingAppFactoryIds: () => Promise<Set<"issue-intake" | "pr-closure">>;
 }) {
   const navigate = useNavigate();
   return async () => {
@@ -347,6 +358,7 @@ export function useOnboardingPageModel(args: {
   const createLine = useCreateFactoryLine(args.organizationId, args.factoryId);
   const createWorkOrder = useCreateWorkOrder(args.organizationId, args.factoryId);
   const dispatchWorkOrder = useDispatchWorkOrder(args.organizationId, args.factoryId);
+  const factoryApps = useFactoryApps(args.organizationId, args.factoryId);
   const installer = useInstallFactory();
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
   const githubConnections = useOnboardingGithubConnections({
@@ -385,6 +397,28 @@ export function useOnboardingPageModel(args: {
     createLine: createLine.mutateAsync,
     createWorkOrder: createWorkOrder.mutateAsync,
     dispatchWorkOrder: dispatchWorkOrder.mutateAsync,
+    loadExistingAppFactoryIds: async () => {
+      const apps = (await factoryApps.refetch()).data ?? [];
+      const appTypes = await Promise.all(
+        apps
+          .map((app) => app.id)
+          .filter((appId): appId is string => Boolean(appId))
+          .map(async (appId) => {
+            try {
+              const response = await canvasesDescribeCanvas(
+                withOrganizationHeader({
+                  path: { id: appId },
+                }),
+              );
+              const canvas = response.data?.canvas;
+              return canvas ? identifyProvisionedEventApp(canvas) : undefined;
+            } catch {
+              return undefined;
+            }
+          }),
+      );
+      return new Set(appTypes.filter((appType): appType is "issue-intake" | "pr-closure" => Boolean(appType)));
+    },
   });
   const cancel = useCancelOnboarding({
     organizationId: args.organizationId,

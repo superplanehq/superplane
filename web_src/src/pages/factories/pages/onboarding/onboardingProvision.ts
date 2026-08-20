@@ -1,4 +1,5 @@
 import type {
+  CanvasesCanvas,
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesUpdateFactoryOnboardingBody,
@@ -22,6 +23,9 @@ export interface ProvisionedLine {
   lineId: string;
   primaryAppId: string;
 }
+
+type OnboardingEventAppId = (typeof ONBOARDING_EVENT_APPS)[number];
+type CanvasNode = NonNullable<NonNullable<CanvasesCanvas["spec"]>["nodes"]>[number];
 
 // A finished line has one step per bundled app, each calling the app onRun
 // entrypoint. Match on the first entrypoint to recover a line provisioned by an
@@ -54,6 +58,60 @@ async function installOnboardingApp(args: {
   });
   if (!installed?.canvasId) throw new Error(`Failed to create the ${args.appFactoryId} app`);
   return installed;
+}
+
+function readNodeConfiguration(node: CanvasNode): Record<string, unknown> {
+  const configuration = node.configuration;
+  return configuration && typeof configuration === "object" ? configuration : {};
+}
+
+function hasAction(nodes: CanvasNode[], component: string, nodeId: string): boolean {
+  return nodes.some((node) => node.component === component && node.id === nodeId);
+}
+
+function hasTriggerAction(nodes: CanvasNode[], nodeId: string, expectedAction: string): boolean {
+  return nodes.some((node) => {
+    if (node.component !== "github.onIssue" && node.component !== "github.onPullRequest") {
+      return false;
+    }
+    if (node.id !== nodeId) {
+      return false;
+    }
+    const actions = readNodeConfiguration(node).actions;
+    return Array.isArray(actions) && actions.includes(expectedAction);
+  });
+}
+
+function isIssueIntakeCanvas(canvas: CanvasesCanvas): boolean {
+  const nodes = canvas.spec?.nodes ?? [];
+  return (
+    hasTriggerAction(nodes, "on-issue-labeled", "labeled") &&
+    hasTriggerAction(nodes, "on-issue-assigned", "assigned") &&
+    hasAction(nodes, "findWorkOrder", "find-existing-work-order") &&
+    hasAction(nodes, "createWorkOrder", "create-work-order")
+  );
+}
+
+function isPrClosureCanvas(canvas: CanvasesCanvas): boolean {
+  const nodes = canvas.spec?.nodes ?? [];
+  return (
+    hasTriggerAction(nodes, "on-pr-closed", "closed") &&
+    hasAction(nodes, "findWorkOrder", "find-work-order") &&
+    hasAction(nodes, "updateWorkOrderArtifact", "stamp-pr-merged") &&
+    hasAction(nodes, "updateWorkOrderArtifact", "stamp-pr-closed") &&
+    hasAction(nodes, "updateWorkOrderStatus", "complete-work-order") &&
+    hasAction(nodes, "updateWorkOrderStatus", "reject-work-order")
+  );
+}
+
+export function identifyProvisionedEventApp(canvas: CanvasesCanvas): OnboardingEventAppId | undefined {
+  if (isIssueIntakeCanvas(canvas)) {
+    return "issue-intake";
+  }
+  if (isPrClosureCanvas(canvas)) {
+    return "pr-closure";
+  }
+  return undefined;
 }
 
 // Install each bundled app in order and return the line steps that call them.
@@ -93,8 +151,21 @@ export async function provisionEventApps(args: {
   appRepository: string;
   backlogRepository: string;
   installFactory: InstallOnboardingApp;
+  existingAppFactoryIds?: Iterable<OnboardingEventAppId>;
+  loadExistingAppFactoryIds?: () => Promise<Set<OnboardingEventAppId>>;
 }): Promise<void> {
+  const provisionedAppFactoryIds = new Set<OnboardingEventAppId>(args.existingAppFactoryIds ?? []);
+  if (args.loadExistingAppFactoryIds) {
+    for (const appFactoryId of await args.loadExistingAppFactoryIds()) {
+      provisionedAppFactoryIds.add(appFactoryId);
+    }
+  }
+
   for (const appFactoryId of ONBOARDING_EVENT_APPS) {
+    if (provisionedAppFactoryIds.has(appFactoryId)) {
+      continue;
+    }
+
     await installOnboardingApp({
       factoryId: args.factoryId,
       appFactoryId,
@@ -103,6 +174,7 @@ export async function provisionEventApps(args: {
       backlogRepository: args.backlogRepository,
       installFactory: args.installFactory,
     });
+    provisionedAppFactoryIds.add(appFactoryId);
   }
 }
 

@@ -10,12 +10,15 @@ spec:
       targetId: has-factory-label
     - channel: default
       sourceId: has-factory-label
-      targetId: create-work-order
+      targetId: find-existing-work-order
     - channel: default
       sourceId: on-issue-assigned
       targetId: assigned-to-agent
     - channel: default
       sourceId: assigned-to-agent
+      targetId: find-existing-work-order
+    - channel: notFound
+      sourceId: find-existing-work-order
       targetId: create-work-order
   nodes:
     - id: on-issue-labeled
@@ -62,6 +65,17 @@ spec:
         x: 1044
         'y': 618
       isCollapsed: false
+    - id: find-existing-work-order
+      name: Find Existing Work Order
+      type: TYPE_ACTION
+      component: findWorkOrder
+      configuration:
+        artifactKey: '{{ root().data.issue.html_url }}'
+        by: artifactKey
+      position:
+        x: 810
+        'y': 798
+      isCollapsed: false
     - id: create-work-order
       name: Create Work Order
       type: TYPE_ACTION
@@ -69,6 +83,15 @@ spec:
       configuration:
         title: '{{ root().data.issue.title }}'
         description: '{{ root().data.issue.body }}'
+        artifactType: link
+        artifactKey: '{{ root().data.issue.html_url }}'
+        artifactTitle: 'Issue #{{ root().data.issue.number }}'
+        artifactUrl: '{{ root().data.issue.html_url }}'
+        artifactData:
+          - name: repository
+            value: '{{ root().data.repository.full_name }}'
+          - name: issueNumber
+            value: '{{ root().data.issue.number }}'
       position:
         x: 810
         'y': 978

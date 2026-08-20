@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { writeCanvasRunsSidebarOpen } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { usePermissions } from "@/contexts/usePermissions";
+import { factoryAppsKey } from "@/hooks/useFactoryData";
 import { canvasKeys, useCreateCanvas, useUpdateCanvasFolderMembership } from "@/hooks/useCanvasData";
 import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { appPath } from "@/lib/appPaths";
@@ -161,6 +162,11 @@ export function useInstallFactory({ folder }: UseInstallFactoryOptions = {}) {
           queryClient,
           navigate,
         });
+        if (input.workspaceFactoryId) {
+          await queryClient.invalidateQueries({
+            queryKey: factoryAppsKey(organizationId, input.workspaceFactoryId),
+          });
+        }
         pendingCanvasRef.current = null;
         return { canvasId, canvasName };
       } catch (error) {

@@ -83,7 +83,7 @@ describe("setup factory event apps", () => {
     expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("pr-closure");
   });
 
-  it("creates work orders for factory-labeled or agent-assigned issues", () => {
+  it("deduplicates source issues before creating a work order", () => {
     const canvasYaml = materializeOnboardingApp("issue-intake");
 
     expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*actions:[\s\S]*- labeled/);
@@ -91,8 +91,16 @@ describe("setup factory event apps", () => {
     expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*repository: acme\/backlog/);
     expect(canvasYaml).toContain('root().data.label.name == "factory"');
     expect(canvasYaml).toContain('root().data.assignee.login == "superplaneagent"');
+    expect(canvasYaml).toContain("component: findWorkOrder");
+    expect(canvasYaml).toContain("by: artifactKey");
+    expect(canvasYaml).toContain("artifactKey: '{{ root().data.issue.html_url }}'");
+    expect(canvasYaml).toMatch(/channel: notFound[\s\S]*sourceId: find-existing-work-order[\s\S]*targetId: create-work-order/);
     expect(canvasYaml).toMatch(/component: createWorkOrder[\s\S]*title: '{{ root\(\)\.data\.issue\.title }}'/);
     expect(canvasYaml).toContain("description: '{{ root().data.issue.body }}'");
+    expect(canvasYaml).toContain("artifactType: link");
+    expect(canvasYaml).toContain("artifactKey: '{{ root().data.issue.html_url }}'");
+    expect(canvasYaml).toContain("artifactUrl: '{{ root().data.issue.html_url }}'");
+    expect(canvasYaml).toContain("artifactTitle: 'Issue #{{ root().data.issue.number }}'");
     expect(canvasYaml).toContain("id: int-1");
     expect(canvasYaml).toContain("name: acme-github");
     expect(canvasYaml).not.toContain("{{ install_params.");

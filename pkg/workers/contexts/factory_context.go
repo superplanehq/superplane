@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -62,33 +63,116 @@ func (c *FactoryContext) WithWorkOrderNotification(
 	return c
 }
 
-func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, error) {
+func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, bool, error) {
 	// A run already tied to another work order must not spawn a new one.
 	_, err := models.FindWorkOrderExecutionByRunID(c.tx, c.execution.RunID)
 	if err == nil {
-		return nil, errors.New("cannot create work order while executing another work order")
+		return nil, false, errors.New("cannot create work order while executing another work order")
 	}
 	if !errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
-		return nil, err
+		return nil, false, err
 	}
 
 	if c.canvas.FactoryID == nil {
-		return nil, errors.New("app is not owned by a factory")
-	}
-
-	f, err := models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
-	if err != nil {
-		return nil, err
+		return nil, false, errors.New("app is not owned by a factory")
 	}
 
 	sourceRunID := c.execution.RunID
-	order, err := f.CreateWorkOrder(c.tx, params.Title, params.Description, nil, []uuid.UUID{}, &sourceRunID)
+	var (
+		order   *models.FactoryWorkOrder
+		created bool
+	)
+
+	err = c.tx.Transaction(func(tx *gorm.DB) error {
+		f, findErr := models.FindFactory(tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
+		if findErr != nil {
+			return findErr
+		}
+
+		if params.Artifact != nil {
+			if lockErr := lockFactoryArtifactKey(tx, f.ID, params.Artifact.Key); lockErr != nil {
+				return lockErr
+			}
+			existing, existingErr := findFactoryWorkOrderByArtifactKey(tx, f, params.Artifact.Key)
+			if existingErr != nil {
+				return existingErr
+			}
+			if existing != nil {
+				order = existing
+				return nil
+			}
+		}
+
+		createdOrder, createErr := f.CreateWorkOrder(tx, params.Title, params.Description, nil, []uuid.UUID{}, &sourceRunID)
+		if createErr != nil {
+			return createErr
+		}
+		order = createdOrder
+		created = true
+
+		if params.Artifact == nil {
+			return nil
+		}
+
+		_, artifactErr := order.CreateArtifact(tx, models.FactoryWorkOrderArtifactParams{
+			Type:       params.Artifact.Type,
+			Data:       params.Artifact.Data,
+			Key:        params.Artifact.Key,
+			Automation: c.automationRef(),
+			Run:        c.runRef(),
+		})
+		return artifactErr
+	})
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	c.notifyWorkOrderUpdated(f.ID, order.ID, factory.EventTypeOrderStatusUpdated)
-	return workOrderToCore(order), nil
+	if created {
+		c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderStatusUpdated)
+		if params.Artifact != nil {
+			c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactAdded)
+		}
+	}
+	return workOrderToCore(order), created, nil
+}
+
+func lockFactoryArtifactKey(tx *gorm.DB, factoryID uuid.UUID, key string) error {
+	trimmedKey := strings.TrimSpace(key)
+	if trimmedKey == "" {
+		return nil
+	}
+
+	lockID := hashFactoryArtifactKeyLock(factoryID, trimmedKey)
+	return tx.Exec("SELECT pg_advisory_xact_lock(?)", lockID).Error
+}
+
+func findFactoryWorkOrderByArtifactKey(
+	tx *gorm.DB,
+	f *models.Factory,
+	key string,
+) (*models.FactoryWorkOrder, error) {
+	trimmedKey := strings.TrimSpace(key)
+	if trimmedKey == "" {
+		return nil, nil
+	}
+
+	order, err := f.FindWorkOrderByArtifactKey(tx, trimmedKey)
+	if err == nil {
+		return order, nil
+	}
+	if errors.Is(err, models.ErrFactoryWorkOrderNotFound) {
+		return nil, nil
+	}
+	return nil, err
+}
+
+func hashFactoryArtifactKeyLock(factoryID uuid.UUID, key string) int64 {
+	hasher := fnv.New64a()
+	_, _ = hasher.Write([]byte("factory-work-order-artifact-key:"))
+	_, _ = hasher.Write([]byte(factoryID.String()))
+	_, _ = hasher.Write([]byte(":"))
+	_, _ = hasher.Write([]byte(key))
+	return int64(hasher.Sum64())
 }
 
 func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
