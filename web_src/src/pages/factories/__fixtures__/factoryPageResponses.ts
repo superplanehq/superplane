@@ -144,6 +144,15 @@ export const REFUND_FACTORY: FactoriesFactory = {
   lines: REFUND_FACTORY_LINES,
 };
 
+/** Same workspace, but with the GitHub integration + repo set during onboarding (the Velocity page's default repo source). */
+export const REFUND_FACTORY_WITH_REPO: FactoriesFactory = {
+  ...REFUND_FACTORY,
+  onboarding: {
+    vcsIntegrationId: "int-github-1",
+    appRepository: "acme/refunds",
+  },
+};
+
 export const EMPTY_FACTORY: FactoriesFactory = {
   id: EMPTY_FACTORY_ID,
   name: "Payments Factory",

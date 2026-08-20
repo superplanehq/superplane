@@ -1,9 +1,8 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
-import type { FactoriesDescribeFactoryVelocityResponse, OrganizationsIntegration } from "@/api-client";
+import type { FactoriesDescribeFactoryVelocityResponse, FactoriesFactoryOnboarding } from "@/api-client";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { useFactoryVelocity } from "@/hooks/useFactoryVelocity";
-import { useConnectedIntegrations, useIntegrationResources } from "@/hooks/useIntegrations";
 
 import {
   aggregateFactoryVelocityFlow,
@@ -24,14 +23,8 @@ export interface VelocityPageModel {
   periodLabel: string;
   setPeriodDays: (days: VelocityPeriodDays) => void;
 
-  githubIntegrations: OrganizationsIntegration[];
-  integrationId: string;
-  setIntegrationId: (integrationId: string) => void;
-
-  repositoryOptions: string[];
-  repositoriesLoading: boolean;
-  repository: string;
-  setRepository: (repository: string) => void;
+  /** Whether the workspace has a GitHub integration + repository configured from onboarding. */
+  hasRepoConfigured: boolean;
 
   velocity: {
     data?: VelocityData;
@@ -89,41 +82,19 @@ function toVelocityData(response: FactoriesDescribeFactoryVelocityResponse, date
   };
 }
 
-export function useVelocityPageModel(organizationId: string, factoryId: string): VelocityPageModel {
+export function useVelocityPageModel(
+  organizationId: string,
+  factoryId: string,
+  onboarding: FactoriesFactoryOnboarding | null | undefined,
+): VelocityPageModel {
   const [periodDays, setPeriodDays] = useState<VelocityPeriodDays>(7);
-  const [integrationId, setIntegrationId] = useState<string>("");
-  const [repository, setRepository] = useState<string>("");
 
-  const { data: connectedIntegrations = [] } = useConnectedIntegrations(organizationId);
-  const githubIntegrations = useMemo(
-    () =>
-      connectedIntegrations.filter(
-        (integration) => integration.metadata?.integrationName === "github" && integration.status?.state === "ready",
-      ),
-    [connectedIntegrations],
-  );
-
-  const effectiveIntegrationId = useMemo(() => {
-    if (integrationId) return integrationId;
-    if (githubIntegrations.length === 1) {
-      return githubIntegrations[0].metadata?.id ?? "";
-    }
-    return "";
-  }, [integrationId, githubIntegrations]);
-
-  const { data: repositoryResources = [], isLoading: repositoriesLoading } = useIntegrationResources(
-    organizationId,
-    effectiveIntegrationId,
-    "repository",
-  );
-
-  const repositoryOptions = useMemo(
-    () =>
-      repositoryResources
-        .map((resource) => resource.name?.trim() ?? "")
-        .filter((name): name is string => name.length > 0),
-    [repositoryResources],
-  );
+  // The velocity chart always uses the workspace's own GitHub integration and
+  // repository (set during onboarding) rather than letting the user pick one
+  // per-visit — there is exactly one "right" repo for a given workspace.
+  const integrationId = onboarding?.vcsIntegrationId ?? "";
+  const repository = onboarding?.appRepository ?? "";
+  const hasRepoConfigured = Boolean(integrationId && repository);
 
   const {
     data: velocityResponse,
@@ -133,7 +104,7 @@ export function useVelocityPageModel(organizationId: string, factoryId: string):
     refetch: refetchVelocity,
   } = useFactoryVelocity(organizationId, factoryId, {
     periodDays,
-    integrationId: effectiveIntegrationId || undefined,
+    integrationId: integrationId || undefined,
     repository: repository || undefined,
   });
 
@@ -147,8 +118,7 @@ export function useVelocityPageModel(organizationId: string, factoryId: string):
   const isVelocityLoading = velocityLoading || (velocityFetching && !velocityResponse);
   const isWorkOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
 
-  const hasRepoContext = Boolean(effectiveIntegrationId && repository);
-  const hasPeopleCohort = Boolean(velocityResponse?.hasPeopleCohort && hasRepoContext);
+  const hasPeopleCohort = Boolean(velocityResponse?.hasPeopleCohort && hasRepoConfigured);
 
   const velocityData = velocityResponse
     ? toVelocityData(velocityResponse, formatVelocityYesterdayLabel(velocityResponse.yesterday?.date))
@@ -160,17 +130,7 @@ export function useVelocityPageModel(organizationId: string, factoryId: string):
     periodLabel: factoryVelocityPeriodLabel(periodDays),
     setPeriodDays,
 
-    githubIntegrations,
-    integrationId: effectiveIntegrationId,
-    setIntegrationId: (value: string) => {
-      setIntegrationId(value);
-      setRepository("");
-    },
-
-    repositoryOptions,
-    repositoriesLoading,
-    repository,
-    setRepository,
+    hasRepoConfigured,
 
     velocity: {
       data: velocityData,
