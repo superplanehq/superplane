@@ -758,10 +758,31 @@
     @apply bg-background text-foreground;
   }
 
+  /*
+   * `Highlight`/`HighlightText` are OS-level system colors: they follow the
+   * operating system's appearance, not this app's `.dark` class. With the app
+   * in dark mode on a light-themed OS, the pair resolves to a light background
+   * with dark text and the selection loses all contrast.
+   *
+   * The composer is the worst case. Its `<textarea>` is `text-transparent` —
+   * the visible glyphs come from the backdrop underneath (see MentionTextarea /
+   * BackdropContent), which is never itself selected. So in dark mode the
+   * backdrop's light text sat over the light system highlight, and recoloring
+   * the textarea's own (invisible) text could not rescue it. Here the highlight
+   * background carries the contrast; the text color still matters for ordinary
+   * inputs, whose glyphs really are painted by the field.
+   */
   input:focus::selection,
   textarea:focus::selection {
-    background-color: Highlight;
-    color: HighlightText;
+    background-color: theme("colors.blue.200");
+    color: theme("colors.slate.900");
+  }
+
+  /* Dark, saturated highlight so the backdrop's light text stays legible. */
+  .dark input:focus::selection,
+  .dark textarea:focus::selection {
+    background-color: theme("colors.blue.800");
+    color: theme("colors.gray.50");
   }
 }
 
