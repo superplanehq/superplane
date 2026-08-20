@@ -1,5 +1,13 @@
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
-import { useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+} from "react";
 
 import { startFactoryConfigureEnter, type FactoryConfigureEnterDeps } from "./factoryConfigureEnterSession";
 
@@ -66,11 +74,20 @@ export function useFactoryConfigureEnter({
   };
 
   // Per Configure visit: bump when leaving so a later visit can seed again.
-  // Once edit enables for a visit, save/exit must not re-seed while URL still
-  // has configure=1 (handleCommittedVersionId clears editSessionActive first).
+  // Once edit enables for a visit, clearing editSessionActive with configure=1
+  // still set must not re-seed that visit (save teardown / discard). Save-and-stay
+  // calls allowNextConfigureEnter so the next seed uses a new visit.
   const configureVisitIdRef = useRef(0);
   const inFlightVisitIdRef = useRef<number | null>(null);
   const editEnabledVisitIdRef = useRef<number | null>(null);
+  const [configureEnterNonce, setConfigureEnterNonce] = useState(0);
+
+  const allowNextConfigureEnter = useCallback(() => {
+    configureVisitIdRef.current += 1;
+    inFlightVisitIdRef.current = null;
+    editEnabledVisitIdRef.current = null;
+    setConfigureEnterNonce((nonce) => nonce + 1);
+  }, []);
 
   useEffect(() => {
     if (factoryConfigure) {
@@ -122,5 +139,8 @@ export function useFactoryConfigureEnter({
     factoryConfigure,
     liveCanvasVersionId,
     liveCanvasVersionLoading,
+    configureEnterNonce,
   ]);
+
+  return { allowNextConfigureEnter };
 }

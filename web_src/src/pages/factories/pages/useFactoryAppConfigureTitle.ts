@@ -16,7 +16,6 @@ type UseFactoryAppConfigureTitleArgs = {
   savedName?: string;
   configureBusy: boolean;
   configureActionsRef: MutableRefObject<FactoryConfigureActions | null>;
-  onDone: () => void;
 };
 
 export function resolveDraftTitleToPersist(draftTitle: string | null, savedTitle: string): string | null {
@@ -28,24 +27,13 @@ export function resolveDraftTitleToPersist(draftTitle: string | null, savedTitle
 }
 
 export function useFactoryAppConfigureTitle(args: UseFactoryAppConfigureTitleArgs) {
-  const {
-    organizationId,
-    factoryId,
-    appId,
-    isConfigure,
-    canRename,
-    savedName,
-    configureBusy,
-    configureActionsRef,
-    onDone,
-  } = args;
+  const { organizationId, factoryId, appId, isConfigure, canRename, savedName, configureBusy, configureActionsRef } =
+    args;
   const queryClient = useQueryClient();
   const updateCanvas = useUpdateCanvas(organizationId, appId);
   const [draftTitle, setDraftTitle] = useState<string | null>(null);
   const draftTitleRef = useRef<string | null>(null);
   const savingRef = useRef(false);
-  const onDoneRef = useRef(onDone);
-  onDoneRef.current = onDone;
 
   const savedTitle = resolveFactoryAppCanvasTitle(savedName);
   const title = isConfigure && draftTitle != null ? draftTitle : savedTitle;
@@ -103,7 +91,6 @@ export function useFactoryAppConfigureTitle(args: UseFactoryAppConfigureTitleArg
 
         const actions = configureActionsRef.current;
         if (!actions) {
-          onDoneRef.current();
           return;
         }
 
