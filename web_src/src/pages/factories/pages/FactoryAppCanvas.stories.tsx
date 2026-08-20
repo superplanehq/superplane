@@ -33,6 +33,7 @@ const plannerCanvasFixture = factoryOwnedCanvasFixture(REFUND_PLANNER_APP);
 const plannerAppId = REFUND_PLANNER_APP.id ?? "app-refund-planner";
 const implementerAppId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
 const planAndImplementLineId = REFUND_FACTORY_LINES[0]?.id ?? "line-plan-and-implement";
+const fromLinesPath = `workspaces/${PRIMARY_FACTORY_KEY}/apps/${implementerAppId}?run=${LINE_RUN_IMPLEMENT_FAILED_ID}&from=lines&lineId=${planAndImplementLineId}`;
 
 export const FromAutomations: Story = {
   name: "From Automations",
@@ -49,7 +50,7 @@ export const FromLines: Story = {
   name: "From Lines",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${implementerAppId}?run=${LINE_RUN_IMPLEMENT_FAILED_ID}&from=lines&lineId=${planAndImplementLineId}`}
+      pathSuffix={fromLinesPath}
       factoriesFixture={defaultFactoriesFixture}
       appFixture={refundLineCanvasFixture()}
     />
@@ -74,6 +75,39 @@ export const WithRun: Story = {
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${plannerAppId}?from=automations&run=${defaultCanvasAppFixture.publishedRunId ?? "run-1"}`}
       factoriesFixture={defaultFactoriesFixture}
       appFixture={plannerCanvasFixture}
+    />
+  ),
+};
+
+export const EditWithLocalAgent: Story = {
+  name: "Edit with a local agent",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${implementerAppId}?configure=1&agentPrompt=1&from=lines&lineId=${planAndImplementLineId}`}
+      factoriesFixture={defaultFactoriesFixture}
+      appFixture={refundLineCanvasFixture()}
+    />
+  ),
+};
+
+export const ViewYaml: Story = {
+  name: "View YAML",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${implementerAppId}?configure=1&yaml=1&from=lines&lineId=${planAndImplementLineId}`}
+      factoriesFixture={defaultFactoriesFixture}
+      appFixture={refundLineCanvasFixture()}
+    />
+  ),
+};
+
+export const EditWorkspacePanels: Story = {
+  name: "Edit workspace panels",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${implementerAppId}?configure=1&agent=1&blocks=1&from=lines&lineId=${planAndImplementLineId}`}
+      factoriesFixture={defaultFactoriesFixture}
+      appFixture={refundLineCanvasFixture()}
     />
   ),
 };

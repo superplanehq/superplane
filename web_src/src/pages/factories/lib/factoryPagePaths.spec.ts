@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   factoryAppConfigurePath,
   factoryAppPath,
+  factoryAppViewPath,
   factoryDetailPath,
   factorySettingsGeneralPathAfterKeyChange,
   legacyWorkOrderDetailPath,
   organizationSettingsPath,
   organizationSettingsSectionPath,
+  parseFactoryAppNavFrom,
   workOrderDetailPath,
   workOrdersPath,
 } from "./factoryPagePaths";
@@ -56,8 +58,38 @@ describe("factorySettingsGeneralPathAfterKeyChange", () => {
 });
 
 describe("factoryAppConfigurePath", () => {
-  it("adds configure=1", () => {
+  it("adds configure=1 and keeps the components panel closed", () => {
     expect(factoryAppConfigurePath("org-1", "SP", "app-1")).toBe("/org-1/workspaces/SP/apps/app-1?configure=1");
+  });
+
+  it("keeps the run when entering edit from a run page", () => {
+    expect(factoryAppConfigurePath("org-1", "SP", "app-1", { from: "lines", lineId: "line-1", runId: "run-9" })).toBe(
+      "/org-1/workspaces/SP/apps/app-1?run=run-9&configure=1&from=lines&lineId=line-1",
+    );
+  });
+
+  it("opens components only when blocks is requested", () => {
+    expect(factoryAppConfigurePath("org-1", "SP", "app-1", { blocks: true })).toBe(
+      "/org-1/workspaces/SP/apps/app-1?configure=1&blocks=1",
+    );
+  });
+});
+
+describe("factoryAppViewPath", () => {
+  it("returns the canvas run page without edit chrome", () => {
+    expect(factoryAppViewPath("org-1", "SP", "app-1", { from: "lines", lineId: "line-1", runId: "run-9" })).toBe(
+      "/org-1/workspaces/SP/apps/app-1?run=run-9&from=lines&lineId=line-1",
+    );
+  });
+});
+
+describe("parseFactoryAppNavFrom", () => {
+  it("accepts known from values", () => {
+    expect(parseFactoryAppNavFrom("lines")).toBe("lines");
+  });
+
+  it("returns undefined for unknown from values", () => {
+    expect(parseFactoryAppNavFrom("canvas")).toBeUndefined();
   });
 });
 

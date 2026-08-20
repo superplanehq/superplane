@@ -57,6 +57,17 @@ describe("matchFactoryPageFixture", () => {
     });
   });
 
+  it("includes agent permissions on the factory me user", async () => {
+    const me = await fetchFactoryPageFixture("/api/v1/me");
+    const body = await me.json();
+    expect(body.user.permissions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ resource: "agents", action: "read" }),
+        expect.objectContaining({ resource: "agents", action: "create" }),
+      ]),
+    );
+  });
+
   it("grants workspace settings permission on /api/v1/me", async () => {
     const me = await fetchFactoryPageFixture("/api/v1/me");
     await expect(me.json()).resolves.toMatchObject({
