@@ -18,12 +18,13 @@ func Test__RollUpFactoryUsage__FillsFinishedExecutionCache(t *testing.T) {
 	defer r.Close()
 
 	execution := dispatchFactoryExecutionForUsageTest(t, r)
-	recordFactoryLLMUsage(t, r.Organization.ID, execution.RunID)
+	runID := requireFactoryExecutionRunID(t, execution)
+	recordFactoryLLMUsage(t, r.Organization.ID, runID)
 	require.NoError(t, execution.MarkFinished(database.Conn(), models.CanvasRunResultPassed))
 
-	require.NoError(t, rollUpFactoryUsage(database.Conn(), execution.RunID))
+	require.NoError(t, rollUpFactoryUsage(database.Conn(), runID))
 
-	updated, err := models.FindWorkOrderExecutionByRunID(database.Conn(), execution.RunID)
+	updated, err := models.FindWorkOrderExecutionByRunID(database.Conn(), runID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1_000_000), updated.TotalTokens)
 	assert.Equal(t, int64(300), updated.CostCents)
@@ -34,7 +35,7 @@ func Test__RollUpFactoryUsage__FillsCacheFromChildRun(t *testing.T) {
 	defer r.Close()
 
 	execution := dispatchFactoryExecutionForUsageTest(t, r)
-	parentRun, err := models.FindUnscopedCanvasRun(database.Conn(), execution.RunID)
+	parentRun, err := models.FindUnscopedCanvasRun(database.Conn(), requireFactoryExecutionRunID(t, execution))
 	require.NoError(t, err)
 
 	now := parentRun.CreatedAt
@@ -60,7 +61,7 @@ func Test__RollUpFactoryUsage__FillsCacheFromChildRun(t *testing.T) {
 
 	require.NoError(t, rollUpFactoryUsage(database.Conn(), childRun.ID))
 
-	updated, err := models.FindWorkOrderExecutionByRunID(database.Conn(), execution.RunID)
+	updated, err := models.FindWorkOrderExecutionByRunID(database.Conn(), requireFactoryExecutionRunID(t, execution))
 	require.NoError(t, err)
 	assert.Equal(t, int64(1_000_000), updated.TotalTokens)
 	assert.Equal(t, int64(300), updated.CostCents)
@@ -71,6 +72,12 @@ func Test__RollUpFactoryUsage__IgnoresRunsWithoutFactoryExecution(t *testing.T) 
 	defer r.Close()
 
 	require.NoError(t, rollUpFactoryUsage(database.Conn(), uuid.New()))
+}
+
+func requireFactoryExecutionRunID(t *testing.T, execution *models.FactoryWorkOrderExecution) uuid.UUID {
+	t.Helper()
+	require.NotNil(t, execution.RunID)
+	return *execution.RunID
 }
 
 func recordFactoryLLMUsage(t *testing.T, organizationID, runID uuid.UUID) {
