@@ -10,6 +10,7 @@ import {
 import { DEFAULT_ARTIFACTS_BY_ORDER_ID, DEFAULT_EVENTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
 import { DEFAULT_CHECKS_BY_ORDER_ID } from "./workOrderCheckFixtures";
 import type {
+  FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesWorkOrder,
   FactoriesWorkOrderEvent,
@@ -18,6 +19,7 @@ import type {
 import { defaultNotificationSettings } from "@/lib/notificationSettings";
 import { fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
 import { automationNameForLineStep } from "../lib/factoryLineFormShared";
+import { metricsForLine } from "../pages/lineListMetricsMockData";
 
 export type { FactoriesFixture };
 
@@ -93,6 +95,22 @@ function factoriesCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {
   };
 }
 
+function factoryWithLineMetrics(factory: FactoriesFactory): FactoriesFactory {
+  return {
+    ...factory,
+    lines: (factory.lines ?? []).map((line) => {
+      if (line.metrics) {
+        return line;
+      }
+      const metrics = metricsForLine(line.id);
+      if (!metrics) {
+        return line;
+      }
+      return { ...line, metrics };
+    }),
+  };
+}
+
 function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     {
@@ -111,7 +129,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
           if (typeof request.description === "string") {
             factory.description = request.description;
           }
-          return { json: { factory } };
+          return { json: { factory: factoryWithLineMetrics(factory) } };
         }
 
         if (method === "DELETE") {
@@ -122,7 +140,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
           return { json: {} };
         }
 
-        return factory ? { json: { factory } } : { json: {} };
+        return factory ? { json: { factory: factoryWithLineMetrics(factory) } } : { json: {} };
       },
     },
     {

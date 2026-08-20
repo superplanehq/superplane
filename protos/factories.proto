@@ -436,6 +436,8 @@ message FactoryLine {
   repeated Step steps = 3;
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp updated_at = 5;
+  // Trailing 30-day summary. Unset when the line has no closed work orders in the window.
+  optional FactoryLineMetrics metrics = 6;
 }
 
 message CreateFactoryLineRequest {
@@ -914,6 +916,31 @@ message DescribeFactoryVelocityTotals {
   int32 superplane_share_pct = 4;
   // Waste as a percentage of SuperPlane closes (merged + waste), 0-100.
   int32 waste_pct = 5;
+}
+
+// Trailing 30-day line summary nested on FactoryLine.
+
+message FactoryLineMetrics {
+  // Share of closed work orders whose pull request merged, 0-100.
+  double success_rate_pct = 1;
+  int32 merged_count = 2;
+  int32 total_closed_count = 3;
+  // Median minutes from first execution to merge. Unset when nothing merged.
+  optional double duration_minutes = 4;
+  // Execution cost in USD divided by merged work orders. Unset when cost is untracked.
+  optional double cost_per_success_usd = 5;
+  // Cumulative success-rate samples, one per calendar day, oldest first. 0-100.
+  repeated double success_trend_pct = 6;
+  // Success-rate points vs the prior 30 days. Unset when the prior window has no closes.
+  optional double success_delta_pts = 7;
+  // Duration change vs the prior 30 days, in minutes. Unset when either window has no duration.
+  optional double duration_delta_minutes = 8;
+  // Cost change vs the prior 30 days, in USD. Unset when either window has no cost.
+  optional double cost_delta_usd = 9;
+  // Merged work orders per day in the window.
+  double throughput_per_day = 10;
+  // Daily merged-work-order counts, oldest first.
+  repeated int32 throughput_trend = 11;
 }
 
 // LLM spend
