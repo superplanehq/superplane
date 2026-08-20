@@ -9,6 +9,11 @@ import { LinesPage } from "./LinesPage";
  * Lines page: metric cards on the list, phase board on line detail.
  * FactoriesHarness supplies a factory-owned canvas so a run-card click opens
  * the automation run instead of Overview.
+ *
+ * Populated shows the automations-style 3-dots overflow menu (Edit,
+ * Duplicate) on hover/open for each list card. Duplicate hits the same
+ * `POST /api/v1/factories/:id/lines` fixture route as "New line" and routes
+ * to the freshly created line.
  */
 const meta = {
   title: "Factories/Pages/Lines",
