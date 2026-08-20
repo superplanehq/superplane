@@ -1,0 +1,26 @@
+{
+  "type": "posthog.queryResult",
+  "data": {
+    "projectId": "12345",
+    "columns": ["event", "distinct_id", "timestamp"],
+    "rowCount": 3,
+    "rows": [
+      {
+        "event": "subscription upgraded",
+        "distinct_id": "user_84f21c",
+        "timestamp": "2024-08-14T09:31:12.482000Z"
+      },
+      {
+        "event": "checkout completed",
+        "distinct_id": "user_1d90ae",
+        "timestamp": "2024-08-14T09:28:44.117000Z"
+      },
+      {
+        "event": "trial started",
+        "distinct_id": "user_5c73bb",
+        "timestamp": "2024-08-14T09:22:03.905000Z"
+      }
+    ]
+  },
+  "timestamp": "2024-08-14T09:31:12Z"
+}

@@ -132,6 +132,11 @@ import {
   eventStateRegistry as launchdarklyEventStateRegistry,
 } from "./launchdarkly/index";
 import {
+  componentMappers as posthogComponentMappers,
+  triggerRenderers as posthogTriggerRenderers,
+  eventStateRegistry as posthogEventStateRegistry,
+} from "./posthog/index";
+import {
   componentMappers as awsComponentMappers,
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
@@ -343,6 +348,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   newrelic: newrelicComponentMappers,
   firehydrant: firehydrantComponentMappers,
   launchdarkly: launchdarklyComponentMappers,
+  posthog: posthogComponentMappers,
   aws: awsComponentMappers,
   azure: azureComponentMappers,
   discord: discordComponentMappers,
@@ -392,6 +398,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   newrelic: newrelicTriggerRenderers,
   firehydrant: firehydrantTriggerRenderers,
   launchdarkly: launchdarklyTriggerRenderers,
+  posthog: posthogTriggerRenderers,
   aws: awsTriggerRenderers,
   azure: azureTriggerRenderers,
   discord: discordTriggerRenderers,
@@ -442,6 +449,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   octopus: octopusEventStateRegistry,
   firehydrant: firehydrantEventStateRegistry,
   launchdarkly: launchdarklyEventStateRegistry,
+  posthog: posthogEventStateRegistry,
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,

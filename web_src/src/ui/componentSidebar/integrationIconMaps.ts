@@ -64,6 +64,7 @@ import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
+import posthogIcon from "@/assets/icons/integrations/posthog.svg";
 import teamsIcon from "@/assets/icons/integrations/teams.svg";
 import ociIcon from "@/assets/icons/integrations/oci.svg";
 import graphqlIcon from "@/assets/icons/graphql.svg";
@@ -116,6 +117,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   servicenow: servicenowIcon,
   statuspage: statuspageIcon,
   launchdarkly: launchdarklyIcon,
+  posthog: posthogIcon,
   teams: teamsIcon,
   elastic: elasticIcon,
   oci: ociIcon,
@@ -166,6 +168,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   servicenow: servicenowIcon,
   statuspage: statuspageIcon,
   launchdarkly: launchdarklyIcon,
+  posthog: posthogIcon,
   teams: teamsIcon,
   azure: azureIcon,
   graphql: graphqlIcon,
