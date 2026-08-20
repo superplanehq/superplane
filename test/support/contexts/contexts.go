@@ -739,6 +739,8 @@ type RunExecutionContext struct {
 	CancelErr        error
 	CancelCalled     bool
 	LastCreateParams *core.RunCreationParams
+	AddErrorCalls    []string
+	AddErrorErr      error
 }
 
 func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, error) {
@@ -762,4 +764,9 @@ func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, 
 func (c *RunExecutionContext) Cancel() error {
 	c.CancelCalled = true
 	return c.CancelErr
+}
+
+func (c *RunExecutionContext) AddError(message string) error {
+	c.AddErrorCalls = append(c.AddErrorCalls, message)
+	return c.AddErrorErr
 }

@@ -10,6 +10,7 @@ const components = [
   { name: "deploy", label: "Deploy" },
   { name: "broadcastMessage", label: "Broadcast Message" },
   { name: "runApp", label: "Run App" },
+  { name: "addRunError", label: "Add Run Error" },
   { name: "createWorkOrder", label: "Create Work Order" },
   { name: "updateWorkOrderArtifact", label: "Update Work Order Artifact" },
   { name: "runnerJS", label: "Run JavaScript" },
@@ -37,6 +38,7 @@ describe("buildBuildingBlockCategories", () => {
     expect(categories.find((category) => category.name === "SuperPlane")?.blocks.map((block) => block.name)).toEqual([
       "onBroadcast",
       "onRun",
+      "addRunError",
       "broadcastMessage",
       "runApp",
     ]);
@@ -60,6 +62,7 @@ describe("buildBuildingBlockCategories", () => {
     expect(categories.find((category) => category.name === "SuperPlane")?.blocks.map((block) => block.name)).toEqual([
       "onBroadcast",
       "onRun",
+      "addRunError",
       "broadcastMessage",
       "createWorkOrder",
       "runApp",
