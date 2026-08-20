@@ -33,3 +33,14 @@ coverage-go.out
 /api/swagger/*
 !/api/swagger/swagger-ui.html
 server
+
+# design-sync (claude.ai/design): generated/transient state.
+# The durable set — .design-sync/config.json, NOTES.md, previews/, overrides/ —
+# stays tracked so re-syncs reuse every fix.
+/.ds-sync/
+/ds-bundle/
+/.design-sync/sb-reference/
+/.design-sync/.cache/
+/.design-sync/learnings/
+/.design-sync/node_modules
+/.design-sync/*.log
