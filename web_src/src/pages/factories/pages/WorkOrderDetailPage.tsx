@@ -213,7 +213,7 @@ function LoadedWorkOrderDetail({
 }: LoadedWorkOrderDetailProps) {
   return (
     <WorkOrderDetailLoadedView
-      statusNotes={presentWorkOrderStatusNotes(order.statusNotes, derived.displayStatus)}
+      statusNotes={presentWorkOrderStatusNotes(order.statusNotes, derived.displayStatus ?? undefined)}
       organizationId={organizationId}
       factoryKey={factoryKey}
       order={order}
