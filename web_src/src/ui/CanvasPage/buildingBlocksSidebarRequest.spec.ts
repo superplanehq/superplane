@@ -1,7 +1,8 @@
 import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  clearBuildingBlocksSidebarRequests,
   publishBuildingBlocksSidebarChanged,
   requestBuildingBlocksSidebar,
   subscribeBuildingBlocksSidebarChanged,
@@ -10,6 +11,10 @@ import {
 } from "./buildingBlocksSidebarRequest";
 
 describe("buildingBlocksSidebarRequest", () => {
+  beforeEach(() => {
+    clearBuildingBlocksSidebarRequests();
+  });
+
   it("notifies request subscribers", () => {
     const onChange = vi.fn();
     const unsubscribe = subscribeBuildingBlocksSidebarRequest(onChange);
@@ -41,5 +46,15 @@ describe("buildingBlocksSidebarRequest", () => {
     renderHook(() => useBuildingBlocksSidebarRequest("canvas-late", onToggle));
 
     expect(onToggle).toHaveBeenCalledWith(true);
+  });
+
+  it("does not replay after requests are cleared", () => {
+    requestBuildingBlocksSidebar("canvas-late", true);
+    clearBuildingBlocksSidebarRequests();
+    const onToggle = vi.fn();
+
+    renderHook(() => useBuildingBlocksSidebarRequest("canvas-late", onToggle));
+
+    expect(onToggle).not.toHaveBeenCalled();
   });
 });

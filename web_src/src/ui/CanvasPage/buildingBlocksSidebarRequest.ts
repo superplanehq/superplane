@@ -16,6 +16,11 @@ export function requestBuildingBlocksSidebar(canvasId: string, open: boolean): v
   dispatchBuildingBlocksSidebarEvent(BUILDING_BLOCKS_SIDEBAR_REQUEST_EVENT, canvasId, open);
 }
 
+/** Test helper. Drop cached requests so later mounts do not replay a prior open. */
+export function clearBuildingBlocksSidebarRequests(): void {
+  lastBuildingBlocksRequestByCanvas.clear();
+}
+
 export function publishBuildingBlocksSidebarChanged(canvasId: string, open: boolean): void {
   dispatchBuildingBlocksSidebarEvent(BUILDING_BLOCKS_SIDEBAR_CHANGED_EVENT, canvasId, open);
 }

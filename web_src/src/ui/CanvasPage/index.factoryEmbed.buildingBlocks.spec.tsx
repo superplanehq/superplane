@@ -4,7 +4,11 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 
-import { requestBuildingBlocksSidebar, subscribeBuildingBlocksSidebarChanged } from "./buildingBlocksSidebarRequest";
+import {
+  requestBuildingBlocksSidebar,
+  subscribeBuildingBlocksSidebarChanged,
+  clearBuildingBlocksSidebarRequests,
+} from "./buildingBlocksSidebarRequest";
 import { CANVAS_SIDEBAR_STORAGE_KEY } from "./index";
 
 const { reactFlowPropsRef } = vi.hoisted(() => ({
@@ -123,6 +127,7 @@ describe("CanvasPage factory embed building blocks sidebar", () => {
   beforeEach(() => {
     reactFlowPropsRef.current = null;
     window.localStorage.removeItem(CANVAS_SIDEBAR_STORAGE_KEY);
+    clearBuildingBlocksSidebarRequests();
     globalThis.ResizeObserver = class {
       observe() {}
       unobserve() {}
