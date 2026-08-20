@@ -63,6 +63,17 @@ describe("setup factory line apps", () => {
     expect(pr).toMatch(/component: github\.createPullRequest[\s\S]*\[Work Order\]\(\{\{ order\(\)\.url \}\}\)/);
     expect(pr).toContain("Created via [SuperPlane](https://superplane.com)");
   });
+
+  it("announces the PR-merge wait after the work order attaches the pull request", () => {
+    const pr = materializeOnboardingApp("line-pr");
+
+    expect(pr).toMatch(/sourceId: attach-pr-artifact[\s\S]*targetId: set-pr-closure-note/);
+    expect(pr).toContain("component: setWorkOrderStatusNote");
+    expect(pr).toContain("noteKey: pr-closure");
+    expect(pr).toContain("headline: Review the pull request");
+    expect(pr).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data.html_url }}'");
+    expect(pr).toContain("showOnlyWhenWaiting: true");
+  });
 });
 
 describe("setup factory event apps", () => {
