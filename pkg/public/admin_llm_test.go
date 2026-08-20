@@ -16,12 +16,19 @@ import (
 
 func TestAdminLLMSettings(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
+	_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
+		WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
+		MarkupBPS:           models.DefaultMarkupBPS,
+		WarningThresholdBPS: models.DefaultWarningThresholdBPS,
+	})
+	require.NoError(t, err)
 	t.Cleanup(func() {
 		_, _ = models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
 			WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
 			MarkupBPS:           models.DefaultMarkupBPS,
 			WarningThresholdBPS: models.DefaultWarningThresholdBPS,
 		})
+		_ = database.Conn().Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
 	})
 
 	t.Run("non-admin gets 404", func(t *testing.T) {

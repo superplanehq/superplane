@@ -16,7 +16,11 @@ import (
 
 func Test__ListHostedLLMModels(t *testing.T) {
 	r := support.Setup(t)
-	db := database.DB(t.Context())
+	db := database.Conn()
+	require.NoError(t, db.Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{}).Error)
+	t.Cleanup(func() {
+		_ = database.Conn().Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
+	})
 
 	resp, err := ListHostedLLMModels(context.Background(), r.Organization.ID.String(), &pb.ListHostedLLMModelsRequest{
 		Provider: "anthropic",

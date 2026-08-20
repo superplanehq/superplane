@@ -16,6 +16,12 @@ import (
 )
 
 func Test__DescribeOrganizationLLMSpend(t *testing.T) {
+	_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
+		WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
+		MarkupBPS:           models.DefaultMarkupBPS,
+		WarningThresholdBPS: models.DefaultWarningThresholdBPS,
+	})
+	require.NoError(t, err)
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 

@@ -12,7 +12,7 @@ import {
   percentInputToBps,
 } from "@/lib/hostedCredit";
 import { Switch } from "@/ui/switch";
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type HostedLLMProvider = {
   provider: string;

@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 func Test__ApplyMarkupMicros(t *testing.T) {
@@ -20,8 +19,9 @@ func Test__ApplyMarkupMicros(t *testing.T) {
 }
 
 func Test__WelcomeGrantOnOrgCreate(t *testing.T) {
+	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
-	db := database.DB(t.Context())
+	db := database.Conn()
 
 	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
@@ -36,9 +36,9 @@ func Test__WelcomeGrantOnOrgCreate(t *testing.T) {
 }
 
 func Test__WelcomeGrantSkippedWhenAmountIsZero(t *testing.T) {
+	restoreInstallationLLMSettings(t)
 	_ = support.Setup(t)
-	db := database.DB(t.Context())
-	restoreInstallationLLMSettings(t, db)
+	db := database.Conn()
 
 	_, err := models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
 		WelcomeGrantCents:   0,
@@ -141,12 +141,12 @@ func Test__BYOKRecordUsageIsNotMarkedUp(t *testing.T) {
 }
 
 func Test__AssertHostedCreditAvailable(t *testing.T) {
+	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
-	db := database.DB(t.Context())
+	db := database.Conn()
 
 	require.NoError(t, models.AssertHostedCreditAvailable(db, r.Organization.ID))
 
-	restoreInstallationLLMSettings(t, db)
 	_, err := models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
 		WelcomeGrantCents:   0,
 		MarkupBPS:           models.DefaultMarkupBPS,
@@ -160,21 +160,30 @@ func Test__AssertHostedCreditAvailable(t *testing.T) {
 	require.ErrorIs(t, err, models.ErrHostedCreditEmpty)
 }
 
-func restoreInstallationLLMSettings(t *testing.T, db *gorm.DB) {
+func restoreInstallationLLMSettings(t *testing.T) {
 	t.Helper()
+	resetInstallationLLMSettings(t)
 	t.Cleanup(func() {
-		_, err := models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
-			WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
-			MarkupBPS:           models.DefaultMarkupBPS,
-			WarningThresholdBPS: models.DefaultWarningThresholdBPS,
-		})
-		require.NoError(t, err)
+		resetInstallationLLMSettings(t)
 	})
+}
+
+func resetInstallationLLMSettings(t *testing.T) {
+	t.Helper()
+	_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
+		WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
+		MarkupBPS:           models.DefaultMarkupBPS,
+		WarningThresholdBPS: models.DefaultWarningThresholdBPS,
+	})
+	require.NoError(t, err)
 }
 
 func Test__HostedLLMProviderAllowlist(t *testing.T) {
 	_ = support.Setup(t)
-	db := database.DB(t.Context())
+	db := database.Conn()
+	t.Cleanup(func() {
+		_ = database.Conn().Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
+	})
 
 	saved, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
 		Provider:      models.UsageProviderAnthropic,

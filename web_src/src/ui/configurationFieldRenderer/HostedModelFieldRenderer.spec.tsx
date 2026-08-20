@@ -18,6 +18,13 @@ function createField(): ConfigurationField {
   };
 }
 
+function mockHostedModels(value: {
+  data: { enabled: boolean; models: Array<{ id: string; name: string }> };
+  isLoading: boolean;
+}) {
+  vi.mocked(useHostedLLMModels).mockReturnValue(value as unknown as ReturnType<typeof useHostedLLMModels>);
+}
+
 describe("HostedModelFieldRenderer", () => {
   beforeAll(() => {
     Element.prototype.hasPointerCapture ??= () => false;
@@ -27,13 +34,13 @@ describe("HostedModelFieldRenderer", () => {
   });
 
   beforeEach(() => {
-    vi.mocked(useHostedLLMModels).mockReturnValue({
+    mockHostedModels({
       data: {
         enabled: true,
         models: [{ id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" }],
       },
       isLoading: false,
-    } as ReturnType<typeof useHostedLLMModels>);
+    });
   });
 
   it("shows a free-text model field for secret credentials", () => {
@@ -67,10 +74,10 @@ describe("HostedModelFieldRenderer", () => {
   });
 
   it("explains when SuperPlane-hosted models are not configured", () => {
-    vi.mocked(useHostedLLMModels).mockReturnValue({
+    mockHostedModels({
       data: { enabled: false, models: [] },
       isLoading: false,
-    } as ReturnType<typeof useHostedLLMModels>);
+    });
 
     render(
       <HostedModelFieldRenderer

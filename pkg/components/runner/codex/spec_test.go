@@ -47,6 +47,7 @@ func TestValidateRunCodexSpecRejectsReservedEnv(t *testing.T) {
 	t.Parallel()
 
 	prompt := "fix tests"
+	value := "x"
 	spec := RunCodexSpec{
 		MachineType: "e1-large-amd64",
 		Steps: []runner.AgentStep{
@@ -56,7 +57,9 @@ func TestValidateRunCodexSpecRejectsReservedEnv(t *testing.T) {
 			Source: runner.CredentialsSourceSecret,
 			Secret: configuration.SecretKeyRef{Secret: "openai", Key: "api_key"},
 		},
-		Environment: []runner.EnvironmentVariable{{Name: envOpenAIAPIKey, Value: "x"}},
+		Environment: []runner.EnvironmentVariable{
+			{Name: envOpenAIAPIKey, ValueSource: runner.EnvironmentValueSourceLiteral, Value: &value},
+		},
 	}
 	err := validateRunCodexSpec(spec)
 	require.Error(t, err)
