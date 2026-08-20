@@ -48,7 +48,7 @@ func Test__DescribeFactory_AttachesLineMetrics(t *testing.T) {
 		require.NoError(t, err)
 		_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
 		require.NoError(t, err)
-		createDescribeMetricsExecution(t, db, r, factoryModel.ID, order.ID, busy.ID, busy.Name, now.Add(-2*time.Hour))
+		createDescribeMetricsExecution(t, db, r, factoryModel.ID, order.ID, busy.ID, busy.Name, now.Add(-2*time.Hour), now)
 		_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
 			ToState: models.FactoryWorkOrderStateClosed,
 			Result:  models.FactoryWorkOrderResultCompleted,
@@ -65,8 +65,10 @@ func Test__DescribeFactory_AttachesLineMetrics(t *testing.T) {
 		require.NotNil(t, idleLine)
 		require.NotNil(t, busyLine.Metrics)
 		assert.Equal(t, int32(1), busyLine.Metrics.TotalClosedCount)
-		assert.Equal(t, int32(0), busyLine.Metrics.MergedCount)
-		assert.Nil(t, busyLine.Metrics.DurationMinutes)
+		assert.Equal(t, int32(1), busyLine.Metrics.MergedCount)
+		assert.Equal(t, 100.0, busyLine.Metrics.SuccessRatePct)
+		require.NotNil(t, busyLine.Metrics.DurationMinutes)
+		assert.InDelta(t, 120.0, *busyLine.Metrics.DurationMinutes, 1.0)
 		assert.Nil(t, busyLine.Metrics.CostPerSuccessUsd)
 		assert.Nil(t, idleLine.Metrics)
 	})
@@ -110,6 +112,7 @@ func createDescribeMetricsExecution(
 	factoryID, workOrderID, lineID uuid.UUID,
 	lineName string,
 	createdAt time.Time,
+	finishedAt time.Time,
 ) {
 	t.Helper()
 	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factoryID, workOrderID, lineID, lineName, nil)
@@ -127,7 +130,8 @@ func createDescribeMetricsExecution(
 		Status:         models.FactoryWorkOrderExecutionStatusFinished,
 		Result:         models.CanvasRunResultPassed,
 		CreatedAt:      createdAt,
-		UpdatedAt:      createdAt,
+		UpdatedAt:      finishedAt,
+		FinishedAt:     &finishedAt,
 	}
 	require.NoError(t, db.Create(&execution).Error)
 }

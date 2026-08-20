@@ -14,18 +14,19 @@ import {
  */
 export type LineListMetrics = {
   /**
-   * Share of closed work orders on this line whose pull request merged to main.
-   * Numerator is merged work orders. Denominator is closed work orders
-   * (merged + not merged). Omit when the line has no closed work orders.
+   * Share of closed work orders on this line that completed or that have a
+   * merged pull request. Numerator is merged work orders. Denominator is
+   * closed work orders (merged + not merged). Omit when the line has no
+   * closed work orders.
    */
   successRatePct: number;
-  /** Merged-to-main work orders in the window (success-rate numerator). */
+  /** Completed or merged work orders in the window (success-rate numerator). */
   mergedCount: number;
   /** Closed work orders in the window (success-rate denominator). */
   totalClosedCount: number;
   /**
-   * Median time from first execution to merge, in minutes, for merged work
-   * orders. Unset when nothing merged.
+   * Median summed execution run time, in minutes, for merged work orders.
+   * Unset when the sum is 0.
    */
   durationMinutes?: number;
   /**

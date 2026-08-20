@@ -133,13 +133,10 @@ func (s lineWindowStats) successRatePct() float64 {
 }
 
 func durationMinutes(row models.ClosedWorkOrderMetricRow) (float64, bool) {
-	if row.FirstExecutionAt == nil || row.MergedAt == nil {
+	if row.ExecutionMinutes <= 0 {
 		return 0, false
 	}
-	if row.MergedAt.Before(*row.FirstExecutionAt) {
-		return 0, false
-	}
-	return row.MergedAt.Sub(*row.FirstExecutionAt).Minutes(), true
+	return row.ExecutionMinutes, true
 }
 
 func successTrend(rows []models.ClosedWorkOrderMetricRow, buckets []lineMetricsDayBucket) []float64 {
