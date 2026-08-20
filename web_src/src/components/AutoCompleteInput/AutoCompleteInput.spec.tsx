@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { AutoCompleteInput } from "./AutoCompleteInput";
 import { calculateDropdownPosition } from "./dropdownPosition";
@@ -225,5 +226,75 @@ describe("AutoCompleteInput fullHeight mode", () => {
     // Auto-resize should still set an inline height.
     expect(input.style.height).not.toBe("");
     expect(input.className).not.toContain("h-full");
+  });
+});
+
+describe("AutoCompleteInput expression auto-wrapping", () => {
+  const renderControlledInput = (onValueChange?: (next: string) => void) => {
+    const Wrapper = () => {
+      const [value, setValue] = useState("");
+      return (
+        <AutoCompleteInput
+          aria-label="Pull request ID"
+          exampleObj={{ __root: { data: { pullrequest: { id: 42 } } } }}
+          value={value}
+          onChange={(next) => {
+            setValue(next);
+            onValueChange?.(next);
+          }}
+          placeholder="42 or {{ root().data.pullrequest.id }}"
+          startWord="{{"
+          prefix="{{ "
+          suffix=" }}"
+        />
+      );
+    };
+
+    render(<Wrapper />);
+    return screen.getByRole("textbox", { name: "Pull request ID" }) as HTMLTextAreaElement;
+  };
+
+  it("wraps the typed start word into an empty expression", () => {
+    const input = renderControlledInput();
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "{", selectionStart: 1 } });
+    fireEvent.change(input, { target: { value: "{{", selectionStart: 2 } });
+
+    expect(input.value).toBe("{{  }}");
+  });
+
+  // Regression: the caret used to be restored in a requestAnimationFrame, which raced
+  // the controlled re-render that rewrites the textarea value. The caret ended up after
+  // the closing braces, so everything typed next landed outside the expression and the
+  // component was saved with an empty expression body.
+  it("leaves the caret inside the expression it just wrapped", () => {
+    const input = renderControlledInput();
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "{", selectionStart: 1 } });
+    fireEvent.change(input, { target: { value: "{{", selectionStart: 2 } });
+
+    expect(input.selectionStart).toBe(3);
+    expect(input.selectionEnd).toBe(3);
+  });
+
+  it("keeps what the user types next inside the expression", () => {
+    let latestValue = "";
+    const input = renderControlledInput((next) => {
+      latestValue = next;
+    });
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "{", selectionStart: 1 } });
+    fireEvent.change(input, { target: { value: "{{", selectionStart: 2 } });
+
+    // Type the expression body at the caret the component restored.
+    const caret = input.selectionStart ?? 0;
+    const body = "root().data.pullrequest.id";
+    const typed = `${input.value.slice(0, caret)}${body}${input.value.slice(caret)}`;
+    fireEvent.change(input, { target: { value: typed, selectionStart: caret + body.length } });
+
+    expect(latestValue).toBe("{{ root().data.pullrequest.id }}");
   });
 });
