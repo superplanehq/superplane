@@ -33,7 +33,7 @@ func TestDecodeRunClaudeCodeSpecAppliesDefaults(t *testing.T) {
 	assert.Equal(t, runner.DefaultExecutionTimeoutSeconds, spec.ExecutionTimeoutSeconds)
 	require.Len(t, spec.Steps, 1)
 	assert.Equal(t, "Fix bug", spec.Steps[0].Name)
-	assert.Equal(t, claudeStepPrompt, spec.Steps[0].Type)
+	assert.Equal(t, runner.AgentStepPrompt, spec.Steps[0].Type)
 }
 
 func TestDecodeRunClaudeCodeSpecMigratesLegacyFields(t *testing.T) {
@@ -54,11 +54,11 @@ func TestDecodeRunClaudeCodeSpecMigratesLegacyFields(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, spec.Steps, 3)
 	assert.Equal(t, "Setup", spec.Steps[0].Name)
-	assert.Equal(t, claudeStepBash, spec.Steps[0].Type)
+	assert.Equal(t, runner.AgentStepBash, spec.Steps[0].Type)
 	assert.Equal(t, "Prompt", spec.Steps[1].Name)
-	assert.Equal(t, claudeStepPrompt, spec.Steps[1].Type)
+	assert.Equal(t, runner.AgentStepPrompt, spec.Steps[1].Type)
 	assert.Equal(t, "After", spec.Steps[2].Name)
-	assert.Equal(t, claudeStepBash, spec.Steps[2].Type)
+	assert.Equal(t, runner.AgentStepBash, spec.Steps[2].Type)
 }
 
 func TestValidateRunClaudeCodeSpec(t *testing.T) {
@@ -67,9 +67,9 @@ func TestValidateRunClaudeCodeSpec(t *testing.T) {
 	valid := RunClaudeCodeSpec{
 		MachineType: testRunnerMachineType,
 		Steps: []ClaudeCodeStep{
-			{Name: "Do the thing", Type: claudeStepPrompt, Prompt: strPtr("do the thing")},
+			{Name: "Do the thing", Type: runner.AgentStepPrompt, Prompt: strPtr("do the thing")},
 		},
-		Credentials: ClaudeCodeCredentials{
+		Credentials: runner.AgentCredentials{
 			Source: "secret",
 			Secret: secretRef("anthropic", "api_key"),
 		},
@@ -78,7 +78,7 @@ func TestValidateRunClaudeCodeSpec(t *testing.T) {
 
 	t.Run("requires step name", func(t *testing.T) {
 		spec := valid
-		spec.Steps = []ClaudeCodeStep{{Type: claudeStepPrompt, Prompt: strPtr("go")}}
+		spec.Steps = []ClaudeCodeStep{{Type: runner.AgentStepPrompt, Prompt: strPtr("go")}}
 		require.Error(t, validateRunClaudeCodeSpec(spec))
 	})
 
@@ -90,7 +90,7 @@ func TestValidateRunClaudeCodeSpec(t *testing.T) {
 
 	t.Run("requires at least one prompt", func(t *testing.T) {
 		spec := valid
-		spec.Steps = []ClaudeCodeStep{{Name: "Echo", Type: claudeStepBash, Command: strPtr("echo hi")}}
+		spec.Steps = []ClaudeCodeStep{{Name: "Echo", Type: runner.AgentStepBash, Command: strPtr("echo hi")}}
 		require.Error(t, validateRunClaudeCodeSpec(spec))
 	})
 }
@@ -102,10 +102,10 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 		Model:            "sonnet",
 		WorkingDirectory: "/tmp/workspace",
 		Steps: []ClaudeCodeStep{
-			{Name: "Clone repo", Type: claudeStepBash, Command: strPtr("git clone https://github.com/acme/widgets.git repo")},
-			{Name: "Fix panic", Type: claudeStepPrompt, Prompt: strPtr("Fix auth.py's nil panic")},
-			{Name: "Fix tests", Type: claudeStepPrompt, Prompt: strPtr("Run the tests and fix failures")},
-			{Name: "Push", Type: claudeStepBash, Command: strPtr("git push")},
+			{Name: "Clone repo", Type: runner.AgentStepBash, Command: strPtr("git clone https://github.com/acme/widgets.git repo")},
+			{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr("Fix auth.py's nil panic")},
+			{Name: "Fix tests", Type: runner.AgentStepPrompt, Prompt: strPtr("Run the tests and fix failures")},
+			{Name: "Push", Type: runner.AgentStepBash, Command: strPtr("git push")},
 		},
 	}
 
@@ -151,16 +151,16 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 func TestClaudeStepSlug(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, "01-clone-repo", claudeStepSlug(1, "Clone repo"))
-	assert.Equal(t, "02-step", claudeStepSlug(2, "!!!"))
-	assert.Equal(t, "03-step", claudeStepSlug(3, "   "))
+	assert.Equal(t, "01-clone-repo", runner.AgentStepSlug(1, "Clone repo"))
+	assert.Equal(t, "02-step", runner.AgentStepSlug(2, "!!!"))
+	assert.Equal(t, "03-step", runner.AgentStepSlug(3, "   "))
 }
 
 func TestShellSingleQuote(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, `'hello'`, shellSingleQuote("hello"))
-	assert.Equal(t, `'it'\''s fine'`, shellSingleQuote("it's fine"))
+	assert.Equal(t, `'hello'`, runner.ShellSingleQuote("hello"))
+	assert.Equal(t, `'it'\''s fine'`, runner.ShellSingleQuote("it's fine"))
 }
 
 func requireTaskFile(t *testing.T, files []runner.BrokerTaskFile, path string) runner.BrokerTaskFile {

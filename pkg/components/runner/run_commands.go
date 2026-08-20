@@ -345,7 +345,7 @@ func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 }
 
 func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *Task, organizationID string) error {
-	return processBrokerTaskStatus(state, task, RunnerFinishedEventType, organizationID, nil)
+	return processBrokerTaskStatus(state, task, RunnerFinishedEventType, organizationID, nil, nil, nil)
 }
 
 func brokerResultAsAny(raw json.RawMessage) any {

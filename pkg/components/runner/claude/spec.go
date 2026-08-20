@@ -2,38 +2,23 @@ package claude
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
-	"unicode"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
-	"github.com/superplanehq/superplane/pkg/configuration"
 )
 
 const (
-	claudeStepPrompt   = "prompt"
-	claudeStepBash     = "bash"
 	envAnthropicAPIKey = "ANTHROPIC_API_KEY"
-
-	claudeCredentialsSourceSecret      = "secret"
-	claudeCredentialsSourceIntegration = "integration"
 )
 
-var nonSlugChars = regexp.MustCompile(`[^a-z0-9]+`)
-
 // ClaudeCodeStep is one ordered bash or prompt action in a Run Claude Code node.
-type ClaudeCodeStep struct {
-	Name    string  `mapstructure:"name"`
-	Type    string  `mapstructure:"type"`
-	Prompt  *string `mapstructure:"prompt,omitempty"`
-	Command *string `mapstructure:"command,omitempty"`
-}
+type ClaudeCodeStep = runner.AgentStep
 
 // RunClaudeCodeSpec is persisted runnerClaudeCode node configuration.
 type RunClaudeCodeSpec struct {
 	MachineType             string                        `mapstructure:"machineType"`
 	Steps                   []ClaudeCodeStep              `mapstructure:"steps"`
-	Credentials             ClaudeCodeCredentials         `mapstructure:"credentials"`
+	Credentials             runner.AgentCredentials       `mapstructure:"credentials"`
 	Model                   string                        `mapstructure:"model"`
 	WorkingDirectory        string                        `mapstructure:"workingDirectory"`
 	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
@@ -46,12 +31,6 @@ type RunClaudeCodeSpec struct {
 	SetupCommands       string `mapstructure:"setup_commands"`
 	EnableAfterCommands bool   `mapstructure:"enable_after_commands"`
 	AfterCommands       string `mapstructure:"after_commands"`
-}
-
-type ClaudeCodeCredentials struct {
-	Source      string                       `mapstructure:"source"`
-	Secret      configuration.SecretKeyRef   `mapstructure:"secret"`
-	Integration configuration.IntegrationRef `mapstructure:"integration"`
 }
 
 // ClaudeCodeBrokerTask is the ordered broker commands and task files for a run.
@@ -90,37 +69,28 @@ func migrateLegacyClaudeCodeSteps(spec *RunClaudeCodeSpec) {
 	var steps []ClaudeCodeStep
 	if spec.EnableSetupCommands {
 		if cmd := strings.TrimSpace(spec.SetupCommands); cmd != "" {
-			steps = append(steps, ClaudeCodeStep{Name: "Setup", Type: claudeStepBash, Command: &cmd})
+			steps = append(steps, ClaudeCodeStep{Name: "Setup", Type: runner.AgentStepBash, Command: &cmd})
 		}
 	}
 	if prompt := strings.TrimSpace(spec.Prompt); prompt != "" {
-		steps = append(steps, ClaudeCodeStep{Name: "Prompt", Type: claudeStepPrompt, Prompt: &prompt})
+		steps = append(steps, ClaudeCodeStep{Name: "Prompt", Type: runner.AgentStepPrompt, Prompt: &prompt})
 	}
 	if spec.EnableAfterCommands {
 		if cmd := strings.TrimSpace(spec.AfterCommands); cmd != "" {
-			steps = append(steps, ClaudeCodeStep{Name: "After", Type: claudeStepBash, Command: &cmd})
+			steps = append(steps, ClaudeCodeStep{Name: "After", Type: runner.AgentStepBash, Command: &cmd})
 		}
 	}
 	spec.Steps = steps
-}
-
-func normalizeClaudeStepType(stepType string) string {
-	switch strings.TrimSpace(stepType) {
-	case claudeStepBash:
-		return claudeStepBash
-	default:
-		return claudeStepPrompt
-	}
 }
 
 func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 	if strings.TrimSpace(spec.MachineType) == "" {
 		return fmt.Errorf("machine type is required")
 	}
-	if err := validateClaudeCodeSteps(spec.Steps); err != nil {
+	if err := runner.ValidateAgentSteps(spec.Steps); err != nil {
 		return err
 	}
-	if err := validateClaudeCodeCredentials(spec.Credentials); err != nil {
+	if err := runner.ValidateAgentCredentials(spec.Credentials, true); err != nil {
 		return err
 	}
 	if err := runner.ValidateEnvironmentFrom(spec.EnvironmentFrom); err != nil {
@@ -129,62 +99,13 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 	if err := runner.ValidateEnvironment(spec.Environment); err != nil {
 		return err
 	}
-	for i, variable := range spec.Environment {
-		if strings.TrimSpace(variable.Name) == envAnthropicAPIKey {
-			return fmt.Errorf("environment[%d].name cannot be %s; use the Anthropic API Key field", i, envAnthropicAPIKey)
-		}
+	if err := runner.ValidateReservedEnvironmentName(spec.Environment, envAnthropicAPIKey); err != nil {
+		return err
 	}
 	if spec.ExecutionTimeoutSeconds != 0 {
 		if spec.ExecutionTimeoutSeconds < 1 || spec.ExecutionTimeoutSeconds > runner.MaxExecutionTimeoutSecondsRequest {
 			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", runner.MaxExecutionTimeoutSecondsRequest, runner.DefaultExecutionTimeoutSeconds)
 		}
-	}
-	return nil
-}
-
-func validateClaudeCodeCredentials(credentials ClaudeCodeCredentials) error {
-	switch credentials.Source {
-	case claudeCredentialsSourceSecret:
-		if !credentials.Secret.IsSet() {
-			return fmt.Errorf("anthropic API key is required")
-		}
-
-		return nil
-	case claudeCredentialsSourceIntegration:
-		if !credentials.Integration.IsSet() {
-			return fmt.Errorf("claude integration is required")
-		}
-
-		return nil
-	default:
-		return fmt.Errorf("invalid credentials source: %s", credentials.Source)
-	}
-}
-
-func validateClaudeCodeSteps(steps []ClaudeCodeStep) error {
-	if len(steps) == 0 {
-		return fmt.Errorf("at least one step is required")
-	}
-
-	promptCount := 0
-	for i, step := range steps {
-		if strings.TrimSpace(step.Name) == "" {
-			return fmt.Errorf("steps[%d].name is required", i)
-		}
-		switch normalizeClaudeStepType(step.Type) {
-		case claudeStepBash:
-			if step.Command == nil || strings.TrimSpace(*step.Command) == "" {
-				return fmt.Errorf("steps[%d].command is required for bash steps", i)
-			}
-		case claudeStepPrompt:
-			if step.Prompt == nil || strings.TrimSpace(*step.Prompt) == "" {
-				return fmt.Errorf("steps[%d].prompt is required for prompt steps", i)
-			}
-			promptCount++
-		}
-	}
-	if promptCount == 0 {
-		return fmt.Errorf("at least one prompt step is required")
 	}
 	return nil
 }
@@ -219,9 +140,9 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 }
 
 func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, model string) (runner.BrokerTaskFile, runner.BrokerCommand) {
-	stepSlug := claudeStepSlug(stepNumber, step.Name)
-	switch normalizeClaudeStepType(step.Type) {
-	case claudeStepBash:
+	stepSlug := runner.AgentStepSlug(stepNumber, step.Name)
+	switch runner.NormalizeAgentStepType(step.Type) {
+	case runner.AgentStepBash:
 		command := ""
 		if step.Command != nil {
 			command = *step.Command
@@ -260,7 +181,7 @@ func claudePrepareScript(workdir string) string {
 	prepare.WriteString("fi\n")
 	prepare.WriteString("printf '0\\n' >\"$SUPERPLANE_TASK_DIR/prompt_count\"\n")
 	if workdir != "" {
-		fmt.Fprintf(&prepare, "cd %s\n", shellSingleQuote(workdir))
+		fmt.Fprintf(&prepare, "cd %s\n", runner.ShellSingleQuote(workdir))
 	}
 	prepare.WriteString("echo \"Claude Code ready\"\n")
 	prepare.WriteString("echo \"claude=$(claude --version 2>/dev/null | head -n1)\"\n")
@@ -271,65 +192,18 @@ func claudePrepareScript(workdir string) string {
 
 func claudeBashStepBrokerCommand(stepName, scriptName string) runner.BrokerCommand {
 	return runner.BrokerCommand{
-		Name:    claudeStepLabel(stepName, scriptName),
+		Name:    runner.AgentStepLabel(stepName, scriptName),
 		Command: fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName),
 	}
 }
 
 func claudePromptStepBrokerCommand(stepName, promptName, model string) runner.BrokerCommand {
 	return runner.BrokerCommand{
-		Name: claudeStepLabel(stepName, promptName),
+		Name: runner.AgentStepLabel(stepName, promptName),
 		Command: fmt.Sprintf(
 			`node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/%s" %s`,
 			promptName,
-			shellSingleQuote(model),
+			runner.ShellSingleQuote(model),
 		),
-	}
-}
-
-func claudeStepLabel(stepName, fallback string) string {
-	if label := strings.TrimSpace(stepName); label != "" {
-		return label
-	}
-	return fallback
-}
-
-func claudeStepSlug(stepNumber int, name string) string {
-	slug := slugifyClaudeStepName(name)
-	if slug == "" {
-		slug = "step"
-	}
-	return fmt.Sprintf("%02d-%s", stepNumber, slug)
-}
-
-func slugifyClaudeStepName(name string) string {
-	trimmed := strings.TrimSpace(name)
-	if trimmed == "" {
-		return ""
-	}
-	var b strings.Builder
-	for _, r := range strings.ToLower(trimmed) {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			b.WriteRune(r)
-			continue
-		}
-		b.WriteByte('-')
-	}
-	slug := nonSlugChars.ReplaceAllString(b.String(), "-")
-	slug = strings.Trim(slug, "-")
-	if len(slug) > 48 {
-		slug = strings.Trim(slug[:48], "-")
-	}
-	return slug
-}
-
-func shellSingleQuote(value string) string {
-	// Wrap in single quotes, escaping embedded single quotes as: '\''
-	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
-}
-
-func defaultClaudeCodeSteps() []map[string]any {
-	return []map[string]any{
-		{"name": "Prompt", "type": claudeStepPrompt, "prompt": ""},
 	}
 }
