@@ -37,6 +37,11 @@ type fakeFactoryContext struct {
 	reportCheckParams core.ReportWorkOrderCheckParams
 	reportCheckResult *core.WorkOrderCheck
 	reportCheckErr    error
+
+	setStatusNoteCalls  int
+	setStatusNoteParams core.SetWorkOrderStatusNoteParams
+	setStatusNoteResult *core.WorkOrderStatusNote
+	setStatusNoteErr    error
 }
 
 func (f *fakeFactoryContext) CreateWorkOrder(_ core.WorkOrderParams) (*core.WorkOrder, error) {
@@ -73,6 +78,12 @@ func (f *fakeFactoryContext) ReportWorkOrderCheck(params core.ReportWorkOrderChe
 	f.reportCheckCalls++
 	f.reportCheckParams = params
 	return f.reportCheckResult, f.reportCheckErr
+}
+
+func (f *fakeFactoryContext) SetWorkOrderStatusNote(params core.SetWorkOrderStatusNoteParams) (*core.WorkOrderStatusNote, error) {
+	f.setStatusNoteCalls++
+	f.setStatusNoteParams = params
+	return f.setStatusNoteResult, f.setStatusNoteErr
 }
 
 func TestUpdateWorkOrderStatus_Execute(t *testing.T) {
