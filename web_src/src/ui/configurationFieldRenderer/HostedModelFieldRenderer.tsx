@@ -2,6 +2,7 @@ import React from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Text } from "@/components/Text/text";
 import { useHostedLLMModels } from "@/hooks/useHostedLLMModels";
+import { compareModelLabels } from "@/lib/hostedLLMModels";
 import { toTestId } from "@/lib/testID";
 import type { FieldRendererProps } from "./types";
 import { StringFieldRenderer } from "./StringFieldRenderer";
@@ -22,7 +23,9 @@ export const HostedModelFieldRenderer: React.FC<FieldRendererProps> = (props) =>
   const isHosted = source === "hosted";
   const provider = field.typeOptions?.hostedModel?.provider ?? "";
   const { data, isLoading } = useHostedLLMModels(organizationId, provider, isHosted);
-  const models = data?.models ?? [];
+  const models = [...(data?.models ?? [])].sort((left, right) =>
+    compareModelLabels(left.name || left.id || "", right.name || right.id || ""),
+  );
   const hostedEnabled = data?.enabled === true;
 
   if (!isHosted) {

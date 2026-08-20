@@ -1461,6 +1461,18 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	<-client.Done
 }
 
+func shouldProxyToVite(path string) bool {
+	if strings.HasPrefix(path, "/admin/api") {
+		return false
+	}
+
+	if strings.HasPrefix(path, "/api") {
+		return false
+	}
+
+	return true
+}
+
 // setupDevProxy configures a simple reverse proxy to the Vite development server
 func (s *Server) setupDevProxy(webBasePath string) {
 	viteHost := os.Getenv("VITE_DEV_HOST")
@@ -1511,7 +1523,8 @@ func (s *Server) setupDevProxy(webBasePath string) {
 	}
 
 	proxyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/api" {
+		if !shouldProxyToVite(r.URL.Path) {
+			http.NotFound(w, r)
 			return
 		}
 

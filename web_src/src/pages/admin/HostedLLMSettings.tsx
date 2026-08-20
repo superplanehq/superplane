@@ -11,8 +11,10 @@ import {
   hostedProviderLabel,
   percentInputToBps,
 } from "@/lib/hostedCredit";
+import { filterModelIds, uniqueSortedModelIds } from "@/lib/hostedLLMModels";
 import { Switch } from "@/ui/switch";
-import { useCallback, useEffect, useState } from "react";
+import { Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type HostedLLMProvider = {
   provider: string;
@@ -153,7 +155,7 @@ export function HostedLLMSettings() {
         throw new Error(await getErrorMessage(response, "Unable to list models from the provider"));
       }
       const data: { models?: Array<{ id: string }> } = await response.json();
-      const ids = (data.models ?? []).map((model) => model.id).filter((id) => id.trim() !== "");
+      const ids = uniqueSortedModelIds((data.models ?? []).map((model) => model.id));
       updateProviderForm(provider, { listedModels: ids.length > 0 ? ids : form.allowedModels });
       showSuccessToast("Model list updated");
     } catch (error) {
@@ -281,7 +283,7 @@ export function HostedLLMSettings() {
           <div className="mt-8 space-y-6">
             {(settings?.providers ?? []).map((provider) => {
               const form = providers[provider.provider] ?? emptyProviderForm(provider);
-              const modelChoices = Array.from(new Set([...form.listedModels, ...form.allowedModels]));
+              const modelChoices = uniqueSortedModelIds([...form.listedModels, ...form.allowedModels]);
               return (
                 <div key={provider.provider} className="rounded-md border border-slate-200 p-4 dark:border-gray-700/70">
                   <div className="flex items-center justify-between gap-4">
@@ -350,19 +352,12 @@ export function HostedLLMSettings() {
                       List models, then select the allowlist for SuperPlane-hosted nodes.
                     </Text>
                   ) : (
-                    <div className="mt-4 max-h-48 space-y-2 overflow-auto">
-                      {modelChoices.map((model) => (
-                        <label key={model} className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-100">
-                          <Checkbox
-                            checked={form.allowedModels.includes(model)}
-                            onChange={(event) =>
-                              toggleAllowedModel(provider.provider, model, event.currentTarget.checked)
-                            }
-                          />
-                          <span className="font-mono text-xs">{model}</span>
-                        </label>
-                      ))}
-                    </div>
+                    <HostedProviderModelAllowlist
+                      provider={provider.provider}
+                      modelIds={modelChoices}
+                      allowedModels={form.allowedModels}
+                      onToggle={(model, checked) => toggleAllowedModel(provider.provider, model, checked)}
+                    />
                   )}
 
                   <div className="mt-4">
@@ -384,5 +379,59 @@ export function HostedLLMSettings() {
         </>
       )}
     </section>
+  );
+}
+
+function HostedProviderModelAllowlist({
+  provider,
+  modelIds,
+  allowedModels,
+  onToggle,
+}: {
+  provider: string;
+  modelIds: string[];
+  allowedModels: string[];
+  onToggle: (model: string, checked: boolean) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const visibleModels = useMemo(() => filterModelIds(modelIds, query), [modelIds, query]);
+  const selectedCount = allowedModels.length;
+
+  return (
+    <div className="mt-4 space-y-3">
+      <InputGroup className="relative">
+        <Search
+          size={14}
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+        />
+        <Input
+          type="search"
+          className="pl-9"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search models..."
+          aria-label="Search models"
+          data-testid={`installation-llm-${provider}-model-search`}
+        />
+      </InputGroup>
+      <Text className="text-xs text-gray-500 dark:text-gray-400">
+        {selectedCount} of {modelIds.length} models selected
+      </Text>
+      {visibleModels.length === 0 ? (
+        <Text className="text-sm text-gray-500 dark:text-gray-400">No models match this search.</Text>
+      ) : (
+        <div className="max-h-72 space-y-2 overflow-auto" data-testid={`installation-llm-${provider}-model-list`}>
+          {visibleModels.map((model) => (
+            <label key={model} className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-100">
+              <Checkbox
+                checked={allowedModels.includes(model)}
+                onChange={(event) => onToggle(model, event.currentTarget.checked)}
+              />
+              <span className="font-mono text-xs">{model}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
