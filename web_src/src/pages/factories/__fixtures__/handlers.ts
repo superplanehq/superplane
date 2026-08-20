@@ -366,6 +366,18 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   ];
 }
 
+// Broad grants so factory stories render management actions enabled instead
+// of permission-locked (dispatch, close, assign, notifications, members).
+const STORYBOOK_ME_PERMISSIONS = [
+  "canvases",
+  "integrations",
+  "factories",
+  "work_orders",
+  "members",
+  "notifications",
+  "organization",
+].flatMap((resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action })));
+
 function organizationLlmSpendRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/llm-spend"),
@@ -378,7 +390,14 @@ function meRoute(): FactoriesRoute {
   return {
     pattern: re("/api/v1/me"),
     resolve: () => ({
-      json: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME, email: STORYBOOK_ME_USER_EMAIL } },
+      json: {
+        user: {
+          id: STORYBOOK_ME_USER_ID,
+          name: STORYBOOK_ME_USER_NAME,
+          email: STORYBOOK_ME_USER_EMAIL,
+          permissions: STORYBOOK_ME_PERMISSIONS,
+        },
+      },
     }),
   };
 }

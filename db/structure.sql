@@ -552,6 +552,7 @@ CREATE TABLE public.factory_work_orders (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     source_run_id uuid,
     number bigint NOT NULL,
+    status_note jsonb,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 

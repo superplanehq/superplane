@@ -26,7 +26,7 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 		order,
 		dispatchesByOrderID[order.ID],
 		creatorAutomations[order.ID],
-	), nil
+	)
 }
 
 func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, orders []models.FactoryWorkOrder) ([]*pb.WorkOrder, error) {
@@ -52,12 +52,16 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 
 	result := make([]*pb.WorkOrder, len(orders))
 	for i := range orders {
-		result[i] = serializeWorkOrder(
+		serialized, err := serializeWorkOrder(
 			factory,
 			&orders[i],
 			dispatchesByOrderID[orders[i].ID],
 			creatorAutomations[orders[i].ID],
 		)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = serialized
 	}
 
 	return result, nil
