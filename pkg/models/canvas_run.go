@@ -1,8 +1,10 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,7 +42,7 @@ type CanvasRun struct {
 	Input             JSONValue
 	State             string
 	Result            string
-	ResultMessage     string
+	Errors            datatypes.JSONSlice[RunError]
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
 	CancelledAt       *time.Time
@@ -615,6 +617,10 @@ func (r *CanvasRun) CalculateResult(tx *gorm.DB) (string, error) {
 		return CanvasRunResultCancelled, nil
 	}
 
+	if len(r.Errors) > 0 {
+		return CanvasRunResultFailed, nil
+	}
+
 	var result struct {
 		HasFailed    bool
 		HasCancelled bool
@@ -1033,4 +1039,65 @@ func (r *CanvasRun) MarkAsCancelling(tx *gorm.DB, cancelledBy *uuid.UUID) error 
 			"updated_at":   &now,
 		}).
 		Error
+}
+
+const MaxRunErrorsCount = 50
+
+var ErrRunErrorsTooLarge = errors.New("run errors exceed maximum size")
+var ErrRunErrorsTooMany = errors.New("run errors exceed maximum count")
+var ErrRunErrorMessageRequired = errors.New("run error message is required")
+
+type RunError struct {
+	Message string `json:"message"`
+}
+
+func (r *CanvasRun) ErrorMessages() []string {
+	if len(r.Errors) == 0 {
+		return nil
+	}
+
+	messages := make([]string, 0, len(r.Errors))
+	for _, runError := range r.Errors {
+		messages = append(messages, runError.Message)
+	}
+
+	return messages
+}
+
+/*
+ * Appends a new error into the run errors slice.
+ * Locks the run with FOR NO KEY UPDATE so concurrent appends do not
+ * overwrite each other, while child FK inserts on the run can proceed.
+ */
+func (r *CanvasRun) AddError(tx *gorm.DB, message string, maxSize int) error {
+	if message == "" {
+		return ErrRunErrorMessageRequired
+	}
+
+	return tx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.
+			Clauses(clause.Locking{Strength: lockingForUpdateNoKey}).
+			Where("id = ?", r.ID).
+			First(r).
+			Error; err != nil {
+			return err
+		}
+
+		if len(r.Errors) >= MaxRunErrorsCount {
+			return fmt.Errorf("%w: %d (max %d)", ErrRunErrorsTooMany, len(r.Errors), MaxRunErrorsCount)
+		}
+
+		next := append(slices.Clone(r.Errors), RunError{Message: message})
+		encoded, err := json.Marshal(next)
+		if err != nil {
+			return fmt.Errorf("marshal run errors: %w", err)
+		}
+
+		if len(encoded) > maxSize {
+			return fmt.Errorf("%w: %d bytes (max %d)", ErrRunErrorsTooLarge, len(encoded), maxSize)
+		}
+
+		r.Errors = next
+		return tx.Model(r).Update("errors", r.Errors).Error
+	})
 }
