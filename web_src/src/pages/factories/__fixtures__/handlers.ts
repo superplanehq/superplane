@@ -1,3 +1,4 @@
+import { EMPTY_USAGE_REPORT } from "./usageReportFixtures";
 import {
   defaultFactoriesFixture,
   ORGANIZATION_USERS,
@@ -9,6 +10,7 @@ import {
 import { DEFAULT_ARTIFACTS_BY_ORDER_ID, DEFAULT_EVENTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
 import { DEFAULT_CHECKS_BY_ORDER_ID } from "./workOrderCheckFixtures";
 import type {
+  FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesWorkOrder,
   FactoriesWorkOrderEvent,
@@ -17,6 +19,7 @@ import type {
 import { defaultNotificationSettings } from "@/lib/notificationSettings";
 import { fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
 import { automationNameForLineStep } from "../lib/factoryLineFormShared";
+import { metricsForLine } from "../pages/lineListMetricsMockData";
 
 export type { FactoriesFixture };
 
@@ -92,6 +95,22 @@ function factoriesCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {
   };
 }
 
+function factoryWithLineMetrics(factory: FactoriesFactory): FactoriesFactory {
+  return {
+    ...factory,
+    lines: (factory.lines ?? []).map((line) => {
+      if (line.metrics) {
+        return line;
+      }
+      const metrics = metricsForLine(line.id);
+      if (!metrics) {
+        return line;
+      }
+      return { ...line, metrics };
+    }),
+  };
+}
+
 function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     {
@@ -110,7 +129,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
           if (typeof request.description === "string") {
             factory.description = request.description;
           }
-          return { json: { factory } };
+          return { json: { factory: factoryWithLineMetrics(factory) } };
         }
 
         if (method === "DELETE") {
@@ -121,12 +140,16 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
           return { json: {} };
         }
 
-        return factory ? { json: { factory } } : { json: {} };
+        return factory ? { json: { factory: factoryWithLineMetrics(factory) } } : { json: {} };
       },
     },
     {
       pattern: re("/api/v1/factories/([^/]+)/apps"),
       resolve: (match) => ({ json: { apps: fixture.appsByFactoryId[match[1]] ?? [] } }),
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/usage"),
+      resolve: (match) => ({ json: fixture.usageByFactoryId?.[match[1]] ?? EMPTY_USAGE_REPORT }),
     },
   ];
 }
@@ -355,6 +378,13 @@ const STORYBOOK_ME_PERMISSIONS = [
   "organization",
 ].flatMap((resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action })));
 
+function organizationLlmSpendRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/llm-spend"),
+    resolve: () => ({ json: fixture.organizationLlmSpend ?? EMPTY_USAGE_REPORT }),
+  };
+}
+
 /** Serves `/api/v1/me` so factory stories resolve `useMe` without the Home harness. */
 function meRoute(): FactoriesRoute {
   return {
@@ -396,6 +426,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...factoryDetailRoutes(fixture),
     ...factoryLinesRoutes(fixture),
     ...workOrderRoutes(fixture),
+    organizationLlmSpendRoute(fixture),
   ];
 }
 

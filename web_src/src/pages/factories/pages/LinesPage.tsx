@@ -49,7 +49,7 @@ import {
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
 import { LineListCard } from "./LineListCard";
-import { descriptionForLine, metricsForLine } from "./lineListMetricsMockData";
+import { descriptionForLine, toLineListMetrics } from "./lineListMetricsMockData";
 import { PhaseGlyph } from "./linePhaseGlyph";
 
 const LIST_SUBTITLE = "Last 30 days. Success rate, completions per day, duration, and cost per merged work order.";
@@ -155,7 +155,7 @@ export function LinesPage() {
                   <LineListCard
                     line={line}
                     href={factoryLineDetailPath(organizationId, factoryKey, line.id)}
-                    metrics={metricsForLine(line.id)}
+                    metrics={toLineListMetrics(line.metrics)}
                     description={descriptionForLine(line.id)}
                   />
                 </li>

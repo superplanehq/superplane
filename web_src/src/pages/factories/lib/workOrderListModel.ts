@@ -6,7 +6,7 @@ import type {
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
-import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "./workOrderUsage";
+import { formatUsdCents, formatWorkOrderUsage, parseWorkOrderMetric } from "./workOrderUsage";
 import {
   WORK_ORDER_BOARD_LANES,
   WORK_ORDER_DISPLAY_STATUSES,
@@ -92,7 +92,7 @@ export function buildWorkOrderListEntry(
     distinctLineCount: lines.ids.length,
     totalTokens,
     totalCostCents,
-    usageLabel: formatUsageLabel(totalTokens, totalCostCents),
+    usageLabel: formatWorkOrderUsage(totalTokens, totalCostCents),
     usageTooltip: formatUsageTooltip(totalTokens, totalCostCents),
     updatedAtMs: parseTimestamp(order.updatedAt) || createdAtMs,
     createdAtMs,
@@ -240,23 +240,13 @@ function findLatestExecution(pairs: ExecutionWithLine[]): ExecutionWithLine | nu
   return winner;
 }
 
-function formatUsageLabel(totalTokens: number, totalCostCents: number): string | null {
-  if (totalCostCents > 0) {
-    return formatUsdCents(totalCostCents);
-  }
-  if (totalTokens > 0) {
-    return formatCompactTokens(totalTokens);
-  }
-  return null;
-}
-
 function formatUsageTooltip(totalTokens: number, totalCostCents: number): string | null {
   const parts: string[] = [];
-  if (totalTokens > 0) {
-    parts.push(`${totalTokens.toLocaleString()} tokens`);
-  }
   if (totalCostCents > 0) {
     parts.push(formatUsdCents(totalCostCents));
+  }
+  if (totalTokens > 0) {
+    parts.push(`${totalTokens.toLocaleString()} tokens`);
   }
   return parts.length > 0 ? parts.join(" · ") : null;
 }

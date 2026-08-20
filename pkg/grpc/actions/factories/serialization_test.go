@@ -95,6 +95,33 @@ func TestSerializeExecutionSteps_UsesCanvasNames(t *testing.T) {
 	assert.EqualValues(t, 2, out[2].GetStepIndex())
 }
 
+func TestSerializeExecutionSteps_FallsBackToStepNameWhenCanvasGone(t *testing.T) {
+	steps := []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp},
+		{Type: models.FactoryLineStepTypeRunApp},
+	}
+	executions := []models.FactoryWorkOrderExecutionRecord{
+		{
+			FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{
+				StepIndex: 0,
+				StepName:  "implement",
+			},
+		},
+		{
+			FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{
+				StepIndex: 1,
+				StepName:  "verify",
+			},
+			CanvasName: "verify-app",
+		},
+	}
+
+	out := serializeExecutionSteps(steps, executions)
+	require.Len(t, out, 2)
+	assert.Equal(t, "implement", out[0].GetName())
+	assert.Equal(t, "verify-app", out[1].GetName())
+}
+
 func TestSerializeExecutionSteps_EmptyReturnsNil(t *testing.T) {
 	assert.Nil(t, serializeExecutionSteps(nil, nil))
 	assert.Nil(t, serializeExecutionSteps([]models.FactoryLineStep{}, nil))
@@ -124,13 +151,13 @@ func TestSerializeWorkOrder_LineDispatchesReplaceFlatExecutions(t *testing.T) {
 						ID:          uuid.New(),
 						StepIndex:   0,
 						StepName:    "step-one",
-						RunID:       runID,
+						RunID:       &runID,
 						Status:      models.FactoryWorkOrderExecutionStatusFinished,
 						Result:      models.CanvasRunResultPassed,
 						TotalTokens: 10,
 						CostCents:   5,
 					},
-					CanvasID:   canvasID,
+					CanvasID:   &canvasID,
 					CanvasName: "step-one-app",
 				},
 			},
@@ -201,4 +228,50 @@ func TestSerializeWorkOrder_StatusNotes(t *testing.T) {
 	// No notes stored serializes as absent, not as an empty list.
 	bare := &models.FactoryWorkOrder{ID: uuid.New()}
 	assert.Empty(t, mustSerializeWorkOrder(t, nil, bare, nil, nil).GetStatusNotes())
+}
+
+func TestSerializeWorkOrderExecution_OmitsRunWhenRunIDNil(t *testing.T) {
+	now := time.Now()
+	out := serializeWorkOrderExecution(models.FactoryWorkOrderExecutionRecord{
+		FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{
+			ID:        uuid.New(),
+			LineID:    uuid.New(),
+			StepName:  "implement",
+			StepIndex: 1,
+			Status:    models.FactoryWorkOrderExecutionStatusFinished,
+			Result:    models.CanvasRunResultPassed,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+	})
+
+	assert.Nil(t, out.GetRun())
+	assert.Equal(t, pb.WorkOrderExecution_STATE_FINISHED, out.GetState())
+	assert.Equal(t, pb.WorkOrderExecution_RESULT_PASSED, out.GetResult())
+	assert.Equal(t, "implement", out.GetStep())
+}
+
+func TestSerializeWorkOrderExecution_IncludesRunWhenRunIDSet(t *testing.T) {
+	runID := uuid.New()
+	canvasID := uuid.New()
+	now := time.Now()
+	out := serializeWorkOrderExecution(models.FactoryWorkOrderExecutionRecord{
+		FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{
+			ID:        uuid.New(),
+			LineID:    uuid.New(),
+			StepName:  "implement",
+			RunID:     &runID,
+			Status:    models.FactoryWorkOrderExecutionStatusFinished,
+			Result:    models.CanvasRunResultPassed,
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+		CanvasID:   &canvasID,
+		CanvasName: "Implement app",
+	})
+
+	require.NotNil(t, out.GetRun())
+	assert.Equal(t, runID.String(), out.GetRun().GetId())
+	assert.Equal(t, canvasID.String(), out.GetRun().GetAppId())
+	assert.Equal(t, "Implement app", out.GetRun().GetAppName())
 }

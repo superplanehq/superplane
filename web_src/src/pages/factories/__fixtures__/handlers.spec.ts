@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { fetchFactoryPageFixture } from "./handlers";
-import { CLOSED_WORK_ORDER, OPEN_WORK_ORDER, PRIMARY_FACTORY_ID, RUNNING_WORK_ORDER } from "./factoryPageResponses";
+import { lineMetricsFactoriesFixture } from "./lineMetricsFactoriesFixture";
+import {
+  CLOSED_WORK_ORDER,
+  FACTORIES_ORGANIZATION_ID,
+  OPEN_WORK_ORDER,
+  PRIMARY_FACTORY_ID,
+  REFUND_LINE_ONBOARDING_ID,
+  REFUND_LINE_PLAN_ID,
+  RUNNING_WORK_ORDER,
+} from "./factoryPageResponses";
 
 describe("matchFactoryPageFixture", () => {
   it("lists factories and returns the primary factory by id", async () => {
@@ -11,9 +20,12 @@ describe("matchFactoryPageFixture", () => {
     });
 
     const detail = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}`);
-    await expect(detail.json()).resolves.toMatchObject({
-      factory: expect.objectContaining({ id: PRIMARY_FACTORY_ID, name: "Refunds Factory" }),
-    });
+    const body = (await detail.json()) as {
+      factory: { id?: string; name?: string; lines?: Array<{ id?: string; metrics?: { successRatePct?: number } }> };
+    };
+    expect(body.factory).toMatchObject({ id: PRIMARY_FACTORY_ID, name: "Refunds Factory" });
+    const plan = body.factory.lines?.find((line) => line.id === REFUND_LINE_PLAN_ID);
+    expect(plan?.metrics?.successRatePct).toBe(82);
   });
 
   it("serves work orders and includes both open and closed entries", async () => {
@@ -23,10 +35,44 @@ describe("matchFactoryPageFixture", () => {
     expect(ids).toEqual(expect.arrayContaining([OPEN_WORK_ORDER.id, RUNNING_WORK_ORDER.id, CLOSED_WORK_ORDER.id]));
   });
 
+  it("serves factory usage and organization LLM spend reports", async () => {
+    const usage = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/usage`);
+    await expect(usage.json()).resolves.toMatchObject({
+      totalTokens: "25600",
+      totalCostCents: "876",
+      byModel: expect.arrayContaining([expect.objectContaining({ provider: "anthropic" })]),
+    });
+
+    const spend = await fetchFactoryPageFixture(`/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/llm-spend`);
+    await expect(spend.json()).resolves.toMatchObject({
+      totalTokens: "25600",
+      totalCostCents: "876",
+    });
+  });
+
   it("returns factory apps for the populated factory", async () => {
     const apps = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/apps`);
     await expect(apps.json()).resolves.toMatchObject({
       apps: expect.arrayContaining([expect.objectContaining({ name: "Refund Planner" })]),
     });
+  });
+
+  it("omits metrics on an idle onboarding line", async () => {
+    const detail = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}`,
+      undefined,
+      structuredClone(lineMetricsFactoriesFixture),
+    );
+    const body = (await detail.json()) as {
+      factory: { lines?: Array<{ id?: string; metrics?: { successRatePct?: number } }> };
+    };
+    const onboarding = body.factory.lines?.find((line) => line.id === REFUND_LINE_ONBOARDING_ID);
+    expect(onboarding).toBeDefined();
+    expect(onboarding?.metrics).toBeUndefined();
+  });
+
+  it("does not serve a separate line-metrics route", async () => {
+    const response = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/line-metrics`);
+    expect(response.status).toBe(404);
   });
 });
