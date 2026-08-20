@@ -185,6 +185,7 @@ spec:
         body: When the pull request merges, this work order completes. If it closes without a merge, SuperPlane rejects the work order.
         ctaLabel: 'Review PR #{{ $["Create Draft Pull Request"].data.number }}'
         ctaUrl: '{{ $["Create Draft Pull Request"].data.html_url }}'
+        showOnlyWhenWaiting: true
       position:
         x: 1706
         'y': 792

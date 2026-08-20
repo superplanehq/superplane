@@ -72,6 +72,7 @@ describe("setup factory line apps", () => {
     expect(pr).toContain("noteKey: pr-closure");
     expect(pr).toContain("headline: Review the pull request");
     expect(pr).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data.html_url }}'");
+    expect(pr).toContain("showOnlyWhenWaiting: true");
   });
 });
 
