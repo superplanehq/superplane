@@ -77,9 +77,28 @@ describe("setup factory line apps", () => {
 });
 
 describe("setup factory event apps", () => {
-  it("provisions PR Closure outside the factory line", () => {
-    expect(ONBOARDING_EVENT_APPS).toEqual(["pr-closure"]);
+  it("provisions issue intake and PR closure outside the factory line", () => {
+    expect(ONBOARDING_EVENT_APPS).toEqual(["issue-intake", "pr-closure"]);
+    expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("issue-intake");
     expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("pr-closure");
+  });
+
+  it("creates work orders for factory-labeled or agent-assigned issues", () => {
+    const canvasYaml = materializeOnboardingApp("issue-intake");
+
+    expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*actions:[\s\S]*- labeled/);
+    expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*actions:[\s\S]*- assigned/);
+    expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*repository: acme\/backlog/);
+    expect(canvasYaml).toContain('root().data.label.name == "factory"');
+    expect(canvasYaml).toContain('root().data.assignee.login == "superplaneagent"');
+    expect(canvasYaml).toMatch(/component: createWorkOrder[\s\S]*title: '{{ root\(\)\.data\.issue\.title }}'/);
+    expect(canvasYaml).toContain("description: '{{ root().data.issue.body }}'");
+    expect(canvasYaml).toContain("id: int-1");
+    expect(canvasYaml).toContain("name: acme-github");
+    expect(canvasYaml).not.toContain("{{ install_params.");
+    expect(canvasYaml).not.toContain(FACTORY_CANVAS_ID_PLACEHOLDER);
+    expect(canvasYaml).not.toContain("superplanehq");
+    expect(canvasYaml).not.toMatch(/component: onRun/);
   });
 
   it("closes the work order when a factory pull request is closed", () => {
