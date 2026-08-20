@@ -902,7 +902,7 @@ The Query Logs component runs a CloudWatch Logs Insights query over one or more 
 
 - **Region**: AWS region of the log groups
 - **Log Groups**: One or more CloudWatch log groups to query
-- **Query String**: Logs Insights query, e.g. `fields @timestamp, @message | sort @timestamp desc | limit 20`
+- **Query String**: Logs Insights query, e.g. `fields @timestamp, @message | sort @timestamp desc`. Leave off a trailing `limit` command so the Limit field below governs the row count
 - **Lookback Period**: How far back to search, relative to now
 - **Limit**: Maximum number of log events to return (up to 10000)
 
@@ -927,7 +927,7 @@ The Query Logs component runs a CloudWatch Logs Insights query over one or more 
       "/aws/lambda/my-function"
     ],
     "queryId": "12ab3456-12ab-123a-789e-1234567890ab",
-    "queryString": "fields @timestamp, @message | sort @timestamp desc | limit 20",
+    "queryString": "fields @timestamp, @message | sort @timestamp desc",
     "rows": [
       {
         "@message": "START RequestId: 3f2a1c9e-1234-4a5b-8b9c-0d1e2f3a4b5c Version: $LATEST",

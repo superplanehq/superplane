@@ -3,7 +3,7 @@
     "end": "2026-05-29T09:00:00Z",
     "logGroups": ["/aws/lambda/my-function"],
     "queryId": "12ab3456-12ab-123a-789e-1234567890ab",
-    "queryString": "fields @timestamp, @message | sort @timestamp desc | limit 20",
+    "queryString": "fields @timestamp, @message | sort @timestamp desc",
     "rows": [
       {
         "@message": "START RequestId: 3f2a1c9e-1234-4a5b-8b9c-0d1e2f3a4b5c Version: $LATEST",

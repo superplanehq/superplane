@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
@@ -96,7 +97,7 @@ func (c *QueryLogs) Documentation() string {
 
 - **Region**: AWS region of the log groups
 - **Log Groups**: One or more CloudWatch log groups to query
-- **Query String**: Logs Insights query, e.g. ` + "`fields @timestamp, @message | sort @timestamp desc | limit 20`" + `
+- **Query String**: Logs Insights query, e.g. ` + "`fields @timestamp, @message | sort @timestamp desc`" + `. Leave off a trailing ` + "`limit`" + ` command so the Limit field below governs the row count
 - **Lookback Period**: How far back to search, relative to now
 - **Limit**: Maximum number of log events to return (up to 10000)
 
@@ -167,8 +168,8 @@ func (c *QueryLogs) Configuration() []configuration.Field {
 			Label:       "Query String",
 			Type:        configuration.FieldTypeText,
 			Required:    true,
-			Default:     "fields @timestamp, @message | sort @timestamp desc | limit 20",
-			Description: "CloudWatch Logs Insights query",
+			Default:     "fields @timestamp, @message | sort @timestamp desc",
+			Description: "CloudWatch Logs Insights query. Leave off a trailing \"limit\" command so the Limit field below governs the row count instead",
 		},
 		{
 			Name:        "lookbackPeriod",
@@ -311,6 +312,7 @@ func (c *QueryLogs) pollQueryResults(ctx core.ActionHookContext) error {
 func (c *QueryLogs) reschedulePoll(ctx core.ActionHookContext, metadata QueryLogsExecutionMetadata) error {
 	metadata.PollAttempts++
 	if metadata.PollAttempts >= maxQueryLogsPollTries {
+		stopQuery(ctx.Logger, ctx.HTTP, ctx.Integration, metadata.Region, metadata.QueryID)
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("timed out waiting for Logs Insights query %s to complete after %d poll attempts",
 			metadata.QueryID, metadata.PollAttempts))
 	}
@@ -379,7 +381,32 @@ func validateQueryLogsConfiguration(config QueryLogsConfiguration) error {
 }
 
 func (c *QueryLogs) Cancel(ctx core.ExecutionContext) error {
+	metadata := QueryLogsExecutionMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil || metadata.QueryID == "" {
+		return nil
+	}
+
+	stopQuery(ctx.Logger, ctx.HTTP, ctx.Integration, metadata.Region, metadata.QueryID)
 	return nil
+}
+
+// stopQuery best-effort cancels a running Logs Insights query so it stops
+// consuming the account's concurrent query quota once SuperPlane is no longer
+// waiting on it. Failures are logged rather than returned: callers use this
+// from paths (cancellation, poll timeout) that must complete either way.
+func stopQuery(logger *log.Entry, http core.HTTPContext, integration core.IntegrationContext, region, queryID string) {
+	creds, err := common.CredentialsFromInstallation(integration)
+	if err != nil {
+		logger.Warnf("failed to get AWS credentials to stop Logs Insights query %s: %v", queryID, err)
+		return
+	}
+
+	if err := NewLogsClient(http, creds, region).StopQuery(queryID); err != nil {
+		logger.Warnf("failed to stop Logs Insights query %s: %v", queryID, err)
+		return
+	}
+
+	logger.Infof("stopped Logs Insights query %s", queryID)
 }
 
 func (c *QueryLogs) Cleanup(ctx core.SetupContext) error {
