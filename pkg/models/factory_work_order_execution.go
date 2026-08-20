@@ -119,22 +119,63 @@ func (e *FactoryWorkOrderExecution) MarkFinished(tx *gorm.DB, result string) err
 		return nil
 	}
 
+	if err := e.setFinished(tx, result); err != nil {
+		return err
+	}
+
+	return e.RecordFinished(tx, result)
+}
+
+func (e *FactoryWorkOrderExecution) setFinished(tx *gorm.DB, result string) error {
+	if e.Status == FactoryWorkOrderExecutionStatusFinished {
+		return nil
+	}
+
 	now := time.Now()
 	e.Status = FactoryWorkOrderExecutionStatusFinished
 	e.Result = result
 	e.UpdatedAt = now
 	e.FinishedAt = &now
 
-	if err := tx.Model(e).Updates(map[string]any{
+	return tx.Model(e).Updates(map[string]any{
 		"status":      FactoryWorkOrderExecutionStatusFinished,
 		"result":      result,
 		"updated_at":  now,
 		"finished_at": &now,
-	}).Error; err != nil {
+	}).Error
+}
+
+// abortInFlightFactoryStepForDeletedRun finishes a pending or running
+// factory step as cancelled before its canvas run is removed. Finished
+// history rows stay as they are. In-flight rows would otherwise keep a
+// parallelism slot with a null run_id after ON DELETE SET NULL.
+func abortInFlightFactoryStepForDeletedRun(tx *gorm.DB, runID uuid.UUID) error {
+	execution, err := FindWorkOrderExecutionByRunID(tx, runID)
+	if err != nil {
+		if errors.Is(err, ErrFactoryWorkOrderExecutionNotFound) {
+			return nil
+		}
 		return err
 	}
 
-	return e.RecordFinished(tx, result)
+	return execution.abortForDeletedRun(tx)
+}
+
+func (e *FactoryWorkOrderExecution) abortForDeletedRun(tx *gorm.DB) error {
+	if e.Status == FactoryWorkOrderExecutionStatusFinished {
+		return nil
+	}
+
+	if err := e.setFinished(tx, CanvasRunResultCancelled); err != nil {
+		return err
+	}
+
+	dispatch, err := FindWorkOrderLineDispatch(tx, e.LineDispatchID)
+	if err != nil {
+		return err
+	}
+
+	return dispatch.Finish(tx, CanvasRunResultCancelled)
 }
 
 func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) error {

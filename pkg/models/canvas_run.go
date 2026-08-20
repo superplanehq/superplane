@@ -324,8 +324,13 @@ func LockCanvasRun(db *gorm.DB, workflowID, runID uuid.UUID) (*CanvasRun, error)
 func (r *CanvasRun) DeleteChain(db *gorm.DB) (*RunDeletionSummary, error) {
 	summary := &RunDeletionSummary{}
 
-	// factory_work_order_executions.run_id is ON DELETE SET NULL, so the
-	// work-order history row stays after this run is removed.
+	// In-flight factory steps would stay pending/running after run_id is
+	// set to NULL and hold a parallelism slot forever. Finish those as
+	// cancelled first. Finished history rows stay; the FK SET NULL keeps
+	// them after this run is removed.
+	if err := abortInFlightFactoryStepForDeletedRun(db, r.ID); err != nil {
+		return nil, err
+	}
 
 	var executionIDs []uuid.UUID
 	err := db.
