@@ -858,6 +858,70 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 	})
 }
 
+func TestAdminListOrgExperimentalFeatures(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+
+	foreignOrg, err := models.CreateOrganization("admin-flags-foreign", "")
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_ = models.DisableExperimentalFeature(foreignOrg.ID, features.FeatureFactories)
+	})
+
+	t.Run("returns registry and enabled features without org membership", func(t *testing.T) {
+		require.NoError(t, models.EnableExperimentalFeature(foreignOrg.ID, features.FeatureFactories))
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/" + foreignOrg.ID.String() + "/experimental-features",
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+
+		var body struct {
+			Features []map[string]any `json:"features"`
+			Enabled  []string         `json:"enabled"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		require.NotEmpty(t, body.Features)
+		assert.Contains(t, body.Enabled, features.FeatureFactories)
+
+		ids := make([]string, 0, len(body.Features))
+		for _, f := range body.Features {
+			id, _ := f["id"].(string)
+			ids = append(ids, id)
+		}
+		assert.Contains(t, ids, features.FeatureFactories)
+	})
+
+	t.Run("returns an empty enabled list when none are on", func(t *testing.T) {
+		require.NoError(t, models.DisableExperimentalFeature(foreignOrg.ID, features.FeatureFactories))
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/" + foreignOrg.ID.String() + "/experimental-features",
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+
+		var body struct {
+			Enabled []string `json:"enabled"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.Empty(t, body.Enabled)
+		assert.NotNil(t, body.Enabled)
+	})
+
+	t.Run("returns 404 for non-existent org", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+}
+
 func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
