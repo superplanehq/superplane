@@ -46,6 +46,7 @@ func TestSetWorkOrderStatusNote_Execute(t *testing.T) {
 		assert.Equal(t, "Review the pull request", factoryCtx.setStatusNoteParams.Headline)
 		assert.Equal(t, "Review PR #42", factoryCtx.setStatusNoteParams.CtaLabel)
 		assert.Equal(t, "https://github.com/acme/app/pull/42", factoryCtx.setStatusNoteParams.CtaURL)
+		assert.False(t, factoryCtx.setStatusNoteParams.ShowOnlyWhenWaiting)
 		assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
 		assert.Equal(t, "workOrder.statusNoteSet", stateCtx.Type)
 		assert.Len(t, stateCtx.Payloads, 1)
@@ -66,5 +67,23 @@ func TestSetWorkOrderStatusNote_Execute(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "work order must be open")
 		assert.Empty(t, stateCtx.Payloads)
+	})
+
+	t.Run("passes showOnlyWhenWaiting through to the factory context", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{setStatusNoteResult: stored}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":             "wo-1",
+				"noteKey":             "queue-slot",
+				"headline":            "Waiting for a slot",
+				"showOnlyWhenWaiting": true,
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.True(t, factoryCtx.setStatusNoteParams.ShowOnlyWhenWaiting)
 	})
 }

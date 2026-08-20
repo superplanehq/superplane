@@ -222,14 +222,15 @@ func serializeWorkOrderStatusNotes(order *models.FactoryWorkOrder) ([]*pb.WorkOr
 
 func serializeWorkOrderStatusNote(note *models.FactoryWorkOrderStatusNote) *pb.WorkOrderStatusNote {
 	serialized := &pb.WorkOrderStatusNote{
-		Key:        note.Key,
-		Kind:       note.Kind,
-		Headline:   note.Headline,
-		Body:       note.Body,
-		CtaLabel:   note.CtaLabel,
-		CtaUrl:     note.CtaURL,
-		Automation: serializeAutomationRef(note.Automation),
-		UpdatedAt:  timestamppb.New(note.UpdatedAt),
+		Key:                 note.Key,
+		Kind:                note.Kind,
+		Headline:            note.Headline,
+		Body:                note.Body,
+		CtaLabel:            note.CtaLabel,
+		CtaUrl:              note.CtaURL,
+		Automation:          serializeAutomationRef(note.Automation),
+		UpdatedAt:           timestamppb.New(note.UpdatedAt),
+		ShowOnlyWhenWaiting: note.ShowOnlyWhenWaiting,
 	}
 	if note.Run != nil {
 		serialized.RunId = note.Run.ID.String()

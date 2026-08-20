@@ -206,6 +206,13 @@ func TestSerializeWorkOrder_StatusNotes(t *testing.T) {
 			Run:       &factory.RunRef{ID: runID},
 			UpdatedAt: time.Now(),
 		},
+		{
+			Key:                 "queue-slot",
+			Kind:                models.FactoryWorkOrderStatusNoteKindInfo,
+			Headline:            "Waiting for a slot",
+			ShowOnlyWhenWaiting: true,
+			UpdatedAt:           time.Now(),
+		},
 	})
 	require.NoError(t, err)
 
@@ -213,17 +220,19 @@ func TestSerializeWorkOrder_StatusNotes(t *testing.T) {
 	serialized := mustSerializeWorkOrder(t, nil, order, nil, nil)
 
 	statusNotes := serialized.GetStatusNotes()
-	require.Len(t, statusNotes, 1)
+	require.Len(t, statusNotes, 2)
 	statusNote := statusNotes[0]
 	assert.Equal(t, "pr-closure", statusNote.GetKey())
 	assert.Equal(t, "info", statusNote.GetKind())
 	assert.Equal(t, "Review the pull request", statusNote.GetHeadline())
 	assert.Equal(t, "Review PR #42", statusNote.GetCtaLabel())
 	assert.Equal(t, "https://github.com/acme/app/pull/42", statusNote.GetCtaUrl())
+	assert.False(t, statusNote.GetShowOnlyWhenWaiting())
 	require.NotNil(t, statusNote.GetAutomation())
 	assert.Equal(t, appID.String(), statusNote.GetAutomation().GetAppId())
 	assert.Equal(t, runID.String(), statusNote.GetRunId())
 	assert.NotNil(t, statusNote.GetUpdatedAt())
+	assert.True(t, statusNotes[1].GetShowOnlyWhenWaiting())
 
 	// No notes stored serializes as absent, not as an empty list.
 	bare := &models.FactoryWorkOrder{ID: uuid.New()}

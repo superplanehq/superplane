@@ -1,10 +1,12 @@
 import type { FactoriesWorkOrderStatusNote } from "@/api-client";
+import type { WorkOrderDisplayStatus } from "./workOrderProgress";
 
 /**
  * A "what happens next" panel set by an automation while the order is
- * Waiting — e.g. a PR watcher announcing that merging the tracked pull
+ * open — e.g. a PR watcher announcing that merging the tracked pull
  * request completes the order. Notes are latest-only per key; a
  * different key sits beside it. Cleared on any state transition.
+ * A note with showOnlyWhenWaiting stays hidden while a line is running.
  */
 export interface WorkOrderStatusNotePresentation {
   key: string;
@@ -43,8 +45,12 @@ export function presentWorkOrderStatusNote(
 
 export function presentWorkOrderStatusNotes(
   notes: FactoriesWorkOrderStatusNote[] | undefined,
+  displayStatus?: WorkOrderDisplayStatus,
 ): WorkOrderStatusNotePresentation[] {
   return (notes ?? []).flatMap((note) => {
+    if (note.showOnlyWhenWaiting && displayStatus !== undefined && displayStatus !== "waiting") {
+      return [];
+    }
     const presented = presentWorkOrderStatusNote(note);
     return presented ? [presented] : [];
   });

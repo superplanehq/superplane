@@ -292,6 +292,38 @@ func TestFactoryWorkOrder_SetStatusNote_RejectsAfterCloseOnStaleSnapshot(t *test
 	assert.Equal(t, FactoryWorkOrderStateClosed, reloaded.State)
 }
 
+func TestFactoryWorkOrder_SetStatusNote_PersistsShowOnlyWhenWaiting(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	order, _ := openWorkOrderForStatusNote(t, "note-waiting-only")
+
+	_, err := order.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{
+		Key:                 "queue-slot",
+		Headline:            "Waiting for a slot",
+		ShowOnlyWhenWaiting: true,
+	})
+	require.NoError(t, err)
+
+	reloaded, err := FindUnscopedWorkOrder(database.Conn(), order.ID)
+	require.NoError(t, err)
+
+	notes, err := reloaded.StatusNotes()
+	require.NoError(t, err)
+	require.Len(t, notes, 1)
+	assert.True(t, notes[0].ShowOnlyWhenWaiting)
+
+	_, err = reloaded.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{
+		Key:      "pr-closure",
+		Headline: "Review the pull request",
+	})
+	require.NoError(t, err)
+
+	notes, err = reloaded.StatusNotes()
+	require.NoError(t, err)
+	require.Len(t, notes, 2)
+	assert.False(t, notes[1].ShowOnlyWhenWaiting)
+}
+
 func TestFactoryWorkOrder_ClearStatusNotes(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 

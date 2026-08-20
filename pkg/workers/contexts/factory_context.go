@@ -246,14 +246,15 @@ func (c *FactoryContext) SetWorkOrderStatusNote(params core.SetWorkOrderStatusNo
 	}
 
 	note, err := order.SetStatusNote(c.tx, models.FactoryWorkOrderStatusNoteParams{
-		Key:        params.NoteKey,
-		Kind:       params.Kind,
-		Headline:   params.Headline,
-		Body:       params.Body,
-		CtaLabel:   params.CtaLabel,
-		CtaURL:     params.CtaURL,
-		Automation: c.automationRef(),
-		Run:        c.runRef(),
+		Key:                 params.NoteKey,
+		Kind:                params.Kind,
+		Headline:            params.Headline,
+		Body:                params.Body,
+		CtaLabel:            params.CtaLabel,
+		CtaURL:              params.CtaURL,
+		ShowOnlyWhenWaiting: params.ShowOnlyWhenWaiting,
+		Automation:          c.automationRef(),
+		Run:                 c.runRef(),
 	})
 	if err != nil {
 		return nil, err
@@ -479,13 +480,14 @@ func artifactToCore(artifact *models.FactoryWorkOrderArtifact) (*core.WorkOrderA
 
 func statusNoteToCore(order *models.FactoryWorkOrder, note *models.FactoryWorkOrderStatusNote) *core.WorkOrderStatusNote {
 	return &core.WorkOrderStatusNote{
-		WorkOrderID: order.ID.String(),
-		Key:         note.Key,
-		Kind:        note.Kind,
-		Headline:    note.Headline,
-		Body:        note.Body,
-		CtaLabel:    note.CtaLabel,
-		CtaURL:      note.CtaURL,
+		WorkOrderID:         order.ID.String(),
+		Key:                 note.Key,
+		Kind:                note.Kind,
+		Headline:            note.Headline,
+		Body:                note.Body,
+		CtaLabel:            note.CtaLabel,
+		CtaURL:              note.CtaURL,
+		ShowOnlyWhenWaiting: note.ShowOnlyWhenWaiting,
 	}
 }
 

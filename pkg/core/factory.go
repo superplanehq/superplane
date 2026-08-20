@@ -126,12 +126,13 @@ type SetWorkOrderStatusNoteParams struct {
 	// UpdateWorkOrderStatusParams.OrderID.
 	OrderID string
 	// NoteKey identifies the note across sets (e.g. "pr-closure").
-	NoteKey  string
-	Kind     string
-	Headline string
-	Body     string
-	CtaLabel string
-	CtaURL   string
+	NoteKey             string
+	Kind                string
+	Headline            string
+	Body                string
+	CtaLabel            string
+	CtaURL              string
+	ShowOnlyWhenWaiting bool
 }
 
 type WorkOrder struct {
@@ -150,13 +151,14 @@ type WorkOrderArtifact struct {
 }
 
 type WorkOrderStatusNote struct {
-	WorkOrderID string `json:"workOrderId"`
-	Key         string `json:"key"`
-	Kind        string `json:"kind"`
-	Headline    string `json:"headline"`
-	Body        string `json:"body,omitempty"`
-	CtaLabel    string `json:"ctaLabel,omitempty"`
-	CtaURL      string `json:"ctaUrl,omitempty"`
+	WorkOrderID         string `json:"workOrderId"`
+	Key                 string `json:"key"`
+	Kind                string `json:"kind"`
+	Headline            string `json:"headline"`
+	Body                string `json:"body,omitempty"`
+	CtaLabel            string `json:"ctaLabel,omitempty"`
+	CtaURL              string `json:"ctaUrl,omitempty"`
+	ShowOnlyWhenWaiting bool   `json:"showOnlyWhenWaiting,omitempty"`
 }
 
 type WorkOrderCheck struct {

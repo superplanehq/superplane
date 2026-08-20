@@ -52,6 +52,10 @@ type FactoryWorkOrderStatusNote struct {
 	Body     string `json:"body,omitempty"`
 	CtaLabel string `json:"ctaLabel,omitempty"`
 	CtaURL   string `json:"ctaUrl,omitempty"`
+	// ShowOnlyWhenWaiting hides the note on the work order page while a
+	// line is running. The default is false: the note stays visible
+	// for the whole open wait, including an active dispatch.
+	ShowOnlyWhenWaiting bool `json:"showOnlyWhenWaiting,omitempty"`
 	// Automation and Run snapshot who announced the wait, captured at
 	// write time like check attribution.
 	Automation *factory.AutomationRef `json:"automation,omitempty"`
@@ -60,14 +64,15 @@ type FactoryWorkOrderStatusNote struct {
 }
 
 type FactoryWorkOrderStatusNoteParams struct {
-	Key        string
-	Kind       string
-	Headline   string
-	Body       string
-	CtaLabel   string
-	CtaURL     string
-	Automation *factory.AutomationRef
-	Run        *factory.RunRef
+	Key                 string
+	Kind                string
+	Headline            string
+	Body                string
+	CtaLabel            string
+	CtaURL              string
+	ShowOnlyWhenWaiting bool
+	Automation          *factory.AutomationRef
+	Run                 *factory.RunRef
 }
 
 // StatusNotes decodes the notes stored on the row. Returns nil when the
@@ -231,15 +236,16 @@ func normalizeStatusNoteParams(params FactoryWorkOrderStatusNoteParams) (*Factor
 	}
 
 	return &FactoryWorkOrderStatusNote{
-		Key:        key,
-		Kind:       kind,
-		Headline:   headline,
-		Body:       body,
-		CtaLabel:   ctaLabel,
-		CtaURL:     ctaURL,
-		Automation: params.Automation,
-		Run:        params.Run,
-		UpdatedAt:  time.Now(),
+		Key:                 key,
+		Kind:                kind,
+		Headline:            headline,
+		Body:                body,
+		CtaLabel:            ctaLabel,
+		CtaURL:              ctaURL,
+		ShowOnlyWhenWaiting: params.ShowOnlyWhenWaiting,
+		Automation:          params.Automation,
+		Run:                 params.Run,
+		UpdatedAt:           time.Now(),
 	}, nil
 }
 

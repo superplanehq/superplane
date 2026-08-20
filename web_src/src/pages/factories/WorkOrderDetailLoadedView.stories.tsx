@@ -77,7 +77,7 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     order,
     events: overrides.events ?? [],
     artifacts: overrides.artifacts ?? [],
-    statusNotes: presentWorkOrderStatusNotes(order.statusNotes),
+    statusNotes: presentWorkOrderStatusNotes(order.statusNotes, derived.displayStatus ?? undefined),
     checks: overrides.checks,
     isArtifactsLoading: false,
     displayStatus: derived.displayStatus!,

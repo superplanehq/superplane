@@ -566,6 +566,10 @@ message WorkOrderStatusNote {
   AutomationRef automation = 7;
   string run_id = 8;
   google.protobuf.Timestamp updated_at = 9;
+  // When true, the work order page hides this note while a line is
+  // running. The default is false: the note stays visible for the
+  // whole open wait.
+  bool show_only_when_waiting = 10;
 }
 
 message WorkOrderCreator {

@@ -18,12 +18,13 @@ func init() {
 type SetWorkOrderStatusNote struct{}
 
 type SetWorkOrderStatusNoteConfiguration struct {
-	OrderID  string `json:"orderId" mapstructure:"orderId"`
-	NoteKey  string `json:"noteKey" mapstructure:"noteKey"`
-	Headline string `json:"headline" mapstructure:"headline"`
-	Body     string `json:"body" mapstructure:"body"`
-	CtaLabel string `json:"ctaLabel" mapstructure:"ctaLabel"`
-	CtaURL   string `json:"ctaUrl" mapstructure:"ctaUrl"`
+	OrderID             string `json:"orderId" mapstructure:"orderId"`
+	NoteKey             string `json:"noteKey" mapstructure:"noteKey"`
+	Headline            string `json:"headline" mapstructure:"headline"`
+	Body                string `json:"body" mapstructure:"body"`
+	CtaLabel            string `json:"ctaLabel" mapstructure:"ctaLabel"`
+	CtaURL              string `json:"ctaUrl" mapstructure:"ctaUrl"`
+	ShowOnlyWhenWaiting bool   `json:"showOnlyWhenWaiting" mapstructure:"showOnlyWhenWaiting"`
 }
 
 func (c *SetWorkOrderStatusNote) Name() string {
@@ -39,13 +40,14 @@ func (c *SetWorkOrderStatusNote) Description() string {
 }
 
 func (c *SetWorkOrderStatusNote) Documentation() string {
-	return `The Set Work Order Status Note component announces what a waiting work order is blocked on and what resolves it. The note shows as a "next step" panel on the work order page while the order waits — for example, a PR watcher can announce "Review the pull request: when it merges, this work order completes automatically."
+	return `The Set Work Order Status Note component announces what a waiting work order is blocked on and what resolves it. The note shows as a "next step" panel on the work order page — for example, a PR watcher can announce "Review the pull request: when it merges, this work order completes automatically."
 
 Each note is identified by its ` + "`noteKey`" + ` (for example ` + "`pr-closure`" + `). The first set creates the note. A later set with the same key updates that note in place. A different key sits beside it, so one work order can carry several waits at once (a PR review and a later decision prompt). Any state change (close, reopen, back to draft) clears every note. The work order must be open.
 
 - ` + "`headline`" + ` is the short instruction shown as the panel title (e.g. "Review the pull request").
 - ` + "`body`" + ` is an optional markdown paragraph with the details — what happens on each outcome.
 - ` + "`ctaLabel`" + ` and ` + "`ctaUrl`" + ` render an optional action button that links to where the wait resolves (e.g. the pull request). Set both or neither.
+- ` + "`showOnlyWhenWaiting`" + ` hides the note while a line is running. The default is off, so the note stays visible during a run.
 
 ` + "`orderId`" + ` explicitly targets the work order — it defaults to ` + "`{{ order().id }}`" + `, the work order driving the current run. This component can only be used in factory-owned apps.`
 }
@@ -124,6 +126,13 @@ func (c *SetWorkOrderStatusNote) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 		},
+		{
+			Name:        "showOnlyWhenWaiting",
+			Label:       "Show only while waiting",
+			Description: "When this option is on, SuperPlane hides the note while a line is running.",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+		},
 	}
 }
 
@@ -134,12 +143,13 @@ func (c *SetWorkOrderStatusNote) Execute(ctx core.ExecutionContext) error {
 	}
 
 	note, err := ctx.Factory.SetWorkOrderStatusNote(core.SetWorkOrderStatusNoteParams{
-		OrderID:  config.OrderID,
-		NoteKey:  config.NoteKey,
-		Headline: config.Headline,
-		Body:     config.Body,
-		CtaLabel: config.CtaLabel,
-		CtaURL:   config.CtaURL,
+		OrderID:             config.OrderID,
+		NoteKey:             config.NoteKey,
+		Headline:            config.Headline,
+		Body:                config.Body,
+		CtaLabel:            config.CtaLabel,
+		CtaURL:              config.CtaURL,
+		ShowOnlyWhenWaiting: config.ShowOnlyWhenWaiting,
 	})
 	if err != nil {
 		return err
