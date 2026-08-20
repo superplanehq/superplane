@@ -11,6 +11,8 @@ import planningCanvasYaml from "./line-apps/planning.canvas.yaml?raw";
 import implementationCanvasYaml from "./line-apps/implementation.canvas.yaml?raw";
 import prCanvasYaml from "./line-apps/pr.canvas.yaml?raw";
 import prClosureCanvasYaml from "./line-apps/pr-closure.canvas.yaml?raw";
+import issueIntakeCanvasYaml from "./line-apps/issue-intake.canvas.yaml?raw";
+import issueIntakeConsoleYaml from "./line-apps/issue-intake.console.yaml?raw";
 
 export type { FactoryDefinition, FactoryStartingTask, FactoryRunDefinition } from "./types";
 export {
@@ -95,6 +97,7 @@ function buildLineApp(args: {
 }
 
 const EVENT_APP_COMPONENT_INTEGRATIONS: Record<string, string> = {
+  "github.onIssue": "github",
   "github.onPullRequest": "github",
 };
 
@@ -103,6 +106,7 @@ function buildEventApp(args: {
   title: string;
   description: string;
   canvasYaml: string;
+  consoleYaml?: string;
   triggerNodeId: string;
 }): FactoryDefinition {
   return buildOnboardingApp({
@@ -110,7 +114,7 @@ function buildEventApp(args: {
     title: args.title,
     description: args.description,
     canvasYaml: args.canvasYaml,
-    consoleYaml: eventAppConsoleYaml,
+    consoleYaml: args.consoleYaml ?? eventAppConsoleYaml,
     integrations: ["github"],
     componentIntegrations: EVENT_APP_COMPONENT_INTEGRATIONS,
     entrypointNodeId: args.triggerNodeId,
@@ -134,7 +138,7 @@ export const ONBOARDING_LINE_APPS: OnboardingLineApp[] = [
 
 // Event-driven factory apps provisioned during onboarding. These listen for
 // GitHub events; they are not factory line steps.
-export const ONBOARDING_EVENT_APPS = ["pr-closure"] as const;
+export const ONBOARDING_EVENT_APPS = ["issue-intake", "pr-closure"] as const;
 
 const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
   "software-factory": buildSoftwareFactory(),
@@ -158,6 +162,14 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
     description: "Generate a pull request title and body, then open a draft PR.",
     canvasYaml: prCanvasYaml,
     entrypointNodeId: "onrun-open-pr",
+  }),
+  "issue-intake": buildEventApp({
+    id: "issue-intake",
+    title: "Issue Intake",
+    description: "Create a work order when an issue gets the factory label or is assigned to the SuperPlane agent.",
+    canvasYaml: issueIntakeCanvasYaml,
+    consoleYaml: issueIntakeConsoleYaml,
+    triggerNodeId: "on-issue-labeled",
   }),
   "pr-closure": buildEventApp({
     id: "pr-closure",

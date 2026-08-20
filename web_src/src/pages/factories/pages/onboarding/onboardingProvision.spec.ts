@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory } from "@/api-client";
 
-import { DEFAULT_LINE_NAME, provisionLine } from "./onboardingProvision";
+import { DEFAULT_LINE_NAME, provisionEventApps, provisionLine } from "./onboardingProvision";
 
 describe("provisionLine", () => {
   it("reuses a line that already has the planning entrypoint", async () => {
@@ -62,5 +62,41 @@ describe("provisionLine", () => {
       provisionedAppId: result.primaryAppId,
       provisionedLineId: "line-new",
     });
+  });
+});
+
+describe("provisionEventApps", () => {
+  it("installs issue intake and PR closure for the workspace", async () => {
+    const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
+      canvasId: `canvas-${factoryId}`,
+      canvasName: factoryId,
+    }));
+
+    await provisionEventApps({
+      factoryId: "factory-1",
+      selections: {},
+      appRepository: "acme/app",
+      backlogRepository: "acme/backlog",
+      installFactory,
+    });
+
+    expect(installFactory).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        factoryId: "issue-intake",
+        workspaceFactoryId: "factory-1",
+        installParams: {
+          appRepository: "acme/app",
+          backlogRepository: "acme/backlog",
+        },
+      }),
+    );
+    expect(installFactory).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        factoryId: "pr-closure",
+        workspaceFactoryId: "factory-1",
+      }),
+    );
   });
 });
