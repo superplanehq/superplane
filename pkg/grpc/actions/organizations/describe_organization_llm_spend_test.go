@@ -43,9 +43,10 @@ func Test__DescribeOrganizationLLMSpend(t *testing.T) {
 		return nil
 	}))
 
+	require.NotNil(t, execution.RunID)
 	require.NoError(t, models.RecordUsage(db, models.LLMUsageEventInput{
 		OrganizationID:  r.Organization.ID,
-		CanvasRunID:     execution.RunID,
+		CanvasRunID:     *execution.RunID,
 		NodeExecutionID: uuid.New(),
 		NodeID:          "prompt",
 		Provider:        models.UsageProviderOpenAI,
