@@ -1,10 +1,16 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { client } from "@/api-client/client.gen";
 
-import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY, defaultFactoriesFixture } from "./factoryPageResponses";
+import {
+  PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
+  FACTORIES_ORGANIZATION_ID,
+  defaultFactoriesFixture,
+} from "./factoryPageResponses";
+import { factorySettingsPath } from "../lib/factoryPagePaths";
 import { FactoriesHarness } from "./FactoriesHarness";
 import { CONNECTED_SETUP_INTEGRATIONS, SETUP_ANSWERS, factoriesFixtureWithSetupAnswers } from "./setupStoryFixtures";
 
@@ -38,6 +44,38 @@ describe("FactoriesHarness work orders", () => {
     const response = await fetch("http://localhost/api/v1/canvases/app-refund-implementer");
     const body = (await response.json()) as { canvas?: { metadata?: { factoryId?: string } } };
     expect(body.canvas?.metadata?.factoryId).toBe(PRIMARY_FACTORY_ID);
+  }, 10000);
+
+  it("lets the signed-in user open workspace settings from the sidebar cog", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/overview`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    const settingsLink = await screen.findByTestId("factories-workspace-settings-link", {}, { timeout: 8000 });
+    await waitFor(() => {
+      expect(settingsLink).toHaveAttribute("href", factorySettingsPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY));
+    });
+    expect(settingsLink).not.toHaveClass("pointer-events-none");
+  }, 10000);
+
+  it("lets the signed-in user open organization settings from the user menu", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/overview`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    const trigger = await screen.findByTestId("factories-sidebar-user-menu-trigger", {}, { timeout: 8000 });
+    expect(screen.queryByTestId("factories-sidebar-organization-settings-link")).not.toBeInTheDocument();
+    await user.click(trigger);
+    const orgCog = await screen.findByTestId("factories-sidebar-organization-settings-link");
+    await user.click(orgCog);
+    expect(await screen.findByTestId("organization-settings-sidebar", {}, { timeout: 8000 })).toBeInTheDocument();
   }, 10000);
 });
 

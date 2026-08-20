@@ -202,8 +202,8 @@ export const canvasAppIds = {
 function buildMeUser(orgId: string) {
   return {
     id: "storybook-user",
-    name: "Storybook User",
-    email: "storybook@superplane.dev",
+    name: "Leonardo DiCaprio",
+    email: "john.doe@superplane.dev",
     organizationId: orgId,
     hasToken: true,
     roles: ["org_admin"],
@@ -437,7 +437,12 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
         },
       }),
     },
-    { pattern: re("/account"), resolve: () => ({ json: { id: meUser.id, email: meUser.email, name: meUser.name } }) },
+    {
+      pattern: re("/account"),
+      resolve: () => ({
+        json: { id: meUser.id, email: meUser.email, name: meUser.name, avatar_url: "/storybook/leonardo-dicaprio.jpg" },
+      }),
+    },
   ];
 }
 
