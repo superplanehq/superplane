@@ -13,9 +13,15 @@ import (
 )
 
 // fakeFactoryContext lets Execute-level tests drive `core.FactoryContext`
-// without spinning up a database. Only UpdateWorkOrderStatus and
-// FindWorkOrder are wired up; the rest of the interface returns zero values.
+// without spinning up a database. Only the methods exercised by these
+// component tests capture inputs; the rest return zero values.
 type fakeFactoryContext struct {
+	createWorkOrderCalls  int
+	createWorkOrderParams core.WorkOrderParams
+	createWorkOrderResult *core.WorkOrder
+	createWorkOrderMade   bool
+	createWorkOrderErr    error
+
 	statusCalls int
 	nextChanged bool
 	nextErr     error
@@ -44,8 +50,10 @@ type fakeFactoryContext struct {
 	setStatusNoteErr    error
 }
 
-func (f *fakeFactoryContext) CreateWorkOrder(_ core.WorkOrderParams) (*core.WorkOrder, error) {
-	return nil, nil
+func (f *fakeFactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, bool, error) {
+	f.createWorkOrderCalls++
+	f.createWorkOrderParams = params
+	return f.createWorkOrderResult, f.createWorkOrderMade, f.createWorkOrderErr
 }
 
 func (f *fakeFactoryContext) FindWorkOrder(params core.FindWorkOrderParams) (*core.WorkOrder, error) {
@@ -125,6 +133,87 @@ func TestUpdateWorkOrderStatus_Execute(t *testing.T) {
 		assert.Empty(t, stateCtx.Channel, "no-op must not emit on any channel")
 		assert.Empty(t, stateCtx.Type)
 		assert.Nil(t, stateCtx.Payloads)
+	})
+}
+
+func TestCreateWorkOrder_Execute(t *testing.T) {
+	component := &CreateWorkOrder{}
+	workOrder := &core.WorkOrder{ID: "wo-1", Title: "From issue", Description: "Automated intake", State: "draft"}
+	factoryCtx := &fakeFactoryContext{createWorkOrderResult: workOrder, createWorkOrderMade: true}
+	stateCtx := &contexts.ExecutionStateContext{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"title":         "From issue",
+			"description":   "Automated intake",
+			"artifactType":  "link",
+			"artifactKey":   "https://github.com/example/repo/issues/42",
+			"artifactUrl":   "https://github.com/example/repo/issues/42",
+			"artifactTitle": "Issue #42",
+			"artifactData": []map[string]any{
+				{"name": "repository", "value": "example/repo"},
+			},
+		},
+		ExecutionState: stateCtx,
+		Factory:        factoryCtx,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, factoryCtx.createWorkOrderCalls)
+	require.NotNil(t, factoryCtx.createWorkOrderParams.Artifact)
+	assert.Equal(t, "link", factoryCtx.createWorkOrderParams.Artifact.Type)
+	assert.Equal(t, "https://github.com/example/repo/issues/42", factoryCtx.createWorkOrderParams.Artifact.Key)
+	assert.Equal(t, "https://github.com/example/repo/issues/42", factoryCtx.createWorkOrderParams.Artifact.Data["url"])
+	assert.Equal(t, "Issue #42", factoryCtx.createWorkOrderParams.Artifact.Data["title"])
+	assert.Equal(t, "example/repo", factoryCtx.createWorkOrderParams.Artifact.Data["repository"])
+	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
+	assert.Equal(t, "workOrder.created", stateCtx.Type)
+}
+
+func TestCreateWorkOrder_Execute_PassesWhenWorkOrderAlreadyExists(t *testing.T) {
+	component := &CreateWorkOrder{}
+	workOrder := &core.WorkOrder{ID: "wo-1", Title: "From issue", Description: "Automated intake", State: "draft"}
+	factoryCtx := &fakeFactoryContext{createWorkOrderResult: workOrder, createWorkOrderMade: false}
+	stateCtx := &contexts.ExecutionStateContext{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"title":       "From issue",
+			"description": "Automated intake",
+		},
+		ExecutionState: stateCtx,
+		Factory:        factoryCtx,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, factoryCtx.createWorkOrderCalls)
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.Finished)
+	assert.Empty(t, stateCtx.Channel)
+	assert.Empty(t, stateCtx.Type)
+	assert.Nil(t, stateCtx.Payloads)
+}
+
+func TestCreateWorkOrder_ValidatesConfiguration(t *testing.T) {
+	fields := (&CreateWorkOrder{}).Configuration()
+
+	t.Run("requires artifactUrl for link artifacts", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"title":        "From issue",
+			"artifactType": "link",
+		})
+		if err == nil {
+			t.Fatal("expected error for link artifact without artifactUrl")
+		}
+	})
+
+	t.Run("accepts link artifacts with artifactUrl", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"title":        "From issue",
+			"artifactType": "link",
+			"artifactUrl":  "https://github.com/example/repo/issues/42",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 	})
 }
 

@@ -8,7 +8,9 @@ import "errors"
 var ErrWorkOrderNotFound = errors.New("work order not found")
 
 type FactoryContext interface {
-	CreateWorkOrder(params WorkOrderParams) (*WorkOrder, error)
+	// CreateWorkOrder reports whether it created a new row or reused an
+	// existing work order resolved by the initial artifact key.
+	CreateWorkOrder(params WorkOrderParams) (order *WorkOrder, created bool, err error)
 	// FindWorkOrder resolves a work order by id or by one of its
 	// artifacts' keys, without requiring the current run to be attached
 	// to a `factory_work_order_executions` row. Returns ErrWorkOrderNotFound
@@ -43,6 +45,13 @@ type FactoryContext interface {
 type WorkOrderParams struct {
 	Title       string
 	Description string
+	Artifact    *WorkOrderArtifactSeed
+}
+
+type WorkOrderArtifactSeed struct {
+	Type string
+	Data map[string]any
+	Key  string
 }
 
 // FindWorkOrderParams configures FactoryContext.FindWorkOrder. By selects

@@ -29,11 +29,12 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 	t.Run("creates work order on factory-owned app", func(t *testing.T) {
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
-		workOrder, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+		workOrder, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{
 			Title:       "From GitHub issue",
 			Description: "Automated intake",
 		})
 		require.NoError(t, err)
+		assert.True(t, created)
 		assert.Equal(t, "From GitHub issue", workOrder.Title)
 		assert.Equal(t, "Automated intake", workOrder.Description)
 		assert.NotEmpty(t, workOrder.ID)
@@ -84,10 +85,89 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		assert.Nil(t, opened.User)
 	})
 
+	t.Run("atomically attaches the source artifact during creation", func(t *testing.T) {
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		workOrder, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+			Title:       "From labeled issue",
+			Description: "Automated intake",
+			Artifact: &core.WorkOrderArtifactSeed{
+				Type: "link",
+				Key:  "https://github.com/acme/backlog/issues/42",
+				Data: map[string]any{
+					"url":   "https://github.com/acme/backlog/issues/42",
+					"title": "Issue #42",
+				},
+			},
+		})
+		require.NoError(t, err)
+		assert.True(t, created)
+
+		found, err := factory.FindWorkOrderByArtifactKey(database.Conn(), "https://github.com/acme/backlog/issues/42")
+		require.NoError(t, err)
+		assert.Equal(t, workOrder.ID, found.ID.String())
+	})
+
+	t.Run("reuses an existing work order when the artifact key already exists", func(t *testing.T) {
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+		var beforeCount int64
+		err = database.Conn().
+			Model(&models.FactoryWorkOrder{}).
+			Where("organization_id = ? AND factory_id = ?", r.Organization.ID, factory.ID).
+			Count(&beforeCount).
+			Error
+		require.NoError(t, err)
+
+		var notifications int
+		ctx = ctx.WithWorkOrderUpdated(func(_, _, _ string) { notifications++ })
+
+		first, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+			Title:       "From labeled issue",
+			Description: "Automated intake",
+			Artifact: &core.WorkOrderArtifactSeed{
+				Type: "link",
+				Key:  "https://github.com/acme/backlog/issues/99",
+				Data: map[string]any{
+					"url":   "https://github.com/acme/backlog/issues/99",
+					"title": "Issue #99",
+				},
+			},
+		})
+		require.NoError(t, err)
+		assert.True(t, created)
+		assert.Equal(t, 2, notifications, "create with artifact should fan out status and artifact updates")
+
+		second, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+			Title:       "Duplicate labeled issue",
+			Description: "Should reuse the first work order",
+			Artifact: &core.WorkOrderArtifactSeed{
+				Type: "link",
+				Key:  "https://github.com/acme/backlog/issues/99",
+				Data: map[string]any{
+					"url":   "https://github.com/acme/backlog/issues/99",
+					"title": "Issue #99",
+				},
+			},
+		})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Equal(t, first.ID, second.ID)
+		assert.Equal(t, 2, notifications, "reused work orders must not fan out duplicate creation updates")
+
+		var afterCount int64
+		err = database.Conn().
+			Model(&models.FactoryWorkOrder{}).
+			Where("organization_id = ? AND factory_id = ?", r.Organization.ID, factory.ID).
+			Count(&afterCount).
+			Error
+		require.NoError(t, err)
+		assert.EqualValues(t, beforeCount+1, afterCount)
+	})
+
 	t.Run("rejects blank title", func(t *testing.T) {
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
-		_, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "   "})
+		_, _, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "   "})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, models.ErrFactoryWorkOrderTitleRequired)
 	})
@@ -96,7 +176,7 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		regularCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 		ctx := NewFactoryContext(database.Conn(), regularCanvas, nodeExecution)
 
-		_, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Should fail"})
+		_, _, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Should fail"})
 		require.Error(t, err)
 		assert.EqualError(t, err, "app is not owned by a factory")
 	})
@@ -128,7 +208,7 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		require.NoError(t, database.Conn().Create(&workOrderExecution).Error)
 
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
-		_, err = ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Nested"})
+		_, _, err = ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Nested"})
 		require.Error(t, err)
 		assert.EqualError(t, err, "cannot create work order while executing another work order")
 	})

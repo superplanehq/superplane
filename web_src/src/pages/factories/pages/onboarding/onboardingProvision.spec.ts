@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { FactoriesFactory } from "@/api-client";
-import { getFactoryDefinition } from "@/pages/home/factories";
+import type { CanvasesCanvas, FactoriesFactory } from "@/api-client";
 
-import { DEFAULT_LINE_NAME, provisionEventApps, provisionLine } from "./onboardingProvision";
+import { DEFAULT_LINE_NAME, identifyProvisionedEventApp, provisionEventApps, provisionLine } from "./onboardingProvision";
 
 describe("provisionLine", () => {
   it("reuses a line that already has the planning entrypoint", async () => {
@@ -113,13 +112,7 @@ describe("provisionEventApps", () => {
       appRepository: "acme/app",
       backlogRepository: "acme/backlog",
       installFactory,
-      existingApps: [
-        {
-          id: "canvas-existing",
-          name: "Issue Intake",
-          description: getFactoryDefinition("issue-intake").description,
-        },
-      ],
+      existingAppFactoryIds: ["issue-intake"],
     });
 
     expect(installFactory).toHaveBeenCalledTimes(1);
@@ -143,13 +136,7 @@ describe("provisionEventApps", () => {
       appRepository: "acme/app",
       backlogRepository: "acme/backlog",
       installFactory,
-      existingApps: [
-        {
-          id: "canvas-existing",
-          name: "PR Closure",
-          description: getFactoryDefinition("pr-closure").description,
-        },
-      ],
+      existingAppFactoryIds: ["pr-closure"],
     });
 
     expect(installFactory).toHaveBeenCalledTimes(1);
@@ -161,7 +148,7 @@ describe("provisionEventApps", () => {
     );
   });
 
-  it("reuses a uniquely renamed event app from an earlier attempt", async () => {
+  it("reuses event apps loaded from stable factory ids", async () => {
     const installFactory = vi.fn();
 
     await provisionEventApps({
@@ -170,20 +157,53 @@ describe("provisionEventApps", () => {
       appRepository: "acme/app",
       backlogRepository: "acme/backlog",
       installFactory,
-      existingApps: [
-        {
-          id: "canvas-existing",
-          name: "Issue Intake (2)",
-          description: getFactoryDefinition("issue-intake").description,
-        },
-        {
-          id: "canvas-existing-2",
-          name: "PR Closure",
-          description: getFactoryDefinition("pr-closure").description,
-        },
-      ],
+      loadExistingAppFactoryIds: async () => new Set(["issue-intake", "pr-closure"]),
     });
 
     expect(installFactory).not.toHaveBeenCalled();
+  });
+});
+
+describe("identifyProvisionedEventApp", () => {
+  it("identifies Issue Intake from its graph", () => {
+    const canvas = {
+      spec: {
+        nodes: [
+          { id: "on-issue-labeled", component: "github.onIssue", configuration: { actions: ["labeled"] } },
+          { id: "on-issue-assigned", component: "github.onIssue", configuration: { actions: ["assigned"] } },
+          { id: "find-existing-work-order", component: "findWorkOrder" },
+          { id: "create-work-order", component: "createWorkOrder" },
+        ],
+      },
+    } as CanvasesCanvas;
+
+    expect(identifyProvisionedEventApp(canvas)).toBe("issue-intake");
+  });
+
+  it("identifies PR Closure from its graph", () => {
+    const canvas = {
+      spec: {
+        nodes: [
+          { id: "on-pr-closed", component: "github.onPullRequest", configuration: { actions: ["closed"] } },
+          { id: "find-work-order", component: "findWorkOrder" },
+          { id: "stamp-pr-merged", component: "updateWorkOrderArtifact" },
+          { id: "stamp-pr-closed", component: "updateWorkOrderArtifact" },
+          { id: "complete-work-order", component: "updateWorkOrderStatus" },
+          { id: "reject-work-order", component: "updateWorkOrderStatus" },
+        ],
+      },
+    } as CanvasesCanvas;
+
+    expect(identifyProvisionedEventApp(canvas)).toBe("pr-closure");
+  });
+
+  it("returns undefined for unrelated apps", () => {
+    const canvas = {
+      spec: {
+        nodes: [{ id: "onrun-create-plan", component: "onRun" }],
+      },
+    } as CanvasesCanvas;
+
+    expect(identifyProvisionedEventApp(canvas)).toBeUndefined();
   });
 });

@@ -17,9 +17,19 @@ func init() {
 
 type CreateWorkOrder struct{}
 
+type CreateWorkOrderArtifactDataEntry struct {
+	Name  string `json:"name" mapstructure:"name"`
+	Value string `json:"value" mapstructure:"value"`
+}
+
 type CreateWorkOrderConfiguration struct {
-	Title       string `json:"title" mapstructure:"title"`
-	Description string `json:"description" mapstructure:"description"`
+	Title           string                           `json:"title" mapstructure:"title"`
+	Description     string                           `json:"description" mapstructure:"description"`
+	ArtifactType    string                           `json:"artifactType" mapstructure:"artifactType"`
+	ArtifactURL     string                           `json:"artifactUrl" mapstructure:"artifactUrl"`
+	ArtifactTitle   string                           `json:"artifactTitle" mapstructure:"artifactTitle"`
+	ArtifactKey     string                           `json:"artifactKey" mapstructure:"artifactKey"`
+	ArtifactData    []CreateWorkOrderArtifactDataEntry `json:"artifactData" mapstructure:"artifactData"`
 }
 
 func (c *CreateWorkOrder) Name() string {
@@ -35,7 +45,11 @@ func (c *CreateWorkOrder) Description() string {
 }
 
 func (c *CreateWorkOrder) Documentation() string {
-	return `The Create Work Order component creates a new work order in the factory. This component can only be used in factory-owned apps.`
+	return `The Create Work Order component creates a new work order in the factory.
+
+When you set the optional artifact fields, it also attaches the artifact in the same transaction. This is useful for event-driven intake flows that need an idempotency key such as a source issue URL.
+
+This component can only be used in factory-owned apps.`
 }
 
 func (c *CreateWorkOrder) Icon() string {
@@ -80,6 +94,66 @@ func (c *CreateWorkOrder) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 		},
+		{
+			Name:        "artifactType",
+			Label:       "Initial Artifact Type",
+			Description: "Optional artifact to attach as part of work order creation",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Togglable:   true,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Link", Value: "link"},
+					},
+				},
+			},
+		},
+		{
+			Name:                 "artifactUrl",
+			Label:                "Initial Artifact URL",
+			Description:          "HTTP or HTTPS URL to attach when the initial artifact type is link",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			RequiredConditions:   []configuration.RequiredCondition{{Field: "artifactType", Values: []string{"link"}}},
+			VisibilityConditions: []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"link"}}},
+		},
+		{
+			Name:                 "artifactTitle",
+			Label:                "Initial Artifact Title",
+			Description:          "Optional chip label for the attached link artifact",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			VisibilityConditions: []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"link"}}},
+		},
+		{
+			Name:        "artifactKey",
+			Label:       "Initial Artifact Key",
+			Description: "Optional stable key used to find an existing work order before creation",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+		},
+		{
+			Name:                 "artifactData",
+			Label:                "Initial Artifact Metadata",
+			Description:          "Extra name/value pairs merged into the attached artifact data",
+			Type:                 configuration.FieldTypeList,
+			Required:             false,
+			VisibilityConditions: []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"link"}}},
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Entry",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{Name: "name", Label: "Name", Type: configuration.FieldTypeString, Required: true},
+							{Name: "value", Label: "Value", Type: configuration.FieldTypeString, Required: true},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -89,13 +163,37 @@ func (c *CreateWorkOrder) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	workOrder, err := ctx.Factory.CreateWorkOrder(core.WorkOrderParams{
+	params := core.WorkOrderParams{
 		Title:       config.Title,
 		Description: config.Description,
-	})
+	}
+	if config.ArtifactType != "" {
+		artifactData := map[string]any{}
+		for _, entry := range config.ArtifactData {
+			if entry.Name == "" {
+				continue
+			}
+			artifactData[entry.Name] = entry.Value
+		}
+		if config.ArtifactURL != "" {
+			artifactData["url"] = config.ArtifactURL
+		}
+		if config.ArtifactTitle != "" {
+			artifactData["title"] = config.ArtifactTitle
+		}
+		params.Artifact = &core.WorkOrderArtifactSeed{
+			Type: config.ArtifactType,
+			Data: artifactData,
+			Key:  config.ArtifactKey,
+		}
+	}
 
+	workOrder, created, err := ctx.Factory.CreateWorkOrder(params)
 	if err != nil {
 		return err
+	}
+	if !created {
+		return ctx.ExecutionState.Pass()
 	}
 
 	return ctx.ExecutionState.Emit(

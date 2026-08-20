@@ -163,7 +163,7 @@ export function useInstallFactory({ folder }: UseInstallFactoryOptions = {}) {
           navigate,
         });
         if (input.workspaceFactoryId) {
-          void queryClient.invalidateQueries({
+          await queryClient.invalidateQueries({
             queryKey: factoryAppsKey(organizationId, input.workspaceFactoryId),
           });
         }

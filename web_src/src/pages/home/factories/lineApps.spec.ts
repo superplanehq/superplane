@@ -97,10 +97,10 @@ describe("setup factory event apps", () => {
     expect(canvasYaml).toMatch(/channel: notFound[\s\S]*sourceId: find-existing-work-order[\s\S]*targetId: create-work-order/);
     expect(canvasYaml).toMatch(/component: createWorkOrder[\s\S]*title: '{{ root\(\)\.data\.issue\.title }}'/);
     expect(canvasYaml).toContain("description: '{{ root().data.issue.body }}'");
-    expect(canvasYaml).toContain("component: addWorkOrderArtifact");
     expect(canvasYaml).toContain("artifactType: link");
-    expect(canvasYaml).toContain("orderId: '{{ $[\"Create Work Order\"].data.workOrder.id }}'");
-    expect(canvasYaml).toContain("url: '{{ root().data.issue.html_url }}'");
+    expect(canvasYaml).toContain("artifactKey: '{{ root().data.issue.html_url }}'");
+    expect(canvasYaml).toContain("artifactUrl: '{{ root().data.issue.html_url }}'");
+    expect(canvasYaml).toContain("artifactTitle: 'Issue #{{ root().data.issue.number }}'");
     expect(canvasYaml).toContain("id: int-1");
     expect(canvasYaml).toContain("name: acme-github");
     expect(canvasYaml).not.toContain("{{ install_params.");

@@ -1,12 +1,12 @@
 import type {
-  FactoryApp,
+  CanvasesCanvas,
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesUpdateFactoryOnboardingBody,
   FactoryLineStep,
 } from "@/api-client";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
-import { getFactoryDefinition, ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS } from "@/pages/home/factories";
+import { ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS } from "@/pages/home/factories";
 import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
 
 export const DEFAULT_LINE_NAME = "Software delivery";
@@ -25,6 +25,7 @@ export interface ProvisionedLine {
 }
 
 type OnboardingEventAppId = (typeof ONBOARDING_EVENT_APPS)[number];
+type CanvasNode = NonNullable<NonNullable<CanvasesCanvas["spec"]>["nodes"]>[number];
 
 // A finished line has one step per bundled app, each calling the app onRun
 // entrypoint. Match on the first entrypoint to recover a line provisioned by an
@@ -59,23 +60,58 @@ async function installOnboardingApp(args: {
   return installed;
 }
 
-function isMatchingEventAppName(name: string | undefined, expectedName: string): boolean {
-  if (!name) return false;
-  if (name === expectedName) return true;
-  const escapedName = expectedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^${escapedName} \\(\\d+\\)$`).test(name);
+function readNodeConfiguration(node: CanvasNode): Record<string, unknown> {
+  const configuration = node.configuration;
+  return configuration && typeof configuration === "object" ? configuration : {};
 }
 
-function findProvisionedEventApp(
-  apps: FactoryApp[],
-  appFactoryId: OnboardingEventAppId,
-): FactoryApp | undefined {
-  const definition = getFactoryDefinition(appFactoryId);
-  return apps.find(
-    (app) =>
-      app.description === definition.description &&
-      isMatchingEventAppName(app.name ?? undefined, definition.title),
+function hasAction(nodes: CanvasNode[], component: string, nodeId: string): boolean {
+  return nodes.some((node) => node.component === component && node.id === nodeId);
+}
+
+function hasTriggerAction(nodes: CanvasNode[], nodeId: string, expectedAction: string): boolean {
+  return nodes.some((node) => {
+    if (node.component !== "github.onIssue" && node.component !== "github.onPullRequest") {
+      return false;
+    }
+    if (node.id !== nodeId) {
+      return false;
+    }
+    const actions = readNodeConfiguration(node).actions;
+    return Array.isArray(actions) && actions.includes(expectedAction);
+  });
+}
+
+function isIssueIntakeCanvas(canvas: CanvasesCanvas): boolean {
+  const nodes = canvas.spec?.nodes ?? [];
+  return (
+    hasTriggerAction(nodes, "on-issue-labeled", "labeled") &&
+    hasTriggerAction(nodes, "on-issue-assigned", "assigned") &&
+    hasAction(nodes, "findWorkOrder", "find-existing-work-order") &&
+    hasAction(nodes, "createWorkOrder", "create-work-order")
   );
+}
+
+function isPrClosureCanvas(canvas: CanvasesCanvas): boolean {
+  const nodes = canvas.spec?.nodes ?? [];
+  return (
+    hasTriggerAction(nodes, "on-pr-closed", "closed") &&
+    hasAction(nodes, "findWorkOrder", "find-work-order") &&
+    hasAction(nodes, "updateWorkOrderArtifact", "stamp-pr-merged") &&
+    hasAction(nodes, "updateWorkOrderArtifact", "stamp-pr-closed") &&
+    hasAction(nodes, "updateWorkOrderStatus", "complete-work-order") &&
+    hasAction(nodes, "updateWorkOrderStatus", "reject-work-order")
+  );
+}
+
+export function identifyProvisionedEventApp(canvas: CanvasesCanvas): OnboardingEventAppId | undefined {
+  if (isIssueIntakeCanvas(canvas)) {
+    return "issue-intake";
+  }
+  if (isPrClosureCanvas(canvas)) {
+    return "pr-closure";
+  }
+  return undefined;
 }
 
 // Install each bundled app in order and return the line steps that call them.
@@ -115,17 +151,22 @@ export async function provisionEventApps(args: {
   appRepository: string;
   backlogRepository: string;
   installFactory: InstallOnboardingApp;
-  existingApps?: FactoryApp[];
-  loadExistingApps?: () => Promise<FactoryApp[]>;
+  existingAppFactoryIds?: Iterable<OnboardingEventAppId>;
+  loadExistingAppFactoryIds?: () => Promise<Set<OnboardingEventAppId>>;
 }): Promise<void> {
-  const provisionedApps = [...(args.existingApps ?? (args.loadExistingApps ? await args.loadExistingApps() : []))];
+  const provisionedAppFactoryIds = new Set<OnboardingEventAppId>(args.existingAppFactoryIds ?? []);
+  if (args.loadExistingAppFactoryIds) {
+    for (const appFactoryId of await args.loadExistingAppFactoryIds()) {
+      provisionedAppFactoryIds.add(appFactoryId);
+    }
+  }
 
   for (const appFactoryId of ONBOARDING_EVENT_APPS) {
-    if (findProvisionedEventApp(provisionedApps, appFactoryId)) {
+    if (provisionedAppFactoryIds.has(appFactoryId)) {
       continue;
     }
 
-    const installed = await installOnboardingApp({
+    await installOnboardingApp({
       factoryId: args.factoryId,
       appFactoryId,
       selections: args.selections,
@@ -133,12 +174,7 @@ export async function provisionEventApps(args: {
       backlogRepository: args.backlogRepository,
       installFactory: args.installFactory,
     });
-
-    provisionedApps.push({
-      id: installed.canvasId,
-      name: installed.canvasName,
-      description: getFactoryDefinition(appFactoryId).description,
-    });
+    provisionedAppFactoryIds.add(appFactoryId);
   }
 }
 

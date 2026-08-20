@@ -20,9 +20,6 @@ spec:
     - channel: notFound
       sourceId: find-existing-work-order
       targetId: create-work-order
-    - channel: default
-      sourceId: create-work-order
-      targetId: attach-source-issue
   nodes:
     - id: on-issue-labeled
       name: On Issue Label
@@ -86,26 +83,16 @@ spec:
       configuration:
         title: '{{ root().data.issue.title }}'
         description: '{{ root().data.issue.body }}'
-      position:
-        x: 810
-        'y': 978
-      isCollapsed: false
-    - id: attach-source-issue
-      name: Attach Source Issue
-      type: TYPE_ACTION
-      component: addWorkOrderArtifact
-      configuration:
         artifactType: link
         artifactKey: '{{ root().data.issue.html_url }}'
-        orderId: '{{ $["Create Work Order"].data.workOrder.id }}'
-        title: 'Issue #{{ root().data.issue.number }}'
-        url: '{{ root().data.issue.html_url }}'
-        data:
+        artifactTitle: 'Issue #{{ root().data.issue.number }}'
+        artifactUrl: '{{ root().data.issue.html_url }}'
+        artifactData:
           - name: repository
             value: '{{ root().data.repository.full_name }}'
           - name: issueNumber
             value: '{{ root().data.issue.number }}'
       position:
         x: 810
-        'y': 1158
+        'y': 978
       isCollapsed: false

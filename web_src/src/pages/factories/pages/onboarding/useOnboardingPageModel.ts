@@ -1,4 +1,4 @@
-import type { FactoriesFactory, FactoriesFactoryLine, FactoryApp, FactoryLineStep } from "@/api-client";
+import { canvasesDescribeCanvas, type FactoriesFactory, type FactoriesFactoryLine, type FactoryLineStep } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
 import {
@@ -13,6 +13,7 @@ import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations
 import { getApiErrorMessage } from "@/lib/errors";
 import { githubInstallationUrl } from "@/lib/githubInstallation";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
@@ -37,6 +38,7 @@ import {
 } from "./onboardingStatus";
 import {
   DEFAULT_LINE_NAME,
+  identifyProvisionedEventApp,
   provisionEventApps,
   provisionLine,
   type InstallOnboardingApp,
@@ -164,7 +166,7 @@ async function provisionWorkspace(args: {
   workOrderDescription: string;
   github: { id: string };
   claude: { id: string };
-  loadFactoryApps: () => Promise<FactoryApp[]>;
+  loadExistingAppFactoryIds: () => Promise<Set<"issue-intake" | "pr-closure">>;
 }): Promise<{ number?: number | string | null }> {
   if (args.workspaceName !== args.factory?.name) {
     await args.updateFactory({ name: args.workspaceName });
@@ -194,7 +196,7 @@ async function provisionWorkspace(args: {
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
     installFactory: args.installFactory,
-    loadExistingApps: args.loadFactoryApps,
+    loadExistingAppFactoryIds: args.loadExistingAppFactoryIds,
   });
   await args.updateOnboarding({
     provisionedAppId: primaryAppId,
@@ -240,7 +242,7 @@ function useFinishOnboarding(args: {
     description: string;
   }) => Promise<{ id?: string | null; number?: number | string | null }>;
   dispatchWorkOrder: (input: { orderId: string; lineName: string }) => Promise<unknown>;
-  loadFactoryApps: () => Promise<FactoryApp[]>;
+  loadExistingAppFactoryIds: () => Promise<Set<"issue-intake" | "pr-closure">>;
 }) {
   const navigate = useNavigate();
   return async () => {
@@ -395,7 +397,28 @@ export function useOnboardingPageModel(args: {
     createLine: createLine.mutateAsync,
     createWorkOrder: createWorkOrder.mutateAsync,
     dispatchWorkOrder: dispatchWorkOrder.mutateAsync,
-    loadFactoryApps: async () => factoryApps.data ?? (await factoryApps.refetch()).data ?? [],
+    loadExistingAppFactoryIds: async () => {
+      const apps = (await factoryApps.refetch()).data ?? [];
+      const appTypes = await Promise.all(
+        apps
+          .map((app) => app.id)
+          .filter((appId): appId is string => Boolean(appId))
+          .map(async (appId) => {
+            try {
+              const response = await canvasesDescribeCanvas(
+                withOrganizationHeader({
+                  path: { id: appId },
+                }),
+              );
+              const canvas = response.data?.canvas;
+              return canvas ? identifyProvisionedEventApp(canvas) : undefined;
+            } catch {
+              return undefined;
+            }
+          }),
+      );
+      return new Set(appTypes.filter((appType): appType is "issue-intake" | "pr-closure" => Boolean(appType)));
+    },
   });
   const cancel = useCancelOnboarding({
     organizationId: args.organizationId,
