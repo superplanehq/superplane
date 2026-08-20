@@ -1,0 +1,118 @@
+{
+  "data": {
+    "actor": {
+      "display_name": "John Doe",
+      "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}",
+      "type": "user",
+      "nickname": "johndoe",
+      "links": {
+        "html": {
+          "href": "https://bitbucket.org/johndoe/"
+        },
+        "avatar": {
+          "href": "https://bitbucket.org/account/johndoe/avatar/"
+        }
+      }
+    },
+    "repository": {
+      "type": "repository",
+      "full_name": "my-workspace/my-repo",
+      "name": "my-repo",
+      "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}",
+      "links": {
+        "html": {
+          "href": "https://bitbucket.org/my-workspace/my-repo"
+        }
+      }
+    },
+    "pullrequest": {
+      "type": "pullrequest",
+      "id": 42,
+      "title": "feat: add login page",
+      "description": "Adds the login page and wires it to the session API.",
+      "state": "OPEN",
+      "draft": false,
+      "created_on": "2024-01-15T10:28:41.153217+00:00",
+      "updated_on": "2024-01-15T10:28:41.153217+00:00",
+      "close_source_branch": true,
+      "comment_count": 0,
+      "task_count": 0,
+      "author": {
+        "display_name": "John Doe",
+        "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}",
+        "type": "user",
+        "nickname": "johndoe",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/johndoe/"
+          },
+          "avatar": {
+            "href": "https://bitbucket.org/account/johndoe/avatar/"
+          }
+        }
+      },
+      "reviewers": [],
+      "participants": [],
+      "source": {
+        "branch": {
+          "name": "feature/login-page"
+        },
+        "commit": {
+          "type": "commit",
+          "hash": "709d658dc5b6d6afcd46049c2f332ee3f515a67d",
+          "links": {
+            "html": {
+              "href": "https://bitbucket.org/my-workspace/my-repo/commits/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
+            }
+          }
+        },
+        "repository": {
+          "type": "repository",
+          "full_name": "my-workspace/my-repo",
+          "name": "my-repo",
+          "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}",
+          "links": {
+            "html": {
+              "href": "https://bitbucket.org/my-workspace/my-repo"
+            }
+          }
+        }
+      },
+      "destination": {
+        "branch": {
+          "name": "main"
+        },
+        "commit": {
+          "type": "commit",
+          "hash": "1f4b0c6d9a2e5f8b3c7d0e1a4b6c9d2e5f8a1b3c",
+          "links": {
+            "html": {
+              "href": "https://bitbucket.org/my-workspace/my-repo/commits/1f4b0c6d9a2e5f8b3c7d0e1a4b6c9d2e5f8a1b3c"
+            }
+          }
+        },
+        "repository": {
+          "type": "repository",
+          "full_name": "my-workspace/my-repo",
+          "name": "my-repo",
+          "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}",
+          "links": {
+            "html": {
+              "href": "https://bitbucket.org/my-workspace/my-repo"
+            }
+          }
+        }
+      },
+      "links": {
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/repositories/my-workspace/my-repo/pullrequests/42"
+        },
+        "html": {
+          "href": "https://bitbucket.org/my-workspace/my-repo/pull-requests/42"
+        }
+      }
+    }
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "bitbucket.pullRequest"
+}

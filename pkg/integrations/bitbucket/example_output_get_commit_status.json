@@ -1,0 +1,71 @@
+{
+  "data": {
+    "commit": "9fec847784abb10b2fa567ee63b85bd238955d0e",
+    "state": "SUCCESSFUL",
+    "total_count": 2,
+    "statuses": [
+      {
+        "key": "BITBUCKETPIPELINE",
+        "name": "Pipeline #128 for main",
+        "state": "SUCCESSFUL",
+        "url": "https://bitbucket.org/superplane/web/pipelines/results/128",
+        "description": "Pipeline succeeded",
+        "type": "build",
+        "refname": "main",
+        "created_on": "2026-08-11T11:02:44.118093+00:00",
+        "updated_on": "2026-08-11T11:09:31.774502+00:00",
+        "commit": {
+          "hash": "9fec847784abb10b2fa567ee63b85bd238955d0e",
+          "links": {
+            "self": {
+              "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/9fec847784abb10b2fa567ee63b85bd238955d0e"
+            },
+            "html": {
+              "href": "https://bitbucket.org/superplane/web/commits/9fec847784abb10b2fa567ee63b85bd238955d0e"
+            }
+          }
+        },
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/9fec847784abb10b2fa567ee63b85bd238955d0e/statuses/build/BITBUCKETPIPELINE"
+          },
+          "html": {
+            "href": "https://bitbucket.org/superplane/web/commits/9fec847784abb10b2fa567ee63b85bd238955d0e"
+          }
+        }
+      },
+      {
+        "key": "superplane-deploy",
+        "name": "SuperPlane deploy",
+        "state": "SUCCESSFUL",
+        "url": "https://app.superplane.com/canvases/web-delivery/runs/8f2c1a44",
+        "description": "Deployed to production",
+        "type": "build",
+        "refname": "main",
+        "created_on": "2026-08-11T11:24:18.402117+00:00",
+        "updated_on": "2026-08-11T11:31:52.660984+00:00",
+        "commit": {
+          "hash": "9fec847784abb10b2fa567ee63b85bd238955d0e",
+          "links": {
+            "self": {
+              "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/9fec847784abb10b2fa567ee63b85bd238955d0e"
+            },
+            "html": {
+              "href": "https://bitbucket.org/superplane/web/commits/9fec847784abb10b2fa567ee63b85bd238955d0e"
+            }
+          }
+        },
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/9fec847784abb10b2fa567ee63b85bd238955d0e/statuses/build/superplane-deploy"
+          },
+          "html": {
+            "href": "https://bitbucket.org/superplane/web/commits/9fec847784abb10b2fa567ee63b85bd238955d0e"
+          }
+        }
+      }
+    ]
+  },
+  "timestamp": "2026-08-11T11:32:10.559274Z",
+  "type": "bitbucket.commitStatuses"
+}

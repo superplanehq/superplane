@@ -1,0 +1,109 @@
+{
+  "data": {
+    "id": 42,
+    "title": "Add login page",
+    "description": "Adds the login page and wires it to the session API.",
+    "state": "MERGED",
+    "draft": false,
+    "created_on": "2026-08-11T09:14:22.512345+00:00",
+    "updated_on": "2026-08-11T11:20:05.104773+00:00",
+    "close_source_branch": true,
+    "comment_count": 3,
+    "task_count": 0,
+    "author": {
+      "uuid": "{6b0b1d0e-6a1f-4f2f-9a2b-2f1d3a9c7e21}",
+      "account_id": "712020:1f6a0d7c-5d54-4b1e-9a4f-6c2f9e0a7b31",
+      "display_name": "Anthony Foussette",
+      "nickname": "anthony"
+    },
+    "reviewers": [
+      {
+        "uuid": "{2a5f7c88-91b4-4f0a-8c62-1e7d9b0a4f13}",
+        "account_id": "712020:9c4e1b77-2a3d-4e58-b0c1-7f8a2d5e6c04",
+        "display_name": "Marta Silva",
+        "nickname": "marta"
+      }
+    ],
+    "source": {
+      "branch": {
+        "name": "feature/login-page"
+      },
+      "commit": {
+        "hash": "9fec847784abb10b2fa567ee63b85bd238955d0e",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/9fec847784abb10b2fa567ee63b85bd238955d0e"
+          },
+          "html": {
+            "href": "https://bitbucket.org/superplane/web/commits/9fec847784abb10b2fa567ee63b85bd238955d0e"
+          }
+        }
+      },
+      "repository": {
+        "uuid": "{4f2b8a1c-3d6e-4a5b-9c8d-0e1f2a3b4c5d}",
+        "name": "web",
+        "full_name": "superplane/web",
+        "slug": "web",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/superplane/web"
+          }
+        }
+      }
+    },
+    "destination": {
+      "branch": {
+        "name": "main"
+      },
+      "commit": {
+        "hash": "c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0"
+          },
+          "html": {
+            "href": "https://bitbucket.org/superplane/web/commits/c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0"
+          }
+        }
+      },
+      "repository": {
+        "uuid": "{4f2b8a1c-3d6e-4a5b-9c8d-0e1f2a3b4c5d}",
+        "name": "web",
+        "full_name": "superplane/web",
+        "slug": "web",
+        "links": {
+          "html": {
+            "href": "https://bitbucket.org/superplane/web"
+          }
+        }
+      }
+    },
+    "links": {
+      "self": {
+        "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/pullrequests/42"
+      },
+      "html": {
+        "href": "https://bitbucket.org/superplane/web/pull-requests/42"
+      }
+    },
+    "closed_by": {
+      "uuid": "{2a5f7c88-91b4-4f0a-8c62-1e7d9b0a4f13}",
+      "account_id": "712020:9c4e1b77-2a3d-4e58-b0c1-7f8a2d5e6c04",
+      "display_name": "Marta Silva",
+      "nickname": "marta"
+    },
+    "merge_commit": {
+      "hash": "7ab3c9d1e5f28046b1c3a7d9e2b4c6d8e0f1a2b3",
+      "links": {
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/commit/7ab3c9d1e5f28046b1c3a7d9e2b4c6d8e0f1a2b3"
+        },
+        "html": {
+          "href": "https://bitbucket.org/superplane/web/commits/7ab3c9d1e5f28046b1c3a7d9e2b4c6d8e0f1a2b3"
+        }
+      }
+    }
+  },
+  "timestamp": "2026-08-11T11:20:05.211640Z",
+  "type": "bitbucket.pullRequest"
+}
