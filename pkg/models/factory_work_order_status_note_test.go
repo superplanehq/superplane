@@ -230,6 +230,68 @@ func TestFactoryWorkOrder_ClearStatusNote_RemovesOneKey(t *testing.T) {
 	assert.Equal(t, "deploy-window", notes[0].Key)
 }
 
+func TestFactoryWorkOrder_SetStatusNote_MergesKeysFromStaleSnapshot(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	order, _ := openWorkOrderForStatusNote(t, "note-stale-merge")
+
+	first, err := FindUnscopedWorkOrder(database.Conn(), order.ID)
+	require.NoError(t, err)
+	second, err := FindUnscopedWorkOrder(database.Conn(), order.ID)
+	require.NoError(t, err)
+
+	_, err = first.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{
+		Key:      "pr-closure",
+		Headline: "Review the pull request",
+	})
+	require.NoError(t, err)
+
+	_, err = second.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{
+		Key:      "deploy-window",
+		Headline: "Waiting on the deploy window",
+	})
+	require.NoError(t, err)
+
+	reloaded, err := FindUnscopedWorkOrder(database.Conn(), order.ID)
+	require.NoError(t, err)
+
+	notes, err := reloaded.StatusNotes()
+	require.NoError(t, err)
+	require.Len(t, notes, 2)
+	assert.ElementsMatch(t, []string{"pr-closure", "deploy-window"}, []string{notes[0].Key, notes[1].Key})
+}
+
+func TestFactoryWorkOrder_SetStatusNote_RejectsAfterCloseOnStaleSnapshot(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	order, userID := openWorkOrderForStatusNote(t, "note-stale-close")
+
+	stale, err := FindUnscopedWorkOrder(database.Conn(), order.ID)
+	require.NoError(t, err)
+
+	_, err = order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		ToState: FactoryWorkOrderStateClosed,
+		Result:  FactoryWorkOrderResultCompleted,
+		Actor:   &userID,
+	})
+	require.NoError(t, err)
+
+	_, err = stale.SetStatusNote(database.Conn(), FactoryWorkOrderStatusNoteParams{
+		Key:      "pr-closure",
+		Headline: "Review the pull request",
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrFactoryWorkOrderStatusNoteInvalid)
+
+	reloaded, err := FindUnscopedWorkOrder(database.Conn(), order.ID)
+	require.NoError(t, err)
+
+	notes, err := reloaded.StatusNotes()
+	require.NoError(t, err)
+	assert.Empty(t, notes)
+	assert.Equal(t, FactoryWorkOrderStateClosed, reloaded.State)
+}
+
 func TestFactoryWorkOrder_ClearStatusNotes(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 

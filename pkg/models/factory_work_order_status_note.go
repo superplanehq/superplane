@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -86,31 +87,39 @@ func (o *FactoryWorkOrder) StatusNotes() ([]FactoryWorkOrderStatusNote, error) {
 
 // SetStatusNote validates and upserts the note by Key. Only open orders
 // can carry notes: a draft was never dispatched and a closed order is
-// not waiting on anything.
+// not waiting on anything. The write locks the row and reloads the
+// stored list so concurrent sets with different keys keep both notes,
+// and a close that already committed is not overwritten.
 func (o *FactoryWorkOrder) SetStatusNote(
 	tx *gorm.DB,
 	params FactoryWorkOrderStatusNoteParams,
 ) (*FactoryWorkOrderStatusNote, error) {
-	if !o.IsOpen() {
-		return nil, fmt.Errorf("%w: work order must be open, is %s", ErrFactoryWorkOrderStatusNoteInvalid, o.State)
-	}
-
 	note, err := normalizeStatusNoteParams(params)
 	if err != nil {
 		return nil, err
 	}
 
-	notes, err := o.StatusNotes()
-	if err != nil {
-		return nil, err
-	}
+	err = tx.Transaction(func(tx *gorm.DB) error {
+		if err := o.lockAndReload(tx); err != nil {
+			return err
+		}
+		if !o.IsOpen() {
+			return fmt.Errorf("%w: work order must be open, is %s", ErrFactoryWorkOrderStatusNoteInvalid, o.State)
+		}
 
-	notes, err = upsertStatusNote(notes, *note)
-	if err != nil {
-		return nil, err
-	}
+		notes, err := o.StatusNotes()
+		if err != nil {
+			return err
+		}
 
-	if err := o.persistStatusNotes(tx, notes); err != nil {
+		notes, err = upsertStatusNote(notes, *note)
+		if err != nil {
+			return err
+		}
+
+		return o.persistStatusNotes(tx, notes)
+	})
+	if err != nil {
 		return nil, err
 	}
 
@@ -125,25 +134,56 @@ func (o *FactoryWorkOrder) ClearStatusNote(tx *gorm.DB, key string) error {
 		return fmt.Errorf("%w: key is required", ErrFactoryWorkOrderStatusNoteInvalid)
 	}
 
-	notes, err := o.StatusNotes()
-	if err != nil {
-		return err
-	}
+	return tx.Transaction(func(tx *gorm.DB) error {
+		if err := o.lockAndReload(tx); err != nil {
+			return err
+		}
 
-	kept := slices.DeleteFunc(notes, func(note FactoryWorkOrderStatusNote) bool {
-		return note.Key == key
+		notes, err := o.StatusNotes()
+		if err != nil {
+			return err
+		}
+
+		kept := slices.DeleteFunc(notes, func(note FactoryWorkOrderStatusNote) bool {
+			return note.Key == key
+		})
+		if len(kept) == len(notes) {
+			return nil
+		}
+
+		return o.persistStatusNotes(tx, kept)
 	})
-	if len(kept) == len(notes) {
-		return nil
-	}
-
-	return o.persistStatusNotes(tx, kept)
 }
 
 // ClearStatusNotes removes every note without a state transition, for
 // waits that all resolve while the order stays open.
 func (o *FactoryWorkOrder) ClearStatusNotes(tx *gorm.DB) error {
-	return o.persistStatusNotes(tx, nil)
+	return tx.Transaction(func(tx *gorm.DB) error {
+		if err := o.lockAndReload(tx); err != nil {
+			return err
+		}
+		return o.persistStatusNotes(tx, nil)
+	})
+}
+
+// lockAndReload takes a row lock and replaces the in-memory state,
+// result, and notes with the committed row. Callers must hold a
+// transaction: the lock lasts only until that transaction ends.
+func (o *FactoryWorkOrder) lockAndReload(tx *gorm.DB) error {
+	var locked FactoryWorkOrder
+	err := tx.
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", o.ID).
+		First(&locked).
+		Error
+	if err != nil {
+		return err
+	}
+
+	o.State = locked.State
+	o.Result = locked.Result
+	o.StatusNote = locked.StatusNote
+	return nil
 }
 
 func normalizeStatusNoteParams(params FactoryWorkOrderStatusNoteParams) (*FactoryWorkOrderStatusNote, error) {
