@@ -1,6 +1,10 @@
 BEGIN;
 
-CREATE TABLE llm_usage_events (
+-- IF NOT EXISTS lets databases that already created this table under an
+-- older timestamp (20260819005114, 20260819020000, or 20260819142559)
+-- apply this version without failing.
+
+CREATE TABLE IF NOT EXISTS llm_usage_events (
   id                       UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id          UUID NOT NULL,
   factory_id               UUID,
@@ -31,18 +35,18 @@ CREATE TABLE llm_usage_events (
   UNIQUE (idempotency_key)
 );
 
-CREATE INDEX idx_llm_usage_events_org_occurred
+CREATE INDEX IF NOT EXISTS idx_llm_usage_events_org_occurred
   ON llm_usage_events (organization_id, occurred_at DESC);
 
-CREATE INDEX idx_llm_usage_events_factory_occurred
+CREATE INDEX IF NOT EXISTS idx_llm_usage_events_factory_occurred
   ON llm_usage_events (factory_id, occurred_at DESC)
   WHERE factory_id IS NOT NULL;
 
-CREATE INDEX idx_llm_usage_events_work_order
+CREATE INDEX IF NOT EXISTS idx_llm_usage_events_work_order
   ON llm_usage_events (work_order_id)
   WHERE work_order_id IS NOT NULL;
 
-CREATE INDEX idx_llm_usage_events_execution
+CREATE INDEX IF NOT EXISTS idx_llm_usage_events_execution
   ON llm_usage_events (work_order_execution_id)
   WHERE work_order_execution_id IS NOT NULL;
 
