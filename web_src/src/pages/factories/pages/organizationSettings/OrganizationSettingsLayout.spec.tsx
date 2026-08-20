@@ -21,6 +21,8 @@ describe("OrganizationSettingsLayout", () => {
     );
 
     const sidebar = await screen.findByTestId("organization-settings-sidebar", {}, { timeout: 8000 });
+    expect(await screen.findByTestId("organization-settings-overview-name")).toHaveTextContent("SuperPlane");
+
     const backLink = within(sidebar).getByTestId("organization-settings-back");
     const name = within(sidebar).getByTestId("organization-settings-name");
     const general = within(sidebar).getByTestId("organization-settings-nav-general");
@@ -38,7 +40,6 @@ describe("OrganizationSettingsLayout", () => {
     expect(general).toHaveAttribute("aria-current", "page");
     expect(backLink.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(name.compareDocumentPosition(general) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(await screen.findByTestId("organization-settings-overview-name")).toHaveTextContent("SuperPlane");
   }, 10000);
 
   it("opens a workspaces table from the Workspaces menu item", async () => {
