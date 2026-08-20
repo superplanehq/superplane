@@ -2,22 +2,13 @@ import { cn } from "@/lib/utils";
 import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
 import { Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
 
-import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import { factoryOverviewPath } from "../../lib/factoryPagePaths";
 import { AgentStep } from "./AgentStep";
-import type { OnboardingRepo } from "./onboardingMocks";
-import { AnalysisSidePanel } from "./AnalysisSidePanel";
-import { DonePanel } from "./DonePanel";
-import { Shell } from "./OnboardingShell";
-import { WIZARD_STEPS, type IntegrationId, type VcsHostId, type WizardStepId } from "./onboardingFixtures";
+import { WIZARD_STEPS, type IntegrationId, type WizardStepId } from "./onboardingFixtures";
 import { IssuesStep } from "./onboardingIssuesStep";
 import { NameStep, RepositoryStep, StartStep, VcsStep } from "./onboardingSteps";
 import { WizardStepFooter } from "./WizardStepFooter";
-import { useConnectDialog } from "./useConnectDialog";
-import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
-import { useOnboardingStorybook } from "./useOnboardingStorybook";
+import { type OnboardingSetupApi } from "./useOnboardingSetupState";
 
 export type { WizardStepId };
 
@@ -62,17 +53,6 @@ function canAdvance(setup: OnboardingSetupApi, step: WizardStepId): boolean {
     case "start":
       return setup.canFinish;
   }
-}
-
-function onboardingReposFromSetup(selectedRepo: string | null, vcsHost: VcsHostId | null): OnboardingRepo[] {
-  if (!selectedRepo || !vcsHost) {
-    return [];
-  }
-  const [org, name] = selectedRepo.split("/");
-  if (!org || !name) {
-    return [];
-  }
-  return [{ id: `${vcsHost}-${org}-${name}`, name, org, provider: vcsHost }];
 }
 
 function WizardProgress({
@@ -379,78 +359,5 @@ export function SetupSections({
         </section>
       )}
     </div>
-  );
-}
-
-/**
- * Storybook-only workspace setup: progressive wizard + setup.log side panel.
- * Connect uses the real IntegrationCreateDialog. Not mounted on production routes.
- */
-export function OnboardingWireframe() {
-  const navigate = useNavigate();
-  const { organizationId, factoryId, factoryKey } = useFactoriesLayout();
-  const onboarding = useOnboardingStorybook();
-  const setup = useOnboardingSetupState(onboarding?.pending?.workspaceName ?? "");
-  const { requestConnect, requestConfigure, dialog } = useConnectDialog(setup);
-  const [openSection, setOpenSection] = useState<WizardStepId>("vcs");
-
-  const finishSetup = () => {
-    if (onboarding && factoryId) {
-      onboarding.completeOnboarding(factoryId, onboardingReposFromSetup(setup.selectedRepo, setup.vcsHost));
-    }
-    if (organizationId && factoryKey) {
-      navigate(factoryOverviewPath(organizationId, factoryKey), { replace: true });
-      return;
-    }
-    setup.setFinished(true);
-  };
-
-  if (setup.finished) {
-    return (
-      <Shell className="w-full">
-        <div className="mx-auto max-w-lg px-8 py-14">
-          <DonePanel setup={setup} />
-        </div>
-        {dialog}
-      </Shell>
-    );
-  }
-
-  return (
-    <Shell className="w-full">
-      <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8">
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
-          <SetupSections
-            setup={setup}
-            openSection={openSection}
-            setOpenSection={setOpenSection}
-            requestConnect={requestConnect}
-            createVcsConnection={() => requestConnect("github")}
-            selectVcsConnection={() => setup.selectVcsHost("github")}
-            githubConnections={{ name: "github", allInstances: [], readyInstances: [] }}
-            requestConfigure={() => {
-              if (setup.vcsHost) requestConfigure(setup.vcsHost);
-            }}
-            onFinish={finishSetup}
-          />
-          <div className="lg:sticky lg:top-6 lg:self-start">
-            <AnalysisSidePanel
-              progress={{
-                workspaceName: setup.workspaceName,
-                nameReady: setup.nameReady,
-                selectedRepo: setup.selectedRepo,
-                vcsHost: setup.vcsHost,
-                repoCommitted: setup.repoCommitted,
-                issuesChoice: setup.issuesChoice,
-                issuesCommitted: setup.issuesCommitted,
-                agent: setup.agent,
-                agentReady: setup.agentReady,
-              }}
-            />
-          </div>
-        </div>
-      </div>
-      {dialog}
-    </Shell>
   );
 }

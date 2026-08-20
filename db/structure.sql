@@ -486,7 +486,7 @@ CREATE TABLE public.factory_work_order_executions (
     line_id uuid NOT NULL,
     step_index integer NOT NULL,
     step_name text NOT NULL,
-    run_id uuid NOT NULL,
+    run_id uuid,
     status character varying(32) DEFAULT 'pending'::character varying NOT NULL,
     result character varying(32) DEFAULT ''::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -552,6 +552,7 @@ CREATE TABLE public.factory_work_orders (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     source_run_id uuid,
     number bigint NOT NULL,
+    status_note jsonb,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
@@ -2768,7 +2769,7 @@ ALTER TABLE ONLY public.factory_work_order_executions
 --
 
 ALTER TABLE ONLY public.factory_work_order_executions
-    ADD CONSTRAINT factory_work_order_executions_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id) ON DELETE RESTRICT;
+    ADD CONSTRAINT factory_work_order_executions_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id) ON DELETE SET NULL;
 
 
 --
@@ -3323,7 +3324,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260820001035	f
+20260820071427	f
 \.
 
 

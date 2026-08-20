@@ -1,7 +1,7 @@
 import {
   FACTORY_NODE_CARD_HEIGHT,
   FACTORY_NODE_CARD_WIDTH,
-  FACTORY_NODE_VERTICAL_GAP,
+  FACTORY_NODE_EDIT_VERTICAL_GAP,
 } from "@/lib/factoryCanvasChrome";
 
 type FlowPoint = { x: number; y: number };
@@ -41,7 +41,7 @@ export function computeAppendFromNodePlacement({
   canvasWidth,
   canvasHeight,
 }: AppendPlacementInput): AppendPlacementResult {
-  const gapY = isVerticalFlow ? FACTORY_NODE_VERTICAL_GAP : APPEND_GAP_Y;
+  const gapY = isVerticalFlow ? FACTORY_NODE_EDIT_VERTICAL_GAP : APPEND_GAP_Y;
   const estimatedWidth = isVerticalFlow ? FACTORY_NODE_CARD_WIDTH : PLACEHOLDER_ESTIMATED_WIDTH;
   const estimatedHeight = isVerticalFlow ? FACTORY_NODE_CARD_HEIGHT : PLACEHOLDER_ESTIMATED_HEIGHT;
 

@@ -32,6 +32,12 @@ type FactoryContext interface {
 	// score as PreviousScore. Every report also lands an
 	// `order.check.reported` timeline event.
 	ReportWorkOrderCheck(params ReportWorkOrderCheckParams) (*WorkOrderCheck, error)
+	// SetWorkOrderStatusNote upserts a status note on the work order,
+	// keyed by NoteKey: the first set creates the note, later sets with
+	// the same key update it in place, and a different key sits beside
+	// it. Any lifecycle transition clears the whole set. The order must
+	// be open.
+	SetWorkOrderStatusNote(params SetWorkOrderStatusNoteParams) (*WorkOrderStatusNote, error)
 }
 
 type WorkOrderParams struct {
@@ -111,6 +117,24 @@ type ReportWorkOrderCheckParams struct {
 	Analysis string
 }
 
+// SetWorkOrderStatusNoteParams carries one status note. NoteKey identifies
+// the note across sets (e.g. "pr-closure"). Kind is "info" (the default
+// when empty); Headline is required; CtaLabel and CtaURL must be set
+// together and the URL must be absolute http(s).
+type SetWorkOrderStatusNoteParams struct {
+	// OrderID identifies the work order to target; see
+	// UpdateWorkOrderStatusParams.OrderID.
+	OrderID string
+	// NoteKey identifies the note across sets (e.g. "pr-closure").
+	NoteKey             string
+	Kind                string
+	Headline            string
+	Body                string
+	CtaLabel            string
+	CtaURL              string
+	ShowOnlyWhenWaiting bool
+}
+
 type WorkOrder struct {
 	ID          string `json:"id"`
 	Title       string `json:"title"`
@@ -124,6 +148,17 @@ type WorkOrderArtifact struct {
 	WorkOrderID string         `json:"workOrderId"`
 	Type        string         `json:"type"`
 	Data        map[string]any `json:"data,omitempty"`
+}
+
+type WorkOrderStatusNote struct {
+	WorkOrderID         string `json:"workOrderId"`
+	Key                 string `json:"key"`
+	Kind                string `json:"kind"`
+	Headline            string `json:"headline"`
+	Body                string `json:"body,omitempty"`
+	CtaLabel            string `json:"ctaLabel,omitempty"`
+	CtaURL              string `json:"ctaUrl,omitempty"`
+	ShowOnlyWhenWaiting bool   `json:"showOnlyWhenWaiting,omitempty"`
 }
 
 type WorkOrderCheck struct {
