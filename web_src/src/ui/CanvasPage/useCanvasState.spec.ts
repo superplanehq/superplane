@@ -102,8 +102,8 @@ describe("useCanvasState", () => {
     const compactStride = FACTORY_COMPACT_LAYER_STRIDE;
     const stacked = [makeNode("top", 0, 0), makeNode("bottom", 0, compactStride)];
 
-    const { result, rerender } = renderHook(({ props }) => useCanvasState(props), {
-      initialProps: { props: { ...makeProps(stacked), layoutMode: "factory-auto" as const } },
+    const { result, rerender } = renderHook(({ props }: { props: CanvasPageProps }) => useCanvasState(props), {
+      initialProps: { props: { ...makeProps(stacked), layoutMode: "factory-auto" } },
     });
 
     expect(result.current.nodes.find((node) => node.id === "top")?.position.y).toBe(0);
@@ -111,7 +111,7 @@ describe("useCanvasState", () => {
       compactStride + FACTORY_EDIT_VERTICAL_EXTRA_PER_LAYER,
     );
 
-    rerender({ props: makeProps(stacked) });
+    rerender({ props: { ...makeProps(stacked), layoutMode: "manual" } });
     expect(result.current.nodes.find((node) => node.id === "bottom")?.position.y).toBe(compactStride);
   });
 
