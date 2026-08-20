@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Edge, Node } from "@xyflow/react";
+import { FACTORY_COMPACT_LAYER_STRIDE, FACTORY_EDIT_VERTICAL_EXTRA_PER_LAYER } from "@/lib/factoryEditVerticalSpacing";
 import type { CanvasPageProps } from ".";
 import { useCanvasState } from "./useCanvasState";
 
@@ -95,6 +96,23 @@ describe("useCanvasState", () => {
     });
 
     expect(result.current.edges).toBe(edgesBeforeDrag);
+  });
+
+  it("stretches stacked factory ranks in factory-auto edit layout only", () => {
+    const compactStride = FACTORY_COMPACT_LAYER_STRIDE;
+    const stacked = [makeNode("top", 0, 0), makeNode("bottom", 0, compactStride)];
+
+    const { result, rerender } = renderHook(({ props }) => useCanvasState(props), {
+      initialProps: { props: { ...makeProps(stacked), layoutMode: "factory-auto" as const } },
+    });
+
+    expect(result.current.nodes.find((node) => node.id === "top")?.position.y).toBe(0);
+    expect(result.current.nodes.find((node) => node.id === "bottom")?.position.y).toBe(
+      compactStride + FACTORY_EDIT_VERTICAL_EXTRA_PER_LAYER,
+    );
+
+    rerender({ props: makeProps(stacked) });
+    expect(result.current.nodes.find((node) => node.id === "bottom")?.position.y).toBe(compactStride);
   });
 
   it("does not restart an active factory layout animation when the same layout refreshes", () => {

@@ -1,6 +1,7 @@
 import type { Edge, EdgeChange, Node, NodeChange, NodePositionChange } from "@xyflow/react";
 import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { expandFactoryEditVerticalPositions } from "@/lib/factoryEditVerticalSpacing";
 import type { CanvasPageProps } from ".";
 import { isFactoryAutoLayout } from "./layoutMode";
 import {
@@ -92,6 +93,12 @@ function buildSyncedNodes(
   return [...syncedNodes, ...localOnlyNodes];
 }
 
+function withFactoryEditVerticalSpacing(nodes: Node[], specNodeIds: Set<string>): Node[] {
+  const specNodes = nodes.filter((node) => specNodeIds.has(node.id));
+  const localOnlyNodes = nodes.filter((node) => !specNodeIds.has(node.id));
+  return [...expandFactoryEditVerticalPositions(specNodes), ...localOnlyNodes];
+}
+
 export interface CanvasPageState {
   nodes: Node[];
   edges: Edge[];
@@ -116,7 +123,13 @@ export interface CanvasPageState {
 export function useCanvasState(props: CanvasPageProps): CanvasPageState {
   const { nodes: initialNodes, edges: initialEdges, startCollapsed } = props;
 
-  const [nodes, setNodes] = useState<Node[]>(() => initialNodes ?? []);
+  const [nodes, setNodes] = useState<Node[]>(() => {
+    const list = initialNodes ?? [];
+    if (!isFactoryAutoLayout(props.layoutMode)) {
+      return list;
+    }
+    return expandFactoryEditVerticalPositions(list);
+  });
   const [edges, setEdges] = useState<Edge[]>(() => initialEdges ?? []);
   const pendingNodePositionsRef = useRef<Map<string, PendingNodePosition>>(new Map());
   const displayedNodesRef = useRef(nodes);
@@ -151,7 +164,10 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
     }
 
     const currentNodes = displayedNodesRef.current;
-    const targetNodes = buildSyncedNodes(currentNodes, initialNodes, pendingNodePositionsRef.current);
+    const targetNodes = withFactoryEditVerticalSpacing(
+      buildSyncedNodes(currentNodes, initialNodes, pendingNodePositionsRef.current),
+      new Set(initialNodes.map((node) => node.id)),
+    );
     const targetKey = getLayoutTargetKey(targetNodes);
     const animationEnabled = !(
       typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
