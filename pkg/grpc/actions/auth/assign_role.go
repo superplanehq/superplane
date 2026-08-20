@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"slices"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -32,6 +33,18 @@ func AssignRole(ctx context.Context, orgID, domainType, domainID, roleName, user
 
 	if user.IsAPIKey() && roleName == models.RoleOrgOwner {
 		return nil, grpcerrors.InvalidArgument(nil, "API keys cannot be assigned the org_owner role")
+	}
+
+	if domainType == models.DomainTypeOrganization && roleName != models.RoleOrgOwner {
+		ownerIDs, err := authService.GetOrgUsersForRole(ctx, models.RoleOrgOwner, orgID)
+		if err != nil {
+			log.Errorf("Error determining owners for org %s: %v", orgID, err)
+			return nil, grpcerrors.Internal(err, "error determining organization owners")
+		}
+
+		if len(ownerIDs) <= 1 && slices.Contains(ownerIDs, user.ID.String()) {
+			return nil, grpcerrors.FailedPrecondition(nil, "cannot demote the last organization owner")
+		}
 	}
 
 	err = authService.AssignRole(user.ID.String(), roleName, domainID, domainType)
