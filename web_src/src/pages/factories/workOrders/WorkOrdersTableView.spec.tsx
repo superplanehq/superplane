@@ -90,15 +90,13 @@ function gridTemplateTokens(className: string): string[] {
 }
 
 describe("WorkOrdersTableView", () => {
-  it("has a non-empty spend usage label to prove removal isn't just an empty-state coincidence", () => {
-    expect(busyEntry.usageLabel).toBe("$0.45");
-  });
-
-  it("never renders a Spend column, header or cell", () => {
+  it("shows USD and tokens in the Spend column", () => {
+    expect(busyEntry.usageLabel).toBe("$0.45 · 1k tokens");
     renderTable();
 
-    expect(screen.queryByText("Spend")).not.toBeInTheDocument();
-    expect(screen.queryByText(busyEntry.usageLabel as string)).not.toBeInTheDocument();
+    expect(screen.getByText("Spend")).toBeInTheDocument();
+    expect(screen.getByText("$0.45")).toBeInTheDocument();
+    expect(screen.getByText("1k tokens")).toBeInTheDocument();
   });
 
   it("keeps the header and every row on the exact same grid template, regardless of row content", () => {

@@ -27,7 +27,8 @@ describe("createHomeFixtureFetch", () => {
     const account = await fetchFixture("/account");
     await expect(account.json()).resolves.toMatchObject({
       id: "storybook-user",
-      name: "Storybook User",
+      name: "Leonardo DiCaprio",
+      avatar_url: "/storybook/leonardo-dicaprio.jpg",
     });
 
     const me = await fetchFixture("/api/v1/me");
@@ -41,6 +42,16 @@ describe("createHomeFixtureFetch", () => {
         expect.objectContaining({ resource: "agents", action: "create" }),
         expect.objectContaining({ resource: "work_orders", action: "create" }),
         expect.objectContaining({ resource: "work_orders", action: "update" }),
+      ]),
+    );
+  });
+
+  it("serves the account organization list", async () => {
+    const organizations = await fetchFixture("/organizations");
+    await expect(organizations.json()).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "SuperPlane" }),
+        expect.objectContaining({ id: "org-storybook-acme", name: "Acme" }),
       ]),
     );
   });

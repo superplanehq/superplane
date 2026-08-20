@@ -1,10 +1,10 @@
 import type { CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
 import { OrgWorkspaceHarness, type OrgWorkspacePageOverrides } from "@/pages/__fixtures__/OrgWorkspaceHarness";
-import type { HomePageFixture } from "@/pages/home/__fixtures__/handlers";
+import type { HomePageFixture, StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers";
 import { defaultHomePageFixture } from "@/pages/home/__fixtures__/homePageResponses";
 
 import { OnboardingStorybookProvider } from "../pages/onboarding/OnboardingStorybookContext";
-import { OnboardingWireframe } from "../pages/onboarding/OnboardingWireframe";
+import { OnboardingPage } from "../pages/onboarding/OnboardingPage";
 import type { OnboardingStorybookSeed } from "../pages/onboarding/onboardingMocks";
 import { StorybookOverviewPage } from "../pages/onboarding/StorybookOverviewPage";
 import { WikiWireframe } from "../pages/wiki/WikiWireframe";
@@ -19,7 +19,7 @@ import { WorkOrderOverviewMissionSlotContext } from "../sidebar/workOrderOvervie
 interface FactoriesHarnessProps {
   /** Path under the org. Defaults to `workspaces` (list page). */
   pathSuffix?: string;
-  /** Fixture backing the factories API. Defaults to the populated Refunds Factory dataset. */
+  /** Fixture backing the factories API. Defaults to the populated Semaphore dataset. */
   factoriesFixture?: FactoriesFixture;
   /** Canvas fixture for factory-embedded AppPage routes. Defaults to a factory-owned canvas so in-story clicks do not redirect to Overview. */
   appFixture?: CanvasAppFixture;
@@ -35,6 +35,8 @@ interface FactoriesHarnessProps {
   onboardingSeed?: OnboardingStorybookSeed;
   /** When false, skip setup provider/routes (app-like create → overview). */
   enableOnboarding?: boolean;
+  /** Organization connections the story starts with. Defaults to none. */
+  orgIntegrations?: StorybookOrgIntegration[];
 }
 
 function DefaultWikiWireframe() {
@@ -55,6 +57,7 @@ export function FactoriesHarness({
   pageOverrides,
   onboardingSeed,
   enableOnboarding = true,
+  orgIntegrations,
 }: FactoriesHarnessProps) {
   const homeFixture: HomePageFixture = {
     ...defaultHomePageFixture,
@@ -74,12 +77,13 @@ export function FactoriesHarness({
       homeFixture={homeFixture}
       factoriesFixture={factoriesFixture}
       appFixture={appFixture}
+      orgIntegrations={orgIntegrations}
       pageOverrides={
         enableOnboarding
           ? {
               wiki: DefaultWikiWireframe,
               overview: StorybookOverviewPage,
-              onboarding: OnboardingWireframe,
+              onboarding: OnboardingPage,
               workOrders: MissionsWorkOrdersPage,
               ...pageOverrides,
             }

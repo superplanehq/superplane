@@ -243,16 +243,16 @@ function formatSpendingLine(totalTokens: number, totalCostCents: number): ReactN
   if (tokens && usd) {
     return (
       <>
-        {tokens} <span className="text-muted-foreground">·</span> {usd}
+        {usd} <span className="text-muted-foreground">·</span> {tokens}
       </>
     );
   }
-  return tokens ?? usd ?? "";
+  return usd ?? tokens ?? "";
 }
 
 function formatSpendingTooltip(totalTokens: number, totalCostCents: number): string {
   const parts: string[] = [];
-  if (totalTokens > 0) parts.push(`${totalTokens.toLocaleString()} tokens`);
   if (totalCostCents > 0) parts.push(formatUsdCents(totalCostCents));
+  if (totalTokens > 0) parts.push(`${totalTokens.toLocaleString()} tokens`);
   return parts.join(" · ");
 }

@@ -26,7 +26,8 @@ func TestFactories(t *testing.T) {
 		steps.fillFactorySettingsName(updatedName)
 		steps.fillFactorySettingsDescription("updated description")
 		steps.submitFactorySettings()
-		steps.assertFactoryVisibleInSidebar(updatedName)
+		steps.visitFactorySettings(factory)
+		steps.assertFactorySettingsName(updatedName)
 		steps.assertFactorySavedInDB(factory.ID, updatedName, "updated description")
 	})
 
@@ -95,24 +96,7 @@ func (s *factorySteps) visitFactoryOverview(factory *models.Factory) {
 }
 
 func (s *factorySteps) completeFactoryOnboarding(factory *models.Factory) {
-	vcsID := uuid.New().String()
-	agentID := uuid.New().String()
-	appRepository := "acme/app"
-	backlogRepository := "acme/backlog"
-	issuesSource := models.FactoryOnboardingIssuesSourceVCS
-	agentHarness := models.FactoryOnboardingAgentHarnessClaudeCode
-	appID := uuid.New().String()
-	lineID := uuid.New().String()
-	require.NoError(s.t, factory.CompleteOnboarding(database.DB(s.t.Context()), models.FactoryOnboardingPatch{
-		VCSIntegrationID:   &vcsID,
-		AgentIntegrationID: &agentID,
-		AppRepository:      &appRepository,
-		BacklogRepository:  &backlogRepository,
-		IssuesSource:       &issuesSource,
-		AgentHarness:       &agentHarness,
-		ProvisionedAppID:   &appID,
-		ProvisionedLineID:  &lineID,
-	}))
+	support.CompleteFactoryOnboarding(s.t, factory)
 }
 
 func (s *factorySteps) fillFactorySettingsName(name string) {
@@ -132,10 +116,6 @@ func (s *factorySteps) fillFactorySettingsDescription(description string) {
 func (s *factorySteps) submitFactorySettings() {
 	s.session.Click(q.TestID("factory-settings-save"))
 	s.session.Sleep(1000)
-}
-
-func (s *factorySteps) assertFactoryVisibleInSidebar(name string) {
-	s.session.AssertText(name)
 }
 
 func (s *factorySteps) assertFactorySettingsName(name string) {

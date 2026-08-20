@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
-import { SetupSections } from "./OnboardingWireframe";
+import { SetupSections } from "./SetupSections";
 import { VcsStep } from "./onboardingSteps";
 import { useOnboardingSetupState } from "./useOnboardingSetupState";
 

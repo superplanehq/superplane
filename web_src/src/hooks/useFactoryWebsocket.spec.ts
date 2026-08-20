@@ -77,6 +77,9 @@ describe("useFactoryWebsocket", () => {
       queryKey: factoryQueryKeys.workOrders("org-1", "factory-1"),
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.detail("org-1", "factory-1"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: factoryQueryKeys.workOrderDetail("org-1", "factory-1", "order-1"),
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
@@ -113,6 +116,9 @@ describe("useFactoryWebsocket", () => {
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: factoryQueryKeys.workOrders("org-1", "factory-1"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.detail("org-1", "factory-1"),
     });
   });
 });
