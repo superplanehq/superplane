@@ -33,8 +33,8 @@ func Test__ListClosedWorkOrderMetricRows(t *testing.T) {
 		order := createClosedMetricOrder(t, db, factoryModel, r)
 		older := now.Add(-2 * time.Hour)
 		newer := now.Add(-time.Hour)
-		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, older, 0)
-		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineB.ID, lineB.Name, newer, 0)
+		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, older, 0, 0)
+		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineB.ID, lineB.Name, newer, 0, 0)
 		closeWorkOrderAt(t, db, order, now.Add(-30*time.Minute))
 
 		rows := listMetricRows(t, db, factoryModel.ID, windowFrom, windowTo)
@@ -44,7 +44,7 @@ func Test__ListClosedWorkOrderMetricRows(t *testing.T) {
 
 	t.Run("uses the close event time not updated_at", func(t *testing.T) {
 		order := createClosedMetricOrder(t, db, factoryModel, r)
-		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-time.Hour), 0)
+		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-time.Hour), 0, 0)
 		closeWorkOrderAt(t, db, order, now.Add(-40*24*time.Hour))
 		require.NoError(t, db.Model(order).Update("updated_at", now).Error)
 
@@ -54,7 +54,7 @@ func Test__ListClosedWorkOrderMetricRows(t *testing.T) {
 
 	t.Run("includes a close event inside the window", func(t *testing.T) {
 		order := createClosedMetricOrder(t, db, factoryModel, r)
-		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-time.Hour), 0)
+		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-time.Hour), 0, 0)
 		closedAt := now.Add(-5 * 24 * time.Hour)
 		closeWorkOrderAt(t, db, order, closedAt)
 
@@ -65,7 +65,7 @@ func Test__ListClosedWorkOrderMetricRows(t *testing.T) {
 
 	t.Run("completed close is success and merge time falls back to close", func(t *testing.T) {
 		order := createClosedMetricOrder(t, db, factoryModel, r)
-		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-time.Hour), 0)
+		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-time.Hour), 0, 0)
 		closedAt := now.Add(-time.Hour)
 		closeWorkOrderAt(t, db, order, closedAt)
 
@@ -78,7 +78,7 @@ func Test__ListClosedWorkOrderMetricRows(t *testing.T) {
 
 	t.Run("rejected close with an unmerged PR is not success", func(t *testing.T) {
 		order := createClosedMetricOrder(t, db, factoryModel, r)
-		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-time.Hour), 0)
+		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-time.Hour), 0, 0)
 		attachOpenPR(t, db, order, "https://github.com/example/repo/pull/metrics-rejected")
 		closeWorkOrderAtWithResult(t, db, order, now.Add(-time.Hour), models.FactoryWorkOrderResultRejected)
 
@@ -90,7 +90,7 @@ func Test__ListClosedWorkOrderMetricRows(t *testing.T) {
 
 	t.Run("GitHub-shaped closed merged PR counts as success without merged_at", func(t *testing.T) {
 		order := createClosedMetricOrder(t, db, factoryModel, r)
-		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-time.Hour), 0)
+		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-time.Hour), 0, 0)
 		attachGitHubMergedPR(t, db, order, "https://github.com/example/repo/pull/metrics-github")
 		closedAt := now.Add(-45 * time.Minute)
 		closeWorkOrderAtWithResult(t, db, order, closedAt, models.FactoryWorkOrderResultFailed)
@@ -105,7 +105,7 @@ func Test__ListClosedWorkOrderMetricRows(t *testing.T) {
 	t.Run("merged PR artifact counts as success", func(t *testing.T) {
 		order := createClosedMetricOrder(t, db, factoryModel, r)
 		firstExec := now.Add(-3 * time.Hour)
-		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, firstExec, 25)
+		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, firstExec, 25, 45*time.Minute)
 		mergedAt := now.Add(-90 * time.Minute)
 		attachMergedPR(t, db, order, "https://github.com/example/repo/pull/metrics-1", mergedAt)
 		closeWorkOrderAt(t, db, order, now.Add(-time.Hour))
@@ -115,8 +115,7 @@ func Test__ListClosedWorkOrderMetricRows(t *testing.T) {
 		assert.True(t, row.Merged)
 		require.NotNil(t, row.MergedAt)
 		assert.WithinDuration(t, mergedAt, *row.MergedAt, time.Second)
-		require.NotNil(t, row.FirstExecutionAt)
-		assert.WithinDuration(t, firstExec, *row.FirstExecutionAt, time.Second)
+		assert.InDelta(t, 45.0, row.ExecutionMinutes, 0.1)
 		assert.Equal(t, int64(25), row.CostCents)
 	})
 
@@ -130,13 +129,14 @@ func Test__ListClosedWorkOrderMetricRows(t *testing.T) {
 
 	t.Run("sums execution cost across retries", func(t *testing.T) {
 		order := createClosedMetricOrder(t, db, factoryModel, r)
-		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-2*time.Hour), 100)
-		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-time.Hour), 50)
+		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-2*time.Hour), 100, 10*time.Minute)
+		createMetricExecution(t, db, r, factoryModel.ID, order.ID, lineA.ID, lineA.Name, now.Add(-time.Hour), 50, 20*time.Minute)
 		closeWorkOrderAt(t, db, order, now.Add(-30*time.Minute))
 
 		rows := listMetricRows(t, db, factoryModel.ID, windowFrom, windowTo)
 		row := requireMetricRow(t, rows, order.ID)
 		assert.Equal(t, int64(150), row.CostCents)
+		assert.InDelta(t, 30.0, row.ExecutionMinutes, 0.1)
 	})
 }
 
@@ -210,10 +210,12 @@ func createMetricExecution(
 	lineName string,
 	createdAt time.Time,
 	costCents int64,
+	runFor time.Duration,
 ) {
 	t.Helper()
 	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factoryID, workOrderID, lineID, lineName, nil)
 	runID := createMetricRun(t, r)
+	finishedAt := createdAt.Add(runFor)
 	execution := models.FactoryWorkOrderExecution{
 		ID:             uuid.New(),
 		OrganizationID: r.Organization.ID,
@@ -228,7 +230,8 @@ func createMetricExecution(
 		Result:         models.CanvasRunResultPassed,
 		CostCents:      costCents,
 		CreatedAt:      createdAt,
-		UpdatedAt:      createdAt,
+		UpdatedAt:      finishedAt,
+		FinishedAt:     &finishedAt,
 	}
 	require.NoError(t, db.Create(&execution).Error)
 }

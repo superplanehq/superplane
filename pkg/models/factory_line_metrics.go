@@ -16,7 +16,7 @@ type ClosedWorkOrderMetricRow struct {
 	ClosedAt         time.Time
 	Merged           bool
 	MergedAt         *time.Time
-	FirstExecutionAt *time.Time
+	ExecutionMinutes float64
 	CostCents        int64
 }
 
@@ -76,7 +76,13 @@ latest_execution AS (
 execution_stats AS (
 	SELECT
 		x.work_order_id,
-		MIN(x.created_at) AS first_execution_at,
+		COALESCE(SUM(
+			CASE
+				WHEN x.finished_at IS NOT NULL AND x.finished_at > x.created_at
+				THEN EXTRACT(EPOCH FROM (x.finished_at - x.created_at)) / 60.0
+				ELSE 0
+			END
+		), 0) AS execution_minutes,
 		COALESCE(SUM(x.cost_cents), 0) AS cost_cents
 	FROM factory_work_order_executions x
 	WHERE x.factory_id = ?
@@ -105,7 +111,7 @@ SELECT
 		mp.merged_at,
 		CASE WHEN COALESCE(mp.merged, FALSE) OR wo.result = ? THEN lc.closed_at END
 	) AS merged_at,
-	es.first_execution_at,
+	es.execution_minutes,
 	es.cost_cents
 FROM factory_work_orders wo
 INNER JOIN latest_close lc ON lc.work_order_id = wo.id

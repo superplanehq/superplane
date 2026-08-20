@@ -51,20 +51,14 @@ func Test__aggregateLineMetrics(t *testing.T) {
 	})
 
 	t.Run("computes success rate duration cost and prior-window deltas", func(t *testing.T) {
-		first := now.Add(-2 * time.Hour)
-		merged := now.Add(-time.Hour)
 		priorClose := currentStart.Add(-24 * time.Hour)
-		priorFirst := priorClose.Add(-30 * time.Minute)
-		priorMerged := priorClose.Add(-10 * time.Minute)
-
 		rows := []models.ClosedWorkOrderMetricRow{
 			{
 				WorkOrderID:      uuid.New(),
 				LineID:           lineA,
 				ClosedAt:         now.Add(-time.Hour),
 				Merged:           true,
-				MergedAt:         &merged,
-				FirstExecutionAt: &first,
+				ExecutionMinutes: 60,
 				CostCents:        640,
 			},
 			{
@@ -77,8 +71,7 @@ func Test__aggregateLineMetrics(t *testing.T) {
 				LineID:           lineA,
 				ClosedAt:         priorClose,
 				Merged:           true,
-				MergedAt:         &priorMerged,
-				FirstExecutionAt: &priorFirst,
+				ExecutionMinutes: 20,
 				CostCents:        200,
 			},
 		}
@@ -102,16 +95,13 @@ func Test__aggregateLineMetrics(t *testing.T) {
 	})
 
 	t.Run("omits cost when summed cents are zero", func(t *testing.T) {
-		merged := now.Add(-time.Hour)
-		first := now.Add(-2 * time.Hour)
 		rows := []models.ClosedWorkOrderMetricRow{
 			{
 				WorkOrderID:      uuid.New(),
 				LineID:           lineA,
 				ClosedAt:         now.Add(-time.Hour),
 				Merged:           true,
-				MergedAt:         &merged,
-				FirstExecutionAt: &first,
+				ExecutionMinutes: 60,
 			},
 		}
 		got := aggregateLineMetrics(rows, now)
@@ -123,19 +113,13 @@ func Test__aggregateLineMetrics(t *testing.T) {
 	t.Run("fills thirty daily buckets and median duration", func(t *testing.T) {
 		early := currentStart.Add(2 * time.Hour)
 		late := currentEnd.Add(-2 * time.Hour)
-		d1Start := early.Add(-30 * time.Minute)
-		d1Merge := early.Add(30 * time.Minute)
-		d2Start := late.Add(-90 * time.Minute)
-		d2Merge := late.Add(-30 * time.Minute)
-
 		rows := []models.ClosedWorkOrderMetricRow{
 			{
 				WorkOrderID:      uuid.New(),
 				LineID:           lineA,
 				ClosedAt:         early,
 				Merged:           true,
-				MergedAt:         &d1Merge,
-				FirstExecutionAt: &d1Start,
+				ExecutionMinutes: 60,
 				CostCents:        100,
 			},
 			{
@@ -143,8 +127,7 @@ func Test__aggregateLineMetrics(t *testing.T) {
 				LineID:           lineA,
 				ClosedAt:         late,
 				Merged:           true,
-				MergedAt:         &d2Merge,
-				FirstExecutionAt: &d2Start,
+				ExecutionMinutes: 60,
 				CostCents:        100,
 			},
 			{

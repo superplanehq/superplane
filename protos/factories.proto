@@ -925,7 +925,7 @@ message FactoryLineMetrics {
   double success_rate_pct = 1;
   int32 merged_count = 2;
   int32 total_closed_count = 3;
-  // Median minutes from first execution to merge. Uses close time when merge time is missing. Unset when nothing merged.
+  // Median minutes of summed execution run time among merged work orders. Unset when the sum is 0.
   optional double duration_minutes = 4;
   // Execution cost in USD divided by merged work orders. Unset when cost is untracked.
   optional double cost_per_success_usd = 5;

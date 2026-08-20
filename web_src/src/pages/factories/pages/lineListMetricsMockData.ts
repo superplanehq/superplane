@@ -25,9 +25,8 @@ export type LineListMetrics = {
   /** Closed work orders in the window (success-rate denominator). */
   totalClosedCount: number;
   /**
-   * Median time from first execution to merge, in minutes, for merged work
-   * orders. Uses close time when merge time is missing. Unset when nothing
-   * merged.
+   * Median summed execution run time, in minutes, for merged work orders.
+   * Unset when the sum is 0.
    */
   durationMinutes?: number;
   /**
