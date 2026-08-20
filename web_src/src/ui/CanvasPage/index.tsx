@@ -93,8 +93,10 @@ import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "../componentSidebar/types";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
+import { RunErrorsCard } from "../Runs/RunErrorsCard";
 import { RunInspectorLoadingPanel } from "../Runs/RunInspectorLoadingPanel";
 import { RunInspectorPanel } from "../Runs/RunInspectorPanel";
+import { normalizeRunErrors, shouldShowFactoryCanvasRunErrors } from "../Runs/runErrors";
 import { getRunStatus } from "../Runs/runPresentation";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
@@ -445,6 +447,8 @@ export interface CanvasPageProps {
   factoryEmbed?: boolean;
   /** Factory-shell Configure. Drives edit-grid dots before the draft session is ready. */
   factoryConfigure?: boolean;
+  /** Storybook-only factory edit workspace. Live factory canvas ignores this. */
+  factoryEditWorkspace?: boolean;
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -1315,6 +1319,13 @@ function CanvasPage(props: CanvasPageProps) {
     factoryEmbed: props.factoryEmbed,
     selectedNodeId: props.runNodeDetailNodeId,
   });
+  const runErrors = normalizeRunErrors(props.runNodeDetailRun?.errors);
+  const showFactoryCanvasRunErrors = shouldShowFactoryCanvasRunErrors({
+    factoryEmbed: props.factoryEmbed,
+    isRunInspectionMode: props.isRunInspectionMode,
+    runInspectorOpen,
+    errorCount: runErrors.length,
+  });
 
   const renderInspectorSidebar = useCallback(
     (layout: "sidebar" | "bottom") => (
@@ -1484,7 +1495,7 @@ function CanvasPage(props: CanvasPageProps) {
 
       {/* Main content area with sidebar and canvas */}
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        {props.factoryEmbed ? (
+        {props.factoryEmbed && props.factoryEditWorkspace ? (
           <FactoryCanvasToolSidebar toolSidebarState={toolSidebarState} />
         ) : (
           <CanvasToolSidebar toolSidebarState={toolSidebarState} />
@@ -1517,7 +1528,7 @@ function CanvasPage(props: CanvasPageProps) {
             isOpen={
               isBuildingBlocksSidebarOpen &&
               allowsBuildingBlocksSidebar(workflowHeaderMode) &&
-              (!!props.isEditing || Boolean(props.factoryEmbed))
+              (!!props.isEditing || Boolean(props.factoryEmbed && props.factoryEditWorkspace))
             }
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
@@ -1557,6 +1568,11 @@ function CanvasPage(props: CanvasPageProps) {
                 }}
               />
             ) : null}
+            {showFactoryCanvasRunErrors ? (
+              <div className="absolute inset-x-0 top-0 z-[19] px-4 pt-3" data-testid="factory-run-errors-banner">
+                <RunErrorsCard errors={runErrors} className="mx-auto max-w-2xl shadow-sm" />
+              </div>
+            ) : null}
             {props.headerMode === "files" ? (
               <div
                 className="absolute inset-0 bg-slate-50 dark:bg-gray-900"
@@ -1570,6 +1586,7 @@ function CanvasPage(props: CanvasPageProps) {
                   factoryId={props.factoryId}
                   factoryEmbed={props.factoryEmbed}
                   factoryConfigure={props.factoryConfigure}
+                  factoryEditWorkspace={props.factoryEditWorkspace}
                   layoutMode={props.layoutMode}
                   onNodeDelete={handleNodeDelete}
                   onNodesDelete={handleNodesDelete}
@@ -2214,6 +2231,7 @@ function CanvasContent({
   factoryId,
   factoryEmbed = false,
   factoryConfigure = false,
+  factoryEditWorkspace = false,
   layoutMode,
   onNodeDelete,
   onNodesDelete,
@@ -2269,6 +2287,7 @@ function CanvasContent({
   factoryId?: string;
   factoryEmbed?: boolean;
   factoryConfigure?: boolean;
+  factoryEditWorkspace?: boolean;
   layoutMode?: CanvasLayoutMode;
   onNodeDelete?: (nodeId: string) => void;
   onNodesDelete?: (nodeIds: string[]) => void;
@@ -2334,10 +2353,8 @@ function CanvasContent({
   const isReadOnly = readOnly ?? false;
   const flowDirection = resolveCanvasFlowDirection(factoryId);
   const isVerticalFlow = flowDirection === "vertical";
-  const factoryEditGrid = isEditing || factoryConfigure;
-  const factoryBackground = isVerticalFlow
-    ? factoryCanvasBackground(resolvedTheme === "dark", factoryEditGrid)
-    : null;
+  const factoryEditGrid = Boolean(factoryEditWorkspace && (isEditing || factoryConfigure));
+  const factoryBackground = isVerticalFlow ? factoryCanvasBackground(resolvedTheme === "dark", factoryEditGrid) : null;
   const flowBgColor = factoryBackground?.bgColor ?? (resolvedTheme === "dark" ? DARK_BASE_BG_HEX : "#F1F5F9");
   const flowDotColor = factoryBackground?.color ?? (resolvedTheme === "dark" ? "#374151" : "#cbd5e1");
   const flowDotGap = factoryBackground?.gap ?? 8;
@@ -2906,6 +2923,7 @@ function CanvasContent({
     getNodes,
     getViewport,
     hasFitToViewRef,
+    hasReactFlowInitialized,
     isAutoFocusEnabled,
     isRunInspectionMode,
     reportZoom,

@@ -1,10 +1,14 @@
 import type { FactoriesFactoryLine } from "@/api-client";
+import { PermissionTooltip } from "@/components/PermissionGate";
 import { cn } from "@/lib/utils";
-import { Workflow } from "lucide-react";
-import type { KeyboardEvent, ReactNode } from "react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { Copy, MoreHorizontal, Pencil, Workflow } from "lucide-react";
+import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { humanizeLineName } from "../lib/humanizeLineName";
+import { overflowMenuContentClassName, overflowMenuItemClassName } from "./automationsPageParts";
 import { factoryCardClassName } from "./factoryPageLayoutStyles";
+import type { LineCardActions } from "./lineCardActions";
 import {
   formatCostDelta,
   formatCostPerSuccess,
@@ -21,25 +25,84 @@ export function LineListCard({
   href,
   metrics,
   description,
+  actions,
 }: {
   line: FactoriesFactoryLine;
   href: string;
   metrics: LineListMetrics | null;
   description?: string;
+  actions?: LineCardActions;
 }) {
+  const lineName = humanizeLineName(line.name);
+
   return (
     <CardShell href={href} testId={`lines-card-${line.id}`} className="px-4 py-4">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <Workflow className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden />
-          <span className="text-[15px] font-medium tracking-[-0.01em] text-foreground">
-            {humanizeLineName(line.name)}
-          </span>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <Workflow className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden />
+            <span className="text-[15px] font-medium tracking-[-0.01em] text-foreground">{lineName}</span>
+          </div>
+          {description ? <p className="mt-1 text-[12px] leading-snug text-muted-foreground">{description}</p> : null}
         </div>
-        {description ? <p className="mt-1 text-[12px] leading-snug text-muted-foreground">{description}</p> : null}
+        {actions ? <LineCardMenu name={lineName} actions={actions} /> : null}
       </div>
       <LineListHeroSplit metrics={metrics} />
     </CardShell>
+  );
+}
+
+/** Hover-reveal 3-dots menu, mirroring `AutomationCardMenu`. Delete is intentionally omitted — no `DeleteFactoryLine` API yet. */
+function LineCardMenu({ name, actions }: { name: string; actions: LineCardActions }) {
+  const stopCardNavigation = (event: MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>) => {
+    event.stopPropagation();
+  };
+
+  return (
+    <div className="shrink-0" onClick={stopCardNavigation} onKeyDown={stopCardNavigation}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={`${name} menu`}
+            className={cn(
+              "flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground",
+              "opacity-0 group-hover/line:opacity-100 group-focus-within/line:opacity-100 data-[state=open]:opacity-100",
+            )}
+            disabled={actions.isDuplicating}
+            data-testid="lines-card-menu"
+          >
+            <MoreHorizontal className="size-3.5" aria-hidden />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" sideOffset={6} className={overflowMenuContentClassName}>
+          <PermissionTooltip allowed={actions.canEdit} message="You don't have permission to edit this line.">
+            <DropdownMenuItem
+              className={overflowMenuItemClassName}
+              onClick={actions.onEdit}
+              disabled={!actions.canEdit}
+              data-testid="lines-card-edit"
+            >
+              <Pencil aria-hidden />
+              Edit
+            </DropdownMenuItem>
+          </PermissionTooltip>
+          <PermissionTooltip allowed={actions.canDuplicate} message="You don't have permission to duplicate this line.">
+            <DropdownMenuItem
+              className={overflowMenuItemClassName}
+              onClick={() => {
+                void actions.onDuplicate();
+              }}
+              disabled={!actions.canDuplicate || actions.isDuplicating}
+              data-testid="lines-card-duplicate"
+            >
+              <Copy aria-hidden />
+              Duplicate
+            </DropdownMenuItem>
+          </PermissionTooltip>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 

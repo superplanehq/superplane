@@ -49,8 +49,9 @@ import {
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
 import { LineListCard } from "./LineListCard";
-import { descriptionForLine, metricsForLine } from "./lineListMetricsMockData";
+import { descriptionForLine, toLineListMetrics } from "./lineListMetricsMockData";
 import { PhaseGlyph } from "./linePhaseGlyph";
+import { useLineCardMutations } from "./useLineCardMutations";
 
 const LIST_SUBTITLE = "Last 30 days. Success rate, completions per day, duration, and cost per merged work order.";
 
@@ -65,6 +66,13 @@ export function LinesPage() {
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
+  const { actionsForLine } = useLineCardMutations({
+    organizationId,
+    factoryId,
+    factoryKey,
+    lines,
+    canUpdate,
+  });
   const selectedLine = useMemo(
     () => (routeLineId ? (lines.find((line) => line.id === routeLineId) ?? null) : null),
     [lines, routeLineId],
@@ -155,8 +163,9 @@ export function LinesPage() {
                   <LineListCard
                     line={line}
                     href={factoryLineDetailPath(organizationId, factoryKey, line.id)}
-                    metrics={metricsForLine(line.id)}
+                    metrics={toLineListMetrics(line.metrics)}
                     description={descriptionForLine(line.id)}
+                    actions={actionsForLine(line)}
                   />
                 </li>
               );
@@ -405,7 +414,7 @@ function PhaseRunCard({
   const queuedLabel = isQueuedStepRow(run.execution) ? resolvePhaseRunStatus(run.execution).label : null;
 
   return (
-    <div>
+    <div data-testid={`lines-phase-run-${run.executionId}`}>
       <WorkOrderCard {...workOrderCardContext} entry={entry} href={href} />
       {queuedLabel ? (
         <p className="mt-1 flex items-center gap-1 px-0.5 text-[11px] text-muted-foreground">

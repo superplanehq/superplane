@@ -765,6 +765,31 @@ func (s *Server) unblockAccount(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "unblocked"})
 }
 
+// adminListOrgExperimentalFeatures returns the installation feature registry
+// plus the features enabled for the given organization. Installation admins
+// are not always members of the org, so this must not go through the member
+// DescribeOrganization API.
+func (s *Server) adminListOrgExperimentalFeatures(w http.ResponseWriter, r *http.Request) {
+	orgID := mux.Vars(r)["orgId"]
+
+	org, err := models.FindOrganizationByID(orgID)
+	if err != nil {
+		http.Error(w, "Organization not found", http.StatusNotFound)
+		return
+	}
+
+	enabled := []string(org.EnabledExperimentalFeatures)
+	if enabled == nil {
+		enabled = []string{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"features": experimentalFeatureItems(),
+		"enabled":  enabled,
+	})
+}
+
 // adminEnableOrgExperimentalFeature toggles an experimental feature on for
 // the given organization.
 func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *http.Request) {

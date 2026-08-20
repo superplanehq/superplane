@@ -34,6 +34,9 @@ export function invalidateFactoryWorkOrderQueries(
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.workOrders(organizationId, factoryId),
   });
+  void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.detail(organizationId, factoryId),
+  });
 
   if (!orderId) {
     return;

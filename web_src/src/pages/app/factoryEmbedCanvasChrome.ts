@@ -6,6 +6,7 @@ type ViewportLike = { x: number; y: number; zoom: number };
 type FactoryEmbedCanvasChromeInput = {
   factoryEmbed: boolean;
   factoryAgentEnabled?: boolean;
+  factoryEditWorkspace?: boolean;
   factoryViewOnly: boolean;
   factoryOwnedApp: boolean;
   routeFactoryId?: string;
@@ -38,9 +39,9 @@ function resolveFactoryHideAddControls(input: FactoryEmbedCanvasChromeInput): bo
   if (input.factoryViewOnly) {
     return true;
   }
-  // Configure keeps the Components panel available. A leftover `?run=` query
-  // would otherwise hide add controls before the edit session starts.
-  if (input.factoryEmbed) {
+  // Storybook Configure keeps the Components panel available. A leftover `?run=`
+  // query would otherwise hide add controls before the edit session starts.
+  if (input.factoryEditWorkspace && input.factoryEmbed) {
     return false;
   }
   return input.hideAddControls;
@@ -55,7 +56,7 @@ function resolveFactoryShellVisibility(input: FactoryEmbedCanvasChromeInput) {
     hideAddControls: resolveFactoryHideAddControls(input),
     hidePageChrome: input.factoryEmbed,
     hideCanvasToolSidebar: input.factoryEmbed && !input.factoryAgentEnabled,
-    hideRightSideControls: input.factoryEmbed,
+    hideRightSideControls: Boolean(input.factoryEmbed && input.factoryEditWorkspace),
     factoryEmbed: input.factoryEmbed,
   };
 }

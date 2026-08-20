@@ -273,6 +273,7 @@ export function AppPage({
   factoryEmbed = false,
   factoryConfigure = false,
   factoryAgentEnabled = false,
+  factoryEditWorkspace = false,
   factoryConfigureActionsRef,
   onFactoryConfigureBusyChange,
   onFactoryConfigureDone,
@@ -284,6 +285,8 @@ export function AppPage({
   factoryConfigure?: boolean;
   /** Factory-shell opt-in: show the in-app agent sidebar next to the canvas. */
   factoryAgentEnabled?: boolean;
+  /** Storybook-only factory edit workspace chrome. Live factory canvas ignores this. */
+  factoryEditWorkspace?: boolean;
   /** Imperative Discard/Save handlers for the factory Configure chrome (no setState bridge). */
   factoryConfigureActionsRef?: MutableRefObject<FactoryConfigureActions | null>;
   onFactoryConfigureBusyChange?: (busy: boolean) => void;
@@ -3724,6 +3727,7 @@ export function AppPage({
   const factoryEmbedCanvasChrome = resolveFactoryEmbedCanvasChrome({
     factoryEmbed,
     factoryAgentEnabled,
+    factoryEditWorkspace,
     factoryViewOnly,
     factoryOwnedApp,
     routeFactoryId,
@@ -3903,6 +3907,7 @@ export function AppPage({
           buildingBlocks={buildingBlocks}
           isEditing={isEditing}
           factoryConfigure={factoryConfigure}
+          factoryEditWorkspace={factoryEditWorkspace}
           activeCanvasVersionId={activeCanvasVersionId}
           liveCanvasVersionId={liveCanvasVersionId}
           onAgentStagingReady={handleAgentStagingReady}

@@ -11,7 +11,8 @@ import { useFactoryAppCanvasPageModel } from "./useFactoryAppCanvasPageModel";
 /**
  * Factory-shell embed for a factory-owned app/canvas. Keeps the workspace
  * sidebar and a route-aware back header. View mode is read-only; `?configure=1`
- * opens edit mode with Agent and Components toggles, plus More options.
+ * opens Configure (edit mode) with Discard / Save. Storybook adds Edit, Agent,
+ * Components, and More options; the live app does not.
  */
 export function FactoryAppCanvasPage() {
   const { factory } = useFactoriesLayout();
@@ -50,9 +51,9 @@ export function FactoryAppCanvasPage() {
         onDraftTitleChange={model.isConfigure ? model.handleDraftTitleChange : undefined}
         onDiscard={model.handleConfigureDiscard}
         onSave={model.handleConfigureSave}
-        onOpenVisualEditor={model.handleOpenVisualEditor}
+        onOpenVisualEditor={model.storybookEditWorkspace ? model.handleOpenVisualEditor : undefined}
         workspace={
-          model.isConfigure
+          model.storybookEditWorkspace && model.isConfigure
             ? {
                 agentOpen: model.agentOpen,
                 componentsOpen: model.componentsOpen,
@@ -71,24 +72,29 @@ export function FactoryAppCanvasPage() {
           <AppPage
             factoryEmbed
             factoryConfigure={model.isConfigure}
-            factoryAgentEnabled={model.isConfigure}
+            factoryAgentEnabled={model.storybookEditWorkspace && model.isConfigure}
+            factoryEditWorkspace={model.storybookEditWorkspace}
             factoryConfigureActionsRef={model.configureActionsRef}
             onFactoryConfigureBusyChange={model.handleConfigureBusyChange}
             onFactoryConfigureDone={model.handleConfigureDone}
-            onFactoryConfigureSaved={model.handleConfigureSaved}
+            onFactoryConfigureSaved={model.storybookEditWorkspace ? model.handleConfigureSaved : undefined}
           />
         )}
       </div>
-      <FactoryCanvasYamlModal
-        open={model.yamlViewOpen}
-        onOpenChange={model.handleYamlViewOpenChange}
-        canvas={model.canvas}
-      />
-      <AgentSetupPromptDialog
-        open={model.agentPromptOpen}
-        onOpenChange={model.handleAgentPromptOpenChange}
-        prompt={agentPrompt}
-      />
+      {model.storybookEditWorkspace ? (
+        <>
+          <FactoryCanvasYamlModal
+            open={model.yamlViewOpen}
+            onOpenChange={model.handleYamlViewOpenChange}
+            canvas={model.canvas}
+          />
+          <AgentSetupPromptDialog
+            open={model.agentPromptOpen}
+            onOpenChange={model.handleAgentPromptOpenChange}
+            prompt={agentPrompt}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

@@ -27,16 +27,8 @@ export function resolveDraftTitleToPersist(draftTitle: string | null, savedTitle
 }
 
 export function useFactoryAppConfigureTitle(args: UseFactoryAppConfigureTitleArgs) {
-  const {
-    organizationId,
-    factoryId,
-    appId,
-    isConfigure,
-    canRename,
-    savedName,
-    configureBusy,
-    configureActionsRef,
-  } = args;
+  const { organizationId, factoryId, appId, isConfigure, canRename, savedName, configureBusy, configureActionsRef } =
+    args;
   const queryClient = useQueryClient();
   const updateCanvas = useUpdateCanvas(organizationId, appId);
   const [draftTitle, setDraftTitle] = useState<string | null>(null);

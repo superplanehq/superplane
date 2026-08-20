@@ -160,6 +160,36 @@ describe("RunInspectionFloatingBar", () => {
     expect(screen.queryByRole("button", { name: "Back to Live Canvas" })).not.toBeInTheDocument();
   });
 
+  it("shows factory run errors on the canvas when the inspector is closed", () => {
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          factoryEmbed
+          isRunInspectionMode
+          runNodeDetailCanvasId="canvas-1"
+          runNodeDetailRun={{
+            id: "run-1",
+            canvasId: "canvas-1",
+            state: "STATE_FINISHED",
+            result: "RESULT_FAILED",
+            errors: ["pipeline failed"],
+          }}
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("factory-run-errors-banner")).toBeInTheDocument();
+    expect(screen.getByText("This run has an error")).toBeInTheDocument();
+    expect(screen.getByText("pipeline failed")).toBeInTheDocument();
+  });
+
   it("does not show the previous version bar while inspecting a run", () => {
     render(
       <MemoryRouter>

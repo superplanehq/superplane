@@ -35,6 +35,7 @@ import {
   FactorySettingsNotificationsPage,
   FactorySettingsProfilePage,
   FactorySettingsSoonPage,
+  FactorySettingsUsagePage,
   FACTORY_SETTINGS_NAV_ITEMS,
   isFactorySettingsComingSoon,
   LegacyWorkOrderDetailRedirect,
@@ -43,6 +44,8 @@ import {
   NewWorkspacePage,
   OnboardingGate,
   OnboardingPage,
+  OrganizationSettingsLayout,
+  organizationSettingsSectionRoutes,
   VelocityPage,
   WikiPage,
   WorkOrderDetailPage,
@@ -213,6 +216,12 @@ function AppRouter() {
                   >
                     {factorySettingsSectionRoutes}
                   </Route>
+                  <Route
+                    path=":factoryKey/organization"
+                    element={withAuthPermissionAndFactoriesFeature(OrganizationSettingsLayout, "factories", "read")}
+                  >
+                    {organizationSettingsSectionRoutes}
+                  </Route>
                 </Route>
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
               </Route>
@@ -268,6 +277,7 @@ function FactoryLineEditPageGate() {
 const factorySettingsSectionRoutes = [
   <Route key="factory-settings-index" index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />,
   <Route key="factory-settings-general" path="general" element={<FactorySettingsGeneralPage />} />,
+  <Route key="factory-settings-usage" path="usage" element={<FactorySettingsUsagePage />} />,
   <Route key="factory-settings-profile" path="profile" element={<FactorySettingsProfilePage />} />,
   <Route key="factory-settings-notifications" path="notifications" element={<FactorySettingsNotificationsPage />} />,
   ...FACTORY_SETTINGS_NAV_ITEMS.filter(isFactorySettingsComingSoon).map((item) => (

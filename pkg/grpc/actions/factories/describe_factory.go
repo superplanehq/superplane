@@ -30,7 +30,12 @@ func DescribeFactory(ctx context.Context, organizationID, factoryID string) (*pb
 		return nil, factoryErrorToStatus(err, "failed to describe factory")
 	}
 
+	serialized, err := serializeFactoryWithLineMetrics(db, factory, lines)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe factory")
+	}
+
 	return &pb.DescribeFactoryResponse{
-		Factory: serializeFactoryWithLines(factory, lines),
+		Factory: serialized,
 	}, nil
 }

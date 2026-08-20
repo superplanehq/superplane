@@ -6,6 +6,8 @@ import {
   factoryDetailPath,
   factorySettingsGeneralPathAfterKeyChange,
   legacyWorkOrderDetailPath,
+  organizationSettingsPath,
+  organizationSettingsSectionPath,
   parseFactoryAppNavFrom,
   workOrderDetailPath,
   workOrdersPath,
@@ -88,5 +90,12 @@ describe("parseFactoryAppNavFrom", () => {
 
   it("returns undefined for unknown from values", () => {
     expect(parseFactoryAppNavFrom("canvas")).toBeUndefined();
+  });
+});
+
+describe("organizationSettingsPath", () => {
+  it("builds organization settings under the current workspace", () => {
+    expect(organizationSettingsPath("org-1", "RF")).toBe("/org-1/workspaces/RF/organization");
+    expect(organizationSettingsSectionPath("org-1", "RF", "general")).toBe("/org-1/workspaces/RF/organization/general");
   });
 });

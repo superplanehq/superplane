@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { organizationKeys } from "./useOrganizationData";
 
@@ -17,6 +17,30 @@ export interface ExperimentalFeaturesRegistry {
 export const adminExperimentalFeaturesKeys = {
   all: ["adminExperimentalFeatures"] as const,
   registry: (orgId: string) => [...adminExperimentalFeaturesKeys.all, "registry", orgId] as const,
+};
+
+async function fetchAdminExperimentalFeatures(orgId: string): Promise<ExperimentalFeaturesRegistry> {
+  const res = await fetch(`/admin/api/organizations/${orgId}/experimental-features`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to load experimental features (${res.status})`);
+  }
+  const data = (await res.json()) as Partial<ExperimentalFeaturesRegistry>;
+  return {
+    features: data.features ?? [],
+    enabled: data.enabled ?? [],
+  };
+}
+
+export const useAdminExperimentalFeaturesRegistry = (orgId: string, enabled = true) => {
+  return useQuery({
+    queryKey: adminExperimentalFeaturesKeys.registry(orgId),
+    queryFn: () => fetchAdminExperimentalFeatures(orgId),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    enabled: !!orgId && enabled,
+  });
 };
 
 async function toggleAdminExperimentalFeature(orgId: string, featureId: string, enabled: boolean): Promise<void> {

@@ -30,7 +30,7 @@ describe("WorkspaceSwitcher", () => {
     renderSwitcher();
 
     const nameLink = screen.getByTestId("factories-workspace-overview-link");
-    expect(nameLink).toHaveTextContent("Refunds Factory");
+    expect(nameLink).toHaveTextContent("Semaphore");
     expect(nameLink).toHaveAttribute("href", factoryOverviewPath(FACTORIES_ORGANIZATION_ID, REFUND_FACTORY.key!));
   });
 });

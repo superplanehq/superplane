@@ -75,11 +75,18 @@ describe("resolveFactoryEmbedCanvasChrome", () => {
     expect(chrome.hideCanvasToolSidebar).toBe(false);
   });
 
-  it("hides the right-side add rail in factory embed", () => {
-    const { input } = buildInput({ factoryEmbed: true });
+  it("hides the right-side add rail in the Storybook factory edit workspace", () => {
+    const { input } = buildInput({ factoryEmbed: true, factoryEditWorkspace: true });
     const chrome = resolveFactoryEmbedCanvasChrome(input);
 
     expect(chrome.hideRightSideControls).toBe(true);
+  });
+
+  it("keeps the live factory right-side add rail", () => {
+    const { input } = buildInput({ factoryEmbed: true });
+    const chrome = resolveFactoryEmbedCanvasChrome(input);
+
+    expect(chrome.hideRightSideControls).toBe(false);
   });
 
   it("hides add controls in factory view-only mode", () => {
@@ -89,9 +96,10 @@ describe("resolveFactoryEmbedCanvasChrome", () => {
     expect(chrome.hideAddControls).toBe(true);
   });
 
-  it("keeps add controls in factory Configure even when run inspection would hide them", () => {
+  it("keeps add controls in Storybook Configure even when run inspection would hide them", () => {
     const { input } = buildInput({
       factoryEmbed: true,
+      factoryEditWorkspace: true,
       factoryViewOnly: false,
       hideAddControls: true,
       runInspectionChromeActive: true,
@@ -99,5 +107,16 @@ describe("resolveFactoryEmbedCanvasChrome", () => {
     const chrome = resolveFactoryEmbedCanvasChrome(input);
 
     expect(chrome.hideAddControls).toBe(false);
+  });
+
+  it("does not force add controls open in live factory Configure", () => {
+    const { input } = buildInput({
+      factoryEmbed: true,
+      factoryViewOnly: false,
+      hideAddControls: true,
+    });
+    const chrome = resolveFactoryEmbedCanvasChrome(input);
+
+    expect(chrome.hideAddControls).toBe(true);
   });
 });

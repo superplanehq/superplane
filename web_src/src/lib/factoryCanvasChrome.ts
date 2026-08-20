@@ -91,5 +91,10 @@ export const FACTORY_HANDLE_STYLE = {
 /** Keep FactoryNodeCard, append ghost, placement gap, and ELK estimates aligned. */
 export const FACTORY_NODE_CARD_WIDTH = 280;
 export const FACTORY_NODE_CARD_HEIGHT = 104;
-/** Vertical gap below a factory card when appending / layering. */
+/** Vertical gap below a factory card in persisted ELK layout, live, and run. */
 export const FACTORY_NODE_VERTICAL_GAP = 64;
+/**
+ * Edit/configure only. Compact 64px leaves node duplicate/delete on top of
+ * the edge-delete control. Live and run keep FACTORY_NODE_VERTICAL_GAP.
+ */
+export const FACTORY_NODE_EDIT_VERTICAL_GAP = 200;

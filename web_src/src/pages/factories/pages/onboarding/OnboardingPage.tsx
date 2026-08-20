@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { OnboardingCancelDialog } from "./OnboardingCancelDialog";
-import { SetupSections } from "./OnboardingWireframe";
+import { SetupSections } from "./SetupSections";
 import { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 export function OnboardingPage() {

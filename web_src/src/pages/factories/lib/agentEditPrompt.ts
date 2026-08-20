@@ -6,7 +6,7 @@ export const API_TOKEN_DISPLAY = "***REDACTED***";
 
 /** Replace the copyable token placeholder so the on-screen prompt does not show it. */
 export function redactAgentEditPromptForDisplay(prompt: string): string {
-  return prompt.replaceAll(API_TOKEN_PLACEHOLDER, API_TOKEN_DISPLAY);
+  return prompt.split(API_TOKEN_PLACEHOLDER).join(API_TOKEN_DISPLAY);
 }
 
 export type AgentEditPromptInput = {

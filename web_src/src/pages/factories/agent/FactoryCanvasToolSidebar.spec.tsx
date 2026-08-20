@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AgentMode } from "@/components/AgentSidebar/agentMode";
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { FactoryCanvasToolSidebar } from "./FactoryCanvasToolSidebar";
 
@@ -75,7 +76,7 @@ vi.mock("./FactoryRichMessage", () => ({
   FactoryRichMessage: ({ content }: { content: string }) => <div data-testid="rich-message">{content}</div>,
 }));
 
-function makeToolSidebarState(overrides: Partial<CanvasToolSidebarState> = {}) {
+function makeToolSidebarState(overrides: Partial<CanvasToolSidebarState> = {}): CanvasToolSidebarState {
   return {
     canvasId: "canvas-1",
     organizationId: "org-1",
@@ -96,7 +97,7 @@ function makeToolSidebarState(overrides: Partial<CanvasToolSidebarState> = {}) {
     handleToolSidebarToggle: vi.fn(),
     openToolSidebar: vi.fn(),
     closeToolSidebar: vi.fn(),
-    agentMode: "operator",
+    agentMode: "operator" as AgentMode,
     switchAgentMode: vi.fn(),
     ...overrides,
   };

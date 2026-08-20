@@ -135,7 +135,7 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
               handleCommitStaging,
               canvasName: saveOptions?.canvasName,
               onAfterCommit: allowNextConfigureEnter,
-              onDone: () => onFactoryConfigureSavedRef.current?.(),
+              onDone: () => (onFactoryConfigureSavedRef.current ?? onFactoryConfigureDoneRef.current)?.(),
             });
           },
           discard: () => {

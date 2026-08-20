@@ -145,6 +145,7 @@ describe("CanvasPage factory embed building blocks sidebar", () => {
           buildingBlocks={[]}
           isEditing={false}
           factoryEmbed
+          factoryEditWorkspace
           hideRightSideControls
           activeCanvasVersionId=""
         />
@@ -200,6 +201,7 @@ describe("CanvasPage factory embed building blocks sidebar", () => {
           buildingBlocks={[]}
           isEditing={false}
           factoryEmbed
+          factoryEditWorkspace
           hideRightSideControls
           activeCanvasVersionId=""
         />
@@ -224,6 +226,7 @@ describe("CanvasPage factory embed building blocks sidebar", () => {
           buildingBlocks={[]}
           isEditing={false}
           factoryEmbed
+          factoryEditWorkspace
           hideRightSideControls
           activeCanvasVersionId=""
         />

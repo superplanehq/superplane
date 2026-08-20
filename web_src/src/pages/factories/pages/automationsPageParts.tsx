@@ -107,8 +107,9 @@ export function AutomationCard({
   );
 }
 
-const overflowMenuContentClassName = "min-w-[12rem] rounded-xl border-border p-1 shadow-lg";
-const overflowMenuItemClassName = "cursor-pointer rounded-md px-2 py-1.5 text-[13px] [&_svg]:size-3.5";
+/** Shared with the lines list-card menu so both overflow menus stay pixel-for-pixel in sync. */
+export const overflowMenuContentClassName = "min-w-[12rem] rounded-xl border-border p-1 shadow-lg";
+export const overflowMenuItemClassName = "cursor-pointer rounded-md px-2 py-1.5 text-[13px] [&_svg]:size-3.5";
 const overflowMenuDestructiveItemClassName =
   "text-destructive focus:bg-destructive/10 focus:text-destructive dark:focus:bg-destructive/15";
 
