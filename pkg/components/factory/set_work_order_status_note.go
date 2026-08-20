@@ -49,7 +49,9 @@ Each note is identified by its ` + "`noteKey`" + ` (for example ` + "`pr-closure
 - ` + "`ctaLabel`" + ` and ` + "`ctaUrl`" + ` render an optional action button that links to where the wait resolves (e.g. the pull request). Set both or neither.
 - ` + "`showOnlyWhenWaiting`" + ` hides the note while a line is running. The default is off, so the note stays visible during a run.
 
-` + "`orderId`" + ` explicitly targets the work order — it defaults to ` + "`{{ order().id }}`" + `, the work order driving the current run. This component can only be used in factory-owned apps.`
+` + "`orderId`" + ` explicitly targets the work order — it defaults to ` + "`{{ order().id }}`" + `, the work order driving the current run. This component can only be used in factory-owned apps.
+
+Setting a note also emails the work order's owners and creator (excluding whoever triggered the run), so they know it's waiting on their review — every set sends a fresh email, including one that just updates an existing note's body. Recipients can turn this off in their notification settings without affecting other work order emails.`
 }
 
 func (c *SetWorkOrderStatusNote) Icon() string {

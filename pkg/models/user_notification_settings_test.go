@@ -81,6 +81,7 @@ func Test__UserNotificationSettings__Notifies(t *testing.T) {
 		settings := models.DefaultUserNotificationSettings()
 		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAssigned))
 		assert.True(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderCommentOwned))
+		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderStatusNoteOwned))
 	})
 
 	t.Run("none scope blocks every type", func(t *testing.T) {
@@ -101,6 +102,15 @@ func Test__UserNotificationSettings__Notifies(t *testing.T) {
 		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAssigned))
 		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderCommentOwned))
 		assert.True(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderAssigned))
+	})
+
+	t.Run("all scope with a type list can opt out of status notes alone", func(t *testing.T) {
+		settings := models.UserNotificationSettings{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+			EventTypes:     datatypes.NewJSONType([]string{models.NotificationTypeWorkOrderCommentOwned}),
+		}
+		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderStatusNoteOwned))
+		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderCommentOwned))
 	})
 
 	t.Run("filtered scope requires the workspace and the type", func(t *testing.T) {
