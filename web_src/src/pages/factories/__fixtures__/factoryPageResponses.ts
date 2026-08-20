@@ -248,6 +248,20 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
     { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
   ],
   lineDispatches: [],
+  // A watcher automation announcing why the order is Waiting — the detail
+  // page renders it as the "next step" panel above the checks.
+  statusNotes: [
+    {
+      key: "pr-closure",
+      kind: "info",
+      headline: "Review the pull request",
+      body: "The Refund Processing line opened [PR #6812](https://github.com/superplanehq/superplane/pull/6812). When it merges, this work order completes automatically. If it closes without a merge, the work order is rejected.",
+      ctaLabel: "Review PR #6812",
+      ctaUrl: "https://github.com/superplanehq/superplane/pull/6812",
+      automation: { appId: "app-refund-verifier", appName: "PR Closure" },
+      updatedAt: relativeIso(25 * 60 * 1000),
+    },
+  ],
 };
 
 /**
