@@ -337,8 +337,12 @@ func serializeExecutionSteps(
 
 	nameByIndex := make(map[int]string, len(executions))
 	for _, execution := range executions {
-		if execution.CanvasName != "" {
-			nameByIndex[execution.StepIndex] = execution.CanvasName
+		name := execution.CanvasName
+		if name == "" {
+			name = execution.StepName
+		}
+		if name != "" {
+			nameByIndex[execution.StepIndex] = name
 		}
 	}
 

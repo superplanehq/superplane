@@ -81,6 +81,33 @@ func TestSerializeExecutionSteps_UsesCanvasNames(t *testing.T) {
 	assert.EqualValues(t, 2, out[2].GetStepIndex())
 }
 
+func TestSerializeExecutionSteps_FallsBackToStepNameWhenCanvasGone(t *testing.T) {
+	steps := []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp},
+		{Type: models.FactoryLineStepTypeRunApp},
+	}
+	executions := []models.FactoryWorkOrderExecutionRecord{
+		{
+			FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{
+				StepIndex: 0,
+				StepName:  "implement",
+			},
+		},
+		{
+			FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{
+				StepIndex: 1,
+				StepName:  "verify",
+			},
+			CanvasName: "verify-app",
+		},
+	}
+
+	out := serializeExecutionSteps(steps, executions)
+	require.Len(t, out, 2)
+	assert.Equal(t, "implement", out[0].GetName())
+	assert.Equal(t, "verify-app", out[1].GetName())
+}
+
 func TestSerializeExecutionSteps_EmptyReturnsNil(t *testing.T) {
 	assert.Nil(t, serializeExecutionSteps(nil, nil))
 	assert.Nil(t, serializeExecutionSteps([]models.FactoryLineStep{}, nil))
