@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -526,6 +527,74 @@ func Test__EventRetentionWorker_DoesNotStarveEligibleRunsWhenBlockedRunsAreOlder
 	require.Equal(t, 1, deleted)
 	support.VerifyCanvasEventsCount(t, canvas.ID, 1)
 	support.VerifyNodeQueueCount(t, canvas.ID, 1)
+}
+
+func Test__EventRetentionWorker_KeepsFactoryWorkOrderExecution(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := NewEventRetentionWorker(&fakeEventRetentionUsageService{enabled: true})
+	cacheOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "trigger",
+				Type:   models.NodeTypeTrigger,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Trigger: &models.TriggerRef{Name: "start"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := createExpiredRootEventForWorker(t, canvas.ID)
+	run, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), rootEvent.ID)
+	require.NoError(t, err)
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	line, err := factory.CreateLine(database.Conn(), "line", nil)
+	require.NoError(t, err)
+	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factory.ID, order.ID, line.ID, line.Name, nil)
+
+	now := time.Now()
+	execution := models.FactoryWorkOrderExecution{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factory.ID,
+		WorkOrderID:    order.ID,
+		LineID:         line.ID,
+		LineDispatchID: dispatch.ID,
+		StepIndex:      0,
+		StepName:       "implement",
+		RunID:          &run.ID,
+		Status:         models.FactoryWorkOrderExecutionStatusFinished,
+		Result:         models.CanvasRunResultPassed,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	require.NoError(t, database.Conn().Create(&execution).Error)
+
+	deleted, err := worker.cleanRuns(time.Now(), 100)
+	require.NoError(t, err)
+	require.Equal(t, 1, deleted)
+
+	var persisted models.FactoryWorkOrderExecution
+	require.NoError(t, database.Conn().Where("id = ?", execution.ID).First(&persisted).Error)
+	assert.Nil(t, persisted.RunID)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, persisted.Status)
+	assert.Equal(t, models.CanvasRunResultPassed, persisted.Result)
+
+	var runCount int64
+	require.NoError(t, database.Conn().Model(&models.CanvasRun{}).Where("id = ?", run.ID).Count(&runCount).Error)
+	assert.Equal(t, int64(0), runCount)
 }
 
 func createExpiredCompletedRootEventChain(t *testing.T, canvasID uuid.UUID) {
