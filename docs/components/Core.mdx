@@ -48,6 +48,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Run Claude Code" href="#run-claude-code" description="Runs Claude Code on a fleet runner" />
   <LinkCard title="Run JavaScript" href="#run-java-script" description="Runs JavaScript on a fleet runner with access to upstream node data via $" />
   <LinkCard title="Run Python" href="#run-python" description="Runs Python on a fleet runner with access to upstream node data via the payload argument" />
+  <LinkCard title="Set Work Order Status Note" href="#set-work-order-status-note" description="Announce what a waiting work order is blocked on and what resolves it" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
   <LinkCard title="Update Memory" href="#update-memory" description="Update values in canvas memory by namespace and field matches" />
@@ -1578,6 +1579,41 @@ def main(payload):
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "runnerPython.finished"
+}
+```
+
+<a id="set-work-order-status-note"></a>
+
+## Set Work Order Status Note
+
+**Component key:** `setWorkOrderStatusNote`
+
+The Set Work Order Status Note component announces what a waiting work order is blocked on and what resolves it. The note shows as a "next step" panel on the work order page while the order waits — for example, a PR watcher can announce "Review the pull request: when it merges, this work order completes automatically."
+
+Each note is identified by its `noteKey` (for example `pr-closure`). The first set creates the note. A later set with the same key updates that note in place. A different key sits beside it, so one work order can carry several waits at once (a PR review and a later decision prompt). Any state change (close, reopen, back to draft) clears every note. The work order must be open.
+
+- `headline` is the short instruction shown as the panel title (e.g. "Review the pull request").
+- `body` is an optional markdown paragraph with the details — what happens on each outcome.
+- `ctaLabel` and `ctaUrl` render an optional action button that links to where the wait resolves (e.g. the pull request). Set both or neither.
+
+`orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run. This component can only be used in factory-owned apps.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "statusNote": {
+      "body": "When PR #42 merges, this work order completes automatically.",
+      "ctaLabel": "Review PR #42",
+      "ctaUrl": "https://github.com/acme/app/pull/42",
+      "headline": "Review the pull request",
+      "key": "pr-closure",
+      "kind": "info"
+    }
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "workOrder.statusNoteSet"
 }
 ```
 
