@@ -48,6 +48,8 @@ export function createOrgWorkspaceFixtureFetch(
     homeFixture?: HomePageFixture;
     appFixture?: CanvasAppFixture;
     factoriesFixture?: FactoriesFixture;
+    /** Organization connections the story starts with (e.g. an installed GitHub). */
+    orgIntegrations?: StorybookOrgIntegration[];
   },
 ): typeof fetch {
   const homeFixture = options?.homeFixture ?? defaultHomePageFixture;
@@ -57,7 +59,8 @@ export function createOrgWorkspaceFixtureFetch(
   // would permanently alter the module-level `defaultFactoriesFixture` (and every
   // fixture that shares nested arrays with it).
   const factoriesFixture = options?.factoriesFixture ? structuredClone(options.factoriesFixture) : undefined;
-  const orgIntegrations: StorybookOrgIntegration[] = [];
+  // Connect flows push into this list, so each fetch impl owns a private copy.
+  const orgIntegrations: StorybookOrgIntegration[] = structuredClone(options?.orgIntegrations ?? []);
   const agentMessages = createStorybookAgentMessageStore(appFixture?.agentMessages?.messages);
 
   const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -145,9 +148,10 @@ async function resolveOrgWorkspaceFixture(args: {
   const canvasResolved = matchCanvasAppFixture(url, appFixture, method, body);
   const factorySetupResolved = await matchFactorySetupFixture(url, method, input, init, orgIntegrations);
   const { factoryPagesResolved, factoryUsersResolved } = resolveFactoryFixtures(url, method, body, factoriesFixture);
-  // AppPageHarness always supplies `appFixture`, so canvas integrations win there.
-  // HomePageHarness omits it, so factory GitHub/Claude stubs stay available for setup.
-  if (url.pathname === "/api/v1/integrations" && method === "GET" && appFixture !== undefined) {
+  // Canvas integrations win only for fixtures that declare them. Factory
+  // stories carry a canvas fixture without integrations, so the GitHub/Claude
+  // definitions workspace setup needs stay available.
+  if (url.pathname === "/api/v1/integrations" && method === "GET" && appFixture?.integrations !== undefined) {
     return canvasResolved ?? factorySetupResolved ?? homeResolved ?? emptyOrgWorkspaceCatchAll(url);
   }
   return (

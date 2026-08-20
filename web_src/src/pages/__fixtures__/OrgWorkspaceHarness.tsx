@@ -45,7 +45,7 @@ import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetai
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
 import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
 import { HomePage } from "@/pages/home";
-import { homePageIds, type HomePageFixture } from "@/pages/home/__fixtures__/handlers";
+import { homePageIds, type HomePageFixture, type StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers";
 import { NewAppPage } from "@/pages/home/NewAppPage";
 import { OrganizationSettings } from "@/pages/organization/settings";
 import type { AgentSuggestion } from "@/ui/CanvasPage";
@@ -108,6 +108,8 @@ export interface OrgWorkspaceHarnessProps {
   factoriesFixture?: FactoriesFixture;
   /** Storybook-only: seed post-install Agent improvement suggestions for the canvas. */
   agentSuggestions?: AgentSuggestion[];
+  /** Organization connections the story starts with (e.g. an installed GitHub). */
+  orgIntegrations?: StorybookOrgIntegration[];
   /** Storybook-only: replace selected factory page elements (e.g. wiki wireframe). */
   pageOverrides?: OrgWorkspacePageOverrides;
 }
@@ -119,10 +121,12 @@ interface FixtureFetchOptions {
   appFixture?: CanvasAppFixture;
   factoriesFixture?: FactoriesFixture;
   agentSuggestions?: AgentSuggestion[];
+  orgIntegrations?: StorybookOrgIntegration[];
 }
 
 function useOrgWorkspaceFixtureFetch(options: FixtureFetchOptions) {
-  const { canvasId, openAgentSidebar, homeFixture, appFixture, factoriesFixture, agentSuggestions } = options;
+  const { canvasId, openAgentSidebar, homeFixture, appFixture, factoriesFixture, agentSuggestions, orgIntegrations } =
+    options;
   const [fixtureFetch] = useState(() => {
     // Persist before AppPage reads the preference in useState initializers.
     writeCanvasAgentSidebarOpen(canvasId, openAgentSidebar);
@@ -130,7 +134,12 @@ function useOrgWorkspaceFixtureFetch(options: FixtureFetchOptions) {
       setAgentSuggestions(canvasId, agentSuggestions);
     }
     const state = fixtureFetchState();
-    const impl = createOrgWorkspaceFixtureFetch(state.original, { homeFixture, appFixture, factoriesFixture });
+    const impl = createOrgWorkspaceFixtureFetch(state.original, {
+      homeFixture,
+      appFixture,
+      factoriesFixture,
+      orgIntegrations,
+    });
     state.delegate = impl;
     return impl;
   });
@@ -300,6 +309,7 @@ export function OrgWorkspaceHarness({
   appFixture,
   factoriesFixture,
   agentSuggestions,
+  orgIntegrations,
   pageOverrides,
 }: OrgWorkspaceHarnessProps) {
   const { orgId, canvasId } = resolveWorkspaceIds(homeFixture, appFixture, factoriesFixture);
@@ -310,6 +320,7 @@ export function OrgWorkspaceHarness({
     appFixture,
     factoriesFixture,
     agentSuggestions,
+    orgIntegrations,
   });
 
   const homePath = pathSuffix ? `/${orgId}/${pathSuffix}` : `/${orgId}`;

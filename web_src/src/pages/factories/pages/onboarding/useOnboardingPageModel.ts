@@ -40,6 +40,7 @@ import { createAndDispatchInitialWorkOrder } from "./onboardingWorkOrder";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
+import { useFinishSetupAction } from "./useFinishSetupAction";
 
 const ONBOARDING_INTEGRATIONS = ["github", "claude"];
 
@@ -390,6 +391,13 @@ export function useOnboardingPageModel(args: {
     factoryId: args.factoryId,
     canDelete: canAct("factories", "delete"),
   });
+  const finishSetup = useFinishSetupAction({
+    organizationId: args.organizationId,
+    factoryId: args.factoryId,
+    factoryKey: args.factoryKey,
+    setup,
+    finish,
+  });
 
   return {
     setup,
@@ -415,7 +423,7 @@ export function useOnboardingPageModel(args: {
       canAct("canvases", "update"),
     saving: saving || installer.isInstalling || createWorkOrder.isPending,
     ...saves,
-    finish,
+    finish: finishSetup,
     ...cancel,
   };
 }
