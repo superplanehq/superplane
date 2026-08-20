@@ -11,6 +11,7 @@ export const NOTIFICATION_SETTINGS_TYPES = [
   "TYPE_WORK_ORDER_STATUS_OWNED",
   "TYPE_WORK_ORDER_ARTIFACT_OWNED",
   "TYPE_WORK_ORDER_MENTIONED",
+  "TYPE_WORK_ORDER_STATUS_NOTE_OWNED",
 ] as const satisfies readonly Exclude<MeNotificationSettingsType, "TYPE_UNSPECIFIED">[];
 
 export type ConfigurableNotificationType = (typeof NOTIFICATION_SETTINGS_TYPES)[number];
@@ -55,6 +56,11 @@ export const NOTIFICATION_TYPE_OPTIONS: NotificationTypeOption[] = [
     key: "TYPE_WORK_ORDER_MENTIONED",
     label: "Mentions in work order comments",
     description: "Someone mentions you in a work order comment.",
+  },
+  {
+    key: "TYPE_WORK_ORDER_STATUS_NOTE_OWNED",
+    label: "Review requests on work orders you own or created",
+    description: "An automation flags a work order you own or created as waiting on your review.",
   },
 ];
 
