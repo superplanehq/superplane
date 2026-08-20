@@ -10,6 +10,7 @@ import {
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   STORYBOOK_ME_USER_ID,
+  STORYBOOK_ME_USER_NAME,
   type FactoriesFixture,
 } from "../../__fixtures__/factoryPageResponses";
 
@@ -121,7 +122,7 @@ function prArtifact(order: FactoriesWorkOrder, atHours: number, pr: { number: nu
     id: `art-overview-${order.number}`,
     type: "TYPE_PR",
     data: { url: `https://github.com/${pr.repo}/pull/${pr.number}`, title: pr.title, number: pr.number },
-    createdBy: { id: STORYBOOK_ME_USER_ID, name: "Storybook User" },
+    createdBy: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
     createdAt: hoursAgo(atHours),
   };
   const event: FactoriesWorkOrderEvent = {

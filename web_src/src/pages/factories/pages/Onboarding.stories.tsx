@@ -28,7 +28,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const pendingSeed = {
-  pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" },
+  pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Semaphore" },
 };
 
 /**

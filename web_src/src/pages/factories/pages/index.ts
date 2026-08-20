@@ -21,3 +21,11 @@ export { FactorySettingsProfilePage } from "./settings/FactorySettingsProfilePag
 export { FactorySettingsSoonPage } from "./settings/FactorySettingsSoonPage";
 export { FactorySettingsUsagePage } from "./settings/FactorySettingsUsagePage";
 export { FACTORY_SETTINGS_NAV_ITEMS, isFactorySettingsComingSoon } from "./settings/settingsNavItems";
+export { OrganizationSettingsLayout } from "./organizationSettings/OrganizationSettingsLayout";
+export { OrganizationSettingsOverviewPage } from "./organizationSettings/OrganizationSettingsOverviewPage";
+export { OrganizationSettingsWorkspacesPage } from "./organizationSettings/OrganizationSettingsWorkspacesPage";
+export { organizationSettingsSectionRoutes } from "./organizationSettings/organizationSettingsRoutes";
+export {
+  ORGANIZATION_SETTINGS_NAV_ITEMS,
+  isOrganizationSettingsComingSoon,
+} from "./organizationSettings/organizationSettingsNavItems";

@@ -29,8 +29,9 @@ export const PRIMARY_FACTORY_KEY = "RF";
 export const EMPTY_FACTORY_KEY = "PF";
 
 export const STORYBOOK_ME_USER_ID = "storybook-user";
-export const STORYBOOK_ME_USER_NAME = "Storybook User";
-export const STORYBOOK_ME_USER_EMAIL = "storybook@superplane.dev";
+export const STORYBOOK_ME_USER_NAME = "Leonardo DiCaprio";
+export const STORYBOOK_ME_USER_EMAIL = "john.doe@superplane.dev";
+export const STORYBOOK_ME_USER_AVATAR_URL = "/storybook/leonardo-dicaprio.jpg";
 
 // Relative timestamps so `formatTimeAgo` stays stable across story loads.
 const NOW_MS = Date.now();
@@ -137,7 +138,7 @@ export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
 
 export const REFUND_FACTORY: FactoriesFactory = {
   id: PRIMARY_FACTORY_ID,
-  name: "Refunds Factory",
+  name: "Semaphore",
   key: "RF",
   description:
     "Handles reconciliation work: plan a change, implement across affected services, and verify with regression suites.",
@@ -146,7 +147,7 @@ export const REFUND_FACTORY: FactoriesFactory = {
 
 export const EMPTY_FACTORY: FactoriesFactory = {
   id: EMPTY_FACTORY_ID,
-  name: "Payments Factory",
+  name: "SuperPlane",
   key: "PF",
   description: "New factory. No lines or work orders configured yet.",
   lines: [],
