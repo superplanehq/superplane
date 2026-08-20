@@ -20,6 +20,9 @@ spec:
     - channel: default
       sourceId: add-pr-label
       targetId: attach-pr-artifact
+    - channel: default
+      sourceId: attach-pr-artifact
+      targetId: set-pr-closure-note
   nodes:
     - id: onrun-open-pr
       name: Open Pull Request
@@ -170,4 +173,20 @@ spec:
       position:
         x: 1706
         'y': 624
+      isCollapsed: true
+    - id: set-pr-closure-note
+      name: Set PR closure note
+      type: TYPE_ACTION
+      component: setWorkOrderStatusNote
+      configuration:
+        orderId: '{{ order().id }}'
+        noteKey: pr-closure
+        headline: Review the pull request
+        body: When the pull request merges, this work order completes. If it closes without a merge, SuperPlane rejects the work order.
+        ctaLabel: 'Review PR #{{ $["Create Draft Pull Request"].data.number }}'
+        ctaUrl: '{{ $["Create Draft Pull Request"].data.html_url }}'
+        showOnlyWhenWaiting: true
+      position:
+        x: 1706
+        'y': 792
       isCollapsed: true

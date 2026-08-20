@@ -69,8 +69,11 @@ type FactoryWorkOrder struct {
 	Result         string
 	CreatedByID    *uuid.UUID
 	SourceRunID    *uuid.UUID
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	// StatusNote is the jsonb array of current-wait announcements (see
+	// FactoryWorkOrderStatusNote). Cleared on every state transition.
+	StatusNote datatypes.JSON
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 
 	CreatedBy *User                      `gorm:"foreignKey:CreatedByID"`
 	Assignees []FactoryWorkOrderAssignee `gorm:"foreignKey:WorkOrderID"`
@@ -276,17 +279,29 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		o.State = toState
 		o.Result = nextResult
 		o.UpdatedAt = now
+		// A transition invalidates the current-wait announcement: the
+		// note must always describe the state the order is in now.
+		o.StatusNote = nil
 
 		err := tx.
 			Model(o).
 			Updates(map[string]any{
-				"state":      o.State,
-				"result":     o.Result,
-				"updated_at": o.UpdatedAt,
+				"state":       o.State,
+				"result":      o.Result,
+				"status_note": nil,
+				"updated_at":  o.UpdatedAt,
 			}).
 			Error
 		if err != nil {
 			return err
+		}
+
+		// A closing order abandons any traversal still waiting in a step's
+		// queue; a queued dispatch has no run to finish it later.
+		if toState == FactoryWorkOrderStateClosed {
+			if err := o.dropQueuedLineWork(tx); err != nil {
+				return err
+			}
 		}
 
 		run, app := update.Run, update.App

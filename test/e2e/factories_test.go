@@ -45,8 +45,10 @@ func TestFactories(t *testing.T) {
 
 		recreated := steps.givenFactoryExists(name, "reused after delete")
 		require.NotEqual(t, factory.ID, recreated.ID)
-		steps.visitFactoriesList()
-		steps.assertFactoryVisibleInList(name)
+		// The workspaces index opens the remaining workspace. Incomplete
+		// setup hides the sidebar, so the name is not on that page.
+		steps.visitFactorySettings(recreated)
+		steps.assertFactorySettingsName(name)
 	})
 
 	t.Run("persists setup completion across reload", func(t *testing.T) {
@@ -83,11 +85,6 @@ func (s *factorySteps) givenFactoryExists(name, description string) *models.Fact
 	return factory
 }
 
-func (s *factorySteps) visitFactoriesList() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/workspaces")
-	s.session.Sleep(500)
-}
-
 func (s *factorySteps) visitFactorySettings(factory *models.Factory) {
 	s.session.Visit("/" + s.session.OrgID.String() + "/workspaces/" + factory.Key + "/settings/general")
 	s.session.AssertVisible(q.TestID("factory-settings-name"))
@@ -98,24 +95,7 @@ func (s *factorySteps) visitFactoryOverview(factory *models.Factory) {
 }
 
 func (s *factorySteps) completeFactoryOnboarding(factory *models.Factory) {
-	vcsID := uuid.New().String()
-	agentID := uuid.New().String()
-	appRepository := "acme/app"
-	backlogRepository := "acme/backlog"
-	issuesSource := models.FactoryOnboardingIssuesSourceVCS
-	agentHarness := models.FactoryOnboardingAgentHarnessClaudeCode
-	appID := uuid.New().String()
-	lineID := uuid.New().String()
-	require.NoError(s.t, factory.CompleteOnboarding(database.DB(s.t.Context()), models.FactoryOnboardingPatch{
-		VCSIntegrationID:   &vcsID,
-		AgentIntegrationID: &agentID,
-		AppRepository:      &appRepository,
-		BacklogRepository:  &backlogRepository,
-		IssuesSource:       &issuesSource,
-		AgentHarness:       &agentHarness,
-		ProvisionedAppID:   &appID,
-		ProvisionedLineID:  &lineID,
-	}))
+	support.CompleteFactoryOnboarding(s.t, factory)
 }
 
 func (s *factorySteps) fillFactorySettingsName(name string) {
@@ -141,6 +121,13 @@ func (s *factorySteps) assertFactoryVisibleInSidebar(name string) {
 	s.session.AssertText(name)
 }
 
+func (s *factorySteps) assertFactorySettingsName(name string) {
+	page := s.session.Page()
+	value, err := page.GetByTestId("factory-settings-name").InputValue()
+	require.NoError(s.t, err)
+	require.Equal(s.t, name, value)
+}
+
 func (s *factorySteps) assertFactorySavedInDB(factoryID uuid.UUID, name, description string) {
 	factory, err := models.FindFactory(database.DB(s.t.Context()), s.session.OrgID, factoryID)
 	require.NoError(s.t, err)
@@ -161,10 +148,6 @@ func (s *factorySteps) confirmDeleteFactory() {
 
 func (s *factorySteps) assertRedirectedToFactoriesList() {
 	s.session.WaitForBrowserPath("/" + s.session.OrgID.String() + "/workspaces")
-}
-
-func (s *factorySteps) assertFactoryVisibleInList(name string) {
-	s.session.AssertText(name)
 }
 
 func (s *factorySteps) assertFactoryNotVisibleInList(name string) {

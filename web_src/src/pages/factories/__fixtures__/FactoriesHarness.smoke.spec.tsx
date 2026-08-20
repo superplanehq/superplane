@@ -12,6 +12,7 @@ import {
 } from "./factoryPageResponses";
 import { factorySettingsPath } from "../lib/factoryPagePaths";
 import { FactoriesHarness } from "./FactoriesHarness";
+import { CONNECTED_SETUP_INTEGRATIONS, SETUP_ANSWERS, factoriesFixtureWithSetupAnswers } from "./setupStoryFixtures";
 
 describe("FactoriesHarness work orders", () => {
   beforeAll(() => {
@@ -76,4 +77,55 @@ describe("FactoriesHarness work orders", () => {
     await user.click(orgCog);
     expect(await screen.findByTestId("organization-settings-sidebar", {}, { timeout: 8000 })).toBeInTheDocument();
   }, 10000);
+});
+
+describe("FactoriesHarness workspace setup", () => {
+  beforeAll(() => {
+    client.setConfig({ baseUrl: "http://localhost" });
+  });
+
+  it("mounts the same setup page as the app, without workspace chrome", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup`}
+        factoriesFixture={defaultFactoriesFixture}
+        onboardingSeed={{ pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" } }}
+      />,
+    );
+
+    expect(await screen.findByTestId("workspace-setup", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-setup-cancel")).toBeInTheDocument();
+    expect(screen.queryByTestId("factories-sidebar")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("continues from a seeded GitHub connection to the repository list", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup`}
+        factoriesFixture={defaultFactoriesFixture}
+        onboardingSeed={{ pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" } }}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: /acme-github/ }, { timeout: 8000 }));
+
+    expect(await screen.findByRole("option", { name: /acme\/api/ }, { timeout: 8000 })).toBeInTheDocument();
+  }, 15000);
+
+  it("opens the step from the URL with the saved answers restored", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=issues`}
+        factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.repository)}
+        onboardingSeed={{ pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" } }}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("button", { name: /Change backlog repository/ }, { timeout: 8000 }),
+    ).toBeInTheDocument();
+  }, 15000);
 });

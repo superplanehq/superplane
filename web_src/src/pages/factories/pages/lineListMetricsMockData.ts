@@ -6,42 +6,43 @@ import {
 } from "../__fixtures__/factoryPageResponses";
 
 /**
- * Stand-in line-list metrics until an aggregation API exists.
+ * Stand-in line-list metrics for Storybook fixtures.
  *
- * None of these fields exist on the factory-line API yet. This type is the
- * contract a later endpoint should fill.
+ * Live pages load the same shape from `FactoryLine.metrics` on DescribeFactory.
  *
  * Window: last 30 days.
  */
 export type LineListMetrics = {
   /**
-   * Share of closed work orders on this line whose pull request merged to main.
-   * Numerator is merged work orders. Denominator is closed work orders
-   * (merged + not merged). Omit when the line has no closed work orders.
+   * Share of closed work orders on this line that completed or that have a
+   * merged pull request. Numerator is merged work orders. Denominator is
+   * closed work orders (merged + not merged). Omit when the line has no
+   * closed work orders.
    */
   successRatePct: number;
-  /** Merged-to-main work orders in the window (success-rate numerator). */
+  /** Completed or merged work orders in the window (success-rate numerator). */
   mergedCount: number;
   /** Closed work orders in the window (success-rate denominator). */
   totalClosedCount: number;
   /**
-   * Median time from first execution to merge, in minutes, for merged work
-   * orders.
+   * Median summed execution run time, in minutes, for merged work orders.
+   * Unset when the sum is 0.
    */
-  durationMinutes: number;
+  durationMinutes?: number;
   /**
    * Tracked cost (model tokens + execution compute) divided by merged work
-   * orders. Failed and reworked runs raise this number.
+   * orders. Failed and reworked runs raise this number. Unset when cost is
+   * untracked.
    */
-  costPerSuccessUsd: number;
+  costPerSuccessUsd?: number;
   /** Daily success-rate samples in the window, oldest first. 0–100. */
   successTrendPct: number[];
   /** Success-rate points vs the prior 30 days. Positive is better. */
-  successDeltaPts: number;
+  successDeltaPts?: number;
   /** Duration change vs the prior 30 days, in minutes. Negative is better. */
-  durationDeltaMinutes: number;
+  durationDeltaMinutes?: number;
   /** Cost change vs the prior 30 days, in USD. Negative is better. */
-  costDeltaUsd: number;
+  costDeltaUsd?: number;
   /**
    * Merged work orders per day in the window. Completions, not closed
    * work orders.
@@ -111,6 +112,26 @@ export function metricsForLine(lineId: string | undefined): LineListMetrics | nu
     return null;
   }
   return LINE_LIST_METRICS_BY_ID[lineId] ?? null;
+}
+
+export function toLineListMetrics(row: Partial<LineListMetrics> | null | undefined): LineListMetrics | null {
+  if (row == null) {
+    return null;
+  }
+
+  return {
+    successRatePct: row.successRatePct ?? 0,
+    mergedCount: row.mergedCount ?? 0,
+    totalClosedCount: row.totalClosedCount ?? 0,
+    durationMinutes: row.durationMinutes,
+    costPerSuccessUsd: row.costPerSuccessUsd,
+    successTrendPct: row.successTrendPct ?? [],
+    successDeltaPts: row.successDeltaPts,
+    durationDeltaMinutes: row.durationDeltaMinutes,
+    costDeltaUsd: row.costDeltaUsd,
+    throughputPerDay: row.throughputPerDay ?? 0,
+    throughputTrend: row.throughputTrend ?? [],
+  };
 }
 
 export function descriptionForLine(lineId: string | undefined): string | undefined {

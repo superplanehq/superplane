@@ -1,12 +1,30 @@
+import type { OrganizationsIntegration } from "@/api-client";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import { useMemo, useRef, useState } from "react";
 
 import { HomeIntegrationCreateDialog } from "./HomeIntegrationCreateDialog";
-import type { IntegrationInstanceSummary, IntegrationSelections } from "./homeIntegrationStatus";
+import {
+  selectionFromInstance,
+  type IntegrationInstanceSummary,
+  type IntegrationSelections,
+} from "./homeIntegrationStatus";
 import { resolveIntegrationHomeHref, useCreateDialogProps } from "./integrationConnectDialogState";
 import { useHomeIntegrationConnectActions } from "./useHomeIntegrationConnectActions";
 import { useInstallIntegrationSelections, useRefetchOnWindowFocus } from "./useInstallIntegrationSelections";
+
+function selectReadyIntegrationInstance(
+  connected: OrganizationsIntegration[],
+  selections: IntegrationSelections,
+  integrationName: string,
+  integrationId: string,
+): IntegrationSelections | null {
+  const instance = connected?.find(
+    (item) => item.metadata?.integrationName === integrationName && item.metadata?.id === integrationId,
+  );
+  const selection = instance ? selectionFromInstance(instance) : null;
+  return selection?.ready ? { ...selections, [integrationName]: selection } : null;
+}
 
 /**
  * Connect and configure flows for a set of integration types, without any row
@@ -15,14 +33,19 @@ import { useInstallIntegrationSelections, useRefetchOnWindowFocus } from "./useI
  */
 export function useIntegrationConnectDialog({
   organizationId,
+  returnTo,
   integrationNames,
   selections,
   onSelectionsChange,
+  preferredCreateNames,
 }: {
   organizationId: string;
+  returnTo?: string;
   integrationNames: string[];
   selections: IntegrationSelections;
   onSelectionsChange: (selections: IntegrationSelections) => void;
+  /** When set, a new connection uses this name instead of the integration type name. */
+  preferredCreateNames?: Record<string, string>;
 }) {
   const { data: connected = [], refetch } = useConnectedIntegrations(organizationId, {
     enabled: !!organizationId,
@@ -54,11 +77,13 @@ export function useIntegrationConnectDialog({
   });
   useRefetchOnWindowFocus(refetch);
 
+  const preferredCreateName = dialogIntegrationName ? preferredCreateNames?.[dialogIntegrationName] : undefined;
   const { dialogDefinition, dialogPendingInstance, initialWebhookSetup, defaultDialogName } = useCreateDialogProps(
     dialogIntegrationName,
     availableIntegrations,
     connected,
     existingIntegrationNames,
+    preferredCreateName,
   );
   const integrationHomeHref = useMemo(
     () =>
@@ -81,6 +106,11 @@ export function useIntegrationConnectDialog({
       setDialogIntegrationName,
       setConfigureIntegrationId,
     });
+
+  const selectInstance = (integrationName: string, integrationId: string) => {
+    const next = selectReadyIntegrationInstance(connected, selections, integrationName, integrationId);
+    if (next) onSelectionsChange(next);
+  };
 
   const dialogs = (
     <>
@@ -118,6 +148,8 @@ export function useIntegrationConnectDialog({
           void refetch();
         }}
         onRefetch={() => void refetch()}
+        setupReturnTo={returnTo}
+        preferredCreateName={preferredCreateName}
       />
     </>
   );
@@ -126,6 +158,7 @@ export function useIntegrationConnectDialog({
     integrationData,
     requestConnect: openConnectDialog,
     createNew: openCreateIntegrationModal,
+    selectInstance,
     configure: openConfigureDialog,
     dialogs,
   };

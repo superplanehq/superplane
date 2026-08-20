@@ -39,7 +39,19 @@ func (c *FactoryResourceCleaner) Run() (deleted int64, complete bool, err error)
 	remaining := c.limit
 	factoryOrders := c.tx.Model(&FactoryWorkOrder{}).Select("id").Where("factory_id = ?", c.factory.ID)
 
-	count, err := deleteRowsLimited(c.tx, &FactoryWorkOrderExecution{}, remaining, "factory_id = ?", c.factory.ID)
+	// Queue items FK-reference line dispatches, work orders, and lines
+	// (all RESTRICT), so they must go before any of those.
+	count, err := deleteRowsLimited(c.tx, &FactoryWorkOrderQueueItem{}, remaining, "factory_id = ?", c.factory.ID)
+	if err != nil {
+		return deleted, false, fmt.Errorf("delete factory work order queue items: %w", err)
+	}
+	deleted += count
+	remaining -= int(count)
+	if remaining <= 0 {
+		return deleted, false, nil
+	}
+
+	count, err = deleteRowsLimited(c.tx, &FactoryWorkOrderExecution{}, remaining, "factory_id = ?", c.factory.ID)
 	if err != nil {
 		return deleted, false, fmt.Errorf("delete factory work order executions: %w", err)
 	}
@@ -201,6 +213,11 @@ func deleteOrphanFactoryWorkOrdersLimited(tx *gorm.DB, factoryID uuid.UUID, limi
 			NOT EXISTS (
 				SELECT 1 FROM factory_work_order_line_dispatches
 				WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+			)`).
+		Where(`
+			NOT EXISTS (
+				SELECT 1 FROM factory_work_order_queue_items
+				WHERE factory_work_order_queue_items.work_order_id = factory_work_orders.id
 			)`).
 		Where(`
 			NOT EXISTS (

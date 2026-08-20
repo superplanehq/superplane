@@ -28,6 +28,7 @@ export function buildStorybookMeUser(orgId: string) {
       "users",
       "roles",
       "organization",
+      "org",
       "agents",
       "factories",
       "work_orders",
@@ -117,6 +118,10 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       resolve: () => ({ json: {} }),
     },
     { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
+    {
+      pattern: re("/api/v1/organizations/[^/]+/llm-spend"),
+      resolve: () => ({ json: { totalTokens: "0", totalCostCents: "0", periodDays: 30, byModel: [] } }),
+    },
     { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
     {
       pattern: re("/api/v1/organizations/[^/]+"),

@@ -10,6 +10,7 @@ export {
   FactorySettingsNotificationsPage,
   FactorySettingsProfilePage,
   FactorySettingsSoonPage,
+  FactorySettingsUsagePage,
   FACTORY_SETTINGS_NAV_ITEMS,
   isFactorySettingsComingSoon,
   LegacyWorkOrderDetailRedirect,

@@ -14,6 +14,10 @@ import (
 const (
 	FactoryLineStepTypeRunApp = "runApp"
 
+	// DefaultFactoryLineStepMaxParallelism is the number of in-flight runs
+	// a step allows when maxParallelism is not set.
+	DefaultFactoryLineStepMaxParallelism = 10
+
 	factoryLineNameUniqueConstraint = "factory_lines_factory_id_name_key"
 )
 
@@ -28,6 +32,17 @@ type FactoryLineStep struct {
 	Type       string    `json:"type"`
 	AppID      uuid.UUID `json:"app_id"`
 	Entrypoint string    `json:"entrypoint"`
+	// MaxParallelism caps the step's in-flight runs across all work
+	// orders on the line. Unset means the default of 10; there is no
+	// unbounded setting.
+	MaxParallelism *int `json:"max_parallelism,omitempty"`
+}
+
+func (s *FactoryLineStep) EffectiveMaxParallelism() int {
+	if s.MaxParallelism == nil || *s.MaxParallelism < 1 {
+		return DefaultFactoryLineStepMaxParallelism
+	}
+	return *s.MaxParallelism
 }
 
 type FactoryLine struct {
@@ -76,12 +91,15 @@ func (f *Factory) CreateLine(tx *gorm.DB, name string, steps []FactoryLineStep) 
 	return line, nil
 }
 
-// FactoryLineStepResult is the run + execution created by starting a step
-// inside a line dispatch (see FactoryLine.Dispatch and
-// FactoryWorkOrderLineDispatch.StartStep).
+// FactoryLineStepResult is the outcome of making a work order ready for a
+// step (see FactoryLine.Dispatch and
+// FactoryWorkOrderLineDispatch.EnqueueOrStartStep): either the run +
+// execution created by starting it, or — when the step is at its
+// maxParallelism — the queue item created instead (Run and Execution nil).
 type FactoryLineStepResult struct {
 	Run       *CanvasRun
 	Execution *FactoryWorkOrderExecution
+	QueueItem *FactoryWorkOrderQueueItem
 }
 
 const onRunTriggerName = "onRun"

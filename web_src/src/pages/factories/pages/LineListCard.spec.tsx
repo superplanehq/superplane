@@ -37,9 +37,12 @@ describe("LineListCard", () => {
     expect(split).toHaveTextContent("$3.20");
   });
 
-  it("shows dashes when the line has no merged work orders", () => {
+  it("shows zero success rate and completions when the line has no metrics", () => {
     render(<LineListHeroSplit metrics={null} />);
 
-    expect(screen.getByTestId("lines-card-metrics")).toHaveTextContent("—");
+    const split = screen.getByTestId("lines-card-metrics");
+    expect(split).toHaveTextContent("0%");
+    expect(split).toHaveTextContent("0 per day");
+    expect(split).toHaveTextContent("—");
   });
 });

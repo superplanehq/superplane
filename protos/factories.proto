@@ -286,6 +286,17 @@ service Factories {
     };
   }
 
+  rpc DescribeFactoryUsage(DescribeFactoryUsageRequest) returns (DescribeFactoryUsageResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/usage"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe factory LLM spend";
+      description: "Returns token and estimated dollar spend for a workspace, grouped by model";
+      tags: "Factory";
+    };
+  }
+
 }
 
 // Factories
@@ -409,6 +420,10 @@ message FactoryLine {
   message Step {
     string type = 1;
     optional AppStep app = 2;
+    // Maximum in-flight runs for this step across all work orders on the
+    // line. Work orders above this limit wait in the step's queue. Unset
+    // means the server default (10). Must be at least 1 when set.
+    optional int32 max_parallelism = 3;
   }
 
   message AppStep {
@@ -421,6 +436,8 @@ message FactoryLine {
   repeated Step steps = 3;
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp updated_at = 5;
+  // Trailing 30-day summary. Unset when the line has no closed work orders in the window.
+  optional FactoryLineMetrics metrics = 6;
 }
 
 message CreateFactoryLineRequest {
@@ -528,6 +545,31 @@ message WorkOrder {
   // first. A line dispatched twice (e.g. a failed traversal re-dispatched)
   // produces two separate entries here, each with its own step executions.
   repeated WorkOrderLineDispatch line_dispatches = 14;
+  // Current-wait announcements set by automations: what a waiting order
+  // is blocked on and what resolves it. One entry per note key; any
+  // state transition clears the whole set.
+  repeated WorkOrderStatusNote status_notes = 15;
+}
+
+// WorkOrderStatusNote announces what a waiting work order is blocked on
+// and what resolves it. Notes are latest-only per key: setting a note
+// with the same key updates it in place, and a different key sits
+// beside it. Any state transition clears the whole set.
+message WorkOrderStatusNote {
+  string key = 1;
+  string kind = 2;
+  string headline = 3;
+  string body = 4;
+  string cta_label = 5;
+  string cta_url = 6;
+  // Automation that set the note and the run that produced it.
+  AutomationRef automation = 7;
+  string run_id = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  // When true, the work order page hides this note while a line is
+  // running. The default is false: the note stays visible for the
+  // whole open wait.
+  bool show_only_when_waiting = 10;
 }
 
 message WorkOrderCreator {
@@ -579,6 +621,29 @@ message WorkOrderLineDispatch {
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp finished_at = 7;
   repeated WorkOrderExecution step_executions = 8;
+  // Set while the dispatch waits for admission into a step that is at
+  // its maxParallelism. A dispatch waits at no more than one step at a
+  // time; no run or step execution exists for a queued step yet.
+  optional WorkOrderQueueItem queue_item = 9;
+}
+
+// WorkOrderQueueItem is a line dispatch waiting for admission into a step
+// that is at its maxParallelism. The run and step execution are created
+// when the step admits the work order.
+message WorkOrderQueueItem {
+  string id = 1;
+  string step_name = 2;
+  // Zero-based index of the step inside the parent dispatch's `steps`
+  // snapshot.
+  int32 step_index = 3;
+  // 1-based position in the step's FIFO queue across all work orders of
+  // the line.
+  int32 position = 4;
+  google.protobuf.Timestamp created_at = 5;
+  // App (canvas) id of the queued step, from the parent dispatch's steps
+  // snapshot. Lets the UI place the queued work order on the correct
+  // board column even after a line edit moved the step.
+  string app_id = 6;
 }
 
 message WorkOrderExecution {
@@ -876,4 +941,51 @@ message DescribeFactoryVelocityTotals {
   int32 superplane_share_pct = 4;
   // Waste as a percentage of SuperPlane closes (merged + waste), 0-100.
   int32 waste_pct = 5;
+}
+
+// Trailing 30-day line summary nested on FactoryLine.
+
+message FactoryLineMetrics {
+  // Share of closed work orders that completed or that have a merged pull request, 0-100.
+  double success_rate_pct = 1;
+  int32 merged_count = 2;
+  int32 total_closed_count = 3;
+  // Median minutes of summed execution run time among merged work orders. Unset when the sum is 0.
+  optional double duration_minutes = 4;
+  // Execution cost in USD divided by merged work orders. Unset when cost is untracked.
+  optional double cost_per_success_usd = 5;
+  // Cumulative success-rate samples, one per calendar day, oldest first. 0-100.
+  repeated double success_trend_pct = 6;
+  // Success-rate points vs the prior 30 days. Unset when the prior window has no closes.
+  optional double success_delta_pts = 7;
+  // Duration change vs the prior 30 days, in minutes. Unset when either window has no duration.
+  optional double duration_delta_minutes = 8;
+  // Cost change vs the prior 30 days, in USD. Unset when either window has no cost.
+  optional double cost_delta_usd = 9;
+  // Merged work orders per day in the window.
+  double throughput_per_day = 10;
+  // Daily merged-work-order counts, oldest first.
+  repeated int32 throughput_trend = 11;
+}
+
+// LLM spend
+
+message DescribeFactoryUsageRequest {
+  string factory_id = 1;
+  // Period window in days. Defaults to 30. Maximum is 90.
+  int32 period_days = 2;
+}
+
+message DescribeFactoryUsageResponse {
+  int64 total_tokens = 1;
+  int64 total_cost_cents = 2;
+  int32 period_days = 3;
+  repeated UsageByModel by_model = 4;
+}
+
+message UsageByModel {
+  string provider = 1;
+  string model = 2;
+  int64 total_tokens = 3;
+  int64 cost_cents = 4;
 }

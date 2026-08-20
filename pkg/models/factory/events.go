@@ -24,8 +24,15 @@ const (
 	// latest-only state (one row per key, updated in place); the events
 	// keep the score history on the timeline.
 	EventTypeOrderCheckReported = "order.check.reported"
+	// EventTypeOrderStatusNoteUpdated is a websocket-only notification
+	// reason (like EventTypeOrderArtifactUpdated) — it does not back a
+	// timeline event. The status note is current-wait metadata on the
+	// order row; this reason just tells the frontend to refetch the
+	// order. Clearing rides on `order.status.updated`.
+	EventTypeOrderStatusNoteUpdated = "order.status_note.updated"
 
 	// Factory line events
+	EventTypeLineStepExecutionQueued   = "step.execution.queued"
 	EventTypeLineStepExecutionCreated  = "step.execution.created"
 	EventTypeLineStepExecutionFinished = "step.execution.finished"
 )
@@ -62,6 +69,15 @@ const (
 	// CheckFormatBoolean is a pass/fail verdict: score 1 (pass) or 0
 	// (fail) on a max score of 1.
 	CheckFormatBoolean = "boolean"
+)
+
+// Status note kinds. A status note is a display-only announcement of
+// what a waiting work order is blocked on and what resolves it. `info`
+// is the only kind today; the tag exists so future kinds (e.g. an
+// interactive decision prompt) extend the payload instead of changing
+// its meaning.
+const (
+	StatusNoteKindInfo = "info"
 )
 
 // Events
@@ -132,6 +148,16 @@ type WorkOrderCheckReported struct {
 	Check      *CheckRef      `json:"check,omitempty"`
 	Automation *AutomationRef `json:"automation,omitempty"`
 	Run        *RunRef        `json:"run,omitempty"`
+}
+
+// LineStepExecutionQueued is recorded when a work order becomes ready for
+// a step that is at its maxParallelism, so the work order waits in the
+// step's queue instead of starting a run.
+type LineStepExecutionQueued struct {
+	StepName string        `json:"stepName"`
+	Order    *WorkOrderRef `json:"order,omitempty"`
+	Line     *LineRef      `json:"line,omitempty"`
+	App      *AppRef       `json:"app,omitempty"`
 }
 
 type LineStepExecutionCreated struct {
