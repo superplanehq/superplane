@@ -9,6 +9,7 @@ import { DaysOfWeekFieldRenderer } from "./DaysOfWeekFieldRenderer";
 import { ExpressionFieldRenderer } from "./ExpressionFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
+import { HostedModelFieldRenderer } from "./HostedModelFieldRenderer";
 import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
 import { AppFieldRenderer } from "./AppFieldRenderer";
 import { AppCanvasNodeFieldRenderer } from "./AppCanvasNodeFieldRenderer";
@@ -318,6 +319,8 @@ function renderFallbackField(commonProps: FieldRendererProps) {
       return <NumberFieldRenderer {...commonProps} />;
     case "boolean":
       return <BooleanFieldRenderer {...commonProps} />;
+    case "hosted-model":
+      return <HostedModelFieldRenderer {...commonProps} />;
     case "select":
       return <SelectFieldRenderer {...commonProps} />;
     case "multi-select":
