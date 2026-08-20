@@ -375,6 +375,29 @@ func CreateFactoryLineDispatch(
 	return &dispatch
 }
 
+// CompleteFactoryOnboarding marks a factory as past the setup wizard so
+// workspace pages render instead of redirecting to /setup.
+func CompleteFactoryOnboarding(t require.TestingT, factory *models.Factory) {
+	vcsID := uuid.New().String()
+	agentID := uuid.New().String()
+	appRepository := "acme/app"
+	backlogRepository := "acme/backlog"
+	issuesSource := models.FactoryOnboardingIssuesSourceVCS
+	agentHarness := models.FactoryOnboardingAgentHarnessClaudeCode
+	appID := uuid.New().String()
+	lineID := uuid.New().String()
+	require.NoError(t, factory.CompleteOnboarding(database.Conn(), models.FactoryOnboardingPatch{
+		VCSIntegrationID:   &vcsID,
+		AgentIntegrationID: &agentID,
+		AppRepository:      &appRepository,
+		BacklogRepository:  &backlogRepository,
+		IssuesSource:       &issuesSource,
+		AgentHarness:       &agentHarness,
+		ProvisionedAppID:   &appID,
+		ProvisionedLineID:  &lineID,
+	}))
+}
+
 // CreateFactoryAppWithOnRunTrigger creates a factory-owned canvas with a
 // single onRun-triggered node, ready to be used as a factory line step's
 // entrypoint.

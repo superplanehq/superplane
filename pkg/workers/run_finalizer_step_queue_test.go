@@ -147,6 +147,12 @@ func reloadDispatch(t *testing.T, dispatchID uuid.UUID) *models.FactoryWorkOrder
 	return dispatch
 }
 
+func assertExecutionRunID(t *testing.T, expected uuid.UUID, execution models.FactoryWorkOrderExecution) {
+	t.Helper()
+	require.NotNil(t, execution.RunID)
+	assert.Equal(t, expected, *execution.RunID)
+}
+
 func Test__StepQueue_DispatchQueuesWhenStepAtCapacity(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -224,7 +230,7 @@ func Test__StepQueue_TerminalRunAdmitsOldestQueuedWorkOrder(t *testing.T) {
 	require.Len(t, admitted, 1)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, admitted[0].Status)
 	assert.Equal(t, secondDispatch.ID, admitted[0].LineDispatchID)
-	assert.Equal(t, pending[0].runID, admitted[0].RunID)
+	assertExecutionRunID(t, pending[0].runID, admitted[0])
 
 	// Third is still queued, now first in line: only one slot was freed.
 	thirdItem = queueItemForDispatch(t, thirdDispatch.ID)
@@ -315,7 +321,7 @@ func Test__StepQueue_ClosedWorkOrderIsSkippedAtAdmission(t *testing.T) {
 	admitted := executionsForOrder(t, third.ID)
 	require.Len(t, admitted, 1)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, admitted[0].Status)
-	assert.Equal(t, pending[0].runID, admitted[0].RunID)
+	assertExecutionRunID(t, pending[0].runID, admitted[0])
 }
 
 // A raised maxParallelism can leave free slots while dispatches wait in
@@ -365,11 +371,11 @@ func Test__StepQueue_RaisedCapacityKeepsFifoOrder(t *testing.T) {
 
 	secondExecutions := executionsForOrder(t, second.ID)
 	require.Len(t, secondExecutions, 1)
-	assert.Equal(t, pending[0].runID, secondExecutions[0].RunID)
+	assertExecutionRunID(t, pending[0].runID, secondExecutions[0])
 
 	thirdExecutions := executionsForOrder(t, third.ID)
 	require.Len(t, thirdExecutions, 1)
-	assert.Equal(t, pending[1].runID, thirdExecutions[0].RunID)
+	assertExecutionRunID(t, pending[1].runID, thirdExecutions[0])
 
 	// Each admitted order is reported for a websocket update after commit.
 	require.Len(t, updates, 2)
@@ -426,5 +432,5 @@ func Test__StepQueue_AdvancementQueuesWhenNextStepAtCapacity(t *testing.T) {
 		First(&admitted).Error)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, admitted.Status)
 	assert.Equal(t, secondDispatch.ID, admitted.LineDispatchID)
-	assert.Equal(t, thirdPending[0].runID, admitted.RunID)
+	assertExecutionRunID(t, thirdPending[0].runID, admitted)
 }

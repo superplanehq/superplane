@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,7 +36,7 @@ type FactoryWorkOrderExecution struct {
 	LineDispatchID uuid.UUID
 	StepIndex      int
 	StepName       string
-	RunID          uuid.UUID
+	RunID          *uuid.UUID
 	Status         string
 	Result         string
 	// Aggregate usage populated by runners. Both default to zero; the API
@@ -118,22 +119,63 @@ func (e *FactoryWorkOrderExecution) MarkFinished(tx *gorm.DB, result string) err
 		return nil
 	}
 
+	if err := e.setFinished(tx, result); err != nil {
+		return err
+	}
+
+	return e.RecordFinished(tx, result)
+}
+
+func (e *FactoryWorkOrderExecution) setFinished(tx *gorm.DB, result string) error {
+	if e.Status == FactoryWorkOrderExecutionStatusFinished {
+		return nil
+	}
+
 	now := time.Now()
 	e.Status = FactoryWorkOrderExecutionStatusFinished
 	e.Result = result
 	e.UpdatedAt = now
 	e.FinishedAt = &now
 
-	if err := tx.Model(e).Updates(map[string]any{
+	return tx.Model(e).Updates(map[string]any{
 		"status":      FactoryWorkOrderExecutionStatusFinished,
 		"result":      result,
 		"updated_at":  now,
 		"finished_at": &now,
-	}).Error; err != nil {
+	}).Error
+}
+
+// abortInFlightFactoryStepForDeletedRun finishes a pending or running
+// factory step as cancelled before its canvas run is removed. Finished
+// history rows stay as they are. In-flight rows would otherwise keep a
+// parallelism slot with a null run_id after ON DELETE SET NULL.
+func abortInFlightFactoryStepForDeletedRun(tx *gorm.DB, runID uuid.UUID) error {
+	execution, err := FindWorkOrderExecutionByRunID(tx, runID)
+	if err != nil {
+		if errors.Is(err, ErrFactoryWorkOrderExecutionNotFound) {
+			return nil
+		}
 		return err
 	}
 
-	return e.RecordFinished(tx, result)
+	return execution.abortForDeletedRun(tx)
+}
+
+func (e *FactoryWorkOrderExecution) abortForDeletedRun(tx *gorm.DB) error {
+	if e.Status == FactoryWorkOrderExecutionStatusFinished {
+		return nil
+	}
+
+	if err := e.setFinished(tx, CanvasRunResultCancelled); err != nil {
+		return err
+	}
+
+	dispatch, err := FindWorkOrderLineDispatch(tx, e.LineDispatchID)
+	if err != nil {
+		return err
+	}
+
+	return dispatch.Finish(tx, CanvasRunResultCancelled)
 }
 
 func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) error {
@@ -155,7 +197,11 @@ func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) e
 		return err
 	}
 
-	run, err := LockCanvasRunInTransaction(tx, e.RunID)
+	if e.RunID == nil {
+		return fmt.Errorf("work order execution %s has no run", e.ID)
+	}
+
+	run, err := LockCanvasRunInTransaction(tx, *e.RunID)
 	if err != nil {
 		return err
 	}
@@ -190,7 +236,7 @@ func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) e
 // of being joined/serialized per execution.
 type FactoryWorkOrderExecutionRecord struct {
 	FactoryWorkOrderExecution
-	CanvasID   uuid.UUID
+	CanvasID   *uuid.UUID
 	CanvasName string
 	RunState   string
 	RunResult  string
@@ -213,12 +259,12 @@ func ListFactoryWorkOrderExecutionsByLineDispatchIDs(
 		Select(`
 			e.*,
 			c.id AS canvas_id,
-			c.name AS canvas_name,
-			r.state AS run_state,
-			r.result AS run_result
+			COALESCE(c.name, '') AS canvas_name,
+			COALESCE(r.state, '') AS run_state,
+			COALESCE(r.result, '') AS run_result
 		`).
-		Joins("JOIN workflow_runs r ON r.id = e.run_id").
-		Joins("JOIN workflows c ON c.id = r.workflow_id").
+		Joins("LEFT JOIN workflow_runs r ON r.id = e.run_id").
+		Joins("LEFT JOIN workflows c ON c.id = r.workflow_id").
 		Where("e.line_dispatch_id IN ?", lineDispatchIDs).
 		Order("e.created_at ASC").
 		Order("e.id ASC").
