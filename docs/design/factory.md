@@ -158,9 +158,9 @@ Rules:
 
 - Population: work orders currently `closed`, with at least one execution, whose latest `order.status.updated` event with `toState=closed` falls in the window. Close time is that event, not `updated_at`.
 - Line attribution: `line_id` of the latest execution (`created_at`, then `id`).
-- Success: a closed work order counts as merged when it has a PR artifact with `data.state=merged` or a set `merged_at`. Success rate is merged / closed. Work order `result=completed` is not a merge proxy.
+- Success: a closed work order counts as merged when its `result` is `completed`. It also counts as merged when a PR artifact has `merged_at`, `data.state=merged`, or GitHub-native `data.merged=true`. Success rate is merged / closed.
 - Completions: `mergedCount / 30`. `throughputTrend` is daily merged counts by close day, oldest first.
-- Duration: median minutes from first execution `created_at` to PR `merged_at` among merged work orders. Omitted when nothing merged.
+- Duration: median minutes from first execution `created_at` to merge time among merged work orders. Merge time is PR `merged_at`. SuperPlane uses the close event when that stamp is missing. Omitted when nothing merged.
 - Cost per success: `SUM(execution.cost_cents) / mergedCount / 100` across all executions of those closed work orders. Omitted when the sum is 0 (usage is not written yet).
 - `successTrendPct` is the cumulative success rate from the start of the window through each day.
 - Deltas compare current vs prior window. A delta is omitted when the prior window has no comparable data.
