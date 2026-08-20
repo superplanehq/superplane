@@ -103,6 +103,17 @@ describe("api-interceptor", () => {
     expect(locationHref).toBe("http://localhost/dashboard?tab=overview");
   });
 
+  it("does not hard-redirect the account session probe on 401", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(new Response("", { status: 401 }));
+    const { setupApiInterceptor } = await import("@/lib/api-interceptor");
+
+    setupApiInterceptor();
+
+    const response = await globalThis.fetch("/account");
+    expect(response.status).toBe(401);
+    expect(locationHref).toBe("http://localhost/dashboard?tab=overview");
+  });
+
   it("does not redirect auth routes", async () => {
     pathname = "/login";
     search = "";
