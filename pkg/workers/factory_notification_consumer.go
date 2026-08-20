@@ -320,6 +320,13 @@ func workOrderNotificationCandidates(
 		for _, assignee := range order.Assignees {
 			add(assignee.UserID, models.NotificationTypeWorkOrderArtifactOwned)
 		}
+	case factory.EventTypeOrderStatusNoteUpdated:
+		for _, assignee := range order.Assignees {
+			add(assignee.UserID, models.NotificationTypeWorkOrderStatusNoteOwned)
+		}
+		if order.CreatedByID != nil {
+			add(*order.CreatedByID, models.NotificationTypeWorkOrderStatusNoteOwned)
+		}
 	}
 
 	return candidates
@@ -385,6 +392,10 @@ func buildWorkOrderNotificationContent(
 	case factory.EventTypeOrderArtifactAdded:
 		content.Subject = fmt.Sprintf("[%s] New artifact", orderKey)
 		content.Data.Summary = fmt.Sprintf("%s added a %s artifact to %s.", actorName, artifactTypeLabel(message.ArtifactType), orderKey)
+	case factory.EventTypeOrderStatusNoteUpdated:
+		content.Subject = fmt.Sprintf("[%s] %s", orderKey, message.StatusNoteHeadline)
+		content.Data.Summary = fmt.Sprintf("%s flagged %s as waiting on you: %s.", actorName, orderKey, message.StatusNoteHeadline)
+		content.Data.Detail = truncateNotificationDetail(statusNoteDetail(message))
 	default:
 		content.Subject = fmt.Sprintf("[%s] Work order update", orderKey)
 		content.Data.Summary = fmt.Sprintf("%s updated %s.", actorName, orderKey)
@@ -412,6 +423,24 @@ func statusChangeDescription(message messages.FactoryWorkOrderNotificationMessag
 	default:
 		return "updated"
 	}
+}
+
+// statusNoteDetail folds the note body and its call-to-action (if any)
+// into the single Detail line the shared email template renders. The
+// template has no secondary link slot, so the CTA is appended as plain
+// text; the primary "Open the work order in SuperPlane" link already
+// covers navigating back to SuperPlane.
+func statusNoteDetail(message messages.FactoryWorkOrderNotificationMessage) string {
+	detail := message.StatusNoteBody
+	if message.StatusNoteCtaLabel == "" || message.StatusNoteCtaURL == "" {
+		return detail
+	}
+
+	cta := fmt.Sprintf("%s: %s", message.StatusNoteCtaLabel, message.StatusNoteCtaURL)
+	if detail == "" {
+		return cta
+	}
+	return detail + "\n\n" + cta
 }
 
 func artifactTypeLabel(artifactType string) string {

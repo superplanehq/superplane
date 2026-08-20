@@ -24,11 +24,16 @@ const (
 	// latest-only state (one row per key, updated in place); the events
 	// keep the score history on the timeline.
 	EventTypeOrderCheckReported = "order.check.reported"
-	// EventTypeOrderStatusNoteUpdated is a websocket-only notification
-	// reason (like EventTypeOrderArtifactUpdated) — it does not back a
-	// timeline event. The status note is current-wait metadata on the
-	// order row; this reason just tells the frontend to refetch the
-	// order. Clearing rides on `order.status.updated`.
+	// EventTypeOrderStatusNoteUpdated does not back a timeline event
+	// (like EventTypeOrderArtifactUpdated): the status note is
+	// current-wait metadata on the order row, not a discrete history
+	// entry, so the websocket fan-out just tells the frontend to
+	// refetch the order. It does, however, back an email notification
+	// (see FactoryContext.SetWorkOrderStatusNote): a note is how a line
+	// tells an order's owners/creator it's waiting on their review, so
+	// setting one publishes a FactoryWorkOrderNotificationMessage the
+	// same way status changes and comments do. Clearing rides on
+	// `order.status.updated`.
 	EventTypeOrderStatusNoteUpdated = "order.status_note.updated"
 
 	// Factory line events

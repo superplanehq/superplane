@@ -261,6 +261,17 @@ func (c *FactoryContext) SetWorkOrderStatusNote(params core.SetWorkOrderStatusNo
 	}
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderStatusNoteUpdated)
+	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
+		OrganizationID:     order.OrganizationID.String(),
+		FactoryID:          order.FactoryID.String(),
+		OrderID:            order.ID.String(),
+		EventType:          factory.EventTypeOrderStatusNoteUpdated,
+		ActorName:          c.automationName(),
+		StatusNoteHeadline: note.Headline,
+		StatusNoteBody:     note.Body,
+		StatusNoteCtaLabel: note.CtaLabel,
+		StatusNoteCtaURL:   note.CtaURL,
+	})
 	return statusNoteToCore(order, note), nil
 }
 
