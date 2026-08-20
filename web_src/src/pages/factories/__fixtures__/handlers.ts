@@ -12,6 +12,8 @@ import { DEFAULT_CHECKS_BY_ORDER_ID } from "./workOrderCheckFixtures";
 import type {
   FactoriesFactory,
   FactoriesFactoryLine,
+  FactoriesFactoryOnboarding,
+  FactoriesUpdateFactoryOnboardingBody,
   FactoriesWorkOrder,
   FactoriesWorkOrderEvent,
   FactoriesWorkOrderLineDispatch,
@@ -152,6 +154,37 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
       resolve: (match) => ({ json: fixture.usageByFactoryId?.[match[1]] ?? EMPTY_USAGE_REPORT }),
     },
   ];
+}
+
+function mergedOnboarding(
+  current: FactoriesFactoryOnboarding | undefined,
+  request: FactoriesUpdateFactoryOnboardingBody,
+): FactoriesFactoryOnboarding {
+  const next: FactoriesFactoryOnboarding = { ...current };
+  if (request.vcsIntegrationId) next.vcsIntegrationId = request.vcsIntegrationId;
+  if (request.agentIntegrationId) next.agentIntegrationId = request.agentIntegrationId;
+  if (request.appRepository) next.appRepository = request.appRepository;
+  if (request.backlogRepository) next.backlogRepository = request.backlogRepository;
+  if (request.issuesSource) next.issuesSource = request.issuesSource;
+  if (request.agentHarness) next.agentHarness = request.agentHarness;
+  if (request.provisionedAppId) next.provisionedAppId = request.provisionedAppId;
+  if (request.provisionedLineId) next.provisionedLineId = request.provisionedLineId;
+  if (request.complete) next.completedAt = new Date().toISOString();
+  return next;
+}
+
+/** Persists workspace setup answers so setup stories advance step by step. */
+function factoryOnboardingRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/onboarding"),
+    resolve: (match, method, body) => {
+      if (method !== "PATCH") return null;
+      const factory = fixture.factories.find((entry) => entry.id === match[1]);
+      if (!factory) return { json: {} };
+      factory.onboarding = mergedOnboarding(factory.onboarding, (body ?? {}) as FactoriesUpdateFactoryOnboardingBody);
+      return { json: { factory: factoryWithLineMetrics(factory) } };
+    },
+  };
 }
 
 function factoryLinesRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
@@ -424,6 +457,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     meRoute(),
     notificationSettingsRoute(fixture),
     ...factoryDetailRoutes(fixture),
+    factoryOnboardingRoute(fixture),
     ...factoryLinesRoutes(fixture),
     ...workOrderRoutes(fixture),
     organizationLlmSpendRoute(fixture),
