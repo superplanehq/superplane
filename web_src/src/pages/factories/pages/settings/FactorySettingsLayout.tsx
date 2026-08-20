@@ -1,9 +1,7 @@
-import { useAccount } from "@/contexts/useAccount";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
-import type { ReactNode } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useParams } from "react-router";
 import {
   factoryRouteNeedsCanonicalRedirect,
@@ -13,8 +11,12 @@ import {
 import { factoryDetailPath, factoryListPath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
-import { FactorySettingsYouSection } from "./FactorySettingsYouSection";
-import { FACTORY_SETTINGS_NAV_ITEMS, type FactorySettingsNavItem } from "./settingsNavItems";
+import {
+  FACTORY_SETTINGS_NAV_ITEMS,
+  isYouSettingsSection,
+  settingsSectionFromPathname,
+  type FactorySettingsNavItem,
+} from "./settingsNavItems";
 
 export function FactorySettingsLayout() {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
@@ -72,8 +74,9 @@ function FactorySettingsLayoutContent({
   factoryKey: string;
 }) {
   useFactoriesThemeClass();
-  const { account } = useAccount();
+  const { pathname } = useLocation();
   const { data: factory, isLoading, error } = useFactory(organizationId, factoryId);
+  const isProfileSettings = isYouSettingsSection(settingsSectionFromPathname(pathname));
 
   // See the matching comment in `FactoriesLayout`: once `factory` has loaded
   // the `<Outlet/>` below mounts a leaf settings page that owns the full
@@ -95,6 +98,7 @@ function FactorySettingsLayoutContent({
 
   const workspaceGroup = FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.group === "workspace");
   const governanceGroup = FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.group === "governance");
+  const youGroup = FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.group === "you");
 
   return (
     <FactorySettingsLayoutContext.Provider value={{ organizationId, factoryId, factory }}>
@@ -112,28 +116,24 @@ function FactorySettingsLayoutContent({
               <ArrowLeft className="size-3.5" aria-hidden />
               Back to workspace
             </NavLink>
-            <p
-              className="mt-2 truncate px-2.5 text-[13px] font-medium tracking-[-0.01em] text-foreground"
-              title={factory.name ?? undefined}
-              data-testid="factory-settings-workspace-name"
-            >
-              {factory.name}
-            </p>
+            {isProfileSettings ? (
+              <p
+                className="mt-2 truncate px-2.5 text-[13px] font-medium tracking-[-0.01em] text-foreground"
+                data-testid="factory-settings-profile-title"
+              >
+                Profile settings
+              </p>
+            ) : null}
           </div>
-          <nav className="flex min-h-0 flex-1 flex-col">
-            <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-2 py-4">
-              <SettingsNavSection badge="Workspace" badgeClassName="bg-foreground text-background">
+          <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 py-4">
+            {isProfileSettings ? (
+              <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={youGroup} />
+            ) : (
+              <div className="flex flex-col gap-4" data-testid="factory-settings-workspace-nav">
                 <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={workspaceGroup} />
                 <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={governanceGroup} />
-              </SettingsNavSection>
-            </div>
-            <FactorySettingsYouSection
-              organizationId={organizationId}
-              factoryKey={factoryKey}
-              userName={account?.name ?? "You"}
-              userEmail={account?.email}
-              userAvatarUrl={account?.avatar_url}
-            />
+              </div>
+            )}
           </nav>
         </aside>
         <main className="flex min-h-screen min-w-0 flex-1 flex-col bg-background">
@@ -141,29 +141,6 @@ function FactorySettingsLayoutContent({
         </main>
       </div>
     </FactorySettingsLayoutContext.Provider>
-  );
-}
-
-function SettingsNavSection({
-  badge,
-  badgeClassName,
-  children,
-}: {
-  badge: string;
-  badgeClassName: string;
-  children: ReactNode;
-}) {
-  return (
-    <div>
-      <p className="px-2.5 pb-2">
-        <span
-          className={cn("inline rounded px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide", badgeClassName)}
-        >
-          {badge}
-        </span>
-      </p>
-      <div className="flex flex-col gap-4">{children}</div>
-    </div>
   );
 }
 

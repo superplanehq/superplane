@@ -5,6 +5,8 @@ import {
   factoryDetailPath,
   factorySettingsGeneralPathAfterKeyChange,
   legacyWorkOrderDetailPath,
+  organizationSettingsPath,
+  organizationSettingsSectionPath,
   workOrderDetailPath,
   workOrdersPath,
 } from "./factoryPagePaths";
@@ -56,5 +58,12 @@ describe("factorySettingsGeneralPathAfterKeyChange", () => {
 describe("factoryAppConfigurePath", () => {
   it("adds configure=1", () => {
     expect(factoryAppConfigurePath("org-1", "SP", "app-1")).toBe("/org-1/workspaces/SP/apps/app-1?configure=1");
+  });
+});
+
+describe("organizationSettingsPath", () => {
+  it("builds organization settings under the current workspace", () => {
+    expect(organizationSettingsPath("org-1", "RF")).toBe("/org-1/workspaces/RF/organization");
+    expect(organizationSettingsSectionPath("org-1", "RF", "general")).toBe("/org-1/workspaces/RF/organization/general");
   });
 });

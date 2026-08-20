@@ -36,7 +36,28 @@ export const FACTORY_SETTINGS_NAV_ITEMS: FactorySettingsNavItem[] = [
 ];
 
 const IMPLEMENTED_SETTINGS_SECTIONS = new Set<FactorySettingsSection>(["general", "usage", "profile", "notifications"]);
+const SETTINGS_SECTIONS = new Set<string>(FACTORY_SETTINGS_NAV_ITEMS.map((item) => item.id));
 
 export function isFactorySettingsComingSoon(item: FactorySettingsNavItem) {
   return !IMPLEMENTED_SETTINGS_SECTIONS.has(item.id);
+}
+
+export function settingsSectionFromPathname(pathname: string): FactorySettingsSection | undefined {
+  const segments = pathname.split("/").filter(Boolean);
+  const settingsIndex = segments.lastIndexOf("settings");
+  if (settingsIndex === -1) {
+    return undefined;
+  }
+  const section = segments[settingsIndex + 1];
+  if (!section || !SETTINGS_SECTIONS.has(section)) {
+    return undefined;
+  }
+  return section as FactorySettingsSection;
+}
+
+export function isYouSettingsSection(section: FactorySettingsSection | undefined): boolean {
+  if (!section) {
+    return false;
+  }
+  return FACTORY_SETTINGS_NAV_ITEMS.some((item) => item.group === "you" && item.id === section);
 }
