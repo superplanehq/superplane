@@ -9,8 +9,8 @@ export function edgePalette(isDark: boolean) {
   return factoryEdgePalette(isDark);
 }
 
-export function backgroundColors(isDark: boolean) {
-  return factoryCanvasBackground(isDark);
+export function backgroundColors(isDark: boolean, isEditing = false) {
+  return factoryCanvasBackground(isDark, isEditing);
 }
 
 export function buildWorkflowGraph(editable = false): { nodes: Node<StepNodeData>[]; edges: Edge[] } {

@@ -63,6 +63,7 @@ import {
   useCanvasToolSidebarState,
   type CanvasToolSidebarState,
 } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import { FactoryCanvasToolSidebar } from "@/pages/factories/agent/FactoryCanvasToolSidebar";
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { countUnacknowledgedErrors } from "@/pages/app/lib/canvas-runs";
@@ -106,6 +107,7 @@ import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { enrichCanvasNodes, type EnrichedCanvasNodeCacheEntry } from "./enrichCanvasNodes";
 import { buildStyledCanvasEdges } from "./factoryCanvasEdgeStyle";
 import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
+import { publishBuildingBlocksSidebarChanged, useBuildingBlocksSidebarRequest } from "./buildingBlocksSidebarRequest";
 import { RightSideControls } from "./RightSideControls";
 import { computeAppendFromNodePlacement } from "./appendFromNodePlacement";
 import { selectCreatedRerun } from "./runInspectionRerunSelection";
@@ -278,6 +280,10 @@ export interface CanvasPageProps {
   hideAddControls?: boolean;
   /** Hide the Agent / Versions left panel toggle (templates only). */
   hideCanvasToolSidebar?: boolean;
+  /** Hide the + / note rail. Factory edit mode uses header workspace toggles instead. */
+  hideRightSideControls?: boolean;
+  /** Overlay on the canvas column (factory YAML workspace). */
+  canvasOverlay?: ReactNode;
   /** Hide the top PageHeader / SecondaryHeader chrome (factory embed shell owns the header). */
   hidePageChrome?: boolean;
   /** Enables managed agent chat controls when the user has the required RBAC permissions. */
@@ -439,6 +445,10 @@ export interface CanvasPageProps {
    * selected, and chrome is Close-only (no newer/older/copy link).
    */
   factoryEmbed?: boolean;
+  /** Factory-shell Configure. Drives edit-grid dots before the draft session is ready. */
+  factoryConfigure?: boolean;
+  /** Storybook-only factory edit workspace. Live factory canvas ignores this. */
+  factoryEditWorkspace?: boolean;
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -810,7 +820,7 @@ function CanvasPage(props: CanvasPageProps) {
   const hasUserToggledSidebarRef = props.hasUserToggledSidebarRef ?? localHasUserToggledSidebarRef;
   const isSidebarOpenRef = props.isSidebarOpenRef ?? localIsSidebarOpenRef;
 
-  if (isSidebarOpenRef.current === null && typeof window !== "undefined") {
+  if (isSidebarOpenRef.current === null && typeof window !== "undefined" && !props.factoryEmbed) {
     const storedSidebarState = window.localStorage.getItem(CANVAS_SIDEBAR_STORAGE_KEY);
     if (storedSidebarState !== null) {
       try {
@@ -822,13 +832,15 @@ function CanvasPage(props: CanvasPageProps) {
     }
   }
 
-  // Initialize sidebar state from ref if available, otherwise based on whether nodes exist
+  // Factory embed opens from the Components tab (`blocks=1`), not from empty
+  // canvases or the shared localStorage preference.
   const [isBuildingBlocksSidebarOpen, setIsBuildingBlocksSidebarOpen] = useState(() => {
-    // If we have a persisted state in the ref, use it
+    if (props.factoryEmbed) {
+      return isSidebarOpenRef.current === true;
+    }
     if (isSidebarOpenRef.current !== null) {
       return isSidebarOpenRef.current;
     }
-    // Otherwise, open if no nodes exist
     return props.nodes.length === 0;
   });
 
@@ -1109,7 +1121,7 @@ function CanvasPage(props: CanvasPageProps) {
     [props, readOnly],
   );
 
-  const handleSidebarToggle = useCallback(
+  const applyBuildingBlocksSidebarOpen = useCallback(
     (open: boolean) => {
       hasUserToggledSidebarRef.current = true;
       isSidebarOpenRef.current = open;
@@ -1120,6 +1132,18 @@ function CanvasPage(props: CanvasPageProps) {
     },
     [hasUserToggledSidebarRef, isSidebarOpenRef],
   );
+
+  const handleSidebarToggle = useCallback(
+    (open: boolean) => {
+      applyBuildingBlocksSidebarOpen(open);
+      if (props.canvasId) {
+        publishBuildingBlocksSidebarChanged(props.canvasId, open);
+      }
+    },
+    [applyBuildingBlocksSidebarOpen, props.canvasId],
+  );
+
+  useBuildingBlocksSidebarRequest(props.canvasId, applyBuildingBlocksSidebarOpen);
 
   /**
    * Keyboard equivalent of dropping a block onto the canvas via drag-and-drop.
@@ -1471,7 +1495,11 @@ function CanvasPage(props: CanvasPageProps) {
 
       {/* Main content area with sidebar and canvas */}
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        <CanvasToolSidebar toolSidebarState={toolSidebarState} />
+        {props.factoryEmbed && props.factoryEditWorkspace ? (
+          <FactoryCanvasToolSidebar toolSidebarState={toolSidebarState} />
+        ) : (
+          <CanvasToolSidebar toolSidebarState={toolSidebarState} />
+        )}
 
         <CanvasRunsSidebar isOpen={isRunsSidebarOpen}>{props.toolSidebarRunsContent ?? null}</CanvasRunsSidebar>
 
@@ -1479,7 +1507,7 @@ function CanvasPage(props: CanvasPageProps) {
           {props.toolSidebarVersionsContent ?? null}
         </CanvasVersionsSidebar>
 
-        {isPanelHeaderMode(workflowHeaderMode) ? null : props.isEditing ? (
+        {props.hideRightSideControls || isPanelHeaderMode(workflowHeaderMode) ? null : props.isEditing ? (
           props.headerMode === "console" ? null : (
             <RightSideControls
               mode="edit"
@@ -1497,7 +1525,11 @@ function CanvasPage(props: CanvasPageProps) {
         )}
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
           <BuildingBlocksSidebar
-            isOpen={isBuildingBlocksSidebarOpen && !!props.isEditing && allowsBuildingBlocksSidebar(workflowHeaderMode)}
+            isOpen={
+              isBuildingBlocksSidebarOpen &&
+              allowsBuildingBlocksSidebar(workflowHeaderMode) &&
+              (!!props.isEditing || Boolean(props.factoryEmbed && props.factoryEditWorkspace))
+            }
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
             integrations={props.integrations}
@@ -1553,6 +1585,8 @@ function CanvasPage(props: CanvasPageProps) {
                   state={state}
                   factoryId={props.factoryId}
                   factoryEmbed={props.factoryEmbed}
+                  factoryConfigure={props.factoryConfigure}
+                  factoryEditWorkspace={props.factoryEditWorkspace}
                   layoutMode={props.layoutMode}
                   onNodeDelete={handleNodeDelete}
                   onNodesDelete={handleNodesDelete}
@@ -1609,6 +1643,11 @@ function CanvasPage(props: CanvasPageProps) {
             {isComponentSidebarVisibleMode(props.headerMode) && !props.isRunInspectionMode && props.isEditing
               ? renderInspectorSidebar("sidebar")
               : null}
+            {props.canvasOverlay ? (
+              <div className="absolute inset-0 z-20 flex flex-col bg-background" data-testid="canvas-center-overlay">
+                {props.canvasOverlay}
+              </div>
+            ) : null}
           </div>
         </div>
         {runInspectorOpen && props.runNodeDetailRun ? (
@@ -2191,6 +2230,8 @@ function CanvasContent({
   state,
   factoryId,
   factoryEmbed = false,
+  factoryConfigure = false,
+  factoryEditWorkspace = false,
   layoutMode,
   onNodeDelete,
   onNodesDelete,
@@ -2245,6 +2286,8 @@ function CanvasContent({
   state: CanvasPageState;
   factoryId?: string;
   factoryEmbed?: boolean;
+  factoryConfigure?: boolean;
+  factoryEditWorkspace?: boolean;
   layoutMode?: CanvasLayoutMode;
   onNodeDelete?: (nodeId: string) => void;
   onNodesDelete?: (nodeIds: string[]) => void;
@@ -2310,7 +2353,8 @@ function CanvasContent({
   const isReadOnly = readOnly ?? false;
   const flowDirection = resolveCanvasFlowDirection(factoryId);
   const isVerticalFlow = flowDirection === "vertical";
-  const factoryBackground = isVerticalFlow ? factoryCanvasBackground(resolvedTheme === "dark") : null;
+  const factoryEditGrid = Boolean(factoryEditWorkspace && (isEditing || factoryConfigure));
+  const factoryBackground = isVerticalFlow ? factoryCanvasBackground(resolvedTheme === "dark", factoryEditGrid) : null;
   const flowBgColor = factoryBackground?.bgColor ?? (resolvedTheme === "dark" ? DARK_BASE_BG_HEX : "#F1F5F9");
   const flowDotColor = factoryBackground?.color ?? (resolvedTheme === "dark" ? "#374151" : "#cbd5e1");
   const flowDotGap = factoryBackground?.gap ?? 8;
@@ -3334,7 +3378,13 @@ function CanvasContent({
             style={reactFlowStyle}
             className="h-full w-full"
           >
-            <Background gap={flowDotGap} size={flowDotSize} bgColor={flowBgColor} color={flowDotColor} />
+            <Background
+              id={factoryBackground ? `dots-${factoryEditGrid ? "edit" : "view"}-${flowDotSize}` : undefined}
+              gap={flowDotGap}
+              size={flowDotSize}
+              bgColor={flowBgColor}
+              color={flowDotColor}
+            />
             <GlobalCommandPaletteCanvasNodeSearch onSearch={handleNodeSearch} onSelectNode={handleNodeSearchSelect} />
             <Panel
               position="bottom-left"
