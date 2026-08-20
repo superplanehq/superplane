@@ -13,7 +13,7 @@ export function WorkOrderMarkdownArtifactDialog({ open, onClose, title, body }: 
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <DialogContent
         size="large"
-        className="max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto text-left"
+        className="max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-4xl overflow-y-auto text-left"
       >
         <DialogTitle>{title}</DialogTitle>
         <div className="mt-2">
