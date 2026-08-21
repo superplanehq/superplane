@@ -1,9 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { MockInstance } from "vitest";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/ui/dialog";
 
 describe("ui dialog accessibility", () => {
-  let warnSpy: ReturnType<typeof vi.spyOn>;
+  let warnSpy: MockInstance<typeof console.warn>;
 
   beforeEach(() => {
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -52,7 +53,7 @@ describe("ui dialog accessibility", () => {
 
     const describedByWarning = warnSpy.mock.calls
       .flat()
-      .some((entry: unknown) => typeof entry === "string" && entry.includes("aria-describedby"));
+      .some((entry) => typeof entry === "string" && entry.includes("aria-describedby"));
     expect(describedByWarning).toBe(false);
   });
 
