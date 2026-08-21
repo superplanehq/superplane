@@ -5,6 +5,7 @@ import { useCallback, useMemo, type MouseEvent } from "react";
 
 import type { ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { factoryCanvasBackground, factoryEdgePalette } from "@/lib/factoryCanvasChrome";
+import { cn } from "@/lib/utils";
 import { Link } from "@/components/Link/link";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { FactoryNodeCardShell } from "@/ui/factoryNodeChrome/FactoryNodeCardShell";
@@ -19,27 +20,42 @@ type LineNodeData = {
   status: FactoryNodeStatus;
   metrics: string;
   nodeId: string;
+  isSelected: boolean;
   onSelect?: (id: string) => void;
 } & Record<string, unknown>;
 
-function LineCanvasNode({ data, selected }: NodeProps<Node<LineNodeData>>) {
+function LineCanvasNode({ data }: NodeProps<Node<LineNodeData>>) {
   return (
-    <div className="relative" onClick={() => data.onSelect?.(data.nodeId)}>
-      <Handle type="target" position={Position.Top} className="!size-2 !border-border !bg-card" />
-      <FactoryNodeCardShell
-        title={data.title}
-        subtitle={data.subtitle}
-        iconSlug={data.iconSlug}
-        status={data.status}
-        metrics={data.metrics}
-        selected={selected}
-      />
-      <Handle id="default" type="source" position={Position.Bottom} className="!size-2 !border-border !bg-card" />
-      <Handle id="true" type="source" position={Position.Bottom} className="!size-2 !border-border !bg-card" />
-      <Handle id="passed" type="source" position={Position.Bottom} className="!size-2 !border-border !bg-card" />
-      <Handle id="false" type="source" position={Position.Right} className="!size-2 !border-border !bg-card" />
-      <Handle id="failed" type="source" position={Position.Right} className="!size-2 !border-border !bg-card" />
-      <Handle id="found" type="source" position={Position.Bottom} className="!size-2 !border-border !bg-card" />
+    <div
+      className={cn("relative rounded-2xl", data.isSelected && "z-10")}
+      data-testid={`split-run-canvas-node-${data.nodeId}`}
+      data-selected={data.isSelected ? "true" : undefined}
+      aria-selected={data.isSelected}
+      onClick={() => data.onSelect?.(data.nodeId)}
+    >
+      <div
+        className={cn(
+          "rounded-2xl",
+          data.isSelected &&
+            "ring-2 ring-[color:var(--status-running-dot)] ring-offset-2 ring-offset-[color:var(--status-running-bg)]",
+        )}
+      >
+        <Handle type="target" position={Position.Top} className="!size-2 !border-border !bg-card" />
+        <FactoryNodeCardShell
+          title={data.title}
+          subtitle={data.subtitle}
+          iconSlug={data.iconSlug}
+          status={data.status}
+          metrics={data.metrics}
+          selected={data.isSelected}
+        />
+        <Handle id="default" type="source" position={Position.Bottom} className="!size-2 !border-border !bg-card" />
+        <Handle id="true" type="source" position={Position.Bottom} className="!size-2 !border-border !bg-card" />
+        <Handle id="passed" type="source" position={Position.Bottom} className="!size-2 !border-border !bg-card" />
+        <Handle id="false" type="source" position={Position.Right} className="!size-2 !border-border !bg-card" />
+        <Handle id="failed" type="source" position={Position.Right} className="!size-2 !border-border !bg-card" />
+        <Handle id="found" type="source" position={Position.Bottom} className="!size-2 !border-border !bg-card" />
+      </div>
     </div>
   );
 }
@@ -76,6 +92,7 @@ function graphFromCanvas(
           status: canvas.statuses[node.id] ?? "pending",
           metrics: canvas.metrics[node.id] ?? "—",
           nodeId: node.id,
+          isSelected: node.id === selectedId,
           onSelect,
         },
         selected: node.id === selectedId,
@@ -165,6 +182,8 @@ export function CompactLineCanvas({
           fitViewOptions={{ padding: 0.2 }}
           nodesDraggable={false}
           nodesConnectable={false}
+          elementsSelectable
+          selectNodesOnDrag={false}
           panOnScroll
           zoomOnScroll
           onNodeClick={onNodeClick}

@@ -163,7 +163,10 @@ function StreamLine({
               onSelect?.(line.nodeId);
             }
           }}
-          className="flex min-w-0 flex-1 items-baseline gap-2 text-left"
+          className={cn(
+            "flex min-w-0 flex-1 items-baseline gap-2 text-left",
+            line.nodeId && "cursor-pointer hover:text-foreground",
+          )}
         >
           <span className="w-14 shrink-0 tabular-nums text-muted-foreground">{line.at}</span>
           <span

@@ -54,6 +54,17 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByText("Factory Lines")).not.toBeInTheDocument();
   });
 
+  it("selects the canvas component when a log line is clicked", async () => {
+    const user = userEvent.setup();
+    renderSplitRun();
+
+    await user.click(within(screen.getByTestId("split-run-stream-line-create-branch")).getByRole("button"));
+
+    expect(screen.getByTestId("split-run-stream-line-create-branch")).toHaveAttribute("data-highlighted", "true");
+    expect(screen.getByTestId("split-run-canvas-node-create-branch")).toHaveAttribute("data-selected", "true");
+    expect(screen.getByTestId("split-run-canvas-node-onrun-implement")).not.toHaveAttribute("data-selected");
+  });
+
   it("opens Edit from the canvas overflow menu", async () => {
     const user = userEvent.setup();
     render(
@@ -327,5 +338,6 @@ describe("WorkOrderSplitRunPopup", () => {
     await user.click(within(screen.getByTestId("split-run-stream-line-find-work-order")).getByRole("button"));
 
     expect(screen.getByTestId("split-run-stream-line-find-work-order")).toHaveAttribute("data-highlighted", "true");
+    expect(screen.getByTestId("split-run-canvas-node-find-work-order")).toHaveAttribute("data-selected", "true");
   });
 });
