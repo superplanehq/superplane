@@ -7,7 +7,13 @@ import { client } from "@/api-client/client.gen";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { PRIMARY_FACTORY_KEY, REFUND_FACTORY_LINES } from "../../__fixtures__/factoryPageResponses";
+import {
+  FACTORIES_ORGANIZATION_ID,
+  PRIMARY_FACTORY_KEY,
+  REFUND_FACTORY_LINES,
+  RUNNING_WORK_ORDER,
+} from "../../__fixtures__/factoryPageResponses";
+import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 import { lineMetricsFactoriesFixture } from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { WorkOrderPopupRedesignPlayground } from "./WorkOrderPopupRedesignPlayground";
 import { AGENT_WORK_POPUP_RUNNING } from "./workOrderPopupMocks";
@@ -188,6 +194,10 @@ describe("Line board job popup", () => {
     const dialog = await screen.findByTestId("work-order-split-run");
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Add refund reconciliation test" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "Open work order" })).toHaveAttribute(
+      "href",
+      workOrderDetailPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, RUNNING_WORK_ORDER.number ?? "103"),
+    );
     expect(within(dialog).queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
     expect(within(dialog).queryByText("Backlog")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
@@ -220,9 +230,9 @@ describe("Line board job popup", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Ship idempotent refund retries" }));
     dialog = await screen.findByTestId("work-order-split-run");
-    expect(within(dialog).queryByText("Review the pull request")).not.toBeInTheDocument();
+    expect(within(dialog).getByText("Review the pull request")).toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
-    expect(within(dialog).getByText("Verify")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
     await user.click(screen.getByRole("button", { name: "Open Fix refund dispatcher timeout loop" }));

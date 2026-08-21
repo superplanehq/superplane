@@ -7,7 +7,8 @@ import type {
   FactoriesWorkOrderState,
 } from "@/api-client";
 import { cn } from "@/lib/utils";
-import { workOrdersPath } from "./lib/factoryPagePaths";
+import { factoryHomePath, firstFactoryLineId } from "./lib/factoryPagePaths";
+import { latestDispatchForLine } from "./lib/workOrderNumberResolution";
 import { getWorkOrderDisplayKey, type WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 import { factoryContentBodyClassName } from "./pages/factoryPageLayoutStyles";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
@@ -78,7 +79,8 @@ export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps)
       <WorkOrderDetailHeader
         orderTitle={props.order.title ?? "Work Order"}
         orderIdentifier={identifier === "—" ? undefined : identifier}
-        backHref={isDialog ? undefined : workOrdersPath(props.organizationId, props.factoryKey)}
+        backHref={isDialog ? undefined : workOrderBoardBackHref(props)}
+        backLabel="Workspace"
         displayStatus={props.displayStatus}
         isOpen={props.isOpen}
         isDispatchable={props.isDispatchable}
@@ -323,4 +325,11 @@ function WorkOrderStatusNotesSection({
       ))}
     </div>
   );
+}
+
+function workOrderBoardBackHref(
+  props: Pick<WorkOrderDetailLoadedViewProps, "organizationId" | "factoryKey" | "order" | "factoryLines">,
+) {
+  const lineId = latestDispatchForLine(props.order)?.line?.id ?? firstFactoryLineId({ lines: props.factoryLines });
+  return factoryHomePath(props.organizationId, props.factoryKey, lineId);
 }

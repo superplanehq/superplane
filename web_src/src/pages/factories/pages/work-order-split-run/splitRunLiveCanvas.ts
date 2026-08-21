@@ -141,6 +141,127 @@ function liveExecutionsByNode(
   return { nodes, latest };
 }
 
+function compareReadyCanvasNodes(
+  left: { id: string; type?: string },
+  right: { id: string; type?: string },
+  indexById: Map<string, number>,
+): number {
+  const leftTrigger = left.type === "TYPE_TRIGGER" ? 0 : 1;
+  const rightTrigger = right.type === "TYPE_TRIGGER" ? 0 : 1;
+  if (leftTrigger !== rightTrigger) {
+    return leftTrigger - rightTrigger;
+  }
+  return (indexById.get(left.id) ?? 0) - (indexById.get(right.id) ?? 0);
+}
+
+function emptyCanvasGraph(nodes: Array<{ id: string }>): {
+  outgoing: Map<string, string[]>;
+  indegree: Map<string, number>;
+} {
+  const outgoing = new Map<string, string[]>();
+  const indegree = new Map<string, number>();
+  for (const node of nodes) {
+    outgoing.set(node.id, []);
+    indegree.set(node.id, 0);
+  }
+  return { outgoing, indegree };
+}
+
+function addCanvasEdge(
+  outgoing: Map<string, string[]>,
+  indegree: Map<string, number>,
+  sourceId: string,
+  targetId: string,
+) {
+  const next = outgoing.get(sourceId) ?? [];
+  if (next.includes(targetId)) {
+    return;
+  }
+  next.push(targetId);
+  outgoing.set(sourceId, next);
+  indegree.set(targetId, (indegree.get(targetId) ?? 0) + 1);
+}
+
+function fillCanvasGraph(
+  outgoing: Map<string, string[]>,
+  indegree: Map<string, number>,
+  edges: Array<{ sourceId?: string; targetId?: string }> | undefined,
+  knownIds: Set<string>,
+) {
+  for (const edge of edges ?? []) {
+    const sourceId = edge.sourceId;
+    const targetId = edge.targetId;
+    if (!sourceId || !targetId || sourceId === targetId || !knownIds.has(sourceId) || !knownIds.has(targetId)) {
+      continue;
+    }
+    addCanvasEdge(outgoing, indegree, sourceId, targetId);
+  }
+}
+
+function enqueueReadyTargets<T extends { id: string; type?: string }>(
+  nodeId: string,
+  graph: { outgoing: Map<string, string[]>; indegree: Map<string, number> },
+  ctx: { nodes: T[]; indexById: Map<string, number>; ready: T[] },
+) {
+  for (const targetId of graph.outgoing.get(nodeId) ?? []) {
+    const nextDegree = (graph.indegree.get(targetId) ?? 1) - 1;
+    graph.indegree.set(targetId, nextDegree);
+    if (nextDegree !== 0) {
+      continue;
+    }
+    const target = ctx.nodes[ctx.indexById.get(targetId) ?? -1];
+    if (!target) {
+      continue;
+    }
+    ctx.ready.push(target);
+    ctx.ready.sort((left, right) => compareReadyCanvasNodes(left, right, ctx.indexById));
+  }
+}
+
+function walkCanvasOrder<T extends { id: string; type?: string }>(
+  nodes: T[],
+  graph: { outgoing: Map<string, string[]>; indegree: Map<string, number> },
+  indexById: Map<string, number>,
+): string[] {
+  const ready = nodes.filter((node) => graph.indegree.get(node.id) === 0);
+  ready.sort((left, right) => compareReadyCanvasNodes(left, right, indexById));
+  const orderedIds: string[] = [];
+  while (ready.length > 0) {
+    const node = ready.shift();
+    if (!node) {
+      break;
+    }
+    orderedIds.push(node.id);
+    enqueueReadyTargets(node.id, graph, { nodes, indexById, ready });
+  }
+  return orderedIds;
+}
+
+function completeCanvasOrder<T extends { id: string }>(orderedIds: string[], nodes: T[]): string[] {
+  const seen = new Set(orderedIds);
+  for (const node of nodes) {
+    if (!seen.has(node.id)) {
+      orderedIds.push(node.id);
+    }
+  }
+  return orderedIds;
+}
+
+export function orderCanvasNodesTopologically<T extends { id: string; type?: string }>(
+  nodes: T[],
+  edges: Array<{ sourceId?: string; targetId?: string }> | undefined,
+): T[] {
+  if (nodes.length < 2) {
+    return nodes;
+  }
+
+  const indexById = new Map(nodes.map((node, index) => [node.id, index]));
+  const graph = emptyCanvasGraph(nodes);
+  fillCanvasGraph(graph.outgoing, graph.indegree, edges, new Set(indexById.keys()));
+  const orderedIds = completeCanvasOrder(walkCanvasOrder(nodes, graph, indexById), nodes);
+  return orderedIds.map((id) => nodes[indexById.get(id) ?? -1]).filter((node): node is T => Boolean(node));
+}
+
 function streamLineForNode(
   node: ComponentsNode & { id: string },
   execution: CanvasesCanvasNodeExecutionRef | undefined,
@@ -200,7 +321,7 @@ export function streamFromLiveRun(
     return [];
   }
   const seen = new Set<string>();
-  const lines = nodes.map((node) => {
+  const lines = orderCanvasNodesTopologically(nodes, canvas?.spec?.edges).map((node) => {
     seen.add(node.id);
     return streamLineForNode(node, latest.get(node.id));
   });
@@ -210,15 +331,7 @@ export function streamFromLiveRun(
     }
     lines.push(streamLineForNode({ id: execution.nodeId, name: execution.nodeId, type: "TYPE_ACTION" }, execution));
   }
-  return lines.sort((left, right) => {
-    const delta =
-      createdAtMs(latest.get(left.nodeId ?? left.id)?.createdAt) -
-      createdAtMs(latest.get(right.nodeId ?? right.id)?.createdAt);
-    if (delta !== 0) {
-      return delta;
-    }
-    return (left.componentName ?? "").localeCompare(right.componentName ?? "");
-  });
+  return lines;
 }
 
 export function resolveSplitRunVisual(

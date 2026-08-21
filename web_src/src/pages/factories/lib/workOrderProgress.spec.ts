@@ -6,6 +6,7 @@ import {
   WORK_ORDER_BOARD_LANES,
   countActiveWorkOrders,
   filterWorkOrdersByStatus,
+  getWorkOrderDetailDerived,
   getWorkOrderDisplayKey,
   getWorkOrderDisplayStatus,
   getWorkOrderDisplayStatusMeta,
@@ -68,6 +69,37 @@ describe("getWorkOrderDisplayStatus", () => {
         order({
           state: "STATE_OPEN",
           lineDispatches: activeDispatch(),
+        }),
+      ),
+    ).toBe("running");
+  });
+
+  it("open orders with an in-flight step stay running when the dispatch is not marked active", () => {
+    expect(
+      getWorkOrderDisplayStatus(
+        order({
+          state: "STATE_OPEN",
+          lineDispatches: [
+            {
+              id: "d1",
+              state: "STATE_FINISHED",
+              stepExecutions: [{ id: "e1", step: "s", state: "STATE_STARTED", result: "RESULT_UNKNOWN" }],
+            },
+          ],
+        }),
+      ),
+    ).toBe("running");
+    expect(
+      getWorkOrderDisplayStatus(
+        order({
+          state: "STATE_OPEN",
+          lineDispatches: [
+            {
+              id: "d1",
+              state: "STATE_FINISHED",
+              stepExecutions: [{ id: "e1", step: "s", state: "STATE_PENDING", result: "RESULT_UNKNOWN" }],
+            },
+          ],
         }),
       ),
     ).toBe("running");
@@ -183,6 +215,21 @@ describe("groupWorkOrdersByLane", () => {
       review: ["w"],
       done: ["c", "f", "x"],
     });
+  });
+});
+
+describe("getWorkOrderDetailDerived", () => {
+  it("exposes only the first assignee as the owner", () => {
+    const derived = getWorkOrderDetailDerived(
+      order({
+        assignees: [
+          { id: "owner-1", name: "Ada" },
+          { id: "owner-2", name: "Grace" },
+        ],
+      }),
+    );
+    expect(derived.assigneeIds).toEqual(["owner-1"]);
+    expect(derived.assigneeNames).toEqual(["Ada"]);
   });
 });
 

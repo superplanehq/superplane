@@ -65,11 +65,12 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.checks).toEqual([]);
   });
 
-  it("does not invent a pull request review when the order has no notes", () => {
+  it("asks the assignee for attention when a waiting order has no notes", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
         title: "Ship idempotent refund retries",
         state: "STATE_OPEN",
+        assignees: [{ id: "user-1", name: "Ada Lovelace" }],
         lineDispatches: [
           dispatch("STATE_FINISHED", [
             { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
@@ -77,9 +78,32 @@ describe("splitRunFixtureForWorkOrder", () => {
           ]),
         ],
       }),
+      { detailHref: "/org-1/workspaces/RF/work-order/101" },
     );
     expect(fixture.footerTone).toBe("waiting");
-    expect(fixture.waitingNotes).toEqual([]);
+    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Needs attention"]);
+    expect(fixture.waitingNotes[0]?.text).toBe("This work order needs attention from Ada Lovelace.");
+    expect(fixture.waitingNotes[0]?.cta).toEqual({
+      label: "Open work order",
+      href: "/org-1/workspaces/RF/work-order/101",
+    });
+  });
+
+  it("shows the attention footer after a finished unnamed step while the order waits", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "dasdas",
+        state: "STATE_OPEN",
+        assignees: [{ id: "user-1", name: "test test" }],
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            { id: "e-1", step: "dasdasdas", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+          ]),
+        ],
+      }),
+    );
+    expect(fixture.footerTone).toBe("waiting");
+    expect(fixture.waitingNotes[0]?.text).toBe("This work order needs attention from test test.");
   });
 
   it("shows checks on verify and done cards only when the API supplies them", () => {
@@ -195,9 +219,9 @@ describe("splitRunFixtureForWorkOrder", () => {
       }),
     );
 
-    expect(fixture.lineStatus).toBe("waiting");
-    expect(fixture.phases.at(-1)?.status).toBe("waiting");
-    expect(splitRunStatusLabel(fixture.phases.at(-1)!.status)).toBe("Needs attention");
+    expect(fixture.lineStatus).toBe("running");
+    expect(fixture.phases.at(-1)?.status).toBe("pending");
+    expect(splitRunStatusLabel(fixture.phases.at(-1)!.status)).toBe("Pending");
   });
 
   it("marks a failed implement step as failed", () => {

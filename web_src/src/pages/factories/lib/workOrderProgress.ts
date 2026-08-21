@@ -1,11 +1,16 @@
 import type { FactoriesWorkOrder } from "@/api-client";
+import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { formatWorkOrderIdentifier } from "./workspaceKey";
 
-// A traversal's own stored `state` replaces scanning its step executions
-// for a pending/running one — the dispatch already knows whether it's
-// active.
+// Running when the dispatch is still active, or when a step is still in
+// flight. Dispatch state can lag behind step executions.
 function hasActiveLineDispatch(order: FactoriesWorkOrder): boolean {
-  return (order.lineDispatches ?? []).some((dispatch) => dispatch.state === "STATE_ACTIVE");
+  return (order.lineDispatches ?? []).some((dispatch) => {
+    if (dispatch.state === "STATE_ACTIVE") {
+      return true;
+    }
+    return (dispatch.stepExecutions ?? []).some(isActiveWorkOrderExecution);
+  });
 }
 
 /**
@@ -276,12 +281,14 @@ export function getWorkOrderDetailDerived(order: FactoriesWorkOrder | undefined)
   const displayStatus = getWorkOrderDisplayStatus(order);
   const isOpen = order.state === "STATE_OPEN";
   const isDraft = order.state === "STATE_DRAFT";
+  const owner = (order.assignees ?? [])[0];
+  const ownerId = owner?.id;
 
   return {
     displayStatus,
     statusMeta: getWorkOrderDisplayStatusMeta(displayStatus),
-    assigneeIds: (order.assignees ?? []).map((assignee) => assignee.id).filter((id): id is string => Boolean(id)),
-    assigneeNames: (order.assignees ?? []).map((assignee) => assignee.name ?? "Unknown"),
+    assigneeIds: ownerId ? [ownerId] : [],
+    assigneeNames: ownerId ? [owner.name ?? "Unknown"] : [],
     isOpen,
     isDispatchable: isOpen || isDraft,
     isClosed: order.state === "STATE_CLOSED",

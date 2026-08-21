@@ -48,6 +48,7 @@ import {
   factoryAppSplitRunPath,
   factoryLineDetailPath,
   linesPath,
+  workOrderDetailPath,
 } from "../lib/factoryPagePaths";
 import { formatLinePhaseDescription, humanizeLineName } from "../lib/humanizeLineName";
 import {
@@ -265,6 +266,7 @@ function LineDetail({
         <LineBoardSplitRunPopup
           organizationId={organizationId}
           factoryId={factoryId}
+          factoryKey={factoryKey}
           lineId={line.id}
           lineName={line.name}
           peekOrderId={peekOrderId}
@@ -284,6 +286,7 @@ function LineDetail({
 function LineBoardSplitRunPopup({
   organizationId,
   factoryId,
+  factoryKey,
   lineId,
   lineName,
   peekOrderId,
@@ -297,6 +300,7 @@ function LineBoardSplitRunPopup({
 }: {
   organizationId: string;
   factoryId: string;
+  factoryKey: string;
   lineId: string | undefined;
   lineName: string | undefined;
   peekOrderId: string;
@@ -310,13 +314,16 @@ function LineBoardSplitRunPopup({
 }) {
   const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
   const resolvedLineName = lineName?.trim();
+  const detailHref =
+    peekOrder?.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, peekOrder.number) : undefined;
   return (
     <WorkOrderSplitRunPopup
       key={peekOrderId}
       organizationId={organizationId}
-      fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId })}
+      fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId, detailHref })}
       canvasEditHref={canvasEditHref}
       canvasExpandHref={canvasExpandHref}
+      detailHref={detailHref}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       isDispatching={isDispatching}
       onDispatch={resolvedLineName ? () => onDispatch(peekOrderId, { lineName: resolvedLineName }) : undefined}

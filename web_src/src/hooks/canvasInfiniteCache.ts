@@ -362,3 +362,29 @@ export function upsertRunIntoDescribeRunData(
 
   return { ...current, run: mergeRunUpdate(current.run, incoming) };
 }
+
+export function upsertExecutionIntoDescribeRunData(
+  current: { run?: CanvasesCanvasRun } | undefined,
+  execution: CanvasesCanvasNodeExecution,
+): { run?: CanvasesCanvasRun } | undefined {
+  const run = current?.run;
+  if (!run) {
+    return current;
+  }
+
+  if (execution.runId && run.id && execution.runId !== run.id) {
+    return current;
+  }
+
+  const rootEventId = execution.rootEvent?.id;
+  if (!execution.runId && rootEventId && run.rootEvent?.id && run.rootEvent.id !== rootEventId) {
+    return current;
+  }
+
+  const executions = upsertExecutionRef(run.executions ?? [], executionToRef(execution));
+  if (executions === run.executions) {
+    return current;
+  }
+
+  return { ...current, run: { ...run, executions } };
+}

@@ -125,7 +125,7 @@ const PR_CLOSURE_APP_NAME = "PR Closure";
 
 export function splitRunFixtureForWorkOrder(
   order?: FactoriesWorkOrder,
-  options?: { checks?: FactoriesWorkOrderCheck[]; lineId?: string | null },
+  options?: { checks?: FactoriesWorkOrderCheck[]; lineId?: string | null; detailHref?: string },
 ): SplitRunFixture {
   if (!order) {
     return SPLIT_RUN_RUNNING;
@@ -135,7 +135,7 @@ export function splitRunFixtureForWorkOrder(
 
 function mappedWorkOrderFixture(
   order: FactoriesWorkOrder,
-  options?: { checks?: FactoriesWorkOrderCheck[]; lineId?: string | null },
+  options?: { checks?: FactoriesWorkOrderCheck[]; lineId?: string | null; detailHref?: string },
 ): SplitRunFixture {
   const displayStatus = getWorkOrderDisplayStatus(order);
   const executions = latestDispatchExecutions(order, options?.lineId);
@@ -152,7 +152,17 @@ function mappedWorkOrderFixture(
     lineStatus: lineStatusForDisplay(displayStatus),
     currentPhaseId: current ? phaseIdForExecution(current) : (phases[0]?.id ?? ""),
     phases,
-    ...reviewSurfaces(order, displayStatus, options?.checks, options?.lineId),
+    ...reviewSurfaces(order, displayStatus, options?.checks, options?.lineId, options?.detailHref),
+  };
+}
+
+function attentionNote(order: FactoriesWorkOrder, detailHref?: string): WorkOrderStatusNotePresentation {
+  const name = order.assignees?.[0]?.name?.trim();
+  return {
+    key: "needs-attention",
+    headline: "Needs attention",
+    text: name ? `This work order needs attention from ${name}.` : "This work order needs attention.",
+    cta: detailHref ? { label: "Open work order", href: detailHref } : undefined,
   };
 }
 
@@ -161,6 +171,7 @@ function reviewSurfaces(
   displayStatus: WorkOrderDisplayStatus,
   apiChecks?: FactoriesWorkOrderCheck[],
   lineId?: string | null,
+  detailHref?: string,
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footerTone"> {
   const executions = latestDispatchExecutions(order, lineId);
   const current = pickCurrentExecution(executions);
@@ -175,7 +186,15 @@ function reviewSurfaces(
   if (implementFailed) {
     return { waitingNotes: [IMPLEMENT_FAILED_NOTE], checks: [], footerTone: "failed" };
   }
-  if (column === "implement" && (displayStatus === "waiting" || current?.state === "STATE_PENDING")) {
+  if (displayStatus === "waiting") {
+    const notes = presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
+    return {
+      waitingNotes: notes.length > 0 ? notes : [attentionNote(order, detailHref)],
+      checks: [],
+      footerTone: "waiting",
+    };
+  }
+  if (column === "implement" && current?.state === "STATE_PENDING") {
     return {
       waitingNotes: presentWorkOrderStatusNotes(order.statusNotes, displayStatus),
       checks: [],
@@ -255,7 +274,7 @@ function statusForExecution(execution: FactoriesWorkOrderExecution): SplitRunPha
     return "running";
   }
   if (execution.state === "STATE_PENDING") {
-    return "waiting";
+    return "pending";
   }
   if (execution.result === "RESULT_FAILED") {
     return "failed";

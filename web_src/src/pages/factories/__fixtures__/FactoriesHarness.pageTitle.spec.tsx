@@ -18,10 +18,9 @@ describe("client-side navigation updates document.title", () => {
     client.setConfig({ baseUrl: "http://localhost" });
   });
 
-  // Regression test for the reported bug: visiting a work order detail page
-  // sets a specific title, and navigating back to the Work Orders list left
-  // that title in place because `WorkOrdersPage` never called `usePageTitle`.
-  it("resets the tab title after navigating from a work order detail page back to the list", async () => {
+  // Visiting a work order sets a specific title. Back now returns to the
+  // workspace board, which must replace that title.
+  it("resets the tab title after navigating from a work order detail page back to the board", async () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
@@ -31,15 +30,17 @@ describe("client-side navigation updates document.title", () => {
       />,
     );
 
-    expect(await screen.findByTestId("work-order-detail-back", {}, { timeout: 8000 })).toBeInTheDocument();
+    const back = await screen.findByTestId("work-order-detail-back", {}, { timeout: 8000 });
+    expect(back).toHaveTextContent("Workspace");
+    expect(back).not.toHaveTextContent("Line");
     expect(document.title).toContain("Reconcile duplicate refunds in ledger");
     expect(document.title).toContain("Semaphore");
 
-    await user.click(screen.getByTestId("work-order-detail-back"));
+    await user.click(back);
 
-    expect(await screen.findByTestId("work-orders-header", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(document.title).not.toContain("Reconcile duplicate refunds in ledger");
-    expect(document.title).toBe("Work Orders · Semaphore · SuperPlane");
+    expect(document.title).toBe("Plan and Implement · Semaphore · SuperPlane");
   }, 15000);
 
   it("updates the tab title on the line board home", async () => {

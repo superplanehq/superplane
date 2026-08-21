@@ -1,3 +1,4 @@
+import { Link } from "@/components/Link/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -166,12 +167,17 @@ function ReviewCta({
     );
   }
   if (cta.href) {
+    const inApp = cta.href.startsWith("/");
     return (
       <Button asChild className={cn("shrink-0", failedClass)}>
-        <a href={cta.href} target="_blank" rel="noreferrer">
-          {cta.label}
-          <ExternalLink className="size-3.5" aria-hidden />
-        </a>
+        {inApp ? (
+          <Link href={cta.href}>{cta.label}</Link>
+        ) : (
+          <a href={cta.href} target="_blank" rel="noreferrer">
+            {cta.label}
+            <ExternalLink className="size-3.5" aria-hidden />
+          </a>
+        )}
       </Button>
     );
   }

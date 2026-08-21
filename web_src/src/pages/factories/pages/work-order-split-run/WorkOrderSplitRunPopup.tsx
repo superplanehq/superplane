@@ -20,6 +20,7 @@ export function WorkOrderSplitRunPopup({
   fixed = false,
   canvasEditHref,
   canvasExpandHref,
+  detailHref,
   onDispatch,
   isDispatching = false,
   canDispatch = false,
@@ -30,6 +31,7 @@ export function WorkOrderSplitRunPopup({
   fixed?: boolean;
   canvasEditHref?: (key: SplitRunCanvasKey) => string | undefined;
   canvasExpandHref?: (key: SplitRunCanvasKey) => string | undefined;
+  detailHref?: string;
   onDispatch?: () => Promise<void>;
   isDispatching?: boolean;
   canDispatch?: boolean;
@@ -47,7 +49,7 @@ export function WorkOrderSplitRunPopup({
 
   return (
     <PopupShell testId="work-order-split-run" canvas fixed={fixed} onDismiss={onClose}>
-      <PopupHeader title={fixture.title} onClose={onClose}>
+      <PopupHeader title={fixture.title} onClose={onClose} detailHref={detailHref}>
         <OwnerTimeCostRow fixture={fixture}>
           <SplitRunCheckPills checks={fixture.checks} />
         </OwnerTimeCostRow>

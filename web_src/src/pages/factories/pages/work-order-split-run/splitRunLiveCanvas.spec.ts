@@ -6,6 +6,7 @@ import { clockLabel } from "./splitRunFormat";
 import {
   metricFromExecution,
   nodeStatusFromExecution,
+  orderCanvasNodesTopologically,
   resolveSplitRunVisual,
   splitRunCanvasFromLive,
   streamFromLiveRun,
@@ -65,7 +66,7 @@ describe("streamFromLiveRun", () => {
     expect(claude?.status).toBe("pending");
   });
 
-  it("orders log lines by createdAt and stamps the trigger from the root event", () => {
+  it("orders log lines by canvas topology, not execution time", () => {
     const stream = streamFromLiveRun(
       {
         spec: {
@@ -74,6 +75,11 @@ describe("streamFromLiveRun", () => {
             { id: "on-run", name: "onRun", type: "TYPE_TRIGGER", component: "onRun" },
             { id: "noop-2", name: "noop 2", type: "TYPE_ACTION" },
             { id: "noop", name: "noop", type: "TYPE_ACTION" },
+          ],
+          edges: [
+            { sourceId: "on-run", targetId: "noop" },
+            { sourceId: "noop", targetId: "noop-2" },
+            { sourceId: "noop-2", targetId: "random-noop" },
           ],
         },
       },
@@ -103,9 +109,44 @@ describe("streamFromLiveRun", () => {
       },
     );
 
-    expect(stream.map((line) => line.componentName)).toEqual(["onRun", "random noop", "noop 2", "noop"]);
+    expect(stream.map((line) => line.componentName)).toEqual(["onRun", "noop", "noop 2", "random noop"]);
     expect(stream[0]?.at).toBe(clockLabel("2026-08-21T13:22:50.000Z"));
     expect(stream[0]?.status).toBe("passed");
+  });
+});
+
+describe("orderCanvasNodesTopologically", () => {
+  it("puts triggers first and follows edges", () => {
+    const ordered = orderCanvasNodesTopologically(
+      [
+        { id: "b", type: "TYPE_ACTION" },
+        { id: "a", type: "TYPE_TRIGGER" },
+        { id: "c", type: "TYPE_ACTION" },
+      ],
+      [
+        { sourceId: "a", targetId: "b" },
+        { sourceId: "b", targetId: "c" },
+      ],
+    );
+
+    expect(ordered.map((node) => node.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("keeps spec order among siblings and after a cycle", () => {
+    const ordered = orderCanvasNodesTopologically(
+      [
+        { id: "loop", type: "TYPE_ACTION" },
+        { id: "start", type: "TYPE_TRIGGER" },
+        { id: "again", type: "TYPE_ACTION" },
+      ],
+      [
+        { sourceId: "start", targetId: "loop" },
+        { sourceId: "loop", targetId: "again" },
+        { sourceId: "again", targetId: "loop" },
+      ],
+    );
+
+    expect(ordered.map((node) => node.id)).toEqual(["start", "loop", "again"]);
   });
 });
 

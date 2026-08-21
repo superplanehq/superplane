@@ -23,8 +23,10 @@ interface WorkOrderDetailHeaderProps {
   orderTitle: string;
   /** Short identifier (e.g. `SP-42`). Rendered as a kicker above the title. */
   orderIdentifier?: string;
-  /** Back link target (Work Orders list). Omit in the card dialog. */
+  /** Back link target (workspace board). Omit in the card dialog. */
   backHref?: string;
+  /** Back link label. Defaults to Workspace. */
+  backLabel?: string;
   displayStatus: WorkOrderDisplayStatus;
   isOpen: boolean;
   isDispatchable: boolean;
@@ -46,7 +48,7 @@ export function WorkOrderDetailHeader(props: WorkOrderDetailHeaderProps) {
       className={props.className}
       variant="entity"
       backHref={props.backHref}
-      backLabel={props.backHref ? "Work Orders" : undefined}
+      backLabel={props.backHref ? (props.backLabel ?? "Workspace") : undefined}
       backTestId="work-order-detail-back"
       kicker={props.orderIdentifier}
       title={props.orderTitle}

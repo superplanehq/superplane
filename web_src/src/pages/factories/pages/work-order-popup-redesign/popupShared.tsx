@@ -1,4 +1,5 @@
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
+import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
@@ -41,14 +42,29 @@ export function PopupHeader({
   title,
   children,
   onClose,
+  detailHref,
 }: {
   title: string;
   children?: ReactNode;
   onClose?: () => void;
+  detailHref?: string;
 }) {
   return (
     <header className="relative shrink-0 border-b border-border px-5 py-3 pr-12">
-      <h2 className="truncate text-[16px] font-semibold tracking-[-0.02em] text-foreground">{title}</h2>
+      <div className="flex min-w-0 items-center gap-3">
+        <h2 className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-[-0.02em] text-foreground">
+          {title}
+        </h2>
+        {detailHref ? (
+          <Link
+            href={detailHref}
+            className="shrink-0 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+            data-testid="split-run-open-work-order"
+          >
+            Open work order
+          </Link>
+        ) : null}
+      </div>
       {children}
       <button
         type="button"
