@@ -1,0 +1,27 @@
+{
+  "data": {
+    "end": "2026-05-29T09:00:00Z",
+    "logGroups": ["/aws/lambda/my-function"],
+    "queryId": "12ab3456-12ab-123a-789e-1234567890ab",
+    "queryString": "fields @timestamp, @message | sort @timestamp desc",
+    "rows": [
+      {
+        "@message": "START RequestId: 3f2a1c9e-1234-4a5b-8b9c-0d1e2f3a4b5c Version: $LATEST",
+        "@timestamp": "2026-05-29 08:59:42.123"
+      },
+      {
+        "@message": "END RequestId: 3f2a1c9e-1234-4a5b-8b9c-0d1e2f3a4b5c",
+        "@timestamp": "2026-05-29 08:59:41.987"
+      }
+    ],
+    "start": "2026-05-29T08:00:00Z",
+    "statistics": {
+      "bytesScanned": 20480,
+      "recordsMatched": 2,
+      "recordsScanned": 512
+    },
+    "status": "Complete"
+  },
+  "timestamp": "2026-05-29T09:00:01.123456Z",
+  "type": "aws.cloudwatch.queryResult"
+}
