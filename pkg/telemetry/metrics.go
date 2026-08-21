@@ -36,6 +36,11 @@ var (
 	nodeRequestWorkerTickHistogram          metric.Float64Histogram
 	nodeRequestWorkerRequestsCountHistogram metric.Int64Histogram
 
+	repositoryProvisionerWorkerTickHistogram               metric.Float64Histogram
+	repositoryProvisionerWorkerRepositoriesCountGauge      metric.Int64Gauge
+	repositoryProvisionerWorkerRepositoriesCounter         metric.Int64Counter
+	repositoryProvisionerWorkerRepositoryDurationHistogram metric.Float64Histogram
+
 	webhookProvisionerWorkerTickHistogram            metric.Float64Histogram
 	webhookProvisionerWorkerWebhooksCountGauge       metric.Int64Gauge
 	webhookProvisionerWorkerWebhooksCounter          metric.Int64Counter
@@ -246,6 +251,42 @@ func InitMetrics(ctx context.Context) error {
 		"node_request_worker.tick.requests.pending",
 		metric.WithDescription("Number of pending workflow node requests each tick"),
 		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	repositoryProvisionerWorkerTickHistogram, err = meter.Float64Histogram(
+		"repository_provisioner_worker.tick.duration.seconds",
+		metric.WithDescription("Duration of each RepositoryProvisionerWorker backfill tick"),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	repositoryProvisionerWorkerRepositoriesCountGauge, err = meter.Int64Gauge(
+		"repository_provisioner_worker.tick.repositories.pending",
+		metric.WithDescription("Number of pending repositories on the last repository provisioner tick"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	repositoryProvisionerWorkerRepositoriesCounter, err = meter.Int64Counter(
+		"repository_provisioner_worker.repositories.total",
+		metric.WithDescription("RepositoryProvisionerWorker repository processing outcomes"),
+		metric.WithUnit("1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	repositoryProvisionerWorkerRepositoryDurationHistogram, err = meter.Float64Histogram(
+		"repository_provisioner_worker.repository.duration.seconds",
+		metric.WithDescription("Duration of RepositoryProvisionerWorker repository processing"),
+		metric.WithUnit("s"),
 	)
 	if err != nil {
 		return err
@@ -658,6 +699,48 @@ func RecordNodeRequestWorkerRequestsCount(ctx context.Context, count int) {
 	}
 
 	nodeRequestWorkerRequestsCountHistogram.Record(ctx, int64(count))
+}
+
+func RecordRepositoryProvisionerWorkerTickDuration(ctx context.Context, d time.Duration) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	repositoryProvisionerWorkerTickHistogram.Record(ctx, d.Seconds())
+}
+
+func RecordRepositoryProvisionerWorkerRepositoriesCount(ctx context.Context, count int) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	repositoryProvisionerWorkerRepositoriesCountGauge.Record(ctx, int64(count))
+}
+
+func RecordRepositoryProvisionerWorkerRepositoryProcessing(
+	ctx context.Context,
+	d time.Duration,
+	trigger, outcome, reason string,
+) {
+	if !metricsReady.Load() {
+		return
+	}
+
+	attrs := metric.WithAttributes(
+		attribute.String("trigger", trigger),
+		attribute.String("outcome", outcome),
+		attribute.String("reason", reason),
+	)
+
+	repositoryProvisionerWorkerRepositoriesCounter.Add(ctx, 1, attrs)
+	repositoryProvisionerWorkerRepositoryDurationHistogram.Record(
+		ctx,
+		d.Seconds(),
+		metric.WithAttributes(
+			attribute.String("trigger", trigger),
+			attribute.String("outcome", outcome),
+		),
+	)
 }
 
 func RecordWebhookProvisionerWorkerTickDuration(ctx context.Context, d time.Duration) {
