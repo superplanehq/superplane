@@ -89,6 +89,7 @@ describe("FactoryAppCanvasHeader", () => {
     await user.click(screen.getByTestId("factory-app-canvas-title"));
     expect(screen.queryByTestId("factory-app-rename-input")).not.toBeInTheDocument();
     expect(onDraftTitleChange).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("factory-app-edit")).not.toBeInTheDocument();
   });
 
   it("shows Edit in view mode", async () => {

@@ -16,6 +16,8 @@ type UseFactoryAppConfigureTitleArgs = {
   savedName?: string;
   configureBusy: boolean;
   configureActionsRef: MutableRefObject<FactoryConfigureActions | null>;
+  /** Leave Configure chrome immediately on Discard, before staging reset finishes. */
+  onDiscardLeave?: () => void;
 };
 
 export function resolveDraftTitleToPersist(draftTitle: string | null, savedTitle: string): string | null {
@@ -27,8 +29,17 @@ export function resolveDraftTitleToPersist(draftTitle: string | null, savedTitle
 }
 
 export function useFactoryAppConfigureTitle(args: UseFactoryAppConfigureTitleArgs) {
-  const { organizationId, factoryId, appId, isConfigure, canRename, savedName, configureBusy, configureActionsRef } =
-    args;
+  const {
+    organizationId,
+    factoryId,
+    appId,
+    isConfigure,
+    canRename,
+    savedName,
+    configureBusy,
+    configureActionsRef,
+    onDiscardLeave,
+  } = args;
   const queryClient = useQueryClient();
   const updateCanvas = useUpdateCanvas(organizationId, appId);
   const [draftTitle, setDraftTitle] = useState<string | null>(null);
@@ -110,8 +121,9 @@ export function useFactoryAppConfigureTitle(args: UseFactoryAppConfigureTitleArg
       return;
     }
     clearDraftTitle();
+    onDiscardLeave?.();
     configureActionsRef.current?.discard();
-  }, [clearDraftTitle, configureActionsRef, configureBusy, updateCanvas.isPending]);
+  }, [clearDraftTitle, configureActionsRef, configureBusy, onDiscardLeave, updateCanvas.isPending]);
 
   return {
     title,

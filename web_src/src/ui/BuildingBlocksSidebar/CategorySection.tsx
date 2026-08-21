@@ -1,7 +1,12 @@
 import type { OrganizationsIntegration } from "@/api-client";
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
-import { resolveIcon } from "@/lib/utils";
+import { cn, resolveIcon } from "@/lib/utils";
+import {
+  factorySidebarKindLabelClassName,
+  factorySidebarMutedIconClassName,
+  factorySidebarRowHoverClassName,
+} from "@/ui/factoryNodeChrome";
 import { ChevronRight, Plug } from "lucide-react";
 import { memo, useState, type DragEvent } from "react";
 import { toTestId } from "../../lib/testID";
@@ -53,6 +58,7 @@ function renderCategoryIcon(
   categoryIconSrc: string | undefined,
   categoryName: string,
   CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null,
+  iconClassName: string,
 ) {
   if (categoryIconSrc) {
     return (
@@ -64,7 +70,7 @@ function renderCategoryIcon(
     );
   }
   if (CategoryIcon) {
-    return <CategoryIcon size={14} className="text-gray-500 dark:text-gray-400" />;
+    return <CategoryIcon size={14} className={iconClassName} />;
   }
   return null;
 }
@@ -72,13 +78,19 @@ function renderCategoryIcon(
 interface BlockItemProps {
   block: BuildingBlock;
   onBlockClick?: (block: BuildingBlock) => void;
+  factoryChrome?: boolean;
 }
 
-const BlockItem = memo(function BlockItem({ block, onBlockClick }: BlockItemProps) {
+const BlockItem = memo(function BlockItem({ block, onBlockClick, factoryChrome = false }: BlockItemProps) {
   const appIconSrc = getHeaderIconSrc(block.name);
   const IconComponent = resolveIcon(resolveIconSlug(block));
-  const hoverBg = TYPE_HOVER_BG[block.type] || TYPE_HOVER_BG.component;
-  const badgeColor = TYPE_BADGE_COLOR[block.type] || TYPE_BADGE_COLOR.component;
+  const hoverBg = factoryChrome
+    ? factorySidebarRowHoverClassName
+    : TYPE_HOVER_BG[block.type] || TYPE_HOVER_BG.component;
+  const badgeColor = factoryChrome
+    ? factorySidebarKindLabelClassName(block.type)
+    : TYPE_BADGE_COLOR[block.type] || TYPE_BADGE_COLOR.component;
+  const iconClassName = factoryChrome ? factorySidebarMutedIconClassName : "text-gray-500 dark:text-gray-400";
 
   return (
     <Item
@@ -91,24 +103,32 @@ const BlockItem = memo(function BlockItem({ block, onBlockClick }: BlockItemProp
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("application/reactflow", JSON.stringify(block));
       }}
-      className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-pointer ${hoverBg}`}
+      className={`ml-3 flex cursor-pointer items-center gap-2 px-2 py-1 ${hoverBg}`}
       size="sm"
     >
       <ItemMedia>
         {appIconSrc ? (
           <img src={appIconSrc} alt={block.label || block.name} className="size-3.5" />
         ) : (
-          <IconComponent size={14} className="text-gray-500 dark:text-gray-400" />
+          <IconComponent size={14} className={iconClassName} />
         )}
       </ItemMedia>
 
       <ItemContent>
-        <div className="flex items-center gap-2 w-full min-w-0">
-          <ItemTitle className="text-[13px] font-normal min-w-0 flex-1 w-0 overflow-hidden">
+        <div className="flex w-full min-w-0 items-center gap-2">
+          <ItemTitle
+            className={cn(
+              "min-w-0 w-0 flex-1 overflow-hidden text-[13px] font-normal",
+              factoryChrome && "text-foreground",
+            )}
+          >
             <span className="block min-w-0 truncate">{block.label || block.name}</span>
           </ItemTitle>
           <span
-            className={`inline-block text-left px-1.5 py-0.5 text-[11px] font-medium ${badgeColor} rounded whitespace-nowrap flex-shrink-0 ml-auto`}
+            className={cn(
+              "ml-auto inline-block shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-left",
+              badgeColor,
+            )}
           >
             {TYPE_LABEL[block.type] || "Action"}
           </span>
@@ -125,6 +145,7 @@ export interface CategorySectionProps {
   searchTerm?: string;
   typeFilter?: TypeFilter;
   onBlockClick?: (block: BuildingBlock) => void;
+  factoryChrome?: boolean;
 }
 
 type IntegrationState = "ready" | "error" | "pending" | "notConfigured";
@@ -136,6 +157,23 @@ const INTEGRATION_STATE_COLOR: Record<IntegrationState, string> = {
   notConfigured: "text-gray-500",
 };
 
+function factoryOrOrgClass(factoryChrome: boolean, factoryClass: string, orgClass: string): string {
+  if (factoryChrome) {
+    return factoryClass;
+  }
+  return orgClass;
+}
+
+function resolveCategoryIconSrc(categoryName: string, integrationName: string): string | undefined {
+  if (categoryName === "SuperPlane") {
+    return SuperplaneLogo;
+  }
+  if (integrationName === "smtp") {
+    return undefined;
+  }
+  return getIntegrationIconSrc(integrationName);
+}
+
 export function CategorySection({
   category,
   integrations = [],
@@ -143,6 +181,7 @@ export function CategorySection({
   searchTerm = "",
   typeFilter = "all",
   onBlockClick,
+  factoryChrome = false,
 }: CategorySectionProps) {
   const sortedBlocks = filterBlocksInCategory(category, searchTerm, typeFilter);
 
@@ -157,13 +196,14 @@ export function CategorySection({
 
   const firstBlock = sortedBlocks[0];
   const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
-  const categoryIconSrc =
-    category.name === "SuperPlane"
-      ? SuperplaneLogo
-      : integrationName === "smtp"
-        ? undefined
-        : getIntegrationIconSrc(integrationName);
+  const categoryIconSrc = resolveCategoryIconSrc(category.name, integrationName);
   const CategoryIcon = categoryIconSrc ? null : resolveCategoryIcon(category.name, integrationName);
+  const iconClassName = factoryOrOrgClass(
+    factoryChrome,
+    factorySidebarMutedIconClassName,
+    "text-gray-500 dark:text-gray-400",
+  );
+  const surfaceClass = factoryOrOrgClass(factoryChrome, "bg-background", "bg-white dark:bg-gray-900");
   const integrationStatusColorClass =
     INTEGRATION_STATE_COLOR[resolveIntegrationState(category, integrations, firstBlock)];
 
@@ -177,15 +217,31 @@ export function CategorySection({
         }
       }}
     >
-      <summary className="relative cursor-pointer hover:text-gray-500 dark:hover:text-gray-300 mb-3 flex w-full items-center justify-between gap-2 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
+      <summary
+        className={cn(
+          "relative mb-3 flex w-full cursor-pointer items-center justify-between gap-2 [&::-webkit-details-marker]:hidden [&::marker]:hidden",
+          factoryOrOrgClass(
+            factoryChrome,
+            "hover:text-muted-foreground",
+            "hover:text-gray-500 dark:hover:text-gray-300",
+          ),
+        )}
+      >
         <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-border/60" />
-        <span className="relative z-10 flex items-center gap-1 bg-white dark:bg-gray-900 pr-3">
+        <span className={cn("relative z-10 flex items-center gap-1 pr-3", surfaceClass)}>
           <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
-          {renderCategoryIcon(categoryIconSrc, category.name, CategoryIcon)}
-          <span className="text-[13px] text-gray-800 font-medium pl-1 dark:text-gray-100">{category.name}</span>
+          {renderCategoryIcon(categoryIconSrc, category.name, CategoryIcon, iconClassName)}
+          <span
+            className={cn(
+              "pl-1 text-[13px] font-medium",
+              factoryOrOrgClass(factoryChrome, "text-foreground", "text-gray-800 dark:text-gray-100"),
+            )}
+          >
+            {category.name}
+          </span>
         </span>
         {showIntegrationSetupStatus && (
-          <span className="relative z-10 shrink-0 bg-white dark:bg-gray-900 pl-3">
+          <span className={cn("relative z-10 shrink-0 pl-3", surfaceClass)}>
             <Plug size={14} className={integrationStatusColorClass} />
           </span>
         )}
@@ -193,7 +249,12 @@ export function CategorySection({
 
       <ItemGroup>
         {sortedBlocks.map((block) => (
-          <BlockItem key={`${block.type}-${block.name}`} block={block} onBlockClick={onBlockClick} />
+          <BlockItem
+            key={`${block.type}-${block.name}`}
+            block={block}
+            onBlockClick={onBlockClick}
+            factoryChrome={factoryChrome}
+          />
         ))}
       </ItemGroup>
     </details>

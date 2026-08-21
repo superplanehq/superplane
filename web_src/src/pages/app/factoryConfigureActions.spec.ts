@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { runFactoryConfigureSave, stagingSummaryHasChanges, withCanvasMetadataName } from "./factoryConfigureActions";
+import {
+  runFactoryConfigureDiscard,
+  runFactoryConfigureSave,
+  stagingSummaryHasChanges,
+  withCanvasMetadataName,
+} from "./factoryConfigureActions";
 
 describe("withCanvasMetadataName", () => {
   it("overlays metadata.name when a new name is provided", () => {
@@ -96,5 +101,45 @@ describe("runFactoryConfigureSave", () => {
     expect(deps.handleCommitStaging).not.toHaveBeenCalled();
     expect(deps.onAfterCommit).not.toHaveBeenCalled();
     expect(deps.onDone).toHaveBeenCalled();
+  });
+});
+
+describe("runFactoryConfigureDiscard", () => {
+  it("leaves Configure before restoring prod so Discard/Save do not stay", async () => {
+    const order: string[] = [];
+    await runFactoryConfigureDiscard({
+      setSavePending: vi.fn(),
+      hasStagingChanges: true,
+      hasUncommittedCanvasDraftChanges: false,
+      handleResetStaging: async () => {
+        order.push("reset");
+      },
+      handleExitEditSession: () => {
+        order.push("exit");
+      },
+      onDone: () => {
+        order.push("done");
+      },
+    });
+    expect(order).toEqual(["done", "reset", "exit"]);
+  });
+
+  it("still exits edit when there is nothing to reset", async () => {
+    const order: string[] = [];
+    await runFactoryConfigureDiscard({
+      setSavePending: vi.fn(),
+      hasStagingChanges: false,
+      hasUncommittedCanvasDraftChanges: false,
+      handleResetStaging: async () => {
+        order.push("reset");
+      },
+      handleExitEditSession: () => {
+        order.push("exit");
+      },
+      onDone: () => {
+        order.push("done");
+      },
+    });
+    expect(order).toEqual(["done", "exit"]);
   });
 });
