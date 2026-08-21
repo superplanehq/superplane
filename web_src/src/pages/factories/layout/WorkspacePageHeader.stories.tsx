@@ -219,9 +219,7 @@ export const AlignedWithSidebar: Story = {
           factoryKey={REFUND_FACTORY.key!}
           lineId={REFUND_LINE_PLAN_ID}
           canOpenSettings
-          canCreateWorkOrder
           permissionsLoading={false}
-          onCreateWorkOrder={() => console.log("create work order")}
         />
       </aside>
       <div className="min-w-0 flex-1">

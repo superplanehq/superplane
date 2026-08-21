@@ -1,14 +1,13 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { TooltipProvider } from "@/ui/tooltip";
 import { FACTORIES_ORGANIZATION_ID, REFUND_FACTORY, REFUND_LINE_PLAN_ID } from "../__fixtures__/factoryPageResponses";
-import { factoryHomePath, factorySettingsPath, factoryVelocityPath, workOrdersPath } from "../lib/factoryPagePaths";
+import { factoryHomePath, factoryIntakePath, factorySettingsPath, factoryVelocityPath } from "../lib/factoryPagePaths";
 import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
 
-function renderNav(path: string, onCreateWorkOrder = vi.fn()) {
+function renderNav(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <TooltipProvider>
@@ -17,9 +16,7 @@ function renderNav(path: string, onCreateWorkOrder = vi.fn()) {
           factoryKey={REFUND_FACTORY.key!}
           lineId={REFUND_LINE_PLAN_ID}
           canOpenSettings
-          canCreateWorkOrder
           permissionsLoading={false}
-          onCreateWorkOrder={onCreateWorkOrder}
         />
       </TooltipProvider>
     </MemoryRouter>,
@@ -30,7 +27,7 @@ const org = FACTORIES_ORGANIZATION_ID;
 const key = REFUND_FACTORY.key!;
 
 describe("FactoriesSidebarNav", () => {
-  it("places Intake, Board, Velocity, Settings, and Create under the switcher", () => {
+  it("places Intake, Board, Velocity, and Settings under the switcher", () => {
     renderNav(`/${org}/workspaces/${key}/lines/${REFUND_LINE_PLAN_ID}`);
 
     const nav = screen.getByTestId("factories-sidebar-nav");
@@ -39,11 +36,14 @@ describe("FactoriesSidebarNav", () => {
       screen.getByTestId("factories-nav-board"),
       screen.getByTestId("factories-nav-velocity"),
       screen.getByTestId("factories-workspace-settings-link"),
-      screen.getByTestId("factories-sidebar-create-work-order"),
     ];
 
-    expect(controls.map((node) => nav.contains(node))).toEqual([true, true, true, true, true]);
-    expect(screen.getByTestId("factories-nav-intake")).toHaveAttribute("href", workOrdersPath(org, key));
+    expect(controls.map((node) => nav.contains(node))).toEqual([true, true, true, true]);
+    expect(screen.queryByTestId("factories-sidebar-create-work-order")).not.toBeInTheDocument();
+    expect(screen.getByTestId("factories-nav-intake")).toHaveAttribute(
+      "href",
+      factoryIntakePath(org, key, REFUND_LINE_PLAN_ID),
+    );
     expect(screen.getByTestId("factories-nav-board")).toHaveAttribute(
       "href",
       factoryHomePath(org, key, REFUND_LINE_PLAN_ID),
@@ -62,19 +62,14 @@ describe("FactoriesSidebarNav", () => {
     expect(screen.getByTestId("factories-nav-intake")).not.toHaveAttribute("aria-current");
   });
 
-  it("marks the Intake icon current on work orders", () => {
-    renderNav(`/${org}/workspaces/${key}/work-orders`);
+  it("marks the Intake icon current when the line board shows the drawer", () => {
+    renderNav(`/${org}/workspaces/${key}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
 
     expect(screen.getByTestId("factories-nav-intake")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("factories-nav-intake")).toHaveAttribute(
+      "href",
+      factoryHomePath(org, key, REFUND_LINE_PLAN_ID),
+    );
     expect(screen.getByTestId("factories-nav-board")).not.toHaveAttribute("aria-current");
-  });
-
-  it("opens create work order from the plus control", async () => {
-    const onCreateWorkOrder = vi.fn();
-    const user = userEvent.setup();
-    renderNav(`/${org}/workspaces/${key}/lines/${REFUND_LINE_PLAN_ID}`, onCreateWorkOrder);
-
-    await user.click(screen.getByTestId("factories-sidebar-create-work-order"));
-    expect(onCreateWorkOrder).toHaveBeenCalledTimes(1);
   });
 });

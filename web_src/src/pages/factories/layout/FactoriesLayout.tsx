@@ -194,10 +194,8 @@ function FactoriesLayoutContent({
             accountAvatarUrl={account?.avatar_url}
             canOpenSettings={canAct("factories", "update")}
             canCreateFactory={canAct("factories", "create")}
-            canCreateWorkOrder={canCreateWorkOrder}
             permissionsLoading={permissionsLoading}
             onOpenCreateFactory={() => navigate(newFactoryPath(organizationId))}
-            onCreateWorkOrder={openCreateWorkOrder}
           />
         )}
         <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
@@ -226,10 +224,8 @@ interface FactoriesSidebarProps {
   accountAvatarUrl?: string | null;
   canOpenSettings: boolean;
   canCreateFactory: boolean;
-  canCreateWorkOrder: boolean;
   permissionsLoading: boolean;
   onOpenCreateFactory: () => void;
-  onCreateWorkOrder: () => void;
 }
 
 function FactoriesSidebar({
@@ -242,10 +238,8 @@ function FactoriesSidebar({
   accountAvatarUrl,
   canOpenSettings,
   canCreateFactory,
-  canCreateWorkOrder,
   permissionsLoading,
   onOpenCreateFactory,
-  onCreateWorkOrder,
 }: FactoriesSidebarProps) {
   return (
     <aside
@@ -265,9 +259,7 @@ function FactoriesSidebar({
         factoryKey={factoryKey}
         lineId={firstFactoryLineId(factory)}
         canOpenSettings={canOpenSettings}
-        canCreateWorkOrder={canCreateWorkOrder}
         permissionsLoading={permissionsLoading}
-        onCreateWorkOrder={onCreateWorkOrder}
       />
       <div className="flex-1" />
       <SidebarUserMenu

@@ -38,4 +38,21 @@ describe("WorkOrderKanbanBoard", () => {
     expect(emptyCopy.className).toContain("flex-1");
     expect(screen.queryByText("0")).not.toBeInTheDocument();
   });
+
+  it("keeps children under an empty lane when asked", () => {
+    render(
+      <WorkOrderBoardLane
+        title="Backlog"
+        count={0}
+        emptyDescription="No work orders in the backlog."
+        keepChildrenWhenEmpty
+        testId="lane-backlog"
+      >
+        <button type="button">Add work order</button>
+      </WorkOrderBoardLane>,
+    );
+
+    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add work order" })).toBeInTheDocument();
+  });
 });

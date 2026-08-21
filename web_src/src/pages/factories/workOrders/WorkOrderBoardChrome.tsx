@@ -67,6 +67,11 @@ interface WorkOrderBoardLaneProps {
   tone?: BoardLaneTone;
   /** Sits at the end of the header, for example a menu button. */
   actions?: ReactNode;
+  /**
+   * Keep rendering children when count is 0 (for a trailing add control
+   * under an empty or short list).
+   */
+  keepChildrenWhenEmpty?: boolean;
   /** Accessible name, when it must read differently from the title. */
   label?: string;
   className?: string;
@@ -80,6 +85,7 @@ export function WorkOrderBoardLane({
   emptyDescription,
   tone = "neutral",
   actions,
+  keepChildrenWhenEmpty = false,
   label,
   className,
   testId,
@@ -101,7 +107,7 @@ export function WorkOrderBoardLane({
         {actions}
       </header>
 
-      {count === 0 ? (
+      {count === 0 && !keepChildrenWhenEmpty ? (
         <p className="mt-2 flex-1 rounded-md border border-dashed border-border/60 px-3 py-6 text-center text-[12px] text-muted-foreground">
           {emptyDescription}
         </p>

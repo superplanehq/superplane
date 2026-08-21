@@ -1,9 +1,15 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { cn } from "@/lib/utils";
-import { ArrowRightFromLine, Gauge, Kanban, Plus, Settings } from "lucide-react";
+import { ArrowRightFromLine, Gauge, Kanban, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
-import { factoryHomePath, factorySettingsPath, factoryVelocityPath, workOrdersPath } from "../lib/factoryPagePaths";
+import {
+  factoryHomePath,
+  factoryIntakePath,
+  factorySettingsPath,
+  factoryVelocityPath,
+  isIntakeSearchOpen,
+} from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName } from "./factoriesRail";
 
 interface FactoriesSidebarNavProps {
@@ -11,9 +17,7 @@ interface FactoriesSidebarNavProps {
   factoryKey: string;
   lineId?: string;
   canOpenSettings: boolean;
-  canCreateWorkOrder: boolean;
   permissionsLoading: boolean;
-  onCreateWorkOrder: () => void;
 }
 
 function railLinkClassName(isCurrent: boolean) {
@@ -48,25 +52,24 @@ function RailNavLink({
 }
 
 /**
- * Icon rail under the workspace switcher: incoming work, the line board,
- * velocity, settings, then create.
+ * Icon rail under the workspace switcher: intake drawer on the line board,
+ * the line board, velocity, then settings.
  */
 export function FactoriesSidebarNav({
   organizationId,
   factoryKey,
   lineId,
   canOpenSettings,
-  canCreateWorkOrder,
   permissionsLoading,
-  onCreateWorkOrder,
 }: FactoriesSidebarNavProps) {
-  const { pathname } = useLocation();
-  const intakeHref = workOrdersPath(organizationId, factoryKey);
+  const { pathname, search } = useLocation();
   const boardHref = factoryHomePath(organizationId, factoryKey, lineId);
+  const intakeOpen = isIntakeSearchOpen(search);
+  const intakeHref = intakeOpen ? boardHref : factoryIntakePath(organizationId, factoryKey, lineId);
   const velocityHref = factoryVelocityPath(organizationId, factoryKey);
   const settingsHref = factorySettingsPath(organizationId, factoryKey);
-  const intakeCurrent = isIntakePath(pathname);
-  const boardCurrent = isBoardPath(pathname);
+  const intakeCurrent = intakeOpen;
+  const boardCurrent = isBoardPath(pathname) && !intakeOpen;
   const velocityCurrent = isVelocityPath(pathname);
   const settingsCurrent = isSettingsPath(pathname);
 
@@ -107,32 +110,8 @@ export function FactoriesSidebarNav({
           <Settings className="size-3.5" aria-hidden />
         </Link>
       </PermissionTooltip>
-      <PermissionTooltip
-        allowed={canCreateWorkOrder || permissionsLoading}
-        message="You don't have permission to create work orders."
-      >
-        <button
-          type="button"
-          onClick={() => {
-            if (canCreateWorkOrder) {
-              onCreateWorkOrder();
-            }
-          }}
-          disabled={!canCreateWorkOrder}
-          aria-label="Create work order"
-          title="Create work order"
-          data-testid="factories-sidebar-create-work-order"
-          className={factoriesRailControlClassName}
-        >
-          <Plus className="size-3.5" aria-hidden />
-        </button>
-      </PermissionTooltip>
     </nav>
   );
-}
-
-export function isIntakePath(pathname: string): boolean {
-  return pathname.includes("/work-orders") || /\/work-order\//.test(pathname);
 }
 
 export function isBoardPath(pathname: string): boolean {

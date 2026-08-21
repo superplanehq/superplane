@@ -119,10 +119,13 @@ describe("LinesPage card menu", () => {
 });
 
 describe("LinesPage board", () => {
-  function renderBoard() {
+  function renderBoard(
+    path = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+    openCreateWorkOrder = vi.fn(),
+  ) {
     return render(
       <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`]}>
+        <MemoryRouter initialEntries={[path]}>
           <FactoriesLayoutContext.Provider
             value={{
               organizationId: "org-1",
@@ -130,7 +133,7 @@ describe("LinesPage board", () => {
               factoryKey: PRIMARY_FACTORY_KEY,
               factory: REFUND_FACTORY,
               factories: [REFUND_FACTORY],
-              openCreateWorkOrder: vi.fn(),
+              openCreateWorkOrder,
             }}
           >
             <Routes>
@@ -149,6 +152,31 @@ describe("LinesPage board", () => {
 
     expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-back-to-list")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("line-intake-drawer")).not.toBeInTheDocument();
+  });
+
+  it("creates work orders from the backlog header plus and add control", async () => {
+    const openCreateWorkOrder = vi.fn();
+    const user = userEvent.setup();
+    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, openCreateWorkOrder);
+
+    const backlog = screen.getByTestId("lines-backlog-column");
+    expect(within(backlog).getByTestId("lines-backlog-create")).toBeInTheDocument();
+    expect(within(backlog).getByTestId("lines-backlog-add")).toHaveTextContent("Add work order");
+
+    await user.click(within(backlog).getByTestId("lines-backlog-create"));
+    await user.click(within(backlog).getByTestId("lines-backlog-add"));
+    expect(openCreateWorkOrder).toHaveBeenCalledTimes(2);
+  });
+
+  it("opens the Intake drawer beside the board when the intake query is set", () => {
+    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
+
+    expect(screen.getByTestId("line-intake-drawer")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Plan and Implement" })).toBeInTheDocument();
+    expect(screen.getByTestId("line-intake-close")).toBeInTheDocument();
+    expect(screen.getByTestId("line-intake-add")).toHaveTextContent("Add intake");
   });
 
   it("opens Edit from the line overflow menu", async () => {

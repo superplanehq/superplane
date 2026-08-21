@@ -33,6 +33,18 @@ export function factoryHomePath(organizationId: string, factoryKey: string, line
   return linesPath(organizationId, factoryKey);
 }
 
+/** Opens the line board with the Intake drawer beside the columns. */
+export const INTAKE_SEARCH_PARAM = "intake";
+
+export function factoryIntakePath(organizationId: string, factoryKey: string, lineId?: string | null) {
+  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${INTAKE_SEARCH_PARAM}=1`;
+}
+
+export function isIntakeSearchOpen(search: string): boolean {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(INTAKE_SEARCH_PARAM) === "1";
+}
+
 export function factorySetupPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/setup`;
 }

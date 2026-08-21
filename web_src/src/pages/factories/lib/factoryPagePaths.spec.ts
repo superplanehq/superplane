@@ -6,6 +6,8 @@ import {
   factoryAppViewPath,
   factoryDetailPath,
   factoryHomePath,
+  factoryIntakePath,
+  isIntakeSearchOpen,
   factorySettingsGeneralPathAfterKeyChange,
   firstFactoryLineId,
   legacyWorkOrderDetailPath,
@@ -29,6 +31,18 @@ describe("factoryHomePath", () => {
 
   it("opens the lines list when no line id is present", () => {
     expect(factoryHomePath("org-1", "SP")).toBe("/org-1/workspaces/SP/lines");
+  });
+});
+
+describe("factoryIntakePath", () => {
+  it("opens the line board with the intake query", () => {
+    expect(factoryIntakePath("org-1", "SP", "line-plan")).toBe("/org-1/workspaces/SP/lines/line-plan?intake=1");
+  });
+
+  it("reads the intake query from the search string", () => {
+    expect(isIntakeSearchOpen("?intake=1")).toBe(true);
+    expect(isIntakeSearchOpen("intake=1")).toBe(true);
+    expect(isIntakeSearchOpen("")).toBe(false);
   });
 });
 

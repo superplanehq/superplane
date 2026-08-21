@@ -12,7 +12,7 @@ import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoL
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Clock, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import {
@@ -46,7 +46,9 @@ import {
   editFactoryLinePath,
   factoryAppConfigurePath,
   factoryAppSplitRunPath,
+  factoryHomePath,
   factoryLineDetailPath,
+  isIntakeSearchOpen,
   linesPath,
   workOrderDetailPath,
 } from "../lib/factoryPagePaths";
@@ -57,6 +59,7 @@ import {
   factorySectionHeaderClassName,
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
+import { LineIntakeDrawer } from "./LineIntakeDrawer";
 import { LineListCard } from "./LineListCard";
 import { descriptionForLine, toLineListMetrics } from "./lineListMetricsMockData";
 import { useLineCardMutations } from "./useLineCardMutations";
@@ -64,15 +67,19 @@ import { useLineCardMutations } from "./useLineCardMutations";
 const LIST_SUBTITLE = "Last 30 days. Success rate, completions per day, duration, and cost per merged work order.";
 
 export function LinesPage() {
-  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId } = useParams<{ lineId: string }>();
+  const { search } = useLocation();
+  const navigate = useNavigate();
+  const intakeOpen = isIntakeSearchOpen(search);
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
   const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
 
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
+  const canCreateWorkOrder = canAct("work_orders", "create");
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const { actionsForLine } = useLineCardMutations({
     organizationId,
@@ -100,34 +107,41 @@ export function LinesPage() {
   // the lanes read as columns rather than as boxes around their cards.
   if (selectedLine) {
     return (
-      <div className={factoryKanbanPageClassName} data-testid="lines-detail-page">
-        <div className="shrink-0">
-          <LineDetailHeader
-            organizationId={organizationId}
-            factoryKey={factoryKey}
-            line={selectedLine}
-            canUpdate={canUpdate}
-          />
-        </div>
+      <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
+        {intakeOpen ? (
+          <LineIntakeDrawer onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))} />
+        ) : null}
+        <div className={factoryKanbanPageClassName}>
+          <div className="shrink-0">
+            <LineDetailHeader
+              organizationId={organizationId}
+              factoryKey={factoryKey}
+              line={selectedLine}
+              canUpdate={canUpdate}
+            />
+          </div>
 
-        <div className={factoryWorkOrdersBodyClassName}>
-          <LineDetail
-            organizationId={organizationId}
-            factoryId={factoryId}
-            factoryKey={factoryKey}
-            line={selectedLine}
-            apps={factoryApps}
-            workOrders={workOrders}
-            workOrderCardContext={{
-              organizationId,
-              factoryKey,
-              factoryLines: lines,
-              canDispatch: canUpdateWorkOrders,
-              preferredLineName: selectedLine.name,
-              canAssign: canUpdateWorkOrders,
-              ...cardActions,
-            }}
-          />
+          <div className={factoryWorkOrdersBodyClassName}>
+            <LineDetail
+              organizationId={organizationId}
+              factoryId={factoryId}
+              factoryKey={factoryKey}
+              line={selectedLine}
+              apps={factoryApps}
+              workOrders={workOrders}
+              canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
+              onCreateWorkOrder={openCreateWorkOrder}
+              workOrderCardContext={{
+                organizationId,
+                factoryKey,
+                factoryLines: lines,
+                canDispatch: canUpdateWorkOrders,
+                preferredLineName: selectedLine.name,
+                canAssign: canUpdateWorkOrders,
+                ...cardActions,
+              }}
+            />
+          </div>
         </div>
       </div>
     );
@@ -218,6 +232,8 @@ function LineDetail({
   line,
   apps,
   workOrders,
+  canCreateWorkOrder,
+  onCreateWorkOrder,
   workOrderCardContext,
 }: {
   organizationId: string;
@@ -226,6 +242,8 @@ function LineDetail({
   line: FactoriesFactoryLine;
   apps: Array<{ id?: string; name?: string }>;
   workOrders: FactoriesWorkOrder[];
+  canCreateWorkOrder: boolean;
+  onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
 }) {
   const steps = line.steps ?? [];
@@ -254,6 +272,8 @@ function LineDetail({
           apps={apps}
           backlogOrders={backlogOrders}
           columns={board}
+          canCreateWorkOrder={canCreateWorkOrder}
+          onCreateWorkOrder={onCreateWorkOrder}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={setPeekOrderId}
         />
@@ -422,6 +442,8 @@ function PhaseBoard({
   apps,
   backlogOrders,
   columns,
+  canCreateWorkOrder,
+  onCreateWorkOrder,
   workOrderCardContext,
   onOpenWorkOrder,
 }: {
@@ -431,6 +453,8 @@ function PhaseBoard({
   apps: Array<{ id?: string; name?: string }>;
   backlogOrders: FactoriesWorkOrder[];
   columns: LinePhaseColumn[];
+  canCreateWorkOrder: boolean;
+  onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string) => void;
 }) {
@@ -445,6 +469,8 @@ function PhaseBoard({
         <BacklogColumn
           orders={backlogOrders}
           configureHref={backlogConfigureHref}
+          canCreateWorkOrder={canCreateWorkOrder}
+          onCreateWorkOrder={onCreateWorkOrder}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
         />
@@ -474,11 +500,15 @@ function PhaseBoard({
 function BacklogColumn({
   orders,
   configureHref,
+  canCreateWorkOrder,
+  onCreateWorkOrder,
   workOrderCardContext,
   onOpenWorkOrder,
 }: {
   orders: FactoriesWorkOrder[];
   configureHref: string | null;
+  canCreateWorkOrder: boolean;
+  onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string) => void;
 }) {
@@ -490,12 +520,44 @@ function BacklogColumn({
       tone="neutral"
       emptyDescription="No work orders in the backlog."
       className="bg-muted"
+      keepChildrenWhenEmpty
       actions={
-        configureHref ? <ColumnConfigureMenu title="Backlog" href={configureHref} testId="lines-backlog-menu" /> : null
+        <div className="flex shrink-0 items-center gap-0.5">
+          <PermissionTooltip
+            allowed={canCreateWorkOrder}
+            message="You don't have permission to create work orders."
+          >
+            <button
+              type="button"
+              onClick={() => {
+                if (canCreateWorkOrder) {
+                  onCreateWorkOrder();
+                }
+              }}
+              disabled={!canCreateWorkOrder}
+              aria-label="Create work order"
+              title="Create work order"
+              data-testid="lines-backlog-create"
+              className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-60"
+            >
+              <Plus className="size-3.5" aria-hidden />
+            </button>
+          </PermissionTooltip>
+          {configureHref ? (
+            <ColumnConfigureMenu title="Backlog" href={configureHref} testId="lines-backlog-menu" />
+          ) : null}
+        </div>
       }
       testId="lines-backlog-column"
     >
       <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-backlog-column-scroll">
+        {orders.length === 0 ? (
+          <li>
+            <p className="rounded-md border border-dashed border-border/60 px-3 py-6 text-center text-[12px] text-muted-foreground">
+              No work orders in the backlog.
+            </p>
+          </li>
+        ) : null}
         {orders.map((order) => (
           <li key={order.id}>
             <LineBoardOrderCard
@@ -505,6 +567,24 @@ function BacklogColumn({
             />
           </li>
         ))}
+        <li>
+          <PermissionTooltip allowed={canCreateWorkOrder} message="You don't have permission to create work orders.">
+            <button
+              type="button"
+              onClick={() => {
+                if (canCreateWorkOrder) {
+                  onCreateWorkOrder();
+                }
+              }}
+              disabled={!canCreateWorkOrder}
+              data-testid="lines-backlog-add"
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/60 px-3 py-2.5 text-[13px] font-medium tracking-[-0.01em] text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-60"
+            >
+              <Plus className="size-3.5 shrink-0" aria-hidden />
+              Add work order
+            </button>
+          </PermissionTooltip>
+        </li>
       </ul>
     </WorkOrderBoardLane>
   );
