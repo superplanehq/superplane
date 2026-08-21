@@ -1,15 +1,19 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { PRIMARY_FACTORY_KEY, REFUND_FACTORY_LINES } from "../../__fixtures__/factoryPageResponses";
+import { REFUND_IMPLEMENTER_APP } from "../../__fixtures__/factoryOwnedCanvasFixture";
+import {
+  LINE_RUN_IMPLEMENT_ID,
+  PRIMARY_FACTORY_KEY,
+  REFUND_FACTORY_LINES,
+} from "../../__fixtures__/factoryPageResponses";
 import { lineMetricsFactoriesFixture } from "../../__fixtures__/lineMetricsFactoriesFixture";
 
 /**
  * Line board with the terminal-log run popup. Open a card: finished steps
- * stay collapsed, the current step expands, and a log step click selects
- * that step on the canvas. Expand opens the full automation run page.
- *
- * This story replaces the factory app canvas run view.
+ * stay collapsed, the current step expands, and a log line click selects
+ * that component on the canvas (running-blue ring). Expand opens the full
+ * automation run page.
  */
 const meta = {
   title: "Factories/Pages/Work Order Split Run",
@@ -30,6 +34,20 @@ export const Running: Story = {
     return (
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={lineMetricsFactoriesFixture}
+      />
+    );
+  },
+};
+
+export const AutomationRun: Story = {
+  name: "Automation run",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    const appId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${appId}/split-run?from=lines&lineId=${line.id}&run=${LINE_RUN_IMPLEMENT_ID}&orderNumber=103&canvas=implementation`}
         factoriesFixture={lineMetricsFactoriesFixture}
       />
     );
