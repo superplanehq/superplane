@@ -276,7 +276,7 @@ func TestOrganizationAuthMiddleware_APIKeyWithDeletedCreator(t *testing.T) {
 func TestOrganizationAuthMiddleware_BlockedImpersonationTargetFallsBackToAdmin(t *testing.T) {
 	r := support.Setup(t)
 	signer := jwt.NewSigner("test-secret")
-	require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
+	require.NoError(t, models.PromoteToInstallationAdmin(database.Conn(), r.Account.ID.String()))
 
 	targetAccount, err := models.CreateAccount("Blocked Target", "blocked-target@example.com")
 	require.NoError(t, err)
@@ -311,7 +311,7 @@ func TestOrganizationAuthMiddleware_BlockedImpersonationTargetFallsBackToAdmin(t
 func TestAccountAuthMiddleware_BlockedImpersonationTargetClearsCookie(t *testing.T) {
 	r := support.Setup(t)
 	signer := jwt.NewSigner("test-secret")
-	require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
+	require.NoError(t, models.PromoteToInstallationAdmin(database.Conn(), r.Account.ID.String()))
 
 	targetAccount, err := models.CreateAccount("Blocked Target", "blocked-account-target@example.com")
 	require.NoError(t, err)

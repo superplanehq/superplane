@@ -624,7 +624,7 @@ func (s *Server) promoteAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := models.PromoteToInstallationAdmin(targetID); err != nil {
+	if err := models.PromoteToInstallationAdmin(database.DB(r.Context()), targetID); err != nil {
 		log.Errorf("admin: failed to promote %s: %v", targetID, err)
 		http.Error(w, "Failed to promote account", http.StatusInternalServerError)
 		return
@@ -665,7 +665,7 @@ func (s *Server) demoteAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := models.DemoteFromInstallationAdmin(targetID); err != nil {
+	if err := models.DemoteFromInstallationAdmin(database.DB(r.Context()), targetID); err != nil {
 		log.Errorf("admin: failed to demote %s: %v", targetID, err)
 		http.Error(w, "Failed to demote account", http.StatusInternalServerError)
 		return

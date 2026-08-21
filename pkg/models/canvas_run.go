@@ -484,7 +484,7 @@ func ListCanvasRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, limit int, b
 	var runs []CanvasRun
 	query := tx.
 		Where("workflow_id = ?", workflowID).
-		Order("created_at DESC").
+		Order("created_at DESC, id DESC").
 		Limit(limit)
 
 	query = applyCanvasRunFilters(query, filters)
