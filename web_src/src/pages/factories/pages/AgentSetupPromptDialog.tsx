@@ -8,37 +8,49 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { redactAgentEditPromptForDisplay } from "../lib/agentEditPrompt";
+import { MarkdownContent } from "@/pages/app/Markdown";
 
 type AgentSetupPromptDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  installInstructions: string;
+  installCommands: string;
   prompt: string;
 };
 
-export function AgentSetupPromptDialog({ open, onOpenChange, prompt }: AgentSetupPromptDialogProps) {
-  const displayPrompt = redactAgentEditPromptForDisplay(prompt);
-
+export function AgentSetupPromptDialog({
+  open,
+  onOpenChange,
+  installInstructions,
+  installCommands,
+  prompt,
+}: AgentSetupPromptDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex max-h-[90vh] max-w-2xl flex-col gap-0 overflow-hidden p-0"
+        size="large"
+        className="flex max-h-[90vh] w-full max-w-3xl flex-col gap-0 overflow-hidden p-0"
         data-testid="agent-setup-prompt-dialog"
       >
         <DialogHeader className="border-b border-border px-5 py-4">
           <DialogTitle>Edit with a local agent</DialogTitle>
           <DialogDescription>
-            Copy this prompt into a local coding agent. The prompt shows how to install the SuperPlane CLI, connect to
-            the API, and update this canvas.
+            Install the SuperPlane CLI in your terminal. Then copy the prompt into a local coding agent.
           </DialogDescription>
         </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <pre
-            className="whitespace-pre-wrap break-words font-mono text-[13px] leading-relaxed text-foreground"
-            data-testid="agent-setup-prompt-markdown"
-          >
-            {displayPrompt}
-          </pre>
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-4">
+          <PromptSection
+            title="Install the SuperPlane CLI"
+            helper="Run these commands in your terminal."
+            body={installInstructions}
+            testId="agent-setup-install-markdown"
+          />
+          <PromptSection
+            title="Prompt"
+            helper="This prompt includes canvas IDs and CLI commands to read and update the canvas."
+            body={prompt}
+            testId="agent-setup-prompt-markdown"
+          />
         </div>
         <DialogFooter className="border-t border-border px-5 py-3">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -46,15 +58,44 @@ export function AgentSetupPromptDialog({ open, onOpenChange, prompt }: AgentSetu
           </Button>
           <CopyButton
             variant="button"
+            buttonVariant="outline"
+            text={installCommands}
+            copiedLabel="Copied"
+            data-testid="agent-setup-install-copy"
+          >
+            Copy install commands
+          </CopyButton>
+          <CopyButton
+            variant="button"
             buttonVariant="default"
             text={prompt}
             copiedLabel="Copied"
             data-testid="agent-setup-prompt-copy"
           >
-            Copy prompt and embed API key
+            Copy prompt
           </CopyButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function PromptSection({
+  title,
+  helper,
+  body,
+  testId,
+}: {
+  title: string;
+  helper: string;
+  body: string;
+  testId: string;
+}) {
+  return (
+    <section>
+      <h3 className="text-sm font-medium text-foreground">{title}</h3>
+      <p className="mt-1 text-[13px] leading-5 text-muted-foreground">{helper}</p>
+      <MarkdownContent className="mt-3" content={body} variant="workspace" data-testid={testId} />
+    </section>
   );
 }

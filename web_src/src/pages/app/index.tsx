@@ -285,7 +285,7 @@ export function AppPage({
   factoryConfigure?: boolean;
   /** Factory-shell opt-in: show the in-app agent sidebar next to the canvas. */
   factoryAgentEnabled?: boolean;
-  /** Storybook-only factory edit workspace chrome. Live factory canvas ignores this. */
+  /** Factory-shell edit workspace chrome (styled agent sidebar, larger edit dots). */
   factoryEditWorkspace?: boolean;
   /** Imperative Discard/Save handlers for the factory Configure chrome (no setState bridge). */
   factoryConfigureActionsRef?: MutableRefObject<FactoryConfigureActions | null>;
@@ -3013,6 +3013,7 @@ export function AppPage({
       onCanvasDraftRestoredToCommitted: handleCanvasDraftRestoredToCommitted,
       onCommittedVersionId: handleCommittedVersionId,
       registerIgnoredCanvasUpdatedEcho,
+      factoryContext: factoryEmbed,
     },
   );
 
@@ -3107,7 +3108,7 @@ export function AppPage({
   });
 
   const handleUseVersion = useCallback(
-    (versionID: string, options?: { preserveStagedLayer?: boolean }) => {
+    (versionID: string, options?: { preserveStagedLayer?: boolean; leaveFactoryConfigure?: boolean }) => {
       if (!organizationId || !canvasId) {
         return;
       }
@@ -3441,11 +3442,15 @@ export function AppPage({
   // previewing a version from the sidebar.
   const handleExitEditSession = useCallback(() => {
     setEditSessionActive(false);
-    clearRunInspectionForEdit();
-    if (liveCanvasVersionId) {
-      handleUseVersion(liveCanvasVersionId);
+    // Factory Discard leaves Configure with run/from/line kept. Clearing run
+    // inspection here would drop that context before the live restore rewrite.
+    if (!factoryConfigure) {
+      clearRunInspectionForEdit();
     }
-  }, [clearRunInspectionForEdit, liveCanvasVersionId, handleUseVersion]);
+    if (liveCanvasVersionId) {
+      handleUseVersion(liveCanvasVersionId, factoryConfigure ? { leaveFactoryConfigure: true } : undefined);
+    }
+  }, [clearRunInspectionForEdit, factoryConfigure, liveCanvasVersionId, handleUseVersion]);
 
   useFactoryConfigureSession({
     factoryConfigure,

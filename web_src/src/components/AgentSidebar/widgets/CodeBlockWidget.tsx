@@ -5,6 +5,7 @@ import Editor from "@monaco-editor/react";
 import { useTheme } from "@/contexts/useTheme";
 import { FullscreenContentDialog } from "@/ui/FullscreenContentDialog";
 import { HeaderIconButton } from "@/ui/HeaderIconButton";
+import { calcCodeBlockHeight } from "./calcCodeBlockHeight";
 
 interface CodeBlockWidgetProps {
   code: string;
@@ -51,12 +52,6 @@ function mapLanguage(lang?: string): string {
   return map[lang.toLowerCase()] || lang.toLowerCase();
 }
 
-function calcHeight(code: string, maxPx = 250): number {
-  const lineCount = code.split("\n").length;
-  const lineHeight = 19;
-  return Math.min(Math.max(lineCount * lineHeight + 16, 60), maxPx);
-}
-
 export const CodeBlockWidget = memo(function CodeBlockWidget({ code, language }: CodeBlockWidgetProps) {
   const [copied, setCopied] = useState(false);
   const [modalCopied, setModalCopied] = useState(false);
@@ -75,11 +70,11 @@ export const CodeBlockWidget = memo(function CodeBlockWidget({ code, language }:
     [code],
   );
 
-  const height = calcHeight(code);
+  const height = calcCodeBlockHeight(code);
 
   return (
     <>
-      <div className="group my-4 w-full min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+      <div className="group my-4 w-full min-w-0 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-800">
         <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-1 dark:border-gray-700 dark:bg-gray-900/60">
           <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-gray-400">
             {language || "code"}
@@ -103,9 +98,9 @@ export const CodeBlockWidget = memo(function CodeBlockWidget({ code, language }:
             </button>
           </div>
         </div>
-        <div style={{ height: `${height}px` }}>
+        <div className="overflow-hidden" data-testid="code-block-editor" style={{ height }}>
           <Editor
-            height="100%"
+            height={height}
             width="100%"
             defaultLanguage={monacoLang}
             value={code}
