@@ -10,7 +10,7 @@ import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Clock, Inbox, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
+import { Clock, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
@@ -50,7 +50,7 @@ import {
   linesPath,
   workOrderDetailPath,
 } from "../lib/factoryPagePaths";
-import { formatLinePhaseDescription, humanizeLineName } from "../lib/humanizeLineName";
+import { humanizeLineName } from "../lib/humanizeLineName";
 import {
   factoryKanbanPageClassName,
   factorySectionBodyClassName,
@@ -106,7 +106,6 @@ export function LinesPage() {
             organizationId={organizationId}
             factoryKey={factoryKey}
             line={selectedLine}
-            apps={factoryApps}
             canUpdate={canUpdate}
           />
         </div>
@@ -191,13 +190,11 @@ function LineDetailHeader({
   organizationId,
   factoryKey,
   line,
-  apps,
   canUpdate,
 }: {
   organizationId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
-  apps: Array<{ id?: string; name?: string }>;
   canUpdate: boolean;
 }) {
   const editHref = line.id ? editFactoryLinePath(organizationId, factoryKey, line.id) : "#";
@@ -205,9 +202,8 @@ function LineDetailHeader({
     <WorkspacePageHeader
       className={factorySectionHeaderClassName}
       title={humanizeLineName(line.name)}
-      subtitle={formatLinePhaseDescription(line.steps, apps)}
       actions={
-        canUpdate ? (
+        canUpdate && line.id ? (
           <ColumnConfigureMenu title={humanizeLineName(line.name)} href={editHref} testId="lines-edit-menu" />
         ) : undefined
       }
@@ -494,7 +490,6 @@ function BacklogColumn({
       tone="neutral"
       emptyDescription="No work orders in the backlog."
       className="bg-muted"
-      leading={<Inbox className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />}
       actions={
         configureHref ? <ColumnConfigureMenu title="Backlog" href={configureHref} testId="lines-backlog-menu" /> : null
       }

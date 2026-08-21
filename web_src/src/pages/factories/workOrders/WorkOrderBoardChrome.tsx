@@ -65,8 +65,6 @@ interface WorkOrderBoardLaneProps {
   /** Replaces the body while the lane holds nothing. */
   emptyDescription: string;
   tone?: BoardLaneTone;
-  /** Sits before the title, for example a phase status glyph. */
-  leading?: ReactNode;
   /** Sits at the end of the header, for example a menu button. */
   actions?: ReactNode;
   /** Accessible name, when it must read differently from the title. */
@@ -81,7 +79,6 @@ export function WorkOrderBoardLane({
   count,
   emptyDescription,
   tone = "neutral",
-  leading,
   actions,
   label,
   className,
@@ -100,13 +97,7 @@ export function WorkOrderBoardLane({
       data-testid={testId}
     >
       <header className="flex shrink-0 items-center justify-between gap-2 px-2 pb-2">
-        <div className="inline-flex min-w-0 items-center gap-2">
-          {leading}
-          <h2 className="truncate text-[12px] font-semibold uppercase tracking-[0.06em] text-foreground/80">{title}</h2>
-          <span className="shrink-0 rounded-full bg-background/70 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-            {count}
-          </span>
-        </div>
+        <h2 className="workspace-section-title truncate">{title}</h2>
         {actions}
       </header>
 

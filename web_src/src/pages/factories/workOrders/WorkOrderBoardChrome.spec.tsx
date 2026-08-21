@@ -19,6 +19,8 @@ describe("WorkOrderKanbanBoard", () => {
     expect(screen.getByTestId("kanban-board").className).toContain("overflow-x-auto");
     expect(screen.getByTestId("lane-plan").className).toContain("min-w-72");
     expect(screen.getByTestId("lane-plan").className).toContain("shrink-0");
+    expect(screen.getByRole("heading", { name: "Plan" })).toBeInTheDocument();
+    expect(screen.queryByText("0")).not.toBeInTheDocument();
   });
 
   it("keeps empty-lane copy and stretches the empty body", () => {
@@ -34,5 +36,6 @@ describe("WorkOrderKanbanBoard", () => {
     const emptyCopy = screen.getByText("No work orders in this phase.");
     expect(emptyCopy).toBeInTheDocument();
     expect(emptyCopy.className).toContain("flex-1");
+    expect(screen.queryByText("0")).not.toBeInTheDocument();
   });
 });
