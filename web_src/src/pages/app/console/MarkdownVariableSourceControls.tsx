@@ -59,7 +59,7 @@ export function MemorySourceControls({
       <div className="space-y-1">
         <Label className="text-[11px] font-medium text-slate-600">Namespace</Label>
         <Select
-          value={source.namespace || undefined}
+          value={source.namespace ?? ""}
           onValueChange={(value) => onChange({ ...source, namespace: value })}
         >
           <SelectTrigger className="h-7 text-[12px]" data-testid="markdown-variable-memory-namespace">
