@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  START_WORK_ORDER,
   fixtureIssueCount,
   type AgentHarnessId,
   type IntegrationId,
@@ -20,8 +19,6 @@ export type OnboardingSetupState = {
   issuesDiscovered: boolean;
   issuesChoice: IssuesChoiceId | null;
   agent: AgentHarnessId | null;
-  workOrderTitle: string;
-  workOrderDescription: string;
   finished: boolean;
 };
 
@@ -58,23 +55,19 @@ function setupReadiness(input: {
   connected: Set<IntegrationId>;
   issuesChoice: IssuesChoiceId | null;
   agent: AgentHarnessId | null;
-  workOrderTitle: string;
-  workOrderDescription: string;
 }) {
   const nameReady = input.workspaceName.trim().length > 0;
   const vcsReady = input.vcsHost !== null && input.connected.has(input.vcsHost);
   const repoReady = vcsReady && input.selectedRepo !== null;
   const issuesReady = isIssuesReady(input.issuesChoice, input.connected);
   const agentReady = isAgentReady(input.agent, input.connected);
-  const startReady = input.workOrderTitle.trim().length > 0 && input.workOrderDescription.trim().length > 0;
   return {
     nameReady,
     vcsReady,
     repoReady,
     issuesReady,
     agentReady,
-    startReady,
-    canFinish: nameReady && repoReady && agentReady && startReady,
+    canFinish: nameReady && repoReady && agentReady,
   };
 }
 
@@ -104,8 +97,6 @@ export function useOnboardingSetupState(
   /** True after Continue to coding agent — starts backlog analysis. */
   const [issuesCommitted, setIssuesCommitted] = useState(false);
   const [agent, setAgent] = useState<AgentHarnessId | null>(null);
-  const [workOrderTitle, setWorkOrderTitle] = useState<string>(START_WORK_ORDER.title);
-  const [workOrderDescription, setWorkOrderDescription] = useState<string>(START_WORK_ORDER.description);
   const [finished, setFinished] = useState(false);
   const discoveryTimerRef = useRef<number | null>(null);
   const connected = options?.connected ?? localConnected;
@@ -218,15 +209,13 @@ export function useOnboardingSetupState(
   const backlogRepo = issuesRepo ?? selectedRepo;
   const issueCount =
     options?.simulateDiscovery === false ? undefined : backlogRepo ? fixtureIssueCount(backlogRepo) : 0;
-  const { nameReady, vcsReady, repoReady, issuesReady, agentReady, startReady, canFinish } = setupReadiness({
+  const { nameReady, vcsReady, repoReady, issuesReady, agentReady, canFinish } = setupReadiness({
     workspaceName,
     vcsHost,
     selectedRepo,
     connected,
     issuesChoice,
     agent,
-    workOrderTitle,
-    workOrderDescription,
   });
 
   const summary = useMemo(
@@ -238,9 +227,8 @@ export function useOnboardingSetupState(
       issuesChoice,
       agent,
       issueCount,
-      workOrderTitle: workOrderTitle.trim(),
     }),
-    [workspaceName, vcsHost, selectedRepo, backlogRepo, issuesChoice, agent, issueCount, workOrderTitle],
+    [workspaceName, vcsHost, selectedRepo, backlogRepo, issuesChoice, agent, issueCount],
   );
 
   return {
@@ -266,10 +254,6 @@ export function useOnboardingSetupState(
     commitIssuesStep,
     agent,
     setAgent,
-    workOrderTitle,
-    setWorkOrderTitle,
-    workOrderDescription,
-    setWorkOrderDescription,
     finished,
     setFinished,
     issueCount,
@@ -278,7 +262,6 @@ export function useOnboardingSetupState(
     repoReady,
     issuesReady,
     agentReady,
-    startReady,
     canFinish,
     summary,
   };
