@@ -312,6 +312,11 @@ func TestEnvironmentContextOverridesConfiguredContext(t *testing.T) {
 	require.Contains(t, err.Error(), "pass --app-id")
 	require.Empty(t, config.GetActiveApp())
 
+	err = config.SetActiveFactory("factory-from-env-run")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "pass --factory")
+	require.Empty(t, config.GetActiveFactory())
+
 	current, ok := GetCurrentContext()
 	require.True(t, ok)
 	require.Nil(t, current.Canvas)

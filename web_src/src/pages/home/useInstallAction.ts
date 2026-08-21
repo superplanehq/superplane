@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import type { NavigateFunction } from "react-router-dom";
+import type { NavigateFunction } from "react-router";
 import type { QueryClient } from "@tanstack/react-query";
 import { canvasKeys, useUpdateCanvasFolderMembership } from "@/hooks/useCanvasData";
 import { usePermissions } from "@/contexts/usePermissions";

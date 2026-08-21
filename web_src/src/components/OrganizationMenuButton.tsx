@@ -21,7 +21,7 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/usePermissions";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
@@ -110,8 +110,8 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
     ...(factoriesEnabled
       ? [
           {
-            label: "Factories",
-            href: organizationId ? `/${organizationId}/factories` : "#",
+            label: "Workspaces",
+            href: organizationId ? `/${organizationId}/workspaces` : "#",
             Icon: Factory,
             permission: { resource: "factories", action: "read" },
           },

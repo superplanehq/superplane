@@ -16,6 +16,10 @@ import { deleteRepositoryMapper } from "./codeartifact/delete_repository";
 import { disposePackageVersionsMapper } from "./codeartifact/dispose_package_versions";
 import { updatePackageVersionsStatusMapper } from "./codeartifact/update_package_versions_status";
 import { onAlarmTriggerRenderer } from "./cloudwatch/on_alarm";
+import { createAlarmMapper } from "./cloudwatch/create_alarm";
+import { updateAlarmMapper } from "./cloudwatch/update_alarm";
+import { getAlarmMapper } from "./cloudwatch/get_alarm";
+import { deleteAlarmMapper } from "./cloudwatch/delete_alarm";
 import { createServiceMapper } from "./ecs/create_service";
 import { createRecordMapper } from "./route53/create_record";
 import { upsertRecordMapper } from "./route53/upsert_record";
@@ -38,13 +42,9 @@ import { getPipelineMapper } from "./codepipeline/get_pipeline";
 import { onPipelineTriggerRenderer } from "./codepipeline/on_pipeline";
 import { onImageTriggerRenderer } from "./ec2/on_image";
 import { onEc2AlarmTriggerRenderer } from "./ec2/on_alarm";
-import { createAlarmMapper } from "./ec2/create_alarm";
-import { deleteAlarmMapper } from "./ec2/delete_alarm";
-import { updateAlarmMapper } from "./ec2/update_alarm";
 import { createImageMapper } from "./ec2/create_image";
 import { CREATE_INSTANCE_STATE_REGISTRY, createInstanceMapper } from "./ec2/create_instance";
 import { deleteInstanceMapper } from "./ec2/delete_instance";
-import { getAlarmMapper } from "./ec2/get_alarm";
 import { getImageMapper as getEc2ImageMapper } from "./ec2/get_image";
 import { getInstanceMapper } from "./ec2/get_instance";
 import { getInstanceMetricsMapper } from "./ec2/get_instance_metrics";
@@ -60,17 +60,25 @@ import { disableImageMapper } from "./ec2/disable_image";
 import { enableImageDeprecationMapper } from "./ec2/enable_image_deprecation";
 import { disableImageDeprecationMapper } from "./ec2/disable_image_deprecation";
 import {
+  createRuleGroupNamespaceMapper,
   createWorkspaceMapper,
+  deleteRuleGroupNamespaceMapper,
   deleteWorkspaceMapper,
+  getRuleGroupNamespaceMapper,
   getWorkspaceMapper,
   queryMapper,
   queryRangeMapper,
+  updateRuleGroupNamespaceMapper,
   updateWorkspaceMapper,
 } from "./prometheus";
 import { createLoadBalancerMapper } from "./ec2/create_load_balancer";
 import { deleteLoadBalancerMapper } from "./ec2/delete_load_balancer";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
+  "cloudwatch.createAlarm": createAlarmMapper,
+  "cloudwatch.updateAlarm": updateAlarmMapper,
+  "cloudwatch.getAlarm": getAlarmMapper,
+  "cloudwatch.deleteAlarm": deleteAlarmMapper,
   "codepipeline.getPipeline": getPipelineMapper,
   "codepipeline.getPipelineExecution": getPipelineExecutionMapper,
   "codepipeline.retryStageExecution": retryStageExecutionMapper,
@@ -89,6 +97,10 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "prometheus.getWorkspace": getWorkspaceMapper,
   "prometheus.updateWorkspace": updateWorkspaceMapper,
   "prometheus.deleteWorkspace": deleteWorkspaceMapper,
+  "prometheus.createRuleGroupNamespace": createRuleGroupNamespaceMapper,
+  "prometheus.getRuleGroupNamespace": getRuleGroupNamespaceMapper,
+  "prometheus.updateRuleGroupNamespace": updateRuleGroupNamespaceMapper,
+  "prometheus.deleteRuleGroupNamespace": deleteRuleGroupNamespaceMapper,
   "prometheus.query": queryMapper,
   "prometheus.queryRange": queryRangeMapper,
   "codeArtifact.copyPackageVersions": copyPackageVersionsMapper,
@@ -114,8 +126,6 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "ec2.allocateElasticIP": allocateElasticIPMapper,
   "ec2.manageElasticIP": manageElasticIPMapper,
   "ec2.copyImage": copyImageMapper,
-  "ec2.createAlarm": createAlarmMapper,
-  "ec2.deleteAlarm": deleteAlarmMapper,
   "ec2.createImage": createImageMapper,
   "ec2.createInstance": createInstanceMapper,
   "ec2.deregisterImage": deregisterImageMapper,
@@ -124,8 +134,6 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "ec2.disableImageDeprecation": disableImageDeprecationMapper,
   "ec2.enableImage": enableImageMapper,
   "ec2.enableImageDeprecation": enableImageDeprecationMapper,
-  "ec2.getAlarm": getAlarmMapper,
-  "ec2.updateAlarm": updateAlarmMapper,
   "ec2.getImage": getEc2ImageMapper,
   "ec2.getInstance": getInstanceMapper,
   "ec2.getInstanceMetrics": getInstanceMetricsMapper,
@@ -148,6 +156,10 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
+  "cloudwatch.createAlarm": buildActionStateRegistry("created"),
+  "cloudwatch.updateAlarm": buildActionStateRegistry("updated"),
+  "cloudwatch.getAlarm": buildActionStateRegistry("retrieved"),
+  "cloudwatch.deleteAlarm": buildActionStateRegistry("deleted"),
   "codepipeline.getPipeline": buildActionStateRegistry("retrieved"),
   "codepipeline.getPipelineExecution": buildActionStateRegistry("retrieved"),
   "codepipeline.retryStageExecution": buildActionStateRegistry("retried"),
@@ -165,6 +177,10 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "prometheus.getWorkspace": buildActionStateRegistry("retrieved"),
   "prometheus.updateWorkspace": buildActionStateRegistry("updated"),
   "prometheus.deleteWorkspace": buildActionStateRegistry("deleted"),
+  "prometheus.createRuleGroupNamespace": buildActionStateRegistry("created"),
+  "prometheus.getRuleGroupNamespace": buildActionStateRegistry("retrieved"),
+  "prometheus.updateRuleGroupNamespace": buildActionStateRegistry("updated"),
+  "prometheus.deleteRuleGroupNamespace": buildActionStateRegistry("deleted"),
   "prometheus.query": buildActionStateRegistry("success"),
   "prometheus.queryRange": buildActionStateRegistry("success"),
   "codeArtifact.copyPackageVersions": buildActionStateRegistry("copied"),
@@ -190,8 +206,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ec2.allocateElasticIP": buildActionStateRegistry("allocated"),
   "ec2.manageElasticIP": MANAGE_ELASTIC_IP_STATE_REGISTRY,
   "ec2.copyImage": buildActionStateRegistry("copied"),
-  "ec2.createAlarm": buildActionStateRegistry("created"),
-  "ec2.deleteAlarm": buildActionStateRegistry("deleted"),
   "ec2.createImage": buildActionStateRegistry("created"),
   "ec2.createInstance": CREATE_INSTANCE_STATE_REGISTRY,
   "ec2.deregisterImage": buildActionStateRegistry("deregistered"),
@@ -200,8 +214,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ec2.disableImageDeprecation": buildActionStateRegistry("disabled"),
   "ec2.enableImage": buildActionStateRegistry("enabled"),
   "ec2.enableImageDeprecation": buildActionStateRegistry("enabled"),
-  "ec2.getAlarm": buildActionStateRegistry("retrieved"),
-  "ec2.updateAlarm": buildActionStateRegistry("updated"),
   "ec2.getImage": buildActionStateRegistry("retrieved"),
   "ec2.getInstance": buildActionStateRegistry("retrieved"),
   "ec2.getInstanceMetrics": buildActionStateRegistry("retrieved"),

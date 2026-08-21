@@ -6,7 +6,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Palette } from "lucide-react";
 import { useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router";
 import { Heading } from "../../components/Heading/heading";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/useAccount";
@@ -14,7 +14,7 @@ import { CanvasCardsGrid } from "./CanvasCardsGrid";
 import { CanvasFolderSection } from "./CanvasFolderSection";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { EditAppModal } from "./EditAppModal";
-import { HomeFactoriesSection } from "./HomeFactoriesSection";
+import { HomeFactoriesLink } from "./HomeFactoriesLink";
 import { HomePageShell } from "./HomePageShell";
 import { applyCanvasAppPreferences } from "./canvasAppPreferencePresentation";
 import { CANVAS_FOLDER_SECTION_SHELL_CLASS } from "./canvasFolderStyles";
@@ -75,7 +75,7 @@ export function HomePage() {
   return (
     <HomePageShell>
       <div className="mx-auto w-full max-w-6xl p-8">
-        {factoriesEnabled ? <HomeFactoriesSection organizationId={organizationId} /> : null}
+        {factoriesEnabled ? <HomeFactoriesLink organizationId={organizationId} /> : null}
 
         <Header />
 

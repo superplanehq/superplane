@@ -60,8 +60,15 @@ type Metadata struct {
 const installationInstructions = `
 SuperPlane connects to Linear with OAuth.
 
-1. Click the **Connect** button with client id and secret empty to start the setup wizard. 
+1. Click the **Connect** button with client id and secret empty to start the setup wizard.
 
+The connection requests the **read**, **write** and **admin** scopes. Write covers creating and editing
+issues, comments, attachments and reactions; admin is needed because the triggers register webhooks,
+which Linear restricts to workspace admins.
+
+Components act as the user who authorizes the connection, so that user needs access to the teams you
+automate. Linear also lets only a comment's own author edit it, so **Update Issue Comment** can only
+change comments that this same connection posted.
 `
 
 func (l *Linear) Name() string {
@@ -109,6 +116,11 @@ func (l *Linear) Actions() []core.Action {
 		&UpdateIssue{},
 		&AddIssueLabel{},
 		&AddIssueComment{},
+		&UpdateIssueComment{},
+		&CreateAttachment{},
+		&DeleteAttachment{},
+		&RemoveIssueLabel{},
+		&AddReaction{},
 	}
 }
 
@@ -117,6 +129,7 @@ func (l *Linear) Triggers() []core.Trigger {
 		&OnIssue{},
 		&OnIssueComment{},
 		&OnIssueLabel{},
+		&OnIssueAttachment{},
 	}
 }
 

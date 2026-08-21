@@ -4,7 +4,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router";
 import { Description, Label } from "../../../components/Fieldset/fieldset";
 import { Input } from "../../../components/Input/input";
 import { Text } from "../../../components/Text/text";
@@ -211,6 +211,96 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
         category: "Canvases",
         resource: "canvases",
         action: "delete",
+      },
+    ],
+  },
+  {
+    category: "Factories",
+    icon: "precision_manufacturing",
+    permissions: [
+      {
+        id: "factory.read",
+        name: "View Factories",
+        description: "View factories, lines, and factory apps",
+        category: "Factories",
+        resource: "factories",
+        action: "read",
+      },
+      {
+        id: "factory.create",
+        name: "Create Factories",
+        description: "Create new factories within the organization",
+        category: "Factories",
+        resource: "factories",
+        action: "create",
+      },
+      {
+        id: "factory.update",
+        name: "Manage Factories",
+        description: "Update factory settings and lines",
+        category: "Factories",
+        resource: "factories",
+        action: "update",
+      },
+      {
+        id: "factory.delete",
+        name: "Delete Factories",
+        description: "Delete factories from the organization",
+        category: "Factories",
+        resource: "factories",
+        action: "delete",
+      },
+    ],
+  },
+  {
+    category: "Work Orders",
+    icon: "assignment",
+    permissions: [
+      {
+        id: "work_order.read",
+        name: "View Work Orders",
+        description: "View work orders, events, and artifacts",
+        category: "Work Orders",
+        resource: "work_orders",
+        action: "read",
+      },
+      {
+        id: "work_order.create",
+        name: "Create Work Orders",
+        description: "Create new work orders",
+        category: "Work Orders",
+        resource: "work_orders",
+        action: "create",
+      },
+      {
+        id: "work_order.update",
+        name: "Manage Work Orders",
+        description: "Update work order status, assignees, comments, and artifacts",
+        category: "Work Orders",
+        resource: "work_orders",
+        action: "update",
+      },
+    ],
+  },
+  {
+    category: "Notifications",
+    icon: "notifications",
+    permissions: [
+      {
+        id: "notification.read",
+        name: "View Notification Settings",
+        description: "View your work order notification settings",
+        category: "Notifications",
+        resource: "notifications",
+        action: "read",
+      },
+      {
+        id: "notification.update",
+        name: "Change Notification Settings",
+        description: "Change your work order notification settings",
+        category: "Notifications",
+        resource: "notifications",
+        action: "update",
       },
     ],
   },

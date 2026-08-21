@@ -1,183 +1,464 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
+import { Text } from "@/components/Text/text";
+import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact, FactoriesWorkOrderEvent } from "@/api-client";
 import { Link } from "@/components/Link/link";
-import { formatTimeAgo } from "@/lib/date";
+import { Button } from "@/components/ui/button";
+import { useOrganizationUsers } from "@/hooks/useOrganizationData";
+import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
+import { useMemo, type ReactNode } from "react";
+import { Clock, FileText, Gauge, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
+import { buildLatestArtifactDataById } from "./lib/workOrderArtifact";
 import {
-  Check,
-  CircleDashed,
-  CircleDot,
-  CornerDownRight,
-  GitBranch,
-  Loader2,
-  MinusCircle,
-  UserRound,
-  XCircle,
-} from "lucide-react";
-import {
-  buildWorkOrderTimelineEvents,
-  describeWorkOrderClosed,
+  buildWorkOrderTimelineView,
+  buildWorkOrderUserDisplayLookup,
+  buildWorkOrderUserNameLookup,
+  findLatestDispatchIndex,
   type WorkOrderTimelineEvent,
-  type WorkOrderTimelineStep,
-} from "./workOrderTimelineEvents";
-import { getWorkOrderExecutionDisplayMeta, getWorkOrderExecutionRunHref } from "./workOrderExecutions";
+  type WorkOrderTimelineEventKind,
+} from "./lib/workOrderTimelineEvents";
+import { formatWorkOrderDateTime as formatTimelineDate } from "./lib/workOrderDateTime";
+import { flattenWorkOrderExecutions, getWorkOrderRunHref } from "./lib/workOrderExecutions";
+import { ArtifactEventBody } from "./timeline/ArtifactEventBody";
+import { CheckReportedEventBody } from "./timeline/CheckReportedEventBody";
+import { CommentEventBody } from "./timeline/CommentEventBody";
+import { DispatchTimelineItem } from "./timeline/DispatchTimelineItem";
+import { TimelineAutomationActor } from "./timeline";
+import { TimelineMarker } from "./timeline/TimelineMarker";
+import {
+  timelineActorClassName as inlineActorClassName,
+  timelineLinkClassName as inlineLinkClassName,
+  timelineParagraphClassName as inlineParagraphClassName,
+  timelineTimeClassName as inlineTimeClassName,
+} from "./timeline/timelineStyles";
+import { AssigneeChangeDescription } from "./workOrderTimelineAssignee";
 
 interface WorkOrderTimelineProps {
   organizationId: string;
+  factoryKey: string;
   order: FactoriesWorkOrder;
+  events?: FactoriesWorkOrderEvent[];
+  eventsError?: Error | null;
+  isLoading?: boolean;
+  hasMoreEvents?: boolean;
+  isLoadingMoreEvents?: boolean;
+  onLoadMoreEvents?: () => void;
+  onRetryEvents?: () => void;
+  /**
+   * Current artifacts list (from useWorkOrderArtifacts), used to overlay
+   * live data — e.g. a PR's current `state` — on top of each
+   * `artifactAdded` event's data snapshot, so the "attached" chip in the
+   * timeline doesn't go stale the moment the PR changes state. Falls
+   * back to the event's own snapshot when an artifact isn't found here
+   * (very old events beyond the artifacts list, or a deleted artifact).
+   */
+  artifacts?: FactoriesWorkOrderArtifact[];
+  /** Optional trailing timeline content, such as the comment composer. */
+  footer?: ReactNode;
 }
 
-export function WorkOrderActivityTimeline({ organizationId, order }: WorkOrderTimelineProps) {
-  const events = buildWorkOrderTimelineEvents(order);
-  const closedLabel = describeWorkOrderClosed(order);
+export function WorkOrderActivityTimeline({
+  organizationId,
+  factoryKey,
+  order,
+  events,
+  eventsError = null,
+  isLoading = false,
+  hasMoreEvents = false,
+  isLoadingMoreEvents = false,
+  onLoadMoreEvents,
+  onRetryEvents,
+  artifacts,
+  footer,
+}: WorkOrderTimelineProps) {
+  const { data: users = [] } = useOrganizationUsers(organizationId);
+  const resolveUserName = useMemo(() => buildWorkOrderUserNameLookup(users, order), [users, order]);
+  const resolveUserDisplay = useMemo(() => buildWorkOrderUserDisplayLookup(users, order), [users, order]);
+  const latestArtifactDataById = useMemo(() => buildLatestArtifactDataById(artifacts), [artifacts]);
+  const pendingView = renderTimelinePendingView({ events, eventsError, isLoading, onRetryEvents });
+  const timeline = pendingView
+    ? { events: [] as WorkOrderTimelineEvent[] }
+    : buildWorkOrderTimelineView(events, resolveUserName, flattenWorkOrderExecutions(order));
 
-  if (events.length === 0 && !closedLabel) {
-    return <p className="text-sm text-gray-500 dark:text-gray-400">No activity yet.</p>;
+  // Without a footer, keep the historical "single message" layout: the
+  // pending/empty state occupies the whole slot on its own.
+  if (!footer && pendingView) {
+    return pendingView;
+  }
+  if (!footer && timeline.events.length === 0) {
+    return <TimelineActivityEmpty />;
   }
 
   return (
-    <ol className="relative space-y-0">
-      {events.map((event, index) => (
-        <TimelineItem
-          key={event.id}
-          event={event}
+    <div>
+      {pendingView ? (
+        <div className="mb-4">{pendingView}</div>
+      ) : (
+        <TimelineEventsList
           organizationId={organizationId}
-          isLast={index === events.length - 1 && !closedLabel}
+          factoryKey={factoryKey}
+          orderNumber={order.number}
+          events={timeline.events}
+          resolveUserDisplay={resolveUserDisplay}
+          latestArtifactDataById={latestArtifactDataById}
+          hasMoreEvents={hasMoreEvents}
+          isLoadingMoreEvents={isLoadingMoreEvents}
+          onLoadMoreEvents={onLoadMoreEvents}
         />
-      ))}
-
-      {closedLabel && order.updatedAt ? (
-        <li className="relative flex gap-4 pb-2 pl-8">
-          <TimelineMarker icon={CircleDot} className="text-gray-400" />
-          <div className="min-w-0 flex-1 pb-8">
-            <p className="text-sm text-gray-900 dark:text-gray-100">{closedLabel}</p>
-            <time className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-              {formatTimeAgo(new Date(order.updatedAt))}
-            </time>
-          </div>
-        </li>
+      )}
+      {footer ? (
+        <div className="relative mt-4 flex gap-3">
+          <TimelineMarker icon={MessageSquare} />
+          <div className="min-w-0 flex-1">{footer}</div>
+        </div>
       ) : null}
-    </ol>
+    </div>
   );
 }
+
+interface TimelineEventsListProps {
+  organizationId: string;
+  factoryKey: string;
+  orderNumber?: string;
+  events: WorkOrderTimelineEvent[];
+  resolveUserDisplay: OrgUserDisplayLookup;
+  latestArtifactDataById: Map<string, Record<string, unknown>>;
+  hasMoreEvents: boolean;
+  isLoadingMoreEvents: boolean;
+  onLoadMoreEvents?: () => void;
+}
+
+function TimelineEventsList({
+  organizationId,
+  factoryKey,
+  orderNumber,
+  events,
+  resolveUserDisplay,
+  latestArtifactDataById,
+  hasMoreEvents,
+  isLoadingMoreEvents,
+  onLoadMoreEvents,
+}: TimelineEventsListProps) {
+  const latestDispatchIndex = findLatestDispatchIndex(events);
+  return (
+    <>
+      {hasMoreEvents ? (
+        <div className="mb-3">
+          <Button
+            type="button"
+            variant="link"
+            onClick={onLoadMoreEvents}
+            disabled={isLoadingMoreEvents || !onLoadMoreEvents}
+            className="h-auto p-0 text-[13px] text-foreground"
+          >
+            {isLoadingMoreEvents ? "Loading…" : "Load more events"}
+          </Button>
+        </div>
+      ) : null}
+
+      {events.length > 0 ? (
+        <ul className="relative space-y-4">
+          <span className="pointer-events-none absolute left-[11px] top-3 bottom-3 w-px bg-border" aria-hidden />
+          {events.map((event, index) => (
+            <TimelineItem
+              key={event.id}
+              event={event}
+              organizationId={organizationId}
+              factoryKey={factoryKey}
+              orderNumber={orderNumber}
+              resolveUserDisplay={resolveUserDisplay}
+              latestArtifactDataById={latestArtifactDataById}
+              isLatestDispatch={index === latestDispatchIndex}
+            />
+          ))}
+        </ul>
+      ) : null}
+    </>
+  );
+}
+
+function renderTimelinePendingView({
+  events,
+  eventsError,
+  isLoading,
+  onRetryEvents,
+}: {
+  events?: FactoriesWorkOrderEvent[];
+  eventsError: Error | null;
+  isLoading: boolean;
+  onRetryEvents?: () => void;
+}) {
+  if (eventsError && !events?.length) {
+    return <TimelineActivityError onRetryEvents={onRetryEvents} />;
+  }
+
+  if (isLoading && !events?.length) {
+    return <TimelineActivityLoading />;
+  }
+
+  return null;
+}
+
+function TimelineActivityError({ onRetryEvents }: { onRetryEvents?: () => void }) {
+  return (
+    <div role="alert" className="rounded-lg border border-destructive/30 px-4 py-3">
+      <Text className="text-destructive">Failed to load activity.</Text>
+      {onRetryEvents ? (
+        <Button
+          type="button"
+          variant="link"
+          onClick={onRetryEvents}
+          className="mt-2 h-auto p-0 text-sm text-foreground"
+        >
+          Try again
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function TimelineActivityLoading() {
+  return <Text className="text-sm text-muted-foreground">Loading activity…</Text>;
+}
+
+function TimelineActivityEmpty() {
+  return <p className="text-sm text-muted-foreground">No activity yet.</p>;
+}
+
+// Kinds that render an avatar marker (when the actor is resolvable).
+const AVATAR_MARKER_KINDS: WorkOrderTimelineEventKind[] = [
+  "created",
+  "assigned",
+  "statusChanged",
+  "closed",
+  "commented",
+  "artifactAdded",
+];
 
 function TimelineItem({
   event,
   organizationId,
-  isLast,
+  factoryKey,
+  orderNumber,
+  resolveUserDisplay,
+  latestArtifactDataById,
+  isLatestDispatch,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
-  isLast: boolean;
+  factoryKey: string;
+  orderNumber?: string;
+  resolveUserDisplay: OrgUserDisplayLookup;
+  latestArtifactDataById: Map<string, Record<string, unknown>>;
+  isLatestDispatch: boolean;
 }) {
-  const Icon = event.kind === "created" ? UserRound : GitBranch;
+  if (event.kind === "dispatched") {
+    return (
+      <DispatchTimelineItem
+        event={event}
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
+        isLatestDispatch={isLatestDispatch}
+      />
+    );
+  }
+
+  const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
+  const useAvatar = AVATAR_MARKER_KINDS.includes(event.kind) && Boolean(actorDisplay);
 
   return (
-    <li className="relative flex gap-4 pl-8">
-      {!isLast ? (
-        <span className="absolute left-[11px] top-6 bottom-0 w-px bg-gray-200 dark:bg-gray-700/70" aria-hidden />
-      ) : null}
-      <TimelineMarker icon={Icon} className={event.kind === "created" ? "text-gray-500" : "text-violet-500"} />
-      <div className={cn("min-w-0 flex-1", isLast ? "pb-2" : "pb-8")}>
-        {event.kind === "created" ? (
-          <p className="text-sm text-gray-900 dark:text-gray-100">
-            {event.actorName ? (
-              <>
-                <span className="font-semibold">{event.actorName}</span>{" "}
-              </>
-            ) : null}
-            {event.title}
-          </p>
-        ) : (
-          <>
-            <p className="text-sm text-gray-900 dark:text-gray-100">{event.title}</p>
-            {event.steps?.length ? (
-              <ul className="mt-2 space-y-1">
-                {event.steps.map((step) => (
-                  <DispatchStepRow key={step.id} organizationId={organizationId} step={step} />
-                ))}
-              </ul>
-            ) : null}
-          </>
-        )}
-        {event.kind === "created" ? (
-          <time className="mt-2 block text-xs text-gray-500 dark:text-gray-400">
-            {formatTimeAgo(new Date(event.at))}
-          </time>
-        ) : null}
+    <li>
+      <div className="flex gap-3 py-0.5">
+        <TimelineMarker
+          display={useAvatar ? actorDisplay : null}
+          icon={useAvatar ? undefined : getFallbackMarkerIcon(event.kind)}
+        />
+        <div className="min-w-0 flex-1 pt-0.5">
+          <TimelineItemBody
+            event={event}
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            orderNumber={orderNumber}
+            resolveUserDisplay={resolveUserDisplay}
+            latestArtifactDataById={latestArtifactDataById}
+          />
+        </div>
       </div>
     </li>
   );
 }
 
-function DispatchStepRow({ organizationId, step }: { organizationId: string; step: WorkOrderTimelineStep }) {
-  const runHref = getWorkOrderExecutionRunHref(organizationId, step.execution);
-  const linkClassName =
-    "pointer-events-auto inline-flex w-fit max-w-full items-center gap-2 rounded-md px-1 py-0.5 text-sm text-gray-700 no-underline transition-colors hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/40 dark:hover:text-gray-100";
-  const stepContent = (
-    <>
-      <StepStatusIcon execution={step.execution} />
-      <span className="min-w-0">
-        {step.stepName}
-        {step.at ? (
-          <>
-            {" "}
-            <time className="text-xs text-gray-500 dark:text-gray-400">{formatTimeAgo(new Date(step.at))}</time>
-          </>
-        ) : null}
-      </span>
-    </>
-  );
+function TimelineItemBody({
+  event,
+  organizationId,
+  factoryKey,
+  orderNumber,
+  resolveUserDisplay,
+  latestArtifactDataById,
+}: {
+  event: WorkOrderTimelineEvent;
+  organizationId: string;
+  factoryKey: string;
+  orderNumber?: string;
+  resolveUserDisplay: OrgUserDisplayLookup;
+  latestArtifactDataById: Map<string, Record<string, unknown>>;
+}) {
+  const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
+  const timeLabel = formatTimelineDate(new Date(event.at));
+
+  if (event.kind === "commented") {
+    return (
+      <CommentEventBody
+        event={event}
+        actorDisplay={actorDisplay}
+        timeLabel={timeLabel}
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
+      />
+    );
+  }
+
+  if (event.kind === "artifactAdded") {
+    return (
+      <ArtifactEventBody
+        event={event}
+        actorDisplay={actorDisplay}
+        timeLabel={timeLabel}
+        latestArtifactDataById={latestArtifactDataById}
+      />
+    );
+  }
+
+  if (event.kind === "checkReported") {
+    return (
+      <CheckReportedEventBody
+        event={event}
+        timeLabel={timeLabel}
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
+      />
+    );
+  }
 
   return (
-    <li className="flex min-w-0 items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-      <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden />
+    <UserActionEventDescription
+      event={event}
+      organizationId={organizationId}
+      factoryKey={factoryKey}
+      orderNumber={orderNumber}
+      resolveUserDisplay={resolveUserDisplay}
+      timeLabel={timeLabel}
+    />
+  );
+}
+
+const AUTOMATION_ATTRIBUTABLE_KINDS: WorkOrderTimelineEventKind[] = ["created", "statusChanged", "closed"];
+const SOMEONE_FALLBACK_KINDS: WorkOrderTimelineEventKind[] = ["created", "statusChanged", "closed"];
+
+function UserActionEventDescription({
+  event,
+  organizationId,
+  factoryKey,
+  orderNumber,
+  resolveUserDisplay,
+  timeLabel,
+}: {
+  event: WorkOrderTimelineEvent;
+  organizationId: string;
+  factoryKey: string;
+  orderNumber?: string;
+  resolveUserDisplay: OrgUserDisplayLookup;
+  timeLabel: string;
+}) {
+  const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
+  const automationActor =
+    !actorDisplay && AUTOMATION_ATTRIBUTABLE_KINDS.includes(event.kind) ? event.actorAutomation : undefined;
+  const hasSourceRun = Boolean(event.sourceRunId) && !automationActor;
+  const showSomeoneFallback =
+    !actorDisplay && !hasSourceRun && !automationActor && SOMEONE_FALLBACK_KINDS.includes(event.kind);
+
+  return (
+    <div>
+      <p className={cn(inlineParagraphClassName, "flex flex-wrap items-baseline gap-x-1 gap-y-0.5")}>
+        {actorDisplay ? (
+          <span className={inlineActorClassName}>{actorDisplay.name}</span>
+        ) : automationActor ? (
+          <TimelineAutomationActor actor={automationActor} />
+        ) : showSomeoneFallback ? (
+          <span className={inlineActorClassName}>Someone</span>
+        ) : null}
+        {event.kind === "assigned" && event.assigneeChange ? (
+          <AssigneeChangeDescription
+            actorUserId={event.actorUserId}
+            assigneeChange={event.assigneeChange}
+            resolveUserDisplay={resolveUserDisplay}
+          />
+        ) : hasSourceRun ? (
+          <SourceRunAttribution
+            event={event}
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            orderNumber={orderNumber}
+          />
+        ) : (
+          <span>{event.title}</span>
+        )}
+        <span className={inlineTimeClassName}>
+          {" · "}
+          {timeLabel}
+        </span>
+      </p>
+      {event.kind === "created" && actorDisplay ? (
+        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">Create work order form</p>
+      ) : null}
+    </div>
+  );
+}
+
+function SourceRunAttribution({
+  event,
+  organizationId,
+  factoryKey,
+  orderNumber,
+}: {
+  event: WorkOrderTimelineEvent;
+  organizationId: string;
+  factoryKey: string;
+  orderNumber?: string;
+}) {
+  const runHref = getWorkOrderRunHref(organizationId, factoryKey, event.sourceAppId, event.sourceRunId, {
+    orderNumber,
+  });
+  const connector = event.kind === "created" ? "from" : "via";
+  return (
+    <span className="inline-flex flex-wrap items-baseline gap-x-1">
+      <span>{event.title}</span>
+      <span>{connector}</span>
       {runHref ? (
-        <Link href={runHref} className={linkClassName}>
-          {stepContent}
+        <Link href={runHref} className={inlineLinkClassName}>
+          run
         </Link>
       ) : (
-        <span className="inline-flex w-fit max-w-full items-center gap-2">{stepContent}</span>
+        <span>run</span>
       )}
-    </li>
-  );
-}
-
-function StepStatusIcon({ execution }: { execution: FactoriesWorkOrderExecution }) {
-  const meta = getWorkOrderExecutionDisplayMeta(execution);
-  const iconClassName = "h-3.5 w-3.5 shrink-0";
-
-  if (execution.result === "RESULT_PASSED") {
-    return <Check className={cn(iconClassName, "text-emerald-500")} aria-label="Passed" />;
-  }
-
-  if (execution.result === "RESULT_FAILED") {
-    return <XCircle className={cn(iconClassName, "text-red-500")} aria-label="Failed" />;
-  }
-
-  if (meta.isActive) {
-    return <Loader2 className={cn(iconClassName, "animate-spin text-violet-500")} aria-label={meta.label} />;
-  }
-
-  if (execution.result === "RESULT_CANCELLED") {
-    return <MinusCircle className={cn(iconClassName, "text-gray-400")} aria-label="Cancelled" />;
-  }
-
-  if (execution.state === "STATE_PENDING") {
-    return <CircleDashed className={cn(iconClassName, "text-amber-500")} aria-label="Pending" />;
-  }
-
-  return <CircleDashed className={cn(iconClassName, "text-gray-400")} aria-label={meta.label} />;
-}
-
-function TimelineMarker({ icon: Icon, className }: { icon: typeof UserRound; className?: string }) {
-  return (
-    <span
-      className={cn(
-        "absolute left-0 flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white dark:border-gray-700/70 dark:bg-gray-900",
-        className,
-      )}
-    >
-      <Icon className="h-3.5 w-3.5" aria-hidden />
     </span>
   );
+}
+
+function getFallbackMarkerIcon(kind: WorkOrderTimelineEventKind): LucideIcon {
+  switch (kind) {
+    case "artifactAdded":
+      return FileText;
+    case "checkReported":
+      return Gauge;
+    case "queued":
+      return Clock;
+    case "statusChanged":
+    case "closed":
+      return Play;
+    default:
+      return UserRound;
+  }
 }

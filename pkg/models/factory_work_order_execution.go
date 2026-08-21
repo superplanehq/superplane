@@ -1,10 +1,14 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/models/factory"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -16,8 +20,7 @@ const (
 
 var (
 	ErrFactoryWorkOrderExecutionNotFound = errors.New("factory work order execution not found")
-	ErrFactoryWorkOrderExecutionActive   = errors.New("work order already has an active execution")
-	ErrFactoryWorkOrderNotOpen           = errors.New("work order is not open")
+	ErrFactoryWorkOrderNotDispatchable   = errors.New("work order cannot be dispatched in its current state")
 )
 
 type FactoryWorkOrderExecution struct {
@@ -26,14 +29,23 @@ type FactoryWorkOrderExecution struct {
 	FactoryID      uuid.UUID
 	WorkOrderID    uuid.UUID
 	LineID         uuid.UUID
+	// LineDispatchID is the parent traversal this step run belongs to. Its
+	// steps snapshot is authoritative for what StepIndex refers to —
+	// see FactoryWorkOrderLineDispatch. StepName is the automation
+	// (canvas) name captured when the step started.
+	LineDispatchID uuid.UUID
 	StepIndex      int
 	StepName       string
-	RunID          uuid.UUID
+	RunID          *uuid.UUID
 	Status         string
 	Result         string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	FinishedAt     *time.Time
+	// Aggregate usage populated by runners. Both default to zero; the API
+	// only surfaces non-zero values to the UI.
+	TotalTokens int64
+	CostCents   int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	FinishedAt  *time.Time
 }
 
 func FindWorkOrderExecutionByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryWorkOrderExecution, error) {
@@ -47,6 +59,44 @@ func FindWorkOrderExecutionByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryWorkOr
 	}
 
 	return &execution, nil
+}
+
+const maxFactoryExecutionRunAncestors = 32
+
+// FindWorkOrderExecutionForRun returns the factory step for this run or an
+// ancestor. Child runs created by ctx.Runs.Create keep a different run ID
+// than the factory line step, so a direct lookup would drop their spend.
+func FindWorkOrderExecutionForRun(tx *gorm.DB, runID uuid.UUID) (*FactoryWorkOrderExecution, error) {
+	seen := make(map[uuid.UUID]struct{}, 8)
+	current := runID
+	for range maxFactoryExecutionRunAncestors {
+		if _, visited := seen[current]; visited {
+			return nil, ErrFactoryWorkOrderExecutionNotFound
+		}
+		seen[current] = struct{}{}
+
+		execution, err := FindWorkOrderExecutionByRunID(tx, current)
+		if err == nil {
+			return execution, nil
+		}
+		if !errors.Is(err, ErrFactoryWorkOrderExecutionNotFound) {
+			return nil, err
+		}
+
+		run, err := FindUnscopedCanvasRun(tx, current)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, ErrFactoryWorkOrderExecutionNotFound
+			}
+			return nil, err
+		}
+		if run.ParentRunID == nil || *run.ParentRunID == uuid.Nil {
+			return nil, ErrFactoryWorkOrderExecutionNotFound
+		}
+		current = *run.ParentRunID
+	}
+
+	return nil, ErrFactoryWorkOrderExecutionNotFound
 }
 
 func (e *FactoryWorkOrderExecution) MarkRunning(tx *gorm.DB) error {
@@ -69,6 +119,18 @@ func (e *FactoryWorkOrderExecution) MarkFinished(tx *gorm.DB, result string) err
 		return nil
 	}
 
+	if err := e.setFinished(tx, result); err != nil {
+		return err
+	}
+
+	return e.RecordFinished(tx, result)
+}
+
+func (e *FactoryWorkOrderExecution) setFinished(tx *gorm.DB, result string) error {
+	if e.Status == FactoryWorkOrderExecutionStatusFinished {
+		return nil
+	}
+
 	now := time.Now()
 	e.Status = FactoryWorkOrderExecutionStatusFinished
 	e.Result = result
@@ -83,21 +145,111 @@ func (e *FactoryWorkOrderExecution) MarkFinished(tx *gorm.DB, result string) err
 	}).Error
 }
 
+// abortInFlightFactoryStepForDeletedRun finishes a pending or running
+// factory step as cancelled before its canvas run is removed. Finished
+// history rows stay as they are. In-flight rows would otherwise keep a
+// parallelism slot with a null run_id after ON DELETE SET NULL.
+func abortInFlightFactoryStepForDeletedRun(tx *gorm.DB, runID uuid.UUID) error {
+	execution, err := FindWorkOrderExecutionByRunID(tx, runID)
+	if err != nil {
+		if errors.Is(err, ErrFactoryWorkOrderExecutionNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	return execution.abortForDeletedRun(tx)
+}
+
+func (e *FactoryWorkOrderExecution) abortForDeletedRun(tx *gorm.DB) error {
+	if e.Status == FactoryWorkOrderExecutionStatusFinished {
+		return nil
+	}
+
+	if err := e.setFinished(tx, CanvasRunResultCancelled); err != nil {
+		return err
+	}
+
+	dispatch, err := FindWorkOrderLineDispatch(tx, e.LineDispatchID)
+	if err != nil {
+		return err
+	}
+
+	return dispatch.Finish(tx, CanvasRunResultCancelled)
+}
+
+func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) error {
+	f, err := FindFactory(tx, e.OrganizationID, e.FactoryID)
+	if err != nil {
+		return err
+	}
+
+	order, err := f.FindWorkOrder(tx, e.WorkOrderID)
+	if err != nil {
+		return err
+	}
+
+	// The line ref comes from the dispatch's snapshot, not the live line —
+	// this event is a historical fact about the traversal, so a line
+	// rename/edit after dispatch shouldn't change what it says.
+	dispatch, err := FindWorkOrderLineDispatch(tx, e.LineDispatchID)
+	if err != nil {
+		return err
+	}
+
+	if e.RunID == nil {
+		return fmt.Errorf("work order execution %s has no run", e.ID)
+	}
+
+	run, err := LockCanvasRunInTransaction(tx, *e.RunID)
+	if err != nil {
+		return err
+	}
+
+	data := factory.LineStepExecutionFinished{
+		StepName: e.StepName,
+		Order:    order.Ref(),
+		Line:     dispatch.Ref(),
+		App:      &factory.AppRef{ID: run.WorkflowID, Name: e.StepName},
+		Run:      &factory.RunRef{ID: run.ID, State: run.State, Result: &run.Result},
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	event := &FactoryWorkOrderEvent{
+		ID:          uuid.New(),
+		WorkOrderID: e.WorkOrderID,
+		Type:        factory.EventTypeLineStepExecutionFinished,
+		Data:        datatypes.JSON(jsonData),
+		CreatedAt:   time.Now(),
+	}
+
+	return tx.Create(event).Error
+}
+
+// FactoryWorkOrderExecutionRecord is a step execution enriched with the
+// canvas run details the API/UI need to render it. Its line/steps
+// information now lives on the parent FactoryWorkOrderLineDispatch instead
+// of being joined/serialized per execution.
 type FactoryWorkOrderExecutionRecord struct {
 	FactoryWorkOrderExecution
-	LineName   string
-	CanvasID   uuid.UUID
+	CanvasID   *uuid.UUID
 	CanvasName string
 	RunState   string
 	RunResult  string
 }
 
-func ListFactoryWorkOrderExecutionsByWorkOrderIDs(
+// ListFactoryWorkOrderExecutionsByLineDispatchIDs bulk-loads step executions
+// for the given line dispatches, keyed by line_dispatch_id.
+func ListFactoryWorkOrderExecutionsByLineDispatchIDs(
 	tx *gorm.DB,
-	workOrderIDs []uuid.UUID,
+	lineDispatchIDs []uuid.UUID,
 ) (map[uuid.UUID][]FactoryWorkOrderExecutionRecord, error) {
-	result := make(map[uuid.UUID][]FactoryWorkOrderExecutionRecord, len(workOrderIDs))
-	if len(workOrderIDs) == 0 {
+	result := make(map[uuid.UUID][]FactoryWorkOrderExecutionRecord, len(lineDispatchIDs))
+	if len(lineDispatchIDs) == 0 {
 		return result, nil
 	}
 
@@ -106,16 +258,14 @@ func ListFactoryWorkOrderExecutionsByWorkOrderIDs(
 		Table("factory_work_order_executions AS e").
 		Select(`
 			e.*,
-			l.name AS line_name,
 			c.id AS canvas_id,
-			c.name AS canvas_name,
-			r.state AS run_state,
-			r.result AS run_result
+			COALESCE(c.name, '') AS canvas_name,
+			COALESCE(r.state, '') AS run_state,
+			COALESCE(r.result, '') AS run_result
 		`).
-		Joins("JOIN factory_lines l ON l.id = e.line_id").
-		Joins("JOIN workflow_runs r ON r.id = e.run_id").
-		Joins("JOIN workflows c ON c.id = r.workflow_id").
-		Where("e.work_order_id IN ?", workOrderIDs).
+		Joins("LEFT JOIN workflow_runs r ON r.id = e.run_id").
+		Joins("LEFT JOIN workflows c ON c.id = r.workflow_id").
+		Where("e.line_dispatch_id IN ?", lineDispatchIDs).
 		Order("e.created_at ASC").
 		Order("e.id ASC").
 		Scan(&records).
@@ -125,19 +275,50 @@ func ListFactoryWorkOrderExecutionsByWorkOrderIDs(
 	}
 
 	for _, record := range records {
-		result[record.WorkOrderID] = append(result[record.WorkOrderID], record)
+		result[record.LineDispatchID] = append(result[record.LineDispatchID], record)
 	}
 
 	return result, nil
 }
 
-func factoryWorkOrderRunInput(order *FactoryWorkOrder) map[string]any {
-	return map[string]any{
-		"work_order": map[string]any{
-			"id":          order.ID.String(),
-			"title":       order.Title,
-			"description": order.Description,
-			"factory_id":  order.FactoryID.String(),
-		},
+func factoryWorkOrderRunInput(tx *gorm.DB, order *FactoryWorkOrder) (map[string]any, error) {
+	workOrder := map[string]any{
+		"id":          order.ID.String(),
+		"title":       order.Title,
+		"description": order.Description,
+		"factory_id":  order.FactoryID.String(),
 	}
+
+	if order.SourceRunID != nil {
+		rootEvent, err := FindRootEventForRun(tx, *order.SourceRunID)
+		if err != nil {
+			return nil, err
+		}
+
+		if rootEvent != nil {
+			if source := RootEventSourcePayload(rootEvent.Data.Data()); source != nil {
+				workOrder["source"] = source
+			}
+		}
+	}
+
+	return map[string]any{
+		"work_order": workOrder,
+	}, nil
+}
+
+// RootEventSourcePayload peels a root event envelope down to its `.data`
+// payload — used as work-order `source` for both run input and order().
+func RootEventSourcePayload(eventData any) any {
+	payload, ok := eventData.(map[string]any)
+	if !ok {
+		return eventData
+	}
+
+	source, ok := payload["data"]
+	if !ok {
+		return eventData
+	}
+
+	return source
 }

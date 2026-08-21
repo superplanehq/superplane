@@ -110,6 +110,13 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
     description: "Returns the current run, exposing its id, url, and started_at.",
     example: "run().url",
   },
+  {
+    name: "order",
+    snippet: "order().",
+    description:
+      "Returns the work order for this run when dispatched from a factory, exposing id, title, description, factory_id, state, result, source, url, artifacts, and comments (the last three loaded when accessed).",
+    example: 'none(order().artifacts, {#.type == "pr"})',
+  },
   // String
   {
     name: "trim",
@@ -1470,6 +1477,11 @@ function normalizeSpecialFunctionExpr(expr: string): string | null {
   const appMatch = expr.match(/^app\(\)/);
   if (appMatch) {
     return `__app${expr.slice(appMatch[0].length)}`;
+  }
+
+  const orderMatch = expr.match(/^order\(\)/);
+  if (orderMatch) {
+    return `__order${expr.slice(orderMatch[0].length)}`;
   }
 
   return expr;

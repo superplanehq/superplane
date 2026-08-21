@@ -6,18 +6,21 @@ vi.mock("@xyflow/react", () => ({
   Handle: ({
     type,
     id,
+    position,
     className,
     style,
     children,
   }: {
     type: string;
     id?: string;
+    position?: string;
     className?: string;
     style?: { pointerEvents?: string };
     children?: React.ReactNode;
   }) => (
     <div
       data-testid={`handle-${type}-${id || "default"}`}
+      data-position={position}
       data-highlighted={className?.includes("highlighted") ? "true" : "false"}
       data-pointer-events={style?.pointerEvents || "auto"}
       data-class-name={className}
@@ -28,6 +31,8 @@ vi.mock("@xyflow/react", () => ({
   Position: {
     Left: "left",
     Right: "right",
+    Top: "top",
+    Bottom: "bottom",
   },
 }));
 
@@ -190,6 +195,75 @@ describe("Block fallback rendering", () => {
 
     expect(screen.getByTestId("handle-target-default")).toHaveAttribute("data-pointer-events", "none");
     expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-pointer-events", "none");
+  });
+
+  it("places handles top-to-bottom for vertical factory flow", () => {
+    render(
+      <Block
+        canvasMode="edit"
+        nodeId="component-node"
+        data={{
+          label: "Component",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          _flowDirection: "vertical",
+          component: {
+            title: "Component",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _allEdges: [
+            {
+              source: "component-node",
+              sourceHandle: "default",
+              target: "next-node",
+            },
+            {
+              source: "prev-node",
+              sourceHandle: "default",
+              target: "component-node",
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("handle-target-default")).toHaveAttribute("data-position", "top");
+    expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-position", "bottom");
+  });
+
+  it("hides channel stems when factory run display ports are active", () => {
+    render(
+      <Block
+        canvasMode="live"
+        nodeId="runner"
+        data={{
+          label: "Run Claude Code",
+          state: "pending",
+          type: "component",
+          outputChannels: ["passed", "failed"],
+          _flowDirection: "vertical",
+          _factoryRunDisplaySource: true,
+          _factorySpineSource: true,
+          component: {
+            title: "Run Claude Code",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _allEdges: [
+            { source: "runner", sourceHandle: "passed", target: "loop" },
+            { source: "runner", sourceHandle: "failed", target: "loop" },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.queryByText("passed")).not.toBeInTheDocument();
+    expect(screen.queryByText("failed")).not.toBeInTheDocument();
+    expect(screen.getByTestId("handle-source-__factorySpine")).toHaveAttribute("data-position", "bottom");
+    expect(screen.queryByTestId("handle-source-passed")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("handle-source-failed")).not.toBeInTheDocument();
   });
 
   it("shows an append connector button for end nodes in edit mode", () => {

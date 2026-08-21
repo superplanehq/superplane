@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/attachments"
@@ -348,6 +347,8 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
+	recordClaudeUsage(ctx, response)
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		MessagePayloadType,
@@ -355,12 +356,27 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *TextPrompt) Cancel(ctx core.ExecutionContext) error {
-	return nil
+func recordClaudeUsage(ctx core.ExecutionContext, response *CreateMessageResponse) {
+	if response == nil {
+		return
+	}
+	cacheWrite := int64(response.Usage.cacheWriteTokens())
+	cacheRead := int64(response.Usage.CacheReadInputTokens)
+	input := int64(response.Usage.InputTokens)
+	output := int64(response.Usage.OutputTokens)
+	ctx.RecordUsageBestEffort(core.UsageRecord{
+		Provider:         "anthropic",
+		Model:            response.Model,
+		InputTokens:      input,
+		OutputTokens:     output,
+		CacheWriteTokens: cacheWrite,
+		CacheReadTokens:  cacheRead,
+		TotalTokens:      input + output + cacheWrite + cacheRead,
+	})
 }
 
-func (c *TextPrompt) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
+func (c *TextPrompt) Cancel(ctx core.ExecutionContext) error {
+	return nil
 }
 
 func (c *TextPrompt) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

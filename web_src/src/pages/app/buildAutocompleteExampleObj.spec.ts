@@ -63,6 +63,12 @@ describe("buildAutocompleteExampleObj", () => {
         url: expect.stringContaining("?run=f47ac10b-58cc-4372-a567-0e02b2c3d479"),
         started_at: expect.any(String),
       }),
+      __order: expect.objectContaining({
+        id: expect.any(String),
+        title: "Ship feature",
+        artifacts: expect.any(Array),
+        comments: expect.any(Array),
+      }),
     });
     expect(
       evaluateExpr(
@@ -115,8 +121,15 @@ describe("buildAutocompleteExampleObj", () => {
         url: expect.stringContaining("?run=f47ac10b-58cc-4372-a567-0e02b2c3d479"),
         started_at: expect.any(String),
       }),
+      __order: expect.objectContaining({
+        id: expect.any(String),
+        title: "Ship feature",
+        artifacts: expect.any(Array),
+        comments: expect.any(Array),
+      }),
     });
     expect(evaluateExpr("root().data.check_run.name", autocompleteContext!)).toBe("Unit tests");
     expect(evaluateExpr("app().name", autocompleteContext!)).toBe("Deploy");
+    expect(evaluateExpr("order().title", autocompleteContext!)).toBe("Ship feature");
   });
 });

@@ -6,13 +6,18 @@ export function flattenBuildingBlocks(categories: BuildingBlockCategory[]): Buil
   return categories.flatMap((c) => c.blocks);
 }
 
+export type BuildBuildingBlockCategoriesOptions = {
+  isFactoryApp?: boolean;
+};
+
 export function buildBuildingBlockCategories(
   triggers: TriggersTrigger[],
   components: ActionsAction[],
   integrations: IntegrationsIntegrationDefinition[],
+  options: BuildBuildingBlockCategoriesOptions = {},
 ): BuildingBlockCategory[] {
   const runnerCategory = runners(triggers, components);
-  const superplaneCategory = superplane(triggers, components);
+  const superplaneCategory = superplane(triggers, components, options.isFactoryApp ?? false);
 
   return [
     core(triggers, components),
@@ -24,10 +29,16 @@ export function buildBuildingBlockCategories(
   ];
 }
 
-function superplane(triggers: TriggersTrigger[], components: ActionsAction[]): BuildingBlockCategory | null {
+function superplane(
+  triggers: TriggersTrigger[],
+  components: ActionsAction[],
+  isFactoryApp: boolean,
+): BuildingBlockCategory | null {
   const blocks: BuildingBlock[] = [
     ...triggers.filter((t) => isSuperPlaneBlock(t)).map((t) => toTriggerBlock(t)),
-    ...components.filter((c) => isSuperPlaneBlock(c)).map((c) => toComponentBlock(c)),
+    ...components
+      .filter((c) => isSuperPlaneBlock(c) || (isFactoryApp && isFactoryBlock(c)))
+      .map((c) => toComponentBlock(c)),
   ];
 
   if (blocks.length === 0) {
@@ -198,10 +209,23 @@ function isRunnerBlock(component: { name?: string }): boolean {
   );
 }
 
-const SUPERPLANE_BLOCK_NAMES = new Set(["onbroadcast", "broadcastmessage", "onrun", "runapp"]);
+const SUPERPLANE_BLOCK_NAMES = new Set(["onBroadcast", "broadcastMessage", "onRun", "runApp", "addRunError"]);
+const FACTORY_BLOCK_NAMES = new Set([
+  "createWorkOrder",
+  "findWorkOrder",
+  "updateWorkOrderStatus",
+  "addWorkOrderComment",
+  "addWorkOrderArtifact",
+  "updateWorkOrderArtifact",
+  "reportWorkOrderCheck",
+]);
 
 function isSuperPlaneBlock(component: { name?: string }): boolean {
-  return SUPERPLANE_BLOCK_NAMES.has((component.name || "").toLowerCase());
+  return SUPERPLANE_BLOCK_NAMES.has(component.name || "");
+}
+
+function isFactoryBlock(component: { name?: string }): boolean {
+  return FACTORY_BLOCK_NAMES.has(component.name || "");
 }
 
 function isCoreComponent(component: { name?: string }): boolean {
@@ -209,6 +233,7 @@ function isCoreComponent(component: { name?: string }): boolean {
     !isMemoryBlock(component) &&
     !isDebuggingBlock(component) &&
     !isRunnerBlock(component) &&
-    !isSuperPlaneBlock(component)
+    !isSuperPlaneBlock(component) &&
+    !isFactoryBlock(component)
   );
 }

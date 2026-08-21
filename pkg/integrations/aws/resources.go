@@ -2,6 +2,7 @@ package aws
 
 import (
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/cloudwatch"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codeartifact"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codepipeline"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ec2"
@@ -16,8 +17,23 @@ import (
 
 func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
+	case "cloudwatch.logGroup":
+		return cloudwatch.ListLogGroups(ctx, resourceType)
+
 	case "lambda.function":
 		return lambda.ListFunctions(ctx, resourceType)
+
+	case "cloudwatch.alarm":
+		return cloudwatch.ListAlarms(ctx, resourceType)
+
+	case "cloudwatch.namespace":
+		return cloudwatch.ListNamespaces(ctx, resourceType)
+
+	case "cloudwatch.metric":
+		return cloudwatch.ListMetricNames(ctx, resourceType)
+
+	case "cloudwatch.metricDimensions":
+		return cloudwatch.ListMetricDimensions(ctx, resourceType)
 
 	case "ecr.repository":
 		return ecr.ListRepositories(ctx, resourceType)
@@ -64,9 +80,6 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	case "iam.instanceProfile":
 		return ec2.ListInstanceProfiles(ctx, resourceType)
 
-	case "ec2.alarm":
-		return ec2.ListAlarms(ctx, resourceType)
-
 	case "ec2.instanceAlarm":
 		return ec2.ListInstanceAlarms(ctx, resourceType)
 
@@ -108,6 +121,9 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 
 	case "prometheus.workspace":
 		return prometheus.ListWorkspaces(ctx, resourceType)
+
+	case "prometheus.ruleGroupsNamespace":
+		return prometheus.ListRuleGroupsNamespaces(ctx, resourceType)
 
 	case "route53.hostedZone":
 		return route53.ListHostedZones(ctx, resourceType)

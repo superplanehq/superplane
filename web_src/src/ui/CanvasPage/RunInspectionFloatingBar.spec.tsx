@@ -1,6 +1,6 @@
 import { fireEvent, render as testingLibraryRender, screen } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 
@@ -16,6 +16,12 @@ vi.mock("@/sentry", () => ({
 }));
 
 vi.mock("@xyflow/react", () => ({
+  Position: {
+    Left: "left",
+    Right: "right",
+    Top: "top",
+    Bottom: "bottom",
+  },
   Background: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   Panel: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   ReactFlow: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
@@ -50,6 +56,10 @@ vi.mock("../componentSidebar", () => ({
 
 vi.mock("@/components/CanvasToolSidebar", () => ({
   CanvasToolSidebar: () => null,
+}));
+
+vi.mock("@/pages/factories/agent/FactoryCanvasToolSidebar", () => ({
+  FactoryCanvasToolSidebar: () => null,
 }));
 
 vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({
@@ -128,6 +138,56 @@ describe("RunInspectionFloatingBar", () => {
     );
 
     expect(screen.queryByText("Previewing previous run")).not.toBeInTheDocument();
+  });
+
+  it("hides the run inspection bar when back-to-live is not provided", () => {
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          isRunInspectionMode
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText("Previewing previous run")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Back to Live Canvas" })).not.toBeInTheDocument();
+  });
+
+  it("shows factory run errors on the canvas when the inspector is closed", () => {
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          factoryEmbed
+          isRunInspectionMode
+          runNodeDetailCanvasId="canvas-1"
+          runNodeDetailRun={{
+            id: "run-1",
+            canvasId: "canvas-1",
+            state: "STATE_FINISHED",
+            result: "RESULT_FAILED",
+            errors: ["pipeline failed"],
+          }}
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("factory-run-errors-banner")).toBeInTheDocument();
+    expect(screen.getByText("This run has an error")).toBeInTheDocument();
+    expect(screen.getByText("pipeline failed")).toBeInTheDocument();
   });
 
   it("does not show the previous version bar while inspecting a run", () => {

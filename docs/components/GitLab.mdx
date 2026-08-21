@@ -12,6 +12,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to branch creation events from GitLab" />
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events from GitLab" />
   <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events from GitLab" />
+  <LinkCard title="On Job" href="#on-job" description="Listen to job events from GitLab" />
   <LinkCard title="On MR Diff Note" href="#on-mr-diff-note" description="Listen to merge request diff (inline code review) comment events from GitLab" />
   <LinkCard title="On Merge Comment" href="#on-merge-comment" description="Listen to merge request comment events from GitLab" />
   <LinkCard title="On Merge Request" href="#on-merge-request" description="Listen to merge request events from GitLab" />
@@ -353,6 +354,137 @@ This trigger automatically sets up a GitLab webhook when configured. The webhook
   },
   "timestamp": "2026-02-12T20:40:00.000000000Z",
   "type": "gitlab.issueComment"
+}
+```
+
+<a id="on-job"></a>
+
+## On Job
+
+**Trigger key:** `gitlab.onJob`
+
+The On Job trigger starts a workflow execution when the status of a CI/CD job changes in a GitLab project.
+
+Jobs are the individual units of work inside a pipeline. Where the On Pipeline trigger fires once for the pipeline as a whole, this trigger fires for each job, so you can react to one specific job - a deploy, a scan, a migration - without waiting for the rest of the pipeline.
+
+### Use Cases
+
+- **Per-job automation**: Run a workflow the moment the `deploy` job succeeds, without waiting for the whole pipeline
+- **Targeted failure handling**: Page or open an issue when a named job fails
+- **Stage gates**: React when a job in a specific stage finishes
+- **Build observability**: Record durations, runners, and failure reasons per job
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Statuses** (required): Job statuses to listen for. Default: success, failed.
+- **Names** *(optional)*: Filter on the job name, e.g. equals `deploy` or matches `test-.*`
+- **Refs** *(optional)*: Filter on the branch or tag the job ran for
+
+### Event Data
+
+Each event includes:
+- **build_name**, **build_stage**, **build_status**: The job, its stage, and its new status
+- **build_started_at**, **build_finished_at**, **build_duration**, **build_queued_duration**: Job timings
+- **build_failure_reason**, **build_allow_failure**, **retries_count**: Failure and retry details
+- **pipeline_id**, **ref**, **sha**, **tag**: The pipeline and ref the job belongs to
+- **runner**: The runner that executed the job
+- **commit**, **project**, **repository**, **user**, **environment**: Surrounding context
+
+Note that GitLab excludes trigger jobs from this event, and commit statuses published by external systems are not jobs, so they do not produce job events.
+
+### Permissions
+
+The connected token needs the `api` scope, and the connected user needs at least the **Maintainer** role on the project so SuperPlane can create the webhook.
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "before_sha": "9d1a3c4e7b2f8a6d5c0e1b3a7f9d2c4e6b8a0f13",
+    "build_allow_failure": false,
+    "build_created_at": "2026-02-13T17:56:00.412Z",
+    "build_duration": 120.166,
+    "build_failure_reason": "unknown_failure",
+    "build_finished_at": "2026-02-13T17:59:30.284Z",
+    "build_id": 998876,
+    "build_name": "unit-tests",
+    "build_queued_duration": 3.204,
+    "build_stage": "test",
+    "build_started_at": "2026-02-13T17:57:30.118Z",
+    "build_status": "success",
+    "commit": {
+      "author_email": "jrivera@example.com",
+      "author_name": "Jamie Rivera",
+      "author_url": "https://gitlab.com/jrivera",
+      "duration": 240,
+      "finished_at": "2026-02-13T18:00:00.000Z",
+      "id": 12345,
+      "message": "Cache dependencies between CI jobs\n",
+      "name": "Pipeline for branch: main",
+      "sha": "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+      "started_at": "2026-02-13T17:56:04.000Z",
+      "status": "success"
+    },
+    "environment": null,
+    "object_kind": "build",
+    "pipeline_id": 12345,
+    "project": {
+      "avatar_url": null,
+      "ci_config_path": ".gitlab-ci.yml",
+      "default_branch": "main",
+      "description": "Example project used by SuperPlane workflows.",
+      "git_http_url": "https://gitlab.com/group/example-project.git",
+      "git_ssh_url": "git@gitlab.com:group/example-project.git",
+      "id": 987,
+      "name": "example-project",
+      "namespace": "group",
+      "path_with_namespace": "group/example-project",
+      "visibility_level": 20,
+      "web_url": "https://gitlab.com/group/example-project"
+    },
+    "project_id": 987,
+    "project_name": "group/example-project",
+    "ref": "main",
+    "repository": {
+      "description": "Example project used by SuperPlane workflows.",
+      "git_http_url": "https://gitlab.com/group/example-project.git",
+      "git_ssh_url": "git@gitlab.com:group/example-project.git",
+      "homepage": "https://gitlab.com/group/example-project",
+      "name": "example-project",
+      "url": "git@gitlab.com:group/example-project.git",
+      "visibility_level": 20
+    },
+    "retries_count": 0,
+    "runner": {
+      "active": true,
+      "description": "shared-runners-manager-6.gitlab.com",
+      "id": 380987,
+      "is_shared": true,
+      "runner_type": "instance_type",
+      "tags": [
+        "linux",
+        "docker",
+        "shared-runner"
+      ]
+    },
+    "sha": "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+    "tag": false,
+    "user": {
+      "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/22/avatar.png",
+      "email": "jrivera@example.com",
+      "id": 22,
+      "name": "Jamie Rivera",
+      "username": "jrivera"
+    }
+  },
+  "timestamp": "2026-02-13T17:59:30.284000000Z",
+  "type": "gitlab.job"
 }
 ```
 
@@ -3105,11 +3237,23 @@ The Update Issue component modifies an existing GitLab issue: its title, descrip
 - **Title** (toggle): New title for the issue
 - **Description** (toggle): New description for the issue
 - **State** (toggle): Close or reopen the issue
-- **Labels** (toggle): Labels to add to the issue, keeping any existing labels
+- **Labels to Add** (toggle): Labels to add to the issue, keeping any existing labels
 - **Assignees** (toggle): Users to assign the issue to, replacing any existing assignees
 - **Milestone** (toggle): Milestone to associate with the issue
 
-Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Labels are added to the issue's existing labels rather than replacing them, so enabling Labels with nothing selected makes no change. Enabling Assignees with nothing selected removes all assignees, and enabling Milestone with nothing selected unassigns the milestone. Title is the exception: GitLab does not allow blank titles, so it must have a value when enabled.
+Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Title is the exception: GitLab does not allow blank titles, so it must have a value when enabled.
+
+#### List and reference fields: append vs. replace
+
+These fields behave differently, because GitLab's API exposes them differently:
+
+| Field | Behaviour | Enabled with nothing selected |
+| --- | --- | --- |
+| **Labels to Add** | **Appends** — sent as `add_labels`, so labels already on the issue are kept | No change |
+| **Assignees** | **Replaces** — sent as `assignee_ids`, which overwrites the whole list | Clears all assignees |
+| **Milestone** | **Replaces** — a single `milestone_id` | Unassigns the milestone |
+
+Because labels only ever append, this component cannot remove a label. Use GitLab's own label controls when you need to take one off.
 
 ### Output
 
@@ -3256,10 +3400,21 @@ The Update Merge Request component modifies an existing GitLab merge request: it
 - **Description** (toggle): New description for the merge request
 - **Target Branch** (toggle): Retarget the merge request onto a different branch
 - **State** (toggle): Close or reopen the merge request
-- **Labels** (toggle): Labels to add, keeping any existing labels
+- **Labels to Add** (toggle): Labels to add, keeping any existing labels
 - **Assignees** (toggle): Users to assign, replacing any existing assignees
 
-Each field besides Project and Merge Request IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Labels are added to the merge request's existing labels rather than replacing them, so enabling Labels with nothing selected makes no change. Enabling Assignees with nothing selected clears them. Title and Target Branch are the exception: GitLab rejects a blank title, and an empty target branch cannot resolve to a real branch, so both must have a value when enabled.
+Each field besides Project and Merge Request IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Title and Target Branch are the exception: GitLab rejects a blank title, and an empty target branch cannot resolve to a real branch, so both must have a value when enabled.
+
+#### List fields: append vs. replace
+
+The two list fields behave differently, because GitLab's API exposes them differently:
+
+| Field | Behaviour | Enabled with nothing selected |
+| --- | --- | --- |
+| **Labels to Add** | **Appends** — sent as `add_labels`, so labels already on the merge request are kept | No change |
+| **Assignees** | **Replaces** — sent as `assignee_ids`, which overwrites the whole list | Clears all assignees |
+
+Because labels only ever append, this component cannot remove a label. Use GitLab's own label controls, or a dedicated label action, when you need to take one off.
 
 ### Permissions
 

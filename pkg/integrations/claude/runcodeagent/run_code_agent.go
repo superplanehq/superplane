@@ -185,10 +185,6 @@ func (a *RunCodeAgent) Setup(ctx core.SetupContext) error {
 	return setNodeMetadata(ctx, spec)
 }
 
-func (a *RunCodeAgent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
-
 func (a *RunCodeAgent) Execute(ctx core.ExecutionContext) error {
 	spec, err := decodeSpec(ctx.Configuration)
 	if err != nil {
@@ -396,6 +392,14 @@ func (a *RunCodeAgent) emitIfTerminal(ctx core.ExecutionContext, client *runagen
 	if err != nil || sm == nil || !sm.Complete {
 		ctx.Logger.Warnf("Session %s terminal but events not ready; scheduling poll.", meta.Session.ID)
 		return false, nil
+	}
+
+	if sm.Err != nil {
+		ctx.Logger.Errorf("Session %s failed: %s", meta.Session.ID, sm.Err.Message)
+		mergeSessionIntoMetadata(meta, session)
+		_ = ctx.Metadata.Set(*meta)
+		a.teardown(client, meta, false, spec.PersistSession, ctx.Logger.Warnf)
+		return true, fmt.Errorf("code agent session failed: %s", sm.Err.Message)
 	}
 
 	out := buildOutput(session.Status, meta.Session.ID, meta.Branch, sm, meta.PrURL)

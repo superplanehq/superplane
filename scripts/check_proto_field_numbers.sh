@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 #
-# Lint proto message field numbers for gaps.
+# Lint proto message field numbers for gaps and duplicates.
 #
 # House style: within each message, field numbers stay contiguous (1..N with no
-# holes). The protos here are used for JSON conversion, not wire compatibility,
-# so a removed field should be renumbered rather than left as a gap. This is a
-# light heuristic, not a full proto parser: enum values and options are ignored
-# because they lack a type token, and comments/strings are stripped before
-# scanning.
+# holes) and unique. The protos here are used for JSON conversion, not wire
+# compatibility, so a removed field should be renumbered rather than left as a
+# gap. Two fields sharing a number is worse than a gap: it collides silently in
+# the JSON mapping and is only caught later by protoc during "make pb.gen", so
+# flag it here in the fast lint too. This is a light heuristic, not a full proto
+# parser: enum values and options are ignored because they lack a type token,
+# and comments/strings are stripped before scanning.
 
 set -euo pipefail
 shopt -s nullglob
@@ -26,7 +28,7 @@ awk '
 	# Reset the block stack at the start of each file.
 	FNR == 1 {
 		sp = 0
-		delete kind; delete nm; delete lo; delete hi; delete cnt; delete nums
+		delete kind; delete nm; delete lo; delete hi; delete cnt; delete nums; delete dups
 	}
 
 	{
@@ -49,6 +51,9 @@ awk '
 			# oneof fields belong to the enclosing message.
 			for (d = sp; d >= 1; d--) {
 				if (kind[d] == "message") {
+					if ((d SUBSEP num) in nums) {
+						dups[d] = dups[d] (dups[d] == "" ? "" : ", ") num
+					}
 					nums[d, num] = 1
 					if (cnt[d] == 0 || num < lo[d]) lo[d] = num
 					if (cnt[d] == 0 || num > hi[d]) hi[d] = num
@@ -72,7 +77,7 @@ awk '
 					kind[sp] = "block"
 					nm[sp] = ""
 				}
-				lo[sp] = ""; hi[sp] = ""; cnt[sp] = 0
+				lo[sp] = ""; hi[sp] = ""; cnt[sp] = 0; dups[sp] = ""
 			} else if (c == "}" && sp > 0) {
 				d = sp
 				sp--
@@ -83,20 +88,27 @@ awk '
 							missing = missing (missing == "" ? "" : ", ") v
 						}
 					}
-					if (missing != "") {
+					if (missing != "" || dups[d] != "") {
 						qualified = ""
 						for (e = 1; e <= d; e++) {
 							if (kind[e] == "message") {
 								qualified = qualified (qualified == "" ? "" : ".") nm[e]
 							}
 						}
-						printf "%s: %s: field numbers have gaps: missing %s\n", FILENAME, qualified, missing > "/dev/stderr"
-						bad = 1
+						if (missing != "") {
+							printf "%s: %s: field numbers have gaps: missing %s\n", FILENAME, qualified, missing > "/dev/stderr"
+							bad = 1
+						}
+						if (dups[d] != "") {
+							printf "%s: %s: field numbers are duplicated: %s\n", FILENAME, qualified, dups[d] > "/dev/stderr"
+							bad = 1
+						}
 					}
 				}
 				# Drop this frame'\''s field numbers so a sibling reusing the depth
 				# starts clean.
 				for (v = lo[d]; v <= hi[d]; v++) delete nums[d, v]
+				delete dups[d]
 			}
 		}
 	}
@@ -104,11 +116,12 @@ awk '
 	END {
 		if (bad) {
 			print "" > "/dev/stderr"
-			print "Proto message field numbers must be contiguous with no gaps." > "/dev/stderr"
-			print "Renumber the remaining fields so the numbers run 1..N, then run" > "/dev/stderr"
-			print "\"make pb.gen\". Do not use \"reserved\" to paper over a hole." > "/dev/stderr"
+			print "Proto message field numbers must be contiguous (1..N) and unique." > "/dev/stderr"
+			print "Renumber the fields so the numbers run 1..N with no gaps or" > "/dev/stderr"
+			print "duplicates, then run \"make pb.gen\". Do not use \"reserved\" to" > "/dev/stderr"
+			print "paper over a hole." > "/dev/stderr"
 			exit 1
 		}
-		print "Proto message field numbers are contiguous."
+		print "Proto message field numbers are contiguous and unique."
 	}
 ' "${files[@]}"

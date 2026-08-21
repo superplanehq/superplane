@@ -12,6 +12,7 @@ import { IntegrationButton } from "@/components/AgentSidebar/widgets/Integration
 import { MarkdownCode } from "@/components/AgentSidebar/widgets/MarkdownCode";
 import { MermaidWidget } from "@/components/AgentSidebar/widgets/MermaidWidget";
 import { NodeChipFromLink } from "@/components/AgentSidebar/widgets/NodeChip";
+import type { WorkOrderMentionCandidate } from "@/lib/workOrderMentions";
 import { cn } from "@/lib/utils";
 
 import { CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES } from "./console/consoleCodeStyles";
@@ -21,6 +22,7 @@ import { parseGithubAlertChildren } from "./markdownAlertParse";
 import { MarkdownSection } from "./markdownSection";
 import { parseGithubSectionChildren } from "./markdownSectionParse";
 import { markdownHeadingClassName } from "./markdownHeadingStyles";
+import { highlightMentionChildren } from "./markdownMentionHighlight";
 import {
   MARKDOWN_TABLE_CLASSES,
   MARKDOWN_TABLE_DATA_CLASSES,
@@ -62,6 +64,15 @@ const MARKDOWN_CONTENT_CLASSES = cn(
   CONSOLE_LINK_ANCHOR_SELECTOR_CLASSES,
   CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES,
 );
+
+const WORKSPACE_MARKDOWN_CONTENT_CLASSES = "workspace-markdown";
+
+const WORKSPACE_MARKDOWN_HEADING_CLASSES = {
+  h1: "workspace-markdown-heading workspace-markdown-heading-h1",
+  h2: "workspace-markdown-heading workspace-markdown-heading-h2",
+  h3: "workspace-markdown-heading workspace-markdown-heading-h3",
+  h4: "workspace-markdown-heading workspace-markdown-heading-h4",
+} as const;
 /**
  * Sanitize schema extending the rehype-sanitize defaults with `<details>` /
  * `<summary>` (plus the `open` attribute) so collapsible sections can be
@@ -70,7 +81,7 @@ const MARKDOWN_CONTENT_CLASSES = cn(
  */
 const MARKDOWN_SANITIZE_SCHEMA = {
   ...defaultSchema,
-  tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary"],
+  tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary", "u"],
   attributes: {
     ...(defaultSchema.attributes ?? {}),
     a: [...(defaultSchema.attributes?.a ?? []), "title"],
@@ -85,8 +96,10 @@ const MARKDOWN_SANITIZE_SCHEMA = {
 interface MarkdownContentProps {
   content: string;
   className?: string;
+  variant?: "default" | "workspace";
   canvasId?: string;
   organizationId?: string;
+  mentionPeople?: WorkOrderMentionCandidate[];
   "data-testid"?: string;
 }
 
@@ -103,37 +116,44 @@ interface MarkdownContentProps {
 export function MarkdownContent({
   content,
   className,
+  variant = "default",
   canvasId,
   organizationId,
+  mentionPeople,
   "data-testid": dataTestId,
 }: MarkdownContentProps) {
   const normalized = content.replace(/\r\n/g, "\n");
   if (!normalized.trim()) return null;
+  const contentClassName = variant === "workspace" ? WORKSPACE_MARKDOWN_CONTENT_CLASSES : MARKDOWN_CONTENT_CLASSES;
+  const headingClassName = (level: keyof typeof WORKSPACE_MARKDOWN_HEADING_CLASSES) =>
+    variant === "workspace" ? WORKSPACE_MARKDOWN_HEADING_CLASSES[level] : markdownHeadingClassName(level);
   return (
-    <div className={cn(MARKDOWN_CONTENT_CLASSES, className)} data-testid={dataTestId}>
+    <div className={cn(contentClassName, className)} data-testid={dataTestId}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, MARKDOWN_SANITIZE_SCHEMA]]}
         urlTransform={(url) => (isSpecialMarkdownLink(url) ? url : defaultUrlTransform(url))}
         components={{
+          p: ({ children, ...props }) => <p {...props}>{mentionAwareChildren(mentionPeople, children)}</p>,
+          li: ({ children, ...props }) => <li {...props}>{mentionAwareChildren(mentionPeople, children)}</li>,
           h1: ({ children, ...props }) => (
-            <h1 className={markdownHeadingClassName("h1")} {...props}>
-              {children}
+            <h1 className={headingClassName("h1")} {...props}>
+              {mentionAwareChildren(mentionPeople, children)}
             </h1>
           ),
           h2: ({ children, ...props }) => (
-            <h2 className={markdownHeadingClassName("h2")} {...props}>
-              {children}
+            <h2 className={headingClassName("h2")} {...props}>
+              {mentionAwareChildren(mentionPeople, children)}
             </h2>
           ),
           h3: ({ children, ...props }) => (
-            <h3 className={markdownHeadingClassName("h3")} {...props}>
-              {children}
+            <h3 className={headingClassName("h3")} {...props}>
+              {mentionAwareChildren(mentionPeople, children)}
             </h3>
           ),
           h4: ({ children, ...props }) => (
-            <h4 className={markdownHeadingClassName("h4")} {...props}>
-              {children}
+            <h4 className={headingClassName("h4")} {...props}>
+              {mentionAwareChildren(mentionPeople, children)}
             </h4>
           ),
           table: ({ children, ...props }) => (
@@ -143,12 +163,12 @@ export function MarkdownContent({
           ),
           th: ({ children, ...props }) => (
             <th className={MARKDOWN_TABLE_HEAD_CLASSES} {...props}>
-              {children}
+              {mentionAwareChildren(mentionPeople, children)}
             </th>
           ),
           td: ({ children, ...props }) => (
             <td className={MARKDOWN_TABLE_DATA_CLASSES} {...props}>
-              {children}
+              {mentionAwareChildren(mentionPeople, children)}
             </td>
           ),
           strong: ({ children, ...props }) => (
@@ -180,6 +200,10 @@ export function MarkdownContent({
 
 type MarkdownNode = NonNullable<ExtraProps["node"]>;
 type MarkdownElementChild = Extract<MarkdownNode["children"][number], { type: "element" }>;
+
+function mentionAwareChildren(people: WorkOrderMentionCandidate[] | undefined, children: ReactNode): ReactNode {
+  return people?.length ? highlightMentionChildren(children, people) : children;
+}
 
 function MarkdownPre({ children, node, ...props }: ComponentProps<"pre"> & ExtraProps) {
   if (hasLanguageCodeNode(node) || hasLanguageCodeChild(children)) {

@@ -22,6 +22,10 @@ export const setupApiInterceptor = (): void => {
     }
 
     if (response.status === 401) {
+      if (isAccountSessionProbe(input)) {
+        return response;
+      }
+
       redirectUnauthorized();
       throw new Error("Unauthorized");
     }
@@ -32,11 +36,18 @@ export const setupApiInterceptor = (): void => {
   interceptorSetup = true;
 };
 
-function isAuthenticatedRequest(input: RequestInfo | URL): boolean {
+function requestPath(input: RequestInfo | URL): string {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-  const path = new URL(url, "http://localhost").pathname;
+  return new URL(url, "http://localhost").pathname;
+}
 
+function isAuthenticatedRequest(input: RequestInfo | URL): boolean {
+  const path = requestPath(input);
   return path.includes("/api/") || path.startsWith("/account/") || ACCOUNT_SESSION_PATHS.has(path);
+}
+
+function isAccountSessionProbe(input: RequestInfo | URL): boolean {
+  return requestPath(input) === "/account";
 }
 
 function isAuthRoute(pathname: string): boolean {

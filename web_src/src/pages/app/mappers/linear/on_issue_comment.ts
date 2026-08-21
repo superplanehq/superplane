@@ -61,6 +61,13 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
       });
     }
 
+    if (configuration?.contentFilter) {
+      metadataItems.push({
+        icon: "funnel",
+        label: `Filter: ${configuration.contentFilter}`,
+      });
+    }
+
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: linearIcon,

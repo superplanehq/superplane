@@ -43,6 +43,24 @@ export interface JiraDeletedIssue {
   deleted?: boolean;
 }
 
+export interface JiraComment {
+  id?: string;
+  body?: unknown;
+  author?: JiraUser;
+  updateAuthor?: JiraUser;
+}
+
+export interface JiraServiceDesk {
+  id?: string;
+  projectKey?: string;
+  projectName?: string;
+}
+
+export interface JiraOpsTeam {
+  teamId?: string;
+  teamName?: string;
+}
+
 export interface JiraNodeMetadata {
   project?: JiraProject;
   issueType?: string;

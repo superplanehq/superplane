@@ -1,8 +1,10 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,7 +42,7 @@ type CanvasRun struct {
 	Input             JSONValue
 	State             string
 	Result            string
-	ResultMessage     string
+	Errors            datatypes.JSONSlice[RunError]
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
 	CancelledAt       *time.Time
@@ -65,9 +67,9 @@ func (r *CanvasRun) TableName() string {
 	return "workflow_runs"
 }
 
-func FindCanvasRunInTransaction(tx *gorm.DB, workflowID, runID uuid.UUID) (*CanvasRun, error) {
+func FindCanvasRunInTransaction(db *gorm.DB, workflowID, runID uuid.UUID) (*CanvasRun, error) {
 	var run CanvasRun
-	err := tx.
+	err := db.
 		Where("workflow_id = ?", workflowID).
 		Where("id = ?", runID).
 		First(&run).
@@ -79,9 +81,19 @@ func FindCanvasRunInTransaction(tx *gorm.DB, workflowID, runID uuid.UUID) (*Canv
 	return &run, nil
 }
 
-func FindCanvasRunByRootEventInTransaction(tx *gorm.DB, rootEventID uuid.UUID) (*CanvasRun, error) {
+func FindUnscopedCanvasRun(db *gorm.DB, runID uuid.UUID) (*CanvasRun, error) {
 	var run CanvasRun
-	err := tx.
+	err := db.Where("id = ?", runID).First(&run).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &run, nil
+}
+
+func FindCanvasRunByRootEventInTransaction(db *gorm.DB, rootEventID uuid.UUID) (*CanvasRun, error) {
+	var run CanvasRun
+	err := db.
 		Joins("INNER JOIN workflow_events ON workflow_events.run_id = workflow_runs.id").
 		Where("workflow_events.id = ?", rootEventID).
 		First(&run).
@@ -91,6 +103,20 @@ func FindCanvasRunByRootEventInTransaction(tx *gorm.DB, rootEventID uuid.UUID) (
 	}
 
 	return &run, nil
+}
+
+func FindRootEventForRun(tx *gorm.DB, runID uuid.UUID) (*CanvasEvent, error) {
+	var execution CanvasNodeExecution
+	err := tx.
+		Select("root_event_id").
+		Where("run_id = ?", runID).
+		First(&execution).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return FindCanvasEventInTransaction(tx, execution.RootEventID)
 }
 
 func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *CanvasEvent) (*CanvasRun, error) {
@@ -297,6 +323,14 @@ func LockCanvasRun(db *gorm.DB, workflowID, runID uuid.UUID) (*CanvasRun, error)
 
 func (r *CanvasRun) DeleteChain(db *gorm.DB) (*RunDeletionSummary, error) {
 	summary := &RunDeletionSummary{}
+
+	// In-flight factory steps would stay pending/running after run_id is
+	// set to NULL and hold a parallelism slot forever. Finish those as
+	// cancelled first. Finished history rows stay; the FK SET NULL keeps
+	// them after this run is removed.
+	if err := abortInFlightFactoryStepForDeletedRun(db, r.ID); err != nil {
+		return nil, err
+	}
 
 	var executionIDs []uuid.UUID
 	err := db.
@@ -586,6 +620,10 @@ func (r *CanvasRun) FindOpenWork(tx *gorm.DB) (*OpenCanvasRunWork, error) {
 func (r *CanvasRun) CalculateResult(tx *gorm.DB) (string, error) {
 	if r.State == CanvasRunStateCancelling {
 		return CanvasRunResultCancelled, nil
+	}
+
+	if len(r.Errors) > 0 {
+		return CanvasRunResultFailed, nil
 	}
 
 	var result struct {
@@ -1006,4 +1044,65 @@ func (r *CanvasRun) MarkAsCancelling(tx *gorm.DB, cancelledBy *uuid.UUID) error 
 			"updated_at":   &now,
 		}).
 		Error
+}
+
+const MaxRunErrorsCount = 50
+
+var ErrRunErrorsTooLarge = errors.New("run errors exceed maximum size")
+var ErrRunErrorsTooMany = errors.New("run errors exceed maximum count")
+var ErrRunErrorMessageRequired = errors.New("run error message is required")
+
+type RunError struct {
+	Message string `json:"message"`
+}
+
+func (r *CanvasRun) ErrorMessages() []string {
+	if len(r.Errors) == 0 {
+		return nil
+	}
+
+	messages := make([]string, 0, len(r.Errors))
+	for _, runError := range r.Errors {
+		messages = append(messages, runError.Message)
+	}
+
+	return messages
+}
+
+/*
+ * Appends a new error into the run errors slice.
+ * Locks the run with FOR NO KEY UPDATE so concurrent appends do not
+ * overwrite each other, while child FK inserts on the run can proceed.
+ */
+func (r *CanvasRun) AddError(tx *gorm.DB, message string, maxSize int) error {
+	if message == "" {
+		return ErrRunErrorMessageRequired
+	}
+
+	return tx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.
+			Clauses(clause.Locking{Strength: lockingForUpdateNoKey}).
+			Where("id = ?", r.ID).
+			First(r).
+			Error; err != nil {
+			return err
+		}
+
+		if len(r.Errors) >= MaxRunErrorsCount {
+			return fmt.Errorf("%w: %d (max %d)", ErrRunErrorsTooMany, len(r.Errors), MaxRunErrorsCount)
+		}
+
+		next := append(slices.Clone(r.Errors), RunError{Message: message})
+		encoded, err := json.Marshal(next)
+		if err != nil {
+			return fmt.Errorf("marshal run errors: %w", err)
+		}
+
+		if len(encoded) > maxSize {
+			return fmt.Errorf("%w: %d bytes (max %d)", ErrRunErrorsTooLarge, len(encoded), maxSize)
+		}
+
+		r.Errors = next
+		return tx.Model(r).Update("errors", r.Errors).Error
+	})
 }

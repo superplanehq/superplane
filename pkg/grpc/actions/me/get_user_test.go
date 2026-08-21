@@ -49,16 +49,24 @@ func Test_ListUserPermissions(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp.User)
 		assert.NotEmpty(t, resp.User.Permissions)
-		assert.ElementsMatch(t, resp.User.Permissions, getExpectedPermissions([]string{
+		expected := getExpectedPermissions([]string{
 			"org",
 			"roles",
 			"groups",
 			"members",
 			"canvases",
 			"factories",
+			"work_orders",
 			"api_keys",
 			"agents",
-		}))
+			"notifications",
+		})
+		expected = append(expected, &pbAuth.Permission{
+			Resource:   "notifications",
+			Action:     "update",
+			DomainType: actions.DomainTypeToProto(models.DomainTypeOrganization),
+		})
+		assert.ElementsMatch(t, resp.User.Permissions, expected)
 	})
 
 	t.Run("canceled context bubbles up for gateway sanitization", func(t *testing.T) {

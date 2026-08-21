@@ -3,9 +3,14 @@ package factories
 import (
 	"context"
 
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
@@ -13,6 +18,16 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
+	}
+
+	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
+	}
+
+	closedBy, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to create work order")
 	}
 
 	factoryID, err := parseFactoryID(req.GetFactoryId())
@@ -43,13 +58,44 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 	}
 
 	logger = logging.WithWorkOrder(logger, *order)
-	order, err = order.Close(db, result)
+	fromState := order.State
+	wasClosed := order.IsClosed()
+	order, err = order.Close(db, result, &closedBy)
 	if err != nil {
 		logger.WithError(err).Error("close work order failed")
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
-	serialized, err := loadAndSerializeWorkOrder(ctx, order)
+	if err := messages.PublishFactoryWorkOrderUpdated(
+		factory.ID.String(),
+		order.ID.String(),
+		factoryevents.EventTypeOrderStatusUpdated,
+	); err != nil {
+		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
+	}
+
+	if !wasClosed {
+		notification := messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID: orgID.String(),
+			FactoryID:      factory.ID.String(),
+			OrderID:        order.ID.String(),
+			EventType:      factoryevents.EventTypeOrderStatusUpdated,
+			ActorUserID:    closedBy.String(),
+			FromState:      fromState,
+			ToState:        models.FactoryWorkOrderStateClosed,
+			Result:         result,
+		}
+		if err := notification.Publish(); err != nil {
+			logger.WithError(err).Warnf("Failed to publish work order notification for order %s", order.ID)
+		}
+	}
+
+	order, err = factory.FindWorkOrder(db, orderID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to close work order")
+	}
+
+	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}

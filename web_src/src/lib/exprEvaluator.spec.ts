@@ -14,6 +14,15 @@ describe("exprEvaluator", () => {
     );
   });
 
+  it("evaluates order context helper", () => {
+    expect(
+      evaluateExpr("order().title", {
+        __order: { id: "order-1", title: "Ship feature", artifacts: [{ type: "pr" }] },
+      }),
+    ).toBe("Ship feature");
+    expect(evaluateExpr("order()", {})).toBeNull();
+  });
+
   it("evaluates expr-compatible string and array slices", () => {
     expect(evaluateExpr("root().data.sha[:7]", { __root: { data: { sha: "d6f3c8a2e8b7" } } })).toBe("d6f3c8a");
     expect(evaluateExpr("root().data.sha[2:7]", { __root: { data: { sha: "d6f3c8a2e8b7" } } })).toBe("f3c8a");

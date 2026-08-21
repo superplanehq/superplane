@@ -1,0 +1,69 @@
+package organizations
+
+import (
+	"context"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+)
+
+const (
+	llmSpendPeriodDaysDefault = 30
+	llmSpendPeriodDaysMax     = 90
+)
+
+func DescribeOrganizationLLMSpend(
+	ctx context.Context,
+	orgID string,
+	req *pb.DescribeOrganizationLLMSpendRequest,
+) (*pb.DescribeOrganizationLLMSpendResponse, error) {
+	organizationID, err := uuid.Parse(orgID)
+	if err != nil {
+		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
+	}
+
+	period := clampLLMSpendPeriodDays(int(req.GetPeriodDays()))
+	since := time.Now().AddDate(0, 0, -period)
+
+	totals, byModel, err := models.SummarizeUsage(database.DB(ctx), models.UsageReportFilter{
+		OrganizationID: organizationID,
+		Since:          since,
+	})
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to describe organization LLM spend")
+	}
+
+	return &pb.DescribeOrganizationLLMSpendResponse{
+		TotalTokens:    totals.TotalTokens,
+		TotalCostCents: totals.CostCents(),
+		PeriodDays:     int32(period),
+		ByModel:        serializeLLMSpendByModel(byModel),
+	}, nil
+}
+
+func clampLLMSpendPeriodDays(period int) int {
+	if period <= 0 {
+		return llmSpendPeriodDaysDefault
+	}
+	if period > llmSpendPeriodDaysMax {
+		return llmSpendPeriodDaysMax
+	}
+	return period
+}
+
+func serializeLLMSpendByModel(rows []models.UsageByModel) []*pb.LLMSpendByModel {
+	out := make([]*pb.LLMSpendByModel, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, &pb.LLMSpendByModel{
+			Provider:    row.Provider,
+			Model:       row.Model,
+			TotalTokens: row.TotalTokens,
+			CostCents:   row.CostCents(),
+		})
+	}
+	return out
+}

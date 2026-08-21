@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/exprruntime"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/gorm"
 )
 
@@ -505,6 +507,13 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 			}
 
 			return b.resolveAppPayload()
+		}),
+		expr.Function("order", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("order() takes no arguments")
+			}
+
+			return b.resolveOrderPayload(expression)
 		}),
 	}
 
@@ -1002,6 +1011,211 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 	return payload, nil
 }
 
+// resolveOrderPayload exposes the work order driving this run via order().
+// Returns nil when the run is not attached to a factory work-order execution.
+// The url, artifacts, and comments are loaded only when the expression AST
+// references order().url / order().artifacts / order().comments.
+func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
+	if b.rootEventID == nil {
+		return nil, nil
+	}
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(b.tx, *b.rootEventID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("order() could not resolve the current run: %w", err)
+	}
+
+	execution, err := models.FindWorkOrderExecutionByRunID(b.tx, run.ID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("order() could not resolve the work order execution: %w", err)
+	}
+
+	order, err := models.FindUnscopedWorkOrder(b.tx, execution.WorkOrderID)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not resolve the work order: %w", err)
+	}
+
+	payload := map[string]any{
+		"id":          order.ID.String(),
+		"title":       order.Title,
+		"description": order.Description,
+		"factory_id":  order.FactoryID.String(),
+		"state":       order.State,
+		"result":      order.Result,
+	}
+
+	if err := attachOrderSource(b.tx, order, payload); err != nil {
+		return nil, err
+	}
+
+	usesURL, err := expressionvalidation.ExpressionUsesOrderURL(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesURL {
+		url, err := b.buildWorkOrderURL(order)
+		if err != nil {
+			return nil, err
+		}
+		payload["url"] = url
+	}
+
+	usesArtifacts, err := expressionvalidation.ExpressionUsesOrderArtifacts(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesArtifacts {
+		artifacts, err := order.ListArtifacts(b.tx)
+		if err != nil {
+			return nil, fmt.Errorf("order() could not load artifacts: %w", err)
+		}
+
+		artifactPayloads := make([]any, 0, len(artifacts))
+		for i := range artifacts {
+			item, err := artifactExpressionPayload(&artifacts[i])
+			if err != nil {
+				return nil, err
+			}
+			artifactPayloads = append(artifactPayloads, item)
+		}
+		payload["artifacts"] = artifactPayloads
+	}
+
+	usesComments, err := expressionvalidation.ExpressionUsesOrderComments(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesComments {
+		comments, err := order.ListComments(b.tx)
+		if err != nil {
+			return nil, fmt.Errorf("order() could not load comments: %w", err)
+		}
+
+		commentPayloads := make([]any, 0, len(comments))
+		for i := range comments {
+			item, err := commentExpressionPayload(&comments[i])
+			if err != nil {
+				return nil, err
+			}
+			commentPayloads = append(commentPayloads, item)
+		}
+		payload["comments"] = commentPayloads
+	}
+
+	return payload, nil
+}
+
+func attachOrderSource(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
+	if order.SourceRunID == nil {
+		return nil
+	}
+
+	rootEvent, err := models.FindRootEventForRun(tx, *order.SourceRunID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return fmt.Errorf("order() could not resolve source: %w", err)
+	}
+	if rootEvent == nil {
+		return nil
+	}
+
+	if source := models.RootEventSourcePayload(rootEvent.Data.Data()); source != nil {
+		payload["source"] = normalizeExpressionValue(source)
+	}
+	return nil
+}
+
+func artifactExpressionPayload(artifact *models.FactoryWorkOrderArtifact) (map[string]any, error) {
+	data := map[string]any{}
+	if len(artifact.Data) > 0 {
+		if err := json.Unmarshal(artifact.Data, &data); err != nil {
+			return nil, fmt.Errorf("order() could not decode artifact data: %w", err)
+		}
+	}
+
+	return map[string]any{
+		"id":   artifact.ID.String(),
+		"type": artifact.Type,
+		"data": normalizeExpressionValue(data),
+	}, nil
+}
+
+func commentExpressionPayload(comment *models.FactoryWorkOrderComment) (map[string]any, error) {
+	author := comment.Author()
+	payload := map[string]any{
+		"id":         comment.ID.String(),
+		"body":       comment.Body,
+		"created_at": comment.CreatedAt,
+		"author":     commentAuthorExpressionPayload(&author),
+	}
+
+	if run := comment.RunRef(); run != nil {
+		payload["run"] = map[string]any{"id": run.ID.String()}
+	}
+
+	return normalizeExpressionValue(payload).(map[string]any), nil
+}
+
+func commentAuthorExpressionPayload(author *factory.WorkOrderCommentAuthor) map[string]any {
+	authorPayload := map[string]any{
+		"kind": author.Kind,
+	}
+
+	if author.UserID != nil {
+		authorPayload["user_id"] = *author.UserID
+	}
+
+	if automation := author.Automation; automation != nil {
+		automationPayload := map[string]any{}
+		if automation.NodeID != "" {
+			automationPayload["node_id"] = automation.NodeID
+		}
+		if automation.NodeName != "" {
+			automationPayload["node_name"] = automation.NodeName
+		}
+		if automation.AppID != uuid.Nil {
+			automationPayload["app_id"] = automation.AppID.String()
+		}
+		if automation.AppName != "" {
+			automationPayload["app_name"] = automation.AppName
+		}
+		if automation.LineID != uuid.Nil {
+			automationPayload["line_id"] = automation.LineID.String()
+		}
+		if automation.LineName != "" {
+			automationPayload["line_name"] = automation.LineName
+		}
+		if automation.StepIndex != nil {
+			automationPayload["step_index"] = *automation.StepIndex
+		}
+		if automation.StepName != "" {
+			automationPayload["step_name"] = automation.StepName
+		}
+		authorPayload["automation"] = automationPayload
+	}
+
+	return authorPayload
+}
+
+// buildWorkOrderURL resolves the work order permalink in the SuperPlane UI.
+// The factory key is part of that path, so the owning factory has to be loaded.
+func (b *NodeConfigurationBuilder) buildWorkOrderURL(order *models.FactoryWorkOrder) (string, error) {
+	owner, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
+	if err != nil {
+		return "", fmt.Errorf("order() could not resolve the factory that owns the work order: %w", err)
+	}
+
+	return uiBaseURL() + order.URLPath(owner.Key), nil
+}
+
 func (b *NodeConfigurationBuilder) buildRunURL(run *models.CanvasRun) (string, error) {
 	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
 	if err != nil {
@@ -1152,6 +1366,7 @@ var reservedExpressionIdentifiers = map[string]struct{}{
 	"previous": {},
 	"run":      {},
 	"app":      {},
+	"order":    {},
 	"ctx":      {},
 }
 

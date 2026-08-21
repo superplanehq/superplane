@@ -1,19 +1,56 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { MemoryRouter, Outlet, Route, Routes } from "react-router-dom";
+import { useContext, useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { MemoryRouter, Navigate, Outlet, Route, Routes, useParams } from "react-router";
 
+import { requestCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/canvasAgentSidebarOpenRequest";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
 import { AccountProvider } from "@/contexts/AccountProvider";
 import { PermissionsProvider } from "@/contexts/PermissionsProvider";
+import { ThemeContext } from "@/contexts/themeContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { agentChatKeys } from "@/hooks/useAgentChats";
+import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { AppPage } from "@/pages/app";
 import { STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT } from "@/pages/app/__fixtures__/agentChatResponses";
 import { canvasAppIds, type CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
+import {
+  AutomationsPage,
+  CreateWorkOrderComposeRedirect,
+  FactoriesIndexPage,
+  FactoriesLayout,
+  FactoryAppCanvasPage,
+  FactoryLineEditPage,
+  FactorySettingsGeneralPage,
+  FactorySettingsLayout,
+  FactorySettingsNotificationsPage,
+  FactorySettingsProfilePage,
+  FactorySettingsSoonPage,
+  FactorySettingsUsagePage,
+  FACTORY_SETTINGS_NAV_ITEMS,
+  isFactorySettingsComingSoon,
+  LegacyWorkOrderDetailRedirect,
+  LinesPage,
+  MissionsPage,
+  NewWorkspacePage,
+  OrganizationSettingsLayout,
+  organizationSettingsSectionRoutes,
+  OverviewPage,
+  VelocityPage,
+  WikiPage,
+  WorkOrderDetailPage,
+  WorkOrdersPage,
+} from "@/pages/factories";
+import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
+import { createFactoryLinePath, editFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
+import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetailPage";
+import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
+import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
 import { HomePage } from "@/pages/home";
-import { homePageIds, type HomePageFixture } from "@/pages/home/__fixtures__/handlers";
+import { homePageIds, type HomePageFixture, type StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers";
 import { NewAppPage } from "@/pages/home/NewAppPage";
+import { OrganizationSettings } from "@/pages/organization/settings";
 import type { AgentSuggestion } from "@/ui/CanvasPage";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -44,10 +81,22 @@ function fixtureFetchState(): FixtureFetchState {
   return state;
 }
 
+/** Storybook-only route swaps. App routes ignore this. */
+export interface OrgWorkspacePageOverrides {
+  wiki?: ComponentType;
+  overview?: ComponentType;
+  /** When set, mounts `/setup` and gates other factory pages while pending. */
+  onboarding?: ComponentType;
+  /** Storybook-only Work Orders page. Live app ignores this. */
+  workOrders?: ComponentType;
+  /** Storybook-only Velocity page (e.g. work-order flow prototype). */
+  velocity?: ComponentType;
+}
+
 export interface OrgWorkspaceHarnessProps {
   /** Where to land when the story mounts. */
   startAt?: "home" | "app";
-  /** Path under the org when `startAt` is `home`, e.g. `apps/new`. */
+  /** Path under the org when `startAt` is `home`, e.g. `apps/new` or `workspaces/...`. */
   pathSuffix?: string;
   /** Query string for the app route (without leading `?`). */
   appQuery?: string;
@@ -58,17 +107,29 @@ export interface OrgWorkspaceHarnessProps {
   openAgentSidebar?: boolean;
   homeFixture?: HomePageFixture;
   appFixture?: CanvasAppFixture;
+  /** Backing fixture for factory pages (list, detail, orders, lines, apps). */
+  factoriesFixture?: FactoriesFixture;
   /** Storybook-only: seed post-install Agent improvement suggestions for the canvas. */
   agentSuggestions?: AgentSuggestion[];
+  /** Organization connections the story starts with (e.g. an installed GitHub). */
+  orgIntegrations?: StorybookOrgIntegration[];
+  /** Storybook-only: replace selected factory page elements (e.g. wiki wireframe). */
+  pageOverrides?: OrgWorkspacePageOverrides;
 }
 
-function useOrgWorkspaceFixtureFetch(
-  canvasId: string,
-  openAgentSidebar: boolean,
-  homeFixture?: HomePageFixture,
-  appFixture?: CanvasAppFixture,
-  agentSuggestions?: AgentSuggestion[],
-) {
+interface FixtureFetchOptions {
+  canvasId: string;
+  openAgentSidebar: boolean;
+  homeFixture?: HomePageFixture;
+  appFixture?: CanvasAppFixture;
+  factoriesFixture?: FactoriesFixture;
+  agentSuggestions?: AgentSuggestion[];
+  orgIntegrations?: StorybookOrgIntegration[];
+}
+
+function useOrgWorkspaceFixtureFetch(options: FixtureFetchOptions) {
+  const { canvasId, openAgentSidebar, homeFixture, appFixture, factoriesFixture, agentSuggestions, orgIntegrations } =
+    options;
   const [fixtureFetch] = useState(() => {
     // Persist before AppPage reads the preference in useState initializers.
     writeCanvasAgentSidebarOpen(canvasId, openAgentSidebar);
@@ -76,13 +137,21 @@ function useOrgWorkspaceFixtureFetch(
       setAgentSuggestions(canvasId, agentSuggestions);
     }
     const state = fixtureFetchState();
-    const impl = createOrgWorkspaceFixtureFetch(state.original, { homeFixture, appFixture });
+    const impl = createOrgWorkspaceFixtureFetch(state.original, {
+      homeFixture,
+      appFixture,
+      factoriesFixture,
+      orgIntegrations,
+    });
     state.delegate = impl;
     return impl;
   });
 
   useEffect(() => {
     writeCanvasAgentSidebarOpen(canvasId, openAgentSidebar);
+    if (openAgentSidebar) {
+      requestCanvasAgentSidebarOpen(canvasId);
+    }
     const state = fixtureFetchState();
     if (state.delegate === null) {
       state.delegate = fixtureFetch;
@@ -97,9 +166,66 @@ function useOrgWorkspaceFixtureFetch(
   return fixtureFetch;
 }
 
-function OrgWorkspaceRoutes() {
+/**
+ * Resolve org and canvas IDs from whichever fixture the story provided. Kept
+ * as a plain helper so the harness component stays under the complexity budget.
+ */
+function resolveWorkspaceIds(
+  homeFixture: HomePageFixture | undefined,
+  appFixture: CanvasAppFixture | undefined,
+  factoriesFixture: FactoriesFixture | undefined,
+) {
+  const orgId =
+    homeFixture?.organizationId ??
+    appFixture?.organizationId ??
+    factoriesFixture?.organizationId ??
+    homePageIds.organizationId;
+  const canvasId = appFixture?.canvasId ?? canvasAppIds.canvasId;
+  return { orgId, canvasId };
+}
+
+function factoryRoute(element: React.ReactNode) {
+  return <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>{element}</RequireExperimentalFeature>;
+}
+
+function HarnessLegacyAutomationsNewLineRedirect() {
+  const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
+  if (!organizationId || !factoryKey) {
+    return <Navigate to="/" replace />;
+  }
+  return <Navigate to={createFactoryLinePath(organizationId, factoryKey)} replace />;
+}
+
+function HarnessLegacyAutomationsLineEditRedirect() {
+  const { organizationId, factoryKey, lineId } = useParams<{
+    organizationId: string;
+    factoryKey: string;
+    lineId: string;
+  }>();
+  if (!organizationId || !factoryKey || !lineId) {
+    return <Navigate to="/" replace />;
+  }
+  return <Navigate to={editFactoryLinePath(organizationId, factoryKey, lineId)} replace />;
+}
+
+function OptionalOnboardingGate({ enabled }: { enabled: boolean }) {
+  if (!enabled) {
+    return <Outlet />;
+  }
+  return <OnboardingGate />;
+}
+
+function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePageOverrides }) {
+  const WikiRoutePage = pageOverrides?.wiki ?? WikiPage;
+  const OverviewRoutePage = pageOverrides?.overview ?? OverviewPage;
+  const WorkOrdersRoutePage = pageOverrides?.workOrders ?? WorkOrdersPage;
+  const VelocityRoutePage = pageOverrides?.velocity ?? VelocityPage;
+  const OnboardingRoutePage = pageOverrides?.onboarding;
+  const onboardingEnabled = Boolean(OnboardingRoutePage);
+
   return (
     <Routes>
+      <Route path="create" element={<div data-testid="organization-create-page">Create a new organization</div>} />
       <Route
         path=":organizationId"
         element={
@@ -111,10 +237,70 @@ function OrgWorkspaceRoutes() {
         <Route index element={<HomePage />} />
         <Route path="apps/new" element={<NewAppPage />} />
         <Route path="apps/:appId" element={<AppPage />} />
+        <Route path="workspaces">
+          <Route index element={factoryRoute(<FactoriesIndexPage />)} />
+          <Route path="new" element={factoryRoute(<NewWorkspacePage />)} />
+          <Route path=":factoryKey" element={factoryRoute(<FactoriesLayout />)}>
+            <Route element={<OptionalOnboardingGate enabled={onboardingEnabled} />}>
+              <Route index element={<Navigate to="overview" replace />} />
+              {OnboardingRoutePage ? <Route path="setup" element={<OnboardingRoutePage />} /> : null}
+              <Route path="overview" element={<OverviewRoutePage />} />
+              <Route path="missions" element={<MissionsPage />} />
+              <Route path="missions/:missionId" element={<MissionDetailPage />} />
+              <Route path="wiki" element={<WikiRoutePage />} />
+              <Route path="velocity" element={<VelocityRoutePage />} />
+              <Route path="work-orders">
+                <Route index element={<WorkOrdersRoutePage />} />
+                <Route path="new" element={<CreateWorkOrderComposeRedirect />} />
+                <Route path=":orderId" element={<LegacyWorkOrderDetailRedirect />} />
+              </Route>
+              <Route path="work-order/:orderNumber" element={<WorkOrderDetailPage />} />
+              <Route path="lines">
+                <Route index element={<LinesPage />} />
+                <Route path="new" element={<FactoryLineEditPage />} />
+                <Route path=":lineId" element={<LinesPage />} />
+                <Route path=":lineId/edit" element={<FactoryLineEditPage />} />
+                {/* Storybook design preview: factory WorkOrderCanvas node chrome */}
+                <Route path=":lineId/phases/:phaseId/configure" element={<ConfigureAutomationPage />} />
+              </Route>
+              <Route path="automations">
+                <Route index element={<AutomationsPage />} />
+                <Route path="new" element={<HarnessLegacyAutomationsNewLineRedirect />} />
+                <Route path=":lineId/edit" element={<HarnessLegacyAutomationsLineEditRedirect />} />
+                <Route path=":appId" element={<AutomationsPage />} />
+              </Route>
+              <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
+            </Route>
+          </Route>
+          <Route path=":factoryKey/settings" element={factoryRoute(<FactorySettingsLayout />)}>
+            <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
+            <Route path="general" element={<FactorySettingsGeneralPage />} />
+            <Route path="usage" element={<FactorySettingsUsagePage />} />
+            <Route path="profile" element={<FactorySettingsProfilePage />} />
+            <Route path="notifications" element={<FactorySettingsNotificationsPage />} />
+            {FACTORY_SETTINGS_NAV_ITEMS.filter(isFactorySettingsComingSoon).map((item) => (
+              <Route
+                key={item.id}
+                path={item.id}
+                element={
+                  <FactorySettingsSoonPage
+                    title={item.label}
+                    description={`${item.label} settings for this workspace.`}
+                    Icon={item.Icon}
+                  />
+                }
+              />
+            ))}
+          </Route>
+          <Route path=":factoryKey/organization" element={factoryRoute(<OrganizationSettingsLayout />)}>
+            {organizationSettingsSectionRoutes}
+          </Route>
+        </Route>
         <Route
           path="settings/integrations/:integrationName/setup"
           element={<div data-testid="integration-setup-placeholder">Integration setup</div>}
         />
+        <Route path="settings/*" element={<OrganizationSettings />} />
       </Route>
     </Routes>
   );
@@ -131,11 +317,21 @@ export function OrgWorkspaceHarness({
   openAgentSidebar = false,
   homeFixture,
   appFixture,
+  factoriesFixture,
   agentSuggestions,
+  orgIntegrations,
+  pageOverrides,
 }: OrgWorkspaceHarnessProps) {
-  const orgId = homeFixture?.organizationId ?? appFixture?.organizationId ?? homePageIds.organizationId;
-  const canvasId = appFixture?.canvasId ?? canvasAppIds.canvasId;
-  useOrgWorkspaceFixtureFetch(canvasId, openAgentSidebar, homeFixture, appFixture, agentSuggestions);
+  const { orgId, canvasId } = resolveWorkspaceIds(homeFixture, appFixture, factoriesFixture);
+  useOrgWorkspaceFixtureFetch({
+    canvasId,
+    openAgentSidebar,
+    homeFixture,
+    appFixture,
+    factoriesFixture,
+    agentSuggestions,
+    orgIntegrations,
+  });
 
   const homePath = pathSuffix ? `/${orgId}/${pathSuffix}` : `/${orgId}`;
   const appPath = `/${orgId}/apps/${canvasId}${appQuery ? `?${appQuery}` : ""}`;
@@ -153,17 +349,26 @@ export function OrgWorkspaceHarness({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
+      <OptionalThemeProvider>
         <TooltipProvider delayDuration={150}>
           <div className="h-dvh w-full overflow-auto">
             <MemoryRouter initialEntries={[initialPath]}>
               <AccountProvider>
-                <OrgWorkspaceRoutes />
+                <OrgWorkspaceRoutes pageOverrides={pageOverrides} />
               </AccountProvider>
             </MemoryRouter>
           </div>
         </TooltipProvider>
-      </ThemeProvider>
+      </OptionalThemeProvider>
     </QueryClientProvider>
   );
+}
+
+/** Prefer Storybook toolbar theme when present; else mount ThemeProvider. */
+function OptionalThemeProvider({ children }: { children: ReactNode }) {
+  const inheritedTheme = useContext(ThemeContext);
+  if (inheritedTheme) {
+    return children;
+  }
+  return <ThemeProvider>{children}</ThemeProvider>;
 }

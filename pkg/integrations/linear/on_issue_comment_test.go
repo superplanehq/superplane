@@ -28,8 +28,18 @@ func commentEvent(action string) map[string]any {
 	}
 }
 
+func commentEventWithBody(action, body string) map[string]any {
+	event := commentEvent(action)
+	event["data"].(map[string]any)["body"] = body
+	return event
+}
+
 func commentConfig() map[string]any {
 	return map[string]any{"team": "t1", "actions": []string{"create"}}
+}
+
+func commentConfigWithFilter(filter string) map[string]any {
+	return map[string]any{"team": "t1", "actions": []string{"create"}, "contentFilter": filter}
 }
 
 // signedCommentRequest signs the body and sets the Comment event header, since
@@ -83,6 +93,26 @@ func Test__OnIssueComment__Setup(t *testing.T) {
 		})
 
 		require.ErrorContains(t, err, "at least one action is required")
+	})
+
+	t.Run("invalid content filter pattern -> error", func(t *testing.T) {
+		err := trigger.Setup(core.TriggerContext{
+			Integration:   integrationWithTeam(),
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: commentConfigWithFilter("[invalid(regex"),
+		})
+
+		require.ErrorContains(t, err, "invalid content filter pattern")
+	})
+
+	t.Run("valid content filter is accepted", func(t *testing.T) {
+		err := trigger.Setup(core.TriggerContext{
+			Integration:   integrationWithTeam(),
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: commentConfigWithFilter("^/deploy"),
+		})
+
+		require.NoError(t, err)
 	})
 
 	t.Run("requests a comment webhook scoped to the team", func(t *testing.T) {
@@ -207,6 +237,86 @@ func Test__OnIssueComment__HandleWebhook__FiltersActions(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 		require.NoError(t, err)
 		assert.Equal(t, 1, events.Count())
+	})
+}
+
+func Test__OnIssueComment__HandleWebhook__FiltersContent(t *testing.T) {
+	trigger := &OnIssueComment{}
+
+	t.Run("matching body is emitted", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		body := commentEventWithBody("create", "/deploy staging")
+		ctx := signedCommentRequest(t, body, commentConfigWithFilter("^/deploy"), events)
+
+		code, _, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Equal(t, 1, events.Count())
+	})
+
+	t.Run("non-matching body is ignored", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		ctx := signedCommentRequest(t, commentEvent("create"), commentConfigWithFilter("^/deploy"), events)
+
+		code, _, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Zero(t, events.Count())
+	})
+
+	t.Run("pattern matches anywhere in the body", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		body := commentEventWithBody("create", "please /deploy staging now")
+		ctx := signedCommentRequest(t, body, commentConfigWithFilter("/deploy"), events)
+
+		code, _, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Equal(t, 1, events.Count())
+	})
+
+	t.Run("empty filter emits every comment", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		ctx := signedCommentRequest(t, commentEvent("create"), commentConfigWithFilter(""), events)
+
+		code, _, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Equal(t, 1, events.Count())
+	})
+
+	t.Run("comment without a body does not match", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		body := commentEvent("remove")
+		delete(body["data"].(map[string]any), "body")
+		config := map[string]any{"team": "t1", "actions": []string{"remove"}, "contentFilter": "^/deploy"}
+		ctx := signedCommentRequest(t, body, config, events)
+
+		code, _, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Zero(t, events.Count())
+	})
+
+	t.Run("invalid pattern -> bad request", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		ctx := signedCommentRequest(t, commentEvent("create"), commentConfigWithFilter("[invalid(regex"), events)
+
+		code, _, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusBadRequest, code)
+		require.ErrorContains(t, err, "invalid content filter pattern")
+		assert.Zero(t, events.Count())
+	})
+
+	t.Run("filter is not reached for unselected actions", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		body := commentEventWithBody("update", "/deploy staging")
+		ctx := signedCommentRequest(t, body, commentConfigWithFilter("^/deploy"), events)
+
+		code, _, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Zero(t, events.Count())
 	})
 }
 

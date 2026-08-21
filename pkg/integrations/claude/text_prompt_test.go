@@ -710,3 +710,59 @@ func TestExtractGeneratedFileIDs_LegacyBlock(t *testing.T) {
 		t.Errorf("expected deduplicated [file_a file_b], got %v", ids)
 	}
 }
+
+type recordingUsage struct {
+	records []core.UsageRecord
+}
+
+func (r *recordingUsage) Record(record core.UsageRecord) error {
+	r.records = append(r.records, record)
+	return nil
+}
+
+func Test__RecordClaudeUsage__IncludesCacheTokens(t *testing.T) {
+	recorder := &recordingUsage{}
+	ctx := core.ExecutionContext{Usage: recorder}
+
+	recordClaudeUsage(ctx, &CreateMessageResponse{
+		Model: "claude-sonnet-4-6",
+		Usage: MessageUsage{
+			InputTokens:              100,
+			OutputTokens:             20,
+			CacheCreationInputTokens: 40,
+			CacheReadInputTokens:     80,
+		},
+	})
+
+	if len(recorder.records) != 1 {
+		t.Fatalf("expected 1 usage record, got %d", len(recorder.records))
+	}
+	got := recorder.records[0]
+	if got.InputTokens != 100 || got.OutputTokens != 20 || got.CacheWriteTokens != 40 || got.CacheReadTokens != 80 {
+		t.Errorf("unexpected token split: %+v", got)
+	}
+	if got.TotalTokens != 240 {
+		t.Errorf("expected total 240, got %d", got.TotalTokens)
+	}
+}
+
+func Test__RecordClaudeUsage__UsesNestedCacheCreationWhenTopLevelMissing(t *testing.T) {
+	recorder := &recordingUsage{}
+	ctx := core.ExecutionContext{Usage: recorder}
+
+	usage := MessageUsage{
+		InputTokens:          10,
+		OutputTokens:         2,
+		CacheReadInputTokens: 5,
+	}
+	usage.CacheCreation.Ephemeral5mInputTokens = 3
+	usage.CacheCreation.Ephemeral1hInputTokens = 4
+	recordClaudeUsage(ctx, &CreateMessageResponse{Model: "claude-sonnet-4-6", Usage: usage})
+
+	if len(recorder.records) != 1 {
+		t.Fatalf("expected 1 usage record, got %d", len(recorder.records))
+	}
+	if recorder.records[0].CacheWriteTokens != 7 {
+		t.Errorf("expected nested cache write 7, got %d", recorder.records[0].CacheWriteTokens)
+	}
+}

@@ -2,7 +2,7 @@ import { Heading } from "@/components/Heading/heading";
 import type { ComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { Star } from "lucide-react";
 import type { ReactNode } from "react";
 import { appPath } from "@/lib/appPaths";

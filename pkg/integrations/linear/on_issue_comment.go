@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"slices"
 
 	"github.com/mitchellh/mapstructure"
@@ -15,8 +16,9 @@ import (
 type OnIssueComment struct{}
 
 type OnIssueCommentConfiguration struct {
-	Team    string   `json:"team" mapstructure:"team"`
-	Actions []string `json:"actions" mapstructure:"actions"`
+	Team          string   `json:"team" mapstructure:"team"`
+	Actions       []string `json:"actions" mapstructure:"actions"`
+	ContentFilter string   `json:"contentFilter" mapstructure:"contentFilter"`
 }
 
 func (i *OnIssueComment) Name() string {
@@ -37,7 +39,7 @@ updated or deleted on an issue in a Linear team.
 
 ## Use Cases
 
-- **Run a command** when someone comments a keyword on an issue
+- **Run a command** when someone comments a keyword like ` + "`/deploy`" + ` on an issue
 - **Sync discussion** to another tool when a comment is added
 - **Notify a channel** when an issue gets new activity
 
@@ -45,6 +47,8 @@ updated or deleted on an issue in a Linear team.
 
 - **Team** (required): Linear team to monitor
 - **Actions** (required): Which comment actions to listen for (created, updated, deleted). Default: created.
+- **Content Filter** (optional): Regex pattern to filter comments by content, e.g. ` + "`/deploy`" + ` to
+  only trigger on comments containing "/deploy". A comment delivered without a body never matches.
 
 ## Outputs
 
@@ -97,6 +101,14 @@ func (i *OnIssueComment) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "contentFilter",
+			Label:       "Content Filter",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Placeholder: "e.g., /deploy",
+			Description: "Optional regex pattern to filter comments by content",
+		},
 	}
 }
 
@@ -116,6 +128,12 @@ func (i *OnIssueComment) Setup(ctx core.TriggerContext) error {
 	//
 	if len(config.Actions) == 0 {
 		return fmt.Errorf("at least one action is required")
+	}
+
+	if config.ContentFilter != "" {
+		if _, err := regexp.Compile(config.ContentFilter); err != nil {
+			return fmt.Errorf("invalid content filter pattern: %w", err)
+		}
 	}
 
 	team, err := requireTeam(ctx.Integration, config.Team)
@@ -174,6 +192,16 @@ func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 		return http.StatusOK, nil, nil
 	}
 
+	matched, err := i.matchesContentFilter(config.ContentFilter, data)
+	if err != nil {
+		return http.StatusBadRequest, nil, err
+	}
+
+	if !matched {
+		ctx.Logger.Info("Comment does not match the content filter - ignoring")
+		return http.StatusOK, nil, nil
+	}
+
 	if err := ctx.Events.Emit(CommentPayloadType, data); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
@@ -197,4 +225,29 @@ func (i *OnIssueComment) whitelistedAction(logger *log.Entry, data map[string]an
 	}
 
 	return true
+}
+
+// matchesContentFilter checks the comment body against the regex filter. An empty
+// filter always matches, and a comment delivered without a body never does.
+func (i *OnIssueComment) matchesContentFilter(filter string, data map[string]any) (bool, error) {
+	if filter == "" {
+		return true, nil
+	}
+
+	comment, ok := data["data"].(map[string]any)
+	if !ok {
+		return false, nil
+	}
+
+	body, ok := comment["body"].(string)
+	if !ok {
+		return false, nil
+	}
+
+	matched, err := regexp.MatchString(filter, body)
+	if err != nil {
+		return false, fmt.Errorf("invalid content filter pattern: %w", err)
+	}
+
+	return matched, nil
 }

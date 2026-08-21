@@ -1,5 +1,32 @@
-export { CreateWorkOrderPage } from "./CreateWorkOrderPage";
-export { FactoryDetailPage } from "./FactoryDetailPage";
-export { FactoryLineEditPage } from "./FactoryLineEditPage";
-export { FactoryListPage } from "./FactoryListPage";
-export { WorkOrderDetailPage } from "./WorkOrderDetailPage";
+export { FactoriesIndexPage } from "./FactoriesIndexPage";
+export { FactoriesLayout } from "./layout/FactoriesLayout";
+export {
+  AutomationsPage,
+  CreateWorkOrderComposeRedirect,
+  FactoryAppCanvasPage,
+  FactoryLineEditPage,
+  FactorySettingsGeneralPage,
+  FactorySettingsLayout,
+  FactorySettingsNotificationsPage,
+  FactorySettingsProfilePage,
+  FactorySettingsSoonPage,
+  FactorySettingsUsagePage,
+  FACTORY_SETTINGS_NAV_ITEMS,
+  isFactorySettingsComingSoon,
+  LegacyWorkOrderDetailRedirect,
+  LinesPage,
+  MissionsPage,
+  NewWorkspacePage,
+  OnboardingGate,
+  OnboardingPage,
+  OrganizationSettingsLayout,
+  OrganizationSettingsOverviewPage,
+  OrganizationSettingsWorkspacesPage,
+  organizationSettingsSectionRoutes,
+  OverviewPage,
+  VelocityPage,
+  WikiPage,
+  WorkOrderDetailPage,
+  WorkOrdersPage,
+  WorkspaceOverviewPage,
+} from "./pages";

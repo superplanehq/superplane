@@ -140,6 +140,33 @@ describe("onIssueCommentTriggerRenderer.getTriggerProps", () => {
     expect(props.metadata?.[0]).toEqual({ icon: "users", label: "t1" });
   });
 
+  it("renders the content filter after the selected actions", () => {
+    const props = onIssueCommentTriggerRenderer.getTriggerProps(
+      buildTriggerContext({
+        node: {
+          configuration: { team: "t1", actions: ["create"], contentFilter: "^/deploy" },
+          metadata: { team: { id: "t1", key: "ENG", name: "Engineering" } },
+        },
+      }),
+    );
+
+    expect(props.metadata?.[1]).toEqual({ icon: "funnel", label: "Created" });
+    expect(props.metadata?.[2]).toEqual({ icon: "funnel", label: "Filter: ^/deploy" });
+  });
+
+  it("omits the content filter when it is not configured", () => {
+    const props = onIssueCommentTriggerRenderer.getTriggerProps(
+      buildTriggerContext({
+        node: {
+          configuration: { team: "t1", actions: ["create"] },
+          metadata: { team: { id: "t1", key: "ENG", name: "Engineering" } },
+        },
+      }),
+    );
+
+    expect(props.metadata).toHaveLength(2);
+  });
+
   it("surfaces the last event when one exists", () => {
     const props = onIssueCommentTriggerRenderer.getTriggerProps(
       buildTriggerContext({

@@ -20,6 +20,13 @@ const (
 	// CommentPayloadType is the payload type emitted by the addIssueComment action.
 	CommentPayloadType = "linear.comment"
 
+	// AttachmentPayloadType is the payload type emitted for every Linear attachment,
+	// both by the createAttachment action and the onIssueAttachment trigger.
+	AttachmentPayloadType = "linear.attachment"
+
+	// ReactionPayloadType is the payload type emitted by the addReaction action.
+	ReactionPayloadType = "linear.reaction"
+
 	// SignatureHeader carries a hex-encoded HMAC-SHA256 of the raw request body.
 	SignatureHeader = "Linear-Signature"
 
@@ -31,6 +38,9 @@ const (
 
 	// CommentResourceType is the Linear webhook resource type for comment events.
 	CommentResourceType = "Comment"
+
+	// AttachmentResourceType is the Linear webhook resource type for attachment events.
+	AttachmentResourceType = "Attachment"
 )
 
 // NodeMetadata is stored on Linear nodes at setup time, so canvas cards can

@@ -8,9 +8,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
+	"gopkg.in/yaml.v3"
 )
 
-const workspaceResourceType = "prometheus.workspace"
+const (
+	workspaceResourceType            = "prometheus.workspace"
+	ruleGroupsNamespaceResourceType  = "prometheus.ruleGroupsNamespace"
+	ruleGroupsNamespaceNameMaxLength = 128
+)
 
 type workspaceConfiguration struct {
 	Region      string `json:"region" mapstructure:"region"`
@@ -105,13 +110,13 @@ func clientTokenField() configuration.Field {
 	}
 }
 
-func tagsField() configuration.Field {
+func tagsField(description string) configuration.Field {
 	return configuration.Field{
 		Name:        "tags",
 		Label:       "Tags",
 		Type:        configuration.FieldTypeList,
 		Required:    false,
-		Description: "Tags to associate with the workspace",
+		Description: description,
 		TypeOptions: &configuration.TypeOptions{
 			List: &configuration.ListTypeOptions{
 				ItemLabel: "Tag",
@@ -137,6 +142,88 @@ func tagsField() configuration.Field {
 	}
 }
 
+func ruleGroupsNamespaceNameField(description string) configuration.Field {
+	return configuration.Field{
+		Name:        "name",
+		Label:       "Name",
+		Type:        configuration.FieldTypeString,
+		Required:    true,
+		Description: description,
+		VisibilityConditions: []configuration.VisibilityCondition{
+			{
+				Field:  "region",
+				Values: []string{"*"},
+			},
+		},
+		TypeOptions: &configuration.TypeOptions{
+			String: &configuration.StringTypeOptions{
+				MaxLength: func() *int { max := ruleGroupsNamespaceNameMaxLength; return &max }(),
+			},
+		},
+	}
+}
+
+func ruleGroupsNamespaceField(label string, description string) configuration.Field {
+	return configuration.Field{
+		Name:        "namespace",
+		Label:       label,
+		Type:        configuration.FieldTypeIntegrationResource,
+		Required:    true,
+		Description: description,
+		VisibilityConditions: []configuration.VisibilityCondition{
+			{Field: "region", Values: []string{"*"}},
+			{Field: "workspace", Values: []string{"*"}},
+		},
+		TypeOptions: &configuration.TypeOptions{
+			Resource: &configuration.ResourceTypeOptions{
+				Type: ruleGroupsNamespaceResourceType,
+				Parameters: []configuration.ParameterRef{
+					{
+						Name: "region",
+						ValueFrom: &configuration.ParameterValueFrom{
+							Field: "region",
+						},
+					},
+					{
+						Name: "workspace",
+						ValueFrom: &configuration.ParameterValueFrom{
+							Field: "workspace",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func ruleGroupsNamespaceDataField(description string) configuration.Field {
+	return configuration.Field{
+		Name:        "data",
+		Label:       "Rules Document (YAML)",
+		Type:        configuration.FieldTypeText,
+		Required:    true,
+		Description: description,
+		Placeholder: ruleGroupsNamespaceDataPlaceholder,
+		TypeOptions: &configuration.TypeOptions{
+			Text: &configuration.TextTypeOptions{
+				Language: "yaml",
+			},
+		},
+	}
+}
+
+const ruleGroupsNamespaceDataPlaceholder = `groups:
+  - name: example-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status="500"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: High error rate detected
+`
+
 func decodeWorkspaceConfiguration(rawConfiguration any) (workspaceConfiguration, error) {
 	config := workspaceConfiguration{}
 	if err := mapstructure.Decode(rawConfiguration, &config); err != nil {
@@ -155,6 +242,52 @@ func decodeWorkspaceConfiguration(rawConfiguration any) (workspaceConfiguration,
 	}
 
 	return config, nil
+}
+
+type ruleGroupsNamespaceConfiguration struct {
+	Region      string `json:"region" mapstructure:"region"`
+	WorkspaceID string `json:"workspace" mapstructure:"workspace"`
+	Name        string `json:"namespace" mapstructure:"namespace"`
+	ClientToken string `json:"clientToken" mapstructure:"clientToken"`
+}
+
+func decodeRuleGroupsNamespaceConfiguration(rawConfiguration any) (ruleGroupsNamespaceConfiguration, error) {
+	config := ruleGroupsNamespaceConfiguration{}
+	if err := mapstructure.Decode(rawConfiguration, &config); err != nil {
+		return ruleGroupsNamespaceConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	config.Region = strings.TrimSpace(config.Region)
+	config.WorkspaceID = strings.TrimSpace(config.WorkspaceID)
+	config.Name = strings.TrimSpace(config.Name)
+	config.ClientToken = strings.TrimSpace(config.ClientToken)
+
+	if config.Region == "" {
+		return ruleGroupsNamespaceConfiguration{}, fmt.Errorf("region is required")
+	}
+	if config.WorkspaceID == "" {
+		return ruleGroupsNamespaceConfiguration{}, fmt.Errorf("workspace is required")
+	}
+	if config.Name == "" {
+		return ruleGroupsNamespaceConfiguration{}, fmt.Errorf("namespace is required")
+	}
+
+	return config, nil
+}
+
+// Only validates YAML syntax; AWS validates the rule group schema itself.
+func validateRuleGroupsNamespaceData(data string) (string, error) {
+	trimmed := strings.TrimSpace(data)
+	if trimmed == "" {
+		return "", fmt.Errorf("data is required")
+	}
+
+	var document any
+	if err := yaml.Unmarshal([]byte(trimmed), &document); err != nil {
+		return "", fmt.Errorf("data is not valid YAML: %w", err)
+	}
+
+	return trimmed, nil
 }
 
 func workspaceClient(ctx core.ExecutionContext, region string) (*Client, error) {

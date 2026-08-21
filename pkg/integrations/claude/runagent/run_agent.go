@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -271,10 +270,6 @@ func (a *RunAgent) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (a *RunAgent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
-
 func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 	spec, err := decodeSpec(ctx.Configuration)
 	if err != nil {
@@ -387,9 +382,18 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 
 	if refreshed != nil && isSessionTerminal(refreshed.Status) {
 		sm, err := client.GetSessionMessagesWithRetry(session.ID, finalMessageReads, finalMessageDelay)
-		if err != nil {
+		switch {
+		case err != nil:
 			ctx.Logger.Warnf("Failed to fetch messages for managed session %s: %v. Scheduling poll.", session.ID, err)
-		} else if sm != nil && sm.Complete {
+		case sm != nil && sm.Complete && sm.Err != nil:
+			ctx.Logger.Errorf("Managed session %s failed: %s", session.ID, sm.Err.Message)
+			mergeSessionIntoMetadata(&metadata, refreshed)
+			_ = ctx.Metadata.Set(metadata)
+			reclaimSession(client, session.ID, spec.PersistSession, ctx.Logger)
+			cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
+			cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
+			return fmt.Errorf("managed agent session failed: %s", sm.Err.Message)
+		case sm != nil && sm.Complete:
 			out := buildOutputFromSessionMessages(refreshed.Status, session.ID, sm)
 			applyStructuredOutput(&out, refreshed.Status, schema)
 			out.Artifacts = CollectSessionArtifacts(client, session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
@@ -397,14 +401,13 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 				cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 				return emitErr
 			}
-			// Persist terminal status only after successful emit
 			mergeSessionIntoMetadata(&metadata, refreshed)
 			_ = ctx.Metadata.Set(metadata)
 			reclaimSession(client, session.ID, spec.PersistSession, ctx.Logger)
 			cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
 			cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 			return nil
-		} else {
+		default:
 			ctx.Logger.Warnf("Events not complete for session %s after retries. Scheduling poll.", session.ID)
 		}
 	}

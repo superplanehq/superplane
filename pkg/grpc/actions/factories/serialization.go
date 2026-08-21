@@ -1,9 +1,12 @@
 package factories
 
 import (
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
 func serializeFactory(factory *models.Factory) *pb.Factory {
@@ -11,25 +14,95 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 		Id:          factory.ID.String(),
 		Name:        factory.Name,
 		Description: factory.Description,
+		Key:         factory.Key,
+		Onboarding:  serializeFactoryOnboarding(factory),
 	}
 }
 
 func serializeFactoryWithLines(
 	factory *models.Factory,
 	lines []models.FactoryLine,
+	metricsByLine map[uuid.UUID]*pb.FactoryLineMetrics,
 ) *pb.Factory {
 	return &pb.Factory{
 		Id:          factory.ID.String(),
 		Name:        factory.Name,
 		Description: factory.Description,
-		Lines:       serializeFactoryLines(lines),
+		Key:         factory.Key,
+		Lines:       serializeFactoryLines(lines, metricsByLine),
+		Onboarding:  serializeFactoryOnboarding(factory),
 	}
 }
 
-func serializeFactoryLines(lines []models.FactoryLine) []*pb.FactoryLine {
+func serializeFactoryWithLineMetrics(
+	tx *gorm.DB,
+	factory *models.Factory,
+	lines []models.FactoryLine,
+) (*pb.Factory, error) {
+	if len(lines) == 0 {
+		return serializeFactoryWithLines(factory, lines, nil), nil
+	}
+	metricsByLine, err := loadFactoryLineMetrics(tx, factory.ID)
+	if err != nil {
+		return nil, err
+	}
+	return serializeFactoryWithLines(factory, lines, metricsByLine), nil
+}
+
+func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
+	config := factory.OnboardingConfigValue()
+	onboarding := &pb.FactoryOnboarding{
+		VcsIntegrationId:   config.VCSIntegrationID,
+		AgentIntegrationId: config.AgentIntegrationID,
+		AppRepository:      config.AppRepository,
+		BacklogRepository:  config.BacklogRepository,
+		IssuesSource:       serializeFactoryOnboardingIssuesSource(config.IssuesSource),
+		AgentHarness:       serializeFactoryOnboardingAgentHarness(config.AgentHarness),
+		ProvisionedAppId:   config.ProvisionedAppID,
+		ProvisionedLineId:  config.ProvisionedLineID,
+	}
+	if factory.OnboardingCompletedAt != nil {
+		onboarding.CompletedAt = timestamppb.New(*factory.OnboardingCompletedAt)
+	}
+	return onboarding
+}
+
+func serializeFactoryOnboardingIssuesSource(source string) pb.FactoryOnboarding_IssuesSource {
+	switch source {
+	case models.FactoryOnboardingIssuesSourceVCS:
+		return pb.FactoryOnboarding_ISSUES_SOURCE_VCS
+	case models.FactoryOnboardingIssuesSourceLinear:
+		return pb.FactoryOnboarding_ISSUES_SOURCE_LINEAR
+	case models.FactoryOnboardingIssuesSourceJira:
+		return pb.FactoryOnboarding_ISSUES_SOURCE_JIRA
+	case models.FactoryOnboardingIssuesSourceSkip:
+		return pb.FactoryOnboarding_ISSUES_SOURCE_SKIP
+	default:
+		return pb.FactoryOnboarding_ISSUES_SOURCE_UNSPECIFIED
+	}
+}
+
+func serializeFactoryOnboardingAgentHarness(harness string) pb.FactoryOnboarding_AgentHarness {
+	switch harness {
+	case models.FactoryOnboardingAgentHarnessClaudeCode:
+		return pb.FactoryOnboarding_AGENT_HARNESS_CLAUDE_CODE
+	case models.FactoryOnboardingAgentHarnessCursor:
+		return pb.FactoryOnboarding_AGENT_HARNESS_CURSOR
+	case models.FactoryOnboardingAgentHarnessCodex:
+		return pb.FactoryOnboarding_AGENT_HARNESS_CODEX
+	default:
+		return pb.FactoryOnboarding_AGENT_HARNESS_UNSPECIFIED
+	}
+}
+
+func serializeFactoryLines(lines []models.FactoryLine, metricsByLine map[uuid.UUID]*pb.FactoryLineMetrics) []*pb.FactoryLine {
 	result := make([]*pb.FactoryLine, len(lines))
 	for i := range lines {
-		result[i] = serializeFactoryLine(&lines[i])
+		serialized := serializeFactoryLine(&lines[i])
+		if metricsByLine != nil {
+			serialized.Metrics = metricsByLine[lines[i].ID]
+		}
+		result[i] = serialized
 	}
 	return result
 }
@@ -57,12 +130,15 @@ func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 	steps := make([]*pb.FactoryLine_Step, len(line.Steps))
 	for i, step := range line.Steps {
 		steps[i] = &pb.FactoryLine_Step{
-			Name: step.Name,
 			Type: step.Type,
 			App: &pb.FactoryLine_AppStep{
 				App:        step.AppID.String(),
 				Entrypoint: step.Entrypoint,
 			},
+		}
+		if step.MaxParallelism != nil {
+			value := int32(*step.MaxParallelism)
+			steps[i].MaxParallelism = &value
 		}
 	}
 
@@ -83,22 +159,111 @@ func serializeFactories(factories []models.Factory) []*pb.Factory {
 	return result
 }
 
-func serializeWorkOrder(order *models.FactoryWorkOrder, executions []models.FactoryWorkOrderExecutionRecord) *pb.WorkOrder {
+func serializeWorkOrder(
+	f *models.Factory,
+	order *models.FactoryWorkOrder,
+	dispatches []models.FactoryWorkOrderLineDispatchRecord,
+	createdByAutomation *factory.AutomationRef,
+) (*pb.WorkOrder, error) {
+	serializedDispatches := serializeWorkOrderLineDispatches(dispatches)
+
+	var totalTokens, totalCostCents int64
+	for _, d := range dispatches {
+		for _, e := range d.Executions {
+			totalTokens += e.TotalTokens
+			totalCostCents += e.CostCents
+		}
+	}
+
+	displayKey := ""
+	if f != nil {
+		displayKey = f.WorkOrderKey(order.Number)
+	}
+
+	statusNotes, err := serializeWorkOrderStatusNotes(order)
+	if err != nil {
+		return nil, err
+	}
+
 	return &pb.WorkOrder{
-		Id:          order.ID.String(),
-		Title:       order.Title,
-		Description: order.Description,
-		State:       serializeWorkOrderState(order.State),
-		Result:      serializeWorkOrderResult(order.Result),
-		CreatedAt:   timestamppb.New(order.CreatedAt),
-		UpdatedAt:   timestamppb.New(order.UpdatedAt),
-		Assignees:   serializeWorkOrderAssignees(order.Assignees),
-		Executions:  serializeWorkOrderExecutions(executions),
-		CreatedBy:   serializeWorkOrderCreator(order),
+		Id:             order.ID.String(),
+		Title:          order.Title,
+		Description:    order.Description,
+		Number:         order.Number,
+		Key:            displayKey,
+		State:          serializeWorkOrderState(order.State),
+		Result:         serializeWorkOrderResult(order.Result),
+		CreatedAt:      timestamppb.New(order.CreatedAt),
+		UpdatedAt:      timestamppb.New(order.UpdatedAt),
+		Assignees:      serializeWorkOrderAssignees(order.Assignees),
+		LineDispatches: serializedDispatches,
+		CreatedBy:      serializeWorkOrderCreator(order, createdByAutomation),
+		TotalTokens:    totalTokens,
+		TotalCostCents: totalCostCents,
+		StatusNotes:    statusNotes,
+	}, nil
+}
+
+func serializeWorkOrderStatusNotes(order *models.FactoryWorkOrder) ([]*pb.WorkOrderStatusNote, error) {
+	notes, err := order.StatusNotes()
+	if err != nil {
+		return nil, err
+	}
+	if len(notes) == 0 {
+		return nil, nil
+	}
+
+	serialized := make([]*pb.WorkOrderStatusNote, 0, len(notes))
+	for i := range notes {
+		serialized = append(serialized, serializeWorkOrderStatusNote(&notes[i]))
+	}
+	return serialized, nil
+}
+
+func serializeWorkOrderStatusNote(note *models.FactoryWorkOrderStatusNote) *pb.WorkOrderStatusNote {
+	serialized := &pb.WorkOrderStatusNote{
+		Key:                 note.Key,
+		Kind:                note.Kind,
+		Headline:            note.Headline,
+		Body:                note.Body,
+		CtaLabel:            note.CtaLabel,
+		CtaUrl:              note.CtaURL,
+		Automation:          serializeAutomationRef(note.Automation),
+		UpdatedAt:           timestamppb.New(note.UpdatedAt),
+		ShowOnlyWhenWaiting: note.ShowOnlyWhenWaiting,
+	}
+	if note.Run != nil {
+		serialized.RunId = note.Run.ID.String()
+	}
+
+	return serialized
+}
+
+func serializeAutomationRef(ref *factory.AutomationRef) *pb.AutomationRef {
+	if ref == nil {
+		return nil
+	}
+	return &pb.AutomationRef{
+		NodeId:   ref.NodeID,
+		NodeName: ref.NodeName,
+		AppId:    ref.AppID.String(),
+		AppName:  ref.AppName,
 	}
 }
 
-func serializeWorkOrderCreator(order *models.FactoryWorkOrder) *pb.UserRef {
+// The automation branch takes precedence: when a canvas automation opened the
+// work order, its identity is the source of truth for authorship even if the
+// underlying run was launched under a member's session.
+func serializeWorkOrderCreator(
+	order *models.FactoryWorkOrder,
+	createdByAutomation *factory.AutomationRef,
+) *pb.WorkOrderCreator {
+	if createdByAutomation != nil {
+		return &pb.WorkOrderCreator{
+			Kind: &pb.WorkOrderCreator_Automation{Automation: serializeAutomationRef(createdByAutomation)},
+		}
+	}
+
 	if order.CreatedByID == nil {
 		return nil
 	}
@@ -108,9 +273,84 @@ func serializeWorkOrderCreator(order *models.FactoryWorkOrder) *pb.UserRef {
 		name = order.CreatedBy.Name
 	}
 
-	return &pb.UserRef{
-		Id:   order.CreatedByID.String(),
-		Name: name,
+	return &pb.WorkOrderCreator{
+		Kind: &pb.WorkOrderCreator_User{
+			User: &pb.UserRef{
+				Id:   order.CreatedByID.String(),
+				Name: name,
+			},
+		},
+	}
+}
+
+func serializeWorkOrderLineDispatches(dispatches []models.FactoryWorkOrderLineDispatchRecord) []*pb.WorkOrderLineDispatch {
+	result := make([]*pb.WorkOrderLineDispatch, 0, len(dispatches))
+	for _, dispatch := range dispatches {
+		result = append(result, serializeWorkOrderLineDispatch(dispatch))
+	}
+	return result
+}
+
+func serializeWorkOrderLineDispatch(dispatch models.FactoryWorkOrderLineDispatchRecord) *pb.WorkOrderLineDispatch {
+	item := &pb.WorkOrderLineDispatch{
+		Id: dispatch.ID.String(),
+		Line: &pb.LineRef{
+			Id:   dispatch.LineID.String(),
+			Name: dispatch.LineName,
+		},
+		Steps:          serializeExecutionSteps(dispatch.Steps, dispatch.Executions),
+		State:          serializeLineDispatchState(dispatch.State),
+		Result:         serializeLineDispatchResult(dispatch.Result),
+		CreatedAt:      timestamppb.New(dispatch.CreatedAt),
+		StepExecutions: serializeWorkOrderExecutions(dispatch.Executions),
+	}
+	if dispatch.FinishedAt != nil {
+		item.FinishedAt = timestamppb.New(*dispatch.FinishedAt)
+	}
+	if dispatch.QueueItem != nil {
+		item.QueueItem = serializeWorkOrderQueueItem(dispatch.QueueItem, dispatch.Steps)
+	}
+	return item
+}
+
+func serializeWorkOrderQueueItem(
+	item *models.FactoryWorkOrderQueueItemRecord,
+	steps []models.FactoryLineStep,
+) *pb.WorkOrderQueueItem {
+	result := &pb.WorkOrderQueueItem{
+		Id:        item.ID.String(),
+		StepName:  item.StepName,
+		StepIndex: int32(item.StepIndex),
+		Position:  int32(item.Position),
+		CreatedAt: timestamppb.New(item.CreatedAt),
+	}
+	if item.StepIndex >= 0 && item.StepIndex < len(steps) {
+		result.AppId = steps[item.StepIndex].AppID.String()
+	}
+	return result
+}
+
+func serializeLineDispatchState(state string) pb.WorkOrderLineDispatch_State {
+	switch state {
+	case models.FactoryWorkOrderLineDispatchStateActive:
+		return pb.WorkOrderLineDispatch_STATE_ACTIVE
+	case models.FactoryWorkOrderLineDispatchStateFinished:
+		return pb.WorkOrderLineDispatch_STATE_FINISHED
+	default:
+		return pb.WorkOrderLineDispatch_STATE_UNKNOWN
+	}
+}
+
+func serializeLineDispatchResult(result string) pb.WorkOrderLineDispatch_Result {
+	switch result {
+	case models.CanvasRunResultPassed:
+		return pb.WorkOrderLineDispatch_RESULT_PASSED
+	case models.CanvasRunResultFailed:
+		return pb.WorkOrderLineDispatch_RESULT_FAILED
+	case models.CanvasRunResultCancelled:
+		return pb.WorkOrderLineDispatch_RESULT_CANCELLED
+	default:
+		return pb.WorkOrderLineDispatch_RESULT_UNKNOWN
 	}
 }
 
@@ -124,23 +364,59 @@ func serializeWorkOrderExecutions(executions []models.FactoryWorkOrderExecutionR
 
 func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecord) *pb.WorkOrderExecution {
 	item := &pb.WorkOrderExecution{
-		Id:        execution.ID.String(),
-		Step:      execution.StepName,
-		State:     serializeWorkOrderExecutionState(execution.Status, execution.RunState),
-		Result:    serializeWorkOrderExecutionResult(execution.Result, execution.RunResult),
-		CreatedAt: timestamppb.New(execution.CreatedAt),
-		UpdatedAt: timestamppb.New(execution.UpdatedAt),
-		Line: &pb.WorkOrderExecution_LineRef{
-			Id:   execution.LineID.String(),
-			Name: execution.LineName,
-		},
-		Run: &pb.WorkOrderExecution_RunRef{
+		Id:          execution.ID.String(),
+		Step:        execution.StepName,
+		StepIndex:   int32(execution.StepIndex),
+		State:       serializeWorkOrderExecutionState(execution.Status, execution.RunState),
+		Result:      serializeWorkOrderExecutionResult(execution.Result, execution.RunResult),
+		CreatedAt:   timestamppb.New(execution.CreatedAt),
+		UpdatedAt:   timestamppb.New(execution.UpdatedAt),
+		TotalTokens: execution.TotalTokens,
+		CostCents:   execution.CostCents,
+	}
+	if execution.RunID != nil {
+		runRef := &pb.WorkOrderExecution_RunRef{
 			Id:      execution.RunID.String(),
-			AppId:   execution.CanvasID.String(),
 			AppName: execution.CanvasName,
-		},
+		}
+		if execution.CanvasID != nil {
+			runRef.AppId = execution.CanvasID.String()
+		}
+		item.Run = runRef
+	}
+	if execution.FinishedAt != nil {
+		item.FinishedAt = timestamppb.New(*execution.FinishedAt)
 	}
 	return item
+}
+
+func serializeExecutionSteps(
+	steps []models.FactoryLineStep,
+	executions []models.FactoryWorkOrderExecutionRecord,
+) []*pb.WorkOrderExecutionStep {
+	if len(steps) == 0 {
+		return nil
+	}
+
+	nameByIndex := make(map[int]string, len(executions))
+	for _, execution := range executions {
+		name := execution.CanvasName
+		if name == "" {
+			name = execution.StepName
+		}
+		if name != "" {
+			nameByIndex[execution.StepIndex] = name
+		}
+	}
+
+	result := make([]*pb.WorkOrderExecutionStep, len(steps))
+	for i := range steps {
+		result[i] = &pb.WorkOrderExecutionStep{
+			Name:      nameByIndex[i],
+			StepIndex: int32(i),
+		}
+	}
+	return result
 }
 
 func serializeWorkOrderExecutionState(status, runState string) pb.WorkOrderExecution_State {
@@ -180,6 +456,8 @@ func serializeWorkOrderExecutionResult(executionResult, runResult string) pb.Wor
 
 func serializeWorkOrderState(state string) pb.WorkOrder_State {
 	switch state {
+	case models.FactoryWorkOrderStateDraft:
+		return pb.WorkOrder_STATE_DRAFT
 	case models.FactoryWorkOrderStateOpen:
 		return pb.WorkOrder_STATE_OPEN
 	case models.FactoryWorkOrderStateClosed:
@@ -195,6 +473,8 @@ func serializeWorkOrderResult(result string) pb.WorkOrder_Result {
 		return pb.WorkOrder_RESULT_COMPLETED
 	case models.FactoryWorkOrderResultRejected:
 		return pb.WorkOrder_RESULT_REJECTED
+	case models.FactoryWorkOrderResultFailed:
+		return pb.WorkOrder_RESULT_FAILED
 	default:
 		return pb.WorkOrder_RESULT_UNSPECIFIED
 	}

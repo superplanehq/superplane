@@ -5,11 +5,14 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
 )
@@ -35,17 +38,27 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		return nil, factoryErrorToStatus(invalidArgument("line_name is required"), "failed to dispatch work order")
 	}
 
-	tx := database.DB(ctx)
+	var actor *uuid.UUID
+	if userIDStr, ok := authentication.GetUserIdFromMetadata(ctx); ok {
+		parsed, err := uuid.Parse(userIDStr)
+		if err == nil {
+			actor = &parsed
+		}
+	}
+
+	var factory *models.Factory
 	var order *models.FactoryWorkOrder
 	var pendingRun *models.CanvasRun
-
 	var logger *log.Entry
+	var fromState string
 
-	err = tx.Transaction(func(tx *gorm.DB) error {
-		factory, err := models.FindFactory(tx, orgID, factoryID)
+	db := database.DB(ctx)
+	err = db.Transaction(func(tx *gorm.DB) error {
+		f, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
 			return err
 		}
+		factory = f
 
 		order, err = factory.FindWorkOrder(tx, orderID)
 		if err != nil {
@@ -53,8 +66,8 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		}
 
 		logger = logging.WithWorkOrder(logging.ForFactory(*factory), *order)
-		if order.State != models.FactoryWorkOrderStateOpen {
-			return models.ErrFactoryWorkOrderNotOpen
+		if !order.IsDispatchable() {
+			return models.ErrFactoryWorkOrderNotDispatchable
 		}
 
 		line, err := factory.FindLineByName(tx, lineName)
@@ -66,16 +79,22 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return models.ErrFactoryLineHasNoSteps
 		}
 
-		_, err = order.FindActiveExecution(tx)
+		_, err = order.FindActiveLineDispatch(tx)
 		if err == nil {
-			return models.ErrFactoryWorkOrderExecutionActive
+			return models.ErrFactoryWorkOrderLineDispatchActive
 		}
 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
 
-		result, err := line.StartStep(tx, order, 0)
+		// Promote draft → open before the first step; no-op if already open.
+		fromState = order.State
+		if err := order.TransitionOnDispatch(tx, actor); err != nil {
+			return err
+		}
+
+		_, result, err := line.Dispatch(tx, order)
 		if err != nil {
 			return err
 		}
@@ -94,7 +113,32 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		}
 	}
 
-	serialized, err := loadAndSerializeWorkOrder(ctx, order)
+	if err := messages.PublishFactoryWorkOrderUpdated(
+		factoryID.String(),
+		order.ID.String(),
+		factoryevents.EventTypeLineStepExecutionCreated,
+	); err != nil {
+		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
+	}
+
+	if fromState != order.State {
+		notification := messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID: orgID.String(),
+			FactoryID:      factoryID.String(),
+			OrderID:        order.ID.String(),
+			EventType:      factoryevents.EventTypeOrderStatusUpdated,
+			FromState:      fromState,
+			ToState:        order.State,
+		}
+		if actor != nil {
+			notification.ActorUserID = actor.String()
+		}
+		if err := notification.Publish(); err != nil {
+			logger.WithError(err).Warnf("Failed to publish work order notification for order %s", order.ID)
+		}
+	}
+
+	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}

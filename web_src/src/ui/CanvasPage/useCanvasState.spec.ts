@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Edge, Node } from "@xyflow/react";
+import { FACTORY_COMPACT_LAYER_STRIDE, FACTORY_EDIT_VERTICAL_EXTRA_PER_LAYER } from "@/lib/factoryEditVerticalSpacing";
 import type { CanvasPageProps } from ".";
 import { useCanvasState } from "./useCanvasState";
 
@@ -26,6 +27,10 @@ function makeProps(nodes: Node[], edges: Edge[] = []): CanvasPageProps {
 }
 
 describe("useCanvasState", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("preserves position of actively dragged nodes when props update", () => {
     const initial = [makeNode("a", 0, 0), makeNode("b", 100, 100)];
     const { result, rerender } = renderHook(({ props }) => useCanvasState(props), {
@@ -91,6 +96,61 @@ describe("useCanvasState", () => {
     });
 
     expect(result.current.edges).toBe(edgesBeforeDrag);
+  });
+
+  it("stretches stacked factory ranks in factory-auto edit layout only", () => {
+    const compactStride = FACTORY_COMPACT_LAYER_STRIDE;
+    const stacked = [makeNode("top", 0, 0), makeNode("bottom", 0, compactStride)];
+
+    const { result, rerender } = renderHook(({ props }: { props: CanvasPageProps }) => useCanvasState(props), {
+      initialProps: { props: { ...makeProps(stacked), layoutMode: "factory-auto" } },
+    });
+
+    expect(result.current.nodes.find((node) => node.id === "top")?.position.y).toBe(0);
+    expect(result.current.nodes.find((node) => node.id === "bottom")?.position.y).toBe(
+      compactStride + FACTORY_EDIT_VERTICAL_EXTRA_PER_LAYER,
+    );
+
+    rerender({ props: { ...makeProps(stacked), layoutMode: "manual" } });
+    expect(result.current.nodes.find((node) => node.id === "bottom")?.position.y).toBe(compactStride);
+  });
+
+  it("does not restart an active factory layout animation when the same layout refreshes", () => {
+    const animationFrames = new Map<number, FrameRequestCallback>();
+    let nextFrameId = 1;
+    const requestAnimationFrame = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      const frameId = nextFrameId++;
+      animationFrames.set(frameId, callback);
+      return frameId;
+    });
+    const cancelAnimationFrame = vi.spyOn(window, "cancelAnimationFrame").mockImplementation((frameId) => {
+      animationFrames.delete(frameId);
+    });
+    const initialProps = {
+      ...makeProps([makeNode("a", 0, 0)]),
+      layoutMode: "factory-auto" as const,
+    };
+    const { rerender } = renderHook(({ props }) => useCanvasState(props), {
+      initialProps: { props: initialProps },
+    });
+
+    rerender({
+      props: {
+        ...makeProps([makeNode("a", 100, 100)]),
+        layoutMode: "factory-auto" as const,
+      },
+    });
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+
+    rerender({
+      props: {
+        ...makeProps([{ ...makeNode("a", 100, 100), data: { status: "saved" } }]),
+        layoutMode: "factory-auto" as const,
+      },
+    });
+
+    expect(cancelAnimationFrame).not.toHaveBeenCalled();
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
   });
 
   it("does not re-push sidebar params when onSidebarChange identity changes", () => {

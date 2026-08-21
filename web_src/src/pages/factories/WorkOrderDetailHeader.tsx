@@ -1,112 +1,143 @@
-import type { FactoriesFactoryLine, FactoriesWorkOrderResult } from "@/api-client";
-import { Badge } from "@/components/ui/badge";
+import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { cn } from "@/lib/utils";
-import { Forward, Loader2 } from "lucide-react";
-import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
-import type { WorkOrderDisplayStatus } from "./workOrderProgress";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { Check, Ellipsis, Link2 } from "lucide-react";
+import { Fragment, useState } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdownMenu";
+import { WorkspacePageHeader } from "./layout/WorkspacePageHeader";
+import {
+  applyWorkOrderStatusAction,
+  buildWorkOrderStatusActions,
+  type WorkOrderStatusActionKind,
+} from "./lib/workOrderStatusActions";
+import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailHeaderProps {
   orderTitle: string;
-  statusMeta: { label: string; className: string };
+  /** Short identifier (e.g. `SP-42`). Rendered as a kicker above the title. */
+  orderIdentifier?: string;
+  /** Back link target (Work Orders list). */
+  backHref: string;
   displayStatus: WorkOrderDisplayStatus;
   isOpen: boolean;
-  factoryLines: FactoriesFactoryLine[];
-  canDispatch: boolean;
+  isDispatchable: boolean;
+  isClosed: boolean;
   canClose: boolean;
-  permissionsLoading: boolean;
-  isDispatching: boolean;
+  canManage: boolean;
   isCompleting: boolean;
   isRejecting: boolean;
   isClosing: boolean;
-  onDispatch: (lineName: string) => Promise<void>;
+  isUpdatingStatus: boolean;
   onClose: (result: FactoriesWorkOrderResult) => void;
+  onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
 }
 
-export function WorkOrderDetailHeader({
-  orderTitle,
-  statusMeta,
-  displayStatus,
-  isOpen,
-  factoryLines,
-  canDispatch,
-  canClose,
-  permissionsLoading,
-  isDispatching,
-  isCompleting,
-  isRejecting,
-  isClosing,
-  onDispatch,
-  onClose,
-}: WorkOrderDetailHeaderProps) {
+export function WorkOrderDetailHeader(props: WorkOrderDetailHeaderProps) {
   return (
-    <header className="border-b border-gray-200 pb-6 dark:border-gray-700/70">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-          <Badge
-            variant="outline"
-            className={cn("inline-flex shrink-0 px-2.5 py-1 text-xs font-medium", statusMeta.className)}
+    <WorkspacePageHeader
+      variant="entity"
+      backHref={props.backHref}
+      backLabel="Work Orders"
+      backTestId="work-order-detail-back"
+      kicker={props.orderIdentifier}
+      title={props.orderTitle}
+      actions={
+        <>
+          <CopyLinkButton />
+          <HeaderOverflowMenu {...props} />
+        </>
+      }
+    />
+  );
+}
+
+function CopyLinkButton() {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      showSuccessToast("Link copied to clipboard.");
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      showErrorToast("Failed to copy link.");
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      onClick={() => void handleCopy()}
+      className="text-muted-foreground hover:bg-accent hover:text-foreground"
+      aria-label="Copy link to work order"
+      data-testid="work-order-copy-link-button"
+    >
+      {copied ? <Check className="size-3.5" aria-hidden /> : <Link2 className="size-3.5" aria-hidden />}
+    </Button>
+  );
+}
+
+const HEADER_ACTION_TEST_ID: Record<WorkOrderStatusActionKind, string> = {
+  complete: "work-order-complete-button",
+  reject: "work-order-reject-button",
+  "reject-draft": "work-order-reject-draft-button",
+  "back-to-draft": "work-order-back-to-draft-button",
+  reopen: "work-order-reopen-open-button",
+};
+
+function HeaderOverflowMenu(props: WorkOrderDetailHeaderProps) {
+  const actions = buildWorkOrderStatusActions(props);
+  if (actions.length === 0) {
+    return null;
+  }
+
+  const disabled = props.isClosing || props.isUpdatingStatus || props.isCompleting || props.isRejecting;
+
+  return (
+    <DropdownMenu>
+      <PermissionTooltip
+        allowed={props.canClose || props.canManage}
+        message="You don't have permission to manage this work order."
+      >
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="text-muted-foreground hover:bg-accent hover:text-foreground"
+            disabled={disabled}
+            aria-label="More actions"
+            data-testid="work-order-actions-button"
           >
-            {displayStatus === "running" ? <Loader2 className="mr-1 inline h-3 w-3 animate-spin" aria-hidden /> : null}
-            {statusMeta.label}
-          </Badge>
-          <h1 className="min-w-0 text-2xl font-semibold tracking-tight text-slate-900 dark:text-gray-100">
-            {orderTitle}
-          </h1>
-        </div>
+            <Ellipsis className="size-3.5" aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+      </PermissionTooltip>
 
-        {isOpen ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
-              <DispatchWorkOrderPopover
-                lines={factoryLines}
-                isSaving={isDispatching}
-                canDispatch={canDispatch || permissionsLoading}
-                onDispatch={onDispatch}
-              >
-                <Button
-                  type="button"
-                  disabled={!canDispatch || factoryLines.length === 0}
-                  data-testid="work-order-dispatch-button"
-                >
-                  Dispatch
-                  <Forward className="ml-1.5 h-4 w-4" aria-hidden />
-                </Button>
-              </DispatchWorkOrderPopover>
-            </PermissionTooltip>
-
-            <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
-              <LoadingButton
-                type="button"
-                variant="ghost"
-                disabled={!canClose || isClosing}
-                loading={isCompleting}
-                loadingText="Completing..."
-                onClick={() => void onClose("RESULT_COMPLETED")}
-                data-testid="work-order-complete-button"
-              >
-                Complete
-              </LoadingButton>
-            </PermissionTooltip>
-
-            <PermissionTooltip allowed={canClose} message="You don't have permission to close work orders.">
-              <LoadingButton
-                type="button"
-                variant="ghost"
-                disabled={!canClose || isClosing}
-                loading={isRejecting}
-                loadingText="Rejecting..."
-                onClick={() => void onClose("RESULT_REJECTED")}
-                data-testid="work-order-reject-button"
-              >
-                Reject
-              </LoadingButton>
-            </PermissionTooltip>
-          </div>
-        ) : null}
-      </div>
-    </header>
+      <DropdownMenuContent align="end" className="w-48">
+        {actions.map((action) => (
+          <Fragment key={action.kind}>
+            {action.separatorBefore ? <DropdownMenuSeparator /> : null}
+            <DropdownMenuItem
+              disabled={action.disabled}
+              onSelect={() => applyWorkOrderStatusAction(action.kind, props)}
+              data-testid={HEADER_ACTION_TEST_ID[action.kind]}
+            >
+              {action.label}
+            </DropdownMenuItem>
+          </Fragment>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

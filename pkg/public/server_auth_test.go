@@ -32,6 +32,7 @@ func setupTestServer(r *support.ResourceRegistry, t *testing.T) (*Server, *model
 	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)
 
+	server.RegisterWebSocketRoutes()
 	server.RegisterWebRoutes("")
 
 	return server, r.Account, token

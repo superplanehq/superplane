@@ -57,6 +57,7 @@ import (
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/web/assets"
@@ -532,8 +533,9 @@ func (s *Server) RegisterOpenAPIHandler() {
 	log.Infof("Raw API JSON available at %s", swaggerFilesPath+"/superplane.swagger.json")
 }
 
-func (s *Server) RegisterWebRoutes(webBasePath string) {
-	log.Infof("Registering web routes with base path: %s", webBasePath)
+// RegisterWebSocketRoutes registers canvas, agent-session, and factory WebSocket endpoints.
+func (s *Server) RegisterWebSocketRoutes() {
+	log.Info("Registering websocket routes")
 
 	// WebSocket endpoint - protected by organization scoped authentication
 	s.Router.Handle(
@@ -550,6 +552,17 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 		middleware.OrganizationAuthMiddleware(s.jwt).
 			Middleware(http.HandlerFunc(s.handleAgentSessionWebSocket)),
 	)
+
+	// Factory WebSocket: org-scoped work-order updates for a single factory.
+	s.Router.Handle(
+		"/ws/factories/{factoryId}",
+		middleware.OrganizationAuthMiddleware(s.jwt).
+			Middleware(http.HandlerFunc(s.handleFactoryWebSocket)),
+	)
+}
+
+func (s *Server) RegisterWebRoutes(webBasePath string) {
+	log.Infof("Registering web routes with base path: %s", webBasePath)
 
 	//
 	// In development mode, we proxy to the Vite dev server.
@@ -672,6 +685,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/canvases", s.adminListCanvases).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/users", s.adminListOrgUsers).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features", s.adminListOrgExperimentalFeatures).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminEnableOrgExperimentalFeature).Methods("POST")
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminDisableOrgExperimentalFeature).Methods("DELETE")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminGetInstallationNetworkSettings).Methods("GET")
@@ -1385,6 +1399,11 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	user, ok := middleware.GetUserFromContext(r.Context())
 	if !ok {
+		telemetry.RecordWebSocketConnectionOutcome(
+			r.Context(),
+			ws.KindCanvas,
+			telemetry.WebSocketConnectionOutcomeAuthError,
+		)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -1394,18 +1413,33 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	parsedWorkflowID, err := uuid.Parse(workflowID)
 	if err != nil {
+		telemetry.RecordWebSocketConnectionOutcome(
+			r.Context(),
+			ws.KindCanvas,
+			telemetry.WebSocketConnectionOutcomeAuthError,
+		)
 		http.Error(w, "workflow not found", http.StatusNotFound)
 		return
 	}
 
 	_, err = models.FindCanvas(user.OrganizationID, parsedWorkflowID)
 	if err != nil {
+		telemetry.RecordWebSocketConnectionOutcome(
+			r.Context(),
+			ws.KindCanvas,
+			telemetry.WebSocketConnectionOutcomeAuthError,
+		)
 		http.Error(w, "canvas not found", http.StatusNotFound)
 		return
 	}
 
-	ws, err := s.upgrader.Upgrade(w, r, nil)
+	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		telemetry.RecordWebSocketConnectionOutcome(
+			r.Context(),
+			ws.KindCanvas,
+			telemetry.WebSocketConnectionOutcomeUpgradeError,
+		)
 		if _, ok := err.(websocket.HandshakeError); !ok {
 			log.Println(err)
 		}
@@ -1413,7 +1447,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := s.wsHub.NewClient(ws, workflowID)
+	client := s.wsHub.NewClient(conn, workflowID)
 
 	<-client.Done
 }

@@ -2,10 +2,10 @@ package perplexity
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -270,6 +270,8 @@ func (c *runAgent) Execute(ctx core.ExecutionContext) error {
 		Response:  response,
 	}
 
+	recordPerplexityUsage(ctx, response)
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		AgentPayloadType,
@@ -277,12 +279,26 @@ func (c *runAgent) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *runAgent) Cancel(ctx core.ExecutionContext) error {
-	return nil
+func recordPerplexityUsage(ctx core.ExecutionContext, response *AgentResponse) {
+	if response == nil || response.Usage == nil {
+		return
+	}
+	record := core.UsageRecord{
+		Provider:     "perplexity",
+		Model:        response.Model,
+		InputTokens:  int64(response.Usage.InputTokens),
+		OutputTokens: int64(response.Usage.OutputTokens),
+		TotalTokens:  int64(response.Usage.TotalTokens),
+	}
+	if response.Usage.Cost.TotalCost > 0 {
+		micros := int64(math.Round(response.Usage.Cost.TotalCost * 1_000_000))
+		record.CostMicros = &micros
+	}
+	ctx.RecordUsageBestEffort(record)
 }
 
-func (c *runAgent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
+func (c *runAgent) Cancel(ctx core.ExecutionContext) error {
+	return nil
 }
 
 func (c *runAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

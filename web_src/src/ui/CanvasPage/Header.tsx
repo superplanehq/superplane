@@ -5,7 +5,7 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Link } from "@/components/Link/link";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { ChevronLeft } from "lucide-react";
 import { CanvasModeToggle, type CanvasMode } from "./components/CanvasModeToggle";
 import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";
@@ -32,6 +32,7 @@ export interface HeaderProps {
     diffCounts: { added: number; updated: number; removed: number };
     diffToggles: {
       showDeletedNodes: boolean;
+      showDeletedNodesControl?: boolean;
       toggleShowDeletedNodes: () => void;
       showEdgeDiff: boolean;
       toggleShowEdgeDiff: () => void;
@@ -236,12 +237,12 @@ function PageHeader({
 function FactoryReturnLink({ organizationId, factoryId }: { organizationId: string; factoryId: string }) {
   return (
     <Link
-      href={`/${organizationId}/factories/${factoryId}`}
+      href={`/${organizationId}/workspaces/${factoryId}/overview`}
       className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
       data-testid="return-to-factory-link"
     >
       <ChevronLeft className="h-4 w-4" aria-hidden />
-      Return to factory
+      Return to workspace
     </Link>
   );
 }

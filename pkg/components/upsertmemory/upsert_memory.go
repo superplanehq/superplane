@@ -507,10 +507,6 @@ func buildPairs(pairs []FieldPair) map[string]any {
 	return values
 }
 
-func (c *UpsertMemory) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
-
 func (c *UpsertMemory) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

@@ -66,6 +66,8 @@ func (h *GitLabWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 		events.NoteEvents = true
 	case "pipeline":
 		events.PipelineEvents = true
+	case "job":
+		events.JobEvents = true
 	case "releases":
 		events.ReleasesEvents = true
 	case "milestone":

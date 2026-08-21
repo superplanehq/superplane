@@ -1,5 +1,5 @@
 import { createElement, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { cn, resolveIcon } from "@/lib/utils";
 import { appPath } from "@/lib/appPaths";
 import { useCanvas } from "@/hooks/useCanvasData";

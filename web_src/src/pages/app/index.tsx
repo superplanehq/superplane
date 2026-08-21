@@ -4,9 +4,9 @@ import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, startTransition, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { flushSync } from "react-dom";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import type {
   CanvasesCanvas,
   CanvasesCanvasEvent,
@@ -17,6 +17,7 @@ import type {
   ActionsAction,
   ComponentsEdge,
   ComponentsIntegrationRef,
+  ComponentsConcurrencySpec,
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
 } from "@/api-client";
@@ -61,16 +62,24 @@ import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
 import { setCanvasStagingEchoUserId } from "@/lib/canvasStagingEcho";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
+import { isFactoryApp, resolveCanvasFlowDirection } from "@/lib/canvasFlowDirection";
 import { DefaultLayoutEngine } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
-import type { CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
+import type { BuildingBlock } from "@/ui/BuildingBlocksSidebar";
+import type { CanvasNode, CanvasPageProps, NewNodeData, NodeEditData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
 import { CanvasPageLoadingOverlay } from "@/ui/CanvasPage/CanvasPageLoadingOverlay";
 import { resolveFitViewVersionId } from "@/ui/CanvasPage/fitView";
 import { useAppPageAgentSuggestions } from "./useAppPageAgentSuggestions";
 import { useAutoLayoutOnUpdatePreference } from "./useAutoLayoutOnUpdatePreference";
+import {
+  appendWorkflowFragment,
+  removeWorkflowEdges,
+  removeWorkflowNodes,
+  useTopologyMutationCommit,
+} from "./useTopologyMutationCommit";
 import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
@@ -88,8 +97,7 @@ import { useFilesHeaderState } from "./files/useFilesHeaderState";
 import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
-import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
-import { resolveCachedNodeRunId, resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
+import { useRunInspectionNavigation } from "./useRunInspectionNavigation";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { resolveEditableWorkflowSnapshot } from "./lib/editable-workflow-snapshot";
@@ -98,13 +106,13 @@ import {
   syncLoadedVersionToCanvasDetail,
   isHistoricalVersionSpecLoading,
 } from "./lib/resolve-canvas-for-view";
-import { activateCanvasVersionForEditing as applyCanvasVersionForEditing } from "./lib/canvas-version-activation";
 import {
   clearLiveEditSessionDraftState,
   clearLiveEditSessionSearchParams,
   isActiveCanvasVersionCurrentLive,
   resetCommittedLiveCanvasDetail,
 } from "./lib/live-edit-session";
+import { useActivateCanvasVersionForEditing } from "./useActivateCanvasVersionForEditing";
 import { useRefreshLatestLiveCanvasData } from "./useRefreshLatestLiveCanvasData";
 import type { CanvasVersionListItem } from "./lib/canvas-versions";
 import { canvasVersionShell, sortVersionsDesc } from "./lib/canvas-versions";
@@ -118,6 +126,9 @@ import { useEnterLiveEditSession } from "./useEnterLiveEditSession";
 import { useCanvasEchoReleaseGuards } from "./useCanvasEchoReleaseGuards";
 import { useCanvasLifecycleEventHandlers } from "./useCanvasLifecycleEventHandlers";
 import { useDraftStagingActions } from "./useDraftStagingActions";
+import { useFactoryConfigureSession, type FactoryConfigureActions } from "./useFactoryConfigureSession";
+import { useFactoryConfigureInitialLayout } from "./useFactoryConfigureInitialLayout";
+import { resolveFactoryEmbedCanvasChrome, resolveFactoryEmbedSidebars } from "./factoryEmbedCanvasChrome";
 import { executeCommitStaging } from "./lib/commit-staging-flow";
 import { buildDuplicatedEdges, buildDuplicatedNodes } from "./lib/duplicate-nodes";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
@@ -133,21 +144,23 @@ import { buildAppFiles } from "./files/lib/app-files";
 import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
+import { useVisibleNodeRuntimeMaps } from "./useVisibleNodeRuntimeMaps";
+import { useGetSidebarData } from "./useGetSidebarData";
 import { useRunParticipantFitRequest } from "./useRunParticipantFitRequest";
 import { useAgentNodeFocusRequest, type CanvasFocusRequest } from "./useAgentNodeFocusRequest";
 import { isRunDetailDismissed, useRunsDetailState } from "./useRunsDetailState";
 import { useComponentIconMap } from "./useComponentIconMap";
 import { useRunSidebarNavigationState } from "./useRunSidebarNavigationState";
-import { useSidebarEventRunLookup } from "@/hooks/useSidebarEventRunLookup";
 import { useCanvasAutoFocusPreference } from "@/hooks/useCanvasAutoFocusPreference";
 import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
 import {
-  applyRunInspectionNavigationSearchParams,
   clearComponentSidebarSearchParams,
+  clampWorkflowViewFlagsForFactoryApp,
   getExitEditModeDisabledTooltip,
   getRunActionState,
   getWorkflowViewPresentation,
   allowsRunsSidebar,
+  isNonCanvasAppViewParam,
   useWorkflowUrlViewFlags,
   clearRunInspectionSearchParams,
 } from "./viewState";
@@ -172,7 +185,6 @@ import {
   isValidRunId,
   prepareCanvasLogNodes,
   prepareData,
-  prepareSidebarData,
   shouldClearRunDetailNode,
 } from "./workflowPageHelpers";
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
@@ -214,10 +226,85 @@ function whenAllowed<T>(allowed: boolean, value: T): T | undefined {
   return allowed ? value : undefined;
 }
 
-export function AppPage() {
-  const { organizationId, appId } = useParams<{
+/** Factory apps keep nodes always expanded — omit collapse toggle. */
+function resolveFactoryAwareToggleView(
+  isReadOnly: boolean,
+  factoryOwnedApp: boolean,
+  handler: (nodeId: string, collapsed: boolean) => void,
+): ((nodeId: string, collapsed: boolean) => void) | undefined {
+  if (isReadOnly || factoryOwnedApp) {
+    return undefined;
+  }
+  return handler;
+}
+
+function resolveFactoryAutoCanvasProps(
+  enabled: boolean,
+  readOnly: boolean,
+  callbacks: { [Key in keyof FactoryLayoutCanvasCallbacks]-?: NonNullable<CanvasPageProps[Key]> },
+): Pick<
+  CanvasPageProps,
+  | "layoutMode"
+  | "onAutoLayoutNodes"
+  | "onNodePositionChange"
+  | "onNodesPositionChange"
+  | "onPlaceholderAdd"
+  | "onPlaceholderConfigure"
+> {
+  if (readOnly) return { layoutMode: enabled ? "factory-auto" : "manual" };
+  if (enabled) {
+    return {
+      layoutMode: "factory-auto",
+      onPlaceholderAdd: callbacks.onPlaceholderAdd,
+      onPlaceholderConfigure: callbacks.onPlaceholderConfigure,
+    };
+  }
+  return { layoutMode: "manual", ...callbacks };
+}
+
+type FactoryLayoutCanvasCallbacks = Pick<
+  CanvasPageProps,
+  "onAutoLayoutNodes" | "onNodePositionChange" | "onNodesPositionChange" | "onPlaceholderAdd" | "onPlaceholderConfigure"
+>;
+
+export type { FactoryConfigureActions } from "./useFactoryConfigureSession";
+
+export function AppPage({
+  factoryEmbed = false,
+  factoryConfigure = false,
+  factoryAgentEnabled = false,
+  factoryEditWorkspace = false,
+  factoryConfigureActionsRef,
+  onFactoryConfigureBusyChange,
+  onFactoryConfigureDone,
+  onFactoryConfigureSaved,
+  factoryCanvasOverlay,
+}: {
+  factoryEmbed?: boolean;
+  /** Factory-shell Configure: same chrome as embed, but canvas edit session allowed. */
+  factoryConfigure?: boolean;
+  /** Factory-shell opt-in: show the in-app agent sidebar next to the canvas. */
+  factoryAgentEnabled?: boolean;
+  /** Storybook-only factory edit workspace chrome. Live factory canvas ignores this. */
+  factoryEditWorkspace?: boolean;
+  /** Imperative Discard/Save handlers for the factory Configure chrome (no setState bridge). */
+  factoryConfigureActionsRef?: MutableRefObject<FactoryConfigureActions | null>;
+  onFactoryConfigureBusyChange?: (busy: boolean) => void;
+  onFactoryConfigureDone?: () => void;
+  /** After Configure Save: keep the editor open. Discard still uses onFactoryConfigureDone. */
+  onFactoryConfigureSaved?: () => void;
+  /** Overlay on the canvas column (factory YAML workspace). */
+  factoryCanvasOverlay?: ReactNode;
+} = {}) {
+  const factoryViewOnly = factoryEmbed && !factoryConfigure;
+  const {
+    organizationId,
+    appId,
+    factoryId: routeFactoryId,
+  } = useParams<{
     organizationId: string;
     appId?: string;
+    factoryId?: string;
   }>();
   const canvasId = appId || "";
   const agentSuggestions = useAppPageAgentSuggestions(appId);
@@ -227,7 +314,6 @@ export function AppPage() {
   const { data: me } = useMe();
   const {
     isRunInspectionMode,
-    isMemoryMode,
     isConsoleAddPanelOpen,
     setIsConsoleAddPanelOpen,
     isConsoleYamlOpen,
@@ -257,7 +343,7 @@ export function AppPage() {
     canvasId,
     onBackToRunList: clearRunDetailNodeSearch,
   });
-  const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
+  const rawUrlViewFlags = useWorkflowUrlViewFlags(searchParams);
   const { filesHeaderActionsSlotId } = useFilesHeaderState(canvasId);
   const currentUserId = me?.id;
   useEffect(() => {
@@ -297,7 +383,7 @@ export function AppPage() {
   const { data: availableIntegrations = [], isLoading: integrationsLoading } = useAvailableIntegrations();
   const canReadIntegrations = canAct("integrations", "read");
   const canUpdateIntegrations = canAct("integrations", "update");
-  const canUseAgents = canAct("agents", "create") && canAct("agents", "read");
+  const canUseAgents = (!factoryEmbed || factoryAgentEnabled) && canAct("agents", "create") && canAct("agents", "read");
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const {
     data: liveCanvas,
@@ -311,6 +397,32 @@ export function AppPage() {
     refetchOnReconnect: false,
     refetchOnMount: false,
   });
+  const factoryOwnedApp = isFactoryApp(liveCanvas?.metadata?.factoryId);
+  const factoryAutoLayout = factoryConfigure && factoryOwnedApp;
+  const urlViewFlags = useMemo(
+    () => (factoryOwnedApp ? clampWorkflowViewFlagsForFactoryApp(rawUrlViewFlags) : rawUrlViewFlags),
+    [factoryOwnedApp, rawUrlViewFlags],
+  );
+  useEffect(() => {
+    if (!factoryOwnedApp) {
+      return;
+    }
+
+    const view = searchParams.get("view") ?? "";
+    if (!isNonCanvasAppViewParam(view)) {
+      return;
+    }
+
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("view");
+        next.delete("file");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [factoryOwnedApp, searchParams, setSearchParams]);
   const liveCanvasVersionId = liveCanvas?.metadata?.liveVersionId;
   const { data: liveCanvasVersion, isLoading: liveCanvasVersionLoading } = useDescribeCanvasVersion(
     canvasId!,
@@ -356,7 +468,7 @@ export function AppPage() {
     liveCanvasVersionId,
     selectableVersionsById,
     isRunInspectionMode,
-    isMemoryMode,
+    isMemoryMode: urlViewFlags.isMemoryMode,
   });
   const [draftCanvasSpec, setDraftCanvasSpec] = useState<CanvasesCanvas["spec"] | null>(null);
   const draftSpecToRender = draftCanvasSpec ?? selectedCanvasVersion?.spec ?? null;
@@ -382,7 +494,10 @@ export function AppPage() {
     selectedCanvasVersion,
     liveCanvasVersionId,
     isRunInspectionMode,
+    includeConsoleBaseline: !factoryOwnedApp,
   });
+  // Factory Configure seeds draft up front; never block the shell on baseline/resync fetches.
+  const showDraftCanvasLoadingOverlay = isDraftCanvasLoading && !(factoryConfigure && draftCanvasSpec);
   useDraftCanvasSpecSync({
     isEditing,
     isEnteringEditSession,
@@ -513,7 +628,7 @@ export function AppPage() {
     data: canvasMemoryEntries = [],
     isLoading: canvasMemoryLoading,
     error: canvasMemoryError,
-  } = useCanvasMemoryEntries(canvasId!, shouldLoadCanvasMemoryEntries(isMemoryMode, isViewingLiveVersion));
+  } = useCanvasMemoryEntries(canvasId!, shouldLoadCanvasMemoryEntries(urlViewFlags.isMemoryMode, isViewingLiveVersion));
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
   const createCanvasMemoryNamespace = useCreateCanvasMemoryNamespace(canvasId!);
   const updateCanvasMemoryNamespace = useUpdateCanvasMemoryNamespace(canvasId!);
@@ -560,7 +675,7 @@ export function AppPage() {
    * This ref persists across re-renders to preserve sidebar state.
    */
   const isSidebarOpenRef = useRef<boolean | null>(null);
-  if (isSidebarOpenRef.current === null && typeof window !== "undefined") {
+  if (!factoryEmbed && isSidebarOpenRef.current === null && typeof window !== "undefined") {
     const storedSidebarState = window.localStorage.getItem(CANVAS_SIDEBAR_STORAGE_KEY);
     if (storedSidebarState !== null) {
       try {
@@ -571,7 +686,7 @@ export function AppPage() {
       }
     }
   }
-  if (isSidebarOpenRef.current === null && canvas) {
+  if (!factoryEmbed && isSidebarOpenRef.current === null && canvas) {
     isSidebarOpenRef.current = canvas.spec?.nodes?.length === 0;
   }
 
@@ -605,7 +720,6 @@ export function AppPage() {
   const hasTrackedCanvasView = useRef(false);
   const canvasSaveSessionRef = useRef(0);
   const consoleMutationGenerationRef = useRef(0);
-  const liveCanvasNodeClickLookupRef = useRef(0);
   const handleRemoteStagingUpdatedRef = useRef<() => Promise<void>>(async () => {});
   const ignoredCanvasUpdatedEchoReleasesRef = useRef<Array<CanvasEchoRelease>>([]);
   const { registerIgnoredCanvasUpdatedEcho, consumeIgnoredCanvasUpdatedEcho, resetLifecycleEchoGuards } =
@@ -893,23 +1007,20 @@ export function AppPage() {
 
     return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap, nodeEventsMap: eventsMap };
   }, [storeVersion]);
-  const visibleNodeExecutionsMap = useMemo(
-    () => (showLiveActivity ? nodeExecutionsMap : {}),
-    [showLiveActivity, nodeExecutionsMap],
-  );
+  const { showNodeRuntimeActivity, visibleNodeExecutionsMap, visibleNodeQueueItemsMap, visibleNodeEventsMap } =
+    useVisibleNodeRuntimeMaps({
+      showLiveActivity,
+      factoryEmbed,
+      isRunInspectionMode,
+      nodeExecutionsMap,
+      nodeQueueItemsMap,
+      nodeEventsMap,
+    });
   const consoleNodeStatuses = useMemo(
     () => deriveConsoleNodeStatuses(visibleNodeExecutionsMap),
     [visibleNodeExecutionsMap],
   );
   const handleConsoleTriggerNode = useConsoleTriggerNode({ canvasId, canvas: canvas ?? undefined, queryClient });
-  const visibleNodeQueueItemsMap = useMemo(
-    () => (showLiveActivity ? nodeQueueItemsMap : {}),
-    [showLiveActivity, nodeQueueItemsMap],
-  );
-  const visibleNodeEventsMap = useMemo(
-    () => (showLiveActivity ? nodeEventsMap : {}),
-    [showLiveActivity, nodeEventsMap],
-  );
 
   const {
     stagingStale,
@@ -939,7 +1050,9 @@ export function AppPage() {
     canvas,
     getConsoleMutationGeneration: () => consoleMutationGenerationRef.current,
     committedBaselines: committedBaselinesForEdit,
-    editBootstrapReady: isEditBootstrapReady,
+    // Factory Configure seeds draft before baselines finish; still treat as ready so
+    // Save can see local graph diffs and open the commit dialog.
+    editBootstrapReady: isEditBootstrapReady || (factoryConfigure && Boolean(draftCanvasSpec)),
   });
 
   useDefaultAppTab({ canvasId, urlViewFlags, searchParams });
@@ -1131,26 +1244,6 @@ export function AppPage() {
     });
   }, []);
 
-  const applyAutoLayoutOnAddedNode = useCallback(
-    async (workflow: CanvasesCanvas, nodeID?: string): Promise<CanvasesCanvas> => {
-      if (!isAutoLayoutOnUpdateEnabled || !nodeID) {
-        return workflow;
-      }
-
-      const node = workflow.spec?.nodes?.find((candidate) => candidate.id === nodeID);
-      if (!node || node.type === "TYPE_WIDGET") {
-        return workflow;
-      }
-
-      return DefaultLayoutEngine.apply(workflow, {
-        scope: "connected-component",
-        nodeIds: [nodeID],
-        components,
-      });
-    },
-    [isAutoLayoutOnUpdateEnabled, components],
-  );
-
   /**
    * Ref to track pending position updates that need to be auto-saved.
    * Maps node ID to its updated position.
@@ -1279,8 +1372,11 @@ export function AppPage() {
   }, [components, availableIntegrations]);
 
   const buildingBlocks = useMemo(
-    () => buildBuildingBlockCategories(triggers, components, availableIntegrations),
-    [triggers, components, availableIntegrations],
+    () =>
+      buildBuildingBlockCategories(triggers, components, availableIntegrations, {
+        isFactoryApp: Boolean(canvas?.metadata?.factoryId),
+      }),
+    [triggers, components, availableIntegrations, canvas?.metadata?.factoryId],
   );
   const canvasEdges = canvas?.spec?.edges ?? EMPTY_CANVAS_SPEC_ITEMS;
   const canvasNodesById = useMemo(() => {
@@ -1418,6 +1514,7 @@ export function AppPage() {
     allComponents,
     canvasId,
     queryClient,
+    includeRemovedNodeGhosts: !factoryOwnedApp,
   });
 
   const nodesWithIntegrationStatus = useMemo(
@@ -1499,48 +1596,15 @@ export function AppPage() {
     triggersLoading,
   ]);
 
-  const getSidebarData = useCallback(
-    (nodeId: string): SidebarData | null => {
-      const node = canvasNodesById.get(nodeId);
-      if (!node) return null;
-
-      // Get current data from store (don't trigger load here - that's done in useEffect)
-      const nodeData = getNodeData(nodeId);
-
-      // Build maps with current node data for sidebar
-      const executionsMap =
-        !showLiveActivity || nodeData.executions.length === 0 ? {} : { [nodeId]: nodeData.executions };
-      const queueItemsMap =
-        !showLiveActivity || nodeData.queueItems.length === 0
-          ? {}
-          : { [nodeId]: nodeData.queueItems.slice().reverse() };
-      const eventsMapForSidebar =
-        !showLiveActivity || nodeData.events.length === 0
-          ? {}
-          : { [nodeId]: nodeData.events.length > 0 ? nodeData.events : visibleNodeEventsMap[nodeId] || [] };
-      const totalHistoryCount = !showLiveActivity ? 0 : nodeData.totalInHistoryCount;
-      const totalQueueCount = !showLiveActivity ? 0 : nodeData.totalInQueueCount;
-
-      const sidebarData = prepareSidebarData(
-        node,
-        canvasNodes,
-        allComponents,
-        allTriggers,
-        executionsMap,
-        queueItemsMap,
-        eventsMapForSidebar,
-        totalHistoryCount,
-        totalQueueCount,
-      );
-
-      // Add loading state to sidebar data
-      return {
-        ...sidebarData,
-        isLoading: nodeData.isLoading,
-      };
-    },
-    [canvasNodes, canvasNodesById, allComponents, allTriggers, visibleNodeEventsMap, showLiveActivity, getNodeData],
-  );
+  const getSidebarData = useGetSidebarData({
+    canvasNodes,
+    canvasNodesById,
+    allComponents,
+    allTriggers,
+    visibleNodeEventsMap,
+    showNodeRuntimeActivity,
+    getNodeData,
+  });
 
   // Trigger data loading when sidebar opens for a node
   const loadSidebarData = useCallback(
@@ -1895,6 +1959,28 @@ export function AppPage() {
     ],
   );
 
+  const commitTopologyMutation = useTopologyMutationCommit({
+    factoryAutoLayout,
+    autoLayoutOnUpdate: isAutoLayoutOnUpdateEnabled,
+    components,
+    getCurrentWorkflow: getCurrentWorkflowSnapshot,
+    applyLocalWorkflow: applyLocalWorkflowUpdate,
+    saveWorkflow: handleSaveWorkflow,
+    saveSessionRef: canvasSaveSessionRef,
+    readOnly: isReadOnly,
+  });
+  const applyInitialFactoryLayout = useCallback(
+    () => commitTopologyMutation((workflow) => workflow),
+    [commitTopologyMutation],
+  );
+  useFactoryConfigureInitialLayout({
+    factoryAutoLayout,
+    isEditing,
+    editBootstrapReady: isEditBootstrapReady,
+    activeCanvasVersionId,
+    applyLayout: applyInitialFactoryLayout,
+  });
+
   const getNodeEditData = useCallback(
     (nodeId: string): NodeEditData | null => {
       const node = canvasNodesById.get(nodeId);
@@ -1948,6 +2034,12 @@ export function AppPage() {
         integrationLabel,
         blockName,
         integrationRef: node.integration,
+        concurrency: node.concurrency,
+        // Merge admits every run's queue item, so it is inherently
+        // unbounded and takes no concurrency configuration. Loop only
+        // honors max, as its parallel-session cap.
+        supportsConcurrency: node.type === "TYPE_ACTION" && node.component !== "merge",
+        concurrencyMaxOnly: node.component === "loop",
       };
     },
     [
@@ -2115,6 +2207,7 @@ export function AppPage() {
       updatedConfiguration: Record<string, any>,
       updatedNodeName: string,
       integrationRef?: ComponentsIntegrationRef,
+      concurrency?: ComponentsConcurrencySpec,
     ) => {
       if (!canvas || !organizationId || !canvasId) return;
 
@@ -2146,6 +2239,7 @@ export function AppPage() {
             configuration: updatedConfiguration,
             name: updatedNodeName,
             integration: integrationRef,
+            concurrency,
           };
         }
         return node;
@@ -2432,110 +2526,67 @@ export function AppPage() {
     async (newNodeData: NewNodeData): Promise<string> => {
       if (!canvas || !organizationId || !canvasId) return "";
 
-      const latestWorkflow = getCurrentWorkflowSnapshot();
-      if (!latestWorkflow) return "";
-
-      // Save snapshot before making changes
-
       const { buildingBlock, configuration, position, sourceConnection, integrationRef } = newNodeData;
 
       // Filter configuration to only include visible fields
       const filteredConfiguration = filterVisibleConfiguration(configuration, buildingBlock.configuration || []);
-
-      // Get existing node names for unique name generation
-      const existingNodeNames = (latestWorkflow.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
-
-      // Generate unique node name based on component name + ordinal
       const nameBase = newNodeData.nodeName || buildingBlock.name || "node";
-      const uniqueNodeName = generateUniqueNodeName(nameBase, existingNodeNames);
+      let newNodeId = "";
 
-      // Generate a unique node ID
-      const newNodeId = generateNodeId(buildingBlock.name || "node", uniqueNodeName);
+      await commitTopologyMutation((workflow) => {
+        const existingNodeNames = (workflow.spec?.nodes || []).map((node) => node.name || "").filter(Boolean);
+        const uniqueNodeName = generateUniqueNodeName(nameBase, existingNodeNames);
+        newNodeId = generateNodeId(buildingBlock.name || "node", uniqueNodeName);
 
-      // Create the new node
-      const newNode: ComponentsNode = {
-        id: newNodeId,
-        name: uniqueNodeName,
-        type:
-          buildingBlock.type === "trigger"
-            ? "TYPE_TRIGGER"
-            : buildingBlock.name === "annotation"
-              ? "TYPE_WIDGET"
-              : "TYPE_ACTION",
-        configuration: filteredConfiguration,
-        integration: integrationRef,
-        position: position
-          ? {
-              x: Math.round(position.x),
-              y: Math.round(position.y),
-            }
-          : {
-              x: (latestWorkflow?.spec?.nodes?.length || 0) * 250,
-              y: 100,
-            },
-      };
-
-      // Add type-specific component reference
-      if (buildingBlock.name === "annotation") {
-        // Annotation nodes are now widgets
-        newNode.component = "annotation";
-        newNode.configuration = { text: "", color: "yellow" };
-      } else if (buildingBlock.type === "component") {
-        newNode.component = buildingBlock.name;
-      } else if (buildingBlock.type === "trigger") {
-        newNode.component = buildingBlock.name;
-      }
-
-      // Track node addition
-      const { nodeType, integration, nodeRef } = getNodeAnalyticsProps(newNode, availableIntegrations);
-      analytics.nodeAdd(nodeType, integration, nodeRef, organizationId);
-
-      // Add the new node to the workflow
-      const updatedNodes = [...(latestWorkflow.spec?.nodes || []), newNode];
-
-      // If there's a source connection, create the edge
-      let updatedEdges = latestWorkflow.spec?.edges || [];
-      if (sourceConnection) {
-        const newEdge: ComponentsEdge = {
-          sourceId: sourceConnection.nodeId,
-          targetId: newNodeId,
-          channel: sourceConnection.handleId || "default",
+        const newNode: ComponentsNode = {
+          id: newNodeId,
+          name: uniqueNodeName,
+          type:
+            buildingBlock.type === "trigger"
+              ? "TYPE_TRIGGER"
+              : buildingBlock.name === "annotation"
+                ? "TYPE_WIDGET"
+                : "TYPE_ACTION",
+          configuration: filteredConfiguration,
+          integration: integrationRef,
+          position: position
+            ? {
+                x: Math.round(position.x),
+                y: Math.round(position.y),
+              }
+            : {
+                x: (workflow.spec?.nodes?.length || 0) * 250,
+                y: 100,
+              },
         };
-        updatedEdges = [...updatedEdges, newEdge];
-      }
 
-      const updatedWorkflow = {
-        ...latestWorkflow,
-        spec: {
-          ...latestWorkflow.spec,
-          nodes: updatedNodes,
-          edges: updatedEdges,
-        },
-      };
+        if (buildingBlock.name === "annotation") {
+          newNode.component = "annotation";
+          newNode.configuration = { text: "", color: "yellow" };
+        } else if (buildingBlock.type === "component" || buildingBlock.type === "trigger") {
+          newNode.component = buildingBlock.name;
+        }
 
-      const finalWorkflow = await applyAutoLayoutOnAddedNode(updatedWorkflow, newNodeId);
+        const { nodeType, integration, nodeRef } = getNodeAnalyticsProps(newNode, availableIntegrations);
+        analytics.nodeAdd(nodeType, integration, nodeRef, organizationId);
 
-      // Update local cache
-      applyLocalWorkflowUpdate(finalWorkflow);
-
-      if (!isReadOnly) {
-        await handleSaveWorkflow(finalWorkflow, { showToast: false });
-      }
-
-      // Return the new node ID
+        const newEdges: ComponentsEdge[] = sourceConnection
+          ? [
+              {
+                sourceId: sourceConnection.nodeId,
+                targetId: newNodeId,
+                channel: sourceConnection.handleId || "default",
+              },
+            ]
+          : [];
+        return {
+          workflow: appendWorkflowFragment(workflow, [newNode], newEdges),
+          options: { addedNodeId: newNodeId },
+        };
+      });
       return newNodeId;
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      getCurrentWorkflowSnapshot,
-      handleSaveWorkflow,
-      applyAutoLayoutOnAddedNode,
-      isReadOnly,
-      applyLocalWorkflowUpdate,
-      availableIntegrations,
-    ],
+    [canvas, organizationId, canvasId, availableIntegrations, commitTopologyMutation],
   );
 
   const handlePlaceholderAdd = useCallback(
@@ -2575,51 +2626,27 @@ export function AppPage() {
             } as ComponentsEdge)
           : null;
 
-      const updatedWorkflow = {
-        ...latestWorkflow,
-        spec: {
-          ...latestWorkflow.spec,
-          nodes: [...(latestWorkflow.spec?.nodes || []), newNode],
-          edges: newEdge ? [...(latestWorkflow.spec?.edges || []), newEdge] : [...(latestWorkflow.spec?.edges || [])],
+      await commitTopologyMutation(
+        (workflow) => appendWorkflowFragment(workflow, [newNode], newEdge ? [newEdge] : []),
+        {
+          addedNodeId: newNodeId,
         },
-      };
-
-      const finalWorkflow = await applyAutoLayoutOnAddedNode(updatedWorkflow, newNodeId);
-
-      applyLocalWorkflowUpdate(finalWorkflow);
-
-      if (!isReadOnly) {
-        await handleSaveWorkflow(finalWorkflow, { showToast: false });
-      }
+      );
 
       return newNodeId;
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      getCurrentWorkflowSnapshot,
-      handleSaveWorkflow,
-      applyAutoLayoutOnAddedNode,
-      isReadOnly,
-      applyLocalWorkflowUpdate,
-    ],
+    [canvas, organizationId, canvasId, getCurrentWorkflowSnapshot, commitTopologyMutation],
   );
 
   const handlePlaceholderConfigure = useCallback(
     async (data: {
       placeholderId: string;
-      buildingBlock: any;
+      buildingBlock: BuildingBlock;
       nodeName: string;
-      configuration: Record<string, any>;
-      appName?: string;
+      configuration: Record<string, unknown>;
+      integrationName?: string;
     }): Promise<void> => {
       if (!canvas || !organizationId || !canvasId) {
-        return;
-      }
-
-      const nodeIndex = canvas.spec?.nodes?.findIndex((n) => n.id === data.placeholderId);
-      if (nodeIndex === undefined || nodeIndex === -1) {
         return;
       }
 
@@ -2627,76 +2654,46 @@ export function AppPage() {
         data.configuration,
         data.buildingBlock.configuration || [],
       );
+      await commitTopologyMutation((workflow) => {
+        const nodes = workflow.spec?.nodes || [];
+        const nodeIndex = nodes.findIndex((node) => node.id === data.placeholderId);
+        if (nodeIndex === -1) {
+          return workflow;
+        }
 
-      // Get existing node names for unique name generation (exclude the placeholder being configured)
-      const existingNodeNames = (canvas.spec?.nodes || [])
-        .filter((n) => n.id !== data.placeholderId)
-        .map((n) => n.name || "")
-        .filter(Boolean);
+        const existingNodeNames = nodes
+          .filter((node) => node.id !== data.placeholderId)
+          .map((node) => node.name || "")
+          .filter(Boolean);
+        const uniqueNodeName = generateUniqueNodeName(data.buildingBlock.name || "node", existingNodeNames);
+        const updatedNode: ComponentsNode = {
+          ...nodes[nodeIndex],
+          name: uniqueNodeName,
+          type: data.buildingBlock.type === "trigger" ? "TYPE_TRIGGER" : "TYPE_ACTION",
+          component: data.buildingBlock.name,
+          configuration: filteredConfiguration,
+        };
+        const updatedNodes = [...nodes];
+        updatedNodes[nodeIndex] = updatedNode;
 
-      // Generate unique node name based on component name + ordinal
-      const uniqueNodeName = generateUniqueNodeName(data.buildingBlock.name || "node", existingNodeNames);
-
-      // Update placeholder with real component data
-      const updatedNode: ComponentsNode = {
-        ...canvas.spec!.nodes![nodeIndex],
-        name: uniqueNodeName,
-        type: data.buildingBlock.type === "trigger" ? "TYPE_TRIGGER" : "TYPE_ACTION",
-        configuration: filteredConfiguration,
-      };
-
-      // Add the component reference that was missing
-      if (data.buildingBlock.type === "component") {
-        updatedNode.component = data.buildingBlock.name;
-      } else if (data.buildingBlock.type === "trigger") {
-        updatedNode.component = data.buildingBlock.name;
-      }
-
-      const updatedNodes = [...(canvas.spec?.nodes || [])];
-      updatedNodes[nodeIndex] = updatedNode;
-
-      // Update outgoing edges from this node to use valid channels
-      // Find edges where this node is the source
-      const outgoingEdges = canvas.spec?.edges?.filter((edge) => edge.sourceId === data.placeholderId) || [];
-
-      let updatedEdges = [...(canvas.spec?.edges || [])];
-
-      if (outgoingEdges.length > 0) {
-        // Get the valid output channels for the new component
-        const validChannels = data.buildingBlock.outputChannels?.map((ch: any) => ch.name).filter(Boolean) || [
-          "default",
-        ];
-
-        // Update each outgoing edge to use a valid channel
-        updatedEdges = updatedEdges.map((edge) => {
-          if (edge.sourceId === data.placeholderId) {
-            // If the current channel is not valid for the new component, use the first valid channel
-            const newChannel = validChannels.includes(edge.channel) ? edge.channel : validChannels[0];
-            return {
-              ...edge,
-              channel: newChannel,
-            };
+        const declaredChannels = (data.buildingBlock.outputChannels || [])
+          .map((channel) => channel.name)
+          .filter((channel): channel is string => Boolean(channel));
+        const validChannels = declaredChannels.length > 0 ? declaredChannels : ["default"];
+        const updatedEdges = (workflow.spec?.edges || []).map((edge) => {
+          if (edge.sourceId !== data.placeholderId || validChannels.includes(edge.channel || "default")) {
+            return edge;
           }
-          return edge;
+          return { ...edge, channel: validChannels[0] };
         });
-      }
 
-      const updatedWorkflow = {
-        ...canvas,
-        spec: {
-          ...canvas.spec,
-          nodes: updatedNodes,
-          edges: updatedEdges,
-        },
-      };
-
-      applyLocalWorkflowUpdate(updatedWorkflow);
-
-      if (!isReadOnly) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      }
+        return {
+          ...workflow,
+          spec: { ...workflow.spec, nodes: updatedNodes, edges: updatedEdges },
+        };
+      });
     },
-    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, commitTopologyMutation],
   );
 
   const handleEdgeCreate = useCallback(
@@ -2713,26 +2710,9 @@ export function AppPage() {
       };
 
       analytics.edgeCreate(organizationId);
-
-      // Add the new edge to the workflow
-      const updatedEdges = [...(canvas.spec?.edges || []), newEdge];
-
-      const updatedWorkflow = {
-        ...canvas,
-        spec: {
-          ...canvas.spec,
-          edges: updatedEdges,
-        },
-      };
-
-      // Update local cache
-      applyLocalWorkflowUpdate(updatedWorkflow);
-
-      if (!isReadOnly) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      }
+      await commitTopologyMutation((workflow) => appendWorkflowFragment(workflow, [], [newEdge]));
     },
-    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, commitTopologyMutation],
   );
   const handleNodeDelete = useCallback(
     async (nodeId: string) => {
@@ -2746,32 +2726,10 @@ export function AppPage() {
         const { nodeType, integration, nodeRef } = getNodeAnalyticsProps(nodeBeingDeleted, availableIntegrations);
         analytics.nodeRemove(nodeType, integration, nodeRef, organizationId);
       }
-      const updatedNodes = specNodes.filter((node) => node.id !== nodeId);
-      const survivingNodeIds = new Set(updatedNodes.map((node) => node.id).filter(Boolean));
 
-      const updatedEdges = canvas.spec?.edges?.filter(
-        (edge) =>
-          (!edge.sourceId || survivingNodeIds.has(edge.sourceId)) &&
-          (!edge.targetId || survivingNodeIds.has(edge.targetId)),
-      );
-
-      const updatedWorkflow = {
-        ...canvas,
-        spec: {
-          ...canvas.spec,
-          nodes: updatedNodes,
-          edges: updatedEdges,
-        },
-      };
-
-      // Update local cache
-      applyLocalWorkflowUpdate(updatedWorkflow);
-
-      if (!isReadOnly) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      }
+      await commitTopologyMutation((workflow) => removeWorkflowNodes(workflow, new Set([nodeId])));
     },
-    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate, availableIntegrations],
+    [canvas, organizationId, canvasId, availableIntegrations, commitTopologyMutation],
   );
   const handleNodesDelete = useCallback(
     async (nodeIds: string[]) => {
@@ -2785,30 +2743,9 @@ export function AppPage() {
           const { nodeType, integration, nodeRef } = getNodeAnalyticsProps(node, availableIntegrations);
           analytics.nodeRemove(nodeType, integration, nodeRef, organizationId);
         });
-      const updatedNodes = specNodes.filter((node) => !node.id || !nodeIdSet.has(node.id));
-      const survivingNodeIds = new Set(updatedNodes.map((node) => node.id).filter(Boolean));
-      const updatedEdges = canvas.spec?.edges?.filter(
-        (edge) =>
-          (!edge.sourceId || survivingNodeIds.has(edge.sourceId)) &&
-          (!edge.targetId || survivingNodeIds.has(edge.targetId)),
-      );
-
-      const updatedWorkflow = {
-        ...canvas,
-        spec: {
-          ...canvas.spec,
-          nodes: updatedNodes,
-          edges: updatedEdges,
-        },
-      };
-
-      applyLocalWorkflowUpdate(updatedWorkflow);
-
-      if (!isReadOnly) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      }
+      await commitTopologyMutation((workflow) => removeWorkflowNodes(workflow, nodeIdSet));
     },
-    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate, availableIntegrations],
+    [canvas, organizationId, canvasId, availableIntegrations, commitTopologyMutation],
   );
   const handleAutoLayoutNodes = useCallback(
     async (nodeIds: string[]) => {
@@ -2818,6 +2755,7 @@ export function AppPage() {
         nodeIds,
         scope: "connected-component",
         components,
+        direction: resolveCanvasFlowDirection(canvas.metadata?.factoryId),
       });
 
       analytics.autoLayout(updatedWorkflow.spec?.nodes?.length ?? 0, organizationId);
@@ -2835,29 +2773,16 @@ export function AppPage() {
     async (nodeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
 
-      const specNodes = canvas.spec?.nodes || [];
-      const { newNodes, nodeIdMap } = buildDuplicatedNodes(specNodes, nodeIds);
-      if (newNodes.length === 0) return;
+      await commitTopologyMutation((workflow) => {
+        const { newNodes, nodeIdMap } = buildDuplicatedNodes(workflow.spec?.nodes || [], nodeIds);
+        if (newNodes.length === 0) return { workflow, changed: false };
 
-      const duplicatedNodeIds = new Set(nodeIds);
-      const newEdges = buildDuplicatedEdges(canvas.spec?.edges || [], duplicatedNodeIds, nodeIdMap);
-
-      const updatedWorkflow = {
-        ...canvas,
-        spec: {
-          ...canvas.spec,
-          nodes: [...(canvas.spec?.nodes || []), ...newNodes],
-          edges: [...(canvas.spec?.edges || []), ...newEdges],
-        },
-      };
-
-      applyLocalWorkflowUpdate(updatedWorkflow);
-
-      if (!isReadOnly) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      }
+        const duplicatedNodeIds = new Set(nodeIds);
+        const newEdges = buildDuplicatedEdges(workflow.spec?.edges || [], duplicatedNodeIds, nodeIdMap);
+        return appendWorkflowFragment(workflow, newNodes, newEdges);
+      });
     },
-    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, commitTopologyMutation],
   );
 
   const handleEdgeDelete = useCallback(
@@ -2879,33 +2804,9 @@ export function AppPage() {
       });
 
       analytics.edgeRemove(organizationId);
-
-      // Remove the edges from the workflow
-      const updatedEdges = canvas.spec?.edges?.filter((edge) => {
-        return !edgesToRemove.some(
-          (toRemove) =>
-            edge.sourceId === toRemove.sourceId &&
-            edge.targetId === toRemove.targetId &&
-            edge.channel === toRemove.channel,
-        );
-      });
-
-      const updatedWorkflow = {
-        ...canvas,
-        spec: {
-          ...canvas.spec,
-          edges: updatedEdges,
-        },
-      };
-
-      // Update local cache
-      applyLocalWorkflowUpdate(updatedWorkflow);
-
-      if (!isReadOnly) {
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-      }
+      await commitTopologyMutation((workflow) => removeWorkflowEdges(workflow, edgesToRemove));
     },
-    [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
+    [canvas, organizationId, canvasId, commitTopologyMutation],
   );
 
   /**
@@ -3018,70 +2919,40 @@ export function AppPage() {
     async (nodeId: string) => {
       if (!canvas || !organizationId || !canvasId) return;
 
-      const nodeToDuplicate = canvas.spec?.nodes?.find((node) => node.id === nodeId);
-      if (!nodeToDuplicate) return;
+      await commitTopologyMutation((workflow) => {
+        const nodeToDuplicate = workflow.spec?.nodes?.find((node) => node.id === nodeId);
+        if (!nodeToDuplicate) return { workflow, changed: false };
 
-      const existingNodeNames = (canvas.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
-
-      let baseName = nodeToDuplicate.name?.trim() || "";
-      if (!baseName) {
-        if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.component) {
-          baseName = nodeToDuplicate.component;
-        } else if (nodeToDuplicate.type === "TYPE_ACTION" && nodeToDuplicate.component) {
-          baseName = nodeToDuplicate.component;
-        } else {
-          baseName = "node";
+        const existingNodeNames = (workflow.spec?.nodes || []).map((node) => node.name || "").filter(Boolean);
+        let baseName = nodeToDuplicate.name?.trim() || "";
+        if (!baseName) {
+          baseName =
+            (nodeToDuplicate.type === "TYPE_TRIGGER" || nodeToDuplicate.type === "TYPE_ACTION") &&
+            nodeToDuplicate.component
+              ? nodeToDuplicate.component
+              : "node";
         }
-      }
 
-      // Generate unique node name based on the existing node name + ordinal
-      const uniqueNodeName = generateUniqueNodeName(baseName, existingNodeNames);
+        const uniqueNodeName = generateUniqueNodeName(baseName, existingNodeNames);
+        const newNodeId = generateNodeId(baseName, uniqueNodeName);
+        const duplicateNode: ComponentsNode = {
+          ...nodeToDuplicate,
+          id: newNodeId,
+          name: uniqueNodeName,
+          position: {
+            x: (nodeToDuplicate.position?.x || 0) + 50,
+            y: (nodeToDuplicate.position?.y || 0) + 50,
+          },
+          isCollapsed: false,
+        };
 
-      const newNodeId = generateNodeId(baseName, uniqueNodeName);
-
-      const offsetX = 50;
-      const offsetY = 50;
-
-      const duplicateNode: ComponentsNode = {
-        ...nodeToDuplicate,
-        id: newNodeId,
-        name: uniqueNodeName,
-        position: {
-          x: (nodeToDuplicate.position?.x || 0) + offsetX,
-          y: (nodeToDuplicate.position?.y || 0) + offsetY,
-        },
-        // Reset collapsed state for the duplicate
-        isCollapsed: false,
-      };
-
-      // Add the duplicate node to the workflow
-      const updatedNodes = [...(canvas.spec?.nodes || []), duplicateNode];
-
-      const updatedWorkflow = {
-        ...canvas,
-        spec: {
-          ...canvas.spec,
-          nodes: updatedNodes,
-        },
-      };
-
-      const finalWorkflow = await applyAutoLayoutOnAddedNode(updatedWorkflow, newNodeId);
-
-      // Update local cache
-      applyLocalWorkflowUpdate(finalWorkflow);
-      if (!isReadOnly) {
-        await handleSaveWorkflow(finalWorkflow, { showToast: false });
-      }
+        return {
+          workflow: appendWorkflowFragment(workflow, [duplicateNode]),
+          options: { addedNodeId: newNodeId },
+        };
+      });
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      handleSaveWorkflow,
-      applyAutoLayoutOnAddedNode,
-      isReadOnly,
-      applyLocalWorkflowUpdate,
-    ],
+    [canvas, organizationId, canvasId, commitTopologyMutation],
   );
 
   const cancelPendingCanvasSaves = useCallback(() => {
@@ -3153,8 +3024,11 @@ export function AppPage() {
     async (commitMessage: string) => {
       await handleCommitStaging(commitMessage);
       setCommitDialogOpen(false);
+      if (factoryConfigure) {
+        onFactoryConfigureSaved?.();
+      }
     },
-    [handleCommitStaging],
+    [factoryConfigure, handleCommitStaging, onFactoryConfigureSaved],
   );
 
   const handleAgentSidebarStagingCommit = useCallback(
@@ -3213,43 +3087,24 @@ export function AppPage() {
     await handleResetStaging();
   }, [handleResetStaging]);
 
-  const activateCanvasVersionForEditing = useCallback(
-    (versionID: string, version: CanvasesCanvasVersion, options?: { preserveStagedLayer?: boolean }) =>
-      applyCanvasVersionForEditing({
-        organizationId,
-        canvasId,
-        versionID,
-        version,
-        options,
-        liveCanvasVersionId,
-        queryClient,
-        draftCanvasSpec,
-        draftCanvasSpecsRef,
-        activeCanvasVersionIdRef,
-        lastAppliedVersionSnapshotRef,
-        liveCanvasVersion,
-        liveCanvas,
-        clearPendingAutoSaveWork,
-        setDraftCanvasSpec,
-        setActiveCanvasVersion,
-        setLastSavedWorkflowSnapshot,
-        setSearchParams,
-        initializeFromWorkflow,
-      }),
-    [
-      organizationId,
-      canvasId,
-      liveCanvasVersionId,
-      queryClient,
-      draftCanvasSpec,
-      liveCanvasVersion,
-      liveCanvas,
-      clearPendingAutoSaveWork,
-      setLastSavedWorkflowSnapshot,
-      setSearchParams,
-      initializeFromWorkflow,
-    ],
-  );
+  const activateCanvasVersionForEditing = useActivateCanvasVersionForEditing({
+    organizationId,
+    canvasId,
+    liveCanvasVersionId,
+    queryClient,
+    draftCanvasSpec,
+    draftCanvasSpecsRef,
+    activeCanvasVersionIdRef,
+    lastAppliedVersionSnapshotRef,
+    liveCanvasVersion,
+    liveCanvas,
+    clearPendingAutoSaveWork,
+    setDraftCanvasSpec,
+    setActiveCanvasVersion,
+    setLastSavedWorkflowSnapshot,
+    setSearchParams,
+    initializeFromWorkflow,
+  });
 
   const handleUseVersion = useCallback(
     (versionID: string, options?: { preserveStagedLayer?: boolean }) => {
@@ -3477,161 +3332,50 @@ export function AppPage() {
     setFocusRequest,
   ]);
 
-  const exitEditableVersionForRunInspection = useCallback(() => {
-    if (!hasEditableVersion || !liveCanvasVersionId) {
-      return;
-    }
-
-    handleUseVersion(liveCanvasVersionId);
-  }, [hasEditableVersion, liveCanvasVersionId, handleUseVersion]);
-
-  const runLookupEnabled = isViewingLiveVersion && !isEditing;
-  const liveSidebarRunLookupEnabled = runLookupEnabled && !isRunInspectionMode;
-
-  const handleSelectRun = useCallback(
-    (runId: string) => {
-      exitEditableVersionForRunInspection();
-      clearDismissedRunDetail({ persistAutoOpen: true });
-      setRunDetailNodeId(null);
-      setFocusRequest(null);
-      requestRunFitRef.current(runId);
-      startTransition(() => {
-        setSearchParams((current) => applyRunInspectionNavigationSearchParams(current, { runId }), { replace: true });
-      });
-    },
-    [clearDismissedRunDetail, exitEditableVersionForRunInspection, setRunDetailNodeId, setSearchParams],
-  );
-
-  const { resolveRunIdForSidebarEvent, fetchRunIdForSidebarEvent } = useSidebarEventRunLookup({
-    enabled: runLookupEnabled,
+  const {
+    runLookupEnabled,
+    liveSidebarRunLookupEnabled,
+    resolveRunIdForSidebarEvent,
+    fetchRunIdForSidebarEvent,
+    handleSelectRun,
+    handleSelectRunFromSidebarEvent,
+    handleLogRunExecutionSelect,
+    handleNavigateRun,
+    handleClearRunInspection,
+    handleSelectLiveCanvas,
+    handleRunNodeDetailSelection,
+    handleRunNodeDetailNavigate,
+    handleRunCanvasNodeClick,
+    handleLiveCanvasNodeClick,
+  } = useRunInspectionNavigation({
+    hasEditableVersion,
+    liveCanvasVersionId,
+    handleUseVersion,
+    isViewingLiveVersion,
+    isEditing,
+    isRunInspectionMode,
+    clearDismissedRunDetail,
+    setRunDetailNodeId,
+    setFocusRequest,
+    setSearchParams,
+    requestRunFitRef,
+    preserveRunDetailNodeOnNextRunChangeRef,
+    searchParams,
+    runDetailNodeId,
+    clearParticipantFit: runParticipantFit.clearParticipantFit,
+    selectedRunId,
+    selectedRun,
+    isSelectedRunLoading,
+    describeRunSettled,
     canvasId,
     organizationId,
     queryClient,
     runs: runsData.runs,
     infiniteRunsPages: infiniteRunsQuery.data?.pages,
+    runCanvasData,
+    canvasNodesById,
+    refetchNodeDataMethod,
   });
-
-  const handleSelectRunFromSidebarEvent = useCallback(
-    (runId: string, options?: { nodeId?: string }) => {
-      exitEditableVersionForRunInspection();
-      clearDismissedRunDetail({ persistAutoOpen: true });
-      const inspectorNodeId =
-        options?.nodeId ?? (searchParams.get("sidebar") === "1" ? searchParams.get("node") : null);
-      if (!inspectorNodeId) requestRunFitRef.current(runId);
-      if (inspectorNodeId) {
-        preserveRunDetailNodeOnNextRunChangeRef.current = true;
-        setRunDetailNodeId(inspectorNodeId);
-        setFocusRequest({ nodeId: inspectorNodeId, requestId: Date.now(), targetMode: "runs", tab: "latest" });
-      } else {
-        setRunDetailNodeId(null);
-        setFocusRequest(null);
-      }
-
-      setSearchParams(
-        (current) =>
-          applyRunInspectionNavigationSearchParams(current, {
-            runId,
-            nodeId: inspectorNodeId,
-          }),
-        { replace: true },
-      );
-    },
-    [clearDismissedRunDetail, exitEditableVersionForRunInspection, searchParams, setRunDetailNodeId, setSearchParams],
-  );
-
-  const handleLogRunExecutionSelect = useCallback(
-    (options: { runId: string; nodeId: string }) => {
-      exitEditableVersionForRunInspection();
-      clearDismissedRunDetail({ persistAutoOpen: true });
-      preserveRunDetailNodeOnNextRunChangeRef.current = true;
-      setRunDetailNodeId(options.nodeId);
-      setFocusRequest({ nodeId: options.nodeId, requestId: Date.now(), targetMode: "runs", tab: "latest" });
-      setSearchParams(
-        (current) =>
-          applyRunInspectionNavigationSearchParams(current, {
-            runId: options.runId,
-            nodeId: options.nodeId,
-          }),
-        { replace: true },
-      );
-    },
-    [clearDismissedRunDetail, exitEditableVersionForRunInspection, setRunDetailNodeId, setSearchParams],
-  );
-
-  const handleNavigateRun = useCallback(
-    (runId: string) => {
-      exitEditableVersionForRunInspection();
-      const preservedNodeId = runDetailNodeId;
-      preserveRunDetailNodeOnNextRunChangeRef.current = Boolean(preservedNodeId);
-      clearDismissedRunDetail({ persistAutoOpen: true });
-      setFocusRequest(null);
-      requestRunFitRef.current(runId);
-      setSearchParams(
-        (current) =>
-          applyRunInspectionNavigationSearchParams(current, {
-            runId,
-            nodeId: preservedNodeId,
-          }),
-        { replace: true },
-      );
-    },
-    [clearDismissedRunDetail, exitEditableVersionForRunInspection, runDetailNodeId, setFocusRequest, setSearchParams],
-  );
-
-  const handleClearRunInspection = useCallback(() => {
-    setRunDetailNodeId(null);
-    setFocusRequest(null);
-    runParticipantFit.clearParticipantFit();
-    setSearchParams((current) => clearRunInspectionSearchParams(current), { replace: true });
-  }, [runParticipantFit, setSearchParams, setRunDetailNodeId]);
-
-  const handleRunNodeDetailSelection = useCallback(
-    (nodeId: string | null) => {
-      setRunDetailNodeId(nodeId);
-      if (nodeId) {
-        clearDismissedRunDetail({ persistAutoOpen: true });
-      } else {
-        setFocusRequest(null);
-      }
-
-      setSearchParams(
-        (current) => {
-          const next = new URLSearchParams(current);
-          if (nodeId) {
-            next.set("sidebar", "1");
-            next.set("node", nodeId);
-          } else {
-            next.delete("sidebar");
-            next.delete("node");
-          }
-          return next;
-        },
-        { replace: true },
-      );
-    },
-    [clearDismissedRunDetail, setRunDetailNodeId, setSearchParams],
-  );
-
-  const handleRunNodeDetailNavigate = useCallback(
-    (nodeId: string) => {
-      handleRunNodeDetailSelection(nodeId);
-      setFocusRequest({ nodeId, requestId: Date.now(), targetMode: "runs", tab: "latest" });
-    },
-    [handleRunNodeDetailSelection],
-  );
-
-  useStaleRunInspectionUrlCleanup({
-    selectedRunId,
-    isRunInspectionMode,
-    selectedRun,
-    isRunResolveLoading: isSelectedRunLoading,
-    describeRunSettled,
-    onClear: handleClearRunInspection,
-  });
-
-  const handleSelectLiveCanvas = useCallback(() => {
-    handleClearRunInspection();
-  }, [handleClearRunInspection]);
 
   const { handleSelectConsoleMode, handleExitConsoleMode } = useConsoleModeActions({
     setIsConsoleAddPanelOpen,
@@ -3677,14 +3421,19 @@ export function AppPage() {
     handleToggleEditMode,
     setRunDetailNodeId,
     setSearchParams,
-    startup: {
-      hasEditableVersion,
-      canUpdateCanvas: canStageCanvasVersion,
-      canvas,
-      liveVersionLoading: canvasLoading || liveCanvasVersionLoading,
-      handlePlaceholderAdd,
-      searchParams,
-    },
+    // Factory view embed is read-only. Configure enters via a dedicated effect
+    // (does not await staged-spec resync — that was leaving "Loading canvas..." forever).
+    startup:
+      factoryViewOnly || factoryConfigure
+        ? undefined
+        : {
+            hasEditableVersion,
+            canUpdateCanvas: canStageCanvasVersion,
+            canvas,
+            liveVersionLoading: canvasLoading || liveCanvasVersionLoading,
+            handlePlaceholderAdd,
+            searchParams,
+          },
   });
 
   // Ends the edit session: closes the versions sidebar and returns to the live
@@ -3698,93 +3447,38 @@ export function AppPage() {
     }
   }, [clearRunInspectionForEdit, liveCanvasVersionId, handleUseVersion]);
 
-  const handleRunCanvasNodeClick = useCallback(
-    (nodeId: string) => {
-      if (!isRunInspectionMode || !selectedRun) return;
-      const participants = runCanvasData?.participantNodeIds;
-      if (participants && participants.length > 0 && !participants.includes(nodeId)) {
-        return;
-      }
-      handleRunNodeDetailSelection(nodeId);
-    },
-    [handleRunNodeDetailSelection, isRunInspectionMode, selectedRun, runCanvasData],
-  );
-
-  const resolveLatestNodeRunLookupEvent = useCallback(
-    async (nodeId: string): Promise<SidebarEvent | null> => {
-      const workflowNode = canvasNodesById.get(nodeId);
-      if (!workflowNode || !canvasId) {
-        return null;
-      }
-
-      const nodeType = workflowNode.type || "TYPE_ACTION";
-      await refetchNodeDataMethod(canvasId, nodeId, nodeType, queryClient);
-
-      const nodeData = useNodeExecutionStore.getState().getNodeData(nodeId);
-      return resolveRunLookupEventForNodeActivity(nodeId, nodeType, nodeData);
-    },
-    [canvasId, canvasNodesById, refetchNodeDataMethod, queryClient],
-  );
-
-  const handleLiveCanvasNodeClick = useCallback(
-    (nodeId: string) => {
-      if (isRunInspectionMode || isEditing || !liveSidebarRunLookupEnabled) return;
-
-      const lookupId = liveCanvasNodeClickLookupRef.current + 1;
-      liveCanvasNodeClickLookupRef.current = lookupId;
-
-      const cachedRunId = resolveCachedNodeRunId(nodeId, canvasNodesById.get(nodeId), resolveRunIdForSidebarEvent);
-      if (cachedRunId) return handleSelectRunFromSidebarEvent(cachedRunId, { nodeId });
-
-      void (async () => {
-        try {
-          const lookupEvent = await resolveLatestNodeRunLookupEvent(nodeId);
-          if (!lookupEvent || liveCanvasNodeClickLookupRef.current !== lookupId) return;
-
-          const runId = await fetchRunIdForSidebarEvent(lookupEvent, { maxPages: 1 });
-          if (!runId || liveCanvasNodeClickLookupRef.current !== lookupId) return;
-
-          handleSelectRunFromSidebarEvent(runId, { nodeId });
-        } catch (error) {
-          console.error("Failed to inspect latest node run", error);
-        }
-      })();
-    },
-    [
-      canvasNodesById,
-      fetchRunIdForSidebarEvent,
-      handleSelectRunFromSidebarEvent,
-      isEditing,
-      isRunInspectionMode,
-      liveSidebarRunLookupEnabled,
-      resolveLatestNodeRunLookupEvent,
-      resolveRunIdForSidebarEvent,
-    ],
-  );
-
-  useEffect(() => {
-    liveCanvasNodeClickLookupRef.current += 1;
-  }, [isEditing, isRunInspectionMode, liveSidebarRunLookupEnabled]);
-
-  useEffect(() => {
-    if (!isRunInspectionMode || isViewingLiveVersion) return;
-    // Entering an edit session on a draft exits run inspection rather than
-    // snapping back to the live version (which would bounce the user out of edit
-    // mode). For non-editable previews, keep pinning run inspection to live.
-    if (hasEditableVersion) {
-      handleClearRunInspection();
-      return;
-    }
-    if (!liveCanvasVersionId) return;
-    handleUseVersion(liveCanvasVersionId);
-  }, [
-    hasEditableVersion,
-    handleClearRunInspection,
-    handleUseVersion,
-    isRunInspectionMode,
-    isViewingLiveVersion,
+  useFactoryConfigureSession({
+    factoryConfigure,
+    factoryConfigureActionsRef,
+    onFactoryConfigureBusyChange,
+    onFactoryConfigureDone,
+    onFactoryConfigureSaved,
+    editSessionActive,
+    setEditSessionActive,
+    canStageCanvasVersion,
+    canvasLoading,
+    liveCanvasVersionLoading,
     liveCanvasVersionId,
-  ]);
+    liveCanvasVersion,
+    liveCanvas,
+    previewingCurrentVersionRef,
+    activateCanvasVersionForEditing,
+    draftCanvasSpecsRef,
+    setDraftCanvasSpec,
+    resyncStagedEditorState,
+    setLastSavedWorkflowSnapshot,
+    commitStagingPending,
+    resetStagingPending,
+    activeCanvasVersionIdRef,
+    activeCanvasVersionId,
+    getCurrentWorkflowSnapshot,
+    updateCanvasVersionMutation,
+    handleCommitStaging,
+    handleResetStaging,
+    handleExitEditSession,
+    hasStagingChanges,
+    hasUncommittedCanvasDraftChanges,
+  });
 
   const buildYamlExportPayload = useCallback(
     (workflow: CanvasesCanvas | null | undefined, canvasNodes?: CanvasNode[]) =>
@@ -3926,7 +3620,7 @@ export function AppPage() {
     !canvas && (canvasLoading || triggersLoading || componentsLoading || widgetsLoading);
 
   useReportPageReady(!isInitialCanvasBootstrapLoading && !!canvas, {
-    failed: !canvas && !canvasLoading && !isDraftCanvasLoading,
+    failed: !canvas && !canvasLoading && !showDraftCanvasLoadingOverlay,
   });
 
   // Keep full-screen loading only for initial bootstrap.
@@ -3942,7 +3636,7 @@ export function AppPage() {
     );
   }
 
-  if (!canvas && !canvasLoading && !isDraftCanvasLoading) {
+  if (!canvas && !canvasLoading && !showDraftCanvasLoadingOverlay) {
     // Workflow not found after loading - could be deleted or doesn't exist
     // Show a brief message then redirect (handled by the error useEffect above)
     return (
@@ -4021,16 +3715,46 @@ export function AppPage() {
   runDisabledRef.current = runDisabled;
   runDisabledTooltipRef.current = runDisabledTooltip;
 
-  // The runs sidebar (and its toggle icon) is available on both the Canvas and
-  // Console tabs, but not on Memory/Files surfaces or during an edit session.
-  const showRunsSidebar =
-    allowsRunsSidebar(headerMode) && !editSessionActive && !urlViewFlags.isMemoryMode && !urlViewFlags.isFilesMode;
-
-  // The versions sidebar is available only during an edit session while on the
-  // Canvas, Console, or Files surfaces (hidden in Memory and run inspection).
-  // Within the edit session it can be shown/hidden with the header toggle.
-  const showVersionsSidebar = editSessionActive && !runInspectionChromeActive && !urlViewFlags.isMemoryMode;
   const selectedRunDetailDismissed = isRunDetailDismissed(detailDismissedForRunId, selectedRunId);
+  const { showRunsSidebar, showVersionsSidebar } = resolveFactoryEmbedSidebars({
+    factoryEmbed,
+    headerModeAllowsRuns: allowsRunsSidebar(headerMode),
+    editSessionActive,
+    isMemoryMode: urlViewFlags.isMemoryMode,
+    isFilesMode: urlViewFlags.isFilesMode,
+    runInspectionChromeActive,
+  });
+  const factoryEmbedCanvasChrome = resolveFactoryEmbedCanvasChrome({
+    factoryEmbed,
+    factoryAgentEnabled,
+    factoryEditWorkspace,
+    factoryViewOnly,
+    factoryOwnedApp,
+    routeFactoryId,
+    canvas,
+    headerBanner,
+    canUpdateCanvas,
+    showBottomStatusControls,
+    hideAddControls,
+    editSessionActive,
+    runInspectionChromeActive,
+    handleSelectMemoryMode,
+    handleSelectConsoleMode,
+    handleSelectFilesMode,
+    handleEnterEditModeFromHeader,
+    handleExitEditSession,
+    handleSelectLiveCanvas,
+    handleBackToRunList,
+    filesHeaderActionsSlotId,
+    runsHasFitToViewRef,
+    hasFitToViewRef,
+    runsViewportRef,
+    viewportRef,
+    selectedRunId,
+    selectedRunDetailDismissed,
+    runCanvasLoading,
+    selectedRun,
+  });
 
   const toolSidebarRunsContent = renderCanvasRunsSidebarPanel({
     isOpen: showRunsSidebar,
@@ -4068,6 +3792,13 @@ export function AppPage() {
     onLoadMoreLiveVersions: hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined,
     loadMoreLiveVersionsDisabled: !hasMoreLiveVersions || isLoadingMoreLiveVersions,
     loadMoreLiveVersionsPending: isLoadingMoreLiveVersions,
+  });
+  const factoryLayoutCanvasProps = resolveFactoryAutoCanvasProps(factoryAutoLayout, isReadOnly, {
+    onAutoLayoutNodes: handleAutoLayoutNodes,
+    onNodePositionChange: handleNodePositionChange,
+    onNodesPositionChange: handleNodesPositionChange,
+    onPlaceholderAdd: handlePlaceholderAdd,
+    onPlaceholderConfigure: handlePlaceholderConfigure,
   });
 
   return (
@@ -4146,16 +3877,13 @@ export function AppPage() {
           onSidebarChange={handleSidebarChange}
           onTriggerModalHostReady={registerTriggerModalHost}
           title={canvas?.metadata?.name || liveCanvas?.metadata?.name || "Canvas"}
-          factoryId={canvas?.metadata?.factoryId}
-          headerBanner={headerBanner}
+          {...factoryEmbedCanvasChrome}
+          canvasOverlay={factoryCanvasOverlay}
           canvasStateMode={canvasStateMode}
-          showCanvasSettingsMenu={canUpdateCanvas}
           onSeeCurrentVersion={handleSeeCurrentVersion}
-          showBottomStatusControls={showBottomStatusControls}
-          hideAddControls={hideAddControls}
-          onSelectMemory={handleSelectMemoryMode}
           nodes={nodes}
           edges={renderedEdges}
+          {...factoryLayoutCanvasProps}
           organizationId={organizationId}
           canvasId={canvasId}
           getSidebarData={getSidebarData}
@@ -4171,23 +3899,20 @@ export function AppPage() {
           onNodeDelete={!isReadOnly ? handleNodeDelete : undefined}
           onNodesDelete={!isReadOnly ? handleNodesDelete : undefined}
           onDuplicateNodes={!isReadOnly ? handleNodesDuplicate : undefined}
-          onAutoLayoutNodes={!isReadOnly ? handleAutoLayoutNodes : undefined}
           onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
           isAutoLayoutOnUpdateEnabled={isAutoLayoutOnUpdateEnabled && !isReadOnly}
           onToggleAutoLayoutOnUpdate={!isReadOnly ? handleToggleAutoLayoutOnUpdate : undefined}
-          onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
-          onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
-          onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
+          onToggleView={resolveFactoryAwareToggleView(isReadOnly, factoryOwnedApp, handleNodeCollapseChange)}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
           buildingBlocks={buildingBlocks}
           isEditing={isEditing}
+          factoryConfigure={factoryConfigure}
+          factoryEditWorkspace={factoryEditWorkspace}
           activeCanvasVersionId={activeCanvasVersionId}
           liveCanvasVersionId={liveCanvasVersionId}
           onAgentStagingReady={handleAgentStagingReady}
           onAgentStagingCommit={whenAllowed(canUpdateCanvas, handleAgentSidebarStagingCommit)}
           onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
-          onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
-          onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
           integrations={canReadIntegrations ? integrations : []}
           canReadIntegrations={canReadIntegrations}
           canCreateIntegrations={canAct("integrations", "create")}
@@ -4197,33 +3922,22 @@ export function AppPage() {
           missingIntegrations={missingIntegrations}
           onConnectIntegration={!isReadOnly ? handleConnectIntegration : undefined}
           readOnly={isReadOnly || readOnlyViewModes}
-          hasFitToViewRef={runInspectionChromeActive ? runsHasFitToViewRef : hasFitToViewRef}
-          isRunInspectionMode={runInspectionChromeActive}
           hasUserToggledSidebarRef={hasUserToggledSidebarRef}
           isSidebarOpenRef={isSidebarOpenRef}
-          viewportRef={runInspectionChromeActive ? runsViewportRef : viewportRef}
           fitViewContentKey={`${canvasId}:${resolveFitViewVersionId({ liveCanvasVersionId, activeCanvasVersionId, isViewingDraftVersion: isEditing, draftSpec: draftSpecToRender, selectedVersion: selectedCanvasVersion })}`}
           lastFittedContentKeyRef={lastFittedContentKeyRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
           {...runParticipantFit.canvasFitProps}
-          runCanvasLoading={
-            runInspectionChromeActive && selectedRunId !== null && !selectedRunDetailDismissed && runCanvasLoading
-          }
-          runNodeDetailRun={
-            runInspectionChromeActive && selectedRunId && !selectedRunDetailDismissed ? selectedRun : null
-          }
           runNodeDetailNodeId={runDetailNodeId}
           runNodeDetailCanvasId={canvasId}
           runNodeDetailEdges={selectedRunCanvas?.spec?.edges}
           runNavigation={runNavigation}
-          onRunNodeDetailClose={handleBackToRunList}
           onRunNodeDetailClear={() => handleRunNodeDetailSelection(null)}
           onRunNodeDetailNavigate={handleRunNodeDetailNavigate}
           onRunNavigate={handleNavigateRun}
           onRunNavigateOlder={() => {
             void infiniteRunsQuery.fetchNextPage();
           }}
-          onBackToLiveCanvas={handleSelectLiveCanvas}
           onShowDiff={onShowDiff}
           {...canvasConsoleVersionDiff.consoleDiffHeaderProps}
           visualDiffEnabled={draftVisualDiff.visualDiffEnabled && isEditSessionUiReady}
@@ -4231,15 +3945,9 @@ export function AppPage() {
           onToggleVisualDiff={draftVisualDiff.toggleVisualDiff}
           onShowNodeDiff={onShowNodeDiff}
           headerMode={headerMode}
-          isEditSessionActive={editSessionActive}
           onSelectCanvasView={handleSelectCanvasView}
-          onEnterEditMode={handleEnterEditModeFromHeader}
           enterEditModeDisabled={enterEditModeDisabled}
           enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
-          onExitEditMode={handleExitEditSession}
-          onSelectConsole={handleSelectConsoleMode}
-          onSelectFiles={handleSelectFilesMode}
-          filesHeaderActionsSlotId={filesHeaderActionsSlotId}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           {...draftChangeIndicators}
@@ -4295,7 +4003,7 @@ export function AppPage() {
           toolSidebarVersionsContent={toolSidebarVersionsContent}
           focusRequest={focusRequest}
         />
-        {isDraftCanvasLoading ? <CanvasPageLoadingOverlay message="Loading canvas..." /> : null}
+        {showDraftCanvasLoadingOverlay ? <CanvasPageLoadingOverlay message="Loading canvas..." /> : null}
         {versionCanvasLoading && !runInspectionChromeActive ? (
           <CanvasPageLoadingOverlay message="Loading version..." testId="canvas-version-loading" />
         ) : null}
