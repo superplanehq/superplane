@@ -6,8 +6,9 @@ import { fiveStepLineFactoriesFixture, lineMetricsFactoriesFixture } from "../__
 import { LinesPage } from "./LinesPage";
 
 /**
- * Line board is the workspace home: phase columns fill the pane, cards open
- * in a dialog. The list story remains for line management.
+ * Line board is the workspace home: phase columns fill the pane. Cards open
+ * the job-report popup (Storybook wireframe). The list story remains for
+ * line management.
  */
 const meta = {
   title: "Factories/Pages/Lines",

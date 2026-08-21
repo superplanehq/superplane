@@ -5,16 +5,23 @@ import type {
   FactoriesWorkOrderLineDispatch,
   FactoriesWorkOrderLineDispatchResult,
   FactoriesWorkOrderLineDispatchState,
+  FactoryApp,
   FactoryLineStep,
 } from "@/api-client";
 
 import {
+  CLOSED_WORK_ORDER,
+  FAILED_WORK_ORDER,
   HOUR_AGO,
+  OPEN_WORK_ORDER,
+  OPEN_WORK_ORDER_SECONDARY,
   LAST_WEEK,
   LINE_RUN_IMPLEMENT_ID,
   LINE_RUN_VERIFY_PASSED_ID,
   OPERATOR_USER,
+  PR_CLOSURE_COMPLETED_WORK_ORDER,
   PRIMARY_FACTORY_ID,
+  REFUND_FACTORY_APPS,
   REFUND_LINE_FEATURE_ID,
   REFUND_LINE_ONBOARDING_ID,
   REFUND_LINE_PLAN_ID,
@@ -33,6 +40,197 @@ function runAppStep(appId: string, entrypoint: string): FactoryLineStep {
   return {
     type: RUN_APP_TYPE,
     app: { app: appId, entrypoint },
+  };
+}
+
+const PLAN_LINE_DONE_APP_ID = "app-refund-done";
+const PLAN_LINE_BACKLOG_APP_ID = "app-refund-backlog";
+
+const BACKLOG_APP: FactoryApp = {
+  id: PLAN_LINE_BACKLOG_APP_ID,
+  name: "Backlog",
+  description: "Scopes work orders before they enter a line.",
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+};
+
+const PLAN_LINE_APPS: FactoryApp[] = [
+  BACKLOG_APP,
+  ...REFUND_FACTORY_APPS.map((app) => {
+    if (app.id === "app-refund-planner") {
+      return { ...app, name: "Plan" };
+    }
+    if (app.id === "app-refund-implementer") {
+      return { ...app, name: "Implement" };
+    }
+    if (app.id === "app-refund-verifier") {
+      return { ...app, name: "Verify" };
+    }
+    return app;
+  }),
+  {
+    id: PLAN_LINE_DONE_APP_ID,
+    name: "Done",
+    description: "Completes or rejects the work order when a pull request merges or closes.",
+    createdAt: LAST_WEEK,
+    updatedAt: YESTERDAY,
+  },
+];
+
+function withPlanLinePhases(line: FactoriesFactoryLine): FactoriesFactoryLine {
+  if (line.id !== REFUND_LINE_PLAN_ID) {
+    return line;
+  }
+  return {
+    ...line,
+    steps: [
+      runAppStep("app-refund-planner", "start-plan"),
+      runAppStep("app-refund-implementer", "start-implementation"),
+      runAppStep("app-refund-verifier", "start-verification"),
+      runAppStep(PLAN_LINE_DONE_APP_ID, "start-done"),
+    ],
+  };
+}
+
+function planLineActiveDispatch(
+  orderId: string,
+  stepExecutions: FactoriesWorkOrderExecution[],
+): FactoriesWorkOrderLineDispatch {
+  return {
+    id: `dispatch-${REFUND_LINE_PLAN_ID}-${orderId}`,
+    line: { id: REFUND_LINE_PLAN_ID, name: "plan-and-implement" },
+    steps: [
+      { name: "Plan", stepIndex: 0 },
+      { name: "Implement", stepIndex: 1 },
+      { name: "Verify", stepIndex: 2 },
+      { name: "Done", stepIndex: 3 },
+    ],
+    state: "STATE_ACTIVE",
+    result: "RESULT_UNKNOWN",
+    createdAt: TWO_HOURS_AGO,
+    stepExecutions,
+  };
+}
+
+function withPlanPhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
+  if (order.id !== OPEN_WORK_ORDER.id) {
+    return order;
+  }
+  return {
+    ...order,
+    lineDispatches: [
+      planLineActiveDispatch(order.id, [
+        {
+          id: "exec-plan-open",
+          step: "Plan",
+          stepIndex: 0,
+          state: "STATE_STARTED",
+          result: "RESULT_UNKNOWN",
+          createdAt: HOUR_AGO,
+          updatedAt: HOUR_AGO,
+          run: { id: "run-plan-open", appId: "app-refund-planner", appName: "Plan" },
+        },
+      ]),
+    ],
+  };
+}
+
+function withVerifyPhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
+  if (order.id !== OPEN_WORK_ORDER_SECONDARY.id) {
+    return order;
+  }
+  return {
+    ...order,
+    lineDispatches: [
+      planLineActiveDispatch(order.id, [
+        {
+          id: "exec-verify-plan",
+          step: "Plan",
+          stepIndex: 0,
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: TWO_HOURS_AGO,
+          updatedAt: TWO_HOURS_AGO,
+          run: { id: "run-verify-plan", appId: "app-refund-planner", appName: "Plan" },
+        },
+        {
+          id: "exec-verify-implement",
+          step: "Implement",
+          stepIndex: 1,
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: TWO_HOURS_AGO,
+          updatedAt: HOUR_AGO,
+          run: { id: "run-verify-implement", appId: "app-refund-implementer", appName: "Implement" },
+        },
+        {
+          id: "exec-verify-open",
+          step: "Verify",
+          stepIndex: 2,
+          state: "STATE_STARTED",
+          result: "RESULT_UNKNOWN",
+          createdAt: HOUR_AGO,
+          updatedAt: HOUR_AGO,
+          run: { id: "run-verify-open", appId: "app-refund-verifier", appName: "Verify" },
+        },
+      ]),
+    ],
+  };
+}
+
+function withFailedWaitingNote(order: FactoriesWorkOrder): FactoriesWorkOrder {
+  if (order.id !== FAILED_WORK_ORDER.id) {
+    return order;
+  }
+  return {
+    ...order,
+    statusNotes: [
+      {
+        key: "implement-failed",
+        kind: "warning",
+        headline: "Review the failed implement step",
+        body: "Implement did not pass. Open the log, then dispatch the line again.",
+        updatedAt: HOUR_AGO,
+      },
+    ],
+  };
+}
+
+function withDonePhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
+  const doneRun =
+    order.id === CLOSED_WORK_ORDER.id
+      ? { executionId: "exec-done-closed", runId: "run-done-closed", appName: "Done" }
+      : order.id === PR_CLOSURE_COMPLETED_WORK_ORDER.id
+        ? { executionId: "exec-done-pr-closure", runId: "run-done-pr-closure", appName: "PR Closure" }
+        : null;
+  if (!doneRun) {
+    return order;
+  }
+  const dispatch = order.lineDispatches?.[0];
+  if (!dispatch) {
+    return order;
+  }
+  return {
+    ...order,
+    lineDispatches: [
+      {
+        ...dispatch,
+        steps: [...(dispatch.steps ?? []), { name: "Done", stepIndex: 3 }],
+        stepExecutions: [
+          ...(dispatch.stepExecutions ?? []),
+          {
+            id: doneRun.executionId,
+            step: "Done",
+            stepIndex: 3,
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: YESTERDAY,
+            updatedAt: YESTERDAY,
+            run: { id: doneRun.runId, appId: PLAN_LINE_DONE_APP_ID, appName: doneRun.appName },
+          },
+        ],
+      },
+    ],
   };
 }
 
@@ -216,13 +414,21 @@ export const lineMetricsFactoriesFixture: FactoriesFixture = {
     }
     return {
       ...factory,
-      lines: [...(factory.lines ?? []), ONBOARDING_FACTORY_LINE, FEATURE_DELIVERY_LINE],
+      lines: [...(factory.lines ?? []).map(withPlanLinePhases), ONBOARDING_FACTORY_LINE, FEATURE_DELIVERY_LINE],
     };
   }),
+  appsByFactoryId: {
+    ...defaultFactoriesFixture.appsByFactoryId,
+    [PRIMARY_FACTORY_ID]: PLAN_LINE_APPS,
+  },
   workOrdersByFactoryId: {
     ...defaultFactoriesFixture.workOrdersByFactoryId,
     [PRIMARY_FACTORY_ID]: [
-      ...(defaultFactoriesFixture.workOrdersByFactoryId[PRIMARY_FACTORY_ID] ?? []),
+      ...(defaultFactoriesFixture.workOrdersByFactoryId[PRIMARY_FACTORY_ID] ?? [])
+        .map(withPlanPhase)
+        .map(withVerifyPhase)
+        .map(withFailedWaitingNote)
+        .map(withDonePhase),
       FEATURE_RUNNING_WORK_ORDER,
       FEATURE_PR_WORK_ORDER,
       FEATURE_CI_WORK_ORDER,
@@ -254,4 +460,8 @@ export const fiveStepLineFactoriesFixture: FactoriesFixture = {
       }),
     };
   }),
+  appsByFactoryId: {
+    ...defaultFactoriesFixture.appsByFactoryId,
+    [PRIMARY_FACTORY_ID]: [BACKLOG_APP, ...(defaultFactoriesFixture.appsByFactoryId[PRIMARY_FACTORY_ID] ?? [])],
+  },
 };
