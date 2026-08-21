@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/yaml"
+	goyaml "gopkg.in/yaml.v3"
 )
 
 const canvasYAMLSnapshotPath = "canvas.yaml"
@@ -109,16 +109,12 @@ func loadEffectiveSnapshotGraph(ctx context.Context, session *models.AgentSessio
 		if file.Deleted {
 			return snapshotGraph{source: "staging"}
 		}
-		parsed, parseErr := yaml.CanvasFromYAML([]byte(file.Content))
-		if parseErr != nil || parsed == nil || parsed.Spec == nil {
+		parsed, parseErr := parseStagedSnapshotGraph(file.Content)
+		if parseErr != nil {
 			log.WithError(parseErr).Warn("failed to parse staged canvas yaml for agent snapshot")
 			return graph
 		}
-		return snapshotGraph{
-			source: "staging",
-			nodes:  parsed.Nodes(),
-			edges:  parsed.Edges(),
-		}
+		return parsed
 	}
 
 	return graph
@@ -174,4 +170,94 @@ func firstSnapshotNonEmptyString(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// Local YAML parse only. pkg/yaml.CanvasFromYAML pulls canvases/changesets and
+// creates a test import cycle through test/support → agents.
+type stagedCanvasDocument struct {
+	Spec *stagedCanvasSpec `yaml:"spec"`
+}
+
+type stagedCanvasSpec struct {
+	Nodes []stagedCanvasNode `yaml:"nodes"`
+	Edges []stagedCanvasEdge `yaml:"edges"`
+}
+
+type stagedCanvasNode struct {
+	ID             string  `yaml:"id"`
+	Name           string  `yaml:"name"`
+	Type           string  `yaml:"type"`
+	Component      string  `yaml:"component"`
+	ErrorMessage   *string `yaml:"errorMessage"`
+	WarningMessage *string `yaml:"warningMessage"`
+}
+
+type stagedCanvasEdge struct {
+	SourceID string `yaml:"sourceId"`
+	TargetID string `yaml:"targetId"`
+	Channel  string `yaml:"channel"`
+}
+
+func parseStagedSnapshotGraph(content string) (snapshotGraph, error) {
+	var document stagedCanvasDocument
+	if err := goyaml.Unmarshal([]byte(content), &document); err != nil {
+		return snapshotGraph{}, err
+	}
+	if document.Spec == nil {
+		return snapshotGraph{}, fmt.Errorf("staged canvas yaml has no spec")
+	}
+
+	nodes := make([]models.Node, 0, len(document.Spec.Nodes))
+	for _, node := range document.Spec.Nodes {
+		nodes = append(nodes, stagedCanvasNodeToModel(node))
+	}
+
+	edges := make([]models.Edge, 0, len(document.Spec.Edges))
+	for _, edge := range document.Spec.Edges {
+		edges = append(edges, models.Edge{
+			SourceID: edge.SourceID,
+			TargetID: edge.TargetID,
+			Channel:  edge.Channel,
+		})
+	}
+
+	return snapshotGraph{source: "staging", nodes: nodes, edges: edges}, nil
+}
+
+func stagedCanvasNodeToModel(node stagedCanvasNode) models.Node {
+	return models.Node{
+		ID:             node.ID,
+		Name:           node.Name,
+		Type:           stagedCanvasNodeType(node.Type),
+		Ref:            stagedCanvasNodeRef(node.Type, node.Component),
+		ErrorMessage:   node.ErrorMessage,
+		WarningMessage: node.WarningMessage,
+	}
+}
+
+func stagedCanvasNodeType(yamlType string) string {
+	switch yamlType {
+	case "TYPE_TRIGGER":
+		return models.NodeTypeTrigger
+	case "TYPE_WIDGET":
+		return models.NodeTypeWidget
+	case "TYPE_ACTION":
+		return models.NodeTypeComponent
+	default:
+		return yamlType
+	}
+}
+
+func stagedCanvasNodeRef(yamlType, component string) models.NodeRef {
+	if component == "" {
+		return models.NodeRef{}
+	}
+	switch yamlType {
+	case "TYPE_TRIGGER":
+		return models.NodeRef{Trigger: &models.TriggerRef{Name: component}}
+	case "TYPE_WIDGET":
+		return models.NodeRef{Widget: &models.WidgetRef{Name: component}}
+	default:
+		return models.NodeRef{Component: &models.ComponentRef{Name: component}}
+	}
 }

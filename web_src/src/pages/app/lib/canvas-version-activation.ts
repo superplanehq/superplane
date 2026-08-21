@@ -195,7 +195,11 @@ export function activateCanvasVersionForEditing({
   setLastSavedWorkflowSnapshot(null);
 
   setSearchParams((current) => {
-    let next = clearRunInspectionSearchParams(new URLSearchParams(current));
+    // Leaving factory Configure must keep run/from/line context. Clearing run
+    // inspection params here would drop the run the leave path just restored.
+    let next = options?.leaveFactoryConfigure
+      ? new URLSearchParams(current)
+      : clearRunInspectionSearchParams(new URLSearchParams(current));
     next.delete("branch");
     if (isCurrentLive) {
       next.delete("version");

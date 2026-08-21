@@ -108,4 +108,40 @@ describe("activateCanvasVersionForEditing", () => {
     expect(next.get("agent")).toBeNull();
     expect(next.get("from")).toBe("automations");
   });
+
+  it("keeps run context when leaving factory Configure", () => {
+    const setSearchParams = vi.fn();
+
+    activateCanvasVersionForEditing({
+      organizationId: "org-1",
+      canvasId: "canvas-1",
+      versionID: "version-live",
+      version: { metadata: { id: "version-live" }, spec: {} },
+      options: { leaveFactoryConfigure: true },
+      liveCanvasVersionId: "version-live",
+      queryClient: {
+        cancelQueries: vi.fn(),
+        invalidateQueries: vi.fn().mockResolvedValue(undefined),
+        setQueryData: vi.fn(),
+        getQueryData: vi.fn(),
+      } as never,
+      draftCanvasSpec: null,
+      draftCanvasSpecsRef: { current: new Map() },
+      activeCanvasVersionIdRef: { current: "" },
+      lastAppliedVersionSnapshotRef: { current: "" },
+      clearPendingAutoSaveWork: vi.fn(),
+      setDraftCanvasSpec: vi.fn(),
+      setActiveCanvasVersion: vi.fn(),
+      setLastSavedWorkflowSnapshot: vi.fn(),
+      setSearchParams,
+      initializeFromWorkflow: vi.fn(),
+    });
+
+    const updater = setSearchParams.mock.calls[0]?.[0] as (current: URLSearchParams) => URLSearchParams;
+    const next = updater(new URLSearchParams("configure=1&agent=1&run=run-42&from=automations"));
+    expect(next.get("configure")).toBeNull();
+    expect(next.get("agent")).toBeNull();
+    expect(next.get("run")).toBe("run-42");
+    expect(next.get("from")).toBe("automations");
+  });
 });

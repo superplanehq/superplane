@@ -3442,7 +3442,11 @@ export function AppPage({
   // previewing a version from the sidebar.
   const handleExitEditSession = useCallback(() => {
     setEditSessionActive(false);
-    clearRunInspectionForEdit();
+    // Factory Discard leaves Configure with run/from/line kept. Clearing run
+    // inspection here would drop that context before the live restore rewrite.
+    if (!factoryConfigure) {
+      clearRunInspectionForEdit();
+    }
     if (liveCanvasVersionId) {
       handleUseVersion(liveCanvasVersionId, factoryConfigure ? { leaveFactoryConfigure: true } : undefined);
     }
