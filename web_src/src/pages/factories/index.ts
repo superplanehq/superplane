@@ -4,6 +4,7 @@ export {
   AutomationsPage,
   CreateWorkOrderComposeRedirect,
   FactoryAppCanvasPage,
+  FactoryHomeRedirect,
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,

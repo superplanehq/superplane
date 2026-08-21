@@ -22,9 +22,11 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   entry: WorkOrderListEntry;
   /**
    * Overlay destination. Defaults to the work order. The Lines board
-   * passes the canvas run so a click opens the same card in the run view.
+   * passes onOpen to show the card dialog instead of navigating.
    */
   href?: string;
+  /** When set, the card overlay opens this handler instead of navigating. */
+  onOpen?: () => void;
 }
 
 /**
@@ -45,6 +47,7 @@ export function WorkOrderCard({
   onDispatch,
   onAssigneesSave,
   href,
+  onOpen,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination =
@@ -57,7 +60,16 @@ export function WorkOrderCard({
       className="group relative w-full rounded-md border border-border bg-card p-2.5 shadow-sm transition hover:border-foreground/20 hover:shadow"
       data-testid={`work-order-card-${entry.id}`}
     >
-      <Link to={destination} className="absolute inset-0 z-0 rounded-md" aria-label={`Open ${entry.title}`} />
+      {onOpen ? (
+        <button
+          type="button"
+          className="absolute inset-0 z-0 rounded-md"
+          aria-label={`Open ${entry.title}`}
+          onClick={onOpen}
+        />
+      ) : (
+        <Link to={destination} className="absolute inset-0 z-0 rounded-md" aria-label={`Open ${entry.title}`} />
+      )}
 
       <div className="relative z-10 pointer-events-none">
         <div className="flex items-start justify-between gap-2">

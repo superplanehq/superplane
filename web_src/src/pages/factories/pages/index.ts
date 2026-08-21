@@ -2,6 +2,7 @@ export { AutomationsPage } from "./AutomationsPage";
 export { ComingSoonPage } from "./ComingSoonPage";
 export { CreateWorkOrderComposeRedirect } from "./CreateWorkOrderComposeRedirect";
 export { FactoryAppCanvasPage } from "./FactoryAppCanvasPage";
+export { FactoryHomeRedirect } from "./FactoryHomeRedirect";
 export { FactoryLineEditPage } from "./FactoryLineEditPage";
 export { LinesPage } from "./LinesPage";
 export { MissionsPage } from "./MissionsPage";

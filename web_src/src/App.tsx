@@ -29,6 +29,7 @@ import {
   FactoriesIndexPage,
   FactoriesLayout,
   FactoryAppCanvasPage,
+  FactoryHomeRedirect,
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
@@ -180,7 +181,7 @@ function AppRouter() {
                     element={withAuthPermissionAndFactoriesFeature(FactoriesLayout, "factories", "read")}
                   >
                     <Route element={<OnboardingGate />}>
-                      <Route index element={<Navigate to="overview" replace />} />
+                      <Route index element={<FactoryHomeRedirect />} />
                       <Route path="setup" element={<OnboardingPage />} />
                       <Route path="onboarding" element={<Navigate to="../setup" replace />} />
                       <Route path="overview" element={<WorkspaceOverviewPage />} />

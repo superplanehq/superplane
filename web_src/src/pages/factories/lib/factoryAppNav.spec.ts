@@ -30,10 +30,10 @@ describe("resolveFactoryAppBackNav", () => {
     });
   });
 
-  it("falls back to Overview when from missing", () => {
+  it("falls back to the line board when from is missing", () => {
     expect(resolveFactoryAppBackNav("org", "fac", {})).toEqual({
-      label: "Overview",
-      href: "/org/workspaces/fac/overview",
+      label: "Line",
+      href: "/org/workspaces/fac/lines",
     });
   });
 

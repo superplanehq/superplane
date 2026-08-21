@@ -4,7 +4,9 @@ import {
   factoryAppPath,
   factoryAppViewPath,
   factoryDetailPath,
+  factoryHomePath,
   factorySettingsGeneralPathAfterKeyChange,
+  firstFactoryLineId,
   legacyWorkOrderDetailPath,
   organizationSettingsPath,
   organizationSettingsSectionPath,
@@ -16,6 +18,26 @@ import {
 describe("factoryDetailPath", () => {
   it("builds the workspace URL from the workspace key", () => {
     expect(factoryDetailPath("org-1", "SP")).toBe("/org-1/workspaces/SP");
+  });
+});
+
+describe("factoryHomePath", () => {
+  it("opens the first line board when a line id is present", () => {
+    expect(factoryHomePath("org-1", "SP", "line-plan")).toBe("/org-1/workspaces/SP/lines/line-plan");
+  });
+
+  it("opens the lines list when no line id is present", () => {
+    expect(factoryHomePath("org-1", "SP")).toBe("/org-1/workspaces/SP/lines");
+  });
+});
+
+describe("firstFactoryLineId", () => {
+  it("returns the first line that has an id", () => {
+    expect(firstFactoryLineId({ lines: [{ id: "line-a" }, { id: "line-b" }] })).toBe("line-a");
+  });
+
+  it("returns undefined when the factory has no line", () => {
+    expect(firstFactoryLineId({ lines: [] })).toBeUndefined();
   });
 });
 

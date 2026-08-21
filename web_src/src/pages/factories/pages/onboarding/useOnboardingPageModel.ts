@@ -13,12 +13,7 @@ import { useInstallFactory } from "@/pages/home/useInstallFactory";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
-import {
-  factoryListPath,
-  factoryOverviewPath,
-  factorySetupPath,
-  workOrderDetailPath,
-} from "../../lib/factoryPagePaths";
+import { factoryHomePath, factoryListPath, factorySetupPath, workOrderDetailPath } from "../../lib/factoryPagePaths";
 import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import type { IntegrationId, WizardStepId } from "./onboardingFixtures";
@@ -212,7 +207,7 @@ function navigateAfterFinish(
     navigate(workOrderDetailPath(organizationId, factoryKey, orderNumber), { replace: true });
     return;
   }
-  navigate(factoryOverviewPath(organizationId, factoryKey), { replace: true });
+  navigate(factoryHomePath(organizationId, factoryKey), { replace: true });
 }
 
 function useFinishOnboarding(args: {

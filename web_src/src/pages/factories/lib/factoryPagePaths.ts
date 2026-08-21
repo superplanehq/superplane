@@ -15,6 +15,24 @@ export function factoryOverviewPath(organizationId: string, factoryKey: string) 
   return `${factoryDetailPath(organizationId, factoryKey)}/overview`;
 }
 
+/** First line id on a factory, when the factory has at least one line. */
+export function firstFactoryLineId(
+  factory: { lines?: Array<{ id?: string }> | null } | null | undefined,
+): string | undefined {
+  return factory?.lines?.find((line) => Boolean(line.id))?.id;
+}
+
+/**
+ * Workspace home: the first line board when a line exists, otherwise the
+ * lines list (empty state).
+ */
+export function factoryHomePath(organizationId: string, factoryKey: string, lineId?: string | null) {
+  if (lineId) {
+    return factoryLineDetailPath(organizationId, factoryKey, lineId);
+  }
+  return linesPath(organizationId, factoryKey);
+}
+
 export function factorySetupPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/setup`;
 }

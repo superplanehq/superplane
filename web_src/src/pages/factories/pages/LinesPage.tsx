@@ -9,7 +9,7 @@ import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Clock, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
+import { ChevronDown, Clock, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
@@ -17,7 +17,6 @@ import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import {
   buildLinePhaseBoard,
   LINE_PHASE_RUNS_PAGE_SIZE,
-  linePhaseRunHref,
   resolveColumnGlyph,
   resolvePhaseRunStatus,
   type LinePhaseColumn,
@@ -34,6 +33,7 @@ import {
   type BoardLaneTone,
 } from "../workOrders/WorkOrderBoardChrome";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
+import { WorkOrderPeekDialog } from "../WorkOrderPeekDialog";
 import {
   createFactoryLinePath,
   editFactoryLinePath,
@@ -98,6 +98,7 @@ export function LinesPage() {
             organizationId={organizationId}
             factoryKey={factoryKey}
             line={selectedLine}
+            lines={lines}
             apps={factoryApps}
             canUpdate={canUpdate}
           />
@@ -106,6 +107,7 @@ export function LinesPage() {
         <div className={factoryWorkOrdersBodyClassName}>
           <LineDetail
             organizationId={organizationId}
+            factoryId={factoryId}
             factoryKey={factoryKey}
             line={selectedLine}
             apps={factoryApps}
@@ -181,12 +183,14 @@ function LineDetailHeader({
   organizationId,
   factoryKey,
   line,
+  lines,
   apps,
   canUpdate,
 }: {
   organizationId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
+  lines: FactoriesFactoryLine[];
   apps: Array<{ id?: string; name?: string }>;
   canUpdate: boolean;
 }) {
@@ -194,11 +198,8 @@ function LineDetailHeader({
   return (
     <WorkspacePageHeader
       className={factorySectionHeaderClassName}
-      variant="entity"
-      backHref={linesPath(organizationId, factoryKey)}
-      backLabel="Lines"
-      backTestId="lines-back-to-list"
       title={humanizeLineName(line.name)}
+      leading={<LineBoardSwitcher organizationId={organizationId} factoryKey={factoryKey} lines={lines} />}
       subtitle={formatLinePhaseDescription(line.steps, apps)}
       actions={
         canUpdate ? (
@@ -214,8 +215,51 @@ function LineDetailHeader({
   );
 }
 
+function LineBoardSwitcher({
+  organizationId,
+  factoryKey,
+  lines,
+}: {
+  organizationId: string;
+  factoryKey: string;
+  lines: FactoriesFactoryLine[];
+}) {
+  const navigate = useNavigate();
+  const switchableLines = lines.filter((entry) => Boolean(entry.id));
+  if (switchableLines.length <= 1) {
+    return null;
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          data-testid="lines-switcher"
+          aria-label="Switch line"
+        >
+          <ChevronDown className="size-4" aria-hidden />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        {switchableLines.map((entry) => (
+          <DropdownMenuItem
+            key={entry.id}
+            onClick={() => navigate(factoryLineDetailPath(organizationId, factoryKey, entry.id!))}
+            data-testid={`lines-switcher-${entry.id}`}
+          >
+            {humanizeLineName(entry.name)}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function LineDetail({
   organizationId,
+  factoryId,
   factoryKey,
   line,
   apps,
@@ -223,6 +267,7 @@ function LineDetail({
   workOrderCardContext,
 }: {
   organizationId: string;
+  factoryId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
   apps: Array<{ id?: string; name?: string }>;
@@ -231,6 +276,7 @@ function LineDetail({
 }) {
   const steps = line.steps ?? [];
   const board = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
+  const [peekOrderId, setPeekOrderId] = useState<string | null>(null);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
@@ -243,8 +289,21 @@ function LineDetail({
           lineId={line.id}
           columns={board}
           workOrderCardContext={workOrderCardContext}
+          onOpenWorkOrder={setPeekOrderId}
         />
       )}
+      <WorkOrderPeekDialog
+        open={Boolean(peekOrderId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPeekOrderId(null);
+          }
+        }}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        orderId={peekOrderId}
+      />
     </div>
   );
 }
@@ -255,12 +314,14 @@ function PhaseBoard({
   lineId,
   columns,
   workOrderCardContext,
+  onOpenWorkOrder,
 }: {
   organizationId: string;
   factoryKey: string;
   lineId?: string;
   columns: LinePhaseColumn[];
   workOrderCardContext: WorkOrderCardContext;
+  onOpenWorkOrder: (orderId: string) => void;
 }) {
   return (
     <WorkOrderKanbanBoard testId="lines-phase-board">
@@ -278,6 +339,7 @@ function PhaseBoard({
             lineId={lineId}
             column={column}
             workOrderCardContext={workOrderCardContext}
+            onOpenWorkOrder={onOpenWorkOrder}
           />
         </div>
       ))}
@@ -301,12 +363,14 @@ function PhaseColumn({
   lineId,
   column,
   workOrderCardContext,
+  onOpenWorkOrder,
 }: {
   organizationId: string;
   factoryKey: string;
   lineId?: string;
   column: LinePhaseColumn;
   workOrderCardContext: WorkOrderCardContext;
+  onOpenWorkOrder: (orderId: string) => void;
 }) {
   const scrollRef = useRef<HTMLUListElement>(null);
   const [visibleCount, setVisibleCount] = useState(LINE_PHASE_RUNS_PAGE_SIZE);
@@ -378,12 +442,7 @@ function PhaseColumn({
       >
         {visibleRuns.map((run) => (
           <li key={run.executionId}>
-            <PhaseRunCard
-              run={run}
-              lineId={lineId}
-              stepAppId={column.appId}
-              workOrderCardContext={workOrderCardContext}
-            />
+            <PhaseRunCard run={run} workOrderCardContext={workOrderCardContext} onOpenWorkOrder={onOpenWorkOrder} />
           </li>
         ))}
       </ul>
@@ -393,29 +452,28 @@ function PhaseColumn({
 
 function PhaseRunCard({
   run,
-  lineId,
-  stepAppId,
   workOrderCardContext,
+  onOpenWorkOrder,
 }: {
   run: LinePhaseRunCard;
-  lineId?: string;
-  stepAppId?: string;
   workOrderCardContext: WorkOrderCardContext;
+  onOpenWorkOrder: (orderId: string) => void;
 }) {
   const { factory } = useFactoriesLayout();
   const entry = useMemo(() => buildWorkOrderListEntry(run.order, factory), [run.order, factory]);
-  const href = linePhaseRunHref(
-    workOrderCardContext.organizationId,
-    workOrderCardContext.factoryKey,
-    lineId,
-    run,
-    stepAppId,
-  );
   const queuedLabel = isQueuedStepRow(run.execution) ? resolvePhaseRunStatus(run.execution).label : null;
 
   return (
     <div data-testid={`lines-phase-run-${run.executionId}`}>
-      <WorkOrderCard {...workOrderCardContext} entry={entry} href={href} />
+      <WorkOrderCard
+        {...workOrderCardContext}
+        entry={entry}
+        onOpen={() => {
+          if (run.workOrderId) {
+            onOpenWorkOrder(run.workOrderId);
+          }
+        }}
+      />
       {queuedLabel ? (
         <p className="mt-1 flex items-center gap-1 px-0.5 text-[11px] text-muted-foreground">
           <Clock className="size-3 shrink-0" aria-hidden />

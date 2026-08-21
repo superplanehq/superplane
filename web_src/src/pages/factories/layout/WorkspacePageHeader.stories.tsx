@@ -5,14 +5,8 @@ import { Button } from "@/components/ui/button";
 import { SegmentedNav } from "@/ui/SegmentedNav";
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "../__fixtures__/factoriesStoryTheme";
-import {
-  EMPTY_FACTORY,
-  FACTORIES_ORGANIZATION_ID,
-  PRIMARY_FACTORY_KEY,
-  REFUND_FACTORY,
-} from "../__fixtures__/factoryPageResponses";
+import { EMPTY_FACTORY, FACTORIES_ORGANIZATION_ID, REFUND_FACTORY } from "../__fixtures__/factoryPageResponses";
 import { factorySectionHeaderClassName } from "../pages/factoryPageLayoutStyles";
-import { FactoriesNav } from "./FactoriesNav";
 import { WorkspacePageHeader } from "./WorkspacePageHeader";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
@@ -200,12 +194,12 @@ export const EntityWorkOrder: Story = {
   },
 };
 
-/** Compact section title lines up with the sidebar workspace name. */
+/** Compact section title lines up with the sidebar workspace control. */
 export const AlignedWithSidebar: Story = {
   name: "Aligned with sidebar",
   render: () => (
     <div className="flex min-h-screen bg-background">
-      <aside className="flex w-[var(--workspace-navigation-width)] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+      <aside className="flex w-[var(--workspace-navigation-width)] shrink-0 flex-col items-center border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
         <WorkspaceSwitcher
           organizationId={FACTORIES_ORGANIZATION_ID}
           factory={REFUND_FACTORY}
@@ -215,17 +209,12 @@ export const AlignedWithSidebar: Story = {
           permissionsLoading={false}
           onCreateFactory={() => console.log("create workspace")}
         />
-        <FactoriesNav
-          organizationId={FACTORIES_ORGANIZATION_ID}
-          factoryKey={PRIMARY_FACTORY_KEY}
-          recentWorkOrders={[]}
-        />
       </aside>
       <div className="min-w-0 flex-1">
         <WorkspacePageHeader
           className={factorySectionHeaderClassName}
-          title="Overview"
-          subtitle="Your workspace at a glance. Content for this page comes next."
+          title="Plan and Implement"
+          subtitle="Refund Planner → Refund Implementer"
         />
       </div>
     </div>

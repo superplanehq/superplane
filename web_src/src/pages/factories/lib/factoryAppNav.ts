@@ -1,8 +1,8 @@
 import {
   automationDetailPath,
   automationsPath,
+  factoryHomePath,
   factoryLineDetailPath,
-  factoryOverviewPath,
   linesPath,
   workOrderDetailPath,
   workOrdersPath,
@@ -15,7 +15,7 @@ export type FactoryAppBackNav = {
 
 /**
  * Resolves the route-aware back link for the factory-embedded canvas view.
- * Unknown / missing `from` falls back to Overview.
+ * Unknown / missing `from` falls back to the line board home.
  */
 export function resolveFactoryAppBackNav(
   organizationId: string,
@@ -65,5 +65,5 @@ export function resolveFactoryAppBackNav(
     return { label: "Work Orders", href: workOrdersPath(organizationId, factoryKey) };
   }
 
-  return { label: "Overview", href: factoryOverviewPath(organizationId, factoryKey) };
+  return { label: "Line", href: factoryHomePath(organizationId, factoryKey) };
 }
