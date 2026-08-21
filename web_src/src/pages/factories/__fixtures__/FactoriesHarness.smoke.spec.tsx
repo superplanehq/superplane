@@ -163,6 +163,19 @@ describe("FactoriesHarness workspace setup", () => {
     expect(await screen.findByRole("option", { name: /acme\/api/ }, { timeout: 8000 })).toBeInTheDocument();
   }, 15000);
 
+  it("opens the repository list when GitHub sends the browser back to the VCS step", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=vcs&pick=newest`}
+        factoriesFixture={defaultFactoriesFixture}
+        onboardingSeed={{ pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" } }}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+      />,
+    );
+
+    expect(await screen.findByRole("option", { name: /acme\/api/ }, { timeout: 8000 })).toBeInTheDocument();
+  }, 15000);
+
   it("opens the step from the URL with the saved answers restored", async () => {
     render(
       <FactoriesHarness
