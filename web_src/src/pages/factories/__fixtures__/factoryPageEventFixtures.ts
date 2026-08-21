@@ -6,6 +6,7 @@ import {
   DRAFT_WORK_ORDER,
   FAILED_WORK_ORDER,
   HOUR_AGO,
+  INGEST_DRAFT_WORK_ORDER,
   LAST_WEEK,
   LINE_RUN_IMPLEMENT_FAILED_ID,
   LINE_RUN_IMPLEMENT_ID,
@@ -247,6 +248,19 @@ export const DRAFT_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     "Scoping notes: need product sign-off on metric names before moving to ready.",
     { kind: "user", userId: STORYBOOK_ME_USER_ID },
   ),
+];
+
+export const INGEST_DRAFT_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
+  statusUpdatedEvent(INGEST_DRAFT_WORK_ORDER, TWO_HOURS_AGO, {
+    fromState: "",
+    toState: "draft",
+    automation: {
+      appId: "app-refund-backlog",
+      appName: "Ingest",
+      nodeName: "Create Work Order",
+    },
+    app: { id: "app-refund-backlog" },
+  }),
 ];
 
 export const CLOSED_FAILED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
@@ -521,6 +535,7 @@ export const DEFAULT_EVENTS_BY_ORDER_ID: Record<string, FactoriesWorkOrderEvent[
   [RUNNING_WORK_ORDER.id!]: RUNNING_WORK_ORDER_EVENTS,
   [FAILED_WORK_ORDER.id!]: FAILED_WORK_ORDER_EVENTS,
   [DRAFT_WORK_ORDER.id!]: DRAFT_WORK_ORDER_EVENTS,
+  [INGEST_DRAFT_WORK_ORDER.id!]: INGEST_DRAFT_WORK_ORDER_EVENTS,
   [CLOSED_WORK_ORDER.id!]: CLOSED_WORK_ORDER_EVENTS,
   [CLOSED_FAILED_WORK_ORDER.id!]: CLOSED_FAILED_WORK_ORDER_EVENTS,
 };

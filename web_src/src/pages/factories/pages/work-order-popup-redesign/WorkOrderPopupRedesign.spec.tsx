@@ -48,6 +48,7 @@ describe("WorkOrderPopupRedesignPlayground", () => {
     expect(within(dialog).getByRole("link", { name: /#482|Fix duplicate refund/ })).toHaveAttribute("target", "_blank");
     expect(within(dialog).getByRole("link", { name: /feature\/refund-retry/ })).toHaveAttribute("target", "_blank");
     expect(within(dialog).getByText("plan-and-implement")).toBeInTheDocument();
+    expect(within(dialog).getByText("Backlog")).toBeInTheDocument();
     expect(within(dialog).getByText("Plan")).toBeInTheDocument();
     expect(within(dialog).getByText("Implement")).toBeInTheDocument();
     expect(within(dialog).getByText("Verify")).toBeInTheDocument();
@@ -75,6 +76,7 @@ describe("WorkOrderPopupRedesignPlayground", () => {
     expect(within(dialog).getByRole("heading", { name: "Add refund reconciliation test" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("heading", { name: "Scores" })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Log" })).toBeInTheDocument();
+    expect(within(dialog).getByText("Backlog")).toBeInTheDocument();
     expect(within(dialog).getByText("Implement")).toBeInTheDocument();
     expect(within(dialog).queryByText("Review the pull request")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("heading", { name: "Outputs" })).not.toBeInTheDocument();
@@ -118,10 +120,10 @@ describe("Line board job popup", () => {
       }),
     ).toBeInTheDocument();
     expect(
-      within(screen.getByTestId("lines-backlog-column")).queryByRole("button", {
-        name: "Open Reconcile duplicate refunds in ledger",
+      within(screen.getByTestId("lines-backlog-column")).getByRole("button", {
+        name: "Open Paginated listings report a next page on the last full page",
       }),
-    ).not.toBeInTheDocument();
+    ).toBeInTheDocument();
     expect(
       within(screen.getByLabelText("Plan phase")).getByRole("button", {
         name: "Open Reconcile duplicate refunds in ledger",
@@ -146,12 +148,61 @@ describe("Line board job popup", () => {
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Add refund reconciliation test" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("heading", { name: "Outputs" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "description.md" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("heading", { name: "Scores" })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Log" })).toBeInTheDocument();
     expect(within(dialog).getByText("Implement")).toBeInTheDocument();
     expect(within(dialog).queryByText("Review the pull request")).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/Users see duplicate refund/)).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-peek-dialog")).not.toBeInTheDocument();
+  }, 15000);
+
+  it("matches popup content to the card state", async () => {
+    const user = userEvent.setup();
+    const line = REFUND_FACTORY_LINES[0];
+
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={lineMetricsFactoriesFixture}
+      />,
+    );
+
+    await screen.findByRole("button", { name: "Open Add refund reconciliation test" }, { timeout: 8000 });
+
+    await user.click(screen.getByRole("button", { name: "Open Reconcile duplicate refunds in ledger" }));
+    let dialog = await screen.findByTestId("work-order-popup-job");
+    expect(within(dialog).queryByText("Review the pull request")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("heading", { name: "Scores" })).not.toBeInTheDocument();
+    expect(within(dialog).getByText("Plan")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+
+    await user.click(screen.getByRole("button", { name: "Open Ship idempotent refund retries" }));
+    dialog = await screen.findByTestId("work-order-popup-job");
+    expect(within(dialog).getByText("Review the failed implement step")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("heading", { name: "Scores" })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+
+    await user.click(screen.getByRole("button", { name: "Open Add refund reason enum to schema" }));
+    dialog = await screen.findByTestId("work-order-popup-job");
+    expect(within(dialog).queryByText("Review the pull request")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Scores" })).toBeInTheDocument();
+    expect(within(dialog).getByText("Verify")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+
+    await user.click(screen.getByRole("button", { name: "Open Draft: rework refund telemetry" }));
+    dialog = await screen.findByTestId("work-order-popup-job");
+    expect(within(dialog).getByText("Backlog")).toBeInTheDocument();
+    expect(within(dialog).getByText("Create work order")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "description.md" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("heading", { name: "Scores" })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+
+    await user.click(
+      screen.getByRole("button", { name: "Open Paginated listings report a next page on the last full page" }),
+    );
+    dialog = await screen.findByTestId("work-order-popup-job");
+    expect(within(dialog).getByText("Create work order from GitHub issue")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "description.md" })).toBeInTheDocument();
   }, 15000);
 });

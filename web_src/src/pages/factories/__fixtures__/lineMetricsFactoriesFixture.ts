@@ -11,6 +11,7 @@ import type {
 
 import {
   CLOSED_WORK_ORDER,
+  FAILED_WORK_ORDER,
   HOUR_AGO,
   OPEN_WORK_ORDER,
   OPEN_WORK_ORDER_SECONDARY,
@@ -172,6 +173,24 @@ function withVerifyPhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
           run: { id: "run-verify-open", appId: "app-refund-verifier", appName: "Verify" },
         },
       ]),
+    ],
+  };
+}
+
+function withFailedWaitingNote(order: FactoriesWorkOrder): FactoriesWorkOrder {
+  if (order.id !== FAILED_WORK_ORDER.id) {
+    return order;
+  }
+  return {
+    ...order,
+    statusNotes: [
+      {
+        key: "implement-failed",
+        kind: "warning",
+        headline: "Review the failed implement step",
+        body: "Implement did not pass. Open the log, then dispatch the line again.",
+        updatedAt: HOUR_AGO,
+      },
     ],
   };
 }
@@ -401,6 +420,7 @@ export const lineMetricsFactoriesFixture: FactoriesFixture = {
       ...(defaultFactoriesFixture.workOrdersByFactoryId[PRIMARY_FACTORY_ID] ?? [])
         .map(withPlanPhase)
         .map(withVerifyPhase)
+        .map(withFailedWaitingNote)
         .map(withDonePhase),
       FEATURE_RUNNING_WORK_ORDER,
       FEATURE_PR_WORK_ORDER,

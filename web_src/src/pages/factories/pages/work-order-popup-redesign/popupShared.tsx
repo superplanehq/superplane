@@ -150,6 +150,7 @@ const LOG_DOT: Record<PopupLogState, string> = {
   passed: "bg-[color:var(--status-completed-dot)]",
   running: "bg-[color:var(--status-running-dot)]",
   waiting: "bg-[color:var(--status-waiting-dot)]",
+  failed: "bg-[color:var(--status-failed-dot)]",
 };
 
 export function AgentLogList({ entries }: { entries: PopupLogEntry[] }) {

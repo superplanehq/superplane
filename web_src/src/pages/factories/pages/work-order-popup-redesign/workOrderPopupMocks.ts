@@ -1,4 +1,9 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
+import type {
+  FactoriesWorkOrder,
+  FactoriesWorkOrderArtifact,
+  FactoriesWorkOrderExecution,
+  FactoriesWorkOrderLineDispatch,
+} from "@/api-client";
 import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
 
 import { OPEN_WORK_ORDER_ARTIFACTS } from "../../__fixtures__/factoryPageFixtureVariants";
@@ -12,12 +17,13 @@ import {
 import { OPEN_WORK_ORDER_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import { toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
+import { getWorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 import type { WorkOrderTimelineEvent, WorkOrderTimelineStep } from "../../lib/workOrderTimelineEvents";
 
 export type PopupConcept = "session" | "trace" | "job";
 
-export type PopupLogState = "passed" | "running" | "waiting";
+export type PopupLogState = "passed" | "running" | "waiting" | "failed";
 
 export interface PopupLogEntry {
   id: string;
@@ -73,12 +79,19 @@ export const AGENT_WORK_POPUP: PopupFixture = {
   waitingNotes: presentWorkOrderStatusNotes(OPEN_WORK_ORDER.statusNotes),
   log: [
     {
-      id: "plan",
-      actor: "Plan",
-      title: "Write description.md",
-      duration: "1m 12s",
+      id: "backlog",
+      actor: "Backlog",
+      title: "Create work order",
+      duration: "2s",
       state: "passed",
       artifactId: "art-description",
+    },
+    {
+      id: "plan",
+      actor: "Plan",
+      title: "Write investigation notes",
+      duration: "1m 12s",
+      state: "passed",
     },
     {
       id: "implement",
@@ -119,6 +132,14 @@ export const AGENT_WORK_POPUP_RUNNING: PopupFixture = {
   checks: [],
   waitingNotes: [],
   log: [
+    {
+      id: "backlog",
+      actor: "Backlog",
+      title: "Create work order",
+      duration: "2s",
+      state: "passed",
+      artifactId: "art-description",
+    },
     {
       id: "plan",
       actor: "Plan",
@@ -166,6 +187,7 @@ export function buildPopupDispatchEvent(fixture: PopupFixture): WorkOrderTimelin
             },
           ]
         : undefined,
+      comments: entry.title !== entry.actor ? [{ body: entry.title }] : undefined,
       execution: {
         id: entry.id,
         step: entry.actor,
@@ -188,15 +210,139 @@ export function buildPopupDispatchEvent(fixture: PopupFixture): WorkOrderTimelin
   };
 }
 
+const PHASE_NAMES = ["Plan", "Implement", "Verify", "Done"] as const;
+
+function descriptionArtifactForOrder(order: FactoriesWorkOrder): FactoriesWorkOrderArtifact {
+  return {
+    ...DESCRIPTION_ARTIFACT,
+    data: {
+      name: "description.md",
+      title: "description.md",
+      body: order.description ?? "",
+    },
+  };
+}
+
+function backlogLogEntry(order: FactoriesWorkOrder): PopupLogEntry {
+  const ingested = Boolean(order.createdBy?.automation);
+  return {
+    id: "backlog",
+    actor: "Backlog",
+    title: ingested ? "Create work order from GitHub issue" : "Create work order",
+    duration: "2s",
+    state: "passed",
+    artifactId: "art-description",
+  };
+}
+
+function ownerForOrder(order: FactoriesWorkOrder, fallback: OrgUserDisplay): OrgUserDisplay {
+  const automation = order.createdBy?.automation;
+  if (automation) {
+    const name = automation.appName?.trim() || automation.nodeName?.trim();
+    if (name) {
+      return {
+        id: automation.appId || automation.nodeId || name,
+        name,
+        initials: getUserInitials(name) || "A",
+      };
+    }
+  }
+
+  const user = order.createdBy?.user;
+  if (user?.id || user?.name) {
+    const name = user.name?.trim() || fallback.name;
+    return {
+      id: user.id ?? fallback.id,
+      name,
+      initials: getUserInitials(name),
+      avatarUrl: user.id === STORYBOOK_ME_USER_ID ? STORYBOOK_ME_USER_AVATAR_URL : undefined,
+    };
+  }
+
+  return fallback;
+}
+
 export function popupFixtureForWorkOrder(order?: FactoriesWorkOrder): PopupFixture {
-  const running = (order?.lineDispatches ?? []).some((dispatch) =>
-    (dispatch.stepExecutions ?? []).some((execution) => execution.state === "STATE_STARTED"),
-  );
-  const base = running ? AGENT_WORK_POPUP_RUNNING : AGENT_WORK_POPUP;
+  if (!order) {
+    return AGENT_WORK_POPUP;
+  }
+
+  const displayStatus = getWorkOrderDisplayStatus(order);
+  const executions = latestDispatchExecutions(order);
+  const current = pickCurrentExecution(executions);
+  const inVerify = current?.stepIndex === 2;
+  const base = displayStatus === "running" ? AGENT_WORK_POPUP_RUNNING : AGENT_WORK_POPUP;
+
   return {
     ...base,
-    title: order?.title ?? base.title,
+    title: order.title ?? base.title,
+    waitingNotes: displayStatus === "waiting" ? presentWorkOrderStatusNotes(order.statusNotes, displayStatus) : [],
+    checks: inVerify
+      ? presentWorkOrderChecks(OPEN_WORK_ORDER_CHECKS).filter((check) => check.id !== "check-confidence")
+      : [],
+    description: descriptionArtifactForOrder(order),
+    log: [backlogLogEntry(order), ...executions.map(executionToLogEntry)],
+    elapsed: displayStatus === "draft" ? "Not started" : base.elapsed,
+    owner: ownerForOrder(order, base.owner),
   };
+}
+
+function latestDispatchExecutions(order: FactoriesWorkOrder): FactoriesWorkOrderExecution[] {
+  const dispatches = order.lineDispatches ?? [];
+  if (dispatches.length === 0) {
+    return [];
+  }
+  const latest = dispatches.reduce((best: FactoriesWorkOrderLineDispatch, candidate) => {
+    const bestAt = Date.parse(best.createdAt ?? "") || 0;
+    const candidateAt = Date.parse(candidate.createdAt ?? "") || 0;
+    return candidateAt >= bestAt ? candidate : best;
+  });
+  return latest.stepExecutions ?? [];
+}
+
+function pickCurrentExecution(executions: FactoriesWorkOrderExecution[]): FactoriesWorkOrderExecution | undefined {
+  const active = executions.filter(
+    (execution) =>
+      execution.state === "STATE_STARTED" ||
+      execution.state === "STATE_PENDING" ||
+      execution.state === "STATE_CANCELLING",
+  );
+  const pool = active.length > 0 ? active : executions;
+  return pool.reduce<FactoriesWorkOrderExecution | undefined>((best, candidate) => {
+    if (!best) {
+      return candidate;
+    }
+    return (candidate.stepIndex ?? -1) >= (best.stepIndex ?? -1) ? candidate : best;
+  }, undefined);
+}
+
+function executionToLogEntry(execution: FactoriesWorkOrderExecution): PopupLogEntry {
+  const stepIndex = execution.stepIndex ?? 0;
+  const actor = PHASE_NAMES[stepIndex] ?? execution.step ?? "Step";
+  const state = logStateForExecution(execution);
+  return {
+    id: execution.id ?? actor,
+    actor,
+    title: execution.step ?? actor,
+    duration: state === "running" ? "4m so far" : "1m 12s",
+    state,
+  };
+}
+
+function logStateForExecution(execution: FactoriesWorkOrderExecution): PopupLogState {
+  if (execution.state === "STATE_STARTED" || execution.state === "STATE_CANCELLING") {
+    return "running";
+  }
+  if (execution.state === "STATE_PENDING") {
+    return "waiting";
+  }
+  if (execution.result === "RESULT_FAILED") {
+    return "failed";
+  }
+  if (execution.result === "RESULT_PASSED") {
+    return "passed";
+  }
+  return "waiting";
 }
 
 function logDurationMs(duration: string): number | null {
@@ -216,6 +362,9 @@ function logExecution(state: PopupLogState): { state: string; result: string } {
   }
   if (state === "waiting") {
     return { state: "STATE_PENDING", result: "RESULT_UNKNOWN" };
+  }
+  if (state === "failed") {
+    return { state: "STATE_FINISHED", result: "RESULT_FAILED" };
   }
   return { state: "STATE_STARTED", result: "RESULT_UNKNOWN" };
 }

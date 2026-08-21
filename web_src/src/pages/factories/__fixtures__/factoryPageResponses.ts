@@ -400,6 +400,31 @@ export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   lineDispatches: [],
 };
 
+export const INGEST_DRAFT_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-ingest-pagination",
+  number: "106",
+  key: "RF-106",
+  title: "Paginated listings report a next page on the last full page",
+  description: [
+    "Every cursor-paginated listing reports `hasNextPage: true` on its last page whenever the number of rows is an exact multiple of the page size. Clients then request a page that comes back empty.",
+    "",
+    "Fetch `limit + 1` rows and let the extra row answer whether another page exists.",
+  ].join("\n"),
+  state: "STATE_DRAFT",
+  result: "RESULT_UNSPECIFIED",
+  createdAt: TWO_HOURS_AGO,
+  updatedAt: TWO_HOURS_AGO,
+  createdBy: {
+    automation: {
+      appId: "app-refund-backlog",
+      appName: "Ingest",
+      nodeName: "Create Work Order",
+    },
+  },
+  assignees: [],
+  lineDispatches: [],
+};
+
 export const CLOSED_FAILED_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-closed-failed-refunds",
   number: "92",
@@ -475,6 +500,7 @@ export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
   RUNNING_WORK_ORDER,
   FAILED_WORK_ORDER,
   DRAFT_WORK_ORDER,
+  INGEST_DRAFT_WORK_ORDER,
   CLOSED_WORK_ORDER,
   CLOSED_FAILED_WORK_ORDER,
 ];
