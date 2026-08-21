@@ -68,6 +68,7 @@ describe("NOTIFICATION_TYPE_OPTIONS", () => {
       TYPE_WORK_ORDER_STATUS_OWNED: "Status changes on work orders you own or created",
       TYPE_WORK_ORDER_ARTIFACT_OWNED: "New artifacts on work orders you own",
       TYPE_WORK_ORDER_MENTIONED: "Mentions in work order comments",
+      TYPE_WORK_ORDER_STATUS_NOTE_OWNED: "Review requests on work orders you own or created",
     });
   });
 

@@ -141,6 +141,8 @@ func (a *AWS) Actions() []core.Action {
 		&cloudwatch.UpdateAlarm{},
 		&cloudwatch.GetAlarm{},
 		&cloudwatch.DeleteAlarm{},
+		&cloudwatch.QueryLogs{},
+		&cloudwatch.AddLogEvent{},
 		&codeartifact.CopyPackageVersions{},
 		&codeartifact.CreateRepository{},
 		&codeartifact.DeletePackageVersions{},
@@ -367,7 +369,7 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 2. Go to **Roles → Create role**, choose **Web identity** as the trusted entity type, and select the identity provider you created in step 1. Give the role a name and description, then create it.
 
    > **Permissions:**
-   > Attach **AmazonEventBridgeFullAccess** and **IAMFullAccess**, which the integration uses to set itself up and deliver events to SuperPlane. Then attach one managed policy for each AWS service your components use: EC2 (**AmazonEC2FullAccess**), ECS (**AmazonECS_FullAccess**), ECR (**AmazonEC2ContainerRegistryFullAccess**), Lambda (**AWSLambda_FullAccess**), CloudWatch (**CloudWatchFullAccessV2**), SQS (**AmazonSQSFullAccess**), SNS (**AmazonSNSFullAccess**), Route 53 (**AmazonRoute53FullAccess**), CodePipeline (**AWSCodePipeline_FullAccess**), CodeArtifact (**AWSCodeArtifactAdminAccess**), and Amazon Managed Service for Prometheus (**AmazonPrometheusFullAccess**).
+   > Attach **AmazonEventBridgeFullAccess** and **IAMFullAccess**, which the integration uses to set itself up and deliver events to SuperPlane. Then attach one managed policy for each AWS service your components use: EC2 (**AmazonEC2FullAccess**), ECS (**AmazonECS_FullAccess**), ECR (**AmazonEC2ContainerRegistryFullAccess**), Lambda (**AWSLambda_FullAccess**), CloudWatch (**CloudWatchFullAccessV2**, which also covers CloudWatch Logs), SQS (**AmazonSQSFullAccess**), SNS (**AmazonSNSFullAccess**), Route 53 (**AmazonRoute53FullAccess**), CodePipeline (**AWSCodePipeline_FullAccess**), CodeArtifact (**AWSCodeArtifactAdminAccess**), and Amazon Managed Service for Prometheus (**AmazonPrometheusFullAccess**).
 
 3. Copy the ARN of the role you created and paste it into the **IAM Role ARN** field below, then save.
 `, ctx.BaseURL, ctx.Integration.ID().String()),

@@ -1,0 +1,242 @@
+---
+title: "OpenRouter"
+---
+
+Run prompts across hundreds of models through OpenRouter
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Chat Completion" href="#chat-completion" description="Generate a response with any model available on OpenRouter" />
+  <LinkCard title="Get Credits" href="#get-credits" description="Fetches the OpenRouter credit balance and API key usage" />
+</CardGrid>
+
+## Instructions
+
+## Connecting
+
+Connection to OpenRouter is done through OAuth. Clicking connect will guide you through the process.
+
+You need an OpenRouter account with credits available. Free model variants (IDs ending in `:free`) draw from a shared upstream pool and are rate limited independently of your balance.
+
+## Provisioning API Key (optional)
+
+Only required by the **Get Credits** component. OpenRouter's OAuth only issues keys for calling models, so this one is created and pasted by hand.
+
+Create one at [Provisioning Keys](https://openrouter.ai/settings/provisioning-keys) and paste it below.
+
+- Provisioning keys read account credits and manage keys, but cannot call model endpoints.
+- Leave it empty if you only use Chat Completion.
+
+<a id="chat-completion"></a>
+
+## Chat Completion
+
+**Component key:** `openrouter.chatCompletion`
+
+The Chat Completion component sends a prompt to any of the models OpenRouter brokers and returns the generated response.
+
+### Use Cases
+
+- **Model comparison**: Run the same prompt against models from different vendors without changing integrations
+- **Cost control**: Route to the cheapest provider serving a model, or cap which providers may serve it
+- **Resilience**: Fall back to other models when the primary is rate limited or down
+- **Document analysis**: Attach PDFs, images, or text files from the Files tab alongside the prompt
+
+### Configuration
+
+- **Model**: The model to prompt. Picked from the models OpenRouter currently lists.
+- **Prompt**: The user message (supports expressions)
+- **System Prompt**: (Optional) System-level instructions
+- **Files**: (Optional) Files from the Files tab to attach. Text files are added to the prompt directly. Images require a vision model. PDFs are parsed by OpenRouter and work with any model, but parsing is a paid feature and the request is rejected below a minimum account balance.
+- **Max Tokens**: (Optional) Upper bound on generated tokens. Reasoning models bill their reasoning against this budget, so a low value can return an empty response.
+- **Temperature**: (Optional) Sampling temperature
+- **Fallback Models**: (Optional) Models to try when the primary fails at runtime. Tried in order.
+- **Web Search**: (Optional) Search the web before answering and cite the sources used. Billed on top of tokens, including on free models.
+- **Web Search Results**: (Optional) How many results to gather when Web Search is on. More results cost more.
+- **Structured Output**: (Optional) A JSON Schema for the response. The model returns JSON matching it, available on the `parsed` output. Only some models support this, so enabling it automatically restricts routing to providers that honour it.
+- **Provider Routing**: (Optional) Control which upstream provider serves the request. See below.
+
+### Provider Routing
+
+A model ID on OpenRouter is a listing, not a server: several providers compete to serve the same model and they are not equivalent. Across the providers serving one popular model, input price can vary more than fourfold, the context ceiling can vary tenfold, and quantization ranges from fp4 to fp8 — which affects answer quality. Left alone, OpenRouter picks one and the choice can change between requests.
+
+- **Optimize For**: Sort candidate providers by price, throughput, or latency
+- **Allowed Providers** / **Excluded Providers**: Restrict routing to (or away from) specific providers. The list is narrowed to the providers actually serving the selected model.
+- **Allow Fallbacks**: When off, the request fails rather than silently rerouting to a provider outside your preferences
+- **Require Parameter Support**: Only route to providers that honour every parameter sent. Off by default, matching OpenRouter — a provider that does not support a parameter accepts the request and ignores it rather than returning an error. Configuring Structured Output forces it on regardless of this setting.
+- **Data Collection**: Set to Deny to exclude providers that may train on submitted data
+
+### Output
+
+Returns the completion including:
+- **text**: The generated text
+- **parsed**: When Structured Output is configured, the response parsed into an object
+- **citations**: When Web Search is on, the sources the model cited, with url and title
+- **reasoning**: The model's reasoning trace, when it returns one
+- **model**: The model that served the request
+- **provider**: The upstream provider that actually served it, which can differ between requests
+- **finishReason**: Why generation stopped
+- **usage**: Token counts and cost, including reasoning tokens
+- **response**: The full API response
+
+### Notes
+
+- Fallback models cover runtime failures such as rate limits and provider outages. An invalid model ID still fails the request outright.
+- Free model variants (IDs ending in `:free`) draw from a shared upstream pool and are rate limited independently of your balance.
+- Attachments are inlined into the request body rather than uploaded, so the combined size is capped at 8MB.
+- Only PDFs and images are sent as attachments. Text files become part of the prompt, so they cost prompt tokens and are not subject to OpenRouter's document parsing.
+- Web search is billed per request on top of tokens, so it costs money even when the model itself is free.
+- Structured Output is supported by most but not all models. Because a provider that does not support it accepts the request and ignores the schema, enabling it forces Require Parameter Support on, overriding that setting in Provider Routing. This can make a request fail outright rather than silently return prose, which is the intended trade: an unparseable reply is harder to notice than an error.
+- The schema is validated before the request and sent in strict mode. Strict mode marks every property required, so express optional fields by making their type nullable.
+- Image generation is not available here. OpenRouter generates images through a separate endpoint, and the `modalities` parameter is ignored by chat completions.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "citations": [
+      {
+        "title": "A short history of greetings",
+        "url": "https://example.com/greetings"
+      }
+    ],
+    "finishReason": "stop",
+    "id": "gen-1755000000-AbCdEfGhIjKlMnOp",
+    "model": "openai/gpt-4o-mini",
+    "parsed": {
+      "greeting": "Hello, world!"
+    },
+    "provider": "OpenAI",
+    "reasoning": "The user greeted me, so a short greeting back is enough.",
+    "response": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "Hello, world!",
+            "reasoning": "The user greeted me, so a short greeting back is enough.",
+            "role": "assistant"
+          },
+          "native_finish_reason": "stop"
+        }
+      ],
+      "created": 1755000000,
+      "id": "gen-1755000000-AbCdEfGhIjKlMnOp",
+      "model": "openai/gpt-4o-mini",
+      "object": "chat.completion",
+      "provider": "OpenAI",
+      "usage": {
+        "completion_tokens": 9,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 0.0000075,
+        "cost_details": {
+          "upstream_inference_completions_cost": 0.0000054,
+          "upstream_inference_cost": 0.0000075,
+          "upstream_inference_prompt_cost": 0.0000021
+        },
+        "prompt_tokens": 14,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0
+        },
+        "total_tokens": 23
+      }
+    },
+    "text": "Hello, world!",
+    "usage": {
+      "completion_tokens": 9,
+      "completion_tokens_details": {
+        "audio_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "cost": 0.0000075,
+      "cost_details": {
+        "upstream_inference_completions_cost": 0.0000054,
+        "upstream_inference_cost": 0.0000075,
+        "upstream_inference_prompt_cost": 0.0000021
+      },
+      "prompt_tokens": 14,
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      },
+      "total_tokens": 23
+    }
+  },
+  "timestamp": "2026-08-18T12:00:00Z",
+  "type": "openrouter.chatCompletion.result"
+}
+```
+
+<a id="get-credits"></a>
+
+## Get Credits
+
+**Component key:** `openrouter.getCredits`
+
+The Get Credits component fetches the credit balance of your OpenRouter account together with the usage recorded against the configured API key.
+
+### Use Cases
+
+- **Budget alerts**: Trigger a notification when the remaining balance drops below a threshold
+- **Spend reporting**: Track daily, weekly, and monthly usage on a schedule
+- **Pre-flight checks**: Gate an expensive workflow on there being enough credit left
+
+### How It Works
+
+1. Reads the account credit totals purchased and consumed
+2. Reads the usage and limits recorded against the configured API key
+3. Emits both, along with the remaining balance
+
+### Configuration
+
+None on the component itself. It uses the **Provisioning API Key** set on the integration, which OpenRouter requires for reading account credits.
+
+### Output
+
+The output includes:
+- **totalCredits**: Credits purchased on the account
+- **totalUsage**: Credits consumed on the account
+- **balance**: Credits purchased minus credits consumed
+- **key**: Usage recorded against the configured key — its label, all-time and daily/weekly/monthly usage, any credit limit and how much of it remains, and whether the account is on the free tier
+
+### Notes
+
+- Requires a Provisioning API Key on the integration. OpenRouter documents `/credits` as a management-key endpoint, and OAuth cannot issue that kind of key.
+- The key figures describe the OAuth-issued inference key, while the credit totals describe the account.
+- `key.limit` and `key.limitRemaining` are null when the key has no credit limit set
+- Account credit totals cover the whole account, while the key figures cover only the configured key
+
+### Example Output
+
+```json
+{
+  "data": {
+    "balance": 74.75,
+    "key": {
+      "isFreeTier": false,
+      "label": "sk-or-v1-...c0de",
+      "limit": 50,
+      "limitRemaining": 24.25,
+      "limitReset": null,
+      "usage": 25.75,
+      "usageDaily": 1.2,
+      "usageMonthly": 25.75,
+      "usageWeekly": 8.4
+    },
+    "totalCredits": 100.5,
+    "totalUsage": 25.75
+  },
+  "timestamp": "2026-08-18T12:00:00Z",
+  "type": "openrouter.getCredits.result"
+}
+```
+

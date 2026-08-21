@@ -1599,6 +1599,8 @@ Each note is identified by its `noteKey` (for example `pr-closure`). The first s
 
 `orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run. This component can only be used in factory-owned apps.
 
+Setting a note also emails the work order's owners and creator (excluding whoever triggered the run), so they know it's waiting on their review — every set sends a fresh email, including one that just updates an existing note's body. Recipients can turn this off in their notification settings without affecting other work order emails.
+
 ### Example Output
 
 ```json

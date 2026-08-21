@@ -255,6 +255,72 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		assert.ElementsMatch(t, []string{owner.GetEmail(), creator.GetEmail()}, recipients)
 	})
 
+	t.Run("status note notifies owners and creator", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consume(t, newConsumer(emailService), messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID:     r.Organization.ID.String(),
+			FactoryID:          factoryModel.ID.String(),
+			OrderID:            order.ID.String(),
+			EventType:          factoryevents.EventTypeOrderStatusNoteUpdated,
+			ActorName:          "pr-watcher",
+			StatusNoteHeadline: "Review the pull request",
+			StatusNoteBody:     "Merging the PR completes this work order automatically.",
+			StatusNoteCtaLabel: "Review PR #42",
+			StatusNoteCtaURL:   "https://github.com/example/repo/pull/42",
+		})
+
+		sent := emailService.SentWorkOrderNotificationEmails()
+		recipients := make([]string, 0, len(sent))
+		for _, email := range sent {
+			recipients = append(recipients, email.ToEmail)
+			assert.Contains(t, email.Subject, "Review the pull request")
+			assert.Contains(t, email.Data.Summary, "waiting on you")
+			assert.Contains(t, email.Data.Detail, "Merging the PR completes this work order automatically.")
+			assert.Contains(t, email.Data.Detail, "https://github.com/example/repo/pull/42")
+		}
+		assert.ElementsMatch(t, []string{owner.GetEmail(), creator.GetEmail()}, recipients)
+	})
+
+	t.Run("status note setting can be turned off without affecting comments", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+			EventTypes: []string{
+				models.NotificationTypeWorkOrderCommentOwned,
+				models.NotificationTypeWorkOrderStatusOwned,
+				models.NotificationTypeWorkOrderArtifactOwned,
+				models.NotificationTypeWorkOrderAssigned,
+				models.NotificationTypeWorkOrderMention,
+			},
+		})
+
+		emailService := services.NewNoopEmailService()
+		consume(t, newConsumer(emailService), messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID:     r.Organization.ID.String(),
+			FactoryID:          factoryModel.ID.String(),
+			OrderID:            order.ID.String(),
+			EventType:          factoryevents.EventTypeOrderStatusNoteUpdated,
+			ActorName:          "pr-watcher",
+			StatusNoteHeadline: "Review the pull request",
+		})
+
+		for _, email := range emailService.SentWorkOrderNotificationEmails() {
+			assert.NotEqual(t, owner.GetEmail(), email.ToEmail)
+		}
+
+		// Restore full opt-in so later subtests aren't affected by this
+		// deliberately narrowed type list.
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+	})
+
 	t.Run("soft-deleted members are not emailed", func(t *testing.T) {
 		left := support.CreateUser(t, r, r.Organization.ID)
 		enableNotifications(t, left.ID, models.UserNotificationSettingsParams{

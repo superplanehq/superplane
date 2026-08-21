@@ -104,12 +104,13 @@ func notificationTypesFromProto(eventTypes []pb.NotificationSettings_Type) ([]st
 }
 
 var notificationTypeProto = map[string]pb.NotificationSettings_Type{
-	models.NotificationTypeWorkOrderAssigned:       pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED,
-	models.NotificationTypeWorkOrderCommentOwned:   pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED,
-	models.NotificationTypeWorkOrderCommentCreated: pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_CREATED,
-	models.NotificationTypeWorkOrderStatusOwned:    pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_OWNED,
-	models.NotificationTypeWorkOrderArtifactOwned:  pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED,
-	models.NotificationTypeWorkOrderMention:        pb.NotificationSettings_TYPE_WORK_ORDER_MENTIONED,
+	models.NotificationTypeWorkOrderAssigned:        pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED,
+	models.NotificationTypeWorkOrderCommentOwned:    pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED,
+	models.NotificationTypeWorkOrderCommentCreated:  pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_CREATED,
+	models.NotificationTypeWorkOrderStatusOwned:     pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_OWNED,
+	models.NotificationTypeWorkOrderArtifactOwned:   pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED,
+	models.NotificationTypeWorkOrderMention:         pb.NotificationSettings_TYPE_WORK_ORDER_MENTIONED,
+	models.NotificationTypeWorkOrderStatusNoteOwned: pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_NOTE_OWNED,
 }
 
 func notificationTypeToProto(notificationType string) (pb.NotificationSettings_Type, bool) {

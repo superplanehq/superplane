@@ -29,6 +29,13 @@ type FactoryWorkOrderNotificationMessage struct {
 	ToState          string   `json:"to_state,omitempty"`
 	Result           string   `json:"result,omitempty"`
 	ArtifactType     string   `json:"artifact_type,omitempty"`
+	// StatusNote* carry a `setWorkOrderStatusNote` write into the email,
+	// so the consumer never has to re-read the (latest-only, mutable)
+	// note off the order row and risk describing a later update.
+	StatusNoteHeadline string `json:"status_note_headline,omitempty"`
+	StatusNoteBody     string `json:"status_note_body,omitempty"`
+	StatusNoteCtaLabel string `json:"status_note_cta_label,omitempty"`
+	StatusNoteCtaURL   string `json:"status_note_cta_url,omitempty"`
 }
 
 func (m FactoryWorkOrderNotificationMessage) Publish() error {

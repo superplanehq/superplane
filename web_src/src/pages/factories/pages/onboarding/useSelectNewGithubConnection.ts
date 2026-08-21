@@ -22,6 +22,7 @@ export function useOnboardingGithubConnections(args: {
   selectNewest: boolean;
   selections: IntegrationSelections;
   selectInstance: (integrationName: string, integrationId: string) => void;
+  onConnectionSelected: () => void;
 }): IntegrationInstanceSummary {
   const githubConnections =
     args.integrationData.find((integration) => integration.name === "github") ?? EMPTY_GITHUB_CONNECTIONS;
@@ -32,6 +33,7 @@ export function useOnboardingGithubConnections(args: {
     readyInstances: githubConnections.readyInstances,
     selections: args.selections,
     selectInstance: args.selectInstance,
+    onConnectionSelected: args.onConnectionSelected,
   });
 
   return githubConnections;
@@ -46,7 +48,9 @@ function newestReadyInstance(instances: OrganizationsIntegration[]): Organizatio
 }
 
 /**
- * Selects the newest ready GitHub connection after the return from GitHub.
+ * Selects the newest ready GitHub connection after the return from GitHub, then
+ * reports the selection so the wizard can continue.
+ *
  * The round trip reloads the page, so the in-memory "just connected" hint is
  * gone. Only runs when the return URL asks for it (`pick=newest`), and at most
  * once, so the user can still choose a different connection afterwards.
@@ -57,9 +61,10 @@ function useSelectNewGithubConnection(args: {
   readyInstances: IntegrationInstanceSummary["readyInstances"];
   selections: IntegrationSelections;
   selectInstance: (integrationName: string, integrationId: string) => void;
+  onConnectionSelected: () => void;
 }) {
   const selectedNewConnection = useRef(false);
-  const { openSection, selectNewest, readyInstances, selections, selectInstance } = args;
+  const { openSection, selectNewest, readyInstances, selections, selectInstance, onConnectionSelected } = args;
 
   useEffect(() => {
     if (selectedNewConnection.current || !selectNewest || openSection !== "vcs") return;
@@ -71,5 +76,6 @@ function useSelectNewGithubConnection(args: {
 
     selectedNewConnection.current = true;
     if (selections.github?.id !== id) selectInstance("github", id);
-  }, [openSection, selectNewest, readyInstances, selections, selectInstance]);
+    onConnectionSelected();
+  }, [openSection, selectNewest, readyInstances, selections, selectInstance, onConnectionSelected]);
 }

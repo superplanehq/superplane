@@ -69,6 +69,23 @@ func Test__UpdateNotificationSettings(t *testing.T) {
 		assert.Equal(t, resp.Settings.Workspaces.EventTypes, described.Settings.Workspaces.EventTypes)
 	})
 
+	t.Run("persists the status note type", func(t *testing.T) {
+		resp, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
+			Settings: &pb.NotificationSettings{
+				Workspaces: &pb.NotificationSettings_Workspaces{
+					Scope: pb.NotificationSettings_WORKSPACE_SCOPE_ALL,
+					EventTypes: []pb.NotificationSettings_Type{
+						pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_NOTE_OWNED,
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []pb.NotificationSettings_Type{
+			pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_NOTE_OWNED,
+		}, resp.Settings.Workspaces.EventTypes)
+	})
+
 	t.Run("filtered scope requires a workspace", func(t *testing.T) {
 		_, err := UpdateNotificationSettings(ctx, &pb.UpdateNotificationSettingsRequest{
 			Settings: &pb.NotificationSettings{
