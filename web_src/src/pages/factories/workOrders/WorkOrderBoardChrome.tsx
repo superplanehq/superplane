@@ -65,6 +65,11 @@ interface WorkOrderBoardLaneProps {
   /** Replaces the body while the lane holds nothing. */
   emptyDescription: string;
   tone?: BoardLaneTone;
+  /**
+   * Optional pastel fill from the column color picker. When set, it replaces
+   * the status tone background so the chosen color is visible.
+   */
+  surfaceClassName?: string;
   /** Sits at the end of the header, for example a menu button. */
   actions?: ReactNode;
   /**
@@ -84,6 +89,7 @@ export function WorkOrderBoardLane({
   count,
   emptyDescription,
   tone = "neutral",
+  surfaceClassName,
   actions,
   keepChildrenWhenEmpty = false,
   label,
@@ -97,7 +103,7 @@ export function WorkOrderBoardLane({
       className={cn(
         "flex min-h-0 flex-col self-stretch rounded-lg border border-border/70 p-2",
         workOrderKanbanLaneSizeClassName,
-        LANE_TONE_CLASSNAME[tone],
+        surfaceClassName ?? LANE_TONE_CLASSNAME[tone],
         className,
       )}
       data-testid={testId}

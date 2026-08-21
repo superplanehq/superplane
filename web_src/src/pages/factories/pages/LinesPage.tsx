@@ -59,8 +59,10 @@ import {
   factorySectionHeaderClassName,
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
+import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
 import { LineListCard } from "./LineListCard";
+import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { descriptionForLine, toLineListMetrics } from "./lineListMetricsMockData";
 import { useLineCardMutations } from "./useLineCardMutations";
 
@@ -462,6 +464,11 @@ function PhaseBoard({
   const backlogConfigureHref = backlogApp
     ? factoryAppConfigurePath(organizationId, factoryKey, backlogApp.id, { from: "lines", lineId })
     : null;
+  const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>({});
+
+  const setColumnColor = useCallback((columnKey: string, colorId: LineBoardColumnColorId | null) => {
+    setColumnColors((current) => ({ ...current, [columnKey]: colorId }));
+  }, []);
 
   return (
     <WorkOrderKanbanBoard testId="lines-phase-board">
@@ -469,30 +476,37 @@ function PhaseBoard({
         <BacklogColumn
           orders={backlogOrders}
           configureHref={backlogConfigureHref}
+          colorId={columnColors.backlog ?? null}
+          onColorChange={(colorId) => setColumnColor("backlog", colorId)}
           canCreateWorkOrder={canCreateWorkOrder}
           onCreateWorkOrder={onCreateWorkOrder}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
         />
       </div>
-      {columns.map((column, index) => (
-        <div
-          key={`${column.stepIndex}-${column.stepName}`}
-          className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}
-        >
-          {index < columns.length - 1 ? (
-            <span className="absolute top-[21px] left-full z-[1] h-px w-3 bg-border" aria-hidden />
-          ) : null}
-          <PhaseColumn
-            organizationId={organizationId}
-            factoryKey={factoryKey}
-            lineId={lineId}
-            column={column}
-            workOrderCardContext={workOrderCardContext}
-            onOpenWorkOrder={onOpenWorkOrder}
-          />
-        </div>
-      ))}
+      {columns.map((column, index) => {
+        const columnKey = `phase-${column.stepIndex}`;
+        return (
+          <div
+            key={`${column.stepIndex}-${column.stepName}`}
+            className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}
+          >
+            {index < columns.length - 1 ? (
+              <span className="absolute top-[21px] left-full z-[1] h-px w-3 bg-border" aria-hidden />
+            ) : null}
+            <PhaseColumn
+              organizationId={organizationId}
+              factoryKey={factoryKey}
+              lineId={lineId}
+              column={column}
+              colorId={columnColors[columnKey] ?? null}
+              onColorChange={(colorId) => setColumnColor(columnKey, colorId)}
+              workOrderCardContext={workOrderCardContext}
+              onOpenWorkOrder={onOpenWorkOrder}
+            />
+          </div>
+        );
+      })}
     </WorkOrderKanbanBoard>
   );
 }
@@ -500,6 +514,8 @@ function PhaseBoard({
 function BacklogColumn({
   orders,
   configureHref,
+  colorId,
+  onColorChange,
   canCreateWorkOrder,
   onCreateWorkOrder,
   workOrderCardContext,
@@ -507,26 +523,28 @@ function BacklogColumn({
 }: {
   orders: FactoriesWorkOrder[];
   configureHref: string | null;
+  colorId: LineBoardColumnColorId | null;
+  onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   canCreateWorkOrder: boolean;
   onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string) => void;
 }) {
+  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
+
   return (
     <WorkOrderBoardLane
       title="Backlog"
       label="Backlog"
       count={orders.length}
       tone="neutral"
+      surfaceClassName={surfaceClassName}
       emptyDescription="No work orders in the backlog."
-      className="bg-muted"
+      className={surfaceClassName ? undefined : "bg-muted"}
       keepChildrenWhenEmpty
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
-          <PermissionTooltip
-            allowed={canCreateWorkOrder}
-            message="You don't have permission to create work orders."
-          >
+          <PermissionTooltip allowed={canCreateWorkOrder} message="You don't have permission to create work orders.">
             <button
               type="button"
               onClick={() => {
@@ -543,9 +561,13 @@ function BacklogColumn({
               <Plus className="size-3.5" aria-hidden />
             </button>
           </PermissionTooltip>
-          {configureHref ? (
-            <ColumnConfigureMenu title="Backlog" href={configureHref} testId="lines-backlog-menu" />
-          ) : null}
+          <ColumnLaneMenu
+            title="Backlog"
+            testId="lines-backlog-menu"
+            editHref={configureHref}
+            colorId={colorId}
+            onColorChange={onColorChange}
+          />
         </div>
       }
       testId="lines-backlog-column"
@@ -630,6 +652,8 @@ function PhaseColumn({
   factoryKey,
   lineId,
   column,
+  colorId,
+  onColorChange,
   workOrderCardContext,
   onOpenWorkOrder,
 }: {
@@ -637,6 +661,8 @@ function PhaseColumn({
   factoryKey: string;
   lineId?: string;
   column: LinePhaseColumn;
+  colorId: LineBoardColumnColorId | null;
+  onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string) => void;
 }) {
@@ -660,12 +686,12 @@ function PhaseColumn({
     loadMoreIfNeeded(scrollRef.current);
   }, [visibleCount, loadMoreIfNeeded]);
 
-  const navigate = useNavigate();
   const visibleRuns = column.runs.slice(0, Math.min(visibleCount, totalRuns));
   const configureHref = column.appId
     ? factoryAppConfigurePath(organizationId, factoryKey, column.appId, { from: "lines", lineId })
     : null;
   const glyph = resolveColumnGlyph(column);
+  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
 
   return (
     <WorkOrderBoardLane
@@ -673,32 +699,17 @@ function PhaseColumn({
       label={`${column.stepName} phase`}
       count={totalRuns}
       tone={PHASE_LANE_TONE[glyph]}
+      surfaceClassName={surfaceClassName}
       emptyDescription="No work orders in this phase."
       testId={`lines-phase-column-${column.stepIndex}`}
       actions={
-        configureHref ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label={`${column.stepName} menu`}
-                className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                data-testid={`lines-phase-menu-${column.stepIndex}`}
-              >
-                <MoreHorizontal className="size-3.5" aria-hidden />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem
-                onClick={() => navigate(configureHref)}
-                data-testid={`lines-phase-edit-${column.stepIndex}`}
-              >
-                <Pencil className="h-3.5 w-3.5" aria-hidden />
-                Edit
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null
+        <ColumnLaneMenu
+          title={column.stepName}
+          testId={`lines-phase-menu-${column.stepIndex}`}
+          editHref={configureHref}
+          colorId={colorId}
+          onColorChange={onColorChange}
+        />
       }
     >
       <ul

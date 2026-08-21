@@ -1,0 +1,48 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
+import { describe, expect, it, vi } from "vitest";
+
+import { ColumnLaneMenu } from "./ColumnLaneMenu";
+
+describe("ColumnLaneMenu", () => {
+  it("offers circular colour swatches and applies a selection", async () => {
+    const onColorChange = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu
+          title="Backlog"
+          testId="lines-backlog-menu"
+          editHref="/edit"
+          colorId={null}
+          onColorChange={onColorChange}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    expect(screen.getByText("Set color")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-menu-color-lime")).toHaveAttribute("aria-label", "Lime");
+
+    await user.click(screen.getByTestId("lines-backlog-menu-color-lime"));
+    expect(onColorChange).toHaveBeenCalledWith("lime");
+  });
+
+  it("removes the colour when requested", async () => {
+    const onColorChange = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu title="Plan" testId="lines-phase-menu-0" colorId="sky" onColorChange={onColorChange} />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    expect(screen.getByTestId("lines-phase-menu-0-color-sky")).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByTestId("lines-phase-menu-0-color-remove"));
+    expect(onColorChange).toHaveBeenCalledWith(null);
+  });
+});

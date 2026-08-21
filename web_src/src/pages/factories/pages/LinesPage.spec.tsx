@@ -169,6 +169,16 @@ describe("LinesPage board", () => {
     expect(openCreateWorkOrder).toHaveBeenCalledTimes(2);
   });
 
+  it("sets a pastel colour on the backlog from circular swatches", async () => {
+    const user = userEvent.setup();
+    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-color-lime"));
+
+    expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-100");
+  });
+
   it("opens the Intake drawer beside the board when the intake query is set", () => {
     renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
 
