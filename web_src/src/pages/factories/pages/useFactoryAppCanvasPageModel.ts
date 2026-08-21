@@ -6,9 +6,8 @@ import { factoryAppViewPath, parseFactoryAppNavFrom } from "../lib/factoryPagePa
 import { useFactoryAppCanvasEditActions } from "./useFactoryAppCanvasEditActions";
 import { useFactoryAppCanvasRoute } from "./useFactoryAppCanvasRoute";
 import { useFactoryAppConfigureTitle } from "./useFactoryAppConfigureTitle";
-import { useFactoryCanvasEditWorkspace } from "./factoryCanvasEditWorkspaceContext";
 
-function resolveCanRenameAutomation(
+export function resolveCanUpdateFactoryAutomation(
   permissionsLoading: boolean,
   canAct: (resource: string, action: string) => boolean,
 ) {
@@ -16,13 +15,12 @@ function resolveCanRenameAutomation(
 }
 
 export function useFactoryAppCanvasPageModel() {
-  const storybookEditWorkspace = useFactoryCanvasEditWorkspace();
   const route = useFactoryAppCanvasRoute();
   const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const configureActionsRef = useRef<FactoryConfigureActions | null>(null);
   const [configureBusy, setConfigureBusy] = useState(false);
-  const canRename = resolveCanRenameAutomation(permissionsLoading, canAct);
+  const canUpdateCanvas = resolveCanUpdateFactoryAutomation(permissionsLoading, canAct);
   const navigateDone = useCallback(() => {
     navigate(
       factoryAppViewPath(route.organizationId, route.factoryKey, route.appId, {
@@ -54,10 +52,11 @@ export function useFactoryAppCanvasPageModel() {
     factoryId: route.factoryId,
     appId: route.appId,
     isConfigure: route.isConfigure,
-    canRename,
+    canRename: canUpdateCanvas,
     savedName: route.canvas?.metadata?.name,
     configureBusy,
     configureActionsRef,
+    onDiscardLeave: navigateDone,
   });
   const handleConfigureDone = useCallback(() => {
     clearDraftTitle();
@@ -82,11 +81,9 @@ export function useFactoryAppCanvasPageModel() {
     componentsOpen: route.componentsOpen,
     setSearchParams: route.setSearchParams,
     navigate,
-    enabled: storybookEditWorkspace,
   });
 
   return {
-    storybookEditWorkspace,
     organizationId: route.organizationId,
     factoryId: route.factoryId,
     factoryKey: route.factoryKey,
@@ -100,7 +97,8 @@ export function useFactoryAppCanvasPageModel() {
     title,
     subtitle: route.subtitle,
     shouldRedirect: route.shouldRedirect,
-    canRename,
+    canUpdateCanvas,
+    canRename: canUpdateCanvas,
     handleDraftTitleChange,
     handleConfigureSave,
     handleConfigureDiscard,

@@ -1,6 +1,7 @@
 import { fireEvent, render } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { calcCodeBlockHeight } from "./calcCodeBlockHeight";
 import { CodeBlockWidget } from "./CodeBlockWidget";
 
 // Stub Monaco so the test doesn't try to spin up a real editor and so we can
@@ -17,7 +18,24 @@ vi.mock("@/contexts/useTheme", () => ({
   useTheme: () => ({ preference: "light", resolvedTheme: "light", setPreference: () => undefined }),
 }));
 
+describe("calcCodeBlockHeight", () => {
+  it("fits one line without a tall minimum", () => {
+    expect(calcCodeBlockHeight("echo hello")).toBe(35);
+  });
+
+  it("grows with extra lines and caps at 250", () => {
+    expect(calcCodeBlockHeight("echo one\necho two")).toBe(54);
+    expect(calcCodeBlockHeight(Array.from({ length: 40 }, (_, index) => `line ${index}`).join("\n"))).toBe(250);
+  });
+});
+
 describe("CodeBlockWidget", () => {
+  it("sizes a one-line snippet to the content height", () => {
+    const { getByTestId } = render(<CodeBlockWidget code="echo hello" language="bash" />);
+
+    expect(getByTestId("code-block-editor")).toHaveStyle({ height: "35px" });
+  });
+
   it("applies width constraints so it cannot stretch a narrow parent", () => {
     const { container } = render(<CodeBlockWidget code="echo hello" language="bash" />);
     const root = container.firstChild as HTMLElement;

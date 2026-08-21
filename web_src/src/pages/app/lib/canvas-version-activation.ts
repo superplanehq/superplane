@@ -5,7 +5,14 @@ import type { SetURLSearchParams } from "react-router";
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { canvasKeys, invalidateStagedCanvasCaches } from "@/hooks/useCanvasData";
 
+import { leaveFactoryConfigureSearchParams } from "@/pages/factories/lib/factoryAppSearchParamFlag";
 import { clearRunInspectionSearchParams } from "../viewState";
+
+export type ActivateCanvasVersionOptions = {
+  preserveStagedLayer?: boolean;
+  /** Strip factory Configure chrome flags while restoring the live version. */
+  leaveFactoryConfigure?: boolean;
+};
 
 export function updateCanvasDetailForSelectedVersion({
   queryClient,
@@ -141,7 +148,7 @@ export function activateCanvasVersionForEditing({
   canvasId?: string;
   versionID: string;
   version: CanvasesCanvasVersion;
-  options?: { preserveStagedLayer?: boolean };
+  options?: ActivateCanvasVersionOptions;
   liveCanvasVersionId?: string;
   queryClient: QueryClient;
   draftCanvasSpec: DraftSpec;
@@ -188,12 +195,15 @@ export function activateCanvasVersionForEditing({
   setLastSavedWorkflowSnapshot(null);
 
   setSearchParams((current) => {
-    const next = clearRunInspectionSearchParams(new URLSearchParams(current));
+    let next = clearRunInspectionSearchParams(new URLSearchParams(current));
     next.delete("branch");
     if (isCurrentLive) {
       next.delete("version");
     } else {
       next.set("version", versionID);
+    }
+    if (options?.leaveFactoryConfigure) {
+      next = leaveFactoryConfigureSearchParams(next);
     }
     // Same query string → keep current instance so React Router skips a no-op navigation.
     if (next.toString() === current.toString()) {

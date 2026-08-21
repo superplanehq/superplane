@@ -25,8 +25,6 @@ type FactoryAppCanvasEditActionsInput = {
   componentsOpen: boolean;
   setSearchParams: (updater: (current: URLSearchParams) => URLSearchParams, options?: { replace?: boolean }) => void;
   navigate: (to: string) => void;
-  /** Storybook-only. Live factory canvas ignores agent/components URL flags. */
-  enabled?: boolean;
 };
 
 export function useFactoryAppCanvasEditActions({
@@ -42,7 +40,6 @@ export function useFactoryAppCanvasEditActions({
   componentsOpen,
   setSearchParams,
   navigate,
-  enabled = false,
 }: FactoryAppCanvasEditActionsInput) {
   const handleSearchParamFlag = useCallback(
     (key: string, open: boolean) => {
@@ -123,7 +120,6 @@ export function useFactoryAppCanvasEditActions({
     componentsOpen,
     onAgentOpenChange: handleAgentOpenChange,
     onComponentsOpenChange: handleComponentsOpenChange,
-    enabled,
   });
 
   return {
@@ -144,7 +140,6 @@ function useFactoryAppCanvasWorkspaceSync({
   componentsOpen,
   onAgentOpenChange,
   onComponentsOpenChange,
-  enabled,
 }: {
   appId: string;
   isConfigure: boolean;
@@ -152,10 +147,9 @@ function useFactoryAppCanvasWorkspaceSync({
   componentsOpen: boolean;
   onAgentOpenChange: (open: boolean) => void;
   onComponentsOpenChange: (open: boolean) => void;
-  enabled: boolean;
 }) {
   useEffect(() => {
-    if (!enabled || !appId) return;
+    if (!appId) return;
     if (!isConfigure) {
       writeCanvasAgentSidebarOpen(appId, false);
       requestCanvasAgentSidebarClose(appId);
@@ -167,26 +161,26 @@ function useFactoryAppCanvasWorkspaceSync({
       return;
     }
     requestCanvasAgentSidebarClose(appId);
-  }, [appId, agentOpen, enabled, isConfigure]);
+  }, [appId, agentOpen, isConfigure]);
 
   useEffect(() => {
-    if (!enabled || !isConfigure || !appId) return;
+    if (!isConfigure || !appId) return;
     requestBuildingBlocksSidebar(appId, componentsOpen);
-  }, [appId, componentsOpen, enabled, isConfigure]);
+  }, [appId, componentsOpen, isConfigure]);
 
   useEffect(() => {
-    if (!enabled || !isConfigure || !appId) return;
+    if (!isConfigure || !appId) return;
     return subscribeCanvasAgentSidebarChanged((canvasId, open) => {
       if (canvasId !== appId) return;
       onAgentOpenChange(open);
     });
-  }, [appId, enabled, isConfigure, onAgentOpenChange]);
+  }, [appId, isConfigure, onAgentOpenChange]);
 
   useEffect(() => {
-    if (!enabled || !isConfigure || !appId) return;
+    if (!isConfigure || !appId) return;
     return subscribeBuildingBlocksSidebarChanged((canvasId, open) => {
       if (canvasId !== appId) return;
       onComponentsOpenChange(open);
     });
-  }, [appId, enabled, isConfigure, onComponentsOpenChange]);
+  }, [appId, isConfigure, onComponentsOpenChange]);
 }

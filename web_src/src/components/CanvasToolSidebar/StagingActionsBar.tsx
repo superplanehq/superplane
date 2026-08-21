@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useDraftActions } from "@/components/AgentSidebar/useDraftActions";
+import { type DraftActionsConfirmKind } from "@/components/AgentSidebar/widgets/draftActionsConfirmCopy";
 import { DraftActionsWidget } from "@/components/AgentSidebar/widgets/DraftActionsWidget";
 import {
   buildAgentStagingAutoOpenKey,
@@ -19,6 +20,7 @@ type StagingActionsBarProps = {
   onVersionPublished?: () => void;
   onAgentStagingReady?: AgentStagingReadyHandler;
   onAgentStagingCommit?: (commitMessage: string) => Promise<boolean>;
+  confirmKind?: DraftActionsConfirmKind;
   liveCanvasVersionId?: string;
   headerMode?: CanvasPageHeaderMode;
   isRunInspectionMode?: boolean;
@@ -33,6 +35,7 @@ export function StagingActionsBar({
   onVersionPublished,
   onAgentStagingReady,
   onAgentStagingCommit,
+  confirmKind,
   liveCanvasVersionId,
   headerMode,
   isRunInspectionMode = false,
@@ -97,6 +100,7 @@ export function StagingActionsBar({
           onDismiss={dismiss}
           onViewStaging={onAgentStagingReady}
           onCommitStaging={onAgentStagingCommit}
+          confirmKind={confirmKind}
         />
       </div>
     </div>

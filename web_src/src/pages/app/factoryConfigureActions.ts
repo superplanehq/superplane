@@ -165,11 +165,13 @@ function applyStagedWorkflowSnapshot(
 export async function runFactoryConfigureDiscard(deps: FactoryConfigureDiscardDeps): Promise<void> {
   deps.setSavePending(true);
   try {
+    // Leave Configure URL first. Restoring the live version also writes search
+    // params; if that write wins after navigate, Discard/Save stay on screen.
+    deps.onDone?.();
     if (deps.hasStagingChanges || deps.hasUncommittedCanvasDraftChanges) {
       await deps.handleResetStaging();
     }
     deps.handleExitEditSession();
-    deps.onDone?.();
   } finally {
     deps.setSavePending(false);
   }
