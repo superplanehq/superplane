@@ -14,6 +14,7 @@ import (
 	"math/big"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -119,6 +120,7 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 	trigger := &OnTopicMessage{}
 
 	t.Run("notification for configured topic -> emits event", func(t *testing.T) {
+		resetSigningCertCache(t)
 		privateKey, certPEM := createTestSigningCert(t)
 		message := signTestMessage(t, trigger, SubscriptionMessage{
 			Type:             "Notification",
@@ -167,6 +169,7 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("subscription confirmation for different topic -> ignored", func(t *testing.T) {
+		resetSigningCertCache(t)
 		privateKey, certPEM := createTestSigningCert(t)
 		message := signTestMessage(t, trigger, SubscriptionMessage{
 			Type:             "SubscriptionConfirmation",
@@ -206,6 +209,7 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("confirmation for configured topic -> confirms subscription", func(t *testing.T) {
+		resetSigningCertCache(t)
 		privateKey, certPEM := createTestSigningCert(t)
 		message := signTestMessage(t, trigger, SubscriptionMessage{
 			Type:             "SubscriptionConfirmation",
@@ -270,6 +274,86 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 }
 
 const testSigningCertURL = "https://sns.us-east-1.amazonaws.com/test.pem"
+
+func resetSigningCertCache(t *testing.T) {
+	t.Helper()
+	signingCertCache = sync.Map{}
+}
+
+func Test__OnTopicMessage__fetchSigningCertificate__Caching(t *testing.T) {
+	trigger := &OnTopicMessage{}
+
+	t.Run("second fetch for the same URL is served from cache", func(t *testing.T) {
+		resetSigningCertCache(t)
+		_, certPEM := createTestSigningCert(t)
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(certPEM))},
+			},
+		}
+		ctx := core.WebhookRequestContext{HTTP: httpContext, Logger: log.NewEntry(log.New())}
+
+		cert1, err := trigger.fetchSigningCertificate(ctx, testSigningCertURL)
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+
+		cert2, err := trigger.fetchSigningCertificate(ctx, testSigningCertURL)
+		require.NoError(t, err)
+		assert.Same(t, cert1, cert2)
+		assert.Len(t, httpContext.Requests, 1, "second fetch should not issue a new HTTP request")
+	})
+
+	t.Run("expired cache entry triggers a re-fetch", func(t *testing.T) {
+		resetSigningCertCache(t)
+		_, certPEM1 := createTestSigningCert(t)
+		_, certPEM2 := createTestSigningCert(t)
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(certPEM1))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(certPEM2))},
+			},
+		}
+		ctx := core.WebhookRequestContext{HTTP: httpContext, Logger: log.NewEntry(log.New())}
+
+		cert1, err := trigger.fetchSigningCertificate(ctx, testSigningCertURL)
+		require.NoError(t, err)
+
+		// Force the cached entry to look expired.
+		signingCertCache.Store(testSigningCertURL, signingCertCacheEntry{
+			cert:      cert1,
+			expiresAt: time.Now().Add(-time.Second),
+		})
+
+		cert2, err := trigger.fetchSigningCertificate(ctx, testSigningCertURL)
+		require.NoError(t, err)
+		assert.NotSame(t, cert1, cert2)
+		assert.Len(t, httpContext.Requests, 2, "expired cache entry should trigger a new HTTP request")
+	})
+
+	t.Run("different URLs are cached independently", func(t *testing.T) {
+		resetSigningCertCache(t)
+		_, certPEM1 := createTestSigningCert(t)
+		_, certPEM2 := createTestSigningCert(t)
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(certPEM1))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(certPEM2))},
+			},
+		}
+		ctx := core.WebhookRequestContext{HTTP: httpContext, Logger: log.NewEntry(log.New())}
+
+		_, err := trigger.fetchSigningCertificate(ctx, testSigningCertURL)
+		require.NoError(t, err)
+
+		_, err = trigger.fetchSigningCertificate(ctx, "https://sns.us-west-2.amazonaws.com/test.pem")
+		require.NoError(t, err)
+
+		assert.Len(t, httpContext.Requests, 2)
+	})
+}
 
 func createTestSigningCert(t *testing.T) (*rsa.PrivateKey, []byte) {
 	t.Helper()
