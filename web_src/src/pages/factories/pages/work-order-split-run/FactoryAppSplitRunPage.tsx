@@ -45,11 +45,20 @@ export function FactoryAppSplitRunPage() {
     return byNumber ?? findWorkOrderByRunId(workOrders, runId) ?? null;
   }, [isLoading, orderNumber, runId, workOrders]);
   const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, order?.id ?? "");
-  const fixture = useMemo(
-    () => (order ? splitRunFixtureForWorkOrder(order, { checks: orderChecks }) : SPLIT_RUN_RUNNING),
-    [order, orderChecks],
-  );
+  const waitingForOrder = !order && (isLoading || Boolean(runId || orderNumber));
+  const fixture = useMemo(() => {
+    if (order) {
+      return splitRunFixtureForWorkOrder(order, { checks: orderChecks, lineId });
+    }
+    if (waitingForOrder) {
+      return null;
+    }
+    return SPLIT_RUN_RUNNING;
+  }, [lineId, order, orderChecks, waitingForOrder]);
   const phase = useMemo(() => {
+    if (!fixture) {
+      return SPLIT_RUN_RUNNING.phases.find((entry) => entry.id === "implement")!;
+    }
     return (
       fixture.phases.find((entry) => canvasKeyForPhase(entry) === canvasKey) ??
       fixture.phases[0] ??
@@ -82,7 +91,35 @@ export function FactoryAppSplitRunPage() {
     navigate(editHref);
   }, [editHref, navigate]);
 
-  usePageTitle([canvas.title, factory?.name ?? "Workspace"]);
+  usePageTitle([
+    waitingForOrder ? (isLoading ? "Loading run" : "Run not found") : canvas.title,
+    factory?.name ?? "Workspace",
+  ]);
+
+  if (!fixture) {
+    return (
+      <div
+        className="absolute inset-0 flex flex-col bg-background"
+        data-testid="factory-app-split-run-page"
+        data-state={isLoading ? "loading" : "not-found"}
+      >
+        <FactoryAppCanvasHeader
+          backHref={back.href}
+          backLabel={back.label}
+          title={isLoading ? "Loading run" : "Run not found"}
+          subtitle={subtitle}
+          isConfigure={false}
+          configureBusy={false}
+          onDiscard={() => undefined}
+          onSave={() => undefined}
+          onOpenVisualEditor={handleOpenVisualEditor}
+        />
+        <p className="px-6 py-8 text-sm text-muted-foreground">
+          {isLoading ? "Loading this run." : "This run is not on the workspace."}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="absolute inset-0 flex flex-col bg-background" data-testid="factory-app-split-run-page">

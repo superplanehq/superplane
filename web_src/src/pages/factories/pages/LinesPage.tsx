@@ -270,6 +270,7 @@ function LineDetail({
         <LineBoardSplitRunPopup
           organizationId={organizationId}
           factoryId={factoryId}
+          lineId={line.id}
           peekOrderId={peekOrderId}
           peekOrder={peekOrder}
           canvasEditHref={canvasEditHref}
@@ -284,6 +285,7 @@ function LineDetail({
 function LineBoardSplitRunPopup({
   organizationId,
   factoryId,
+  lineId,
   peekOrderId,
   peekOrder,
   canvasEditHref,
@@ -292,6 +294,7 @@ function LineBoardSplitRunPopup({
 }: {
   organizationId: string;
   factoryId: string;
+  lineId: string | undefined;
   peekOrderId: string;
   peekOrder: FactoriesWorkOrder | undefined;
   canvasEditHref: (key: SplitRunCanvasKey) => string | undefined;
@@ -302,7 +305,7 @@ function LineBoardSplitRunPopup({
   return (
     <WorkOrderSplitRunPopup
       key={peekOrderId}
-      fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks })}
+      fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId })}
       canvasEditHref={canvasEditHref}
       canvasExpandHref={canvasExpandHref}
       onClose={onClose}

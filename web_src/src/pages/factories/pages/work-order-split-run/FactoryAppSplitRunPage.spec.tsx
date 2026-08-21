@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -7,6 +7,7 @@ import { client } from "@/api-client/client.gen";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { REFUND_IMPLEMENTER_APP } from "../../__fixtures__/factoryOwnedCanvasFixture";
 import {
+  defaultFactoriesFixture,
   LINE_RUN_IMPLEMENT_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
@@ -29,8 +30,10 @@ describe("FactoryAppSplitRunPage", () => {
       />,
     );
 
-    const page = await screen.findByTestId("factory-app-split-run-page", {}, { timeout: 8000 });
-    expect(within(page).getByTestId("factory-app-canvas-title")).toHaveTextContent("Implementation");
+    await waitFor(() => {
+      expect(screen.getByTestId("factory-app-canvas-title")).toHaveTextContent("Implementation");
+    });
+    const page = screen.getByTestId("factory-app-split-run-page");
     expect(within(page).getByTestId("split-run-phase-implement")).toBeInTheDocument();
     expect(within(page).queryByTestId("split-run-phase-plan")).not.toBeInTheDocument();
     expect(within(page).getByTestId("split-run-stream-implement")).toBeInTheDocument();
@@ -39,6 +42,24 @@ describe("FactoryAppSplitRunPage", () => {
     expect(within(page).queryByTestId("split-run-canvas-expand")).not.toBeInTheDocument();
     expect(within(page).queryByTestId("split-run-canvas-menu")).not.toBeInTheDocument();
     expect(within(page).getByTestId("factory-app-edit")).toHaveTextContent("Edit");
+  }, 10000);
+
+  it("does not show the demo run when the selected run is missing", async () => {
+    const line = REFUND_FACTORY_LINES[0];
+    const appId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
+
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${appId}/split-run?from=lines&lineId=${line.id}&run=run-missing`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    const page = await screen.findByTestId("factory-app-split-run-page", {}, { timeout: 8000 });
+    await waitFor(() => {
+      expect(page).toHaveAttribute("data-state", "not-found");
+    });
+    expect(screen.queryByText("Add refund reconciliation test")).not.toBeInTheDocument();
   }, 10000);
 
   it("redirects the deprecated canvas run view to the split run page", async () => {

@@ -100,6 +100,39 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(done.waitingNotes).toEqual([]);
   });
 
+  it("uses the newest dispatch on the viewed line", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Two-line order",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "d-other",
+            createdAt: "2026-08-21T12:00:00.000Z",
+            line: { id: "line-other", name: "other-line" },
+            state: "STATE_FINISHED",
+            stepExecutions: [
+              { id: "e-other", step: "Implement", stepIndex: 1, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            ],
+          },
+          {
+            id: "d-viewed",
+            createdAt: "2026-08-21T11:00:00.000Z",
+            line: { id: "line-1", name: "plan-and-implement" },
+            state: "STATE_ACTIVE",
+            stepExecutions: [
+              { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
+            ],
+          },
+        ],
+      }),
+      { lineId: "line-1" },
+    );
+    expect(fixture.lineName).toBe("plan-and-implement");
+    expect(fixture.currentPhaseId).toMatch(/^plan-/);
+    expect(fixture.phases.some((phase) => phase.name === "Plan")).toBe(true);
+  });
+
   it("uses supplied checks instead of the fixture pills", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({

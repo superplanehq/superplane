@@ -3,10 +3,10 @@ import type {
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderCheck,
   FactoriesWorkOrderExecution,
-  FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
 import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
 import { workOrderOwnerDisplay } from "../../lib/workOrderCreator";
+import { latestDispatchForLine } from "../../lib/workOrderNumberResolution";
 import { clockLabel, formatCostCents, formatTokenCount, providerForName } from "./splitRunFormat";
 
 import { OPEN_WORK_ORDER_ARTIFACTS } from "../../__fixtures__/factoryPageFixtureVariants";
@@ -307,7 +307,7 @@ const PR_CLOSURE_APP_NAME = "PR Closure";
 
 export function splitRunFixtureForWorkOrder(
   order?: FactoriesWorkOrder,
-  options?: { checks?: FactoriesWorkOrderCheck[] },
+  options?: { checks?: FactoriesWorkOrderCheck[]; lineId?: string | null },
 ): SplitRunFixture {
   if (!order) {
     return SPLIT_RUN_RUNNING;
@@ -323,7 +323,7 @@ export function splitRunFixtureForWorkOrder(
   }
 
   const displayStatus = getWorkOrderDisplayStatus(order);
-  const executions = latestDispatchExecutions(order);
+  const executions = latestDispatchExecutions(order, options?.lineId);
   const current = pickCurrentExecution(executions);
   const backlog = backlogPhase(order);
   const phases = [backlog, ...executions.map((execution) => executionToPhase(execution))];
@@ -337,11 +337,11 @@ export function splitRunFixtureForWorkOrder(
     costUsd: formatCostCents(order.totalCostCents) ?? (displayStatus === "draft" ? "$0.00" : SPLIT_RUN_RUNNING.costUsd),
     tokensLabel:
       formatTokenCount(order.totalTokens) ?? (displayStatus === "draft" ? "0 tokens" : SPLIT_RUN_RUNNING.tokensLabel),
-    lineName: latestDispatch(order)?.line?.name ?? SPLIT_RUN_RUNNING.lineName,
+    lineName: latestDispatchForLine(order, options?.lineId)?.line?.name ?? SPLIT_RUN_RUNNING.lineName,
     lineStatus: lineStatusForDisplay(displayStatus),
     currentPhaseId,
     phases,
-    ...reviewSurfaces(order, displayStatus, options?.checks),
+    ...reviewSurfaces(order, displayStatus, options?.checks, options?.lineId),
   };
 }
 
@@ -349,17 +349,14 @@ function reviewSurfaces(
   order: FactoriesWorkOrder,
   displayStatus: WorkOrderDisplayStatus,
   apiChecks?: FactoriesWorkOrderCheck[],
+  lineId?: string | null,
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footerTone"> {
-  const executions = latestDispatchExecutions(order);
+  const executions = latestDispatchExecutions(order, lineId);
   const current = pickCurrentExecution(executions);
   const column = boardColumnFor(current, executions.length);
   const implementFailed = column === "implement" && current?.result === "RESULT_FAILED";
   const showChecks = column === "verify" || column === "done";
-  const checks = showChecks
-    ? apiChecks !== undefined
-      ? presentWorkOrderChecks(apiChecks)
-      : OPEN_PAGE_CHECKS
-    : [];
+  const checks = showChecks ? (apiChecks !== undefined ? presentWorkOrderChecks(apiChecks) : OPEN_PAGE_CHECKS) : [];
 
   if (displayStatus === "draft") {
     return { waitingNotes: [DRAFT_NEXT_STEP], checks: [], footerTone: "draft" };
@@ -501,20 +498,8 @@ function phaseIdForExecution(execution: FactoriesWorkOrderExecution): string {
   return `${name}-${execution.stepIndex ?? 0}`;
 }
 
-function latestDispatch(order: FactoriesWorkOrder): FactoriesWorkOrderLineDispatch | undefined {
-  const dispatches = order.lineDispatches ?? [];
-  if (dispatches.length === 0) {
-    return undefined;
-  }
-  return dispatches.reduce((best, candidate) => {
-    const bestAt = Date.parse(best.createdAt ?? "") || 0;
-    const candidateAt = Date.parse(candidate.createdAt ?? "") || 0;
-    return candidateAt >= bestAt ? candidate : best;
-  });
-}
-
-function latestDispatchExecutions(order: FactoriesWorkOrder): FactoriesWorkOrderExecution[] {
-  return latestDispatch(order)?.stepExecutions ?? [];
+function latestDispatchExecutions(order: FactoriesWorkOrder, lineId?: string | null): FactoriesWorkOrderExecution[] {
+  return latestDispatchForLine(order, lineId)?.stepExecutions ?? [];
 }
 
 function pickCurrentExecution(executions: FactoriesWorkOrderExecution[]): FactoriesWorkOrderExecution | undefined {
