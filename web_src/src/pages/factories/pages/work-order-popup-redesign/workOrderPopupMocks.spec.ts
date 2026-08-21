@@ -106,7 +106,87 @@ describe("popupFixtureForWorkOrder", () => {
 
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.checks).toEqual([]);
-    expect(fixture.log.map((entry) => entry.actor)).toEqual(["Backlog", "Plan", "Implement", "Verify", "Done"]);
+    expect(fixture.log.map((entry) => [entry.actor, entry.title])).toEqual([
+      ["Backlog", "Create work order"],
+      ["Plan", "Plan"],
+      ["Implement", "Implement"],
+      ["Verify", "Verify"],
+      ["Done", "Complete work order"],
+    ]);
+  });
+
+  it("shows a PR Closure complete step with the pull request", () => {
+    const fixture = popupFixtureForWorkOrder(
+      order({
+        title: "Merged job",
+        state: "STATE_CLOSED",
+        result: "RESULT_COMPLETED",
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { id: "e-impl", step: "Implement", stepIndex: 1, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { id: "e-verify", step: "Verify", stepIndex: 2, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            {
+              id: "e-done",
+              step: "Done",
+              stepIndex: 3,
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              run: { appId: "app-refund-done", appName: "PR Closure" },
+            },
+          ]),
+        ],
+      }),
+    );
+
+    expect(fixture.log.at(-1)).toMatchObject({
+      actor: "Done",
+      title: "Complete work order from merged pull request",
+      artifactId: "art-pr-closure",
+    });
+  });
+
+  it("shows reject titles for a user and for PR Closure", () => {
+    const userReject = popupFixtureForWorkOrder(
+      order({
+        title: "User reject",
+        state: "STATE_CLOSED",
+        result: "RESULT_REJECTED",
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            {
+              id: "e-done",
+              step: "Done",
+              stepIndex: 3,
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+            },
+          ]),
+        ],
+      }),
+    );
+    const automationReject = popupFixtureForWorkOrder(
+      order({
+        title: "Automation reject",
+        state: "STATE_CLOSED",
+        result: "RESULT_REJECTED",
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            {
+              id: "e-done",
+              step: "Done",
+              stepIndex: 3,
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              run: { appId: "app-refund-done", appName: "PR Closure" },
+            },
+          ]),
+        ],
+      }),
+    );
+
+    expect(userReject.log.at(-1)?.title).toBe("Reject work order");
+    expect(automationReject.log.at(-1)?.title).toBe("Reject work order from closed pull request");
   });
 
   it("shows a backlog create step with description.md for a user draft", () => {

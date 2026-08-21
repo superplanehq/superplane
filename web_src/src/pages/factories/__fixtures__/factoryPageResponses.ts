@@ -401,14 +401,33 @@ export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
 };
 
 export const INGEST_DRAFT_WORK_ORDER: FactoriesWorkOrder = {
-  id: "wo-ingest-pagination",
-  number: "106",
-  key: "RF-106",
-  title: "Paginated listings report a next page on the last full page",
+  id: "wo-ingest-api-key",
+  number: "72",
+  key: "RF-72",
+  title: "Duplicate API key name returns HTTP 500 instead of a validation/conflict error",
   description: [
-    "Every cursor-paginated listing reports `hasNextPage: true` on its last page whenever the number of rows is an exact multiple of the page size. Clients then request a page that comes back empty.",
+    "Creating an API key with a name that already exists in the organization returns `HTTP 500 Internal Server Error` with a generic message, instead of a client-actionable validation or conflict response.",
     "",
-    "Fetch `limit + 1` rows and let the extra row answer whether another page exists.",
+    "### What happens",
+    "",
+    "`POST /api/v1/api-keys` with a name that collides with an existing key (the name is trimmed before creation, so surrounding whitespace still collides) returns:",
+    "",
+    "```",
+    "HTTP/1.1 500 Internal Server Error",
+    '{"code": ...,"message":"failed to create API key","details":[]}',
+    "```",
+    "",
+    "The database correctly rejects the duplicate:",
+    "",
+    "```",
+    'ERROR: duplicate key value violates unique constraint "unique_api_key_in_organization" (SQLSTATE 23505)',
+    "```",
+    "",
+    "No second key is created, so the data stays consistent, but a foreseeable user input (reusing a name) surfaces as a server error with no indication of the real cause.",
+    "",
+    "### Expected",
+    "",
+    "A duplicate name should return a client-visible conflict or validation error explaining that the name is already in use, rather than a generic `500`.",
   ].join("\n"),
   state: "STATE_DRAFT",
   result: "RESULT_UNSPECIFIED",
@@ -418,7 +437,7 @@ export const INGEST_DRAFT_WORK_ORDER: FactoriesWorkOrder = {
     automation: {
       appId: "app-refund-backlog",
       appName: "Ingest",
-      nodeName: "Create Work Order",
+      nodeName: "On Issue Label",
     },
   },
   assignees: [],
@@ -494,6 +513,56 @@ export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
   totalCostCents: "538",
 };
 
+export const PR_CLOSURE_COMPLETED_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-pr-closure-receipts",
+  number: "88",
+  key: "RF-88",
+  title: "Send refund receipts after provider confirm",
+  description: [
+    "Customers do not receive a receipt after a refund confirms at the provider.",
+    "",
+    "Send the receipt when the provider webhook reports success. PR Closure completes the work order after the pull request merges.",
+  ].join("\n"),
+  state: "STATE_CLOSED",
+  result: "RESULT_COMPLETED",
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  lineDispatches: [
+    planLineDispatch([
+      planLineExecution("plan", {
+        id: "pr-plan",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        updatedAt: LAST_WEEK,
+        totalTokens: "900",
+        costCents: "22",
+      }),
+      planLineExecution("implement", {
+        id: "pr-impl",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        run: { id: "run-pr-closure-implement", appId: "app-refund-implementer", appName: "Refund Implementer" },
+        updatedAt: LAST_WEEK,
+        totalTokens: "5400",
+        costCents: "180",
+      }),
+      planLineExecution("verify", {
+        id: "pr-verify",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        run: { id: "run-pr-closure-verify", appId: "app-refund-verifier", appName: "Refund Verifier" },
+        updatedAt: YESTERDAY,
+        totalTokens: "700",
+        costCents: "16",
+      }),
+    ]),
+  ],
+  totalTokens: "7000",
+  totalCostCents: "218",
+};
+
 export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
   OPEN_WORK_ORDER,
   OPEN_WORK_ORDER_SECONDARY,
@@ -502,6 +571,7 @@ export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
   DRAFT_WORK_ORDER,
   INGEST_DRAFT_WORK_ORDER,
   CLOSED_WORK_ORDER,
+  PR_CLOSURE_COMPLETED_WORK_ORDER,
   CLOSED_FAILED_WORK_ORDER,
 ];
 

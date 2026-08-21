@@ -121,7 +121,7 @@ describe("Line board job popup", () => {
     ).toBeInTheDocument();
     expect(
       within(screen.getByTestId("lines-backlog-column")).getByRole("button", {
-        name: "Open Paginated listings report a next page on the last full page",
+        name: "Open Duplicate API key name returns HTTP 500 instead of a validation/conflict error",
       }),
     ).toBeInTheDocument();
     expect(
@@ -141,6 +141,11 @@ describe("Line board job popup", () => {
     ).toBeInTheDocument();
     expect(
       within(screen.getByLabelText("Done phase")).getByRole("button", { name: "Open Backfill refund audit trail" }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByLabelText("Done phase")).getByRole("button", {
+        name: "Open Send refund receipts after provider confirm",
+      }),
     ).toBeInTheDocument();
     await user.click(card);
 
@@ -199,10 +204,23 @@ describe("Line board job popup", () => {
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
     await user.click(
-      screen.getByRole("button", { name: "Open Paginated listings report a next page on the last full page" }),
+      screen.getByRole("button", {
+        name: "Open Duplicate API key name returns HTTP 500 instead of a validation/conflict error",
+      }),
     );
     dialog = await screen.findByTestId("work-order-popup-job");
     expect(within(dialog).getByText("Create work order from GitHub issue")).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "description.md" })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+
+    await user.click(screen.getByRole("button", { name: "Open Backfill refund audit trail" }));
+    dialog = await screen.findByTestId("work-order-popup-job");
+    expect(within(dialog).getByText("Complete work order")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+
+    await user.click(screen.getByRole("button", { name: "Open Send refund receipts after provider confirm" }));
+    dialog = await screen.findByTestId("work-order-popup-job");
+    expect(within(dialog).getByText("Complete work order from merged pull request")).toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: /#510|Send refund receipts/ })).toHaveAttribute("target", "_blank");
   }, 15000);
 });

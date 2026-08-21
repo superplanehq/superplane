@@ -19,6 +19,7 @@ import {
   LINE_RUN_IMPLEMENT_ID,
   LINE_RUN_VERIFY_PASSED_ID,
   OPERATOR_USER,
+  PR_CLOSURE_COMPLETED_WORK_ORDER,
   PRIMARY_FACTORY_ID,
   REFUND_FACTORY_APPS,
   REFUND_LINE_FEATURE_ID,
@@ -70,7 +71,7 @@ const PLAN_LINE_APPS: FactoryApp[] = [
   {
     id: PLAN_LINE_DONE_APP_ID,
     name: "Done",
-    description: "Closes the work order after verification.",
+    description: "Completes or rejects the work order when a pull request merges or closes.",
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
   },
@@ -196,7 +197,13 @@ function withFailedWaitingNote(order: FactoriesWorkOrder): FactoriesWorkOrder {
 }
 
 function withDonePhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
-  if (order.id !== CLOSED_WORK_ORDER.id) {
+  const doneRun =
+    order.id === CLOSED_WORK_ORDER.id
+      ? { executionId: "exec-done-closed", runId: "run-done-closed", appName: "Done" }
+      : order.id === PR_CLOSURE_COMPLETED_WORK_ORDER.id
+        ? { executionId: "exec-done-pr-closure", runId: "run-done-pr-closure", appName: "PR Closure" }
+        : null;
+  if (!doneRun) {
     return order;
   }
   const dispatch = order.lineDispatches?.[0];
@@ -212,14 +219,14 @@ function withDonePhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
         stepExecutions: [
           ...(dispatch.stepExecutions ?? []),
           {
-            id: "exec-done-closed",
+            id: doneRun.executionId,
             step: "Done",
             stepIndex: 3,
             state: "STATE_FINISHED",
             result: "RESULT_PASSED",
             createdAt: YESTERDAY,
             updatedAt: YESTERDAY,
-            run: { id: "run-done-closed", appId: PLAN_LINE_DONE_APP_ID, appName: "Done" },
+            run: { id: doneRun.runId, appId: PLAN_LINE_DONE_APP_ID, appName: doneRun.appName },
           },
         ],
       },

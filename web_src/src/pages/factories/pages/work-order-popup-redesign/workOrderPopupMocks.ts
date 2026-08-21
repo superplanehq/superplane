@@ -211,6 +211,18 @@ export function buildPopupDispatchEvent(fixture: PopupFixture): WorkOrderTimelin
 }
 
 const PHASE_NAMES = ["Plan", "Implement", "Verify", "Done"] as const;
+const PR_CLOSURE_APP_NAME = "PR Closure";
+
+export const PR_CLOSURE_PR_ARTIFACT: FactoriesWorkOrderArtifact = {
+  id: "art-pr-closure",
+  type: "TYPE_PR",
+  data: {
+    url: "https://github.com/example/ledger/pull/510",
+    title: "Send refund receipts after provider confirm",
+    number: 510,
+    state: "merged",
+  },
+};
 
 function descriptionArtifactForOrder(order: FactoriesWorkOrder): FactoriesWorkOrderArtifact {
   return {
@@ -281,7 +293,8 @@ export function popupFixtureForWorkOrder(order?: FactoriesWorkOrder): PopupFixtu
       ? presentWorkOrderChecks(OPEN_WORK_ORDER_CHECKS).filter((check) => check.id !== "check-confidence")
       : [],
     description: descriptionArtifactForOrder(order),
-    log: [backlogLogEntry(order), ...executions.map(executionToLogEntry)],
+    outputs: executions.some(isPrClosureRun) ? [PR_CLOSURE_PR_ARTIFACT] : [],
+    log: [backlogLogEntry(order), ...executions.map((execution) => executionToLogEntry(order, execution))],
     elapsed: displayStatus === "draft" ? "Not started" : base.elapsed,
     owner: ownerForOrder(order, base.owner),
   };
@@ -316,16 +329,30 @@ function pickCurrentExecution(executions: FactoriesWorkOrderExecution[]): Factor
   }, undefined);
 }
 
-function executionToLogEntry(execution: FactoriesWorkOrderExecution): PopupLogEntry {
+function isPrClosureRun(execution: FactoriesWorkOrderExecution): boolean {
+  return execution.run?.appName === PR_CLOSURE_APP_NAME;
+}
+
+function doneLogTitle(order: FactoriesWorkOrder, execution: FactoriesWorkOrderExecution): string {
+  const fromPullRequest = isPrClosureRun(execution);
+  if (order.result === "RESULT_REJECTED") {
+    return fromPullRequest ? "Reject work order from closed pull request" : "Reject work order";
+  }
+  return fromPullRequest ? "Complete work order from merged pull request" : "Complete work order";
+}
+
+function executionToLogEntry(order: FactoriesWorkOrder, execution: FactoriesWorkOrderExecution): PopupLogEntry {
   const stepIndex = execution.stepIndex ?? 0;
   const actor = PHASE_NAMES[stepIndex] ?? execution.step ?? "Step";
   const state = logStateForExecution(execution);
+  const isDone = stepIndex === 3;
   return {
     id: execution.id ?? actor,
     actor,
-    title: execution.step ?? actor,
+    title: isDone ? doneLogTitle(order, execution) : (execution.step ?? actor),
     duration: state === "running" ? "4m so far" : "1m 12s",
     state,
+    artifactId: isDone && isPrClosureRun(execution) ? PR_CLOSURE_PR_ARTIFACT.id : undefined,
   };
 }
 
