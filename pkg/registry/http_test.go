@@ -2,6 +2,7 @@ package registry
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -164,6 +165,8 @@ func Test__HTTPContext__Do(t *testing.T) {
 		_, err = ctx.Do(req)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "access to example.com is not allowed")
+		var policyErr *HTTPPolicyError
+		assert.True(t, errors.As(err, &policyErr))
 	})
 
 	t.Run("private IP", func(t *testing.T) {
@@ -185,6 +188,8 @@ func Test__HTTPContext__Do(t *testing.T) {
 		_, err = ctx.Do(req)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "access to 127.0.0.1 is not allowed")
+		var policyErr *HTTPPolicyError
+		assert.True(t, errors.As(err, &policyErr))
 		assert.Zero(t, hits.Load())
 	})
 }
@@ -244,7 +249,68 @@ func Test__HTTPContext__Do__RedirectToBlockedHost(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "redirect blocked")
 	assert.Contains(t, err.Error(), "access to example.com is not allowed")
+	var policyErr *HTTPPolicyError
+	assert.True(t, errors.As(err, &policyErr))
 	assert.Equal(t, int32(1), hits.Load())
+}
+
+func Test__HTTPContext__Do__StripsSensitiveHeadersOnCrossOriginRedirect(t *testing.T) {
+	var receivedHeader string
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedHeader = r.Header.Get("X-API-Key")
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(target.Close)
+
+	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusFound)
+	}))
+	t.Cleanup(source.Close)
+
+	ctx, err := NewHTTPContext(HTTPOptions{})
+	require.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodGet, source.URL, nil)
+	require.NoError(t, err)
+	req.Header.Set("X-API-Key", "secret")
+	req = WithSensitiveHeaders(req, "X-API-Key")
+
+	response, err := ctx.Do(req)
+	require.NoError(t, err)
+	require.NoError(t, response.Body.Close())
+	assert.Empty(t, receivedHeader)
+}
+
+func Test__HTTPContext__Do__KeepsSensitiveHeadersStrippedAfterCrossOriginRedirect(t *testing.T) {
+	var receivedHeader string
+	var target *httptest.Server
+	target = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/redirect" {
+			http.Redirect(w, r, target.URL+"/final", http.StatusFound)
+			return
+		}
+		receivedHeader = r.Header.Get("X-API-Key")
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(target.Close)
+
+	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL+"/redirect", http.StatusFound)
+	}))
+	t.Cleanup(source.Close)
+
+	ctx, err := NewHTTPContext(HTTPOptions{})
+	require.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodGet, source.URL, nil)
+	require.NoError(t, err)
+	req.Header.Set("X-API-Key", "secret")
+	req = WithSensitiveHeaders(req, "X-API-Key")
+
+	response, err := ctx.Do(req)
+	require.NoError(t, err)
+	require.NoError(t, response.Body.Close())
+	assert.Empty(t, receivedHeader)
 }
 
 func Test__HTTPContext__Do__ResponseTooLarge_ContentLength(t *testing.T) {
@@ -265,6 +331,8 @@ func Test__HTTPContext__Do__ResponseTooLarge_ContentLength(t *testing.T) {
 	_, err = ctx.Do(req)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "response too large")
+	var responseTooLargeErr *HTTPResponseTooLargeError
+	assert.True(t, errors.As(err, &responseTooLargeErr))
 }
 
 func Test__HTTPContext__Do__ResponseTooLarge_Streaming(t *testing.T) {
@@ -291,6 +359,8 @@ func Test__HTTPContext__Do__ResponseTooLarge_Streaming(t *testing.T) {
 	body, err := io.ReadAll(resp.Body)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "response too large")
+	var responseTooLargeErr *HTTPResponseTooLargeError
+	assert.True(t, errors.As(err, &responseTooLargeErr))
 	assert.Len(t, body, 5)
 }
 

@@ -56,6 +56,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Update Work Order Status" href="#update-work-order-status" description="Transition a work order between lifecycle states" />
   <LinkCard title="Upsert Memory" href="#upsert-memory" description="Update matching memory rows, or create one when no match exists" />
   <LinkCard title="Wait" href="#wait" description="Wait for a certain amount of time" />
+  <LinkCard title="Wait for Endpoint" href="#wait-for-endpoint" description="Poll an HTTP endpoint until it is ready or the deadline expires" />
 </CardGrid>
 
 <a id="on-broadcast"></a>
@@ -1967,6 +1968,54 @@ The component emits a payload with:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "wait.finished"
+}
+```
+
+<a id="wait-for-endpoint"></a>
+
+## Wait for Endpoint
+
+**Component key:** `waitForEndpoint`
+
+Wait for Endpoint checks a service after deployment and continues the workflow only when it is ready.
+
+The first check happens immediately. If the endpoint is not ready, SuperPlane schedules durable checks without keeping a worker occupied.
+
+### Readiness
+
+By default, any 2xx response is ready. You can configure exact statuses such as `200,204` and an optional condition such as `body.status == "ready"`.
+
+### Outcomes
+
+- **Ready**: the status and optional condition matched.
+- **Timeout**: the deadline expired. Connect this channel to rollback, notification, or diagnostics nodes.
+
+Network failures are retried until timeout. Invalid configuration, blocked URLs, missing secrets, oversized responses, and invalid conditions fail the execution.
+
+### Local testing
+
+Start SuperPlane locally and add this component after a Start trigger. Use `https://httpbin.org/status/200` for a simple Ready-path check.
+
+To test a service running on your machine, enable private network access under Installation Settings and use an address reachable from the app container, such as `http://host.docker.internal:8080/ready`. Connect Ready and Timeout to separate downstream nodes so both outcomes are visible.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "attempts": 3,
+    "body": {
+      "status": "ready"
+    },
+    "elapsedMs": 20000,
+    "finishedAt": "2026-08-01T06:00:20Z",
+    "resolvedUrl": "https://service.example.com/ready",
+    "startedAt": "2026-08-01T06:00:00Z",
+    "status": 200,
+    "url": "https://service.example.com/ready"
+  },
+  "timestamp": "2026-08-01T06:00:20Z",
+  "type": "endpoint.ready"
 }
 ```
 

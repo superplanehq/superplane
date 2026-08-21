@@ -27,6 +27,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/updatememory"
 	_ "github.com/superplanehq/superplane/pkg/components/upsertmemory"
 	_ "github.com/superplanehq/superplane/pkg/components/wait"
+	_ "github.com/superplanehq/superplane/pkg/components/waitforendpoint"
 	_ "github.com/superplanehq/superplane/pkg/integrations/aws"
 	_ "github.com/superplanehq/superplane/pkg/integrations/azure"
 	_ "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
