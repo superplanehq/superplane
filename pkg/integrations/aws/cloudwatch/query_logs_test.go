@@ -24,6 +24,17 @@ func validQueryLogsConfig() map[string]any {
 	}
 }
 
+// failingMetadataContext simulates a persistence failure on Set, so tests can
+// exercise the cleanup path that runs when saving execution metadata fails.
+type failingMetadataContext struct {
+	Metadata any
+}
+
+func (m *failingMetadataContext) Get() any { return m.Metadata }
+func (m *failingMetadataContext) Set(any) error {
+	return fmt.Errorf("simulated persistence failure")
+}
+
 func credentialSecrets() map[string]core.IntegrationSecret {
 	return map[string]core.IntegrationSecret{
 		"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
@@ -145,6 +156,32 @@ func TestQueryLogs_Execute(t *testing.T) {
 
 		require.Len(t, httpContext.Requests, 1)
 		assert.Equal(t, "Logs_20140328.StartQuery", httpContext.Requests[0].Header.Get("X-Amz-Target"))
+	})
+
+	t.Run("metadata save fails after query starts -> stops the query", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"queryId":"query-123"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"success": true}`))},
+			},
+		}
+
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  validQueryLogsConfig(),
+			ExecutionState: execState,
+			HTTP:           httpContext,
+			Logger:         logrus.NewEntry(logrus.New()),
+			Metadata:       &failingMetadataContext{},
+			Integration:    &contexts.IntegrationContext{CurrentSecrets: credentialSecrets()},
+		})
+
+		require.NoError(t, err)
+		assert.False(t, execState.Passed)
+		assert.Contains(t, execState.FailureMessage, "failed to save execution metadata")
+
+		require.Len(t, httpContext.Requests, 2)
+		assert.Equal(t, "Logs_20140328.StopQuery", httpContext.Requests[1].Header.Get("X-Amz-Target"))
 	})
 
 	t.Run("zero limit -> sends the field's default instead of leaving it unset", func(t *testing.T) {
@@ -275,6 +312,35 @@ func TestQueryLogs_HandleHook(t *testing.T) {
 		assert.Equal(t, 1, stored.PollAttempts)
 	})
 
+	t.Run("get query results fails -> fails execution and stops the query", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusBadRequest,
+					Body:       io.NopCloser(strings.NewReader(`{"__type": "ServiceUnavailableException", "message": "try again"}`)),
+				},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"success": true}`))},
+			},
+		}
+
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.HandleHook(core.ActionHookContext{
+			Name:           queryLogsPollHook,
+			ExecutionState: execState,
+			HTTP:           httpContext,
+			Logger:         logrus.NewEntry(logrus.New()),
+			Metadata:       &contexts.MetadataContext{Metadata: QueryLogsExecutionMetadata{QueryID: "query-123", Region: "us-east-1"}},
+			Integration:    &contexts.IntegrationContext{CurrentSecrets: credentialSecrets()},
+		})
+
+		require.NoError(t, err)
+		assert.False(t, execState.Passed)
+		assert.Contains(t, execState.FailureMessage, "failed to get query results")
+
+		require.Len(t, httpContext.Requests, 2)
+		assert.Equal(t, "Logs_20140328.StopQuery", httpContext.Requests[1].Header.Get("X-Amz-Target"))
+	})
+
 	t.Run("status Failed -> fails execution", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -330,6 +396,35 @@ func TestQueryLogs_HandleHook(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, execState.Passed)
 		assert.Contains(t, execState.FailureMessage, "timed out")
+
+		require.Len(t, httpContext.Requests, 2)
+		assert.Equal(t, "Logs_20140328.StopQuery", httpContext.Requests[1].Header.Get("X-Amz-Target"))
+	})
+
+	t.Run("poll attempt save fails -> fails execution and stops the query", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status": "Running", "results": []}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"success": true}`))},
+			},
+		}
+
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.HandleHook(core.ActionHookContext{
+			Name:           queryLogsPollHook,
+			ExecutionState: execState,
+			HTTP:           httpContext,
+			Logger:         logrus.NewEntry(logrus.New()),
+			Metadata: &failingMetadataContext{Metadata: QueryLogsExecutionMetadata{
+				QueryID: "query-123",
+				Region:  "us-east-1",
+			}},
+			Integration: &contexts.IntegrationContext{CurrentSecrets: credentialSecrets()},
+		})
+
+		require.NoError(t, err)
+		assert.False(t, execState.Passed)
+		assert.Contains(t, execState.FailureMessage, "failed to save poll attempt count")
 
 		require.Len(t, httpContext.Requests, 2)
 		assert.Equal(t, "Logs_20140328.StopQuery", httpContext.Requests[1].Header.Get("X-Amz-Target"))

@@ -256,6 +256,7 @@ func (c *QueryLogs) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if err := ctx.Metadata.Set(metadata); err != nil {
+		stopQuery(ctx.Logger, ctx.HTTP, ctx.Integration, config.Region, queryID)
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to save execution metadata: %v", err))
 	}
 
@@ -294,6 +295,7 @@ func (c *QueryLogs) pollQueryResults(ctx core.ActionHookContext) error {
 	client := NewLogsClient(ctx.HTTP, creds, metadata.Region)
 	results, err := client.GetQueryResults(metadata.QueryID)
 	if err != nil {
+		stopQuery(ctx.Logger, ctx.HTTP, ctx.Integration, metadata.Region, metadata.QueryID)
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to get query results: %v", err))
 	}
 
@@ -318,6 +320,7 @@ func (c *QueryLogs) reschedulePoll(ctx core.ActionHookContext, metadata QueryLog
 	}
 
 	if err := ctx.Metadata.Set(metadata); err != nil {
+		stopQuery(ctx.Logger, ctx.HTTP, ctx.Integration, metadata.Region, metadata.QueryID)
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to save poll attempt count: %v", err))
 	}
 
