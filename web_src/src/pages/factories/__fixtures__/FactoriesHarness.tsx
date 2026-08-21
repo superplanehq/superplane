@@ -4,7 +4,6 @@ import type { HomePageFixture, StorybookOrgIntegration } from "@/pages/home/__fi
 import { defaultHomePageFixture } from "@/pages/home/__fixtures__/homePageResponses";
 import { FEATURE_CLAUDE_MANAGED_AGENTS, FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 
-import { FactoryCanvasEditWorkspaceProvider } from "../pages/FactoryCanvasEditWorkspaceProvider";
 import { OnboardingStorybookProvider } from "../pages/onboarding/OnboardingStorybookContext";
 import { OnboardingPage } from "../pages/onboarding/OnboardingPage";
 import type { OnboardingStorybookSeed } from "../pages/onboarding/onboardingMocks";
@@ -103,13 +102,11 @@ export function FactoriesHarness({
   );
 
   const withMissions = (
-    <FactoryCanvasEditWorkspaceProvider>
-      <MissionAssignmentProvider>
-        <WorkOrderOverviewMissionSlotContext.Provider value={WorkOrderMissionOverviewRow}>
-          {harness}
-        </WorkOrderOverviewMissionSlotContext.Provider>
-      </MissionAssignmentProvider>
-    </FactoryCanvasEditWorkspaceProvider>
+    <MissionAssignmentProvider>
+      <WorkOrderOverviewMissionSlotContext.Provider value={WorkOrderMissionOverviewRow}>
+        {harness}
+      </WorkOrderOverviewMissionSlotContext.Provider>
+    </MissionAssignmentProvider>
   );
 
   if (!enableOnboarding) {

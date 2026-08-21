@@ -8,6 +8,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { useSidebarLayoutStore, useSidebarLayoutViewport, useSidebarMount } from "@/stores/sidebarLayoutStore";
+import {
+  factorySidebarCloseButtonClassName,
+  factorySidebarFontClassName,
+  factorySidebarHeadingClassName,
+  factorySidebarIconButtonClassName,
+  factorySidebarInputClassName,
+  factorySidebarMutedIconClassName,
+  factorySidebarResizeLineClassName,
+  factorySidebarSurfaceClassName,
+} from "@/ui/factoryNodeChrome";
 import { CategorySection } from "./CategorySection";
 import { findFirstVisibleBlock, normalizeIntegrationName } from "./filter";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
@@ -31,6 +41,7 @@ export interface BuildingBlocksSidebarProps {
    * or has zero matches — the caller never has to handle a "no block" case.
    */
   onEnterSubmit?: (block: BuildingBlock) => void;
+  factoryChrome?: boolean;
 }
 
 export function BuildingBlocksSidebar({
@@ -43,6 +54,7 @@ export function BuildingBlocksSidebar({
   disabledMessage,
   onBlockClick,
   onEnterSubmit,
+  factoryChrome = false,
 }: BuildingBlocksSidebarProps) {
   const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
 
@@ -59,6 +71,7 @@ export function BuildingBlocksSidebar({
       disabledTooltip={disabledTooltip}
       onBlockClick={onBlockClick}
       onEnterSubmit={onEnterSubmit}
+      factoryChrome={factoryChrome}
     />
   );
 }
@@ -71,6 +84,7 @@ interface OpenBuildingBlocksSidebarProps {
   disabledTooltip: string;
   onBlockClick?: (block: BuildingBlock) => void;
   onEnterSubmit?: (block: BuildingBlock) => void;
+  factoryChrome: boolean;
 }
 
 function OpenBuildingBlocksSidebar({
@@ -81,6 +95,7 @@ function OpenBuildingBlocksSidebar({
   disabledTooltip,
   onBlockClick,
   onEnterSubmit,
+  factoryChrome,
 }: OpenBuildingBlocksSidebarProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -210,9 +225,13 @@ function OpenBuildingBlocksSidebar({
   return (
     <div
       ref={sidebarRef}
-      className="absolute right-0 top-0 h-full z-21"
+      className={cn(
+        "absolute right-0 top-0 z-21 h-full",
+        factoryChrome && [factorySidebarFontClassName, factorySidebarSurfaceClassName],
+      )}
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
       data-testid="building-blocks-sidebar"
+      data-factory-chrome={factoryChrome ? "true" : undefined}
     >
       <div
         onPointerDown={handlePointerDown}
@@ -221,25 +240,37 @@ function OpenBuildingBlocksSidebar({
       >
         <div
           aria-hidden
-          className={`pointer-events-none absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50 dark:group-hover:bg-gray-500/50 ${
-            isResizing ? "bg-slate-950/50 dark:bg-gray-500/50" : ""
-          }`}
+          className={
+            factoryChrome
+              ? cn(factorySidebarResizeLineClassName, isResizing && "bg-foreground/40")
+              : `pointer-events-none absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50 dark:group-hover:bg-gray-500/50 ${
+                  isResizing ? "bg-slate-950/50 dark:bg-gray-500/50" : ""
+                }`
+          }
         />
       </div>
 
       <div
         className={cn(
-          "border-l h-full flex flex-col overflow-hidden bg-white dark:bg-gray-900",
-          appDarkModeClasses.sidebarEdge,
+          "flex h-full flex-col overflow-hidden border-l",
+          factoryChrome
+            ? factorySidebarSurfaceClassName
+            : cn("bg-white dark:bg-gray-900", appDarkModeClasses.sidebarEdge),
         )}
       >
-        <div className="flex items-center justify-between gap-3 px-4 py-3 shrink-0">
-          <h2 className="min-w-0 text-sm font-medium">Select Component</h2>
+        <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
+          <h2 className={factoryChrome ? factorySidebarHeadingClassName : "min-w-0 text-sm font-medium"}>
+            Select Component
+          </h2>
           <button
             type="button"
             onClick={() => onToggle(false)}
             data-testid="close-sidebar-button"
-            className="shrink-0 flex h-6 w-6 cursor-pointer items-center justify-center rounded leading-none hover:bg-slate-950/5 dark:hover:bg-gray-800/50"
+            className={
+              factoryChrome
+                ? factorySidebarCloseButtonClassName
+                : "flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded leading-none hover:bg-slate-950/5 dark:hover:bg-gray-800/50"
+            }
             aria-label="Close sidebar"
           >
             <X size={16} className="shrink-0" />
@@ -247,17 +278,20 @@ function OpenBuildingBlocksSidebar({
         </div>
 
         <div className="flex flex-1 flex-col min-h-0 overflow-y-auto overflow-x-hidden">
-          <div className="flex items-center gap-2 px-5 pt-3 shrink-0">
-            <div className="flex-1 relative min-w-0">
+          <div className="flex shrink-0 items-center gap-2 px-5 pt-3">
+            <div className="relative min-w-0 flex-1">
               <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none dark:text-gray-500"
+                className={cn(
+                  "pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2",
+                  factoryChrome ? factorySidebarMutedIconClassName : "text-gray-400 dark:text-gray-500",
+                )}
                 size={16}
               />
               <Input
                 ref={searchInputRef}
                 type="text"
                 placeholder="Filter components..."
-                className="pl-9"
+                className={factoryChrome ? factorySidebarInputClassName : "pl-9"}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={(e) => {
@@ -278,9 +312,15 @@ function OpenBuildingBlocksSidebar({
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon-sm" className="h-8 w-8 shrink-0" aria-label="Sidebar settings">
-                  <Settings2 className="h-4 w-4" />
-                </Button>
+                {factoryChrome ? (
+                  <button type="button" className={factorySidebarIconButtonClassName} aria-label="Sidebar settings">
+                    <Settings2 className="size-4" strokeWidth={1.75} />
+                  </button>
+                ) : (
+                  <Button variant="outline" size="icon-sm" className="h-8 w-8 shrink-0" aria-label="Sidebar settings">
+                    <Settings2 className="h-4 w-4" />
+                  </Button>
+                )}
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuCheckboxItem
@@ -308,13 +348,19 @@ function OpenBuildingBlocksSidebar({
                 showIntegrationSetupStatus={showIntegrationSetupStatus}
                 searchTerm={searchTerm}
                 onBlockClick={onBlockClick}
+                factoryChrome={factoryChrome}
               />
             ))}
 
             {disabled && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="absolute inset-0 bg-white/60 dark:bg-gray-900/60 z-30 cursor-not-allowed" />
+                  <div
+                    className={cn(
+                      "absolute inset-0 z-30 cursor-not-allowed",
+                      factoryChrome ? "bg-background/60" : "bg-white/60 dark:bg-gray-900/60",
+                    )}
+                  />
                 </TooltipTrigger>
                 <TooltipContent side="left" sideOffset={10}>
                   <p>{disabledTooltip}</p>
