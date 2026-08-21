@@ -7,12 +7,14 @@ import type {
   FactoriesWorkOrderEvent,
   FactoryApp,
   FactoryLineStep,
+  SuperplaneUsersUser,
 } from "@/api-client";
 
 import type { FactoriesWorkOrderCheck } from "@/api-client";
 import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } from "./usageReportFixtures";
 import { planLineDispatch, planLineExecution } from "./factoryPagePlanLine";
 import {
+  ARNOLD_USER,
   EMPTY_FACTORY_ID,
   FACTORIES_ORGANIZATION_ID,
   HOUR_AGO,
@@ -22,6 +24,7 @@ import {
   LINE_RUN_IMPLEMENT_PASSED_ID,
   LINE_RUN_VERIFY_PASSED_ID,
   OPERATOR_USER,
+  ORGANIZATION_USERS,
   PRIMARY_FACTORY_ID,
   REFUND_LINE_HOTFIX_ID,
   REFUND_LINE_PLAN_ID,
@@ -34,6 +37,15 @@ import {
 } from "./factoryPageIds";
 
 export * from "./factoryPageIds";
+
+export function toStorybookOrganizationUser(user: (typeof ORGANIZATION_USERS)[number]): SuperplaneUsersUser {
+  const avatarUrl = "avatarUrl" in user ? user.avatarUrl : undefined;
+  return {
+    metadata: { id: user.id, email: user.email },
+    spec: { displayName: user.name },
+    ...(avatarUrl ? { status: { accountProviders: [{ avatarUrl }] } } : {}),
+  };
+}
 
 const RUN_APP_TYPE = "runApp";
 
@@ -169,8 +181,87 @@ export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
   createdAt: TWO_HOURS_AGO,
   updatedAt: TWO_HOURS_AGO,
   createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
+  assignees: [{ id: ARNOLD_USER.id, name: ARNOLD_USER.name }],
+  lineDispatches: [
+    planLineDispatch([
+      planLineExecution("plan", {
+        id: "schema-plan",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        createdAt: LAST_WEEK,
+        updatedAt: LAST_WEEK,
+      }),
+    ]),
+  ],
+};
+
+export const QUESTION_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-agent-question-refunds",
+  number: "108",
+  key: "RF-108",
+  title: "Clarify retry policy for provider timeouts",
+  description: [
+    "The payment poller stops on the first provider timeout. Confirm whether it should fail closed or retry with backoff before the next dispatch.",
+  ].join("\n"),
+  state: "STATE_OPEN",
+  result: "RESULT_UNSPECIFIED",
+  createdAt: TWO_HOURS_AGO,
+  updatedAt: HOUR_AGO,
+  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  lineDispatches: [],
+  lineDispatches: [
+    planLineDispatch([
+      planLineExecution("plan", {
+        id: "question-plan",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        updatedAt: HOUR_AGO,
+      }),
+    ]),
+  ],
+  statusNotes: [
+    {
+      key: "agent-question",
+      kind: "info",
+      headline: "The agent has a question",
+      body: "Should the poller fail closed on the first timeout, or retry with backoff?",
+      automation: { appId: "app-refund-planner", appName: "Refund Planner" },
+      updatedAt: HOUR_AGO,
+    },
+  ],
+};
+
+export const APPROVAL_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-approval-refunds",
+  number: "109",
+  key: "RF-109",
+  title: "Review the refund webhook schema change",
+  description: [
+    "The implement step opened a pull request for the webhook schema. A person must review it before the line can continue.",
+  ].join("\n"),
+  state: "STATE_OPEN",
+  result: "RESULT_UNSPECIFIED",
+  createdAt: TWO_HOURS_AGO,
+  updatedAt: HOUR_AGO,
+  createdBy: { user: { id: REVIEWER_USER.id, name: REVIEWER_USER.name } },
+  assignees: [{ id: ARNOLD_USER.id, name: ARNOLD_USER.name }],
+  lineDispatches: [
+    planLineDispatch([
+      planLineExecution("plan", {
+        id: "approval-plan",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        updatedAt: TWO_HOURS_AGO,
+      }),
+      planLineExecution("implement", {
+        id: "approval-impl",
+        state: "STATE_STARTED",
+        result: "RESULT_UNKNOWN",
+        run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+        updatedAt: HOUR_AGO,
+      }),
+    ]),
+  ],
 };
 
 // Storybook user owns this order so "mine + running" surfaces it.
@@ -233,7 +324,7 @@ export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
   createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
-  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  assignees: [{ id: ARNOLD_USER.id, name: ARNOLD_USER.name }],
   lineDispatches: [
     planLineDispatch([
       planLineExecution("plan", {
@@ -278,7 +369,7 @@ export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   createdAt: HOUR_AGO,
   updatedAt: HOUR_AGO,
   createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
-  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  assignees: [],
   lineDispatches: [],
 };
 
@@ -448,6 +539,8 @@ export const PR_CLOSURE_COMPLETED_WORK_ORDER: FactoriesWorkOrder = {
 export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
   OPEN_WORK_ORDER,
   OPEN_WORK_ORDER_SECONDARY,
+  QUESTION_WORK_ORDER,
+  APPROVAL_WORK_ORDER,
   RUNNING_WORK_ORDER,
   FAILED_WORK_ORDER,
   DRAFT_WORK_ORDER,

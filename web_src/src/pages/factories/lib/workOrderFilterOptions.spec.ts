@@ -33,6 +33,7 @@ describe("buildStatusFilterOptions", () => {
       "waiting",
       "completed",
       "failed",
+      "rejected",
       "cancelled",
     ]);
     expect(options.every((option) => Boolean(option.dot))).toBe(true);

@@ -58,8 +58,21 @@ export const OPERATOR_USER = {
   email: "jamie@superplane.dev",
 } as const;
 
+export const ARNOLD_USER = {
+  id: "user-arnold",
+  name: "Arnold Schwarzenegger",
+  email: "arnold@superplane.dev",
+  avatarUrl: "/storybook/arnold-schwarzenegger.jpg",
+} as const;
+
 export const ORGANIZATION_USERS = [
-  { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME, email: STORYBOOK_ME_USER_EMAIL },
+  {
+    id: STORYBOOK_ME_USER_ID,
+    name: STORYBOOK_ME_USER_NAME,
+    email: STORYBOOK_ME_USER_EMAIL,
+    avatarUrl: STORYBOOK_ME_USER_AVATAR_URL,
+  },
+  ARNOLD_USER,
   REVIEWER_USER,
   OPERATOR_USER,
 ];

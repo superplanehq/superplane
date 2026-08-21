@@ -5,6 +5,7 @@ import {
   STORYBOOK_ME_USER_EMAIL,
   STORYBOOK_ME_USER_ID,
   STORYBOOK_ME_USER_NAME,
+  toStorybookOrganizationUser,
   type FactoriesFixture,
 } from "./factoryPageResponses";
 import { DEFAULT_ARTIFACTS_BY_ORDER_ID, DEFAULT_EVENTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
@@ -486,10 +487,7 @@ export function matchFactoryPageFixture(
 export function factoriesOrganizationUsersResponse(): FixtureResult {
   return {
     json: {
-      users: ORGANIZATION_USERS.map((user) => ({
-        metadata: { id: user.id, email: user.email },
-        spec: { displayName: user.name },
-      })),
+      users: ORGANIZATION_USERS.map(toStorybookOrganizationUser),
     },
   };
 }

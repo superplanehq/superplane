@@ -1,19 +1,55 @@
 import type { FactoriesFactoryLine } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { cn } from "@/lib/utils";
-import { ArrowRight, Forward, Loader2, UserPlus } from "lucide-react";
+import { Forward, UserPlus } from "lucide-react";
 import { DispatchWorkOrderPopover } from "../DispatchWorkOrderPopover";
 import { OrgUserReference } from "../OrgUserReference";
 import { WorkOrderAssigneesPopover } from "../WorkOrderAssigneesPopover";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 
-/** Actions callable from list and table rows. Cards keep owner changes only. */
+/** Actions callable from list and table rows. Cards do not change the owner. */
 export interface WorkOrderRowCallbacks {
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
+}
+
+interface CardOwnerMarkProps {
+  entry: WorkOrderListEntry;
+  organizationId: string;
+}
+
+/**
+ * Display-only owner avatar for cards. The owner cannot be changed here.
+ */
+export function CardOwnerMark({ entry, organizationId }: CardOwnerMarkProps) {
+  const { resolveUser } = useOrgUserLookup(organizationId);
+  if (entry.displayStatus === "draft") {
+    return null;
+  }
+
+  const owner = entry.order.assignees?.[0];
+  if (!owner) {
+    return null;
+  }
+
+  return (
+    <span
+      className="inline-flex size-5 shrink-0 items-center justify-center"
+      data-testid={`work-order-row-assignees-${entry.id}`}
+      title={owner.name}
+    >
+      <OrgUserReference
+        display={resolveUser(owner.id, owner.name)}
+        size="xs"
+        showName={false}
+        className="rounded-full leading-none"
+      />
+    </span>
+  );
 }
 
 interface AssigneeGroupProps {
@@ -126,8 +162,9 @@ interface StartDraftButtonProps {
 }
 
 /**
- * Right-quarter hover control that starts a draft. The panel is a chevron
- * pointing into the card; the arrow means Start.
+ * Persistent Start control on a draft card. One click sends the work order
+ * to the preferred line, or opens the line picker when more than one line
+ * exists.
  */
 export function StartDraftButton({
   entry,
@@ -145,40 +182,21 @@ export function StartDraftButton({
   const disabled = !canDispatch || lines.length === 0;
 
   const startButton = (
-    <button
+    <LoadingButton
       type="button"
-      aria-label="Start"
-      disabled={disabled || isDispatching}
+      size="xs"
+      disabled={disabled}
+      loading={isDispatching}
+      loadingText="Starting..."
       data-testid={`work-order-card-start-${entry.id}`}
-      className={cn(
-        "flex h-full w-full items-center justify-end pr-[18%] text-primary-foreground",
-        "bg-primary transition-[filter] duration-200 hover:brightness-110",
-        "[clip-path:polygon(38%_0,100%_0,100%_100%,38%_100%,0_50%)]",
-        (disabled || isDispatching) && "opacity-90",
-      )}
       onClick={lineName ? () => void onDispatch(entry.id, { lineName }) : undefined}
     >
-      {isDispatching ? (
-        <Loader2 className="size-4 animate-spin" aria-hidden />
-      ) : (
-        <ArrowRight
-          className="size-4 translate-x-0 transition-transform duration-200 group-hover:translate-x-0.5"
-          aria-hidden
-        />
-      )}
-    </button>
+      Start
+    </LoadingButton>
   );
 
   return (
-    <div
-      className={cn(
-        "absolute inset-y-0 right-0 z-20 w-1/4 overflow-hidden rounded-r-md transition-opacity duration-200",
-        "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100",
-        isDispatching && "pointer-events-auto opacity-100",
-      )}
-      data-testid={`work-order-card-hover-actions-${entry.id}`}
-      onClick={(event) => event.stopPropagation()}
-    >
+    <div className="pointer-events-auto" onClick={(event) => event.stopPropagation()}>
       <PermissionTooltip allowed={canDispatch} message="You don't have permission to start this work order.">
         {lineName ? (
           startButton

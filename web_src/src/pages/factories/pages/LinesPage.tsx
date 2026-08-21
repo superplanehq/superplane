@@ -57,7 +57,6 @@ import {
 } from "./factoryPageLayoutStyles";
 import { LineListCard } from "./LineListCard";
 import { descriptionForLine, toLineListMetrics } from "./lineListMetricsMockData";
-import { PhaseGlyph } from "./linePhaseGlyph";
 import { useLineCardMutations } from "./useLineCardMutations";
 
 const LIST_SUBTITLE = "Last 30 days. Success rate, completions per day, duration, and cost per merged work order.";
@@ -207,12 +206,7 @@ function LineDetailHeader({
       subtitle={formatLinePhaseDescription(line.steps, apps)}
       actions={
         canUpdate ? (
-          <Button type="button" variant="outline" size="sm" asChild data-testid="lines-edit-button">
-            <Link href={editHref}>
-              <Pencil className="size-3.5" aria-hidden />
-              Edit
-            </Link>
-          </Button>
+          <ColumnConfigureMenu title={humanizeLineName(line.name)} href={editHref} testId="lines-edit-menu" />
         ) : undefined
       }
     />
@@ -569,7 +563,6 @@ function PhaseColumn({
       count={totalRuns}
       tone={PHASE_LANE_TONE[glyph]}
       emptyDescription="No work orders in this phase."
-      leading={<PhaseGlyph kind={glyph} />}
       testId={`lines-phase-column-${column.stepIndex}`}
       actions={
         configureHref ? (

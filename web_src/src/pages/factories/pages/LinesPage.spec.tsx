@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory } from "@/api-client";
-import { factoryLineDetailPath } from "../lib/factoryPagePaths";
+import { editFactoryLinePath, factoryLineDetailPath } from "../lib/factoryPagePaths";
 import {
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
@@ -119,8 +119,8 @@ describe("LinesPage card menu", () => {
 });
 
 describe("LinesPage board", () => {
-  it("does not show a back link to the lines list", () => {
-    render(
+  function renderBoard() {
+    return render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`]}>
           <FactoriesLayoutContext.Provider
@@ -135,13 +135,32 @@ describe("LinesPage board", () => {
           >
             <Routes>
               <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
+              <Route path="/org-1/workspaces/:factoryKey/lines/:lineId/edit" element={<div>Edit line</div>} />
             </Routes>
+            <LocationProbe />
           </FactoriesLayoutContext.Provider>
         </MemoryRouter>
       </QueryClientProvider>,
     );
+  }
+
+  it("does not show a back link to the lines list", () => {
+    renderBoard();
 
     expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-back-to-list")).not.toBeInTheDocument();
+  });
+
+  it("opens Edit from the line overflow menu", async () => {
+    const user = userEvent.setup();
+    renderBoard();
+
+    expect(screen.queryByRole("link", { name: "Edit" })).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-edit-menu"));
+    await user.click(screen.getByTestId("lines-edit-menu-edit"));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      editFactoryLinePath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
   });
 });

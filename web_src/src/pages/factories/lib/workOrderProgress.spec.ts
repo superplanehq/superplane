@@ -97,9 +97,21 @@ describe("getWorkOrderDisplayStatus", () => {
   it.each([
     ["RESULT_COMPLETED", "completed"] as const,
     ["RESULT_FAILED", "failed"] as const,
-    ["RESULT_REJECTED", "cancelled"] as const,
+    ["RESULT_REJECTED", "rejected"] as const,
   ])("closed orders with %s map to %s", (result, expected) => {
     expect(getWorkOrderDisplayStatus(order({ state: "STATE_CLOSED", result }))).toBe(expected);
+  });
+
+  it("maps a canceled line dispatch to Canceled when the order is not completed", () => {
+    expect(
+      getWorkOrderDisplayStatus(
+        order({
+          state: "STATE_CLOSED",
+          result: "RESULT_UNSPECIFIED",
+          lineDispatches: [{ id: "d1", state: "STATE_FINISHED", result: "RESULT_CANCELLED" }],
+        }),
+      ),
+    ).toBe("cancelled");
   });
 });
 
@@ -112,10 +124,16 @@ describe("filterWorkOrdersByStatus", () => {
     lineDispatches: activeDispatch(),
   });
   const closedCompleted = order({ state: "STATE_CLOSED", result: "RESULT_COMPLETED", id: "wo-completed" });
-  const closedCancelled = order({ state: "STATE_CLOSED", result: "RESULT_REJECTED", id: "wo-cancelled" });
+  const closedRejected = order({ state: "STATE_CLOSED", result: "RESULT_REJECTED", id: "wo-rejected" });
+  const closedCancelled = order({
+    state: "STATE_CLOSED",
+    result: "RESULT_UNSPECIFIED",
+    id: "wo-cancelled",
+    lineDispatches: [{ id: "d-cancel", state: "STATE_FINISHED", result: "RESULT_CANCELLED" }],
+  });
   const closedFailed = order({ state: "STATE_CLOSED", result: "RESULT_FAILED", id: "wo-failed" });
 
-  const all = [draft, waiting, running, closedCompleted, closedCancelled, closedFailed];
+  const all = [draft, waiting, running, closedCompleted, closedRejected, closedCancelled, closedFailed];
 
   it("`active` returns every non-closed order", () => {
     expect(idsFilteredBy(all, "active")).toEqual([draft.id, waiting.id, running.id]);
@@ -131,6 +149,7 @@ describe("filterWorkOrdersByStatus", () => {
     expect(idsFilteredBy(all, "running")).toEqual([running.id]);
     expect(idsFilteredBy(all, "completed")).toEqual([closedCompleted.id]);
     expect(idsFilteredBy(all, "failed")).toEqual([closedFailed.id]);
+    expect(idsFilteredBy(all, "rejected")).toEqual([closedRejected.id]);
     expect(idsFilteredBy(all, "cancelled")).toEqual([closedCancelled.id]);
   });
 

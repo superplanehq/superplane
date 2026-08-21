@@ -134,14 +134,24 @@ describe("Line board job popup", () => {
         name: "Open Add refund reconciliation test",
       }),
     ).toBeInTheDocument();
-    expect(
-      within(screen.getByLabelText("Implement phase")).getByRole("button", {
-        name: "Open Ship idempotent refund retries",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByLabelText("Implement phase")).getByRole("button", {
+    const failedCard = within(screen.getByLabelText("Implement phase"))
+      .getByRole("button", {
         name: "Open Fix refund dispatcher timeout loop",
+      })
+      .closest("article") as HTMLElement;
+    expect(within(failedCard).getByLabelText("Failed")).toBeInTheDocument();
+    expect(within(failedCard).getByText("Run failed")).toBeInTheDocument();
+    const webhookCard = within(screen.getByLabelText("Implement phase"))
+      .getByRole("button", {
+        name: "Open Review the refund webhook schema change",
+      })
+      .closest("article") as HTMLElement;
+    expect(within(webhookCard).getByLabelText("Running")).toBeInTheDocument();
+    expect(within(webhookCard).queryByText("Approval needed")).not.toBeInTheDocument();
+    expect(within(webhookCard).queryByText("Run failed")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByLabelText("Verify phase")).getByRole("button", {
+        name: "Open Ship idempotent refund retries",
       }),
     ).toBeInTheDocument();
     expect(
@@ -155,6 +165,22 @@ describe("Line board job popup", () => {
     expect(
       within(screen.getByLabelText("Done phase")).getByRole("button", {
         name: "Open Send refund receipts after provider confirm",
+      }),
+    ).toBeInTheDocument();
+    const rejectedCard = within(screen.getByLabelText("Done phase"))
+      .getByRole("button", { name: "Open Replace the refund batch exporter" })
+      .closest("article") as HTMLElement;
+    expect(within(rejectedCard).getByLabelText("Rejected")).toBeInTheDocument();
+    const canceledCard = within(screen.getByLabelText("Done phase"))
+      .getByRole("button", { name: "Open Migrate refunds to the v2 provider API" })
+      .closest("article") as HTMLElement;
+    expect(within(canceledCard).getByLabelText("Canceled")).toBeInTheDocument();
+    expect(
+      within(screen.getByLabelText("Done phase")).getByRole("button", { name: "Open Publish refund SLA dashboard" }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByLabelText("Done phase")).getByRole("button", {
+        name: "Open Document provider timeout playbook",
       }),
     ).toBeInTheDocument();
     await user.click(card);
@@ -193,9 +219,9 @@ describe("Line board job popup", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Ship idempotent refund retries" }));
     dialog = await screen.findByTestId("work-order-split-run");
-    expect(within(dialog).getByText("Review the pull request")).toBeInTheDocument();
-    expect(within(dialog).getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
-    expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Review the pull request")).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-checks")).toBeInTheDocument();
+    expect(within(dialog).getByText("Verify")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
     await user.click(screen.getByRole("button", { name: "Open Fix refund dispatcher timeout loop" }));
