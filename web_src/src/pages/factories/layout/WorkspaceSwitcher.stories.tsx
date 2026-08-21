@@ -12,7 +12,7 @@ const meta = {
     layout: "padded",
     docs: {
       description: {
-        component: "The workspace initials open the switcher. The gear opens settings.",
+        component: "The workspace initials open the switcher.",
       },
     },
   },
@@ -35,7 +35,6 @@ export const Default: Story = {
     organizationId: FACTORIES_ORGANIZATION_ID,
     factory: REFUND_FACTORY,
     factories: [REFUND_FACTORY, EMPTY_FACTORY],
-    canOpenSettings: true,
     canCreateFactory: true,
     permissionsLoading: false,
     onCreateFactory: () => console.log("create workspace"),
@@ -45,7 +44,6 @@ export const Default: Story = {
 export const ReadOnly: Story = {
   args: {
     ...Default.args!,
-    canOpenSettings: false,
     canCreateFactory: false,
   },
 };

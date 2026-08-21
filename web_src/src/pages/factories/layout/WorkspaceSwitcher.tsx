@@ -9,16 +9,15 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 import { cn } from "@/lib/utils";
-import { Check, Plus, Settings, Triangle } from "lucide-react";
-import { Link, useNavigate } from "react-router";
-import { factoryDetailPath, factorySettingsPath } from "../lib/factoryPagePaths";
+import { Check, Plus, Triangle } from "lucide-react";
+import { useNavigate } from "react-router";
+import { factoryDetailPath } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
 
 interface WorkspaceSwitcherProps {
   organizationId: string;
   factory: FactoriesFactory;
   factories: FactoriesFactory[];
-  canOpenSettings: boolean;
   canCreateFactory: boolean;
   permissionsLoading: boolean;
   onCreateFactory: () => void;
@@ -28,13 +27,11 @@ export function WorkspaceSwitcher({
   organizationId,
   factory,
   factories,
-  canOpenSettings,
   canCreateFactory,
   permissionsLoading,
   onCreateFactory,
 }: WorkspaceSwitcherProps) {
   const navigate = useNavigate();
-  const settingsHref = factory.key ? factorySettingsPath(organizationId, factory.key) : "#";
   const workspaceName = factory.name?.trim() || "Workspace";
 
   return (
@@ -95,25 +92,6 @@ export function WorkspaceSwitcher({
           </PermissionTooltip>
         </DropdownMenuContent>
       </DropdownMenu>
-      <PermissionTooltip
-        allowed={canOpenSettings || permissionsLoading}
-        message="You don't have permission to open workspace settings."
-      >
-        <Link
-          to={canOpenSettings ? settingsHref : "#"}
-          onClick={(event) => {
-            if (!canOpenSettings) {
-              event.preventDefault();
-            }
-          }}
-          aria-label="Workspace settings"
-          title="Workspace settings"
-          data-testid="factories-workspace-settings-link"
-          className={cn(factoriesRailControlClassName, !canOpenSettings && "pointer-events-none opacity-60")}
-        >
-          <Settings className="size-3.5" aria-hidden />
-        </Link>
-      </PermissionTooltip>
     </div>
   );
 }
