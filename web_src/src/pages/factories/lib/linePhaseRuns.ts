@@ -52,7 +52,11 @@ export function linePhaseRunHref(
   const appId = run.execution.run?.appId || stepAppId;
   const runId = run.execution.run?.id;
   if (appId && runId) {
-    return factoryAppRunPath(organizationId, factoryKey, appId, runId, { from: "lines", lineId });
+    return factoryAppRunPath(organizationId, factoryKey, appId, runId, {
+      from: "lines",
+      lineId,
+      orderNumber: run.order.number,
+    });
   }
   if (appId) {
     return factoryAppPath(organizationId, factoryKey, appId, { from: "lines", lineId });

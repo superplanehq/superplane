@@ -100,6 +100,22 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(done.waitingNotes).toEqual([]);
   });
 
+  it("uses supplied checks instead of the fixture pills", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Verify job",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          dispatch("STATE_ACTIVE", [
+            { id: "e-verify", step: "Verify", stepIndex: 2, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
+          ]),
+        ],
+      }),
+      { checks: [] },
+    );
+    expect(fixture.checks).toEqual([]);
+  });
+
   it("opens a running plan on the current phase and hides later steps", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({

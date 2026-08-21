@@ -4,6 +4,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryApps, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,7 @@ import {
   type PhaseGlyphKind,
 } from "../lib/linePhaseRuns";
 import { isQueuedStepRow } from "../lib/workOrderExecutions";
+import { latestDispatchForLine } from "../lib/workOrderNumberResolution";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import {
   WorkOrderBoardLane,
@@ -111,6 +113,7 @@ export function LinesPage() {
         <div className={factoryWorkOrdersBodyClassName}>
           <LineDetail
             organizationId={organizationId}
+            factoryId={factoryId}
             factoryKey={factoryKey}
             line={selectedLine}
             apps={factoryApps}
@@ -218,6 +221,7 @@ function LineDetailHeader({
 
 function LineDetail({
   organizationId,
+  factoryId,
   factoryKey,
   line,
   apps,
@@ -225,6 +229,7 @@ function LineDetail({
   workOrderCardContext,
 }: {
   organizationId: string;
+  factoryId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
   apps: Array<{ id?: string; name?: string }>;
@@ -262,16 +267,47 @@ function LineDetail({
         />
       )}
       {peekOrderId ? (
-        <WorkOrderSplitRunPopup
-          key={peekOrderId}
-          fixture={splitRunFixtureForWorkOrder(workOrders.find((order) => order.id === peekOrderId))}
+        <LineBoardSplitRunPopup
+          organizationId={organizationId}
+          factoryId={factoryId}
+          peekOrderId={peekOrderId}
+          peekOrder={peekOrder}
           canvasEditHref={canvasEditHref}
           canvasExpandHref={canvasExpandHref}
           onClose={() => setPeekOrderId(null)}
-          fixed
         />
       ) : null}
     </div>
+  );
+}
+
+function LineBoardSplitRunPopup({
+  organizationId,
+  factoryId,
+  peekOrderId,
+  peekOrder,
+  canvasEditHref,
+  canvasExpandHref,
+  onClose,
+}: {
+  organizationId: string;
+  factoryId: string;
+  peekOrderId: string;
+  peekOrder: FactoriesWorkOrder | undefined;
+  canvasEditHref: (key: SplitRunCanvasKey) => string | undefined;
+  canvasExpandHref: (key: SplitRunCanvasKey) => string | undefined;
+  onClose: () => void;
+}) {
+  const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
+  return (
+    <WorkOrderSplitRunPopup
+      key={peekOrderId}
+      fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks })}
+      canvasEditHref={canvasEditHref}
+      canvasExpandHref={canvasExpandHref}
+      onClose={onClose}
+      fixed
+    />
   );
 }
 
@@ -324,14 +360,18 @@ function canvasExpandHrefForLine(
     return factoryAppSplitRunPath(organizationId, factoryKey, appId, {
       from: "lines",
       lineId: line.id,
-      runId: executionRunIdForCanvas(order, key),
+      runId: executionRunIdForCanvas(order, key, line.id),
       orderNumber: order?.number,
       canvas: key,
     });
   };
 }
 
-function executionRunIdForCanvas(order: FactoriesWorkOrder | undefined, key: SplitRunCanvasKey): string | undefined {
+function executionRunIdForCanvas(
+  order: FactoriesWorkOrder | undefined,
+  key: SplitRunCanvasKey,
+  lineId: string | undefined,
+): string | undefined {
   const stepIndex: Partial<Record<SplitRunCanvasKey, number>> = {
     planning: 0,
     implementation: 1,
@@ -342,7 +382,7 @@ function executionRunIdForCanvas(order: FactoriesWorkOrder | undefined, key: Spl
   if (index == null) {
     return undefined;
   }
-  const executions = order?.lineDispatches?.[0]?.stepExecutions ?? [];
+  const executions = latestDispatchForLine(order, lineId)?.stepExecutions ?? [];
   return executions.find((execution) => execution.stepIndex === index)?.run?.id;
 }
 

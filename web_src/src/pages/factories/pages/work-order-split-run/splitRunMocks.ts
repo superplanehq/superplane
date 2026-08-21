@@ -1,6 +1,7 @@
 import type {
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
+  FactoriesWorkOrderCheck,
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
@@ -304,7 +305,10 @@ export function splitRunStatusLabel(status: SplitRunPhaseStatus): string {
 
 const PR_CLOSURE_APP_NAME = "PR Closure";
 
-export function splitRunFixtureForWorkOrder(order?: FactoriesWorkOrder): SplitRunFixture {
+export function splitRunFixtureForWorkOrder(
+  order?: FactoriesWorkOrder,
+  options?: { checks?: FactoriesWorkOrderCheck[] },
+): SplitRunFixture {
   if (!order) {
     return SPLIT_RUN_RUNNING;
   }
@@ -337,19 +341,25 @@ export function splitRunFixtureForWorkOrder(order?: FactoriesWorkOrder): SplitRu
     lineStatus: lineStatusForDisplay(displayStatus),
     currentPhaseId,
     phases,
-    ...reviewSurfaces(order, displayStatus),
+    ...reviewSurfaces(order, displayStatus, options?.checks),
   };
 }
 
 function reviewSurfaces(
   order: FactoriesWorkOrder,
   displayStatus: WorkOrderDisplayStatus,
+  apiChecks?: FactoriesWorkOrderCheck[],
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footerTone"> {
   const executions = latestDispatchExecutions(order);
   const current = pickCurrentExecution(executions);
   const column = boardColumnFor(current, executions.length);
   const implementFailed = column === "implement" && current?.result === "RESULT_FAILED";
-  const checks = column === "verify" || column === "done" ? OPEN_PAGE_CHECKS : [];
+  const showChecks = column === "verify" || column === "done";
+  const checks = showChecks
+    ? apiChecks !== undefined
+      ? presentWorkOrderChecks(apiChecks)
+      : OPEN_PAGE_CHECKS
+    : [];
 
   if (displayStatus === "draft") {
     return { waitingNotes: [DRAFT_NEXT_STEP], checks: [], footerTone: "draft" };

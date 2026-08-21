@@ -208,7 +208,7 @@ describe("Line board job popup", () => {
     await user.click(screen.getByRole("button", { name: "Open Add refund reason enum to schema" }));
     dialog = await screen.findByTestId("work-order-split-run");
     expect(within(dialog).queryByText("Review the pull request")).not.toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-checks")).toBeInTheDocument();
+    expect(await within(dialog).findByTestId("split-run-checks")).toBeInTheDocument();
     expect(within(dialog).getByText("Verify")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
@@ -234,13 +234,13 @@ describe("Line board job popup", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Backfill refund audit trail" }));
     dialog = await screen.findByTestId("work-order-split-run");
-    expect(within(dialog).getByTestId("split-run-checks")).toBeInTheDocument();
+    expect(await within(dialog).findByTestId("split-run-checks")).toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-review")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
     await user.click(screen.getByRole("button", { name: "Open Send refund receipts after provider confirm" }));
     dialog = await screen.findByTestId("work-order-split-run");
-    expect(within(dialog).getByTestId("split-run-checks")).toBeInTheDocument();
+    expect(await within(dialog).findByTestId("split-run-checks")).toBeInTheDocument();
     expect(within(dialog).getAllByRole("link", { name: /#510|Send refund receipts/ })[0]).toHaveAttribute(
       "target",
       "_blank",

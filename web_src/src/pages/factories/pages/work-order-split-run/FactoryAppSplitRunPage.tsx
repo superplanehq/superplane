@@ -1,4 +1,5 @@
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { cn } from "@/lib/utils";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useCallback, useMemo, useState } from "react";
@@ -8,7 +9,7 @@ import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { resolveFactoryAppCanvasSubtitle, resolveFactoryLineName } from "../../lib/factoryAppCanvasCopy";
 import { resolveFactoryAppBackNav } from "../../lib/factoryAppNav";
 import { factoryAppConfigurePath, parseFactoryAppNavFrom } from "../../lib/factoryPagePaths";
-import { resolveWorkOrderByNumber } from "../../lib/workOrderNumberResolution";
+import { findWorkOrderByRunId, resolveWorkOrderByNumber } from "../../lib/workOrderNumberResolution";
 import { FactoryAppCanvasHeader } from "../FactoryAppCanvasHeader";
 import { CompactLineCanvas } from "./CompactLineCanvas";
 import { PhaseLogCard } from "./PhaseLogCard";
@@ -39,11 +40,15 @@ export function FactoryAppSplitRunPage() {
   const canvasKey = parseSplitRunCanvasKey(searchParams.get("canvas")) ?? "implementation";
   const lineName = useMemo(() => resolveFactoryLineName(factory?.lines, lineId), [factory?.lines, lineId]);
   const { data: workOrders = [], isLoading } = useFactoryWorkOrders(organizationId, factoryId);
-  const order = useMemo(
-    () => resolveWorkOrderByNumber(workOrders, orderNumber ?? undefined, isLoading).order,
-    [isLoading, orderNumber, workOrders],
+  const order = useMemo(() => {
+    const byNumber = resolveWorkOrderByNumber(workOrders, orderNumber ?? undefined, isLoading).order;
+    return byNumber ?? findWorkOrderByRunId(workOrders, runId) ?? null;
+  }, [isLoading, orderNumber, runId, workOrders]);
+  const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, order?.id ?? "");
+  const fixture = useMemo(
+    () => (order ? splitRunFixtureForWorkOrder(order, { checks: orderChecks }) : SPLIT_RUN_RUNNING),
+    [order, orderChecks],
   );
-  const fixture = useMemo(() => (order ? splitRunFixtureForWorkOrder(order) : SPLIT_RUN_RUNNING), [order]);
   const phase = useMemo(() => {
     return (
       fixture.phases.find((entry) => canvasKeyForPhase(entry) === canvasKey) ??
