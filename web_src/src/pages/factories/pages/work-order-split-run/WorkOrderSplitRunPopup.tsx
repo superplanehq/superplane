@@ -1,34 +1,49 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { OwnerTimeCostRow, PopupHeader, PopupShell, SectionTitle } from "../work-order-popup-redesign/popupShared";
 import { CompactLineCanvas } from "./CompactLineCanvas";
 import { PhaseLogCard } from "./PhaseLogCard";
 import { SplitRunCheckPills, SplitRunReview } from "./SplitRunReview";
-import { richStreamForCanvas, splitRunCanvasForPhase, type SplitRunCanvasKey } from "./splitRunCanvases";
-import { phaseById, type SplitRunFixture, type SplitRunPhaseId } from "./splitRunMocks";
+import { emptySplitRunCanvas, type SplitRunCanvasKey } from "./splitRunCanvases";
+import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
+import { type SplitRunFixture, type SplitRunPhaseId } from "./splitRunMocks";
+import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
 
 /**
  * Split run popup. Left 60% is a terminal log. Right 40% is the canvas
  * for the selected log step. Storybook and the line board.
  */
 export function WorkOrderSplitRunPopup({
+  organizationId,
   fixture,
   onClose,
   fixed = false,
   canvasEditHref,
   canvasExpandHref,
+  onDispatch,
+  isDispatching = false,
+  canDispatch = false,
 }: {
+  organizationId?: string;
   fixture: SplitRunFixture;
   onClose?: () => void;
   fixed?: boolean;
   canvasEditHref?: (key: SplitRunCanvasKey) => string | undefined;
   canvasExpandHref?: (key: SplitRunCanvasKey) => string | undefined;
+  onDispatch?: () => Promise<void>;
+  isDispatching?: boolean;
+  canDispatch?: boolean;
 }) {
   const [phaseId, setPhaseId] = useState<SplitRunPhaseId>(fixture.currentPhaseId);
   const [openPhaseId, setOpenPhaseId] = useState<SplitRunPhaseId | null>(fixture.currentPhaseId);
   const [nodeId, setNodeId] = useState<string | null>(null);
-  const selectedPhase = phaseById(fixture, phaseId);
-  const selectedCanvas = splitRunCanvasForPhase(selectedPhase);
+  const selectedPhase = fixture.phases.find((entry) => entry.id === phaseId) ?? fixture.phases[0];
+  const live = useSplitRunLiveCanvas(organizationId, selectedPhase);
+  const visual = useMemo(
+    () =>
+      selectedPhase ? resolveSplitRunVisual(selectedPhase, live) : { canvas: emptySplitRunCanvas(), stream: undefined },
+    [live, selectedPhase],
+  );
 
   return (
     <PopupShell testId="work-order-split-run" canvas fixed={fixed} onDismiss={onClose}>
@@ -50,7 +65,13 @@ export function WorkOrderSplitRunPopup({
                 <PhaseLogCard
                   phase={entry}
                   expanded={entry.id === openPhaseId}
-                  stream={entry.id === openPhaseId ? richStreamForCanvas(splitRunCanvasForPhase(entry)) : undefined}
+                  stream={
+                    entry.id === openPhaseId
+                      ? entry.id === selectedPhase?.id
+                        ? visual.stream
+                        : entry.stream
+                      : undefined
+                  }
                   selectedNodeId={nodeId}
                   onSelectNode={setNodeId}
                   onToggle={() => {
@@ -62,17 +83,23 @@ export function WorkOrderSplitRunPopup({
               </li>
             ))}
           </ol>
-          <SplitRunReview notes={fixture.waitingNotes} tone={fixture.footerTone} />
+          <SplitRunReview
+            notes={fixture.waitingNotes}
+            tone={fixture.footerTone}
+            onAction={fixture.footerTone === "draft" ? onDispatch : undefined}
+            actionBusy={isDispatching}
+            actionDisabled={!canDispatch}
+          />
         </aside>
 
         <section className="flex min-h-0 min-w-0 flex-col" aria-label="Run">
           <CompactLineCanvas
-            key={selectedPhase.id}
-            canvas={selectedCanvas}
+            key={selectedPhase?.id ?? "empty"}
+            canvas={visual.canvas}
             selectedId={nodeId}
             onSelect={setNodeId}
-            editHref={canvasEditHref?.(selectedCanvas.key)}
-            expandHref={canvasExpandHref?.(selectedCanvas.key)}
+            editHref={canvasEditHref?.(visual.canvas.key)}
+            expandHref={canvasExpandHref?.(visual.canvas.key)}
           />
         </section>
       </div>

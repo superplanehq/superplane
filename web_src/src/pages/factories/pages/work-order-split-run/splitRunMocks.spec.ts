@@ -29,17 +29,18 @@ describe("splitRunFixtureForWorkOrder", () => {
     ]);
   });
 
-  it("keeps the implement stream on the running reconciliation card", () => {
+  it("maps the running reconciliation card from the work-order execution", () => {
     const fixture = splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER);
     expect(fixture.title).toBe("Add refund reconciliation test");
     expect(fixture.costUsd).toBe("$0.73");
     expect(fixture.tokensLabel).toBe("2.7k tokens");
     expect(fixture.lineStatus).toBe("running");
-    expect(fixture.currentPhaseId).toBe("implement");
-    const implement = fixture.phases.find((phase) => phase.id === "implement");
+    expect(fixture.currentPhaseId).toMatch(/^refund-implementer-/);
+    const implement = fixture.phases.find((phase) => phase.name === "Refund Implementer");
     expect(implement?.status).toBe("running");
-    expect(implement?.stream.map((line) => line.componentName)).toContain("Refund Implementer");
-    expect(implement?.stream.map((line) => line.componentName)).toContain("Write File");
+    expect(implement?.appId).toBe("app-refund-implementer");
+    expect(implement?.runId).toBe(RUNNING_WORK_ORDER.lineDispatches?.[0]?.stepExecutions?.[1]?.run?.id);
+    expect(implement?.stream.map((line) => line.componentName)).toEqual(["Refund Implementer"]);
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.checks).toEqual([]);
   });
@@ -49,6 +50,7 @@ describe("splitRunFixtureForWorkOrder", () => {
       order({
         title: "Ship idempotent refund retries",
         state: "STATE_OPEN",
+        statusNotes: OPEN_WORK_ORDER.statusNotes,
         lineDispatches: [
           dispatch("STATE_FINISHED", [
             { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
@@ -63,7 +65,24 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.checks).toEqual([]);
   });
 
-  it("shows checks on verify and done cards", () => {
+  it("does not invent a pull request review when the order has no notes", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Ship idempotent refund retries",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { id: "e-impl", step: "Implement", stepIndex: 1, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+          ]),
+        ],
+      }),
+    );
+    expect(fixture.footerTone).toBe("waiting");
+    expect(fixture.waitingNotes).toEqual([]);
+  });
+
+  it("shows checks on verify and done cards only when the API supplies them", () => {
     const verify = splitRunFixtureForWorkOrder(
       order({
         title: "Verify job",
@@ -75,14 +94,7 @@ describe("splitRunFixtureForWorkOrder", () => {
         ],
       }),
     );
-    expect(verify.checks.map((check) => check.name)).toEqual([
-      "Risk review",
-      "Code coverage",
-      "Test coverage",
-      "Confidence score",
-      "CI",
-    ]);
-    expect(verify.waitingNotes).toEqual([]);
+    expect(verify.checks).toEqual([]);
 
     const done = splitRunFixtureForWorkOrder(
       order({
@@ -96,7 +108,7 @@ describe("splitRunFixtureForWorkOrder", () => {
         ],
       }),
     );
-    expect(done.checks.map((check) => check.name)).toContain("Risk review");
+    expect(done.checks).toEqual([]);
     expect(done.waitingNotes).toEqual([]);
   });
 
@@ -164,10 +176,7 @@ describe("splitRunFixtureForWorkOrder", () => {
 
     expect(fixture.title).toBe("Plan job");
     expect(fixture.lineStatus).toBe("running");
-    expect(fixture.phases.map((phase) => [phase.name, phase.status])).toEqual([
-      ["Backlog", "passed"],
-      ["Plan", "running"],
-    ]);
+    expect(fixture.phases.map((phase) => [phase.name, phase.status])).toEqual([["Plan", "running"]]);
     expect(fixture.currentPhaseId).toBe("plan-0");
     expect(fixture.phases.at(-1)?.canvasSteps.at(-1)?.status).toBe("running");
   });
@@ -215,7 +224,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.checks).toEqual([]);
   });
 
-  it("keeps a backlog card on the create-work-order step", () => {
+  it("lists no log rows when the work order has no step runs", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
         title: OPEN_WORK_ORDER.title,
@@ -225,13 +234,11 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
 
     expect(fixture.lineStatus).toBe("pending");
-    expect(fixture.phases).toHaveLength(1);
-    expect(fixture.phases[0]?.name).toBe("Backlog");
-    expect(fixture.phases[0]?.artifacts[0]?.data).toMatchObject({ name: "description.md" });
-    expect(fixture.currentPhaseId).toBe("backlog");
+    expect(fixture.phases).toEqual([]);
+    expect(fixture.currentPhaseId).toBe("");
     expect(fixture.footerTone).toBe("draft");
     expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Start the next stage"]);
-    expect(fixture.waitingNotes[0]?.cta?.label).toBe("Start Plan");
+    expect(fixture.waitingNotes[0]?.cta?.label).toBe("Dispatch");
     expect(fixture.checks).toEqual([]);
   });
 });

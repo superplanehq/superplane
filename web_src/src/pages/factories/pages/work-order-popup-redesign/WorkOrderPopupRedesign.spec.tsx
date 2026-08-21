@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -188,10 +188,11 @@ describe("Line board job popup", () => {
     const dialog = await screen.findByTestId("work-order-split-run");
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Add refund reconciliation test" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "description.md" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Backlog")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Log" })).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-implement")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-phase-refund-implementer-1")).toBeInTheDocument();
     expect(within(dialog).queryByText("Review the pull request")).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/Users see duplicate refund/)).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-peek-dialog")).not.toBeInTheDocument();
@@ -240,10 +241,11 @@ describe("Line board job popup", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Draft: rework refund telemetry" }));
     dialog = await screen.findByTestId("work-order-split-run");
-    expect(within(dialog).getByText("Backlog")).toBeInTheDocument();
-    expect(within(dialog).getByText(/Create work order/)).toBeInTheDocument();
-    expect(within(dialog).getAllByRole("button", { name: "description.md" }).length).toBeGreaterThan(0);
+    expect(within(dialog).queryByText("Backlog")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Create work order/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
     expect(within(dialog).getByText("Start the next stage")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Dispatch" })).toBeEnabled();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
@@ -253,8 +255,8 @@ describe("Line board job popup", () => {
       }),
     );
     dialog = await screen.findByTestId("work-order-split-run");
-    expect(within(dialog).getByText(/Create work order from GitHub issue/)).toBeInTheDocument();
-    expect(within(dialog).getAllByRole("button", { name: "description.md" }).length).toBeGreaterThan(0);
+    expect(within(dialog).queryByText(/Create work order from GitHub issue/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
     expect(within(dialog).getByText("Start the next stage")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
@@ -271,5 +273,27 @@ describe("Line board job popup", () => {
       "target",
       "_blank",
     );
+  }, 15000);
+
+  it("dispatches a draft work order to the open line", async () => {
+    const user = userEvent.setup();
+    const line = REFUND_FACTORY_LINES[0];
+
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={lineMetricsFactoriesFixture}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole("button", { name: "Open Draft: rework refund telemetry" }, { timeout: 8000 }),
+    );
+    const dialog = await screen.findByTestId("work-order-split-run");
+    await user.click(within(dialog).getByRole("button", { name: "Dispatch" }));
+
+    await waitFor(() => {
+      expect(within(dialog).queryByText("Start the next stage")).not.toBeInTheDocument();
+    });
   }, 15000);
 });

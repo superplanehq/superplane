@@ -11,6 +11,7 @@ import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
   findBacklogAutomationApp,
+  findClosureAutomationApp,
   linePhaseRunHref,
   resolvePhaseRunStatus,
 } from "./linePhaseRuns";
@@ -409,6 +410,24 @@ describe("findBacklogAutomationApp", () => {
         { id: "app-refund-backlog", name: "Backlog" },
       ]),
     ).toEqual({ id: "app-refund-backlog", name: "Backlog" });
+  });
+});
+
+describe("findClosureAutomationApp", () => {
+  it("returns the factory PR Closure automation", () => {
+    expect(
+      findClosureAutomationApp([
+        { id: "app-plan", name: "Plan" },
+        { id: "app-pr-closure", name: "PR Closure" },
+      ]),
+    ).toEqual({ id: "app-pr-closure", name: "PR Closure" });
+  });
+
+  it("matches the refund done app id when the name is absent", () => {
+    expect(findClosureAutomationApp([{ id: "app-refund-done" }])).toEqual({
+      id: "app-refund-done",
+      name: "PR Closure",
+    });
   });
 });
 

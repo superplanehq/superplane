@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canvasKeyForAutomation,
   canvasKeyForPhase,
   parseSplitRunCanvasKey,
   richStreamForCanvas,
@@ -15,6 +16,18 @@ describe("parseSplitRunCanvasKey", () => {
 
   it("returns undefined for unknown keys", () => {
     expect(parseSplitRunCanvasKey("canvas")).toBeUndefined();
+  });
+});
+
+describe("canvasKeyForAutomation", () => {
+  it("maps planner, implementer, and closure apps", () => {
+    expect(canvasKeyForAutomation({ id: "app-refund-planner" })).toBe("planning");
+    expect(canvasKeyForAutomation({ id: "app-refund-implementer" })).toBe("implementation");
+    expect(canvasKeyForAutomation({ id: "app-pr-closure", name: "PR Closure" })).toBe("closure");
+  });
+
+  it("returns undefined when the app does not name a canvas", () => {
+    expect(canvasKeyForAutomation({ id: "app-custom" })).toBeUndefined();
   });
 });
 

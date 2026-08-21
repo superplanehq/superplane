@@ -21,11 +21,31 @@ export type SplitRunCanvasKey = "intake" | "planning" | "implementation" | "risk
 
 const CANVAS_KEYS: SplitRunCanvasKey[] = ["intake", "planning", "implementation", "risk", "closure"];
 
+const CANVAS_HINTS: { needles: string[]; key: SplitRunCanvasKey }[] = [
+  { needles: ["backlog", "intake", "create work order"], key: "intake" },
+  { needles: ["plan"], key: "planning" },
+  { needles: ["implement"], key: "implementation" },
+  { needles: ["verify", "risk", "ci"], key: "risk" },
+  { needles: ["closure", "done"], key: "closure" },
+];
+
 export function parseSplitRunCanvasKey(value: string | null | undefined): SplitRunCanvasKey | undefined {
   if (!value) {
     return undefined;
   }
   return CANVAS_KEYS.find((key) => key === value);
+}
+
+function canvasKeyFromLabel(label: string): SplitRunCanvasKey | undefined {
+  return CANVAS_HINTS.find((hint) => hint.needles.some((needle) => label.includes(needle)))?.key;
+}
+
+/** Map a factory automation onto a split-run canvas when the URL omits `canvas`. */
+export function canvasKeyForAutomation(app: { id?: string; name?: string } | undefined): SplitRunCanvasKey | undefined {
+  if (!app?.id && !app?.name) {
+    return undefined;
+  }
+  return canvasKeyFromLabel(`${app.id ?? ""} ${app.name ?? ""}`.toLowerCase());
 }
 
 export interface SplitRunCanvasModel {
@@ -47,19 +67,18 @@ const CANVAS_YAML: Record<SplitRunCanvasKey, string> = {
 
 export function canvasKeyForPhase(phase: SplitRunPhase): SplitRunCanvasKey {
   const label = `${phase.id} ${phase.name} ${phase.componentName}`.toLowerCase();
-  if (label.includes("backlog") || label.includes("intake") || label.includes("create work order")) {
-    return "intake";
-  }
-  if (label.includes("plan")) {
-    return "planning";
-  }
-  if (label.includes("implement")) {
-    return "implementation";
-  }
-  if (label.includes("verify") || label.includes("risk") || label.includes("ci")) {
-    return "risk";
-  }
-  return "closure";
+  return canvasKeyFromLabel(label) ?? "closure";
+}
+
+export function emptySplitRunCanvas(phase?: SplitRunPhase, title?: string): SplitRunCanvasModel {
+  return {
+    key: phase ? canvasKeyForPhase(phase) : "implementation",
+    title: title ?? phase?.componentName ?? "",
+    nodes: [],
+    edges: [],
+    statuses: {},
+    metrics: {},
+  };
 }
 
 export function splitRunCanvasForPhase(phase: SplitRunPhase): SplitRunCanvasModel {

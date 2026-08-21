@@ -24,6 +24,7 @@ import {
   FactoryAppSplitRunPage,
   FactoryHomeRedirect,
   FactoryLineEditPage,
+  FactorySettingsAutomationsPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
   FactorySettingsNotificationsPage,
@@ -278,6 +279,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
           <Route path=":factoryKey/settings" element={factoryRoute(<FactorySettingsLayout />)}>
             <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
             <Route path="general" element={<FactorySettingsGeneralPage />} />
+            <Route path="automations" element={<FactorySettingsAutomationsPage />} />
             <Route path="usage" element={<FactorySettingsUsagePage />} />
             <Route path="profile" element={<FactorySettingsProfilePage />} />
             <Route path="notifications" element={<FactorySettingsNotificationsPage />} />

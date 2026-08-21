@@ -78,6 +78,13 @@ export const REFUND_FACTORY_APPS: FactoryApp[] = [
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
   },
+  {
+    id: "app-pr-closure",
+    name: "PR Closure",
+    description: "Closes the work order when the pull request merges or is closed.",
+    createdAt: LAST_WEEK,
+    updatedAt: YESTERDAY,
+  },
 ];
 
 export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [

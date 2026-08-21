@@ -1,11 +1,10 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { client } from "@/api-client/client.gen";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { REFUND_IMPLEMENTER_APP } from "../../__fixtures__/factoryOwnedCanvasFixture";
+import { REFUND_IMPLEMENTER_APP, refundLineCanvasFixture } from "../../__fixtures__/factoryOwnedCanvasFixture";
 import {
   defaultFactoriesFixture,
   LINE_RUN_IMPLEMENT_ID,
@@ -31,17 +30,52 @@ describe("FactoryAppSplitRunPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("factory-app-canvas-title")).toHaveTextContent("Implementation");
+      expect(screen.getByTestId("split-run-phase-refund-implementer-1")).toBeInTheDocument();
     });
     const page = screen.getByTestId("factory-app-split-run-page");
-    expect(within(page).getByTestId("split-run-phase-implement")).toBeInTheDocument();
-    expect(within(page).queryByTestId("split-run-phase-plan")).not.toBeInTheDocument();
-    expect(within(page).getByTestId("split-run-stream-implement")).toBeInTheDocument();
+    expect(screen.getByTestId("factory-app-canvas-title")).toHaveTextContent("Refund Implementer");
+    expect(within(page).queryByTestId("split-run-phase-refund-planner-0")).not.toBeInTheDocument();
+    expect(within(page).getByTestId("split-run-stream-refund-implementer-1")).toBeInTheDocument();
     expect(within(page).getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
     expect(within(page).getByTestId("split-run-resize-handle")).toBeInTheDocument();
     expect(within(page).queryByTestId("split-run-canvas-expand")).not.toBeInTheDocument();
     expect(within(page).queryByTestId("split-run-canvas-menu")).not.toBeInTheDocument();
     expect(within(page).getByTestId("factory-app-edit")).toHaveTextContent("Edit");
+  }, 10000);
+
+  it("opens the planner canvas when the URL omits canvas", async () => {
+    const line = REFUND_FACTORY_LINES[0];
+
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/app-refund-planner/split-run?from=lines&lineId=${line.id}&run=run-plan-open&orderNumber=101`}
+        factoriesFixture={lineMetricsFactoriesFixture}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("split-run-phase-plan-0")).toBeInTheDocument();
+    });
+    expect(
+      within(screen.getByTestId("factory-app-split-run-page")).queryByTestId("split-run-phase-refund-implementer-1"),
+    ).not.toBeInTheDocument();
+  }, 10000);
+
+  it("does not show the demo run when no run is selected", async () => {
+    const appId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
+
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${appId}/split-run`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    const page = await screen.findByTestId("factory-app-split-run-page", {}, { timeout: 8000 });
+    await waitFor(() => {
+      expect(page).toHaveAttribute("data-state", "not-found");
+    });
+    expect(screen.queryByText("Add refund reconciliation test")).not.toBeInTheDocument();
   }, 10000);
 
   it("does not show the demo run when the selected run is missing", async () => {
@@ -76,22 +110,22 @@ describe("FactoryAppSplitRunPage", () => {
     expect(await screen.findByTestId("factory-app-split-run-page", {}, { timeout: 8000 })).toBeInTheDocument();
   }, 10000);
 
-  it("opens configure from the header Edit button", async () => {
-    const user = userEvent.setup();
+  it("points Edit at the configure canvas", async () => {
     const line = REFUND_FACTORY_LINES[0];
     const appId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
 
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${appId}/split-run?from=lines&lineId=${line.id}&run=${LINE_RUN_IMPLEMENT_ID}&orderNumber=103&canvas=implementation`}
-        factoriesFixture={lineMetricsFactoriesFixture}
+        factoriesFixture={defaultFactoriesFixture}
+        appFixture={refundLineCanvasFixture()}
       />,
     );
 
     const page = await screen.findByTestId("factory-app-split-run-page", {}, { timeout: 8000 });
-    await user.click(within(page).getByTestId("factory-app-edit"));
-
-    const canvasPage = await screen.findByTestId("factory-app-canvas-page", {}, { timeout: 8000 });
-    expect(canvasPage).toHaveAttribute("data-configure", "true");
+    const edit = within(page).getByTestId("factory-app-edit");
+    expect(edit).toHaveAttribute("href", expect.stringContaining(`/apps/${appId}?`));
+    expect(edit).toHaveAttribute("href", expect.stringContaining("configure=1"));
+    expect(edit.getAttribute("href")).not.toContain("split-run");
   }, 10000);
 });

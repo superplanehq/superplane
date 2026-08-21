@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
-import { CircleAlert, CircleCheck, ExternalLink, Hourglass, Minus, Play, TriangleAlert } from "lucide-react";
+import { CircleAlert, CircleCheck, ExternalLink, Hourglass, Loader2, Minus, Play, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -64,10 +64,16 @@ export function SplitRunReview({
   notes,
   tone = "waiting",
   className,
+  onAction,
+  actionBusy = false,
+  actionDisabled = false,
 }: {
   notes: WorkOrderStatusNotePresentation[];
   tone?: SplitRunFooterTone;
   className?: string;
+  onAction?: () => void | Promise<void>;
+  actionBusy?: boolean;
+  actionDisabled?: boolean;
 }) {
   const note = notes[0];
 
@@ -115,16 +121,64 @@ export function SplitRunReview({
         ) : (
           <span />
         )}
-        {note.cta ? (
-          <Button asChild className={cn("shrink-0", tone === "failed" && "bg-red-700 text-white hover:bg-red-700/90")}>
-            <a href={note.cta.href} target="_blank" rel="noreferrer">
-              {note.cta.label}
-              <ExternalLink className="size-3.5" aria-hidden />
-            </a>
-          </Button>
-        ) : null}
+        <ReviewCta
+          cta={note.cta}
+          tone={tone}
+          onAction={onAction}
+          actionBusy={actionBusy}
+          actionDisabled={actionDisabled}
+        />
       </div>
     </aside>
+  );
+}
+
+function ReviewCta({
+  cta,
+  tone,
+  onAction,
+  actionBusy,
+  actionDisabled,
+}: {
+  cta?: WorkOrderStatusNotePresentation["cta"];
+  tone: SplitRunFooterTone;
+  onAction?: () => void | Promise<void>;
+  actionBusy: boolean;
+  actionDisabled: boolean;
+}) {
+  if (!cta) {
+    return null;
+  }
+
+  const failedClass = tone === "failed" ? "bg-red-700 text-white hover:bg-red-700/90" : undefined;
+  if (onAction) {
+    return (
+      <Button
+        type="button"
+        className={cn("shrink-0", failedClass)}
+        disabled={actionDisabled || actionBusy}
+        onClick={() => void onAction()}
+        data-testid="split-run-review-cta"
+      >
+        {actionBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
+        {cta.label}
+      </Button>
+    );
+  }
+  if (cta.href) {
+    return (
+      <Button asChild className={cn("shrink-0", failedClass)}>
+        <a href={cta.href} target="_blank" rel="noreferrer">
+          {cta.label}
+          <ExternalLink className="size-3.5" aria-hidden />
+        </a>
+      </Button>
+    );
+  }
+  return (
+    <Button type="button" className="shrink-0" disabled data-testid="split-run-review-cta">
+      {cta.label}
+    </Button>
   );
 }
 

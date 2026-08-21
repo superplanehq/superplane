@@ -7,6 +7,7 @@ export {
   FactoryAppSplitRunPage,
   FactoryHomeRedirect,
   FactoryLineEditPage,
+  FactorySettingsAutomationsPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
   FactorySettingsNotificationsPage,

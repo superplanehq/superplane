@@ -4,6 +4,7 @@ import { Maximize2, MoreHorizontal, Pencil } from "lucide-react";
 import { useCallback, useMemo, type MouseEvent } from "react";
 
 import type { ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
+import { useTheme } from "@/contexts/useTheme";
 import { factoryCanvasBackground, factoryEdgePalette } from "@/lib/factoryCanvasChrome";
 import { cn } from "@/lib/utils";
 import { Link } from "@/components/Link/link";
@@ -141,8 +142,10 @@ export function CompactLineCanvas({
   showHeader?: boolean;
 }) {
   const { nodes, edges } = useMemo(() => graphFromCanvas(canvas, selectedId, onSelect), [canvas, selectedId, onSelect]);
-  const background = factoryCanvasBackground(false);
-  const palette = factoryEdgePalette(false);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+  const background = factoryCanvasBackground(isDark);
+  const palette = factoryEdgePalette(isDark);
 
   const onNodeClick = useCallback(
     (_event: MouseEvent, node: Node) => {
@@ -189,7 +192,7 @@ export function CompactLineCanvas({
           onNodeClick={onNodeClick}
           onPaneClick={() => onSelect(null)}
           proOptions={{ hideAttribution: true }}
-          colorMode="light"
+          colorMode={isDark ? "dark" : "light"}
           defaultEdgeOptions={{ type: "smoothstep", style: palette.default }}
         >
           <Background
@@ -205,7 +208,6 @@ export function CompactLineCanvas({
 }
 
 function CanvasOverflowMenu({ title, editHref }: { title: string; editHref?: string }) {
-  const href = editHref || "#";
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -219,12 +221,19 @@ function CanvasOverflowMenu({ title, editHref }: { title: string; editHref?: str
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-40">
-        <DropdownMenuItem asChild data-testid="split-run-canvas-edit">
-          <a href={href}>
+        {editHref ? (
+          <DropdownMenuItem asChild data-testid="split-run-canvas-edit">
+            <Link href={editHref}>
+              <Pencil className="h-3.5 w-3.5" aria-hidden />
+              Edit
+            </Link>
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem disabled data-testid="split-run-canvas-edit">
             <Pencil className="h-3.5 w-3.5" aria-hidden />
             Edit
-          </a>
-        </DropdownMenuItem>
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

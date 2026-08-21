@@ -59,7 +59,7 @@ export function AutomationsPage() {
   }
 
   return (
-    <div data-testid="automations-list-page">
+    <div className="flex min-h-0 flex-1 flex-col pb-8" data-testid="automations-list-page">
       <WorkspacePageHeader
         className={factorySectionHeaderClassName}
         title="Automations"

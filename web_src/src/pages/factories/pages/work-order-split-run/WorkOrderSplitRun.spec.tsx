@@ -1,22 +1,34 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { DRAFT_WORK_ORDER, FAILED_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
+import { OPEN_WORK_ORDER_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
-function renderSplitRun() {
+function renderPopup(props: ComponentProps<typeof WorkOrderSplitRunPopup>) {
   return render(
-    <MemoryRouter>
-      <TooltipProvider>
-        <WorkOrderSplitRunPopup fixture={SPLIT_RUN_RUNNING} />
-      </TooltipProvider>
-    </MemoryRouter>,
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter>
+        <ThemeProvider>
+          <TooltipProvider>
+            <WorkOrderSplitRunPopup {...props} />
+          </TooltipProvider>
+        </ThemeProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
+}
+
+function renderSplitRun() {
+  return renderPopup({ fixture: SPLIT_RUN_RUNNING });
 }
 
 describe("WorkOrderSplitRunPopup", () => {
@@ -65,15 +77,17 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-canvas-node-onrun-implement")).not.toHaveAttribute("data-selected");
   });
 
+  it("keeps Edit in the canvas overflow menu when no edit href is set", async () => {
+    const user = userEvent.setup();
+    renderSplitRun();
+
+    await user.click(screen.getByTestId("split-run-canvas-menu"));
+    expect(await screen.findByTestId("split-run-canvas-edit")).toHaveTextContent("Edit");
+  });
+
   it("opens Edit from the canvas overflow menu", async () => {
     const user = userEvent.setup();
-    render(
-      <MemoryRouter>
-        <TooltipProvider>
-          <WorkOrderSplitRunPopup fixture={SPLIT_RUN_RUNNING} canvasEditHref={() => "/edit-implementation"} />
-        </TooltipProvider>
-      </MemoryRouter>,
-    );
+    renderPopup({ fixture: SPLIT_RUN_RUNNING, canvasEditHref: () => "/edit-implementation" });
 
     await user.click(screen.getByTestId("split-run-canvas-menu"));
     const edit = await screen.findByTestId("split-run-canvas-edit");
@@ -82,13 +96,11 @@ describe("WorkOrderSplitRunPopup", () => {
   });
 
   it("places expand before the overflow menu and opens the automation run", () => {
-    render(
-      <MemoryRouter>
-        <TooltipProvider>
-          <WorkOrderSplitRunPopup fixture={SPLIT_RUN_RUNNING} canvasExpandHref={() => "/split-run-implementation"} />
-        </TooltipProvider>
-      </MemoryRouter>,
-    );
+    renderPopup({
+      fixture: SPLIT_RUN_RUNNING,
+      canvasEditHref: () => "/edit-implementation",
+      canvasExpandHref: () => "/split-run-implementation",
+    });
 
     const expand = screen.getByTestId("split-run-canvas-expand");
     const menu = screen.getByTestId("split-run-canvas-menu");
@@ -98,36 +110,39 @@ describe("WorkOrderSplitRunPopup", () => {
   });
 
   it("keeps every check pill on the owner and cost row for verify", () => {
-    render(
-      <MemoryRouter>
-        <TooltipProvider>
-          <WorkOrderSplitRunPopup
-            fixture={splitRunFixtureForWorkOrder({
-              ...OPEN_WORK_ORDER,
-              title: "Add refund reason enum to schema",
-              lineDispatches: [
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(
+        {
+          ...OPEN_WORK_ORDER,
+          title: "Add refund reason enum to schema",
+          lineDispatches: [
+            {
+              id: "dispatch-verify",
+              line: { id: "line-1", name: "plan-and-implement" },
+              state: "STATE_ACTIVE",
+              stepExecutions: [
+                { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
                 {
-                  id: "dispatch-verify",
-                  line: { id: "line-1", name: "plan-and-implement" },
-                  state: "STATE_ACTIVE",
-                  stepExecutions: [
-                    { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
-                    {
-                      id: "e-impl",
-                      step: "Implement",
-                      stepIndex: 1,
-                      state: "STATE_FINISHED",
-                      result: "RESULT_PASSED",
-                    },
-                    { id: "e-verify", step: "Verify", stepIndex: 2, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
-                  ],
+                  id: "e-impl",
+                  step: "Implement",
+                  stepIndex: 1,
+                  state: "STATE_FINISHED",
+                  result: "RESULT_PASSED",
+                },
+                {
+                  id: "e-verify",
+                  step: "Verify",
+                  stepIndex: 2,
+                  state: "STATE_STARTED",
+                  result: "RESULT_UNKNOWN",
                 },
               ],
-            })}
-          />
-        </TooltipProvider>
-      </MemoryRouter>,
-    );
+            },
+          ],
+        },
+        { checks: OPEN_WORK_ORDER_CHECKS },
+      ),
+    });
 
     const meta = screen.getByTestId("popup-owner-time-cost");
     expect(within(meta).getByTestId("split-run-checks")).toBeInTheDocument();
@@ -138,35 +153,29 @@ describe("WorkOrderSplitRunPopup", () => {
   });
 
   it("pins the pull request review to the waiting implement log", () => {
-    render(
-      <MemoryRouter>
-        <TooltipProvider>
-          <WorkOrderSplitRunPopup
-            fixture={splitRunFixtureForWorkOrder({
-              ...OPEN_WORK_ORDER,
-              title: "Ship idempotent refund retries",
-              lineDispatches: [
-                {
-                  id: "dispatch-waiting",
-                  line: { id: "line-1", name: "plan-and-implement" },
-                  state: "STATE_FINISHED",
-                  stepExecutions: [
-                    { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
-                    {
-                      id: "e-impl",
-                      step: "Implement",
-                      stepIndex: 1,
-                      state: "STATE_FINISHED",
-                      result: "RESULT_PASSED",
-                    },
-                  ],
-                },
-              ],
-            })}
-          />
-        </TooltipProvider>
-      </MemoryRouter>,
-    );
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder({
+        ...OPEN_WORK_ORDER,
+        title: "Ship idempotent refund retries",
+        lineDispatches: [
+          {
+            id: "dispatch-waiting",
+            line: { id: "line-1", name: "plan-and-implement" },
+            state: "STATE_FINISHED",
+            stepExecutions: [
+              { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+              {
+                id: "e-impl",
+                step: "Implement",
+                stepIndex: 1,
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+              },
+            ],
+          },
+        ],
+      }),
+    });
 
     const review = screen.getByTestId("split-run-review");
     expect(review).toHaveTextContent("Review the pull request");
@@ -177,28 +186,31 @@ describe("WorkOrderSplitRunPopup", () => {
 
   it("opens a compact check in the analysis dialog", async () => {
     const user = userEvent.setup();
-    render(
-      <MemoryRouter>
-        <TooltipProvider>
-          <WorkOrderSplitRunPopup
-            fixture={splitRunFixtureForWorkOrder({
-              ...OPEN_WORK_ORDER,
-              title: "Add refund reason enum to schema",
-              lineDispatches: [
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(
+        {
+          ...OPEN_WORK_ORDER,
+          title: "Add refund reason enum to schema",
+          lineDispatches: [
+            {
+              id: "dispatch-verify",
+              line: { id: "line-1", name: "plan-and-implement" },
+              state: "STATE_ACTIVE",
+              stepExecutions: [
                 {
-                  id: "dispatch-verify",
-                  line: { id: "line-1", name: "plan-and-implement" },
-                  state: "STATE_ACTIVE",
-                  stepExecutions: [
-                    { id: "e-verify", step: "Verify", stepIndex: 2, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
-                  ],
+                  id: "e-verify",
+                  step: "Verify",
+                  stepIndex: 2,
+                  state: "STATE_STARTED",
+                  result: "RESULT_UNKNOWN",
                 },
               ],
-            })}
-          />
-        </TooltipProvider>
-      </MemoryRouter>,
-    );
+            },
+          ],
+        },
+        { checks: OPEN_WORK_ORDER_CHECKS },
+      ),
+    });
 
     await user.click(screen.getByTestId("split-run-check-check-risk-review"));
 
@@ -207,40 +219,39 @@ describe("WorkOrderSplitRunPopup", () => {
   });
 
   it("hides the review strip when the work order has no note or checks", () => {
-    render(
-      <MemoryRouter>
-        <TooltipProvider>
-          <WorkOrderSplitRunPopup fixture={{ ...SPLIT_RUN_RUNNING, waitingNotes: [], checks: [] }} />
-        </TooltipProvider>
-      </MemoryRouter>,
-    );
+    renderPopup({ fixture: { ...SPLIT_RUN_RUNNING, waitingNotes: [], checks: [] } });
 
     expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
   });
 
   it("prompts a draft backlog card to start the next stage", () => {
-    render(
-      <MemoryRouter>
-        <TooltipProvider>
-          <WorkOrderSplitRunPopup fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)} />
-        </TooltipProvider>
-      </MemoryRouter>,
-    );
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
 
     const review = screen.getByTestId("split-run-review");
     expect(review).toHaveTextContent("Start the next stage");
-    expect(within(review).getByRole("link", { name: "Start Plan" })).toBeInTheDocument();
+    expect(within(review).getByRole("button", { name: "Dispatch" })).toBeDisabled();
+    expect(screen.queryByTestId("split-run-phase-backlog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
   });
 
+  it("dispatches the draft to the line from the next-step button", async () => {
+    const user = userEvent.setup();
+    const onDispatch = vi.fn().mockResolvedValue(undefined);
+
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+      canDispatch: true,
+      onDispatch,
+    });
+
+    await user.click(within(screen.getByTestId("split-run-review")).getByRole("button", { name: "Dispatch" }));
+
+    expect(onDispatch).toHaveBeenCalledTimes(1);
+  });
+
   it("shows a failed implement diagnosis in the log footer", () => {
-    render(
-      <MemoryRouter>
-        <TooltipProvider>
-          <WorkOrderSplitRunPopup fixture={splitRunFixtureForWorkOrder(FAILED_WORK_ORDER)} />
-        </TooltipProvider>
-      </MemoryRouter>,
-    );
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(FAILED_WORK_ORDER) });
 
     const review = screen.getByTestId("split-run-review");
     expect(review).toHaveTextContent("Implement did not pass");
@@ -268,28 +279,22 @@ describe("WorkOrderSplitRunPopup", () => {
   });
 
   it("opens a mapped plan-running work order on the plan canvas", () => {
-    render(
-      <MemoryRouter>
-        <TooltipProvider>
-          <WorkOrderSplitRunPopup
-            fixture={splitRunFixtureForWorkOrder({
-              ...OPEN_WORK_ORDER,
-              title: "Plan job",
-              lineDispatches: [
-                {
-                  id: "dispatch-1",
-                  line: { id: "line-1", name: "plan-and-implement" },
-                  state: "STATE_ACTIVE",
-                  stepExecutions: [
-                    { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
-                  ],
-                },
-              ],
-            })}
-          />
-        </TooltipProvider>
-      </MemoryRouter>,
-    );
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder({
+        ...OPEN_WORK_ORDER,
+        title: "Plan job",
+        lineDispatches: [
+          {
+            id: "dispatch-1",
+            line: { id: "line-1", name: "plan-and-implement" },
+            state: "STATE_ACTIVE",
+            stepExecutions: [
+              { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
+            ],
+          },
+        ],
+      }),
+    });
 
     expect(screen.getByRole("heading", { name: "Plan job" })).toBeInTheDocument();
     expect(screen.getByTestId("split-run-stream-plan-0")).toBeInTheDocument();
@@ -302,33 +307,27 @@ describe("WorkOrderSplitRunPopup", () => {
 
   it("highlights the PR Closure log for the selected canvas component", async () => {
     const user = userEvent.setup();
-    render(
-      <MemoryRouter>
-        <TooltipProvider>
-          <WorkOrderSplitRunPopup
-            fixture={{
-              ...SPLIT_RUN_RUNNING,
-              title: "Send refund receipts after provider confirm",
-              lineStatus: "passed",
-              currentPhaseId: "done",
-              phases: [
-                ...SPLIT_RUN_RUNNING.phases.map((phase) => ({ ...phase, status: "passed" as const })),
-                {
-                  id: "done",
-                  name: "Done",
-                  status: "passed",
-                  duration: "1m 12s",
-                  componentName: "PR Closure",
-                  artifacts: [],
-                  stream: [],
-                  canvasSteps: [],
-                },
-              ],
-            }}
-          />
-        </TooltipProvider>
-      </MemoryRouter>,
-    );
+    renderPopup({
+      fixture: {
+        ...SPLIT_RUN_RUNNING,
+        title: "Send refund receipts after provider confirm",
+        lineStatus: "passed",
+        currentPhaseId: "done",
+        phases: [
+          ...SPLIT_RUN_RUNNING.phases.map((phase) => ({ ...phase, status: "passed" as const })),
+          {
+            id: "done",
+            name: "Done",
+            status: "passed",
+            duration: "1m 12s",
+            componentName: "PR Closure",
+            artifacts: [],
+            stream: [],
+            canvasSteps: [],
+          },
+        ],
+      },
+    });
 
     const stream = screen.getByTestId("split-run-stream-done");
     expect(within(stream).queryByText("Started")).not.toBeInTheDocument();

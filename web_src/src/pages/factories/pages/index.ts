@@ -17,6 +17,7 @@ export { WikiPage } from "./WikiPage";
 export { LegacyWorkOrderDetailRedirect, WorkOrderDetailPage } from "./WorkOrderDetailPage";
 export { WorkOrdersPage } from "./WorkOrdersPage";
 export { FactorySettingsLayout } from "./settings/FactorySettingsLayout";
+export { FactorySettingsAutomationsPage } from "./settings/FactorySettingsAutomationsPage";
 export { FactorySettingsGeneralPage } from "./settings/FactorySettingsGeneralPage";
 export { FactorySettingsNotificationsPage } from "./settings/FactorySettingsNotificationsPage";
 export { FactorySettingsProfilePage } from "./settings/FactorySettingsProfilePage";

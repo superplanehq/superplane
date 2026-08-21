@@ -22,7 +22,7 @@ spec:
       configuration: {}
       position:
         x: 80
-        'y': 40
+        "y": 40
     - id: assess-pr-risk
       name: Assess PR Risk
       type: TYPE_ACTION
@@ -30,7 +30,7 @@ spec:
       configuration: {}
       position:
         x: 80
-        'y': 220
+        "y": 220
     - id: format-risk-review
       name: Format Risk Review
       type: TYPE_ACTION
@@ -38,7 +38,7 @@ spec:
       configuration: {}
       position:
         x: 80
-        'y': 400
+        "y": 400
     - id: report-risk-check
       name: Report Risk Check
       type: TYPE_ACTION
@@ -46,4 +46,4 @@ spec:
       configuration: {}
       position:
         x: 400
-        'y': 400
+        "y": 400

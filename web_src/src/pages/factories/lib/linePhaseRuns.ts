@@ -114,6 +114,21 @@ export function findBacklogAutomationApp(
   return { id: match.id, name: match.name ?? "Backlog" };
 }
 
+/** Factory-level PR Closure automation. It is not a line step. */
+export function findClosureAutomationApp(
+  apps: Array<{ id?: string; name?: string }>,
+): { id: string; name: string } | undefined {
+  const match = apps.find(
+    (app) =>
+      Boolean(app.id) &&
+      (app.name === "PR Closure" || app.id === "app-refund-done" || (app.id ?? "").includes("pr-closure")),
+  );
+  if (!match?.id) {
+    return undefined;
+  }
+  return { id: match.id, name: match.name ?? "PR Closure" };
+}
+
 function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {
   if (!order.id || order.state !== "STATE_DRAFT") {
     return false;

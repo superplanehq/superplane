@@ -32,6 +32,7 @@ import {
   FactoryAppSplitRunPage,
   FactoryHomeRedirect,
   FactoryLineEditPage,
+  FactorySettingsAutomationsPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
   FactorySettingsNotificationsPage,
@@ -280,6 +281,7 @@ function FactoryLineEditPageGate() {
 const factorySettingsSectionRoutes = [
   <Route key="factory-settings-index" index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />,
   <Route key="factory-settings-general" path="general" element={<FactorySettingsGeneralPage />} />,
+  <Route key="factory-settings-automations" path="automations" element={<FactorySettingsAutomationsPage />} />,
   <Route key="factory-settings-usage" path="usage" element={<FactorySettingsUsagePage />} />,
   <Route key="factory-settings-profile" path="profile" element={<FactorySettingsProfilePage />} />,
   <Route key="factory-settings-notifications" path="notifications" element={<FactorySettingsNotificationsPage />} />,

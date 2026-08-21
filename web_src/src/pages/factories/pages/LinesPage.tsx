@@ -19,6 +19,7 @@ import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
   findBacklogAutomationApp,
+  findClosureAutomationApp,
   LINE_PHASE_RUNS_PAGE_SIZE,
   resolveColumnGlyph,
   resolvePhaseRunStatus,
@@ -265,10 +266,14 @@ function LineDetail({
           organizationId={organizationId}
           factoryId={factoryId}
           lineId={line.id}
+          lineName={line.name}
           peekOrderId={peekOrderId}
           peekOrder={peekOrder}
           canvasEditHref={canvasEditHref}
           canvasExpandHref={canvasExpandHref}
+          canDispatch={workOrderCardContext.canDispatch}
+          isDispatching={workOrderCardContext.isDispatching}
+          onDispatch={workOrderCardContext.onDispatch}
           onClose={() => setPeekOrderId(null)}
         />
       ) : null}
@@ -280,31 +285,54 @@ function LineBoardSplitRunPopup({
   organizationId,
   factoryId,
   lineId,
+  lineName,
   peekOrderId,
   peekOrder,
   canvasEditHref,
   canvasExpandHref,
+  canDispatch,
+  isDispatching,
+  onDispatch,
   onClose,
 }: {
   organizationId: string;
   factoryId: string;
   lineId: string | undefined;
+  lineName: string | undefined;
   peekOrderId: string;
   peekOrder: FactoriesWorkOrder | undefined;
   canvasEditHref: (key: SplitRunCanvasKey) => string | undefined;
   canvasExpandHref: (key: SplitRunCanvasKey) => string | undefined;
+  canDispatch: boolean;
+  isDispatching: boolean;
+  onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onClose: () => void;
 }) {
   const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
+  const resolvedLineName = lineName?.trim();
   return (
     <WorkOrderSplitRunPopup
       key={peekOrderId}
+      organizationId={organizationId}
       fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId })}
       canvasEditHref={canvasEditHref}
       canvasExpandHref={canvasExpandHref}
+      canDispatch={canDispatch && Boolean(resolvedLineName)}
+      isDispatching={isDispatching}
+      onDispatch={resolvedLineName ? () => onDispatch(peekOrderId, { lineName: resolvedLineName }) : undefined}
       onClose={onClose}
       fixed
     />
+  );
+}
+
+function firstCanvasAppId(appIdByCanvas: Record<SplitRunCanvasKey, string | undefined>): string | undefined {
+  return (
+    appIdByCanvas.planning ??
+    appIdByCanvas.implementation ??
+    appIdByCanvas.risk ??
+    appIdByCanvas.closure ??
+    appIdByCanvas.intake
   );
 }
 
@@ -313,13 +341,14 @@ function canvasAppIdsForLine(
   apps: Array<{ id?: string; name?: string }>,
 ): Record<SplitRunCanvasKey, string | undefined> {
   const backlog = findBacklogAutomationApp(apps);
+  const closure = findClosureAutomationApp(apps);
   const steps = line.steps ?? [];
   return {
     intake: backlog?.id,
     planning: steps[0]?.app?.app,
     implementation: steps[1]?.app?.app,
     risk: steps[2]?.app?.app,
-    closure: steps[3]?.app?.app,
+    closure: steps[3]?.app?.app ?? closure?.id,
   };
 }
 
@@ -332,7 +361,7 @@ function canvasEditHrefForLine(
   const appIdByCanvas = canvasAppIdsForLine(line, apps);
 
   return (key) => {
-    const appId = appIdByCanvas[key];
+    const appId = appIdByCanvas[key] ?? firstCanvasAppId(appIdByCanvas) ?? apps.find((app) => app.id)?.id;
     if (!appId) {
       return undefined;
     }
