@@ -16,8 +16,6 @@ type UseFactoryAppConfigureTitleArgs = {
   savedName?: string;
   configureBusy: boolean;
   configureActionsRef: MutableRefObject<FactoryConfigureActions | null>;
-  /** Leave Configure chrome immediately on Discard, before staging reset finishes. */
-  onDiscardLeave?: () => void;
 };
 
 export function resolveDraftTitleToPersist(draftTitle: string | null, savedTitle: string): string | null {
@@ -28,18 +26,21 @@ export function resolveDraftTitleToPersist(draftTitle: string | null, savedTitle
   return nextName;
 }
 
+/** Discard must run AppPage reset. Do not leave Configure when discard is missing. */
+export function canStartFactoryConfigureDiscard(args: {
+  configureBusy: boolean;
+  renamePending: boolean;
+  hasDiscardAction: boolean;
+}): boolean {
+  if (args.configureBusy || args.renamePending) {
+    return false;
+  }
+  return args.hasDiscardAction;
+}
+
 export function useFactoryAppConfigureTitle(args: UseFactoryAppConfigureTitleArgs) {
-  const {
-    organizationId,
-    factoryId,
-    appId,
-    isConfigure,
-    canRename,
-    savedName,
-    configureBusy,
-    configureActionsRef,
-    onDiscardLeave,
-  } = args;
+  const { organizationId, factoryId, appId, isConfigure, canRename, savedName, configureBusy, configureActionsRef } =
+    args;
   const queryClient = useQueryClient();
   const updateCanvas = useUpdateCanvas(organizationId, appId);
   const [draftTitle, setDraftTitle] = useState<string | null>(null);
@@ -117,13 +118,20 @@ export function useFactoryAppConfigureTitle(args: UseFactoryAppConfigureTitleArg
   }, [configureActionsRef, configureBusy, persistDraftTitleIfNeeded, updateCanvas.isPending]);
 
   const handleConfigureDiscard = useCallback(() => {
-    if (configureBusy || updateCanvas.isPending) {
+    const discard = configureActionsRef.current?.discard;
+    if (
+      !discard ||
+      !canStartFactoryConfigureDiscard({
+        configureBusy,
+        renamePending: updateCanvas.isPending,
+        hasDiscardAction: true,
+      })
+    ) {
       return;
     }
     clearDraftTitle();
-    onDiscardLeave?.();
-    configureActionsRef.current?.discard();
-  }, [clearDraftTitle, configureActionsRef, configureBusy, onDiscardLeave, updateCanvas.isPending]);
+    discard();
+  }, [clearDraftTitle, configureActionsRef, configureBusy, updateCanvas.isPending]);
 
   return {
     title,

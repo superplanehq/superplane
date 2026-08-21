@@ -56,7 +56,6 @@ export function useFactoryAppCanvasPageModel() {
     savedName: route.canvas?.metadata?.name,
     configureBusy,
     configureActionsRef,
-    onDiscardLeave: navigateDone,
   });
   const handleConfigureDone = useCallback(() => {
     clearDraftTitle();
@@ -91,7 +90,7 @@ export function useFactoryAppCanvasPageModel() {
     canvas: route.canvas,
     canvasLoading: route.canvasLoading,
     isConfigure: route.isConfigure,
-    configureBusy: titleConfigureBusy,
+    configureBusy: titleConfigureBusy || (route.canvasLoading && !route.canvas),
     configureActionsRef,
     back: route.back,
     title,
