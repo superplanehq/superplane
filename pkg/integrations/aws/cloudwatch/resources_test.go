@@ -209,3 +209,29 @@ func Test__Dimensions(t *testing.T) {
 		assert.Empty(t, decoded)
 	})
 }
+
+func Test__ListLogGroups(t *testing.T) {
+	t.Run("missing region -> error", func(t *testing.T) {
+		ctx, _ := listResourcesContext()
+		ctx.Parameters = map[string]string{}
+
+		_, err := ListLogGroups(ctx, "cloudwatch.logGroup")
+		require.ErrorContains(t, err, "region is required")
+	})
+
+	t.Run("follows nextToken across pages", func(t *testing.T) {
+		page1 := `{"logGroups":[{"logGroupName":"/aws/lambda/fn-1"}],"nextToken":"page-2"}`
+		page2 := `{"logGroups":[{"logGroupName":"/aws/lambda/fn-2"}]}`
+		ctx, httpContext := listResourcesContext(page1, page2)
+
+		resources, err := ListLogGroups(ctx, "cloudwatch.logGroup")
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, "/aws/lambda/fn-1", resources[0].Name)
+		assert.Equal(t, "/aws/lambda/fn-2", resources[1].Name)
+
+		require.Len(t, httpContext.Requests, 2)
+		assert.NotContains(t, requestBody(t, httpContext, 0), "nextToken")
+		assert.Contains(t, requestBody(t, httpContext, 1), `"nextToken":"page-2"`)
+	})
+}
