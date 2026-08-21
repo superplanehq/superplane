@@ -20,6 +20,7 @@ describe("useOnboardingSetupState", () => {
     });
     act(() => result.current.startIssuesDiscovery());
 
+    expect(result.current.vcsReady).toBe(true);
     expect(result.current.repoReady).toBe(true);
     expect(result.current.issuesDiscovered).toBe(true);
     expect(result.current.issuesChoice).toBe("vcs");

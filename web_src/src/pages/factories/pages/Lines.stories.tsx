@@ -1,19 +1,19 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
-import {
-  defaultFactoriesFixture,
-  emptyFactoriesFixture,
-  fiveStepLineFactoriesFixture,
-  PRIMARY_FACTORY_KEY,
-  REFUND_FACTORY_LINES,
-} from "../__fixtures__/factoryPageResponses";
+import { emptyFactoriesFixture, PRIMARY_FACTORY_KEY, REFUND_FACTORY_LINES } from "../__fixtures__/factoryPageResponses";
+import { fiveStepLineFactoriesFixture, lineMetricsFactoriesFixture } from "../__fixtures__/lineMetricsFactoriesFixture";
 import { LinesPage } from "./LinesPage";
 
 /**
- * Lines page: card list → line detail with phase board.
+ * Lines page: metric cards on the list, phase board on line detail.
  * FactoriesHarness supplies a factory-owned canvas so a run-card click opens
  * the automation run instead of Overview.
+ *
+ * Populated shows the automations-style 3-dots overflow menu (Edit,
+ * Duplicate) on hover/open for each list card. Duplicate hits the same
+ * `POST /api/v1/factories/:id/lines` fixture route as "New line" and routes
+ * to the freshly created line.
  */
 const meta = {
   title: "Factories/Pages/Lines",
@@ -28,7 +28,7 @@ type Story = StoryObj<typeof meta>;
 const linesListPath = `workspaces/${PRIMARY_FACTORY_KEY}/lines`;
 
 export const Populated: Story = {
-  render: () => <FactoriesHarness pathSuffix={linesListPath} factoriesFixture={defaultFactoriesFixture} />,
+  render: () => <FactoriesHarness pathSuffix={linesListPath} factoriesFixture={lineMetricsFactoriesFixture} />,
 };
 
 export const EmptyFactory: Story = {
@@ -43,7 +43,7 @@ export const LineDetail: Story = {
     return (
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
-        factoriesFixture={defaultFactoriesFixture}
+        factoriesFixture={lineMetricsFactoriesFixture}
       />
     );
   },

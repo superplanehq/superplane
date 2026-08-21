@@ -1,19 +1,19 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
 #root {
   width: 100%;
 
-  --jetbrains-mono: 'JetBrains Mono', monospace;
-  --font-inter: 'Inter', sans-serif;
-  --dark-gray:    #202B30;
-  --dim-gray:     #495358;
-  --gray:         #677278;
-  --mid-gray:     #96A0A6;
-  --light-gray:   #B5BCC0;
-  --lighter-gray: #D3DADE;
-  --lightest-gray:#E5E8EA;
-  --washed-gray:  #F5F8F9;
+  --jetbrains-mono: "JetBrains Mono", monospace;
+  --font-inter: "Inter", sans-serif;
+  --dark-gray: #202b30;
+  --dim-gray: #495358;
+  --gray: #677278;
+  --mid-gray: #96a0a6;
+  --light-gray: #b5bcc0;
+  --lighter-gray: #d3dade;
+  --lightest-gray: #e5e8ea;
+  --washed-gray: #f5f8f9;
 
   --near-white: #f7fafb;
 
@@ -22,9 +22,9 @@
   --lightest-green: #cef1c8;
   --washed-green: #e2f5e0;
 
-  --dark-red: #B71C1C;
+  --dark-red: #b71c1c;
   --red: #e53935;
-  --light-red: #EF9A9A;
+  --light-red: #ef9a9a;
   --lightest-red: #ffdddd;
   --washed-red: #ffecec;
 
@@ -38,12 +38,12 @@
   --lightest-purple: #e3d5ff;
   --washed-purple: #f3ecff;
 
-  --blue: #2196F3;
+  --blue: #2196f3;
   --lighter-blue: #b0e3fd;
   --lightest-blue: #c7edff;
   --washed-blue: #eff8ff;
 
-  --yellow: #FBC335;
+  --yellow: #fbc335;
   --lightest-yellow: #fff3bf;
   --washed-yellow: #fffae4;
 
@@ -56,40 +56,40 @@
   --lightest-brown: #f6f3ec;
   --washed-brown: #fffef9;
 
-  --magenta: #E91E63;
-  --cyan: #00ACC1;
+  --magenta: #e91e63;
+  --cyan: #00acc1;
 
-  --transparent:transparent;
-  --black:  #000;
-  --white:  #FFF;
+  --transparent: transparent;
+  --black: #000;
+  --white: #fff;
 
-  --black-90:   rgba(0,0,0,.9);
-  --black-80:   rgba(0,0,0,.8);
-  --black-70:   rgba(0,0,0,.7);
-  --black-60:   rgba(0,0,0,.6);
-  --black-50:   rgba(0,0,0,.5);
-  --black-40:   rgba(0,0,0,.4);
-  --black-30:   rgba(0,0,0,.3);
-  --black-20:   rgba(0,0,0,.2);
-  --black-15:   rgba(0,0,0,.15);
-  --black-10:   rgba(0,0,0,.1);
-  --black-05:   rgba(0,0,0,.05);
-  --black-075:  rgba(0,0,0,.075);
-  --black-025:  rgba(0,0,0,.025);
-  --black-0125: rgba(0,0,0,.0125);
+  --black-90: rgba(0, 0, 0, 0.9);
+  --black-80: rgba(0, 0, 0, 0.8);
+  --black-70: rgba(0, 0, 0, 0.7);
+  --black-60: rgba(0, 0, 0, 0.6);
+  --black-50: rgba(0, 0, 0, 0.5);
+  --black-40: rgba(0, 0, 0, 0.4);
+  --black-30: rgba(0, 0, 0, 0.3);
+  --black-20: rgba(0, 0, 0, 0.2);
+  --black-15: rgba(0, 0, 0, 0.15);
+  --black-10: rgba(0, 0, 0, 0.1);
+  --black-05: rgba(0, 0, 0, 0.05);
+  --black-075: rgba(0, 0, 0, 0.075);
+  --black-025: rgba(0, 0, 0, 0.025);
+  --black-0125: rgba(0, 0, 0, 0.0125);
 
-  --white-90:   rgba(255,255,255,.9);
-  --white-80:   rgba(255,255,255,.8);
-  --white-70:   rgba(255,255,255,.7);
-  --white-60:   rgba(255,255,255,.6);
-  --white-50:   rgba(255,255,255,.5);
-  --white-40:   rgba(255,255,255,.4);
-  --white-30:   rgba(255,255,255,.3);
-  --white-20:   rgba(255,255,255,.2);
-  --white-10:   rgba(255,255,255,.1);
-  --white-05:   rgba(255,255,255,.05);
-  --white-025:  rgba(255,255,255,.025);
-  --white-0125: rgba(255,255,255,.0125);
+  --white-90: rgba(255, 255, 255, 0.9);
+  --white-80: rgba(255, 255, 255, 0.8);
+  --white-70: rgba(255, 255, 255, 0.7);
+  --white-60: rgba(255, 255, 255, 0.6);
+  --white-50: rgba(255, 255, 255, 0.5);
+  --white-40: rgba(255, 255, 255, 0.4);
+  --white-30: rgba(255, 255, 255, 0.3);
+  --white-20: rgba(255, 255, 255, 0.2);
+  --white-10: rgba(255, 255, 255, 0.1);
+  --white-05: rgba(255, 255, 255, 0.05);
+  --white-025: rgba(255, 255, 255, 0.025);
+  --white-0125: rgba(255, 255, 255, 0.0125);
 }
 
 .logo {
@@ -231,7 +231,6 @@
 
 @custom-variant dark (&:where(.dark, .dark *):not(:where(.dark-mode-disabled, .dark-mode-disabled *)));
 
-
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -271,16 +270,16 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --color-slate-400: #A1AEC0;
+  --color-slate-400: #a1aec0;
   --color-gray-50: oklch(96.07% 0.002 247.84);
   --color-gray-100: oklch(92.12% 0.005 258.33);
-  --color-gray-200: oklch(83.87% 0.010 267.35);
+  --color-gray-200: oklch(83.87% 0.01 267.35);
   --color-gray-300: oklch(75.68% 0.014 266.67);
   --color-gray-400: oklch(67.21% 0.019 264.44);
   --color-gray-500: oklch(58.48% 0.025 263.11);
   --color-gray-600: oklch(49.87% 0.021 264.37);
   --color-gray-700: oklch(40.88% 0.016 266.53);
-  --color-gray-800: oklch(31.30% 0.013 267.12);
+  --color-gray-800: oklch(31.3% 0.013 267.12);
   --color-gray-900: oklch(21.26% 0.007 258.37);
   --color-gray-950: oklch(17.74% 0.004 264.46);
 }
@@ -302,7 +301,7 @@
   --accent: #f9fafb;
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: theme('colors.slate.300');
+  --border: theme("colors.slate.300");
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
   --chart-1: oklch(0.646 0.222 41.116);
@@ -473,7 +472,17 @@
 
   --status-done-lane-bg: #f9fafb;
 
-  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --work-order-mention-fg: #0969da;
+  --work-order-mention-bg: #ddf4ff;
+
+  font-family:
+    "Inter",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   font-size: 14px;
   line-height: 1.5;
@@ -547,6 +556,9 @@
   --status-cancelled-dot: #71717a;
 
   --status-done-lane-bg: rgba(255, 255, 255, 0.02);
+
+  --work-order-mention-fg: #4493f8;
+  --work-order-mention-bg: rgba(56, 139, 253, 0.15);
 }
 
 @layer components {
@@ -725,8 +737,67 @@
   pointer-events: none;
 }
 
+.work-order-mention {
+  color: var(--work-order-mention-fg);
+  background-color: var(--work-order-mention-bg);
+  border-radius: 6px;
+  padding: 0 0.15em;
+  margin: 0 -0.15em;
+  font-weight: 600;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.work-order-mention-in-composer {
+  font-weight: inherit;
+}
+
 .theme-factories [data-slot="button"]:not([data-size^="icon"]) {
   border-radius: calc(var(--radius) - 2px);
+}
+
+.theme-factories .factory-agent-sidebar,
+.theme-factories .factory-agent-sidebar button,
+.theme-factories .factory-agent-sidebar textarea,
+.theme-factories .factory-agent-sidebar input {
+  font-family:
+    "Inter",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+.theme-factories .factory-agent-sidebar {
+  font-weight: 400;
+}
+
+/* Unlayered so these beat `.workspace-markdown` (13px / muted) on chat body. */
+.theme-factories .factory-agent-sidebar .factory-agent-message,
+.theme-factories .factory-agent-sidebar .factory-agent-message.workspace-markdown {
+  color: var(--foreground);
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 22.5px;
+}
+
+.theme-factories .factory-agent-sidebar .factory-agent-message p,
+.theme-factories .factory-agent-sidebar .factory-agent-message li {
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+}
+
+.theme-factories .factory-agent-sidebar .factory-agent-message.workspace-markdown strong,
+.theme-factories .factory-agent-sidebar .factory-agent-message.workspace-markdown b,
+.theme-factories .factory-agent-sidebar .workspace-markdown strong,
+.theme-factories .factory-agent-sidebar .workspace-markdown b {
+  font-weight: 600;
 }
 
 @layer base {

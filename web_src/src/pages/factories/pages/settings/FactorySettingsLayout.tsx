@@ -1,6 +1,4 @@
-import { useAccount } from "@/contexts/useAccount";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
-import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
@@ -11,10 +9,14 @@ import {
   resolveFactoryByKey,
 } from "../../lib/factoryKeyResolution";
 import { factoryDetailPath, factoryListPath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
-import { SidebarUserMenu } from "../../layout/SidebarUserMenu";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
-import { FACTORY_SETTINGS_NAV_ITEMS } from "./settingsNavItems";
+import {
+  FACTORY_SETTINGS_NAV_ITEMS,
+  isYouSettingsSection,
+  settingsSectionFromPathname,
+  type FactorySettingsNavItem,
+} from "./settingsNavItems";
 
 export function FactorySettingsLayout() {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
@@ -72,11 +74,15 @@ function FactorySettingsLayoutContent({
   factoryKey: string;
 }) {
   useFactoriesThemeClass();
-  const { account } = useAccount();
-  const { data: organization } = useOrganization(organizationId);
+  const { pathname } = useLocation();
   const { data: factory, isLoading, error } = useFactory(organizationId, factoryId);
+  const isProfileSettings = isYouSettingsSection(settingsSectionFromPathname(pathname));
 
-  usePageTitle(factory?.name ? [factory.name, "Settings"] : ["Settings"]);
+  // See the matching comment in `FactoriesLayout`: once `factory` has loaded
+  // the `<Outlet/>` below mounts a leaf settings page that owns the full
+  // title itself, and this baseline must stop firing so it can't clobber the
+  // leaf's title on the same first-render commit.
+  usePageTitle(factory?.name ? [factory.name, "Settings"] : ["Settings"], { enabled: !factory });
 
   if (!isLoading && error) {
     return <Navigate to={factoryListPath(organizationId)} replace />;
@@ -92,6 +98,7 @@ function FactorySettingsLayoutContent({
 
   const workspaceGroup = FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.group === "workspace");
   const governanceGroup = FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.group === "governance");
+  const youGroup = FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.group === "you");
 
   return (
     <FactorySettingsLayoutContext.Provider value={{ organizationId, factoryId, factory }}>
@@ -109,25 +116,25 @@ function FactorySettingsLayoutContent({
               <ArrowLeft className="size-3.5" aria-hidden />
               Back to workspace
             </NavLink>
-            <p
-              className="mt-2 truncate px-2.5 text-[13px] font-medium tracking-[-0.01em] text-foreground"
-              title={factory.name ?? undefined}
-              data-testid="factory-settings-workspace-name"
-            >
-              {factory.name}
-            </p>
+            {isProfileSettings ? (
+              <p
+                className="mt-2 truncate px-2.5 text-[13px] font-medium tracking-[-0.01em] text-foreground"
+                data-testid="factory-settings-profile-title"
+              >
+                Profile settings
+              </p>
+            ) : null}
           </div>
-          <nav className="flex flex-1 flex-col gap-4 px-2 py-4">
-            <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={workspaceGroup} />
-            <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={governanceGroup} />
+          <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 py-4">
+            {isProfileSettings ? (
+              <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={youGroup} />
+            ) : (
+              <div className="flex flex-col gap-4" data-testid="factory-settings-workspace-nav">
+                <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={workspaceGroup} />
+                <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={governanceGroup} />
+              </div>
+            )}
           </nav>
-          <SidebarUserMenu
-            organizationId={organizationId}
-            userName={account?.name ?? "You"}
-            userEmail={account?.email}
-            userAvatarUrl={account?.avatar_url}
-            organizationName={organization?.metadata?.name ?? "Organization"}
-          />
         </aside>
         <main className="flex min-h-screen min-w-0 flex-1 flex-col bg-background">
           <Outlet />
@@ -144,7 +151,7 @@ function SettingsNavGroup({
 }: {
   organizationId: string;
   factoryKey: string;
-  items: typeof FACTORY_SETTINGS_NAV_ITEMS;
+  items: FactorySettingsNavItem[];
 }) {
   return (
     <ul className="flex flex-col gap-0.5">
@@ -161,6 +168,7 @@ function SettingsNavGroup({
                 )
               }
               data-testid={`factory-settings-nav-${item.id}`}
+              aria-label={item.id === "profile" ? "Profile" : undefined}
             >
               <Icon className="size-[15px] shrink-0 opacity-80" strokeWidth={1.75} aria-hidden />
               <span>{item.label}</span>

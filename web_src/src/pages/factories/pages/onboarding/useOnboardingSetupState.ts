@@ -7,10 +7,10 @@ import {
   type IssuesChoiceId,
   type VcsHostId,
 } from "./onboardingFixtures";
+import { isPlaceholderWorkspaceName, workspaceNameFromRepository } from "./workspaceNames";
 
 export type OnboardingSetupState = {
   workspaceName: string;
-  inviteCopied: boolean;
   connected: Set<IntegrationId>;
   vcsHost: VcsHostId | null;
   selectedRepo: string | null;
@@ -57,11 +57,13 @@ function setupReadiness(input: {
   agent: AgentHarnessId | null;
 }) {
   const nameReady = input.workspaceName.trim().length > 0;
-  const repoReady = input.vcsHost !== null && input.connected.has(input.vcsHost) && input.selectedRepo !== null;
+  const vcsReady = input.vcsHost !== null && input.connected.has(input.vcsHost);
+  const repoReady = vcsReady && input.selectedRepo !== null;
   const issuesReady = isIssuesReady(input.issuesChoice, input.connected);
   const agentReady = isAgentReady(input.agent, input.connected);
   return {
     nameReady,
+    vcsReady,
     repoReady,
     issuesReady,
     agentReady,
@@ -77,7 +79,11 @@ export function useOnboardingSetupState(
   },
 ) {
   const [workspaceName, setWorkspaceName] = useState(() => initialName.trim());
-  const [inviteCopied, setInviteCopied] = useState(false);
+  // A restored custom name must not be overwritten when the repository is
+  // restored. Placeholder names stay open to the repository-derived suggestion.
+  const [workspaceNameEdited, setWorkspaceNameEdited] = useState(
+    () => initialName.trim().length > 0 && !isPlaceholderWorkspaceName(initialName),
+  );
   const [localConnected, setLocalConnected] = useState<Set<IntegrationId>>(() => new Set());
   const [vcsHost, setVcsHost] = useState<VcsHostId | null>(null);
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
@@ -109,6 +115,20 @@ export function useOnboardingSetupState(
     setLocalConnected((prev) => new Set(prev).add(id));
   }, []);
 
+  const editWorkspaceName = useCallback((name: string) => {
+    setWorkspaceName(name);
+    setWorkspaceNameEdited(true);
+  }, []);
+
+  /** Derived names never overwrite a name the user typed. */
+  const suggestWorkspaceName = useCallback(
+    (name: string) => {
+      if (workspaceNameEdited) return;
+      setWorkspaceName(name);
+    },
+    [workspaceNameEdited],
+  );
+
   const resetIssuesState = useCallback(() => {
     clearDiscoveryTimer();
     setIssuesRepo(null);
@@ -135,8 +155,9 @@ export function useOnboardingSetupState(
       setSelectedRepo(repo);
       setRepoCommitted(false);
       resetIssuesState();
+      suggestWorkspaceName(workspaceNameFromRepository(repo));
     },
-    [resetIssuesState],
+    [resetIssuesState, suggestWorkspaceName],
   );
 
   const commitRepoStep = useCallback(() => {
@@ -188,7 +209,7 @@ export function useOnboardingSetupState(
   const backlogRepo = issuesRepo ?? selectedRepo;
   const issueCount =
     options?.simulateDiscovery === false ? undefined : backlogRepo ? fixtureIssueCount(backlogRepo) : 0;
-  const { nameReady, repoReady, issuesReady, agentReady, canFinish } = setupReadiness({
+  const { nameReady, vcsReady, repoReady, issuesReady, agentReady, canFinish } = setupReadiness({
     workspaceName,
     vcsHost,
     selectedRepo,
@@ -212,9 +233,8 @@ export function useOnboardingSetupState(
 
   return {
     workspaceName,
-    setWorkspaceName,
-    inviteCopied,
-    setInviteCopied,
+    editWorkspaceName,
+    suggestWorkspaceName,
     connected,
     connectIntegration,
     vcsHost,
@@ -238,6 +258,7 @@ export function useOnboardingSetupState(
     setFinished,
     issueCount,
     nameReady,
+    vcsReady,
     repoReady,
     issuesReady,
     agentReady,

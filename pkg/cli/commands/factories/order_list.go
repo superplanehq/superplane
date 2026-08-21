@@ -80,12 +80,23 @@ func (c *orderListCommand) Execute(ctx core.CommandContext) error {
 				formatOrderState(order.GetState()),
 				formatOrderResult(order.GetResult()),
 				formatAssigneeList(order.GetAssignees()),
-				len(order.GetExecutions()),
+				countStepExecutions(order.GetLineDispatches()),
 				formatRelativeTime(order.GetCreatedAt()),
 			)
 		}
 		return writer.Flush()
 	})
+}
+
+// countStepExecutions sums the step executions across every line dispatch,
+// matching the flat "executions" count the EXECUTIONS column showed before
+// line dispatches became first-class aggregates.
+func countStepExecutions(dispatches []openapi_client.FactoriesWorkOrderLineDispatch) int {
+	total := 0
+	for _, dispatch := range dispatches {
+		total += len(dispatch.GetStepExecutions())
+	}
+	return total
 }
 
 // shortOrderStateTokens maps short, case-insensitive state names to the

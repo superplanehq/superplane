@@ -1,12 +1,27 @@
+import { EMPTY_USAGE_REPORT } from "./usageReportFixtures";
 import {
   defaultFactoriesFixture,
   ORGANIZATION_USERS,
+  STORYBOOK_ME_USER_EMAIL,
   STORYBOOK_ME_USER_ID,
+  STORYBOOK_ME_USER_NAME,
   type FactoriesFixture,
 } from "./factoryPageResponses";
 import { DEFAULT_ARTIFACTS_BY_ORDER_ID, DEFAULT_EVENTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
-import type { FactoriesWorkOrder, FactoriesWorkOrderEvent } from "@/api-client";
-import { fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
+import { DEFAULT_CHECKS_BY_ORDER_ID } from "./workOrderCheckFixtures";
+import type {
+  FactoriesFactory,
+  FactoriesFactoryLine,
+  FactoriesFactoryOnboarding,
+  FactoriesUpdateFactoryOnboardingBody,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderEvent,
+  FactoriesWorkOrderLineDispatch,
+} from "@/api-client";
+import { defaultNotificationSettings } from "@/lib/notificationSettings";
+import { buildStorybookMeUser, fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
+import { automationNameForLineStep } from "../lib/factoryLineFormShared";
+import { metricsForLine } from "../pages/lineListMetricsMockData";
 
 export type { FactoriesFixture };
 
@@ -82,6 +97,22 @@ function factoriesCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {
   };
 }
 
+function factoryWithLineMetrics(factory: FactoriesFactory): FactoriesFactory {
+  return {
+    ...factory,
+    lines: (factory.lines ?? []).map((line) => {
+      if (line.metrics) {
+        return line;
+      }
+      const metrics = metricsForLine(line.id);
+      if (!metrics) {
+        return line;
+      }
+      return { ...line, metrics };
+    }),
+  };
+}
+
 function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     {
@@ -100,7 +131,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
           if (typeof request.description === "string") {
             factory.description = request.description;
           }
-          return { json: { factory } };
+          return { json: { factory: factoryWithLineMetrics(factory) } };
         }
 
         if (method === "DELETE") {
@@ -111,14 +142,49 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
           return { json: {} };
         }
 
-        return factory ? { json: { factory } } : { json: {} };
+        return factory ? { json: { factory: factoryWithLineMetrics(factory) } } : { json: {} };
       },
     },
     {
       pattern: re("/api/v1/factories/([^/]+)/apps"),
       resolve: (match) => ({ json: { apps: fixture.appsByFactoryId[match[1]] ?? [] } }),
     },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/usage"),
+      resolve: (match) => ({ json: fixture.usageByFactoryId?.[match[1]] ?? EMPTY_USAGE_REPORT }),
+    },
   ];
+}
+
+function mergedOnboarding(
+  current: FactoriesFactoryOnboarding | undefined,
+  request: FactoriesUpdateFactoryOnboardingBody,
+): FactoriesFactoryOnboarding {
+  const next: FactoriesFactoryOnboarding = { ...current };
+  if (request.vcsIntegrationId) next.vcsIntegrationId = request.vcsIntegrationId;
+  if (request.agentIntegrationId) next.agentIntegrationId = request.agentIntegrationId;
+  if (request.appRepository) next.appRepository = request.appRepository;
+  if (request.backlogRepository) next.backlogRepository = request.backlogRepository;
+  if (request.issuesSource) next.issuesSource = request.issuesSource;
+  if (request.agentHarness) next.agentHarness = request.agentHarness;
+  if (request.provisionedAppId) next.provisionedAppId = request.provisionedAppId;
+  if (request.provisionedLineId) next.provisionedLineId = request.provisionedLineId;
+  if (request.complete) next.completedAt = new Date().toISOString();
+  return next;
+}
+
+/** Persists workspace setup answers so setup stories advance step by step. */
+function factoryOnboardingRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/onboarding"),
+    resolve: (match, method, body) => {
+      if (method !== "PATCH") return null;
+      const factory = fixture.factories.find((entry) => entry.id === match[1]);
+      if (!factory) return { json: {} };
+      factory.onboarding = mergedOnboarding(factory.onboarding, (body ?? {}) as FactoriesUpdateFactoryOnboardingBody);
+      return { json: { factory: factoryWithLineMetrics(factory) } };
+    },
+  };
 }
 
 function factoryLinesRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
@@ -170,13 +236,47 @@ function createWorkOrderFromRequest(request: RequestBody, orderCount: number): F
     updatedAt: nowIso,
     createdBy: { user: { id: ORGANIZATION_USERS[0].id, name: ORGANIZATION_USERS[0].name } },
     assignees: findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids)),
-    executions: [],
+    lineDispatches: [],
   };
 }
 
 function findOrder(fixture: FactoriesFixture, factoryId: string, orderId: string) {
   const orders = fixture.workOrdersByFactoryId[factoryId] ?? [];
   return orders.find((entry) => entry.id === orderId);
+}
+
+function buildDispatchedLineDispatch(
+  line: FactoriesFactoryLine | undefined,
+  lineName: string,
+  now: string,
+  apps: Array<{ id?: string; name?: string }> = [],
+): FactoriesWorkOrderLineDispatch {
+  const firstStep = line?.steps?.[0];
+  const firstAppId = firstStep?.app?.app;
+  const firstName = automationNameForLineStep(firstStep, apps, 0);
+  return {
+    id: `dispatch-${Date.now()}`,
+    line: line ? { id: line.id, name: line.name } : { id: "line-unknown", name: lineName },
+    steps: (line?.steps ?? []).map((step, index) => ({
+      name: automationNameForLineStep(step, apps, index),
+      stepIndex: index,
+    })),
+    state: "STATE_ACTIVE",
+    result: "RESULT_UNKNOWN",
+    createdAt: now,
+    stepExecutions: [
+      {
+        id: `exec-${Date.now()}`,
+        step: firstName,
+        stepIndex: 0,
+        state: "STATE_STARTED",
+        result: "RESULT_UNKNOWN",
+        createdAt: now,
+        updatedAt: now,
+        run: firstAppId ? { appId: firstAppId, appName: firstName } : undefined,
+      },
+    ],
+  };
 }
 
 function orderEvents(fixture: FactoriesFixture, orderId: string): FactoriesWorkOrderEvent[] {
@@ -189,19 +289,12 @@ function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: st
   const factory = fixture.factories.find((entry) => entry.id === factoryId);
   const lineName = stringOrEmpty(request.lineName ?? request.line_name);
   const line = factory?.lines?.find((entry) => entry.name === lineName) ?? factory?.lines?.[0];
-  order.updatedAt = new Date().toISOString();
-  order.executions = [
-    ...(order.executions ?? []),
-    {
-      id: `dispatch-${Date.now()}`,
-      line: line ? { id: line.id, name: line.name } : { id: "line-unknown", name: lineName },
-      step: line?.steps?.[0]?.name ?? "start",
-      state: "STATE_STARTED",
-      result: "RESULT_UNKNOWN",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ];
+  const now = new Date().toISOString();
+  order.updatedAt = now;
+
+  const apps = fixture.appsByFactoryId[factoryId] ?? [];
+  const newDispatch = buildDispatchedLineDispatch(line, lineName, now, apps);
+  order.lineDispatches = [...(order.lineDispatches ?? []), newDispatch];
   return { json: { order } };
 }
 
@@ -272,6 +365,14 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
       },
     },
     {
+      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/checks"),
+      resolve: (match, method) => {
+        if (method !== "GET") return { json: {} };
+        const checks = fixture.checksByOrderId?.[match[2]] ?? DEFAULT_CHECKS_BY_ORDER_ID[match[2]] ?? [];
+        return { json: { checks } };
+      },
+    },
+    {
       pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/comments"),
       resolve: (match, method, body) => {
         if (method !== "POST") return null;
@@ -298,13 +399,64 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   ];
 }
 
+function organizationLlmSpendRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/llm-spend"),
+    resolve: () => ({ json: fixture.organizationLlmSpend ?? EMPTY_USAGE_REPORT }),
+  };
+}
+
+const STORYBOOK_ME_MEMBER_PERMISSIONS = ["members"].flatMap((resource) =>
+  ["read", "create", "update", "delete"].map((action) => ({ resource, action })),
+);
+
+/** Serves `/api/v1/me` so factory stories resolve `useMe` without the Home harness. */
+function meRoute(organizationId: string): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/me"),
+    resolve: () => {
+      const user = buildStorybookMeUser(organizationId);
+      return {
+        json: {
+          user: {
+            ...user,
+            id: STORYBOOK_ME_USER_ID,
+            name: STORYBOOK_ME_USER_NAME,
+            email: STORYBOOK_ME_USER_EMAIL,
+            permissions: [...user.permissions, ...STORYBOOK_ME_MEMBER_PERMISSIONS],
+          },
+        },
+      };
+    },
+  };
+}
+
+function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
+  const defaults = defaultNotificationSettings();
+
+  return {
+    pattern: re("/api/v1/me/notification-settings"),
+    resolve: (_match, method, body) => {
+      if (method === "PUT") {
+        const request = (body ?? {}) as { settings?: FactoriesFixture["notificationSettings"] };
+        fixture.notificationSettings = { ...defaults, ...(request.settings ?? {}) };
+      }
+      return { json: { settings: fixture.notificationSettings ?? defaults } };
+    },
+  };
+}
+
 /** Builds a resolvable factories route table for a fixture snapshot. */
 function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     factoriesCollectionRoute(fixture),
+    meRoute(fixture.organizationId),
+    notificationSettingsRoute(fixture),
     ...factoryDetailRoutes(fixture),
+    factoryOnboardingRoute(fixture),
     ...factoryLinesRoutes(fixture),
     ...workOrderRoutes(fixture),
+    organizationLlmSpendRoute(fixture),
   ];
 }
 

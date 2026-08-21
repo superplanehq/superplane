@@ -80,7 +80,7 @@ export function WorkOrderCard({
           <span className="text-[11px] text-muted-foreground">{updatedLabel}</span>
           <div className="flex items-center gap-1">
             {entry.usageLabel ? (
-              <span className="text-[11px] text-muted-foreground" title={entry.usageTooltip ?? undefined}>
+              <span className="text-[11px] tabular-nums text-muted-foreground" title={entry.usageTooltip ?? undefined}>
                 {entry.usageLabel}
               </span>
             ) : null}

@@ -16,5 +16,16 @@ export { LegacyWorkOrderDetailRedirect, WorkOrderDetailPage } from "./WorkOrderD
 export { WorkOrdersPage } from "./WorkOrdersPage";
 export { FactorySettingsLayout } from "./settings/FactorySettingsLayout";
 export { FactorySettingsGeneralPage } from "./settings/FactorySettingsGeneralPage";
+export { FactorySettingsNotificationsPage } from "./settings/FactorySettingsNotificationsPage";
+export { FactorySettingsProfilePage } from "./settings/FactorySettingsProfilePage";
 export { FactorySettingsSoonPage } from "./settings/FactorySettingsSoonPage";
-export { FACTORY_SETTINGS_NAV_ITEMS } from "./settings/settingsNavItems";
+export { FactorySettingsUsagePage } from "./settings/FactorySettingsUsagePage";
+export { FACTORY_SETTINGS_NAV_ITEMS, isFactorySettingsComingSoon } from "./settings/settingsNavItems";
+export { OrganizationSettingsLayout } from "./organizationSettings/OrganizationSettingsLayout";
+export { OrganizationSettingsOverviewPage } from "./organizationSettings/OrganizationSettingsOverviewPage";
+export { OrganizationSettingsWorkspacesPage } from "./organizationSettings/OrganizationSettingsWorkspacesPage";
+export { organizationSettingsSectionRoutes } from "./organizationSettings/organizationSettingsRoutes";
+export {
+  ORGANIZATION_SETTINGS_NAV_ITEMS,
+  isOrganizationSettingsComingSoon,
+} from "./organizationSettings/organizationSettingsNavItems";

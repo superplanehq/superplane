@@ -345,6 +345,124 @@ func CreateNextNodeExecution(
 	return &execution
 }
 
+// CreateFactoryLineDispatch creates a bare FactoryWorkOrderLineDispatch row
+// directly (bypassing FactoryLine.Dispatch/StartStep), for tests that build
+// a raw FactoryWorkOrderExecution and just need a valid parent to satisfy
+// the line_dispatch_id NOT NULL FK.
+func CreateFactoryLineDispatch(
+	t require.TestingT,
+	orgID, factoryID, workOrderID, lineID uuid.UUID,
+	lineName string,
+	steps []models.FactoryLineStep,
+) *models.FactoryWorkOrderLineDispatch {
+	now := time.Now()
+	dispatch := models.FactoryWorkOrderLineDispatch{
+		ID:             uuid.New(),
+		OrganizationID: orgID,
+		FactoryID:      factoryID,
+		WorkOrderID:    workOrderID,
+		LineID:         lineID,
+		LineName:       lineName,
+		Steps:          datatypes.NewJSONSlice(steps),
+		State:          models.FactoryWorkOrderLineDispatchStateActive,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+
+	require.NoError(t, database.Conn().Create(&dispatch).Error)
+	return &dispatch
+}
+
+// CompleteFactoryOnboarding marks a factory as past the setup wizard so
+// workspace pages render instead of redirecting to /setup.
+func CompleteFactoryOnboarding(t require.TestingT, factory *models.Factory) {
+	vcsID := uuid.New().String()
+	agentID := uuid.New().String()
+	appRepository := "acme/app"
+	backlogRepository := "acme/backlog"
+	issuesSource := models.FactoryOnboardingIssuesSourceVCS
+	agentHarness := models.FactoryOnboardingAgentHarnessClaudeCode
+	appID := uuid.New().String()
+	lineID := uuid.New().String()
+	require.NoError(t, factory.CompleteOnboarding(database.Conn(), models.FactoryOnboardingPatch{
+		VCSIntegrationID:   &vcsID,
+		AgentIntegrationID: &agentID,
+		AppRepository:      &appRepository,
+		BacklogRepository:  &backlogRepository,
+		IssuesSource:       &issuesSource,
+		AgentHarness:       &agentHarness,
+		ProvisionedAppID:   &appID,
+		ProvisionedLineID:  &lineID,
+	}))
+}
+
+// CreateFactoryAppWithOnRunTrigger creates a factory-owned canvas with a
+// single onRun-triggered node, ready to be used as a factory line step's
+// entrypoint.
+func CreateFactoryAppWithOnRunTrigger(
+	t require.TestingT,
+	r *ResourceRegistry,
+	factoryID uuid.UUID,
+	name, entrypoint string,
+) (*models.Canvas, string) {
+	now := time.Now()
+	liveVersionID := uuid.New()
+	canvas := &models.Canvas{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		LiveVersionID:  &liveVersionID,
+		FactoryID:      &factoryID,
+		Name:           RandomName(name),
+		CreatedBy:      &r.User,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(canvas).Error; err != nil {
+			return err
+		}
+
+		node := models.CanvasNode{
+			WorkflowID: canvas.ID,
+			NodeID:     entrypoint,
+			Name:       name,
+			Type:       models.NodeTypeTrigger,
+			State:      models.CanvasNodeStateReady,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: "onRun"},
+			}),
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}
+		if err := tx.Create(&node).Error; err != nil {
+			return err
+		}
+
+		version := models.CanvasVersion{
+			ID:         liveVersionID,
+			WorkflowID: canvas.ID,
+			OwnerID:    &r.User,
+			Nodes: datatypes.NewJSONSlice([]models.Node{
+				{
+					ID:   entrypoint,
+					Name: name,
+					Type: models.NodeTypeTrigger,
+					Ref: models.NodeRef{
+						Trigger: &models.TriggerRef{Name: "onRun"},
+					},
+				},
+			}),
+			Edges:     datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}
+		return tx.Create(&version).Error
+	}))
+
+	return canvas, entrypoint
+}
+
 func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
 	now := time.Now()
 	liveVersionID := uuid.New()

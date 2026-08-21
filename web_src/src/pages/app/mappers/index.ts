@@ -212,6 +212,11 @@ import {
   eventStateRegistry as perplexityEventStateRegistry,
 } from "./perplexity/index";
 import {
+  componentMappers as openrouterComponentMappers,
+  triggerRenderers as openrouterTriggerRenderers,
+  eventStateRegistry as openrouterEventStateRegistry,
+} from "./openrouter/index";
+import {
   componentMappers as prometheusComponentMappers,
   customFieldRenderers as prometheusCustomFieldRenderers,
   triggerRenderers as prometheusTriggerRenderers,
@@ -269,6 +274,7 @@ import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
 import { loopMapper, LOOP_STATE_REGISTRY } from "./loop";
+import { addRunErrorMapper } from "./addRunError";
 import { runAppMapper, RUN_APP_STATE_REGISTRY } from "./runApp";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
@@ -315,6 +321,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   approval: approvalMapper,
   merge: mergeMapper,
   runApp: runAppMapper,
+  addRunError: addRunErrorMapper,
 };
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
@@ -352,6 +359,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   claude: claudeComponentMappers,
   logfire: logfireComponentMappers,
   perplexity: perplexityComponentMappers,
+  openrouter: openrouterComponentMappers,
   gcp: gcpComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
@@ -401,6 +409,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   claude: claudeTriggerRenderers,
   logfire: logfireTriggerRenderers,
   perplexity: perplexityTriggerRenderers,
+  openrouter: openrouterTriggerRenderers,
   gcp: gcpTriggerRenderers,
   grafana: grafanaTriggerRenderers,
   bitbucket: bitbucketTriggerRenderers,
@@ -445,6 +454,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   claude: claudeEventStateRegistry,
   logfire: logfireEventStateRegistry,
   perplexity: perplexityEventStateRegistry,
+  openrouter: openrouterEventStateRegistry,
   gcp: gcpEventStateRegistry,
   statuspage: statuspageEventStateRegistry,
   aws: awsEventStateRegistry,

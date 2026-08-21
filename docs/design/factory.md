@@ -50,6 +50,11 @@ Expressions on a dispatched run should prefer `order()` over
 `root().data.work_order`. `order()` resolves the live work order for the
 current run (`id`, `title`, `description`, `factory_id`, `state`, `result`,
 `source`) and returns `nil` when the run is not attached to a work order.
+`order().url` is the work order permalink
+(`{BASE_URL}/{orgId}/workspaces/{factoryKey}/work-order/{number}`), resolved
+lazily only when the expression references it, because the factory that owns
+the order has to be loaded for its key. Use it to link back from anything an
+automation creates, e.g. a pull request description.
 `order().artifacts` is a list field loaded lazily only when the expression
 references it (e.g. `none(order().artifacts, {#.type == "pr"})`).
 `order().comments` is likewise a list field loaded lazily only when the
@@ -129,6 +134,7 @@ REST gateway on `protos/factories.proto`:
 
 - Factories: list, create, describe (includes lines).
 - Lines: create, update.
+- Line metrics: list trailing 30-day success, completions, duration, and cost per line.
 - Apps: list factory-owned canvases.
 - Work orders: list (filters: state, result, assignees, unassigned), create, describe, update assignees, dispatch, close, **update status**, **add comment**, **list artifacts**, **create artifact**, list events.
 
@@ -143,6 +149,21 @@ New RPCs (all under `/api/v1/factories/{factoryId}/orders/{orderId}/…`):
 
 Factory structure (create/update/delete factory + lines) uses the `factories` resource.
 Work-order lifecycle (create/list/describe orders, status, assignees, dispatch, close, comments, artifacts, events) uses the separate `work_orders` resource (`read`, `create`, `update`). That lets limited tokens (runners/agents) mutate work orders without `factories:update`. All endpoints stay behind the `factories` experimental feature flag.
+
+## Line metrics
+
+`DescribeFactory` and `UpdateFactory` return trailing 30-day summary numbers on each `FactoryLine` (`metrics`). Auth is `factories:read` or `factories:update`. The window is 30 local calendar days, including today. The prior window is the 30 days before that (deltas). When a line has no closed work orders in the current window, `metrics` is unset. The UI shows 0% success rate and 0 completions per day. Duration and cost stay as dashes. Create-line and update-line responses do not include metrics.
+
+Rules:
+
+- Population: work orders currently `closed`, with at least one execution, whose latest `order.status.updated` event with `toState=closed` falls in the window. Close time is that event, not `updated_at`.
+- Line attribution: `line_id` of the latest execution (`created_at`, then `id`).
+- Success: a closed work order counts as merged when its `result` is `completed`. It also counts as merged when a PR artifact has `merged_at`, `data.state=merged`, or GitHub-native `data.merged=true`. Success rate is merged / closed.
+- Completions: `mergedCount / 30`. `throughputTrend` is daily merged counts by close day, oldest first.
+- Duration: median minutes of summed execution run time among merged work orders. Run time is `finished_at - created_at` for every finished execution on that work order. Omitted when the sum is 0.
+- Cost per success: `SUM(execution.cost_cents) / mergedCount / 100` across all executions of those closed work orders. Omitted when the sum is 0 (usage is not written yet).
+- `successTrendPct` is the cumulative success rate from the start of the window through each day.
+- Deltas compare current vs prior window. A delta is omitted when the prior window has no comparable data.
 
 ## Canvas components
 

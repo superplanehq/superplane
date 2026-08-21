@@ -8,14 +8,22 @@ type SentMagicCodeEmail struct {
 	MagicLink string
 }
 
+type SentWorkOrderNotificationEmail struct {
+	ToEmail string
+	Subject string
+	Data    WorkOrderNotificationTemplateData
+}
+
 type NoopEmailService struct {
-	mu              sync.Mutex
-	magicCodeEmails []SentMagicCodeEmail
+	mu                          sync.Mutex
+	magicCodeEmails             []SentMagicCodeEmail
+	workOrderNotificationEmails []SentWorkOrderNotificationEmail
 }
 
 func NewNoopEmailService() *NoopEmailService {
 	return &NoopEmailService{
-		magicCodeEmails: []SentMagicCodeEmail{},
+		magicCodeEmails:             []SentMagicCodeEmail{},
+		workOrderNotificationEmails: []SentWorkOrderNotificationEmail{},
 	}
 }
 
@@ -31,6 +39,21 @@ func (s *NoopEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) e
 	return nil
 }
 
+func (s *NoopEmailService) SendWorkOrderNotificationEmail(
+	toEmail, subject string,
+	data WorkOrderNotificationTemplateData,
+) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.workOrderNotificationEmails = append(s.workOrderNotificationEmails, SentWorkOrderNotificationEmail{
+		ToEmail: toEmail,
+		Subject: subject,
+		Data:    data,
+	})
+	return nil
+}
+
 func (s *NoopEmailService) SentMagicCodeEmails() []SentMagicCodeEmail {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -40,9 +63,19 @@ func (s *NoopEmailService) SentMagicCodeEmails() []SentMagicCodeEmail {
 	return emails
 }
 
+func (s *NoopEmailService) SentWorkOrderNotificationEmails() []SentWorkOrderNotificationEmail {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	emails := make([]SentWorkOrderNotificationEmail, len(s.workOrderNotificationEmails))
+	copy(emails, s.workOrderNotificationEmails)
+	return emails
+}
+
 func (s *NoopEmailService) Reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.magicCodeEmails = []SentMagicCodeEmail{}
+	s.workOrderNotificationEmails = []SentWorkOrderNotificationEmail{}
 }

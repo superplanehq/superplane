@@ -34,6 +34,9 @@ export function invalidateFactoryWorkOrderQueries(
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.workOrders(organizationId, factoryId),
   });
+  void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.detail(organizationId, factoryId),
+  });
 
   if (!orderId) {
     return;
@@ -51,6 +54,11 @@ export function invalidateFactoryWorkOrderQueries(
   // timeline's live-data overlay silently go stale until a manual reload.
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, orderId),
+  });
+  // Check reports (reportWorkOrderCheck) update the scorecards in place;
+  // refetch so a re-scored check shows its new value and trend delta.
+  void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.workOrderChecks(organizationId, factoryId, orderId),
   });
 }
 

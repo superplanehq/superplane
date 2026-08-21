@@ -13,10 +13,12 @@ import (
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -165,6 +167,10 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 	}
 
 	stateUpdated := false
+	alreadyInitialized := false
+	failedBeforeStart := false
+	var pendingFactoryRuns []factoryLinePendingRun
+	var factoryOrderUpdates []factoryWorkOrderUpdate
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		locked, err := models.LockCanvasRunInTransaction(tx, runID)
 		if err != nil {
@@ -182,6 +188,7 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 
 		if locked.State != models.CanvasRunStatePending {
 			logger.Infof("Run already initialized - skipping")
+			alreadyInitialized = true
 			return nil
 		}
 
@@ -196,9 +203,12 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		//
 		if err != nil {
 			logger.WithError(err).Errorf("Error dispatching pending run callback")
-			if err := w.failRun(tx, locked, eventCollector, executionCollector, err.Error()); err != nil {
-				return err
+			admitted, failErr := w.failRun(tx, locked, eventCollector, executionCollector, err.Error())
+			if failErr != nil {
+				return failErr
 			}
+			failedBeforeStart = true
+			pendingFactoryRuns, factoryOrderUpdates = factoryAdmissionOutcomes(admitted)
 			stateUpdated = true
 			return nil
 		}
@@ -225,6 +235,10 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		return err
 	}
 
+	if alreadyInitialized || failedBeforeStart {
+		rollUpFactoryUsageBestEffort(logger, database.Conn(), runID)
+	}
+
 	if stateUpdated {
 		if err := messages.NewCanvasRunMessage(workflowID.String(), runID.String()).Publish(); err != nil {
 			logger.WithError(err).Warnf("Failed to publish run state message for run %s", runID)
@@ -243,6 +257,26 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		}
 	}
 
+	// A failed factory step run frees its slot: kick off the runs of the
+	// queued dispatches admitted in its place and refresh their work
+	// orders. The pending-run sweep is the safety net when a publish here
+	// is lost.
+	for _, pendingRun := range pendingFactoryRuns {
+		if err := messages.NewCanvasRunMessage(pendingRun.workflowID.String(), pendingRun.runID.String()).PublishPending(); err != nil {
+			logger.WithError(err).Warnf("Failed to publish pending run message for run %s", pendingRun.runID)
+		}
+	}
+
+	for _, update := range factoryOrderUpdates {
+		if err := messages.PublishFactoryWorkOrderUpdated(
+			update.factoryID.String(),
+			update.orderID.String(),
+			factoryevents.EventTypeLineStepExecutionCreated,
+		); err != nil {
+			logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", update.orderID)
+		}
+	}
+
 	return nil
 }
 
@@ -252,35 +286,43 @@ func (w *RunInitializer) failRun(
 	eventCollector func([]models.CanvasEvent),
 	executionCollector func([]models.CanvasNodeExecution),
 	resultMessage string,
-) error {
+) ([]*models.FactoryLineStepResult, error) {
+	if err := run.AddError(tx, resultMessage, config.MaxPayloadSize()); err != nil {
+		return nil, fmt.Errorf("record run error: %w", err)
+	}
+
 	now := time.Now()
 	run.State = models.CanvasRunStateFinished
 	run.Result = models.CanvasRunResultFailed
-	run.ResultMessage = resultMessage
 	run.UpdatedAt = &now
 	run.FinishedAt = &now
 	err := tx.Model(run).
 		Updates(map[string]any{
-			"state":          models.CanvasRunStateFinished,
-			"result":         models.CanvasRunResultFailed,
-			"result_message": &resultMessage,
-			"updated_at":     &now,
-			"finished_at":    &now,
+			"state":       models.CanvasRunStateFinished,
+			"result":      models.CanvasRunResultFailed,
+			"updated_at":  &now,
+			"finished_at": &now,
 		}).
 		Error
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if err := w.finishFactoryWorkOrderExecutionForRun(tx, run.ID, models.CanvasRunResultFailed); err != nil {
-		return err
+	admitted, err := w.finishFactoryWorkOrderExecutionForRun(tx, run.ID, models.CanvasRunResultFailed)
+	if err != nil {
+		return nil, err
 	}
 
-	return NewRunCallbackDispatcher(tx, w.registry, run).
+	err = NewRunCallbackDispatcher(tx, w.registry, run).
 		WithEventCollector(eventCollector).
 		WithExecutionCollector(executionCollector).
 		DispatchFinished()
+	if err != nil {
+		return nil, err
+	}
+
+	return admitted, nil
 }
 
 func (w *RunInitializer) markFactoryWorkOrderExecutionRunning(tx *gorm.DB, runID uuid.UUID) error {
@@ -295,14 +337,47 @@ func (w *RunInitializer) markFactoryWorkOrderExecutionRunning(tx *gorm.DB, runID
 	return execution.MarkRunning(tx)
 }
 
-func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runID uuid.UUID, result string) error {
+// finishFactoryWorkOrderExecutionForRun marks the step execution finished
+// and — since it's only ever called with a terminal (non-passed) result,
+// from failRun — also finishes the parent line dispatch, matching the
+// finishing run_finalizer.executeNextFactoryLineStep does for the normal
+// advancement path. Without this, a run that fails before it ever starts
+// would leave its traversal stuck `active` forever.
+//
+// The failed run never reaches the run finalizer (it is already finished),
+// so its freed step slot must be refilled here: queued dispatches at the
+// step are admitted and returned for the post-commit fan-out.
+func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runID uuid.UUID, result string) ([]*models.FactoryLineStepResult, error) {
 	execution, err := models.FindWorkOrderExecutionByRunID(tx, runID)
 	if err != nil {
 		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
-			return nil
+			return nil, nil
 		}
-		return err
+		return nil, err
 	}
 
-	return execution.MarkFinished(tx, result)
+	if err := execution.RollupUsage(tx); err != nil {
+		w.logger.WithError(err).WithField("run_id", runID).Error("failed to roll up factory usage")
+	}
+
+	// A later initializer pass can find this step already finished after a
+	// rollup error. Still copy ledger totals, but do not finish the line twice.
+	if execution.Status == models.FactoryWorkOrderExecutionStatusFinished {
+		return nil, nil
+	}
+
+	if err := execution.MarkFinished(tx, result); err != nil {
+		return nil, err
+	}
+
+	dispatch, err := models.FindWorkOrderLineDispatch(tx, execution.LineDispatchID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := dispatch.Finish(tx, result); err != nil {
+		return nil, err
+	}
+
+	return models.AdmitQueuedForStep(tx, execution.LineID, execution.StepIndex)
 }

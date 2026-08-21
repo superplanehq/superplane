@@ -17,9 +17,21 @@ function order(overrides: Partial<FactoriesWorkOrder>): FactoriesWorkOrder {
     title: "test order",
     state: "STATE_OPEN",
     result: "RESULT_UNSPECIFIED",
-    executions: [],
+    lineDispatches: [],
     ...overrides,
   };
+}
+
+/** One line dispatch with a single step execution — enough to drive
+ * `hasActiveLineDispatch`/`getWorkOrderDisplayStatus` in these tests. */
+function activeDispatch(): FactoriesWorkOrder["lineDispatches"] {
+  return [
+    {
+      id: "d1",
+      state: "STATE_ACTIVE",
+      stepExecutions: [{ id: "e1", step: "s", state: "STATE_STARTED", result: "RESULT_UNKNOWN" }],
+    },
+  ];
 }
 
 function idsFilteredBy(orders: FactoriesWorkOrder[], statusFilter: WorkOrderStatusFilter) {
@@ -36,7 +48,7 @@ describe("getWorkOrderDisplayStatus", () => {
       getWorkOrderDisplayStatus(
         order({
           state: "STATE_OPEN",
-          executions: [{ id: "e1", step: "s", state: "STATE_STARTED", result: "RESULT_UNKNOWN" }],
+          lineDispatches: activeDispatch(),
         }),
       ),
     ).toBe("running");
@@ -50,7 +62,14 @@ describe("getWorkOrderDisplayStatus", () => {
       getWorkOrderDisplayStatus(
         order({
           state: "STATE_OPEN",
-          executions: [{ id: "e1", step: "s", state: "STATE_FINISHED", result: "RESULT_FAILED" }],
+          lineDispatches: [
+            {
+              id: "d1",
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              stepExecutions: [{ id: "e1", step: "s", state: "STATE_FINISHED", result: "RESULT_FAILED" }],
+            },
+          ],
         }),
       ),
     ).toBe("waiting");
@@ -71,7 +90,7 @@ describe("filterWorkOrdersByStatus", () => {
   const running = order({
     state: "STATE_OPEN",
     id: "wo-running",
-    executions: [{ id: "e1", step: "s", state: "STATE_STARTED", result: "RESULT_UNKNOWN" }],
+    lineDispatches: activeDispatch(),
   });
   const closedCompleted = order({ state: "STATE_CLOSED", result: "RESULT_COMPLETED", id: "wo-completed" });
   const closedCancelled = order({ state: "STATE_CLOSED", result: "RESULT_REJECTED", id: "wo-cancelled" });
@@ -110,7 +129,7 @@ describe("groupWorkOrdersByLane", () => {
       order({
         id: "r",
         state: "STATE_OPEN",
-        executions: [{ id: "e1", step: "s", state: "STATE_STARTED", result: "RESULT_UNKNOWN" }],
+        lineDispatches: activeDispatch(),
       }),
       order({ id: "c", state: "STATE_CLOSED", result: "RESULT_COMPLETED" }),
       order({ id: "f", state: "STATE_CLOSED", result: "RESULT_FAILED" }),

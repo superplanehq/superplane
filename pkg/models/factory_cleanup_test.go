@@ -144,6 +144,8 @@ func Test__FactoryResourceCleaner__HardDeletesFactoryDomain(t *testing.T) {
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
 	run := createRunForRootEvent(t, rootEvent)
 
+	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factory.ID, order.ID, line.ID, line.Name, nil)
+
 	now := time.Now()
 	execution := models.FactoryWorkOrderExecution{
 		ID:             uuid.New(),
@@ -151,14 +153,25 @@ func Test__FactoryResourceCleaner__HardDeletesFactoryDomain(t *testing.T) {
 		FactoryID:      factory.ID,
 		WorkOrderID:    order.ID,
 		LineID:         line.ID,
+		LineDispatchID: dispatch.ID,
 		StepIndex:      0,
 		StepName:       "step",
-		RunID:          run.ID,
+		RunID:          &run.ID,
 		Status:         models.FactoryWorkOrderExecutionStatusFinished,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
 	require.NoError(t, db.Create(&execution).Error)
+
+	// Checks reference the order and factory with RESTRICT FKs, so the
+	// cleaner must remove them before the order and factory rows.
+	_, err = order.ReportCheck(db, models.FactoryWorkOrderCheckParams{
+		Key:      "risk-review",
+		Name:     "Risk review",
+		Score:    42,
+		MaxScore: 100,
+	})
+	require.NoError(t, err)
 
 	require.NoError(t, factory.SoftDelete(db))
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
@@ -181,6 +194,10 @@ func Test__FactoryResourceCleaner__HardDeletesFactoryDomain(t *testing.T) {
 	var orderCount int64
 	require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("factory_id = ?", factory.ID).Count(&orderCount).Error)
 	assert.Equal(t, int64(0), orderCount)
+
+	var checkCount int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrderCheck{}).Where("factory_id = ?", factory.ID).Count(&checkCount).Error)
+	assert.Equal(t, int64(0), checkCount)
 }
 
 func Test__FactoryResourceCleaner__RespectsLimit(t *testing.T) {
@@ -293,7 +310,7 @@ func Test__FactoryResourceCleaner__LargeFactoryStaysWithinBudget(t *testing.T) {
 	assert.Equal(t, int64(0), factoryCount)
 }
 
-func Test__CanvasRun__DeleteChain__RemovesFactoryWorkOrderExecution(t *testing.T) {
+func Test__CanvasRun__DeleteChain__NullsFactoryWorkOrderExecutionRunID(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
@@ -317,6 +334,8 @@ func Test__CanvasRun__DeleteChain__RemovesFactoryWorkOrderExecution(t *testing.T
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
 	run := createRunForRootEvent(t, rootEvent)
 
+	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factory.ID, order.ID, line.ID, line.Name, nil)
+
 	now := time.Now()
 	execution := models.FactoryWorkOrderExecution{
 		ID:             uuid.New(),
@@ -324,10 +343,12 @@ func Test__CanvasRun__DeleteChain__RemovesFactoryWorkOrderExecution(t *testing.T
 		FactoryID:      factory.ID,
 		WorkOrderID:    order.ID,
 		LineID:         line.ID,
+		LineDispatchID: dispatch.ID,
 		StepIndex:      0,
 		StepName:       "step",
-		RunID:          run.ID,
+		RunID:          &run.ID,
 		Status:         models.FactoryWorkOrderExecutionStatusFinished,
+		Result:         models.CanvasRunResultPassed,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
@@ -338,12 +359,99 @@ func Test__CanvasRun__DeleteChain__RemovesFactoryWorkOrderExecution(t *testing.T
 		return err
 	}))
 
+	var persisted models.FactoryWorkOrderExecution
+	require.NoError(t, db.Where("id = ?", execution.ID).First(&persisted).Error)
+	assert.Nil(t, persisted.RunID)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, persisted.Status)
+	assert.Equal(t, models.CanvasRunResultPassed, persisted.Result)
+
+	reloaded, err := models.FindWorkOrderLineDispatch(db, dispatch.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateActive, reloaded.State)
+
 	_, err = models.FindWorkOrderExecutionByRunID(db, run.ID)
 	assert.ErrorIs(t, err, models.ErrFactoryWorkOrderExecutionNotFound)
 
 	var runCount int64
 	require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", run.ID).Count(&runCount).Error)
 	assert.Equal(t, int64(0), runCount)
+}
+
+func Test__CanvasRun__DeleteChain__CancelsInFlightFactoryWorkOrderExecution(t *testing.T) {
+	for _, status := range []string{
+		models.FactoryWorkOrderExecutionStatusPending,
+		models.FactoryWorkOrderExecutionStatusRunning,
+	} {
+		t.Run(status, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
+			require.NoError(t, err)
+			line, err := factory.CreateLine(db, "line", nil)
+			require.NoError(t, err)
+
+			canvas, _ := support.CreateCanvas(
+				t,
+				r.Organization.ID,
+				r.User,
+				[]models.CanvasNode{
+					{NodeID: "trigger", Type: models.NodeTypeTrigger},
+					{NodeID: "node-1", Type: models.NodeTypeComponent},
+				},
+				nil,
+			)
+			rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+			run := createRunForRootEvent(t, rootEvent)
+			dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factory.ID, order.ID, line.ID, line.Name, nil)
+
+			now := time.Now()
+			execution := models.FactoryWorkOrderExecution{
+				ID:             uuid.New(),
+				OrganizationID: r.Organization.ID,
+				FactoryID:      factory.ID,
+				WorkOrderID:    order.ID,
+				LineID:         line.ID,
+				LineDispatchID: dispatch.ID,
+				StepIndex:      0,
+				StepName:       "step",
+				RunID:          &run.ID,
+				Status:         status,
+				CreatedAt:      now,
+				UpdatedAt:      now,
+			}
+			require.NoError(t, db.Create(&execution).Error)
+
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+				_, err := run.DeleteChain(tx)
+				return err
+			}))
+
+			var persisted models.FactoryWorkOrderExecution
+			require.NoError(t, db.Where("id = ?", execution.ID).First(&persisted).Error)
+			assert.Nil(t, persisted.RunID)
+			assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, persisted.Status)
+			assert.Equal(t, models.CanvasRunResultCancelled, persisted.Result)
+			require.NotNil(t, persisted.FinishedAt)
+
+			var active int64
+			require.NoError(t, db.Model(&models.FactoryWorkOrderExecution{}).
+				Where("line_id = ?", line.ID).
+				Where("status IN ?", []string{
+					models.FactoryWorkOrderExecutionStatusPending,
+					models.FactoryWorkOrderExecutionStatusRunning,
+				}).
+				Count(&active).Error)
+			assert.Equal(t, int64(0), active)
+
+			reloaded, err := models.FindWorkOrderLineDispatch(db, dispatch.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.FactoryWorkOrderLineDispatchStateFinished, reloaded.State)
+			assert.Equal(t, models.CanvasRunResultCancelled, reloaded.Result)
+		})
+	}
 }
 
 func Test__CanvasRun__DeleteChain__ClearsWorkOrderSourceRunID(t *testing.T) {
@@ -416,6 +524,8 @@ func Test__FactoryWorkOrder__UpdateStatus__OpenToDraft__RejectsWhenExecutionActi
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
 	run := createRunForRootEvent(t, rootEvent)
 
+	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factory.ID, order.ID, line.ID, line.Name, nil)
+
 	now := time.Now()
 	execution := models.FactoryWorkOrderExecution{
 		ID:             uuid.New(),
@@ -423,9 +533,10 @@ func Test__FactoryWorkOrder__UpdateStatus__OpenToDraft__RejectsWhenExecutionActi
 		FactoryID:      factory.ID,
 		WorkOrderID:    order.ID,
 		LineID:         line.ID,
+		LineDispatchID: dispatch.ID,
 		StepIndex:      0,
 		StepName:       "step",
-		RunID:          run.ID,
+		RunID:          &run.ID,
 		Status:         models.FactoryWorkOrderExecutionStatusPending,
 		CreatedAt:      now,
 		UpdatedAt:      now,
@@ -437,7 +548,7 @@ func Test__FactoryWorkOrder__UpdateStatus__OpenToDraft__RejectsWhenExecutionActi
 		Actor:   &r.User,
 	})
 	require.Error(t, err)
-	assert.ErrorIs(t, err, models.ErrFactoryWorkOrderExecutionActive)
+	assert.ErrorIs(t, err, models.ErrFactoryWorkOrderLineDispatchActive)
 
 	reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
 	require.NoError(t, err)
@@ -445,6 +556,7 @@ func Test__FactoryWorkOrder__UpdateStatus__OpenToDraft__RejectsWhenExecutionActi
 		"failed back-to-draft must not mutate the row")
 
 	require.NoError(t, execution.MarkFinished(db, models.FactoryWorkOrderResultCompleted))
+	require.NoError(t, dispatch.Finish(db, models.FactoryWorkOrderResultCompleted))
 
 	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
 		ToState: models.FactoryWorkOrderStateDraft,

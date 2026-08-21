@@ -15,11 +15,12 @@ export type FactoryEdgePalette = {
   failed: { stroke: string; strokeWidth: number };
 };
 
-export function factoryCanvasBackground(isDark: boolean): FactoryCanvasBackground {
+export function factoryCanvasBackground(isDark: boolean, isEditing = false): FactoryCanvasBackground {
+  const size = isEditing ? 3 : 1;
   if (isDark) {
-    return { gap: 22, size: 1, color: "#33312b", bgColor: "#14120b" };
+    return { gap: 22, size, color: "#33312b", bgColor: "#14120b" };
   }
-  return { gap: 22, size: 1, color: "#e5e7eb", bgColor: "#f9fafb" };
+  return { gap: 22, size, color: "#e5e7eb", bgColor: "#f9fafb" };
 }
 
 export function factoryEdgePalette(isDark: boolean): FactoryEdgePalette {
@@ -90,5 +91,10 @@ export const FACTORY_HANDLE_STYLE = {
 /** Keep FactoryNodeCard, append ghost, placement gap, and ELK estimates aligned. */
 export const FACTORY_NODE_CARD_WIDTH = 280;
 export const FACTORY_NODE_CARD_HEIGHT = 104;
-/** Vertical gap below a factory card when appending / layering. */
+/** Vertical gap below a factory card in persisted ELK layout, live, and run. */
 export const FACTORY_NODE_VERTICAL_GAP = 64;
+/**
+ * Edit/configure only. Compact 64px leaves node duplicate/delete on top of
+ * the edge-delete control. Live and run keep FACTORY_NODE_VERTICAL_GAP.
+ */
+export const FACTORY_NODE_EDIT_VERTICAL_GAP = 200;

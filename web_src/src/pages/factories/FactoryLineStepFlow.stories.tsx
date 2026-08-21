@@ -22,7 +22,7 @@ export const StepNode: Story = {
   name: "LineStepDisplayNode",
   render: () => (
     <div className="w-64">
-      <LineStepDisplayNode stepName="implement" appName="Refund Implementer" entrypoint="start-implementation" />
+      <LineStepDisplayNode appName="Refund Implementer" entrypoint="start-implementation" />
     </div>
   ),
 };
@@ -58,11 +58,11 @@ export const CompactFlow: Story = {
   name: "LineStepFlow (compact)",
   render: () => (
     <LineStepFlow className="w-64">
-      <LineStepDisplayNode stepName="plan" appName="Refund Planner" entrypoint="start-plan" />
+      <LineStepDisplayNode appName="Refund Planner" entrypoint="start-plan" />
       <LineStepArrow />
-      <LineStepDisplayNode stepName="implement" appName="Refund Implementer" entrypoint="start-implementation" />
+      <LineStepDisplayNode appName="Refund Implementer" entrypoint="start-implementation" />
       <LineStepArrow />
-      <LineStepDisplayNode stepName="verify" appName="Refund Verifier" entrypoint="start-verification" />
+      <LineStepDisplayNode appName="Refund Verifier" entrypoint="start-verification" />
       <LineStepAddButton onClick={() => console.log("add step")} />
     </LineStepFlow>
   ),

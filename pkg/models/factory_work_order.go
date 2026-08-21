@@ -69,8 +69,11 @@ type FactoryWorkOrder struct {
 	Result         string
 	CreatedByID    *uuid.UUID
 	SourceRunID    *uuid.UUID
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	// StatusNote is the jsonb array of current-wait announcements (see
+	// FactoryWorkOrderStatusNote). Cleared on every state transition.
+	StatusNote datatypes.JSON
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 
 	CreatedBy *User                      `gorm:"foreignKey:CreatedByID"`
 	Assignees []FactoryWorkOrderAssignee `gorm:"foreignKey:WorkOrderID"`
@@ -78,6 +81,13 @@ type FactoryWorkOrder struct {
 
 func (FactoryWorkOrder) TableName() string {
 	return "factory_work_orders"
+}
+
+// URLPath is the canonical UI permalink of the work order, relative to the
+// server base URL. The factory key is part of the path, so callers that only
+// hold the order must load the factory that owns it.
+func (o *FactoryWorkOrder) URLPath(factoryKey string) string {
+	return fmt.Sprintf("/%s/workspaces/%s/work-order/%d", o.OrganizationID, factoryKey, o.Number)
 }
 
 func (o *FactoryWorkOrder) IsOpen() bool {
@@ -258,10 +268,10 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 	now := time.Now()
 
 	err := db.Transaction(func(tx *gorm.DB) error {
-		// Reverting `open → draft` while a step is still pending/running would
+		// Reverting `open → draft` while a line dispatch is still active would
 		// desync the FSM from the executor. Mirror the dispatch guard here.
 		if fromState == FactoryWorkOrderStateOpen && toState == FactoryWorkOrderStateDraft {
-			if err := o.ensureNoActiveExecution(tx); err != nil {
+			if err := o.ensureNoActiveLineDispatch(tx); err != nil {
 				return err
 			}
 		}
@@ -269,17 +279,29 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		o.State = toState
 		o.Result = nextResult
 		o.UpdatedAt = now
+		// A transition invalidates the current-wait announcement: the
+		// note must always describe the state the order is in now.
+		o.StatusNote = nil
 
 		err := tx.
 			Model(o).
 			Updates(map[string]any{
-				"state":      o.State,
-				"result":     o.Result,
-				"updated_at": o.UpdatedAt,
+				"state":       o.State,
+				"result":      o.Result,
+				"status_note": nil,
+				"updated_at":  o.UpdatedAt,
 			}).
 			Error
 		if err != nil {
 			return err
+		}
+
+		// A closing order abandons any traversal still waiting in a step's
+		// queue; a queued dispatch has no run to finish it later.
+		if toState == FactoryWorkOrderStateClosed {
+			if err := o.dropQueuedLineWork(tx); err != nil {
+				return err
+			}
 		}
 
 		run, app := update.Run, update.App
@@ -369,37 +391,6 @@ func (o *FactoryWorkOrder) TransitionOnDispatch(tx *gorm.DB, actor *uuid.UUID) e
 	return err
 }
 
-// ensureNoActiveExecution returns ErrFactoryWorkOrderExecutionActive if a
-// pending/running execution exists, nil otherwise.
-func (o *FactoryWorkOrder) ensureNoActiveExecution(tx *gorm.DB) error {
-	_, err := o.FindActiveExecution(tx)
-	if err == nil {
-		return ErrFactoryWorkOrderExecutionActive
-	}
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil
-	}
-	return err
-}
-
-func (o *FactoryWorkOrder) FindActiveExecution(tx *gorm.DB) (*FactoryWorkOrderExecution, error) {
-	var execution FactoryWorkOrderExecution
-	err := tx.
-		Where("work_order_id = ?", o.ID).
-		Where("status IN ?", []string{
-			FactoryWorkOrderExecutionStatusPending,
-			FactoryWorkOrderExecutionStatusRunning,
-		}).
-		First(&execution).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &execution, nil
-}
-
 func (o *FactoryWorkOrder) ReplaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID) error {
 	if err := tx.Where("work_order_id = ?", o.ID).Delete(&FactoryWorkOrderAssignee{}).Error; err != nil {
 		return err
@@ -437,25 +428,6 @@ func (o *FactoryWorkOrder) ListEvents(tx *gorm.DB, limit int, before *time.Time)
 	err := query.
 		Order("created_at DESC").
 		Order("id DESC").
-		Find(&events).
-		Error
-	if err != nil {
-		return nil, err
-	}
-
-	return events, nil
-}
-
-// ListComments returns the work order's comment thread (`order.comment.added`
-// events), oldest first — unlike ListEvents (which is DESC for activity
-// feeds), a comment thread reads chronologically oldest→newest.
-func (o *FactoryWorkOrder) ListComments(tx *gorm.DB) ([]FactoryWorkOrderEvent, error) {
-	var events []FactoryWorkOrderEvent
-	err := tx.
-		Where("work_order_id = ?", o.ID).
-		Where("type = ?", factory.EventTypeOrderCommentAdded).
-		Order("created_at ASC").
-		Order("id ASC").
 		Find(&events).
 		Error
 	if err != nil {
@@ -517,22 +489,6 @@ func (o *FactoryWorkOrder) RecordStatusUpdated(tx *gorm.DB, r statusUpdatedRecor
 	}
 
 	return o.recordEvent(tx, factory.EventTypeOrderStatusUpdated, data)
-}
-
-func (o *FactoryWorkOrder) RecordCommentAdded(
-	tx *gorm.DB,
-	body string,
-	author factory.WorkOrderCommentAuthor,
-	run *factory.RunRef,
-) error {
-	data := factory.WorkOrderCommentAdded{
-		Order:  o.Ref(),
-		Body:   body,
-		Author: &author,
-		Run:    run,
-	}
-
-	return o.recordEvent(tx, factory.EventTypeOrderCommentAdded, data)
 }
 
 func (o *FactoryWorkOrder) RecordArtifactAdded(

@@ -1,81 +1,43 @@
-import type {
-  FactoriesFactory,
-  FactoriesFactoryLine,
-  FactoriesUpdateFactoryOnboardingBody,
-  FactoryLineStep,
-} from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryLine, FactoryLineStep } from "@/api-client";
+import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
-import { useIntegrationResources } from "@/hooks/useIntegrations";
-import { useOrganizationInviteLink } from "@/hooks/useOrganizationData";
+import { useCreateFactoryLine, useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
+import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
-import { showErrorToast } from "@/lib/toast";
+import { githubInstallationUrl } from "@/lib/githubInstallation";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
-import { ONBOARDING_LINE_APPS } from "@/pages/home/factories";
-import { useInstallFactory, type InstallFactoryInput } from "@/pages/home/useInstallFactory";
+import { useInstallFactory } from "@/pages/home/useInstallFactory";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 
-import { factoryOverviewPath } from "../../lib/factoryPagePaths";
+import { factoryListPath, factoryOverviewPath, factorySetupPath } from "../../lib/factoryPagePaths";
+import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
-import type { SectionId } from "./OnboardingWireframe";
-import type { IntegrationId, IssuesChoiceId } from "./onboardingFixtures";
+import type { IntegrationId, WizardStepId } from "./onboardingFixtures";
+import {
+  apiIssuesSource,
+  initialOnboardingSelections,
+  initialWizardStep,
+  isWizardStepId,
+  localIssuesSource,
+} from "./onboardingStatus";
+import {
+  provisionEventApps,
+  provisionLine,
+  type InstallOnboardingApp,
+  type UpdateOnboarding,
+} from "./onboardingProvision";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
+import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
+import { useFinishSetupAction } from "./useFinishSetupAction";
 
-const DEFAULT_LINE_NAME = "Software delivery";
 const ONBOARDING_INTEGRATIONS = ["github", "claude"];
 
-function initialSelections(onboarding: FactoriesFactory["onboarding"]): IntegrationSelections {
-  const selections: IntegrationSelections = {};
-  if (onboarding?.vcsIntegrationId) {
-    selections.github = {
-      id: onboarding.vcsIntegrationId,
-      name: onboarding.vcsIntegrationId,
-      ready: false,
-    };
-  }
-  if (onboarding?.agentIntegrationId) {
-    selections.claude = {
-      id: onboarding.agentIntegrationId,
-      name: onboarding.agentIntegrationId,
-      ready: false,
-    };
-  }
-  return selections;
-}
-
-// The workspace already has a name when this page opens, so setup resumes at
-// the first section that still needs an answer.
-function initialSection(onboarding: FactoriesFactory["onboarding"]): SectionId {
-  if (onboarding?.agentHarness || onboarding?.issuesSource) return "agent";
-  if (onboarding?.appRepository) return "issues";
-  return "repo";
-}
-
-function localIssuesSource(source?: string): IssuesChoiceId | null {
-  const sources: Record<string, IssuesChoiceId> = {
-    ISSUES_SOURCE_VCS: "vcs",
-    ISSUES_SOURCE_LINEAR: "linear",
-    ISSUES_SOURCE_JIRA: "jira",
-    ISSUES_SOURCE_SKIP: "skip",
-  };
-  return source ? (sources[source] ?? null) : null;
-}
-
-function apiIssuesSource(source: IssuesChoiceId | null): FactoriesUpdateFactoryOnboardingBody["issuesSource"] {
-  const sources: Partial<Record<IssuesChoiceId, FactoriesUpdateFactoryOnboardingBody["issuesSource"]>> = {
-    vcs: "ISSUES_SOURCE_VCS",
-    linear: "ISSUES_SOURCE_LINEAR",
-    jira: "ISSUES_SOURCE_JIRA",
-    skip: "ISSUES_SOURCE_SKIP",
-  };
-  return source ? sources[source] : "ISSUES_SOURCE_UNSPECIFIED";
-}
-
 function useIntegrationSelections(onboarding: FactoriesFactory["onboarding"]) {
-  const [selections, setSelections] = useState<IntegrationSelections>(() => initialSelections(onboarding));
+  const [selections, setSelections] = useState<IntegrationSelections>(() => initialOnboardingSelections(onboarding));
   const connected = useMemo(() => {
     const ready = new Set<IntegrationId>();
     if (selections.github?.ready) ready.add("github");
@@ -126,107 +88,27 @@ async function runSave(setSaving: (saving: boolean) => void, action: () => Promi
   }
 }
 
-type UpdateOnboarding = (input: FactoriesUpdateFactoryOnboardingBody) => Promise<unknown>;
-
-const PRIMARY_LINE_APP_ENTRYPOINT = ONBOARDING_LINE_APPS[0].entrypointNodeId;
-
-// A finished line has one step per bundled app, each calling the app onRun
-// entrypoint. Match on the first entrypoint to recover a line provisioned by an
-// earlier, interrupted attempt.
-function findProvisionedLine(factory: FactoriesFactory | null): FactoriesFactoryLine | undefined {
-  return factory?.lines?.find((line) =>
-    line.steps?.some((step) => step.app?.entrypoint === PRIMARY_LINE_APP_ENTRYPOINT),
-  );
-}
-
-// Install each bundled app in order and return the line steps that call them.
-// installFactory clears its pending-canvas ref after each success, so the
-// sequential calls create distinct canvases.
-async function provisionLineApps(args: {
-  factoryId: string;
-  selections: IntegrationSelections;
-  appRepository: string;
-  backlogRepository: string;
-  installFactory: (input: InstallFactoryInput) => Promise<{ canvasId: string; canvasName: string } | undefined>;
-}): Promise<FactoryLineStep[]> {
-  const steps: FactoryLineStep[] = [];
-  for (const app of ONBOARDING_LINE_APPS) {
-    const installed = await args.installFactory({
-      factoryId: app.factoryId,
-      workspaceFactoryId: args.factoryId,
-      integrations: args.selections,
-      installParams: {
-        appRepository: args.appRepository,
-        backlogRepository: args.backlogRepository,
-      },
-      startingTaskPrompt: "",
-      navigateOnComplete: false,
-      startInitialRun: false,
-    });
-    if (!installed?.canvasId) throw new Error(`Failed to create the ${app.factoryId} app`);
-    steps.push({
-      name: app.lineStepName,
-      type: "runApp",
-      app: { app: installed.canvasId, entrypoint: app.entrypointNodeId },
-    });
-  }
-  return steps;
-}
-
-interface ProvisionedLine {
-  lineId: string;
-  primaryAppId: string;
-}
-
-async function provisionLine(args: {
-  factory: FactoriesFactory | null;
-  savedLineId?: string;
-  savedAppId?: string;
-  selections: IntegrationSelections;
-  appRepository: string;
-  backlogRepository: string;
-  installFactory: (input: InstallFactoryInput) => Promise<{ canvasId: string; canvasName: string } | undefined>;
-  createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
-  updateOnboarding: UpdateOnboarding;
-}): Promise<ProvisionedLine> {
-  const existing = findProvisionedLine(args.factory);
-  const lineId = args.savedLineId ?? existing?.id;
-  if (lineId) {
-    const primaryAppId = args.savedAppId ?? existing?.steps?.[0]?.app?.app;
-    if (primaryAppId) return { lineId, primaryAppId };
-  }
-
-  const steps = await provisionLineApps({
-    factoryId: args.factory?.id ?? "",
-    selections: args.selections,
-    appRepository: args.appRepository,
-    backlogRepository: args.backlogRepository,
-    installFactory: args.installFactory,
-  });
-  const primaryAppId = steps[0]?.app?.app;
-  if (!primaryAppId) throw new Error("Software delivery apps were not created");
-
-  const line = await args.createLine({ name: DEFAULT_LINE_NAME, steps });
-  if (!line.id) throw new Error("Software delivery line was not created");
-  await args.updateOnboarding({ provisionedAppId: primaryAppId, provisionedLineId: line.id });
-  return { lineId: line.id, primaryAppId };
-}
-
 function useSectionSaves(args: {
   setup: OnboardingSetupApi;
   selections: IntegrationSelections;
   setSaving: (saving: boolean) => void;
+  factoryName: string;
   updateFactory: (input: { name: string }) => Promise<unknown>;
   updateOnboarding: UpdateOnboarding;
 }) {
-  const saveName = () => runSave(args.setSaving, () => args.updateFactory({ name: args.setup.workspaceName.trim() }));
-  const saveRepository = () => {
+  const saveName = () => {
+    const workspaceName = args.setup.workspaceName.trim();
+    if (!workspaceName) return Promise.resolve(false);
+    if (workspaceName === args.factoryName) return Promise.resolve(true);
+    return runSave(args.setSaving, () => args.updateFactory({ name: workspaceName }));
+  };
+  const saveRepository = (repository: string) => {
     const integrationId = args.selections.github?.id;
-    if (!args.setup.selectedRepo || !integrationId) return Promise.resolve(false);
+    if (!repository || !integrationId) return Promise.resolve(false);
     return runSave(args.setSaving, () =>
       args.updateOnboarding({
         vcsIntegrationId: integrationId,
-        appRepository: args.setup.selectedRepo!,
+        appRepository: repository,
       }),
     );
   };
@@ -243,6 +125,60 @@ function useSectionSaves(args: {
   return { saveName, saveRepository, saveIssues };
 }
 
+// Persists onboarding answers, then provisions the line and event apps. Kept
+// out of the click handler so the handler stays focused on validation, saving
+// state, and navigation.
+async function provisionWorkspace(args: {
+  factoryId: string;
+  factory: FactoriesFactory | null;
+  setup: OnboardingSetupApi;
+  selections: IntegrationSelections;
+  updateFactory: (input: { name: string }) => Promise<unknown>;
+  updateOnboarding: UpdateOnboarding;
+  installFactory: InstallOnboardingApp;
+  createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
+  workspaceName: string;
+  appRepository: string;
+  backlogRepository: string;
+  github: { id: string };
+  claude: { id: string };
+}): Promise<void> {
+  if (args.workspaceName !== args.factory?.name) {
+    await args.updateFactory({ name: args.workspaceName });
+  }
+  await args.updateOnboarding({
+    vcsIntegrationId: args.github.id,
+    agentIntegrationId: args.claude.id,
+    appRepository: args.appRepository,
+    backlogRepository: args.backlogRepository,
+    issuesSource: apiIssuesSource(args.setup.issuesChoice),
+    agentHarness: "AGENT_HARNESS_CLAUDE_CODE",
+  });
+  const { lineId, primaryAppId } = await provisionLine({
+    factory: args.factory,
+    savedLineId: args.factory?.onboarding?.provisionedLineId,
+    savedAppId: args.factory?.onboarding?.provisionedAppId,
+    selections: args.selections,
+    appRepository: args.appRepository,
+    backlogRepository: args.backlogRepository,
+    installFactory: args.installFactory,
+    createLine: args.createLine,
+    updateOnboarding: args.updateOnboarding,
+  });
+  await provisionEventApps({
+    factoryId: args.factoryId,
+    selections: args.selections,
+    appRepository: args.appRepository,
+    backlogRepository: args.backlogRepository,
+    installFactory: args.installFactory,
+  });
+  await args.updateOnboarding({
+    provisionedAppId: primaryAppId,
+    provisionedLineId: lineId,
+    complete: true,
+  });
+}
+
 function useFinishOnboarding(args: {
   organizationId: string;
   factoryId: string;
@@ -251,46 +187,36 @@ function useFinishOnboarding(args: {
   setup: OnboardingSetupApi;
   selections: IntegrationSelections;
   setSaving: (saving: boolean) => void;
+  updateFactory: (input: { name: string }) => Promise<unknown>;
   updateOnboarding: UpdateOnboarding;
-  installFactory: (input: InstallFactoryInput) => Promise<{ canvasId: string; canvasName: string } | undefined>;
+  installFactory: InstallOnboardingApp;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
 }) {
   const navigate = useNavigate();
   return async () => {
     const appRepository = args.setup.selectedRepo;
     const backlogRepository = args.setup.issuesRepo ?? appRepository;
+    const workspaceName = args.setup.workspaceName.trim();
     const github = args.selections.github;
     const claude = args.selections.claude;
     if (!appRepository || !backlogRepository || !github?.ready || !claude?.ready) {
       showErrorToast("Connect GitHub and Claude, then select both repositories.");
       return;
     }
+    if (!workspaceName) {
+      showErrorToast("Enter a workspace name.");
+      return;
+    }
 
     args.setSaving(true);
     try {
-      await args.updateOnboarding({
-        vcsIntegrationId: github.id,
-        agentIntegrationId: claude.id,
+      await provisionWorkspace({
+        ...args,
+        workspaceName,
         appRepository,
         backlogRepository,
-        issuesSource: apiIssuesSource(args.setup.issuesChoice),
-        agentHarness: "AGENT_HARNESS_CLAUDE_CODE",
-      });
-      const { lineId, primaryAppId } = await provisionLine({
-        factory: args.factory,
-        savedLineId: args.factory?.onboarding?.provisionedLineId,
-        savedAppId: args.factory?.onboarding?.provisionedAppId,
-        selections: args.selections,
-        appRepository,
-        backlogRepository,
-        installFactory: args.installFactory,
-        createLine: args.createLine,
-        updateOnboarding: args.updateOnboarding,
-      });
-      await args.updateOnboarding({
-        provisionedAppId: primaryAppId,
-        provisionedLineId: lineId,
-        complete: true,
+        github,
+        claude,
       });
       markWorkspaceGettingStarted(args.organizationId, args.factoryId);
       navigate(factoryOverviewPath(args.organizationId, args.factoryKey), { replace: true });
@@ -299,6 +225,37 @@ function useFinishOnboarding(args: {
     } finally {
       args.setSaving(false);
     }
+  };
+}
+
+function useCancelOnboarding(args: { organizationId: string; factoryId: string; canDelete: boolean }) {
+  const { account } = useAccount();
+  const navigate = useNavigate();
+  const deleteFactory = useDeleteFactory(args.organizationId);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const cancelSetup = async () => {
+    if (!args.canDelete) {
+      showErrorToast("You do not have permission to delete this workspace.");
+      throw new Error("Missing permission to delete workspace");
+    }
+    try {
+      await deleteFactory.mutateAsync(args.factoryId);
+      clearLastVisitedFactory(account?.id ?? "", args.organizationId, args.factoryId);
+      showSuccessToast("Workspace deleted.");
+      navigate(factoryListPath(args.organizationId), { replace: true });
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to delete workspace"));
+      throw error;
+    }
+  };
+
+  return {
+    canDeleteWorkspace: args.canDelete,
+    deleteOpen,
+    setDeleteOpen,
+    deleting: deleteFactory.isPending,
+    cancelSetup,
   };
 }
 
@@ -311,27 +268,52 @@ export function useOnboardingPageModel(args: {
   const { canAct } = usePermissions();
   const onboarding = args.factory?.onboarding;
   const integrations = useIntegrationSelections(onboarding);
-  const connect = useIntegrationConnectDialog({
-    organizationId: args.organizationId,
-    integrationNames: ONBOARDING_INTEGRATIONS,
-    selections: integrations.selections,
-    onSelectionsChange: integrations.setSelections,
-  });
   const setup = useOnboardingSetupState(args.factory?.name ?? "", {
     connected: integrations.connected,
     simulateDiscovery: false,
   });
   useRestoreSetup(setup, onboarding, integrations.selections);
+  const [searchParams] = useSearchParams();
+  const [openSection, setOpenSection] = useState<WizardStepId>(() => {
+    const requestedStep = searchParams.get("step");
+    return isWizardStepId(requestedStep) ? requestedStep : initialWizardStep(onboarding);
+  });
+  const connect = useIntegrationConnectDialog({
+    organizationId: args.organizationId,
+    // Carry the current step so the round trip to the provider returns here,
+    // not at the first step. The provider redirects to the integration page,
+    // and IntegrationSetupReturn then sends the browser to this path.
+    // pick=newest asks the VCS step to select the connection just created.
+    returnTo: `${factorySetupPath(args.organizationId, args.factoryKey)}?step=${openSection}${
+      openSection === "vcs" ? "&pick=newest" : ""
+    }`,
+    integrationNames: ONBOARDING_INTEGRATIONS,
+    selections: integrations.selections,
+    onSelectionsChange: integrations.setSelections,
+  });
 
-  const [openSection, setOpenSection] = useState<SectionId>(() => initialSection(onboarding));
   const [saving, setSaving] = useState(false);
   const updateFactory = useUpdateFactory(args.organizationId, args.factoryId);
   const updateOnboarding = useFactoryOnboarding(args.organizationId, args.factoryId);
   const createLine = useCreateFactoryLine(args.organizationId, args.factoryId);
   const installer = useInstallFactory();
-  const canInvite = canAct("members", "create");
-  const invite = useOrganizationInviteLink(args.organizationId, canInvite);
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
+  const githubConnections = useOnboardingGithubConnections({
+    integrationData: connect.integrationData,
+    openSection,
+    selectNewest: searchParams.get("pick") === "newest",
+    selections: integrations.selections,
+    selectInstance: connect.selectInstance,
+    // The user left the wizard to connect GitHub, so the answer for the VCS
+    // step is in. Open the repository step, the same as a connection the user
+    // selects by hand. The host must be set here too, or the repository step
+    // shows "Connect version control first" until the restore effect runs.
+    onConnectionSelected: () => {
+      setup.selectVcsHost("github");
+      setOpenSection("repo");
+    },
+  });
+  const githubIntegration = useIntegration(args.organizationId, githubIntegrationId);
   const resources = useIntegrationResources(args.organizationId, githubIntegrationId, "repository");
   const repositories = useMemo(
     () =>
@@ -340,13 +322,12 @@ export function useOnboardingPageModel(args: {
         .filter((repository): repository is string => Boolean(repository)),
     [resources.data],
   );
-  const inviteUrl =
-    invite.data?.enabled && invite.data.token ? `${window.location.origin}/invite/${invite.data.token}` : null;
 
   const saves = useSectionSaves({
     setup,
     selections: integrations.selections,
     setSaving,
+    factoryName: args.factory?.name ?? "",
     updateFactory: updateFactory.mutateAsync,
     updateOnboarding: updateOnboarding.mutateAsync,
   });
@@ -355,9 +336,22 @@ export function useOnboardingPageModel(args: {
     setup,
     selections: integrations.selections,
     setSaving,
+    updateFactory: updateFactory.mutateAsync,
     updateOnboarding: updateOnboarding.mutateAsync,
     installFactory: installer.installFactory,
     createLine: createLine.mutateAsync,
+  });
+  const cancel = useCancelOnboarding({
+    organizationId: args.organizationId,
+    factoryId: args.factoryId,
+    canDelete: canAct("factories", "delete"),
+  });
+  const finishSetup = useFinishSetupAction({
+    organizationId: args.organizationId,
+    factoryId: args.factoryId,
+    factoryKey: args.factoryKey,
+    setup,
+    finish,
   });
 
   return {
@@ -365,13 +359,18 @@ export function useOnboardingPageModel(args: {
     openSection,
     setOpenSection,
     requestConnect: connect.requestConnect,
+    createVcsConnection: () => connect.createNew("github"),
+    selectVcsConnection: (integrationId: string) => connect.selectInstance("github", integrationId),
+    githubConnections,
+    selectedVcsConnectionId: githubIntegrationId || undefined,
+    requestConfigure: () => {
+      // Manage which repositories the GitHub App can access, on GitHub itself.
+      window.open(githubInstallationUrl(githubIntegration.data), "_blank", "noopener,noreferrer");
+    },
     integrationDialogs: connect.dialogs,
     repositories,
     repositoriesLoading: resources.isLoading,
     repositoriesError: resources.error,
-    inviteUrl,
-    inviteLoading: invite.isLoading,
-    canInvite,
     canConfigureWorkspace:
       canAct("factories", "update") &&
       canAct("integrations", "create") &&
@@ -379,6 +378,7 @@ export function useOnboardingPageModel(args: {
       canAct("canvases", "update"),
     saving: saving || installer.isInstalling,
     ...saves,
-    finish,
+    finish: finishSetup,
+    ...cancel,
   };
 }
