@@ -137,7 +137,12 @@ function EditModeStagingActions({
           Main branch has been updated since you last edited. Discard your changes and start again.
         </p>
         <DiscardStaleStagingButton
-          onDiscard={() => onDiscardStaleStaging?.()}
+          onDiscard={() => {
+            if (!window.confirm("Discard your uncommitted changes and start again? This cannot be undone.")) {
+              return;
+            }
+            onDiscardStaleStaging?.();
+          }}
           disabled={!!discardStaleStagingPending}
         />
       </div>
@@ -155,7 +160,15 @@ function EditModeStagingActions({
   return (
     <div className="flex items-center gap-1.5">
       {onResetStaging ? (
-        <ResetStagingButton onReset={() => onResetStaging()} disabled={stagingActionsDisabled} />
+        <ResetStagingButton
+          onReset={() => {
+            if (!window.confirm("Reset to last commit? All uncommitted changes since then will be discarded.")) {
+              return;
+            }
+            onResetStaging();
+          }}
+          disabled={stagingActionsDisabled}
+        />
       ) : null}
       {onCommitStaging ? (
         <CommitStagingButton onCommit={() => onCommitStaging()} disabled={stagingActionsDisabled} />
