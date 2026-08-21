@@ -372,13 +372,15 @@ export function upsertExecutionIntoDescribeRunData(
     return current;
   }
 
-  if (execution.runId && run.id && execution.runId !== run.id) {
-    return current;
-  }
-
-  const rootEventId = execution.rootEvent?.id;
-  if (!execution.runId && rootEventId && run.rootEvent?.id && run.rootEvent.id !== rootEventId) {
-    return current;
+  if (execution.runId) {
+    if (run.id && execution.runId !== run.id) {
+      return current;
+    }
+  } else {
+    const rootEventId = execution.rootEvent?.id;
+    if (!rootEventId || run.rootEvent?.id !== rootEventId) {
+      return current;
+    }
   }
 
   const executions = upsertExecutionRef(run.executions ?? [], executionToRef(execution));

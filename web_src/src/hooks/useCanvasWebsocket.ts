@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
-import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useQueryClient, type InfiniteData, type QueryClient } from "@tanstack/react-query";
 import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasEvent,
@@ -19,6 +19,36 @@ import {
 import { canvasKeys, invalidateStagedCanvasCaches } from "./useCanvasData";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/`;
+
+function isDescribeRunQueryKey(queryKey: readonly unknown[], canvasId: string): boolean {
+  const sample = canvasKeys.run(canvasId, "_");
+  return queryKey.length === sample.length && sample.slice(0, -1).every((part, index) => queryKey[index] === part);
+}
+
+function patchDescribeRunQueries(
+  queryClient: QueryClient,
+  canvasId: string,
+  execution: CanvasesCanvasNodeExecution,
+): boolean {
+  let patched = false;
+  const queries = queryClient.getQueriesData<{ run?: CanvasesCanvasRun }>({
+    queryKey: [...canvasKeys.runs(), canvasId],
+  });
+
+  for (const [queryKey, current] of queries) {
+    if (!isDescribeRunQueryKey(queryKey, canvasId)) {
+      continue;
+    }
+
+    const next = upsertExecutionIntoDescribeRunData(current, execution);
+    if (next && next !== current) {
+      patched = true;
+      queryClient.setQueryData(queryKey, next);
+    }
+  }
+
+  return patched;
+}
 
 type CanvasWebsocketPayload = {
   canvasId: string;
@@ -150,6 +180,8 @@ export function useCanvasWebsocket(
           patched = true;
           queryClient.setQueryData(describeKey, next);
         }
+      } else if (patchDescribeRunQueries(queryClient, canvasId, execution)) {
+        patched = true;
       }
 
       return patched;
