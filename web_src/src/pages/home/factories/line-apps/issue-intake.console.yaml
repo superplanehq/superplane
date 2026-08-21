@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Console
 metadata:
-  name: Issue Intake
+  name: Issue Ingestion
   canvasId: __FACTORY_CANVAS_ID__
 spec:
   panels:
@@ -10,18 +10,25 @@ spec:
       content:
         title: About this app
         body: |
-          > [!SECTION:setup] GitHub issue intake
+          > [!SECTION:setup] Issue ingestion
           >
-          > This app listens for issues in the backlog repository.
+          > This app is not a factory line step. It creates draft work orders
+          > from the backlog repository.
           >
-          > It creates a work order when:
+          > It runs when:
+          > - The schedule fires every 10 minutes. An agent then picks the open
+          >   issue it is most confident it can implement.
+          > - Someone opens a new issue.
           > - An issue gets the `factory` label.
           > - An issue is assigned to `superplaneagent`.
+          >
+          > For each ingested issue, the app writes a title and description,
+          > creates a draft work order, and attaches an implementation plan.
   layout:
     - i: about
       x: 0
       'y': 0
       w: 12
-      h: 5
+      h: 8
       minW: 3
       minH: 5

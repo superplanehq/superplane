@@ -83,18 +83,30 @@ describe("setup factory event apps", () => {
     expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("pr-closure");
   });
 
-  it("creates work orders for factory-labeled or agent-assigned issues", () => {
+  it("ingests new issues and a 10-minute backlog scan into draft work orders", () => {
     const canvasYaml = materializeOnboardingApp("issue-intake");
 
+    expect(canvasYaml).toMatch(/component: schedule[\s\S]*type: minutes[\s\S]*minutesInterval: 10/);
+    expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*actions:[\s\S]*- opened/);
     expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*actions:[\s\S]*- labeled/);
     expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*actions:[\s\S]*- assigned/);
     expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*repository: acme\/backlog/);
     expect(canvasYaml).toContain('root().data.label.name == "factory"');
     expect(canvasYaml).toContain('root().data.assignee.login == "superplaneagent"');
-    expect(canvasYaml).toMatch(/component: createWorkOrder[\s\S]*title: '{{ root\(\)\.data\.issue\.title }}'/);
-    expect(canvasYaml).toContain("description: '{{ root().data.issue.body }}'");
+    expect(canvasYaml).toContain("component: runnerClaudeCode");
+    expect(canvasYaml).toContain("id: pick-issue");
+    expect(canvasYaml).toContain("id: prepare-work-order");
+    expect(canvasYaml).toContain("component: findWorkOrder");
+    expect(canvasYaml).toContain("by: artifactKey");
+    expect(canvasYaml).toMatch(/channel: notFound[\s\S]*targetId: prepare-work-order/);
+    expect(canvasYaml).toContain("title: '{{ $[\"Prepare Work Order\"].data.result.title }}'");
+    expect(canvasYaml).toContain("description: '{{ fromBase64($[\"Prepare Work Order\"].data.result.description) }}'");
+    expect(canvasYaml).toMatch(/component: addWorkOrderArtifact[\s\S]*artifactType: markdown[\s\S]*title: PLAN.md/);
+    expect(canvasYaml).toMatch(/component: addWorkOrderArtifact[\s\S]*artifactType: link[\s\S]*artifactKey:/);
     expect(canvasYaml).toContain("id: int-1");
     expect(canvasYaml).toContain("name: acme-github");
+    expect(canvasYaml).toContain("name: acme-claude");
+    expect(canvasYaml).toContain("acme/app");
     expect(canvasYaml).not.toContain("{{ install_params.");
     expect(canvasYaml).not.toContain(FACTORY_CANVAS_ID_PLACEHOLDER);
     expect(canvasYaml).not.toContain("superplanehq");

@@ -97,6 +97,7 @@ function buildLineApp(args: {
 }
 
 const EVENT_APP_COMPONENT_INTEGRATIONS: Record<string, string> = {
+  "github.addIssueLabel": "github",
   "github.onIssue": "github",
   "github.onPullRequest": "github",
 };
@@ -108,6 +109,7 @@ function buildEventApp(args: {
   canvasYaml: string;
   consoleYaml?: string;
   triggerNodeId: string;
+  integrations?: string[];
 }): FactoryDefinition {
   return buildOnboardingApp({
     id: args.id,
@@ -115,7 +117,7 @@ function buildEventApp(args: {
     description: args.description,
     canvasYaml: args.canvasYaml,
     consoleYaml: args.consoleYaml ?? eventAppConsoleYaml,
-    integrations: ["github"],
+    integrations: args.integrations ?? ["github"],
     componentIntegrations: EVENT_APP_COMPONENT_INTEGRATIONS,
     entrypointNodeId: args.triggerNodeId,
   });
@@ -137,7 +139,7 @@ export const ONBOARDING_LINE_APPS: OnboardingLineApp[] = [
 ];
 
 // Event-driven factory apps provisioned during onboarding. These listen for
-// GitHub events; they are not factory line steps.
+// GitHub events or a schedule; they are not factory line steps.
 export const ONBOARDING_EVENT_APPS = ["issue-intake", "pr-closure"] as const;
 
 const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
@@ -165,11 +167,12 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
   }),
   "issue-intake": buildEventApp({
     id: "issue-intake",
-    title: "Issue Intake",
-    description: "Create a work order when an issue gets the factory label or is assigned to the SuperPlane agent.",
+    title: "Issue Ingestion",
+    description: "Create a draft work order from new issues and from a 10-minute backlog scan, then attach an implementation plan.",
     canvasYaml: issueIntakeCanvasYaml,
     consoleYaml: issueIntakeConsoleYaml,
-    triggerNodeId: "on-issue-labeled",
+    triggerNodeId: "on-schedule",
+    integrations: ["github", "claude"],
   }),
   "pr-closure": buildEventApp({
     id: "pr-closure",
