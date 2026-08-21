@@ -87,8 +87,3 @@ export const Name: Story = {
   name: "5 Name",
   render: () => <SetupStep step="name" answers={SETUP_ANSWERS.agent} />,
 };
-
-export const Start: Story = {
-  name: "6 Start",
-  render: () => <SetupStep step="start" answers={SETUP_ANSWERS.agent} />,
-};

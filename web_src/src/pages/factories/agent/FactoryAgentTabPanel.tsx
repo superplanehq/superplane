@@ -204,6 +204,7 @@ function ChatConversation({
         onVersionPublished={() => setOutcomeState(null)}
         onAgentStagingReady={onAgentStagingReady}
         onAgentStagingCommit={onAgentStagingCommit}
+        confirmKind="save"
         liveCanvasVersionId={liveCanvasVersionId}
         headerMode={headerMode}
         isRunInspectionMode={isRunInspectionMode}

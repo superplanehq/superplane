@@ -1,4 +1,16 @@
 export { FactoryNodeCard, type FactoryNodeCardProps } from "./FactoryNodeCard";
+export {
+  factorySidebarCloseButtonClassName,
+  factorySidebarFontClassName,
+  factorySidebarHeadingClassName,
+  factorySidebarIconButtonClassName,
+  factorySidebarInputClassName,
+  factorySidebarKindLabelClassName,
+  factorySidebarMutedIconClassName,
+  factorySidebarResizeLineClassName,
+  factorySidebarRowHoverClassName,
+  factorySidebarSurfaceClassName,
+} from "./factorySidebarChrome";
 export { FactorySidebarHeading } from "./FactorySidebarHeading";
 export { resolveFactoryNodeCardTitles } from "./resolveFactoryNodeCardTitles";
 export { resolveFactorySidebarHeading } from "./resolveFactorySidebarHeading";

@@ -114,13 +114,14 @@ function planLineActiveDispatch(
 }
 
 function withPlanPhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
-  if (order.id !== OPEN_WORK_ORDER.id) {
+  const orderId = order.id;
+  if (!orderId || orderId !== OPEN_WORK_ORDER.id) {
     return order;
   }
   return {
     ...order,
     lineDispatches: [
-      planLineActiveDispatch(order.id, [
+      planLineActiveDispatch(orderId, [
         {
           id: "exec-plan-open",
           step: "Plan",
@@ -137,13 +138,14 @@ function withPlanPhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
 }
 
 function withVerifyPhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
-  if (order.id !== OPEN_WORK_ORDER_SECONDARY.id) {
+  const orderId = order.id;
+  if (!orderId || orderId !== OPEN_WORK_ORDER_SECONDARY.id) {
     return order;
   }
   return {
     ...order,
     lineDispatches: [
-      planLineActiveDispatch(order.id, [
+      planLineActiveDispatch(orderId, [
         {
           id: "exec-verify-plan",
           step: "Plan",

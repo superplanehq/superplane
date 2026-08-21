@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -825,6 +826,7 @@ func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	assert.Contains(t, provider.lastPreamble, canvas.ID.String())
 	assert.Contains(t, provider.lastPreamble, "auto_layout_on_update_enabled: false")
 	assert.Contains(t, provider.lastPreamble, "[Canvas Snapshot]")
+	assert.Contains(t, provider.lastPreamble, "snapshot_source: live")
 	assert.Contains(t, provider.lastPreamble, "node_count:")
 	assert.Contains(t, provider.lastPreamble, "  - canvases:update:"+canvas.ID.String())
 	assert.Contains(t, provider.lastPreamble, "All SuperPlane access goes through the agent tools.")
@@ -841,6 +843,60 @@ func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastPreamble, canvas.ID.String(),
 		"the session context must be re-injected on every turn")
+}
+
+func TestService_SendMessage_PreambleUsesStagedEditNodesOverLive(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{
+			NodeID: "prod-node",
+			Name:   "Prod HTTP",
+			Type:   models.NodeTypeComponent,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Component: &models.ComponentRef{Name: "http"},
+			}),
+		},
+	}, nil)
+	require.NotNil(t, canvas.LiveVersionID)
+
+	stagedYAML := `apiVersion: v1
+kind: Canvas
+metadata:
+  name: edit-canvas
+spec:
+  nodes:
+    - id: edit-node
+      name: Edit HTTP
+      type: TYPE_ACTION
+      component: http
+  edges: []
+`
+	_, err := models.UpsertStagedFile(
+		database.DB(t.Context()),
+		canvas.ID,
+		r.User,
+		*canvas.LiveVersionID,
+		canvas.OrganizationID,
+		"canvas.yaml",
+		stagedYAML,
+	)
+	require.NoError(t, err)
+
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "what nodes are on this app?", nil)
+	require.NoError(t, err)
+
+	assert.Contains(t, provider.lastPreamble, "snapshot_source: staging")
+	assert.Contains(t, provider.lastPreamble, "id=edit-node")
+	assert.Contains(t, provider.lastPreamble, `name="Edit HTTP"`)
+	assert.NotContains(t, provider.lastPreamble, "id=prod-node")
+	assert.NotContains(t, provider.lastPreamble, `name="Prod HTTP"`)
 }
 
 func TestService_SendMessage_IncludesAutoLayoutPreferenceInPreamble(t *testing.T) {

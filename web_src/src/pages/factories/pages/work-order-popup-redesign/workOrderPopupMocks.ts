@@ -5,6 +5,7 @@ import type {
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
 import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
+import { workOrderOwnerDisplay } from "../../lib/workOrderCreator";
 
 import { OPEN_WORK_ORDER_ARTIFACTS } from "../../__fixtures__/factoryPageFixtureVariants";
 import {
@@ -247,33 +248,6 @@ function backlogLogEntry(order: FactoriesWorkOrder): PopupLogEntry {
   };
 }
 
-function ownerForOrder(order: FactoriesWorkOrder, fallback: OrgUserDisplay): OrgUserDisplay {
-  const automation = order.createdBy?.automation;
-  if (automation) {
-    const name = automation.appName?.trim() || automation.nodeName?.trim();
-    if (name) {
-      return {
-        id: automation.appId || automation.nodeId || name,
-        name,
-        initials: getUserInitials(name) || "A",
-      };
-    }
-  }
-
-  const user = order.createdBy?.user;
-  if (user?.id || user?.name) {
-    const name = user.name?.trim() || fallback.name;
-    return {
-      id: user.id ?? fallback.id,
-      name,
-      initials: getUserInitials(name),
-      avatarUrl: user.id === STORYBOOK_ME_USER_ID ? STORYBOOK_ME_USER_AVATAR_URL : undefined,
-    };
-  }
-
-  return fallback;
-}
-
 export function popupFixtureForWorkOrder(order?: FactoriesWorkOrder): PopupFixture {
   if (!order) {
     return AGENT_WORK_POPUP;
@@ -296,7 +270,7 @@ export function popupFixtureForWorkOrder(order?: FactoriesWorkOrder): PopupFixtu
     outputs: executions.some(isPrClosureRun) ? [PR_CLOSURE_PR_ARTIFACT] : [],
     log: [backlogLogEntry(order), ...executions.map((execution) => executionToLogEntry(order, execution))],
     elapsed: displayStatus === "draft" ? "Not started" : base.elapsed,
-    owner: ownerForOrder(order, base.owner),
+    owner: workOrderOwnerDisplay(order, base.owner),
   };
 }
 
@@ -383,7 +357,7 @@ function logDurationMs(duration: string): number | null {
   return ms > 0 ? ms : null;
 }
 
-function logExecution(state: PopupLogState): { state: string; result: string } {
+function logExecution(state: PopupLogState): Pick<FactoriesWorkOrderExecution, "state" | "result"> {
   if (state === "passed") {
     return { state: "STATE_FINISHED", result: "RESULT_PASSED" };
   }

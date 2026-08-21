@@ -39,7 +39,7 @@ function resolveFactoryHideAddControls(input: FactoryEmbedCanvasChromeInput): bo
   if (input.factoryViewOnly) {
     return true;
   }
-  // Storybook Configure keeps the Components panel available. A leftover `?run=`
+  // Factory edit workspace keeps the Components panel available. A leftover `?run=`
   // query would otherwise hide add controls before the edit session starts.
   if (input.factoryEditWorkspace && input.factoryEmbed) {
     return false;

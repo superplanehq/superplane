@@ -5,6 +5,8 @@ import type {
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
 import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
+import { workOrderOwnerDisplay } from "../../lib/workOrderCreator";
+import { clockLabel, formatCostCents, formatTokenCount, providerForName } from "./splitRunFormat";
 
 import { OPEN_WORK_ORDER_ARTIFACTS } from "../../__fixtures__/factoryPageFixtureVariants";
 import {
@@ -310,7 +312,7 @@ export function splitRunFixtureForWorkOrder(order?: FactoriesWorkOrder): SplitRu
     return {
       ...SPLIT_RUN_RUNNING,
       title: order.title ?? SPLIT_RUN_RUNNING.title,
-      owner: ownerFromOrder(order, SPLIT_RUN_RUNNING.owner),
+      owner: workOrderOwnerDisplay(order, SPLIT_RUN_RUNNING.owner),
       costUsd: formatCostCents(order.totalCostCents) ?? SPLIT_RUN_RUNNING.costUsd,
       tokensLabel: formatTokenCount(order.totalTokens) ?? SPLIT_RUN_RUNNING.tokensLabel,
     };
@@ -325,7 +327,7 @@ export function splitRunFixtureForWorkOrder(order?: FactoriesWorkOrder): SplitRu
 
   return {
     title: order.title ?? SPLIT_RUN_RUNNING.title,
-    owner: ownerFromOrder(order, SPLIT_RUN_RUNNING.owner),
+    owner: workOrderOwnerDisplay(order, SPLIT_RUN_RUNNING.owner),
     elapsed: elapsedForDisplay(displayStatus),
     startedLabel: SPLIT_RUN_RUNNING.startedLabel,
     costUsd: formatCostCents(order.totalCostCents) ?? (displayStatus === "draft" ? "$0.00" : SPLIT_RUN_RUNNING.costUsd),
@@ -535,83 +537,4 @@ function descriptionArtifactForOrder(order: FactoriesWorkOrder): FactoriesWorkOr
       body: order.description ?? "",
     },
   };
-}
-
-function ownerFromOrder(order: FactoriesWorkOrder, fallback: OrgUserDisplay): OrgUserDisplay {
-  const automation = order.createdBy?.automation;
-  if (automation) {
-    const name = automation.appName?.trim() || automation.nodeName?.trim();
-    if (name) {
-      return {
-        id: automation.appId || automation.nodeId || name,
-        name,
-        initials: getUserInitials(name) || "A",
-      };
-    }
-  }
-
-  const user = order.createdBy?.user;
-  if (user?.id || user?.name) {
-    const name = user.name?.trim() || fallback.name;
-    return {
-      id: user.id ?? fallback.id,
-      name,
-      initials: getUserInitials(name),
-      avatarUrl: user.id === STORYBOOK_ME_USER_ID ? STORYBOOK_ME_USER_AVATAR_URL : undefined,
-    };
-  }
-
-  return fallback;
-}
-
-function formatCostCents(cents?: string): string | undefined {
-  if (cents == null || cents === "") {
-    return undefined;
-  }
-  const amount = Number(cents);
-  if (!Number.isFinite(amount)) {
-    return undefined;
-  }
-  return `$${(amount / 100).toFixed(2)}`;
-}
-
-function formatTokenCount(tokens?: string): string | undefined {
-  if (tokens == null || tokens === "") {
-    return undefined;
-  }
-  const count = Number(tokens);
-  if (!Number.isFinite(count)) {
-    return undefined;
-  }
-  if (count >= 1000) {
-    const thousands = count / 1000;
-    const compact = thousands >= 10 ? thousands.toFixed(0) : thousands.toFixed(1).replace(/\.0$/, "");
-    return `${compact}k tokens`;
-  }
-  return `${count} tokens`;
-}
-
-function clockLabel(iso?: string): string {
-  if (!iso) {
-    return "—";
-  }
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) {
-    return "—";
-  }
-  return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
-}
-
-function providerForName(name: string): RunOverlayProvider {
-  const label = name.toLowerCase();
-  if (
-    label.includes("pull") ||
-    label.includes("pr") ||
-    label.includes("github") ||
-    label.includes("branch") ||
-    label.includes("ci")
-  ) {
-    return "github";
-  }
-  return "superplane";
 }

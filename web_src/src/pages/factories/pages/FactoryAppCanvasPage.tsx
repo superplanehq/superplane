@@ -1,7 +1,12 @@
 import { AppPage } from "@/pages/app";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Navigate } from "react-router";
-import { DEFAULT_SUPERPLANE_BASE_URL, buildAgentEditPrompt } from "../lib/agentEditPrompt";
+import {
+  DEFAULT_SUPERPLANE_BASE_URL,
+  buildAgentCliInstallCommands,
+  buildAgentCliInstallInstructions,
+  buildAgentEditPrompt,
+} from "../lib/agentEditPrompt";
 import { factoryAppSplitRunPath, parseFactoryAppNavFrom } from "../lib/factoryPagePaths";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { AgentSetupPromptDialog } from "./AgentSetupPromptDialog";
@@ -12,16 +17,20 @@ import { useFactoryAppCanvasPageModel } from "./useFactoryAppCanvasPageModel";
 
 /**
  * Factory-shell embed for a factory-owned app/canvas. Configure (`?configure=1`)
- * stays here. Viewing a run (`?run=` without configure) redirects to the
- * split-run page — the line-board popup is the run surface.
+ * stays here and opens the edit workspace. Viewing a run (`?run=` without
+ * configure) redirects to the split-run page — the line-board popup is the
+ * run surface.
  */
 export function FactoryAppCanvasPage() {
   const { factory } = useFactoriesLayout();
   const model = useFactoryAppCanvasPageModel();
+  const agentInstallInstructions = buildAgentCliInstallInstructions({
+    baseUrl: DEFAULT_SUPERPLANE_BASE_URL,
+  });
+  const agentInstallCommands = buildAgentCliInstallCommands();
   const agentPrompt = buildAgentEditPrompt({
     appName: model.title,
     appId: model.appId,
-    baseUrl: DEFAULT_SUPERPLANE_BASE_URL,
     runId: model.runId,
     lineId: model.lineId,
   });
@@ -66,9 +75,9 @@ export function FactoryAppCanvasPage() {
         onDraftTitleChange={model.isConfigure ? model.handleDraftTitleChange : undefined}
         onDiscard={model.handleConfigureDiscard}
         onSave={model.handleConfigureSave}
-        onOpenVisualEditor={model.storybookEditWorkspace ? model.handleOpenVisualEditor : undefined}
+        onOpenVisualEditor={model.canUpdateCanvas ? model.handleOpenVisualEditor : undefined}
         workspace={
-          model.storybookEditWorkspace && model.isConfigure
+          model.isConfigure
             ? {
                 agentOpen: model.agentOpen,
                 componentsOpen: model.componentsOpen,
@@ -87,29 +96,27 @@ export function FactoryAppCanvasPage() {
           <AppPage
             factoryEmbed
             factoryConfigure={model.isConfigure}
-            factoryAgentEnabled={model.storybookEditWorkspace && model.isConfigure}
-            factoryEditWorkspace={model.storybookEditWorkspace}
+            factoryAgentEnabled={model.isConfigure}
+            factoryEditWorkspace
             factoryConfigureActionsRef={model.configureActionsRef}
             onFactoryConfigureBusyChange={model.handleConfigureBusyChange}
             onFactoryConfigureDone={model.handleConfigureDone}
-            onFactoryConfigureSaved={model.storybookEditWorkspace ? model.handleConfigureSaved : undefined}
+            onFactoryConfigureSaved={model.handleConfigureSaved}
           />
         )}
       </div>
-      {model.storybookEditWorkspace ? (
-        <>
-          <FactoryCanvasYamlModal
-            open={model.yamlViewOpen}
-            onOpenChange={model.handleYamlViewOpenChange}
-            canvas={model.canvas}
-          />
-          <AgentSetupPromptDialog
-            open={model.agentPromptOpen}
-            onOpenChange={model.handleAgentPromptOpenChange}
-            prompt={agentPrompt}
-          />
-        </>
-      ) : null}
+      <FactoryCanvasYamlModal
+        open={model.yamlViewOpen}
+        onOpenChange={model.handleYamlViewOpenChange}
+        canvas={model.canvas}
+      />
+      <AgentSetupPromptDialog
+        open={model.agentPromptOpen}
+        onOpenChange={model.handleAgentPromptOpenChange}
+        installInstructions={agentInstallInstructions}
+        installCommands={agentInstallCommands}
+        prompt={agentPrompt}
+      />
     </div>
   );
 }

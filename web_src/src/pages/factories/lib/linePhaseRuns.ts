@@ -220,6 +220,14 @@ function liveColumnIndexForExecution(
     return undefined;
   }
 
+  return closestAppColumnIndex(steps, executionAppId, stepIndex);
+}
+
+function closestAppColumnIndex(
+  steps: NonNullable<FactoriesFactoryLine["steps"]>,
+  executionAppId: string,
+  stepIndex: number,
+): number | undefined {
   const matches: number[] = [];
   for (let index = 0; index < steps.length; index++) {
     if (steps[index]?.app?.app?.trim() === executionAppId) {

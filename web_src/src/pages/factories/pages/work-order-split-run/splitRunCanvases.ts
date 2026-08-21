@@ -136,41 +136,48 @@ function paintStatuses(
   status: SplitRunPhaseStatus,
 ): Record<string, FactoryNodeStatus> {
   const painted: Record<string, FactoryNodeStatus> = {};
-  const takenList = nodes.filter((node) => node.id && taken.has(node.id));
-  const lastTakenId = takenList.at(-1)?.id;
+  const lastTakenId = nodes.filter((node) => node.id && taken.has(node.id)).at(-1)?.id;
 
   for (const node of nodes) {
     if (!node.id) {
       continue;
     }
-    if (!taken.has(node.id)) {
-      painted[node.id] = status === "pending" ? "pending" : "did_not_run";
-      continue;
-    }
-    if (node.type === "TYPE_TRIGGER") {
-      painted[node.id] = status === "pending" ? "pending" : "triggered";
-      continue;
-    }
-    if (status === "pending") {
-      painted[node.id] = "pending";
-      continue;
-    }
-    if (status === "running" && node.id === lastTakenId) {
-      painted[node.id] = "running";
-      continue;
-    }
-    if (status === "failed" && node.id === lastTakenId) {
-      painted[node.id] = "failed";
-      continue;
-    }
-    if ((status === "waiting" || status === "pending") && node.id === lastTakenId) {
-      painted[node.id] = "pending";
-      continue;
-    }
-    painted[node.id] = "passed";
+    painted[node.id] = statusForPaintedNode({
+      taken: taken.has(node.id),
+      isTrigger: node.type === "TYPE_TRIGGER",
+      isLastTaken: node.id === lastTakenId,
+      status,
+    });
   }
 
   return painted;
+}
+
+function statusForPaintedNode(input: {
+  taken: boolean;
+  isTrigger: boolean;
+  isLastTaken: boolean;
+  status: SplitRunPhaseStatus;
+}): FactoryNodeStatus {
+  if (!input.taken) {
+    return input.status === "pending" ? "pending" : "did_not_run";
+  }
+  if (input.isTrigger) {
+    return input.status === "pending" ? "pending" : "triggered";
+  }
+  if (input.status === "pending") {
+    return "pending";
+  }
+  if (input.isLastTaken && input.status === "running") {
+    return "running";
+  }
+  if (input.isLastTaken && input.status === "failed") {
+    return "failed";
+  }
+  if (input.isLastTaken && input.status === "waiting") {
+    return "pending";
+  }
+  return "passed";
 }
 
 function paintMetrics(nodes: ComponentsNode[], taken: Set<string>, phase: SplitRunPhase): Record<string, string> {
@@ -196,45 +203,31 @@ function paintMetrics(nodes: ComponentsNode[], taken: Set<string>, phase: SplitR
   return metrics;
 }
 
+const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string }> = {
+  onRun: { title: "On Run", iconSlug: "play" },
+  runnerBash: { title: "Run Bash", iconSlug: "code" },
+  runnerClaudeCode: { title: "Run Claude Code", iconSlug: "code" },
+  runnerJS: { title: "Run JavaScript", iconSlug: "code" },
+  if: { title: "If", iconSlug: "git-branch" },
+  filter: { title: "Filter", iconSlug: "filter" },
+  addWorkOrderArtifact: { title: "Add Work Order Artifact", iconSlug: "file-text" },
+  addRunError: { title: "Add Run Error", iconSlug: "triangle-alert" },
+  reportWorkOrderCheck: { title: "Report Work Order Check", iconSlug: "clipboard-check" },
+  "github.createIssueComment": { title: "Create Issue Comment", iconSlug: "message-square" },
+  "github.addIssueLabel": { title: "Add Issue Label", iconSlug: "tag" },
+  "github.onIssue": { title: "On Issue", iconSlug: "github" },
+  "github.onPullRequest": { title: "On Pull Request", iconSlug: "git-pull-request" },
+  findWorkOrder: { title: "Find Work Order", iconSlug: "search" },
+  updateWorkOrderArtifact: { title: "Update Work Order Artifact", iconSlug: "file-pen" },
+  createWorkOrder: { title: "Create Work Order", iconSlug: "plus" },
+  updateWorkOrderStatus: { title: "Update Work Order Status", iconSlug: "circle-check" },
+};
+
 export function componentPresentation(component?: string): { title: string; iconSlug: string } {
-  switch (component) {
-    case "onRun":
-      return { title: "On Run", iconSlug: "play" };
-    case "runnerBash":
-      return { title: "Run Bash", iconSlug: "code" };
-    case "runnerClaudeCode":
-      return { title: "Run Claude Code", iconSlug: "code" };
-    case "runnerJS":
-      return { title: "Run JavaScript", iconSlug: "code" };
-    case "if":
-      return { title: "If", iconSlug: "git-branch" };
-    case "filter":
-      return { title: "Filter", iconSlug: "filter" };
-    case "addWorkOrderArtifact":
-      return { title: "Add Work Order Artifact", iconSlug: "file-text" };
-    case "addRunError":
-      return { title: "Add Run Error", iconSlug: "triangle-alert" };
-    case "reportWorkOrderCheck":
-      return { title: "Report Work Order Check", iconSlug: "clipboard-check" };
-    case "github.createIssueComment":
-      return { title: "Create Issue Comment", iconSlug: "message-square" };
-    case "github.addIssueLabel":
-      return { title: "Add Issue Label", iconSlug: "tag" };
-    case "github.onIssue":
-      return { title: "On Issue", iconSlug: "github" };
-    case "github.onPullRequest":
-      return { title: "On Pull Request", iconSlug: "git-pull-request" };
-    case "findWorkOrder":
-      return { title: "Find Work Order", iconSlug: "search" };
-    case "updateWorkOrderArtifact":
-      return { title: "Update Work Order Artifact", iconSlug: "file-pen" };
-    case "createWorkOrder":
-      return { title: "Create Work Order", iconSlug: "plus" };
-    case "updateWorkOrderStatus":
-      return { title: "Update Work Order Status", iconSlug: "circle-check" };
-    default:
-      return { title: component || "Component", iconSlug: "box" };
+  if (!component) {
+    return { title: "Component", iconSlug: "box" };
   }
+  return COMPONENT_PRESENTATION[component] ?? { title: component, iconSlug: "box" };
 }
 
 const PLAN_ARTIFACT: FactoriesWorkOrderArtifact = {
@@ -261,7 +254,7 @@ const CLOSURE_NOTES: FactoriesWorkOrderArtifact = {
 
 const MERGE_SCREENSHOT: FactoriesWorkOrderArtifact = {
   id: "art-merge-screenshot",
-  type: "TYPE_PREVIEW",
+  type: "TYPE_LINK",
   data: {
     name: "merge-screenshot.png",
     title: "merge-screenshot.png",

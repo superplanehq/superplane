@@ -3,7 +3,10 @@ import type { QueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import type { SetURLSearchParams } from "react-router";
 
-import { activateCanvasVersionForEditing as applyCanvasVersionForEditing } from "./lib/canvas-version-activation";
+import {
+  activateCanvasVersionForEditing as applyCanvasVersionForEditing,
+  type ActivateCanvasVersionOptions,
+} from "./lib/canvas-version-activation";
 
 type UseActivateCanvasVersionForEditingOptions = {
   organizationId?: string;
@@ -50,7 +53,7 @@ export function useActivateCanvasVersionForEditing({
   draftCanvasSpecRef.current = draftCanvasSpec;
 
   return useCallback(
-    (versionID: string, version: CanvasesCanvasVersion, options?: { preserveStagedLayer?: boolean }) =>
+    (versionID: string, version: CanvasesCanvasVersion, options?: ActivateCanvasVersionOptions) =>
       applyCanvasVersionForEditing({
         organizationId,
         canvasId,

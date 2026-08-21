@@ -756,6 +756,10 @@
   border-radius: calc(var(--radius) - 2px);
 }
 
+.theme-factories .factory-sidebar,
+.theme-factories .factory-sidebar button,
+.theme-factories .factory-sidebar textarea,
+.theme-factories .factory-sidebar input,
 .theme-factories .factory-agent-sidebar,
 .theme-factories .factory-agent-sidebar button,
 .theme-factories .factory-agent-sidebar textarea,
@@ -771,8 +775,25 @@
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
+.theme-factories .factory-sidebar,
 .theme-factories .factory-agent-sidebar {
   font-weight: 400;
+}
+
+.theme-factories .factory-sidebar input,
+.theme-factories .factory-agent-sidebar input,
+.theme-factories .factory-sidebar textarea,
+.theme-factories .factory-agent-sidebar textarea {
+  background-color: var(--background);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+.theme-factories .factory-sidebar input::placeholder,
+.theme-factories .factory-agent-sidebar input::placeholder,
+.theme-factories .factory-sidebar textarea::placeholder,
+.theme-factories .factory-agent-sidebar textarea::placeholder {
+  color: var(--muted-foreground);
 }
 
 /* Unlayered so these beat `.workspace-markdown` (13px / muted) on chat body. */

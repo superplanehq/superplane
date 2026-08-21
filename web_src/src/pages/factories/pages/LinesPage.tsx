@@ -111,7 +111,6 @@ export function LinesPage() {
         <div className={factoryWorkOrdersBodyClassName}>
           <LineDetail
             organizationId={organizationId}
-            factoryId={factoryId}
             factoryKey={factoryKey}
             line={selectedLine}
             apps={factoryApps}
@@ -219,7 +218,6 @@ function LineDetailHeader({
 
 function LineDetail({
   organizationId,
-  factoryId,
   factoryKey,
   line,
   apps,
@@ -227,7 +225,6 @@ function LineDetail({
   workOrderCardContext,
 }: {
   organizationId: string;
-  factoryId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
   apps: Array<{ id?: string; name?: string }>;

@@ -105,7 +105,7 @@ export function AssigneeGroup({
 }
 
 /** Line to start on: the preferred line when it exists, else the only line. */
-export function resolveStartLineName(lines: FactoriesFactoryLine[], preferredLineName?: string): string | undefined {
+function resolveStartLineName(lines: FactoriesFactoryLine[], preferredLineName?: string): string | undefined {
   const names = lines.map((line) => line.name?.trim()).filter((name): name is string => Boolean(name));
   if (preferredLineName && names.includes(preferredLineName)) {
     return preferredLineName;

@@ -1,8 +1,7 @@
 import type { FactoriesFactory, FactoriesFactoryLine, FactoryLineStep } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useCreateFactoryLine, useCreateWorkOrder, useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
-import { useDispatchWorkOrder } from "@/hooks/useFactoryData";
+import { useCreateFactoryLine, useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
 import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { githubInstallationUrl } from "@/lib/githubInstallation";
@@ -13,7 +12,7 @@ import { useInstallFactory } from "@/pages/home/useInstallFactory";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
-import { factoryHomePath, factoryListPath, factorySetupPath, workOrderDetailPath } from "../../lib/factoryPagePaths";
+import { factoryHomePath, factoryListPath, factorySetupPath } from "../../lib/factoryPagePaths";
 import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import type { IntegrationId, WizardStepId } from "./onboardingFixtures";
@@ -25,13 +24,11 @@ import {
   localIssuesSource,
 } from "./onboardingStatus";
 import {
-  DEFAULT_LINE_NAME,
   provisionEventApps,
   provisionLine,
   type InstallOnboardingApp,
   type UpdateOnboarding,
 } from "./onboardingProvision";
-import { createAndDispatchInitialWorkOrder } from "./onboardingWorkOrder";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
@@ -128,11 +125,10 @@ function useSectionSaves(args: {
   return { saveName, saveRepository, saveIssues };
 }
 
-// Persists onboarding answers, provisions the line and event apps, then creates
-// and dispatches the first work order. Kept out of the click handler so the
-// handler stays focused on validation, saving state, and navigation.
+// Persists onboarding answers, then provisions the line and event apps. Kept
+// out of the click handler so the handler stays focused on validation, saving
+// state, and navigation.
 async function provisionWorkspace(args: {
-  organizationId: string;
   factoryId: string;
   factory: FactoriesFactory | null;
   setup: OnboardingSetupApi;
@@ -141,19 +137,12 @@ async function provisionWorkspace(args: {
   updateOnboarding: UpdateOnboarding;
   installFactory: InstallOnboardingApp;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
-  createWorkOrder: (input: {
-    title: string;
-    description: string;
-  }) => Promise<{ id?: string | null; number?: number | string | null }>;
-  dispatchWorkOrder: (input: { orderId: string; lineName: string }) => Promise<unknown>;
   workspaceName: string;
   appRepository: string;
   backlogRepository: string;
-  workOrderTitle: string;
-  workOrderDescription: string;
   github: { id: string };
   claude: { id: string };
-}): Promise<{ number?: number | string | null }> {
+}): Promise<void> {
   if (args.workspaceName !== args.factory?.name) {
     await args.updateFactory({ name: args.workspaceName });
   }
@@ -188,26 +177,6 @@ async function provisionWorkspace(args: {
     provisionedLineId: lineId,
     complete: true,
   });
-  return createAndDispatchInitialWorkOrder({
-    title: args.workOrderTitle,
-    description: args.workOrderDescription,
-    lineName: DEFAULT_LINE_NAME,
-    createWorkOrder: args.createWorkOrder,
-    dispatchWorkOrder: args.dispatchWorkOrder,
-  });
-}
-
-function navigateAfterFinish(
-  navigate: ReturnType<typeof useNavigate>,
-  organizationId: string,
-  factoryKey: string,
-  orderNumber: number | string | null | undefined,
-) {
-  if (orderNumber != null && orderNumber !== "") {
-    navigate(workOrderDetailPath(organizationId, factoryKey, orderNumber), { replace: true });
-    return;
-  }
-  navigate(factoryHomePath(organizationId, factoryKey), { replace: true });
 }
 
 function useFinishOnboarding(args: {
@@ -222,19 +191,12 @@ function useFinishOnboarding(args: {
   updateOnboarding: UpdateOnboarding;
   installFactory: InstallOnboardingApp;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
-  createWorkOrder: (input: {
-    title: string;
-    description: string;
-  }) => Promise<{ id?: string | null; number?: number | string | null }>;
-  dispatchWorkOrder: (input: { orderId: string; lineName: string }) => Promise<unknown>;
 }) {
   const navigate = useNavigate();
   return async () => {
     const appRepository = args.setup.selectedRepo;
     const backlogRepository = args.setup.issuesRepo ?? appRepository;
     const workspaceName = args.setup.workspaceName.trim();
-    const workOrderTitle = args.setup.workOrderTitle.trim();
-    const workOrderDescription = args.setup.workOrderDescription.trim();
     const github = args.selections.github;
     const claude = args.selections.claude;
     if (!appRepository || !backlogRepository || !github?.ready || !claude?.ready) {
@@ -245,25 +207,19 @@ function useFinishOnboarding(args: {
       showErrorToast("Enter a workspace name.");
       return;
     }
-    if (!workOrderTitle || !workOrderDescription) {
-      showErrorToast("Enter a work order title and description.");
-      return;
-    }
 
     args.setSaving(true);
     try {
-      const order = await provisionWorkspace({
+      await provisionWorkspace({
         ...args,
         workspaceName,
         appRepository,
         backlogRepository,
-        workOrderTitle,
-        workOrderDescription,
         github,
         claude,
       });
       markWorkspaceGettingStarted(args.organizationId, args.factoryId);
-      navigateAfterFinish(navigate, args.organizationId, args.factoryKey, order.number);
+      navigate(factoryHomePath(args.organizationId, args.factoryKey), { replace: true });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
     } finally {
@@ -340,8 +296,6 @@ export function useOnboardingPageModel(args: {
   const updateFactory = useUpdateFactory(args.organizationId, args.factoryId);
   const updateOnboarding = useFactoryOnboarding(args.organizationId, args.factoryId);
   const createLine = useCreateFactoryLine(args.organizationId, args.factoryId);
-  const createWorkOrder = useCreateWorkOrder(args.organizationId, args.factoryId);
-  const dispatchWorkOrder = useDispatchWorkOrder(args.organizationId, args.factoryId);
   const installer = useInstallFactory();
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
   const githubConnections = useOnboardingGithubConnections({
@@ -350,6 +304,14 @@ export function useOnboardingPageModel(args: {
     selectNewest: searchParams.get("pick") === "newest",
     selections: integrations.selections,
     selectInstance: connect.selectInstance,
+    // The user left the wizard to connect GitHub, so the answer for the VCS
+    // step is in. Open the repository step, the same as a connection the user
+    // selects by hand. The host must be set here too, or the repository step
+    // shows "Connect version control first" until the restore effect runs.
+    onConnectionSelected: () => {
+      setup.selectVcsHost("github");
+      setOpenSection("repo");
+    },
   });
   const githubIntegration = useIntegration(args.organizationId, githubIntegrationId);
   const resources = useIntegrationResources(args.organizationId, githubIntegrationId, "repository");
@@ -378,8 +340,6 @@ export function useOnboardingPageModel(args: {
     updateOnboarding: updateOnboarding.mutateAsync,
     installFactory: installer.installFactory,
     createLine: createLine.mutateAsync,
-    createWorkOrder: createWorkOrder.mutateAsync,
-    dispatchWorkOrder: dispatchWorkOrder.mutateAsync,
   });
   const cancel = useCancelOnboarding({
     organizationId: args.organizationId,
@@ -416,7 +376,7 @@ export function useOnboardingPageModel(args: {
       canAct("integrations", "create") &&
       canAct("canvases", "create") &&
       canAct("canvases", "update"),
-    saving: saving || installer.isInstalling || createWorkOrder.isPending,
+    saving: saving || installer.isInstalling,
     ...saves,
     finish: finishSetup,
     ...cancel,

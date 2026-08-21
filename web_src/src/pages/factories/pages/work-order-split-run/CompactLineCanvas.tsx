@@ -108,7 +108,7 @@ function toFlowEdge(edge: ComponentsEdge, index: number): Edge {
   const channel = edge.channel ?? "default";
   const sideChannel = channel === "false" || channel === "failed";
   return {
-    id: edge.id ?? `e-${edge.sourceId}-${edge.targetId}-${index}`,
+    id: `e-${edge.sourceId}-${edge.targetId}-${index}`,
     source: edge.sourceId ?? "",
     target: edge.targetId ?? "",
     sourceHandle: channel,
