@@ -42,19 +42,11 @@ describe("MemorySourceControls", () => {
   it("keeps the namespace Select controlled when going from an empty to a non-empty namespace", () => {
     const onChange = vi.fn();
     const { rerender } = render(
-      <MemorySourceControls
-        canvasId="canvas-1"
-        source={{ kind: "memory", namespace: "" }}
-        onChange={onChange}
-      />,
+      <MemorySourceControls canvasId="canvas-1" source={{ kind: "memory", namespace: "" }} onChange={onChange} />,
     );
 
     rerender(
-      <MemorySourceControls
-        canvasId="canvas-1"
-        source={{ kind: "memory", namespace: "orders" }}
-        onChange={onChange}
-      />,
+      <MemorySourceControls canvasId="canvas-1" source={{ kind: "memory", namespace: "orders" }} onChange={onChange} />,
     );
 
     const warnings = consoleWarnSpy.mock.calls

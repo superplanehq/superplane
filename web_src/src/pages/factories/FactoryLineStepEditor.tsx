@@ -38,10 +38,7 @@ export function FactoryLineStepEditor({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className={cn("space-y-2", stepFieldClassName)}>
           <Label htmlFor={`factory-line-step-app-${index}`}>Automation</Label>
-          <Select
-            value={step.appId}
-            onValueChange={(appId) => onChange({ ...step, appId, entrypoint: "" })}
-          >
+          <Select value={step.appId} onValueChange={(appId) => onChange({ ...step, appId, entrypoint: "" })}>
             <SelectTrigger id={`factory-line-step-app-${index}`} className={stepFieldClassName}>
               <SelectValue placeholder="Select automation" />
             </SelectTrigger>
