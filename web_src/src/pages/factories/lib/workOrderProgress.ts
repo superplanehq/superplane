@@ -9,10 +9,11 @@ function hasActiveLineDispatch(order: FactoriesWorkOrder): boolean {
 }
 
 /**
- * Display vocabulary for the Work Orders workspace. Mirrors the six labels
- * from the reference application: Draft, Running, Waiting, Completed,
- * Failed, Cancelled. Persisted state + result columns in the database stay
- * unchanged; this file is the single mapping layer.
+ * Display vocabulary for the Work Orders workspace: Draft, Running, Needs
+ * attention, Completed, Failed, Cancelled. The idle-open key stays
+ * `waiting` so stored filters keep working. Persisted state + result
+ * columns in the database stay unchanged; this file is the single mapping
+ * layer.
  */
 export type WorkOrderDisplayStatus = "draft" | "running" | "waiting" | "completed" | "failed" | "cancelled";
 
@@ -37,9 +38,9 @@ const DISPLAY_STATUS_META: Record<
     dotClassName: "bg-[color:var(--status-running-dot)]",
   },
   waiting: {
-    label: "Waiting",
-    filterLabel: "Waiting",
-    summary: "Waiting for review or the next dispatch.",
+    label: "Needs attention",
+    filterLabel: "Needs attention",
+    summary: "A person must act before this work can continue.",
     className:
       "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)] text-[color:var(--status-waiting-fg)]",
     dotClassName: "bg-[color:var(--status-waiting-dot)]",
@@ -104,8 +105,8 @@ export const WORK_ORDER_BOARD_LANES: WorkOrderBoardLaneDefinition[] = [
   },
   {
     id: "review",
-    title: "Review",
-    description: "Waiting for reviewers or the next dispatch.",
+    title: "Needs attention",
+    description: "Work orders that wait for a human decision.",
     statuses: ["waiting"],
   },
   {

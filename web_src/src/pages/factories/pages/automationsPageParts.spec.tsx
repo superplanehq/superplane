@@ -217,6 +217,7 @@ describe("AutomationDetail tabs", () => {
     expect(card).toHaveTextContent("Running");
     expect(card).toHaveTextContent("SP-103");
     expect(screen.getByTestId("work-order-row-assignees-wo-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-row-dispatch-wo-1")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open Add refund reconciliation test" })).toHaveAttribute(
       "href",
       expect.stringContaining("run=run-c1111111"),

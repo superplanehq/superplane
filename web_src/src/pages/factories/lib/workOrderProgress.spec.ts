@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { FactoriesWorkOrder } from "@/api-client";
 
 import {
+  WORK_ORDER_BOARD_LANES,
   countActiveWorkOrders,
   filterWorkOrdersByStatus,
   getWorkOrderDisplayKey,
   getWorkOrderDisplayStatus,
+  getWorkOrderDisplayStatusMeta,
   groupWorkOrdersByLane,
   type WorkOrderStatusFilter,
 } from "./workOrderProgress";
@@ -37,6 +39,23 @@ function activeDispatch(): FactoriesWorkOrder["lineDispatches"] {
 function idsFilteredBy(orders: FactoriesWorkOrder[], statusFilter: WorkOrderStatusFilter) {
   return filterWorkOrdersByStatus(orders, statusFilter).map((o) => o.id);
 }
+
+describe("getWorkOrderDisplayStatusMeta", () => {
+  it("labels the idle open state as Needs attention", () => {
+    const meta = getWorkOrderDisplayStatusMeta("waiting");
+    expect(meta.label).toBe("Needs attention");
+    expect(meta.filterLabel).toBe("Needs attention");
+    expect(meta.summary).toBe("A person must act before this work can continue.");
+  });
+});
+
+describe("WORK_ORDER_BOARD_LANES", () => {
+  it("names the waiting lane Needs attention", () => {
+    const review = WORK_ORDER_BOARD_LANES.find((lane) => lane.id === "review");
+    expect(review?.title).toBe("Needs attention");
+    expect(review?.description).toBe("Work orders that wait for a human decision.");
+  });
+});
 
 describe("getWorkOrderDisplayStatus", () => {
   it("draft orders are draft", () => {

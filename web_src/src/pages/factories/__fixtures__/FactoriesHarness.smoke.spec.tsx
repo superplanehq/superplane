@@ -49,7 +49,7 @@ describe("FactoriesHarness work orders", () => {
     expect(body.canvas?.metadata?.factoryId).toBe(PRIMARY_FACTORY_ID);
   }, 10000);
 
-  it("shows Edit on the factory canvas view page", async () => {
+  it("sends a canvas run view to the split-run page with Edit", async () => {
     const implementerAppId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
     const lineId = REFUND_FACTORY_LINES[0]?.id ?? "line-plan-and-implement";
 
@@ -61,8 +61,9 @@ describe("FactoriesHarness work orders", () => {
       />,
     );
 
-    expect(await screen.findByTestId("factory-app-canvas-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByTestId("factory-app-split-run-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(await screen.findByTestId("factory-app-edit", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("factory-app-canvas-page")).not.toBeInTheDocument();
     expect(screen.queryByTestId("factory-app-workspace-toggles")).not.toBeInTheDocument();
   }, 15000);
 

@@ -6,12 +6,14 @@ import { workOrderDetailPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { WorkOrderLineStep } from "./WorkOrderLineStep";
-import { AssigneeGroup, InlineDispatchButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
+import { AssigneeGroup, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
 
 export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   organizationId: string;
   factoryKey: string;
   factoryLines: FactoriesFactoryLine[];
+  /** When set, Start on a draft sends the work order to this line. */
+  preferredLineName?: string;
   canDispatch: boolean;
   canAssign: boolean;
   isDispatching: boolean;
@@ -22,22 +24,27 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   entry: WorkOrderListEntry;
   /**
    * Overlay destination. Defaults to the work order. The Lines board
-   * passes the canvas run so a click opens the same card in the run view.
+   * passes onOpen to show the card dialog instead of navigating.
    */
   href?: string;
+  /** When set, the card overlay opens this handler instead of navigating. */
+  onOpen?: () => void;
 }
 
 /**
  * The canonical work order card.
  *
  * Every board uses this complete component. It owns its content, navigation,
- * dispatch action, and assignee avatars so callers cannot create card variants.
+ * and assignee avatars so callers cannot create card variants. Draft cards
+ * reveal a right-quarter Start arrow on hover. Other dispatch stays on
+ * list/table rows and the work-order detail sidebar.
  */
 export function WorkOrderCard({
   entry,
   organizationId,
   factoryKey,
   factoryLines,
+  preferredLineName,
   canDispatch,
   canAssign,
   isDispatching,
@@ -45,25 +52,36 @@ export function WorkOrderCard({
   onDispatch,
   onAssigneesSave,
   href,
+  onOpen,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination =
     href ??
     (entry.order.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, entry.order.number) : "#");
   const updatedLabel = entry.updatedAtMs > 0 ? formatTimeAgo(new Date(entry.updatedAtMs)) : "—";
+  const showStart = entry.displayStatus === "draft";
 
   return (
     <article
-      className="group relative w-full rounded-md border border-border bg-card p-2.5 shadow-sm transition hover:border-foreground/20 hover:shadow"
+      className="group relative w-full overflow-hidden rounded-md border border-border bg-card p-2.5 shadow-sm transition hover:border-foreground/20 hover:shadow"
       data-testid={`work-order-card-${entry.id}`}
     >
-      <Link to={destination} className="absolute inset-0 z-0 rounded-md" aria-label={`Open ${entry.title}`} />
+      {onOpen ? (
+        <button
+          type="button"
+          className="absolute inset-0 z-0 rounded-md"
+          aria-label={`Open ${entry.title}`}
+          onClick={onOpen}
+        />
+      ) : (
+        <Link to={destination} className="absolute inset-0 z-0 rounded-md" aria-label={`Open ${entry.title}`} />
+      )}
 
       <div className="relative z-10 pointer-events-none">
         <div className="flex items-start justify-between gap-2">
           <span
             className={cn(
-              "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.04em]",
+              "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
               meta.className,
             )}
           >
@@ -84,14 +102,6 @@ export function WorkOrderCard({
                 {entry.usageLabel}
               </span>
             ) : null}
-            <InlineDispatchButton
-              entry={entry}
-              lines={factoryLines}
-              canDispatch={canDispatch}
-              isDispatching={isDispatching}
-              onDispatch={onDispatch}
-              visible={entry.isDispatchable}
-            />
             <AssigneeGroup
               entry={entry}
               organizationId={organizationId}
@@ -102,6 +112,17 @@ export function WorkOrderCard({
           </div>
         </div>
       </div>
+
+      {showStart ? (
+        <StartDraftButton
+          entry={entry}
+          lines={factoryLines}
+          preferredLineName={preferredLineName}
+          canDispatch={canDispatch}
+          isDispatching={isDispatching}
+          onDispatch={onDispatch}
+        />
+      ) : null}
     </article>
   );
 }

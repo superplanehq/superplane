@@ -71,6 +71,7 @@ interface WorkOrderBoardLaneProps {
   actions?: ReactNode;
   /** Accessible name, when it must read differently from the title. */
   label?: string;
+  className?: string;
   testId?: string;
   children?: ReactNode;
 }
@@ -83,6 +84,7 @@ export function WorkOrderBoardLane({
   leading,
   actions,
   label,
+  className,
   testId,
   children,
 }: WorkOrderBoardLaneProps) {
@@ -93,6 +95,7 @@ export function WorkOrderBoardLane({
         "flex min-h-0 flex-col self-stretch rounded-lg border border-border/70 p-2",
         workOrderKanbanLaneSizeClassName,
         LANE_TONE_CLASSNAME[tone],
+        className,
       )}
       data-testid={testId}
     >

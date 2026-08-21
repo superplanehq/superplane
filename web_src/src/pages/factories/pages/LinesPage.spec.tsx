@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, useLocation } from "react-router";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory } from "@/api-client";
@@ -115,5 +115,33 @@ describe("LinesPage card menu", () => {
         factoryLineDetailPath("org-1", PRIMARY_FACTORY_KEY, "line-new"),
       );
     });
+  });
+});
+
+describe("LinesPage board", () => {
+  it("does not show a back link to the lines list", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`]}>
+          <FactoriesLayoutContext.Provider
+            value={{
+              organizationId: "org-1",
+              factoryId: PRIMARY_FACTORY_ID,
+              factoryKey: PRIMARY_FACTORY_KEY,
+              factory: REFUND_FACTORY,
+              factories: [REFUND_FACTORY],
+              openCreateWorkOrder: vi.fn(),
+            }}
+          >
+            <Routes>
+              <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
+            </Routes>
+          </FactoriesLayoutContext.Provider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
+    expect(screen.queryByTestId("lines-back-to-list")).not.toBeInTheDocument();
   });
 });
