@@ -49,6 +49,65 @@ describe("FactoriesHarness work orders", () => {
     expect(body.canvas?.metadata?.factoryId).toBe(PRIMARY_FACTORY_ID);
   }, 10000);
 
+  it("shows Edit on the factory canvas view page", async () => {
+    const implementerAppId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
+    const lineId = REFUND_FACTORY_LINES[0]?.id ?? "line-plan-and-implement";
+
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${implementerAppId}?run=${LINE_RUN_IMPLEMENT_FAILED_ID}&from=lines&lineId=${lineId}`}
+        factoriesFixture={defaultFactoriesFixture}
+        appFixture={refundLineCanvasFixture()}
+      />,
+    );
+
+    expect(await screen.findByTestId("factory-app-canvas-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByTestId("factory-app-edit", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("factory-app-workspace-toggles")).not.toBeInTheDocument();
+  }, 15000);
+
+  it("shows the edit workspace chrome in factory Configure", async () => {
+    const implementerAppId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
+    const lineId = REFUND_FACTORY_LINES[0]?.id ?? "line-plan-and-implement";
+
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${implementerAppId}?configure=1&run=${LINE_RUN_IMPLEMENT_FAILED_ID}&from=lines&lineId=${lineId}`}
+        factoriesFixture={defaultFactoriesFixture}
+        appFixture={refundLineCanvasFixture()}
+      />,
+    );
+
+    expect(await screen.findByTestId("factory-app-canvas-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByTestId("factory-app-discard", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.getByTestId("factory-app-save")).toBeInTheDocument();
+    expect(screen.getByTestId("factory-app-workspace-agent")).toBeInTheDocument();
+    expect(screen.getByTestId("factory-app-workspace-components")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("factory-app-more-options")).toBeInTheDocument();
+    expect(screen.queryByTestId("building-blocks-sidebar")).not.toBeInTheDocument();
+  }, 15000);
+
+  it("opens the agent sidebar from the factory Configure header", async () => {
+    const user = userEvent.setup();
+    const implementerAppId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
+    const lineId = REFUND_FACTORY_LINES[0]?.id ?? "line-plan-and-implement";
+
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${implementerAppId}?configure=1&run=${LINE_RUN_IMPLEMENT_FAILED_ID}&from=lines&lineId=${lineId}`}
+        factoriesFixture={defaultFactoriesFixture}
+        appFixture={refundLineCanvasFixture()}
+      />,
+    );
+
+    expect(await screen.findByTestId("factory-app-canvas-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("canvas-tool-sidebar")).not.toBeInTheDocument();
+
+    await user.click(await screen.findByTestId("factory-app-workspace-agent", {}, { timeout: 8000 }));
+
+    expect(await screen.findByTestId("canvas-tool-sidebar", {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 15000);
+
   it("opens the seeded agent sidebar in factory edit mode", async () => {
     const implementerAppId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
     const lineId = REFUND_FACTORY_LINES[0]?.id ?? "line-plan-and-implement";

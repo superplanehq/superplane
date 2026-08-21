@@ -107,6 +107,7 @@ import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { enrichCanvasNodes, type EnrichedCanvasNodeCacheEntry } from "./enrichCanvasNodes";
 import { buildStyledCanvasEdges } from "./factoryCanvasEdgeStyle";
 import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
+import { useFactoryConfigureFitView } from "./useFactoryConfigureFitView";
 import { publishBuildingBlocksSidebarChanged, useBuildingBlocksSidebarRequest } from "./buildingBlocksSidebarRequest";
 import { RightSideControls } from "./RightSideControls";
 import { computeAppendFromNodePlacement } from "./appendFromNodePlacement";
@@ -447,7 +448,7 @@ export interface CanvasPageProps {
   factoryEmbed?: boolean;
   /** Factory-shell Configure. Drives edit-grid dots before the draft session is ready. */
   factoryConfigure?: boolean;
-  /** Storybook-only factory edit workspace. Live factory canvas ignores this. */
+  /** Factory-shell edit workspace. Enables factory agent sidebar and edit-grid dots. */
   factoryEditWorkspace?: boolean;
 }
 
@@ -1538,6 +1539,7 @@ function CanvasPage(props: CanvasPageProps) {
             disabledMessage="You don't have permission to edit this canvas."
             onBlockClick={handleBuildingBlockSelect}
             onEnterSubmit={handleBuildingBlockSelect}
+            factoryChrome={Boolean(props.factoryEmbed || props.factoryId)}
           />
         )}
 
@@ -2363,6 +2365,8 @@ function CanvasContent({
   // canvas. Run inspection keeps its own dedicated fit/viewport handling, and
   // while editing the viewport must stay put (the draft is the same graph the
   // user was already looking at, and re-fitting would disrupt interactions).
+  // Factory Configure is the exception: Edit stretches ranks / re-lays out, so
+  // CanvasContent fits once after that visit settles.
   const fitViewContentKey = isRunInspectionMode || isEditing ? undefined : fitViewContentKeyProp;
 
   // Determine selection key code to support both Control (Windows/Linux) and Meta (Mac)
@@ -2866,6 +2870,19 @@ function CanvasContent({
     reportZoom,
     viewportRef,
   ]);
+
+  const getFactoryConfigureNodeCount = useCallback(() => stateRef.current.nodes?.length ?? 0, []);
+  useFactoryConfigureFitView({
+    factoryConfigure,
+    isEditing,
+    hasReactFlowInitialized,
+    nodeCount: state.nodes?.length ?? 0,
+    getNodeCount: getFactoryConfigureNodeCount,
+    fitView,
+    getViewport,
+    viewportRef,
+    reportZoom,
+  });
 
   // Fit all currently-rendered nodes into view whenever the parent bumps `fitAllRequest`.
   // Wait a microtask so ReactFlow has measured the just-swapped node set (e.g. switching

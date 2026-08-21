@@ -1,29 +1,48 @@
 import { getInstallCommand } from "@/lib/cli";
 
 export const DEFAULT_SUPERPLANE_BASE_URL = "https://app.superplane.com";
-export const API_TOKEN_PLACEHOLDER = "<YOUR_API_TOKEN>";
-export const API_TOKEN_DISPLAY = "***REDACTED***";
+export const API_TOKEN_PLACEHOLDER = "<YOUR_TOKEN>";
 
-/** Replace the copyable token placeholder so the on-screen prompt does not show it. */
-export function redactAgentEditPromptForDisplay(prompt: string): string {
-  return prompt.split(API_TOKEN_PLACEHOLDER).join(API_TOKEN_DISPLAY);
-}
+export type AgentCliInstallInstructionsInput = {
+  baseUrl: string;
+};
 
 export type AgentEditPromptInput = {
   appName: string;
   appId: string;
-  baseUrl: string;
   runId?: string | null;
   lineId?: string | null;
 };
 
+/** Runnable install lines. Paste these into a terminal. */
+export function buildAgentCliInstallCommands(): string {
+  return [getInstallCommand(), 'export PATH="$HOME/.local/bin:$PATH"'].join("\n");
+}
+
+export function buildAgentCliInstallInstructions(input: AgentCliInstallInstructionsInput): string {
+  const baseUrl = input.baseUrl.trim() || DEFAULT_SUPERPLANE_BASE_URL;
+
+  return [
+    "Install the SuperPlane CLI.",
+    "",
+    "```bash",
+    buildAgentCliInstallCommands(),
+    "```",
+    "",
+    "Connect with an API token.",
+    "Create a token in SuperPlane organization settings. Then run:",
+    "",
+    "```bash",
+    `superplane connect ${baseUrl} ${API_TOKEN_PLACEHOLDER}`,
+    "```",
+  ].join("\n");
+}
+
 export function buildAgentEditPrompt(input: AgentEditPromptInput): string {
   const appName = input.appName.trim() || "Untitled automation";
   const appId = input.appId.trim();
-  const baseUrl = input.baseUrl.trim() || DEFAULT_SUPERPLANE_BASE_URL;
-  const installCommand = getInstallCommand();
 
-  const sections = [
+  return [
     "You are editing a SuperPlane canvas.",
     "The canvas is YAML-backed. Use the SuperPlane CLI to read and update it.",
     "",
@@ -31,37 +50,18 @@ export function buildAgentEditPrompt(input: AgentEditPromptInput): string {
     `Canvas id: ${appId}`,
     ...buildLinkedContextLines(input.runId, input.lineId),
     "",
-    "Follow these steps.",
-    "",
-    "1. Install the SuperPlane CLI.",
-    "",
-    "```bash",
-    installCommand,
-    'export PATH="$HOME/.local/bin:$PATH"',
-    "```",
-    "",
-    "2. Connect with an API token.",
-    "Create a token in SuperPlane organization settings. Then run:",
-    "",
-    "```bash",
-    `superplane connect ${baseUrl} ${API_TOKEN_PLACEHOLDER}`,
-    "```",
-    "",
-    "3. Get the canvas YAML.",
+    "Get the canvas:",
     "",
     "```bash",
     `superplane apps canvas get ${appId} -o yaml > canvas.yaml`,
     "```",
     "",
-    "4. Update the canvas.",
-    "Edit canvas.yaml. Then run:",
+    "Update the canvas:",
     "",
     "```bash",
     `superplane apps canvas update ${appId} -f canvas.yaml -m "Describe the change"`,
     "```",
-  ];
-
-  return sections.join("\n");
+  ].join("\n");
 }
 
 function buildLinkedContextLines(runId?: string | null, lineId?: string | null): string[] {
