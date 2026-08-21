@@ -502,20 +502,21 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 			return err
 		}
 
-		for _, node := range inputNodes {
+		for i, node := range inputNodes {
 			canvasNode := models.CanvasNode{
-				WorkflowID:    workflow.ID,
-				NodeID:        node.ID,
-				Name:          node.Name,
-				State:         models.CanvasNodeStateReady,
-				Type:          node.Type,
-				Ref:           datatypes.NewJSONType(node.Ref),
-				Configuration: datatypes.NewJSONType(node.Configuration),
-				Position:      datatypes.NewJSONType(node.Position),
-				Metadata:      datatypes.NewJSONType(node.Metadata),
-				IsCollapsed:   node.IsCollapsed,
-				CreatedAt:     &now,
-				UpdatedAt:     &now,
+				WorkflowID:        workflow.ID,
+				NodeID:            node.ID,
+				Name:              node.Name,
+				State:             models.CanvasNodeStateReady,
+				Type:              node.Type,
+				Ref:               datatypes.NewJSONType(node.Ref),
+				Configuration:     datatypes.NewJSONType(node.Configuration),
+				Position:          datatypes.NewJSONType(node.Position),
+				Metadata:          datatypes.NewJSONType(node.Metadata),
+				IsCollapsed:       node.IsCollapsed,
+				AppInstallationID: nodes[i].AppInstallationID,
+				CreatedAt:         &now,
+				UpdatedAt:         &now,
 			}
 			canvasNode.SetConcurrencySpec(node.Concurrency)
 

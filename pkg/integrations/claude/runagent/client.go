@@ -21,6 +21,11 @@ const (
 	anthropicVersionValue      = "2023-06-01"
 	anthropicBetaManagedAgents = "managed-agents-2026-04-01,files-api-2025-04-14"
 	sessionEventsPageLimit     = "20"
+	// oauthTokenPrefix identifies a Claude Code OAuth token as opposed to an
+	// Anthropic API key. OAuth tokens must be sent as a bearer token; API keys
+	// use the x-api-key header. The prefix makes the two mutually exclusive, so
+	// a single "apiKey" field can accept either.
+	oauthTokenPrefix = "sk-ant-oat"
 )
 
 type Client struct {
@@ -574,7 +579,7 @@ func (c *Client) UploadFile(content io.Reader, filename string) (string, error) 
 		return "", fmt.Errorf("build upload request: %w", err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("x-api-key", c.APIKey)
+	setAuthHeader(req, c.APIKey)
 	req.Header.Set("anthropic-version", anthropicVersionValue)
 	req.Header.Set("anthropic-beta", anthropicBetaManagedAgents)
 
@@ -817,7 +822,7 @@ func (c *Client) execRequestWithBeta(method, URL string, body io.Reader, beta st
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	req.Header.Set("x-api-key", c.APIKey)
+	setAuthHeader(req, c.APIKey)
 	req.Header.Set("anthropic-version", anthropicVersionValue)
 	if beta != "" {
 		req.Header.Set("anthropic-beta", beta)
@@ -843,11 +848,25 @@ func (c *Client) execRequestWithBeta(method, URL string, body io.Reader, beta st
 			errorMessage = string(responseBody)
 		}
 
+		// Wrapped in an AuthError so the node executor can mark the integration
+		// unhealthy, instead of the failure only surfacing on the individual run.
 		if res.StatusCode == http.StatusUnauthorized {
-			return nil, fmt.Errorf("Claude credentials are invalid or expired: %s", errorMessage)
+			return nil, core.NewAuthError(fmt.Errorf("Claude credentials are invalid or expired: %s", errorMessage))
 		}
 
 		return nil, fmt.Errorf("request failed (%d): %s", res.StatusCode, errorMessage)
 	}
 	return responseBody, nil
+}
+
+// setAuthHeader sets the credential header appropriate for the given key's
+// kind. Claude Code OAuth tokens (sk-ant-oat...) must be sent as a bearer
+// token; the Anthropic API rejects them with "invalid x-api-key" if sent via
+// the x-api-key header used for regular API keys.
+func setAuthHeader(req *http.Request, apiKey string) {
+	if strings.HasPrefix(apiKey, oauthTokenPrefix) {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		return
+	}
+	req.Header.Set("x-api-key", apiKey)
 }

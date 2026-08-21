@@ -338,6 +338,21 @@ func (a *Integration) SoftDeleteInTransaction(tx *gorm.DB) error {
 	}).Error
 }
 
+// MarkError flips the integration to the error state with the given
+// description. Only the state and state_description columns are written, so
+// a caller holding an in-memory copy that has gone stale (e.g. across an
+// external HTTP call) can't clobber concurrent changes to configuration,
+// metadata, or other fields with a full-row save.
+func (a *Integration) MarkError(tx *gorm.DB, message string) error {
+	a.State = IntegrationStateError
+	a.StateDescription = message
+
+	return tx.Model(a).Updates(map[string]interface{}{
+		"state":             a.State,
+		"state_description": a.StateDescription,
+	}).Error
+}
+
 func (a *Integration) GetRequest(ID string) (*IntegrationRequest, error) {
 	var request IntegrationRequest
 

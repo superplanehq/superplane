@@ -373,3 +373,67 @@ func Test__Client__GetMessageBatchResults__emptyID(t *testing.T) {
 	_, err := client.GetMessageBatchResults("")
 	require.Error(t, err)
 }
+
+func Test__setAuthHeader(t *testing.T) {
+	tests := []struct {
+		name              string
+		apiKey            string
+		expectedAuthValue string
+		expectedAPIKeySet bool
+	}{
+		{name: "regular API key uses x-api-key", apiKey: "sk-ant-api03-abc", expectedAPIKeySet: true},
+		{name: "OAuth token uses bearer auth", apiKey: "sk-ant-oat01-abc", expectedAuthValue: "Bearer sk-ant-oat01-abc"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			require.NoError(t, err)
+
+			setAuthHeader(req, tt.apiKey)
+
+			if tt.expectedAPIKeySet {
+				assert.Equal(t, tt.apiKey, req.Header.Get("x-api-key"))
+				assert.Empty(t, req.Header.Get("Authorization"))
+			} else {
+				assert.Equal(t, tt.expectedAuthValue, req.Header.Get("Authorization"))
+				assert.Empty(t, req.Header.Get("x-api-key"))
+			}
+		})
+	}
+}
+
+func Test__Client__CreateMessage__oauthToken(t *testing.T) {
+	jsonResp := `{
+		"id": "msg_123",
+		"type": "message",
+		"role": "assistant",
+		"content": [{"type": "text", "text": "hi"}],
+		"model": "claude-3-opus",
+		"stop_reason": "end_turn",
+		"usage": {"input_tokens": 1, "output_tokens": 1}
+	}`
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: 200, Body: io.NopCloser(bytes.NewBufferString(jsonResp))},
+		},
+	}
+
+	client := &Client{
+		APIKey:  "sk-ant-oat01-token",
+		BaseURL: defaultBaseURL,
+		http:    httpCtx,
+	}
+
+	_, err := client.CreateMessage(CreateMessageRequest{
+		Model:     "claude-3-opus",
+		Messages:  []Message{{Role: "user", Content: "hi"}},
+		MaxTokens: 1024,
+	})
+	require.NoError(t, err)
+
+	require.Len(t, httpCtx.Requests, 1)
+	sentReq := httpCtx.Requests[0]
+	assert.Equal(t, "Bearer sk-ant-oat01-token", sentReq.Header.Get("Authorization"))
+	assert.Empty(t, sentReq.Header.Get("x-api-key"))
+}
