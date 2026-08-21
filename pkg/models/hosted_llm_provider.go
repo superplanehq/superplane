@@ -45,6 +45,24 @@ func (p HostedLLMProvider) HasAPIKey() bool {
 	return len(p.APIKey) > 0
 }
 
+func (p HostedLLMProvider) HasAllowedModel() bool {
+	for _, model := range p.AllowedModels {
+		if strings.TrimSpace(model) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// OffersHostedModels is true when SuperPlane can resolve hosted credentials.
+// A saved API key and allowlist are enough, even if the admin enable switch is off.
+func (p HostedLLMProvider) OffersHostedModels() bool {
+	if !p.HasAPIKey() {
+		return false
+	}
+	return p.Enabled || p.HasAllowedModel()
+}
+
 func (p HostedLLMProvider) AllowsModel(model string) bool {
 	normalized := strings.TrimSpace(model)
 	if normalized == "" {
@@ -84,11 +102,11 @@ func RequireEnabledHostedLLMProvider(tx *gorm.DB, provider string) (*HostedLLMPr
 	if err != nil {
 		return nil, err
 	}
-	if !row.Enabled {
+	if !row.OffersHostedModels() {
+		if !row.HasAPIKey() {
+			return nil, fmt.Errorf("%w: %s", ErrHostedLLMProviderNoKey, provider)
+		}
 		return nil, fmt.Errorf("%w: %s", ErrHostedLLMProviderDisabled, provider)
-	}
-	if !row.HasAPIKey() {
-		return nil, fmt.Errorf("%w: %s", ErrHostedLLMProviderNoKey, provider)
 	}
 	return row, nil
 }

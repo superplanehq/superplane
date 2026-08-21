@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode"
@@ -20,10 +21,11 @@ var nonSlugChars = regexp.MustCompile(`[^a-z0-9]+`)
 
 // AgentStep is one ordered bash or prompt action for a fleet-runner agent node.
 type AgentStep struct {
-	Name    string  `mapstructure:"name"`
-	Type    string  `mapstructure:"type"`
-	Prompt  *string `mapstructure:"prompt,omitempty"`
-	Command *string `mapstructure:"command,omitempty"`
+	Name             string  `mapstructure:"name"`
+	Type             string  `mapstructure:"type"`
+	Prompt           *string `mapstructure:"prompt,omitempty"`
+	Command          *string `mapstructure:"command,omitempty"`
+	WorkingDirectory string  `mapstructure:"workingDirectory,omitempty"`
 }
 
 func NormalizeAgentStepType(stepType string) string {
@@ -43,6 +45,9 @@ func ValidateAgentSteps(steps []AgentStep) error {
 		if strings.TrimSpace(step.Name) == "" {
 			return fmt.Errorf("steps[%d].name is required", i)
 		}
+		if err := validateStepWorkingDirectory(i, step.WorkingDirectory); err != nil {
+			return err
+		}
 		switch NormalizeAgentStepType(step.Type) {
 		case AgentStepBash:
 			if step.Command == nil || strings.TrimSpace(*step.Command) == "" {
@@ -57,6 +62,24 @@ func ValidateAgentSteps(steps []AgentStep) error {
 	}
 	if promptCount == 0 {
 		return fmt.Errorf("at least one prompt step is required")
+	}
+	return nil
+}
+
+func validateStepWorkingDirectory(index int, dir string) error {
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return nil
+	}
+	if strings.ContainsAny(dir, "\n\r") {
+		return fmt.Errorf("steps[%d].workingDirectory must be a single path", index)
+	}
+	if filepath.IsAbs(dir) {
+		return nil
+	}
+	cleaned := filepath.ToSlash(filepath.Clean(dir))
+	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return fmt.Errorf("steps[%d].workingDirectory must not contain ..", index)
 	}
 	return nil
 }

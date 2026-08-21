@@ -392,9 +392,21 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":      "{{ order().id }}",
 			"artifactType": "branch",
+			"repository":   "example/repo",
 		})
 		if err == nil {
 			t.Fatal("expected error for branch without name")
+		}
+	})
+
+	t.Run("requires repository for branch", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
+		})
+		if err == nil {
+			t.Fatal("expected error for branch without repository")
 		}
 	})
 
@@ -443,35 +455,25 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
-	t.Run("accepts branch with name", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"orderId":      "{{ order().id }}",
-			"artifactType": "branch",
-			"name":         "feature/refund-retry",
-		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("accepts branch with name and url", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"orderId":      "{{ order().id }}",
-			"artifactType": "branch",
-			"name":         "feature/refund-retry",
-			"url":          "https://github.com/example/repo/tree/feature/refund-retry",
-		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
 	t.Run("accepts branch with name and repository", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":      "{{ order().id }}",
 			"artifactType": "branch",
 			"name":         "feature/refund-retry",
 			"repository":   "example/repo",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("accepts branch with name, repository, and url", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
+			"repository":   "example/repo",
+			"url":          "https://github.com/example/repo/tree/feature/refund-retry",
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -912,6 +914,7 @@ func TestBuildArtifactData_IgnoresPrLifecycleOnNonPr(t *testing.T) {
 	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
 		ArtifactType: "branch",
 		Name:         "feature/refund-retry",
+		Repository:   "example/repo",
 		State:        "open",
 		Merged:       true,
 		Draft:        true,

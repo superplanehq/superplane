@@ -33,7 +33,7 @@ func ListHostedLLMModels(
 		}
 		return nil, grpcerrors.Internal(err, "failed to list hosted models")
 	}
-	if !row.Enabled {
+	if !row.OffersHostedModels() {
 		return &pb.ListHostedLLMModelsResponse{}, nil
 	}
 

@@ -131,6 +131,7 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, prepare, "claude CLI not found")
 	assert.Contains(t, prepare, "node not found")
 	assert.Contains(t, prepare, "cd '/tmp/workspace'")
+	assert.Contains(t, prepare, `pwd -P >"$SUPERPLANE_TASK_DIR/task_cwd"`)
 	assert.Contains(t, prepare, `echo "Claude Code ready"`)
 	assert.Contains(t, prepare, "claude --version")
 	assert.Contains(t, prepare, "node --version")

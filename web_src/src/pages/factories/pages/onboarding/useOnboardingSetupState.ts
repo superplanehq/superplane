@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { isAgentStepReady } from "./onboardingAgentReadiness";
 import {
   START_WORK_ORDER,
   fixtureIssueCount,
@@ -38,26 +39,13 @@ function isIssuesReady(issuesChoice: IssuesChoiceId | null, connected: Set<Integ
   return false;
 }
 
-function isAgentReady(agent: AgentHarnessId | null, connected: Set<IntegrationId>): boolean {
-  if (agent === "claude-code") {
-    return connected.has("claude");
-  }
-  if (agent === "cursor") {
-    return connected.has("cursor");
-  }
-  if (agent === "codex") {
-    return connected.has("openai");
-  }
-  return false;
-}
-
 function setupReadiness(input: {
   workspaceName: string;
   vcsHost: VcsHostId | null;
   selectedRepo: string | null;
   connected: Set<IntegrationId>;
   issuesChoice: IssuesChoiceId | null;
-  agent: AgentHarnessId | null;
+  remainingCreditCents: number;
   workOrderTitle: string;
   workOrderDescription: string;
 }) {
@@ -65,7 +53,7 @@ function setupReadiness(input: {
   const vcsReady = input.vcsHost !== null && input.connected.has(input.vcsHost);
   const repoReady = vcsReady && input.selectedRepo !== null;
   const issuesReady = isIssuesReady(input.issuesChoice, input.connected);
-  const agentReady = isAgentReady(input.agent, input.connected);
+  const agentReady = isAgentStepReady(input.connected, input.remainingCreditCents);
   const startReady = input.workOrderTitle.trim().length > 0 && input.workOrderDescription.trim().length > 0;
   return {
     nameReady,
@@ -82,6 +70,7 @@ export function useOnboardingSetupState(
   initialName = "",
   options?: {
     connected?: Set<IntegrationId>;
+    remainingCreditCents?: number;
     simulateDiscovery?: boolean;
   },
 ) {
@@ -224,7 +213,7 @@ export function useOnboardingSetupState(
     selectedRepo,
     connected,
     issuesChoice,
-    agent,
+    remainingCreditCents: options?.remainingCreditCents ?? 0,
     workOrderTitle,
     workOrderDescription,
   });

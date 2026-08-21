@@ -16,3 +16,25 @@ export function filterModelIds(ids: string[], query: string): string[] {
 
   return ids.filter((id) => id.toLowerCase().includes(needle));
 }
+
+const PREFERRED_MODEL_SUBSTRING: Record<string, string> = {
+  anthropic: "sonnet",
+  openai: "gpt-5",
+  openrouter: "sonnet",
+};
+
+/** Prefer a known default from the provider allowlist; otherwise use the first id. */
+export function pickHostedModel(provider: string, modelIds: string[]): string | undefined {
+  const ids = uniqueSortedModelIds(modelIds);
+  const preferred = PREFERRED_MODEL_SUBSTRING[provider];
+  if (preferred) {
+    const match = ids.find((id) => id.toLowerCase().includes(preferred));
+    if (match) return match;
+  }
+  return ids[0];
+}
+
+/** Prefer a Sonnet id from the Anthropic hosted allowlist; otherwise use the first id. */
+export function pickHostedAnthropicModel(modelIds: string[]): string | undefined {
+  return pickHostedModel("anthropic", modelIds);
+}

@@ -62,7 +62,7 @@ func Test__AdminGrantRestoresHostedCredit(t *testing.T) {
 	execution := dispatchWorkOrderExecution(t, r)
 	require.NoError(t, models.RecordUsage(db, models.LLMUsageEventInput{
 		OrganizationID:  r.Organization.ID,
-		CanvasRunID:     execution.RunID,
+		CanvasRunID:     requireExecutionRunID(t, execution),
 		NodeExecutionID: uuid.New(),
 		NodeID:          "prompt",
 		Provider:        models.UsageProviderAnthropic,
@@ -97,7 +97,7 @@ func Test__HostedRecordUsageAppliesOrgMarkupOverride(t *testing.T) {
 
 	require.NoError(t, models.RecordUsage(db, models.LLMUsageEventInput{
 		OrganizationID:  r.Organization.ID,
-		CanvasRunID:     execution.RunID,
+		CanvasRunID:     requireExecutionRunID(t, execution),
 		NodeExecutionID: uuid.New(),
 		NodeID:          "prompt",
 		Provider:        models.UsageProviderAnthropic,
@@ -121,7 +121,7 @@ func Test__BYOKRecordUsageIsNotMarkedUp(t *testing.T) {
 
 	require.NoError(t, models.RecordUsage(db, models.LLMUsageEventInput{
 		OrganizationID:  r.Organization.ID,
-		CanvasRunID:     execution.RunID,
+		CanvasRunID:     requireExecutionRunID(t, execution),
 		NodeExecutionID: uuid.New(),
 		NodeID:          "prompt",
 		Provider:        models.UsageProviderAnthropic,
@@ -183,6 +183,7 @@ func Test__HostedLLMProviderAllowlist(t *testing.T) {
 	db := database.Conn()
 	t.Cleanup(func() {
 		_ = database.Conn().Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
+		_ = database.Conn().Where("provider = ?", models.UsageProviderOpenRouter).Delete(&models.HostedLLMProvider{})
 	})
 
 	saved, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
@@ -194,6 +195,17 @@ func Test__HostedLLMProviderAllowlist(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, saved.AllowsModel("claude-sonnet-4-6"))
 	assert.False(t, saved.AllowsModel("gpt-5-mini"))
+
+	disabled, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderOpenRouter,
+		Enabled:       false,
+		APIKey:        []byte("encrypted"),
+		AllowedModels: datatypes.JSONSlice[string]{"openai/gpt-4.1"},
+	})
+	require.NoError(t, err)
+	assert.True(t, disabled.OffersHostedModels())
+	_, err = models.RequireEnabledHostedLLMProvider(db, models.UsageProviderOpenRouter)
+	require.NoError(t, err)
 
 	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{Provider: "bedrock"})
 	require.Error(t, err)

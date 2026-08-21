@@ -1,6 +1,10 @@
 package runner
 
-import "fmt"
+import (
+	"fmt"
+	"path/filepath"
+	"strings"
+)
 
 type AgentPromptCommand func(promptName, model string) string
 
@@ -44,7 +48,7 @@ func buildAgentStep(stepNumber int, step AgentStep, model, runScriptName string,
 				Mode:    "0644",
 			}, BrokerCommand{
 				Name:    AgentStepLabel(step.Name, scriptName),
-				Command: fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName),
+				Command: WrapCommandInWorkingDirectory(step.WorkingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName)),
 			}
 	default:
 		prompt := ""
@@ -58,9 +62,24 @@ func buildAgentStep(stepNumber int, step AgentStep, model, runScriptName string,
 				Mode:    "0644",
 			}, BrokerCommand{
 				Name:    AgentStepLabel(step.Name, promptName),
-				Command: promptCommand(promptName, model),
+				Command: WrapCommandInWorkingDirectory(step.WorkingDirectory, promptCommand(promptName, model)),
 			}
 	}
+}
+
+// WrapCommandInWorkingDirectory prefixes command so it runs in dir.
+// Relative dirs are resolved from the task launch directory recorded in
+// prepare.sh, so a later `cd` in another step cannot nest or miss the clone.
+func WrapCommandInWorkingDirectory(dir, command string) string {
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return command
+	}
+	if filepath.IsAbs(dir) {
+		return "cd " + ShellSingleQuote(dir) + " && " + command
+	}
+	return `_sp_root=$(cat "$SUPERPLANE_TASK_DIR/task_cwd")
+cd "$_sp_root"/` + ShellSingleQuote(dir) + ` && ` + command
 }
 
 func NodePrepareScript(cliName, cliMissingMessage string, workdir string) string {
@@ -78,6 +97,7 @@ func NodePrepareScript(cliName, cliMissingMessage string, workdir string) string
 	prepare += "  return 127\n"
 	prepare += "fi\n"
 	prepare += "printf '0\\n' >\"$SUPERPLANE_TASK_DIR/prompt_count\"\n"
+	prepare += "pwd -P >\"$SUPERPLANE_TASK_DIR/task_cwd\"\n"
 	if workdir != "" {
 		prepare += "cd " + ShellSingleQuote(workdir) + "\n"
 	}

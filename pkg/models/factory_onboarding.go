@@ -237,16 +237,13 @@ func validateFactoryOnboardingReady(config FactoryOnboardingConfig) error {
 	if strings.TrimSpace(config.VCSIntegrationID) == "" {
 		return ErrFactoryOnboardingVCSIntegrationRequired
 	}
-	if strings.TrimSpace(config.AgentIntegrationID) == "" {
-		return ErrFactoryOnboardingAgentIntegrationRequired
-	}
 	if config.IssuesSource == "" {
 		return ErrFactoryOnboardingIssuesSourceRequired
 	}
 	if err := ValidateFactoryOnboardingIssuesSource(config.IssuesSource); err != nil {
 		return err
 	}
-	if config.AgentHarness == "" {
+	if strings.TrimSpace(config.AgentHarness) == "" {
 		return ErrFactoryOnboardingAgentHarnessRequired
 	}
 	if err := ValidateFactoryOnboardingAgentHarness(config.AgentHarness); err != nil {

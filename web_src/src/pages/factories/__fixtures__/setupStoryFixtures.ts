@@ -2,6 +2,7 @@ import type { FactoriesFactoryOnboarding } from "@/api-client";
 import type { StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers";
 
 import { defaultFactoriesFixture, PRIMARY_FACTORY_ID, type FactoriesFixture } from "./factoryPageResponses";
+import type { StorybookUsageReport } from "./usageReportFixtures";
 
 const GITHUB_CONNECTION_ID = "storybook-github-connection";
 const CLAUDE_CONNECTION_ID = "storybook-claude-connection";
@@ -55,9 +56,13 @@ export const SETUP_ANSWERS = {
 } satisfies Record<string, FactoriesFactoryOnboarding>;
 
 /** Default dataset with saved setup answers on the primary workspace. */
-export function factoriesFixtureWithSetupAnswers(onboarding: FactoriesFactoryOnboarding): FactoriesFixture {
+export function factoriesFixtureWithSetupAnswers(
+  onboarding: FactoriesFactoryOnboarding,
+  options?: { organizationLlmSpend?: StorybookUsageReport },
+): FactoriesFixture {
   return {
     ...defaultFactoriesFixture,
+    organizationLlmSpend: options?.organizationLlmSpend ?? defaultFactoriesFixture.organizationLlmSpend,
     factories: defaultFactoriesFixture.factories.map((factory) =>
       factory.id === PRIMARY_FACTORY_ID ? { ...factory, onboarding } : factory,
     ),

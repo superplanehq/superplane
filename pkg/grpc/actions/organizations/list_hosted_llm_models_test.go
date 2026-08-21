@@ -44,4 +44,25 @@ func Test__ListHostedLLMModels(t *testing.T) {
 	assert.True(t, resp.Enabled)
 	require.Len(t, resp.Models, 2)
 	assert.Equal(t, "claude-sonnet-4-6", resp.Models[0].Id)
+
+	require.NoError(t, db.Where("provider = ?", models.UsageProviderOpenRouter).Delete(&models.HostedLLMProvider{}).Error)
+	t.Cleanup(func() {
+		_ = database.Conn().Where("provider = ?", models.UsageProviderOpenRouter).Delete(&models.HostedLLMProvider{})
+	})
+
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderOpenRouter,
+		Enabled:       false,
+		APIKey:        []byte("encrypted"),
+		AllowedModels: datatypes.JSONSlice[string]{"openai/gpt-4.1", "moonshotai/kimi-k2.6"},
+	})
+	require.NoError(t, err)
+
+	resp, err = ListHostedLLMModels(context.Background(), r.Organization.ID.String(), &pb.ListHostedLLMModelsRequest{
+		Provider: "openrouter",
+	})
+	require.NoError(t, err)
+	assert.True(t, resp.Enabled)
+	require.Len(t, resp.Models, 2)
+	assert.Equal(t, "openai/gpt-4.1", resp.Models[0].Id)
 }

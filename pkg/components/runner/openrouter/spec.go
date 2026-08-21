@@ -40,7 +40,7 @@ func validateRunOpenRouterSpec(spec RunOpenRouterSpec) error {
 	if err := runner.ValidateAgentSteps(spec.Steps); err != nil {
 		return err
 	}
-	if err := runner.ValidateAgentCredentials(spec.Credentials, false); err != nil {
+	if err := runner.ValidateAgentCredentials(spec.Credentials, true); err != nil {
 		return err
 	}
 	if err := runner.ValidateEnvironmentFrom(spec.EnvironmentFrom); err != nil {

@@ -121,6 +121,7 @@ function WizardProgress({
 function WizardStepBody({
   step,
   setup,
+  organizationId,
   requestConnect,
   repos,
   onSelectRepository,
@@ -132,6 +133,7 @@ function WizardStepBody({
 }: {
   step: WizardStepId;
   setup: OnboardingSetupApi;
+  organizationId: string;
   requestConnect: (id: IntegrationId) => void;
   repos?: string[];
   onSelectRepository: (repo: string) => void;
@@ -163,7 +165,7 @@ function WizardStepBody({
     case "issues":
       return <IssuesStep setup={setup} onRequestConnect={requestConnect} autoDiscover repos={repos} />;
     case "agent":
-      return <AgentStep setup={setup} onRequestConnect={requestConnect} />;
+      return <AgentStep organizationId={organizationId} setup={setup} onRequestConnect={requestConnect} />;
     case "name":
       return <NameStep setup={setup} />;
     case "start":
@@ -240,6 +242,7 @@ function repositoryStepNavigation(args: {
 
 export function SetupSections({
   setup,
+  organizationId,
   openSection,
   setOpenSection,
   requestConnect,
@@ -256,6 +259,7 @@ export function SetupSections({
   saving = false,
 }: {
   setup: OnboardingSetupApi;
+  organizationId: string;
   openSection: WizardStepId;
   setOpenSection: (id: WizardStepId) => void;
   requestConnect: (id: IntegrationId) => void;
@@ -317,6 +321,7 @@ export function SetupSections({
     <WizardStepBody
       step={openSection}
       setup={setup}
+      organizationId={organizationId}
       requestConnect={requestConnect}
       repos={repos}
       onSelectRepository={repositoryNavigation.selectRepository}

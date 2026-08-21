@@ -84,6 +84,7 @@ describe("SetupSections start step", () => {
     render(
       <SetupSections
         setup={result.current}
+        organizationId="org-1"
         openSection="start"
         setOpenSection={vi.fn()}
         requestConnect={vi.fn()}

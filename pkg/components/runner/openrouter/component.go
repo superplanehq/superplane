@@ -66,7 +66,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 ## Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
-- **Credentials**: SuperPlane secret or SuperPlane-hosted credentials used as ` + "`OPENROUTER_API_KEY`" + `.
+- **Credentials**: SuperPlane secret, OpenRouter integration, or SuperPlane-hosted credentials used as ` + "`OPENROUTER_API_KEY`" + `.
 - **Model**: OpenRouter model id (` + "`provider/model`" + `). SuperPlane-hosted credentials require a model from the installation allowlist.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
@@ -82,8 +82,10 @@ func (c *RunOpenRouter) Configuration() []configuration.Field {
 		runner.AgentMachineTypeField(),
 		runner.AgentCredentialsField(runner.AgentCredentialsOptions{
 			SecretLabel:       "OpenRouter API Key",
+			IntegrationName:   "openrouter",
+			IntegrationLabel:  "Integration",
 			AllowHosted:       true,
-			HostedDescription: "OpenRouter API key or SuperPlane-hosted credentials.",
+			HostedDescription: "OpenRouter API key, OpenRouter integration, or SuperPlane-hosted credentials.",
 		}),
 		runner.AgentModelField("openrouter", "OpenRouter model id (provider/model). SuperPlane-hosted credentials use the installation allowlist.", "anthropic/claude-sonnet-4-6"),
 		runner.AgentStepsField(
@@ -162,6 +164,8 @@ func injectOpenRouterCredentials(ctx core.ExecutionContext, environment []runner
 	switch credentials.Source {
 	case runner.CredentialsSourceSecret:
 		return runner.InjectSecretAPIKey(ctx, environment, envOpenRouterAPIKey, credentials.Secret)
+	case runner.CredentialsSourceIntegration:
+		return runner.InjectIntegrationKeys(ctx, environment, credentials.Integration)
 	case runner.CredentialsSourceHosted:
 		access, err := runner.PrepareHostedRun(ctx, "openrouter", model)
 		if err != nil {

@@ -3,14 +3,13 @@ package openrouter
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
 
-func TestValidateRunOpenRouterSpecRejectsIntegrationSource(t *testing.T) {
+func TestValidateRunOpenRouterSpecAcceptsIntegrationSource(t *testing.T) {
 	t.Parallel()
 
 	prompt := "fix tests"
@@ -24,9 +23,7 @@ func TestValidateRunOpenRouterSpecRejectsIntegrationSource(t *testing.T) {
 			Integration: configuration.IntegrationRef{Name: "openrouter"},
 		},
 	}
-	err := validateRunOpenRouterSpec(spec)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid credentials source")
+	require.NoError(t, validateRunOpenRouterSpec(spec))
 }
 
 func TestValidateRunOpenRouterSpecAcceptsHostedCredentials(t *testing.T) {

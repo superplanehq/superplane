@@ -21,6 +21,17 @@ export const EMPTY_USAGE_REPORT: StorybookUsageReport = {
   remainingCreditWarning: false,
 };
 
+export const NO_GRANT_USAGE_REPORT: StorybookUsageReport = {
+  totalTokens: "0",
+  totalCostCents: "0",
+  periodDays: 30,
+  byModel: [],
+  remainingCreditCents: "0",
+  grantTotalCents: "0",
+  hostedBilledCents: "0",
+  remainingCreditWarning: false,
+};
+
 /** Totals match spend on the populated Refunds Factory work orders. */
 export const DEFAULT_FACTORY_USAGE: StorybookUsageReport = {
   totalTokens: "25600",

@@ -112,7 +112,8 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 
 // buildClaudeCodeBrokerTask builds broker commands plus task files.
 // Static helpers ship via `files` (materialized under SUPERPLANE_TASK_DIR).
-// Bash steps are sourced into the runner's shared shell so cwd persists across steps.
+// Per-step workingDirectory cds from the task launch directory so clone/repo
+// steps work when the broker starts a new shell for each command.
 func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 	model := strings.TrimSpace(spec.Model)
 	workdir := strings.TrimSpace(spec.WorkingDirectory)
@@ -152,7 +153,7 @@ func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, model string) (run
 			Path:    "steps/" + scriptName,
 			Content: command,
 			Mode:    "0644",
-		}, claudeBashStepBrokerCommand(step.Name, scriptName)
+		}, claudeBashStepBrokerCommand(step.Name, scriptName, step.WorkingDirectory)
 	default:
 		prompt := ""
 		if step.Prompt != nil {
@@ -163,7 +164,7 @@ func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, model string) (run
 			Path:    "prompts/" + promptName,
 			Content: prompt,
 			Mode:    "0644",
-		}, claudePromptStepBrokerCommand(step.Name, promptName, model)
+		}, claudePromptStepBrokerCommand(step.Name, promptName, model, step.WorkingDirectory)
 	}
 }
 
@@ -180,6 +181,7 @@ func claudePrepareScript(workdir string) string {
 	prepare.WriteString("  return 127\n")
 	prepare.WriteString("fi\n")
 	prepare.WriteString("printf '0\\n' >\"$SUPERPLANE_TASK_DIR/prompt_count\"\n")
+	prepare.WriteString("pwd -P >\"$SUPERPLANE_TASK_DIR/task_cwd\"\n")
 	if workdir != "" {
 		fmt.Fprintf(&prepare, "cd %s\n", runner.ShellSingleQuote(workdir))
 	}
@@ -190,20 +192,23 @@ func claudePrepareScript(workdir string) string {
 	return prepare.String()
 }
 
-func claudeBashStepBrokerCommand(stepName, scriptName string) runner.BrokerCommand {
+func claudeBashStepBrokerCommand(stepName, scriptName, workingDirectory string) runner.BrokerCommand {
 	return runner.BrokerCommand{
 		Name:    runner.AgentStepLabel(stepName, scriptName),
-		Command: fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName),
+		Command: runner.WrapCommandInWorkingDirectory(workingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName)),
 	}
 }
 
-func claudePromptStepBrokerCommand(stepName, promptName, model string) runner.BrokerCommand {
+func claudePromptStepBrokerCommand(stepName, promptName, model, workingDirectory string) runner.BrokerCommand {
 	return runner.BrokerCommand{
 		Name: runner.AgentStepLabel(stepName, promptName),
-		Command: fmt.Sprintf(
-			`node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/%s" %s`,
-			promptName,
-			runner.ShellSingleQuote(model),
+		Command: runner.WrapCommandInWorkingDirectory(
+			workingDirectory,
+			fmt.Sprintf(
+				`node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/%s" %s`,
+				promptName,
+				runner.ShellSingleQuote(model),
+			),
 		),
 	}
 }

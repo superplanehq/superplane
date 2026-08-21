@@ -90,6 +90,80 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		assert.Equal(t, firstCompletedAt.UnixMicro(), response.Factory.Onboarding.CompletedAt.AsTime().UnixMicro())
 	})
 
+	t.Run("complete without agent integration succeeds when hosted credit remains", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		appID, lineID := createOnboardingResources(t, r, factory)
+
+		req := readyOnboardingRequest(factory.ID.String(), vcsID, "", appID, lineID)
+		req.AgentIntegrationId = nil
+		complete := true
+		req.Complete = &complete
+
+		response, err := UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), req)
+		require.NoError(t, err)
+		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
+		assert.Empty(t, response.Factory.Onboarding.AgentIntegrationId)
+	})
+
+	t.Run("complete without agent integration rejects when hosted credit is empty", func(t *testing.T) {
+		emptyOrg := support.CreateOrganization(t, r, r.User)
+		require.NoError(t, db.Where("organization_id = ?", emptyOrg.ID).Delete(&models.OrganizationLLMCreditGrant{}).Error)
+
+		factory, err := models.CreateFactory(db, emptyOrg.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		vcsID := createReadyOnboardingIntegration(t, emptyOrg.ID, "github")
+		appID, lineID := createOnboardingResources(t, r, factory)
+
+		req := readyOnboardingRequest(factory.ID.String(), vcsID, "", appID, lineID)
+		req.AgentIntegrationId = nil
+		complete := true
+		req.Complete = &complete
+
+		_, err = UpdateFactoryOnboarding(context.Background(), emptyOrg.ID.String(), req)
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
+	t.Run("complete succeeds with an OpenRouter agent integration", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "openrouter")
+		appID, lineID := createOnboardingResources(t, r, factory)
+
+		req := readyOnboardingRequest(factory.ID.String(), vcsID, agentID, appID, lineID)
+		complete := true
+		req.Complete = &complete
+
+		response, err := UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), req)
+		require.NoError(t, err)
+		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
+		assert.Equal(t, agentID, response.Factory.Onboarding.AgentIntegrationId)
+	})
+
+	t.Run("complete succeeds with an OpenAI agent integration and Codex harness", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "openai")
+		appID, lineID := createOnboardingResources(t, r, factory)
+
+		req := readyOnboardingRequest(factory.ID.String(), vcsID, agentID, appID, lineID)
+		codex := pb.FactoryOnboarding_AGENT_HARNESS_CODEX
+		req.AgentHarness = &codex
+		complete := true
+		req.Complete = &complete
+
+		response, err := UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), req)
+		require.NoError(t, err)
+		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
+		assert.Equal(t, agentID, response.Factory.Onboarding.AgentIntegrationId)
+		assert.Equal(t, pb.FactoryOnboarding_AGENT_HARNESS_CODEX, response.Factory.Onboarding.AgentHarness)
+	})
+
 	t.Run("complete rejects an integration from another organization", func(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
@@ -190,7 +264,7 @@ func createOnboardingResources(
 	factory *models.Factory,
 ) (string, string) {
 	t.Helper()
-	app, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	app, _ := support.CreateCanvas(t, factory.OrganizationID, r.User, nil, nil)
 	require.NoError(t, database.DB(t.Context()).Model(app).Update("factory_id", factory.ID).Error)
 	line, err := factory.CreateLine(database.DB(t.Context()), support.RandomName("line"), []models.FactoryLineStep{
 		{

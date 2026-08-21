@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { compareModelLabels, filterModelIds, uniqueSortedModelIds } from "./hostedLLMModels";
+import {
+  compareModelLabels,
+  filterModelIds,
+  pickHostedAnthropicModel,
+  pickHostedModel,
+  uniqueSortedModelIds,
+} from "./hostedLLMModels";
 
 describe("uniqueSortedModelIds", () => {
   it("sorts model ids by name and drops blanks and duplicates", () => {
@@ -33,5 +39,39 @@ describe("compareModelLabels", () => {
   it("compares labels without regard to case", () => {
     expect(compareModelLabels("Claude", "claude")).toBe(0);
     expect(compareModelLabels("anthropic/a", "OpenAI/b")).toBeLessThan(0);
+  });
+});
+
+describe("pickHostedAnthropicModel", () => {
+  it("prefers a Sonnet id from the allowlist", () => {
+    expect(pickHostedAnthropicModel(["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"])).toBe(
+      "claude-sonnet-4-6",
+    );
+  });
+
+  it("uses the first allowlisted id when no Sonnet id is present", () => {
+    expect(pickHostedAnthropicModel(["claude-opus-4-6", "claude-haiku-4-5"])).toBe("claude-haiku-4-5");
+  });
+
+  it("returns undefined when the allowlist is empty", () => {
+    expect(pickHostedAnthropicModel([])).toBeUndefined();
+  });
+});
+
+describe("pickHostedModel", () => {
+  it("prefers gpt-5 from the OpenAI allowlist", () => {
+    expect(pickHostedModel("openai", ["gpt-4.1", "gpt-5", "o3"])).toBe("gpt-5");
+  });
+
+  it("prefers a Sonnet id from the OpenRouter allowlist", () => {
+    expect(pickHostedModel("openrouter", ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6"])).toBe(
+      "anthropic/claude-sonnet-4-6",
+    );
+  });
+
+  it("uses the first allowlisted id when no preferred id is present", () => {
+    expect(pickHostedModel("openrouter", ["openai/gpt-4.1", "google/gemini-2.5-flash"])).toBe(
+      "google/gemini-2.5-flash",
+    );
   });
 });
