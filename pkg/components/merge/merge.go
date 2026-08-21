@@ -14,7 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-// Merge is a component that passes its input downstream on
+// Merge (labeled "Join" in the UI) is a component that passes its input downstream on
 // different channels based on execution outcome. The queue/worker
 // layer is responsible for aggregating inputs from multiple parents.
 
@@ -84,10 +84,10 @@ type SourceNode struct {
 type Merge struct{}
 
 func (m *Merge) Name() string        { return "merge" }
-func (m *Merge) Label() string       { return "Merge" }
-func (m *Merge) Description() string { return "Merge multiple upstream inputs and forward" }
+func (m *Merge) Label() string       { return "Join" }
+func (m *Merge) Description() string { return "Wait for all upstream inputs and forward" }
 func (m *Merge) Documentation() string {
-	return `The Merge component waits for events from all upstream nodes before forwarding a combined result downstream.
+	return `The Join component waits for events from all upstream nodes before forwarding a combined result downstream.
 
 ## Use Cases
 
@@ -98,7 +98,7 @@ func (m *Merge) Documentation() string {
 
 ## How It Works
 
-1. The Merge component waits for events from all distinct upstream source nodes
+1. The Join component waits for events from all distinct upstream source nodes
 2. Once all inputs are received, it emits the combined data to the Success channel
 3. Optional timeout and conditional stop features allow early completion
 
