@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { factorySettingsSectionPath, organizationSettingsSectionPath } from "../lib/factoryPagePaths";
+import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
 
 interface SidebarUserMenuProps {
   organizationId: string;
@@ -49,20 +50,6 @@ const THEME_OPTIONS: Array<{ value: ThemePreference; label: string }> = [
 ];
 
 const MENU_ITEM_CLASS = "py-1 text-[13px] [&>svg]:size-3.5";
-
-function initialsFor(name: string): string {
-  const parts = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0]?.toUpperCase() ?? "");
-  if (parts.length === 0) {
-    return "?";
-  }
-  if (parts.length === 1) {
-    return parts[0];
-  }
-  return `${parts[0]}${parts[parts.length - 1]}`;
-}
 
 function labelForTheme(preference: ThemePreference): string {
   return THEME_OPTIONS.find((option) => option.value === preference)?.label ?? "System";
@@ -91,32 +78,28 @@ export function SidebarUserMenu({
   };
 
   return (
-    <div className="border-t border-sidebar-border p-2" data-testid="factories-sidebar-user-menu">
+    <div className="flex justify-center border-t border-sidebar-border p-1.5" data-testid="factories-sidebar-user-menu">
       <DropdownMenu defaultOpen={defaultOpen}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
             data-testid="factories-sidebar-user-menu-trigger"
-            className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:bg-sidebar-accent"
+            aria-label={`${userName}, ${organizationName}`}
+            title={`${userName}, ${organizationName}`}
+            className={cn(factoriesRailControlClassName, "data-[state=open]:bg-sidebar-accent")}
           >
             <Avatar
               src={userAvatarUrl ?? undefined}
-              initials={userAvatarUrl ? undefined : initialsFor(userName || "?")}
+              initials={userAvatarUrl ? undefined : initialsForName(userName || "?")}
               alt=""
               className="size-7 text-[10px]"
             />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] tracking-[-0.01em] text-foreground">{userName}</p>
-              <p className="truncate text-[12px] text-muted-foreground">{organizationName}</p>
-            </div>
+            <span className="sr-only">
+              {userName}, {organizationName}
+            </span>
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent
-          side="top"
-          align="start"
-          sideOffset={8}
-          className="w-(--radix-popper-anchor-width) min-w-56"
-        >
+        <DropdownMenuContent side="right" align="end" sideOffset={8} className="min-w-56">
           <OrganizationMenuHeader
             organizationId={organizationId}
             organizationName={organizationName}

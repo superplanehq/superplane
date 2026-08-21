@@ -17,7 +17,8 @@ import {
 import { FactoryAppCanvasPage } from "./FactoryAppCanvasPage";
 
 /**
- * Factory-embedded canvas: view mode (read-only) or Configure (?configure=1) edit mode.
+ * Factory-embedded canvas Configure (edit). Run viewing moved to
+ * Factories/Pages/Work Order Split Run.
  */
 const meta = {
   title: "Factories/Pages/Factory App Canvas",
@@ -47,7 +48,8 @@ export const FromAutomations: Story = {
 };
 
 export const FromLines: Story = {
-  name: "From Lines",
+  name: "From Lines (deprecated)",
+  tags: ["deprecated"],
   render: () => (
     <FactoriesHarness
       pathSuffix={fromLinesPath}
@@ -69,7 +71,8 @@ export const ConfigureEditMode: Story = {
 };
 
 export const WithRun: Story = {
-  name: "With run query",
+  name: "With run query (deprecated)",
+  tags: ["deprecated"],
   render: () => (
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${plannerAppId}?from=automations&run=${defaultCanvasAppFixture.publishedRunId ?? "run-1"}`}

@@ -26,7 +26,7 @@ const meta = {
   parameters: { layout: "padded" },
   decorators: [
     (Story) => (
-      <ComponentStoryShell className="flex min-h-[380px] w-[240px] flex-col justify-end border-r border-sidebar-border bg-sidebar">
+      <ComponentStoryShell className="flex min-h-[380px] w-14 flex-col justify-end border-r border-sidebar-border bg-sidebar">
         <Story />
       </ComponentStoryShell>
     ),

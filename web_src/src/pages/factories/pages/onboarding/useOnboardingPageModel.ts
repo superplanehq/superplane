@@ -12,7 +12,7 @@ import { useInstallFactory } from "@/pages/home/useInstallFactory";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
-import { factoryListPath, factoryOverviewPath, factorySetupPath } from "../../lib/factoryPagePaths";
+import { factoryHomePath, factoryListPath, factorySetupPath } from "../../lib/factoryPagePaths";
 import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import type { IntegrationId, WizardStepId } from "./onboardingFixtures";
@@ -142,7 +142,7 @@ async function provisionWorkspace(args: {
   backlogRepository: string;
   github: { id: string };
   claude: { id: string };
-}): Promise<void> {
+}): Promise<{ lineId: string }> {
   if (args.workspaceName !== args.factory?.name) {
     await args.updateFactory({ name: args.workspaceName });
   }
@@ -177,6 +177,7 @@ async function provisionWorkspace(args: {
     provisionedLineId: lineId,
     complete: true,
   });
+  return { lineId };
 }
 
 function useFinishOnboarding(args: {
@@ -210,7 +211,7 @@ function useFinishOnboarding(args: {
 
     args.setSaving(true);
     try {
-      await provisionWorkspace({
+      const { lineId } = await provisionWorkspace({
         ...args,
         workspaceName,
         appRepository,
@@ -219,7 +220,7 @@ function useFinishOnboarding(args: {
         claude,
       });
       markWorkspaceGettingStarted(args.organizationId, args.factoryId);
-      navigate(factoryOverviewPath(args.organizationId, args.factoryKey), { replace: true });
+      navigate(factoryHomePath(args.organizationId, args.factoryKey, lineId), { replace: true });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
     } finally {
