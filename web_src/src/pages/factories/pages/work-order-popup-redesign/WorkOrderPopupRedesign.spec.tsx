@@ -221,7 +221,7 @@ describe("Line board job popup", () => {
     await user.click(screen.getByRole("button", { name: "Open Ship idempotent refund retries" }));
     dialog = await screen.findByTestId("work-order-split-run");
     expect(within(dialog).queryByText("Review the pull request")).not.toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-checks")).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).getByText("Verify")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
