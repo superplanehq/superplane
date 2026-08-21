@@ -4,20 +4,23 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryApps, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Clock, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
+import { Clock, Inbox, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import {
   buildLinePhaseBoard,
+  collectLineBacklogOrders,
+  findBacklogAutomationApp,
+  findClosureAutomationApp,
   LINE_PHASE_RUNS_PAGE_SIZE,
-  linePhaseRunHref,
   resolveColumnGlyph,
   resolvePhaseRunStatus,
   type LinePhaseColumn,
@@ -25,6 +28,7 @@ import {
   type PhaseGlyphKind,
 } from "../lib/linePhaseRuns";
 import { isQueuedStepRow } from "../lib/workOrderExecutions";
+import { latestDispatchForLine } from "../lib/workOrderNumberResolution";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import {
   WorkOrderBoardLane,
@@ -34,12 +38,17 @@ import {
   type BoardLaneTone,
 } from "../workOrders/WorkOrderBoardChrome";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
+import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
+import type { SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
+import { splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
 import {
   createFactoryLinePath,
   editFactoryLinePath,
   factoryAppConfigurePath,
+  factoryAppSplitRunPath,
   factoryLineDetailPath,
   linesPath,
+  workOrderDetailPath,
 } from "../lib/factoryPagePaths";
 import { formatLinePhaseDescription, humanizeLineName } from "../lib/humanizeLineName";
 import {
@@ -50,7 +59,6 @@ import {
 } from "./factoryPageLayoutStyles";
 import { LineListCard } from "./LineListCard";
 import { descriptionForLine, toLineListMetrics } from "./lineListMetricsMockData";
-import { PhaseGlyph } from "./linePhaseGlyph";
 import { useLineCardMutations } from "./useLineCardMutations";
 
 const LIST_SUBTITLE = "Last 30 days. Success rate, completions per day, duration, and cost per merged work order.";
@@ -106,6 +114,7 @@ export function LinesPage() {
         <div className={factoryWorkOrdersBodyClassName}>
           <LineDetail
             organizationId={organizationId}
+            factoryId={factoryId}
             factoryKey={factoryKey}
             line={selectedLine}
             apps={factoryApps}
@@ -115,6 +124,7 @@ export function LinesPage() {
               factoryKey,
               factoryLines: lines,
               canDispatch: canUpdateWorkOrders,
+              preferredLineName: selectedLine.name,
               canAssign: canUpdateWorkOrders,
               ...cardActions,
             }}
@@ -194,20 +204,11 @@ function LineDetailHeader({
   return (
     <WorkspacePageHeader
       className={factorySectionHeaderClassName}
-      variant="entity"
-      backHref={linesPath(organizationId, factoryKey)}
-      backLabel="Lines"
-      backTestId="lines-back-to-list"
       title={humanizeLineName(line.name)}
       subtitle={formatLinePhaseDescription(line.steps, apps)}
       actions={
         canUpdate ? (
-          <Button type="button" variant="outline" size="sm" asChild data-testid="lines-edit-button">
-            <Link href={editHref}>
-              <Pencil className="size-3.5" aria-hidden />
-              Edit
-            </Link>
-          </Button>
+          <ColumnConfigureMenu title={humanizeLineName(line.name)} href={editHref} testId="lines-edit-menu" />
         ) : undefined
       }
     />
@@ -216,6 +217,7 @@ function LineDetailHeader({
 
 function LineDetail({
   organizationId,
+  factoryId,
   factoryKey,
   line,
   apps,
@@ -223,6 +225,7 @@ function LineDetail({
   workOrderCardContext,
 }: {
   organizationId: string;
+  factoryId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
   apps: Array<{ id?: string; name?: string }>;
@@ -231,39 +234,225 @@ function LineDetail({
 }) {
   const steps = line.steps ?? [];
   const board = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
+  const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
+  const [peekOrderId, setPeekOrderId] = useState<string | null>(null);
+  const peekOrder = workOrders.find((order) => order.id === peekOrderId);
+  const canvasEditHref = useMemo(
+    () => canvasEditHrefForLine(organizationId, factoryKey, line, apps),
+    [organizationId, factoryKey, line, apps],
+  );
+  const canvasExpandHref = useMemo(
+    () => canvasExpandHrefForLine(organizationId, factoryKey, line, apps, peekOrder),
+    [organizationId, factoryKey, line, apps, peekOrder],
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
-      {steps.length === 0 ? (
+      {steps.length === 0 && backlogOrders.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">No phases yet. Edit this line to add app-driven phases.</p>
       ) : (
         <PhaseBoard
           organizationId={organizationId}
           factoryKey={factoryKey}
           lineId={line.id}
+          apps={apps}
+          backlogOrders={backlogOrders}
           columns={board}
           workOrderCardContext={workOrderCardContext}
+          onOpenWorkOrder={setPeekOrderId}
         />
       )}
+      {peekOrderId ? (
+        <LineBoardSplitRunPopup
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          lineId={line.id}
+          lineName={line.name}
+          peekOrderId={peekOrderId}
+          peekOrder={peekOrder}
+          canvasEditHref={canvasEditHref}
+          canvasExpandHref={canvasExpandHref}
+          canDispatch={workOrderCardContext.canDispatch}
+          isDispatching={workOrderCardContext.isDispatching}
+          onDispatch={workOrderCardContext.onDispatch}
+          onClose={() => setPeekOrderId(null)}
+        />
+      ) : null}
     </div>
   );
+}
+
+function LineBoardSplitRunPopup({
+  organizationId,
+  factoryId,
+  factoryKey,
+  lineId,
+  lineName,
+  peekOrderId,
+  peekOrder,
+  canvasEditHref,
+  canvasExpandHref,
+  canDispatch,
+  isDispatching,
+  onDispatch,
+  onClose,
+}: {
+  organizationId: string;
+  factoryId: string;
+  factoryKey: string;
+  lineId: string | undefined;
+  lineName: string | undefined;
+  peekOrderId: string;
+  peekOrder: FactoriesWorkOrder | undefined;
+  canvasEditHref: (key: SplitRunCanvasKey) => string | undefined;
+  canvasExpandHref: (key: SplitRunCanvasKey) => string | undefined;
+  canDispatch: boolean;
+  isDispatching: boolean;
+  onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
+  onClose: () => void;
+}) {
+  const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
+  const resolvedLineName = lineName?.trim();
+  const detailHref =
+    peekOrder?.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, peekOrder.number) : undefined;
+  return (
+    <WorkOrderSplitRunPopup
+      key={peekOrderId}
+      organizationId={organizationId}
+      fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId, detailHref })}
+      canvasEditHref={canvasEditHref}
+      canvasExpandHref={canvasExpandHref}
+      detailHref={detailHref}
+      canDispatch={canDispatch && Boolean(resolvedLineName)}
+      isDispatching={isDispatching}
+      onDispatch={resolvedLineName ? () => onDispatch(peekOrderId, { lineName: resolvedLineName }) : undefined}
+      onClose={onClose}
+      fixed
+    />
+  );
+}
+
+function firstCanvasAppId(appIdByCanvas: Record<SplitRunCanvasKey, string | undefined>): string | undefined {
+  return (
+    appIdByCanvas.planning ??
+    appIdByCanvas.implementation ??
+    appIdByCanvas.risk ??
+    appIdByCanvas.closure ??
+    appIdByCanvas.intake
+  );
+}
+
+function canvasAppIdsForLine(
+  line: FactoriesFactoryLine,
+  apps: Array<{ id?: string; name?: string }>,
+): Record<SplitRunCanvasKey, string | undefined> {
+  const backlog = findBacklogAutomationApp(apps);
+  const closure = findClosureAutomationApp(apps);
+  const steps = line.steps ?? [];
+  return {
+    intake: backlog?.id,
+    planning: steps[0]?.app?.app,
+    implementation: steps[1]?.app?.app,
+    risk: steps[2]?.app?.app,
+    closure: steps[3]?.app?.app ?? closure?.id,
+  };
+}
+
+function canvasEditHrefForLine(
+  organizationId: string,
+  factoryKey: string,
+  line: FactoriesFactoryLine,
+  apps: Array<{ id?: string; name?: string }>,
+): (key: SplitRunCanvasKey) => string | undefined {
+  const appIdByCanvas = canvasAppIdsForLine(line, apps);
+
+  return (key) => {
+    const appId = appIdByCanvas[key] ?? firstCanvasAppId(appIdByCanvas) ?? apps.find((app) => app.id)?.id;
+    if (!appId) {
+      return undefined;
+    }
+    return factoryAppConfigurePath(organizationId, factoryKey, appId, { from: "lines", lineId: line.id });
+  };
+}
+
+function canvasExpandHrefForLine(
+  organizationId: string,
+  factoryKey: string,
+  line: FactoriesFactoryLine,
+  apps: Array<{ id?: string; name?: string }>,
+  order: FactoriesWorkOrder | undefined,
+): (key: SplitRunCanvasKey) => string | undefined {
+  const appIdByCanvas = canvasAppIdsForLine(line, apps);
+
+  return (key) => {
+    const appId = appIdByCanvas[key];
+    if (!appId) {
+      return undefined;
+    }
+    return factoryAppSplitRunPath(organizationId, factoryKey, appId, {
+      from: "lines",
+      lineId: line.id,
+      runId: executionRunIdForCanvas(order, key, line.id),
+      orderNumber: order?.number,
+      canvas: key,
+    });
+  };
+}
+
+function executionRunIdForCanvas(
+  order: FactoriesWorkOrder | undefined,
+  key: SplitRunCanvasKey,
+  lineId: string | undefined,
+): string | undefined {
+  const stepIndex: Partial<Record<SplitRunCanvasKey, number>> = {
+    planning: 0,
+    implementation: 1,
+    risk: 2,
+    closure: 3,
+  };
+  const index = stepIndex[key];
+  if (index == null) {
+    return undefined;
+  }
+  const executions = latestDispatchForLine(order, lineId)?.stepExecutions ?? [];
+  return executions.find((execution) => execution.stepIndex === index)?.run?.id;
 }
 
 function PhaseBoard({
   organizationId,
   factoryKey,
   lineId,
+  apps,
+  backlogOrders,
   columns,
   workOrderCardContext,
+  onOpenWorkOrder,
 }: {
   organizationId: string;
   factoryKey: string;
   lineId?: string;
+  apps: Array<{ id?: string; name?: string }>;
+  backlogOrders: FactoriesWorkOrder[];
   columns: LinePhaseColumn[];
   workOrderCardContext: WorkOrderCardContext;
+  onOpenWorkOrder: (orderId: string) => void;
 }) {
+  const backlogApp = findBacklogAutomationApp(apps);
+  const backlogConfigureHref = backlogApp
+    ? factoryAppConfigurePath(organizationId, factoryKey, backlogApp.id, { from: "lines", lineId })
+    : null;
+
   return (
     <WorkOrderKanbanBoard testId="lines-phase-board">
+      <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
+        <BacklogColumn
+          orders={backlogOrders}
+          configureHref={backlogConfigureHref}
+          workOrderCardContext={workOrderCardContext}
+          onOpenWorkOrder={onOpenWorkOrder}
+        />
+      </div>
       {columns.map((column, index) => (
         <div
           key={`${column.stepIndex}-${column.stepName}`}
@@ -278,10 +467,76 @@ function PhaseBoard({
             lineId={lineId}
             column={column}
             workOrderCardContext={workOrderCardContext}
+            onOpenWorkOrder={onOpenWorkOrder}
           />
         </div>
       ))}
     </WorkOrderKanbanBoard>
+  );
+}
+
+function BacklogColumn({
+  orders,
+  configureHref,
+  workOrderCardContext,
+  onOpenWorkOrder,
+}: {
+  orders: FactoriesWorkOrder[];
+  configureHref: string | null;
+  workOrderCardContext: WorkOrderCardContext;
+  onOpenWorkOrder: (orderId: string) => void;
+}) {
+  return (
+    <WorkOrderBoardLane
+      title="Backlog"
+      label="Backlog"
+      count={orders.length}
+      tone="neutral"
+      emptyDescription="No work orders in the backlog."
+      className="bg-muted"
+      leading={<Inbox className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />}
+      actions={
+        configureHref ? <ColumnConfigureMenu title="Backlog" href={configureHref} testId="lines-backlog-menu" /> : null
+      }
+      testId="lines-backlog-column"
+    >
+      <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-backlog-column-scroll">
+        {orders.map((order) => (
+          <li key={order.id}>
+            <LineBoardOrderCard
+              order={order}
+              workOrderCardContext={workOrderCardContext}
+              onOpenWorkOrder={onOpenWorkOrder}
+            />
+          </li>
+        ))}
+      </ul>
+    </WorkOrderBoardLane>
+  );
+}
+
+function ColumnConfigureMenu({ title, href, testId }: { title: string; href: string; testId: string }) {
+  const navigate = useNavigate();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`${title} menu`}
+          className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          data-testid={testId}
+        >
+          <MoreHorizontal className="size-3.5" aria-hidden />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuItem onClick={() => navigate(href)} data-testid={`${testId}-edit`}>
+          <Pencil className="h-3.5 w-3.5" aria-hidden />
+          Edit
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -301,12 +556,14 @@ function PhaseColumn({
   lineId,
   column,
   workOrderCardContext,
+  onOpenWorkOrder,
 }: {
   organizationId: string;
   factoryKey: string;
   lineId?: string;
   column: LinePhaseColumn;
   workOrderCardContext: WorkOrderCardContext;
+  onOpenWorkOrder: (orderId: string) => void;
 }) {
   const scrollRef = useRef<HTMLUListElement>(null);
   const [visibleCount, setVisibleCount] = useState(LINE_PHASE_RUNS_PAGE_SIZE);
@@ -342,7 +599,6 @@ function PhaseColumn({
       count={totalRuns}
       tone={PHASE_LANE_TONE[glyph]}
       emptyDescription="No work orders in this phase."
-      leading={<PhaseGlyph kind={glyph} />}
       testId={`lines-phase-column-${column.stepIndex}`}
       actions={
         configureHref ? (
@@ -378,12 +634,7 @@ function PhaseColumn({
       >
         {visibleRuns.map((run) => (
           <li key={run.executionId}>
-            <PhaseRunCard
-              run={run}
-              lineId={lineId}
-              stepAppId={column.appId}
-              workOrderCardContext={workOrderCardContext}
-            />
+            <PhaseRunCard run={run} workOrderCardContext={workOrderCardContext} onOpenWorkOrder={onOpenWorkOrder} />
           </li>
         ))}
       </ul>
@@ -393,29 +644,28 @@ function PhaseColumn({
 
 function PhaseRunCard({
   run,
-  lineId,
-  stepAppId,
   workOrderCardContext,
+  onOpenWorkOrder,
 }: {
   run: LinePhaseRunCard;
-  lineId?: string;
-  stepAppId?: string;
   workOrderCardContext: WorkOrderCardContext;
+  onOpenWorkOrder: (orderId: string) => void;
 }) {
   const { factory } = useFactoriesLayout();
   const entry = useMemo(() => buildWorkOrderListEntry(run.order, factory), [run.order, factory]);
-  const href = linePhaseRunHref(
-    workOrderCardContext.organizationId,
-    workOrderCardContext.factoryKey,
-    lineId,
-    run,
-    stepAppId,
-  );
   const queuedLabel = isQueuedStepRow(run.execution) ? resolvePhaseRunStatus(run.execution).label : null;
 
   return (
     <div data-testid={`lines-phase-run-${run.executionId}`}>
-      <WorkOrderCard {...workOrderCardContext} entry={entry} href={href} />
+      <WorkOrderCard
+        {...workOrderCardContext}
+        entry={entry}
+        onOpen={() => {
+          if (run.workOrderId) {
+            onOpenWorkOrder(run.workOrderId);
+          }
+        }}
+      />
       {queuedLabel ? (
         <p className="mt-1 flex items-center gap-1 px-0.5 text-[11px] text-muted-foreground">
           <Clock className="size-3 shrink-0" aria-hidden />
@@ -423,6 +673,31 @@ function PhaseRunCard({
         </p>
       ) : null}
     </div>
+  );
+}
+
+function LineBoardOrderCard({
+  order,
+  workOrderCardContext,
+  onOpenWorkOrder,
+}: {
+  order: FactoriesWorkOrder;
+  workOrderCardContext: WorkOrderCardContext;
+  onOpenWorkOrder: (orderId: string) => void;
+}) {
+  const { factory } = useFactoriesLayout();
+  const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [order, factory]);
+
+  return (
+    <WorkOrderCard
+      {...workOrderCardContext}
+      entry={entry}
+      onOpen={() => {
+        if (order.id) {
+          onOpenWorkOrder(order.id);
+        }
+      }}
+    />
   );
 }
 

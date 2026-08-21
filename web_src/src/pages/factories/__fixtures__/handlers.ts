@@ -5,6 +5,7 @@ import {
   STORYBOOK_ME_USER_EMAIL,
   STORYBOOK_ME_USER_ID,
   STORYBOOK_ME_USER_NAME,
+  toStorybookOrganizationUser,
   type FactoriesFixture,
 } from "./factoryPageResponses";
 import { DEFAULT_ARTIFACTS_BY_ORDER_ID, DEFAULT_EVENTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
@@ -235,7 +236,7 @@ function createWorkOrderFromRequest(request: RequestBody, orderCount: number): F
     createdAt: nowIso,
     updatedAt: nowIso,
     createdBy: { user: { id: ORGANIZATION_USERS[0].id, name: ORGANIZATION_USERS[0].name } },
-    assignees: findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids)),
+    assignees: findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids).slice(0, 1)),
     lineDispatches: [],
   };
 }
@@ -291,6 +292,9 @@ function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: st
   const line = factory?.lines?.find((entry) => entry.name === lineName) ?? factory?.lines?.[0];
   const now = new Date().toISOString();
   order.updatedAt = now;
+  if (order.state === "STATE_DRAFT") {
+    order.state = "STATE_OPEN";
+  }
 
   const apps = fixture.appsByFactoryId[factoryId] ?? [];
   const newDispatch = buildDispatchedLineDispatch(line, lineName, now, apps);
@@ -324,7 +328,7 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         const order = findOrder(fixture, match[1], match[2]);
         if (!order) return { json: {} };
         const request = (body ?? {}) as RequestBody;
-        order.assignees = findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids));
+        order.assignees = findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids).slice(0, 1));
         order.updatedAt = new Date().toISOString();
         return { json: { order } };
       },
@@ -483,10 +487,7 @@ export function matchFactoryPageFixture(
 export function factoriesOrganizationUsersResponse(): FixtureResult {
   return {
     json: {
-      users: ORGANIZATION_USERS.map((user) => ({
-        metadata: { id: user.id, email: user.email },
-        spec: { displayName: user.name },
-      })),
+      users: ORGANIZATION_USERS.map(toStorybookOrganizationUser),
     },
   };
 }

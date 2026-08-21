@@ -1,208 +1,180 @@
-import type {
-  FactoriesFactoryLine,
-  FactoriesWorkOrder,
-  FactoriesWorkOrderExecution,
-  FactoriesWorkOrderLineDispatch,
-  FactoriesWorkOrderLineDispatchResult,
-  FactoriesWorkOrderLineDispatchState,
-  FactoryLineStep,
-} from "@/api-client";
+import type { FactoriesWorkOrder } from "@/api-client";
 
 import {
+  CLOSED_WORK_ORDER,
+  FAILED_WORK_ORDER,
   HOUR_AGO,
-  LAST_WEEK,
-  LINE_RUN_IMPLEMENT_ID,
-  LINE_RUN_VERIFY_PASSED_ID,
-  OPERATOR_USER,
+  OPEN_WORK_ORDER,
+  OPEN_WORK_ORDER_SECONDARY,
+  PR_CLOSURE_COMPLETED_WORK_ORDER,
   PRIMARY_FACTORY_ID,
-  REFUND_LINE_FEATURE_ID,
-  REFUND_LINE_ONBOARDING_ID,
   REFUND_LINE_PLAN_ID,
-  REVIEWER_USER,
-  STORYBOOK_ME_USER_ID,
-  STORYBOOK_ME_USER_NAME,
   TWO_HOURS_AGO,
   YESTERDAY,
   defaultFactoriesFixture,
   type FactoriesFixture,
 } from "./factoryPageResponses";
+import {
+  BACKLOG_APP,
+  PLAN_LINE_APPS,
+  PLAN_LINE_DONE_APP_ID,
+  planLineActiveDispatch,
+  runAppStep,
+  withPlanLinePhases,
+} from "./lineMetricsPlanLine";
+import {
+  BOARD_DONE_CANCELED_ORDER,
+  BOARD_DONE_COMPLETED_PLAYBOOK,
+  BOARD_DONE_COMPLETED_SLA,
+  BOARD_DONE_REJECTED_ORDER,
+  BOARD_IMPLEMENT_FAILED_ORDER,
+  FEATURE_CI_WORK_ORDER,
+  FEATURE_DELIVERY_LINE,
+  FEATURE_PR_WORK_ORDER,
+  FEATURE_RUNNING_WORK_ORDER,
+  ONBOARDING_FACTORY_LINE,
+} from "./lineMetricsBoardOrders";
 
-const RUN_APP_TYPE = "runApp";
-
-function runAppStep(appId: string, entrypoint: string): FactoryLineStep {
+function withPlanPhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
+  const orderId = order.id;
+  if (!orderId || orderId !== OPEN_WORK_ORDER.id) {
+    return order;
+  }
   return {
-    type: RUN_APP_TYPE,
-    app: { app: appId, entrypoint },
+    ...order,
+    lineDispatches: [
+      planLineActiveDispatch(orderId, [
+        {
+          id: "exec-plan-open",
+          step: "Plan",
+          stepIndex: 0,
+          state: "STATE_STARTED",
+          result: "RESULT_UNKNOWN",
+          createdAt: HOUR_AGO,
+          updatedAt: HOUR_AGO,
+          run: { id: "run-plan-open", appId: "app-refund-planner", appName: "Plan" },
+        },
+      ]),
+    ],
   };
 }
 
-const ONBOARDING_FACTORY_LINE: FactoriesFactoryLine = {
-  id: REFUND_LINE_ONBOARDING_ID,
-  name: "onboarding",
-  createdAt: LAST_WEEK,
-  updatedAt: YESTERDAY,
-  steps: [runAppStep("app-refund-planner", "start-plan"), runAppStep("app-refund-implementer", "start-implementation")],
-};
-
-const FEATURE_PLAN_STEP = "plan";
-const FEATURE_IMPLEMENT_STEP = "implement";
-const FEATURE_PR_STEP = "pr";
-const FEATURE_CI_STEP = "ci";
-
-const FEATURE_STEP_INDEX: Record<string, number> = {
-  [FEATURE_PLAN_STEP]: 0,
-  [FEATURE_IMPLEMENT_STEP]: 1,
-  [FEATURE_PR_STEP]: 2,
-  [FEATURE_CI_STEP]: 3,
-};
-
-const FEATURE_STEP_LABEL: Record<string, string> = {
-  [FEATURE_PLAN_STEP]: "Refund Planner",
-  [FEATURE_IMPLEMENT_STEP]: "Refund Implementer",
-  [FEATURE_PR_STEP]: "Refund Implementer",
-  [FEATURE_CI_STEP]: "Refund Verifier",
-};
-
-const FEATURE_DELIVERY_STEPS: NonNullable<FactoriesWorkOrderLineDispatch["steps"]> = [
-  { name: FEATURE_STEP_LABEL[FEATURE_PLAN_STEP], stepIndex: 0 },
-  { name: FEATURE_STEP_LABEL[FEATURE_IMPLEMENT_STEP], stepIndex: 1 },
-  { name: FEATURE_STEP_LABEL[FEATURE_PR_STEP], stepIndex: 2 },
-  { name: FEATURE_STEP_LABEL[FEATURE_CI_STEP], stepIndex: 3 },
-];
-
-const FEATURE_DELIVERY_LINE: FactoriesFactoryLine = {
-  id: REFUND_LINE_FEATURE_ID,
-  name: "feature-delivery",
-  createdAt: LAST_WEEK,
-  updatedAt: YESTERDAY,
-  steps: [
-    runAppStep("app-refund-planner", "start-plan"),
-    runAppStep("app-refund-implementer", "start-implementation"),
-    runAppStep("app-refund-implementer", "start-pull-request"),
-    runAppStep("app-refund-verifier", "start-ci-loop"),
-  ],
-};
-
-function featureLineExecution(
-  step: string,
-  overrides: Partial<FactoriesWorkOrderExecution> = {},
-): FactoriesWorkOrderExecution {
+function withVerifyPhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
+  const orderId = order.id;
+  if (!orderId || orderId !== OPEN_WORK_ORDER_SECONDARY.id) {
+    return order;
+  }
   return {
-    id: `exec-feature-${overrides.id ?? step}`,
-    step: FEATURE_STEP_LABEL[step] ?? step,
-    stepIndex: FEATURE_STEP_INDEX[step] ?? 0,
-    state: "STATE_FINISHED",
-    result: "RESULT_PASSED",
-    createdAt: TWO_HOURS_AGO,
-    updatedAt: HOUR_AGO,
-    run: {
-      id: `run-feature-${step}`,
-      appId: "app-refund-implementer",
-      appName: "Refund Implementer",
-    },
-    ...overrides,
+    ...order,
+    lineDispatches: [
+      planLineActiveDispatch(orderId, [
+        {
+          id: "exec-verify-plan",
+          step: "Plan",
+          stepIndex: 0,
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: TWO_HOURS_AGO,
+          updatedAt: TWO_HOURS_AGO,
+          run: { id: "run-verify-plan", appId: "app-refund-planner", appName: "Plan" },
+        },
+        {
+          id: "exec-verify-implement",
+          step: "Implement",
+          stepIndex: 1,
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: TWO_HOURS_AGO,
+          updatedAt: HOUR_AGO,
+          run: { id: "run-verify-implement", appId: "app-refund-implementer", appName: "Implement" },
+        },
+        {
+          id: "exec-verify-open",
+          step: "Verify",
+          stepIndex: 2,
+          state: "STATE_STARTED",
+          result: "RESULT_UNKNOWN",
+          createdAt: HOUR_AGO,
+          updatedAt: HOUR_AGO,
+          run: { id: "run-verify-open", appId: "app-refund-verifier", appName: "Verify" },
+        },
+      ]),
+    ],
   };
 }
 
-function featureLineDispatch(stepExecutions: FactoriesWorkOrderExecution[]): FactoriesWorkOrderLineDispatch {
-  const state: FactoriesWorkOrderLineDispatchState = stepExecutions.some(
-    (execution) => execution.state !== "STATE_FINISHED",
-  )
-    ? "STATE_ACTIVE"
-    : "STATE_FINISHED";
-
-  const lastExecution = stepExecutions[stepExecutions.length - 1];
-  const result: FactoriesWorkOrderLineDispatchResult =
-    state === "STATE_FINISHED" ? (lastExecution?.result ?? "RESULT_UNKNOWN") : "RESULT_UNKNOWN";
-
+function withWaitingPrReview(order: FactoriesWorkOrder): FactoriesWorkOrder {
+  if (order.id !== FAILED_WORK_ORDER.id) {
+    return order;
+  }
+  const dispatch = order.lineDispatches?.[0];
+  if (!dispatch) {
+    return order;
+  }
   return {
-    id: `dispatch-${REFUND_LINE_FEATURE_ID}-${stepExecutions[0]?.id ?? "empty"}`,
-    line: { id: REFUND_LINE_FEATURE_ID, name: "feature-delivery" },
-    steps: FEATURE_DELIVERY_STEPS,
-    state,
-    result,
-    createdAt: stepExecutions[0]?.createdAt ?? TWO_HOURS_AGO,
-    finishedAt: state === "STATE_FINISHED" ? (lastExecution?.updatedAt ?? HOUR_AGO) : undefined,
-    stepExecutions,
+    ...order,
+    statusNotes: OPEN_WORK_ORDER.statusNotes,
+    lineDispatches: [
+      {
+        ...dispatch,
+        result: "RESULT_UNKNOWN",
+        stepExecutions: [
+          ...(dispatch.stepExecutions ?? []).map((execution) =>
+            execution.stepIndex === 1 ? { ...execution, result: "RESULT_PASSED" as const } : execution,
+          ),
+          {
+            id: "exec-verify-pr",
+            step: "Verify",
+            stepIndex: 2,
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED" as const,
+            createdAt: HOUR_AGO,
+            updatedAt: HOUR_AGO,
+            run: { id: "run-verify-pr", appId: "app-refund-verifier", appName: "Verify" },
+          },
+        ],
+      },
+    ],
   };
 }
 
-const FEATURE_RUNNING_WORK_ORDER: FactoriesWorkOrder = {
-  id: "wo-feature-implement",
-  number: "201",
-  key: "RF-201",
-  title: "Ship ledger retry window",
-  description: "Implement the retry window from the plan and open a pull request.",
-  state: "STATE_OPEN",
-  result: "RESULT_UNSPECIFIED",
-  createdAt: YESTERDAY,
-  updatedAt: HOUR_AGO,
-  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
-  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  lineDispatches: [
-    featureLineDispatch([
-      featureLineExecution(FEATURE_PLAN_STEP, { id: "plan-1" }),
-      featureLineExecution(FEATURE_IMPLEMENT_STEP, {
-        id: "impl-1",
-        state: "STATE_STARTED",
-        result: "RESULT_UNKNOWN",
-        run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
-      }),
-    ]),
-  ],
-};
-
-const FEATURE_PR_WORK_ORDER: FactoriesWorkOrder = {
-  id: "wo-feature-pr",
-  number: "202",
-  key: "RF-202",
-  title: "Open refund schema pull request",
-  description: "Plan and implementation passed. Pull request is waiting for review.",
-  state: "STATE_OPEN",
-  result: "RESULT_UNSPECIFIED",
-  createdAt: YESTERDAY,
-  updatedAt: HOUR_AGO,
-  createdBy: { user: { id: REVIEWER_USER.id, name: REVIEWER_USER.name } },
-  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  lineDispatches: [
-    featureLineDispatch([
-      featureLineExecution(FEATURE_PLAN_STEP, { id: "plan-2" }),
-      featureLineExecution(FEATURE_IMPLEMENT_STEP, { id: "impl-2" }),
-      featureLineExecution(FEATURE_PR_STEP, {
-        id: "pr-2",
-        state: "STATE_PENDING",
-        result: "RESULT_UNKNOWN",
-      }),
-    ]),
-  ],
-};
-
-const FEATURE_CI_WORK_ORDER: FactoriesWorkOrder = {
-  id: "wo-feature-ci",
-  number: "203",
-  key: "RF-203",
-  title: "Run CI on refund enum pull request",
-  description: "Pull request is open. CI loop is running.",
-  state: "STATE_OPEN",
-  result: "RESULT_UNSPECIFIED",
-  createdAt: YESTERDAY,
-  updatedAt: HOUR_AGO,
-  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
-  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  lineDispatches: [
-    featureLineDispatch([
-      featureLineExecution(FEATURE_PLAN_STEP, { id: "plan-3" }),
-      featureLineExecution(FEATURE_IMPLEMENT_STEP, { id: "impl-3" }),
-      featureLineExecution(FEATURE_PR_STEP, { id: "pr-3" }),
-      featureLineExecution(FEATURE_CI_STEP, {
-        id: "ci-3",
-        state: "STATE_STARTED",
-        result: "RESULT_UNKNOWN",
-        run: { id: LINE_RUN_VERIFY_PASSED_ID, appId: "app-refund-verifier", appName: "Refund Verifier" },
-      }),
-    ]),
-  ],
-};
+function withDonePhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
+  const doneRun =
+    order.id === CLOSED_WORK_ORDER.id
+      ? { executionId: "exec-done-closed", runId: "run-done-closed", appName: "Done" }
+      : order.id === PR_CLOSURE_COMPLETED_WORK_ORDER.id
+        ? { executionId: "exec-done-pr-closure", runId: "run-done-pr-closure", appName: "PR Closure" }
+        : null;
+  if (!doneRun) {
+    return order;
+  }
+  const dispatch = order.lineDispatches?.[0];
+  if (!dispatch) {
+    return order;
+  }
+  return {
+    ...order,
+    lineDispatches: [
+      {
+        ...dispatch,
+        steps: [...(dispatch.steps ?? []), { name: "Done", stepIndex: 3 }],
+        stepExecutions: [
+          ...(dispatch.stepExecutions ?? []),
+          {
+            id: doneRun.executionId,
+            step: "Done",
+            stepIndex: 3,
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: YESTERDAY,
+            updatedAt: YESTERDAY,
+            run: { id: doneRun.runId, appId: PLAN_LINE_DONE_APP_ID, appName: doneRun.appName },
+          },
+        ],
+      },
+    ],
+  };
+}
 
 /**
  * Extra lines for the populated Lines list: unused onboarding plus a
@@ -216,13 +188,26 @@ export const lineMetricsFactoriesFixture: FactoriesFixture = {
     }
     return {
       ...factory,
-      lines: [...(factory.lines ?? []), ONBOARDING_FACTORY_LINE, FEATURE_DELIVERY_LINE],
+      lines: [...(factory.lines ?? []).map(withPlanLinePhases), ONBOARDING_FACTORY_LINE, FEATURE_DELIVERY_LINE],
     };
   }),
+  appsByFactoryId: {
+    ...defaultFactoriesFixture.appsByFactoryId,
+    [PRIMARY_FACTORY_ID]: PLAN_LINE_APPS,
+  },
   workOrdersByFactoryId: {
     ...defaultFactoriesFixture.workOrdersByFactoryId,
     [PRIMARY_FACTORY_ID]: [
-      ...(defaultFactoriesFixture.workOrdersByFactoryId[PRIMARY_FACTORY_ID] ?? []),
+      ...(defaultFactoriesFixture.workOrdersByFactoryId[PRIMARY_FACTORY_ID] ?? [])
+        .map(withPlanPhase)
+        .map(withVerifyPhase)
+        .map(withWaitingPrReview)
+        .map(withDonePhase),
+      BOARD_IMPLEMENT_FAILED_ORDER,
+      BOARD_DONE_COMPLETED_SLA,
+      BOARD_DONE_COMPLETED_PLAYBOOK,
+      BOARD_DONE_REJECTED_ORDER,
+      BOARD_DONE_CANCELED_ORDER,
       FEATURE_RUNNING_WORK_ORDER,
       FEATURE_PR_WORK_ORDER,
       FEATURE_CI_WORK_ORDER,
@@ -254,4 +239,8 @@ export const fiveStepLineFactoriesFixture: FactoriesFixture = {
       }),
     };
   }),
+  appsByFactoryId: {
+    ...defaultFactoriesFixture.appsByFactoryId,
+    [PRIMARY_FACTORY_ID]: [BACKLOG_APP, ...(defaultFactoriesFixture.appsByFactoryId[PRIMARY_FACTORY_ID] ?? [])],
+  },
 };

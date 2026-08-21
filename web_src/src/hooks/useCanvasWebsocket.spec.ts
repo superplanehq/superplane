@@ -199,6 +199,66 @@ describe("useCanvasWebsocket", () => {
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(0);
   });
 
+  it("patches execution events into the describe-run cache", async () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(canvasKeys.run(testCanvasId, "run-1"), {
+      run: {
+        id: "run-1",
+        canvasId: testCanvasId,
+        state: "STATE_STARTED",
+        executions: [],
+      },
+    });
+
+    renderCanvasWebsocketHook(queryClient);
+    emitWebsocketMessage("execution_started", {
+      id: "execution-1",
+      runId: "run-1",
+      nodeId: testNodeId,
+      state: "STATE_STARTED",
+      updatedAt: "2026-06-01T12:00:00.000Z",
+    });
+
+    await flushMessageQueue();
+
+    await waitFor(() => {
+      const described = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(canvasKeys.run(testCanvasId, "run-1"));
+      expect(described?.run?.executions?.[0]?.id).toBe("execution-1");
+      expect(described?.run?.executions?.[0]?.state).toBe("STATE_STARTED");
+    });
+  });
+
+  it("patches describe-run cache when an execution omits runId and matches the root event", async () => {
+    const queryClient = new QueryClient();
+    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+    const run = {
+      id: "run-1",
+      canvasId: testCanvasId,
+      state: "STATE_STARTED" as const,
+      rootEvent: { id: "event-1", nodeId: testNodeId },
+      executions: [],
+    };
+    queryClient.setQueryData(canvasKeys.run(testCanvasId, "run-1"), { run });
+    seedInfiniteRuns(queryClient, [run]);
+
+    renderCanvasWebsocketHook(queryClient);
+    emitWebsocketMessage("execution_started", {
+      id: "execution-1",
+      nodeId: testNodeId,
+      state: "STATE_STARTED",
+      updatedAt: "2026-06-01T12:00:00.000Z",
+      rootEvent: { id: "event-1", nodeId: testNodeId },
+    });
+
+    await flushMessageQueue();
+
+    await waitFor(() => {
+      const described = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(canvasKeys.run(testCanvasId, "run-1"));
+      expect(described?.run?.executions?.[0]?.id).toBe("execution-1");
+    });
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(0);
+  });
+
   it("invalidates infinite runs when execution events cannot be patched into cached runs", async () => {
     const queryClient = new QueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();

@@ -1,12 +1,13 @@
-import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesFactory } from "@/api-client";
 import { Link } from "@/components/Link/link";
+import { PermissionTooltip } from "@/components/PermissionGate";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactories, useFactory, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Plus } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from "react-router";
 import { CreateWorkOrderDialog } from "../CreateWorkOrderDialog";
@@ -21,12 +22,10 @@ import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
 import { useOnboardingStorybook } from "../pages/onboarding/useOnboardingStorybook";
 import { isFactoryOnboardingComplete } from "../pages/onboarding/onboardingStatus";
 import { FactoriesLayoutContext } from "./factoriesLayoutContext";
-import { FactoriesNav } from "./FactoriesNav";
+import { factoriesRailControlClassName } from "./factoriesRail";
 import { SidebarUserMenu } from "./SidebarUserMenu";
 import { useCreateWorkOrderDialogState } from "./useCreateWorkOrderDialogState";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
-
-const MAX_RECENT_WORK_ORDERS = 5;
 
 function isOnboardingSidebarHidden(pendingWorkspaceId: string | undefined, factoryId: string) {
   return Boolean(pendingWorkspaceId && pendingWorkspaceId === factoryId);
@@ -121,7 +120,6 @@ function FactoriesLayoutContent({
   const { data: organization } = useOrganization(organizationId);
   const { data: factory, error: factoryError } = useFactory(organizationId, factoryId);
   useFactoryWebsocket(organizationId, factoryId);
-  const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
 
   const storybookOnboarding = useOnboardingStorybook();
 
@@ -151,7 +149,7 @@ function FactoriesLayoutContent({
     }
   }, [account?.id, factoryError, factoryId, organizationId]);
 
-  const recentWorkOrders = useMemo(() => sortRecentWorkOrders(workOrders), [workOrders]);
+  const canCreateWorkOrder = canAct("work_orders", "create");
 
   const layoutContextValue = useMemo(
     () => ({
@@ -197,9 +195,10 @@ function FactoriesLayoutContent({
             accountAvatarUrl={account?.avatar_url}
             canOpenSettings={canAct("factories", "update")}
             canCreateFactory={canAct("factories", "create")}
+            canCreateWorkOrder={canCreateWorkOrder}
             permissionsLoading={permissionsLoading}
-            recentWorkOrders={recentWorkOrders}
             onOpenCreateFactory={() => navigate(newFactoryPath(organizationId))}
+            onCreateWorkOrder={openCreateWorkOrder}
           />
         )}
         <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
@@ -207,7 +206,7 @@ function FactoriesLayoutContent({
         </main>
       </div>
 
-      {canAct("work_orders", "create") ? (
+      {canCreateWorkOrder ? (
         <CreateWorkOrderDialog
           open={createWorkOrderOpen}
           onClose={closeCreateWorkOrder}
@@ -228,9 +227,10 @@ interface FactoriesSidebarProps {
   accountAvatarUrl?: string | null;
   canOpenSettings: boolean;
   canCreateFactory: boolean;
+  canCreateWorkOrder: boolean;
   permissionsLoading: boolean;
-  recentWorkOrders: FactoriesWorkOrder[];
   onOpenCreateFactory: () => void;
+  onCreateWorkOrder: () => void;
 }
 
 function FactoriesSidebar({
@@ -243,13 +243,14 @@ function FactoriesSidebar({
   accountAvatarUrl,
   canOpenSettings,
   canCreateFactory,
+  canCreateWorkOrder,
   permissionsLoading,
-  recentWorkOrders,
   onOpenCreateFactory,
+  onCreateWorkOrder,
 }: FactoriesSidebarProps) {
   return (
     <aside
-      className="sticky top-0 flex h-screen w-[var(--workspace-navigation-width)] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
+      className="sticky top-0 flex h-screen w-[var(--workspace-navigation-width)] shrink-0 flex-col items-center border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
       data-testid="factories-sidebar"
     >
       <WorkspaceSwitcher
@@ -261,9 +262,27 @@ function FactoriesSidebar({
         permissionsLoading={permissionsLoading}
         onCreateFactory={onOpenCreateFactory}
       />
-      <div className="flex-1 overflow-y-auto">
-        <FactoriesNav organizationId={organizationId} factoryKey={factoryKey} recentWorkOrders={recentWorkOrders} />
-      </div>
+      <PermissionTooltip
+        allowed={canCreateWorkOrder || permissionsLoading}
+        message="You don't have permission to create work orders."
+      >
+        <button
+          type="button"
+          onClick={() => {
+            if (canCreateWorkOrder) {
+              onCreateWorkOrder();
+            }
+          }}
+          disabled={!canCreateWorkOrder}
+          aria-label="Create work order"
+          title="Create work order"
+          data-testid="factories-sidebar-create-work-order"
+          className={factoriesRailControlClassName}
+        >
+          <Plus className="size-3.5" aria-hidden />
+        </button>
+      </PermissionTooltip>
+      <div className="flex-1" />
       <SidebarUserMenu
         organizationId={organizationId}
         factoryKey={factoryKey}
@@ -306,15 +325,4 @@ function FactoriesLayoutError({ organizationId }: { organizationId: string }) {
       </div>
     </div>
   );
-}
-
-// Newest first, based on updatedAt then createdAt.
-function sortRecentWorkOrders<T extends { updatedAt?: string; createdAt?: string }>(orders: T[]): T[] {
-  return [...orders]
-    .sort((a, b) => {
-      const aTime = Date.parse(a.updatedAt ?? a.createdAt ?? "") || 0;
-      const bTime = Date.parse(b.updatedAt ?? b.createdAt ?? "") || 0;
-      return bTime - aTime;
-    })
-    .slice(0, MAX_RECENT_WORK_ORDERS);
 }

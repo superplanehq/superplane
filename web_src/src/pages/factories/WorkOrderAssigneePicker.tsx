@@ -62,13 +62,8 @@ export function WorkOrderAssigneePicker({
       return;
     }
 
-    onChange(
-      checked
-        ? selectedIds.includes(userId)
-          ? selectedIds
-          : [...selectedIds, userId]
-        : selectedIds.filter((id) => id !== userId),
-    );
+    // A work order has one owner. Checking a person replaces the current owner.
+    onChange(checked ? [userId] : selectedIds.filter((id) => id !== userId));
   };
 
   if (isLoading) {
