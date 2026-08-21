@@ -46,14 +46,25 @@ export function RunOverlayFrame({
   testId,
   wide = false,
   canvas = false,
+  fixed = false,
+  onDismiss,
 }: {
   children: ReactNode;
   testId: string;
   wide?: boolean;
   canvas?: boolean;
+  /** Cover the viewport. Use on the live line board so overflow does not clip the dialog. */
+  fixed?: boolean;
+  onDismiss?: () => void;
 }) {
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 p-3 sm:p-6">
+    <div
+      className={cn(
+        "inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-6",
+        fixed ? "fixed" : "absolute",
+      )}
+      onClick={onDismiss}
+    >
       <div
         className={cn(
           "flex max-h-[min(52rem,calc(100vh-2.5rem))] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-lg dark:bg-gray-900",
@@ -66,6 +77,7 @@ export function RunOverlayFrame({
         data-testid={testId}
         role="dialog"
         aria-modal="true"
+        onClick={(event) => event.stopPropagation()}
       >
         {children}
       </div>

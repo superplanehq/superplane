@@ -91,6 +91,41 @@ export function buildLinePhaseBoard(
   });
 }
 
+/**
+ * Draft work orders that are not on a line yet. Newest updated drafts
+ * come first.
+ */
+export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
+  return workOrders.filter(isLineBacklogOrder).sort(compareOrdersNewestFirst);
+}
+
+/** Factory-level intake automation. It is not a line step. */
+export function findBacklogAutomationApp(
+  apps: Array<{ id?: string; name?: string }>,
+): { id: string; name: string } | undefined {
+  const match = apps.find((app) => app.id && (app.name === "Backlog" || app.id === "app-refund-backlog"));
+  if (!match?.id) {
+    return undefined;
+  }
+  return { id: match.id, name: match.name ?? "Backlog" };
+}
+
+function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {
+  if (!order.id || order.state !== "STATE_DRAFT") {
+    return false;
+  }
+  return (order.lineDispatches ?? []).length === 0;
+}
+
+function compareOrdersNewestFirst(left: FactoriesWorkOrder, right: FactoriesWorkOrder): number {
+  const leftTime = Date.parse(left.updatedAt ?? left.createdAt ?? "") || 0;
+  const rightTime = Date.parse(right.updatedAt ?? right.createdAt ?? "") || 0;
+  if (leftTime !== rightTime) {
+    return rightTime - leftTime;
+  }
+  return (right.id ?? "").localeCompare(left.id ?? "");
+}
+
 export function resolvePhaseRunStatus(execution: WorkOrderStepRow): {
   kind: "running" | "waiting" | "queued" | "failed" | "idle";
   label: string;

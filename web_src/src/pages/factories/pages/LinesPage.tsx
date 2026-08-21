@@ -9,13 +9,15 @@ import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { ChevronDown, Clock, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
+import { ChevronDown, Clock, Inbox, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import {
   buildLinePhaseBoard,
+  collectLineBacklogOrders,
+  findBacklogAutomationApp,
   LINE_PHASE_RUNS_PAGE_SIZE,
   resolveColumnGlyph,
   resolvePhaseRunStatus,
@@ -33,7 +35,8 @@ import {
   type BoardLaneTone,
 } from "../workOrders/WorkOrderBoardChrome";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
-import { WorkOrderPeekDialog } from "../WorkOrderPeekDialog";
+import { ConceptJobPopup } from "./work-order-popup-redesign/ConceptJobPopup";
+import { popupFixtureForWorkOrder } from "./work-order-popup-redesign/workOrderPopupMocks";
 import {
   createFactoryLinePath,
   editFactoryLinePath,
@@ -276,34 +279,34 @@ function LineDetail({
 }) {
   const steps = line.steps ?? [];
   const board = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
+  const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
   const [peekOrderId, setPeekOrderId] = useState<string | null>(null);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
-      {steps.length === 0 ? (
+      {steps.length === 0 && backlogOrders.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">No phases yet. Edit this line to add app-driven phases.</p>
       ) : (
         <PhaseBoard
           organizationId={organizationId}
           factoryKey={factoryKey}
           lineId={line.id}
+          apps={apps}
+          backlogOrders={backlogOrders}
           columns={board}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={setPeekOrderId}
         />
       )}
-      <WorkOrderPeekDialog
-        open={Boolean(peekOrderId)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPeekOrderId(null);
-          }
-        }}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        factoryKey={factoryKey}
-        orderId={peekOrderId}
-      />
+      {peekOrderId ? (
+        <ConceptJobPopup
+          fixture={popupFixtureForWorkOrder(workOrders.find((order) => order.id === peekOrderId))}
+          organizationId={organizationId}
+          factoryKey={factoryKey}
+          onClose={() => setPeekOrderId(null)}
+          fixed
+        />
+      ) : null}
     </div>
   );
 }
@@ -312,6 +315,8 @@ function PhaseBoard({
   organizationId,
   factoryKey,
   lineId,
+  apps,
+  backlogOrders,
   columns,
   workOrderCardContext,
   onOpenWorkOrder,
@@ -319,12 +324,27 @@ function PhaseBoard({
   organizationId: string;
   factoryKey: string;
   lineId?: string;
+  apps: Array<{ id?: string; name?: string }>;
+  backlogOrders: FactoriesWorkOrder[];
   columns: LinePhaseColumn[];
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string) => void;
 }) {
+  const backlogApp = findBacklogAutomationApp(apps);
+  const backlogConfigureHref = backlogApp
+    ? factoryAppConfigurePath(organizationId, factoryKey, backlogApp.id, { from: "lines", lineId })
+    : null;
+
   return (
     <WorkOrderKanbanBoard testId="lines-phase-board">
+      <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
+        <BacklogColumn
+          orders={backlogOrders}
+          configureHref={backlogConfigureHref}
+          workOrderCardContext={workOrderCardContext}
+          onOpenWorkOrder={onOpenWorkOrder}
+        />
+      </div>
       {columns.map((column, index) => (
         <div
           key={`${column.stepIndex}-${column.stepName}`}
@@ -344,6 +364,71 @@ function PhaseBoard({
         </div>
       ))}
     </WorkOrderKanbanBoard>
+  );
+}
+
+function BacklogColumn({
+  orders,
+  configureHref,
+  workOrderCardContext,
+  onOpenWorkOrder,
+}: {
+  orders: FactoriesWorkOrder[];
+  configureHref: string | null;
+  workOrderCardContext: WorkOrderCardContext;
+  onOpenWorkOrder: (orderId: string) => void;
+}) {
+  return (
+    <WorkOrderBoardLane
+      title="Backlog"
+      label="Backlog"
+      count={orders.length}
+      tone="neutral"
+      emptyDescription="No work orders in the backlog."
+      className="bg-muted"
+      leading={<Inbox className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />}
+      actions={
+        configureHref ? <ColumnConfigureMenu title="Backlog" href={configureHref} testId="lines-backlog-menu" /> : null
+      }
+      testId="lines-backlog-column"
+    >
+      <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-backlog-column-scroll">
+        {orders.map((order) => (
+          <li key={order.id}>
+            <LineBoardOrderCard
+              order={order}
+              workOrderCardContext={workOrderCardContext}
+              onOpenWorkOrder={onOpenWorkOrder}
+            />
+          </li>
+        ))}
+      </ul>
+    </WorkOrderBoardLane>
+  );
+}
+
+function ColumnConfigureMenu({ title, href, testId }: { title: string; href: string; testId: string }) {
+  const navigate = useNavigate();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`${title} menu`}
+          className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          data-testid={testId}
+        >
+          <MoreHorizontal className="size-3.5" aria-hidden />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuItem onClick={() => navigate(href)} data-testid={`${testId}-edit`}>
+          <Pencil className="h-3.5 w-3.5" aria-hidden />
+          Edit
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -481,6 +566,31 @@ function PhaseRunCard({
         </p>
       ) : null}
     </div>
+  );
+}
+
+function LineBoardOrderCard({
+  order,
+  workOrderCardContext,
+  onOpenWorkOrder,
+}: {
+  order: FactoriesWorkOrder;
+  workOrderCardContext: WorkOrderCardContext;
+  onOpenWorkOrder: (orderId: string) => void;
+}) {
+  const { factory } = useFactoriesLayout();
+  const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [order, factory]);
+
+  return (
+    <WorkOrderCard
+      {...workOrderCardContext}
+      entry={entry}
+      onOpen={() => {
+        if (order.id) {
+          onOpenWorkOrder(order.id);
+        }
+      }}
+    />
   );
 }
 
