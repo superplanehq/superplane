@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { MockInstance } from "vitest";
 
 import { MemorySourceControls, RunSourceControls } from "./MarkdownVariableSourceControls";
 
@@ -29,7 +30,7 @@ describe("MemorySourceControls", () => {
   // Radix's Select emits its controlled/uncontrolled mismatch warning via
   // `console.warn` (see @radix-ui/react-use-controllable-state), not
   // `console.error`, so that's what regression tests for this bug need to spy on.
-  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+  let consoleWarnSpy: MockInstance<typeof console.warn>;
 
   beforeEach(() => {
     consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -50,8 +51,8 @@ describe("MemorySourceControls", () => {
     );
 
     const warnings = consoleWarnSpy.mock.calls
-      .map((args: unknown[]) => args.join(" "))
-      .filter((message: string) => message.includes("controlled"));
+      .map((args) => args.join(" "))
+      .filter((message) => message.includes("controlled"));
     expect(warnings).toEqual([]);
   });
 });

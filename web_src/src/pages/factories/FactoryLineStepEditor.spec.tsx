@@ -1,5 +1,6 @@
 import { render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { MockInstance } from "vitest";
 
 import type { FactoryApp } from "@/api-client";
 
@@ -17,7 +18,7 @@ describe("FactoryLineStepEditor", () => {
   // Radix's Select emits its controlled/uncontrolled mismatch warning via
   // `console.warn` (see @radix-ui/react-use-controllable-state), which is
   // what regression tests for this bug need to spy on.
-  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+  let consoleWarnSpy: MockInstance<typeof console.warn>;
 
   beforeEach(() => {
     consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -67,8 +68,8 @@ describe("FactoryLineStepEditor", () => {
     );
 
     const warnings = consoleWarnSpy.mock.calls
-      .map((args: unknown[]) => args.join(" "))
-      .filter((message: string) => message.includes("controlled"));
+      .map((args) => args.join(" "))
+      .filter((message) => message.includes("controlled"));
     expect(warnings).toEqual([]);
   });
 });
