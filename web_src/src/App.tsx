@@ -29,6 +29,7 @@ import {
   FactoriesIndexPage,
   FactoriesLayout,
   FactoryAppCanvasPage,
+  FactoryAppSplitRunPage,
   FactoryHomeRedirect,
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
@@ -208,6 +209,7 @@ function AppRouter() {
                         <Route path=":appId" element={<AutomationsPage />} />
                       </Route>
                       <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
+                      <Route path="apps/:appId/split-run" element={<FactoryAppSplitRunPage />} />
                     </Route>
                     <Route path="settings/*" element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
                   </Route>

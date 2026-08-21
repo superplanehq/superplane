@@ -21,6 +21,7 @@ import {
   FactoriesIndexPage,
   FactoriesLayout,
   FactoryAppCanvasPage,
+  FactoryAppSplitRunPage,
   FactoryHomeRedirect,
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
@@ -271,6 +272,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 <Route path=":appId" element={<AutomationsPage />} />
               </Route>
               <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
+              <Route path="apps/:appId/split-run" element={<FactoryAppSplitRunPage />} />
             </Route>
           </Route>
           <Route path=":factoryKey/settings" element={factoryRoute(<FactorySettingsLayout />)}>

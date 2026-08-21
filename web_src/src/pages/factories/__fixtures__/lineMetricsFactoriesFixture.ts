@@ -17,6 +17,7 @@ import {
   OPEN_WORK_ORDER_SECONDARY,
   LAST_WEEK,
   LINE_RUN_IMPLEMENT_ID,
+  LINE_RUN_IMPLEMENT_FAILED_ID,
   LINE_RUN_VERIFY_PASSED_ID,
   OPERATOR_USER,
   PR_CLOSURE_COMPLETED_WORK_ORDER,
@@ -178,23 +179,73 @@ function withVerifyPhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
   };
 }
 
-function withFailedWaitingNote(order: FactoriesWorkOrder): FactoriesWorkOrder {
+function withWaitingPrReview(order: FactoriesWorkOrder): FactoriesWorkOrder {
   if (order.id !== FAILED_WORK_ORDER.id) {
+    return order;
+  }
+  const dispatch = order.lineDispatches?.[0];
+  if (!dispatch) {
     return order;
   }
   return {
     ...order,
-    statusNotes: [
+    statusNotes: OPEN_WORK_ORDER.statusNotes,
+    lineDispatches: [
       {
-        key: "implement-failed",
-        kind: "warning",
-        headline: "Review the failed implement step",
-        body: "Implement did not pass. Open the log, then dispatch the line again.",
-        updatedAt: HOUR_AGO,
+        ...dispatch,
+        result: "RESULT_UNKNOWN",
+        stepExecutions: (dispatch.stepExecutions ?? []).map((execution) =>
+          execution.stepIndex === 1 ? { ...execution, result: "RESULT_PASSED" } : execution,
+        ),
       },
     ],
   };
 }
+
+export const BOARD_IMPLEMENT_FAILED_ORDER: FactoriesWorkOrder = {
+  id: "wo-board-implement-failed",
+  number: "106",
+  key: "RF-106",
+  title: "Fix refund dispatcher timeout loop",
+  description:
+    "The implement step stopped when backend tests failed on the reconciliation worker. Diagnose the run, then dispatch the line again.",
+  state: "STATE_CLOSED",
+  result: "RESULT_FAILED",
+  createdAt: YESTERDAY,
+  updatedAt: HOUR_AGO,
+  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  totalTokens: "6400",
+  totalCostCents: "210",
+  lineDispatches: [
+    {
+      ...planLineActiveDispatch("wo-board-implement-failed", [
+        {
+          id: "exec-failed-plan",
+          step: "Plan",
+          stepIndex: 0,
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: TWO_HOURS_AGO,
+          updatedAt: TWO_HOURS_AGO,
+          run: { id: "run-failed-plan", appId: "app-refund-planner", appName: "Plan" },
+        },
+        {
+          id: "exec-failed-implement",
+          step: "Implement",
+          stepIndex: 1,
+          state: "STATE_FINISHED",
+          result: "RESULT_FAILED",
+          createdAt: TWO_HOURS_AGO,
+          updatedAt: HOUR_AGO,
+          run: { id: LINE_RUN_IMPLEMENT_FAILED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+        },
+      ]),
+      state: "STATE_FINISHED",
+      result: "RESULT_FAILED",
+    },
+  ],
+};
 
 function withDonePhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
   const doneRun =
@@ -427,8 +478,9 @@ export const lineMetricsFactoriesFixture: FactoriesFixture = {
       ...(defaultFactoriesFixture.workOrdersByFactoryId[PRIMARY_FACTORY_ID] ?? [])
         .map(withPlanPhase)
         .map(withVerifyPhase)
-        .map(withFailedWaitingNote)
+        .map(withWaitingPrReview)
         .map(withDonePhase),
+      BOARD_IMPLEMENT_FAILED_ORDER,
       FEATURE_RUNNING_WORK_ORDER,
       FEATURE_PR_WORK_ORDER,
       FEATURE_CI_WORK_ORDER,

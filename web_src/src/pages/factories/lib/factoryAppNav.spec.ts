@@ -80,7 +80,7 @@ describe("resolveFactoryAppBackNav", () => {
 describe("factoryAppPath", () => {
   it("builds embed path with run and from", () => {
     expect(factoryAppRunPath("org", "fac", "app-1", "run-1", { from: "automations" })).toBe(
-      "/org/workspaces/fac/apps/app-1?run=run-1&from=automations",
+      "/org/workspaces/fac/apps/app-1/split-run?run=run-1&from=automations",
     );
     expect(factoryAppPath("org", "fac", "app-1", { from: "lines", lineId: "line-1" })).toBe(
       "/org/workspaces/fac/apps/app-1?from=lines&lineId=line-1",

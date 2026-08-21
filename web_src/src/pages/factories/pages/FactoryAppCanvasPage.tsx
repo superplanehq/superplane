@@ -1,6 +1,8 @@
 import { AppPage } from "@/pages/app";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { Navigate } from "react-router";
 import { DEFAULT_SUPERPLANE_BASE_URL, buildAgentEditPrompt } from "../lib/agentEditPrompt";
+import { factoryAppSplitRunPath, parseFactoryAppNavFrom } from "../lib/factoryPagePaths";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { AgentSetupPromptDialog } from "./AgentSetupPromptDialog";
 import { FactoryAppCanvasHeader } from "./FactoryAppCanvasHeader";
@@ -9,10 +11,9 @@ import { FactoryCanvasYamlModal } from "./FactoryCanvasYamlModal";
 import { useFactoryAppCanvasPageModel } from "./useFactoryAppCanvasPageModel";
 
 /**
- * Factory-shell embed for a factory-owned app/canvas. Keeps the workspace
- * sidebar and a route-aware back header. View mode is read-only; `?configure=1`
- * opens Configure (edit mode) with Discard / Save. Storybook adds Edit, Agent,
- * Components, and More options; the live app does not.
+ * Factory-shell embed for a factory-owned app/canvas. Configure (`?configure=1`)
+ * stays here. Viewing a run (`?run=` without configure) redirects to the
+ * split-run page — the line-board popup is the run surface.
  */
 export function FactoryAppCanvasPage() {
   const { factory } = useFactoriesLayout();
@@ -32,6 +33,20 @@ export function FactoryAppCanvasPage() {
 
   if (model.shouldRedirect) {
     return <FactoryAppCanvasRedirect organizationId={model.organizationId} factoryKey={model.factoryKey} />;
+  }
+
+  if (model.runId && !model.isConfigure) {
+    return (
+      <Navigate
+        to={factoryAppSplitRunPath(model.organizationId, model.factoryKey, model.appId, {
+          from: parseFactoryAppNavFrom(model.from),
+          lineId: model.lineId ?? undefined,
+          runId: model.runId,
+          orderNumber: model.orderNumber ?? undefined,
+        })}
+        replace
+      />
+    );
   }
 
   return (

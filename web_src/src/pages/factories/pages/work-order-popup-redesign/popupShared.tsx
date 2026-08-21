@@ -20,16 +20,18 @@ export function PopupShell({
   children,
   fixed = false,
   wide = false,
+  canvas = false,
   onDismiss,
 }: {
   testId: string;
   children: ReactNode;
   fixed?: boolean;
   wide?: boolean;
+  canvas?: boolean;
   onDismiss?: () => void;
 }) {
   return (
-    <RunOverlayFrame testId={testId} fixed={fixed} wide={wide} onDismiss={onDismiss}>
+    <RunOverlayFrame testId={testId} fixed={fixed} wide={wide} canvas={canvas} onDismiss={onDismiss}>
       {children}
     </RunOverlayFrame>
   );
@@ -60,8 +62,18 @@ export function PopupHeader({
   );
 }
 
+type OwnerTimeCostFields = Pick<PopupFixture, "owner" | "startedLabel" | "elapsed" | "costUsd" | "tokensLabel">;
+
 /** Owner, elapsed time, and spend. No status, author, or ticket key. */
-export function OwnerTimeCostRow({ fixture, className }: { fixture: PopupFixture; className?: string }) {
+export function OwnerTimeCostRow({
+  fixture,
+  className,
+  children,
+}: {
+  fixture: OwnerTimeCostFields;
+  className?: string;
+  children?: ReactNode;
+}) {
   return (
     <div
       className={cn("mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-foreground", className)}
@@ -80,6 +92,7 @@ export function OwnerTimeCostRow({ fixture, className }: { fixture: PopupFixture
           {fixture.costUsd} <span className="text-muted-foreground">·</span> {fixture.tokensLabel}
         </span>
       </span>
+      {children}
     </div>
   );
 }

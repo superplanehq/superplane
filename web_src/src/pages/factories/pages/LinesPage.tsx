@@ -9,7 +9,7 @@ import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { ChevronDown, Clock, Inbox, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
+import { Clock, Inbox, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
@@ -35,12 +35,14 @@ import {
   type BoardLaneTone,
 } from "../workOrders/WorkOrderBoardChrome";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
-import { ConceptJobPopup } from "./work-order-popup-redesign/ConceptJobPopup";
-import { popupFixtureForWorkOrder } from "./work-order-popup-redesign/workOrderPopupMocks";
+import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
+import type { SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
+import { splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
 import {
   createFactoryLinePath,
   editFactoryLinePath,
   factoryAppConfigurePath,
+  factoryAppSplitRunPath,
   factoryLineDetailPath,
   linesPath,
 } from "../lib/factoryPagePaths";
@@ -101,7 +103,6 @@ export function LinesPage() {
             organizationId={organizationId}
             factoryKey={factoryKey}
             line={selectedLine}
-            lines={lines}
             apps={factoryApps}
             canUpdate={canUpdate}
           />
@@ -186,14 +187,12 @@ function LineDetailHeader({
   organizationId,
   factoryKey,
   line,
-  lines,
   apps,
   canUpdate,
 }: {
   organizationId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
-  lines: FactoriesFactoryLine[];
   apps: Array<{ id?: string; name?: string }>;
   canUpdate: boolean;
 }) {
@@ -202,7 +201,6 @@ function LineDetailHeader({
     <WorkspacePageHeader
       className={factorySectionHeaderClassName}
       title={humanizeLineName(line.name)}
-      leading={<LineBoardSwitcher organizationId={organizationId} factoryKey={factoryKey} lines={lines} />}
       subtitle={formatLinePhaseDescription(line.steps, apps)}
       actions={
         canUpdate ? (
@@ -215,48 +213,6 @@ function LineDetailHeader({
         ) : undefined
       }
     />
-  );
-}
-
-function LineBoardSwitcher({
-  organizationId,
-  factoryKey,
-  lines,
-}: {
-  organizationId: string;
-  factoryKey: string;
-  lines: FactoriesFactoryLine[];
-}) {
-  const navigate = useNavigate();
-  const switchableLines = lines.filter((entry) => Boolean(entry.id));
-  if (switchableLines.length <= 1) {
-    return null;
-  }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-          data-testid="lines-switcher"
-          aria-label="Switch line"
-        >
-          <ChevronDown className="size-4" aria-hidden />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
-        {switchableLines.map((entry) => (
-          <DropdownMenuItem
-            key={entry.id}
-            onClick={() => navigate(factoryLineDetailPath(organizationId, factoryKey, entry.id!))}
-            data-testid={`lines-switcher-${entry.id}`}
-          >
-            {humanizeLineName(entry.name)}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
@@ -281,6 +237,15 @@ function LineDetail({
   const board = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
   const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
   const [peekOrderId, setPeekOrderId] = useState<string | null>(null);
+  const peekOrder = workOrders.find((order) => order.id === peekOrderId);
+  const canvasEditHref = useMemo(
+    () => canvasEditHrefForLine(organizationId, factoryKey, line, apps),
+    [organizationId, factoryKey, line, apps],
+  );
+  const canvasExpandHref = useMemo(
+    () => canvasExpandHrefForLine(organizationId, factoryKey, line, apps, peekOrder),
+    [organizationId, factoryKey, line, apps, peekOrder],
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
@@ -299,16 +264,88 @@ function LineDetail({
         />
       )}
       {peekOrderId ? (
-        <ConceptJobPopup
-          fixture={popupFixtureForWorkOrder(workOrders.find((order) => order.id === peekOrderId))}
-          organizationId={organizationId}
-          factoryKey={factoryKey}
+        <WorkOrderSplitRunPopup
+          key={peekOrderId}
+          fixture={splitRunFixtureForWorkOrder(workOrders.find((order) => order.id === peekOrderId))}
+          canvasEditHref={canvasEditHref}
+          canvasExpandHref={canvasExpandHref}
           onClose={() => setPeekOrderId(null)}
           fixed
         />
       ) : null}
     </div>
   );
+}
+
+function canvasAppIdsForLine(
+  line: FactoriesFactoryLine,
+  apps: Array<{ id?: string; name?: string }>,
+): Record<SplitRunCanvasKey, string | undefined> {
+  const backlog = findBacklogAutomationApp(apps);
+  const steps = line.steps ?? [];
+  return {
+    intake: backlog?.id,
+    planning: steps[0]?.app?.app,
+    implementation: steps[1]?.app?.app,
+    risk: steps[2]?.app?.app,
+    closure: steps[3]?.app?.app,
+  };
+}
+
+function canvasEditHrefForLine(
+  organizationId: string,
+  factoryKey: string,
+  line: FactoriesFactoryLine,
+  apps: Array<{ id?: string; name?: string }>,
+): (key: SplitRunCanvasKey) => string | undefined {
+  const appIdByCanvas = canvasAppIdsForLine(line, apps);
+
+  return (key) => {
+    const appId = appIdByCanvas[key];
+    if (!appId) {
+      return undefined;
+    }
+    return factoryAppConfigurePath(organizationId, factoryKey, appId, { from: "lines", lineId: line.id });
+  };
+}
+
+function canvasExpandHrefForLine(
+  organizationId: string,
+  factoryKey: string,
+  line: FactoriesFactoryLine,
+  apps: Array<{ id?: string; name?: string }>,
+  order: FactoriesWorkOrder | undefined,
+): (key: SplitRunCanvasKey) => string | undefined {
+  const appIdByCanvas = canvasAppIdsForLine(line, apps);
+
+  return (key) => {
+    const appId = appIdByCanvas[key];
+    if (!appId) {
+      return undefined;
+    }
+    return factoryAppSplitRunPath(organizationId, factoryKey, appId, {
+      from: "lines",
+      lineId: line.id,
+      runId: executionRunIdForCanvas(order, key),
+      orderNumber: order?.number,
+      canvas: key,
+    });
+  };
+}
+
+function executionRunIdForCanvas(order: FactoriesWorkOrder | undefined, key: SplitRunCanvasKey): string | undefined {
+  const stepIndex: Partial<Record<SplitRunCanvasKey, number>> = {
+    planning: 0,
+    implementation: 1,
+    risk: 2,
+    closure: 3,
+  };
+  const index = stepIndex[key];
+  if (index == null) {
+    return undefined;
+  }
+  const executions = order?.lineDispatches?.[0]?.stepExecutions ?? [];
+  return executions.find((execution) => execution.stepIndex === index)?.run?.id;
 }
 
 function PhaseBoard({

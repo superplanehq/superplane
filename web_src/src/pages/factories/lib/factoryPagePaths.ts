@@ -151,13 +151,16 @@ export function factoryAppConfigurePath(
   });
 }
 
-/** Factory canvas view URL. Keeps run/from context and omits edit chrome. */
+/** Factory canvas view URL. Run views use the split-run page. */
 export function factoryAppViewPath(
   organizationId: string,
   factoryKey: string,
   appId: string,
   options?: Pick<FactoryAppNavOptions, "from" | "lineId" | "orderNumber" | "runId">,
 ) {
+  if (options?.runId) {
+    return factoryAppSplitRunPath(organizationId, factoryKey, appId, options);
+  }
   return factoryAppPath(organizationId, factoryKey, appId, options);
 }
 
@@ -177,7 +180,33 @@ export function factoryAppRunPath(
   runId: string,
   options?: Omit<FactoryAppNavOptions, "runId">,
 ) {
-  return factoryAppPath(organizationId, factoryKey, appId, { ...options, runId });
+  return factoryAppSplitRunPath(organizationId, factoryKey, appId, { ...options, runId });
+}
+
+export function factoryAppSplitRunPath(
+  organizationId: string,
+  factoryKey: string,
+  appId: string,
+  options?: Omit<FactoryAppNavOptions, "configure" | "blocks"> & { canvas?: string },
+) {
+  const search = new URLSearchParams();
+  if (options?.runId) {
+    search.set("run", options.runId);
+  }
+  if (options?.from) {
+    search.set("from", options.from);
+  }
+  if (options?.lineId) {
+    search.set("lineId", options.lineId);
+  }
+  if (options?.orderNumber) {
+    search.set("orderNumber", options.orderNumber);
+  }
+  if (options?.canvas) {
+    search.set("canvas", options.canvas);
+  }
+  const qs = search.toString();
+  return `${factoryDetailPath(organizationId, factoryKey)}/apps/${appId}/split-run${qs ? `?${qs}` : ""}`;
 }
 
 export function factorySettingsPath(organizationId: string, factoryKey: string) {

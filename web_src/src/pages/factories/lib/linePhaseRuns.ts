@@ -39,7 +39,7 @@ export type LinePhaseColumn = {
 export const LINE_PHASE_RUNS_PAGE_SIZE = 3;
 
 /**
- * Destination for a phase-board card: the canvas run for this phase.
+ * Destination for a phase-board card: the split-run page for this phase.
  * Never the work order page — that destination stays on the Work Orders list.
  */
 export function linePhaseRunHref(
