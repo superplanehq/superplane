@@ -244,12 +244,9 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
   createdAt: HOUR_AGO,
   updatedAt: HOUR_AGO,
   createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
-  assignees: [
-    { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
-    { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-  ],
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [],
-  // A watcher automation announcing why the order is Waiting — the detail
+  // A watcher automation announcing why the order needs attention — the detail
   // page renders it as the "next step" panel above the checks.
   statusNotes: [
     {
@@ -288,7 +285,7 @@ export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
   lineDispatches: [],
 };
 
-// Storybook user is co-assigned so "mine + running" surfaces this order.
+// Storybook user owns this order so "mine + running" surfaces it.
 export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-running-refunds",
   number: "103",
@@ -306,10 +303,7 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
   createdBy: { user: { id: REVIEWER_USER.id, name: REVIEWER_USER.name } },
-  assignees: [
-    { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
-    { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-  ],
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     planLineDispatch([
       planLineExecution("plan", {

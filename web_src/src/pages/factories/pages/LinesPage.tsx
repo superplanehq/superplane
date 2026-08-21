@@ -121,6 +121,7 @@ export function LinesPage() {
               factoryKey,
               factoryLines: lines,
               canDispatch: canUpdateWorkOrders,
+              preferredLineName: selectedLine.name,
               canAssign: canUpdateWorkOrders,
               ...cardActions,
             }}

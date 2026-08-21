@@ -295,7 +295,7 @@ export function phaseById(fixture: SplitRunFixture, id: SplitRunPhaseId): SplitR
 export function splitRunStatusLabel(status: SplitRunPhaseStatus): string {
   if (status === "passed") return "Completed";
   if (status === "running") return "Running";
-  if (status === "waiting") return "Waiting";
+  if (status === "waiting") return "Needs attention";
   if (status === "failed") return "Failed";
   return "Pending";
 }

@@ -139,7 +139,7 @@ describe("splitRunFixtureForWorkOrder", () => {
 
     expect(fixture.lineStatus).toBe("waiting");
     expect(fixture.phases.at(-1)?.status).toBe("waiting");
-    expect(splitRunStatusLabel(fixture.phases.at(-1)!.status)).toBe("Waiting");
+    expect(splitRunStatusLabel(fixture.phases.at(-1)!.status)).toBe("Needs attention");
   });
 
   it("marks a failed implement step as failed", () => {
