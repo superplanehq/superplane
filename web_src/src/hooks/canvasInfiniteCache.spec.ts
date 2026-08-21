@@ -6,6 +6,7 @@ import {
   executionToRef,
   parseRunsFiltersFromQueryKey,
   runMatchesFilters,
+  upsertExecutionIntoDescribeRunData,
   upsertExecutionIntoInfiniteRunsData,
   upsertRunIntoDescribeRunData,
   upsertRunIntoInfiniteData,
@@ -352,5 +353,32 @@ describe("execution cache patching", () => {
     const next = upsertExecutionIntoInfiniteRunsData(old, incoming);
 
     expect(next?.pages[0]?.runs?.[0]?.executions?.[0]?.state).toBe("STATE_FINISHED");
+  });
+
+  it("upserts executions into the described run", () => {
+    const current = { run: makeRun({ id: "run-1", executions: [] }) };
+    const next = upsertExecutionIntoDescribeRunData(current, {
+      id: "execution-1",
+      runId: "run-1",
+      nodeId: "node-1",
+      state: "STATE_STARTED",
+      updatedAt: "2026-06-01T12:01:00.000Z",
+    });
+
+    expect(next?.run?.executions).toEqual([
+      expect.objectContaining({ id: "execution-1", nodeId: "node-1", state: "STATE_STARTED" }),
+    ]);
+  });
+
+  it("ignores describe-run execution updates for a different run", () => {
+    const current = { run: makeRun({ id: "run-1", executions: [] }) };
+    const next = upsertExecutionIntoDescribeRunData(current, {
+      id: "execution-1",
+      runId: "run-other",
+      nodeId: "node-1",
+      state: "STATE_STARTED",
+    });
+
+    expect(next).toBe(current);
   });
 });

@@ -20,7 +20,7 @@ interface WorkspacePageHeaderBaseProps {
 interface WorkspaceSectionHeaderProps extends WorkspacePageHeaderBaseProps {
   variant?: "section";
   /** Section title, e.g. "Work Orders", "Lines". */
-  title: string;
+  title: ReactNode;
   /** Optional description below the title. */
   subtitle?: ReactNode;
   /** Optional inline element rendered next to the title (e.g. Work Orders scope pills). */
@@ -30,15 +30,15 @@ interface WorkspaceSectionHeaderProps extends WorkspacePageHeaderBaseProps {
 interface WorkspaceEntityHeaderProps extends WorkspacePageHeaderBaseProps {
   variant: "entity";
   /** Entity title, e.g. work order title, line name, automation name. */
-  title: string;
+  title: ReactNode;
   /** Optional short identifier shown above the title (e.g. "SP-42"). */
   kicker?: ReactNode;
   /** Optional description below the title. */
   subtitle?: ReactNode;
-  /** Back link target. Renders "<Icon> <label>" affordance above the title. */
-  backHref: string;
+  /** Back link target. Omit on landing surfaces that have no parent list. */
+  backHref?: string;
   /** Label for the back link, e.g. "Work Orders", "Lines", "Automations". */
-  backLabel: string;
+  backLabel?: string;
   /** Optional test id on the back link. */
   backTestId?: string;
 }
@@ -77,7 +77,9 @@ export function WorkspacePageHeader(props: WorkspacePageHeaderProps) {
         )}
       >
         <div className={cn("min-w-0", actionsAlign === "start" ? "shrink-0" : "flex-1")}>
-          {isEntity ? <BackLink href={props.backHref} label={props.backLabel} testId={props.backTestId} /> : null}
+          {isEntity && props.backHref && props.backLabel ? (
+            <BackLink href={props.backHref} label={props.backLabel} testId={props.backTestId} />
+          ) : null}
           {isEntity && props.kicker ? (
             <p
               className="mt-2 text-[12px] font-medium uppercase tracking-[0.06em] text-muted-foreground tabular-nums"

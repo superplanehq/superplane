@@ -10,6 +10,7 @@ import type {
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import {
   parseRunsFiltersFromQueryKey,
+  upsertExecutionIntoDescribeRunData,
   upsertExecutionIntoInfiniteRunsData,
   upsertRunIntoDescribeRunData,
   upsertRunIntoInfiniteData,
@@ -138,6 +139,16 @@ export function useCanvasWebsocket(
         if (next !== data) {
           patched = true;
           queryClient.setQueryData(queryKey, next);
+        }
+      }
+
+      if (execution.runId) {
+        const describeKey = canvasKeys.run(canvasId, execution.runId);
+        const current = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(describeKey);
+        const next = upsertExecutionIntoDescribeRunData(current, execution);
+        if (next && next !== current) {
+          patched = true;
+          queryClient.setQueryData(describeKey, next);
         }
       }
 
@@ -409,4 +420,8 @@ export function useCanvasWebsocket(
     },
     enabled,
   );
+}
+
+export function useCanvasRuntimeWebsocket(canvasId: string, organizationId: string, enabled = true): void {
+  useCanvasWebsocket(canvasId, organizationId, undefined, undefined, undefined, undefined, undefined, true, enabled);
 }

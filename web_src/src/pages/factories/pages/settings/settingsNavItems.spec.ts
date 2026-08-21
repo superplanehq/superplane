@@ -6,6 +6,7 @@ describe("settingsSectionFromPathname", () => {
   it("reads the section after /settings/", () => {
     expect(settingsSectionFromPathname("/org/workspaces/RF/settings/profile")).toBe("profile");
     expect(settingsSectionFromPathname("/org/workspaces/RF/settings/general")).toBe("general");
+    expect(settingsSectionFromPathname("/org/workspaces/RF/settings/automations")).toBe("automations");
     expect(settingsSectionFromPathname("/org/workspaces/RF/settings/notifications")).toBe("notifications");
   });
 

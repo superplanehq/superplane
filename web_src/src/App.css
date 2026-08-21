@@ -377,7 +377,7 @@
 /* Workspace design tokens, active while a /workspaces route is mounted. */
 .theme-factories {
   --radius: 0.5rem;
-  --workspace-navigation-width: 15rem;
+  --workspace-navigation-width: 3.5rem;
   --workspace-content-max-width: 68.75rem;
   --workspace-page-gutter: 2rem;
   --workspace-page-padding-block: 2rem;
