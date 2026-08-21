@@ -130,6 +130,19 @@ func CreateAccountInTransaction(tx *gorm.DB, name, email string) (*Account, erro
 	return account, nil
 }
 
+func CreateInstallationAdminAccount(tx *gorm.DB, name, email string) (*Account, error) {
+	account := &Account{
+		Name:              name,
+		Email:             utils.NormalizeEmail(email),
+		InstallationAdmin: true,
+	}
+	if err := tx.Create(account).Error; err != nil {
+		return nil, err
+	}
+
+	return account, nil
+}
+
 func ListAccounts(search string, limit, offset int, sortBy, sortDirection string) ([]Account, int64, error) {
 	query := database.Conn().Model(&Account{})
 

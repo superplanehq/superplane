@@ -267,6 +267,11 @@ func (c *Client) GetRepositoryPermissionLevel(ctx context.Context, repository st
 	return c.underlying.Repositories.GetPermissionLevel(ctx, owner, name, username)
 }
 
+func (c *Client) GetContents(ctx context.Context, repository, path string, opts *github.RepositoryContentGetOptions) (*github.RepositoryContent, []*github.RepositoryContent, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.GetContents(ctx, owner, name, path, opts)
+}
+
 func (c *Client) CancelWorkflowRun(repository string, workflowRunID int64) (*github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Actions.CancelWorkflowRunByID(context.Background(), owner, name, workflowRunID)
