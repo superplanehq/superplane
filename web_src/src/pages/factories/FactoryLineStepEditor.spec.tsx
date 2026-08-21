@@ -67,8 +67,8 @@ describe("FactoryLineStepEditor", () => {
     );
 
     const warnings = consoleWarnSpy.mock.calls
-      .map((args) => args.join(" "))
-      .filter((message) => message.includes("controlled"));
+      .map((args: unknown[]) => args.join(" "))
+      .filter((message: string) => message.includes("controlled"));
     expect(warnings).toEqual([]);
   });
 });
