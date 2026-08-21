@@ -28,6 +28,9 @@ const (
 	// model — and any server-side tools like code execution — finish, which
 	// regularly takes longer than the platform's default request timeout.
 	generationTimeout = 5 * time.Minute
+	// oauthTokenPrefix marks a Claude Code OAuth token, which the API rejects on
+	// x-api-key and expects as a bearer token instead.
+	oauthTokenPrefix = "sk-ant-oat"
 )
 
 type Client struct {
@@ -273,7 +276,7 @@ func (c *Client) UploadFile(content io.Reader, filename, contentType string) (st
 		return "", fmt.Errorf("build upload request: %w", err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("x-api-key", c.APIKey)
+	setAuthHeader(req, c.APIKey)
 	req.Header.Set("anthropic-version", anthropicVersionValue)
 	req.Header.Set("anthropic-beta", anthropicFilesBeta)
 
@@ -362,6 +365,18 @@ func (c *Client) doRequest(method, URL string, body io.Reader, apiKey, beta stri
 	return c.doRequestCtx(context.Background(), method, URL, body, apiKey, beta)
 }
 
+// setAuthHeader picks the header the credential is valid for. OAuth tokens only
+// authenticate against inference endpoints, so actions beyond Text Prompt still
+// fail — with the API's own scope error.
+func setAuthHeader(req *http.Request, token string) {
+	if strings.HasPrefix(token, oauthTokenPrefix) {
+		req.Header.Set("Authorization", "Bearer "+token)
+		return
+	}
+
+	req.Header.Set("x-api-key", token)
+}
+
 func (c *Client) doRequestCtx(ctx context.Context, method, URL string, body io.Reader, apiKey, beta string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, method, URL, body)
 	if err != nil {
@@ -370,7 +385,7 @@ func (c *Client) doRequestCtx(ctx context.Context, method, URL string, body io.R
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	req.Header.Set("x-api-key", apiKey)
+	setAuthHeader(req, apiKey)
 	req.Header.Set("anthropic-version", anthropicVersionValue)
 	if beta != "" {
 		req.Header.Set("anthropic-beta", beta)

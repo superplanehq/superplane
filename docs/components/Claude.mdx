@@ -20,6 +20,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 To get new Claude API key, go to [platform.claude.com](https://platform.claude.com).
 
+## Claude Code OAuth tokens
+
+The API Key field also accepts a Claude Code OAuth token (`sk-ant-oat…`, from `claude setup-token`), which bills against a Claude subscription instead of API credits.
+
+Such a token carries inference scope only. It covers **Text Prompt**, and it is also what the **Run Claude Code** component needs to run the CLI on a subscription. Everything that touches workspace resources — **Run Agent**, **Run Code Agent**, **Create Batch Message**, file attachments, and usage reports — still requires a regular API key and fails with a scope error otherwise.
+
 ## Files & artifacts
 
 The Files API is in beta: SuperPlane enables it per request via the `anthropic-beta` header, so no console toggle is needed and a standard API key suffices. Files and sessions are scoped to the API key's workspace. For **Run Managed Agent** artifacts, the agent must save its deliverables under `/mnt/session/outputs/`.
