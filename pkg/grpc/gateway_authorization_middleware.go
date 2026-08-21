@@ -20,7 +20,7 @@ func GatewayAuthorizationMiddleware(
 
 			ctx, err := authorizer.AuthorizeHTTP(r.Context(), r, route, pathParams)
 			if err != nil {
-				writeGatewayHTTPError(r.Context(), w, err)
+				writeGatewayHTTPError(r, w, err)
 				return
 			}
 
