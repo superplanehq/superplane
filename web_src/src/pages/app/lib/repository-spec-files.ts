@@ -6,11 +6,11 @@ import {
   type CanvasesStagingSummary,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { isNotFoundError } from "@/lib/errors";
 
 import { dematerializeCanvasSpec, dematerializeConsoleSpec } from "./workflow-spec-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "./workflow-spec-paths";
 import { toCanvasVersionShell } from "./canvas-versions";
-import { isNotFoundError } from "../workflowPageHelpers";
 
 // Confirms whether a canvas version still exists via DescribeCanvasVersion.
 export async function canvasVersionExists(canvasId: string, versionId: string): Promise<boolean> {

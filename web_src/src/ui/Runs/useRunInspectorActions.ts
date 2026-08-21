@@ -8,7 +8,8 @@ import {
   canvasesReemitTriggerEvent,
   type CanvasesCanvasRun,
 } from "@/api-client";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { getApiErrorMessage, isNotFoundError } from "@/lib/errors";
+import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { RunInspectorNodeSection } from "./types";
 
@@ -172,9 +173,17 @@ function useStopMutation({
     onSuccess: async () => {
       await refreshRunQueries();
     },
-    onError: (error) => {
-      console.error("Failed to stop run", error);
-      showErrorToast("Failed to stop run");
+    onError: async (error) => {
+      if (isNotFoundError(error)) {
+        showInfoToast("Run is no longer active");
+        await refreshRunQueries();
+        return;
+      }
+
+      const apiMessage = getApiErrorMessage(error, "");
+      const errorMessage = apiMessage ? `Failed to stop run: ${apiMessage}` : "Failed to stop run";
+      console.error(errorMessage);
+      showErrorToast(errorMessage);
     },
   });
 }
