@@ -12,13 +12,13 @@ const meta = {
     layout: "padded",
     docs: {
       description: {
-        component: "The workspace name opens Overview. The gear opens settings. The swap control switches workspace.",
+        component: "The workspace initials open the switcher. The gear opens settings.",
       },
     },
   },
   decorators: [
     (Story) => (
-      <ComponentStoryShell className="min-h-40 w-[240px] border-r border-sidebar-border bg-sidebar p-2">
+      <ComponentStoryShell className="min-h-40 w-14 border-r border-sidebar-border bg-sidebar">
         <Story />
       </ComponentStoryShell>
     ),

@@ -5,16 +5,25 @@ import type {
   FactoriesWorkOrderLineDispatch,
   FactoriesWorkOrderLineDispatchResult,
   FactoriesWorkOrderLineDispatchState,
+  FactoryApp,
   FactoryLineStep,
 } from "@/api-client";
 
 import {
+  ARNOLD_USER,
+  CLOSED_WORK_ORDER,
+  FAILED_WORK_ORDER,
   HOUR_AGO,
+  OPEN_WORK_ORDER,
+  OPEN_WORK_ORDER_SECONDARY,
   LAST_WEEK,
   LINE_RUN_IMPLEMENT_ID,
+  LINE_RUN_IMPLEMENT_FAILED_ID,
   LINE_RUN_VERIFY_PASSED_ID,
   OPERATOR_USER,
+  PR_CLOSURE_COMPLETED_WORK_ORDER,
   PRIMARY_FACTORY_ID,
+  REFUND_FACTORY_APPS,
   REFUND_LINE_FEATURE_ID,
   REFUND_LINE_ONBOARDING_ID,
   REFUND_LINE_PLAN_ID,
@@ -33,6 +42,399 @@ function runAppStep(appId: string, entrypoint: string): FactoryLineStep {
   return {
     type: RUN_APP_TYPE,
     app: { app: appId, entrypoint },
+  };
+}
+
+const PLAN_LINE_DONE_APP_ID = "app-refund-done";
+const PLAN_LINE_BACKLOG_APP_ID = "app-refund-backlog";
+
+const BACKLOG_APP: FactoryApp = {
+  id: PLAN_LINE_BACKLOG_APP_ID,
+  name: "Backlog",
+  description: "Scopes work orders before they enter a line.",
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+};
+
+const PLAN_LINE_APPS: FactoryApp[] = [
+  BACKLOG_APP,
+  ...REFUND_FACTORY_APPS.map((app) => {
+    if (app.id === "app-refund-planner") {
+      return { ...app, name: "Plan" };
+    }
+    if (app.id === "app-refund-implementer") {
+      return { ...app, name: "Implement" };
+    }
+    if (app.id === "app-refund-verifier") {
+      return { ...app, name: "Verify" };
+    }
+    return app;
+  }),
+  {
+    id: PLAN_LINE_DONE_APP_ID,
+    name: "Done",
+    description: "Completes or rejects the work order when a pull request merges or closes.",
+    createdAt: LAST_WEEK,
+    updatedAt: YESTERDAY,
+  },
+];
+
+function withPlanLinePhases(line: FactoriesFactoryLine): FactoriesFactoryLine {
+  if (line.id !== REFUND_LINE_PLAN_ID) {
+    return line;
+  }
+  return {
+    ...line,
+    steps: [
+      runAppStep("app-refund-planner", "start-plan"),
+      runAppStep("app-refund-implementer", "start-implementation"),
+      runAppStep("app-refund-verifier", "start-verification"),
+      runAppStep(PLAN_LINE_DONE_APP_ID, "start-done"),
+    ],
+  };
+}
+
+function planLineActiveDispatch(
+  orderId: string,
+  stepExecutions: FactoriesWorkOrderExecution[],
+): FactoriesWorkOrderLineDispatch {
+  return {
+    id: `dispatch-${REFUND_LINE_PLAN_ID}-${orderId}`,
+    line: { id: REFUND_LINE_PLAN_ID, name: "plan-and-implement" },
+    steps: [
+      { name: "Plan", stepIndex: 0 },
+      { name: "Implement", stepIndex: 1 },
+      { name: "Verify", stepIndex: 2 },
+      { name: "Done", stepIndex: 3 },
+    ],
+    state: "STATE_ACTIVE",
+    result: "RESULT_UNKNOWN",
+    createdAt: TWO_HOURS_AGO,
+    stepExecutions,
+  };
+}
+
+function withPlanPhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
+  const orderId = order.id;
+  if (!orderId || orderId !== OPEN_WORK_ORDER.id) {
+    return order;
+  }
+  return {
+    ...order,
+    lineDispatches: [
+      planLineActiveDispatch(orderId, [
+        {
+          id: "exec-plan-open",
+          step: "Plan",
+          stepIndex: 0,
+          state: "STATE_STARTED",
+          result: "RESULT_UNKNOWN",
+          createdAt: HOUR_AGO,
+          updatedAt: HOUR_AGO,
+          run: { id: "run-plan-open", appId: "app-refund-planner", appName: "Plan" },
+        },
+      ]),
+    ],
+  };
+}
+
+function withVerifyPhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
+  const orderId = order.id;
+  if (!orderId || orderId !== OPEN_WORK_ORDER_SECONDARY.id) {
+    return order;
+  }
+  return {
+    ...order,
+    lineDispatches: [
+      planLineActiveDispatch(orderId, [
+        {
+          id: "exec-verify-plan",
+          step: "Plan",
+          stepIndex: 0,
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: TWO_HOURS_AGO,
+          updatedAt: TWO_HOURS_AGO,
+          run: { id: "run-verify-plan", appId: "app-refund-planner", appName: "Plan" },
+        },
+        {
+          id: "exec-verify-implement",
+          step: "Implement",
+          stepIndex: 1,
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: TWO_HOURS_AGO,
+          updatedAt: HOUR_AGO,
+          run: { id: "run-verify-implement", appId: "app-refund-implementer", appName: "Implement" },
+        },
+        {
+          id: "exec-verify-open",
+          step: "Verify",
+          stepIndex: 2,
+          state: "STATE_STARTED",
+          result: "RESULT_UNKNOWN",
+          createdAt: HOUR_AGO,
+          updatedAt: HOUR_AGO,
+          run: { id: "run-verify-open", appId: "app-refund-verifier", appName: "Verify" },
+        },
+      ]),
+    ],
+  };
+}
+
+function withWaitingPrReview(order: FactoriesWorkOrder): FactoriesWorkOrder {
+  if (order.id !== FAILED_WORK_ORDER.id) {
+    return order;
+  }
+  const dispatch = order.lineDispatches?.[0];
+  if (!dispatch) {
+    return order;
+  }
+  return {
+    ...order,
+    statusNotes: OPEN_WORK_ORDER.statusNotes,
+    lineDispatches: [
+      {
+        ...dispatch,
+        result: "RESULT_UNKNOWN",
+        stepExecutions: [
+          ...(dispatch.stepExecutions ?? []).map((execution) =>
+            execution.stepIndex === 1 ? { ...execution, result: "RESULT_PASSED" } : execution,
+          ),
+          {
+            id: "exec-verify-pr",
+            step: "Verify",
+            stepIndex: 2,
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: HOUR_AGO,
+            updatedAt: HOUR_AGO,
+            run: { id: "run-verify-pr", appId: "app-refund-verifier", appName: "Verify" },
+          },
+        ],
+      },
+    ],
+  };
+}
+
+export const BOARD_IMPLEMENT_FAILED_ORDER: FactoriesWorkOrder = {
+  id: "wo-board-implement-failed",
+  number: "106",
+  key: "RF-106",
+  title: "Fix refund dispatcher timeout loop",
+  description:
+    "The implement step stopped when backend tests failed on the reconciliation worker. Diagnose the run, then dispatch the line again.",
+  state: "STATE_CLOSED",
+  result: "RESULT_FAILED",
+  createdAt: YESTERDAY,
+  updatedAt: HOUR_AGO,
+  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  totalTokens: "6400",
+  totalCostCents: "210",
+  lineDispatches: [
+    {
+      ...planLineActiveDispatch("wo-board-implement-failed", [
+        {
+          id: "exec-failed-plan",
+          step: "Plan",
+          stepIndex: 0,
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: TWO_HOURS_AGO,
+          updatedAt: TWO_HOURS_AGO,
+          run: { id: "run-failed-plan", appId: "app-refund-planner", appName: "Plan" },
+        },
+        {
+          id: "exec-failed-implement",
+          step: "Implement",
+          stepIndex: 1,
+          state: "STATE_FINISHED",
+          result: "RESULT_FAILED",
+          createdAt: TWO_HOURS_AGO,
+          updatedAt: HOUR_AGO,
+          run: { id: LINE_RUN_IMPLEMENT_FAILED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+        },
+      ]),
+      state: "STATE_FINISHED",
+      result: "RESULT_FAILED",
+    },
+  ],
+};
+
+function boardDoneOrder({
+  id,
+  number,
+  key,
+  title,
+  description,
+  result,
+  dispatchResult,
+  doneResult,
+  updatedAt,
+  assignee,
+}: {
+  id: string;
+  number: string;
+  key: string;
+  title: string;
+  description: string;
+  result: FactoriesWorkOrder["result"];
+  dispatchResult: FactoriesWorkOrderLineDispatchResult;
+  doneResult: FactoriesWorkOrderExecution["result"];
+  updatedAt: string;
+  assignee: { id: string; name: string };
+}): FactoriesWorkOrder {
+  return {
+    id,
+    number,
+    key,
+    title,
+    description,
+    state: "STATE_CLOSED",
+    result,
+    createdAt: LAST_WEEK,
+    updatedAt,
+    createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+    assignees: [assignee],
+    lineDispatches: [
+      {
+        ...planLineActiveDispatch(id, [
+          {
+            id: `exec-done-plan-${id}`,
+            step: "Plan",
+            stepIndex: 0,
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: LAST_WEEK,
+            updatedAt: LAST_WEEK,
+            run: { id: `run-done-plan-${id}`, appId: "app-refund-planner", appName: "Plan" },
+          },
+          {
+            id: `exec-done-implement-${id}`,
+            step: "Implement",
+            stepIndex: 1,
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: LAST_WEEK,
+            updatedAt: LAST_WEEK,
+            run: { id: `run-done-implement-${id}`, appId: "app-refund-implementer", appName: "Implement" },
+          },
+          {
+            id: `exec-done-verify-${id}`,
+            step: "Verify",
+            stepIndex: 2,
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: LAST_WEEK,
+            updatedAt: LAST_WEEK,
+            run: { id: `run-done-verify-${id}`, appId: "app-refund-verifier", appName: "Verify" },
+          },
+          {
+            id: `exec-done-${id}`,
+            step: "Done",
+            stepIndex: 3,
+            state: "STATE_FINISHED",
+            result: doneResult,
+            createdAt: updatedAt,
+            updatedAt,
+            run: { id: `run-done-${id}`, appId: PLAN_LINE_DONE_APP_ID, appName: "Done" },
+          },
+        ]),
+        state: "STATE_FINISHED",
+        result: dispatchResult,
+      },
+    ],
+  };
+}
+
+const BOARD_DONE_COMPLETED_SLA: FactoriesWorkOrder = boardDoneOrder({
+  id: "wo-board-done-sla",
+  number: "110",
+  key: "RF-110",
+  title: "Publish refund SLA dashboard",
+  description: "Publish the refund SLA dashboard so support can see provider latency by day.",
+  result: "RESULT_COMPLETED",
+  dispatchResult: "RESULT_PASSED",
+  doneResult: "RESULT_PASSED",
+  updatedAt: TWO_HOURS_AGO,
+  assignee: { id: ARNOLD_USER.id, name: ARNOLD_USER.name },
+});
+
+const BOARD_DONE_COMPLETED_PLAYBOOK: FactoriesWorkOrder = boardDoneOrder({
+  id: "wo-board-done-playbook",
+  number: "111",
+  key: "RF-111",
+  title: "Document provider timeout playbook",
+  description: "Write the playbook for provider timeouts so on-call can retry or fail closed.",
+  result: "RESULT_COMPLETED",
+  dispatchResult: "RESULT_PASSED",
+  doneResult: "RESULT_PASSED",
+  updatedAt: YESTERDAY,
+  assignee: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
+});
+
+const BOARD_DONE_REJECTED_ORDER: FactoriesWorkOrder = boardDoneOrder({
+  id: "wo-board-done-rejected",
+  number: "112",
+  key: "RF-112",
+  title: "Replace the refund batch exporter",
+  description: "Replace the batch exporter. A reviewer rejected the change because it drops the audit columns.",
+  result: "RESULT_REJECTED",
+  dispatchResult: "RESULT_PASSED",
+  doneResult: "RESULT_PASSED",
+  updatedAt: HOUR_AGO,
+  assignee: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
+});
+
+const BOARD_DONE_CANCELED_ORDER: FactoriesWorkOrder = boardDoneOrder({
+  id: "wo-board-done-canceled",
+  number: "113",
+  key: "RF-113",
+  title: "Migrate refunds to the v2 provider API",
+  description: "The v2 migration stopped when the provider delayed the cutover. The work order was canceled.",
+  result: "RESULT_UNSPECIFIED",
+  dispatchResult: "RESULT_CANCELLED",
+  doneResult: "RESULT_CANCELLED",
+  updatedAt: TWO_HOURS_AGO,
+  assignee: { id: OPERATOR_USER.id, name: OPERATOR_USER.name },
+});
+
+function withDonePhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
+  const doneRun =
+    order.id === CLOSED_WORK_ORDER.id
+      ? { executionId: "exec-done-closed", runId: "run-done-closed", appName: "Done" }
+      : order.id === PR_CLOSURE_COMPLETED_WORK_ORDER.id
+        ? { executionId: "exec-done-pr-closure", runId: "run-done-pr-closure", appName: "PR Closure" }
+        : null;
+  if (!doneRun) {
+    return order;
+  }
+  const dispatch = order.lineDispatches?.[0];
+  if (!dispatch) {
+    return order;
+  }
+  return {
+    ...order,
+    lineDispatches: [
+      {
+        ...dispatch,
+        steps: [...(dispatch.steps ?? []), { name: "Done", stepIndex: 3 }],
+        stepExecutions: [
+          ...(dispatch.stepExecutions ?? []),
+          {
+            id: doneRun.executionId,
+            step: "Done",
+            stepIndex: 3,
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: YESTERDAY,
+            updatedAt: YESTERDAY,
+            run: { id: doneRun.runId, appId: PLAN_LINE_DONE_APP_ID, appName: doneRun.appName },
+          },
+        ],
+      },
+    ],
   };
 }
 
@@ -216,13 +618,26 @@ export const lineMetricsFactoriesFixture: FactoriesFixture = {
     }
     return {
       ...factory,
-      lines: [...(factory.lines ?? []), ONBOARDING_FACTORY_LINE, FEATURE_DELIVERY_LINE],
+      lines: [...(factory.lines ?? []).map(withPlanLinePhases), ONBOARDING_FACTORY_LINE, FEATURE_DELIVERY_LINE],
     };
   }),
+  appsByFactoryId: {
+    ...defaultFactoriesFixture.appsByFactoryId,
+    [PRIMARY_FACTORY_ID]: PLAN_LINE_APPS,
+  },
   workOrdersByFactoryId: {
     ...defaultFactoriesFixture.workOrdersByFactoryId,
     [PRIMARY_FACTORY_ID]: [
-      ...(defaultFactoriesFixture.workOrdersByFactoryId[PRIMARY_FACTORY_ID] ?? []),
+      ...(defaultFactoriesFixture.workOrdersByFactoryId[PRIMARY_FACTORY_ID] ?? [])
+        .map(withPlanPhase)
+        .map(withVerifyPhase)
+        .map(withWaitingPrReview)
+        .map(withDonePhase),
+      BOARD_IMPLEMENT_FAILED_ORDER,
+      BOARD_DONE_COMPLETED_SLA,
+      BOARD_DONE_COMPLETED_PLAYBOOK,
+      BOARD_DONE_REJECTED_ORDER,
+      BOARD_DONE_CANCELED_ORDER,
       FEATURE_RUNNING_WORK_ORDER,
       FEATURE_PR_WORK_ORDER,
       FEATURE_CI_WORK_ORDER,
@@ -254,4 +669,8 @@ export const fiveStepLineFactoriesFixture: FactoriesFixture = {
       }),
     };
   }),
+  appsByFactoryId: {
+    ...defaultFactoriesFixture.appsByFactoryId,
+    [PRIMARY_FACTORY_ID]: [BACKLOG_APP, ...(defaultFactoriesFixture.appsByFactoryId[PRIMARY_FACTORY_ID] ?? [])],
+  },
 };

@@ -29,6 +29,8 @@ import {
   FactoriesIndexPage,
   FactoriesLayout,
   FactoryAppCanvasPage,
+  FactoryAppSplitRunPage,
+  FactoryHomeRedirect,
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
@@ -180,7 +182,7 @@ function AppRouter() {
                     element={withAuthPermissionAndFactoriesFeature(FactoriesLayout, "factories", "read")}
                   >
                     <Route element={<OnboardingGate />}>
-                      <Route index element={<Navigate to="overview" replace />} />
+                      <Route index element={<FactoryHomeRedirect />} />
                       <Route path="setup" element={<OnboardingPage />} />
                       <Route path="onboarding" element={<Navigate to="../setup" replace />} />
                       <Route path="overview" element={<WorkspaceOverviewPage />} />
@@ -207,6 +209,7 @@ function AppRouter() {
                         <Route path=":appId" element={<AutomationsPage />} />
                       </Route>
                       <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
+                      <Route path="apps/:appId/split-run" element={<FactoryAppSplitRunPage />} />
                     </Route>
                     <Route path="settings/*" element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
                   </Route>

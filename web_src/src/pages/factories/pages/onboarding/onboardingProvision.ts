@@ -117,11 +117,9 @@ export async function provisionLine(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   updateOnboarding: UpdateOnboarding;
 }): Promise<ProvisionedLine> {
-  const existing = findProvisionedLine(args.factory);
-  const lineId = args.savedLineId ?? existing?.id;
-  if (lineId) {
-    const primaryAppId = args.savedAppId ?? existing?.steps?.[0]?.app?.app;
-    if (primaryAppId) return { lineId, primaryAppId };
+  const existing = existingProvisionedLine(args.factory, args.savedLineId, args.savedAppId);
+  if (existing) {
+    return existing;
   }
 
   const steps = await provisionLineApps({
@@ -138,4 +136,18 @@ export async function provisionLine(args: {
   if (!line.id) throw new Error("Software delivery line was not created");
   await args.updateOnboarding({ provisionedAppId: primaryAppId, provisionedLineId: line.id });
   return { lineId: line.id, primaryAppId };
+}
+
+function existingProvisionedLine(
+  factory: FactoriesFactory | null,
+  savedLineId?: string,
+  savedAppId?: string,
+): ProvisionedLine | undefined {
+  const existing = findProvisionedLine(factory);
+  const lineId = savedLineId ?? existing?.id;
+  const primaryAppId = savedAppId ?? existing?.steps?.[0]?.app?.app;
+  if (lineId && primaryAppId) {
+    return { lineId, primaryAppId };
+  }
+  return undefined;
 }

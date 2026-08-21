@@ -63,7 +63,7 @@ export function WorkOrderDetailPage() {
   }
 
   return (
-    <WorkOrderDetailPageContent
+    <WorkOrderDetailPanel
       organizationId={organizationId}
       factoryId={factoryId}
       factoryKey={factoryKey}
@@ -101,16 +101,18 @@ export function LegacyWorkOrderDetailRedirect() {
   return <Navigate to={`${canonicalHref}${location.search}`} replace />;
 }
 
-function WorkOrderDetailPageContent({
+export function WorkOrderDetailPanel({
   organizationId,
   factoryId,
   factoryKey,
   orderId,
+  chrome = "page",
 }: {
   organizationId: string;
   factoryId: string;
   factoryKey: string;
   orderId: string;
+  chrome?: "page" | "dialog";
 }) {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
 
@@ -127,17 +129,20 @@ function WorkOrderDetailPageContent({
   // across re-renders/refetches that don't actually change `order`.
   const derived = useMemo(() => getWorkOrderDetailDerived(order), [order]);
 
-  usePageTitle([order?.title ?? "Work Order", factory?.name ?? "Workspace"]);
+  usePageTitle([order?.title ?? "Work Order", factory?.name ?? "Workspace"], { enabled: chrome === "page" });
 
   const workOrdersHref = workOrdersPath(organizationId, factoryKey);
 
   if (shouldRedirectAfterError({ factoryLoading, factoryError, orderLoading, orderError })) {
+    if (chrome === "dialog") {
+      return <p className="px-6 py-8 text-[13px] text-muted-foreground">This work order cannot be opened.</p>;
+    }
     return <Navigate to={workOrdersHref} replace />;
   }
 
   if (factoryLoading || orderLoading) {
     return (
-      <div className={factoryContentBodyClassName}>
+      <div className={chrome === "dialog" ? "px-6 py-8" : factoryContentBodyClassName}>
         <p className="text-[13px] text-muted-foreground">Loading work order…</p>
       </div>
     );
@@ -154,6 +159,7 @@ function WorkOrderDetailPageContent({
       factoryLines={factory.lines ?? []}
       organizationId={organizationId}
       factoryKey={factoryKey}
+      chrome={chrome}
       events={events}
       eventsQuery={eventsQuery}
       artifactsQuery={artifactsQuery}
@@ -184,6 +190,7 @@ interface LoadedWorkOrderDetailProps {
   factoryLines: FactoriesFactoryLine[];
   organizationId: string;
   factoryKey: string;
+  chrome?: "page" | "dialog";
   events: ReturnType<typeof flattenWorkOrderEventsPages>;
   eventsQuery: ReturnType<typeof useWorkOrderEvents>;
   artifactsQuery: ReturnType<typeof useWorkOrderArtifacts>;
@@ -201,6 +208,7 @@ function LoadedWorkOrderDetail({
   factoryLines,
   organizationId,
   factoryKey,
+  chrome = "page",
   events,
   eventsQuery,
   artifactsQuery,
@@ -216,6 +224,7 @@ function LoadedWorkOrderDetail({
       statusNotes={presentWorkOrderStatusNotes(order.statusNotes, derived.displayStatus ?? undefined)}
       organizationId={organizationId}
       factoryKey={factoryKey}
+      chrome={chrome}
       order={order}
       events={events}
       eventsError={eventsQuery.error ?? null}

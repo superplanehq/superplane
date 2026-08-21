@@ -5,77 +5,47 @@ import type {
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderEvent,
-  FactoriesWorkOrderExecution,
-  FactoriesWorkOrderLineDispatch,
-  FactoriesWorkOrderLineDispatchResult,
-  FactoriesWorkOrderLineDispatchState,
   FactoryApp,
   FactoryLineStep,
+  SuperplaneUsersUser,
 } from "@/api-client";
-import { canvasAppIds } from "@/pages/app/__fixtures__/handlers";
 
 import type { FactoriesWorkOrderCheck } from "@/api-client";
 import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } from "./usageReportFixtures";
-
-/** Shared with the home fixture so routes stay in sync across HomePage → Factories navigation. */
-export const FACTORIES_ORGANIZATION_ID = "3ee1aa47-3a60-4c1f-b645-0b9859ab91f8";
-
-export const PRIMARY_FACTORY_ID = "factory-refunds";
-export const EMPTY_FACTORY_ID = "factory-payments";
-
-/** Workspace key for `PRIMARY_FACTORY_ID` — routes use this, not the raw id. */
-export const PRIMARY_FACTORY_KEY = "RF";
-/** Workspace key for `EMPTY_FACTORY_ID` — routes use this, not the raw id. */
-export const EMPTY_FACTORY_KEY = "PF";
-
-export const STORYBOOK_ME_USER_ID = "storybook-user";
-export const STORYBOOK_ME_USER_NAME = "Leonardo DiCaprio";
-export const STORYBOOK_ME_USER_EMAIL = "john.doe@superplane.dev";
-export const STORYBOOK_ME_USER_AVATAR_URL = "/storybook/leonardo-dicaprio.jpg";
-
-// Relative timestamps so `formatTimeAgo` stays stable across story loads.
-const NOW_MS = Date.now();
-const MINUTE_MS = 60_000;
-const HOUR_MS = 60 * MINUTE_MS;
-const DAY_MS = 24 * HOUR_MS;
-const relativeIso = (offsetMs: number) => new Date(NOW_MS - offsetMs).toISOString();
-
-export const HOUR_AGO = relativeIso(HOUR_MS);
-export const TWO_HOURS_AGO = relativeIso(2 * HOUR_MS);
-export const YESTERDAY = relativeIso(DAY_MS);
-export const LAST_WEEK = relativeIso(7 * DAY_MS);
-
-/**
- * Canvas run ids on Line phase cards. Must be UUIDs: AppPage strips any
- * `?run=` value that fails `isValidRunId`, which drops factory run autolayout.
- *
- * `LINE_RUN_IMPLEMENT_FAILED_ID` matches the captured Software Factory
- * published run so Storybook reuses that run's executions and root event.
- */
-export const LINE_RUN_IMPLEMENT_ID = "8f3a1c2e-4b5d-46f0-a789-0b1c2d3e4f50";
-export const LINE_RUN_IMPLEMENT_FAILED_ID = canvasAppIds.publishedRunId ?? "fef4cee8-fdd7-47af-b5da-e739664cd31d";
-export const LINE_RUN_IMPLEMENT_PASSED_ID = "9a4b2d3f-5c6e-47f0-b890-1c2d3e4f5061";
-export const LINE_RUN_VERIFY_PASSED_ID = "0b5c3e4a-6d7f-4081-8901-2d3e4f506172";
-export const LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID =
-  canvasAppIds.rootEventId ?? "755a4430-2481-43f6-94cb-089c331a5d2f";
-
-export const REVIEWER_USER = {
-  id: "user-reviewer-alex",
-  name: "Alex Reviewer",
-  email: "alex@superplane.dev",
-} as const;
-
-export const OPERATOR_USER = {
-  id: "user-operator-jamie",
-  name: "Jamie Operator",
-  email: "jamie@superplane.dev",
-} as const;
-
-export const ORGANIZATION_USERS = [
-  { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME, email: STORYBOOK_ME_USER_EMAIL },
-  REVIEWER_USER,
+import { planLineDispatch, planLineExecution } from "./factoryPagePlanLine";
+import {
+  ARNOLD_USER,
+  EMPTY_FACTORY_ID,
+  FACTORIES_ORGANIZATION_ID,
+  HOUR_AGO,
+  LAST_WEEK,
+  LINE_RUN_IMPLEMENT_FAILED_ID,
+  LINE_RUN_IMPLEMENT_ID,
+  LINE_RUN_IMPLEMENT_PASSED_ID,
+  LINE_RUN_VERIFY_PASSED_ID,
   OPERATOR_USER,
-];
+  ORGANIZATION_USERS,
+  PRIMARY_FACTORY_ID,
+  REFUND_LINE_HOTFIX_ID,
+  REFUND_LINE_PLAN_ID,
+  REVIEWER_USER,
+  STORYBOOK_ME_USER_ID,
+  STORYBOOK_ME_USER_NAME,
+  TWO_HOURS_AGO,
+  YESTERDAY,
+  minutesAgo,
+} from "./factoryPageIds";
+
+export * from "./factoryPageIds";
+
+export function toStorybookOrganizationUser(user: (typeof ORGANIZATION_USERS)[number]): SuperplaneUsersUser {
+  const avatarUrl = "avatarUrl" in user ? user.avatarUrl : undefined;
+  return {
+    metadata: { id: user.id, email: user.email },
+    spec: { displayName: user.name },
+    ...(avatarUrl ? { status: { accountProviders: [{ avatarUrl }] } } : {}),
+  };
+}
 
 const RUN_APP_TYPE = "runApp";
 
@@ -109,11 +79,6 @@ export const REFUND_FACTORY_APPS: FactoryApp[] = [
     updatedAt: YESTERDAY,
   },
 ];
-
-export const REFUND_LINE_PLAN_ID = "line-plan-and-implement";
-export const REFUND_LINE_HOTFIX_ID = "line-hotfix";
-export const REFUND_LINE_ONBOARDING_ID = "line-onboarding";
-export const REFUND_LINE_FEATURE_ID = "line-feature-delivery";
 
 export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
   {
@@ -153,71 +118,6 @@ export const EMPTY_FACTORY: FactoriesFactory = {
   lines: [],
 };
 
-const PLAN_STEP_INDEX: Record<string, number> = { plan: 0, implement: 1, verify: 2 };
-const PLAN_STEP_LABEL: Record<string, string> = {
-  plan: "Refund Planner",
-  implement: "Refund Implementer",
-  verify: "Refund Verifier",
-};
-
-function planLineExecution(
-  step: string,
-  overrides: Partial<FactoriesWorkOrderExecution> = {},
-): FactoriesWorkOrderExecution {
-  return {
-    id: `exec-${step}-${overrides.id ?? Math.random().toString(36).slice(2, 8)}`,
-    step: PLAN_STEP_LABEL[step] ?? step,
-    stepIndex: PLAN_STEP_INDEX[step] ?? 0,
-    state: "STATE_FINISHED",
-    result: "RESULT_PASSED",
-    createdAt: TWO_HOURS_AGO,
-    updatedAt: HOUR_AGO,
-    run: {
-      id: `run-${step}`,
-      appId: "app-refund-planner",
-      appName: "Refund Planner",
-    },
-    ...overrides,
-  };
-}
-
-/**
- * Builds a single line dispatch (traversal) around a set of step
- * executions — the fixtures below give every work order at most one
- * dispatch of the `plan-and-implement` line, since none of the storybook
- * scenarios need to show two traversals of the same line side by side.
- */
-function planLineDispatch(
-  stepExecutions: FactoriesWorkOrderExecution[],
-  overrides: Partial<FactoriesWorkOrderLineDispatch> = {},
-): FactoriesWorkOrderLineDispatch {
-  const state: FactoriesWorkOrderLineDispatchState = stepExecutions.some(
-    (execution) => execution.state !== "STATE_FINISHED",
-  )
-    ? "STATE_ACTIVE"
-    : "STATE_FINISHED";
-
-  const lastExecution = stepExecutions[stepExecutions.length - 1];
-  const result: FactoriesWorkOrderLineDispatchResult =
-    state === "STATE_FINISHED" ? (lastExecution?.result ?? "RESULT_UNKNOWN") : "RESULT_UNKNOWN";
-
-  return {
-    id: `dispatch-${REFUND_LINE_PLAN_ID}-${stepExecutions[0]?.id ?? "empty"}`,
-    line: { id: REFUND_LINE_PLAN_ID, name: "plan-and-implement" },
-    steps: [
-      { name: "Refund Planner", stepIndex: 0 },
-      { name: "Refund Implementer", stepIndex: 1 },
-      { name: "Refund Verifier", stepIndex: 2 },
-    ],
-    state,
-    result,
-    createdAt: stepExecutions[0]?.createdAt ?? TWO_HOURS_AGO,
-    finishedAt: state === "STATE_FINISHED" ? (lastExecution?.updatedAt ?? HOUR_AGO) : undefined,
-    stepExecutions,
-    ...overrides,
-  };
-}
-
 export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-open-refunds",
   number: "101",
@@ -244,12 +144,9 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
   createdAt: HOUR_AGO,
   updatedAt: HOUR_AGO,
   createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
-  assignees: [
-    { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
-    { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-  ],
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [],
-  // A watcher automation announcing why the order is Waiting — the detail
+  // A watcher automation announcing why the order needs attention — the detail
   // page renders it as the "next step" panel above the checks.
   statusNotes: [
     {
@@ -260,7 +157,7 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
       ctaLabel: "Review PR #6812",
       ctaUrl: "https://github.com/superplanehq/superplane/pull/6812",
       automation: { appId: "app-refund-verifier", appName: "PR Closure" },
-      updatedAt: relativeIso(25 * 60 * 1000),
+      updatedAt: minutesAgo(25),
     },
   ],
 };
@@ -284,11 +181,90 @@ export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
   createdAt: TWO_HOURS_AGO,
   updatedAt: TWO_HOURS_AGO,
   createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
-  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  lineDispatches: [],
+  assignees: [{ id: ARNOLD_USER.id, name: ARNOLD_USER.name }],
+  lineDispatches: [
+    planLineDispatch([
+      planLineExecution("plan", {
+        id: "schema-plan",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        createdAt: LAST_WEEK,
+        updatedAt: LAST_WEEK,
+      }),
+    ]),
+  ],
 };
 
-// Storybook user is co-assigned so "mine + running" surfaces this order.
+export const QUESTION_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-agent-question-refunds",
+  number: "108",
+  key: "RF-108",
+  title: "Clarify retry policy for provider timeouts",
+  description: [
+    "The payment poller stops on the first provider timeout. Confirm whether it should fail closed or retry with backoff before the next dispatch.",
+  ].join("\n"),
+  state: "STATE_OPEN",
+  result: "RESULT_UNSPECIFIED",
+  createdAt: TWO_HOURS_AGO,
+  updatedAt: HOUR_AGO,
+  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  lineDispatches: [
+    planLineDispatch([
+      planLineExecution("plan", {
+        id: "question-plan",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        updatedAt: HOUR_AGO,
+      }),
+    ]),
+  ],
+  statusNotes: [
+    {
+      key: "agent-question",
+      kind: "info",
+      headline: "The agent has a question",
+      body: "Should the poller fail closed on the first timeout, or retry with backoff?",
+      automation: { appId: "app-refund-planner", appName: "Refund Planner" },
+      updatedAt: HOUR_AGO,
+    },
+  ],
+};
+
+export const APPROVAL_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-approval-refunds",
+  number: "109",
+  key: "RF-109",
+  title: "Review the refund webhook schema change",
+  description: [
+    "The implement step opened a pull request for the webhook schema. A person must review it before the line can continue.",
+  ].join("\n"),
+  state: "STATE_OPEN",
+  result: "RESULT_UNSPECIFIED",
+  createdAt: TWO_HOURS_AGO,
+  updatedAt: HOUR_AGO,
+  createdBy: { user: { id: REVIEWER_USER.id, name: REVIEWER_USER.name } },
+  assignees: [{ id: ARNOLD_USER.id, name: ARNOLD_USER.name }],
+  lineDispatches: [
+    planLineDispatch([
+      planLineExecution("plan", {
+        id: "approval-plan",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        updatedAt: TWO_HOURS_AGO,
+      }),
+      planLineExecution("implement", {
+        id: "approval-impl",
+        state: "STATE_STARTED",
+        result: "RESULT_UNKNOWN",
+        run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+        updatedAt: HOUR_AGO,
+      }),
+    ]),
+  ],
+};
+
+// Storybook user owns this order so "mine + running" surfaces it.
 export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-running-refunds",
   number: "103",
@@ -306,10 +282,7 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
   createdBy: { user: { id: REVIEWER_USER.id, name: REVIEWER_USER.name } },
-  assignees: [
-    { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
-    { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-  ],
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     planLineDispatch([
       planLineExecution("plan", {
@@ -351,7 +324,7 @@ export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
   createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
-  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  assignees: [{ id: ARNOLD_USER.id, name: ARNOLD_USER.name }],
   lineDispatches: [
     planLineDispatch([
       planLineExecution("plan", {
@@ -396,7 +369,51 @@ export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   createdAt: HOUR_AGO,
   updatedAt: HOUR_AGO,
   createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
-  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  assignees: [],
+  lineDispatches: [],
+};
+
+export const INGEST_DRAFT_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-ingest-api-key",
+  number: "72",
+  key: "RF-72",
+  title: "Duplicate API key name returns HTTP 500 instead of a validation/conflict error",
+  description: [
+    "Creating an API key with a name that already exists in the organization returns `HTTP 500 Internal Server Error` with a generic message, instead of a client-actionable validation or conflict response.",
+    "",
+    "### What happens",
+    "",
+    "`POST /api/v1/api-keys` with a name that collides with an existing key (the name is trimmed before creation, so surrounding whitespace still collides) returns:",
+    "",
+    "```",
+    "HTTP/1.1 500 Internal Server Error",
+    '{"code": ...,"message":"failed to create API key","details":[]}',
+    "```",
+    "",
+    "The database correctly rejects the duplicate:",
+    "",
+    "```",
+    'ERROR: duplicate key value violates unique constraint "unique_api_key_in_organization" (SQLSTATE 23505)',
+    "```",
+    "",
+    "No second key is created, so the data stays consistent, but a foreseeable user input (reusing a name) surfaces as a server error with no indication of the real cause.",
+    "",
+    "### Expected",
+    "",
+    "A duplicate name should return a client-visible conflict or validation error explaining that the name is already in use, rather than a generic `500`.",
+  ].join("\n"),
+  state: "STATE_DRAFT",
+  result: "RESULT_UNSPECIFIED",
+  createdAt: TWO_HOURS_AGO,
+  updatedAt: TWO_HOURS_AGO,
+  createdBy: {
+    automation: {
+      appId: "app-refund-backlog",
+      appName: "Ingest",
+      nodeName: "On Issue Label",
+    },
+  },
+  assignees: [],
   lineDispatches: [],
 };
 
@@ -469,13 +486,67 @@ export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
   totalCostCents: "538",
 };
 
+export const PR_CLOSURE_COMPLETED_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-pr-closure-receipts",
+  number: "88",
+  key: "RF-88",
+  title: "Send refund receipts after provider confirm",
+  description: [
+    "Customers do not receive a receipt after a refund confirms at the provider.",
+    "",
+    "Send the receipt when the provider webhook reports success. PR Closure completes the work order after the pull request merges.",
+  ].join("\n"),
+  state: "STATE_CLOSED",
+  result: "RESULT_COMPLETED",
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  lineDispatches: [
+    planLineDispatch([
+      planLineExecution("plan", {
+        id: "pr-plan",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        updatedAt: LAST_WEEK,
+        totalTokens: "900",
+        costCents: "22",
+      }),
+      planLineExecution("implement", {
+        id: "pr-impl",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        run: { id: "run-pr-closure-implement", appId: "app-refund-implementer", appName: "Refund Implementer" },
+        updatedAt: LAST_WEEK,
+        totalTokens: "5400",
+        costCents: "180",
+      }),
+      planLineExecution("verify", {
+        id: "pr-verify",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        run: { id: "run-pr-closure-verify", appId: "app-refund-verifier", appName: "Refund Verifier" },
+        updatedAt: YESTERDAY,
+        totalTokens: "700",
+        costCents: "16",
+      }),
+    ]),
+  ],
+  totalTokens: "7000",
+  totalCostCents: "218",
+};
+
 export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
   OPEN_WORK_ORDER,
   OPEN_WORK_ORDER_SECONDARY,
+  QUESTION_WORK_ORDER,
+  APPROVAL_WORK_ORDER,
   RUNNING_WORK_ORDER,
   FAILED_WORK_ORDER,
   DRAFT_WORK_ORDER,
+  INGEST_DRAFT_WORK_ORDER,
   CLOSED_WORK_ORDER,
+  PR_CLOSURE_COMPLETED_WORK_ORDER,
   CLOSED_FAILED_WORK_ORDER,
 ];
 
@@ -515,20 +586,4 @@ export const defaultFactoriesFixture: FactoriesFixture = {
     [EMPTY_FACTORY_ID]: EMPTY_USAGE_REPORT,
   },
   organizationLlmSpend: DEFAULT_FACTORY_USAGE,
-};
-
-export const emptyFactoriesFixture: FactoriesFixture = {
-  organizationId: FACTORIES_ORGANIZATION_ID,
-  factories: [],
-  workOrdersByFactoryId: {},
-  appsByFactoryId: {},
-};
-
-/** Same shape as {@link defaultFactoriesFixture} but with only closed orders in the primary factory. */
-export const emptyWorkOrdersFactoriesFixture: FactoriesFixture = {
-  ...defaultFactoriesFixture,
-  workOrdersByFactoryId: {
-    [PRIMARY_FACTORY_ID]: [CLOSED_WORK_ORDER],
-    [EMPTY_FACTORY_ID]: [],
-  },
 };

@@ -42,32 +42,33 @@ describe("client-side navigation updates document.title", () => {
     expect(document.title).toBe("Work Orders · Semaphore · SuperPlane");
   }, 15000);
 
-  it("updates the tab title when clicking between main workspace tabs", async () => {
-    const user = userEvent.setup();
+  it("updates the tab title on the line board home", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/overview`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/line-plan-and-implement`}
         factoriesFixture={defaultFactoriesFixture}
         pageOverrides={pageOverrides}
       />,
     );
 
-    expect(await screen.findByTestId("overview-work-orders-card", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(document.title).toBe("Overview · Semaphore · SuperPlane");
-
-    await user.click(screen.getByTestId("factories-nav-lines"));
-    expect(await screen.findByTestId("lines-list", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(document.title).toBe("Lines · Semaphore · SuperPlane");
-
-    await user.click(screen.getByTestId("factories-nav-velocity"));
-    expect(await screen.findByTestId("factory-velocity-page", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(document.title).toBe("Velocity · Semaphore · SuperPlane");
+    expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(document.title).toBe("Plan and Implement · Semaphore · SuperPlane");
   }, 15000);
 
-  // Lines/Automations render the list and a selected entity's detail inline in
-  // the same mounted component (no route unmount): the title must still track
-  // the current selection, not just the initial mount.
-  it("updates the tab title when selecting a line inline, then back to the list", async () => {
+  it("sets the tab title on the lines list", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines`}
+        factoriesFixture={defaultFactoriesFixture}
+        pageOverrides={pageOverrides}
+      />,
+    );
+
+    expect(await screen.findByTestId("lines-list", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(document.title).toBe("Lines · Semaphore · SuperPlane");
+  }, 15000);
+
+  it("updates the tab title when selecting a line from the list", async () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
@@ -83,10 +84,6 @@ describe("client-side navigation updates document.title", () => {
     await user.click(screen.getByTestId("lines-card-line-plan-and-implement"));
     expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(document.title).toBe("Plan and Implement · Semaphore · SuperPlane");
-
-    await user.click(screen.getByTestId("lines-back-to-list"));
-    expect(await screen.findByTestId("lines-list", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(document.title).toBe("Lines · Semaphore · SuperPlane");
   }, 15000);
 
   it("updates the tab title when selecting an automation inline, then back to the list", async () => {
@@ -143,7 +140,6 @@ describe("client-side navigation updates document.title", () => {
   }, 15000);
 
   it("sets the tab title on the Missions and Wiki coming-soon pages", async () => {
-    const user = userEvent.setup();
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/missions`}
@@ -154,8 +150,17 @@ describe("client-side navigation updates document.title", () => {
 
     expect(await screen.findByTestId("coming-soon-body", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(document.title).toBe("Missions · SuperPlane");
+  }, 15000);
 
-    await user.click(screen.getByTestId("factories-nav-wiki"));
+  it("sets the tab title on the Wiki coming-soon page", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/wiki`}
+        factoriesFixture={defaultFactoriesFixture}
+        pageOverrides={{ ...pageOverrides, wiki: undefined }}
+      />,
+    );
+
     expect(await screen.findByTestId("coming-soon-body", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(document.title).toBe("Wiki · SuperPlane");
   }, 15000);

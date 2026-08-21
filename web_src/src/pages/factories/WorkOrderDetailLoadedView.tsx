@@ -66,16 +66,19 @@ interface WorkOrderDetailLoadedViewProps {
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
   onAddComment: (body: string, mentionedUserIds: string[]) => Promise<void>;
+  /** Page chrome includes the back link. Dialog chrome is the card overlay. */
+  chrome?: "page" | "dialog";
 }
 
 export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps) {
   const identifier = getWorkOrderDisplayKey(props.order, props.factoryKey);
+  const isDialog = props.chrome === "dialog";
   return (
     <>
       <WorkOrderDetailHeader
         orderTitle={props.order.title ?? "Work Order"}
         orderIdentifier={identifier === "—" ? undefined : identifier}
-        backHref={workOrdersPath(props.organizationId, props.factoryKey)}
+        backHref={isDialog ? undefined : workOrdersPath(props.organizationId, props.factoryKey)}
         displayStatus={props.displayStatus}
         isOpen={props.isOpen}
         isDispatchable={props.isDispatchable}
@@ -88,6 +91,7 @@ export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps)
         isUpdatingStatus={props.isUpdatingStatus}
         onClose={props.onClose}
         onStatusChange={props.onStatusChange}
+        className={isDialog ? "max-w-none px-6 pt-4 pb-3 pr-12" : undefined}
       />
       <WorkOrderDetailBody {...props} />
     </>
@@ -95,10 +99,9 @@ export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps)
 }
 
 function WorkOrderDetailBody(props: WorkOrderDetailLoadedViewProps) {
+  const isDialog = props.chrome === "dialog";
   return (
-    // pt-2: the entity header already ends with pb-6, so the shared body's
-    // pt-8 would stack to a 56px title-to-content gap.
-    <div className={cn(factoryContentBodyClassName, "pt-2")}>
+    <div className={cn(isDialog ? "px-6 pb-6 pt-2" : cn(factoryContentBodyClassName, "pt-2"))}>
       <div className="grid gap-x-[var(--workspace-column-gap)] gap-y-0 lg:grid-cols-[minmax(0,1fr)_var(--workspace-detail-sidebar-width)]">
         <WorkOrderDetailMainColumn {...props} />
         <WorkOrderDetailBodyAside {...props} />

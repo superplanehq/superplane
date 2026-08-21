@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
-import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 
 import { workOrderDetailPath } from "../lib/factoryPagePaths";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
@@ -50,6 +50,13 @@ const views = [
   { name: "WorkOrdersTableView", Component: WorkOrdersTableView },
 ] as const;
 
+const viewsWithDispatch = [
+  { name: "WorkOrdersListView", Component: WorkOrdersListView },
+  { name: "WorkOrdersTableView", Component: WorkOrdersTableView },
+] as const;
+
+const viewsWithAssignee = viewsWithDispatch;
+
 /**
  * jsdom doesn't lay out elements or perform coordinate-based hit-testing,
  * so `userEvent.click()` always fires directly on the node it's given —
@@ -72,7 +79,11 @@ function effectivePointerEvents(element: Element): "auto" | "none" {
   return "auto";
 }
 
-function renderView(Component: (typeof views)[number]["Component"]) {
+function renderView(
+  Component: (typeof views)[number]["Component"],
+  listEntries: (typeof entry)[] = [entry],
+  extras: { factoryLines?: FactoriesFactoryLine[]; preferredLineName?: string } = {},
+) {
   const onDispatch = vi.fn().mockResolvedValue(undefined);
   const onAssigneesSave = vi.fn().mockResolvedValue(undefined);
 
@@ -81,10 +92,11 @@ function renderView(Component: (typeof views)[number]["Component"]) {
       path: "/",
       element: (
         <Component
-          entries={[entry]}
+          entries={listEntries}
           organizationId={organizationId}
           factoryKey={factoryKey}
-          factoryLines={[]}
+          factoryLines={extras.factoryLines ?? []}
+          preferredLineName={extras.preferredLineName}
           canDispatch={true}
           canAssign={true}
           isDispatching={false}
@@ -107,7 +119,8 @@ function renderView(Component: (typeof views)[number]["Component"]) {
 
   // Scope queries to the row/card itself: board and list also render lane
   // headers whose text ("Running", etc.) can collide with the badge text.
-  const row = screen.getByRole("link", { name: `Open ${entry.title}` }).closest("article") as HTMLElement;
+  const first = listEntries[0];
+  const row = screen.getByRole("link", { name: `Open ${first.title}` }).closest("article") as HTMLElement;
 
   return { router, onDispatch, onAssigneesSave, row };
 }
@@ -120,23 +133,124 @@ describe("WorkOrdersBoardView layout", () => {
     expect(screen.getByTestId("work-orders-board-lane-running").className).toContain("min-w-72");
     expect(screen.getByTestId("work-orders-board-lane-running").className).toContain("shrink-0");
   });
+
+  it("does not render a send-to-line control on the card", () => {
+    const { row } = renderView(WorkOrdersBoardView);
+
+    expect(within(row).queryByTestId(`work-order-row-dispatch-${entry.id}`)).not.toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "Dispatch to line" })).not.toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+  });
+
+  it("shows a status dot, title, start time, and owner", () => {
+    const { row } = renderView(WorkOrdersBoardView);
+
+    expect(within(row).getByLabelText("Running")).toBeInTheDocument();
+    expect(within(row).queryByText("Running")).not.toBeInTheDocument();
+    expect(within(row).getByText(entry.title)).toBeInTheDocument();
+    expect(within(row).getByText(/\d+[smhd] ago$/)).toBeInTheDocument();
+    const owner = within(row).getByTestId(`work-order-row-assignees-${entry.id}`);
+    expect(owner).toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "Change owner" })).not.toBeInTheDocument();
+    expect(effectivePointerEvents(owner)).toBe("none");
+    expect(within(row).queryByText(entry.displayKey)).not.toBeInTheDocument();
+    expect(within(row).queryByText(/verify/i)).not.toBeInTheDocument();
+  });
+
+  it("shows a Run failed label on a waiting card after a failed step", () => {
+    const waiting = buildWorkOrderListEntry(
+      {
+        id: "wo-waiting",
+        number: "6",
+        title: "Ship idempotent refund retries",
+        state: "STATE_OPEN",
+        createdAt: "2024-06-01T00:00:00Z",
+        updatedAt: "2024-06-02T00:00:00Z",
+        lineDispatches: [
+          {
+            id: "dispatch-1",
+            line: { id: "line-a", name: "hotfix" },
+            state: "STATE_FINISHED",
+            stepExecutions: [{ id: "e1", step: "implement", state: "STATE_FINISHED", result: "RESULT_FAILED" }],
+          },
+        ],
+        assignees: [{ id: "user-2", name: "Arnold Schwarzenegger" }],
+      },
+      factory,
+    );
+
+    const { row } = renderView(WorkOrdersBoardView, [waiting]);
+
+    const chip = within(row).getByText("Run failed");
+    expect(chip.querySelector("svg")).toBeTruthy();
+    expect(within(row).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+  });
+
+  it("shows a Start button on a draft backlog card", () => {
+    const draft = buildWorkOrderListEntry(
+      {
+        id: "wo-draft",
+        number: "5",
+        title: "Draft: rework refund telemetry",
+        state: "STATE_DRAFT",
+        createdAt: "2024-06-01T00:00:00Z",
+        updatedAt: "2024-06-02T00:00:00Z",
+        lineDispatches: [],
+        assignees: [],
+      },
+      factory,
+    );
+
+    const { row } = renderView(WorkOrdersBoardView, [draft], {
+      factoryLines: [{ id: "line-a", name: "hotfix" }],
+    });
+
+    const start = within(row).getByRole("button", { name: "Start" });
+    expect(start).toBeInTheDocument();
+    expect(effectivePointerEvents(start)).toBe("auto");
+    expect(within(row).queryByTestId("work-order-row-assignees-wo-draft")).not.toBeInTheDocument();
+  });
+
+  it("starts a draft on the preferred line without opening the card", async () => {
+    const user = userEvent.setup();
+    const draft = buildWorkOrderListEntry(
+      {
+        id: "wo-draft",
+        number: "5",
+        title: "Draft: rework refund telemetry",
+        state: "STATE_DRAFT",
+        createdAt: "2024-06-01T00:00:00Z",
+        updatedAt: "2024-06-02T00:00:00Z",
+        lineDispatches: [],
+      },
+      factory,
+    );
+
+    const { router, onDispatch, row } = renderView(WorkOrdersBoardView, [draft], {
+      factoryLines: [
+        { id: "line-a", name: "plan-and-implement" },
+        { id: "line-b", name: "hotfix" },
+      ],
+      preferredLineName: "plan-and-implement",
+    });
+
+    await user.click(within(row).getByRole("button", { name: "Start" }));
+
+    expect(router.state.location.pathname).toBe("/");
+    expect(onDispatch).toHaveBeenCalledWith("wo-draft", { lineName: "plan-and-implement" });
+  });
 });
 
 describe.each(views)("$name click handling", ({ Component }) => {
-  it("lets clicks on the title and status badge pass through to the overlay link", () => {
+  it("lets clicks on the title and status pass through to the overlay link", () => {
     const { row } = renderView(Component);
     const link = within(row).getByRole("link", { name: `Open ${entry.title}` });
+    const status =
+      Component === WorkOrdersBoardView ? within(row).getByLabelText("Running") : within(row).getByText("Running");
 
     expect(effectivePointerEvents(link)).toBe("auto");
     expect(effectivePointerEvents(within(row).getByText(entry.title))).toBe("none");
-    expect(effectivePointerEvents(within(row).getByText("Running"))).toBe("none");
-  });
-
-  it("keeps the dispatch button and assignee control clickable", () => {
-    const { row } = renderView(Component);
-
-    expect(effectivePointerEvents(within(row).getByTestId(`work-order-row-dispatch-${entry.id}`))).toBe("auto");
-    expect(effectivePointerEvents(within(row).getByTestId(`work-order-row-assignees-${entry.id}`))).toBe("auto");
+    expect(effectivePointerEvents(status)).toBe("none");
   });
 
   it("navigates to the detail page when the overlay link is activated", async () => {
@@ -147,15 +261,13 @@ describe.each(views)("$name click handling", ({ Component }) => {
 
     expect(router.state.location.pathname).toBe(detailHref);
   });
+});
 
-  it("does not navigate when the dispatch button is clicked", async () => {
-    const user = userEvent.setup();
-    const { router, onDispatch, row } = renderView(Component);
+describe.each(viewsWithAssignee)("$name assignee control", ({ Component }) => {
+  it("keeps the assignee control clickable", () => {
+    const { row } = renderView(Component);
 
-    await user.click(within(row).getByTestId(`work-order-row-dispatch-${entry.id}`));
-
-    expect(router.state.location.pathname).toBe("/");
-    expect(onDispatch).not.toHaveBeenCalled();
+    expect(effectivePointerEvents(within(row).getByTestId(`work-order-row-assignees-${entry.id}`))).toBe("auto");
   });
 
   it("does not navigate when the assignee control is clicked", async () => {
@@ -165,5 +277,20 @@ describe.each(views)("$name click handling", ({ Component }) => {
     await user.click(within(row).getByTestId(`work-order-row-assignees-${entry.id}`));
 
     expect(router.state.location.pathname).toBe("/");
+  });
+});
+
+describe.each(viewsWithDispatch)("$name dispatch control", ({ Component }) => {
+  it("keeps the dispatch button clickable and does not navigate when it is clicked", async () => {
+    const user = userEvent.setup();
+    const { router, onDispatch, row } = renderView(Component);
+
+    const dispatchButton = within(row).getByTestId(`work-order-row-dispatch-${entry.id}`);
+    expect(effectivePointerEvents(dispatchButton)).toBe("auto");
+
+    await user.click(dispatchButton);
+
+    expect(router.state.location.pathname).toBe("/");
+    expect(onDispatch).not.toHaveBeenCalled();
   });
 });

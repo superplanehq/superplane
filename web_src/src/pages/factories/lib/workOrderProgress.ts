@@ -9,12 +9,20 @@ function hasActiveLineDispatch(order: FactoriesWorkOrder): boolean {
 }
 
 /**
- * Display vocabulary for the Work Orders workspace. Mirrors the six labels
- * from the reference application: Draft, Running, Waiting, Completed,
- * Failed, Cancelled. Persisted state + result columns in the database stay
- * unchanged; this file is the single mapping layer.
+ * Display vocabulary for the Work Orders workspace: Draft, Running, Needs
+ * attention, Completed, Failed, Rejected, Canceled. The idle-open key stays
+ * `waiting` so stored filters keep working. Persisted state + result
+ * columns in the database stay unchanged; this file is the single mapping
+ * layer.
  */
-export type WorkOrderDisplayStatus = "draft" | "running" | "waiting" | "completed" | "failed" | "cancelled";
+export type WorkOrderDisplayStatus =
+  | "draft"
+  | "running"
+  | "waiting"
+  | "completed"
+  | "failed"
+  | "rejected"
+  | "cancelled";
 
 const DISPLAY_STATUS_META: Record<
   WorkOrderDisplayStatus,
@@ -37,9 +45,9 @@ const DISPLAY_STATUS_META: Record<
     dotClassName: "bg-[color:var(--status-running-dot)]",
   },
   waiting: {
-    label: "Waiting",
-    filterLabel: "Waiting",
-    summary: "Waiting for review or the next dispatch.",
+    label: "Needs attention",
+    filterLabel: "Needs attention",
+    summary: "A person must act before this work can continue.",
     className:
       "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)] text-[color:var(--status-waiting-fg)]",
     dotClassName: "bg-[color:var(--status-waiting-dot)]",
@@ -60,10 +68,18 @@ const DISPLAY_STATUS_META: Record<
       "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)] text-[color:var(--status-failed-fg)]",
     dotClassName: "bg-[color:var(--status-failed-dot)]",
   },
+  rejected: {
+    label: "Rejected",
+    filterLabel: "Rejected",
+    summary: "A person rejected this work order.",
+    className:
+      "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)] text-[color:var(--status-failed-fg)]",
+    dotClassName: "bg-[color:var(--status-failed-dot)]",
+  },
   cancelled: {
-    label: "Cancelled",
-    filterLabel: "Cancelled",
-    summary: "Closed as cancelled.",
+    label: "Canceled",
+    filterLabel: "Canceled",
+    summary: "This work order was canceled.",
     className:
       "border-[color:var(--status-cancelled-border)] bg-[color:var(--status-cancelled-bg)] text-[color:var(--status-cancelled-fg)]",
     dotClassName: "bg-[color:var(--status-cancelled-dot)]",
@@ -76,6 +92,7 @@ export const WORK_ORDER_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = [
   "waiting",
   "completed",
   "failed",
+  "rejected",
   "cancelled",
 ];
 
@@ -104,15 +121,15 @@ export const WORK_ORDER_BOARD_LANES: WorkOrderBoardLaneDefinition[] = [
   },
   {
     id: "review",
-    title: "Review",
-    description: "Waiting for reviewers or the next dispatch.",
+    title: "Needs attention",
+    description: "Work orders that wait for a human decision.",
     statuses: ["waiting"],
   },
   {
     id: "done",
     title: "Done",
-    description: "Completed, failed, or cancelled work.",
-    statuses: ["completed", "failed", "cancelled"],
+    description: "Completed, failed, rejected, or canceled work.",
+    statuses: ["completed", "failed", "rejected", "cancelled"],
   },
 ];
 
@@ -141,10 +158,16 @@ export function getWorkOrderDisplayKey(order: FactoriesWorkOrder, factoryKey?: s
 export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderDisplayStatus {
   if (order.state === "STATE_CLOSED") {
     if (order.result === "RESULT_REJECTED") {
-      return "cancelled";
+      return "rejected";
     }
     if (order.result === "RESULT_FAILED") {
       return "failed";
+    }
+    if (
+      order.result !== "RESULT_COMPLETED" &&
+      (order.lineDispatches ?? []).some((dispatch) => dispatch.result === "RESULT_CANCELLED")
+    ) {
+      return "cancelled";
     }
     return "completed";
   }

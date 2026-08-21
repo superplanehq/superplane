@@ -81,7 +81,7 @@ function ListRow({
 
       <span
         className={cn(
-          "relative z-10 pointer-events-none inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.04em]",
+          "relative z-10 pointer-events-none inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
           meta.className,
         )}
       >

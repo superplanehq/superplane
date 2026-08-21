@@ -21,6 +21,8 @@ import {
   FactoriesIndexPage,
   FactoriesLayout,
   FactoryAppCanvasPage,
+  FactoryAppSplitRunPage,
+  FactoryHomeRedirect,
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
@@ -242,7 +244,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
           <Route path="new" element={factoryRoute(<NewWorkspacePage />)} />
           <Route path=":factoryKey" element={factoryRoute(<FactoriesLayout />)}>
             <Route element={<OptionalOnboardingGate enabled={onboardingEnabled} />}>
-              <Route index element={<Navigate to="overview" replace />} />
+              <Route index element={<FactoryHomeRedirect />} />
               {OnboardingRoutePage ? <Route path="setup" element={<OnboardingRoutePage />} /> : null}
               <Route path="overview" element={<OverviewRoutePage />} />
               <Route path="missions" element={<MissionsPage />} />
@@ -270,6 +272,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 <Route path=":appId" element={<AutomationsPage />} />
               </Route>
               <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
+              <Route path="apps/:appId/split-run" element={<FactoryAppSplitRunPage />} />
             </Route>
           </Route>
           <Route path=":factoryKey/settings" element={factoryRoute(<FactorySettingsLayout />)}>
