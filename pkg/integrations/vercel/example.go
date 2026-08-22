@@ -118,3 +118,31 @@ func (c *UpsertEnvVar) ExampleOutput() map[string]any {
 		&exampleOutputUpsertEnvVar,
 	)
 }
+
+//go:embed example_output_add_domain.json
+var exampleOutputAddDomainBytes []byte
+
+//go:embed example_output_remove_domain.json
+var exampleOutputRemoveDomainBytes []byte
+
+var exampleOutputAddDomainOnce sync.Once
+var exampleOutputAddDomain map[string]any
+
+var exampleOutputRemoveDomainOnce sync.Once
+var exampleOutputRemoveDomain map[string]any
+
+func (c *AddDomain) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputAddDomainOnce,
+		exampleOutputAddDomainBytes,
+		&exampleOutputAddDomain,
+	)
+}
+
+func (c *RemoveDomain) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputRemoveDomainOnce,
+		exampleOutputRemoveDomainBytes,
+		&exampleOutputRemoveDomain,
+	)
+}

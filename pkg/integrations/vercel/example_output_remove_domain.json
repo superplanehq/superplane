@@ -1,0 +1,9 @@
+{
+  "data": {
+    "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+    "name": "www.tenant-1234.com",
+    "removed": true
+  },
+  "timestamp": "2026-08-22T08:30:00.000000Z",
+  "type": "vercel.projectDomain"
+}
