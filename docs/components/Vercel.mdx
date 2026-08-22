@@ -1,0 +1,502 @@
+---
+title: "Vercel"
+---
+
+Deploy to Vercel and react to deployment events
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Deployment" href="#on-deployment" description="Listen to Vercel deployment events for a project, or for all projects" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Add Domain" href="#add-domain" description="Add a domain to a Vercel project" />
+  <LinkCard title="Cancel Deployment" href="#cancel-deployment" description="Cancel an in-progress Vercel deployment" />
+  <LinkCard title="Create Project" href="#create-project" description="Create a new Vercel project" />
+  <LinkCard title="Deploy" href="#deploy" description="Start a new deployment for a Git-connected Vercel project" />
+  <LinkCard title="Get Deployment" href="#get-deployment" description="Retrieve a Vercel deployment by ID" />
+  <LinkCard title="Get Project" href="#get-project" description="Retrieve a Vercel project by ID or name" />
+  <LinkCard title="List Deployments" href="#list-deployments" description="List Vercel deployments, optionally filtered by project, target, and state" />
+  <LinkCard title="Remove Domain" href="#remove-domain" description="Remove a domain from a Vercel project" />
+  <LinkCard title="Rollback Production" href="#rollback-production" description="Point Vercel production traffic back to a previous production deployment" />
+  <LinkCard title="Set Environment Variable" href="#set-environment-variable" description="Create or update an environment variable on a Vercel project" />
+</CardGrid>
+
+## Instructions
+
+1. **Access Token:** Create it in [Vercel Account Settings -> Tokens](https://vercel.com/account/settings/tokens). Use a token scoped to the team that owns your projects.
+2. **Team ID (optional):** Only needed when the token has access to multiple teams. Find it in [Team Settings](https://vercel.com/docs/accounts#find-your-team-id) (starts with `team_`).
+3. **Auth:** SuperPlane sends requests to the [Vercel REST API](https://vercel.com/docs/rest-api) using `Authorization: Bearer <ACCESS_TOKEN>`.
+4. **Git-connected projects only:** The Deploy component starts deployments for projects connected to GitHub, GitLab, or Bitbucket. Projects deployed through the CLI without a Git connection are not supported.
+5. **Webhooks:** SuperPlane creates a Vercel webhook automatically via the [Webhooks API](https://vercel.com/docs/webhooks). No manual setup is required.
+
+<a id="on-deployment"></a>
+
+## On Deployment
+
+**Trigger key:** `vercel.onDeployment`
+
+The On Deployment trigger emits Vercel deployment events.
+
+### Use Cases
+
+- **Deploy notifications**: Notify Slack or PagerDuty when deployments succeed or fail
+- **Post-deploy automation**: Run smoke tests after a production deployment
+- **Release orchestration**: Start downstream workflows when a build finishes
+
+### Configuration
+
+- **Project**: Optional Vercel project. Leave empty to listen to all projects.
+- **Event Types**: Deployment states to listen for. Defaults to `deployment.succeeded`.
+
+### Webhook Verification
+
+SuperPlane creates the webhook in Vercel automatically and verifies every request using the `x-vercel-signature` header.
+
+### Event Data
+
+Emitted data includes `eventType`, `deploymentId`, `url`, `readyState`, `target`, and `projectId`, plus the raw Vercel payload.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "deploymentId": "dpl_8f2vQkP3xWmTnYbZ",
+    "eventType": "deployment.succeeded",
+    "name": "my-app",
+    "payload": {
+      "deployment": {
+        "createdAt": 1755850000000,
+        "id": "dpl_8f2vQkP3xWmTnYbZ",
+        "name": "my-app",
+        "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+        "readyState": "READY",
+        "url": "my-app-9jaegn4en.vercel.app"
+      },
+      "target": "production"
+    },
+    "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+    "readyState": "READY",
+    "target": "production",
+    "type": "deployment.succeeded",
+    "url": "my-app-9jaegn4en.vercel.app"
+  },
+  "timestamp": "2026-08-22T08:00:00.000000Z",
+  "type": "vercel.deployment.succeeded"
+}
+```
+
+<a id="add-domain"></a>
+
+## Add Domain
+
+**Component key:** `vercel.addDomain`
+
+The Add Domain component assigns a domain to a Vercel project.
+
+### Use Cases
+
+- **Tenant provisioning**: Attach a customer domain when onboarding a tenant
+- **Environment automation**: Wire up domains as part of project setup
+
+### Configuration
+
+- **Project**: Required. The Vercel project.
+- **Domain**: Required. The domain name (e.g. `www.example.com`).
+
+### Notes
+
+- The domain must be added to the Vercel account or already owned there
+- DNS records may need updating; check the verification state in the output
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "www.tenant-1234.com",
+    "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+    "verified": false
+  },
+  "timestamp": "2026-08-22T08:25:00.000000Z",
+  "type": "vercel.projectDomain"
+}
+```
+
+<a id="cancel-deployment"></a>
+
+## Cancel Deployment
+
+**Component key:** `vercel.cancelDeployment`
+
+The Cancel Deployment component stops a Vercel build that is still in progress.
+
+### Use Cases
+
+- **Wrong-branch recovery**: Stop a build started from the wrong branch
+- **Incident response**: Cancel deploys with known errors before they go live
+- **Pipeline guardrails**: Cancel queued builds superseded by newer commits
+
+### Configuration
+
+- **Deployment ID**: Required. The deployment to cancel (starts with `dpl_`, supports expressions).
+
+### Notes
+
+- Only deployments that are still building can be canceled
+- The action is irreversible: the build is stopped and marked `CANCELED`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": 1755846000000,
+    "deploymentId": "dpl_2nRtXwBq7cVdLpKa",
+    "name": "my-app",
+    "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+    "readyState": "CANCELED",
+    "target": "preview",
+    "url": "my-app-git-feature.vercel.app"
+  },
+  "timestamp": "2026-08-22T08:05:00.000000Z",
+  "type": "vercel.deployment"
+}
+```
+
+<a id="create-project"></a>
+
+## Create Project
+
+**Component key:** `vercel.createProject`
+
+The Create Project component creates a new Vercel project.
+
+### Use Cases
+
+- **Environment provisioning**: Create a project per feature branch or tenant
+- **Bootstrap automation**: Set up projects from templates or external systems
+
+### Configuration
+
+- **Name**: Required. The project name. Must be 100 characters or fewer and contain only lowercase letters, numbers, and hyphens.
+- **Framework**: Optional. A Vercel framework preset (e.g. `nextjs`, `vite`, `sveltekit`).
+
+### Output
+
+Emits a `vercel.project` payload for the created project.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": 1755850100000,
+    "name": "tenant-1234",
+    "projectId": "prj_newProjectAbCdEfGh"
+  },
+  "timestamp": "2026-08-22T08:15:00.000000Z",
+  "type": "vercel.project"
+}
+```
+
+<a id="deploy"></a>
+
+## Deploy
+
+**Component key:** `vercel.deploy`
+
+The Deploy component starts a new deployment for a Vercel project and returns the queued deployment.
+
+### Use Cases
+
+- **Merge to deploy**: Start a production deploy after a merge or CI pass
+- **Scheduled deploys**: Redeploy on a schedule or after content changes
+- **Chained deploys**: Deploy project B when project A finishes
+
+### How It Works
+
+1. Looks up the selected project and reads its Git connection
+2. Starts a deployment from the configured branch or commit via the [Vercel REST API](https://vercel.com/docs/rest-api)
+3. Emits the queued deployment immediately
+
+The component does not wait for the build to finish. Pair it with the **On Deployment** trigger or the **Get Deployment** component to follow the build state.
+
+### Configuration
+
+- **Project**: Required. Must be connected to GitHub, GitLab, or Bitbucket.
+- **Branch / Commit**: Optional. Defaults to the production branch of the project.
+- **Target**: `production` (default) or `preview`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": 1755850000000,
+    "deploymentId": "dpl_8f2vQkP3xWmTnYbZ",
+    "name": "my-app",
+    "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+    "readyState": "QUEUED",
+    "ref": "main",
+    "target": "production",
+    "url": "my-app-9jaegn4en.vercel.app"
+  },
+  "timestamp": "2026-08-22T08:00:00.000000Z",
+  "type": "vercel.deployment.triggered"
+}
+```
+
+<a id="get-deployment"></a>
+
+## Get Deployment
+
+**Component key:** `vercel.getDeployment`
+
+The Get Deployment component fetches a Vercel deployment by ID.
+
+### Use Cases
+
+- **Status checks**: Inspect the current build state of a deployment
+- **Debugging**: Fetch deployment details after receiving an event
+
+### Configuration
+
+- **Deployment ID**: Deployment ID to retrieve (starts with `dpl_`, supports expressions)
+
+### Output
+
+Emits a `vercel.deployment` payload containing fields like `deploymentId`, `url`, `readyState`, `target`, and `projectId`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": 1755850000000,
+    "deploymentId": "dpl_8f2vQkP3xWmTnYbZ",
+    "name": "my-app",
+    "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+    "readyState": "READY",
+    "target": "production",
+    "url": "my-app-9jaegn4en.vercel.app"
+  },
+  "timestamp": "2026-08-22T08:00:00.000000Z",
+  "type": "vercel.deployment"
+}
+```
+
+<a id="get-project"></a>
+
+## Get Project
+
+**Component key:** `vercel.getProject`
+
+The Get Project component fetches a Vercel project.
+
+### Use Cases
+
+- **Project details**: Read the framework and settings of a project
+- **Guardrails**: Check that a project exists before deploying to it
+
+### Configuration
+
+- **Project**: Required. The Vercel project to retrieve.
+
+### Output
+
+Emits a `vercel.project` payload with fields like `projectId`, `name`, and `framework`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": 1735689600000,
+    "framework": "nextjs",
+    "name": "my-app",
+    "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV"
+  },
+  "timestamp": "2026-08-22T08:00:00.000000Z",
+  "type": "vercel.project"
+}
+```
+
+<a id="list-deployments"></a>
+
+## List Deployments
+
+**Component key:** `vercel.listDeployments`
+
+The List Deployments component fetches recent Vercel deployments.
+
+### Use Cases
+
+- **Release audits**: Fetch recent production deployments for reporting
+- **Find rollbacks**: Locate the last good deployment before rolling back
+- **Stuck build checks**: Look for deployments stuck in a building state
+
+### Configuration
+
+- **Project**: Optional. Leave empty to list deployments across all projects.
+- **Target**: Optional. Filter by production or preview deployments.
+- **State**: Optional. Filter by deployment state (e.g. READY, ERROR).
+- **Limit**: Maximum number of deployments to return. Defaults to 20.
+
+### Output
+
+Emits a `vercel.deployments` payload with a `deployments` array and the total `count`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "count": 2,
+    "deployments": [
+      {
+        "createdAt": 1755850000000,
+        "deploymentId": "dpl_8f2vQkP3xWmTnYbZ",
+        "name": "my-app",
+        "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+        "readyState": "READY",
+        "target": "production",
+        "url": "my-app-9jaegn4en.vercel.app"
+      },
+      {
+        "createdAt": 1755846000000,
+        "deploymentId": "dpl_2nRtXwBq7cVdLpKa",
+        "name": "my-app",
+        "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+        "readyState": "BUILDING",
+        "target": "preview",
+        "url": "my-app-git-feature.vercel.app"
+      }
+    ]
+  },
+  "timestamp": "2026-08-22T08:00:00.000000Z",
+  "type": "vercel.deployments"
+}
+```
+
+<a id="remove-domain"></a>
+
+## Remove Domain
+
+**Component key:** `vercel.removeDomain`
+
+The Remove Domain component detaches a domain from a Vercel project.
+
+### Use Cases
+
+- **Tenant offboarding**: Detach customer domains when a tenant leaves
+- **Environment cleanup**: Remove stale domains as part of teardown workflows
+
+### Configuration
+
+- **Project**: Required. The Vercel project.
+- **Domain**: Required. The domain name to remove (e.g. `www.example.com`).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "www.tenant-1234.com",
+    "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+    "removed": true
+  },
+  "timestamp": "2026-08-22T08:30:00.000000Z",
+  "type": "vercel.projectDomain"
+}
+```
+
+<a id="rollback-production"></a>
+
+## Rollback Production
+
+**Component key:** `vercel.rollback`
+
+The Rollback Production component points production traffic of a Vercel project to a previous production deployment.
+
+### Use Cases
+
+- **Incident response**: Revert production after a bad release
+- **Automated recovery**: Roll back when smoke tests fail after a deploy
+
+### Configuration
+
+- **Project**: Required. The project to roll back.
+- **Deployment ID**: Required. A previous **production** deployment to roll back to (starts with `dpl_`, supports expressions).
+- **Description**: Optional. The reason for the rollback, shown in the Vercel dashboard.
+
+### Notes
+
+- Only previous production deployments can be used as rollback targets
+- Use the **List Deployments** component to find the deployment to roll back to
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deploymentId": "dpl_3kYhGfDs9aWqErTu",
+    "description": "Reverting bad release v1.42.0",
+    "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+    "rolledBack": true
+  },
+  "timestamp": "2026-08-22T08:10:00.000000Z",
+  "type": "vercel.rollback"
+}
+```
+
+<a id="set-environment-variable"></a>
+
+## Set Environment Variable
+
+**Component key:** `vercel.upsertEnvVar`
+
+The Set Environment Variable component creates or updates an environment variable on a Vercel project.
+
+### Use Cases
+
+- **Secret rotation**: Rotate third-party API keys across environments
+- **Config propagation**: Point projects at new infrastructure endpoints
+- **Environment provisioning**: Set variables right after creating a project
+
+### Configuration
+
+- **Project**: Required. The Vercel project.
+- **Key**: Required. The variable name (e.g. `API_URL`).
+- **Value**: Required. The variable value.
+- **Environments**: Which environments the variable applies to. Defaults to production only.
+- **Type**: How Vercel stores the value. Defaults to encrypted. Use sensitive for values that must never be readable after save.
+
+### Notes
+
+- If a variable with the same key already exists, its value is updated (upsert)
+- New values apply to future deployments, not running ones
+
+### Example Output
+
+```json
+{
+  "data": {
+    "envId": "env_9XyZaBcDeFgHiJkLmNoP",
+    "key": "API_URL",
+    "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+    "target": [
+      "production"
+    ]
+  },
+  "timestamp": "2026-08-22T08:20:00.000000Z",
+  "type": "vercel.envVar"
+}
+```
+
