@@ -5,13 +5,14 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory } from "@/api-client";
-import { editFactoryLinePath, factoryLineDetailPath } from "../lib/factoryPagePaths";
+import { editFactoryLinePath, factoryAppConfigurePath, factoryLineDetailPath } from "../lib/factoryPagePaths";
 import {
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
+import { withPlanLinePhases } from "../__fixtures__/lineMetricsPlanLine";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { LINE_LIST_METRICS_BY_ID } from "./lineListMetricsMockData";
 import { LinesPage } from "./LinesPage";
@@ -128,6 +129,7 @@ describe("LinesPage board", () => {
   function renderBoard(
     path = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
     openCreateWorkOrder = vi.fn(),
+    factory: FactoriesFactory = REFUND_FACTORY,
   ) {
     return render(
       <QueryClientProvider client={new QueryClient()}>
@@ -137,8 +139,8 @@ describe("LinesPage board", () => {
               organizationId: "org-1",
               factoryId: PRIMARY_FACTORY_ID,
               factoryKey: PRIMARY_FACTORY_KEY,
-              factory: REFUND_FACTORY,
-              factories: [REFUND_FACTORY],
+              factory,
+              factories: [factory],
               openCreateWorkOrder,
             }}
           >
@@ -225,6 +227,54 @@ describe("LinesPage board", () => {
     await user.keyboard("{Enter}");
 
     expect(screen.getByTestId("lines-column-title-backlog")).toHaveTextContent("Inbox");
+  });
+
+  it("opens backlog settings in a modal and does not open a canvas", async () => {
+    const user = userEvent.setup();
+    const linePath = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`;
+    renderBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-edit"));
+
+    expect(screen.getByTestId("lines-backlog-settings")).toBeInTheDocument();
+    expect(screen.getByLabelText("Name")).toHaveValue("Backlog");
+    expect(screen.getByLabelText("Size")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(linePath);
+    expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent("configure=1");
+  });
+
+  it("saves the backlog name from the settings modal", async () => {
+    const user = userEvent.setup();
+    renderBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-edit"));
+    const name = screen.getByLabelText("Name");
+    await user.clear(name);
+    await user.type(name, "Inbox");
+    await user.click(screen.getByTestId("lines-backlog-settings-save"));
+
+    expect(screen.queryByTestId("lines-backlog-settings")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-column-title-backlog")).toHaveTextContent("Inbox");
+  });
+
+  it("hides Edit on the Done column", async () => {
+    const user = userEvent.setup();
+    const factory: FactoriesFactory = {
+      ...REFUND_FACTORY,
+      lines: (REFUND_FACTORY.lines ?? []).map(withPlanLinePhases),
+    };
+    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), factory);
+
+    await user.click(screen.getByTestId("lines-phase-menu-3"));
+    expect(screen.queryByTestId("lines-phase-menu-3-edit")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent(
+      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, "app-refund-done", {
+        from: "lines",
+        lineId: REFUND_LINE_PLAN_ID,
+      }),
+    );
   });
 
   it("opens Edit from the line overflow menu", async () => {

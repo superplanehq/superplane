@@ -12,6 +12,7 @@ import {
   collectLineBacklogOrders,
   findBacklogAutomationApp,
   findClosureAutomationApp,
+  isDoneLineColumn,
   linePhaseRunHref,
   resolvePhaseRunStatus,
 } from "./linePhaseRuns";
@@ -428,6 +429,14 @@ describe("findClosureAutomationApp", () => {
       id: "app-refund-done",
       name: "PR Closure",
     });
+  });
+});
+
+describe("isDoneLineColumn", () => {
+  it("treats the Done name and the closure app id as special columns", () => {
+    expect(isDoneLineColumn({ stepName: "Done", appId: "app-plan" })).toBe(true);
+    expect(isDoneLineColumn({ stepName: "Phase 4", appId: "app-refund-done" })).toBe(true);
+    expect(isDoneLineColumn({ stepName: "Plan", appId: "app-plan" })).toBe(false);
   });
 });
 

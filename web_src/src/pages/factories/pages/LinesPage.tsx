@@ -23,6 +23,7 @@ import {
   collectLineBacklogOrders,
   findBacklogAutomationApp,
   findClosureAutomationApp,
+  isDoneLineColumn,
   LINE_PHASE_RUNS_PAGE_SIZE,
   resolveColumnGlyph,
   resolvePhaseRunStatus,
@@ -62,6 +63,7 @@ import {
   factorySectionHeaderClassName,
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
+import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
 import { LineListCard } from "./LineListCard";
@@ -304,7 +306,6 @@ function LineDetail({
           organizationId={organizationId}
           factoryKey={factoryKey}
           lineId={line.id}
-          apps={apps}
           backlogOrders={backlogOrders}
           columns={board}
           canCreateWorkOrder={canCreateWorkOrder}
@@ -475,7 +476,6 @@ function PhaseBoard({
   organizationId,
   factoryKey,
   lineId,
-  apps,
   backlogOrders,
   columns,
   canCreateWorkOrder,
@@ -487,7 +487,6 @@ function PhaseBoard({
   organizationId: string;
   factoryKey: string;
   lineId?: string;
-  apps: Array<{ id?: string; name?: string }>;
   backlogOrders: FactoriesWorkOrder[];
   columns: LinePhaseColumn[];
   canCreateWorkOrder: boolean;
@@ -496,12 +495,10 @@ function PhaseBoard({
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string) => void;
 }) {
-  const backlogApp = findBacklogAutomationApp(apps);
-  const backlogConfigureHref = backlogApp
-    ? factoryAppConfigurePath(organizationId, factoryKey, backlogApp.id, { from: "lines", lineId })
-    : null;
   const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>({});
   const [columnTitles, setColumnTitles] = useState<Record<string, string>>({});
+  const [backlogSize, setBacklogSize] = useState<number | null>(null);
+  const [backlogSettingsOpen, setBacklogSettingsOpen] = useState(false);
 
   const setColumnColor = useCallback((columnKey: string, colorId: LineBoardColumnColorId | null) => {
     setColumnColors((current) => ({ ...current, [columnKey]: colorId }));
@@ -517,7 +514,15 @@ function PhaseBoard({
         <BacklogColumn
           orders={backlogOrders}
           title={columnTitles.backlog ?? "Backlog"}
-          configureHref={backlogConfigureHref}
+          size={backlogSize}
+          settingsOpen={backlogSettingsOpen}
+          onOpenSettings={() => setBacklogSettingsOpen(true)}
+          onCloseSettings={() => setBacklogSettingsOpen(false)}
+          onSaveSettings={({ name, size }) => {
+            setColumnTitle("backlog", name);
+            setBacklogSize(size);
+            setBacklogSettingsOpen(false);
+          }}
           colorId={columnColors.backlog ?? null}
           onColorChange={(colorId) => setColumnColor("backlog", colorId)}
           canCreateWorkOrder={canCreateWorkOrder}
@@ -561,7 +566,11 @@ function PhaseBoard({
 function BacklogColumn({
   orders,
   title,
-  configureHref,
+  size,
+  settingsOpen,
+  onOpenSettings,
+  onCloseSettings,
+  onSaveSettings,
   colorId,
   onColorChange,
   canCreateWorkOrder,
@@ -573,7 +582,11 @@ function BacklogColumn({
 }: {
   orders: FactoriesWorkOrder[];
   title: string;
-  configureHref: string | null;
+  size: number | null;
+  settingsOpen: boolean;
+  onOpenSettings: () => void;
+  onCloseSettings: () => void;
+  onSaveSettings: (settings: { name: string; size: number | null }) => void;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   canCreateWorkOrder: boolean;
@@ -584,61 +597,72 @@ function BacklogColumn({
   onOpenWorkOrder: (orderId: string) => void;
 }) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
+  const atCapacity = size != null && orders.length >= size;
+  const canAdd = canCreateWorkOrder && !atCapacity;
 
   return (
-    <WorkOrderBoardLane
-      title={title}
-      label={title}
-      canRename={canRename}
-      onRename={onRename}
-      titleTestId="lines-column-title-backlog"
-      count={orders.length}
-      tone="neutral"
-      surfaceClassName={surfaceClassName}
-      emptyDescription="No work orders in the backlog."
-      className={surfaceClassName ? undefined : "bg-muted"}
-      actions={
-        <div className="flex shrink-0 items-center gap-0.5">
-          <PermissionTooltip allowed={canCreateWorkOrder} message="You don't have permission to create work orders.">
-            <button
-              type="button"
-              onClick={() => {
-                if (canCreateWorkOrder) {
-                  onCreateWorkOrder();
-                }
-              }}
-              disabled={!canCreateWorkOrder}
-              aria-label="Create work order"
-              title="Create work order"
-              data-testid="lines-backlog-create"
-              className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-60"
-            >
-              <Plus className="size-3.5" aria-hidden />
-            </button>
-          </PermissionTooltip>
-          <ColumnLaneMenu
-            title={title}
-            testId="lines-backlog-menu"
-            editHref={configureHref}
-            colorId={colorId}
-            onColorChange={onColorChange}
-          />
-        </div>
-      }
-      testId="lines-backlog-column"
-    >
-      <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-backlog-column-scroll">
-        {orders.map((order) => (
-          <li key={order.id}>
-            <LineBoardOrderCard
-              order={order}
-              workOrderCardContext={workOrderCardContext}
-              onOpenWorkOrder={onOpenWorkOrder}
+    <>
+      <WorkOrderBoardLane
+        title={title}
+        label={title}
+        canRename={canRename}
+        onRename={onRename}
+        titleTestId="lines-column-title-backlog"
+        count={orders.length}
+        tone="neutral"
+        surfaceClassName={surfaceClassName}
+        emptyDescription="No work orders in the backlog."
+        className={surfaceClassName ? undefined : "bg-muted"}
+        actions={
+          <div className="flex shrink-0 items-center gap-0.5">
+            <PermissionTooltip allowed={canCreateWorkOrder} message="You don't have permission to create work orders.">
+              <button
+                type="button"
+                onClick={() => {
+                  if (canAdd) {
+                    onCreateWorkOrder();
+                  }
+                }}
+                disabled={!canAdd}
+                aria-label="Create work order"
+                title={atCapacity ? "The backlog is full." : "Create work order"}
+                data-testid="lines-backlog-create"
+                className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-60"
+              >
+                <Plus className="size-3.5" aria-hidden />
+              </button>
+            </PermissionTooltip>
+            <ColumnLaneMenu
+              title={title}
+              testId="lines-backlog-menu"
+              onEdit={onOpenSettings}
+              colorId={colorId}
+              onColorChange={onColorChange}
             />
-          </li>
-        ))}
-      </ul>
-    </WorkOrderBoardLane>
+          </div>
+        }
+        testId="lines-backlog-column"
+      >
+        <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-backlog-column-scroll">
+          {orders.map((order) => (
+            <li key={order.id}>
+              <LineBoardOrderCard
+                order={order}
+                workOrderCardContext={workOrderCardContext}
+                onOpenWorkOrder={onOpenWorkOrder}
+              />
+            </li>
+          ))}
+        </ul>
+      </WorkOrderBoardLane>
+      <BacklogSettingsDialog
+        open={settingsOpen}
+        name={title}
+        size={size}
+        onSave={onSaveSettings}
+        onClose={onCloseSettings}
+      />
+    </>
   );
 }
 
@@ -723,9 +747,10 @@ function PhaseColumn({
   }, [visibleCount, loadMoreIfNeeded]);
 
   const visibleRuns = column.runs.slice(0, Math.min(visibleCount, totalRuns));
-  const configureHref = column.appId
-    ? factoryAppConfigurePath(organizationId, factoryKey, column.appId, { from: "lines", lineId })
-    : null;
+  const configureHref =
+    !isDoneLineColumn(column) && column.appId
+      ? factoryAppConfigurePath(organizationId, factoryKey, column.appId, { from: "lines", lineId })
+      : null;
   const glyph = resolveColumnGlyph(column);
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
 

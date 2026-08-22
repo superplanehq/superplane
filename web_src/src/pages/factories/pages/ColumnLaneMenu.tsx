@@ -16,8 +16,10 @@ import { LINE_BOARD_COLUMN_COLORS, type LineBoardColumnColorId } from "./lineBoa
 interface ColumnLaneMenuProps {
   title: string;
   testId: string;
-  /** Opens the automation editor when present. */
+  /** Opens the automation canvas. Ignored when onEdit is set. */
   editHref?: string | null;
+  /** Opens column settings. Use this for Backlog instead of a canvas href. */
+  onEdit?: () => void;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
 }
@@ -25,8 +27,19 @@ interface ColumnLaneMenuProps {
 /**
  * Column header menu: Edit (optional) and a compact colour grid.
  */
-export function ColumnLaneMenu({ title, testId, editHref, colorId, onColorChange }: ColumnLaneMenuProps) {
+export function ColumnLaneMenu({ title, testId, editHref, onEdit, colorId, onColorChange }: ColumnLaneMenuProps) {
   const navigate = useNavigate();
+  const canEdit = Boolean(onEdit || editHref);
+
+  const handleEdit = () => {
+    if (onEdit) {
+      onEdit();
+      return;
+    }
+    if (editHref) {
+      navigate(editHref);
+    }
+  };
 
   return (
     <DropdownMenu>
@@ -41,10 +54,10 @@ export function ColumnLaneMenu({ title, testId, editHref, colorId, onColorChange
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-0 w-32 p-0" data-testid={`${testId}-content`}>
-        {editHref ? (
+        {canEdit ? (
           <>
             <div className="p-1">
-              <DropdownMenuItem onClick={() => navigate(editHref)} data-testid={`${testId}-edit`}>
+              <DropdownMenuItem onClick={handleEdit} data-testid={`${testId}-edit`}>
                 <Pencil className="h-3.5 w-3.5" aria-hidden />
                 Edit
               </DropdownMenuItem>

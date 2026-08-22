@@ -129,6 +129,17 @@ export function findClosureAutomationApp(
   return { id: match.id, name: match.name ?? "PR Closure" };
 }
 
+/** Backlog and Done are not canvas-backed columns. */
+export function isDoneLineColumn(column: Pick<LinePhaseColumn, "stepName" | "appId">): boolean {
+  if (column.stepName.trim().toLowerCase() === "done") {
+    return true;
+  }
+  if (!column.appId) {
+    return false;
+  }
+  return column.appId === "app-refund-done" || column.appId.includes("pr-closure");
+}
+
 function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {
   if (!order.id || order.state !== "STATE_DRAFT") {
     return false;

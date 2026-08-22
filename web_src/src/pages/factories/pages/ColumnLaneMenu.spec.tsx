@@ -15,7 +15,7 @@ describe("ColumnLaneMenu", () => {
         <ColumnLaneMenu
           title="Backlog"
           testId="lines-backlog-menu"
-          editHref="/edit"
+          onEdit={vi.fn()}
           colorId={null}
           onColorChange={onColorChange}
         />
@@ -44,5 +44,40 @@ describe("ColumnLaneMenu", () => {
     expect(screen.getByTestId("lines-phase-menu-0-color-sky")).toHaveAttribute("aria-selected", "true");
     await user.click(screen.getByTestId("lines-phase-menu-0-color-remove"));
     expect(onColorChange).toHaveBeenCalledWith(null);
+  });
+
+  it("calls onEdit instead of following a canvas href", async () => {
+    const onEdit = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu
+          title="Backlog"
+          testId="lines-backlog-menu"
+          editHref="/canvas-edit"
+          onEdit={onEdit}
+          colorId={null}
+          onColorChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-edit"));
+    expect(onEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides Edit when the column has no editor", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu title="Done" testId="lines-phase-menu-3" colorId={null} onColorChange={vi.fn()} />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-phase-menu-3"));
+    expect(screen.queryByTestId("lines-phase-menu-3-edit")).not.toBeInTheDocument();
   });
 });
