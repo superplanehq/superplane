@@ -472,6 +472,23 @@ func (c *SecretsContext) GetIntegrationKeys(installationName string) (map[string
 	return keys, nil
 }
 
+type HostedLLMContext struct {
+	Access     core.HostedLLMAccess
+	CreditErr  error
+	ResolveErr error
+}
+
+func (c *HostedLLMContext) Resolve(provider string) (core.HostedLLMAccess, error) {
+	if c.ResolveErr != nil {
+		return core.HostedLLMAccess{}, c.ResolveErr
+	}
+	return c.Access, nil
+}
+
+func (c *HostedLLMContext) AssertCreditAvailable() error {
+	return c.CreditErr
+}
+
 type ExpressionContext struct {
 	Output                any
 	Error                 error

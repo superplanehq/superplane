@@ -405,6 +405,7 @@ func (a *RunCodeAgent) emitIfTerminal(ctx core.ExecutionContext, client *runagen
 	out := buildOutput(session.Status, meta.Session.ID, meta.Branch, sm, meta.PrURL)
 	applyStructuredOutput(&out, session.Status, schema)
 	out.Artifacts = runagent.CollectSessionArtifacts(client, meta.Session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
+	runagent.RecordSessionUsage(ctx.Usage, ctx.Logger, session)
 	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
 		ctx.Logger.Warnf("Failed to emit result for session %s: %v; scheduling poll.", meta.Session.ID, err)
 		return false, nil
