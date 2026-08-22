@@ -1,5 +1,9 @@
 package core
 
+import (
+	log "github.com/sirupsen/logrus"
+)
+
 // UsageRecorder stores one LLM call on the spend ledger.
 // A nil recorder on ExecutionContext is a no-op (tests and non-factory runs).
 type UsageRecorder interface {
@@ -20,6 +24,8 @@ type UsageRecord struct {
 	// CostMicros is provider-reported cost in millionths of a US dollar.
 	// Leave nil to price the call from the SuperPlane price book.
 	CostMicros *int64
+	// FundingSource is "hosted" or "byok". Empty defaults to byok.
+	FundingSource string
 }
 
 // RecordUsage writes the record when a recorder is wired. Tests that omit
@@ -34,7 +40,27 @@ func (ctx ExecutionContext) RecordUsage(record UsageRecord) error {
 // RecordUsageBestEffort records spend without failing the provider call.
 // A ledger error must not drop the model output the caller already paid for.
 func (ctx ExecutionContext) RecordUsageBestEffort(record UsageRecord) {
-	if err := ctx.RecordUsage(record); err != nil && ctx.Logger != nil {
-		ctx.Logger.WithError(err).Error("failed to record LLM usage")
+	recordUsageBestEffort(ctx.Usage, ctx.Logger, record)
+}
+
+// RecordUsage writes the record when a recorder is wired on a hook.
+func (ctx ActionHookContext) RecordUsage(record UsageRecord) error {
+	if ctx.Usage == nil {
+		return nil
+	}
+	return ctx.Usage.Record(record)
+}
+
+// RecordUsageBestEffort records spend without failing the hook.
+func (ctx ActionHookContext) RecordUsageBestEffort(record UsageRecord) {
+	recordUsageBestEffort(ctx.Usage, ctx.Logger, record)
+}
+
+func recordUsageBestEffort(usage UsageRecorder, logger *log.Entry, record UsageRecord) {
+	if usage == nil {
+		return
+	}
+	if err := usage.Record(record); err != nil && logger != nil {
+		logger.WithError(err).Error("failed to record LLM usage")
 	}
 }

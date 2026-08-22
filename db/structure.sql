@@ -574,6 +574,41 @@ CREATE TABLE public.group_metadata (
 
 
 --
+-- Name: hosted_llm_providers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.hosted_llm_providers (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    provider text NOT NULL,
+    enabled boolean DEFAULT false NOT NULL,
+    api_key bytea,
+    base_url text DEFAULT ''::text NOT NULL,
+    allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT hosted_llm_providers_known CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
+);
+
+
+--
+-- Name: installation_llm_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.installation_llm_settings (
+    id integer DEFAULT 1 NOT NULL,
+    welcome_grant_cents bigint DEFAULT 5000 NOT NULL,
+    markup_bps integer DEFAULT 2000 NOT NULL,
+    warning_threshold_bps integer DEFAULT 2000 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT installation_llm_settings_markup_non_negative CHECK ((markup_bps >= 0)),
+    CONSTRAINT installation_llm_settings_singleton CHECK ((id = 1)),
+    CONSTRAINT installation_llm_settings_warning_range CHECK (((warning_threshold_bps >= 0) AND (warning_threshold_bps <= 10000))),
+    CONSTRAINT installation_llm_settings_welcome_non_negative CHECK ((welcome_grant_cents >= 0))
+);
+
+
+--
 -- Name: installation_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -618,7 +653,8 @@ CREATE TABLE public.llm_usage_events (
     price_book_version text NOT NULL,
     idempotency_key text NOT NULL,
     occurred_at timestamp with time zone DEFAULT now() NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    provider_cost_micros bigint DEFAULT 0 NOT NULL
 );
 
 
@@ -649,6 +685,35 @@ CREATE TABLE public.organization_invite_links (
     enabled boolean DEFAULT true NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: organization_llm_credit_grants; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_llm_credit_grants (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    kind text NOT NULL,
+    amount_micros bigint NOT NULL,
+    note text DEFAULT ''::text NOT NULL,
+    actor_account_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organization_llm_credit_grants_amount_positive CHECK ((amount_micros > 0)),
+    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text])))
+);
+
+
+--
+-- Name: organization_llm_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_llm_settings (
+    organization_id uuid NOT NULL,
+    markup_bps integer,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organization_llm_settings_markup_non_negative CHECK (((markup_bps IS NULL) OR (markup_bps >= 0)))
 );
 
 
@@ -1351,6 +1416,30 @@ ALTER TABLE ONLY public.group_metadata
 
 
 --
+-- Name: hosted_llm_providers hosted_llm_providers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hosted_llm_providers
+    ADD CONSTRAINT hosted_llm_providers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: hosted_llm_providers hosted_llm_providers_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hosted_llm_providers
+    ADD CONSTRAINT hosted_llm_providers_provider_key UNIQUE (provider);
+
+
+--
+-- Name: installation_llm_settings installation_llm_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_llm_settings
+    ADD CONSTRAINT installation_llm_settings_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: installation_metadata installation_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1404,6 +1493,22 @@ ALTER TABLE ONLY public.organization_invite_links
 
 ALTER TABLE ONLY public.organization_invite_links
     ADD CONSTRAINT organization_invite_links_token_key UNIQUE (token);
+
+
+--
+-- Name: organization_llm_credit_grants organization_llm_credit_grants_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_llm_credit_grants
+    ADD CONSTRAINT organization_llm_credit_grants_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_llm_settings organization_llm_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_llm_settings
+    ADD CONSTRAINT organization_llm_settings_pkey PRIMARY KEY (organization_id);
 
 
 --
@@ -2070,6 +2175,20 @@ CREATE INDEX idx_llm_usage_events_work_order ON public.llm_usage_events USING bt
 --
 
 CREATE INDEX idx_node_requests_state_run_at ON public.workflow_node_requests USING btree (state, run_at) WHERE ((state)::text = 'pending'::text);
+
+
+--
+-- Name: idx_org_llm_credit_grants_org; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_org_llm_credit_grants_org ON public.organization_llm_credit_grants USING btree (organization_id, created_at DESC);
+
+
+--
+-- Name: idx_org_llm_credit_grants_welcome; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_org_llm_credit_grants_welcome ON public.organization_llm_credit_grants USING btree (organization_id) WHERE (kind = 'welcome'::text);
 
 
 --
@@ -3205,7 +3324,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260820071427	f
+20260822125958	f
 \.
 
 
