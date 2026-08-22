@@ -9,6 +9,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
 type GetDatabase struct{}
@@ -137,7 +138,7 @@ func (g *GetDatabase) Execute(ctx core.ExecutionContext) error {
 
 	db, err := getDatabase(context.Background(), client, client.ProjectID(), instance, database)
 	if err != nil {
-		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to get database", err, roleHintViewer))
+		return ctx.ExecutionState.Fail("error", gcpcommon.APIErrorMessage(err, "failed to get database", roleHintViewer))
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "gcp.cloudsql.database", []any{databasePayload(db)})
