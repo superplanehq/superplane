@@ -7,6 +7,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
+//go:embed example_data_on_deployment.json
+var exampleDataOnDeploymentBytes []byte
+
 //go:embed example_output_deploy.json
 var exampleOutputDeployBytes []byte
 
@@ -36,6 +39,17 @@ var exampleOutputCancelDeployment map[string]any
 
 var exampleOutputRollbackOnce sync.Once
 var exampleOutputRollback map[string]any
+
+var exampleDataOnDeploymentOnce sync.Once
+var exampleDataOnDeployment map[string]any
+
+func (t *OnDeployment) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleDataOnDeploymentOnce,
+		exampleDataOnDeploymentBytes,
+		&exampleDataOnDeployment,
+	)
+}
 
 func (c *TriggerDeployment) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
