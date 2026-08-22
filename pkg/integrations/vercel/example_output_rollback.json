@@ -1,0 +1,10 @@
+{
+  "data": {
+    "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+    "deploymentId": "dpl_3kYhGfDs9aWqErTu",
+    "description": "Reverting bad release v1.42.0",
+    "rolledBack": true
+  },
+  "timestamp": "2026-08-22T08:10:00.000000Z",
+  "type": "vercel.rollback"
+}

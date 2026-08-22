@@ -1,0 +1,10 @@
+{
+  "data": {
+    "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+    "key": "API_URL",
+    "target": ["production"],
+    "envId": "env_9XyZaBcDeFgHiJkLmNoP"
+  },
+  "timestamp": "2026-08-22T08:20:00.000000Z",
+  "type": "vercel.envVar"
+}

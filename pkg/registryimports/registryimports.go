@@ -76,6 +76,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/statuspage"
 	_ "github.com/superplanehq/superplane/pkg/integrations/teams"
 	_ "github.com/superplanehq/superplane/pkg/integrations/telegram"
+	_ "github.com/superplanehq/superplane/pkg/integrations/vercel"
 	_ "github.com/superplanehq/superplane/pkg/triggers/messages"
 	_ "github.com/superplanehq/superplane/pkg/triggers/onerror"
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
