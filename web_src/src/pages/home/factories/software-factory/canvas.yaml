@@ -210,8 +210,10 @@ spec:
               fi
               if git rev-parse --verify "@{u}" >/dev/null 2>&1; then
                 if [ "$(git rev-list --count "@{u}..HEAD")" -eq 0 ]; then
-                  echo "No file changes and no unpushed commits" >&2
-                  exit 1
+                  echo "Branch is already up to date with upstream"
+                  git push origin HEAD
+                  echo "Pushed changes for PR #${PR_NUMBER}"
+                  exit 0
                 fi
               fi
               git push origin HEAD
@@ -556,8 +558,10 @@ spec:
               fi
               if git rev-parse --verify "origin/${BRANCH}" >/dev/null 2>&1; then
                 if [ "$(git rev-list --count "origin/${BRANCH}..HEAD")" -eq 0 ]; then
-                  echo "No file changes and no unpushed commits on ${BRANCH}" >&2
-                  exit 1
+                  echo "Branch ${BRANCH} is already up to date on origin"
+                  git push origin "$BRANCH"
+                  echo "Pushed implementation to $BRANCH"
+                  exit 0
                 fi
               fi
               git push origin "$BRANCH"
@@ -705,8 +709,10 @@ spec:
               fi
               if git rev-parse --verify "@{u}" >/dev/null 2>&1; then
                 if [ "$(git rev-list --count "@{u}..HEAD")" -eq 0 ]; then
-                  echo "No file changes and no unpushed commits" >&2
-                  exit 1
+                  echo "Branch is already up to date with upstream"
+                  git push origin HEAD
+                  echo "Pushed fixes for PR #${PR_NUMBER}"
+                  exit 0
                 fi
               fi
               git push origin HEAD
@@ -1231,6 +1237,7 @@ spec:
             name: Clone Repository
             type: bash
           - name: Draft issue
+            workingDirectory: repo
             prompt: |
               Analyze the task description below and produce a GitHub issue.
 

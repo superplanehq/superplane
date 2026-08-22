@@ -16,13 +16,15 @@ type HostedLLMContext struct {
 	tx             *gorm.DB
 	encryptor      crypto.Encryptor
 	organizationID uuid.UUID
+	executionID    uuid.UUID
 }
 
-func NewHostedLLMContext(tx *gorm.DB, encryptor crypto.Encryptor, organizationID uuid.UUID) *HostedLLMContext {
+func NewHostedLLMContext(tx *gorm.DB, encryptor crypto.Encryptor, organizationID, executionID uuid.UUID) *HostedLLMContext {
 	return &HostedLLMContext{
 		tx:             tx,
 		encryptor:      encryptor,
 		organizationID: organizationID,
+		executionID:    executionID,
 	}
 }
 
@@ -48,5 +50,5 @@ func (c *HostedLLMContext) AssertCreditAvailable() error {
 	if c.organizationID == uuid.Nil {
 		return fmt.Errorf("organization is required for hosted LLM credit")
 	}
-	return models.AssertHostedCreditAvailable(c.tx, c.organizationID)
+	return models.ReserveHostedCredit(c.tx, c.organizationID, c.executionID)
 }

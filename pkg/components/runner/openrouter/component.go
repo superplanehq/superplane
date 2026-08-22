@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	ComponentName       = "runnerOpenRouter"
-	FinishedEventType   = "runnerOpenRouter.finished"
-	envOpenRouterAPIKey = "OPENROUTER_API_KEY"
+	ComponentName        = "runnerOpenRouter"
+	FinishedEventType    = "runnerOpenRouter.finished"
+	envOpenRouterAPIKey  = "OPENROUTER_API_KEY"
+	envOpenRouterBaseURL = "OPENROUTER_BASE_URL"
 )
 
 func init() {
@@ -173,11 +174,7 @@ func injectOpenRouterCredentials(ctx core.ExecutionContext, environment []runner
 		if err != nil {
 			return nil, err
 		}
-		extra := []runner.BrokerEnvironmentVariable{}
-		if access.BaseURL != "" {
-			extra = append(extra, runner.BrokerEnvironmentVariable{Name: "OPENROUTER_BASE_URL", Value: access.BaseURL})
-		}
-		return runner.InjectHostedAPIKey(environment, envOpenRouterAPIKey, access.APIKey, extra...), nil
+		return runner.InjectHostedCredentials(environment, envOpenRouterAPIKey, access.APIKey, envOpenRouterBaseURL, access.BaseURL), nil
 	default:
 		return nil, fmt.Errorf("invalid credentials source: %s", credentials.Source)
 	}

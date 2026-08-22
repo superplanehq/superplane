@@ -13,6 +13,7 @@ const (
 	ComponentName     = "runnerCodex"
 	FinishedEventType = "runnerCodex.finished"
 	envOpenAIAPIKey   = "OPENAI_API_KEY"
+	envOpenAIBaseURL  = "OPENAI_BASE_URL"
 )
 
 func init() {
@@ -171,7 +172,7 @@ func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.Brok
 		if err != nil {
 			return nil, err
 		}
-		return runner.InjectHostedAPIKey(environment, envOpenAIAPIKey, access.APIKey), nil
+		return runner.InjectHostedCredentials(environment, envOpenAIAPIKey, access.APIKey, envOpenAIBaseURL, access.BaseURL), nil
 	default:
 		return nil, fmt.Errorf("invalid credentials source: %s", credentials.Source)
 	}

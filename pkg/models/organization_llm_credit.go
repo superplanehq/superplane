@@ -18,6 +18,7 @@ const (
 
 var (
 	ErrHostedCreditEmpty      = errors.New("hosted LLM credit is empty")
+	ErrHostedRunInFlight      = errors.New("another hosted LLM run is already in progress")
 	ErrCreditGrantNotPositive = errors.New("credit grant must be greater than zero")
 )
 
@@ -45,6 +46,19 @@ type OrganizationLLMSettings struct {
 
 func (OrganizationLLMSettings) TableName() string {
 	return "organization_llm_settings"
+}
+
+// OrganizationLLMCreditHold marks one in-flight hosted run so concurrent
+// PrepareHostedRun calls cannot all pass the remaining-credit gate.
+type OrganizationLLMCreditHold struct {
+	NodeExecutionID uuid.UUID `gorm:"primary_key"`
+	OrganizationID  uuid.UUID
+	AmountMicros    int64
+	CreatedAt       time.Time
+}
+
+func (OrganizationLLMCreditHold) TableName() string {
+	return "organization_llm_credit_holds"
 }
 
 // OrganizationLLMCreditSummary is remaining hosted credit for an org.
@@ -214,4 +228,81 @@ func AssertHostedCreditAvailable(tx *gorm.DB, orgID uuid.UUID) error {
 		return fmt.Errorf("%w: ask an installation admin to add credit", ErrHostedCreditEmpty)
 	}
 	return nil
+}
+
+func ReserveHostedCredit(tx *gorm.DB, orgID, nodeExecutionID uuid.UUID) error {
+	if orgID == uuid.Nil {
+		return fmt.Errorf("organization is required for hosted LLM credit")
+	}
+	if nodeExecutionID == uuid.Nil {
+		return AssertHostedCreditAvailable(tx, orgID)
+	}
+
+	return tx.Transaction(func(inner *gorm.DB) error {
+		if err := lockOrganizationLLMSettings(inner, orgID); err != nil {
+			return err
+		}
+		if err := releaseFinishedHostedCreditHolds(inner, orgID); err != nil {
+			return err
+		}
+		if err := AssertHostedCreditAvailable(inner, orgID); err != nil {
+			return err
+		}
+
+		var inFlight int64
+		err := inner.Model(&OrganizationLLMCreditHold{}).
+			Where("organization_id = ? AND node_execution_id <> ?", orgID, nodeExecutionID).
+			Count(&inFlight).Error
+		if err != nil {
+			return err
+		}
+		if inFlight > 0 {
+			return fmt.Errorf("%w: wait for the current hosted run to finish", ErrHostedRunInFlight)
+		}
+
+		hold := OrganizationLLMCreditHold{
+			NodeExecutionID: nodeExecutionID,
+			OrganizationID:  orgID,
+			AmountMicros:    1,
+			CreatedAt:       time.Now(),
+		}
+		return inner.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "node_execution_id"}},
+			DoNothing: true,
+		}).Create(&hold).Error
+	})
+}
+
+func ReleaseHostedCreditHold(tx *gorm.DB, nodeExecutionID uuid.UUID) error {
+	if nodeExecutionID == uuid.Nil {
+		return nil
+	}
+	return tx.Where("node_execution_id = ?", nodeExecutionID).Delete(&OrganizationLLMCreditHold{}).Error
+}
+
+func lockOrganizationLLMSettings(tx *gorm.DB, orgID uuid.UUID) error {
+	settings := OrganizationLLMSettings{
+		OrganizationID: orgID,
+		UpdatedAt:      time.Now(),
+	}
+	err := tx.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "organization_id"}},
+		DoNothing: true,
+	}).Create(&settings).Error
+	if err != nil {
+		return err
+	}
+	return tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("organization_id = ?", orgID).
+		First(&settings).Error
+}
+
+func releaseFinishedHostedCreditHolds(tx *gorm.DB, orgID uuid.UUID) error {
+	return tx.Exec(`
+		DELETE FROM organization_llm_credit_holds AS holds
+		USING workflow_node_executions AS executions
+		WHERE holds.node_execution_id = executions.id
+		  AND holds.organization_id = ?
+		  AND executions.state = ?
+	`, orgID, CanvasNodeExecutionStateFinished).Error
 }

@@ -193,7 +193,7 @@ func (c *RunClaudeCode) injectCredentials(ctx core.ExecutionContext, environment
 		if err != nil {
 			return nil, err
 		}
-		return runner.InjectHostedAPIKey(environment, envAnthropicAPIKey, access.APIKey), nil
+		return runner.InjectHostedCredentials(environment, envAnthropicAPIKey, access.APIKey, envAnthropicBaseURL, access.BaseURL), nil
 	default:
 		return nil, fmt.Errorf("invalid credentials source: %s", credentials.Source)
 	}

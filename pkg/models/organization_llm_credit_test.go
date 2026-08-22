@@ -160,6 +160,31 @@ func Test__AssertHostedCreditAvailable(t *testing.T) {
 	require.ErrorIs(t, err, models.ErrHostedCreditEmpty)
 }
 
+func Test__ReserveHostedCreditBlocksConcurrentStarts(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.Conn()
+	first := uuid.New()
+	second := uuid.New()
+
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, first))
+	err := models.ReserveHostedCredit(db, r.Organization.ID, second)
+	require.ErrorIs(t, err, models.ErrHostedRunInFlight)
+
+	require.NoError(t, models.ReleaseHostedCreditHold(db, first))
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, second))
+}
+
+func Test__ReserveHostedCreditIsIdempotentForSameExecution(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.Conn()
+	executionID := uuid.New()
+
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, executionID))
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, executionID))
+}
+
 func restoreInstallationLLMSettings(t *testing.T) {
 	t.Helper()
 	resetInstallationLLMSettings(t)

@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	envAnthropicAPIKey = "ANTHROPIC_API_KEY"
+	envAnthropicAPIKey  = "ANTHROPIC_API_KEY"
+	envAnthropicBaseURL = "ANTHROPIC_BASE_URL"
 )
 
 // ClaudeCodeStep is one ordered bash or prompt action in a Run Claude Code node.

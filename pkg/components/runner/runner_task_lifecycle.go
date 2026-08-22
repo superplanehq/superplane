@@ -128,6 +128,7 @@ func processBrokerTaskStatus(
 
 	publishRunnerUsage(organizationID, task, logger)
 	RecordRunnerLLMUsage(usage, logger, finishedEventType, configuration, task.Result)
+	releaseHostedCreditHold(usage, logger)
 
 	channel := FailedOutputChannel
 	if strings.ToLower(strings.TrimSpace(task.Status)) == "succeeded" && task.effectiveExitCode() == 0 {
@@ -142,6 +143,20 @@ func processBrokerTaskStatus(
 		out["result"] = v
 	}
 	return state.Emit(channel, finishedEventType, []any{out})
+}
+
+type hostedCreditHoldReleaser interface {
+	ReleaseHostedCreditHold() error
+}
+
+func releaseHostedCreditHold(usage core.UsageRecorder, logger *log.Entry) {
+	releaser, ok := usage.(hostedCreditHoldReleaser)
+	if !ok {
+		return
+	}
+	if err := releaser.ReleaseHostedCreditHold(); err != nil && logger != nil {
+		logger.WithError(err).Warn("failed to release hosted LLM credit hold")
+	}
 }
 
 func publishRunnerUsage(organizationID string, task *Task, logger *log.Entry) {

@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,7 +22,11 @@ const (
 	UsageProviderOpenAI     = "openai"
 	UsageProviderOpenRouter = "openrouter"
 	UsageProviderPerplexity = "perplexity"
+
+	UsageIdempotencyKeyRunner = "runner"
 )
+
+var ErrHostedUsageUnpriced = errors.New("hosted LLM usage has no price for this model")
 
 // LLMUsageEvent is one append-only LLM spend row. It is the source of truth
 // for reports. Factory execution token/cost columns are cached rollups.
@@ -75,6 +80,7 @@ type LLMUsageEventInput struct {
 	ReasoningTokens  int64
 	TotalTokens      int64
 	CostMicros       *int64
+	IdempotencyKey   string
 }
 
 // RecordUsage inserts one factory-linked usage row and copies ledger totals
@@ -105,6 +111,9 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 		providerCostMicros = *in.CostMicros
 		version = pricebook.Version + "+provider"
 	} else {
+		if fundingSourceIsHosted(in.FundingSource) && !pricebook.IsPriced(in.Model) {
+			return fmt.Errorf("%w: %s %s", ErrHostedUsageUnpriced, in.Provider, in.Model)
+		}
 		providerCostMicros = pricebook.EstimateMicros(
 			in.Provider,
 			in.Model,
@@ -156,7 +165,7 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 		ProviderCostMicros:   providerCostMicros,
 		Currency:             "usd",
 		PriceBookVersion:     version,
-		IdempotencyKey:       "call:" + uuid.New().String(),
+		IdempotencyKey:       usageIdempotencyKey(in.IdempotencyKey),
 		OccurredAt:           now,
 		CreatedAt:            now,
 	}
@@ -169,7 +178,21 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 		return err
 	}
 
-	return execution.RollupUsage(tx)
+	if err := execution.RollupUsage(tx); err != nil {
+		return err
+	}
+	return ReleaseHostedCreditHold(tx, in.NodeExecutionID)
+}
+
+func fundingSourceIsHosted(source string) bool {
+	return strings.TrimSpace(source) == UsageFundingSourceHosted
+}
+
+func usageIdempotencyKey(key string) string {
+	if trimmed := strings.TrimSpace(key); trimmed != "" {
+		return trimmed
+	}
+	return "call:" + uuid.New().String()
 }
 
 // UsageReportFilter scopes ledger aggregates.

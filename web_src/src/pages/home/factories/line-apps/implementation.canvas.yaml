@@ -202,8 +202,10 @@ spec:
               fi
               if git rev-parse --verify "origin/${BRANCH}" >/dev/null 2>&1; then
                 if [ "$(git rev-list --count "origin/${BRANCH}..HEAD")" -eq 0 ]; then
-                  echo "No file changes and no unpushed commits on ${BRANCH}" >&2
-                  exit 1
+                  echo "Branch ${BRANCH} is already up to date on origin"
+                  git push origin "$BRANCH"
+                  echo "Pushed implementation to $BRANCH"
+                  exit 0
                 fi
               fi
               git push origin "$BRANCH"
@@ -305,8 +307,10 @@ spec:
               fi
               if git rev-parse --verify "origin/${BRANCH}" >/dev/null 2>&1; then
                 if [ "$(git rev-list --count "origin/${BRANCH}..HEAD")" -eq 0 ]; then
-                  echo "No file changes and no unpushed commits on ${BRANCH}" >&2
-                  exit 1
+                  echo "Branch ${BRANCH} is already up to date on origin"
+                  git push origin "$BRANCH"
+                  echo "Pushed implementation to $BRANCH"
+                  exit 0
                 fi
               fi
               git push origin "$BRANCH"

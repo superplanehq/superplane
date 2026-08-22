@@ -22,6 +22,7 @@ func RecordRunnerLLMUsage(usage core.UsageRecorder, logger *log.Entry, finishedE
 	if !ok {
 		return
 	}
+	record.IdempotencyKey = models.UsageIdempotencyKeyRunner
 	if err := usage.Record(record); err != nil && logger != nil {
 		logger.WithError(err).Error("failed to record runner LLM usage")
 	}

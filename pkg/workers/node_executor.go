@@ -423,7 +423,7 @@ func (w *NodeExecutor) executeActionNode(
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
 			WithWorkOrderNotification(onFactoryWorkOrderNotification),
 		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
-		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID),
+		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID, execution.ID),
 	}
 
 	if node.AppInstallationID != nil {

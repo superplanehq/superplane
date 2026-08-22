@@ -155,6 +155,9 @@ func (s *Server) adminUpdateHostedLLMProvider(w http.ResponseWriter, r *http.Req
 		}
 		if req.BaseURL != nil {
 			next.BaseURL = strings.TrimSpace(*req.BaseURL)
+			if err := llm.ValidateBaseURL(next.BaseURL); err != nil {
+				return err
+			}
 		}
 		if req.AllowedModels != nil {
 			next.AllowedModels = datatypes.JSONSlice[string](req.AllowedModels)
@@ -235,9 +238,11 @@ func (s *Server) adminListHostedLLMProviderModels(w http.ResponseWriter, r *http
 			return
 		}
 		apiKey = decrypted
-		if baseURL == "" {
-			baseURL = row.BaseURL
-		}
+		baseURL = row.BaseURL
+	}
+	if err := llm.ValidateBaseURL(baseURL); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	client, err := llm.New(s.registry.HTTPContext(), provider, llm.Credentials{APIKey: apiKey, BaseURL: baseURL})
@@ -421,5 +426,6 @@ func isClientLLMSettingsError(err error) bool {
 		strings.Contains(msg, "duplicate allowed") ||
 		strings.Contains(msg, "markup cannot") ||
 		strings.Contains(msg, "welcome grant") ||
-		strings.Contains(msg, "warning threshold")
+		strings.Contains(msg, "warning threshold") ||
+		strings.Contains(msg, "llm base url")
 }

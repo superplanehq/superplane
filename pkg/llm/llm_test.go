@@ -33,6 +33,15 @@ func TestNew_RequiresHTTPAndAPIKey(t *testing.T) {
 	require.ErrorContains(t, err, "unsupported llm provider")
 }
 
+func TestValidateBaseURL(t *testing.T) {
+	require.NoError(t, ValidateBaseURL(""))
+	require.NoError(t, ValidateBaseURL("https://proxy.example/v1"))
+	require.Error(t, ValidateBaseURL("ftp://proxy.example"))
+	require.Error(t, ValidateBaseURL("https://localhost/v1"))
+	require.Error(t, ValidateBaseURL("http://127.0.0.1/v1"))
+	require.Error(t, ValidateBaseURL("http://10.0.0.5/v1"))
+}
+
 func TestNew_UsesDefaultBaseURLs(t *testing.T) {
 	httpCtx := &contexts.HTTPContext{}
 

@@ -129,4 +129,5 @@ func TestRecordRunnerLLMUsageFromFinishedEvent(t *testing.T) {
 	require.Len(t, recorder.records, 1)
 	assert.Equal(t, models.UsageProviderAnthropic, recorder.records[0].Provider)
 	assert.Equal(t, "hosted", recorder.records[0].FundingSource)
+	assert.Equal(t, models.UsageIdempotencyKeyRunner, recorder.records[0].IdempotencyKey)
 }

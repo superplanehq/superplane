@@ -706,6 +706,19 @@ CREATE TABLE public.organization_llm_credit_grants (
 
 
 --
+-- Name: organization_llm_credit_holds; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_llm_credit_holds (
+    node_execution_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    amount_micros bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organization_llm_credit_holds_amount_positive CHECK ((amount_micros > 0))
+);
+
+
+--
 -- Name: organization_llm_settings; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1504,6 +1517,14 @@ ALTER TABLE ONLY public.organization_llm_credit_grants
 
 
 --
+-- Name: organization_llm_credit_holds organization_llm_credit_holds_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_llm_credit_holds
+    ADD CONSTRAINT organization_llm_credit_holds_pkey PRIMARY KEY (node_execution_id);
+
+
+--
 -- Name: organization_llm_settings organization_llm_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2189,6 +2210,13 @@ CREATE INDEX idx_org_llm_credit_grants_org ON public.organization_llm_credit_gra
 --
 
 CREATE UNIQUE INDEX idx_org_llm_credit_grants_welcome ON public.organization_llm_credit_grants USING btree (organization_id) WHERE (kind = 'welcome'::text);
+
+
+--
+-- Name: idx_org_llm_credit_holds_org; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_org_llm_credit_holds_org ON public.organization_llm_credit_holds USING btree (organization_id);
 
 
 --
@@ -3324,7 +3352,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260822125958	f
+20260822194140	f
 \.
 
 

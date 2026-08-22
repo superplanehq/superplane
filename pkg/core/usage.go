@@ -26,6 +26,10 @@ type UsageRecord struct {
 	CostMicros *int64
 	// FundingSource is "hosted" or "byok". Empty defaults to byok.
 	FundingSource string
+	// IdempotencyKey is a stable ledger key. Empty generates a unique key
+	// per call. Runner finish records use a prefix so webhook and poll
+	// cannot insert two rows for one node execution.
+	IdempotencyKey string
 }
 
 // RecordUsage writes the record when a recorder is wired. Tests that omit

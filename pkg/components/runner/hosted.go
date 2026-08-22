@@ -6,6 +6,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/llm"
 )
 
 type AgentCredentials struct {
@@ -72,10 +73,21 @@ func PrepareHostedRun(ctx core.ExecutionContext, provider, model string) (core.H
 	if !access.AllowsModel(model) {
 		return core.HostedLLMAccess{}, fmt.Errorf("model %s is not on the SuperPlane-hosted allowlist", model)
 	}
+	if err := llm.ValidateBaseURL(access.BaseURL); err != nil {
+		return core.HostedLLMAccess{}, err
+	}
 	return access, nil
 }
 
 func InjectHostedAPIKey(environment []BrokerEnvironmentVariable, envName, apiKey string, extra ...BrokerEnvironmentVariable) []BrokerEnvironmentVariable {
 	environment = append(environment, BrokerEnvironmentVariable{Name: envName, Value: apiKey})
 	return append(environment, extra...)
+}
+
+func InjectHostedCredentials(environment []BrokerEnvironmentVariable, apiKeyEnv, apiKey, baseURLEnv, baseURL string) []BrokerEnvironmentVariable {
+	extra := []BrokerEnvironmentVariable{}
+	if trimmed := strings.TrimSpace(baseURL); trimmed != "" {
+		extra = append(extra, BrokerEnvironmentVariable{Name: baseURLEnv, Value: strings.TrimRight(trimmed, "/")})
+	}
+	return InjectHostedAPIKey(environment, apiKeyEnv, apiKey, extra...)
 }

@@ -63,11 +63,14 @@ async function runPrompt(promptFile, model) {
     try {
       const event = JSON.parse(line);
       if (event && typeof event === "object") {
-        if (event.type === "item.completed" || event.type === "turn.completed" || event.type === "result") {
-          lastResult = event;
-        }
         if (event.usage || (event.item && event.item.usage)) {
           lastResult = event;
+          return;
+        }
+        if (event.type === "item.completed" || event.type === "turn.completed" || event.type === "result") {
+          if (!lastResult.usage && !(lastResult.item && lastResult.item.usage)) {
+            lastResult = event;
+          }
         }
       }
     } catch (_err) {
