@@ -236,6 +236,23 @@ describe("FactoriesHarness workspace setup", () => {
     expect(await screen.findByRole("option", { name: /acme\/api/ }, { timeout: 8000 })).toBeInTheDocument();
   }, 15000);
 
+  it("opens setup after Create new workspace", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/overview`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    await user.click(await screen.findByTestId("factories-workspace-switch", {}, { timeout: 8000 }));
+    await user.click(screen.getByTestId("factories-workspace-create"));
+
+    expect(await screen.findByTestId("workspace-setup", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByText("The workspace was created without a key")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factories-sidebar")).not.toBeInTheDocument();
+  }, 15000);
+
   it("opens the step from the URL with the saved answers restored", async () => {
     render(
       <FactoriesHarness
