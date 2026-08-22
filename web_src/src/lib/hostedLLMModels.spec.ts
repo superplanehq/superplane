@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   compareModelLabels,
   filterModelIds,
+  hostedModelIds,
   pickHostedAnthropicModel,
   pickHostedModel,
   uniqueSortedModelIds,
@@ -73,5 +74,14 @@ describe("pickHostedModel", () => {
     expect(pickHostedModel("openrouter", ["openai/gpt-4.1", "google/gemini-2.5-flash"])).toBe(
       "google/gemini-2.5-flash",
     );
+  });
+});
+
+describe("hostedModelIds", () => {
+  it("keeps non-empty model ids", () => {
+    expect(hostedModelIds([{ id: "sonnet" }, { id: "" }, { id: null }, {}, { id: "opus" }])).toEqual([
+      "sonnet",
+      "opus",
+    ]);
   });
 });

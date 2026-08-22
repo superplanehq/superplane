@@ -38,3 +38,7 @@ export function pickHostedModel(provider: string, modelIds: string[]): string | 
 export function pickHostedAnthropicModel(modelIds: string[]): string | undefined {
   return pickHostedModel("anthropic", modelIds);
 }
+
+export function hostedModelIds(models: { id?: string | null }[] | undefined): string[] {
+  return (models ?? []).map((model) => model.id ?? "").filter((id) => id !== "");
+}

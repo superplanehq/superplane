@@ -1,37 +1,23 @@
-import type { FactoriesFactory, FactoriesFactoryLine, FactoryLineStep } from "@/api-client";
+import type { FactoriesFactory } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateFactoryLine, useCreateWorkOrder, useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
 import { useDispatchWorkOrder } from "@/hooks/useFactoryData";
-import { useHostedLLMModels } from "@/hooks/useHostedLLMModels";
 import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { useOrganizationLLMSpend } from "@/hooks/useOrganizationLLMSpend";
 import { getApiErrorMessage } from "@/lib/errors";
 import { githubInstallationUrl } from "@/lib/githubInstallation";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
-import type { FactoryAgentRewrite } from "@/pages/home/factories";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
-import {
-  factoryListPath,
-  factoryOverviewPath,
-  factorySetupPath,
-  workOrderDetailPath,
-} from "../../lib/factoryPagePaths";
+import { factoryListPath, factorySetupPath } from "../../lib/factoryPagePaths";
 import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
-import { markWorkspaceGettingStarted } from "./gettingStartedState";
-import {
-  AGENT_PROVIDER_IDS,
-  firstWorkOrderAgentError,
-  hostedModelsQueriesLoading,
-  resolveOnboardingAgent,
-  type OnboardingAgentPlan,
-} from "./onboardingAgentReadiness";
+import { AGENT_PROVIDER_IDS } from "./onboardingAgentReadiness";
 import type { IntegrationId, WizardStepId } from "./onboardingFixtures";
 import {
   apiIssuesSource,
@@ -40,18 +26,13 @@ import {
   isWizardStepId,
   localIssuesSource,
 } from "./onboardingStatus";
-import {
-  DEFAULT_LINE_NAME,
-  provisionEventApps,
-  provisionLine,
-  type InstallOnboardingApp,
-  type UpdateOnboarding,
-} from "./onboardingProvision";
-import { createAndDispatchInitialWorkOrder } from "./onboardingWorkOrder";
+import type { UpdateOnboarding } from "./onboardingProvision";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
+import { useFinishOnboarding } from "./useFinishOnboarding";
+import { useFinishSetupAction } from "./useFinishSetupAction";
+import { useOnboardingAgentPlan } from "./useOnboardingAgentPlan";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
-import { useFinishSetupAction } from "./useFinishSetupAction";
 
 const ONBOARDING_INTEGRATIONS = ["github", ...AGENT_PROVIDER_IDS];
 
@@ -146,232 +127,6 @@ function useSectionSaves(args: {
   return { saveName, saveRepository, saveIssues };
 }
 
-// Persists onboarding answers, provisions the line and event apps, then creates
-// and dispatches the first work order. Kept out of the click handler so the
-// handler stays focused on validation, saving state, and navigation.
-async function provisionWorkspace(args: {
-  organizationId: string;
-  factoryId: string;
-  factory: FactoriesFactory | null;
-  setup: OnboardingSetupApi;
-  selections: IntegrationSelections;
-  updateFactory: (input: { name: string }) => Promise<unknown>;
-  updateOnboarding: UpdateOnboarding;
-  installFactory: InstallOnboardingApp;
-  createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
-  createWorkOrder: (input: {
-    title: string;
-    description: string;
-  }) => Promise<{ id?: string | null; number?: number | string | null }>;
-  dispatchWorkOrder: (input: { orderId: string; lineName: string }) => Promise<unknown>;
-  workspaceName: string;
-  appRepository: string;
-  backlogRepository: string;
-  workOrderTitle: string;
-  workOrderDescription: string;
-  github: { id: string };
-  agentPlan: OnboardingAgentPlan;
-  agentRewrite: FactoryAgentRewrite;
-  agentIntegrationId?: string;
-}): Promise<{ number?: number | string | null }> {
-  if (args.workspaceName !== args.factory?.name) {
-    await args.updateFactory({ name: args.workspaceName });
-  }
-  await args.updateOnboarding({
-    vcsIntegrationId: args.github.id,
-    ...(args.agentIntegrationId ? { agentIntegrationId: args.agentIntegrationId } : {}),
-    appRepository: args.appRepository,
-    backlogRepository: args.backlogRepository,
-    issuesSource: apiIssuesSource(args.setup.issuesChoice),
-    agentHarness: args.agentPlan.harness,
-  });
-  const { lineId, primaryAppId } = await provisionLine({
-    factory: args.factory,
-    savedLineId: args.factory?.onboarding?.provisionedLineId,
-    savedAppId: args.factory?.onboarding?.provisionedAppId,
-    selections: args.selections,
-    appRepository: args.appRepository,
-    backlogRepository: args.backlogRepository,
-    agentRewrite: args.agentRewrite,
-    installFactory: args.installFactory,
-    createLine: args.createLine,
-    updateOnboarding: args.updateOnboarding,
-  });
-  await provisionEventApps({
-    factoryId: args.factoryId,
-    selections: args.selections,
-    appRepository: args.appRepository,
-    backlogRepository: args.backlogRepository,
-    agentRewrite: args.agentRewrite,
-    installFactory: args.installFactory,
-  });
-  await args.updateOnboarding({
-    provisionedAppId: primaryAppId,
-    provisionedLineId: lineId,
-    complete: true,
-  });
-  return createAndDispatchInitialWorkOrder({
-    title: args.workOrderTitle,
-    description: args.workOrderDescription,
-    lineName: DEFAULT_LINE_NAME,
-    createWorkOrder: args.createWorkOrder,
-    dispatchWorkOrder: args.dispatchWorkOrder,
-  });
-}
-
-function navigateAfterFinish(
-  navigate: ReturnType<typeof useNavigate>,
-  organizationId: string,
-  factoryKey: string,
-  orderNumber: number | string | null | undefined,
-) {
-  if (orderNumber != null && orderNumber !== "") {
-    navigate(workOrderDetailPath(organizationId, factoryKey, orderNumber), { replace: true });
-    return;
-  }
-  navigate(factoryOverviewPath(organizationId, factoryKey), { replace: true });
-}
-
-function finishOnboardingError(args: {
-  appRepository: string | null;
-  backlogRepository: string | null;
-  workspaceName: string;
-  workOrderTitle: string;
-  workOrderDescription: string;
-  githubReady: boolean;
-  remainingCreditCents: number;
-  hostedModelsLoading: boolean;
-  plan: OnboardingAgentPlan | undefined;
-}): string | null {
-  if (!args.appRepository || !args.backlogRepository || !args.githubReady) {
-    return "Connect GitHub, then select both repositories.";
-  }
-  const agentError = firstWorkOrderAgentError({
-    remainingCreditCents: args.remainingCreditCents,
-    hostedModelsLoading: args.hostedModelsLoading,
-    plan: args.plan,
-  });
-  if (agentError) return agentError;
-  if (!args.workspaceName) {
-    return "Enter a workspace name.";
-  }
-  if (!args.workOrderTitle || !args.workOrderDescription) {
-    return "Enter a work order title and description.";
-  }
-  return null;
-}
-
-function hostedModelIds(models: { id?: string | null }[] | undefined): string[] {
-  return (models ?? []).map((model) => model.id ?? "").filter((id) => id !== "");
-}
-
-function useOnboardingAgentPlan(organizationId: string, connected: Set<IntegrationId>, remainingCreditCents: number) {
-  const needHosted = remainingCreditCents > 0;
-  const anthropic = useHostedLLMModels(organizationId, "anthropic", needHosted);
-  const openai = useHostedLLMModels(organizationId, "openai", needHosted);
-  const openrouter = useHostedLLMModels(organizationId, "openrouter", needHosted);
-  return {
-    remainingCreditCents,
-    hostedModelsLoading: hostedModelsQueriesLoading(needHosted, [anthropic, openai, openrouter]),
-    plan: resolveOnboardingAgent({
-      connected,
-      remainingCreditCents,
-      hostedModels: {
-        anthropic: hostedModelIds(anthropic.data?.models),
-        openai: hostedModelIds(openai.data?.models),
-        openrouter: hostedModelIds(openrouter.data?.models),
-      },
-    }),
-  };
-}
-
-function agentRewriteFromPlan(plan: OnboardingAgentPlan, selections: IntegrationSelections): FactoryAgentRewrite {
-  if (plan.credentialsSource === "hosted") {
-    return { component: plan.component, model: plan.model, credentials: { source: "hosted" } };
-  }
-  return {
-    component: plan.component,
-    model: plan.model,
-    credentials: {
-      source: "integration",
-      name: selections[plan.integrationName]?.name ?? plan.integrationName,
-    },
-  };
-}
-
-function useFinishOnboarding(args: {
-  organizationId: string;
-  factoryId: string;
-  factoryKey: string;
-  factory: FactoriesFactory | null;
-  setup: OnboardingSetupApi;
-  selections: IntegrationSelections;
-  setSaving: (saving: boolean) => void;
-  updateFactory: (input: { name: string }) => Promise<unknown>;
-  updateOnboarding: UpdateOnboarding;
-  installFactory: InstallOnboardingApp;
-  createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
-  createWorkOrder: (input: {
-    title: string;
-    description: string;
-  }) => Promise<{ id?: string | null; number?: number | string | null }>;
-  dispatchWorkOrder: (input: { orderId: string; lineName: string }) => Promise<unknown>;
-  remainingCreditCents: number;
-  hostedModelsLoading: boolean;
-  plan: OnboardingAgentPlan | undefined;
-}) {
-  const navigate = useNavigate();
-  return async () => {
-    const appRepository = args.setup.selectedRepo;
-    const backlogRepository = args.setup.issuesRepo ?? appRepository;
-    const workspaceName = args.setup.workspaceName.trim();
-    const workOrderTitle = args.setup.workOrderTitle.trim();
-    const workOrderDescription = args.setup.workOrderDescription.trim();
-    const github = args.selections.github;
-    const error = finishOnboardingError({
-      appRepository,
-      backlogRepository,
-      workspaceName,
-      workOrderTitle,
-      workOrderDescription,
-      githubReady: Boolean(github?.ready),
-      remainingCreditCents: args.remainingCreditCents,
-      hostedModelsLoading: args.hostedModelsLoading,
-      plan: args.plan,
-    });
-    if (error) {
-      showErrorToast(error);
-      return;
-    }
-    if (!appRepository || !backlogRepository || !github?.ready || !args.plan) {
-      return;
-    }
-
-    args.setSaving(true);
-    try {
-      const order = await provisionWorkspace({
-        ...args,
-        workspaceName,
-        appRepository,
-        backlogRepository,
-        workOrderTitle,
-        workOrderDescription,
-        github,
-        agentPlan: args.plan,
-        agentRewrite: agentRewriteFromPlan(args.plan, args.selections),
-        agentIntegrationId:
-          args.plan.credentialsSource === "integration" ? args.selections[args.plan.integrationName]?.id : undefined,
-      });
-      markWorkspaceGettingStarted(args.organizationId, args.factoryId);
-      navigateAfterFinish(navigate, args.organizationId, args.factoryKey, order.number);
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
-    } finally {
-      args.setSaving(false);
-    }
-  };
-}
-
 function useCancelOnboarding(args: { organizationId: string; factoryId: string; canDelete: boolean }) {
   const { account } = useAccount();
   const navigate = useNavigate();
@@ -434,6 +189,16 @@ function useOnboardingGithubRepos(organizationId: string, githubIntegrationId: s
   };
 }
 
+function useOnboardingWorkspaceApis(organizationId: string, factoryId: string) {
+  const updateFactory = useUpdateFactory(organizationId, factoryId);
+  const updateOnboarding = useFactoryOnboarding(organizationId, factoryId);
+  const createLine = useCreateFactoryLine(organizationId, factoryId);
+  const createWorkOrder = useCreateWorkOrder(organizationId, factoryId);
+  const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);
+  const installer = useInstallFactory();
+  return { updateFactory, updateOnboarding, createLine, createWorkOrder, dispatchWorkOrder, installer };
+}
+
 export function useOnboardingPageModel(args: {
   organizationId: string;
   factoryId: string;
@@ -472,12 +237,7 @@ export function useOnboardingPageModel(args: {
   });
 
   const [saving, setSaving] = useState(false);
-  const updateFactory = useUpdateFactory(args.organizationId, args.factoryId);
-  const updateOnboarding = useFactoryOnboarding(args.organizationId, args.factoryId);
-  const createLine = useCreateFactoryLine(args.organizationId, args.factoryId);
-  const createWorkOrder = useCreateWorkOrder(args.organizationId, args.factoryId);
-  const dispatchWorkOrder = useDispatchWorkOrder(args.organizationId, args.factoryId);
-  const installer = useInstallFactory();
+  const apis = useOnboardingWorkspaceApis(args.organizationId, args.factoryId);
   const githubIntegrationId = readyGithubIntegrationId(integrations.selections);
   const githubConnections = useOnboardingGithubConnections({
     integrationData: connect.integrationData,
@@ -495,26 +255,25 @@ export function useOnboardingPageModel(args: {
     },
   });
   const githubRepos = useOnboardingGithubRepos(args.organizationId, githubIntegrationId);
-
   const saves = useSectionSaves({
     setup,
     selections: integrations.selections,
     setSaving,
     factoryName: args.factory?.name ?? "",
-    updateFactory: updateFactory.mutateAsync,
-    updateOnboarding: updateOnboarding.mutateAsync,
+    updateFactory: apis.updateFactory.mutateAsync,
+    updateOnboarding: apis.updateOnboarding.mutateAsync,
   });
   const finish = useFinishOnboarding({
     ...args,
     setup,
     selections: integrations.selections,
     setSaving,
-    updateFactory: updateFactory.mutateAsync,
-    updateOnboarding: updateOnboarding.mutateAsync,
-    installFactory: installer.installFactory,
-    createLine: createLine.mutateAsync,
-    createWorkOrder: createWorkOrder.mutateAsync,
-    dispatchWorkOrder: dispatchWorkOrder.mutateAsync,
+    updateFactory: apis.updateFactory.mutateAsync,
+    updateOnboarding: apis.updateOnboarding.mutateAsync,
+    installFactory: apis.installer.installFactory,
+    createLine: apis.createLine.mutateAsync,
+    createWorkOrder: apis.createWorkOrder.mutateAsync,
+    dispatchWorkOrder: apis.dispatchWorkOrder.mutateAsync,
     remainingCreditCents: agent.remainingCreditCents,
     hostedModelsLoading: agent.hostedModelsLoading,
     plan: agent.plan,
@@ -550,7 +309,7 @@ export function useOnboardingPageModel(args: {
     repositoriesLoading: githubRepos.repositoriesLoading,
     repositoriesError: githubRepos.repositoriesError,
     canConfigureWorkspace: canConfigureWorkspace(canAct),
-    saving: saving || installer.isInstalling || createWorkOrder.isPending,
+    saving: saving || apis.installer.isInstalling || apis.createWorkOrder.isPending,
     ...saves,
     finish: finishSetup,
     ...cancel,

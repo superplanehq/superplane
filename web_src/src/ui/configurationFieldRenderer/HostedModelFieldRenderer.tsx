@@ -18,19 +18,18 @@ function credentialsSource(allValues?: Record<string, unknown>): string {
 }
 
 export const HostedModelFieldRenderer: React.FC<FieldRendererProps> = (props) => {
-  const { field, value, onChange, allValues, organizationId, readOnly = false } = props;
-  const source = credentialsSource(allValues);
-  const isHosted = source === "hosted";
+  if (credentialsSource(props.allValues) !== "hosted") {
+    return <StringFieldRenderer {...props} />;
+  }
+  return <HostedModelSelect {...props} />;
+};
+
+function HostedModelSelect({ field, value, onChange, organizationId, readOnly = false }: FieldRendererProps) {
   const provider = field.typeOptions?.hostedModel?.provider ?? "";
-  const { data, isLoading } = useHostedLLMModels(organizationId, provider, isHosted);
+  const { data, isLoading } = useHostedLLMModels(organizationId, provider, true);
   const models = [...(data?.models ?? [])].sort((left, right) =>
     compareModelLabels(left.name || left.id || "", right.name || right.id || ""),
   );
-  const hostedEnabled = data?.enabled === true;
-
-  if (!isHosted) {
-    return <StringFieldRenderer {...props} />;
-  }
 
   if (!organizationId) {
     return <div className="text-sm text-red-500 dark:text-red-400">This field requires organization context.</div>;
@@ -40,7 +39,7 @@ export const HostedModelFieldRenderer: React.FC<FieldRendererProps> = (props) =>
     return <Text className="text-sm text-gray-500 dark:text-gray-400">Loading SuperPlane-hosted models...</Text>;
   }
 
-  if (!hostedEnabled || models.length === 0) {
+  if (data?.enabled !== true || models.length === 0) {
     return (
       <Text className="text-sm text-gray-500 dark:text-gray-400">
         SuperPlane-hosted models are not configured for this provider. Ask an installation admin to add a key and
@@ -66,4 +65,4 @@ export const HostedModelFieldRenderer: React.FC<FieldRendererProps> = (props) =>
       </SelectContent>
     </Select>
   );
-};
+}
