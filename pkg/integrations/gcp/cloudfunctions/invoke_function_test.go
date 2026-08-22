@@ -50,7 +50,7 @@ func TestInvokeFunction_Setup(t *testing.T) {
 func TestInvokeFunction_Execute(t *testing.T) {
 	t.Run("invokes gen1 function via :call API and emits parsed JSON result", func(t *testing.T) {
 		functionName := "projects/my-project/locations/us-central1/functions/hello-world"
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				postURL: func(_ context.Context, fullURL string, body any) ([]byte, error) {
@@ -66,7 +66,7 @@ func TestInvokeFunction_Execute(t *testing.T) {
 					})
 				},
 			}, nil
-		})
+		}
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := (&InvokeFunction{}).Execute(core.ExecutionContext{
@@ -91,7 +91,7 @@ func TestInvokeFunction_Execute(t *testing.T) {
 	t.Run("invokes gen2 function via HTTP trigger URI", func(t *testing.T) {
 		functionName := "projects/my-project/locations/us-central1/functions/hello-world"
 		triggerURI := "https://hello-world-abc123-uc.a.run.app"
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				postURL: func(_ context.Context, fullURL string, body any) ([]byte, error) {
@@ -99,7 +99,7 @@ func TestInvokeFunction_Execute(t *testing.T) {
 					return json.Marshal(map[string]any{"message": "hello gen2"})
 				},
 			}, nil
-		})
+		}
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := (&InvokeFunction{}).Execute(core.ExecutionContext{
@@ -126,7 +126,7 @@ func TestInvokeFunction_Execute(t *testing.T) {
 
 	t.Run("stores raw string when result is not JSON", func(t *testing.T) {
 		functionName := "projects/p/locations/l/functions/f"
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				postURL: func(_ context.Context, _ string, _ any) ([]byte, error) {
@@ -136,7 +136,7 @@ func TestInvokeFunction_Execute(t *testing.T) {
 					})
 				},
 			}, nil
-		})
+		}
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := (&InvokeFunction{}).Execute(core.ExecutionContext{
@@ -155,7 +155,7 @@ func TestInvokeFunction_Execute(t *testing.T) {
 
 	t.Run("fails when function returns an error field", func(t *testing.T) {
 		functionName := "projects/p/locations/l/functions/broken"
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				postURL: func(_ context.Context, _ string, _ any) ([]byte, error) {
@@ -165,7 +165,7 @@ func TestInvokeFunction_Execute(t *testing.T) {
 					})
 				},
 			}, nil
-		})
+		}
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := (&InvokeFunction{}).Execute(core.ExecutionContext{
