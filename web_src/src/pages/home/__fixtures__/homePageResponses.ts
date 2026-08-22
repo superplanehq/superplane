@@ -57,7 +57,7 @@ function makeCanvas(
     description: options.description,
     folderId: options.folderId,
     createdAt: options.createdAt ?? "2026-05-05T00:00:00Z",
-    createdBy: { name: options.createdByName ?? "Storybook User" },
+    createdBy: { name: options.createdByName ?? "Leonardo DiCaprio" },
     starred: options.starred,
     starredAt: options.starredAt,
     nodes: graph.nodes,

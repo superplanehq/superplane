@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useContext, useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { MemoryRouter, Navigate, Outlet, Route, Routes, useParams } from "react-router";
 
+import { requestCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/canvasAgentSidebarOpenRequest";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
 import { AccountProvider } from "@/contexts/AccountProvider";
@@ -33,6 +34,8 @@ import {
   LinesPage,
   MissionsPage,
   NewWorkspacePage,
+  OrganizationSettingsLayout,
+  organizationSettingsSectionRoutes,
   OverviewPage,
   VelocityPage,
   WikiPage,
@@ -146,6 +149,9 @@ function useOrgWorkspaceFixtureFetch(options: FixtureFetchOptions) {
 
   useEffect(() => {
     writeCanvasAgentSidebarOpen(canvasId, openAgentSidebar);
+    if (openAgentSidebar) {
+      requestCanvasAgentSidebarOpen(canvasId);
+    }
     const state = fixtureFetchState();
     if (state.delegate === null) {
       state.delegate = fixtureFetch;
@@ -219,6 +225,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
 
   return (
     <Routes>
+      <Route path="create" element={<div data-testid="organization-create-page">Create a new organization</div>} />
       <Route
         path=":organizationId"
         element={
@@ -284,6 +291,9 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 }
               />
             ))}
+          </Route>
+          <Route path=":factoryKey/organization" element={factoryRoute(<OrganizationSettingsLayout />)}>
+            {organizationSettingsSectionRoutes}
           </Route>
         </Route>
         <Route

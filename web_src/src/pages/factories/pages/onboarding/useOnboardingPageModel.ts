@@ -485,6 +485,14 @@ export function useOnboardingPageModel(args: {
     selectNewest: searchParams.get("pick") === "newest",
     selections: integrations.selections,
     selectInstance: connect.selectInstance,
+    // The user left the wizard to connect GitHub, so the answer for the VCS
+    // step is in. Open the repository step, the same as a connection the user
+    // selects by hand. The host must be set here too, or the repository step
+    // shows "Connect version control first" until the restore effect runs.
+    onConnectionSelected: () => {
+      setup.selectVcsHost("github");
+      setOpenSection("repo");
+    },
   });
   const githubRepos = useOnboardingGithubRepos(args.organizationId, githubIntegrationId);
 

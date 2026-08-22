@@ -15,6 +15,7 @@ import {
   TWO_HOURS_AGO,
   YESTERDAY,
 } from "./factoryPageResponses";
+import { factoryAgentChatMessages } from "./factoryAgentChatMessages";
 import {
   SIMPLE_FACTORY_RUN_EVENT_AT,
   mergeSimpleFactoryRunActions,
@@ -36,7 +37,7 @@ export const REFUND_IMPLEMENTER_APP = REFUND_FACTORY_APPS[1];
 export const REFUND_VERIFIER_APP = REFUND_FACTORY_APPS[2];
 
 /**
- * Clone of the captured Software Factory canvas, owned by the Refunds Factory
+ * Clone of the captured Software Factory canvas, owned by Semaphore
  * so FactoryAppCanvasPage does not redirect to Overview.
  */
 export function factoryOwnedCanvasFixture(
@@ -136,6 +137,7 @@ export function refundLineCanvasFixture(
     executionsByEventId: {
       [LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID]: { executions: simpleFactoryRunExecutions() },
     },
+    agentMessages: factoryAgentChatMessages(),
     canvas: {
       canvas: {
         spec: simpleFactoryRunCanvasSpec(),

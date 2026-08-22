@@ -16,12 +16,13 @@ const (
 	NotificationWorkspaceScopeFiltered = "filtered"
 	NotificationWorkspaceScopeNone     = "none"
 
-	NotificationTypeWorkOrderAssigned       = "work_order_assigned"
-	NotificationTypeWorkOrderCommentOwned   = "work_order_comment_owned"
-	NotificationTypeWorkOrderCommentCreated = "work_order_comment_created"
-	NotificationTypeWorkOrderStatusOwned    = "work_order_status_owned"
-	NotificationTypeWorkOrderArtifactOwned  = "work_order_artifact_owned"
-	NotificationTypeWorkOrderMention        = "work_order_mention"
+	NotificationTypeWorkOrderAssigned        = "work_order_assigned"
+	NotificationTypeWorkOrderCommentOwned    = "work_order_comment_owned"
+	NotificationTypeWorkOrderCommentCreated  = "work_order_comment_created"
+	NotificationTypeWorkOrderStatusOwned     = "work_order_status_owned"
+	NotificationTypeWorkOrderArtifactOwned   = "work_order_artifact_owned"
+	NotificationTypeWorkOrderMention         = "work_order_mention"
+	NotificationTypeWorkOrderStatusNoteOwned = "work_order_status_note_owned"
 )
 
 // NotificationTypes lists every configurable notification type.
@@ -32,6 +33,7 @@ var NotificationTypes = []string{
 	NotificationTypeWorkOrderStatusOwned,
 	NotificationTypeWorkOrderArtifactOwned,
 	NotificationTypeWorkOrderMention,
+	NotificationTypeWorkOrderStatusNoteOwned,
 }
 
 var ErrNotificationWorkspaceScopeInvalid = errors.New("workspace scope must be all, filtered, or none")

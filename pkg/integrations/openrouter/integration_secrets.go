@@ -10,14 +10,14 @@ import (
 const integrationSecretOpenRouterAPIKey = "OPENROUTER_API_KEY"
 
 func (o *OpenRouter) ResolveSecrets(ctx core.IntegrationSecretContext) (map[string][]byte, error) {
-	apiKey, err := ctx.Integration.GetConfig("apiKey")
+	apiKey, err := findSecret(ctx.Integration, SecretAPIKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get API key: %w", err)
+		return nil, fmt.Errorf("failed to read OpenRouter API key: %w", err)
 	}
 
-	key := strings.TrimSpace(string(apiKey))
+	key := strings.TrimSpace(apiKey)
 	if key == "" {
-		return nil, fmt.Errorf("apiKey is required")
+		return nil, fmt.Errorf("OpenRouter API key is required")
 	}
 
 	return map[string][]byte{

@@ -19,7 +19,7 @@ import type {
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
 import { defaultNotificationSettings } from "@/lib/notificationSettings";
-import { fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
+import { buildStorybookMeUser, fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
 import { automationNameForLineStep } from "../lib/factoryLineFormShared";
 import { metricsForLine } from "../pages/lineListMetricsMockData";
 
@@ -399,18 +399,6 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   ];
 }
 
-// Broad grants so factory stories render management actions enabled instead
-// of permission-locked (dispatch, close, assign, notifications, members).
-const STORYBOOK_ME_PERMISSIONS = [
-  "canvases",
-  "integrations",
-  "factories",
-  "work_orders",
-  "members",
-  "notifications",
-  "organization",
-].flatMap((resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action })));
-
 function organizationLlmSpendRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/llm-spend"),
@@ -418,20 +406,28 @@ function organizationLlmSpendRoute(fixture: FactoriesFixture): FactoriesRoute {
   };
 }
 
+const STORYBOOK_ME_MEMBER_PERMISSIONS = ["members"].flatMap((resource) =>
+  ["read", "create", "update", "delete"].map((action) => ({ resource, action })),
+);
+
 /** Serves `/api/v1/me` so factory stories resolve `useMe` without the Home harness. */
-function meRoute(): FactoriesRoute {
+function meRoute(organizationId: string): FactoriesRoute {
   return {
     pattern: re("/api/v1/me"),
-    resolve: () => ({
-      json: {
-        user: {
-          id: STORYBOOK_ME_USER_ID,
-          name: STORYBOOK_ME_USER_NAME,
-          email: STORYBOOK_ME_USER_EMAIL,
-          permissions: STORYBOOK_ME_PERMISSIONS,
+    resolve: () => {
+      const user = buildStorybookMeUser(organizationId);
+      return {
+        json: {
+          user: {
+            ...user,
+            id: STORYBOOK_ME_USER_ID,
+            name: STORYBOOK_ME_USER_NAME,
+            email: STORYBOOK_ME_USER_EMAIL,
+            permissions: [...user.permissions, ...STORYBOOK_ME_MEMBER_PERMISSIONS],
+          },
         },
-      },
-    }),
+      };
+    },
   };
 }
 
@@ -454,7 +450,7 @@ function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
 function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     factoriesCollectionRoute(fixture),
-    meRoute(),
+    meRoute(fixture.organizationId),
     notificationSettingsRoute(fixture),
     ...factoryDetailRoutes(fixture),
     factoryOnboardingRoute(fixture),

@@ -29,7 +29,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const pendingSeed = {
-  pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" },
+  pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Semaphore" },
 };
 
 /**
@@ -102,9 +102,4 @@ export const AgentWithoutGrant: Story = {
 export const Name: Story = {
   name: "5 Name",
   render: () => <SetupStep step="name" answers={SETUP_ANSWERS.agent} />,
-};
-
-export const Start: Story = {
-  name: "6 Start",
-  render: () => <SetupStep step="start" answers={SETUP_ANSWERS.agent} />,
 };

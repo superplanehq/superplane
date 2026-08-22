@@ -16,14 +16,14 @@ describe("matchFactoryPageFixture", () => {
   it("lists factories and returns the primary factory by id", async () => {
     const list = await fetchFactoryPageFixture("/api/v1/factories");
     await expect(list.json()).resolves.toMatchObject({
-      factories: expect.arrayContaining([expect.objectContaining({ name: "Refunds Factory" })]),
+      factories: expect.arrayContaining([expect.objectContaining({ name: "Semaphore" })]),
     });
 
     const detail = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}`);
     const body = (await detail.json()) as {
       factory: { id?: string; name?: string; lines?: Array<{ id?: string; metrics?: { successRatePct?: number } }> };
     };
-    expect(body.factory).toMatchObject({ id: PRIMARY_FACTORY_ID, name: "Refunds Factory" });
+    expect(body.factory).toMatchObject({ id: PRIMARY_FACTORY_ID, name: "Semaphore" });
     const plan = body.factory.lines?.find((line) => line.id === REFUND_LINE_PLAN_ID);
     expect(plan?.metrics?.successRatePct).toBe(82);
   });
@@ -54,6 +54,26 @@ describe("matchFactoryPageFixture", () => {
     const apps = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/apps`);
     await expect(apps.json()).resolves.toMatchObject({
       apps: expect.arrayContaining([expect.objectContaining({ name: "Refund Planner" })]),
+    });
+  });
+
+  it("includes agent permissions on the factory me user", async () => {
+    const me = await fetchFactoryPageFixture("/api/v1/me");
+    const body = await me.json();
+    expect(body.user.permissions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ resource: "agents", action: "read" }),
+        expect.objectContaining({ resource: "agents", action: "create" }),
+      ]),
+    );
+  });
+
+  it("grants workspace settings permission on /api/v1/me", async () => {
+    const me = await fetchFactoryPageFixture("/api/v1/me");
+    await expect(me.json()).resolves.toMatchObject({
+      user: {
+        permissions: expect.arrayContaining([expect.objectContaining({ resource: "factories", action: "update" })]),
+      },
     });
   });
 

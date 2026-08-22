@@ -4,7 +4,7 @@ import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import type {
@@ -272,17 +272,29 @@ export type { FactoryConfigureActions } from "./useFactoryConfigureSession";
 export function AppPage({
   factoryEmbed = false,
   factoryConfigure = false,
+  factoryAgentEnabled = false,
+  factoryEditWorkspace = false,
   factoryConfigureActionsRef,
   onFactoryConfigureBusyChange,
   onFactoryConfigureDone,
+  onFactoryConfigureSaved,
+  factoryCanvasOverlay,
 }: {
   factoryEmbed?: boolean;
   /** Factory-shell Configure: same chrome as embed, but canvas edit session allowed. */
   factoryConfigure?: boolean;
+  /** Factory-shell opt-in: show the in-app agent sidebar next to the canvas. */
+  factoryAgentEnabled?: boolean;
+  /** Factory-shell edit workspace chrome (styled agent sidebar, larger edit dots). */
+  factoryEditWorkspace?: boolean;
   /** Imperative Discard/Save handlers for the factory Configure chrome (no setState bridge). */
   factoryConfigureActionsRef?: MutableRefObject<FactoryConfigureActions | null>;
   onFactoryConfigureBusyChange?: (busy: boolean) => void;
   onFactoryConfigureDone?: () => void;
+  /** After Configure Save: keep the editor open. Discard still uses onFactoryConfigureDone. */
+  onFactoryConfigureSaved?: () => void;
+  /** Overlay on the canvas column (factory YAML workspace). */
+  factoryCanvasOverlay?: ReactNode;
 } = {}) {
   const factoryViewOnly = factoryEmbed && !factoryConfigure;
   const {
@@ -371,7 +383,7 @@ export function AppPage({
   const { data: availableIntegrations = [], isLoading: integrationsLoading } = useAvailableIntegrations();
   const canReadIntegrations = canAct("integrations", "read");
   const canUpdateIntegrations = canAct("integrations", "update");
-  const canUseAgents = !factoryEmbed && canAct("agents", "create") && canAct("agents", "read");
+  const canUseAgents = (!factoryEmbed || factoryAgentEnabled) && canAct("agents", "create") && canAct("agents", "read");
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const {
     data: liveCanvas,
@@ -663,7 +675,7 @@ export function AppPage({
    * This ref persists across re-renders to preserve sidebar state.
    */
   const isSidebarOpenRef = useRef<boolean | null>(null);
-  if (isSidebarOpenRef.current === null && typeof window !== "undefined") {
+  if (!factoryEmbed && isSidebarOpenRef.current === null && typeof window !== "undefined") {
     const storedSidebarState = window.localStorage.getItem(CANVAS_SIDEBAR_STORAGE_KEY);
     if (storedSidebarState !== null) {
       try {
@@ -674,7 +686,7 @@ export function AppPage({
       }
     }
   }
-  if (isSidebarOpenRef.current === null && canvas) {
+  if (!factoryEmbed && isSidebarOpenRef.current === null && canvas) {
     isSidebarOpenRef.current = canvas.spec?.nodes?.length === 0;
   }
 
@@ -3001,6 +3013,7 @@ export function AppPage({
       onCanvasDraftRestoredToCommitted: handleCanvasDraftRestoredToCommitted,
       onCommittedVersionId: handleCommittedVersionId,
       registerIgnoredCanvasUpdatedEcho,
+      factoryContext: factoryEmbed,
     },
   );
 
@@ -3013,10 +3026,10 @@ export function AppPage({
       await handleCommitStaging(commitMessage);
       setCommitDialogOpen(false);
       if (factoryConfigure) {
-        onFactoryConfigureDone?.();
+        onFactoryConfigureSaved?.();
       }
     },
-    [factoryConfigure, handleCommitStaging, onFactoryConfigureDone],
+    [factoryConfigure, handleCommitStaging, onFactoryConfigureSaved],
   );
 
   const handleAgentSidebarStagingCommit = useCallback(
@@ -3095,7 +3108,7 @@ export function AppPage({
   });
 
   const handleUseVersion = useCallback(
-    (versionID: string, options?: { preserveStagedLayer?: boolean }) => {
+    (versionID: string, options?: { preserveStagedLayer?: boolean; leaveFactoryConfigure?: boolean }) => {
       if (!organizationId || !canvasId) {
         return;
       }
@@ -3429,17 +3442,22 @@ export function AppPage({
   // previewing a version from the sidebar.
   const handleExitEditSession = useCallback(() => {
     setEditSessionActive(false);
-    clearRunInspectionForEdit();
-    if (liveCanvasVersionId) {
-      handleUseVersion(liveCanvasVersionId);
+    // Factory Discard leaves Configure with run/from/line kept. Clearing run
+    // inspection here would drop that context before the live restore rewrite.
+    if (!factoryConfigure) {
+      clearRunInspectionForEdit();
     }
-  }, [clearRunInspectionForEdit, liveCanvasVersionId, handleUseVersion]);
+    if (liveCanvasVersionId) {
+      handleUseVersion(liveCanvasVersionId, factoryConfigure ? { leaveFactoryConfigure: true } : undefined);
+    }
+  }, [clearRunInspectionForEdit, factoryConfigure, liveCanvasVersionId, handleUseVersion]);
 
   useFactoryConfigureSession({
     factoryConfigure,
     factoryConfigureActionsRef,
     onFactoryConfigureBusyChange,
     onFactoryConfigureDone,
+    onFactoryConfigureSaved,
     editSessionActive,
     setEditSessionActive,
     canStageCanvasVersion,
@@ -3713,6 +3731,8 @@ export function AppPage({
   });
   const factoryEmbedCanvasChrome = resolveFactoryEmbedCanvasChrome({
     factoryEmbed,
+    factoryAgentEnabled,
+    factoryEditWorkspace,
     factoryViewOnly,
     factoryOwnedApp,
     routeFactoryId,
@@ -3863,6 +3883,7 @@ export function AppPage({
           onTriggerModalHostReady={registerTriggerModalHost}
           title={canvas?.metadata?.name || liveCanvas?.metadata?.name || "Canvas"}
           {...factoryEmbedCanvasChrome}
+          canvasOverlay={factoryCanvasOverlay}
           canvasStateMode={canvasStateMode}
           onSeeCurrentVersion={handleSeeCurrentVersion}
           nodes={nodes}
@@ -3890,6 +3911,8 @@ export function AppPage({
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
           buildingBlocks={buildingBlocks}
           isEditing={isEditing}
+          factoryConfigure={factoryConfigure}
+          factoryEditWorkspace={factoryEditWorkspace}
           activeCanvasVersionId={activeCanvasVersionId}
           liveCanvasVersionId={liveCanvasVersionId}
           onAgentStagingReady={handleAgentStagingReady}
