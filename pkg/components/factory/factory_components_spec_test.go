@@ -399,14 +399,15 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
-	t.Run("requires repository for branch", func(t *testing.T) {
+	t.Run("accepts branch with name and url without repository", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":      "{{ order().id }}",
 			"artifactType": "branch",
 			"name":         "feature/refund-retry",
+			"url":          "https://github.com/example/repo/tree/feature/refund-retry",
 		})
-		if err == nil {
-			t.Fatal("expected error for branch without repository")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
 		}
 	})
 
@@ -502,6 +503,9 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 		if repositoryField == nil {
 			t.Fatal("expected a repository field in configuration")
+		}
+		if len(repositoryField.RequiredConditions) != 0 {
+			t.Fatalf("expected repository not to be required when URL is set, got %d required conditions", len(repositoryField.RequiredConditions))
 		}
 		if len(repositoryField.VisibilityConditions) != 1 {
 			t.Fatalf("expected a single visibility condition for repository, got %d", len(repositoryField.VisibilityConditions))

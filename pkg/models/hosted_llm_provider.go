@@ -80,6 +80,18 @@ func ListHostedLLMProviders(tx *gorm.DB) ([]HostedLLMProvider, error) {
 	return providers, nil
 }
 
+// HasOfferedHostedLLMProvider is true when SuperPlane can resolve hosted
+// credentials and at least one allowlisted model for a coding agent.
+func HasOfferedHostedLLMProvider(tx *gorm.DB) (bool, error) {
+	providers, err := ListHostedLLMProviders(tx)
+	if err != nil {
+		return false, err
+	}
+	return slices.ContainsFunc(providers, func(provider HostedLLMProvider) bool {
+		return provider.OffersHostedModels() && provider.HasAllowedModel()
+	}), nil
+}
+
 func FindHostedLLMProvider(tx *gorm.DB, provider string) (*HostedLLMProvider, error) {
 	normalized, err := NormalizeHostedLLMProvider(provider)
 	if err != nil {

@@ -31,6 +31,7 @@ var (
 	ErrFactoryOnboardingInvalidRepository        = errors.New("repository must use the owner/name format")
 	ErrFactoryOnboardingVCSIntegrationRequired   = errors.New("version control integration id is required")
 	ErrFactoryOnboardingAgentIntegrationRequired = errors.New("agent integration id is required")
+	ErrFactoryOnboardingHostedAgentUnavailable   = errors.New("hosted agent credentials are not available")
 	ErrFactoryOnboardingAppRepositoryRequired    = errors.New("app repository is required")
 	ErrFactoryOnboardingBacklogRepoRequired      = errors.New("backlog repository is required")
 	ErrFactoryOnboardingIssuesSourceRequired     = errors.New("issues source is required")

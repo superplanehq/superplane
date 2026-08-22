@@ -38,6 +38,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "version control integration is required to complete onboarding")
 	case errors.Is(err, models.ErrFactoryOnboardingAgentIntegrationRequired):
 		return grpcerrors.InvalidArgument(err, "agent integration or hosted credit is required to complete onboarding")
+	case errors.Is(err, models.ErrFactoryOnboardingHostedAgentUnavailable):
+		return grpcerrors.InvalidArgument(err, "agent integration or SuperPlane-hosted models are required to complete onboarding")
 	case errors.Is(err, models.ErrFactoryOnboardingAppRepositoryRequired):
 		return grpcerrors.InvalidArgument(err, "app repository is required to complete onboarding")
 	case errors.Is(err, models.ErrFactoryOnboardingBacklogRepoRequired):

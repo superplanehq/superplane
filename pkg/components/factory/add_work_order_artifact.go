@@ -195,13 +195,10 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		configuration.Field{
 			Name:                 "repository",
 			Label:                "Repository",
-			Description:          "Repository that owns the branch (`owner/repo` or the repository https URL). Required for branches. When URL is empty, SuperPlane writes a GitHub tree URL from this value and the branch name.",
+			Description:          "Repository that owns the branch (`owner/repo` or the repository https URL). Required when URL is empty. SuperPlane writes a GitHub tree URL from this value and the branch name.",
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
 			VisibilityConditions: branchOnly,
-			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "artifactType", Values: []string{"branch"}},
-			},
 		},
 		configuration.Field{
 			Name:                 "title",

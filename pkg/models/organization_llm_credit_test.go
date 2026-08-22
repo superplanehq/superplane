@@ -211,6 +211,45 @@ func Test__HostedLLMProviderAllowlist(t *testing.T) {
 	require.Error(t, err)
 }
 
+func Test__HasOfferedHostedLLMProvider(t *testing.T) {
+	_ = support.Setup(t)
+	db := database.Conn()
+	existing, err := models.ListHostedLLMProviders(db)
+	require.NoError(t, err)
+	require.NoError(t, db.Where("provider <> ?", "").Delete(&models.HostedLLMProvider{}).Error)
+	t.Cleanup(func() {
+		_ = database.Conn().Where("provider <> ?", "").Delete(&models.HostedLLMProvider{}).Error
+		for _, provider := range existing {
+			_, _ = models.UpsertHostedLLMProvider(database.Conn(), provider)
+		}
+	})
+
+	offered, err := models.HasOfferedHostedLLMProvider(db)
+	require.NoError(t, err)
+	assert.False(t, offered)
+
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider: models.UsageProviderAnthropic,
+		Enabled:  true,
+		APIKey:   []byte("encrypted"),
+	})
+	require.NoError(t, err)
+	offered, err = models.HasOfferedHostedLLMProvider(db)
+	require.NoError(t, err)
+	assert.False(t, offered)
+
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderAnthropic,
+		Enabled:       true,
+		APIKey:        []byte("encrypted"),
+		AllowedModels: datatypes.JSONSlice[string]{"claude-sonnet-4-6"},
+	})
+	require.NoError(t, err)
+	offered, err = models.HasOfferedHostedLLMProvider(db)
+	require.NoError(t, err)
+	assert.True(t, offered)
+}
+
 func Test__CentsToMicros(t *testing.T) {
 	assert.Equal(t, int64(50_000_000), models.CentsToMicros(5000))
 	assert.Equal(t, int64(0), models.CentsToMicros(0))

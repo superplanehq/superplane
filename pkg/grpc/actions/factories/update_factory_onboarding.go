@@ -105,6 +105,13 @@ func validateFactoryOnboardingResources(
 		if credit.RemainingMicros <= 0 {
 			return models.ErrFactoryOnboardingAgentIntegrationRequired
 		}
+		offered, hostedErr := models.HasOfferedHostedLLMProvider(db)
+		if hostedErr != nil {
+			return hostedErr
+		}
+		if !offered {
+			return models.ErrFactoryOnboardingHostedAgentUnavailable
+		}
 	}
 
 	if config.ProvisionedAppID != "" {

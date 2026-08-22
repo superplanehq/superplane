@@ -13,6 +13,8 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__UpdateFactoryOnboarding(t *testing.T) {
@@ -101,6 +103,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		complete := true
 		req.Complete = &complete
 
+		upsertHostedOnboardingProvider(t, db)
 		response, err := UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), req)
 		require.NoError(t, err)
 		require.NotNil(t, response.Factory.Onboarding.CompletedAt)
@@ -125,6 +128,25 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
+	t.Run("complete without agent integration rejects when no hosted provider is offered", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		appID, lineID := createOnboardingResources(t, r, factory)
+
+		req := readyOnboardingRequest(factory.ID.String(), vcsID, "", appID, lineID)
+		req.AgentIntegrationId = nil
+		complete := true
+		req.Complete = &complete
+
+		clearHostedLLMProviders(t, db)
+		_, err = UpdateFactoryOnboarding(context.Background(), r.Organization.ID.String(), req)
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, message, "SuperPlane-hosted models")
 	})
 
 	t.Run("complete succeeds with an OpenRouter agent integration", func(t *testing.T) {
@@ -289,4 +311,28 @@ func createReadyOnboardingIntegration(t *testing.T, organizationID uuid.UUID, ap
 	require.NoError(t, err)
 	require.NoError(t, database.DB(t.Context()).Model(integration).Update("state", models.IntegrationStateReady).Error)
 	return integration.ID.String()
+}
+
+func upsertHostedOnboardingProvider(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderAnthropic,
+		Enabled:       true,
+		APIKey:        []byte("test-hosted-key"),
+		AllowedModels: datatypes.JSONSlice[string]{"sonnet"},
+	})
+	require.NoError(t, err)
+}
+
+func clearHostedLLMProviders(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	existing, err := models.ListHostedLLMProviders(db)
+	require.NoError(t, err)
+	require.NoError(t, db.Where("provider <> ?", "").Delete(&models.HostedLLMProvider{}).Error)
+	t.Cleanup(func() {
+		for _, provider := range existing {
+			_, upsertErr := models.UpsertHostedLLMProvider(db, provider)
+			require.NoError(t, upsertErr)
+		}
+	})
 }

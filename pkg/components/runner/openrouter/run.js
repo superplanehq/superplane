@@ -81,7 +81,7 @@ function main() {
     });
 }
 
-async function runPrompt(promptFile, model) {
+async function runPrompt(promptFile, model, maxTurns = MAX_TURNS) {
   const resultFile = process.env.SUPERPLANE_RESULT_FILE;
   if (!resultFile) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
@@ -113,8 +113,10 @@ async function runPrompt(promptFile, model) {
   };
   let lastText = "";
   let costMicros = 0;
+  let pendingToolCalls = false;
+  const turnLimit = Number(maxTurns) > 0 ? Number(maxTurns) : MAX_TURNS;
 
-  for (let turn = 0; turn < MAX_TURNS; turn += 1) {
+  for (let turn = 0; turn < turnLimit; turn += 1) {
     const response = await chat(baseURL, apiKey, model, messages);
     addUsage(usage, response.usage);
     costMicros += usageCostMicros(response.usage);
@@ -129,7 +131,8 @@ async function runPrompt(promptFile, model) {
     }
 
     const toolCalls = message.tool_calls || [];
-    if (toolCalls.length === 0) {
+    pendingToolCalls = toolCalls.length > 0;
+    if (!pendingToolCalls) {
       break;
     }
     for (const call of toolCalls) {
@@ -160,6 +163,10 @@ async function runPrompt(promptFile, model) {
     usage,
     total_cost_usd: costMicros > 0 ? costMicros / 1000000 : undefined,
   });
+  if (pendingToolCalls) {
+    process.stderr.write(`OpenRouter agent reached ${turnLimit} turns with pending tool calls\n`);
+    return 1;
+  }
   return 0;
 }
 
@@ -272,4 +279,8 @@ function accumulateLLMUsage(payload) {
   require(script).accumulate(taskDir, payload);
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = { runPrompt, MAX_TURNS };
