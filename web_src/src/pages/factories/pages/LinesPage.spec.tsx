@@ -155,18 +155,16 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("line-intake-drawer")).not.toBeInTheDocument();
   });
 
-  it("creates work orders from the backlog header plus and add control", async () => {
+  it("creates work orders from the backlog header plus", async () => {
     const openCreateWorkOrder = vi.fn();
     const user = userEvent.setup();
     renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, openCreateWorkOrder);
 
     const backlog = screen.getByTestId("lines-backlog-column");
-    expect(within(backlog).getByTestId("lines-backlog-create")).toBeInTheDocument();
-    expect(within(backlog).getByTestId("lines-backlog-add")).toHaveTextContent("Add work order");
+    expect(within(backlog).queryByRole("button", { name: "Add work order" })).not.toBeInTheDocument();
 
     await user.click(within(backlog).getByTestId("lines-backlog-create"));
-    await user.click(within(backlog).getByTestId("lines-backlog-add"));
-    expect(openCreateWorkOrder).toHaveBeenCalledTimes(2);
+    expect(openCreateWorkOrder).toHaveBeenCalledTimes(1);
   });
 
   it("sets a pastel colour on the backlog from circular swatches", async () => {

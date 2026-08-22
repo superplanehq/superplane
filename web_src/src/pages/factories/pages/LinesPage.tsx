@@ -541,7 +541,6 @@ function BacklogColumn({
       surfaceClassName={surfaceClassName}
       emptyDescription="No work orders in the backlog."
       className={surfaceClassName ? undefined : "bg-muted"}
-      keepChildrenWhenEmpty
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
           <PermissionTooltip allowed={canCreateWorkOrder} message="You don't have permission to create work orders.">
@@ -573,13 +572,6 @@ function BacklogColumn({
       testId="lines-backlog-column"
     >
       <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-backlog-column-scroll">
-        {orders.length === 0 ? (
-          <li>
-            <p className="rounded-md border border-dashed border-border/60 px-3 py-6 text-center text-[12px] text-muted-foreground">
-              No work orders in the backlog.
-            </p>
-          </li>
-        ) : null}
         {orders.map((order) => (
           <li key={order.id}>
             <LineBoardOrderCard
@@ -589,24 +581,6 @@ function BacklogColumn({
             />
           </li>
         ))}
-        <li>
-          <PermissionTooltip allowed={canCreateWorkOrder} message="You don't have permission to create work orders.">
-            <button
-              type="button"
-              onClick={() => {
-                if (canCreateWorkOrder) {
-                  onCreateWorkOrder();
-                }
-              }}
-              disabled={!canCreateWorkOrder}
-              data-testid="lines-backlog-add"
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/60 px-3 py-2.5 text-[13px] font-medium tracking-[-0.01em] text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-60"
-            >
-              <Plus className="size-3.5 shrink-0" aria-hidden />
-              Add work order
-            </button>
-          </PermissionTooltip>
-        </li>
       </ul>
     </WorkOrderBoardLane>
   );
