@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 
 describe("ColumnLaneMenu", () => {
-  it("offers circular colour swatches and applies a selection", async () => {
+  it("offers colour swatches and applies a selection", async () => {
     const onColorChange = vi.fn();
     const user = userEvent.setup();
 

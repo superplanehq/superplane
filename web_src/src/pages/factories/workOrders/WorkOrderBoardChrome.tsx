@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, type ReactNode } from "react";
+import { ClickToRename } from "../layout/ClickToRename";
 import { shouldRedirectWheelToHorizontalScroll } from "./kanbanBoardWheel";
 
 /**
@@ -72,6 +73,10 @@ interface WorkOrderBoardLaneProps {
   surfaceClassName?: string;
   /** Sits at the end of the header, for example a menu button. */
   actions?: ReactNode;
+  /** When set, a click on the title opens an inline rename field. */
+  onRename?: (name: string) => void;
+  canRename?: boolean;
+  titleTestId?: string;
   /** Accessible name, when it must read differently from the title. */
   label?: string;
   className?: string;
@@ -86,6 +91,9 @@ export function WorkOrderBoardLane({
   tone = "neutral",
   surfaceClassName,
   actions,
+  onRename,
+  canRename = false,
+  titleTestId,
   label,
   className,
   testId,
@@ -103,7 +111,20 @@ export function WorkOrderBoardLane({
       data-testid={testId}
     >
       <header className="flex shrink-0 items-center justify-between gap-2 px-2 pb-2">
-        <h2 className="workspace-section-title truncate">{title}</h2>
+        <h2 className="workspace-section-title min-w-0 flex-1 overflow-visible">
+          {onRename ? (
+            <ClickToRename
+              value={title}
+              onSave={onRename}
+              canEdit={canRename}
+              testId={titleTestId ?? `${testId ?? "lane"}-title`}
+              ariaLabel={`${title} column name`}
+              inputClassName="text-[15px] font-semibold leading-[22.5px] tracking-[-0.01em]"
+            />
+          ) : (
+            <span className="truncate">{title}</span>
+          )}
+        </h2>
         {actions}
       </header>
 

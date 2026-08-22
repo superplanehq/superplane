@@ -23,8 +23,7 @@ interface ColumnLaneMenuProps {
 }
 
 /**
- * Column header menu: Edit (optional) and circular color swatches
- * inspired by Apple Notes / HoneyBook tag pickers.
+ * Column header menu: Edit (optional) and a compact colour grid.
  */
 export function ColumnLaneMenu({ title, testId, editHref, colorId, onColorChange }: ColumnLaneMenuProps) {
   const navigate = useNavigate();
@@ -41,7 +40,7 @@ export function ColumnLaneMenu({ title, testId, editHref, colorId, onColorChange
           <MoreHorizontal className="size-3.5" aria-hidden />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[13.5rem] p-0" data-testid={`${testId}-content`}>
+      <DropdownMenuContent align="end" className="min-w-0 w-32 p-0" data-testid={`${testId}-content`}>
         {editHref ? (
           <>
             <div className="p-1">
@@ -54,11 +53,11 @@ export function ColumnLaneMenu({ title, testId, editHref, colorId, onColorChange
           </>
         ) : null}
 
-        <div className="px-3 pb-2 pt-2.5" data-testid={`${testId}-color-picker`}>
-          <DropdownMenuLabel className="px-0 pb-2 pt-0 text-[12px] font-medium text-muted-foreground">
+        <div className="px-2 pb-2 pt-2" data-testid={`${testId}-color-picker`}>
+          <DropdownMenuLabel className="px-0 pb-1.5 pt-0 text-[12px] font-medium text-muted-foreground">
             Set color
           </DropdownMenuLabel>
-          <div className="grid grid-cols-5 gap-2" role="listbox" aria-label={`Color for ${title}`}>
+          <div className="grid grid-cols-3 gap-1.5" role="listbox" aria-label={`Color for ${title}`}>
             {LINE_BOARD_COLUMN_COLORS.map((color) => {
               const selected = colorId === color.id;
               return (
@@ -72,12 +71,12 @@ export function ColumnLaneMenu({ title, testId, editHref, colorId, onColorChange
                   data-testid={`${testId}-color-${color.id}`}
                   onClick={() => onColorChange(color.id)}
                   className={cn(
-                    "relative flex size-6 items-center justify-center rounded-full transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                    color.swatchClassName,
-                    selected && "ring-2 ring-foreground/80 ring-offset-2 ring-offset-background",
+                    "relative flex aspect-square w-full items-center justify-center rounded-md ring-1 ring-inset ring-black/10 transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:ring-white/15",
+                    color.className,
+                    selected && "ring-2 ring-foreground",
                   )}
                 >
-                  {selected ? <Check className="size-3 text-white drop-shadow-sm" aria-hidden strokeWidth={3} /> : null}
+                  {selected ? <Check className="size-3 text-foreground" aria-hidden strokeWidth={3} /> : null}
                 </button>
               );
             })}
@@ -87,7 +86,7 @@ export function ColumnLaneMenu({ title, testId, editHref, colorId, onColorChange
               type="button"
               data-testid={`${testId}-color-remove`}
               onClick={() => onColorChange(null)}
-              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-border px-1.5 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <XIcon className="size-3" aria-hidden />
               Remove color

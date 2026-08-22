@@ -3,16 +3,19 @@ import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactoryApps, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryApps, useFactoryWorkOrders, useUpdateFactoryLine } from "@/hooks/useFactoryData";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Clock, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
+import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import {
@@ -117,6 +120,7 @@ export function LinesPage() {
           <div className="shrink-0">
             <LineDetailHeader
               organizationId={organizationId}
+              factoryId={factoryId}
               factoryKey={factoryKey}
               line={selectedLine}
               canUpdate={canUpdate}
@@ -132,6 +136,7 @@ export function LinesPage() {
               apps={factoryApps}
               workOrders={workOrders}
               canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
+              canUpdate={canUpdate}
               onCreateWorkOrder={openCreateWorkOrder}
               workOrderCardContext={{
                 organizationId,
@@ -204,23 +209,49 @@ export function LinesPage() {
 
 function LineDetailHeader({
   organizationId,
+  factoryId,
   factoryKey,
   line,
   canUpdate,
 }: {
   organizationId: string;
+  factoryId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
   canUpdate: boolean;
 }) {
+  const updateLine = useUpdateFactoryLine(organizationId, factoryId);
+  const title = humanizeLineName(line.name);
   const editHref = line.id ? editFactoryLinePath(organizationId, factoryKey, line.id) : "#";
+
+  const handleRename = async (name: string) => {
+    if (!line.id) {
+      return;
+    }
+    try {
+      await updateLine.mutateAsync({ lineId: line.id, name });
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to rename line"));
+    }
+  };
+
   return (
     <WorkspacePageHeader
       className={factorySectionHeaderClassName}
-      title={humanizeLineName(line.name)}
+      title={
+        <ClickToRename
+          value={title}
+          onSave={(name) => void handleRename(name)}
+          canEdit={canUpdate && Boolean(line.id)}
+          busy={updateLine.isPending}
+          testId="lines-board-title"
+          ariaLabel="Line name"
+          inputClassName="font-medium text-[length:var(--workspace-page-title-size)] leading-[var(--workspace-page-title-line-height)] tracking-[var(--workspace-page-title-tracking)]"
+        />
+      }
       actions={
         canUpdate && line.id ? (
-          <ColumnConfigureMenu title={humanizeLineName(line.name)} href={editHref} testId="lines-edit-menu" />
+          <ColumnConfigureMenu title={title} href={editHref} testId="lines-edit-menu" />
         ) : undefined
       }
     />
@@ -235,6 +266,7 @@ function LineDetail({
   apps,
   workOrders,
   canCreateWorkOrder,
+  canUpdate,
   onCreateWorkOrder,
   workOrderCardContext,
 }: {
@@ -245,6 +277,7 @@ function LineDetail({
   apps: Array<{ id?: string; name?: string }>;
   workOrders: FactoriesWorkOrder[];
   canCreateWorkOrder: boolean;
+  canUpdate: boolean;
   onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
 }) {
@@ -275,6 +308,7 @@ function LineDetail({
           backlogOrders={backlogOrders}
           columns={board}
           canCreateWorkOrder={canCreateWorkOrder}
+          canRename={canUpdate}
           onCreateWorkOrder={onCreateWorkOrder}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={setPeekOrderId}
@@ -445,6 +479,7 @@ function PhaseBoard({
   backlogOrders,
   columns,
   canCreateWorkOrder,
+  canRename,
   onCreateWorkOrder,
   workOrderCardContext,
   onOpenWorkOrder,
@@ -456,6 +491,7 @@ function PhaseBoard({
   backlogOrders: FactoriesWorkOrder[];
   columns: LinePhaseColumn[];
   canCreateWorkOrder: boolean;
+  canRename: boolean;
   onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string) => void;
@@ -465,9 +501,14 @@ function PhaseBoard({
     ? factoryAppConfigurePath(organizationId, factoryKey, backlogApp.id, { from: "lines", lineId })
     : null;
   const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>({});
+  const [columnTitles, setColumnTitles] = useState<Record<string, string>>({});
 
   const setColumnColor = useCallback((columnKey: string, colorId: LineBoardColumnColorId | null) => {
     setColumnColors((current) => ({ ...current, [columnKey]: colorId }));
+  }, []);
+
+  const setColumnTitle = useCallback((columnKey: string, title: string) => {
+    setColumnTitles((current) => ({ ...current, [columnKey]: title }));
   }, []);
 
   return (
@@ -475,10 +516,13 @@ function PhaseBoard({
       <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
         <BacklogColumn
           orders={backlogOrders}
+          title={columnTitles.backlog ?? "Backlog"}
           configureHref={backlogConfigureHref}
           colorId={columnColors.backlog ?? null}
           onColorChange={(colorId) => setColumnColor("backlog", colorId)}
           canCreateWorkOrder={canCreateWorkOrder}
+          canRename={canRename}
+          onRename={(title) => setColumnTitle("backlog", title)}
           onCreateWorkOrder={onCreateWorkOrder}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
@@ -499,8 +543,11 @@ function PhaseBoard({
               factoryKey={factoryKey}
               lineId={lineId}
               column={column}
+              title={columnTitles[columnKey] ?? column.stepName}
               colorId={columnColors[columnKey] ?? null}
               onColorChange={(colorId) => setColumnColor(columnKey, colorId)}
+              canRename={canRename}
+              onRename={(title) => setColumnTitle(columnKey, title)}
               workOrderCardContext={workOrderCardContext}
               onOpenWorkOrder={onOpenWorkOrder}
             />
@@ -513,19 +560,25 @@ function PhaseBoard({
 
 function BacklogColumn({
   orders,
+  title,
   configureHref,
   colorId,
   onColorChange,
   canCreateWorkOrder,
+  canRename,
+  onRename,
   onCreateWorkOrder,
   workOrderCardContext,
   onOpenWorkOrder,
 }: {
   orders: FactoriesWorkOrder[];
+  title: string;
   configureHref: string | null;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   canCreateWorkOrder: boolean;
+  canRename: boolean;
+  onRename: (title: string) => void;
   onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string) => void;
@@ -534,8 +587,11 @@ function BacklogColumn({
 
   return (
     <WorkOrderBoardLane
-      title="Backlog"
-      label="Backlog"
+      title={title}
+      label={title}
+      canRename={canRename}
+      onRename={onRename}
+      titleTestId="lines-column-title-backlog"
       count={orders.length}
       tone="neutral"
       surfaceClassName={surfaceClassName}
@@ -561,7 +617,7 @@ function BacklogColumn({
             </button>
           </PermissionTooltip>
           <ColumnLaneMenu
-            title="Backlog"
+            title={title}
             testId="lines-backlog-menu"
             editHref={configureHref}
             colorId={colorId}
@@ -626,8 +682,11 @@ function PhaseColumn({
   factoryKey,
   lineId,
   column,
+  title,
   colorId,
   onColorChange,
+  canRename,
+  onRename,
   workOrderCardContext,
   onOpenWorkOrder,
 }: {
@@ -635,8 +694,11 @@ function PhaseColumn({
   factoryKey: string;
   lineId?: string;
   column: LinePhaseColumn;
+  title: string;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
+  canRename: boolean;
+  onRename: (title: string) => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string) => void;
 }) {
@@ -669,16 +731,19 @@ function PhaseColumn({
 
   return (
     <WorkOrderBoardLane
-      title={column.stepName}
-      label={`${column.stepName} phase`}
+      title={title}
+      label={`${title} phase`}
       count={totalRuns}
       tone={PHASE_LANE_TONE[glyph]}
       surfaceClassName={surfaceClassName}
       emptyDescription="No work orders in this phase."
+      canRename={canRename}
+      onRename={onRename}
+      titleTestId={`lines-column-title-phase-${column.stepIndex}`}
       testId={`lines-phase-column-${column.stepIndex}`}
       actions={
         <ColumnLaneMenu
-          title={column.stepName}
+          title={title}
           testId={`lines-phase-menu-${column.stepIndex}`}
           editHref={configureHref}
           colorId={colorId}

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory } from "@/api-client";
 import { editFactoryLinePath, factoryLineDetailPath } from "../lib/factoryPagePaths";
@@ -17,11 +17,13 @@ import { LINE_LIST_METRICS_BY_ID } from "./lineListMetricsMockData";
 import { LinesPage } from "./LinesPage";
 
 const createFactoryLineMutateAsync = vi.fn();
+const updateFactoryLineMutateAsync = vi.fn();
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => ({ data: [] }),
   useFactoryApps: () => ({ data: [] }),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
+  useUpdateFactoryLine: () => ({ mutateAsync: updateFactoryLineMutateAsync, isPending: false }),
 }));
 
 vi.mock("@/hooks/useWorkOrderCardActions", () => ({
@@ -119,6 +121,10 @@ describe("LinesPage card menu", () => {
 });
 
 describe("LinesPage board", () => {
+  beforeEach(() => {
+    updateFactoryLineMutateAsync.mockReset();
+  });
+
   function renderBoard(
     path = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
     openCreateWorkOrder = vi.fn(),
@@ -174,7 +180,7 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-backlog-menu"));
     await user.click(screen.getByTestId("lines-backlog-menu-color-lime"));
 
-    expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-100");
+    expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
   });
 
   it("opens the Intake drawer beside the board when the intake query is set", () => {
@@ -185,6 +191,40 @@ describe("LinesPage board", () => {
     expect(screen.getByRole("heading", { name: "Plan and Implement" })).toBeInTheDocument();
     expect(screen.getByTestId("line-intake-close")).toBeInTheDocument();
     expect(screen.getByTestId("line-intake-add")).toHaveTextContent("Add intake");
+  });
+
+  it("renames the board title on Enter", async () => {
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderBoard();
+
+    await user.click(screen.getByTestId("lines-board-title"));
+    const input = await screen.findByTestId("lines-board-title-input");
+    await waitFor(() => expect(input).toHaveFocus());
+    await user.clear(input);
+    await user.type(input, "Refund line");
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => {
+      expect(updateFactoryLineMutateAsync).toHaveBeenCalledWith({
+        lineId: REFUND_LINE_PLAN_ID,
+        name: "Refund line",
+      });
+    });
+  });
+
+  it("renames a column title on Enter", async () => {
+    const user = userEvent.setup();
+    renderBoard();
+
+    await user.click(screen.getByTestId("lines-column-title-backlog"));
+    const input = await screen.findByTestId("lines-column-title-backlog-input");
+    await waitFor(() => expect(input).toHaveFocus());
+    await user.clear(input);
+    await user.type(input, "Inbox");
+    await user.keyboard("{Enter}");
+
+    expect(screen.getByTestId("lines-column-title-backlog")).toHaveTextContent("Inbox");
   });
 
   it("opens Edit from the line overflow menu", async () => {
