@@ -76,9 +76,9 @@ func alertPolicyJSON(name, displayName string, enabled bool, comparison string, 
 
 // withFactory installs a mock client for the duration of a component test.
 func withFactory(mc *mockClient) {
-	SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (Client, error) {
+	newClient = func(httpCtx core.HTTPContext, integration core.IntegrationContext) (Client, error) {
 		return mc, nil
-	})
+	}
 }
 
 func Test__ParsePolicyName(t *testing.T) {
