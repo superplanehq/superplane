@@ -1,6 +1,8 @@
 package core
 
 import (
+	"errors"
+
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -162,6 +164,8 @@ type IntegrationPropertyStorage interface {
 type IntegrationSecretStorageReader interface {
 	Get(name string) (string, error)
 }
+
+var ErrIntegrationSecretNotFound = errors.New("integration secret not found")
 
 /*
  * Secrets are sensitive information managed by the integration.
