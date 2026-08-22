@@ -89,13 +89,28 @@ func validateFactoryOnboardingResources(
 		if err != nil {
 			return err
 		}
-		expectedName := map[string]string{
-			models.FactoryOnboardingAgentHarnessClaudeCode: "claude",
-			models.FactoryOnboardingAgentHarnessCursor:     "cursor",
-			models.FactoryOnboardingAgentHarnessCodex:      "openai",
+		expectedNames := map[string][]string{
+			models.FactoryOnboardingAgentHarnessClaudeCode: {"claude", "openrouter"},
+			models.FactoryOnboardingAgentHarnessCursor:     {"cursor"},
+			models.FactoryOnboardingAgentHarnessCodex:      {"openai"},
 		}[config.AgentHarness]
-		if expectedName != "" && integration.AppName != expectedName {
+		if len(expectedNames) > 0 && !slices.Contains(expectedNames, integration.AppName) {
 			return invalidArgument("coding agent integration does not match the selected agent")
+		}
+	} else {
+		credit, err := models.DescribeOrganizationLLMCredit(db, organizationID)
+		if err != nil {
+			return err
+		}
+		if credit.RemainingMicros <= 0 {
+			return models.ErrFactoryOnboardingAgentIntegrationRequired
+		}
+		offered, hostedErr := models.HasOfferedHostedLLMProvider(db)
+		if hostedErr != nil {
+			return hostedErr
+		}
+		if !offered {
+			return models.ErrFactoryOnboardingHostedAgentUnavailable
 		}
 	}
 

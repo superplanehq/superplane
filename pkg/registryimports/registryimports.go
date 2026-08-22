@@ -21,6 +21,8 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/readmemory"
 	_ "github.com/superplanehq/superplane/pkg/components/runner"
 	_ "github.com/superplanehq/superplane/pkg/components/runner/claude"
+	_ "github.com/superplanehq/superplane/pkg/components/runner/codex"
+	_ "github.com/superplanehq/superplane/pkg/components/runner/openrouter"
 	_ "github.com/superplanehq/superplane/pkg/components/runs"
 	_ "github.com/superplanehq/superplane/pkg/components/ssh"
 	_ "github.com/superplanehq/superplane/pkg/components/timegate"

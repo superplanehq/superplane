@@ -371,6 +371,7 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		Secrets:        contexts.NewSecretsContext(tx, w.registry, workflow.OrganizationID, w.encryptor),
 		Files:          contexts.NewRepositoryFilesContextInTransaction(w.gitProvider, execution.WorkflowID, tx),
 		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, workflow, node, execution)),
+		Usage:          contexts.NewUsageContext(workflow.OrganizationID, execution),
 	}
 
 	if node.AppInstallationID != nil {
