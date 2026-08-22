@@ -76,3 +76,45 @@ func (c *RollbackProduction) ExampleOutput() map[string]any {
 		&exampleOutputRollback,
 	)
 }
+
+//go:embed example_output_get_project.json
+var exampleOutputGetProjectBytes []byte
+
+//go:embed example_output_create_project.json
+var exampleOutputCreateProjectBytes []byte
+
+//go:embed example_output_upsert_env_var.json
+var exampleOutputUpsertEnvVarBytes []byte
+
+var exampleOutputGetProjectOnce sync.Once
+var exampleOutputGetProject map[string]any
+
+var exampleOutputCreateProjectOnce sync.Once
+var exampleOutputCreateProject map[string]any
+
+var exampleOutputUpsertEnvVarOnce sync.Once
+var exampleOutputUpsertEnvVar map[string]any
+
+func (c *GetProject) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputGetProjectOnce,
+		exampleOutputGetProjectBytes,
+		&exampleOutputGetProject,
+	)
+}
+
+func (c *CreateProject) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputCreateProjectOnce,
+		exampleOutputCreateProjectBytes,
+		&exampleOutputCreateProject,
+	)
+}
+
+func (c *UpsertEnvVar) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputUpsertEnvVarOnce,
+		exampleOutputUpsertEnvVarBytes,
+		&exampleOutputUpsertEnvVar,
+	)
+}
