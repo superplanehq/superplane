@@ -12,6 +12,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -43,6 +44,7 @@ type createTaskRequest struct {
 func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -92,16 +94,15 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	require.Len(t, req.Commands, 5)
 	assert.Equal(t, "Prepare Claude Code", req.Commands[0].Name)
 	assert.Equal(t, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`, req.Commands[0].Command)
-	assert.Equal(t, runner.BrokerCommand{Name: "Clone", Command: `source "$SUPERPLANE_TASK_DIR/steps/01-clone.sh"`}, req.Commands[1])
-	assert.Equal(t, runner.BrokerCommand{
-		Name:    "Fix tests",
-		Command: `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/02-fix-tests.txt" 'sonnet'`,
-	}, req.Commands[2])
-	assert.Equal(t, runner.BrokerCommand{
-		Name:    "Open PR",
-		Command: `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/03-open-pr.txt" 'sonnet'`,
-	}, req.Commands[3])
-	assert.Equal(t, runner.BrokerCommand{Name: "Status", Command: `source "$SUPERPLANE_TASK_DIR/steps/04-status.sh"`}, req.Commands[4])
+	assert.Equal(t, "Clone", req.Commands[1].Name)
+	assert.Contains(t, req.Commands[1].Command, `source "$SUPERPLANE_TASK_DIR/steps/01-clone.sh"`)
+	assert.Contains(t, req.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
+	assert.Equal(t, "Fix tests", req.Commands[2].Name)
+	assert.Contains(t, req.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/02-fix-tests.txt" 'sonnet'`)
+	assert.Equal(t, "Open PR", req.Commands[3].Name)
+	assert.Contains(t, req.Commands[3].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/03-open-pr.txt" 'sonnet'`)
+	assert.Equal(t, "Status", req.Commands[4].Name)
+	assert.Contains(t, req.Commands[4].Command, `source "$SUPERPLANE_TASK_DIR/steps/04-status.sh"`)
 	assert.Contains(t, string(body), `"name":"Clone"`)
 	assert.Empty(t, req.DockerImage)
 	require.Len(t, req.Environment, 1)
@@ -109,9 +110,11 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	assert.Equal(t, "sk-test-key", req.Environment[0].Value)
 	assert.NotContains(t, string(body), `"message_chain"`)
 
-	require.Len(t, req.Files, 6)
+	require.Len(t, req.Files, 7)
 	assert.Equal(t, runScript, requireTaskFile(t, req.Files, "run.js").Content)
+	assert.Equal(t, runner.LLMUsageScript, requireTaskFile(t, req.Files, "llm_usage.js").Content)
 	assert.Contains(t, requireTaskFile(t, req.Files, "prepare.sh").Content, "cd '/tmp'")
+	assert.Contains(t, requireTaskFile(t, req.Files, "prepare.sh").Content, `pwd -P >"$SUPERPLANE_TASK_DIR/task_cwd"`)
 	assert.Equal(t, "git clone https://github.com/acme/widgets.git /tmp/repo", requireTaskFile(t, req.Files, "steps/01-clone.sh").Content)
 	assert.Equal(t, "Fix the failing tests", requireTaskFile(t, req.Files, "prompts/02-fix-tests.txt").Content)
 	assert.Equal(t, "Open a pull request", requireTaskFile(t, req.Files, "prompts/03-open-pr.txt").Content)
@@ -121,6 +124,7 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -161,13 +165,13 @@ func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
 	require.Len(t, req.Commands, 4)
 	assert.Equal(t, "Prepare Claude Code", req.Commands[0].Name)
 	assert.Equal(t, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`, req.Commands[0].Command)
-	assert.Equal(t, runner.BrokerCommand{Name: "Setup", Command: `source "$SUPERPLANE_TASK_DIR/steps/01-setup.sh"`}, req.Commands[1])
-	assert.Equal(t, runner.BrokerCommand{
-		Name:    "Prompt",
-		Command: `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/02-prompt.txt" ''`,
-	}, req.Commands[2])
-	assert.Equal(t, runner.BrokerCommand{Name: "After", Command: `source "$SUPERPLANE_TASK_DIR/steps/03-after.sh"`}, req.Commands[3])
-	require.Len(t, req.Files, 5)
+	assert.Equal(t, "Setup", req.Commands[1].Name)
+	assert.Contains(t, req.Commands[1].Command, `source "$SUPERPLANE_TASK_DIR/steps/01-setup.sh"`)
+	assert.Equal(t, "Prompt", req.Commands[2].Name)
+	assert.Contains(t, req.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/02-prompt.txt" ''`)
+	assert.Equal(t, "After", req.Commands[3].Name)
+	assert.Contains(t, req.Commands[3].Command, `source "$SUPERPLANE_TASK_DIR/steps/03-after.sh"`)
+	require.Len(t, req.Files, 6)
 	assert.Equal(t, "git clone https://github.com/acme/widgets.git /tmp/repo", requireTaskFile(t, req.Files, "steps/01-setup.sh").Content)
 	assert.Equal(t, "implement the issue", requireTaskFile(t, req.Files, "prompts/02-prompt.txt").Content)
 	assert.Equal(t, "git push", requireTaskFile(t, req.Files, "steps/03-after.sh").Content)
@@ -176,6 +180,7 @@ func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
 func TestRunClaudeCodeExecuteRequiresAPIKeySecret(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	component := &RunClaudeCode{}
 	err := component.Execute(core.ExecutionContext{
@@ -193,7 +198,80 @@ func TestRunClaudeCodeExecuteRequiresAPIKeySecret(t *testing.T) {
 		Requests:       &contexts.RequestContext{},
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "anthropic API key")
+	assert.Contains(t, err.Error(), "secret not found")
+}
+
+func TestRunClaudeCodeExecuteInjectsHostedAPIKey(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-claude-hosted-1"}`))},
+		},
+	}
+
+	component := &RunClaudeCode{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"machineType": testRunnerMachineType,
+			"model":       "claude-sonnet-4-6",
+			"steps": []map[string]any{
+				{"name": "Hello", "type": "prompt", "prompt": "hello"},
+			},
+			"credentials": map[string]any{"source": "hosted"},
+		},
+		HTTP:    httpContext,
+		Secrets: &contexts.SecretsContext{Values: map[string][]byte{}},
+		Webhook: &contexts.NodeWebhookContext{},
+		HostedLLM: &contexts.HostedLLMContext{
+			Access: core.HostedLLMAccess{
+				APIKey:        "sk-hosted",
+				AllowedModels: []string{"claude-sonnet-4-6"},
+			},
+		},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		Requests:       &contexts.RequestContext{},
+	})
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1)
+
+	body, err := io.ReadAll(httpContext.Requests[0].Body)
+	require.NoError(t, err)
+	var req createTaskRequest
+	require.NoError(t, json.Unmarshal(body, &req))
+	require.Len(t, req.Environment, 1)
+	assert.Equal(t, envAnthropicAPIKey, req.Environment[0].Name)
+	assert.Equal(t, "sk-hosted", req.Environment[0].Value)
+}
+
+func TestRunClaudeCodeExecuteSoftBlocksWhenHostedCreditIsEmpty(t *testing.T) {
+	component := &RunClaudeCode{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"machineType": testRunnerMachineType,
+			"model":       "claude-sonnet-4-6",
+			"steps": []map[string]any{
+				{"name": "Hello", "type": "prompt", "prompt": "hello"},
+			},
+			"credentials": map[string]any{"source": "hosted"},
+		},
+		HTTP:    &contexts.HTTPContext{},
+		Secrets: &contexts.SecretsContext{Values: map[string][]byte{}},
+		Webhook: &contexts.NodeWebhookContext{},
+		HostedLLM: &contexts.HostedLLMContext{
+			CreditErr: models.ErrHostedCreditEmpty,
+			Access: core.HostedLLMAccess{
+				APIKey:        "sk-hosted",
+				AllowedModels: []string{"claude-sonnet-4-6"},
+			},
+		},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		Requests:       &contexts.RequestContext{},
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, models.ErrHostedCreditEmpty)
 }
 
 func TestRunClaudeCodeProcessTaskStatusIncludesResult(t *testing.T) {

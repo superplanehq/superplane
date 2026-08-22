@@ -39,5 +39,6 @@ func (c *UsageContext) Record(record core.UsageRecord) error {
 		ReasoningTokens:  record.ReasoningTokens,
 		TotalTokens:      record.TotalTokens,
 		CostMicros:       record.CostMicros,
+		FundingSource:    record.FundingSource,
 	})
 }

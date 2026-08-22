@@ -52,6 +52,9 @@ describe("setup factory line apps", () => {
 
     const implementation = materializeOnboardingApp("line-implementation");
     expect(implementation).toContain("acme/app");
+    expect(implementation).toMatch(
+      /id: add-branch-artifact[\s\S]*component: addWorkOrderArtifact[\s\S]*repository: acme\/app/,
+    );
 
     const pr = materializeOnboardingApp("line-pr");
     expect(pr).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);

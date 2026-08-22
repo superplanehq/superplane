@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBranchTreeURL(t *testing.T) {
@@ -157,15 +158,16 @@ func TestBuildArtifactData_StripsCredentialsFromStoredRepositoryWhenURLIsSet(t *
 }
 
 func TestBuildArtifactData_DropsUnparseableRepositoryURLWithCredentials(t *testing.T) {
-	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
+	data, err := buildArtifactData(AddWorkOrderArtifactConfiguration{
 		ArtifactType: "branch",
 		Name:         "hotfix",
 		Repository:   "https://oauth2:token@",
 	})
 
-	_, hasRepo := data["repository"]
-	assert.False(t, hasRepo)
-	assert.NotContains(t, fmt.Sprintf("%v", data), "token")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "branch artifact requires a url or a repository")
+	assert.NotContains(t, err.Error(), "token")
+	assert.Nil(t, data)
 }
 
 func TestBuildArtifactData_StripsCredentialsFromFreeFormRepository(t *testing.T) {
@@ -181,12 +183,22 @@ func TestBuildArtifactData_StripsCredentialsFromFreeFormRepository(t *testing.T)
 	assert.NotContains(t, fmt.Sprintf("%v", data), "token")
 }
 
-func TestBuildArtifactData_DoesNotInventBranchURLWithoutRepository(t *testing.T) {
-	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
+func TestBuildArtifactData_RejectsBranchWithoutReachableURL(t *testing.T) {
+	_, err := buildArtifactData(AddWorkOrderArtifactConfiguration{
 		ArtifactType: "branch",
 		Name:         "feature/refund-retry",
 	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "branch artifact requires a url or a repository")
+}
 
-	_, hasURL := data["url"]
-	assert.False(t, hasURL)
+func TestBuildArtifactData_AcceptsExplicitBranchURLWithoutRepository(t *testing.T) {
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
+		ArtifactType: "branch",
+		Name:         "feature/refund-retry",
+		URL:          "https://github.com/example/repo/tree/feature/refund-retry",
+	})
+
+	assert.Equal(t, "https://github.com/example/repo/tree/feature/refund-retry", data["url"])
+	assert.Equal(t, "feature/refund-retry", data["name"])
 }

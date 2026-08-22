@@ -47,6 +47,7 @@ type LLMUsageEvent struct {
 	ReasoningTokens      int64
 	TotalTokens          int64
 	CostMicros           int64
+	ProviderCostMicros   int64
 	Currency             string
 	PriceBookVersion     string
 	IdempotencyKey       string
@@ -66,6 +67,7 @@ type LLMUsageEventInput struct {
 	NodeID           string
 	Provider         string
 	Model            string
+	FundingSource    string
 	InputTokens      int64
 	OutputTokens     int64
 	CacheReadTokens  int64
@@ -98,12 +100,12 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 	}
 
 	version := pricebook.Version
-	costMicros := int64(0)
+	providerCostMicros := int64(0)
 	if in.CostMicros != nil {
-		costMicros = *in.CostMicros
+		providerCostMicros = *in.CostMicros
 		version = pricebook.Version + "+provider"
 	} else {
-		costMicros = pricebook.EstimateMicros(
+		providerCostMicros = pricebook.EstimateMicros(
 			in.Provider,
 			in.Model,
 			in.InputTokens,
@@ -112,6 +114,20 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 			in.CacheWriteTokens,
 			in.ReasoningTokens,
 		)
+	}
+
+	fundingSource := in.FundingSource
+	if fundingSource == "" {
+		fundingSource = UsageFundingSourceBYOK
+	}
+
+	billedMicros := providerCostMicros
+	if fundingSource == UsageFundingSourceHosted {
+		markupBPS, markupErr := ResolveOrganizationMarkupBPS(tx, execution.OrganizationID)
+		if markupErr != nil {
+			return markupErr
+		}
+		billedMicros = ApplyMarkupMicros(providerCostMicros, markupBPS)
 	}
 
 	now := time.Now()
@@ -129,14 +145,15 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 		Provider:             in.Provider,
 		Model:                in.Model,
 		UsageKind:            UsageKindModel,
-		FundingSource:        UsageFundingSourceBYOK,
+		FundingSource:        fundingSource,
 		InputTokens:          in.InputTokens,
 		OutputTokens:         in.OutputTokens,
 		CacheReadTokens:      in.CacheReadTokens,
 		CacheWriteTokens:     in.CacheWriteTokens,
 		ReasoningTokens:      in.ReasoningTokens,
 		TotalTokens:          total,
-		CostMicros:           costMicros,
+		CostMicros:           billedMicros,
+		ProviderCostMicros:   providerCostMicros,
 		Currency:             "usd",
 		PriceBookVersion:     version,
 		IdempotencyKey:       "call:" + uuid.New().String(),
