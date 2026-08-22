@@ -79,7 +79,7 @@ func validateStepWorkingDirectory(index int, dir string) error {
 	}
 	cleaned := filepath.ToSlash(filepath.Clean(dir))
 	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
-		return fmt.Errorf("steps[%d].workingDirectory must not contain ..", index)
+		return fmt.Errorf("steps[%d].workingDirectory must not contain parent path segments", index)
 	}
 	return nil
 }

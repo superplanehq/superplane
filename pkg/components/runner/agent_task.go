@@ -9,7 +9,7 @@ import (
 type AgentPromptCommand func(promptName, model string) string
 
 func BuildAgentBrokerTask(
-	prepareName, prepareScript, runScriptName, runScript string,
+	prepareName, prepareScript, runScriptName, runScript, workingDirectory string,
 	steps []AgentStep,
 	model string,
 	promptCommand AgentPromptCommand,
@@ -27,15 +27,16 @@ func BuildAgentBrokerTask(
 	})
 
 	for i, step := range steps {
-		file, command := buildAgentStep(i+1, step, model, runScriptName, promptCommand)
+		file, command := buildAgentStep(i+1, step, workingDirectory, model, runScriptName, promptCommand)
 		files = append(files, file)
 		commands = append(commands, command)
 	}
 	return commands, files
 }
 
-func buildAgentStep(stepNumber int, step AgentStep, model, runScriptName string, promptCommand AgentPromptCommand) (BrokerTaskFile, BrokerCommand) {
+func buildAgentStep(stepNumber int, step AgentStep, nodeWorkingDirectory, model, runScriptName string, promptCommand AgentPromptCommand) (BrokerTaskFile, BrokerCommand) {
 	stepSlug := AgentStepSlug(stepNumber, step.Name)
+	workingDirectory := EffectiveWorkingDirectory(nodeWorkingDirectory, step.WorkingDirectory)
 	switch NormalizeAgentStepType(step.Type) {
 	case AgentStepBash:
 		command := ""
@@ -49,7 +50,7 @@ func buildAgentStep(stepNumber int, step AgentStep, model, runScriptName string,
 				Mode:    "0644",
 			}, BrokerCommand{
 				Name:    AgentStepLabel(step.Name, scriptName),
-				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(step.WorkingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName))),
+				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(workingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName))),
 			}
 	default:
 		prompt := ""
@@ -63,9 +64,19 @@ func buildAgentStep(stepNumber int, step AgentStep, model, runScriptName string,
 				Mode:    "0644",
 			}, BrokerCommand{
 				Name:    AgentStepLabel(step.Name, promptName),
-				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(step.WorkingDirectory, promptCommand(promptName, model))),
+				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(workingDirectory, promptCommand(promptName, model))),
 			}
 	}
+}
+
+// EffectiveWorkingDirectory returns the per-step directory when set,
+// otherwise the node working directory. Each broker command starts a new
+// shell, so steps must cd even when they do not set a per-step directory.
+func EffectiveWorkingDirectory(nodeDir, stepDir string) string {
+	if dir := strings.TrimSpace(stepDir); dir != "" {
+		return dir
+	}
+	return strings.TrimSpace(nodeDir)
 }
 
 // WrapCommandInWorkingDirectory prefixes command so it runs in dir.

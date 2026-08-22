@@ -7,6 +7,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestEffectiveWorkingDirectoryPrefersStepThenNode(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "repo", EffectiveWorkingDirectory("workspace", "repo"))
+	assert.Equal(t, "workspace", EffectiveWorkingDirectory("workspace", ""))
+	assert.Equal(t, "repo", EffectiveWorkingDirectory("", "repo"))
+	assert.Equal(t, "", EffectiveWorkingDirectory("  ", "  "))
+}
+
 func TestWrapCommandInWorkingDirectoryEmptyIsNoOp(t *testing.T) {
 	t.Parallel()
 
@@ -40,6 +49,7 @@ func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 		NodePrepareScript("", "", ""),
 		"run.js",
 		"echo run",
+		"",
 		[]AgentStep{
 			{Name: "Clone", Type: AgentStepBash, Command: strPtr("git clone dest repo")},
 			{Name: "Implement", Type: AgentStepPrompt, Prompt: &prompt, WorkingDirectory: "repo"},
@@ -63,6 +73,35 @@ func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 	prepare := requireBrokerFile(t, files, "prepare.sh").Content
 	assert.Contains(t, prepare, `pwd -P >"$SUPERPLANE_TASK_DIR/task_cwd"`)
 	assert.Equal(t, LLMUsageScript, requireBrokerFile(t, files, "llm_usage.js").Content)
+}
+
+func TestBuildAgentBrokerTaskAppliesNodeWorkingDirectoryWhenStepEmpty(t *testing.T) {
+	t.Parallel()
+
+	prompt := "implement the change"
+	command := "git push"
+	commands, _ := BuildAgentBrokerTask(
+		"Prepare",
+		NodePrepareScript("", "", "repo"),
+		"run.js",
+		"echo run",
+		"repo",
+		[]AgentStep{
+			{Name: "Clone", Type: AgentStepBash, Command: strPtr("git clone dest repo")},
+			{Name: "Implement", Type: AgentStepPrompt, Prompt: &prompt},
+			{Name: "Push", Type: AgentStepBash, Command: &command, WorkingDirectory: "/tmp/override"},
+		},
+		"google/gemini-3.7-flash",
+		func(promptName, model string) string {
+			return "node run.js " + promptName + " " + model
+		},
+	)
+
+	require.Len(t, commands, 4)
+	assert.Contains(t, commands[1].Command, `'repo'`)
+	assert.Contains(t, commands[2].Command, `'repo'`)
+	assert.Contains(t, commands[3].Command, `cd '/tmp/override'`)
+	assert.NotContains(t, commands[3].Command, `'repo'`)
 }
 
 func TestValidateAgentStepsRejectsParentWorkingDirectory(t *testing.T) {

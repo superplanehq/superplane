@@ -52,6 +52,9 @@ func validateRunOpenRouterSpec(spec RunOpenRouterSpec) error {
 	if err := runner.ValidateReservedEnvironmentName(spec.Environment, envOpenRouterAPIKey); err != nil {
 		return err
 	}
+	if strings.TrimSpace(spec.Model) == "" {
+		return fmt.Errorf("model is required")
+	}
 	if spec.ExecutionTimeoutSeconds != 0 {
 		if spec.ExecutionTimeoutSeconds < 1 || spec.ExecutionTimeoutSeconds > runner.MaxExecutionTimeoutSecondsRequest {
 			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", runner.MaxExecutionTimeoutSecondsRequest, runner.DefaultExecutionTimeoutSeconds)
@@ -66,6 +69,7 @@ func buildOpenRouterBrokerTask(spec RunOpenRouterSpec) ([]runner.BrokerCommand, 
 		runner.NodePrepareScript("", "", spec.WorkingDirectory),
 		"run.js",
 		runScript,
+		spec.WorkingDirectory,
 		spec.Steps,
 		strings.TrimSpace(spec.Model),
 		func(promptName, model string) string {

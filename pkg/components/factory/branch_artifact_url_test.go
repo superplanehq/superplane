@@ -192,6 +192,33 @@ func TestBuildArtifactData_RejectsBranchWithoutReachableURL(t *testing.T) {
 	assert.Contains(t, err.Error(), "branch artifact requires a url or a repository")
 }
 
+func TestValidateBranchArtifactConfiguration_RejectsNameOnly(t *testing.T) {
+	err := validateBranchArtifactConfiguration(AddWorkOrderArtifactConfiguration{
+		ArtifactType: "branch",
+		Name:         "feature/refund-retry",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "branch artifact requires a url or a repository")
+}
+
+func TestValidateBranchArtifactConfiguration_AcceptsURLOnly(t *testing.T) {
+	err := validateBranchArtifactConfiguration(AddWorkOrderArtifactConfiguration{
+		ArtifactType: "branch",
+		Name:         "feature/refund-retry",
+		URL:          "https://github.com/example/repo/tree/feature/refund-retry",
+	})
+	require.NoError(t, err)
+}
+
+func TestValidateBranchArtifactConfiguration_AcceptsRepositoryExpression(t *testing.T) {
+	err := validateBranchArtifactConfiguration(AddWorkOrderArtifactConfiguration{
+		ArtifactType: "branch",
+		Name:         "{{ previous().result.branch }}",
+		Repository:   "{{ install_params.appRepository }}",
+	})
+	require.NoError(t, err)
+}
+
 func TestBuildArtifactData_AcceptsExplicitBranchURLWithoutRepository(t *testing.T) {
 	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
 		ArtifactType: "branch",

@@ -112,8 +112,8 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 
 // buildClaudeCodeBrokerTask builds broker commands plus task files.
 // Static helpers ship via `files` (materialized under SUPERPLANE_TASK_DIR).
-// Per-step workingDirectory cds from the task launch directory so clone/repo
-// steps work when the broker starts a new shell for each command.
+// Node and per-step workingDirectory cds from the task launch directory so
+// each broker command starts in the configured workspace.
 func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 	model := strings.TrimSpace(spec.Model)
 	workdir := strings.TrimSpace(spec.WorkingDirectory)
@@ -126,7 +126,7 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 
 	stepCommands := make([]runner.BrokerCommand, 0, len(spec.Steps))
 	for i, step := range spec.Steps {
-		file, command := buildClaudeCodeStep(i+1, step, model)
+		file, command := buildClaudeCodeStep(i+1, step, model, workdir)
 		files = append(files, file)
 		stepCommands = append(stepCommands, command)
 	}
@@ -141,8 +141,9 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 	}
 }
 
-func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, model string) (runner.BrokerTaskFile, runner.BrokerCommand) {
+func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, model, nodeWorkingDirectory string) (runner.BrokerTaskFile, runner.BrokerCommand) {
 	stepSlug := runner.AgentStepSlug(stepNumber, step.Name)
+	workingDirectory := runner.EffectiveWorkingDirectory(nodeWorkingDirectory, step.WorkingDirectory)
 	switch runner.NormalizeAgentStepType(step.Type) {
 	case runner.AgentStepBash:
 		command := ""
@@ -154,7 +155,7 @@ func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, model string) (run
 			Path:    "steps/" + scriptName,
 			Content: command,
 			Mode:    "0644",
-		}, claudeBashStepBrokerCommand(step.Name, scriptName, step.WorkingDirectory)
+		}, claudeBashStepBrokerCommand(step.Name, scriptName, workingDirectory)
 	default:
 		prompt := ""
 		if step.Prompt != nil {
@@ -165,7 +166,7 @@ func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, model string) (run
 			Path:    "prompts/" + promptName,
 			Content: prompt,
 			Mode:    "0644",
-		}, claudePromptStepBrokerCommand(step.Name, promptName, model, step.WorkingDirectory)
+		}, claudePromptStepBrokerCommand(step.Name, promptName, model, workingDirectory)
 	}
 }
 

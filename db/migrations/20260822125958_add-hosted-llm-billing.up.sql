@@ -1,6 +1,6 @@
 BEGIN;
 
-CREATE TABLE installation_llm_settings (
+CREATE TABLE IF NOT EXISTS installation_llm_settings (
   id                      INTEGER PRIMARY KEY DEFAULT 1,
   welcome_grant_cents     BIGINT NOT NULL DEFAULT 5000,
   markup_bps              INTEGER NOT NULL DEFAULT 2000,
@@ -14,9 +14,10 @@ CREATE TABLE installation_llm_settings (
 );
 
 INSERT INTO installation_llm_settings (id, welcome_grant_cents, markup_bps, warning_threshold_bps)
-VALUES (1, 5000, 2000, 2000);
+VALUES (1, 5000, 2000, 2000)
+ON CONFLICT (id) DO NOTHING;
 
-CREATE TABLE hosted_llm_providers (
+CREATE TABLE IF NOT EXISTS hosted_llm_providers (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   provider        TEXT NOT NULL,
   enabled         BOOLEAN NOT NULL DEFAULT FALSE,
@@ -29,7 +30,7 @@ CREATE TABLE hosted_llm_providers (
   CONSTRAINT hosted_llm_providers_known CHECK (provider IN ('anthropic', 'openai', 'openrouter'))
 );
 
-CREATE TABLE organization_llm_credit_grants (
+CREATE TABLE IF NOT EXISTS organization_llm_credit_grants (
   id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id   UUID NOT NULL,
   kind              TEXT NOT NULL,
@@ -41,14 +42,14 @@ CREATE TABLE organization_llm_credit_grants (
   CONSTRAINT organization_llm_credit_grants_amount_positive CHECK (amount_micros > 0)
 );
 
-CREATE UNIQUE INDEX idx_org_llm_credit_grants_welcome
+CREATE UNIQUE INDEX IF NOT EXISTS idx_org_llm_credit_grants_welcome
   ON organization_llm_credit_grants (organization_id)
   WHERE kind = 'welcome';
 
-CREATE INDEX idx_org_llm_credit_grants_org
+CREATE INDEX IF NOT EXISTS idx_org_llm_credit_grants_org
   ON organization_llm_credit_grants (organization_id, created_at DESC);
 
-CREATE TABLE organization_llm_settings (
+CREATE TABLE IF NOT EXISTS organization_llm_settings (
   organization_id  UUID PRIMARY KEY,
   markup_bps       INTEGER,
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -56,7 +57,7 @@ CREATE TABLE organization_llm_settings (
 );
 
 ALTER TABLE llm_usage_events
-  ADD COLUMN provider_cost_micros BIGINT NOT NULL DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS provider_cost_micros BIGINT NOT NULL DEFAULT 0;
 
 UPDATE llm_usage_events
 SET provider_cost_micros = cost_micros

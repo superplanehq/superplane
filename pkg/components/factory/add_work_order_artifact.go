@@ -258,6 +258,14 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 	)
 }
 
+func (c *AddWorkOrderArtifact) ValidateNodeConfiguration(config map[string]any) error {
+	decoded := AddWorkOrderArtifactConfiguration{}
+	if err := mapstructure.Decode(config, &decoded); err != nil {
+		return err
+	}
+	return validateBranchArtifactConfiguration(decoded)
+}
+
 func (c *AddWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 	config := AddWorkOrderArtifactConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {

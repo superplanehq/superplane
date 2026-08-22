@@ -66,6 +66,7 @@ func buildCodexBrokerTask(spec RunCodexSpec) ([]runner.BrokerCommand, []runner.B
 		runner.NodePrepareScript("codex", "codex CLI not found on PATH; install Codex on the runner", spec.WorkingDirectory),
 		"run.js",
 		runScript,
+		spec.WorkingDirectory,
 		spec.Steps,
 		strings.TrimSpace(spec.Model),
 		func(promptName, model string) string {

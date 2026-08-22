@@ -67,7 +67,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Machine type**: Runner fleet registered on the task-broker (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Credentials**: SuperPlane secret, OpenRouter integration, or SuperPlane-hosted credentials used as ` + "`OPENROUTER_API_KEY`" + `.
-- **Model**: OpenRouter model id (` + "`provider/model`" + `). SuperPlane-hosted credentials require a model from the installation allowlist.
+- **Model**: Required OpenRouter model id (` + "`provider/model`" + `). SuperPlane-hosted credentials require a model from the installation allowlist.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
@@ -78,6 +78,8 @@ Configure an ordered list of **bash** and **prompt** steps:
 }
 
 func (c *RunOpenRouter) Configuration() []configuration.Field {
+	model := runner.AgentModelField("openrouter", "OpenRouter model id (provider/model). Required. SuperPlane-hosted credentials use the installation allowlist.", "anthropic/claude-sonnet-4-6")
+	model.Required = true
 	return []configuration.Field{
 		runner.AgentMachineTypeField(),
 		runner.AgentCredentialsField(runner.AgentCredentialsOptions{
@@ -87,7 +89,7 @@ func (c *RunOpenRouter) Configuration() []configuration.Field {
 			AllowHosted:       true,
 			HostedDescription: "OpenRouter API key, OpenRouter integration, or SuperPlane-hosted credentials.",
 		}),
-		runner.AgentModelField("openrouter", "OpenRouter model id (provider/model). SuperPlane-hosted credentials use the installation allowlist.", "anthropic/claude-sonnet-4-6"),
+		model,
 		runner.AgentStepsField(
 			"Ordered bash commands and OpenRouter agent prompts. Add, reorder, and mix freely.",
 			"Fix the failing tests and commit the changes.",

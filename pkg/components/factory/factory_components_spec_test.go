@@ -411,6 +411,46 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
+	t.Run("rejects name-only branch on component validator", func(t *testing.T) {
+		config := map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
+		}
+		err := configuration.ValidateConfiguration(fields, config)
+		if err != nil {
+			t.Fatalf("schema should still allow name-only branch: %v", err)
+		}
+		err = c.ValidateNodeConfiguration(config)
+		if err == nil {
+			t.Fatal("expected error for branch without url or repository")
+		}
+	})
+
+	t.Run("component validator accepts url-only branch", func(t *testing.T) {
+		err := c.ValidateNodeConfiguration(map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
+			"url":          "https://github.com/example/repo/tree/feature/refund-retry",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("component validator accepts repository expression without url", func(t *testing.T) {
+		err := c.ValidateNodeConfiguration(map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"name":         "{{ previous().result.branch }}",
+			"repository":   "{{ install_params.appRepository }}",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
 	t.Run("requires url for link", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":      "{{ order().id }}",
