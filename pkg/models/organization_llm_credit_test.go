@@ -164,25 +164,59 @@ func Test__ReserveHostedCreditBlocksConcurrentStarts(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
 	db := database.Conn()
-	first := uuid.New()
-	second := uuid.New()
+	first := pendingHostedExecution(t, r)
+	second := pendingHostedExecution(t, r)
 
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, first))
-	err := models.ReserveHostedCredit(db, r.Organization.ID, second)
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, first.ID))
+	err := models.ReserveHostedCredit(db, r.Organization.ID, second.ID)
 	require.ErrorIs(t, err, models.ErrHostedRunInFlight)
 
-	require.NoError(t, models.ReleaseHostedCreditHold(db, first))
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, second))
+	require.NoError(t, models.ReleaseHostedCreditHold(db, first.ID))
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, second.ID))
 }
 
 func Test__ReserveHostedCreditIsIdempotentForSameExecution(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
 	db := database.Conn()
-	executionID := uuid.New()
+	execution := pendingHostedExecution(t, r)
 
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, executionID))
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, executionID))
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, execution.ID))
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, execution.ID))
+}
+
+func Test__ReserveHostedCreditReleasesHoldWhenExecutionFinishes(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.Conn()
+	first := pendingHostedExecution(t, r)
+	second := pendingHostedExecution(t, r)
+
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, first.ID))
+	require.NoError(t, db.Model(first).Update("state", models.CanvasNodeExecutionStateFinished).Error)
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, second.ID))
+}
+
+func Test__ReserveHostedCreditReleasesHoldWhenExecutionIsDeleted(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.Conn()
+	first := pendingHostedExecution(t, r)
+	second := pendingHostedExecution(t, r)
+
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, first.ID))
+	require.NoError(t, db.Delete(first).Error)
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, second.ID))
+}
+
+func pendingHostedExecution(t *testing.T, r *support.ResourceRegistry) *models.CanvasNodeExecution {
+	t.Helper()
+	nodeID := support.RandomName("hosted")
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: nodeID, Type: models.NodeTypeComponent},
+	}, []models.Edge{})
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, nodeID, "default", nil)
+	return support.CreateCanvasNodeExecution(t, canvas.ID, nodeID, rootEvent.ID, rootEvent.ID)
 }
 
 func restoreInstallationLLMSettings(t *testing.T) {

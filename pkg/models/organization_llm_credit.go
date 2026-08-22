@@ -242,7 +242,7 @@ func ReserveHostedCredit(tx *gorm.DB, orgID, nodeExecutionID uuid.UUID) error {
 		if err := lockOrganizationLLMSettings(inner, orgID); err != nil {
 			return err
 		}
-		if err := releaseFinishedHostedCreditHolds(inner, orgID); err != nil {
+		if err := releaseStaleHostedCreditHolds(inner, orgID); err != nil {
 			return err
 		}
 		if err := AssertHostedCreditAvailable(inner, orgID); err != nil {
@@ -297,12 +297,17 @@ func lockOrganizationLLMSettings(tx *gorm.DB, orgID uuid.UUID) error {
 		First(&settings).Error
 }
 
-func releaseFinishedHostedCreditHolds(tx *gorm.DB, orgID uuid.UUID) error {
-	return tx.Exec(`
-		DELETE FROM organization_llm_credit_holds AS holds
-		USING workflow_node_executions AS executions
-		WHERE holds.node_execution_id = executions.id
-		  AND holds.organization_id = ?
-		  AND executions.state = ?
-	`, orgID, CanvasNodeExecutionStateFinished).Error
+// releaseStaleHostedCreditHolds deletes holds that no longer belong to an
+// active node execution. Holds have no foreign key, so canvas deletion can
+// leave orphan rows that would otherwise block every later hosted run.
+func releaseStaleHostedCreditHolds(tx *gorm.DB, orgID uuid.UUID) error {
+	return tx.
+		Where("organization_id = ?", orgID).
+		Where(`NOT EXISTS (
+			SELECT 1
+			FROM workflow_node_executions AS executions
+			WHERE executions.id = organization_llm_credit_holds.node_execution_id
+			  AND executions.state IN ?
+		)`, CanvasNodeExecutionActiveStates).
+		Delete(&OrganizationLLMCreditHold{}).Error
 }

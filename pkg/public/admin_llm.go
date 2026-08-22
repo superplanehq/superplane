@@ -218,12 +218,9 @@ func (s *Server) adminListHostedLLMProviderModels(w http.ResponseWriter, r *http
 	}
 
 	apiKey := ""
-	baseURL := ""
+	storedBaseURL := ""
 	if req.APIKey != nil {
 		apiKey = strings.TrimSpace(*req.APIKey)
-	}
-	if req.BaseURL != nil {
-		baseURL = strings.TrimSpace(*req.BaseURL)
 	}
 
 	if apiKey == "" {
@@ -238,8 +235,9 @@ func (s *Server) adminListHostedLLMProviderModels(w http.ResponseWriter, r *http
 			return
 		}
 		apiKey = decrypted
-		baseURL = row.BaseURL
+		storedBaseURL = row.BaseURL
 	}
+	baseURL := resolveHostedListModelsBaseURL(req.BaseURL, storedBaseURL)
 	if err := llm.ValidateBaseURL(baseURL); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -409,6 +407,13 @@ func parseAdminOrgID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 		return uuid.Nil, false
 	}
 	return parsed, true
+}
+
+func resolveHostedListModelsBaseURL(requestBaseURL *string, storedBaseURL string) string {
+	if requestBaseURL != nil {
+		return strings.TrimSpace(*requestBaseURL)
+	}
+	return storedBaseURL
 }
 
 func isClientLLMSettingsError(err error) bool {
