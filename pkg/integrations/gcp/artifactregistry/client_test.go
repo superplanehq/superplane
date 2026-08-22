@@ -41,13 +41,10 @@ func setTestClientFactory(
 ) {
 	t.Helper()
 
-	clientFactoryMu.RLock()
-	previous := clientFactory
-	clientFactoryMu.RUnlock()
-
-	SetClientFactory(fn)
+	previous := newClient
+	newClient = fn
 	t.Cleanup(func() {
-		SetClientFactory(previous)
+		newClient = previous
 	})
 }
 
