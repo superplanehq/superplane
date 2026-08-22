@@ -35,6 +35,7 @@ type ActionHookContext struct {
 	Secrets        SecretsContext
 	Files          RepositoryFilesContext
 	Runs           RunExecutionContext
+	Usage          UsageRecorder
 }
 
 /*
