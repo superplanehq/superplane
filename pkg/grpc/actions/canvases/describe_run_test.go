@@ -155,3 +155,60 @@ func Test__DescribeRun(t *testing.T) {
 		assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
 	})
 }
+
+// A multi-input replay writes one input event per source, all belonging to the
+// run with no execution of their own, but its queue items and executions are
+// rooted on exactly one of them. Serializing any other one leaves the run
+// pointing at an event nothing is rooted on, and ListEventExecutions - which
+// matches on root_event_id - then answers empty for the whole run.
+func Test__DescribeRun__MultiInputReplay__RootEventIsTheOneItsWorkIsRootedOn(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, laneA, laneB, joinNodeID := createJoinCanvas(t, r)
+
+	response, err := ReplayNode(context.Background(), database.DB(t.Context()), canvas, joinNodeID, nil, nil, nil, []models.ReplayInput{
+		{Payload: map[string]any{"v": "from-a"}, SourceNodeID: &laneA},
+		{Payload: map[string]any{"v": "from-b"}, SourceNodeID: &laneB},
+	})
+	require.NoError(t, err)
+	require.Len(t, response.QueueItemIds, 2)
+
+	queueItems := make([]*models.CanvasNodeQueueItem, 0, len(response.QueueItemIds))
+	for _, id := range response.QueueItemIds {
+		queueItemID, err := uuid.Parse(id)
+		require.NoError(t, err)
+
+		queueItem, err := models.FindNodeQueueItem(canvas.ID, queueItemID)
+		require.NoError(t, err)
+		queueItems = append(queueItems, queueItem)
+	}
+
+	rootEventID := queueItems[0].RootEventID
+	require.Equal(t, rootEventID, queueItems[1].RootEventID, "fixture sanity: both queue items must share one root")
+
+	var otherInputEventID uuid.UUID
+	for _, queueItem := range queueItems {
+		if queueItem.EventID != rootEventID {
+			otherInputEventID = queueItem.EventID
+		}
+	}
+	require.NotEqual(t, uuid.Nil, otherInputEventID, "fixture sanity: the run must have a second input event")
+
+	// The execution NodeQueueWorker would create for these queue items: it is
+	// rooted on the queue items' root event, which is what ListEventExecutions
+	// matches on.
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, joinNodeID, rootEventID, queueItems[0].EventID)
+
+	described, err := DescribeRun(context.Background(), database.DB(t.Context()), canvas, response.RunId)
+	require.NoError(t, err)
+	require.NotNil(t, described.Run.RootEvent)
+	assert.Equal(t, rootEventID.String(), described.Run.RootEvent.Id)
+	assert.NotEqual(t, otherInputEventID.String(), described.Run.RootEvent.Id,
+		"serializing the run's other input event would point at an event nothing is rooted on")
+
+	executions, err := ListEventExecutions(context.Background(), database.DB(t.Context()), canvas, described.Run.RootEvent.Id)
+	require.NoError(t, err)
+	require.Len(t, executions.Executions, 1, "the run's serialized root event must resolve the run's executions")
+	assert.Equal(t, execution.ID.String(), executions.Executions[0].Id)
+}

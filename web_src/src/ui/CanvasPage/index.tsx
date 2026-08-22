@@ -1684,6 +1684,7 @@ function CanvasPage(props: CanvasPageProps) {
                   }
                 : undefined
             }
+            onReplayCreated={props.onRunNavigate}
             onRerunCreated={(eventId) =>
               selectCreatedRerun({
                 eventId,

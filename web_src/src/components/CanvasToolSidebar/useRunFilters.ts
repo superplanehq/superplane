@@ -11,12 +11,27 @@ interface UseRunFiltersParams {
   workflowNodes: ComponentsNode[];
   componentIconMap: Record<string, string>;
   onStatusFiltersChange?: (filters: RunStatusFilter[]) => void;
+  /** The run currently open in the inspector, which no filter may hide. */
+  selectedRunId?: string | null;
 }
 
-export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange }: UseRunFiltersParams) {
+export function useRunFilters({
+  runs,
+  workflowNodes,
+  componentIconMap,
+  onStatusFiltersChange,
+  selectedRunId,
+}: UseRunFiltersParams) {
   const [selectedTriggerIds, setSelectedTriggerIds] = useState<Set<string>>(() => loadPersistedFilters().triggerIds);
   const [selectedStatuses, setSelectedStatuses] = useState<Set<RunStatusFilter>>(() => loadPersistedFilters().statuses);
   const [searchQuery, setSearchQuery] = useState("");
+  //
+  // Replay runs are noise in the ordinary runs list — they are debugging
+  // artifacts, not canvas traffic — so they stay hidden until asked for.
+  // Deliberately not persisted: "hidden by default" has to hold on every load,
+  // not just the first one.
+  //
+  const [showReplays, setShowReplays] = useState(false);
 
   const nodeMap = useMemo(() => buildNodeMap(workflowNodes), [workflowNodes]);
 
@@ -58,17 +73,29 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
     [selectedStatuses, selectedTriggerIds],
   );
 
-  const filteredRuns = useMemo(() => {
+  const { filteredRuns, hiddenReplayCount } = useMemo(() => {
     const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+    const visibleRuns: typeof decoratedRuns = [];
+    let hiddenReplays = 0;
 
-    return decoratedRuns.filter(({ run, haystack }) => {
+    for (const decoratedRun of decoratedRuns) {
+      const { run, haystack } = decoratedRun;
       // Shared matcher with console run datasources — keeps status/trigger
       // semantics identical across the sidebar and widget surfaces.
-      if (!runMatchesStatusTriggerFilters(run, statusTriggerFilters)) return false;
-      if (normalizedSearchQuery && !haystack.includes(normalizedSearchQuery)) return false;
-      return true;
-    });
-  }, [decoratedRuns, searchQuery, statusTriggerFilters]);
+      if (!runMatchesStatusTriggerFilters(run, statusTriggerFilters)) continue;
+      if (normalizedSearchQuery && !haystack.includes(normalizedSearchQuery)) continue;
+      // The run being inspected always stays listed, even when it is a replay
+      // and replays are hidden — otherwise opening one leaves the list showing
+      // nothing that matches what the inspector is displaying.
+      if (run.isReplay && !showReplays && run.id !== selectedRunId) {
+        hiddenReplays += 1;
+        continue;
+      }
+      visibleRuns.push(decoratedRun);
+    }
+
+    return { filteredRuns: visibleRuns, hiddenReplayCount: hiddenReplays };
+  }, [decoratedRuns, searchQuery, statusTriggerFilters, showReplays, selectedRunId]);
 
   const orderedRuns = useMemo(
     () => ({
@@ -79,12 +106,17 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
   );
 
   const hasSearchFilter = searchQuery.trim().length > 0;
-  const hasAnyFilter = selectedTriggerIds.size > 0 || selectedStatuses.size > 0 || hasSearchFilter;
+  const hasAnyFilter = selectedTriggerIds.size > 0 || selectedStatuses.size > 0 || hasSearchFilter || showReplays;
 
   const clearFilters = useCallback(() => {
     setSelectedStatuses(new Set());
     setSelectedTriggerIds(new Set());
     setSearchQuery("");
+    setShowReplays(false);
+  }, []);
+
+  const toggleShowReplays = useCallback(() => {
+    setShowReplays((current) => !current);
   }, []);
 
   const toggleStatus = useCallback((status: RunStatusFilter) => {
@@ -109,8 +141,11 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
     selectedStatuses,
     selectedTriggerIds,
     searchQuery,
+    showReplays,
+    toggleShowReplays,
     triggerOptions,
     filteredRuns,
+    hiddenReplayCount,
     orderedRuns,
     hasSearchFilter,
     hasAnyFilter,

@@ -16,6 +16,8 @@ interface RunsToolbarProps {
   onToggleTrigger: (triggerId: string) => void;
   onClearTriggers: () => void;
   onSearchQueryChange: (query: string) => void;
+  showReplays: boolean;
+  onToggleShowReplays: () => void;
 }
 
 export function RunsToolbar({
@@ -28,6 +30,8 @@ export function RunsToolbar({
   onToggleTrigger,
   onClearTriggers,
   onSearchQueryChange,
+  showReplays,
+  onToggleShowReplays,
 }: RunsToolbarProps) {
   const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
     onSearchQueryChange(event.target.value);
@@ -67,6 +71,8 @@ export function RunsToolbar({
         onClearStatuses={onClearStatuses}
         onToggleTrigger={onToggleTrigger}
         onClearTriggers={onClearTriggers}
+        showReplays={showReplays}
+        onToggleShowReplays={onToggleShowReplays}
       />
     </div>
   );

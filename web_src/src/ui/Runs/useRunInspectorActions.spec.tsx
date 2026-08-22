@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvasRun } from "@/api-client";
 import type { RunInspectorNodeSection } from "./types";
-import { useRunInspectorActions } from "./useRunInspectorActions";
+import { canReplaySection, useRunInspectorActions } from "./useRunInspectorActions";
 
 const run: CanvasesCanvasRun = {
   rootEvent: {
@@ -104,5 +104,51 @@ describe("useRunInspectorActions", () => {
     });
 
     expect(result.current.stopDisabled).toBe(false);
+  });
+
+  it("carries the section's own source execution id into the replay target, for lineage on the created run", () => {
+    const section = actionSection({
+      execution: {
+        id: "execution-42",
+        nodeId: "action-1",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        inputEvent: { id: "evt-1", nodeId: "upstream-1", data: { a: 1 } },
+      },
+    });
+    const { result } = renderActions([section]);
+
+    act(() => result.current.openReplay(section));
+
+    expect(result.current.replayTarget?.sourceExecutionId).toBe("execution-42");
+  });
+});
+
+describe("canReplaySection", () => {
+  it("offers no Replay for a step without a single surviving consumed event (boundary, pinned invariant)", () => {
+    const section = actionSection({
+      execution: {
+        id: "execution-1",
+        nodeId: "action-1",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+      },
+    });
+
+    expect(canReplaySection(section)).toBe(false);
+  });
+
+  it("offers Replay once the step carries a past input event", () => {
+    const section = actionSection({
+      execution: {
+        id: "execution-1",
+        nodeId: "action-1",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        inputEvent: { id: "evt-1", nodeId: "upstream-1", data: { a: 1 } },
+      },
+    });
+
+    expect(canReplaySection(section)).toBe(true);
   });
 });

@@ -459,13 +459,14 @@ func (w *NodeQueueWorker) dispatchQueueItem(
 		return w.handleNodeConfigurationError(tx, configErr, collector)
 	}
 
+	var executionID *uuid.UUID
 	switch node.Type {
 	case models.NodeTypeComponent:
 		/*
 		 * For component nodes, delegate to the component's ProcessQueueItem implementation to handle
 		 * the processing.
 		 */
-		err = w.processComponentNode(ctx, node, collector)
+		executionID, err = w.processComponentNode(ctx, node, collector)
 	default:
 		return fmt.Errorf("unsupported node type: %s", node.Type)
 	}
@@ -477,6 +478,17 @@ func (w *NodeQueueWorker) dispatchQueueItem(
 
 	if err != nil {
 		return err
+	}
+
+	//
+	// Record which event fed which execution, regardless of the component
+	// that consumed it. This is what lets replay find the input(s) for any
+	// execution later, without knowing anything about component internals.
+	//
+	if executionID != nil {
+		if err := models.CreateConsumedEvent(tx, *executionID, item.EventID); err != nil {
+			return err
+		}
 	}
 
 	collector.AddQueueItemConsumed(item)
@@ -558,25 +570,25 @@ func (w *NodeQueueWorker) configurationFieldsForNode(node *models.CanvasNode) ([
 	}
 }
 
-func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, node *models.CanvasNode, collector *MessageCollector) error {
+func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, node *models.CanvasNode, collector *MessageCollector) (*uuid.UUID, error) {
 	ref := node.Ref.Data()
 
 	if ref.Component == nil || ref.Component.Name == "" {
-		return fmt.Errorf("node %s has no component reference", node.NodeID)
+		return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
 	}
 
 	action, err := w.registry.GetAction(ref.Component.Name)
 	if err != nil {
-		return fmt.Errorf("action %s not found: %w", ref.Component.Name, err)
+		return nil, fmt.Errorf("action %s not found: %w", ref.Component.Name, err)
 	}
 
 	executionID, err := w.processQueueItem(ctx, action)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	collector.AddExecutionID(executionID)
-	return nil
+	return executionID, nil
 }
 
 // processQueueItem delegates to the component's own queue item processor
@@ -626,6 +638,14 @@ func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, configErr *c
 
 	err = tx.Create(&execution).Error
 	if err != nil {
+		return err
+	}
+
+	//
+	// The queue item was consumed by this (failed) execution, so record the link
+	// just like we do for the happy path.
+	//
+	if err := models.CreateConsumedEvent(tx, execution.ID, configErr.Event.ID); err != nil {
 		return err
 	}
 
