@@ -56,6 +56,23 @@ func (c *Client) FindRepository(repository string) (*github.Repository, error) {
 	return repo, nil
 }
 
+func (c *Client) CompareCommits(ctx context.Context, repository, base, head string) (*github.CommitsComparison, error) {
+	owner, name := c.ownerAndName(repository)
+	comparison, _, err := c.underlying.Repositories.CompareCommits(ctx, owner, name, base, head, nil)
+	return comparison, err
+}
+
+func (c *Client) GetCommit(ctx context.Context, repository, ref string) (*github.RepositoryCommit, error) {
+	owner, name := c.ownerAndName(repository)
+	commit, _, err := c.underlying.Repositories.GetCommit(ctx, owner, name, ref, nil)
+	return commit, err
+}
+
+func (c *Client) CanonicalRepository(repository string) string {
+	owner, name := c.ownerAndName(repository)
+	return owner + "/" + name
+}
+
 // ownerAndName accepts either "repo" (scoped to the integration owner) or
 // "owner/repo". Claude components need the latter; GitHub components historically
 // stored the short name.
