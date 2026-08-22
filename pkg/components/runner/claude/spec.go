@@ -119,6 +119,7 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 	workdir := strings.TrimSpace(spec.WorkingDirectory)
 
 	files := []runner.BrokerTaskFile{
+		runner.LLMUsageTaskFile(),
 		{Path: "run.js", Content: runScript, Mode: "0644"},
 		{Path: "prepare.sh", Content: claudePrepareScript(workdir), Mode: "0644"},
 	}
@@ -195,19 +196,21 @@ func claudePrepareScript(workdir string) string {
 func claudeBashStepBrokerCommand(stepName, scriptName, workingDirectory string) runner.BrokerCommand {
 	return runner.BrokerCommand{
 		Name:    runner.AgentStepLabel(stepName, scriptName),
-		Command: runner.WrapCommandInWorkingDirectory(workingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName)),
+		Command: runner.WrapAgentStepCommand(runner.WrapCommandInWorkingDirectory(workingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName))),
 	}
 }
 
 func claudePromptStepBrokerCommand(stepName, promptName, model, workingDirectory string) runner.BrokerCommand {
 	return runner.BrokerCommand{
 		Name: runner.AgentStepLabel(stepName, promptName),
-		Command: runner.WrapCommandInWorkingDirectory(
-			workingDirectory,
-			fmt.Sprintf(
-				`node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/%s" %s`,
-				promptName,
-				runner.ShellSingleQuote(model),
+		Command: runner.WrapAgentStepCommand(
+			runner.WrapCommandInWorkingDirectory(
+				workingDirectory,
+				fmt.Sprintf(
+					`node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/%s" %s`,
+					promptName,
+					runner.ShellSingleQuote(model),
+				),
 			),
 		),
 	}

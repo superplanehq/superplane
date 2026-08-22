@@ -71,6 +71,41 @@ func TestParseRunnerLLMUsageSkipsEmptyResult(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestParseRunnerLLMUsageFromMergedPlanResult(t *testing.T) {
+	t.Parallel()
+
+	result := json.RawMessage(`{
+		"plan": "cGxhbg==",
+		"model": "google/gemini-3.7-flash",
+		"usage": {
+			"input_tokens": 800,
+			"output_tokens": 120,
+			"cache_read_input_tokens": 4,
+			"reasoning_tokens": 10
+		},
+		"total_cost_usd": 0.0025
+	}`)
+	configuration := map[string]any{
+		"model": "google/gemini-3.7-flash",
+		"credentials": map[string]any{
+			"source": CredentialsSourceHosted,
+		},
+	}
+
+	record, ok := ParseRunnerLLMUsage(models.UsageProviderOpenRouter, configuration, result)
+	require.True(t, ok)
+	assert.Equal(t, models.UsageProviderOpenRouter, record.Provider)
+	assert.Equal(t, "google/gemini-3.7-flash", record.Model)
+	assert.Equal(t, int64(800), record.InputTokens)
+	assert.Equal(t, int64(120), record.OutputTokens)
+	assert.Equal(t, int64(4), record.CacheReadTokens)
+	assert.Equal(t, int64(10), record.ReasoningTokens)
+	assert.Equal(t, int64(934), record.TotalTokens)
+	require.NotNil(t, record.CostMicros)
+	assert.Equal(t, int64(2500), *record.CostMicros)
+	assert.Equal(t, "hosted", record.FundingSource)
+}
+
 type recordingUsage struct {
 	records []core.UsageRecord
 }

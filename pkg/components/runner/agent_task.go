@@ -15,6 +15,7 @@ func BuildAgentBrokerTask(
 	promptCommand AgentPromptCommand,
 ) (commands []BrokerCommand, files []BrokerTaskFile) {
 	files = []BrokerTaskFile{
+		LLMUsageTaskFile(),
 		{Path: runScriptName, Content: runScript, Mode: "0644"},
 		{Path: "prepare.sh", Content: prepareScript, Mode: "0644"},
 	}
@@ -48,7 +49,7 @@ func buildAgentStep(stepNumber int, step AgentStep, model, runScriptName string,
 				Mode:    "0644",
 			}, BrokerCommand{
 				Name:    AgentStepLabel(step.Name, scriptName),
-				Command: WrapCommandInWorkingDirectory(step.WorkingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName)),
+				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(step.WorkingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName))),
 			}
 	default:
 		prompt := ""
@@ -62,7 +63,7 @@ func buildAgentStep(stepNumber int, step AgentStep, model, runScriptName string,
 				Mode:    "0644",
 			}, BrokerCommand{
 				Name:    AgentStepLabel(step.Name, promptName),
-				Command: WrapCommandInWorkingDirectory(step.WorkingDirectory, promptCommand(promptName, model)),
+				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(step.WorkingDirectory, promptCommand(promptName, model))),
 			}
 	}
 }
@@ -80,6 +81,19 @@ func WrapCommandInWorkingDirectory(dir, command string) string {
 	}
 	return `_sp_root=$(cat "$SUPERPLANE_TASK_DIR/task_cwd")
 cd "$_sp_root"/` + ShellSingleQuote(dir) + ` && ` + command
+}
+
+// WrapAgentStepCommand runs command, then merges accumulated LLM usage into
+// SUPERPLANE_RESULT_FILE even when command exits non-zero.
+func WrapAgentStepCommand(command string) string {
+	return `_sp_status=0
+{
+` + command + `
+} || _sp_status=$?
+node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge || true
+if [ "$_sp_status" -ne 0 ]; then
+  return "$_sp_status" 2>/dev/null || exit "$_sp_status"
+fi`
 }
 
 func NodePrepareScript(cliName, cliMissingMessage string, workdir string) string {

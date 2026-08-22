@@ -84,15 +84,14 @@ async function runPrompt(promptFile, model) {
   ]).then(([code]) => code);
 
   const usage = extractUsage(lastResult);
-  fs.writeFileSync(
-    resultFile,
-    `${JSON.stringify({
-      type: "result",
-      result: lastResult.result || lastResult.text || "",
-      model: lastResult.model || model,
-      usage,
-    })}\n`,
-  );
+  const payload = {
+    type: "result",
+    result: lastResult.result || lastResult.text || "",
+    model: lastResult.model || model,
+    usage,
+  };
+  fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
+  accumulateLLMUsage(payload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   return exitCode;
 }
@@ -105,6 +104,18 @@ function extractUsage(event) {
     cache_read_input_tokens: Number(source.cached_input_tokens || source.cache_read_input_tokens || 0),
     reasoning_tokens: Number(source.reasoning_tokens || 0),
   };
+}
+
+function accumulateLLMUsage(payload) {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR;
+  if (!taskDir) {
+    return;
+  }
+  const script = path.join(taskDir, "llm_usage.js");
+  if (!fs.existsSync(script)) {
+    return;
+  }
+  require(script).accumulate(taskDir, payload);
 }
 
 main();

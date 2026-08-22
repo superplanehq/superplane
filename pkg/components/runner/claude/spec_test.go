@@ -114,19 +114,21 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
 	assert.Equal(t, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`, task.Commands[0].Command)
 
-	assert.Equal(t, runner.BrokerCommand{Name: "Clone repo", Command: `source "$SUPERPLANE_TASK_DIR/steps/01-clone-repo.sh"`}, task.Commands[1])
-	assert.Equal(t, runner.BrokerCommand{
-		Name:    "Fix panic",
-		Command: `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/02-fix-panic.txt" 'sonnet'`,
-	}, task.Commands[2])
-	assert.Equal(t, runner.BrokerCommand{
-		Name:    "Fix tests",
-		Command: `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/03-fix-tests.txt" 'sonnet'`,
-	}, task.Commands[3])
-	assert.Equal(t, runner.BrokerCommand{Name: "Push", Command: `source "$SUPERPLANE_TASK_DIR/steps/04-push.sh"`}, task.Commands[4])
+	assert.Equal(t, "Clone repo", task.Commands[1].Name)
+	assert.Contains(t, task.Commands[1].Command, `source "$SUPERPLANE_TASK_DIR/steps/01-clone-repo.sh"`)
+	assert.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
+	assert.Equal(t, "Fix panic", task.Commands[2].Name)
+	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/02-fix-panic.txt" 'sonnet'`)
+	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
+	assert.Equal(t, "Fix tests", task.Commands[3].Name)
+	assert.Contains(t, task.Commands[3].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/03-fix-tests.txt" 'sonnet'`)
+	assert.Equal(t, "Push", task.Commands[4].Name)
+	assert.Contains(t, task.Commands[4].Command, `source "$SUPERPLANE_TASK_DIR/steps/04-push.sh"`)
+	assert.Contains(t, task.Commands[4].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
 
-	require.Len(t, task.Files, 6)
+	require.Len(t, task.Files, 7)
 	assert.Equal(t, runScript, requireTaskFile(t, task.Files, "run.js").Content)
+	assert.Equal(t, runner.LLMUsageScript, requireTaskFile(t, task.Files, "llm_usage.js").Content)
 	prepare := requireTaskFile(t, task.Files, "prepare.sh").Content
 	assert.Contains(t, prepare, "claude CLI not found")
 	assert.Contains(t, prepare, "node not found")

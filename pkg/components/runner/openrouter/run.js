@@ -155,6 +155,11 @@ async function runPrompt(promptFile, model) {
       total_cost_usd: costMicros > 0 ? costMicros / 1000000 : undefined,
     })}\n`,
   );
+  accumulateLLMUsage({
+    model,
+    usage,
+    total_cost_usd: costMicros > 0 ? costMicros / 1000000 : undefined,
+  });
   return 0;
 }
 
@@ -253,6 +258,18 @@ function runTool(name, args) {
 function summarize(text) {
   const line = String(text || "").split(/\r?\n/)[0];
   return line.length > 120 ? `${line.slice(0, 117)}...` : line;
+}
+
+function accumulateLLMUsage(payload) {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR;
+  if (!taskDir) {
+    return;
+  }
+  const script = path.join(taskDir, "llm_usage.js");
+  if (!fs.existsSync(script)) {
+    return;
+  }
+  require(script).accumulate(taskDir, payload);
 }
 
 main();
