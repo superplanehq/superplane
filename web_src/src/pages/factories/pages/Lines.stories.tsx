@@ -45,6 +45,19 @@ export const EmptyFactory: Story = {
   render: () => <FactoriesHarness pathSuffix={linesListPath} factoriesFixture={emptyFactoriesFixture} />,
 };
 
+export const LineBoardIntake: Story = {
+  name: "Line board — intake",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1`}
+        factoriesFixture={lineMetricsFactoriesFixture}
+      />
+    );
+  },
+};
+
 export const LineDetailFivePhases: Story = {
   name: "Line detail — five phases",
   render: () => {

@@ -5,8 +5,14 @@ import { Button } from "@/components/ui/button";
 import { SegmentedNav } from "@/ui/SegmentedNav";
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "../__fixtures__/factoriesStoryTheme";
-import { EMPTY_FACTORY, FACTORIES_ORGANIZATION_ID, REFUND_FACTORY } from "../__fixtures__/factoryPageResponses";
+import {
+  EMPTY_FACTORY,
+  FACTORIES_ORGANIZATION_ID,
+  REFUND_FACTORY,
+  REFUND_LINE_PLAN_ID,
+} from "../__fixtures__/factoryPageResponses";
 import { factorySectionHeaderClassName } from "../pages/factoryPageLayoutStyles";
+import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
 import { WorkspacePageHeader } from "./WorkspacePageHeader";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
@@ -204,10 +210,16 @@ export const AlignedWithSidebar: Story = {
           organizationId={FACTORIES_ORGANIZATION_ID}
           factory={REFUND_FACTORY}
           factories={[REFUND_FACTORY, EMPTY_FACTORY]}
-          canOpenSettings
           canCreateFactory
           permissionsLoading={false}
           onCreateFactory={() => console.log("create workspace")}
+        />
+        <FactoriesSidebarNav
+          organizationId={FACTORIES_ORGANIZATION_ID}
+          factoryKey={REFUND_FACTORY.key!}
+          lineId={REFUND_LINE_PLAN_ID}
+          canOpenSettings
+          permissionsLoading={false}
         />
       </aside>
       <div className="min-w-0 flex-1">

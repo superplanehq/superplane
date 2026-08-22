@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, type ReactNode } from "react";
+import { ClickToRename } from "../layout/ClickToRename";
 import { shouldRedirectWheelToHorizontalScroll } from "./kanbanBoardWheel";
 
 /**
@@ -65,10 +66,17 @@ interface WorkOrderBoardLaneProps {
   /** Replaces the body while the lane holds nothing. */
   emptyDescription: string;
   tone?: BoardLaneTone;
-  /** Sits before the title, for example a phase status glyph. */
-  leading?: ReactNode;
+  /**
+   * Optional pastel fill from the column color picker. When set, it replaces
+   * the status tone background so the chosen color is visible.
+   */
+  surfaceClassName?: string;
   /** Sits at the end of the header, for example a menu button. */
   actions?: ReactNode;
+  /** When set, a click on the title opens an inline rename field. */
+  onRename?: (name: string) => void;
+  canRename?: boolean;
+  titleTestId?: string;
   /** Accessible name, when it must read differently from the title. */
   label?: string;
   className?: string;
@@ -81,8 +89,11 @@ export function WorkOrderBoardLane({
   count,
   emptyDescription,
   tone = "neutral",
-  leading,
+  surfaceClassName,
   actions,
+  onRename,
+  canRename = false,
+  titleTestId,
   label,
   className,
   testId,
@@ -94,19 +105,26 @@ export function WorkOrderBoardLane({
       className={cn(
         "flex min-h-0 flex-col self-stretch rounded-lg border border-border/70 p-2",
         workOrderKanbanLaneSizeClassName,
-        LANE_TONE_CLASSNAME[tone],
+        surfaceClassName ?? LANE_TONE_CLASSNAME[tone],
         className,
       )}
       data-testid={testId}
     >
       <header className="flex shrink-0 items-center justify-between gap-2 px-2 pb-2">
-        <div className="inline-flex min-w-0 items-center gap-2">
-          {leading}
-          <h2 className="truncate text-[12px] font-semibold uppercase tracking-[0.06em] text-foreground/80">{title}</h2>
-          <span className="shrink-0 rounded-full bg-background/70 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-            {count}
-          </span>
-        </div>
+        <h2 className="workspace-section-title min-w-0 flex-1 overflow-visible">
+          {onRename ? (
+            <ClickToRename
+              value={title}
+              onSave={onRename}
+              canEdit={canRename}
+              testId={titleTestId ?? `${testId ?? "lane"}-title`}
+              ariaLabel={`${title} column name`}
+              inputClassName="text-[15px] font-semibold leading-[22.5px] tracking-[-0.01em]"
+            />
+          ) : (
+            <span className="truncate">{title}</span>
+          )}
+        </h2>
         {actions}
       </header>
 

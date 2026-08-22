@@ -82,6 +82,9 @@ export function emptySplitRunCanvas(phase?: SplitRunPhase, title?: string): Spli
 }
 
 export function splitRunCanvasForPhase(phase: SplitRunPhase): SplitRunCanvasModel {
+  if (phase.canvas) {
+    return phase.canvas;
+  }
   const key = canvasKeyForPhase(phase);
   const yaml = CANVAS_YAML[key];
   const spec = parseCanvasYamlToSpec(yaml);
@@ -235,6 +238,8 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string }
   "github.createIssueComment": { title: "Create Issue Comment", iconSlug: "message-square" },
   "github.addIssueLabel": { title: "Add Issue Label", iconSlug: "tag" },
   "github.onIssue": { title: "On Issue", iconSlug: "github" },
+  "sentry.onIssue": { title: "On Issue", iconSlug: "sentry" },
+  "pagerduty.onIncident": { title: "On Incident", iconSlug: "pagerduty" },
   "github.onPullRequest": { title: "On Pull Request", iconSlug: "git-pull-request" },
   findWorkOrder: { title: "Find Work Order", iconSlug: "search" },
   updateWorkOrderArtifact: { title: "Update Work Order Artifact", iconSlug: "file-pen" },

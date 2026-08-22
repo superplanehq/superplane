@@ -89,7 +89,7 @@ export function WorkspacePageHeader(props: WorkspacePageHeaderProps) {
             </p>
           ) : null}
           <div className={cn("flex min-w-0 flex-wrap items-center gap-3", isEntity && "mt-1")}>
-            <h1 className="workspace-page-title min-w-0" data-testid="workspace-page-header-title">
+            <h1 className="workspace-page-title min-w-0 overflow-visible" data-testid="workspace-page-header-title">
               {props.title}
             </h1>
             {!isEntity && props.leading ? <div className="flex items-center gap-2">{props.leading}</div> : null}
