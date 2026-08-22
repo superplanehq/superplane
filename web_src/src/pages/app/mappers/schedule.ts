@@ -144,12 +144,14 @@ function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNex
 
       if (minute < 0 || minute > 59) return null;
 
-      // Match Go backend: start with current time in timezone + interval, set minute
+      // Match Go backend: occurrence in the current hour; advance only if it has passed
       const nextTriggerInTZ = new Date(nowInTZ);
-      nextTriggerInTZ.setHours(nextTriggerInTZ.getHours() + interval);
       nextTriggerInTZ.setMinutes(minute);
       nextTriggerInTZ.setSeconds(0);
       nextTriggerInTZ.setMilliseconds(0);
+      if (nextTriggerInTZ <= nowInTZ) {
+        nextTriggerInTZ.setHours(nextTriggerInTZ.getHours() + interval);
+      }
 
       return new Date(nextTriggerInTZ.getTime() - timezoneOffsetMs);
     }
@@ -164,13 +166,15 @@ function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNex
 
       if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
 
-      // Match Go backend: add interval days in timezone, set time
+      // Match Go backend: occurrence today; advance only if it has passed
       const nextTriggerInTZ = new Date(nowInTZ);
-      nextTriggerInTZ.setDate(nextTriggerInTZ.getDate() + interval);
       nextTriggerInTZ.setHours(hour);
       nextTriggerInTZ.setMinutes(minute);
       nextTriggerInTZ.setSeconds(0);
       nextTriggerInTZ.setMilliseconds(0);
+      if (nextTriggerInTZ <= nowInTZ) {
+        nextTriggerInTZ.setDate(nextTriggerInTZ.getDate() + interval);
+      }
 
       return new Date(nextTriggerInTZ.getTime());
     }
@@ -244,14 +248,22 @@ function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNex
 
       if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
 
-      // Match Go backend: add interval months in timezone, set day/hour/minute
+      // Match Go backend: occurrence this month; advance only if it has passed
       const nextTriggerInTZ = new Date(nowInTZ);
-      nextTriggerInTZ.setMonth(nextTriggerInTZ.getMonth() + interval);
       nextTriggerInTZ.setDate(dayOfMonth);
       nextTriggerInTZ.setHours(hour);
       nextTriggerInTZ.setMinutes(minute);
       nextTriggerInTZ.setSeconds(0);
       nextTriggerInTZ.setMilliseconds(0);
+      if (nextTriggerInTZ <= nowInTZ) {
+        const advanced = new Date(nowInTZ);
+        advanced.setMonth(advanced.getMonth() + interval);
+        nextTriggerInTZ.setFullYear(advanced.getFullYear(), advanced.getMonth(), dayOfMonth);
+        nextTriggerInTZ.setHours(hour);
+        nextTriggerInTZ.setMinutes(minute);
+        nextTriggerInTZ.setSeconds(0);
+        nextTriggerInTZ.setMilliseconds(0);
+      }
 
       return new Date(nextTriggerInTZ.getTime());
     }
