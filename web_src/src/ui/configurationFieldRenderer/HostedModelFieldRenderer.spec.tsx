@@ -55,7 +55,7 @@ describe("HostedModelFieldRenderer", () => {
     );
 
     expect(screen.getByDisplayValue("sonnet")).toBeInTheDocument();
-    expect(useHostedLLMModels).toHaveBeenCalledWith("org-1", "anthropic", false);
+    expect(useHostedLLMModels).not.toHaveBeenCalled();
   });
 
   it("shows the SuperPlane-hosted allowlist when credentials are hosted", () => {
