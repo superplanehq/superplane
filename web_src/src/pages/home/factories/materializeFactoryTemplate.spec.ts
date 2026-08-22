@@ -175,4 +175,68 @@ spec:
     const definition = getFactoryDefinition("software-factory");
     expect(definition.installParams.map((param) => param.name)).toEqual(["appRepository", "backlogRepository"]);
   });
+
+  it("rewrites Claude Code credentials to hosted when Claude is not connected", () => {
+    const canvasYaml = materializeFactoryCanvas({
+      definition: getFactoryDefinition("line-implementation"),
+      canvasName: "Implementation",
+      canvasId: "canvas-hosted",
+      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
+      integrations: {
+        github: { id: "int-1", name: "acme-github", ready: true },
+      },
+      agentRewrite: {
+        component: "runnerClaudeCode",
+        model: "claude-sonnet-4-6",
+        credentials: { source: "hosted" },
+      },
+    });
+
+    expect(canvasYaml).toMatch(/component: runnerClaudeCode[\s\S]*credentials:[\s\S]*source: hosted/);
+    expect(canvasYaml).toContain("model: claude-sonnet-4-6");
+    expect(canvasYaml).not.toMatch(/credentials:[\s\S]*source: integration[\s\S]*name: claude/);
+    expect(canvasYaml).not.toContain("model: sonnet");
+  });
+
+  it("rewrites Claude Code nodes to hosted OpenRouter with an allowlisted model", () => {
+    const canvasYaml = materializeFactoryCanvas({
+      definition: getFactoryDefinition("line-planning"),
+      canvasName: "Planning",
+      canvasId: "canvas-openrouter",
+      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
+      integrations: {
+        github: { id: "int-1", name: "acme-github", ready: true },
+      },
+      agentRewrite: {
+        component: "runnerOpenRouter",
+        model: "openai/gpt-4.1",
+        credentials: { source: "hosted" },
+      },
+    });
+
+    expect(canvasYaml).toMatch(/component: runnerOpenRouter[\s\S]*credentials:[\s\S]*source: hosted/);
+    expect(canvasYaml).toContain("model: openai/gpt-4.1");
+    expect(canvasYaml).not.toContain("runnerClaudeCode");
+  });
+
+  it("rewrites Claude Code nodes to an OpenRouter integration", () => {
+    const canvasYaml = materializeFactoryCanvas({
+      definition: getFactoryDefinition("line-pr"),
+      canvasName: "PR Creation",
+      canvasId: "canvas-or-byok",
+      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
+      integrations: {
+        github: { id: "int-1", name: "acme-github", ready: true },
+        openrouter: { id: "int-3", name: "acme-openrouter", ready: true },
+      },
+      agentRewrite: {
+        component: "runnerOpenRouter",
+        model: "anthropic/claude-sonnet-4-6",
+        credentials: { source: "integration", name: "acme-openrouter" },
+      },
+    });
+
+    expect(canvasYaml).toMatch(/component: runnerOpenRouter[\s\S]*credentials:[\s\S]*name: acme-openrouter/);
+    expect(canvasYaml).not.toContain("runnerClaudeCode");
+  });
 });

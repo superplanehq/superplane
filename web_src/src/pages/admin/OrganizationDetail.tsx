@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { OrgCanvasesTable } from "./OrgCanvasesTable";
 import { OrgExperimentalFeaturesTable } from "./OrgExperimentalFeaturesTable";
+import { OrgLLMCreditSection } from "./OrgLLMCreditSection";
 import { OrgUsersTable } from "./OrgUsersTable";
 
 const OrganizationDetail: React.FC = () => {
@@ -20,6 +21,7 @@ const OrganizationDetail: React.FC = () => {
         <ArrowLeft size={14} />
         All organizations
       </Link>
+      <OrgLLMCreditSection orgId={orgId!} />
       <OrgUsersTable orgId={orgId!} />
       <OrgCanvasesTable orgId={orgId!} />
       <OrgExperimentalFeaturesTable orgId={orgId!} />

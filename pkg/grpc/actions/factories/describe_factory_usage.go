@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 )
 
 const (
@@ -46,11 +47,20 @@ func DescribeFactoryUsage(
 		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
 	}
 
+	credit, err := models.DescribeOrganizationLLMCredit(db, orgID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
+	}
+
 	return &pb.DescribeFactoryUsageResponse{
-		TotalTokens:    totals.TotalTokens,
-		TotalCostCents: totals.CostCents(),
-		PeriodDays:     int32(period),
-		ByModel:        serializeUsageByModel(byModel),
+		TotalTokens:            totals.TotalTokens,
+		TotalCostCents:         totals.CostCents(),
+		PeriodDays:             int32(period),
+		ByModel:                serializeUsageByModel(byModel),
+		RemainingCreditCents:   pricebook.MicrosToCents(credit.RemainingMicros),
+		GrantTotalCents:        pricebook.MicrosToCents(credit.GrantMicros),
+		HostedBilledCents:      pricebook.MicrosToCents(credit.BilledMicros),
+		RemainingCreditWarning: credit.Warning,
 	}, nil
 }
 

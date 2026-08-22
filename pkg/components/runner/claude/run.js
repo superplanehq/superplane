@@ -94,7 +94,9 @@ async function runPrompt(promptFile, model) {
   ]).then(([code]) => code);
 
   formatter.flush();
-  fs.writeFileSync(resultFile, `${formatter.resultJSON()}\n`);
+  const resultJSON = formatter.resultJSON();
+  fs.writeFileSync(resultFile, `${resultJSON}\n`);
+  accumulateLLMUsage(resultJSON, model);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   return exitCode;
 }
@@ -102,6 +104,28 @@ async function runPrompt(promptFile, model) {
 function commandExists(name) {
   const result = spawnSync("sh", ["-c", `command -v ${name}`], { encoding: "utf8" });
   return result.status === 0;
+}
+
+function accumulateLLMUsage(raw, fallbackModel) {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR;
+  if (!taskDir) {
+    return;
+  }
+  const script = path.join(taskDir, "llm_usage.js");
+  if (!fs.existsSync(script)) {
+    return;
+  }
+  let parsed = {};
+  try {
+    parsed = JSON.parse(raw);
+  } catch (_err) {
+    return;
+  }
+  require(script).accumulate(taskDir, {
+    model: parsed.model || fallbackModel,
+    usage: parsed.usage,
+    total_cost_usd: parsed.total_cost_usd,
+  });
 }
 
 function createFormatter() {

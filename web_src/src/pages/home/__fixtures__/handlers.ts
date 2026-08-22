@@ -285,17 +285,7 @@ const STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS = [
     { legacySetupOnly: false },
   ),
   storybookIntegrationDefinition("claude", "Claude", "Use Claude models in workflows", [
-    {
-      name: "apiKey",
-      type: "string",
-      description: "Claude API key",
-      required: true,
-      label: "API Key",
-      visibilityConditions: [],
-      requiredConditions: [],
-      sensitive: true,
-      togglable: false,
-    },
+    storybookApiKeyField("Claude API key"),
     {
       name: "adminKey",
       type: "string",
@@ -308,6 +298,12 @@ const STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS = [
       togglable: false,
     },
   ]),
+  storybookIntegrationDefinition("openai", "OpenAI", "Generate text responses with OpenAI models", [
+    storybookApiKeyField("OpenAI API key"),
+  ]),
+  storybookIntegrationDefinition("openrouter", "OpenRouter", "Use OpenRouter models in workflows", [
+    storybookApiKeyField("OpenRouter API key"),
+  ]),
 ];
 
 const STORYBOOK_GITHUB_REPOSITORIES = [
@@ -318,6 +314,20 @@ const STORYBOOK_GITHUB_REPOSITORIES = [
 ];
 
 /** Storybook definitions aligned with real integration Configuration() fields. */
+function storybookApiKeyField(description: string): StorybookConfigField {
+  return {
+    name: "apiKey",
+    type: "string",
+    description,
+    required: true,
+    label: "API Key",
+    visibilityConditions: [],
+    requiredConditions: [],
+    sensitive: true,
+    togglable: false,
+  };
+}
+
 function storybookIntegrationDefinition(
   name: string,
   label: string,
