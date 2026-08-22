@@ -68,6 +68,51 @@ describe("ColumnLaneMenu", () => {
     expect(onEdit).toHaveBeenCalledTimes(1);
   });
 
+  it("uses the supplied Edit label for canvas columns", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu
+          title="Plan"
+          testId="lines-phase-menu-0"
+          editHref="/canvas-edit"
+          editLabel="Edit Automation"
+          colorId={null}
+          onColorChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    expect(screen.getByTestId("lines-phase-menu-0-edit")).toHaveTextContent("Edit Automation");
+  });
+
+  it("offers Set parallelism with the current value", async () => {
+    const onSetParallelism = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu
+          title="Implement"
+          testId="lines-phase-menu-1"
+          editHref="/canvas-edit"
+          editLabel="Edit Automation"
+          onSetParallelism={onSetParallelism}
+          parallelism={10}
+          colorId={null}
+          onColorChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-phase-menu-1"));
+    expect(screen.getByTestId("lines-phase-menu-1-parallelism")).toHaveTextContent("Set parallelism (10)");
+    await user.click(screen.getByTestId("lines-phase-menu-1-parallelism"));
+    expect(onSetParallelism).toHaveBeenCalledTimes(1);
+  });
+
   it("hides Edit when the column has no editor", async () => {
     const user = userEvent.setup();
 

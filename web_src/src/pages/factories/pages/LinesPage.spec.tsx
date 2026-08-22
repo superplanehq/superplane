@@ -259,6 +259,43 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-column-title-backlog")).toHaveTextContent("Inbox");
   });
 
+  it("labels phase Edit as Edit Automation", async () => {
+    const user = userEvent.setup();
+    renderBoard();
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    expect(screen.getByTestId("lines-phase-menu-0-edit")).toHaveTextContent("Edit Automation");
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    expect(screen.getByTestId("lines-backlog-menu-edit")).toHaveTextContent("Edit");
+    expect(screen.queryByTestId("lines-backlog-menu-parallelism")).not.toBeInTheDocument();
+  });
+
+  it("opens Set parallelism and saves a new cap", async () => {
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderBoard();
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    expect(screen.getByTestId("lines-phase-menu-0-parallelism")).toHaveTextContent("Set parallelism (10)");
+    await user.click(screen.getByTestId("lines-phase-menu-0-parallelism"));
+
+    const input = screen.getByTestId("lines-parallelism-input");
+    await user.clear(input);
+    await user.type(input, "20");
+    await user.click(screen.getByTestId("lines-parallelism-save"));
+
+    await waitFor(() => {
+      expect(updateFactoryLineMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lineId: REFUND_LINE_PLAN_ID,
+          steps: expect.arrayContaining([expect.objectContaining({ maxParallelism: 20 })]),
+        }),
+      );
+    });
+  });
+
   it("hides Edit on the Done column", async () => {
     const user = userEvent.setup();
     const factory: FactoriesFactory = {

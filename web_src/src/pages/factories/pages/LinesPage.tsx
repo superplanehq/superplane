@@ -63,8 +63,10 @@ import {
   factorySectionHeaderClassName,
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
+import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
+import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
 import { LineListCard } from "./LineListCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
@@ -304,8 +306,9 @@ function LineDetail({
       ) : (
         <PhaseBoard
           organizationId={organizationId}
+          factoryId={factoryId}
           factoryKey={factoryKey}
-          lineId={line.id}
+          line={line}
           backlogOrders={backlogOrders}
           columns={board}
           canCreateWorkOrder={canCreateWorkOrder}
@@ -474,8 +477,9 @@ function executionRunIdForCanvas(
 
 function PhaseBoard({
   organizationId,
+  factoryId,
   factoryKey,
-  lineId,
+  line,
   backlogOrders,
   columns,
   canCreateWorkOrder,
@@ -485,8 +489,9 @@ function PhaseBoard({
   onOpenWorkOrder,
 }: {
   organizationId: string;
+  factoryId: string;
   factoryKey: string;
-  lineId?: string;
+  line: FactoriesFactoryLine;
   backlogOrders: FactoriesWorkOrder[];
   columns: LinePhaseColumn[];
   canCreateWorkOrder: boolean;
@@ -499,6 +504,9 @@ function PhaseBoard({
   const [columnTitles, setColumnTitles] = useState<Record<string, string>>({});
   const [backlogSize, setBacklogSize] = useState<number | null>(null);
   const [backlogSettingsOpen, setBacklogSettingsOpen] = useState(false);
+  const [parallelismByStep, setParallelismByStep] = useState<Record<number, number>>({});
+  const updateLine = useUpdateFactoryLine(organizationId, factoryId);
+  const lineId = line.id;
 
   const setColumnColor = useCallback((columnKey: string, colorId: LineBoardColumnColorId | null) => {
     setColumnColors((current) => ({ ...current, [columnKey]: colorId }));
@@ -507,6 +515,29 @@ function PhaseBoard({
   const setColumnTitle = useCallback((columnKey: string, title: string) => {
     setColumnTitles((current) => ({ ...current, [columnKey]: title }));
   }, []);
+
+  const saveParallelism = useCallback(
+    async (stepIndex: number, value: number) => {
+      setParallelismByStep((current) => ({ ...current, [stepIndex]: value }));
+      if (!line.id) {
+        return;
+      }
+      try {
+        await updateLine.mutateAsync({
+          lineId: line.id,
+          steps: replaceLineStepParallelism(line.steps, stepIndex, value),
+        });
+      } catch (error) {
+        setParallelismByStep((current) => {
+          const next = { ...current };
+          delete next[stepIndex];
+          return next;
+        });
+        showErrorToast(getApiErrorMessage(error, "Failed to update parallelism"));
+      }
+    },
+    [line.id, line.steps, updateLine],
+  );
 
   return (
     <WorkOrderKanbanBoard testId="lines-phase-board">
@@ -549,6 +580,8 @@ function PhaseBoard({
               lineId={lineId}
               column={column}
               title={columnTitles[columnKey] ?? column.stepName}
+              parallelism={parallelismByStep[column.stepIndex] ?? column.maxParallelism}
+              onSaveParallelism={(value) => void saveParallelism(column.stepIndex, value)}
               colorId={columnColors[columnKey] ?? null}
               onColorChange={(colorId) => setColumnColor(columnKey, colorId)}
               canRename={canRename}
@@ -707,6 +740,8 @@ function PhaseColumn({
   lineId,
   column,
   title,
+  parallelism,
+  onSaveParallelism,
   colorId,
   onColorChange,
   canRename,
@@ -719,6 +754,8 @@ function PhaseColumn({
   lineId?: string;
   column: LinePhaseColumn;
   title: string;
+  parallelism: number;
+  onSaveParallelism: (value: number) => void;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   canRename: boolean;
@@ -728,6 +765,7 @@ function PhaseColumn({
 }) {
   const scrollRef = useRef<HTMLUListElement>(null);
   const [visibleCount, setVisibleCount] = useState(LINE_PHASE_RUNS_PAGE_SIZE);
+  const [parallelismOpen, setParallelismOpen] = useState(false);
   const totalRuns = column.runs.length;
   const hasMore = visibleCount < totalRuns;
 
@@ -755,40 +793,54 @@ function PhaseColumn({
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
 
   return (
-    <WorkOrderBoardLane
-      title={title}
-      label={`${title} phase`}
-      count={totalRuns}
-      tone={PHASE_LANE_TONE[glyph]}
-      surfaceClassName={surfaceClassName}
-      emptyDescription="No work orders in this phase."
-      canRename={canRename}
-      onRename={onRename}
-      titleTestId={`lines-column-title-phase-${column.stepIndex}`}
-      testId={`lines-phase-column-${column.stepIndex}`}
-      actions={
-        <ColumnLaneMenu
-          title={title}
-          testId={`lines-phase-menu-${column.stepIndex}`}
-          editHref={configureHref}
-          colorId={colorId}
-          onColorChange={onColorChange}
-        />
-      }
-    >
-      <ul
-        ref={scrollRef}
-        className={workOrderKanbanLaneScrollClassName}
-        onScroll={(event) => loadMoreIfNeeded(event.currentTarget)}
-        data-testid={`lines-phase-column-scroll-${column.stepIndex}`}
+    <>
+      <WorkOrderBoardLane
+        title={title}
+        label={`${title} phase`}
+        count={totalRuns}
+        tone={PHASE_LANE_TONE[glyph]}
+        surfaceClassName={surfaceClassName}
+        emptyDescription="No work orders in this phase."
+        canRename={canRename}
+        onRename={onRename}
+        titleTestId={`lines-column-title-phase-${column.stepIndex}`}
+        testId={`lines-phase-column-${column.stepIndex}`}
+        actions={
+          <ColumnLaneMenu
+            title={title}
+            testId={`lines-phase-menu-${column.stepIndex}`}
+            editHref={configureHref}
+            editLabel={configureHref ? "Edit Automation" : undefined}
+            onSetParallelism={configureHref ? () => setParallelismOpen(true) : undefined}
+            parallelism={parallelism}
+            colorId={colorId}
+            onColorChange={onColorChange}
+          />
+        }
       >
-        {visibleRuns.map((run) => (
-          <li key={run.executionId}>
-            <PhaseRunCard run={run} workOrderCardContext={workOrderCardContext} onOpenWorkOrder={onOpenWorkOrder} />
-          </li>
-        ))}
-      </ul>
-    </WorkOrderBoardLane>
+        <ul
+          ref={scrollRef}
+          className={workOrderKanbanLaneScrollClassName}
+          onScroll={(event) => loadMoreIfNeeded(event.currentTarget)}
+          data-testid={`lines-phase-column-scroll-${column.stepIndex}`}
+        >
+          {visibleRuns.map((run) => (
+            <li key={run.executionId}>
+              <PhaseRunCard run={run} workOrderCardContext={workOrderCardContext} onOpenWorkOrder={onOpenWorkOrder} />
+            </li>
+          ))}
+        </ul>
+      </WorkOrderBoardLane>
+      <ParallelismSettingsDialog
+        open={parallelismOpen}
+        value={parallelism}
+        onSave={(value) => {
+          onSaveParallelism(value);
+          setParallelismOpen(false);
+        }}
+        onClose={() => setParallelismOpen(false)}
+      />
+    </>
   );
 }
 

@@ -220,18 +220,18 @@ function CanvasOverflowMenu({ title, editHref }: { title: string; editHref?: str
           <MoreHorizontal className="size-3.5" aria-hidden />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
+      <DropdownMenuContent align="end" className="w-max min-w-40">
         {editHref ? (
           <DropdownMenuItem asChild data-testid="split-run-canvas-edit">
             <Link href={editHref}>
               <Pencil className="h-3.5 w-3.5" aria-hidden />
-              Edit
+              Edit Automation
             </Link>
           </DropdownMenuItem>
         ) : (
           <DropdownMenuItem disabled data-testid="split-run-canvas-edit">
             <Pencil className="h-3.5 w-3.5" aria-hidden />
-            Edit
+            Edit Automation
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>

@@ -1,4 +1,4 @@
-import { Check, MoreHorizontal, Pencil, XIcon } from "lucide-react";
+import { Check, MoreHorizontal, Pencil, SlidersHorizontal, XIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 
+import { DEFAULT_LINE_STEP_PARALLELISM, setParallelismLabel } from "../lib/factoryLineFormShared";
 import { LINE_BOARD_COLUMN_COLORS, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 
 interface ColumnLaneMenuProps {
@@ -20,16 +21,32 @@ interface ColumnLaneMenuProps {
   editHref?: string | null;
   /** Opens column settings. Use this for Backlog instead of a canvas href. */
   onEdit?: () => void;
+  /** Menu item copy. Defaults to Edit. */
+  editLabel?: string;
+  /** Opens the parallelism modal for canvas-backed phases. */
+  onSetParallelism?: () => void;
+  parallelism?: number;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
 }
 
 /**
- * Column header menu: Edit (optional) and a compact colour grid.
+ * Column header menu: Edit (optional) and a single row of colour circles.
  */
-export function ColumnLaneMenu({ title, testId, editHref, onEdit, colorId, onColorChange }: ColumnLaneMenuProps) {
+export function ColumnLaneMenu({
+  title,
+  testId,
+  editHref,
+  onEdit,
+  editLabel = "Edit",
+  onSetParallelism,
+  parallelism = DEFAULT_LINE_STEP_PARALLELISM,
+  colorId,
+  onColorChange,
+}: ColumnLaneMenuProps) {
   const navigate = useNavigate();
   const canEdit = Boolean(onEdit || editHref);
+  const hasActions = canEdit || Boolean(onSetParallelism);
 
   const handleEdit = () => {
     if (onEdit) {
@@ -53,14 +70,22 @@ export function ColumnLaneMenu({ title, testId, editHref, onEdit, colorId, onCol
           <MoreHorizontal className="size-3.5" aria-hidden />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-0 w-32 p-0" data-testid={`${testId}-content`}>
-        {canEdit ? (
+      <DropdownMenuContent align="end" className="min-w-32 w-max p-0" data-testid={`${testId}-content`}>
+        {hasActions ? (
           <>
             <div className="p-1">
-              <DropdownMenuItem onClick={handleEdit} data-testid={`${testId}-edit`}>
-                <Pencil className="h-3.5 w-3.5" aria-hidden />
-                Edit
-              </DropdownMenuItem>
+              {canEdit ? (
+                <DropdownMenuItem onClick={handleEdit} data-testid={`${testId}-edit`}>
+                  <Pencil className="h-3.5 w-3.5" aria-hidden />
+                  {editLabel}
+                </DropdownMenuItem>
+              ) : null}
+              {onSetParallelism ? (
+                <DropdownMenuItem onClick={onSetParallelism} data-testid={`${testId}-parallelism`}>
+                  <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+                  {setParallelismLabel(parallelism)}
+                </DropdownMenuItem>
+              ) : null}
             </div>
             <DropdownMenuSeparator className="my-0" />
           </>
@@ -70,7 +95,7 @@ export function ColumnLaneMenu({ title, testId, editHref, onEdit, colorId, onCol
           <DropdownMenuLabel className="px-0 pb-1.5 pt-0 text-[12px] font-medium text-muted-foreground">
             Set color
           </DropdownMenuLabel>
-          <div className="grid grid-cols-3 gap-1.5" role="listbox" aria-label={`Color for ${title}`}>
+          <div className="flex items-center gap-1" role="listbox" aria-label={`Color for ${title}`}>
             {LINE_BOARD_COLUMN_COLORS.map((color) => {
               const selected = colorId === color.id;
               return (
@@ -84,12 +109,12 @@ export function ColumnLaneMenu({ title, testId, editHref, onEdit, colorId, onCol
                   data-testid={`${testId}-color-${color.id}`}
                   onClick={() => onColorChange(color.id)}
                   className={cn(
-                    "relative flex aspect-square w-full items-center justify-center rounded-md ring-1 ring-inset ring-black/10 transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:ring-white/15",
+                    "relative flex size-5 shrink-0 items-center justify-center rounded-full ring-1 ring-inset ring-black/10 transition-transform hover:z-10 hover:scale-125 hover:ring-2 hover:ring-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:ring-white/15",
                     color.className,
                     selected && "ring-2 ring-foreground",
                   )}
                 >
-                  {selected ? <Check className="size-3 text-foreground" aria-hidden strokeWidth={3} /> : null}
+                  {selected ? <Check className="size-2.5 text-foreground" aria-hidden strokeWidth={3} /> : null}
                 </button>
               );
             })}

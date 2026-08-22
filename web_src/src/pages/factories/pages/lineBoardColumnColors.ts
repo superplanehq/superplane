@@ -3,7 +3,7 @@
  * same fill so the colour you tap is the colour you see on the board.
  */
 
-export type LineBoardColumnColorId = "lime" | "yellow" | "red" | "sky" | "purple" | "slate";
+export type LineBoardColumnColorId = "lime" | "yellow" | "teal" | "sky" | "purple" | "slate";
 
 export interface LineBoardColumnColor {
   id: LineBoardColumnColorId;
@@ -16,7 +16,7 @@ export interface LineBoardColumnColor {
 export const LINE_BOARD_COLUMN_COLORS: LineBoardColumnColor[] = [
   { id: "lime", label: "Lime", className: "bg-lime-300 dark:bg-lime-800" },
   { id: "yellow", label: "Yellow", className: "bg-amber-300 dark:bg-amber-800" },
-  { id: "red", label: "Red", className: "bg-rose-300 dark:bg-rose-800" },
+  { id: "teal", label: "Teal", className: "bg-teal-300 dark:bg-teal-800" },
   { id: "sky", label: "Sky", className: "bg-sky-300 dark:bg-sky-800" },
   { id: "purple", label: "Purple", className: "bg-violet-300 dark:bg-violet-800" },
   { id: "slate", label: "Slate", className: "bg-slate-300 dark:bg-slate-600" },
