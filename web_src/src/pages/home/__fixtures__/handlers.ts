@@ -4,6 +4,7 @@ import {
   STORYBOOK_ME_USER_NAME,
 } from "@/pages/factories/__fixtures__/factoryPageResponses";
 import { defaultHomePageFixture, type HomePageFixture } from "./homePageResponses";
+import { storybookHostedLlmModels } from "./hostedLlmModels";
 
 export type { HomePageFixture };
 
@@ -121,6 +122,10 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
     {
       pattern: re("/api/v1/organizations/[^/]+/llm-spend"),
       resolve: () => ({ json: { totalTokens: "0", totalCostCents: "0", periodDays: 30, byModel: [] } }),
+    },
+    {
+      pattern: re("/api/v1/organizations/[^/]+/hosted-llm-models"),
+      resolve: (_m, url) => ({ json: storybookHostedLlmModels(url.searchParams.get("provider")) }),
     },
     { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
     {
