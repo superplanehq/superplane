@@ -46,7 +46,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Run Shell Commands" href="#run-shell-commands" description="Runs shell commands on a fleet runner (host or Docker container)" />
   <LinkCard title="Run Bash" href="#run-bash" description="Runs a Bash script on a fleet runner with upstream node data in SUPERPLANE_PAYLOAD_FILE" />
   <LinkCard title="Run Claude Code" href="#run-claude-code" description="Runs Claude Code on a fleet runner" />
+  <LinkCard title="Run Codex" href="#run-codex" description="Runs the Codex CLI on a fleet runner" />
   <LinkCard title="Run JavaScript" href="#run-java-script" description="Runs JavaScript on a fleet runner with access to upstream node data via $" />
+  <LinkCard title="Run OpenRouter Agent" href="#run-open-router-agent" description="Runs a SuperPlane OpenRouter agent on a fleet runner" />
   <LinkCard title="Run Python" href="#run-python" description="Runs Python on a fleet runner with access to upstream node data via the payload argument" />
   <LinkCard title="Set Work Order Status Note" href="#set-work-order-status-note" description="Announce what a waiting work order is blocked on and what resolves it" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
@@ -1425,7 +1427,7 @@ Runs [Claude Code](https://code.claude.com/docs/en/headless) in non-interactive 
 
 ### Prerequisites
 - The `claude` CLI is installed on the runner machine and available on `PATH`.
-- An Anthropic API key stored as a SuperPlane secret.
+- An Anthropic API key stored as a SuperPlane secret, a Claude integration, or SuperPlane-hosted credentials.
 
 ### Steps
 Configure an ordered list of **bash** and **prompt** steps:
@@ -1443,8 +1445,8 @@ Example:
 ### Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
-- **Anthropic API Key**: SuperPlane secret used as `ANTHROPIC_API_KEY`.
-- **Model**: Optional model id or alias (for example `sonnet`).
+- **Anthropic API Key**: SuperPlane secret, Claude integration, or SuperPlane-hosted credentials used as `ANTHROPIC_API_KEY`.
+- **Model**: Optional model id or alias (for example `sonnet`). SuperPlane-hosted credentials require a model from the installation allowlist.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
@@ -1472,6 +1474,55 @@ Prompt steps stream agent activity to **View logs**. The finished event includes
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "runnerClaudeCode.finished"
+}
+```
+
+<a id="run-codex"></a>
+
+## Run Codex
+
+**Component key:** `runnerCodex`
+
+Runs the OpenAI Codex CLI in non-interactive mode on a fleet runner.
+
+### Prerequisites
+- The `codex` CLI is installed on the runner machine and available on `PATH`.
+- An OpenAI API key stored as a SuperPlane secret, an OpenAI integration, or SuperPlane-hosted credentials.
+
+### Steps
+Configure an ordered list of **bash** and **prompt** steps:
+
+- **bash** — shell commands (clone a repo, install deps, run tests, push).
+- **prompt** — a Codex turn. Later prompts continue in the same working directory.
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Steps**: Ordered bash/prompt actions (at least one prompt required).
+- **Credentials**: SuperPlane secret, OpenAI integration, or SuperPlane-hosted credentials used as `OPENAI_API_KEY`.
+- **Model**: Optional Codex model id. SuperPlane-hosted credentials require a model from the installation allowlist.
+- **Working directory**: Optional starting directory.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
+
+### Output channels
+- **Passed**: All steps finished with exit code **0**.
+- **Failed**: A bash or prompt step failed (non-zero exit).
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "result": "Done.",
+        "type": "result"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runnerCodex.finished"
 }
 ```
 
@@ -1526,6 +1577,55 @@ function main() {
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "runnerJS.finished"
+}
+```
+
+<a id="run-open-router-agent"></a>
+
+## Run OpenRouter Agent
+
+**Component key:** `runnerOpenRouter`
+
+Runs a SuperPlane-shipped OpenRouter agent on a fleet runner. Prompt turns can use bash, read, edit, and write tools.
+
+### Prerequisites
+- Node.js on the runner `PATH`.
+- An OpenRouter API key stored as a SuperPlane secret, or SuperPlane-hosted credentials.
+
+### Steps
+Configure an ordered list of **bash** and **prompt** steps:
+
+- **bash** — shell commands (clone a repo, install deps, run tests, push).
+- **prompt** — one OpenRouter agent turn in the same working directory.
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Steps**: Ordered bash/prompt actions (at least one prompt required).
+- **Credentials**: SuperPlane secret, OpenRouter integration, or SuperPlane-hosted credentials used as `OPENROUTER_API_KEY`.
+- **Model**: OpenRouter model id (`provider/model`). SuperPlane-hosted credentials require a model from the installation allowlist.
+- **Working directory**: Optional starting directory.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
+
+### Output channels
+- **Passed**: All steps finished with exit code **0**.
+- **Failed**: A bash or prompt step failed (non-zero exit).
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "result": "Done.",
+        "type": "result"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runnerOpenRouter.finished"
 }
 ```
 
