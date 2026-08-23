@@ -65,6 +65,8 @@ interface WorkOrderBoardLaneProps {
   count: number;
   /** Replaces the body while the lane holds nothing. */
   emptyDescription: string;
+  /** When set, replaces the dashed empty copy while the lane holds nothing. */
+  emptyContent?: ReactNode;
   tone?: BoardLaneTone;
   /**
    * Optional pastel fill from the column color picker. When set, it replaces
@@ -88,6 +90,7 @@ export function WorkOrderBoardLane({
   title,
   count,
   emptyDescription,
+  emptyContent,
   tone = "neutral",
   surfaceClassName,
   actions,
@@ -129,9 +132,13 @@ export function WorkOrderBoardLane({
       </header>
 
       {count === 0 ? (
-        <p className="mt-2 flex-1 rounded-md border border-dashed border-border/60 px-3 py-6 text-center text-[12px] text-muted-foreground">
-          {emptyDescription}
-        </p>
+        emptyContent ? (
+          <div className={cn(workOrderKanbanLaneScrollClassName, "justify-center")}>{emptyContent}</div>
+        ) : (
+          <p className="mt-2 flex-1 rounded-md border border-dashed border-border/60 px-3 py-6 text-center text-[12px] text-muted-foreground">
+            {emptyDescription}
+          </p>
+        )
       ) : (
         children
       )}
