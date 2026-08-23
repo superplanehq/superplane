@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canvasKeyForAutomation,
   canvasKeyForPhase,
+  lineAutomationPresentation,
   parseSplitRunCanvasKey,
   richStreamForCanvas,
   splitRunCanvasForPhase,
@@ -20,10 +21,47 @@ describe("parseSplitRunCanvasKey", () => {
 });
 
 describe("canvasKeyForAutomation", () => {
-  it("maps planner, implementer, and closure apps", () => {
+  it("renames leftover refund apps to the line automations", () => {
+    expect(
+      lineAutomationPresentation({ id: "app-refund-implementer", name: "Refund Implementer" }, "Refund Implementer"),
+    ).toEqual({
+      name: "Implement",
+      componentName: "Implementation",
+    });
+    expect(lineAutomationPresentation({ id: "app-refund-planner", name: "Refund Planner" }, "Plan")).toEqual({
+      name: "Plan",
+      componentName: "Planning",
+    });
+    expect(lineAutomationPresentation({ id: "app-refund-verifier", name: "Refund Verifier" }, "Verify")).toEqual({
+      name: "Verify",
+      componentName: "Risk Assessment",
+    });
+  });
+
+  it("maps planner, implementer, verifier, and closure apps", () => {
     expect(canvasKeyForAutomation({ id: "app-refund-planner" })).toBe("planning");
     expect(canvasKeyForAutomation({ id: "app-refund-implementer" })).toBe("implementation");
+    expect(canvasKeyForAutomation({ id: "app-refund-verifier", name: "Refund Verifier" })).toBe("risk");
+    expect(canvasKeyForAutomation({ name: "Verify" })).toBe("risk");
     expect(canvasKeyForAutomation({ id: "app-pr-closure", name: "PR Closure" })).toBe("closure");
+    expect(canvasKeyForAutomation({ id: "app-refund-backlog", name: "Ingest" })).toBe("intake");
+    expect(canvasKeyForAutomation({ name: "Sentry" })).toBe("sentry");
+    expect(canvasKeyForAutomation({ name: "Slack" })).toBe("slack");
+  });
+
+  it("labels intake automations as Backlog plus the source canvas", () => {
+    expect(lineAutomationPresentation({ id: "app-refund-backlog", name: "Ingest" })).toEqual({
+      name: "Backlog",
+      componentName: "Ingest",
+    });
+    expect(lineAutomationPresentation({ name: "Sentry" })).toEqual({
+      name: "Backlog",
+      componentName: "Sentry",
+    });
+    expect(lineAutomationPresentation({ name: "Slack" })).toEqual({
+      name: "Backlog",
+      componentName: "Slack",
+    });
   });
 
   it("returns undefined when the app does not name a canvas", () => {
@@ -42,8 +80,9 @@ describe("splitRunCanvasForPhase", () => {
     expect(canvas.nodes.map((node) => node.name)).toContain("Create Branch");
     expect(canvas.nodes.map((node) => node.name)).toContain("From GH issue?");
     expect(canvas.statuses["create-branch"]).toBe("passed");
-    expect(canvas.statuses["implementation-agent"]).toBe("did_not_run");
-    expect(canvas.statuses["implementation-agent-no-issue"]).toBe("running");
+    expect(canvas.statuses["implementation-agent"]).toBe("running");
+    expect(canvas.statuses["implementation-agent-no-issue"]).toBe("did_not_run");
+    expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
   });
 
   it("opens the planning canvas for a completed plan step", () => {
@@ -53,8 +92,8 @@ describe("splitRunCanvasForPhase", () => {
     const canvas = splitRunCanvasForPhase(plan!);
     expect(canvas.title).toBe("Planning");
     expect(canvas.statuses["onrun-create-plan"]).toBe("triggered");
-    expect(canvas.statuses["planner-agent"]).toBe("did_not_run");
-    expect(canvas.statuses["planner-agent-no-issue"]).toBe("passed");
+    expect(canvas.statuses["planner-agent"]).toBe("passed");
+    expect(canvas.statuses["planner-agent-no-issue"]).toBe("did_not_run");
   });
 
   it("writes one log line per canvas node and extra Claude Code notes", () => {
@@ -104,5 +143,74 @@ describe("splitRunCanvasForPhase", () => {
       "Writing the risk review.",
     ]);
     expect(stream.find((line) => line.id === "report-risk-check")?.componentName).toBe("Risk review  65/100");
+  });
+
+  it("paints the GitHub label path on Ingest and leaves assignment idle", () => {
+    const canvas = splitRunCanvasForPhase({
+      id: "backlog",
+      name: "Backlog",
+      status: "passed",
+      duration: "2s",
+      componentName: "Ingest",
+      artifacts: [],
+      stream: [],
+      canvasSteps: [],
+      canvasKey: "intake",
+      triggerName: "On Issue Label",
+    });
+
+    expect(canvas.title).toBe("Ingest");
+    expect(canvas.statuses["on-issue-labeled"]).toBe("triggered");
+    expect(canvas.statuses["has-factory-label"]).toBe("passed");
+    expect(canvas.statuses["create-work-order"]).toBe("passed");
+    expect(canvas.statuses["on-issue-assigned"]).toBe("did_not_run");
+    expect(canvas.statuses["assigned-to-agent"]).toBe("did_not_run");
+  });
+
+  it("opens Sentry and Slack intake canvases", () => {
+    const sentry = splitRunCanvasForPhase({
+      id: "backlog",
+      name: "Backlog",
+      status: "passed",
+      duration: "2s",
+      componentName: "Sentry",
+      artifacts: [],
+      stream: [],
+      canvasSteps: [],
+      canvasKey: "sentry",
+    });
+    const slack = splitRunCanvasForPhase({
+      id: "backlog",
+      name: "Backlog",
+      status: "passed",
+      duration: "2s",
+      componentName: "Slack",
+      artifacts: [],
+      stream: [],
+      canvasSteps: [],
+      canvasKey: "slack",
+    });
+
+    expect(sentry.title).toBe("Sentry");
+    expect(sentry.nodes.map((node) => node.name)).toEqual(["On Issue", "Factory project?", "Create Work Order"]);
+    expect(slack.title).toBe("Slack");
+    expect(slack.nodes.map((node) => node.name)).toEqual(["On Mention", "Mentioned the agent?", "Create Work Order"]);
+  });
+
+  it("returns an empty canvas when a person created the work order", () => {
+    const canvas = splitRunCanvasForPhase({
+      id: "backlog",
+      name: "Backlog",
+      status: "passed",
+      duration: "2s",
+      componentName: "Created manually",
+      artifacts: [],
+      stream: [],
+      canvasSteps: [],
+      canvasKey: null,
+    });
+
+    expect(canvas.nodes).toEqual([]);
+    expect(canvas.title).toBe("");
   });
 });

@@ -8,7 +8,12 @@ import { describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { DRAFT_WORK_ORDER, FAILED_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
+import {
+  DRAFT_WORK_ORDER,
+  FAILED_WORK_ORDER,
+  INGEST_DRAFT_WORK_ORDER,
+  OPEN_WORK_ORDER,
+} from "../../__fixtures__/factoryPageResponses";
 import { OPEN_WORK_ORDER_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
@@ -64,12 +69,12 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-stream-backlog")).not.toBeInTheDocument();
 
     const plan = screen.getByTestId("split-run-phase-plan");
-    expect(within(plan).getByText(/Refund Planner/)).toBeInTheDocument();
+    expect(within(plan).getByText(/Planning/)).toBeInTheDocument();
     expect(within(plan).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stream-plan")).not.toBeInTheDocument();
 
     const implement = screen.getByTestId("split-run-phase-implement");
-    expect(within(implement).getByText(/Refund Implementer/)).toBeInTheDocument();
+    expect(within(implement).getByText(/Implementation/)).toBeInTheDocument();
     expect(within(implement).getAllByRole("link", { name: /feature\/refund-retry/ }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("split-run-stream-implement")).toBeInTheDocument();
     expect(within(implement).queryByText("Started")).not.toBeInTheDocument();
@@ -285,9 +290,23 @@ describe("WorkOrderSplitRunPopup", () => {
     const review = screen.getByTestId("split-run-review");
     expect(review).toHaveTextContent("Start the next stage");
     expect(within(review).getByRole("button", { name: "Dispatch" })).toBeDisabled();
-    expect(screen.queryByTestId("split-run-phase-backlog")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
+    const backlog = screen.getByTestId("split-run-phase-backlog");
+    expect(within(backlog).getByText(/Created manually/)).toBeInTheDocument();
+    expect(within(backlog).getByText("Leonardo DiCaprio created this work order manually.")).toBeInTheDocument();
+    expect(within(backlog).getAllByRole("button", { name: "description.md" }).length).toBeGreaterThan(0);
+    expect(screen.queryByText("On Issue Label")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
+  });
+
+  it("shows the Ingest canvas when a GitHub automation created the draft", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(INGEST_DRAFT_WORK_ORDER) });
+
+    expect(screen.getByText("Ingest")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-canvas-node-on-issue-labeled")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-canvas-node-on-issue-assigned")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-phase-backlog")).getAllByRole("button", { name: "description.md" }).length,
+    ).toBeGreaterThan(0);
   });
 
   it("dispatches the draft to the line from the next-step button", async () => {

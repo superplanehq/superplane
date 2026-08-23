@@ -411,6 +411,13 @@ describe("findBacklogAutomationApp", () => {
       ]),
     ).toEqual({ id: "app-refund-backlog", name: "Backlog" });
   });
+
+  it("matches the Ingest app name", () => {
+    expect(findBacklogAutomationApp([{ id: "app-refund-backlog", name: "Ingest" }])).toEqual({
+      id: "app-refund-backlog",
+      name: "Ingest",
+    });
+  });
 });
 
 describe("findClosureAutomationApp", () => {

@@ -18,6 +18,7 @@ type LineNodeData = {
   title: string;
   subtitle: string;
   iconSlug: string;
+  iconSrc?: string;
   status: FactoryNodeStatus;
   metrics: string;
   nodeId: string;
@@ -46,6 +47,7 @@ function LineCanvasNode({ data }: NodeProps<Node<LineNodeData>>) {
           title={data.title}
           subtitle={data.subtitle}
           iconSlug={data.iconSlug}
+          iconSrc={data.iconSrc}
           status={data.status}
           metrics={data.metrics}
           selected={data.isSelected}
@@ -90,6 +92,7 @@ function graphFromCanvas(
           title: presentation.title,
           subtitle: node.name ?? presentation.title,
           iconSlug: presentation.iconSlug,
+          iconSrc: presentation.iconSrc,
           status: canvas.statuses[node.id] ?? "pending",
           metrics: canvas.metrics[node.id] ?? "—",
           nodeId: node.id,

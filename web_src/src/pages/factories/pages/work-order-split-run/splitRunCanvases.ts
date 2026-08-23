@@ -12,20 +12,26 @@ import issueIntakeYaml from "@/pages/home/factories/line-apps/issue-intake.canva
 import planningYaml from "@/pages/home/factories/line-apps/planning.canvas.yaml?raw";
 import implementationYaml from "@/pages/home/factories/line-apps/implementation.canvas.yaml?raw";
 import prClosureYaml from "@/pages/home/factories/line-apps/pr-closure.canvas.yaml?raw";
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
+import slackIcon from "@/assets/icons/integrations/slack.svg";
 import { DESCRIPTION_ARTIFACT, PR_CLOSURE_PR_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
 import riskAssessmentYaml from "./risk-assessment.canvas.yaml?raw";
+import sentryIntakeYaml from "./sentry-intake.canvas.yaml?raw";
+import slackIntakeYaml from "./slack-intake.canvas.yaml?raw";
 
 import type { SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamLine } from "./splitRunMocks";
 
-export type SplitRunCanvasKey = "intake" | "planning" | "implementation" | "risk" | "closure";
+export type SplitRunCanvasKey = "intake" | "sentry" | "slack" | "planning" | "implementation" | "risk" | "closure";
 
-const CANVAS_KEYS: SplitRunCanvasKey[] = ["intake", "planning", "implementation", "risk", "closure"];
+const CANVAS_KEYS: SplitRunCanvasKey[] = ["intake", "sentry", "slack", "planning", "implementation", "risk", "closure"];
 
 const CANVAS_HINTS: { needles: string[]; key: SplitRunCanvasKey }[] = [
-  { needles: ["backlog", "intake", "create work order"], key: "intake" },
+  { needles: ["sentry"], key: "sentry" },
+  { needles: ["slack"], key: "slack" },
+  { needles: ["ingest", "intake", "backlog"], key: "intake" },
   { needles: ["plan"], key: "planning" },
   { needles: ["implement"], key: "implementation" },
-  { needles: ["verify", "risk", "ci"], key: "risk" },
+  { needles: ["verify", "verifier", "risk", "ci"], key: "risk" },
   { needles: ["closure", "done"], key: "closure" },
 ];
 
@@ -48,6 +54,29 @@ export function canvasKeyForAutomation(app: { id?: string; name?: string } | und
   return canvasKeyFromLabel(`${app.id ?? ""} ${app.name ?? ""}`.toLowerCase());
 }
 
+const LINE_AUTOMATION_LABEL: Record<SplitRunCanvasKey, { name: string; componentName: string }> = {
+  intake: { name: "Backlog", componentName: "Ingest" },
+  sentry: { name: "Backlog", componentName: "Sentry" },
+  slack: { name: "Backlog", componentName: "Slack" },
+  planning: { name: "Plan", componentName: "Planning" },
+  implementation: { name: "Implement", componentName: "Implementation" },
+  risk: { name: "Verify", componentName: "Risk Assessment" },
+  closure: { name: "Done", componentName: "PR Closure" },
+};
+
+/** Column + canvas titles for a line step, even when the app still has an old name. */
+export function lineAutomationPresentation(
+  app: { id?: string; name?: string } | undefined,
+  step?: string,
+): { name: string; componentName: string } {
+  const key = canvasKeyForAutomation(app) ?? canvasKeyFromLabel((step ?? "").toLowerCase());
+  if (key) {
+    return LINE_AUTOMATION_LABEL[key];
+  }
+  const fallback = step?.trim() || app?.name?.trim() || "Step";
+  return { name: fallback, componentName: app?.name?.trim() || fallback };
+}
+
 export interface SplitRunCanvasModel {
   key: SplitRunCanvasKey;
   title: string;
@@ -59,6 +88,8 @@ export interface SplitRunCanvasModel {
 
 const CANVAS_YAML: Record<SplitRunCanvasKey, string> = {
   intake: issueIntakeYaml,
+  sentry: sentryIntakeYaml,
+  slack: slackIntakeYaml,
   planning: planningYaml,
   implementation: implementationYaml,
   risk: riskAssessmentYaml,
@@ -66,6 +97,9 @@ const CANVAS_YAML: Record<SplitRunCanvasKey, string> = {
 };
 
 export function canvasKeyForPhase(phase: SplitRunPhase): SplitRunCanvasKey {
+  if (phase.canvasKey) {
+    return phase.canvasKey;
+  }
   const label = `${phase.id} ${phase.name} ${phase.componentName}`.toLowerCase();
   return canvasKeyFromLabel(label) ?? "closure";
 }
@@ -82,6 +116,9 @@ export function emptySplitRunCanvas(phase?: SplitRunPhase, title?: string): Spli
 }
 
 export function splitRunCanvasForPhase(phase: SplitRunPhase): SplitRunCanvasModel {
+  if (phase.canvasKey === null) {
+    return emptySplitRunCanvas(undefined, "");
+  }
   const key = canvasKeyForPhase(phase);
   const yaml = CANVAS_YAML[key];
   const spec = parseCanvasYamlToSpec(yaml);
@@ -92,7 +129,7 @@ export function splitRunCanvasForPhase(phase: SplitRunPhase): SplitRunCanvasMode
 
   const nodes = spec.nodes;
   const edges = spec.edges ?? [];
-  const taken = takenNodeIds(key, nodes, edges);
+  const taken = takenNodeIds(key, nodes, edges, phase.status, phase.triggerName);
 
   return {
     key,
@@ -104,12 +141,15 @@ export function splitRunCanvasForPhase(phase: SplitRunPhase): SplitRunCanvasMode
   };
 }
 
-function takenNodeIds(key: SplitRunCanvasKey, nodes: ComponentsNode[], edges: ComponentsEdge[]): Set<string> {
+function takenNodeIds(
+  key: SplitRunCanvasKey,
+  nodes: ComponentsNode[],
+  edges: ComponentsEdge[],
+  status: SplitRunPhaseStatus,
+  triggerName?: string,
+): Set<string> {
   const taken = new Set<string>();
-  const starts = nodes
-    .filter((node) => node.type === "TYPE_TRIGGER")
-    .map((node) => node.id)
-    .filter(Boolean) as string[];
+  const starts = triggerIdsToWalk(nodes, triggerName);
   const queue = [...starts];
 
   while (queue.length > 0) {
@@ -119,15 +159,15 @@ function takenNodeIds(key: SplitRunCanvasKey, nodes: ComponentsNode[], edges: Co
     }
     taken.add(id);
     const outgoing = edges.filter((edge) => edge.sourceId === id);
-    const preferred = preferredChannel(key, outgoing);
+    const preferred = preferredChannel(key, outgoing, status);
     for (const edge of outgoing) {
       if (!edge.targetId) {
         continue;
       }
+      if (edge.channel === "failed" && status !== "failed") {
+        continue;
+      }
       if (outgoing.length === 1 || edge.channel === preferred || edge.channel === "default") {
-        if (edge.channel === "true" && preferred === "false") {
-          continue;
-        }
         queue.push(edge.targetId);
       }
     }
@@ -136,17 +176,32 @@ function takenNodeIds(key: SplitRunCanvasKey, nodes: ComponentsNode[], edges: Co
   return taken;
 }
 
-function preferredChannel(key: SplitRunCanvasKey, edges: ComponentsEdge[]): string | undefined {
-  if (key === "closure" && edges.some((edge) => edge.channel === "true")) {
-    return "true";
+function triggerIdsToWalk(nodes: ComponentsNode[], triggerName?: string): string[] {
+  const triggers = nodes.filter((node) => node.type === "TYPE_TRIGGER" && node.id);
+  if (triggerName) {
+    const named = triggers.find((node) => node.name === triggerName);
+    if (named?.id) {
+      return [named.id];
+    }
   }
-  if (edges.some((edge) => edge.channel === "false")) {
-    return "false";
+  return triggers.map((node) => node.id).filter((id): id is string => Boolean(id));
+}
+
+function preferredChannel(
+  _key: SplitRunCanvasKey,
+  edges: ComponentsEdge[],
+  status: SplitRunPhaseStatus,
+): string | undefined {
+  if (status === "failed" && edges.some((edge) => edge.channel === "failed")) {
+    return "failed";
+  }
+  if (edges.some((edge) => edge.channel === "true")) {
+    return "true";
   }
   if (edges.some((edge) => edge.channel === "passed")) {
     return "passed";
   }
-  return edges[0]?.channel;
+  return edges.find((edge) => edge.channel !== "failed")?.channel ?? edges[0]?.channel;
 }
 
 function paintStatuses(
@@ -222,7 +277,7 @@ function paintMetrics(nodes: ComponentsNode[], taken: Set<string>, phase: SplitR
   return metrics;
 }
 
-const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string }> = {
+const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; iconSrc?: string }> = {
   onRun: { title: "On Run", iconSlug: "play" },
   runnerBash: { title: "Run Bash", iconSlug: "code" },
   runnerClaudeCode: { title: "Run Claude Code", iconSlug: "code" },
@@ -236,13 +291,15 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string }
   "github.addIssueLabel": { title: "Add Issue Label", iconSlug: "tag" },
   "github.onIssue": { title: "On Issue", iconSlug: "github" },
   "github.onPullRequest": { title: "On Pull Request", iconSlug: "git-pull-request" },
+  "sentry.onIssue": { title: "On Issue", iconSlug: "bug", iconSrc: sentryIcon },
+  "slack.onAppMention": { title: "On Mention", iconSlug: "slack", iconSrc: slackIcon },
   findWorkOrder: { title: "Find Work Order", iconSlug: "search" },
   updateWorkOrderArtifact: { title: "Update Work Order Artifact", iconSlug: "file-pen" },
   createWorkOrder: { title: "Create Work Order", iconSlug: "plus" },
   updateWorkOrderStatus: { title: "Update Work Order Status", iconSlug: "circle-check" },
 };
 
-export function componentPresentation(component?: string): { title: string; iconSlug: string } {
+export function componentPresentation(component?: string): { title: string; iconSlug: string; iconSrc?: string } {
   if (!component) {
     return { title: "Component", iconSlug: "box" };
   }
@@ -285,7 +342,10 @@ const MERGE_SCREENSHOT: FactoriesWorkOrderArtifact = {
  * One log line per canvas node. Claude Code nodes add a short transcript.
  * Work-order artifacts and checks hang their file or score on that line.
  */
-export function richStreamForCanvas(canvas: SplitRunCanvasModel): SplitRunStreamLine[] {
+export function richStreamForCanvas(
+  canvas: SplitRunCanvasModel,
+  description?: FactoriesWorkOrderArtifact,
+): SplitRunStreamLine[] {
   const lines: SplitRunStreamLine[] = [];
   let tick = 0;
 
@@ -318,7 +378,10 @@ export function richStreamForCanvas(canvas: SplitRunCanvasModel): SplitRunStream
       at: clockAt(tick),
       componentName: kind === "check" ? checkLine(node.id, componentName) : componentName,
       status: lineStatus,
-      artifact: kind === "check" || nodeStatus === "did_not_run" ? undefined : artifactForNode(node.id, canvas.key),
+      artifact:
+        kind === "check" || nodeStatus === "did_not_run"
+          ? undefined
+          : artifactForNode(node.id, canvas.key, description),
     });
     tick += 1;
   }
@@ -372,9 +435,13 @@ function streamStatusForNode(status: FactoryNodeStatus): SplitRunPhaseStatus {
   return "pending";
 }
 
-function artifactForNode(nodeId: string, key: SplitRunCanvasKey): FactoriesWorkOrderArtifact | undefined {
+function artifactForNode(
+  nodeId: string,
+  key: SplitRunCanvasKey,
+  description?: FactoriesWorkOrderArtifact,
+): FactoriesWorkOrderArtifact | undefined {
   if (nodeId === "create-work-order") {
-    return DESCRIPTION_ARTIFACT;
+    return description ?? DESCRIPTION_ARTIFACT;
   }
   if (nodeId === "add-plan-artifact") {
     return PLAN_ARTIFACT;

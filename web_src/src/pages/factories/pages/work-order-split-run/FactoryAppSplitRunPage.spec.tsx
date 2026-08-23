@@ -30,12 +30,12 @@ describe("FactoryAppSplitRunPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("split-run-phase-refund-implementer-1")).toBeInTheDocument();
+      expect(screen.getByTestId("split-run-phase-implement-1")).toBeInTheDocument();
     });
     const page = screen.getByTestId("factory-app-split-run-page");
-    expect(screen.getByTestId("factory-app-canvas-title")).toHaveTextContent("Refund Implementer");
+    expect(screen.getByTestId("factory-app-canvas-title")).toHaveTextContent("Implementation");
     expect(within(page).queryByTestId("split-run-phase-refund-planner-0")).not.toBeInTheDocument();
-    expect(within(page).getByTestId("split-run-stream-refund-implementer-1")).toBeInTheDocument();
+    expect(within(page).getByTestId("split-run-stream-implement-1")).toBeInTheDocument();
     expect(within(page).getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
     expect(within(page).getByTestId("split-run-resize-handle")).toBeInTheDocument();
     expect(within(page).queryByTestId("split-run-canvas-expand")).not.toBeInTheDocument();
@@ -57,7 +57,7 @@ describe("FactoryAppSplitRunPage", () => {
       expect(screen.getByTestId("split-run-phase-plan-0")).toBeInTheDocument();
     });
     expect(
-      within(screen.getByTestId("factory-app-split-run-page")).queryByTestId("split-run-phase-refund-implementer-1"),
+      within(screen.getByTestId("factory-app-split-run-page")).queryByTestId("split-run-phase-implement-1"),
     ).not.toBeInTheDocument();
   }, 10000);
 

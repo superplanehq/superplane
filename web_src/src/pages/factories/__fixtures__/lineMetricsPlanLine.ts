@@ -22,14 +22,32 @@ const PLAN_LINE_BACKLOG_APP_ID = "app-refund-backlog";
 
 export const BACKLOG_APP: FactoryApp = {
   id: PLAN_LINE_BACKLOG_APP_ID,
-  name: "Backlog",
-  description: "Scopes work orders before they enter a line.",
+  name: "Ingest",
+  description: "Create a work order when a GitHub issue gets the factory label or is assigned to the SuperPlane agent.",
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+};
+
+export const SENTRY_INTAKE_APP: FactoryApp = {
+  id: "app-refund-sentry",
+  name: "Sentry",
+  description: "Create a work order when Sentry opens an issue.",
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+};
+
+export const SLACK_INTAKE_APP: FactoryApp = {
+  id: "app-refund-slack",
+  name: "Slack",
+  description: "Create a work order when someone mentions the SuperPlane agent in Slack.",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
 };
 
 export const PLAN_LINE_APPS: FactoryApp[] = [
   BACKLOG_APP,
+  SENTRY_INTAKE_APP,
+  SLACK_INTAKE_APP,
   ...REFUND_FACTORY_APPS.map((app) => {
     if (app.id === "app-refund-planner") {
       return { ...app, name: "Plan" };

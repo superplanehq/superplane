@@ -1,4 +1,5 @@
 import type {
+  FactoriesAutomationRef,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderCheck,
@@ -8,6 +9,7 @@ import { UNKNOWN_ORG_USER_NAME, getUserInitials, type OrgUserDisplay } from "@/l
 import { workOrderOwnerDisplay } from "../../lib/workOrderCreator";
 import { latestDispatchForLine } from "../../lib/workOrderNumberResolution";
 import { clockLabel, providerForName } from "./splitRunFormat";
+import { canvasKeyForAutomation, lineAutomationPresentation } from "./splitRunCanvases";
 import { SPLIT_RUN_RUNNING } from "./splitRunRunningFixture";
 import {
   costUsdForDisplay,
@@ -21,7 +23,7 @@ import {
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
-import { PR_CLOSURE_PR_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
+import { DESCRIPTION_ARTIFACT, PR_CLOSURE_PR_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
 import type {
   RunOverlayProvider,
   RunOverlayStep,
@@ -60,11 +62,17 @@ export interface SplitRunPhase {
   canvasSteps: RunOverlayStep[];
   appId?: string;
   runId?: string;
+  /** Line automation canvas. `null` means a person created the work order. */
+  canvasKey?: SplitRunIntakeCanvasKey | null;
+  /** Trigger node that ran when the canvas has more than one start. */
+  triggerName?: string;
 }
 
 export type SplitRunFooterTone = "waiting" | "draft" | "failed";
 
 export type SplitRunBoardColumn = "backlog" | "plan" | "implement" | "verify" | "done";
+
+export type SplitRunIntakeCanvasKey = "intake" | "sentry" | "slack";
 
 export interface SplitRunFixture {
   title: string;
@@ -102,7 +110,7 @@ const IMPLEMENT_FAILED_NOTE: WorkOrderStatusNotePresentation = {
   headline: "Implement did not pass",
   text: "Backend tests failed on the reconciliation worker. The implement step stopped. Open the run to see the diagnosis, then dispatch the line again.",
   cta: { label: "Open failed run", href: "https://superplanehq.semaphoreci.com/" },
-  source: { name: "Refund Implementer" },
+  source: { name: "Implementation" },
 };
 
 export function phaseById(fixture: SplitRunFixture, id: SplitRunPhaseId): SplitRunPhase {
@@ -140,7 +148,7 @@ function mappedWorkOrderFixture(
   const displayStatus = getWorkOrderDisplayStatus(order);
   const executions = latestDispatchExecutions(order, options?.lineId);
   const current = pickCurrentExecution(executions);
-  const phases = executions.map((execution) => executionToPhase(execution));
+  const phases = phasesForOrder(order, executions);
   return {
     title: order.title ?? "Work order",
     owner: workOrderOwnerDisplay(order, UNKNOWN_OWNER),
@@ -225,10 +233,103 @@ function boardColumnFor(current: FactoriesWorkOrderExecution | undefined, execut
   return "backlog";
 }
 
+function phasesForOrder(order: FactoriesWorkOrder, executions: FactoriesWorkOrderExecution[]): SplitRunPhase[] {
+  if (executions.length > 0) {
+    return executions.map((execution) => executionToPhase(execution));
+  }
+  return [backlogSourcePhase(order)];
+}
+
+function backlogSourcePhase(order: FactoriesWorkOrder): SplitRunPhase {
+  const description = descriptionArtifactForOrder(order);
+  const automation = order.createdBy?.automation;
+  if (automation) {
+    return automationBacklogPhase(order, automation, description);
+  }
+  return manualBacklogPhase(order, description);
+}
+
+function automationBacklogPhase(
+  order: FactoriesWorkOrder,
+  automation: FactoriesAutomationRef,
+  description: FactoriesWorkOrderArtifact,
+): SplitRunPhase {
+  const app = { id: automation.appId, name: automation.appName };
+  const { name, componentName } = lineAutomationPresentation(app);
+  const at = clockLabel(order.createdAt);
+  return {
+    id: "backlog",
+    name,
+    status: "passed",
+    duration: "2s",
+    componentName,
+    artifacts: [description],
+    stream: [
+      {
+        id: "backlog-create",
+        at,
+        componentName: automation.nodeName?.trim() || "Create Work Order",
+        status: "passed",
+        duration: "2s",
+        artifact: description,
+      },
+    ],
+    canvasSteps: [],
+    appId: automation.appId,
+    canvasKey: intakeCanvasKeyFor(app),
+    triggerName: automation.nodeName,
+  };
+}
+
+function manualBacklogPhase(order: FactoriesWorkOrder, description: FactoriesWorkOrderArtifact): SplitRunPhase {
+  const creator = order.createdBy?.user?.name?.trim();
+  const at = clockLabel(order.createdAt);
+  const line = creator ? `${creator} created this work order manually.` : "Created this work order manually.";
+  return {
+    id: "backlog",
+    name: "Backlog",
+    status: "passed",
+    duration: "2s",
+    componentName: "Created manually",
+    artifacts: [description],
+    stream: [
+      {
+        id: "backlog-created",
+        at,
+        componentName: line,
+        status: "passed",
+        duration: "2s",
+        artifact: description,
+      },
+    ],
+    canvasSteps: [],
+    canvasKey: null,
+  };
+}
+
+function intakeCanvasKeyFor(app: { id?: string; name?: string }): SplitRunIntakeCanvasKey {
+  const key = canvasKeyForAutomation(app);
+  if (key === "sentry" || key === "slack" || key === "intake") {
+    return key;
+  }
+  return "intake";
+}
+
+function descriptionArtifactForOrder(order: FactoriesWorkOrder): FactoriesWorkOrderArtifact {
+  return {
+    ...DESCRIPTION_ARTIFACT,
+    id: `art-description-${order.id ?? "draft"}`,
+    data: {
+      name: "description.md",
+      title: "description.md",
+      body: order.description ?? "",
+    },
+  };
+}
+
 function executionToPhase(execution: FactoriesWorkOrderExecution): SplitRunPhase {
   const status = statusForExecution(execution);
-  const name = execution.step ?? "Step";
-  const componentName = execution.run?.appName ?? name;
+  const { name, componentName } = lineAutomationPresentation(execution.run, execution.step);
   const duration = durationForExecution(execution, status);
   const line: SplitRunStreamLine = {
     id: execution.id ?? name,

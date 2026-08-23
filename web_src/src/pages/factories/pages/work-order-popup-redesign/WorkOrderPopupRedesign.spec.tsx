@@ -202,7 +202,7 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByText("Backlog")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Log" })).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-refund-implementer-1")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-phase-implement-1")).toBeInTheDocument();
     expect(within(dialog).queryByText("Review the pull request")).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/Users see duplicate refund/)).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-peek-dialog")).not.toBeInTheDocument();

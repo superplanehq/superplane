@@ -20,9 +20,15 @@ spec:
     - channel: "false"
       sourceId: from-gh-issue-check
       targetId: implementation-agent-no-issue
+    - channel: failed
+      sourceId: implementation-agent
+      targetId: add-run-error
+    - channel: failed
+      sourceId: implementation-agent-no-issue
+      targetId: add-run-error
   nodes:
     - id: onrun-implement
-      name: Implement
+      name: Start
       type: TYPE_TRIGGER
       component: onRun
       configuration: {}
@@ -287,3 +293,12 @@ spec:
         x: 1770
         'y': 816
       isCollapsed: false
+    - id: add-run-error
+      name: addRunError
+      type: TYPE_ACTION
+      component: addRunError
+      configuration: {}
+      position:
+        x: 1606
+        'y': 984
+      isCollapsed: true

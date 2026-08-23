@@ -1,7 +1,14 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution, FactoriesWorkOrderLineDispatch } from "@/api-client";
 import { describe, expect, it } from "vitest";
 
-import { OPEN_WORK_ORDER, RUNNING_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
+import {
+  DRAFT_WORK_ORDER,
+  INGEST_DRAFT_WORK_ORDER,
+  OPEN_WORK_ORDER,
+  RUNNING_WORK_ORDER,
+  SENTRY_DRAFT_WORK_ORDER,
+  SLACK_DRAFT_WORK_ORDER,
+} from "../../__fixtures__/factoryPageResponses";
 import { splitRunFixtureForWorkOrder, splitRunStatusLabel } from "./splitRunMocks";
 
 function dispatch(state: FactoriesWorkOrderLineDispatch["state"], stepExecutions: FactoriesWorkOrderExecution[]) {
@@ -35,12 +42,13 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.costUsd).toBe("$0.73");
     expect(fixture.tokensLabel).toBe("2.7k tokens");
     expect(fixture.lineStatus).toBe("running");
-    expect(fixture.currentPhaseId).toMatch(/^refund-implementer-/);
-    const implement = fixture.phases.find((phase) => phase.name === "Refund Implementer");
+    expect(fixture.currentPhaseId).toMatch(/^implement-/);
+    const implement = fixture.phases.find((phase) => phase.name === "Implement");
     expect(implement?.status).toBe("running");
+    expect(implement?.componentName).toBe("Implementation");
     expect(implement?.appId).toBe("app-refund-implementer");
     expect(implement?.runId).toBe(RUNNING_WORK_ORDER.lineDispatches?.[0]?.stepExecutions?.[1]?.run?.id);
-    expect(implement?.stream.map((line) => line.componentName)).toEqual(["Refund Implementer"]);
+    expect(implement?.stream.map((line) => line.componentName)).toEqual(["Implementation"]);
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.checks).toEqual([]);
   });
@@ -248,7 +256,70 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.checks).toEqual([]);
   });
 
-  it("lists no log rows when the work order has no step runs", () => {
+  it("logs a manual create when a person opens a draft", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER);
+    const backlog = fixture.phases[0];
+
+    expect(fixture.lineStatus).toBe("pending");
+    expect(fixture.currentPhaseId).toBe("backlog");
+    expect(fixture.footerTone).toBe("draft");
+    expect(backlog).toMatchObject({
+      id: "backlog",
+      name: "Backlog",
+      componentName: "Created manually",
+      status: "passed",
+      canvasKey: null,
+    });
+    expect(backlog?.stream.map((line) => line.componentName)).toEqual([
+      "Leonardo DiCaprio created this work order manually.",
+    ]);
+    expect(backlog?.artifacts[0]?.data).toMatchObject({
+      name: "description.md",
+      body: DRAFT_WORK_ORDER.description,
+    });
+    expect(backlog?.stream[0]?.artifact?.data).toMatchObject({ name: "description.md" });
+  });
+
+  it("logs GitHub ingest as the backlog source", () => {
+    const fixture = splitRunFixtureForWorkOrder(INGEST_DRAFT_WORK_ORDER);
+    const backlog = fixture.phases[0];
+
+    expect(backlog).toMatchObject({
+      name: "Backlog",
+      componentName: "Ingest",
+      canvasKey: "intake",
+      triggerName: "On Issue Label",
+      appId: "app-refund-backlog",
+    });
+    expect(backlog?.artifacts[0]?.data).toMatchObject({
+      name: "description.md",
+      body: INGEST_DRAFT_WORK_ORDER.description,
+    });
+  });
+
+  it("logs Sentry and Slack intake as other backlog sources", () => {
+    const sentry = splitRunFixtureForWorkOrder(SENTRY_DRAFT_WORK_ORDER).phases[0];
+    const slack = splitRunFixtureForWorkOrder(SLACK_DRAFT_WORK_ORDER).phases[0];
+
+    expect(sentry).toMatchObject({
+      name: "Backlog",
+      componentName: "Sentry",
+      canvasKey: "sentry",
+      triggerName: "On Issue",
+      appId: "app-refund-sentry",
+    });
+    expect(sentry?.artifacts[0]?.data).toMatchObject({ name: "description.md" });
+    expect(slack).toMatchObject({
+      name: "Backlog",
+      componentName: "Slack",
+      canvasKey: "slack",
+      triggerName: "On Mention",
+      appId: "app-refund-slack",
+    });
+    expect(slack?.artifacts[0]?.data).toMatchObject({ name: "description.md" });
+  });
+
+  it("still prompts a draft with no creator to start the next stage", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
         title: OPEN_WORK_ORDER.title,
@@ -256,13 +327,15 @@ describe("splitRunFixtureForWorkOrder", () => {
         state: "STATE_DRAFT",
       }),
     );
+    const backlog = fixture.phases[0];
 
-    expect(fixture.lineStatus).toBe("pending");
-    expect(fixture.phases).toEqual([]);
-    expect(fixture.currentPhaseId).toBe("");
     expect(fixture.footerTone).toBe("draft");
-    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Start the next stage"]);
+    expect(backlog?.canvasKey).toBeNull();
+    expect(backlog?.stream.map((line) => line.componentName)).toEqual(["Created this work order manually."]);
+    expect(backlog?.artifacts[0]?.data).toMatchObject({
+      name: "description.md",
+      body: OPEN_WORK_ORDER.description,
+    });
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Dispatch");
-    expect(fixture.checks).toEqual([]);
   });
 });

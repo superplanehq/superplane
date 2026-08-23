@@ -49,8 +49,11 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
       name: "Backlog",
       status: "passed",
       duration: "2s",
-      componentName: "Create work order",
+      componentName: "Ingest",
       artifacts: [DESCRIPTION_ARTIFACT],
+      canvasKey: "intake",
+      triggerName: "On Issue Label",
+      appId: "app-refund-backlog",
       stream: [
         {
           id: "backlog-create",
@@ -78,7 +81,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
       name: "Plan",
       status: "passed",
       duration: "1m 12s",
-      componentName: "Refund Planner",
+      componentName: "Planning",
       artifacts: [PLAN_ARTIFACT],
       stream: [
         {
@@ -92,7 +95,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
         {
           id: "plan-write",
           at: "12:24:09",
-          componentName: "Refund Planner",
+          componentName: "Planning",
           status: "passed",
           duration: "1m 8s",
           detail: "plan.md",
@@ -111,7 +114,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
         {
           id: "refund-planner",
           title: "Write plan",
-          componentName: "Refund Planner",
+          componentName: "Planning",
           provider: "superplane",
           status: "passed",
           detail: "plan.md",
@@ -124,7 +127,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
       name: "Implement",
       status: "running",
       duration: "4m so far",
-      componentName: "Refund Implementer",
+      componentName: "Implementation",
       artifacts: OPEN_WORK_ORDER_ARTIFACTS.filter((artifact) => artifact.id === "art-branch-1"),
       stream: [
         {
@@ -154,7 +157,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
         {
           id: "impl-agent",
           at: "12:25:33",
-          componentName: "Refund Implementer",
+          componentName: "Implementation",
           status: "running",
           duration: "4m so far",
           detail: "reconciliation_worker_test.go",
@@ -164,7 +167,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
           at: "—",
           componentName: "Create Pull Request",
           status: "pending",
-          detail: "Waits on Refund Implementer",
+          detail: "Waits on Implementation",
         },
       ],
       canvasSteps: [
@@ -180,7 +183,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
         {
           id: "refund-implementer",
           title: "Write test",
-          componentName: "Refund Implementer",
+          componentName: "Implementation",
           provider: "superplane",
           status: "running",
           detail: "reconciliation_worker_test.go",
@@ -192,7 +195,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
           componentName: "Create Pull Request",
           provider: "github",
           status: "pending",
-          detail: "Waits on Refund Implementer",
+          detail: "Waits on Implementation",
         },
       ],
     },

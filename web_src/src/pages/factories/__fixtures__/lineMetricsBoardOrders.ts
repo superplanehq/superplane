@@ -61,7 +61,7 @@ export const BOARD_IMPLEMENT_FAILED_ORDER: FactoriesWorkOrder = {
           result: "RESULT_FAILED",
           createdAt: TWO_HOURS_AGO,
           updatedAt: HOUR_AGO,
-          run: { id: LINE_RUN_IMPLEMENT_FAILED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+          run: { id: LINE_RUN_IMPLEMENT_FAILED_ID, appId: "app-refund-implementer", appName: "Implementation" },
         },
       ]),
       state: "STATE_FINISHED",
@@ -229,10 +229,10 @@ const FEATURE_STEP_INDEX: Record<string, number> = {
 };
 
 const FEATURE_STEP_LABEL: Record<string, string> = {
-  [FEATURE_PLAN_STEP]: "Refund Planner",
-  [FEATURE_IMPLEMENT_STEP]: "Refund Implementer",
-  [FEATURE_PR_STEP]: "Refund Implementer",
-  [FEATURE_CI_STEP]: "Refund Verifier",
+  [FEATURE_PLAN_STEP]: "Planning",
+  [FEATURE_IMPLEMENT_STEP]: "Implementation",
+  [FEATURE_PR_STEP]: "Implementation",
+  [FEATURE_CI_STEP]: "Risk Assessment",
 };
 
 const FEATURE_DELIVERY_STEPS: NonNullable<FactoriesWorkOrderLineDispatch["steps"]> = [
@@ -270,7 +270,7 @@ function featureLineExecution(
     run: {
       id: `run-feature-${step}`,
       appId: "app-refund-implementer",
-      appName: "Refund Implementer",
+      appName: "Implementation",
     },
     ...overrides,
   };
@@ -318,7 +318,7 @@ export const FEATURE_RUNNING_WORK_ORDER: FactoriesWorkOrder = {
         id: "impl-1",
         state: "STATE_STARTED",
         result: "RESULT_UNKNOWN",
-        run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+        run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Implementation" },
       }),
     ]),
   ],
@@ -370,7 +370,7 @@ export const FEATURE_CI_WORK_ORDER: FactoriesWorkOrder = {
         id: "ci-3",
         state: "STATE_STARTED",
         result: "RESULT_UNKNOWN",
-        run: { id: LINE_RUN_VERIFY_PASSED_ID, appId: "app-refund-verifier", appName: "Refund Verifier" },
+        run: { id: LINE_RUN_VERIFY_PASSED_ID, appId: "app-refund-verifier", appName: "Risk Assessment" },
       }),
     ]),
   ],

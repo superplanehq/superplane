@@ -424,11 +424,17 @@ function canvasAppIdsForLine(
   const steps = line.steps ?? [];
   return {
     intake: backlog?.id,
+    sentry: appIdNamed(apps, "Sentry"),
+    slack: appIdNamed(apps, "Slack"),
     planning: steps[0]?.app?.app,
     implementation: steps[1]?.app?.app,
     risk: steps[2]?.app?.app,
     closure: steps[3]?.app?.app ?? closure?.id,
   };
+}
+
+function appIdNamed(apps: Array<{ id?: string; name?: string }>, name: string): string | undefined {
+  return apps.find((app) => app.id && app.name === name)?.id;
 }
 
 function canvasEditHrefForLine(

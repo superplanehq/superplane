@@ -334,23 +334,44 @@ export function streamFromLiveRun(
   return lines;
 }
 
+function liveCanvasMatchesLineAutomation(line: SplitRunCanvasModel, live: SplitRunCanvasModel): boolean {
+  const liveIds = new Set(live.nodes.map((node) => node.id).filter((id): id is string => Boolean(id)));
+  const lineIds = line.nodes.map((node) => node.id).filter((id): id is string => Boolean(id));
+  if (lineIds.length === 0) {
+    return false;
+  }
+  const overlap = lineIds.filter((id) => liveIds.has(id)).length;
+  return overlap >= Math.ceil(lineIds.length / 2);
+}
+
 export function resolveSplitRunVisual(
   phase: SplitRunPhase,
   live: { enabled: boolean; isError?: boolean; canvas?: SplitRunCanvasModel; stream: SplitRunStreamLine[] },
 ): { canvas: SplitRunCanvasModel; stream: SplitRunStreamLine[] | undefined } {
+  const lineCanvas = splitRunCanvasForPhase(phase);
+  const lineStream = richStreamForCanvas(lineCanvas, descriptionArtifactFromPhase(phase));
+  if (phase.canvasKey === null || lineCanvas.nodes.length === 0) {
+    return { canvas: lineCanvas, stream: phase.stream };
+  }
   if (live.isError) {
     return { canvas: emptySplitRunCanvas(phase), stream: [] };
   }
-  if (live.enabled) {
+  if (live.canvas && liveCanvasMatchesLineAutomation(lineCanvas, live.canvas)) {
     return {
-      canvas: live.canvas ?? emptySplitRunCanvas(phase),
-      stream: live.stream.length > 0 ? live.stream : phase.stream,
+      canvas: live.canvas,
+      stream: live.stream.length > 0 ? live.stream : lineStream,
     };
   }
-  const canvas = splitRunCanvasForPhase(phase);
-  return { canvas, stream: richStreamForCanvas(canvas) };
+  return { canvas: lineCanvas, stream: lineStream };
 }
 
 export function liveCanvasKeyForPhase(phase: SplitRunPhase): SplitRunCanvasModel["key"] {
   return canvasKeyForAutomation({ id: phase.appId, name: phase.componentName }) ?? canvasKeyForPhase(phase);
+}
+
+function descriptionArtifactFromPhase(phase: SplitRunPhase) {
+  return phase.artifacts.find((artifact) => {
+    const data = artifact.data;
+    return Boolean(data && "name" in data && data.name === "description.md");
+  });
 }
