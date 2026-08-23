@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { groupSplitRunStream } from "./PhaseLogCard";
 import {
   canvasKeyForAutomation,
   canvasKeyForPhase,
@@ -142,7 +143,83 @@ describe("splitRunCanvasForPhase", () => {
       "Scoring retry-policy risk.",
       "Writing the risk review.",
     ]);
-    expect(stream.find((line) => line.id === "report-risk-check")?.componentName).toBe("Risk review  65/100");
+    expect(stream.find((line) => line.id === "report-risk-check")).toMatchObject({
+      kind: "check",
+      componentName: "Risk review",
+      action: "65/100",
+    });
+    const groups = groupSplitRunStream(stream);
+    const agent = groups.find((group) => group.line.id === "assess-pr-risk");
+    expect(agent?.notes.map((line) => line.componentName)).toEqual([
+      "Reading the pull request diff.",
+      "Scoring retry-policy risk.",
+      "Writing the risk review.",
+    ]);
+  });
+
+  it("writes icon, type, name, and action on each canvas node line", () => {
+    const canvas = splitRunCanvasForPhase({
+      id: "backlog",
+      name: "Backlog",
+      status: "passed",
+      duration: "2s",
+      componentName: "Ingest",
+      artifacts: [],
+      stream: [],
+      canvasSteps: [],
+      canvasKey: "intake",
+      triggerName: "On Issue Label",
+    });
+    const stream = richStreamForCanvas(canvas);
+    const labeled = stream.find((line) => line.id === "on-issue-labeled");
+    const factoryLabel = stream.find((line) => line.id === "has-factory-label");
+    const created = stream.find((line) => line.id === "create-work-order");
+    const idle = stream.find((line) => line.id === "on-issue-assigned");
+
+    expect(labeled).toMatchObject({
+      componentType: "github.onIssue",
+      componentName: "On Issue Label",
+      action: "triggered",
+      iconSlug: "github",
+    });
+    expect(factoryLabel).toMatchObject({
+      componentType: "Filter",
+      componentName: "Factory Label?",
+      action: "passed",
+      iconSlug: "funnel",
+    });
+    expect(created).toMatchObject({
+      componentType: "Create Work Order",
+      componentName: "Create Work Order",
+      action: "passed",
+    });
+    expect(idle).toMatchObject({
+      componentType: "github.onIssue",
+      componentName: "On Issue Assignment",
+      action: "did not run",
+    });
+  });
+
+  it("uses catalog labels and namespaced ids for planning components", () => {
+    const canvas = splitRunCanvasForPhase({
+      id: "plan",
+      name: "Plan",
+      status: "passed",
+      duration: "1m",
+      componentName: "Planning",
+      artifacts: [],
+      stream: [],
+      canvasSteps: [],
+    });
+    const stream = richStreamForCanvas(canvas);
+    expect(stream.find((line) => line.id === "add-factory-label")).toMatchObject({
+      componentType: "github.addIssueLabel",
+      componentName: "Add Factory Label",
+    });
+    expect(stream.find((line) => line.id === "planner-agent")).toMatchObject({
+      componentType: "Run Claude Code",
+      componentName: "Agent - Plan for GH Issue",
+    });
   });
 
   it("paints the GitHub label path on Ingest and leaves assignment idle", () => {

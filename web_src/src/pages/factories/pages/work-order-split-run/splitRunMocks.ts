@@ -36,6 +36,8 @@ export type SplitRunPhaseStatus = "passed" | "running" | "pending" | "waiting" |
 
 export type SplitRunStreamEvent = "started" | "expanded" | "completed";
 
+export type SplitRunStreamKind = "trigger" | "filter" | "if" | "action" | "agent" | "check";
+
 export interface SplitRunStreamLine {
   id: string;
   nodeId?: string;
@@ -48,6 +50,12 @@ export interface SplitRunStreamLine {
   artifact?: FactoriesWorkOrderArtifact;
   /** Agent transcript line. No checkmark. */
   note?: boolean;
+  kind?: SplitRunStreamKind;
+  /** Catalog identity: `Run Claude Code`, `github.addIssueLabel`. */
+  componentType?: string;
+  action?: string;
+  iconSlug?: string;
+  iconSrc?: string;
 }
 
 export interface SplitRunPhase {
@@ -269,6 +277,10 @@ function automationBacklogPhase(
         status: "passed",
         duration: "2s",
         artifact: description,
+        kind: "action",
+        componentType: "Create Work Order",
+        action: "passed",
+        iconSlug: "factory",
       },
     ],
     canvasSteps: [],
@@ -297,6 +309,10 @@ function manualBacklogPhase(order: FactoriesWorkOrder, description: FactoriesWor
         status: "passed",
         duration: "2s",
         artifact: description,
+        kind: "action",
+        componentType: "Create Work Order",
+        action: "passed",
+        iconSlug: "user",
       },
     ],
     canvasSteps: [],
@@ -335,6 +351,10 @@ function executionToPhase(execution: FactoriesWorkOrderExecution): SplitRunPhase
     status,
     duration,
     detail: execution.step,
+    kind: "action",
+    componentType: componentName,
+    action: status === "passed" ? "passed" : status === "failed" ? "failed" : status === "running" ? "running" : "—",
+    iconSlug: "box",
   };
   return {
     id: phaseIdForExecution(execution),

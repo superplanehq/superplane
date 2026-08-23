@@ -11,9 +11,11 @@ import {
   canvasKeyForAutomation,
   canvasKeyForPhase,
   componentPresentation,
+  componentTypeLabel,
   emptySplitRunCanvas,
   richStreamForCanvas,
   splitRunCanvasForPhase,
+  streamKindForNode,
   type SplitRunCanvasModel,
 } from "./splitRunCanvases";
 import { clockLabel } from "./splitRunFormat";
@@ -276,6 +278,11 @@ function streamLineForNode(
     componentName: node.name ?? presentation.title,
     status: streamStatusFromNode(status),
     duration: duration === "—" ? undefined : duration,
+    kind: streamKindForNode(node),
+    componentType: componentTypeLabel(node.component),
+    action: liveStreamAction(status, Boolean(execution)),
+    iconSlug: presentation.iconSlug,
+    iconSrc: presentation.iconSrc,
   };
 }
 
@@ -374,4 +381,23 @@ function descriptionArtifactFromPhase(phase: SplitRunPhase) {
     const data = artifact.data;
     return Boolean(data && "name" in data && data.name === "description.md");
   });
+}
+
+function liveStreamAction(status: FactoryNodeStatus, hasExecution: boolean): string {
+  if (!hasExecution) {
+    return "did not run";
+  }
+  if (status === "running" || status === "cancelling") {
+    return "running";
+  }
+  if (status === "failed" || status === "error") {
+    return "failed";
+  }
+  if (status === "triggered") {
+    return "triggered";
+  }
+  if (status === "passed") {
+    return "passed";
+  }
+  return "—";
 }

@@ -79,6 +79,10 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-stream-implement")).toBeInTheDocument();
     expect(within(implement).queryByText("Started")).not.toBeInTheDocument();
     expect(within(implement).getAllByText("Create Branch").length).toBeGreaterThan(0);
+    expect(within(screen.getByTestId("split-run-stream-line-create-branch")).getByText("Run Bash")).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-line-create-branch")).getByText(">")).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-implement")).getAllByText("├─").length).toBeGreaterThan(0);
+    expect(within(screen.getByTestId("split-run-stream-implement")).getAllByText("└─").length).toBeGreaterThan(0);
     expect(within(implement).getByText("Reading plan.md.")).toBeInTheDocument();
 
     expect(screen.getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();

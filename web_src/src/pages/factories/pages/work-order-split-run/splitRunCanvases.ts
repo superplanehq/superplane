@@ -19,7 +19,7 @@ import riskAssessmentYaml from "./risk-assessment.canvas.yaml?raw";
 import sentryIntakeYaml from "./sentry-intake.canvas.yaml?raw";
 import slackIntakeYaml from "./slack-intake.canvas.yaml?raw";
 
-import type { SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamLine } from "./splitRunMocks";
+import type { SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamKind, SplitRunStreamLine } from "./splitRunMocks";
 
 export type SplitRunCanvasKey = "intake" | "sentry" | "slack" | "planning" | "implementation" | "risk" | "closure";
 
@@ -282,21 +282,21 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; 
   runnerBash: { title: "Run Bash", iconSlug: "code" },
   runnerClaudeCode: { title: "Run Claude Code", iconSlug: "code" },
   runnerJS: { title: "Run JavaScript", iconSlug: "code" },
-  if: { title: "If", iconSlug: "git-branch" },
-  filter: { title: "Filter", iconSlug: "filter" },
-  addWorkOrderArtifact: { title: "Add Work Order Artifact", iconSlug: "file-text" },
+  if: { title: "If", iconSlug: "split" },
+  filter: { title: "Filter", iconSlug: "funnel" },
+  addWorkOrderArtifact: { title: "Add Work Order Artifact", iconSlug: "factory" },
   addRunError: { title: "Add Run Error", iconSlug: "triangle-alert" },
-  reportWorkOrderCheck: { title: "Report Work Order Check", iconSlug: "clipboard-check" },
-  "github.createIssueComment": { title: "Create Issue Comment", iconSlug: "message-square" },
-  "github.addIssueLabel": { title: "Add Issue Label", iconSlug: "tag" },
+  reportWorkOrderCheck: { title: "Report Work Order Check", iconSlug: "factory" },
+  "github.createIssueComment": { title: "Create Issue Comment", iconSlug: "github" },
+  "github.addIssueLabel": { title: "Add Issue Label", iconSlug: "github" },
   "github.onIssue": { title: "On Issue", iconSlug: "github" },
-  "github.onPullRequest": { title: "On Pull Request", iconSlug: "git-pull-request" },
+  "github.onPullRequest": { title: "On Pull Request", iconSlug: "github" },
   "sentry.onIssue": { title: "On Issue", iconSlug: "bug", iconSrc: sentryIcon },
   "slack.onAppMention": { title: "On Mention", iconSlug: "slack", iconSrc: slackIcon },
-  findWorkOrder: { title: "Find Work Order", iconSlug: "search" },
-  updateWorkOrderArtifact: { title: "Update Work Order Artifact", iconSlug: "file-pen" },
-  createWorkOrder: { title: "Create Work Order", iconSlug: "plus" },
-  updateWorkOrderStatus: { title: "Update Work Order Status", iconSlug: "circle-check" },
+  findWorkOrder: { title: "Find Work Order", iconSlug: "factory" },
+  updateWorkOrderArtifact: { title: "Update Work Order Artifact", iconSlug: "factory" },
+  createWorkOrder: { title: "Create Work Order", iconSlug: "factory" },
+  updateWorkOrderStatus: { title: "Update Work Order Status", iconSlug: "factory" },
 };
 
 export function componentPresentation(component?: string): { title: string; iconSlug: string; iconSrc?: string } {
@@ -304,6 +304,17 @@ export function componentPresentation(component?: string): { title: string; icon
     return { title: "Component", iconSlug: "box" };
   }
   return COMPONENT_PRESENTATION[component] ?? { title: component, iconSlug: "box" };
+}
+
+/** Integration ids stay namespaced. Core components use their catalog label. */
+export function componentTypeLabel(component?: string): string {
+  if (!component) {
+    return "Component";
+  }
+  if (component.includes(".")) {
+    return component;
+  }
+  return componentPresentation(component).title;
 }
 
 const PLAN_ARTIFACT: FactoriesWorkOrderArtifact = {
@@ -354,9 +365,29 @@ export function richStreamForCanvas(
       continue;
     }
     const nodeStatus = canvas.statuses[node.id] ?? "pending";
-    const componentName = node.name ?? componentPresentation(node.component).title;
+    const presentation = componentPresentation(node.component);
+    const componentName = node.name ?? presentation.title;
     const lineStatus = streamStatusForNode(nodeStatus);
     const kind = classifyNode(node);
+    const streamKind = streamKindForNode(node);
+
+    const artifact =
+      kind === "check" || nodeStatus === "did_not_run" ? undefined : artifactForNode(node.id, canvas.key, description);
+    const name = kind === "check" ? checkName(node.id, componentName) : componentName;
+    lines.push({
+      id: node.id,
+      nodeId: node.id,
+      at: clockAt(tick),
+      componentName: name,
+      status: lineStatus,
+      artifact,
+      kind: streamKind,
+      componentType: componentTypeLabel(node.component),
+      action: actionForStreamLine(streamKind, nodeStatus, node.id),
+      iconSlug: presentation.iconSlug,
+      iconSrc: presentation.iconSrc,
+    });
+    tick += 1;
 
     if (kind === "agent" && nodeStatus !== "did_not_run" && nodeStatus !== "pending") {
       for (const note of agentNotes(node.id)) {
@@ -371,22 +402,51 @@ export function richStreamForCanvas(
         tick += 1;
       }
     }
-
-    lines.push({
-      id: node.id,
-      nodeId: node.id,
-      at: clockAt(tick),
-      componentName: kind === "check" ? checkLine(node.id, componentName) : componentName,
-      status: lineStatus,
-      artifact:
-        kind === "check" || nodeStatus === "did_not_run"
-          ? undefined
-          : artifactForNode(node.id, canvas.key, description),
-    });
-    tick += 1;
   }
 
   return lines;
+}
+
+export function streamKindForNode(node: ComponentsNode): SplitRunStreamKind {
+  if (node.type === "TYPE_TRIGGER") {
+    return "trigger";
+  }
+  const component = node.component ?? "";
+  if (component === "filter") {
+    return "filter";
+  }
+  if (component === "if") {
+    return "if";
+  }
+  if (component === "runnerClaudeCode") {
+    return "agent";
+  }
+  if (component === "reportWorkOrderCheck") {
+    return "check";
+  }
+  return "action";
+}
+
+function actionForStreamLine(kind: SplitRunStreamKind, nodeStatus: FactoryNodeStatus, nodeId: string): string {
+  if (nodeStatus === "did_not_run") {
+    return "did not run";
+  }
+  if (nodeStatus === "pending") {
+    return "—";
+  }
+  if (nodeStatus === "failed") {
+    return "failed";
+  }
+  if (nodeStatus === "running") {
+    return "running";
+  }
+  if (kind === "check") {
+    return checkScore(nodeId);
+  }
+  if (kind === "trigger" || nodeStatus === "triggered") {
+    return "triggered";
+  }
+  return "passed";
 }
 
 function classifyNode(node: ComponentsNode): "agent" | "check" | "artifact" | "simple" {
@@ -421,11 +481,18 @@ function agentNotes(nodeId: string): string[] {
   return ["Reading the work order.", "Writing the change.", "Running the local checks."];
 }
 
-function checkLine(nodeId: string, fallback: string): string {
+function checkName(nodeId: string, fallback: string): string {
   if (nodeId === "report-risk-check") {
-    return "Risk review  65/100";
+    return "Risk review";
   }
   return fallback;
+}
+
+function checkScore(nodeId: string): string {
+  if (nodeId === "report-risk-check") {
+    return "65/100";
+  }
+  return "passed";
 }
 
 function streamStatusForNode(status: FactoryNodeStatus): SplitRunPhaseStatus {
