@@ -32,7 +32,22 @@ function line(
 
 const PLANNING_STREAM: SplitRunStreamLine[] = [
   line({ id: "planner-agent", componentName: "Agent - Plan for GH Issue", componentType: "Run Claude Code" }),
-  line({ id: "step-clone", note: true, componentName: "Clone Repo", componentType: "bash" }),
+  line({
+    id: "step-clone",
+    note: true,
+    componentName: "Clone Repo",
+    componentType: "bash",
+    status: "passed",
+    detail: "Cloning into 'superplane'...",
+  }),
+  line({
+    id: "step-fail",
+    note: true,
+    componentName: "Run Tests",
+    componentType: "bash",
+    status: "failed",
+    detail: "FAIL pkg/foo",
+  }),
   line({
     id: "step-write",
     note: true,
@@ -46,6 +61,7 @@ const PLANNING_STREAM: SplitRunStreamLine[] = [
     noteDepth: 1,
     componentName: "cat /tmp/ORDER.md",
     componentType: "bash",
+    detail: "## Goal\nAdd a menu.",
   }),
   line({
     id: "cmd-note",
@@ -110,8 +126,31 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(screen.getByText("Clone Repo")).toBeInTheDocument();
     expect(screen.getByText("Write Implementation Plan")).toBeInTheDocument();
     expect(screen.getByText("Use plan as output")).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-line-step-clone")).getByText("✓")).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-line-step-fail")).getByText("✗")).toBeInTheDocument();
+    expect(screen.queryByText("Cloning into 'superplane'...")).not.toBeInTheDocument();
     expect(screen.queryByText(LONG_NOTE)).not.toBeInTheDocument();
     expect(screen.queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();
+  });
+
+  it("expands the selected node in the log", () => {
+    render(<PhaseLogCard phase={PHASE} expanded stream={PLANNING_STREAM} selectedNodeId="planner-agent" />);
+
+    expect(screen.getByText("Clone Repo")).toBeInTheDocument();
+    expect(screen.getByText("Write Implementation Plan")).toBeInTheDocument();
+    expect(screen.queryByText(LONG_NOTE)).not.toBeInTheDocument();
+  });
+
+  it("expands bash output from the step line", async () => {
+    const user = userEvent.setup();
+    render(<PhaseLogCard phase={PHASE} expanded stream={PLANNING_STREAM} />);
+
+    await user.click(screen.getByText("Agent - Plan for GH Issue"));
+    await user.click(screen.getByText("Clone Repo"));
+
+    expect(screen.getByText("Cloning into 'superplane'...")).toBeInTheDocument();
+    await user.click(screen.getByText("Run Tests"));
+    expect(screen.getByText("FAIL pkg/foo")).toBeInTheDocument();
   });
 
   it("shows agent text and a collapsed tool summary when the prompt expands", async () => {
@@ -135,7 +174,12 @@ describe("PhaseLogCard collapsed stream", () => {
 
     const stream = screen.getByTestId("split-run-stream-plan");
     expect(within(stream).getByText("cat /tmp/ORDER.md")).toBeInTheDocument();
+    expect(within(stream).queryByText(/## Goal/)).not.toBeInTheDocument();
     expect(within(stream).queryByText("LineListCard.tsx")).not.toBeInTheDocument();
+
+    await user.click(within(stream).getByText("cat /tmp/ORDER.md"));
+    expect(within(stream).getByText(/## Goal/)).toBeInTheDocument();
+    expect(within(stream).getByText(/Add a menu/)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Read 1 file" }));
     expect(within(stream).getByText("LineListCard.tsx")).toBeInTheDocument();

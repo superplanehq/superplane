@@ -25,6 +25,9 @@ Now let me check factories.proto Delete rpc absence explicitly and PermissionToo
 -> [Bash] cat > /tmp/plan.md << 'EOF' Add an automations-style 3-dots overflow menu on each card and then write a very long implementation plan that should not appear in the tree
 $ Use plan as output
 Plan found. Using as output
+$ Run Tests
+FAIL pkg/foo
+✗ tests failed
 `;
 
 describe("parseClaudeCodeLog", () => {
@@ -35,24 +38,37 @@ describe("parseClaudeCodeLog", () => {
       { name: "Use plan as output", type: "bash" },
     ]);
 
-    expect(steps.map((step) => ({ name: step.name, type: step.type }))).toEqual([
-      { name: "Clone Repo", type: "bash" },
-      { name: "Provide description", type: "bash" },
-      { name: "Write Implementation Plan", type: "prompt" },
-      { name: "Use plan as output", type: "bash" },
+    expect(steps.map((step) => ({ name: step.name, type: step.type, status: step.status }))).toEqual([
+      { name: "Clone Repo", type: "bash", status: "passed" },
+      { name: "Provide description", type: "bash", status: "passed" },
+      { name: "Write Implementation Plan", type: "prompt", status: "passed" },
+      { name: "Use plan as output", type: "bash", status: "passed" },
+      { name: "Run Tests", type: "bash", status: "failed" },
     ]);
-    expect(steps[0].commands).toEqual([]);
+    expect(steps[0]).toMatchObject({
+      commands: [],
+      output: "Cloning into 'superplane'...\nremote: Enumerating objects: 7181, done.",
+    });
+    expect(steps[3].output).toBe("Plan found. Using as output");
+    expect(steps[4].output).toBe("FAIL pkg/foo");
     expect(steps[2].commands).toEqual([
-      { type: "bash", name: "cat /tmp/ORDER.md" },
-      { type: "read", name: "web_src/src/pages/factories/pages/LineListCard.tsx" },
-      { type: "note", name: "Let me examine the key files." },
+      { type: "bash", name: "cat /tmp/ORDER.md", status: "passed", output: "## Goal\nAdd a menu." },
+      {
+        type: "read",
+        name: "web_src/src/pages/factories/pages/LineListCard.tsx",
+        status: "passed",
+        output: '1\timport type { FactoriesFactoryLine } from "@/api-client";',
+      },
+      { type: "note", name: "Let me examine the key files.", status: "passed" },
       {
         type: "note",
         name: "Now let me check factories.proto Delete rpc absence explicitly and PermissionTooltip component quickly, plus check showSuccessToast import paths.",
+        status: "passed",
       },
       {
         type: "bash",
         name: "cat > /tmp/plan.md << 'EOF' Add an automations-style 3-dots overflow…",
+        status: "passed",
       },
     ]);
   });
@@ -67,7 +83,13 @@ describe("parseClaudeCodeLog", () => {
       "Write Implementation Plan",
       "Use plan as output",
     ]);
-    expect(steps[2].commands[0]).toEqual({ type: "bash", name: "cat /tmp/ORDER.md" });
+    expect(steps[0].output).toContain("Cloning into 'superplane'...");
+    expect(steps[2].commands[0]).toMatchObject({
+      type: "bash",
+      name: "cat /tmp/ORDER.md",
+      status: "passed",
+      output: expect.stringContaining("## Goal"),
+    });
     expect(steps[2].commands.some((command) => command.name.includes("import type"))).toBe(false);
     expect(steps[2].commands.filter((command) => command.type !== "note")).toHaveLength(42);
     expect(steps[2].commands.map((command) => command.name)).toContain(
@@ -103,7 +125,12 @@ describe("parseClaudeCodeLog", () => {
     ]);
     const implementation = steps.find((step) => step.name === "Implementation");
     expect(implementation?.type).toBe("prompt");
-    expect(implementation?.commands[0]).toEqual({ type: "bash", name: "cat /tmp/ORDER.md" });
+    expect(steps.find((step) => step.name === "Set Up Git User")?.output).toContain("superplaneagent@superplane.com");
+    expect(implementation?.commands[0]).toMatchObject({
+      type: "bash",
+      name: "cat /tmp/ORDER.md",
+      status: "passed",
+    });
     expect(implementation?.commands.map((command) => command.name)).toContain(
       "Now let's look at the messages file, factory_notification_consumer.go, and other referenced files.",
     );

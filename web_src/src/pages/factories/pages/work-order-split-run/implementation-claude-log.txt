@@ -1,8 +1,68 @@
 $ Prepare Claude Code
 $ Set Up Git User
+Using superplaneagent@superplane.com
 $ Provide order
+When a work order finishes implementation in my factory and Changes status to Waiting and requests Review of the assigned User, i am not receiving an email notification as it should send.
 $ Provide Plan
+Root cause: setting a work order's status note (the "waiting for review" panel an automation posts, e.g. via the `setWorkOrderStatusNote` component) never triggers an email. Every other work-order mutation (status change, comment, artifact, assignment) publishes a `FactoryWorkOrderNotificationMessage` that the email worker turns into an email; `FactoryContext.SetWorkOrderStatusNote` only fires the websocket-only `order.status_note.updated` reason. Since a work order becoming "Waiting" in the UI is a *derived* display status (order stays `open`, its line dispatch just stops being active) rather than a persisted state transition, the existing `order.status.updated` / "status changes" notification never fires either. Net effect: nothing emails the assignee/creator when a line parks the order waiting on their review.
+Fix: treat "a status note was set on an open work order" as a notifiable event, add a new notification type for it (own opt-in toggle, defaulting on, distinct from the "opens/closes/drafts" status type), and wire it end to end (backend event → recipient resolution → email content → settings proto/API → frontend settings UI).
+Investigation already done (for context, not to repeat)
+- `pkg/grpc/actions/factories/update_work_order_status.go` and `pkg/workers/contexts/factory_context.go` (`UpdateWorkOrderStatus`, `AddWorkOrderComment`, `AddWorkOrderArtifact`) all publish `messages.FactoryWorkOrderNotificationMessage` after their mutation. `SetWorkOrderStatusNote` (same file, ~line 242) does not.
+- `pkg/workers/factory_notification_consumer.go` is the consumer: `resolveRecipients` → `workOrderNotificationCandidates` (switch over `message.EventType`) → `models.UserNotificationSettings.Notifies` (per-type opt-out) → `buildWorkOrderNotificationContent` (subject/summary/detail) → `EmailService.SendWorkOrderNotificationEmail`.
+- `pkg/models/factory/events.go` documents `EventTypeOrderStatusNoteUpdated` explicitly as "websocket-only... does not back a timeline event" — that reasoning covered the timeline, but nobody added the parallel email hook the way it exists for the other four event types.
+- `pkg/models/user_notification_settings.go` defines the configurable `NotificationType*` constants; `protos/me.proto` (`NotificationSettings.Type` enum) and `pkg/grpc/actions/me/notification_settings.go` (`notificationTypeProto` map) mirror them; `web_src/src/lib/notificationSettings.ts` (`NOTIFICATION_SETTINGS_TYPES` / `NOTIFICATION_TYPE_OPTIONS`) is the frontend mirror, rendered by `FactorySettingsNotificationsPage.tsx`.
+- `services.WorkOrderNotificationTemplateData` / `work_order_notification.txt|html` templates are generic (Summary/Detail/link) and need no new template — just a new `case` in `buildWorkOrderNotificationContent`.
+- The only writer of status notes is the `setWorkOrderStatusNote` factory component (`pkg/components/factory/set_work_order_status_note.go`) via `FactoryContext.SetWorkOrderStatusNote`; there's no separate user-facing gRPC endpoint for it, so this is the single call site to change.
+Implementation steps
+1. New notification type (backend model)
+   - In `pkg/models/user_notification_settings.go`: add `NotificationTypeWorkOrderStatusNote = "work_order_status_note_owned"` (or similar name — keep the `_owned` suffix convention used for owner-facing types) and append it to `NotificationTypes`.
+   - Default: enabled by default like the others (`DefaultUserNotificationSettings` already implies "all" scope = everything on; no per-type default map to touch).
+2. Publish the notification when a status note is set
+   - In `pkg/workers/contexts/factory_context.go`, `SetWorkOrderStatusNote`: after `order.SetStatusNote(...)` succeeds and after the existing `c.notifyWorkOrderUpdated(...)`, also call `c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{...})` with:
+     - `EventType: factory.EventTypeOrderStatusNoteUpdated`
+     - `ActorName: c.automationName()`
+     - a way to carry the note's headline/body/CTA into the email (extend `FactoryWorkOrderNotificationMessage` with e.g. `StatusNoteHeadline`, `StatusNoteBody`, `StatusNoteCtaLabel`, `StatusNoteCtaURL` fields in `pkg/grpc/actions/messages/factory_work_order_notification.go`, following the existing doc-comment style).
+   - Decide/confirm scope: only publish for the *initial* set of a given note key vs. every update. Given notes are latest-only per key and can be updated repeatedly by re-running the same line step, re-notifying on every update would be noisy; check `order.SetStatusNote`/`upsertStatusNote` return value to see if it can tell "created" vs "updated" (mirrors how `order.UpdateStatus` returns `changed` for `SkipSame`). If it can't cheaply, discuss in the PR description whether to notify on every set (simplest, matches how comments/artifacts already notify on every add) or add a `created bool` return from `SetStatusNote`. Default recommendation: notify on every set, since a status note update is itself new information the reviewer should see (e.g., "still waiting" turning into "ready now"), same as `AddWorkOrderComment` firing on every comment.
+   - Guard: only assignees/creator of the order should be candidates (see step 3), and skip sending if there's no headline (mirrors `Documentation()`'s requirement that headline is required, so should always be present).
+3. Recipient resolution
+   - In `pkg/workers/factory_notification_consumer.go`, `workOrderNotificationCandidates`: add a `case factory.EventTypeOrderStatusNoteUpdated:` that adds every `order.Assignees` and `order.CreatedByID` with the new `models.NotificationTypeWorkOrderStatusNote` type — same shape as the `EventTypeOrderStatusUpdated` case, so both owners and the creator get the email, then filtered by their own settings and never sent to the actor (actor exclusion already generic).
+4. Email content
+   - In `buildWorkOrderNotificationContent` (`pkg/workers/factory_notification_consumer.go`): add a `case factory.EventTypeOrderStatusNoteUpdated:` building:
+     - Subject: `fmt.Sprintf("[%s] %s", orderKey, message.StatusNoteHeadline)` (or a fixed prefix like `"Needs your review"` if the headline is meant to stand alone in the summary instead — pick whichever reads best next to the existing subject style, e.g. `"[SP-42] Review the pull request"`).
+     - Summary: `fmt.Sprintf("%s is waiting on you: %s.", orderKey, message.StatusNoteHeadline)` or similar, naming the actor too (`"%s flagged %s as waiting on you: %s."`, actorName, orderKey, headline) for consistency with the other cases.
+     - Detail: the note body, truncated with the existing `truncateNotificationDetail` helper.
+     - Consider surfacing the CTA (`ctaLabel`/`ctaUrl`) — either fold it into `Detail` as a markdown-style link, or check whether `WorkOrderNotificationTemplateData` / the html/txt templates support an optional secondary link; if not, keep it simple for v1 and just link to the work order page via the existing `WorkOrderLink` field, mentioning the CTA label in the summary text.
+5. Proto + gRPC mapping
+   - `protos/me.proto`: add `TYPE_WORK_ORDER_STATUS_NOTE = 7;` (next free enum value) to `NotificationSettings.Type`, regenerate generated Go/TS bindings (`make proto` or repo's usual codegen command — check `Makefile`/`buf.gen.yaml` for the exact target).
+   - `pkg/grpc/actions/me/notification_settings.go`: add the new entry to the `notificationTypeProto` map (`models.NotificationTypeWorkOrderStatusNote: pb.NotificationSettings_TYPE_WORK_ORDER_STATUS_NOTE`).
+6. Frontend settings
+   - `web_src/src/lib/notificationSettings.ts`: add `"TYPE_WORK_ORDER_STATUS_NOTE"` to `NOTIFICATION_SETTINGS_TYPES` and a matching entry in `NOTIFICATION_TYPE_OPTIONS`, e.g. label "Review requests on work orders you own or created", description "An automation flags a work order you own or created as waiting on your review."
+   - Regenerate the frontend API client types from the updated proto (same codegen step as above covers `@/api-client`).
+   - No changes expected to `FactorySettingsNotificationsPage.tsx` itself since it iterates `NOTIFICATION_TYPE_OPTIONS` generically — verify this by reading the render loop.
+7. Tests
+   - `pkg/models/user_notification_settings_test.go`: extend/duplicate an existing `Notifies` case for the new type (cheap, mirrors existing pattern).
+   - `pkg/workers/factory_notification_consumer_test.go`: add a `t.Run("status note notifies owners and creator", ...)` case modeled on the existing `"status change notifies owners and creator"` test — set up a work order, call the code path that sets a status note (or construct the message directly via `c.process`), assert the owner/creator emails fire and the actor is excluded, and one asserting the per-type setting can turn it off.
+   - `pkg/workers/contexts/factory_context_test.go` (check if this file exists; if not, add alongside sibling tests for `AddWorkOrderComment`/`UpdateWorkOrderStatus` in that package): assert `SetWorkOrderStatusNote` now invokes the `onWorkOrderNotification` callback with the right `EventType`/headline/body.
+   - `pkg/components/factory/set_work_order_status_note_test.go` (if present): no behavior change needed at the component level since it just calls `ctx.Factory.SetWorkOrderStatusNote`, but re-run to make sure nothing regresses.
+   - Frontend: `web_src/src/lib/notificationSettings.ts` likely has a spec file — extend it for the new type; same for `FactorySettingsNotificationsPage` tests/stories if they enumerate all types explicitly.
+8. Docs / changelog
+   - Update the `setWorkOrderStatusNote` component's `Documentation()` string (`pkg/components/factory/set_work_order_status_note.go`) to mention that setting a note now emails the order's owners/creator (subject to their notification settings), since that's a behavior change users of the component should know about.
+   - Check `docs/` or release notes conventions in this repo (grep for existing "notification" changelog entries) and add an entry if the project keeps one.
+Open questions to flag in the PR description
+- Confirm naming/wording for the new notification type and email subject/summary with product — "review requested" language should probably match whatever the frontend already calls this state ("Waiting", "Review" board lane) rather than invent new terminology.
+- Confirm whether every status-note update should re-notify, or only the first note for a given key (avoiding repeat emails if an automation "pings" the same wait note repeatedly, e.g. on each poll of an external PR).
+- Confirm whether the CTA link (e.g. "Review PR #42" → external PR URL) should be included as a clickable link in the email body, which needs a template/data-shape decision beyond the minimal `Summary`/`Detail`/`WorkOrderLink` fields that exist today.
+Verification
+- `go build ./...` and `go test ./pkg/models/... ./pkg/workers/... ./pkg/grpc/...` after the change.
+- Manually exercise: dispatch a factory line to a work order, have a step call `setWorkOrderStatusNote` with headline "Review the pull request", confirm the assignee/creator receive an email (via the noop/log email service in dev, or Resend sandbox), and confirm toggling the new setting off suppresses it while leaving other notification types (comments, assignment) unaffected.
 $ Checkout Branch
+Cloning into 'superplane'...
+remote: Enumerating objects: 7185, done.        
+remote: Counting objects: 100% (7185/7185), done.        
+remote: Compressing objects: 100% (5674/5674), done.        
+remote: Total 7185 (delta 1777), reused 4484 (delta 1431), pack-reused 0 (from 0)        
+Receiving objects: 100% (7185/7185), 9.13 MiB | 936.00 KiB/s, done.
+Resolving deltas: 100% (1777/1777), done.
 $ Set Up DCO Signing
 $ Set Up Environment
 $ Implementation

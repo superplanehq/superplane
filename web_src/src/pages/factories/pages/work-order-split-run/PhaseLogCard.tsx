@@ -259,8 +259,14 @@ function StreamNode({
   const { line, notes, artifact } = group;
   const action = streamActionOf(line);
   const steps = groupClaudeSteps(notes);
-  const [expanded, setExpanded] = useState(line.status === "running");
   const hasChildren = steps.length > 0;
+  const [expanded, setExpanded] = useState(line.status === "running" || highlighted);
+
+  useEffect(() => {
+    if (highlighted && hasChildren) {
+      setExpanded(true);
+    }
+  }, [highlighted, hasChildren]);
 
   return (
     <li>
@@ -324,21 +330,18 @@ function StreamNode({
 
 function StreamStep({ step }: { step: ClaudeStepGroup }) {
   const [expanded, setExpanded] = useState(false);
-  const hasBody = step.events.length > 0;
+  const hasOutput = Boolean(step.line.detail);
+  const hasBody = step.events.length > 0 || hasOutput;
 
   const header = (
     <>
       <StreamIndent ch={8} />
-      {hasBody ? (
-        <ChevronRight
-          className={cn("mr-1 size-3 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")}
-          aria-hidden
-        />
-      ) : null}
+      <ExpandChevron expanded={expanded} visible={hasBody} />
       {step.line.componentType ? (
         <span className={cn("mr-2 shrink-0", stepTypeTone(step.line.componentType))}>{step.line.componentType}</span>
       ) : null}
       <span className="min-w-0 truncate text-muted-foreground">{step.line.componentName}</span>
+      <StepStatusMark status={step.line.status} />
     </>
   );
 
@@ -362,8 +365,10 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
           {header}
         </div>
       )}
-      {expanded
-        ? step.events.map((event) =>
+      {expanded ? (
+        <>
+          {hasOutput ? <StreamOutput text={step.line.detail ?? ""} /> : null}
+          {step.events.map((event) =>
             event.kind === "note" ? (
               <div
                 key={event.line.id}
@@ -378,8 +383,9 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
             ) : (
               <StreamToolGroup key={event.id} stepId={event.id} tools={event.tools} />
             ),
-          )
-        : null}
+          )}
+        </>
+      ) : null}
     </li>
   );
 }
@@ -405,22 +411,81 @@ function StreamToolGroup({ stepId, tools }: { stepId: string; tools: SplitRunStr
       {expanded ? (
         <ol>
           {tools.map((tool) => (
-            <li
-              key={tool.id}
-              data-testid={`split-run-stream-line-${tool.id}`}
-              className="flex h-4 w-full items-center whitespace-nowrap"
-            >
-              <StreamIndent ch={12} />
-              {tool.componentType ? (
-                <span className={cn("mr-2 shrink-0", stepTypeTone(tool.componentType))}>{tool.componentType}</span>
-              ) : null}
-              <span className="min-w-0 truncate text-muted-foreground">{tool.componentName}</span>
-            </li>
+            <StreamTool key={tool.id} tool={tool} />
           ))}
         </ol>
       ) : null}
     </div>
   );
+}
+
+function StreamTool({ tool }: { tool: SplitRunStreamLine }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasOutput = Boolean(tool.detail);
+  const row = (
+    <>
+      <StreamIndent ch={12} />
+      <ExpandChevron expanded={expanded} visible={hasOutput} />
+      {tool.componentType ? (
+        <span className={cn("mr-2 shrink-0", stepTypeTone(tool.componentType))}>{tool.componentType}</span>
+      ) : null}
+      <span className="min-w-0 truncate text-muted-foreground">{tool.componentName}</span>
+      <StepStatusMark status={tool.status} />
+    </>
+  );
+
+  return (
+    <li>
+      {hasOutput ? (
+        <button
+          type="button"
+          data-testid={`split-run-stream-line-${tool.id}`}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((open) => !open)}
+          className="flex h-4 w-full cursor-pointer items-center whitespace-nowrap text-left hover:text-foreground"
+        >
+          {row}
+        </button>
+      ) : (
+        <div
+          data-testid={`split-run-stream-line-${tool.id}`}
+          className="flex h-4 w-full items-center whitespace-nowrap"
+        >
+          {row}
+        </div>
+      )}
+      {expanded && hasOutput ? <StreamOutput text={tool.detail ?? ""} /> : null}
+    </li>
+  );
+}
+
+function StreamOutput({ text }: { text: string }) {
+  return (
+    <div className="flex w-full items-start">
+      <StreamIndent ch={12} />
+      <pre className="min-w-0 flex-1 whitespace-pre-wrap break-words py-0.5 font-mono text-[12px] leading-4 text-muted-foreground">
+        {text}
+      </pre>
+    </div>
+  );
+}
+
+function StepStatusMark({ status }: { status: SplitRunPhaseStatus }) {
+  if (status === "failed") {
+    return (
+      <span className="ml-auto shrink-0 pl-2 text-[color:var(--status-failed-fg)]" aria-label="failed">
+        ✗
+      </span>
+    );
+  }
+  if (status === "passed") {
+    return (
+      <span className="ml-auto shrink-0 pl-2 text-[color:var(--status-success)]" aria-label="passed">
+        ✓
+      </span>
+    );
+  }
+  return null;
 }
 
 function NodeIndent() {
@@ -440,12 +505,22 @@ function StreamIndent({ ch, testId }: { ch: number; testId?: string }) {
   );
 }
 
+function ExpandChevron({ expanded, visible }: { expanded: boolean; visible: boolean }) {
+  return (
+    <span className="inline-flex w-4 shrink-0 items-center justify-start text-muted-foreground">
+      {visible ? (
+        <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} aria-hidden />
+      ) : null}
+    </span>
+  );
+}
+
 function stepTypeTone(type: string): string {
   if (type === "prompt") {
-    return "text-[color:var(--status-running)]";
+    return "text-[#8658d6]";
   }
   if (type === "bash") {
-    return "text-[color:var(--status-success)]";
+    return "text-[#fd7e14]";
   }
   return "text-muted-foreground";
 }

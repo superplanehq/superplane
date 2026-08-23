@@ -95,6 +95,10 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(note.closest("li")).not.toHaveTextContent("└──");
     expect(note.closest("li")).toHaveTextContent("bash");
     expect(within(implementStream).getByText("Set Up Environment")).toBeInTheDocument();
+    expect(within(implementStream).getAllByText("✓").length).toBeGreaterThan(0);
+    expect(within(implementStream).queryByText(/superplaneagent@superplane.com/)).not.toBeInTheDocument();
+    await user.click(within(implementStream).getByText("Set Up Git User"));
+    expect(within(implementStream).getByText(/superplaneagent@superplane.com/)).toBeInTheDocument();
     expect(
       within(implementStream).queryByText(
         "Now let's look at the messages file, factory_notification_consumer.go, and other referenced files.",
@@ -420,6 +424,10 @@ describe("WorkOrderSplitRunPopup", () => {
     await user.click(within(screen.getByTestId("split-run-stream-plan")).getByText("Agent - Plan for GH Issue"));
     const planStream = screen.getByTestId("split-run-stream-plan");
     expect(within(planStream).getByText("Clone Repo")).toBeInTheDocument();
+    expect(within(planStream).getAllByText("✓").length).toBeGreaterThan(0);
+    expect(within(planStream).queryByText(/Cloning into/)).not.toBeInTheDocument();
+    await user.click(within(planStream).getByText("Clone Repo"));
+    expect(within(planStream).getByText(/Cloning into/)).toBeInTheDocument();
     expect(within(planStream).getByText("Provide description")).toBeInTheDocument();
     expect(within(planStream).getByText("Write Implementation Plan")).toBeInTheDocument();
     expect(within(planStream).getByText("Use plan as output")).toBeInTheDocument();

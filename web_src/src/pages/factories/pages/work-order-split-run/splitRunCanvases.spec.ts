@@ -236,6 +236,12 @@ describe("splitRunCanvasForPhase", () => {
       { name: "Write Implementation Plan", type: "prompt" },
       { name: "Use plan as output", type: "bash" },
     ]);
+    expect(
+      plannerNotes.some(
+        (line) =>
+          line.componentName === "Clone Repo" && line.status === "passed" && line.detail?.includes("Cloning into"),
+      ),
+    ).toBe(true);
     expect(plannerNotes.some((line) => line.componentName === "cat /tmp/ORDER.md" && line.noteParentId)).toBe(true);
     expect(
       plannerNotes.some(
