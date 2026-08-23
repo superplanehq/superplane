@@ -1,0 +1,72 @@
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { HostedLLMSettings } from "./HostedLLMSettings";
+
+const settingsWithOpenRouterModels = {
+  welcome_grant_cents: 5000,
+  markup_bps: 2000,
+  warning_threshold_bps: 2000,
+  providers: [
+    { provider: "anthropic", enabled: false, api_key_configured: false, base_url: "", allowed_models: [] },
+    { provider: "openai", enabled: false, api_key_configured: false, base_url: "", allowed_models: [] },
+    {
+      provider: "openrouter",
+      enabled: true,
+      api_key_configured: true,
+      base_url: "",
+      allowed_models: ["openai/gpt-4.1", "anthropic/claude-sonnet-4"],
+    },
+  ],
+};
+
+const mockSettingsFetch = (settings = settingsWithOpenRouterModels) => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => {
+      return new Response(JSON.stringify(settings), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }),
+  );
+};
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("HostedLLMSettings", () => {
+  it("sorts listed models by name and filters them with search", async () => {
+    mockSettingsFetch();
+    const user = userEvent.setup();
+
+    render(<HostedLLMSettings />);
+
+    const list = await screen.findByTestId("installation-llm-openrouter-model-list");
+    expect(
+      within(list)
+        .getAllByText(/anthropic\/|openai\//)
+        .map((node) => node.textContent),
+    ).toEqual(["anthropic/claude-sonnet-4", "openai/gpt-4.1"]);
+
+    const search = screen.getByTestId("installation-llm-openrouter-model-search");
+    await user.type(search, "gpt");
+
+    expect(within(list).queryByText("anthropic/claude-sonnet-4")).not.toBeInTheDocument();
+    expect(within(list).getByText("openai/gpt-4.1")).toBeInTheDocument();
+  });
+
+  it("explains when no models match the search", async () => {
+    mockSettingsFetch();
+    const user = userEvent.setup();
+
+    render(<HostedLLMSettings />);
+
+    await screen.findByTestId("installation-llm-openrouter-model-list");
+    await user.type(screen.getByTestId("installation-llm-openrouter-model-search"), "does-not-exist");
+
+    expect(screen.getByText("No models match this search.")).toBeInTheDocument();
+  });
+});

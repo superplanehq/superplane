@@ -52,6 +52,7 @@ export function OnboardingPage() {
         <div>
           <SetupSections
             setup={model.setup}
+            organizationId={layout.organizationId}
             openSection={model.openSection}
             setOpenSection={model.setOpenSection}
             requestConnect={model.requestConnect}
