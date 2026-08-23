@@ -209,9 +209,11 @@ describe("LinesPage board", () => {
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
     const dialog = screen.getByTestId("review-candidate-modal");
-    expect(within(dialog).getByRole("heading", { name: "Review candidate" })).toBeInTheDocument();
-    expect(within(dialog).getByText("PAY-842")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("review-candidate-section-04")).toHaveTextContent("Implementation plan");
+    expect(within(dialog).getByRole("heading", { name: "Add retry handling to webhook delivery" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("review-candidate-score")).toHaveTextContent("95%");
+    expect(within(dialog).getByTestId("review-candidate-plan")).toHaveTextContent(
+      "Add a webhook-specific retry policy using the shared backoff utility.",
+    );
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
   });
 

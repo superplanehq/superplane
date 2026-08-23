@@ -1,6 +1,16 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 
-import { HOUR_AGO, STORYBOOK_ME_USER_ID, STORYBOOK_ME_USER_NAME } from "../../../__fixtures__/factoryPageResponses";
+import {
+  HOUR_AGO,
+  LAST_WEEK,
+  OPERATOR_USER,
+  REVIEWER_USER,
+  STORYBOOK_ME_USER_AVATAR_URL,
+  STORYBOOK_ME_USER_ID,
+  STORYBOOK_ME_USER_NAME,
+  TWO_HOURS_AGO,
+  YESTERDAY,
+} from "../../../__fixtures__/factoryPageResponses";
 
 export type ReviewConfidenceBand = "High" | "Medium" | "Low";
 
@@ -11,13 +21,38 @@ export interface ReviewCandidateSection {
   items: string[];
 }
 
+export interface ReviewIssuePerson {
+  name: string;
+  login: string;
+  avatarUrl?: string;
+}
+
+export interface ReviewIssueLabel {
+  name: string;
+}
+
+export interface ReviewIssue {
+  url: string;
+  bodyMarkdown: string;
+  createdAt: string;
+  updatedAt: string;
+  author: ReviewIssuePerson;
+  assignees: ReviewIssuePerson[];
+  labels: ReviewIssueLabel[];
+}
+
 export interface ReviewCandidate {
   workOrderId: string;
   ticketKey: string;
   title: string;
   ticketBody: string;
+  issue: ReviewIssue;
   confidencePct: number;
   confidenceBand: ReviewConfidenceBand;
+  /** Three reasons SuperPlane can implement this ticket. */
+  reasons: [string, string, string];
+  /** Markdown implementation plan shown on the Plan tab. */
+  planMarkdown: string;
   summary: string;
   readyNote: string;
   sections: ReviewCandidateSection[];
@@ -27,17 +62,32 @@ export interface ReviewCandidate {
 export type ReviewCandidateTab = "plan" | "ticket" | "analysis";
 
 export const REVIEW_CANDIDATE_COPY = {
-  kicker: "Review candidate",
-  tabsLabel: "Review candidate",
+  tabsLabel: "Ticket review",
   planTab: "Plan",
   ticketTab: "Ticket",
   analysisTab: "Analysis Run",
   ticketSource: "GitHub Issues",
   ticketRepository: "acme/payments-service",
+  openIssue: "Open issue on GitHub",
+  opened: "Opened",
+  updated: "Updated",
+  author: "Author",
+  assignees: "Assignees",
+  noAssignees: "No assignees",
+  reasonsHeading: "Why SuperPlane can implement this",
+  planHeading: "Implementation plan",
+  planFile: "plan.md",
+  editPlan: "Edit",
+  donePlan: "Done",
+  planEditorLabel: "Plan markdown",
   back: "Back to results",
   approve: "Approve plan and start",
   approved: "Plan approved",
 } as const;
+
+export function githubIssueUrl(repository: string, ticketKey: string): string {
+  return `https://github.com/${repository}/issues/${ticketKey.replace(/\D/g, "")}`;
+}
 
 export function isReviewCandidateTab(value: string): value is ReviewCandidateTab {
   return value === "plan" || value === "ticket" || value === "analysis";
@@ -53,15 +103,120 @@ export function confidenceBandForScore(confidencePct: number): ReviewConfidenceB
   return "Low";
 }
 
+export function implementationPlanMarkdown(parts: {
+  goal: string;
+  files: readonly string[];
+  steps: readonly string[];
+  verify: readonly string[];
+}): string {
+  return [
+    "## Goal",
+    "",
+    parts.goal,
+    "",
+    "## Files to change",
+    "",
+    ...parts.files.map((file) => `- ${file}`),
+    "",
+    "## Steps",
+    "",
+    ...parts.steps.map((step, index) => `${index + 1}. ${step}`),
+    "",
+    "## Verify",
+    "",
+    ...parts.verify.map((item) => `- ${item}`),
+  ].join("\n");
+}
+
+function planMarkdownFromSections(sections: ReviewCandidateSection[]): string {
+  const requirements = sectionByNumber(sections, "01");
+  const criteria = sectionByNumber(sections, "02");
+  const files = sectionByNumber(sections, "03");
+  const plan = sectionByNumber(sections, "04");
+
+  return implementationPlanMarkdown({
+    goal: requirements?.intro ?? "",
+    files: files?.items ?? [],
+    steps: plan?.items ?? [],
+    verify: criteria?.items ?? [],
+  });
+}
+
+function sectionByNumber(sections: ReviewCandidateSection[], number: string) {
+  return sections.find((section) => section.number === number);
+}
+
+function withPlanMarkdown(candidate: Omit<ReviewCandidate, "planMarkdown">): ReviewCandidate {
+  return { ...candidate, planMarkdown: planMarkdownFromSections(candidate.sections) };
+}
+
+export function confidenceBandClassName(band: ReviewConfidenceBand): string {
+  if (band === "High") {
+    return "text-emerald-700 dark:text-emerald-300";
+  }
+  if (band === "Medium") {
+    return "text-orange-600 dark:text-orange-400";
+  }
+  return "text-red-600 dark:text-red-400";
+}
+
+const ISSUE_AUTHOR: ReviewIssuePerson = {
+  name: STORYBOOK_ME_USER_NAME,
+  login: "ldicaprio",
+  avatarUrl: STORYBOOK_ME_USER_AVATAR_URL,
+};
+
+const ISSUE_ASSIGNEE_ALEX: ReviewIssuePerson = {
+  name: REVIEWER_USER.name,
+  login: "alex",
+};
+
+const ISSUE_ASSIGNEE_JAMIE: ReviewIssuePerson = {
+  name: OPERATOR_USER.name,
+  login: "jamie",
+};
+
+function reviewIssue(ticketKey: string, issue: Omit<ReviewIssue, "url">): ReviewIssue {
+  return { ...issue, url: githubIssueUrl(REVIEW_CANDIDATE_COPY.ticketRepository, ticketKey) };
+}
+
+function issueMarkdown(summary: string, extra: string): string {
+  return `${summary}\n\n${extra}`;
+}
+
 export const REVIEW_CANDIDATES: ReviewCandidate[] = [
-  {
+  withPlanMarkdown({
     workOrderId: "wo-review-pay-842",
     ticketKey: "PAY-842",
     title: "Add retry handling to webhook delivery",
     ticketBody:
       "Webhook delivery stops after a transient provider error. Add bounded retries that stay idempotent and keep the delivery audit trail.",
+    issue: reviewIssue("PAY-842", {
+      createdAt: LAST_WEEK,
+      updatedAt: TWO_HOURS_AGO,
+      author: ISSUE_AUTHOR,
+      assignees: [ISSUE_ASSIGNEE_ALEX],
+      labels: [{ name: "reliability" }, { name: "webhooks" }, { name: "ready" }],
+      bodyMarkdown: issueMarkdown(
+        "Webhook delivery stops after a transient provider error. Add bounded retries that stay idempotent and keep the delivery audit trail.",
+        `## Acceptance criteria
+
+- Retry 5xx, 408, and 429 responses up to four attempts.
+- Reuse the delivery ID so retries never create a duplicate event.
+- Record the last response code and attempt count on final failure.
+
+## Notes
+
+Do not retry permanent 4xx responses, except rate limits and timeouts.`,
+      ),
+    }),
     confidencePct: 95,
     confidenceBand: "High",
+    reasons: [
+      "Acceptance criteria name the retryable status codes and the attempt limit.",
+      "The dispatcher and the shared retry utility are mapped, with neighboring tests.",
+      "No product decision is open. The change stays in one delivery path.",
+    ],
     summary:
       "Analysis complete. Requirements, acceptance criteria, relevant code, tests, and the implementation plan have been reviewed.",
     readyNote:
@@ -112,15 +267,39 @@ export const REVIEW_CANDIDATES: ReviewCandidate[] = [
       },
     ],
     noBlockingQuestions: "The analysis found enough context to begin implementation with the plan above.",
-  },
-  {
+  }),
+  withPlanMarkdown({
     workOrderId: "wo-review-pay-843",
     ticketKey: "PAY-843",
     title: "Handle duplicate refunds on retry",
     ticketBody:
       "A retry of a successful refund can post a second ledger entry. Treat the same provider key as the original refund.",
+    issue: reviewIssue("PAY-843", {
+      createdAt: LAST_WEEK,
+      updatedAt: YESTERDAY,
+      author: ISSUE_AUTHOR,
+      assignees: [ISSUE_ASSIGNEE_JAMIE],
+      labels: [{ name: "refunds" }, { name: "idempotency" }, { name: "ready" }],
+      bodyMarkdown: issueMarkdown(
+        "A retry of a successful refund can post a second ledger entry. Treat the same provider key as the original refund.",
+        `## Acceptance criteria
+
+- A retry with the same provider key returns the original refund result.
+- The ledger gains at most one posted refund for that key.
+- A failed first attempt can retry after success without a duplicate post.
+
+## Notes
+
+Reuse the charge idempotency store. Keep the existing refund audit trail.`,
+      ),
+    }),
     confidencePct: 94,
     confidenceBand: "High",
+    reasons: [
+      "Acceptance criteria require one ledger post per provider key.",
+      "The refund post path and the charge idempotency store are mapped.",
+      "Neighboring tests already cover success and conflict.",
+    ],
     summary:
       "Analysis complete. Requirements, acceptance criteria, relevant code, tests, and the implementation plan have been reviewed.",
     readyNote:
@@ -169,15 +348,39 @@ export const REVIEW_CANDIDATES: ReviewCandidate[] = [
       },
     ],
     noBlockingQuestions: "The analysis found enough context to begin implementation with the plan above.",
-  },
-  {
+  }),
+  withPlanMarkdown({
     workOrderId: "wo-review-pay-844",
     ticketKey: "PAY-844",
     title: "Return 409 when the invoice is already paid",
     ticketBody:
       "A second pay on a paid invoice returns HTTP 500. Map the already-paid state to HTTP 409 and leave the invoice unchanged.",
+    issue: reviewIssue("PAY-844", {
+      createdAt: YESTERDAY,
+      updatedAt: TWO_HOURS_AGO,
+      author: ISSUE_AUTHOR,
+      assignees: [ISSUE_ASSIGNEE_ALEX],
+      labels: [{ name: "bug" }, { name: "invoices" }, { name: "api" }],
+      bodyMarkdown: issueMarkdown(
+        "A second pay on a paid invoice returns HTTP 500. Map the already-paid state to HTTP 409 and leave the invoice unchanged.",
+        `## Acceptance criteria
+
+- A second pay on a paid invoice returns HTTP 409.
+- The response names the invoice as already paid.
+- A first successful pay still returns HTTP 200.
+
+## Notes
+
+The domain already rejects a second capture. Only the HTTP mapping is wrong.`,
+      ),
+    }),
     confidencePct: 88,
     confidenceBand: "High",
+    reasons: [
+      "Acceptance criteria name HTTP 409 for a second pay on a paid invoice.",
+      "The pay handler and the existing conflict error mapping are known.",
+      "The domain already rejects a second capture. Only the HTTP layer is wrong.",
+    ],
     summary:
       "Analysis complete. Requirements, acceptance criteria, relevant code, tests, and the implementation plan have been reviewed.",
     readyNote:
@@ -225,15 +428,39 @@ export const REVIEW_CANDIDATES: ReviewCandidate[] = [
       },
     ],
     noBlockingQuestions: "The analysis found enough context to begin implementation with the plan above.",
-  },
-  {
+  }),
+  withPlanMarkdown({
     workOrderId: "wo-review-pay-845",
     ticketKey: "PAY-845",
     title: "Show a clearer empty state on the billing page",
     ticketBody:
       "The billing page empty branch does not tell the user what to do next. Show a short title and one create-invoice action.",
+    issue: reviewIssue("PAY-845", {
+      createdAt: YESTERDAY,
+      updatedAt: HOUR_AGO,
+      author: ISSUE_AUTHOR,
+      assignees: [],
+      labels: [{ name: "ui" }, { name: "billing" }],
+      bodyMarkdown: issueMarkdown(
+        "The billing page empty branch does not tell the user what to do next. Show a short title and one create-invoice action.",
+        `## Acceptance criteria
+
+- A user with no invoices sees the empty state and a create-invoice action.
+- A user with invoices still sees the invoice list.
+- The empty state uses the existing page header.
+
+## Notes
+
+This change is copy and layout only. Do not add a new billing API.`,
+      ),
+    }),
     confidencePct: 81,
     confidenceBand: "Medium",
+    reasons: [
+      "Acceptance criteria name the empty-state title and the create-invoice action.",
+      "The billing page already has an empty branch and a shared empty-state component.",
+      "The change is copy and layout only. No new billing API.",
+    ],
     summary:
       "Analysis complete. Requirements, acceptance criteria, relevant code, tests, and the implementation plan have been reviewed.",
     readyNote:
@@ -281,15 +508,39 @@ export const REVIEW_CANDIDATES: ReviewCandidate[] = [
       },
     ],
     noBlockingQuestions: "The analysis found enough context to begin implementation with the plan above.",
-  },
-  {
+  }),
+  withPlanMarkdown({
     workOrderId: "wo-review-pay-846",
     ticketKey: "PAY-846",
     title: "Upgrade the Node 20 base image",
     ticketBody:
       "The app and worker images still pin Node 18. Move both images to Node 20 and keep the same entrypoint.",
+    issue: reviewIssue("PAY-846", {
+      createdAt: YESTERDAY,
+      updatedAt: HOUR_AGO,
+      author: ISSUE_AUTHOR,
+      assignees: [ISSUE_ASSIGNEE_ALEX, ISSUE_ASSIGNEE_JAMIE],
+      labels: [{ name: "infrastructure" }, { name: "node" }, { name: "ci" }],
+      bodyMarkdown: issueMarkdown(
+        "The app and worker images still pin Node 18. Move both images to Node 20 and keep the same entrypoint.",
+        `## Acceptance criteria
+
+- The app and worker images build on Node 20.
+- CI builds both images and runs the existing image smoke tests.
+- Runtime environment variables stay the same.
+
+## Notes
+
+Keep the same entrypoint and process user. Do not change application dependencies in this ticket.`,
+      ),
+    }),
     confidencePct: 76,
     confidenceBand: "Medium",
+    reasons: [
+      "Acceptance criteria name the Node 20 images and the existing smoke tests.",
+      "The change is limited to two Dockerfiles and the image CI job.",
+      "CI already runs a Node 20 job, so the target image is known.",
+    ],
     summary:
       "Analysis complete. Requirements, acceptance criteria, relevant code, tests, and the implementation plan have been reviewed.",
     readyNote:
@@ -337,7 +588,7 @@ export const REVIEW_CANDIDATES: ReviewCandidate[] = [
       },
     ],
     noBlockingQuestions: "The analysis found enough context to begin implementation with the plan above.",
-  },
+  }),
 ];
 
 const REVIEW_CANDIDATES_BY_ID = new Map(REVIEW_CANDIDATES.map((candidate) => [candidate.workOrderId, candidate]));
