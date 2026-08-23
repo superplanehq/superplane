@@ -50,6 +50,9 @@ export interface SplitRunStreamLine {
   artifact?: FactoriesWorkOrderArtifact;
   /** Agent transcript line. No checkmark. */
   note?: boolean;
+  /** Nested tool call under a Claude Code step. */
+  noteParentId?: string;
+  noteDepth?: number;
   kind?: SplitRunStreamKind;
   /** Catalog identity: `Run Claude Code`, `github.addIssueLabel`. */
   componentType?: string;

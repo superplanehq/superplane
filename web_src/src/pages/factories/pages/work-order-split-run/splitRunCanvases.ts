@@ -19,6 +19,8 @@ import riskAssessmentYaml from "./risk-assessment.canvas.yaml?raw";
 import sentryIntakeYaml from "./sentry-intake.canvas.yaml?raw";
 import slackIntakeYaml from "./slack-intake.canvas.yaml?raw";
 
+import { parseClaudeCodeLog, type ClaudeCodeLogStep } from "./parseClaudeCodeLog";
+import planningClaudeLog from "./planning-claude-log.txt?raw";
 import type { SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamKind, SplitRunStreamLine } from "./splitRunMocks";
 
 export type SplitRunCanvasKey = "intake" | "sentry" | "slack" | "planning" | "implementation" | "risk" | "closure";
@@ -390,9 +392,10 @@ export function richStreamForCanvas(
     tick += 1;
 
     if (kind === "agent" && nodeStatus !== "did_not_run" && nodeStatus !== "pending") {
-      for (const step of claudeCodeSteps(node)) {
+      for (const step of claudeCodeChildren(node, canvas.key)) {
+        const stepId = `${node.id}-note-${tick}`;
         lines.push({
-          id: `${node.id}-note-${tick}`,
+          id: stepId,
           nodeId: node.id,
           at: clockAt(tick),
           componentName: step.name,
@@ -401,6 +404,20 @@ export function richStreamForCanvas(
           componentType: step.type,
         });
         tick += 1;
+        for (const command of step.commands) {
+          lines.push({
+            id: `${node.id}-cmd-${tick}`,
+            nodeId: node.id,
+            at: clockAt(tick),
+            componentName: command.name,
+            status: lineStatus,
+            note: true,
+            noteParentId: stepId,
+            noteDepth: 1,
+            componentType: command.type,
+          });
+          tick += 1;
+        }
       }
     }
   }
@@ -482,6 +499,14 @@ export function claudeCodeSteps(node: ComponentsNode): Array<{ name: string; typ
     }
   }
   return steps;
+}
+
+function claudeCodeChildren(node: ComponentsNode, canvasKey: SplitRunCanvasKey): ClaudeCodeLogStep[] {
+  const configured = claudeCodeSteps(node);
+  if (canvasKey === "planning") {
+    return parseClaudeCodeLog(planningClaudeLog, configured);
+  }
+  return configured.map((step) => ({ ...step, commands: [] }));
 }
 
 function agentNotes(nodeId: string): string[] {

@@ -399,13 +399,23 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(screen.getByTestId("split-run-stream-plan")).getAllByText("Create Implementation Plan").length).toBe(
       1,
     );
-    expect(within(screen.getByTestId("split-run-stream-plan")).getByText("Clone Repo")).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("split-run-stream-plan")).getByText("Write Implementation Plan"),
-    ).toBeInTheDocument();
-    expect(within(screen.getByTestId("split-run-stream-plan")).getByText("Use plan as output")).toBeInTheDocument();
-    expect(within(screen.getByTestId("split-run-stream-plan")).getAllByText("bash").length).toBeGreaterThan(0);
-    expect(within(screen.getByTestId("split-run-stream-plan")).getByText("prompt")).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-plan")).queryByText("Clone Repo")).not.toBeInTheDocument();
+
+    await user.click(within(screen.getByTestId("split-run-stream-plan")).getByText("Agent - Plan for GH Issue"));
+    const planStream = screen.getByTestId("split-run-stream-plan");
+    expect(within(planStream).getByText("Clone Repo")).toBeInTheDocument();
+    expect(within(planStream).getByText("Provide description")).toBeInTheDocument();
+    expect(within(planStream).getByText("Write Implementation Plan")).toBeInTheDocument();
+    expect(within(planStream).getByText("Use plan as output")).toBeInTheDocument();
+    expect(within(planStream).getAllByText("bash").length).toBeGreaterThan(0);
+    expect(within(planStream).getByText("prompt")).toBeInTheDocument();
+    expect(within(planStream).queryByText("Let me examine the key reference files in detail.")).not.toBeInTheDocument();
+
+    await user.click(within(planStream).getByText("Write Implementation Plan"));
+    expect(within(planStream).getByText("Let me examine the key reference files in detail.")).toBeInTheDocument();
+    expect(within(planStream).getByRole("button", { name: "Ran 2 commands" })).toBeInTheDocument();
+    expect(within(planStream).queryByRole("button", { name: "Read 7 files, ran 35 commands" })).not.toBeInTheDocument();
+    expect(within(planStream).queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();
     expect(screen.getByText("Planning")).toBeInTheDocument();
     expect(screen.getAllByText("From GH issue?").length).toBeGreaterThan(0);
   });

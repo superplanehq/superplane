@@ -222,18 +222,31 @@ describe("splitRunCanvasForPhase", () => {
       componentType: "Run Claude Code",
       componentName: "Agent - Plan for GH Issue",
     });
+    const plannerNotes = stream.filter((line) => line.nodeId === "planner-agent" && line.note);
     expect(
-      stream
-        .filter((line) => line.nodeId === "planner-agent" && line.note)
+      plannerNotes
+        .filter((line) => !line.noteParentId)
         .map((line) => ({
           name: line.componentName,
           type: line.componentType,
         })),
     ).toEqual([
       { name: "Clone Repo", type: "bash" },
+      { name: "Provide description", type: "bash" },
       { name: "Write Implementation Plan", type: "prompt" },
       { name: "Use plan as output", type: "bash" },
     ]);
+    expect(plannerNotes.some((line) => line.componentName === "cat /tmp/ORDER.md" && line.noteParentId)).toBe(true);
+    expect(
+      plannerNotes.some(
+        (line) =>
+          line.componentType === "note" && line.componentName === "Let me examine the key reference files in detail.",
+      ),
+    ).toBe(true);
+    expect(
+      plannerNotes.some((line) => line.componentName.includes("LineListCard.tsx") && line.componentType === "read"),
+    ).toBe(true);
+    expect(plannerNotes.some((line) => line.componentName.includes("import type"))).toBe(false);
     expect(claudeCodeSteps(canvas.nodes.find((node) => node.id === "planner-agent") ?? {})).toEqual([
       { name: "Clone Repo", type: "bash" },
       { name: "Write Implementation Plan", type: "prompt" },

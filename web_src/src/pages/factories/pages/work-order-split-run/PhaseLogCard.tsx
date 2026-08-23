@@ -1,6 +1,6 @@
 import { cn, resolveIcon } from "@/lib/utils";
 import { ChevronRight } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
 
@@ -36,6 +36,76 @@ type StreamNodeGroup = {
   notes: SplitRunStreamLine[];
   artifact?: FactoriesWorkOrderArtifact;
 };
+
+export function toolCallSummary(tools: Array<{ type?: string; componentType?: string }>): string {
+  const files = tools.filter((tool) => (tool.type ?? tool.componentType) === "read").length;
+  const commands = tools.length - files;
+  const parts: string[] = [];
+  if (files > 0) {
+    parts.push(files === 1 ? "Read 1 file" : `Read ${files} files`);
+  }
+  if (commands > 0) {
+    const ran = commands === 1 ? "ran 1 command" : `ran ${commands} commands`;
+    parts.push(parts.length === 0 ? ran.charAt(0).toUpperCase() + ran.slice(1) : ran);
+  }
+  return parts.join(", ");
+}
+
+export type ClaudeStepEvent =
+  | { kind: "note"; line: SplitRunStreamLine }
+  | { kind: "tools"; id: string; tools: SplitRunStreamLine[] };
+
+export type ClaudeStepGroup = {
+  line: SplitRunStreamLine;
+  events: ClaudeStepEvent[];
+};
+
+export function groupClaudeSteps(notes: SplitRunStreamLine[]): ClaudeStepGroup[] {
+  const steps: ClaudeStepGroup[] = [];
+  let pendingTools: SplitRunStreamLine[] = [];
+  let toolGroup = 0;
+
+  const flushTools = (parent: ClaudeStepGroup) => {
+    if (pendingTools.length === 0) {
+      return;
+    }
+    parent.events.push({
+      kind: "tools",
+      id: `${parent.line.id}-tools-${toolGroup}`,
+      tools: pendingTools,
+    });
+    toolGroup += 1;
+    pendingTools = [];
+  };
+
+  for (const line of notes) {
+    if (!line.noteParentId) {
+      const current = steps.at(-1);
+      if (current) {
+        flushTools(current);
+      }
+      toolGroup = 0;
+      steps.push({ line, events: [] });
+      continue;
+    }
+    const parent = steps.find((step) => step.line.id === line.noteParentId);
+    if (!parent) {
+      continue;
+    }
+    if (line.componentType === "note") {
+      flushTools(parent);
+      parent.events.push({ kind: "note", line });
+      continue;
+    }
+    pendingTools.push(line);
+  }
+
+  const last = steps.at(-1);
+  if (last) {
+    flushTools(last);
+  }
+  return steps;
+}
 
 export function groupSplitRunStream(lines: SplitRunStreamLine[]): StreamNodeGroup[] {
   const notesByNode = new Map<string, SplitRunStreamLine[]>();
@@ -188,6 +258,9 @@ function StreamNode({
 }) {
   const { line, notes, artifact } = group;
   const action = streamActionOf(line);
+  const steps = groupClaudeSteps(notes);
+  const [expanded, setExpanded] = useState(line.status === "running");
+  const hasChildren = steps.length > 0;
 
   return (
     <li>
@@ -203,16 +276,26 @@ function StreamNode({
         <NodeIndent />
         <button
           type="button"
+          data-testid={`split-run-node-toggle-${line.id}`}
+          aria-expanded={hasChildren ? expanded : undefined}
           onClick={() => {
+            if (hasChildren) {
+              setExpanded((open) => !open);
+            }
             if (line.nodeId) {
               onSelect?.(line.nodeId);
             }
           }}
           className={cn(
             "flex min-w-0 flex-1 items-center gap-2 text-left",
-            line.nodeId && "cursor-pointer hover:text-foreground",
+            (hasChildren || line.nodeId) && "cursor-pointer hover:text-foreground",
           )}
         >
+          <span className="inline-flex w-3 shrink-0 items-center justify-center text-muted-foreground">
+            {hasChildren ? (
+              <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} aria-hidden />
+            ) : null}
+          </span>
           <span className="w-14 shrink-0 tabular-nums text-muted-foreground">{line.at}</span>
           <StreamLineIcon iconSlug={line.iconSlug} iconSrc={line.iconSrc} />
           {line.componentType ? <span className="shrink-0 text-muted-foreground">{line.componentType}</span> : null}
@@ -228,24 +311,125 @@ function StreamNode({
         </button>
         {artifact ? <StreamArtifact artifact={artifact} /> : null}
       </div>
-      {notes.length > 0 ? (
+      {expanded ? (
         <ol>
-          {notes.map((note, noteIndex) => (
-            <li
-              key={note.id}
-              data-testid={`split-run-stream-line-${note.id}`}
-              className="flex h-4 w-full items-center whitespace-nowrap"
-            >
-              <NotePrefix isLast={noteIndex === notes.length - 1} />
-              {note.componentType ? (
-                <span className={cn("mr-2 shrink-0", stepTypeTone(note.componentType))}>{note.componentType}</span>
-              ) : null}
-              <span className="min-w-0 truncate text-muted-foreground">{note.componentName}</span>
-            </li>
+          {steps.map((step, stepIndex) => (
+            <StreamStep key={step.line.id} step={step} isLast={stepIndex === steps.length - 1} />
           ))}
         </ol>
       ) : null}
     </li>
+  );
+}
+
+function StreamStep({ step, isLast }: { step: ClaudeStepGroup; isLast: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasBody = step.events.length > 0;
+
+  const header = (
+    <>
+      <NotePrefix depth={0} isLast={isLast} parentContinues={false} />
+      {hasBody ? (
+        <ChevronRight
+          className={cn("mr-1 size-3 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")}
+          aria-hidden
+        />
+      ) : null}
+      {step.line.componentType ? (
+        <span className={cn("mr-2 shrink-0", stepTypeTone(step.line.componentType))}>{step.line.componentType}</span>
+      ) : null}
+      <span className="min-w-0 truncate text-muted-foreground">{step.line.componentName}</span>
+    </>
+  );
+
+  return (
+    <li>
+      {hasBody ? (
+        <button
+          type="button"
+          data-testid={`split-run-stream-line-${step.line.id}`}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((open) => !open)}
+          className="flex h-4 w-full cursor-pointer items-center whitespace-nowrap text-left hover:text-foreground"
+        >
+          {header}
+        </button>
+      ) : (
+        <div
+          data-testid={`split-run-stream-line-${step.line.id}`}
+          className="flex h-4 w-full items-center whitespace-nowrap"
+        >
+          {header}
+        </div>
+      )}
+      {expanded
+        ? step.events.map((event) =>
+            event.kind === "note" ? (
+              <div
+                key={event.line.id}
+                data-testid={`split-run-stream-line-${event.line.id}`}
+                className="flex h-4 w-full items-center whitespace-nowrap"
+              >
+                <span className="inline-block w-[12ch] shrink-0 whitespace-pre" aria-hidden>
+                  {"            "}
+                </span>
+                <span className="min-w-0 truncate text-foreground">{event.line.componentName}</span>
+              </div>
+            ) : (
+              <StreamToolGroup key={event.id} stepId={event.id} tools={event.tools} parentContinues={!isLast} />
+            ),
+          )
+        : null}
+    </li>
+  );
+}
+
+function StreamToolGroup({
+  stepId,
+  tools,
+  parentContinues,
+}: {
+  stepId: string;
+  tools: SplitRunStreamLine[];
+  parentContinues: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const summary = toolCallSummary(tools);
+
+  return (
+    <div>
+      <button
+        type="button"
+        data-testid={`split-run-tools-toggle-${stepId}`}
+        aria-expanded={expanded}
+        aria-label={summary}
+        onClick={() => setExpanded((open) => !open)}
+        className="flex h-4 w-full items-center whitespace-nowrap text-muted-foreground"
+      >
+        <span className="inline-block w-[12ch] shrink-0 whitespace-pre" aria-hidden>
+          {"            "}
+        </span>
+        <ChevronRight className={cn("mr-1 size-3 transition-transform", expanded && "rotate-90")} aria-hidden />
+        <span className="min-w-0 truncate">{summary}</span>
+      </button>
+      {expanded ? (
+        <ol>
+          {tools.map((tool, toolIndex) => (
+            <li
+              key={tool.id}
+              data-testid={`split-run-stream-line-${tool.id}`}
+              className="flex h-4 w-full items-center whitespace-nowrap"
+            >
+              <NotePrefix depth={1} isLast={toolIndex === tools.length - 1} parentContinues={parentContinues} />
+              {tool.componentType ? (
+                <span className={cn("mr-2 shrink-0", stepTypeTone(tool.componentType))}>{tool.componentType}</span>
+              ) : null}
+              <span className="min-w-0 truncate text-muted-foreground">{tool.componentName}</span>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+    </div>
   );
 }
 
@@ -267,10 +451,22 @@ function stepTypeTone(type: string): string {
   return "text-muted-foreground";
 }
 
-function NotePrefix({ isLast }: { isLast: boolean }) {
+function notePrefixText(depth: number, isLast: boolean, parentContinues: boolean): string {
+  if (depth <= 0) {
+    return isLast ? "    └── " : "    ├── ";
+  }
+  const spine = parentContinues ? "    │   " : "        ";
+  return `${spine}${isLast ? "└── " : "├── "}`;
+}
+
+function NotePrefix({ depth, isLast, parentContinues }: { depth: number; isLast: boolean; parentContinues: boolean }) {
   return (
-    <span className="inline-block w-[8ch] shrink-0 whitespace-pre text-muted-foreground" aria-hidden>
-      {isLast ? "    └── " : "    ├── "}
+    <span
+      data-testid="split-run-note-prefix"
+      className="inline-block shrink-0 whitespace-pre text-muted-foreground"
+      aria-hidden
+    >
+      {notePrefixText(depth, isLast, parentContinues)}
     </span>
   );
 }

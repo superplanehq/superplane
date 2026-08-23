@@ -1,0 +1,760 @@
+$ Prepare Claude Code
+Claude Code ready
+claude=2.1.212 (Claude Code)
+node=v22.23.1
+cwd=/home/ubuntu
+$ Clone Repo
+Cloning into 'superplane'...
+remote: Enumerating objects: 7181, done.        
+remote: Counting objects: 100% (7181/7181), done.        
+remote: Compressing objects: 100% (5662/5662), done.        
+remote: Total 7181 (delta 1781), reused 4442 (delta 1439), pack-reused 0 (from 0)        
+Receiving objects: 100% (7181/7181), 9.12 MiB | 17.10 MiB/s, done.
+Resolving deltas: 100% (1781/1781), done.
+$ Provide description
+## Goal
+Add a 3-dots overflow menu on each card on the Lines list page. Match the Automations list card: **Edit**, **Duplicate**, **Delete**. Frontend only.
+## Current state
+- Lines list: `web_src/src/pages/factories/pages/LineListCard.tsx` (used by `LinesPage`). Card click goes to line detail. No overflow menu.
+- Automations reference: `AutomationCard` + `AutomationCardMenu` in `web_src/src/pages/factories/pages/automationsPageParts.tsx`.
+  - Hover-reveal 3-dots (`MoreHorizontal`).
+  - Items: Edit, Duplicate, separator, Delete (destructive).
+  - `stopPropagation` so the menu does not open the card.
+  - `PermissionTooltip` when the action is not allowed.
+  - Delete opens `DeleteAutomationDialog` (`Delete "{name}"?` / `This cannot be undone.`).
+- Edit line already exists: `editFactoryLinePath` → `FactoryLineEditPage`.
+- Duplicate line does **not** exist. Automations duplicate via `duplicateAutomationCanvas` (create canvas + copy YAML). Lines have no equivalent.
+- Create line already exists: `useCreateFactoryLine` → `POST /api/v1/factories/{factoryId}/lines`.
+- Permissions on the lines page today: `canAct("factories", "update")` for create and edit.
+## Constraint: Delete has no API
+`protos/factories.proto` has Create and Update for factory lines only. There is no `DeleteFactoryLine` RPC, no generated SDK method, and no `useDeleteFactoryLine`.
+Do **not** invent a delete call. Frontend-only cannot implement Delete.
+**Do this unless product expands scope:**
+1. Ship Edit + Duplicate on this task.
+2. Omit Delete, **or** show Delete disabled with a clear permission/unavailable state. Do not fake a backend delete.
+3. If Delete is required, that is a **follow-up** (proto + handler + `useDeleteFactoryLine` + Storybook DELETE fixture). Out of this frontend-only task.
+## Implement
+### 1. Overflow menu on `LineListCard`
+Mirror the automations list-card menu (not the line-detail header Edit button, not the phase-column menu).
+- Edit → `editFactoryLinePath(organizationId, factoryKey, line.id)`.
+- Duplicate → create a clone (see below).
+- Delete → only if an API exists; otherwise skip or disable (see constraint).
+- Hover-reveal 3-dots. Keep the trigger visible when the menu is open (`data-[state=open]`).
+- Stop click/keyboard on the menu so `CardShell` does not navigate.
+- Gate actions with `canAct("factories", "update")` (same as New line / Edit line). Duplicate needs create, which uses that permission today.
+- UI copy (STE): `Edit`, `Duplicate`, `Delete`. Match automations toasts: `Line duplicated.` / `Failed to duplicate line`. Delete copy if API lands: `Delete "{name}"?` and `This cannot be undone.`
+### 2. Duplicate line (new, frontend only)
+There is no duplicate RPC. Clone with `useCreateFactoryLine`:
+- Name: `{trimmed name} copy`, then unique among existing factory line names (`Foo copy`, `Foo copy (2)`, …). Same idea as `duplicateAutomationName` + `uniqueCanvasName`. Names are unique per factory (`ErrFactoryLineNameAlreadyExists`).
+- Copy `steps` as-is (same apps, entrypoints, max parallelism). Do not copy work-order history or metrics.
+- On success: invalidate factory detail (create hook already does this), toast, then go to the new line detail (`factoryLineDetailPath`). Automations go to configure because the clone is a canvas; a line clone is already runnable.
+- On name collision: retry with the next unique name.
+Put this next to the automations pattern (`automationCardActions.ts` / `useAutomationCardMutations.ts`): e.g. `duplicateLineName` + `useLineCardMutations`. Do not copy canvas YAML staging. That path is automations-only.
+### 3. Tests
+Match `automationsPageParts.spec.tsx`:
+- Menu hidden until hover; items Edit / Duplicate (/ Delete if present).
+- Menu click does not navigate the card.
+- `duplicateLineName` unit tests.
+- Duplicate mutation: create called with copied steps and unique name.
+### 4. Storybook
+Update `web_src/src/pages/factories/pages/Lines.stories.tsx` (and card stories if you add a isolated `LineListCard` story).
+- Populated list must show the overflow control (hover/open).
+- Storybook fixture already handles `POST /api/v1/factories/:id/lines` in `web_src/src/pages/factories/__fixtures__/handlers.ts`. Duplicate must work in Storybook (new line appears in the list).
+- Do not add a DELETE fixture unless the delete API exists.
+### 5. Quality gates
+Before review:
+```bash
+make check.lint.ui
+make check.build.ui
+```
+Fix any failures from this change. Follow `web_src/AGENTS.md` and UI copy STE.
+## **Out of scope**
+- Backend / proto / migrations.
+- Phase-column 3-dots on line detail (Edit only today).
+- Changing `FactoryLineEditPage`.
+- Copying work orders or metrics onto the clone.
+## **Done when**
+- Each line card on `/workspaces/{factoryKey}/lines` has the automations-style 3-dots menu.
+- Edit opens the existing line edit page.
+- Duplicate creates a new line with copied steps and a unique `… copy` name, then opens that line.
+- Storybook Lines stories cover the menu and d
+$ Write Implementation Plan
+Claude Code started · model=claude-sonnet-5 · cwd=/home/ubuntu/superplane
+-> [Bash] cat /tmp/ORDER.md
+     ## Goal
+     Add a 3-dots overflow menu on each card on the Lines list page. Match the Automations list card: **Edit**, **Duplicate**, **Delete**. Frontend only.
+     ## Current state
+     - Lines list: `web_src/src/pages/factories/pages/LineListCard.tsx` (used by `LinesPage`). Card click goes to line detail. No overflow menu.
+     - Automations reference: `AutomationCard` + `AutomationCardMenu` in `web_src/src/pages/factories/pages/automationsPageParts.tsx`.
+       - Hover-reveal 3-dots (`MoreHorizontal`).
+       - Items: Edit, Duplicate, separator, Delete (destructive).
+       - `stopPropagation` so the menu does not open the card.
+       - `PermissionTooltip` when the action is not allowed.
+       - Delete opens `DeleteAutomationDialog` (`Delete "{name}"?` / `This cannot be undone.`).
+     - Edit line already exists: `editFactoryLi…
+-> [Bash] find web_src/src/pages/factories -type f | sort
+     web_src/src/pages/factories/CreateFactoryAppDialog.stories.tsx
+     web_src/src/pages/factories/CreateFactoryAppDialog.tsx
+     web_src/src/pages/factories/CreateWorkOrderDialog.spec.tsx
+     web_src/src/pages/factories/CreateWorkOrderDialog.tsx
+     web_src/src/pages/factories/CreateWorkOrderPropertyPills.spec.tsx
+     web_src/src/pages/factories/CreateWorkOrderPropertyPills.tsx
+     web_src/src/pages/factories/DesignTokens.stories.tsx
+     web_src/src/pages/factories/DispatchWorkOrderPopover.stories.tsx
+     web_src/src/pages/factories/DispatchWorkOrderPopover.tsx
+     web_src/src/pages/factories/FactoriesIndexPage.tsx
+     web_src/src/pages/factories/FactoryDeleteDialog.tsx
+     web_src/src/pages/factories/FactoryLineForm.tsx
+     web_src/src/pages/factories/FactoryLineStepEditor.tsx
+     web_src/src/pages/factories/FactoryLineStepFlow.stories.tsx
+     w…
+Let me examine the key reference files in detail.
+-> [Read] /home/ubuntu/superplane/web_src/src/pages/factories/pages/automationsPageParts.tsx
+     1	import type { FactoryApp } from "@/api-client";
+     2	import { PermissionTooltip } from "@/components/PermissionGate";
+     3	import { Button } from "@/components/ui/button";
+     4	import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+     5	import { LoadingButton } from "@/components/ui/loading-button";
+     6	import { cn } from "@/lib/utils";
+     7	import {
+     8	  DropdownMenu,
+     9	  DropdownMenuContent,
+     10	  DropdownMenuItem,
+     11	  DropdownMenuSeparator,
+     12	  DropdownMenuTrigger,
+     13	} from "@/ui/dropdownMenu";
+     14	import { Copy, MoreHorizontal, Pencil, Plus, Trash2, Workflow } from "lucide-react";
+     15	import { useState, type MouseEvent } from "react";
+     16	import { useNavigate } from "react-router";
+     17	import { resolveFactoryAutomationStatus, type FactoryAutomationTick…
+-> [Read] /home/ubuntu/superplane/web_src/src/pages/factories/pages/LineListCard.tsx
+     1	import type { FactoriesFactoryLine } from "@/api-client";
+     2	import { cn } from "@/lib/utils";
+     3	import { Workflow } from "lucide-react";
+     4	import type { KeyboardEvent, ReactNode } from "react";
+     5	import { useNavigate } from "react-router";
+     6	import { humanizeLineName } from "../lib/humanizeLineName";
+     7	import { factoryCardClassName } from "./factoryPageLayoutStyles";
+     8	import {
+     9	  formatCostDelta,
+     10	  formatCostPerSuccess,
+     11	  formatDuration,
+     12	  formatDurationDelta,
+     13	  formatSuccessDelta,
+     14	  formatSuccessRate,
+     15	  formatThroughput,
+     16	} from "./lineListMetricsFormat";
+     17	import type { LineListMetrics } from "./lineListMetricsMockData";
+     18	
+     19	export function LineListCard({
+     20	  line,
+     21	  href,
+     22	  metrics,
+     23	  description,
+     24	}: {
+     … (156 more lines)
+-> [Read] /home/ubuntu/superplane/web_src/src/pages/factories/pages/automationCardActions.ts
+     1	export function duplicateAutomationName(name: string | undefined) {
+     2	  const trimmed = name?.trim() || "Unnamed automation";
+     3	  return `${trimmed} copy`;
+     4	}
+     5	
+     6	export type AutomationCardActions = {
+     7	  onEdit: () => void;
+     8	  onDuplicate: () => void | Promise<void>;
+     9	  onDelete: () => void | Promise<void>;
+     10	  canEdit: boolean;
+     11	  canDuplicate: boolean;
+     12	  canDelete: boolean;
+     13	  isDuplicating?: boolean;
+     14	  isDeleting?: boolean;
+     15	};
+     16
+-> [Read] /home/ubuntu/superplane/web_src/src/pages/factories/pages/useAutomationCardMutations.ts
+     1	import type { CanvasesCanvasSummary, FactoryApp } from "@/api-client";
+     2	import { canvasKeys, useCreateCanvas, useDeleteCanvas } from "@/hooks/useCanvasData";
+     3	import { factoryAppsKey } from "@/hooks/useFactoryData";
+     4	import { showErrorToast, showSuccessToast } from "@/lib/toast";
+     5	import { getUsageLimitToastMessage } from "@/lib/usageLimits";
+     6	import { useQueryClient } from "@tanstack/react-query";
+     7	import { useCallback, useRef, useState } from "react";
+     8	import { useNavigate } from "react-router";
+     9	import { automationsPath, factoryAppConfigurePath } from "../lib/factoryPagePaths";
+     10	import type { AutomationCardActions } from "./automationCardActions";
+     11	import { duplicateAutomationCanvas } from "./duplicateAutomationCanvas";
+     12	
+     13	type PendingDuplicateCanvas = {
+     14	  canvasId…
+-> [Read] /home/ubuntu/superplane/web_src/src/pages/factories/pages/duplicateAutomationCanvas.ts
+     1	import {
+     2	  canvasesCommitCanvasStaging,
+     3	  canvasesDescribeCanvas,
+     4	  canvasesPutCanvasStaging,
+     5	  type CanvasesCanvas,
+     6	  type FactoryApp,
+     7	} from "@/api-client";
+     8	import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+     9	import { encodeRepositoryFileContent } from "@/pages/app/files/lib/repository-files";
+     10	import { fetchRepositorySpecFileContent } from "@/pages/app/lib/repository-spec-files";
+     11	import { dematerializeConsoleSpec, materializeCanvasSpec } from "@/pages/app/lib/workflow-spec-files";
+     12	import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "@/pages/app/lib/workflow-spec-paths";
+     13	import { isNotFoundError } from "@/pages/app/workflowPageHelpers";
+     14	import { isCanvasNameAlreadyExistsError, uniqueCanvasName } from "@/pages/home/uniqueCanvasName";
+     15…
+-> [Read] /home/ubuntu/superplane/web_src/src/pages/factories/pages/duplicateAutomationCanvas.spec.ts
+     1	import { describe, expect, it, vi, type Mock } from "vitest";
+     2	
+     3	import {
+     4	  consoleYamlHasContent,
+     5	  duplicateAutomationCanvas,
+     6	  rematerializeDuplicateConsoleYaml,
+     7	  rewriteSelfCanvasRefs,
+     8	  type DuplicateAutomationCanvasDeps,
+     9	} from "./duplicateAutomationCanvas";
+     10	
+     11	type TestDuplicateDeps = DuplicateAutomationCanvasDeps & {
+     12	  createCanvas: Mock;
+     13	  describeCanvas?: Mock;
+     14	  fetchConsoleYaml: Mock;
+     15	  putCanvasStaging: Mock;
+     16	  commitCanvasStaging: Mock;
+     17	};
+     18	
+     19	function baseDeps(overrides: Partial<TestDuplicateDeps> = {}): TestDuplicateDeps {
+     20	  return {
+     21	    factoryId: "factory-1",
+     22	    app: { id: "canvas-source", name: "Refund Planner", description: "Plans refunds" },
+     23	    createCanvas: vi.fn().mockResolvedValue({
+     24	      data: { canvas: {…
+-> [Bash] cat /home/ubuntu/superplane/web_src/src/pages/home/uniqueCanvasName.ts 2>/dev/null | head -60 echo --- cat /home/ubuntu/superplane/web_src/src/pages/factories/pages/LinesPage.tsx
+     import { getApiErrorMessage } from "@/lib/errors";
+     const CANVAS_NAME_ALREADY_EXISTS = "Canvas with the same name already exists";
+     /** Returns baseName, or "baseName (2)", "(3)", … until the name is free. */
+     export function uniqueCanvasName(baseName: string, existingNames: Iterable<string>): string {
+       const base = baseName.trim() || "App";
+       const taken = new Set([...existingNames].map((name) => name.trim()).filter((name): name is string => Boolean(name)));
+       if (!taken.has(base)) {
+         return base;
+       }
+       let suffix = 2;
+       let candidate = `${base} (${suffix})`;
+       while (taken.has(candidate)) {
+         suffix += 1;
+         candidate = `${base} (${suffix})`;
+       }
+       return candidate;
+     }
+     export function isCanvasNameAlreadyExistsError(error: unknown): boolean {
+       return getApiErrorMessage(error, ""…
+-> [Bash] cat /home/ubuntu/superplane/web_src/src/pages/factories/pages/LineListCard.spec.tsx
+     import { render, screen } from "@testing-library/react";
+     import { MemoryRouter } from "react-router";
+     import { describe, expect, it } from "vitest";
+     import { REFUND_FACTORY_LINES, REFUND_LINE_PLAN_ID } from "../__fixtures__/factoryPageResponses";
+     import { LINE_LIST_DESCRIPTION_BY_ID, LINE_LIST_METRICS_BY_ID } from "./lineListMetricsMockData";
+     import { LineListCard, LineListHeroSplit } from "./LineListCard";
+     const planLine = REFUND_FACTORY_LINES[0];
+     const planMetrics = LINE_LIST_METRICS_BY_ID[REFUND_LINE_PLAN_ID] ?? null;
+     const planDescription = LINE_LIST_DESCRIPTION_BY_ID[REFUND_LINE_PLAN_ID];
+     describe("LineListCard", () => {
+       it("shows a purpose description and no phase names", () => {
+         render(
+           <MemoryRouter>
+             <LineListCard line={planLine} href="/lines/x" metrics={pla…
+-> [Bash] cat /home/ubuntu/superplane/web_src/src/pages/factories/pages/Lines.stories.tsx
+     import type { Meta, StoryObj } from "@storybook/react-vite";
+     import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
+     import { emptyFactoriesFixture, PRIMARY_FACTORY_KEY, REFUND_FACTORY_LINES } from "../__fixtures__/factoryPageResponses";
+     import { fiveStepLineFactoriesFixture, lineMetricsFactoriesFixture } from "../__fixtures__/lineMetricsFactoriesFixture";
+     import { LinesPage } from "./LinesPage";
+     /**
+      * Lines page: metric cards on the list, phase board on line detail.
+      * FactoriesHarness supplies a factory-owned canvas so a run-card click opens
+      * the automation run instead of Overview.
+      */
+     const meta = {
+       title: "Factories/Pages/Lines",
+       component: LinesPage,
+       parameters: { layout: "fullscreen" },
+     } satisfies Meta<typeof LinesPage>;
+     export default meta;
+     type Story = S…
+-> [Bash] cat /home/ubuntu/superplane/web_src/src/pages/factories/pages/automationsPageParts.spec.tsx
+     import { render, screen } from "@testing-library/react";
+     import userEvent from "@testing-library/user-event";
+     import type { ComponentProps } from "react";
+     import { MemoryRouter } from "react-router";
+     import { describe, expect, it, vi } from "vitest";
+     import type { FactoriesWorkOrder, FactoryApp } from "@/api-client";
+     import { AutomationDetail } from "./AutomationDetail";
+     import { AutomationCard } from "./automationsPageParts";
+     import { duplicateAutomationName } from "./automationCardActions";
+     import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
+     vi.mock("@/hooks/useCanvasData", () => ({
+       useInfiniteCanvasRuns: () => ({
+         data: {
+           pages: [
+             {
+               runs: [
+                 {
+                   id: "run-c1111111",
+                   state: "STATE_STARTED",…
+-> [Bash] grep -rn "useCreateFactoryLine\|useCreateFactoryLine\b" /home/ubuntu/superplane/web_src/src --include=*.ts --include=*.tsx | grep -v spec
+     /home/ubuntu/superplane/web_src/src/pages/factories/useFactoryLineEditActions.tsx:1:import { useCreateFactoryLine, useUpdateFactoryLine, type FactoryLineStep } from "@/hooks/useFactoryData";
+     /home/ubuntu/superplane/web_src/src/pages/factories/useFactoryLineEditActions.tsx:14:  const createFactoryLine = useCreateFactoryLine(organizationId, factoryId);
+     /home/ubuntu/superplane/web_src/src/pages/factories/pages/onboarding/useOnboardingPageModel.ts:4:import { useCreateFactoryLine, useCreateWorkOrder, useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
+     /home/ubuntu/superplane/web_src/src/pages/factories/pages/onboarding/useOnboardingPageModel.ts:347:  const createLine = useCreateFactoryLine(args.organizationId, args.factoryId);
+     /home/ubuntu/superplane/web_src/src/hooks/useFactor…
+-> [Bash] sed -n '1,80p' /home/ubuntu/superplane/web_src/src/pages/factories/useFactoryLineEditActions.tsx
+-> [Bash] sed -n '400,560p' /home/ubuntu/superplane/web_src/src/hooks/useFactoryData.ts
+               },
+             }),
+           );
+           if (!response.data?.comment) {
+             throw new Error("Failed to add comment");
+           }
+           return response.data.comment;
+         },
+         onSuccess: (_data, variables) => {
+           void queryClient.invalidateQueries({
+             queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
+           });
+         },
+       });
+     }
+     export function useWorkOrderArtifacts(organizationId: string, factoryId: string, orderId: string) {
+       return useQuery({
+         queryKey: workOrderArtifactsKey(organizationId, factoryId, orderId),
+         queryFn: async (): Promise<FactoriesWorkOrderArtifact[]> => {
+           const response = await factoriesListWorkOrderArtifacts(
+             withOrganizationHeader({
+               organizationId,
+               path: { factoryId, orderId },
+     … (108 more lin…
+     import { useCreateFactoryLine, useUpdateFactoryLine, type FactoryLineStep } from "@/hooks/useFactoryData";
+     import { getApiErrorMessage } from "@/lib/errors";
+     import { showErrorToast, showSuccessToast } from "@/lib/toast";
+     import { useNavigate } from "react-router";
+     export function useFactoryLineEditActions(
+       organizationId: string,
+       factoryId: string,
+       factoryHref: string,
+       isCreate: boolean,
+       lineId?: string,
+     ) {
+       const navigate = useNavigate();
+       const createFactoryLine = useCreateFactoryLine(organizationId, factoryId);
+       const updateFactoryLine = useUpdateFactoryLine(organizationId, factoryId);
+       const handleSave = async (input: { name: string; steps: FactoryLineStep[] }) => {
+         try {
+           if (isCreate) {
+             await createFactoryLine.mutateAsync(input);
+             showSucces…
+-> [Bash] grep -n "ErrFactoryLineNameAlreadyExists\|already exists" /home/ubuntu/superplane -r --include=*.go | head -20
+     /home/ubuntu/superplane/pkg/usage/sync_test.go:136:		setupOrganizationError: status.Error(codes.AlreadyExists, "already exists"),
+     /home/ubuntu/superplane/pkg/components/merge/merge.go:361:	// Execution already exists, just return it.
+     /home/ubuntu/superplane/pkg/components/readmemory/read_memory.go:60:- Check whether related data already exists
+     /home/ubuntu/superplane/pkg/authentication/authentication.go:407:		http.Error(w, "Account already exists", http.StatusConflict)
+     /home/ubuntu/superplane/pkg/grpc/actions/organizations/update_integration_test.go:223:	t.Run("update integration name to existing name -> already exists", func(t *testing.T) {
+     /home/ubuntu/superplane/pkg/grpc/actions/organizations/update_integration_test.go:248:		assert.Contains(t, msg, "already exists")
+     /home/ubuntu/superp…
+-> [Bash] grep -n "editFactoryLinePath\|factoryLineDetailPath\|createFactoryLinePath\|linesPath" /home/ubuntu/superplane/web_src/src/pages/factories/lib/factoryPagePaths.ts
+     49:export function linesPath(organizationId: string, factoryKey: string) {
+     53:export function createFactoryLinePath(organizationId: string, factoryKey: string) {
+     54:  return `${linesPath(organizationId, factoryKey)}/new`;
+     57:export function factoryLineDetailPath(organizationId: string, factoryKey: string, lineId: string) {
+     58:  return `${linesPath(organizationId, factoryKey)}/${lineId}`;
+     61:export function editFactoryLinePath(organizationId: string, factoryKey: string, lineId: string) {
+     62:  return `${linesPath(organizationId, factoryKey)}/${lineId}/edit`;
+-> [Bash] grep -n "FactoryLineStep\b" -A15 /home/ubuntu/superplane/web_src/src/hooks/useFactoryData.ts | head -40
+     29:  FactoryLineStep,
+     30-} from "@/api-client";
+     31-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+     32-import {
+     33-  getWorkOrderEventsNextPageParam,
+     34-  WORK_ORDER_EVENTS_PAGE_LIMIT,
+     35-} from "@/pages/factories/lib/workOrderEventsPagination";
+     36-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+     37-
+     38-export const factoryQueryKeys = {
+     39-  list: (organizationId: string) => ["factories", organizationId] as const,
+     40-  detail: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId] as const,
+     41-  workOrders: (organizationId: string, factoryId: string) =>
+     42-    ["factories", organizationId, factoryId, "work-orders"] as const,
+     43-  workOrderDetail: (organizationId: string, factoryId: strin…
+-> [Bash] grep -n "FactoryLineStep" -A20 /home/ubuntu/superplane/protos/factories.proto | head -60 echo --- grep -n "getApiErrorMessage" -A15 /home/ubuntu/superplane/web_src/src/lib/errors.ts | head -30 echo --- grep -n "POST.*lines\|factories/:id/lines\|CreateFactoryLine\|createFactoryLine" /home/ubuntu/superplane/web_src/src/pages/factories/__fixtures__/handlers.ts
+     ---
+     5:export function getApiErrorMessage(error: unknown, fallback = "An error occurred"): string {
+     6-  return (
+     7-    getNonEmptyString(error) ??
+     8-    getStatusMessage(getResponseDataError(error)) ??
+     9-    getStatusMessage(getNestedError(error)) ??
+     10-    getStatusMessage(error) ??
+     11-    getNonEmptyString(error instanceof Error ? error.message : null) ??
+     12-    fallback
+     13-  );
+     14-}
+     15-
+     16-export async function getResponseErrorMessage(response: Response, fallback = "An error occurred"): Promise<string> {
+     17-  const rawBody = await response.text();
+     18-  const trimmedBody = rawBody.trim();
+     19-
+     20-  if (!trimmedBody) {
+     --
+     26:    return getApiErrorMessage(parsedBody, fallback);
+     27-  } catch {
+     28:    return getApiErrorMessage(trimmedBody, fallback);
+     29-  }
+     30-}
+     31-
+     … (8 more lines)
+-> [Bash] grep -rn "message FactoryLine\b\|FactoryLineStep\|CreateFactoryLine\|DeleteFactoryLine\|UpdateFactoryLine" /home/ubuntu/superplane/protos/*.proto
+     /home/ubuntu/superplane/protos/factories.proto:100:  rpc CreateFactoryLine(CreateFactoryLineRequest) returns (CreateFactoryLineResponse) {
+     /home/ubuntu/superplane/protos/factories.proto:112:  rpc UpdateFactoryLine(UpdateFactoryLineRequest) returns (UpdateFactoryLineResponse) {
+     /home/ubuntu/superplane/protos/factories.proto:419:message FactoryLine {
+     /home/ubuntu/superplane/protos/factories.proto:443:message CreateFactoryLineRequest {
+     /home/ubuntu/superplane/protos/factories.proto:449:message CreateFactoryLineResponse {
+     /home/ubuntu/superplane/protos/factories.proto:453:message UpdateFactoryLineRequest {
+     /home/ubuntu/superplane/protos/factories.proto:460:message UpdateFactoryLineResponse {
+-> [Bash] sed -n '400,465p' /home/ubuntu/superplane/protos/factories.proto
+     message Factory {
+       message App {
+         string id = 1;
+         string name = 2;
+         string description = 3;
+         google.protobuf.Timestamp created_at = 4;
+         google.protobuf.Timestamp updated_at = 5;
+       }
+       string id = 1;
+       string name = 2;
+       string description = 3;
+       repeated FactoryLine lines = 4;
+       // Workspace key. 2 to 5 uppercase letters, unique per organization.
+       string key = 5;
+       FactoryOnboarding onboarding = 6;
+     }
+     message FactoryLine {
+       message Step {
+         string type = 1;
+         optional AppStep app = 2;
+         // Maximum in-flight runs for this step across all work orders on the
+         // line. Work orders above this limit wait in the step's queue. Unset
+     … (41 more lines)
+-> [Bash] grep -n "factories/.*lines\|CreateFactoryLine\|lines" /home/ubuntu/superplane/web_src/src/pages/factories/__fixtures__/handlers.ts | head -30
+     90:        lines: [],
+     103:    lines: (factory.lines ?? []).map((line) => {
+     193:      pattern: re("/api/v1/factories/([^/]+)/lines"),
+     200:          id: `storybook-line-${(factory.lines?.length ?? 0) + 1}`,
+     204:        factory.lines = [...(factory.lines ?? []), line];
+     209:      pattern: re("/api/v1/factories/([^/]+)/lines/([^/]+)"),
+     214:        const existing = factory?.lines?.find((entry) => entry.id === match[2]);
+     291:  const line = factory?.lines?.find((entry) => entry.name === lineName) ?? factory?.lines?.[0];
+-> [Bash] sed -n '150,240p' /home/ubuntu/superplane/web_src/src/pages/factories/__fixtures__/handlers.ts
+           resolve: (match) => ({ json: { apps: fixture.appsByFactoryId[match[1]] ?? [] } }),
+         },
+         {
+           pattern: re("/api/v1/factories/([^/]+)/usage"),
+           resolve: (match) => ({ json: fixture.usageByFactoryId?.[match[1]] ?? EMPTY_USAGE_REPORT }),
+         },
+       ];
+     }
+     function mergedOnboarding(
+       current: FactoriesFactoryOnboarding | undefined,
+       request: FactoriesUpdateFactoryOnboardingBody,
+     ): FactoriesFactoryOnboarding {
+       const next: FactoriesFactoryOnboarding = { ...current };
+       if (request.vcsIntegrationId) next.vcsIntegrationId = request.vcsIntegrationId;
+       if (request.agentIntegrationId) next.agentIntegrationId = request.agentIntegrationId;
+       if (request.appRepository) next.appRepository = request.appRepository;
+       if (request.backlogRepository) next.backlogRepository = request.bac…
+-> [Bash] cat /home/ubuntu/superplane/web_src/src/pages/factories/lib/humanizeLineName.ts
+     /**
+      * Turns a machine-style line or phase name into readable title copy.
+      * `plan-and-implement` → `Plan and Implement`.
+      */
+     export function humanizeLineName(name: string | undefined | null): string {
+       const trimmed = name?.trim();
+       if (!trimmed) {
+         return "Unnamed line";
+       }
+       const smallWords = new Set(["and", "or", "of", "the", "to", "for", "in", "on", "a", "an"]);
+       const words = trimmed.split(/[-_\s]+/).filter(Boolean);
+       return words
+         .map((word, index) => {
+           const lower = word.toLowerCase();
+           if (index > 0 && smallWords.has(lower)) {
+             return lower;
+           }
+           return lower.charAt(0).toUpperCase() + lower.slice(1);
+         })
+         .join(" ");
+     }
+     /**
+     … (19 more lines)
+-> [Bash] grep -n "REFUND_FACTORY_LINES" -A20 /home/ubuntu/superplane/web_src/src/pages/factories/__fixtures__/factoryPageResponses.ts | head -40
+     118:export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
+     119-  {
+     120-    id: REFUND_LINE_PLAN_ID,
+     121-    name: "plan-and-implement",
+     122-    createdAt: LAST_WEEK,
+     123-    updatedAt: YESTERDAY,
+     124-    steps: [
+     125-      runAppStep("app-refund-planner", "start-plan"),
+     126-      runAppStep("app-refund-implementer", "start-implementation"),
+     127-      runAppStep("app-refund-verifier", "start-verification"),
+     128-    ],
+     129-  },
+     130-  {
+     131-    id: REFUND_LINE_HOTFIX_ID,
+     132-    name: "hotfix",
+     133-    createdAt: LAST_WEEK,
+     134-    updatedAt: YESTERDAY,
+     135-    steps: [runAppStep("app-refund-verifier", "start-verification")],
+     136-  },
+     137-];
+     138-
+     --
+     145:  lines: REFUND_FACTORY_LINES,
+     146-};
+     … (16 more lines)
+-> [Bash] sed -n '1,80p' /home/ubuntu/superplane/web_src/src/pages/factories/FactoryLineForm.tsx
+     import type { FactoryApp, FactoryLineStep } from "@/api-client";
+     import { Button } from "@/components/ui/button";
+     import { Input } from "@/components/ui/input";
+     import { Label } from "@/components/ui/label";
+     import { LoadingButton } from "@/components/ui/loading-button";
+     import { getApiErrorMessage } from "@/lib/errors";
+     import { showErrorToast } from "@/lib/toast";
+     import { useEffect, useMemo, useState } from "react";
+     import { FactoryLineStepsEditor } from "./FactoryLineStepsEditor";
+     import { draftStepsFromLine, draftStepsToProto, emptyStep, type DraftStep } from "./lib/factoryLineFormShared";
+     const stepFieldClassName = "w-full min-w-0";
+     interface FactoryLineFormProps {
+       organizationId: string;
+       apps: FactoryApp[];
+       initialName?: string;
+       initialSteps?: FactoryLineStep[];
+       isSavin…
+-> [Read] /home/ubuntu/superplane/web_src/src/pages/factories/lib/factoryLineFormShared.ts
+     1	import type { FactoryLineStep } from "@/api-client";
+     2	
+     3	export const RUN_APP_TYPE = "runApp";
+     4	
+     5	export type DraftStep = {
+     6	  appId: string;
+     7	  entrypoint: string;
+     8	  // Text form value; empty keeps the server default (10).
+     9	  maxParallelism: string;
+     10	};
+     11	
+     12	export function emptyStep(): DraftStep {
+     13	  return { appId: "", entrypoint: "", maxParallelism: "" };
+     14	}
+     15	
+     16	export function draftStepsFromLine(steps: FactoryLineStep[] | undefined): DraftStep[] {
+     17	  if (!steps?.length) {
+     18	    return [emptyStep()];
+     19	  }
+     20	
+     21	  return steps.map((step) => ({
+     22	    appId: step.app?.app ?? "",
+     23	    entrypoint: step.app?.entrypoint ?? "",
+     24	    maxParallelism: step.maxParallelism != null && step.maxParallelism > 0 ? String(step.maxParallelism) : "",
+     … (46 more lines)
+-> [Bash] sed -n '1,40p' /home/ubuntu/superplane/web_src/src/lib/usageLimits.ts 2>/dev/null; echo ---; grep -rn "getUsageLimitToastMessage" /home/ubuntu/superplane/web_src/src --include=*.ts -l
+     import { getApiErrorMessage } from "@/lib/errors";
+     export interface UsageLimitNotice {
+       title: string;
+       description: string;
+       href?: string;
+       actionLabel?: string;
+       toastMessage: string;
+     }
+     type UsageLimitCopy = Omit<UsageLimitNotice, "href" | "actionLabel"> & {
+       actionLabel?: string;
+       needsUsagePage?: boolean;
+     };
+     const usageLimitCopyByMessage: Record<string, UsageLimitCopy> = {
+       "account organization limit exceeded": {
+         title: "Organization limit reached",
+         description:
+           "This account already has the maximum number of organizations allowed by the current plan. Remove an unused organization or change the plan before creating another one.",
+         toastMessage: "This account already has the maximum number of organizations allowed by the current plan.",
+       },
+       "organizatio…
+-> [Bash] sed -n '1,80p' /home/ubuntu/superplane/web_src/src/pages/factories/pages/useAutomationsPageModel.ts
+     import { usePermissions } from "@/contexts/usePermissions";
+     import { useFactoryApps, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+     import { showErrorToast, showSuccessToast } from "@/lib/toast";
+     import { getUsageLimitToastMessage } from "@/lib/usageLimits";
+     import { useMemo, useState } from "react";
+     import { useNavigate, useParams } from "react-router";
+     import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
+     import { factoryAppConfigurePath } from "../lib/factoryPagePaths";
+     import { useAutomationCardMutations } from "./useAutomationCardMutations";
+     export function useAutomationsPageModel() {
+       const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+       const { appId: routeAppId } = useParams<{ appId: string }>();
+       const { canAct, isLoading: p…
+-> [Bash] grep -n "factoryDetailKey\|factoryKeys" /home/ubuntu/superplane/web_src/src/hooks/useFactoryData.ts | head -20
+     65:function factoryDetailKey(organizationId: string, factoryId: string) {
+     102:    queryKey: factoryDetailKey(organizationId, factoryId),
+     228:      queryClient.setQueryData(factoryDetailKey(organizationId, factoryId), factory);
+     230:      void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
+     252:      queryClient.removeQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
+     500:      void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
+     526:      void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
+-> [Bash] sed -n '55,110p' /home/ubuntu/superplane/web_src/src/hooks/useFactoryData.ts
+         periodDays: number,
+         integrationId: string,
+         repository: string,
+       ) => ["factories", organizationId, factoryId, "velocity", periodDays, integrationId, repository] as const,
+     };
+     function factoryListKey(organizationId: string) {
+       return factoryQueryKeys.list(organizationId);
+     }
+     function factoryDetailKey(organizationId: string, factoryId: string) {
+       return factoryQueryKeys.detail(organizationId, factoryId);
+     }
+     function workOrdersKey(organizationId: string, factoryId: string) {
+       return factoryQueryKeys.workOrders(organizationId, factoryId);
+     }
+     function workOrderDetailKey(organizationId: string, factoryId: string, orderId: string) {
+       return factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId);
+     }
+     function workOrderEventsKey(organizationId: string, factoryId: stri…
+-> [Bash] sed -n '1,60p' /home/ubuntu/superplane/web_src/src/ui/dropdownMenu.tsx 2>/dev/null || find /home/ubuntu/superplane/web_src -iname "dropdownMenu*"
+     /home/ubuntu/superplane/web_src/src/ui/dropdownMenu
+-> [Bash] ls /home/ubuntu/superplane/web_src/src/ui/dropdownMenu; echo ---; sed -n '1,60p' /home/ubuntu/superplane/web_src/src/ui/dropdownMenu/index.ts 2>/dev/null
+     Exit code 2
+     index.stories.tsx
+     index.tsx
+     ---
+-> [Bash] sed -n '1,80p' /home/ubuntu/superplane/web_src/src/pages/factories/pages/Automations.stories.tsx
+     import type { Meta, StoryObj } from "@storybook/react-vite";
+     import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
+     import {
+       defaultFactoriesFixture,
+       PRIMARY_FACTORY_KEY,
+       REFUND_FACTORY_APPS,
+     } from "../__fixtures__/factoryPageResponses";
+     import { emptyFactoriesFixture } from "../__fixtures__/factoryPageFixtureVariants";
+     import { AutomationsPage } from "./AutomationsPage";
+     /**
+      * Automations page: v3-style card list + detail (automation card + Runs / Velocity tabs).
+      */
+     const meta = {
+       title: "Factories/Pages/Automations",
+       component: AutomationsPage,
+       parameters: { layout: "fullscreen" },
+     } satisfies Meta<typeof AutomationsPage>;
+     export default meta;
+     type Story = StoryObj<typeof meta>;
+     … (18 more lines)
+-> [Bash] sed -n '1,60p' /home/ubuntu/superplane/web_src/src/pages/factories/__fixtures__/FactoriesHarness.smoke.spec.tsx
+     import { render, screen, waitFor } from "@testing-library/react";
+     import userEvent from "@testing-library/user-event";
+     import { beforeAll, describe, expect, it } from "vitest";
+     import { client } from "@/api-client/client.gen";
+     import {
+       PRIMARY_FACTORY_ID,
+       PRIMARY_FACTORY_KEY,
+       FACTORIES_ORGANIZATION_ID,
+       defaultFactoriesFixture,
+     } from "./factoryPageResponses";
+     import { factorySettingsPath } from "../lib/factoryPagePaths";
+     import { FactoriesHarness } from "./FactoriesHarness";
+     import { CONNECTED_SETUP_INTEGRATIONS, SETUP_ANSWERS, factoriesFixtureWithSetupAnswers } from "./setupStoryFixtures";
+     describe("FactoriesHarness work orders", () => {
+       beforeAll(() => {
+         client.setConfig({ baseUrl: "http://localhost" });
+       });
+       it("shows the Work Orders board when Work Orders opens fr…
+-> [Bash] grep -rln "play:" /home/ubuntu/superplane/web_src/src/pages/factories/pages/*.stories.tsx | head
+     (Bash completed with no output)
+-> [Bash] sed -n '1,60p' /home/ubuntu/superplane/web_src/src/pages/factories/pages/LinesPage.spec.tsx | head -80; echo ...; wc -l /home/ubuntu/superplane/web_src/src/pages/factories/pages/LinesPage.spec.tsx
+     import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+     import { render, screen } from "@testing-library/react";
+     import { MemoryRouter } from "react-router";
+     import { describe, expect, it, vi } from "vitest";
+     import type { FactoriesFactory } from "@/api-client";
+     import {
+       PRIMARY_FACTORY_ID,
+       PRIMARY_FACTORY_KEY,
+       REFUND_FACTORY,
+       REFUND_LINE_PLAN_ID,
+     } from "../__fixtures__/factoryPageResponses";
+     import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
+     import { LINE_LIST_METRICS_BY_ID } from "./lineListMetricsMockData";
+     import { LinesPage } from "./LinesPage";
+     vi.mock("@/hooks/useFactoryData", () => ({
+       useFactoryWorkOrders: () => ({ data: [] }),
+       useFactoryApps: () => ({ data: [] }),
+     }));
+     vi.mock("@/hooks/useWorkOrderCardActions", () => ({…
+-> [Bash] sed -n '60,81p' /home/ubuntu/superplane/web_src/src/pages/factories/pages/LinesPage.spec.tsx
+     describe("LinesPage metrics", () => {
+       it("shows zero success rate and completions when a line has no nested metrics", () => {
+         renderList();
+         const cards = screen.getAllByTestId("lines-card-metrics");
+         expect(cards[0]).toHaveTextContent("0%");
+         expect(cards[0]).toHaveTextContent("0 per day");
+         expect(cards[0]).toHaveTextContent("—");
+       });
+       it("shows live numbers for a line that has nested metrics", () => {
+         const factory: FactoriesFactory = {
+           ...REFUND_FACTORY,
+           lines: (REFUND_FACTORY.lines ?? []).map((line) =>
+             line.id === REFUND_LINE_PLAN_ID ? { ...line, metrics: LINE_LIST_METRICS_BY_ID[REFUND_LINE_PLAN_ID]! } : line,
+           ),
+         };
+         renderList(factory);
+         expect(screen.getByTestId(`lines-card-${REFUND_LINE_PLAN_ID}`)).toHaveTextContent("82…
+Now let me check factories.proto Delete rpc absence explicitly and PermissionTooltip component quickly, plus check `showSuccessToast`/`showErrorToast` import paths and `getApiErrorMessage` usage pattern once more, and check web_src/AGENTS.md briefly for conventions.
+-> [Bash] grep -n "Delete" /home/ubuntu/superplane/protos/factories.proto
+     87:  rpc DeleteFactory(DeleteFactoryRequest) returns (DeleteFactoryResponse) {
+     92:      summary: "Delete factory";
+     367:message DeleteFactoryRequest {
+     371:message DeleteFactoryResponse {}
+-> [Bash] sed -n '1,50p' /home/ubuntu/superplane/web_src/AGENTS.md
+     # Component Development Guide
+     This document captures the architecture principles, patterns, and workflow for developing components for SuperPlane.
+     For user-facing labels, buttons, empty states, errors, confirmations, and other
+     product wording, follow [../.agents/skills/ui-copy/SKILL.md](../.agents/skills/ui-copy/SKILL.md)
+     and [../.agents/skills/simplified-technical-english/SKILL.md](../.agents/skills/simplified-technical-english/SKILL.md)
+     — write real ASD-STE100-style copy as part of the design, not placeholder text
+     after layout.
+     ## Architecture Principles
+     ### Component Design
+     - **Self-contained components**: Components should manage their own state when possible, using callbacks to notify parents of changes
+     - **Generic callbacks**: Prefer generic update callbacks (e.g., `onTaskUpdat…
+-> [Bash] grep -n "export function PermissionTooltip" -A20 /home/ubuntu/superplane/web_src/src/components/PermissionGate.tsx | head -30
+     14:export function PermissionTooltip({ allowed, message, children, className }: PermissionTooltipProps) {
+     15-  if (allowed) return <>{children}</>;
+     16-
+     17-  return (
+     18-    <Tooltip>
+     19-      <TooltipTrigger asChild>
+     20-        <div className={cn("inline-flex", className)}>
+     21-          <div className="pointer-events-none opacity-60 w-full">{children}</div>
+     22-        </div>
+     23-      </TooltipTrigger>
+     24-      <TooltipContent side="top">{message}</TooltipContent>
+     25-    </Tooltip>
+     26-  );
+     27-}
+     28-
+     29-interface RequirePermissionProps {
+     30-  resource: string;
+     31-  action: string;
+     32-  children: React.ReactNode;
+     33-}
+     34-
+Now I have everything needed to write the plan.
+-> [Bash] cat > /tmp/plan.md << 'EOF' Add an automations-style 3-dots overflow menu to `LineListCard` with Edit and Duplicate. Duplicate clones a line via the existing `useCreateFactoryLine` call (unique "… copy" name, same steps) and opens the new line. Delete is intentionally omitted — there is no `DeleteFactoryLine` RPC — and is called out as a backend follow-up.  ## Files touched  New: - `web_src/src/pages/factories/pages/lineCardActions.ts` — `duplicateLineName()` + `LineCardActions` type (mirrors `automationCardActions.ts`, no delete fields). - `web_src/src/pages/factories/pages/duplicateFactoryLine.ts` — pure duplicate-with-retry logic (mirrors the naming-retry half of `duplicateAutomationCanvas.ts`, without the canvas/YAML staging that's automations-only). - `web_src/src/pages/factories/pages/duplicateFactoryLine.spec.ts` — unit tests for the above. - `web_src/src/pages/factories/pages/useLineCardMutations.ts` — hook wiring edit/duplicate to navigation, toasts, `useCreateFactoryLine`.  Edited: - `web_src/src/pages/factories/pages/LineListCard.tsx` — add the menu. - `web_src/src/pages/factories/pages/LinesPage.tsx` — wire `useLineCardMutations`, pass `actions` to `LineListCard`. - `web_src/src/pages/factories/pages/automationsPageParts.tsx` — export the two shared menu style constants (`overflowMenuContentClassName`, `overflowMenuItemClassName`) so the lines menu matches pixel-for-pixel instead of drifting with a copy-pasted class string. - `web_src/src/pages/factories/pages/LineListCard.spec.tsx` — menu tests. - `web_src/src/pages/factories/pages/LinesPage.spec.tsx` — update the `@/hooks/useFactoryData` mock (add `useCreateFactoryLine`), add a duplicate-flow test. - `web_src/src/pages/factories/pages/Lines.stories.tsx` — doc comment only; the `Populated` story already renders real `LinesPage`, so it gets the menu automatically once `LinesPage` passes `actions`. No fixture change needed — `handlers.ts` already handles `POST /api/v1/factories/:id/lines`.  Nothing under `protos/`, `pkg/`, or migrations.  ## 1. `lineCardActions.ts`  ```ts export function duplicateLineName(name: string | undefined) {   const trimmed = name?.trim() || "Unnamed line"; // same fallback wording as humanizeLineName   return `${trimmed} copy`; }  export type LineCardActions = {   onEdit: () => void;   onDuplicate: () => void | Promise<void>;   canEdit: boolean;   canDuplicate: boolean;   isDuplicating?: boolean; }; ```  No `onDelete`/`canDelete` — keeps the type honest about what's implemented instead of stubbing a no-op delete.  ## 2. `duplicateFactoryLine.ts`  Duplicating a line is a single `CreateFactoryLine` call (unlike automations, which is create-canvas + stage + commit), so this is much simpler than `duplicateAutomationCanvas.ts`: no pending-shell/retry-without-orphan bookkeeping is needed, just "try create, if the name collided pick the next unique name, retry".  ```ts import type { FactoriesFactoryLine, FactoryLineStep } from "@/api-client"; import { getApiErrorMessage } from "@/lib/errors"; import { uniqueCanvasName } from "@/pages/home/uniqueCanvasName"; // generic "X" / "X (2)" picker, already reused by automations import { duplicateLineName } from "./lineCardActions";  const FACTORY_LINE_NAME_ALREADY_EXISTS = "factory line with the same name already exists"; const MAX_NAME_RETRY_ATTEMPTS = 20;  export function isFactoryLineNameAlreadyExistsError(error: unknown): boolean {   return getApiErrorMessage(error, "").includes(FACTORY_LINE_NAME_ALREADY_EXISTS); }  export type DuplicateFactoryLineDeps = {   line: FactoriesFactoryLine;   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;   /** Names already taken in the factory (used to pick "X copy", "X copy (2)", …). */   existingNames?: Iterable<string>; };  export async function duplicateFactoryLine(deps: DuplicateFactoryLineDeps): Promise<FactoriesFactoryLine> {   const preferredName = duplicateLineName(deps.line.name);   const steps = deps.line.steps ?? [];   const taken = new Set(     [...(deps.existingNames ?? [])].map((name) => name.trim()).filter((name): name is string => Boolean(name)),   );   let name = uniqueCanvasName(preferredName, taken);    for (let attempt = 0; attempt < MAX_NAME_RETRY_ATTEMPTS; attempt++) {     try {       return await deps.createLine({ name, steps });     } catch (error) {       if (!isFactoryLineNameAlreadyExistsError(error)) {         throw error;       }       taken.add(name);       name = uniqueCanvasName(preferredName, taken);     }   }    throw new Error("Failed to create line"); } ```  `steps` is passed through unchanged (already `FactoryLineStep[]`, the same shape `useCreateFactoryLine` expects) — apps, entrypoints, and `maxParallelism` all come along for free. No work-order/metrics fields exist on the input type, so there's nothing to strip.  `duplicateFactoryLine.spec.ts` mirrors `duplicateAutomationCanvas.spec.ts`'s naming tests: - `duplicateLineName`: appends " copy", falls back to "Unnamed line copy" for blank names. - `duplicateFactoryLine`: calls `createLine` with the source line's steps and `"{name} copy"` when unique. - picks `"{name} copy (2)"` when `existingNames` already contains `"{name} copy"`. - retries with the next unique name when `createLine` rejects with the "already exists" message (using `isFactoryLineNameAlreadyExistsError`), and does not retry for unrelated errors. - gives up after `MAX_NAME_RETRY_ATTEMPTS` and throws.  ## 3. `useLineCardMutations.ts`  ```ts export function useLineCardMutations(args: {   organizationId: string;   factoryId: string;   factoryKey: string;   lines: FactoriesFactoryLine[];   canUpdate: boolean; }) {   const navigate = useNavigate();   const createLine = useCreateFactoryLine(args.organizationId, args.factoryId);   const [duplicatingLineId, setDuplicatingLineId] = useState<string | null>(null);    const handleEditLine = useCallback((line) => {     if (!line.id) return;     navigate(editFactoryLinePath(args.organizationId, args.factoryKey, line.id));   }, [...]);    const handleDuplicateLine = useCallback(async (line) => {     if (!line.id || duplicatingLineId) return;     setDuplicatingLineId(line.id);     try {       const existingNames = args.lines.map((l) => l.name).filter((n): n is string => Boolean(n));       const created = await duplicateFactoryLine({         line,         createLine: (input) => createLine.mutateAsync(input),         existingNames,       });       showSuccessToast("Line duplicated.");       if (created.id) {         navigate(factoryLineDetailPath(args.organizationId, args.factoryKey, created.id));       }     } catch (error) {       showErrorToast(getApiErrorMessage(error, "Failed to duplicate line"));     } finally {       setDuplicatingLineId(null);     }   }, [...]);    const actionsForLine = useCallback((line): LineCardActions => ({     onEdit: () => handleEditLine(line),     onDuplicate: () => handleDuplicateLine(line),     canEdit: args.canUpdate,     canDuplicate: args.canUpdate, // create-line permission == "factories" "update", same as New line / Edit line today     isDuplicating: duplicatingLineId === line.id,   }), [...]);    return { actionsForLine }; } ```  Notes: - `useCreateFactoryLine`'s own `onSuccess` already invalidates the factory-detail query, so `LinesPage`'s `lines` list (from `useFactoriesLayout()`) refreshes on its own — no extra invalidation needed, matching the order's "create hook already does this". - Reads existing names from the `lines` prop (already loaded via layout context) rather than reaching into the query cache the way `useAutomationCardMutations` does for canvases — lines list is already in scope on this page, so this is simpler and avoids a `useQueryClient` dependency. - On success, navigate straight to `factoryLineDetailPath` (the phase board), not a "configure" route — lines don't have a separate configure step the way a freshly duplicated canvas does. - Toast copy: `"Line duplicated."` / `"Failed to duplicate line"`, matching the automations wording pattern with "line" swapped in.  ## 4. `LineListCard.tsx`  Add an optional `actions?: LineCardActions` prop and render a menu in the header row, mirroring `AutomationCard`/`AutomationCardMenu`:  ```tsx export function LineListCard({ line, href, metrics, description, actions }: {   line: FactoriesFactoryLine;   href: string;   metrics: LineListMetrics | null;   description?: string;   actions?: LineCardActions; }) {   const lineName = humanizeLineName(line.name);   return (     <CardShell href={href} testId={`lines-card-${line.id}`} className="px-4 py-4">       <div className="flex items-start gap-3">         <div className="min-w-0 flex-1">           <div className="flex flex-wrap items-center gap-2">             <Workflow ... />             <span ...>{lineName}</span>           </div>           {description ? <p ...>{description}</p> : null}         </div>         {actions ? <LineCardMenu name={lineName} actions={actions} /> : null}       </div>       <LineListHeroSplit metrics={metrics} />     </CardShell>   ); } ```  `LineCardMenu` (private to this file):  ```tsx function LineCardMenu({ name, actions }: { name: string; actions: LineCardActions }) {   const stop = (event: { stopPropagation: () => void }) => event.stopPropagation();    return (     <div className="shrink-0" onClick={stop} onKeyDown={stop}>       <DropdownMenu>         <DropdownMenuTrigger asChild>           <button             type="button"             aria-label={`${name} menu`}             className={cn(               "flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground",               "opacity-0 group-hover/line:opacity-100 group-focus-within/line:opacity-100 data-[state=open]:opacity-100",             )}             disabled={actions.isDuplicating}             data-testid="lines-card-menu"           >             <MoreHorizontal className="size-3.5" aria-hidden />           </button>         </DropdownMenuTrigger>         <DropdownMenuContent align="end" sideOffset={6} className={overflowMenuContentClassName}>           <PermissionTooltip allowed={actions.canEdit} message="You don't have permission to edit this line.">             <DropdownMenuItem               className={overflowMenuItemClassName}               onClick={actions.onEdit}               disabled={!actions.canEdit}               data-testid="lines-card-edit"             >               <Pencil aria-hidden />               Edit             </DropdownMenuItem>           </PermissionTooltip>           <PermissionTooltip allowed={actions.canDuplicate} message="You don't have permission to duplicate this line.">             <DropdownMenuItem               className={overflowMenuItemClassName}               onClick={() => void actions.onDuplicate()}               disabled={!actions.canDuplicate || actions.isDuplicating}               data-testid="lines-card-duplicate"             >               <Copy aria-hidden />               Duplicate             </DropdownMenuItem>           </PermissionTooltip>         </DropdownMenuContent>       </DropdownMenu>     </div>   ); } ```  Details: - `CardShell` already renders `group/line` on its wrapper (existing class), so hover-reveal reuses that group instead of introducing a second group name. - `data-[state=open]:opacity-100` keeps the trigger visible while the menu is open, per the order. - No `DropdownMenuSeparator` / delete item — only two actions. - Both `onClick` **and** `onKeyDown` are stopped on the wrapper. `CardShell`'s outer `role="button"` div has its own `onKeyDown` (Enter/Space → navigate); a native `<button>` inside it also converts Enter/Space keydown into a click, and that keydown event still bubbles up the DOM independent of the click. Stopping propagation on both event types (not just `onClick`, which is all `AutomationCardMenu` currently stops) is what the order asks for and closes that gap explicitly for lines. - `overflowMenuContentClassName` / `overflowMenuItemClassName` are imported from `automationsPageParts.tsx` (exporting them there is the only change to that file) so the two menus can't visually drift apart.  ## 5. `LinesPage.tsx`  ```tsx const { actionsForLine } = useLineCardMutations({   organizationId,   factoryId,   factoryKey,   lines,   canUpdate, }); ... <LineListCard   line={line}   href={factoryLineDetailPath(organizationId, factoryKey, line.id)}   metrics={toLineListMetrics(line.metrics)}   description={descriptionForLine(line.id)}   actions={actionsForLine(line)} /> ```  Only the list branch gets `actions` — the line-detail header (`LineDetailHeader`'s own Edit button) and the phase-column 3-dots (`PhaseColumn`'s menu) are untouched, per "out of scope".  ## 6. Tests  `LineListCard.spec.tsx` (new `describe("LineListCard menu")` block, pattern copied from `automationsPageParts.spec.tsx`): - Menu trigger has `opacity-0` before hover/click, i.e. hidden until interacted with. - Clicking the trigger reveals `lines-card-edit` ("Edit") and `lines-card-duplicate` ("Duplicate"); no delete item, no separator. - Clicking `lines-card-edit` calls `actions.onEdit` and does **not** call `navigate` to `href` (i.e. the card's own click handler didn't also fire). Do this by rendering inside a `MemoryRouter`, spying on `history`/checking the location stays put after the menu-item click — same idea as checking automations' "menu click does not navigate the card". - A keyboard variant: focus the trigger, press Enter, and assert the location did not change to `href` (covers the onKeyDown-stopPropagation fix called out above). - Menu is omitted entirely when `actions` is not passed (keeps the existing metrics-only tests in this file passing unmodified).  `duplicateFactoryLine.spec.ts`: see section 2.  `LinesPage.spec.tsx`: - Update the `vi.mock("@/hooks/useFactoryData", ...)` factory to also export `useCreateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false })` (or a per-test mock) — required because `LinesPage` will now import it transitively via `useLineCardMutations`; the current mock only stubs `useFactoryWorkOrders`/`useFactoryApps` and would otherwise throw "useCreateFactoryLine is not a function". - New test: click a card's menu → Duplicate, with `useCreateFactoryLine`'s `mutateAsync` mocked to resolve a new line; assert `mutateAsync` was called with the source line's `steps` and a `"{name} copy"` name, and that navigation moved to the new line's detail route (`factoryLineDetailPath`).  ## 7. Storybook  - No fixture change: `handlers.ts`'s `POST /api/v1/factories/:id/lines` route already creates and appends a line and returns it, which is all `useCreateFactoryLine` needs. Clicking Duplicate in the `Populated` story will create `"{name} copy"` and route to it because `LinesPage` always renders through `factoryLineDetailPath`. - `Lines.stories.tsx`'s `Populated` story renders the real `LinesPage`, so the overflow menu (hover/open) shows up automatically once `LinesPage` wires `actionsForLine` — no story code changes are required for that to be true; only the top doc comment gets a line noting the card menu. - No DELETE fixture is added, per the order's constraint. - If we want an explicit isolated `LineListCard` story (not strictly required, since `Lines.stories.tsx` already exercises the real card+menu through `LinesPage`), skip it — keeps the diff smaller and there is no existing precedent of a standalone `AutomationCard` story either.  ## 8. Quality gates  Run before calling this done: ``` make check.lint.ui make check.build.ui ``` Also run the new/changed vitest files directly first (`LineListCard.spec.tsx`, `duplicateFactoryLine.spec.ts`, `LinesPage.spec.tsx`) since `check.build.ui` doesn't run tests. Fix any Prettier/ESLint findings from the new files before finishing (`web_src/AGENTS.md`: run `npm run format`).  ## Delete — explicitly out of scope, follow-up needed  No proto/handler/`useDeleteFactoryLine` exists (`protos/factories.proto` only has `CreateFactoryLine`/`UpdateFactoryLine`/`DeleteFactory`, no `DeleteFactoryLine`). This plan ships Edit + Duplicate only and omits Delete from the menu entirely, rather than adding a disabled/fake Delete item — cleaner UI, and nothing to un-ship later. A follow-up work order should add: `DeleteFactoryLine` RPC + handler, `ErrFactoryLineNameAlreadyExists`-style model wiring if needed, `useDeleteFactoryLine`, a `DeleteLineDialog` (`Delete "{name}"?` / `This cannot be undone.`, matching `DeleteAutomationDialog`), a Storybook `DELETE` fixture, and the menu's separator + Delete item gated on a `factories`/`delete`-style permission.  ## Risks / things to double check while implementing  - Confirm the exact wording of the "already exists" error text returned to the frontend for `CreateFactoryLine` name collisions matches `pkg/grpc/actions/factories/errors.go`'s `"factory line with the same name already exists"` (via `getApiErrorMessage`); if the client-visible message differs (wrapped/prefixed), adjust `isFactoryLineNameAlreadyExistsError`'s substring check accordingly. - `uniqueCanvasName` lives under `pages/home/` despite being generic naming logic; reusing it here follows the existing precedent (`duplicateAutomationCanvas.ts` already imports it for the same "X"/"X (2)" behavior), but if reviewers prefer not to reach into `pages/home` from `pages/factories`, fall back to a small local copy of the same 15-line function in `duplicateFactoryLine.ts` instead. - Double check `PermissionTooltip` renders fine inside a `DropdownMenuContent` for two adjacent items (it already does for automations' three, so this should be a non-issue). EOF echo done
+     done
+Plan written to /tmp/plan.md.
+Summary of the approach: add an Edit+Duplicate 3-dots menu to `LineListCard` (styled/behaved like `AutomationCard`'s menu), back it with a new small `duplicateFactoryLine` helper that retries with a unique `"{name} copy"` name on collision and clones `line.steps` as-is through the existing `useCreateFactoryLine` mutation, then navigates to the new line's detail page. Delete is deliberately left out of the menu since there is no `DeleteFactoryLine` RPC, with a note on what a follow-up work order needs.
+✓ done · 43 turns · $1.2278 · 277.8s
+$ Use plan as output
+Plan found. Using as output
