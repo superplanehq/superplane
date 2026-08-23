@@ -13,6 +13,7 @@ import {
   FAILED_WORK_ORDER,
   INGEST_DRAFT_WORK_ORDER,
   OPEN_WORK_ORDER,
+  RUNNING_WORK_ORDER,
 } from "../../__fixtures__/factoryPageResponses";
 import { OPEN_WORK_ORDER_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
@@ -37,20 +38,14 @@ function renderSplitRun() {
 }
 
 describe("WorkOrderSplitRunPopup", () => {
-  it("links to the work order page when a detail href is set", () => {
+  it("does not put an Open work order link next to close", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER),
-      detailHref: "/org-1/workspaces/RF/work-order/101",
     });
 
-    const link = screen.getByRole("link", { name: "Open work order" });
-    expect(link).toHaveAttribute("href", "/org-1/workspaces/RF/work-order/101");
-  });
-
-  it("hides the work order page link when no detail href is set", () => {
-    renderPopup({ fixture: SPLIT_RUN_RUNNING });
-
+    expect(screen.queryByTestId("split-run-open-work-order")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Open work order" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 
   it("collapses finished steps and expands the running component stream", () => {
@@ -85,6 +80,9 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(screen.getByTestId("split-run-stream-line-create-branch")).getByText("Run Bash")).toBeInTheDocument();
     expect(within(screen.getByTestId("split-run-stream-line-create-branch")).getByText(">")).toBeInTheDocument();
     expect(
+      within(screen.getByTestId("split-run-stream-line-create-branch")).getByTestId("split-run-node-indent"),
+    ).toBeInTheDocument();
+    expect(
       within(screen.getByTestId("split-run-stream-line-create-branch")).queryByText("├──"),
     ).not.toBeInTheDocument();
     expect(
@@ -93,6 +91,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const note = within(implement).getByText("Reading plan.md.");
     expect(note.closest("li")).toHaveTextContent("├──");
     expect(within(screen.getByTestId("split-run-stream-implement")).getAllByText("└──").length).toBeGreaterThan(0);
+    expect(within(implement).queryByText("did not run")).not.toBeInTheDocument();
 
     expect(screen.getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
     expect(screen.getByText("Implementation")).toBeInTheDocument();
@@ -131,6 +130,15 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(
       within(screen.getByTestId("split-run-stream-implement")).getByRole("link", { name: /feature\/refund-retry/ }),
     ).toBeInTheDocument();
+  });
+
+  it("shows canvas artifacts on a collapsed automation before it is opened", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER) });
+
+    const plan = screen.getByTestId("split-run-phase-plan-0");
+    expect(screen.queryByTestId("split-run-stream-plan-0")).not.toBeInTheDocument();
+    expect(within(plan).getByTestId("split-run-phase-artifacts-plan-0")).toBeInTheDocument();
+    expect(within(plan).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
   });
 
   it("selects the canvas component when a log line is clicked", async () => {
@@ -312,7 +320,6 @@ describe("WorkOrderSplitRunPopup", () => {
         },
         { detailHref: "/org-1/workspaces/RF/work-order/101" },
       ),
-      detailHref: "/org-1/workspaces/RF/work-order/101",
     });
 
     const review = screen.getByTestId("split-run-review");

@@ -42,4 +42,8 @@ describe("durationForExecution", () => {
       formatMinutesSecondsDuration(FOUR_MINUTES),
     );
   });
+
+  it("shows a short duration when a finished step has no elapsed time", () => {
+    expect(durationForExecution({ createdAt: START, updatedAt: START }, "passed")).toBe("<1s");
+  });
 });

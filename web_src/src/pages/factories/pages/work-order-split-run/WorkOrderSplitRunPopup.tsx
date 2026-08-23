@@ -20,7 +20,6 @@ export function WorkOrderSplitRunPopup({
   fixed = false,
   canvasEditHref,
   canvasExpandHref,
-  detailHref,
   onDispatch,
   isDispatching = false,
   canDispatch = false,
@@ -31,7 +30,6 @@ export function WorkOrderSplitRunPopup({
   fixed?: boolean;
   canvasEditHref?: (key: SplitRunCanvasKey) => string | undefined;
   canvasExpandHref?: (key: SplitRunCanvasKey) => string | undefined;
-  detailHref?: string;
   onDispatch?: () => Promise<void>;
   isDispatching?: boolean;
   canDispatch?: boolean;
@@ -46,10 +44,19 @@ export function WorkOrderSplitRunPopup({
       selectedPhase ? resolveSplitRunVisual(selectedPhase, live) : { canvas: emptySplitRunCanvas(), stream: undefined },
     [live, selectedPhase],
   );
+  const streams = useMemo(() => {
+    const yamlOnly = { enabled: false, stream: [] };
+    return new Map(
+      fixture.phases.map((entry) => [
+        entry.id,
+        entry.id === selectedPhase?.id ? visual.stream : resolveSplitRunVisual(entry, yamlOnly).stream,
+      ]),
+    );
+  }, [fixture.phases, selectedPhase?.id, visual.stream]);
 
   return (
     <PopupShell testId="work-order-split-run" canvas fixed={fixed} onDismiss={onClose}>
-      <PopupHeader title={fixture.title} onClose={onClose} detailHref={detailHref}>
+      <PopupHeader title={fixture.title} onClose={onClose}>
         <OwnerTimeCostRow fixture={fixture}>
           <SplitRunCheckPills checks={fixture.checks} />
         </OwnerTimeCostRow>
@@ -67,7 +74,7 @@ export function WorkOrderSplitRunPopup({
                 <PhaseLogCard
                   phase={entry}
                   expanded={entry.id === openPhaseId}
-                  stream={entry.id === selectedPhase?.id ? visual.stream : entry.stream}
+                  stream={streams.get(entry.id) ?? entry.stream}
                   selectedNodeId={nodeId}
                   onSelectNode={setNodeId}
                   onToggle={() => {

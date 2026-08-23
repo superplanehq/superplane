@@ -149,6 +149,7 @@ describe("splitRunCanvasForPhase", () => {
       action: "65/100",
     });
     const groups = groupSplitRunStream(stream);
+    expect(groups.some((group) => group.line.action === "did not run")).toBe(false);
     const agent = groups.find((group) => group.line.id === "assess-pr-risk");
     expect(agent?.notes.map((line) => line.componentName)).toEqual([
       "Reading the pull request diff.",

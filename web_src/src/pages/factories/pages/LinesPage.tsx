@@ -395,7 +395,6 @@ function LineBoardSplitRunPopup({
       fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId, detailHref })}
       canvasEditHref={canvasEditHref}
       canvasExpandHref={canvasExpandHref}
-      detailHref={detailHref}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       isDispatching={isDispatching}
       onDispatch={resolvedLineName ? () => onDispatch(peekOrderId, { lineName: resolvedLineName }) : undefined}

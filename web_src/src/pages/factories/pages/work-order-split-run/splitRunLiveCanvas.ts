@@ -366,10 +366,29 @@ export function resolveSplitRunVisual(
   if (live.canvas && liveCanvasMatchesLineAutomation(lineCanvas, live.canvas)) {
     return {
       canvas: live.canvas,
-      stream: live.stream.length > 0 ? live.stream : lineStream,
+      stream: live.stream.length > 0 ? attachMissingStreamArtifacts(live.stream, lineStream) : lineStream,
     };
   }
   return { canvas: lineCanvas, stream: lineStream };
+}
+
+function attachMissingStreamArtifacts(
+  stream: SplitRunStreamLine[],
+  source: SplitRunStreamLine[],
+): SplitRunStreamLine[] {
+  const artifacts = new Map<string, NonNullable<SplitRunStreamLine["artifact"]>>();
+  for (const line of source) {
+    if (line.nodeId && line.artifact) {
+      artifacts.set(line.nodeId, line.artifact);
+    }
+  }
+  return stream.map((line) => {
+    if (line.artifact || !line.nodeId) {
+      return line;
+    }
+    const artifact = artifacts.get(line.nodeId);
+    return artifact ? { ...line, artifact } : line;
+  });
 }
 
 export function liveCanvasKeyForPhase(phase: SplitRunPhase): SplitRunCanvasModel["key"] {

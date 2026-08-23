@@ -192,6 +192,26 @@ describe("resolveSplitRunVisual", () => {
     expect(visual.stream?.some((line) => line.id === "live-create-branch")).toBe(true);
   });
 
+  it("keeps YAML artifacts on a live stream that omits them", () => {
+    const implement = SPLIT_RUN_RUNNING.phases.find((phase) => phase.id === "implement");
+    const yaml = splitRunCanvasForPhase(implement!);
+    const visual = resolveSplitRunVisual(implement!, {
+      enabled: true,
+      canvas: yaml,
+      stream: [
+        {
+          id: "add-branch-artifact",
+          nodeId: "add-branch-artifact",
+          at: "00:00:01",
+          componentName: "Add Branch Artifact",
+          status: "passed",
+        },
+      ],
+    });
+
+    expect(visual.stream?.some((line) => line.artifact?.id === "art-branch-1")).toBe(true);
+  });
+
   it("keeps the YAML canvas when no live run is wired", () => {
     const implement = SPLIT_RUN_RUNNING.phases.find((phase) => phase.id === "implement");
     const visual = resolveSplitRunVisual(implement!, { enabled: false, stream: [] });

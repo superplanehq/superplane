@@ -49,7 +49,7 @@ export function groupSplitRunStream(lines: SplitRunStreamLine[]): StreamNodeGrou
   }
 
   return lines
-    .filter((line) => !line.note)
+    .filter((line) => !line.note && line.action !== "did not run")
     .map((line) => ({
       line,
       notes: notesByNode.get(line.nodeId ?? "") ?? [],
@@ -82,7 +82,7 @@ function artifactsProducedBySteps(
  * Terminal log. The automation is the root. Each node hangs under it.
  * Collapsed automations show produced artifacts on the title line.
  * Expanded automations show those artifacts on the producing steps.
- * Note lines under a node use ├ and └.
+ * Node lines indent under the automation. Note lines use ├ and └.
  */
 export function PhaseLogCard({
   phase,
@@ -200,6 +200,7 @@ function StreamNode({
           highlighted && "bg-accent ring-1 ring-foreground/15",
         )}
       >
+        <NodeIndent />
         <button
           type="button"
           onClick={() => {
@@ -242,6 +243,14 @@ function StreamNode({
         </ol>
       ) : null}
     </li>
+  );
+}
+
+function NodeIndent() {
+  return (
+    <span data-testid="split-run-node-indent" className="inline-block w-[4ch] shrink-0 whitespace-pre" aria-hidden>
+      {"    "}
+    </span>
   );
 }
 
