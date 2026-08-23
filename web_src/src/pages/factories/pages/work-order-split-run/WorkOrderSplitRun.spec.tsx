@@ -65,30 +65,72 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const backlog = screen.getByTestId("split-run-phase-backlog");
     expect(within(backlog).getByText("Backlog")).toBeInTheDocument();
+    expect(within(backlog).getByText("2s")).toBeInTheDocument();
     expect(within(backlog).getByRole("button", { name: "description.md" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stream-backlog")).not.toBeInTheDocument();
 
     const plan = screen.getByTestId("split-run-phase-plan");
     expect(within(plan).getByText(/Planning/)).toBeInTheDocument();
+    expect(within(plan).getByText("1m 12s")).toBeInTheDocument();
     expect(within(plan).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stream-plan")).not.toBeInTheDocument();
 
     const implement = screen.getByTestId("split-run-phase-implement");
     expect(within(implement).getByText(/Implementation/)).toBeInTheDocument();
+    expect(within(implement).getByText("4m")).toBeInTheDocument();
     expect(within(implement).getAllByRole("link", { name: /feature\/refund-retry/ }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("split-run-stream-implement")).toBeInTheDocument();
     expect(within(implement).queryByText("Started")).not.toBeInTheDocument();
     expect(within(implement).getAllByText("Create Branch").length).toBeGreaterThan(0);
     expect(within(screen.getByTestId("split-run-stream-line-create-branch")).getByText("Run Bash")).toBeInTheDocument();
     expect(within(screen.getByTestId("split-run-stream-line-create-branch")).getByText(">")).toBeInTheDocument();
-    expect(within(screen.getByTestId("split-run-stream-implement")).getAllByText("├─").length).toBeGreaterThan(0);
-    expect(within(screen.getByTestId("split-run-stream-implement")).getAllByText("└─").length).toBeGreaterThan(0);
-    expect(within(implement).getByText("Reading plan.md.")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-stream-line-create-branch")).queryByText("├──"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-stream-line-create-branch")).queryByText("└──"),
+    ).not.toBeInTheDocument();
+    const note = within(implement).getByText("Reading plan.md.");
+    expect(note.closest("li")).toHaveTextContent("├──");
+    expect(within(screen.getByTestId("split-run-stream-implement")).getAllByText("└──").length).toBeGreaterThan(0);
 
     expect(screen.getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
     expect(screen.getByText("Implementation")).toBeInTheDocument();
     expect(within(screen.getByTestId("run-overlay-compact-canvas")).getByText("Create Branch")).toBeInTheDocument();
     expect(screen.queryByText("Factory Lines")).not.toBeInTheDocument();
+  });
+
+  it("shows produced artifacts on the collapsed automation line", async () => {
+    const user = userEvent.setup();
+    renderSplitRun();
+
+    const plan = screen.getByTestId("split-run-phase-plan");
+    const planToggle = within(plan).getByRole("button", { name: /Plan/ });
+    const planArtifacts = within(plan).getByTestId("split-run-phase-artifacts-plan");
+    expect(planToggle.parentElement).toBe(planArtifacts.parentElement);
+    expect(within(planArtifacts).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-stream-plan")).not.toBeInTheDocument();
+
+    await user.click(planToggle);
+
+    expect(within(plan).queryByTestId("split-run-phase-artifacts-plan")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-stream-plan")).getByRole("button", { name: "plan.md" }),
+    ).toBeInTheDocument();
+
+    const implement = screen.getByTestId("split-run-phase-implement");
+    const implementToggle = within(implement).getByRole("button", { name: /Implement/ });
+    const implementArtifacts = within(implement).getByTestId("split-run-phase-artifacts-implement");
+    expect(implementToggle.parentElement).toBe(implementArtifacts.parentElement);
+    expect(within(implementArtifacts).getByRole("link", { name: /feature\/refund-retry/ })).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-stream-implement")).not.toBeInTheDocument();
+
+    await user.click(implementToggle);
+
+    expect(within(implement).queryByTestId("split-run-phase-artifacts-implement")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-stream-implement")).getByRole("link", { name: /feature\/refund-retry/ }),
+    ).toBeInTheDocument();
   });
 
   it("selects the canvas component when a log line is clicked", async () => {

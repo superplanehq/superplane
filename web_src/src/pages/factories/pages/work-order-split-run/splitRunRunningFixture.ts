@@ -126,7 +126,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
       id: "implement",
       name: "Implement",
       status: "running",
-      duration: "4m so far",
+      duration: "4m",
       componentName: "Implementation",
       artifacts: OPEN_WORK_ORDER_ARTIFACTS.filter((artifact) => artifact.id === "art-branch-1"),
       stream: [

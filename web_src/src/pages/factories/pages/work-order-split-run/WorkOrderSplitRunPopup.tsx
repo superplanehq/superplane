@@ -67,13 +67,7 @@ export function WorkOrderSplitRunPopup({
                 <PhaseLogCard
                   phase={entry}
                   expanded={entry.id === openPhaseId}
-                  stream={
-                    entry.id === openPhaseId
-                      ? entry.id === selectedPhase?.id
-                        ? visual.stream
-                        : entry.stream
-                      : undefined
-                  }
+                  stream={entry.id === selectedPhase?.id ? visual.stream : entry.stream}
                   selectedNodeId={nodeId}
                   onSelectNode={setNodeId}
                   onToggle={() => {

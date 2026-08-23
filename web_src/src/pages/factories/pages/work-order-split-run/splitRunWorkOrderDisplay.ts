@@ -80,5 +80,5 @@ export function durationForExecution(
   if (!label) {
     return durationForStatus(status);
   }
-  return status === "running" ? `${label} so far` : label;
+  return label;
 }

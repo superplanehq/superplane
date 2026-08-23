@@ -57,9 +57,32 @@ export function groupSplitRunStream(lines: SplitRunStreamLine[]): StreamNodeGrou
     }));
 }
 
+function artifactsProducedBySteps(
+  groups: StreamNodeGroup[],
+  fallback: FactoriesWorkOrderArtifact[],
+): FactoriesWorkOrderArtifact[] {
+  const produced: FactoriesWorkOrderArtifact[] = [];
+  const seen = new Set<string>();
+  for (const group of groups) {
+    const artifact = group.artifact;
+    if (!artifact) {
+      continue;
+    }
+    const key = artifact.id ?? `${artifact.type}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    produced.push(artifact);
+  }
+  return produced.length > 0 ? produced : fallback;
+}
+
 /**
  * Terminal log. The automation is the root. Each node hangs under it.
- * Notes and artifacts hang under their node. Connectors use ├ and └.
+ * Collapsed automations show produced artifacts on the title line.
+ * Expanded automations show those artifacts on the producing steps.
+ * Note lines under a node use ├ and └.
  */
 export function PhaseLogCard({
   phase,
@@ -79,6 +102,7 @@ export function PhaseLogCard({
   collapsible?: boolean;
 }) {
   const groups = groupSplitRunStream(stream ?? phase.stream);
+  const producedArtifacts = artifactsProducedBySteps(groups, phase.artifacts);
 
   useEffect(() => {
     if (!selectedNodeId) {
@@ -92,66 +116,45 @@ export function PhaseLogCard({
 
   return (
     <div data-testid={`split-run-phase-${phase.id}`} aria-current={expanded ? "step" : undefined}>
-      <div className="flex items-start gap-1.5">
+      <div className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
         {collapsible ? (
           <button
             type="button"
             onClick={onToggle}
             aria-expanded={expanded}
-            className="flex min-w-0 flex-1 items-start gap-1.5 py-0.5 text-left font-mono text-[12px] leading-5"
+            className="flex min-w-0 items-center gap-1.5 text-left font-mono text-[12px] leading-none"
           >
             <ChevronRight
-              className={cn(
-                "mt-0.5 size-3 shrink-0 text-muted-foreground transition-transform",
-                expanded && "rotate-90",
-              )}
+              className={cn("size-3 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")}
               aria-hidden
             />
-            <PhaseGlyph kind={statusGlyph(phase.status)} className="mt-0.5 size-3" />
-            <span className="min-w-0 flex-1 whitespace-nowrap">
-              <span className="text-foreground">{phase.name}</span>
-              <span className="text-muted-foreground">{` > ${phase.componentName}`}</span>
-            </span>
-            <span className={cn("shrink-0", streamTone(phase.status))}>{splitRunStatusLabel(phase.status)}</span>
-            <span className="w-16 shrink-0 text-right tabular-nums text-muted-foreground">{phase.duration}</span>
+            <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3" />
+            <PhaseTitle phase={phase} />
           </button>
         ) : (
-          <div className="flex min-w-0 flex-1 items-start gap-1.5 py-0.5 font-mono text-[12px] leading-5">
-            <PhaseGlyph kind={statusGlyph(phase.status)} className="mt-0.5 size-3" />
-            <span className="min-w-0 flex-1 whitespace-nowrap">
-              <span className="text-foreground">{phase.name}</span>
-              <span className="text-muted-foreground">{` > ${phase.componentName}`}</span>
-            </span>
-            <span className={cn("shrink-0", streamTone(phase.status))}>{splitRunStatusLabel(phase.status)}</span>
-            <span className="w-16 shrink-0 text-right tabular-nums text-muted-foreground">{phase.duration}</span>
+          <div className="flex min-w-0 items-center gap-1.5 font-mono text-[12px] leading-none">
+            <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3" />
+            <PhaseTitle phase={phase} />
           </div>
         )}
+        {!expanded && producedArtifacts.length > 0 ? (
+          <span
+            data-testid={`split-run-phase-artifacts-${phase.id}`}
+            className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap"
+          >
+            {producedArtifacts.map((artifact) => (
+              <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
+            ))}
+          </span>
+        ) : null}
       </div>
 
-      {!expanded && phase.artifacts.length > 0 ? (
-        <ul className="mt-0.5 ml-8 flex flex-wrap gap-x-3 gap-y-0.5">
-          {phase.artifacts.map((artifact) => (
-            <li key={artifact.id ?? `${artifact.type}`}>
-              <WorkOrderArtifactInline
-                className="font-mono text-[12px] font-normal tracking-normal"
-                artifact={{
-                  id: artifact.id,
-                  type: artifact.type ?? "TYPE_UNSPECIFIED",
-                  data: toArtifactDataRecord(artifact.data),
-                }}
-              />
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
       {expanded ? (
-        <ol className="mt-0.5 mb-1 font-mono text-[12px] leading-5" data-testid={`split-run-stream-${phase.id}`}>
-          {groups.map((group, index) => (
+        <ol className="mt-0.5 mb-1 font-mono text-[12px] leading-none" data-testid={`split-run-stream-${phase.id}`}>
+          {groups.map((group) => (
             <StreamNode
               key={group.line.id}
               group={group}
-              isLast={index === groups.length - 1}
               highlighted={Boolean(group.line.nodeId && group.line.nodeId === selectedNodeId)}
               onSelect={onSelectNode}
             />
@@ -162,14 +165,24 @@ export function PhaseLogCard({
   );
 }
 
+function PhaseTitle({ phase }: { phase: SplitRunPhase }) {
+  const duration = phase.duration.replace(/\s+so far$/i, "").trim() || "—";
+  return (
+    <span className="min-w-0 flex-1 whitespace-nowrap">
+      <span className="text-foreground">{phase.name}</span>
+      <span className="text-muted-foreground">{` > ${phase.componentName}`}</span>
+      <span className={cn("ml-2", streamTone(phase.status))}>{splitRunStatusLabel(phase.status)}</span>
+      <span className="ml-2 tabular-nums text-muted-foreground">{duration}</span>
+    </span>
+  );
+}
+
 function StreamNode({
   group,
-  isLast,
   highlighted,
   onSelect,
 }: {
   group: StreamNodeGroup;
-  isLast: boolean;
   highlighted: boolean;
   onSelect?: (nodeId: string) => void;
 }) {
@@ -183,11 +196,10 @@ function StreamNode({
         data-highlighted={highlighted ? "true" : undefined}
         aria-current={highlighted ? "true" : undefined}
         className={cn(
-          "flex w-full items-center whitespace-nowrap rounded-sm py-0.5",
+          "flex h-4 w-full items-center whitespace-nowrap rounded-sm",
           highlighted && "bg-accent ring-1 ring-foreground/15",
         )}
       >
-        <TreePrefix isLast={isLast} />
         <button
           type="button"
           onClick={() => {
@@ -213,16 +225,7 @@ function StreamNode({
           </span>
           <span className={cn("shrink-0", streamTone(line.status))}>{action}</span>
         </button>
-        {artifact ? (
-          <WorkOrderArtifactInline
-            className="font-mono text-[12px] font-normal tracking-normal"
-            artifact={{
-              id: artifact.id,
-              type: artifact.type ?? "TYPE_UNSPECIFIED",
-              data: toArtifactDataRecord(artifact.data),
-            }}
-          />
-        ) : null}
+        {artifact ? <StreamArtifact artifact={artifact} /> : null}
       </div>
       {notes.length > 0 ? (
         <ol>
@@ -230,9 +233,9 @@ function StreamNode({
             <li
               key={note.id}
               data-testid={`split-run-stream-line-${note.id}`}
-              className="flex w-full items-center whitespace-nowrap py-0.5"
+              className="flex h-4 w-full items-center whitespace-nowrap"
             >
-              <TreePrefix isLast={noteIndex === notes.length - 1} parentLast={isLast} depth={2} />
+              <NotePrefix isLast={noteIndex === notes.length - 1} />
               <span className="min-w-0 truncate text-muted-foreground">{note.componentName}</span>
             </li>
           ))}
@@ -242,21 +245,32 @@ function StreamNode({
   );
 }
 
-function TreePrefix({ isLast, parentLast, depth = 1 }: { isLast: boolean; parentLast?: boolean; depth?: 1 | 2 }) {
-  const elbow = isLast ? "└─ " : "├─ ";
-  const text = depth === 1 ? elbow : `${parentLast ? "   " : "│  "}${elbow}`;
+function NotePrefix({ isLast }: { isLast: boolean }) {
   return (
-    <span className="shrink-0 text-muted-foreground" aria-hidden>
-      {text}
+    <span className="inline-block w-[8ch] shrink-0 whitespace-pre text-muted-foreground" aria-hidden>
+      {isLast ? "    └── " : "    ├── "}
     </span>
+  );
+}
+
+function StreamArtifact({ artifact }: { artifact: FactoriesWorkOrderArtifact }) {
+  return (
+    <WorkOrderArtifactInline
+      className="font-mono text-[12px] font-normal tracking-normal"
+      artifact={{
+        id: artifact.id,
+        type: artifact.type ?? "TYPE_UNSPECIFIED",
+        data: toArtifactDataRecord(artifact.data),
+      }}
+    />
   );
 }
 
 function StreamLineIcon({ iconSlug, iconSrc }: { iconSlug?: string; iconSrc?: string }) {
   const Icon = resolveIcon(iconSlug ?? "box");
   return (
-    <span className="inline-flex size-3.5 shrink-0 items-center justify-center text-muted-foreground" aria-hidden>
-      {iconSrc ? <img src={iconSrc} alt="" className="size-3.5 object-contain" /> : <Icon className="size-3.5" />}
+    <span className="inline-flex size-3 shrink-0 items-center justify-center text-muted-foreground" aria-hidden>
+      {iconSrc ? <img src={iconSrc} alt="" className="size-3 object-contain" /> : <Icon className="size-3" />}
     </span>
   );
 }

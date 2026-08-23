@@ -39,7 +39,7 @@ describe("durationForExecution", () => {
   it("formats a running step against now", () => {
     const now = Date.parse(START) + FOUR_MINUTES;
     expect(durationForExecution({ createdAt: START, updatedAt: START }, "running", now)).toBe(
-      `${formatMinutesSecondsDuration(FOUR_MINUTES)} so far`,
+      formatMinutesSecondsDuration(FOUR_MINUTES),
     );
   });
 });
