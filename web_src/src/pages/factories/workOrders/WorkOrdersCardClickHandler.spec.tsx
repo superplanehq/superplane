@@ -1,13 +1,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 
 import { workOrderDetailPath } from "../lib/factoryPagePaths";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
+import { WorkOrderCard } from "./WorkOrderCard";
 import { WorkOrdersBoardView } from "./WorkOrdersBoardView";
 import { WorkOrdersListView } from "./WorkOrdersListView";
 import { WorkOrdersTableView } from "./WorkOrdersTableView";
@@ -292,5 +293,47 @@ describe.each(viewsWithDispatch)("$name dispatch control", ({ Component }) => {
 
     expect(router.state.location.pathname).toBe("/");
     expect(onDispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("WorkOrderCard scores", () => {
+  it("shows a score and hides Start on a scored draft card", () => {
+    const draft = buildWorkOrderListEntry(
+      {
+        id: "wo-draft-scored",
+        number: "842",
+        title: "Add retry handling to webhook delivery",
+        state: "STATE_DRAFT",
+        createdAt: "2024-06-01T00:00:00Z",
+        updatedAt: "2024-06-02T00:00:00Z",
+        lineDispatches: [],
+        assignees: [],
+      },
+      factory,
+    );
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <WorkOrderCard
+            entry={draft}
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            factoryLines={[{ id: "line-a", name: "hotfix" }]}
+            canDispatch
+            canAssign
+            isDispatching={false}
+            isAssigneesSaving={false}
+            onDispatch={vi.fn()}
+            onAssigneesSave={vi.fn()}
+            confidencePct={95}
+            onOpen={vi.fn()}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByTestId("work-order-card-score-wo-draft-scored")).toHaveTextContent("95%");
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 });

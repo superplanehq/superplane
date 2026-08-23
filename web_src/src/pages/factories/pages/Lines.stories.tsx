@@ -1,7 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
-import { PRIMARY_FACTORY_KEY, REFUND_FACTORY_LINES } from "../__fixtures__/factoryPageResponses";
+import { refundLineCanvasFixture } from "../__fixtures__/factoryOwnedCanvasFixture";
+import {
+  ACME_ONBOARDING_FACTORY_ID,
+  ACME_ONBOARDING_FACTORY_KEY,
+  ACME_ONBOARDING_LINE_ID,
+  GITHUB_ISSUES_INTAKE_APP,
+  PRIMARY_FACTORY_KEY,
+  REFUND_FACTORY_LINES,
+} from "../__fixtures__/factoryPageResponses";
 import { emptyFactoriesFixture } from "../__fixtures__/factoryPageFixtureVariants";
 import { fiveStepLineFactoriesFixture, lineMetricsFactoriesFixture } from "../__fixtures__/lineMetricsFactoriesFixture";
 import { LinesPage } from "./LinesPage";
@@ -45,6 +53,28 @@ export const EmptyFactory: Story = {
   render: () => <FactoriesHarness pathSuffix={linesListPath} factoriesFixture={emptyFactoriesFixture} />,
 };
 
+export const AcmeOnboardingEmpty: Story = {
+  name: "Acme onboarding — empty board",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}`}
+      factoriesFixture={lineMetricsFactoriesFixture}
+      appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP, ACME_ONBOARDING_FACTORY_ID)}
+    />
+  ),
+};
+
+export const AcmeOnboardingIntake: Story = {
+  name: "Acme onboarding — intake",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&source=github-issues`}
+      factoriesFixture={lineMetricsFactoriesFixture}
+      appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP, ACME_ONBOARDING_FACTORY_ID)}
+    />
+  ),
+};
+
 export const LineBoardIntake: Story = {
   name: "Line board — intake",
   render: () => {
@@ -52,6 +82,19 @@ export const LineBoardIntake: Story = {
     return (
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1`}
+        factoriesFixture={lineMetricsFactoriesFixture}
+      />
+    );
+  },
+};
+
+export const LineBoardIntakeAnalyzing: Story = {
+  name: "Line board — intake tree",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1&source=github-issues`}
         factoriesFixture={lineMetricsFactoriesFixture}
       />
     );

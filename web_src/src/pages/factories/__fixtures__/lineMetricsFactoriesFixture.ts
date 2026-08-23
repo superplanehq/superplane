@@ -1,5 +1,6 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 
+import { REVIEW_CANDIDATE_WORK_ORDERS } from "../pages/onboarding/first-run/reviewCandidates";
 import {
   CLOSED_WORK_ORDER,
   FAILED_WORK_ORDER,
@@ -198,6 +199,7 @@ export const lineMetricsFactoriesFixture: FactoriesFixture = {
   workOrdersByFactoryId: {
     ...defaultFactoriesFixture.workOrdersByFactoryId,
     [PRIMARY_FACTORY_ID]: [
+      ...REVIEW_CANDIDATE_WORK_ORDERS,
       ...(defaultFactoriesFixture.workOrdersByFactoryId[PRIMARY_FACTORY_ID] ?? [])
         .map(withPlanPhase)
         .map(withVerifyPhase)

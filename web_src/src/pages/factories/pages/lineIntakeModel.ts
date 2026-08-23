@@ -5,6 +5,7 @@ import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { getUserInitials } from "@/lib/orgUserDisplay";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
+import { ACME_ONBOARDING_FACTORY_KEY, GITHUB_ISSUES_INTAKE_APP_ID } from "../__fixtures__/factoryPageIds";
 import {
   STORYBOOK_ME_USER_AVATAR_URL,
   STORYBOOK_ME_USER_ID,
@@ -109,6 +110,49 @@ export function lineIntakeSourceById(id: string): LineIntakeSource | undefined {
   return LINE_INTAKE_SOURCES.find((source) => source.id === id);
 }
 
+export function isFirstRunOnboardingFactory(factoryKey: string | undefined): boolean {
+  return factoryKey === ACME_ONBOARDING_FACTORY_KEY;
+}
+
+/** Acme onboarding starts with GitHub issues only. Semaphore keeps the full set. */
+export function lineIntakeSourcesForFactory(factoryKey: string | undefined): LineIntakeSource[] {
+  if (isFirstRunOnboardingFactory(factoryKey)) {
+    return LINE_INTAKE_SOURCES.filter((source) => source.id === "github-issues");
+  }
+  return LINE_INTAKE_SOURCES;
+}
+
+export function isLineIntakeSourceId(id: string | null | undefined): id is LineIntakeSourceId {
+  return Boolean(id && lineIntakeSourceById(id));
+}
+
+export function intakeAutomationAppId(apps: Array<{ id?: string }>): string | undefined {
+  return apps.find((app) => app.id === GITHUB_ISSUES_INTAKE_APP_ID)?.id ?? apps.find((app) => app.id)?.id;
+}
+
+export interface LineIntakeAnalyzingTicket {
+  id: string;
+  title: string;
+}
+
+export const LINE_INTAKE_COPY = {
+  analyzingTitle: "Analyzing",
+  analyzingHelper: "Tickets from this intake.",
+  analyzingStatus: "Analyzing",
+  analyzingEmpty: "No tickets in analysis.",
+  analysisHeadline: "SuperPlane is analyzing this ticket",
+  analysisHelper: "SuperPlane reads the ticket and the repository. It does not start work yet.",
+} as const;
+
+/** GitHub issues pulled in for first-run analysis. Scores land on the board later. */
+export const GITHUB_ISSUES_ANALYZING_TICKETS: LineIntakeAnalyzingTicket[] = [
+  { id: "gh-issue-1", title: "Handle duplicate refunds on retry" },
+  { id: "gh-issue-2", title: "Return 409 when the invoice is already paid" },
+  { id: "gh-issue-3", title: "Show a clearer empty state on the billing page" },
+  { id: "gh-issue-4", title: "Upgrade the Node 20 base image" },
+  { id: "gh-issue-5", title: "Add a flake retry to the checkout e2e suite" },
+];
+
 export interface AddIntakeTemplate {
   id: string;
   name: string;
@@ -176,11 +220,177 @@ const OWNER = {
 };
 
 /**
+ * Ticket click from GitHub issues: same split-run popup, with a canvas
+ * for ingest, analyze, create plan, and score.
+ */
+export function intakeTicketAnalysisFixture(ticket: LineIntakeAnalyzingTicket): SplitRunFixture {
+  const canvas = ticketAnalysisCanvas();
+  return {
+    title: ticket.title,
+    owner: OWNER,
+    elapsed: "Running",
+    startedLabel: "Analyze ticket",
+    costUsd: "—",
+    tokensLabel: "Analysis",
+    lineName: "Intake",
+    lineStatus: "running",
+    currentPhaseId: "analyze",
+    waitingNotes: [
+      {
+        key: `${ticket.id}-analyzing`,
+        headline: LINE_INTAKE_COPY.analysisHeadline,
+        text: LINE_INTAKE_COPY.analysisHelper,
+      },
+    ],
+    checks: [],
+    footerTone: "waiting",
+    phases: [
+      ticketAnalysisPhase({
+        id: "ingest",
+        name: "Ingest",
+        status: "passed",
+        componentName: "Ingest",
+        detail: "Ticket received from GitHub issues.",
+        canvas,
+      }),
+      ticketAnalysisPhase({
+        id: "analyze",
+        name: "Analyze",
+        status: "running",
+        componentName: "Analyze ticket",
+        detail: "Reading the ticket and the repository.",
+        canvas,
+      }),
+      ticketAnalysisPhase({
+        id: "plan",
+        name: "Create plan",
+        status: "pending",
+        componentName: "Create plan",
+        detail: "Waiting for analysis to finish.",
+        canvas,
+      }),
+      ticketAnalysisPhase({
+        id: "score",
+        name: "Score",
+        status: "pending",
+        componentName: "Score",
+        detail: "Waiting for a plan.",
+        canvas,
+      }),
+    ],
+  };
+}
+
+function ticketAnalysisPhase({
+  id,
+  name,
+  status,
+  componentName,
+  detail,
+  canvas,
+}: {
+  id: SplitRunPhase["id"];
+  name: string;
+  status: SplitRunPhase["status"];
+  componentName: string;
+  detail: string;
+  canvas: SplitRunCanvasModel;
+}): SplitRunPhase {
+  return {
+    id,
+    name,
+    status,
+    duration: "—",
+    componentName,
+    artifacts: [],
+    canvas,
+    stream: [
+      {
+        id: `ticket-${id}`,
+        at: "12:00:04",
+        componentName,
+        status,
+        detail,
+      },
+    ],
+  };
+}
+
+function ticketAnalysisCanvas(): SplitRunCanvasModel {
+  const ingestId = "ticket-ingest";
+  const analyzeId = "ticket-analyze";
+  const planId = "ticket-plan";
+  const scoreId = "ticket-score";
+
+  const nodes: ComponentsNode[] = [
+    {
+      id: ingestId,
+      name: "Ingest",
+      type: "TYPE_TRIGGER",
+      component: "github.onIssue",
+      position: { x: 160, y: 40 },
+    },
+    {
+      id: analyzeId,
+      name: "Analyze ticket",
+      type: "TYPE_ACTION",
+      component: "runnerClaudeCode",
+      configuration: {
+        prompt: "Read this ticket and the repository. Find the files and risks that matter.",
+      },
+      position: { x: 160, y: 200 },
+    },
+    {
+      id: planId,
+      name: "Create plan",
+      type: "TYPE_ACTION",
+      component: "addWorkOrderArtifact",
+      configuration: {
+        name: "plan.md",
+      },
+      position: { x: 160, y: 360 },
+    },
+    {
+      id: scoreId,
+      name: "Score",
+      type: "TYPE_ACTION",
+      component: "reportWorkOrderCheck",
+      configuration: {
+        name: "confidence",
+      },
+      position: { x: 160, y: 520 },
+    },
+  ];
+
+  return {
+    key: "intake",
+    title: "Ticket analysis",
+    nodes,
+    edges: [
+      { channel: "default", sourceId: ingestId, targetId: analyzeId },
+      { channel: "default", sourceId: analyzeId, targetId: planId },
+      { channel: "default", sourceId: planId, targetId: scoreId },
+    ],
+    statuses: {
+      [ingestId]: "triggered",
+      [analyzeId]: "running",
+      [planId]: "pending",
+      [scoreId]: "pending",
+    } satisfies Record<string, FactoryNodeStatus>,
+    metrics: {},
+  };
+}
+
+/**
  * Builds the same popup shape as a line-board work order: log on the left,
  * automation canvas on the right. Phases are listen → evaluate → backlog.
  */
+export function intakeAutomationCanvas(source: LineIntakeSource): SplitRunCanvasModel {
+  return intakeCanvasForSource(source);
+}
+
 export function intakeAutomationFixture(source: LineIntakeSource): SplitRunFixture {
-  const canvas = intakeCanvasForSource(source);
+  const canvas = intakeAutomationCanvas(source);
   const waitingNotes: WorkOrderStatusNotePresentation[] = [
     {
       key: `${source.id}-backlog`,
