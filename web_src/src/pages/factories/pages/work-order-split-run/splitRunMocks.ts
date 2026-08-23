@@ -234,10 +234,7 @@ function boardColumnFor(current: FactoriesWorkOrderExecution | undefined, execut
 }
 
 function phasesForOrder(order: FactoriesWorkOrder, executions: FactoriesWorkOrderExecution[]): SplitRunPhase[] {
-  if (executions.length > 0) {
-    return executions.map((execution) => executionToPhase(execution));
-  }
-  return [backlogSourcePhase(order)];
+  return [backlogSourcePhase(order), ...executions.map((execution) => executionToPhase(execution))];
 }
 
 function backlogSourcePhase(order: FactoriesWorkOrder): SplitRunPhase {

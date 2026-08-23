@@ -49,6 +49,14 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(implement?.appId).toBe("app-refund-implementer");
     expect(implement?.runId).toBe(RUNNING_WORK_ORDER.lineDispatches?.[0]?.stepExecutions?.[1]?.run?.id);
     expect(implement?.stream.map((line) => line.componentName)).toEqual(["Implementation"]);
+    expect(fixture.phases[0]).toMatchObject({
+      id: "backlog",
+      name: "Backlog",
+      componentName: "Ingest",
+      status: "passed",
+      canvasKey: "intake",
+    });
+    expect(fixture.phases[0]?.artifacts[0]?.data).toMatchObject({ name: "description.md" });
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.checks).toEqual([]);
   });
@@ -208,7 +216,10 @@ describe("splitRunFixtureForWorkOrder", () => {
 
     expect(fixture.title).toBe("Plan job");
     expect(fixture.lineStatus).toBe("running");
-    expect(fixture.phases.map((phase) => [phase.name, phase.status])).toEqual([["Plan", "running"]]);
+    expect(fixture.phases.map((phase) => [phase.name, phase.status])).toEqual([
+      ["Backlog", "passed"],
+      ["Plan", "running"],
+    ]);
     expect(fixture.currentPhaseId).toBe("plan-0");
     expect(fixture.phases.at(-1)?.canvasSteps.at(-1)?.status).toBe("running");
   });

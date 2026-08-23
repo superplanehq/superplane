@@ -198,8 +198,8 @@ describe("Line board job popup", () => {
       "href",
       workOrderDetailPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, RUNNING_WORK_ORDER.number ?? "103"),
     );
-    expect(within(dialog).queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByText("Backlog")).not.toBeInTheDocument();
+    expect(within(dialog).getByText("Backlog")).toBeInTheDocument();
+    expect(within(dialog).getAllByRole("button", { name: "description.md" }).length).toBeGreaterThan(0);
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Log" })).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-phase-implement-1")).toBeInTheDocument();
@@ -251,9 +251,9 @@ describe("Line board job popup", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Draft: rework refund telemetry" }));
     dialog = await screen.findByTestId("work-order-split-run");
-    expect(within(dialog).queryByText("Backlog")).not.toBeInTheDocument();
-    expect(within(dialog).queryByText(/Create work order/)).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
+    expect(within(dialog).getByText("Backlog")).toBeInTheDocument();
+    expect(within(dialog).getByText(/Created manually/)).toBeInTheDocument();
+    expect(within(dialog).getAllByRole("button", { name: "description.md" }).length).toBeGreaterThan(0);
     expect(within(dialog).getByText("Start the next stage")).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Dispatch" })).toBeEnabled();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
@@ -265,8 +265,8 @@ describe("Line board job popup", () => {
       }),
     );
     dialog = await screen.findByTestId("work-order-split-run");
-    expect(within(dialog).queryByText(/Create work order from GitHub issue/)).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-phase-backlog")).toHaveTextContent("Ingest");
+    expect(within(dialog).getAllByRole("button", { name: "description.md" }).length).toBeGreaterThan(0);
     expect(within(dialog).getByText("Start the next stage")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 

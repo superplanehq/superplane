@@ -371,6 +371,8 @@ describe("WorkOrderSplitRunPopup", () => {
     });
 
     expect(screen.getByRole("heading", { name: "Plan job" })).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-phase-backlog")).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-phase-backlog")).getByText(/Ingest/)).toBeInTheDocument();
     expect(screen.getByTestId("split-run-stream-plan-0")).toBeInTheDocument();
     expect(screen.getByText("Planning")).toBeInTheDocument();
     expect(screen.getAllByText("From GH issue?").length).toBeGreaterThan(0);

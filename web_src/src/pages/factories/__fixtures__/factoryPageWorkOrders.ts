@@ -9,7 +9,6 @@ import {
   LINE_RUN_IMPLEMENT_ID,
   LINE_RUN_IMPLEMENT_PASSED_ID,
   LINE_RUN_VERIFY_PASSED_ID,
-  OPERATOR_USER,
   REVIEWER_USER,
   STORYBOOK_ME_USER_ID,
   STORYBOOK_ME_USER_NAME,
@@ -17,6 +16,18 @@ import {
   YESTERDAY,
   minutesAgo,
 } from "./factoryPageIds";
+
+export const INGEST_CREATED_BY = {
+  automation: { appId: "app-refund-backlog", appName: "Ingest", nodeName: "On Issue Label" },
+} as const;
+
+export const SENTRY_CREATED_BY = {
+  automation: { appId: "app-refund-sentry", appName: "Sentry", nodeName: "On Issue" },
+} as const;
+
+export const SLACK_CREATED_BY = {
+  automation: { appId: "app-refund-slack", appName: "Slack", nodeName: "On Mention" },
+} as const;
 
 export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-open-refunds",
@@ -43,7 +54,7 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: HOUR_AGO,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
+  createdBy: INGEST_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [],
   // A watcher automation announcing why the order needs attention — the detail
@@ -80,7 +91,7 @@ export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: TWO_HOURS_AGO,
   updatedAt: TWO_HOURS_AGO,
-  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
+  createdBy: SENTRY_CREATED_BY,
   assignees: [{ id: ARNOLD_USER.id, name: ARNOLD_USER.name }],
   lineDispatches: [
     planLineDispatch([
@@ -107,7 +118,7 @@ export const QUESTION_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: TWO_HOURS_AGO,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
+  createdBy: SLACK_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     planLineDispatch([
@@ -181,7 +192,7 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: REVIEWER_USER.id, name: REVIEWER_USER.name } },
+  createdBy: INGEST_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     planLineDispatch([
@@ -223,7 +234,7 @@ export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+  createdBy: INGEST_CREATED_BY,
   assignees: [{ id: ARNOLD_USER.id, name: ARNOLD_USER.name }],
   lineDispatches: [
     planLineDispatch([
@@ -306,13 +317,7 @@ export const INGEST_DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: TWO_HOURS_AGO,
   updatedAt: TWO_HOURS_AGO,
-  createdBy: {
-    automation: {
-      appId: "app-refund-backlog",
-      appName: "Ingest",
-      nodeName: "On Issue Label",
-    },
-  },
+  createdBy: INGEST_CREATED_BY,
   assignees: [],
   lineDispatches: [],
 };
@@ -337,13 +342,7 @@ export const SENTRY_DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
   updatedAt: YESTERDAY,
-  createdBy: {
-    automation: {
-      appId: "app-refund-sentry",
-      appName: "Sentry",
-      nodeName: "On Issue",
-    },
-  },
+  createdBy: SENTRY_CREATED_BY,
   assignees: [],
   lineDispatches: [],
 };
@@ -369,13 +368,7 @@ export const SLACK_DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: TWO_HOURS_AGO,
   updatedAt: TWO_HOURS_AGO,
-  createdBy: {
-    automation: {
-      appId: "app-refund-slack",
-      appName: "Slack",
-      nodeName: "On Mention",
-    },
-  },
+  createdBy: SLACK_CREATED_BY,
   assignees: [],
   lineDispatches: [],
 };
@@ -394,7 +387,7 @@ export const CLOSED_FAILED_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_FAILED",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
-  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+  createdBy: SENTRY_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [],
 };
@@ -413,7 +406,7 @@ export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_COMPLETED",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
-  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
+  createdBy: INGEST_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     planLineDispatch([
@@ -463,7 +456,7 @@ export const PR_CLOSURE_COMPLETED_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_COMPLETED",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
-  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+  createdBy: INGEST_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     planLineDispatch([

@@ -23,6 +23,7 @@ import {
   TWO_HOURS_AGO,
   YESTERDAY,
 } from "./factoryPageResponses";
+import { INGEST_CREATED_BY, SENTRY_CREATED_BY, SLACK_CREATED_BY } from "./factoryPageWorkOrders";
 import { PLAN_LINE_DONE_APP_ID, planLineActiveDispatch, runAppStep } from "./lineMetricsPlanLine";
 
 export const BOARD_IMPLEMENT_FAILED_ORDER: FactoriesWorkOrder = {
@@ -36,7 +37,7 @@ export const BOARD_IMPLEMENT_FAILED_ORDER: FactoriesWorkOrder = {
   result: "RESULT_FAILED",
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+  createdBy: INGEST_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   totalTokens: "6400",
   totalCostCents: "210",
@@ -81,6 +82,7 @@ function boardDoneOrder({
   doneResult,
   updatedAt,
   assignee,
+  createdBy = INGEST_CREATED_BY,
 }: {
   id: string;
   number: string;
@@ -92,6 +94,7 @@ function boardDoneOrder({
   doneResult: FactoriesWorkOrderExecution["result"];
   updatedAt: string;
   assignee: { id: string; name: string };
+  createdBy?: FactoriesWorkOrder["createdBy"];
 }): FactoriesWorkOrder {
   return {
     id,
@@ -103,7 +106,7 @@ function boardDoneOrder({
     result,
     createdAt: LAST_WEEK,
     updatedAt,
-    createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+    createdBy,
     assignees: [assignee],
     lineDispatches: [
       {
@@ -180,6 +183,7 @@ export const BOARD_DONE_COMPLETED_PLAYBOOK: FactoriesWorkOrder = boardDoneOrder(
   doneResult: "RESULT_PASSED",
   updatedAt: YESTERDAY,
   assignee: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
+  createdBy: SLACK_CREATED_BY,
 });
 
 export const BOARD_DONE_REJECTED_ORDER: FactoriesWorkOrder = boardDoneOrder({
@@ -193,6 +197,7 @@ export const BOARD_DONE_REJECTED_ORDER: FactoriesWorkOrder = boardDoneOrder({
   doneResult: "RESULT_PASSED",
   updatedAt: HOUR_AGO,
   assignee: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
+  createdBy: SENTRY_CREATED_BY,
 });
 
 export const BOARD_DONE_CANCELED_ORDER: FactoriesWorkOrder = boardDoneOrder({
@@ -309,7 +314,7 @@ export const FEATURE_RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
+  createdBy: SLACK_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     featureLineDispatch([
@@ -334,7 +339,7 @@ export const FEATURE_PR_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: REVIEWER_USER.id, name: REVIEWER_USER.name } },
+  createdBy: INGEST_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     featureLineDispatch([
@@ -359,7 +364,7 @@ export const FEATURE_CI_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+  createdBy: SENTRY_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     featureLineDispatch([
