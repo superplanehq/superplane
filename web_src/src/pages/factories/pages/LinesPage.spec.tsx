@@ -5,11 +5,13 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { editFactoryLinePath, factoryAppConfigurePath, factoryLineDetailPath } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_KEY,
   ACME_ONBOARDING_LINE_ID,
+  GITHUB_ISSUES_INTAKE_APP,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
@@ -24,10 +26,11 @@ import { LinesPage } from "./LinesPage";
 const createFactoryLineMutateAsync = vi.fn();
 const updateFactoryLineMutateAsync = vi.fn();
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
+const useFactoryApps = vi.fn(() => ({ data: [] as Array<{ id?: string; name?: string }> }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
-  useFactoryApps: () => ({ data: [] }),
+  useFactoryApps: () => useFactoryApps(),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: updateFactoryLineMutateAsync, isPending: false }),
 }));
@@ -130,6 +133,7 @@ describe("LinesPage board", () => {
   beforeEach(() => {
     updateFactoryLineMutateAsync.mockReset();
     useFactoryWorkOrders.mockReturnValue({ data: [] });
+    useFactoryApps.mockReturnValue({ data: [] });
   });
 
   function renderBoard(
@@ -139,24 +143,26 @@ describe("LinesPage board", () => {
   ) {
     return render(
       <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={[path]}>
-          <FactoriesLayoutContext.Provider
-            value={{
-              organizationId: "org-1",
-              factoryId: factory.id ?? PRIMARY_FACTORY_ID,
-              factoryKey: factory.key ?? PRIMARY_FACTORY_KEY,
-              factory,
-              factories: [factory],
-              openCreateWorkOrder,
-            }}
-          >
-            <Routes>
-              <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
-              <Route path="/org-1/workspaces/:factoryKey/lines/:lineId/edit" element={<div>Edit line</div>} />
-            </Routes>
-            <LocationProbe />
-          </FactoriesLayoutContext.Provider>
-        </MemoryRouter>
+        <ThemeProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <FactoriesLayoutContext.Provider
+              value={{
+                organizationId: "org-1",
+                factoryId: factory.id ?? PRIMARY_FACTORY_ID,
+                factoryKey: factory.key ?? PRIMARY_FACTORY_KEY,
+                factory,
+                factories: [factory],
+                openCreateWorkOrder,
+              }}
+            >
+              <Routes>
+                <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
+                <Route path="/org-1/workspaces/:factoryKey/lines/:lineId/edit" element={<div>Edit line</div>} />
+              </Routes>
+              <LocationProbe />
+            </FactoriesLayoutContext.Provider>
+          </MemoryRouter>
+        </ThemeProvider>
       </QueryClientProvider>,
     );
   }
@@ -243,6 +249,23 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("line-intake-source-github-issues")).toBeInTheDocument();
     expect(screen.queryByTestId("line-intake-source-sentry-exceptions")).not.toBeInTheDocument();
     expect(screen.queryByTestId("line-intake-source-pagerduty-incidents")).not.toBeInTheDocument();
+  });
+
+  it("opens the factory canvas editor from Edit automation", async () => {
+    useFactoryApps.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE_APP] });
+    const user = userEvent.setup();
+    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1&source=github-issues`);
+
+    await user.click(screen.getByRole("button", { name: "Open GitHub issues settings" }));
+    await user.click(screen.getByRole("tab", { name: "Automation" }));
+
+    expect(screen.getByRole("link", { name: "Edit automation" })).toHaveAttribute(
+      "href",
+      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, GITHUB_ISSUES_INTAKE_APP.id!, {
+        from: "lines",
+        lineId: REFUND_LINE_PLAN_ID,
+      }),
+    );
   });
 
   it("nests analyzing tickets under GitHub issues when that source is open", () => {

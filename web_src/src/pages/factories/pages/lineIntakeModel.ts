@@ -5,7 +5,7 @@ import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { getUserInitials } from "@/lib/orgUserDisplay";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
-import { ACME_ONBOARDING_FACTORY_KEY } from "../__fixtures__/factoryPageIds";
+import { ACME_ONBOARDING_FACTORY_KEY, GITHUB_ISSUES_INTAKE_APP_ID } from "../__fixtures__/factoryPageIds";
 import {
   STORYBOOK_ME_USER_AVATAR_URL,
   STORYBOOK_ME_USER_ID,
@@ -124,6 +124,10 @@ export function lineIntakeSourcesForFactory(factoryKey: string | undefined): Lin
 
 export function isLineIntakeSourceId(id: string | null | undefined): id is LineIntakeSourceId {
   return Boolean(id && lineIntakeSourceById(id));
+}
+
+export function intakeAutomationAppId(apps: Array<{ id?: string }>): string | undefined {
+  return apps.find((app) => app.id === GITHUB_ISSUES_INTAKE_APP_ID)?.id ?? apps.find((app) => app.id)?.id;
 }
 
 export interface LineIntakeAnalyzingTicket {

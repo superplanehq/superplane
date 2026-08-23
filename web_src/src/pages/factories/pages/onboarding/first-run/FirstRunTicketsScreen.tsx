@@ -1,27 +1,26 @@
+import { Button } from "@/components/ui/button";
+
 import { ConnectOptionRow, IntegrationChoiceIcon } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./FirstRunShell";
 import type { FirstRunChrome, FirstRunTicketSource } from "./firstRunTypes";
 
 export function FirstRunTicketsScreen({
-  repository,
   ticketSource,
   chrome,
   onSelectTicketSource,
+  onAnalyzeTickets,
 }: {
-  repository: string;
   ticketSource: FirstRunTicketSource | null;
   chrome?: FirstRunChrome;
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
+  onAnalyzeTickets: () => void;
 }) {
   const copy = FIRST_RUN_COPY.tickets;
 
   return (
     <FirstRunShell testId="first-run-tickets" chrome={chrome}>
-      <FirstRunHeading headline={copy.headline}>
-        <p className="text-[13px] font-medium tracking-[-0.01em]">{copy.repositoryCaption(repository)}</p>
-        <p className="text-[15px] leading-6 text-muted-foreground">{copy.body}</p>
-      </FirstRunHeading>
+      <FirstRunHeading headline={copy.headline} />
 
       <div className="mt-8 space-y-4">
         <FirstRunPanel>
@@ -49,8 +48,22 @@ export function FirstRunTicketsScreen({
             />
           </div>
         </FirstRunPanel>
-        <p className="text-[13px] text-muted-foreground">{copy.trust}</p>
-        <p className="text-[12px] text-muted-foreground">{copy.startHint}</p>
+
+        <div className="space-y-3">
+          <div className="space-y-1 text-[13px] leading-5 text-muted-foreground">
+            <p>{copy.trust}</p>
+            <p>{copy.scoreHint}</p>
+          </div>
+          <Button
+            type="button"
+            className="w-full"
+            disabled={!ticketSource}
+            onClick={onAnalyzeTickets}
+            data-testid="first-run-analyze-tickets"
+          >
+            {copy.analyze}
+          </Button>
+        </div>
       </div>
     </FirstRunShell>
   );

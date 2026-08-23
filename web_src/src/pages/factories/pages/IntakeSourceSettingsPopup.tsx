@@ -36,6 +36,7 @@ interface IntakeSourceSettingsPopupProps {
   runs?: IntakeAutomationRun[];
   onSave: (next: IntakeSourceSettings) => void;
   onOpenRun?: (run: IntakeAutomationRun) => void;
+  editAutomationHref?: string;
   onClose: () => void;
   fixed?: boolean;
   initialTab?: IntakeSettingsTab;
@@ -47,6 +48,7 @@ export function IntakeSourceSettingsPopup({
   runs = GITHUB_INTAKE_RUNS,
   onSave,
   onOpenRun,
+  editAutomationHref,
   onClose,
   fixed = true,
   initialTab = "general",
@@ -83,7 +85,7 @@ export function IntakeSourceSettingsPopup({
         </Tabs>
       </PopupHeader>
       {tab === "automation" ? (
-        <IntakeAutomationCanvas canvas={automationCanvas} />
+        <IntakeAutomationCanvas canvas={automationCanvas} editHref={editAutomationHref} />
       ) : tab === "runs" ? (
         <IntakeRunsList runs={runs} onOpenRun={onOpenRun} />
       ) : (
@@ -289,7 +291,7 @@ function RadioOption({
   );
 }
 
-function IntakeAutomationCanvas({ canvas }: { canvas: SplitRunCanvasModel }) {
+function IntakeAutomationCanvas({ canvas, editHref }: { canvas: SplitRunCanvasModel; editHref?: string }) {
   const [nodeId, setNodeId] = useState<string | null>(null);
 
   return (
@@ -303,6 +305,7 @@ function IntakeAutomationCanvas({ canvas }: { canvas: SplitRunCanvasModel }) {
         selectedId={nodeId}
         onSelect={setNodeId}
         headerEdit="button"
+        editHref={editHref}
         editLabel={INTAKE_SETTINGS_COPY.editAutomation}
       />
     </section>

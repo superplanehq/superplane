@@ -10,34 +10,6 @@ export function firstRunStoryChrome(stepIndex: number): FirstRunChrome {
   };
 }
 
-/** Static preview on the welcome screen. Not live analysis results. */
-export const FIRST_RUN_PREVIEW_TICKETS: FirstRunScoredTicket[] = [
-  {
-    id: "preview-1",
-    title: "Fix retry on expired checkout sessions",
-    source: "acme/payments-service",
-    confidencePct: 92,
-  },
-  {
-    id: "preview-2",
-    title: "Add pagination to the invoices list",
-    source: "acme/api",
-    confidencePct: 84,
-  },
-  {
-    id: "preview-3",
-    title: "Bump lodash and apply the security patch",
-    source: "acme/web",
-    confidencePct: 78,
-  },
-  {
-    id: "preview-4",
-    title: "Document the refund webhook contract",
-    source: "acme/docs",
-    confidencePct: 71,
-  },
-];
-
 export const FIRST_RUN_SCORED_TICKETS: FirstRunScoredTicket[] = [
   {
     id: "ticket-1",

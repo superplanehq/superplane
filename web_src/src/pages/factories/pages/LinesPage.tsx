@@ -55,6 +55,7 @@ import {
   factoryAppSplitRunPath,
   factoryHomePath,
   factoryLineDetailPath,
+  intakeSettingsTabFromSearch,
   intakeSourceFromSearch,
   isIntakeSearchOpen,
   linesPath,
@@ -71,7 +72,13 @@ import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
-import { isFirstRunOnboardingFactory, isLineIntakeSourceId, lineIntakeSourcesForFactory } from "./lineIntakeModel";
+import {
+  intakeAutomationAppId,
+  isFirstRunOnboardingFactory,
+  isLineIntakeSourceId,
+  lineIntakeSourcesForFactory,
+} from "./lineIntakeModel";
+import { isIntakeSettingsTab } from "./intakeSourceSettingsModel";
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
 import { LineListCard } from "./LineListCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
@@ -88,6 +95,7 @@ export function LinesPage() {
   const navigate = useNavigate();
   const intakeOpen = isIntakeSearchOpen(search);
   const intakeSourceId = intakeSourceFromSearch(search);
+  const intakeSettingsTab = intakeSettingsTabFromSearch(search);
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
   const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
@@ -121,12 +129,22 @@ export function LinesPage() {
   // The phase board is a Kanban surface: it claims the full viewport height so
   // the lanes read as columns rather than as boxes around their cards.
   if (selectedLine) {
+    const intakeEditAppId = intakeAutomationAppId(factoryApps);
+    const editAutomationHref = intakeEditAppId
+      ? factoryAppConfigurePath(organizationId, factoryKey, intakeEditAppId, {
+          from: "lines",
+          lineId: selectedLine.id,
+        })
+      : undefined;
     return (
       <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
         {intakeOpen ? (
           <LineIntakeDrawer
             sources={lineIntakeSourcesForFactory(factoryKey)}
             initialSourceId={isLineIntakeSourceId(intakeSourceId) ? intakeSourceId : undefined}
+            initialSettingsOpen={isIntakeSettingsTab(intakeSettingsTab)}
+            initialSettingsTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
+            editAutomationHref={editAutomationHref}
             onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
           />
         ) : null}

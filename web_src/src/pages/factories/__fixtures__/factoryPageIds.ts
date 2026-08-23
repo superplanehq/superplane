@@ -85,3 +85,4 @@ export const REFUND_LINE_HOTFIX_ID = "line-hotfix";
 export const REFUND_LINE_ONBOARDING_ID = "line-onboarding";
 export const REFUND_LINE_FEATURE_ID = "line-feature-delivery";
 export const ACME_ONBOARDING_LINE_ID = "line-acme-onboarding";
+export const GITHUB_ISSUES_INTAKE_APP_ID = "app-github-issues-intake";

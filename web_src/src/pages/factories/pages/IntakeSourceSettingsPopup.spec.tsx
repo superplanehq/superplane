@@ -18,6 +18,7 @@ function renderPopup(
     onSave?: (next: typeof DEFAULT_GITHUB_INTAKE_SETTINGS) => void;
     onClose?: () => void;
     onOpenRun?: (run: IntakeAutomationRun) => void;
+    editAutomationHref?: string;
     initialTab?: "general" | "runs" | "automation";
   } = {},
 ) {
@@ -31,6 +32,7 @@ function renderPopup(
               automationCanvas={githubAutomationCanvas}
               onSave={props.onSave ?? vi.fn()}
               onOpenRun={props.onOpenRun}
+              editAutomationHref={props.editAutomationHref}
               onClose={props.onClose ?? vi.fn()}
               initialTab={props.initialTab}
               fixed={false}
@@ -65,7 +67,7 @@ describe("IntakeSourceSettingsPopup", () => {
 
   it("shows the intake automation on the Automation tab", async () => {
     const user = userEvent.setup();
-    renderPopup();
+    renderPopup({ editAutomationHref: "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1" });
 
     await user.click(screen.getByRole("tab", { name: "Automation" }));
 
@@ -76,7 +78,10 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(within(automation).getByTestId("split-run-canvas-node-github-issues-trigger")).toBeInTheDocument();
     expect(within(automation).getByTestId("split-run-canvas-node-github-issues-classify")).toBeInTheDocument();
     expect(within(automation).getByTestId("split-run-canvas-node-github-issues-create")).toBeInTheDocument();
-    expect(within(automation).getByRole("button", { name: "Edit automation" })).toBeInTheDocument();
+    expect(within(automation).getByRole("link", { name: "Edit automation" })).toHaveAttribute(
+      "href",
+      "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1",
+    );
     expect(within(automation).queryByTestId("split-run-canvas-menu")).not.toBeInTheDocument();
     expect(within(automation).queryByTestId("split-run-phase-listen")).not.toBeInTheDocument();
     expect(within(automation).queryByRole("heading", { name: "Log" })).not.toBeInTheDocument();

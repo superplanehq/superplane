@@ -9,6 +9,8 @@ import { FactoriesHarness } from "./FactoriesHarness";
 import { REFUND_IMPLEMENTER_APP, refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
 import {
   ACME_ONBOARDING_FACTORY_ID,
+  ACME_ONBOARDING_FACTORY_KEY,
+  ACME_ONBOARDING_LINE_ID,
   FACTORIES_ORGANIZATION_ID,
   LINE_RUN_IMPLEMENT_FAILED_ID,
   PRIMARY_FACTORY_ID,
@@ -16,6 +18,7 @@ import {
   REFUND_FACTORY_LINES,
   defaultFactoriesFixture,
 } from "./factoryPageResponses";
+import { lineMetricsFactoriesFixture } from "./lineMetricsFactoriesFixture";
 import { CONNECTED_SETUP_INTEGRATIONS, SETUP_ANSWERS, factoriesFixtureWithSetupAnswers } from "./setupStoryFixtures";
 
 describe("FactoriesHarness work orders", () => {
@@ -306,5 +309,27 @@ describe("FactoriesHarness Acme onboarding", () => {
     expect(screen.getByTestId("lines-phase-column-2")).toHaveTextContent("Nothing here.");
     expect(screen.getByTestId("lines-phase-column-3")).toHaveTextContent("Nothing here.");
     expect(screen.queryAllByTestId(/^work-order-card-/)).toHaveLength(0);
+  }, 15000);
+
+  it("opens the populated Semaphore line board from the first-run Acme board", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&source=github-issues`}
+        factoriesFixture={lineMetricsFactoriesFixture}
+        enableOnboarding={false}
+      />,
+    );
+
+    await user.click(await screen.findByTestId("factories-workspace-switch", {}, { timeout: 8000 }));
+    await user.click(screen.getByTestId(`factories-workspace-option-${PRIMARY_FACTORY_ID}`));
+
+    expect(
+      await screen.findByRole("button", { name: /Switch workspace, Semaphore/ }, { timeout: 8000 }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("factories-sidebar")).toBeInTheDocument();
+    expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-setup")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId(/^work-order-card-/).length).toBeGreaterThan(0);
   }, 15000);
 });

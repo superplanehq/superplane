@@ -20,8 +20,12 @@ describe("FirstRunFlow", () => {
     await user.click(screen.getByTestId("first-run-continue-to-tickets"));
 
     expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.repositoryCaption("acme/payments-service"))).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: FIRST_RUN_COPY.tickets.headline })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /GitHub Issues/ }));
+    expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-analysis")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("first-run-analyze-tickets"));
 
     expect(screen.getByTestId("first-run-analysis")).toBeInTheDocument();
     expect(screen.getByText(FIRST_RUN_COPY.analysis.reassurance)).toBeInTheDocument();

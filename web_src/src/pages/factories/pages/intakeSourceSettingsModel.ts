@@ -4,6 +4,10 @@ export type IntakeListenMode = "listen" | "schedule";
 export type IntakeLabelFilterMode = "include" | "exclude";
 export type IntakeAssignmentFilter = "any" | "assigned" | "unassigned";
 export type IntakeSettingsTab = "general" | "runs" | "automation";
+
+export function isIntakeSettingsTab(value: string | null | undefined): value is IntakeSettingsTab {
+  return value === "general" || value === "runs" || value === "automation";
+}
 export type IntakeTicketPlacement = "backlog" | "rejected" | "progressed" | "below-threshold";
 export type IntakeLineStage = "plan" | "implement" | "verify" | "done";
 

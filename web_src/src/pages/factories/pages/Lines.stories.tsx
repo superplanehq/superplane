@@ -1,9 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
+import { refundLineCanvasFixture } from "../__fixtures__/factoryOwnedCanvasFixture";
 import {
+  ACME_ONBOARDING_FACTORY_ID,
   ACME_ONBOARDING_FACTORY_KEY,
   ACME_ONBOARDING_LINE_ID,
+  GITHUB_ISSUES_INTAKE_APP,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
 } from "../__fixtures__/factoryPageResponses";
@@ -56,6 +59,7 @@ export const AcmeOnboardingEmpty: Story = {
     <FactoriesHarness
       pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}`}
       factoriesFixture={lineMetricsFactoriesFixture}
+      appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP, ACME_ONBOARDING_FACTORY_ID)}
     />
   ),
 };
@@ -66,6 +70,7 @@ export const AcmeOnboardingIntake: Story = {
     <FactoriesHarness
       pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&source=github-issues`}
       factoriesFixture={lineMetricsFactoriesFixture}
+      appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP, ACME_ONBOARDING_FACTORY_ID)}
     />
   ),
 };

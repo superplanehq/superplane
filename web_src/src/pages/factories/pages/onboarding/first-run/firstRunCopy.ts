@@ -10,7 +10,6 @@ export const FIRST_RUN_COPY = {
     greeting: (firstName: string) => `Hi ${firstName}.`,
     headline: "See what SuperPlane can ship from your backlog",
     intro: "Each ticket is scored by how confident SuperPlane is that an agent can complete it.",
-    previewCaption: "Example: tickets scored from a real backlog.",
     getStarted: "Get started",
   },
   connect: {
@@ -34,16 +33,16 @@ export const FIRST_RUN_COPY = {
   },
   tickets: {
     headline: "Connect your ticket system",
-    repositoryCaption: (repository: string) => `Tickets for ${repository}`,
-    body: "SuperPlane reads tickets for this repository. It does not start work yet.",
-    trust: "SuperPlane does not start work and does not change your tickets.",
+    trust: "SuperPlane does not change any tickets.",
+    scoreHint:
+      "It only analyzes them and shows a confidence score for how likely SuperPlane is to address each ticket.",
     githubIssues: "GitHub Issues",
     jira: "Jira",
     linear: "Linear",
     githubIssuesHelper: "Uses GitHub Issues on this repository. No extra setup.",
     jiraHelper: "Find tickets in your Jira backlog.",
     linearHelper: "Find tickets in your Linear backlog.",
-    startHint: "The analysis starts when you choose a ticket system.",
+    analyze: "Analyze my tickets",
   },
   analysis: {
     headline: "Analyzing your backlog",

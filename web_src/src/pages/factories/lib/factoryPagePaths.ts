@@ -37,18 +37,20 @@ export function factoryHomePath(organizationId: string, factoryKey: string, line
 export const INTAKE_SEARCH_PARAM = "intake";
 /** Selects an intake source when the drawer opens. */
 export const INTAKE_SOURCE_SEARCH_PARAM = "source";
+/** Opens GitHub issues settings on a tab: general, runs, or automation. */
+export const INTAKE_SETTINGS_SEARCH_PARAM = "settings";
 
 export function factoryIntakePath(
   organizationId: string,
   factoryKey: string,
   lineId?: string | null,
   sourceId?: string,
+  settingsTab?: string,
 ) {
   const path = `${factoryHomePath(organizationId, factoryKey, lineId)}?${INTAKE_SEARCH_PARAM}=1`;
-  if (!sourceId) {
-    return path;
-  }
-  return `${path}&${INTAKE_SOURCE_SEARCH_PARAM}=${encodeURIComponent(sourceId)}`;
+  const sourceQuery = sourceId ? `&${INTAKE_SOURCE_SEARCH_PARAM}=${encodeURIComponent(sourceId)}` : "";
+  const settingsQuery = settingsTab ? `&${INTAKE_SETTINGS_SEARCH_PARAM}=${encodeURIComponent(settingsTab)}` : "";
+  return `${path}${sourceQuery}${settingsQuery}`;
 }
 
 export function isIntakeSearchOpen(search: string): boolean {
@@ -59,6 +61,11 @@ export function isIntakeSearchOpen(search: string): boolean {
 export function intakeSourceFromSearch(search: string): string | null {
   const query = search.startsWith("?") ? search.slice(1) : search;
   return new URLSearchParams(query).get(INTAKE_SOURCE_SEARCH_PARAM);
+}
+
+export function intakeSettingsTabFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(INTAKE_SETTINGS_SEARCH_PARAM);
 }
 
 export function factorySetupPath(organizationId: string, factoryKey: string) {

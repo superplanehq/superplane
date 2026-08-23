@@ -4,6 +4,7 @@ import { ACME_ONBOARDING_FACTORY_KEY, PRIMARY_FACTORY_KEY } from "../__fixtures_
 import {
   ADD_INTAKE_TEMPLATES,
   filterAddIntakeTemplates,
+  intakeAutomationAppId,
   intakeAutomationFixture,
   intakeTicketAnalysisFixture,
   LINE_INTAKE_SOURCES,
@@ -33,6 +34,14 @@ describe("lineIntakeModel", () => {
     expect(lineIntakeSourcesForFactory(ACME_ONBOARDING_FACTORY_KEY).map((source) => source.id)).toEqual([
       "github-issues",
     ]);
+  });
+
+  it("prefers the GitHub issues intake app for the editor", () => {
+    expect(intakeAutomationAppId([{ id: "app-acme-planner" }, { id: "app-github-issues-intake" }])).toBe(
+      "app-github-issues-intake",
+    );
+    expect(intakeAutomationAppId([{ id: "app-acme-planner" }])).toBe("app-acme-planner");
+    expect(intakeAutomationAppId([])).toBeUndefined();
   });
 
   it("builds a ticket analysis fixture with ingest, analyze, plan, and score", () => {

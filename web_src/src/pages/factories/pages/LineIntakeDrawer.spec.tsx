@@ -18,6 +18,7 @@ function renderDrawer(
     initialSettingsTab?: "general" | "runs" | "automation";
     sources?: LineIntakeSource[];
     onOpenTicket?: (ticket: LineIntakeAnalyzingTicket) => void;
+    editAutomationHref?: string;
   } = {},
 ) {
   return render(
@@ -32,6 +33,7 @@ function renderDrawer(
               initialSettingsTab={props.initialSettingsTab}
               sources={props.sources}
               onOpenTicket={props.onOpenTicket}
+              editAutomationHref={props.editAutomationHref}
             />
           </TooltipProvider>
         </ThemeProvider>
@@ -200,18 +202,20 @@ describe("LineIntakeDrawer", () => {
     expect(within(dialog).getByRole("radio", { name: /Listen for new issues/ })).toBeChecked();
     expect(within(dialog).getByTestId("intake-confidence-value")).toHaveTextContent("65%");
     expect(within(dialog).getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
-    expect(within(dialog).getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-      "General",
-      "Runs",
-      "Automation",
-    ]);
+    expect(
+      within(dialog)
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent),
+    ).toEqual(["General", "Runs", "Automation"]);
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-automation")).not.toBeInTheDocument();
   });
 
   it("shows the GitHub issues automation from the settings Automation tab", async () => {
     const user = userEvent.setup();
-    renderDrawer();
+    renderDrawer({
+      editAutomationHref: "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&from=lines",
+    });
 
     await user.click(screen.getByRole("button", { name: "Open GitHub issues settings" }));
     await user.click(screen.getByRole("tab", { name: "Automation" }));
@@ -219,6 +223,10 @@ describe("LineIntakeDrawer", () => {
     const automation = within(screen.getByTestId("intake-source-settings")).getByTestId("intake-source-automation");
     expect(within(automation).getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
     expect(within(automation).getByTestId("split-run-canvas-node-github-issues-trigger")).toBeInTheDocument();
+    expect(within(automation).getByRole("link", { name: "Edit automation" })).toHaveAttribute(
+      "href",
+      "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&from=lines",
+    );
     expect(within(automation).queryByTestId("split-run-phase-listen")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Accepted events go to Backlog" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();

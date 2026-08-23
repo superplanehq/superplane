@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_GITHUB_INTAKE_SETTINGS,
   GITHUB_INTAKE_RUNS,
+  isIntakeSettingsTab,
   intakePlacementActivity,
   intakePlacementLabel,
   intakeRelativeTime,
@@ -40,5 +41,12 @@ describe("intakeSourceSettingsModel", () => {
     expect(intakePlacementLabel(rejected)).toBe("Rejected");
     expect(intakePlacementLabel(held)).toBe("Not moved to Backlog");
     expect(intakeRelativeTime(180)).toBe("3h ago");
+  });
+
+  it("accepts only the three settings tabs", () => {
+    expect(isIntakeSettingsTab("automation")).toBe(true);
+    expect(isIntakeSettingsTab("runs")).toBe(true);
+    expect(isIntakeSettingsTab("general")).toBe(true);
+    expect(isIntakeSettingsTab("listen")).toBe(false);
   });
 });

@@ -15,6 +15,7 @@ import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } 
 import {
   ACME_ONBOARDING_FACTORY_ID,
   ACME_ONBOARDING_LINE_ID,
+  GITHUB_ISSUES_INTAKE_APP_ID,
   EMPTY_FACTORY_ID,
   FACTORIES_ORGANIZATION_ID,
   LAST_WEEK,
@@ -49,6 +50,14 @@ export function toStorybookOrganizationUser(user: (typeof ORGANIZATION_USERS)[nu
     ...(avatarUrl ? { status: { accountProviders: [{ avatarUrl }] } } : {}),
   };
 }
+
+export const GITHUB_ISSUES_INTAKE_APP: FactoryApp = {
+  id: GITHUB_ISSUES_INTAKE_APP_ID,
+  name: "GitHub issue intake",
+  description: "Listens for GitHub issues and creates backlog work orders.",
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+};
 
 const RUN_APP_TYPE = "runApp";
 
@@ -88,6 +97,7 @@ export const REFUND_FACTORY_APPS: FactoryApp[] = [
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
   },
+  GITHUB_ISSUES_INTAKE_APP,
 ];
 
 export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
@@ -118,6 +128,7 @@ export const REFUND_FACTORY: FactoriesFactory = {
   description:
     "Handles reconciliation work: plan a change, implement across affected services, and verify with regression suites.",
   lines: REFUND_FACTORY_LINES,
+  onboarding: { completedAt: LAST_WEEK },
 };
 
 export const EMPTY_FACTORY: FactoriesFactory = {
@@ -167,6 +178,7 @@ export const ACME_ONBOARDING_APPS: FactoryApp[] = [
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
   },
+  GITHUB_ISSUES_INTAKE_APP,
 ];
 
 export const ACME_ONBOARDING_LINE: FactoriesFactoryLine = {

@@ -4,7 +4,7 @@ import { FirstRunAnalysisScreen } from "./FirstRunAnalysisScreen";
 import { FirstRunBoardExit } from "./FirstRunBoardExit";
 import { FirstRunChooseScreen } from "./FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./FirstRunConnectScreen";
-import { FIRST_RUN_PREVIEW_TICKETS, FIRST_RUN_REPOSITORIES, FIRST_RUN_STORY_EMAIL } from "./firstRunMocks";
+import { FIRST_RUN_REPOSITORIES, FIRST_RUN_STORY_EMAIL } from "./firstRunMocks";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
 import type { FirstRunAnalysisStatus, FirstRunChrome, FirstRunScreenId, FirstRunTicketSource } from "./firstRunTypes";
 import { FirstRunWelcomeScreen } from "./FirstRunWelcomeScreen";
@@ -65,12 +65,7 @@ export function FirstRunFlow({
 
   if (screen === "welcome") {
     return (
-      <FirstRunWelcomeScreen
-        firstName={firstName}
-        previewTickets={FIRST_RUN_PREVIEW_TICKETS}
-        chrome={chromeFor(0)}
-        onGetStarted={() => setScreen("connect")}
-      />
+      <FirstRunWelcomeScreen firstName={firstName} chrome={chromeFor(0)} onGetStarted={() => setScreen("connect")} />
     );
   }
 
@@ -106,11 +101,11 @@ export function FirstRunFlow({
   if (screen === "tickets") {
     return (
       <FirstRunTicketsScreen
-        repository={selectedRepository ?? FIRST_RUN_REPOSITORIES[0]}
         ticketSource={ticketSource}
         chrome={chromeFor(3)}
-        onSelectTicketSource={(source) => {
-          setTicketSource(source);
+        onSelectTicketSource={setTicketSource}
+        onAnalyzeTickets={() => {
+          if (!ticketSource) return;
           setStageIndex(0);
           setScreen("analysis");
         }}

@@ -32,6 +32,7 @@ interface LineIntakeDrawerProps {
   sources?: LineIntakeSource[];
   analyzingTickets?: LineIntakeAnalyzingTicket[];
   onOpenTicket?: (ticket: LineIntakeAnalyzingTicket) => void;
+  editAutomationHref?: string;
 }
 
 /**
@@ -46,6 +47,7 @@ export function LineIntakeDrawer({
   sources = LINE_INTAKE_SOURCES,
   analyzingTickets = GITHUB_ISSUES_ANALYZING_TICKETS,
   onOpenTicket,
+  editAutomationHref,
 }: LineIntakeDrawerProps) {
   const [expandedSourceIds, setExpandedSourceIds] = useState<ReadonlySet<LineIntakeSourceId>>(
     () => new Set(initialSourceId ? [initialSourceId] : []),
@@ -172,6 +174,7 @@ export function LineIntakeDrawer({
           automationCanvas={intakeAutomationCanvas(lineIntakeSourceById("github-issues")!)}
           onSave={setGithubSettings}
           onOpenRun={openIntakeRun}
+          editAutomationHref={editAutomationHref}
           onClose={() => setSettingsOpen(false)}
           initialTab={initialSettingsTab}
           fixed

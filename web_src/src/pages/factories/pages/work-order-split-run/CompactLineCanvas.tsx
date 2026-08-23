@@ -5,6 +5,7 @@ import { useCallback, useMemo, type MouseEvent } from "react";
 
 import type { ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/buttonVariants";
 import { useTheme } from "@/contexts/useTheme";
 import { factoryCanvasBackground, factoryEdgePalette } from "@/lib/factoryCanvasChrome";
 import { cn } from "@/lib/utils";
@@ -180,9 +181,15 @@ export function CompactLineCanvas({
               </Link>
             ) : null}
             {headerEdit === "button" ? (
-              <Button type="button" size="sm" onClick={onEdit} data-testid="split-run-canvas-edit">
-                {editLabel}
-              </Button>
+              editHref ? (
+                <Link href={editHref} className={buttonVariants({ size: "sm" })} data-testid="split-run-canvas-edit">
+                  {editLabel}
+                </Link>
+              ) : (
+                <Button type="button" size="sm" onClick={onEdit} data-testid="split-run-canvas-edit">
+                  {editLabel}
+                </Button>
+              )
             ) : (
               <CanvasOverflowMenu title={canvas.title} editHref={editHref} />
             )}
