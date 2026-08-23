@@ -5,6 +5,7 @@ import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { getUserInitials } from "@/lib/orgUserDisplay";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
+import { ACME_ONBOARDING_FACTORY_KEY } from "../__fixtures__/factoryPageIds";
 import {
   STORYBOOK_ME_USER_AVATAR_URL,
   STORYBOOK_ME_USER_ID,
@@ -107,6 +108,18 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
 
 export function lineIntakeSourceById(id: string): LineIntakeSource | undefined {
   return LINE_INTAKE_SOURCES.find((source) => source.id === id);
+}
+
+export function isFirstRunOnboardingFactory(factoryKey: string | undefined): boolean {
+  return factoryKey === ACME_ONBOARDING_FACTORY_KEY;
+}
+
+/** Acme onboarding starts with GitHub issues only. Semaphore keeps the full set. */
+export function lineIntakeSourcesForFactory(factoryKey: string | undefined): LineIntakeSource[] {
+  if (isFirstRunOnboardingFactory(factoryKey)) {
+    return LINE_INTAKE_SOURCES.filter((source) => source.id === "github-issues");
+  }
+  return LINE_INTAKE_SOURCES;
 }
 
 export function isLineIntakeSourceId(id: string | null | undefined): id is LineIntakeSourceId {
@@ -368,8 +381,12 @@ function ticketAnalysisCanvas(): SplitRunCanvasModel {
  * Builds the same popup shape as a line-board work order: log on the left,
  * automation canvas on the right. Phases are listen → evaluate → backlog.
  */
+export function intakeAutomationCanvas(source: LineIntakeSource): SplitRunCanvasModel {
+  return intakeCanvasForSource(source);
+}
+
 export function intakeAutomationFixture(source: LineIntakeSource): SplitRunFixture {
-  const canvas = intakeCanvasForSource(source);
+  const canvas = intakeAutomationCanvas(source);
   const waitingNotes: WorkOrderStatusNotePresentation[] = [
     {
       key: `${source.id}-backlog`,

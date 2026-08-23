@@ -20,3 +20,40 @@ export const GitHubIssuesExpanded: Story = {
     </ComponentStoryShell>
   ),
 };
+
+export const GitHubIssuesSettings: Story = {
+  name: "GitHub issues settings",
+  render: () => (
+    <ComponentStoryShell className="flex h-svh bg-slate-300 p-0 dark:bg-slate-900">
+      <LineIntakeDrawer initialSourceId="github-issues" initialSettingsOpen onClose={() => undefined} />
+    </ComponentStoryShell>
+  ),
+};
+
+export const GitHubIssuesAutomation: Story = {
+  name: "GitHub issues automation",
+  render: () => (
+    <ComponentStoryShell className="flex h-svh bg-slate-300 p-0 dark:bg-slate-900">
+      <LineIntakeDrawer
+        initialSourceId="github-issues"
+        initialSettingsOpen
+        initialSettingsTab="automation"
+        onClose={() => undefined}
+      />
+    </ComponentStoryShell>
+  ),
+};
+
+export const GitHubIssuesRuns: Story = {
+  name: "GitHub issues runs",
+  render: () => (
+    <ComponentStoryShell className="flex h-svh bg-slate-300 p-0 dark:bg-slate-900">
+      <LineIntakeDrawer
+        initialSourceId="github-issues"
+        initialSettingsOpen
+        initialSettingsTab="runs"
+        onClose={() => undefined}
+      />
+    </ComponentStoryShell>
+  ),
+};

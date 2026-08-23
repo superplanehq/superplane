@@ -6,6 +6,7 @@ import { SegmentedNav } from "@/ui/SegmentedNav";
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "../__fixtures__/factoriesStoryTheme";
 import {
+  ACME_ONBOARDING_FACTORY,
   EMPTY_FACTORY,
   FACTORIES_ORGANIZATION_ID,
   REFUND_FACTORY,
@@ -209,7 +210,7 @@ export const AlignedWithSidebar: Story = {
         <WorkspaceSwitcher
           organizationId={FACTORIES_ORGANIZATION_ID}
           factory={REFUND_FACTORY}
-          factories={[REFUND_FACTORY, EMPTY_FACTORY]}
+          factories={[REFUND_FACTORY, EMPTY_FACTORY, ACME_ONBOARDING_FACTORY]}
           canCreateFactory
           permissionsLoading={false}
           onCreateFactory={() => console.log("create workspace")}

@@ -42,6 +42,7 @@ import {
   type BoardLaneTone,
 } from "../workOrders/WorkOrderBoardChrome";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
+import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
 import { ReviewCandidateModal } from "./onboarding/first-run/ReviewCandidateModal";
 import { reviewCandidateForWorkOrderId } from "./onboarding/first-run/reviewCandidates";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
@@ -70,7 +71,7 @@ import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
-import { isLineIntakeSourceId } from "./lineIntakeModel";
+import { isFirstRunOnboardingFactory, isLineIntakeSourceId, lineIntakeSourcesForFactory } from "./lineIntakeModel";
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
 import { LineListCard } from "./LineListCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
@@ -124,6 +125,7 @@ export function LinesPage() {
       <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
         {intakeOpen ? (
           <LineIntakeDrawer
+            sources={lineIntakeSourcesForFactory(factoryKey)}
             initialSourceId={isLineIntakeSourceId(intakeSourceId) ? intakeSourceId : undefined}
             onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
           />
@@ -554,6 +556,7 @@ function PhaseBoard({
     <WorkOrderKanbanBoard testId="lines-phase-board">
       <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
         <BacklogColumn
+          factoryKey={factoryKey}
           orders={backlogOrders}
           title={columnTitles.backlog ?? "Backlog"}
           size={backlogSize}
@@ -608,6 +611,7 @@ function PhaseBoard({
 }
 
 function BacklogColumn({
+  factoryKey,
   orders,
   title,
   size,
@@ -624,6 +628,7 @@ function BacklogColumn({
   workOrderCardContext,
   onOpenWorkOrder,
 }: {
+  factoryKey: string;
   orders: FactoriesWorkOrder[];
   title: string;
   size: number | null;
@@ -656,6 +661,7 @@ function BacklogColumn({
         tone="neutral"
         surfaceClassName={surfaceClassName}
         emptyDescription="No work orders in the backlog."
+        emptyContent={isFirstRunOnboardingFactory(factoryKey) ? <BacklogOnboardingCard /> : undefined}
         className={surfaceClassName ? undefined : "bg-muted"}
         actions={
           <div className="flex shrink-0 items-center gap-0.5">
@@ -811,7 +817,7 @@ function PhaseColumn({
         count={totalRuns}
         tone={PHASE_LANE_TONE[glyph]}
         surfaceClassName={surfaceClassName}
-        emptyDescription="No work orders in this phase."
+        emptyDescription="Nothing here."
         canRename={canRename}
         onRename={onRename}
         titleTestId={`lines-column-title-phase-${column.stepIndex}`}

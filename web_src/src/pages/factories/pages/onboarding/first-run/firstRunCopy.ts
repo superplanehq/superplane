@@ -66,6 +66,10 @@ export const FIRST_RUN_COPY = {
     empty: "No tickets scored above 65%. Connect more of your backlog or create a work order yourself.",
     rescan: "Rescan backlog",
   },
+  board: {
+    backlogHintTitle: "Tickets land here first.",
+    backlogHintBody: "Intake is scoring issues now. Review the ones SuperPlane can implement, then start the work.",
+  },
 } as const;
 
 export const FIRST_RUN_STAGES = [

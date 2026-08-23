@@ -1,10 +1,17 @@
 import { cn } from "@/lib/utils";
-import { ChevronRight, Plus, Settings, XIcon } from "lucide-react";
+import { ChevronRight, Loader2, Plus, Settings, XIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { AddIntakePicker } from "./AddIntakePicker";
+import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
+import {
+  DEFAULT_GITHUB_INTAKE_SETTINGS,
+  type IntakeAutomationRun,
+  type IntakeSettingsTab,
+} from "./intakeSourceSettingsModel";
 import {
   GITHUB_ISSUES_ANALYZING_TICKETS,
+  intakeAutomationCanvas,
   intakeAutomationFixture,
   intakeTicketAnalysisFixture,
   isLineIntakeSourceId,
@@ -20,6 +27,9 @@ import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRun
 interface LineIntakeDrawerProps {
   onClose: () => void;
   initialSourceId?: LineIntakeSourceId;
+  initialSettingsOpen?: boolean;
+  initialSettingsTab?: IntakeSettingsTab;
+  sources?: LineIntakeSource[];
   analyzingTickets?: LineIntakeAnalyzingTicket[];
   onOpenTicket?: (ticket: LineIntakeAnalyzingTicket) => void;
 }
@@ -31,6 +41,9 @@ interface LineIntakeDrawerProps {
 export function LineIntakeDrawer({
   onClose,
   initialSourceId,
+  initialSettingsOpen = false,
+  initialSettingsTab = "general",
+  sources = LINE_INTAKE_SOURCES,
   analyzingTickets = GITHUB_ISSUES_ANALYZING_TICKETS,
   onOpenTicket,
 }: LineIntakeDrawerProps) {
@@ -39,6 +52,8 @@ export function LineIntakeDrawer({
   );
   const [openTicket, setOpenTicket] = useState<LineIntakeAnalyzingTicket | null>(null);
   const [openSourceId, setOpenSourceId] = useState<string | null>(null);
+  const [githubSettings, setGithubSettings] = useState(DEFAULT_GITHUB_INTAKE_SETTINGS);
+  const [settingsOpen, setSettingsOpen] = useState(initialSettingsOpen);
   const [pickerOpen, setPickerOpen] = useState(false);
   const openSource = openSourceId ? lineIntakeSourceById(openSourceId) : undefined;
 
@@ -56,6 +71,12 @@ export function LineIntakeDrawer({
 
   function expandSource(sourceId: LineIntakeSourceId) {
     setExpandedSourceIds((current) => new Set(current).add(sourceId));
+  }
+
+  function openIntakeRun(run: IntakeAutomationRun) {
+    const ticket = { id: run.id, title: run.title };
+    setOpenTicket(ticket);
+    onOpenTicket?.(ticket);
   }
 
   return (
@@ -82,17 +103,27 @@ export function LineIntakeDrawer({
           Automations that listen, evaluate, and create backlog work orders.
         </p>
         <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 [scrollbar-width:thin]">
-          {LINE_INTAKE_SOURCES.map((source) => {
+          {sources.map((source) => {
             const expanded = expandedSourceIds.has(source.id);
             const tickets = source.id === "github-issues" ? analyzingTickets : [];
             return (
               <li key={source.id}>
                 <IntakeSourceCard
                   source={source}
+                  displayName={source.id === "github-issues" ? githubSettings.name : source.name}
                   expanded={expanded}
                   childCount={tickets.length}
                   onToggle={() => toggleSource(source.id)}
-                  onOpenAutomation={() => setOpenSourceId(source.id)}
+                  onOpenGear={() => {
+                    setOpenTicket(null);
+                    if (source.id === "github-issues") {
+                      setOpenSourceId(null);
+                      setSettingsOpen(true);
+                      return;
+                    }
+                    setSettingsOpen(false);
+                    setOpenSourceId(source.id);
+                  }}
                 >
                   {expanded ? (
                     <AnalyzingTicketList
@@ -100,6 +131,7 @@ export function LineIntakeDrawer({
                       openTicketId={openTicket?.id ?? null}
                       onOpenTicket={(ticket) => {
                         setOpenSourceId(null);
+                        setSettingsOpen(false);
                         setOpenTicket(ticket);
                         onOpenTicket?.(ticket);
                       }}
@@ -134,6 +166,18 @@ export function LineIntakeDrawer({
         }}
       />
 
+      {settingsOpen ? (
+        <IntakeSourceSettingsPopup
+          settings={githubSettings}
+          automationCanvas={intakeAutomationCanvas(lineIntakeSourceById("github-issues")!)}
+          onSave={setGithubSettings}
+          onOpenRun={openIntakeRun}
+          onClose={() => setSettingsOpen(false)}
+          initialTab={initialSettingsTab}
+          fixed
+        />
+      ) : null}
+
       {openSource ? (
         <WorkOrderSplitRunPopup
           key={openSource.id}
@@ -157,24 +201,24 @@ export function LineIntakeDrawer({
 
 function IntakeSourceCard({
   source,
+  displayName,
   expanded,
   childCount,
   onToggle,
-  onOpenAutomation,
+  onOpenGear,
   children,
 }: {
   source: LineIntakeSource;
+  displayName: string;
   expanded: boolean;
   childCount: number;
   onToggle: () => void;
-  onOpenAutomation: () => void;
+  onOpenGear: () => void;
   children?: ReactNode;
 }) {
+  const gearKind = source.id === "github-issues" ? "settings" : "automation";
   return (
-    <article
-      className="relative w-full rounded-lg bg-card shadow-sm"
-      data-testid={`line-intake-source-${source.id}`}
-    >
+    <article className="relative w-full rounded-lg bg-card shadow-sm" data-testid={`line-intake-source-${source.id}`}>
       <div className="relative flex items-start gap-2 px-3 py-3">
         <ChevronRight
           className={cn("mt-1 size-3.5 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")}
@@ -183,7 +227,7 @@ function IntakeSourceCard({
         <button
           type="button"
           className="absolute inset-0 z-0 rounded-lg"
-          aria-label={expanded ? `Collapse ${source.name}` : `Expand ${source.name}`}
+          aria-label={expanded ? `Collapse ${displayName}` : `Expand ${displayName}`}
           aria-expanded={expanded}
           onClick={onToggle}
         />
@@ -194,7 +238,7 @@ function IntakeSourceCard({
         />
         <div className="relative z-10 min-w-0 flex-1 pointer-events-none">
           <h3 className="flex flex-wrap items-center gap-1.5 text-[13px] font-medium tracking-[-0.01em] leading-[19.5px] text-foreground">
-            {source.name}
+            {displayName}
             {expanded && childCount > 0 ? (
               <span className="text-[11px] font-medium tabular-nums text-muted-foreground">{childCount}</span>
             ) : null}
@@ -208,11 +252,11 @@ function IntakeSourceCard({
           type="button"
           onClick={(event) => {
             event.stopPropagation();
-            onOpenAutomation();
+            onOpenGear();
           }}
-          aria-label={`Open ${source.name} automation`}
-          title={`Open ${source.name} automation`}
-          data-testid={`line-intake-source-${source.id}-automation`}
+          aria-label={`Open ${displayName} ${gearKind}`}
+          title={`Open ${displayName} ${gearKind}`}
+          data-testid={`line-intake-source-${source.id}-${gearKind}`}
           className="relative z-20 -mr-1 -mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <Settings className="size-3.5" aria-hidden />
@@ -260,10 +304,11 @@ function AnalyzingTicketList({
                 selected && "bg-accent",
               )}
             >
-              <span className="relative mt-0.5 size-2 shrink-0" aria-hidden>
-                <span className="absolute inset-0 rounded-full bg-[color:var(--status-running-dot)] opacity-60 animate-ping" />
-                <span className="relative block size-2 rounded-full bg-[color:var(--status-running-dot)]" />
-              </span>
+              <Loader2
+                className="mt-0.5 size-3.5 shrink-0 animate-spin text-muted-foreground"
+                aria-hidden
+                data-testid="line-intake-analyzing-spinner"
+              />
               <span className="min-w-0 flex-1 text-left text-[13px] font-medium leading-snug tracking-[-0.01em] text-foreground">
                 {ticket.title}
               </span>

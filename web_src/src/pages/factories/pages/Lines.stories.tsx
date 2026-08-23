@@ -1,7 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
-import { PRIMARY_FACTORY_KEY, REFUND_FACTORY_LINES } from "../__fixtures__/factoryPageResponses";
+import {
+  ACME_ONBOARDING_FACTORY_KEY,
+  ACME_ONBOARDING_LINE_ID,
+  PRIMARY_FACTORY_KEY,
+  REFUND_FACTORY_LINES,
+} from "../__fixtures__/factoryPageResponses";
 import { emptyFactoriesFixture } from "../__fixtures__/factoryPageFixtureVariants";
 import { fiveStepLineFactoriesFixture, lineMetricsFactoriesFixture } from "../__fixtures__/lineMetricsFactoriesFixture";
 import { LinesPage } from "./LinesPage";
@@ -43,6 +48,26 @@ export const LineList: Story = {
 export const EmptyFactory: Story = {
   name: "Empty factory",
   render: () => <FactoriesHarness pathSuffix={linesListPath} factoriesFixture={emptyFactoriesFixture} />,
+};
+
+export const AcmeOnboardingEmpty: Story = {
+  name: "Acme onboarding — empty board",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}`}
+      factoriesFixture={lineMetricsFactoriesFixture}
+    />
+  ),
+};
+
+export const AcmeOnboardingIntake: Story = {
+  name: "Acme onboarding — intake",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&source=github-issues`}
+      factoriesFixture={lineMetricsFactoriesFixture}
+    />
+  ),
 };
 
 export const LineBoardIntake: Story = {

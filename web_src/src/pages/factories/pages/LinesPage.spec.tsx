@@ -7,6 +7,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 import { editFactoryLinePath, factoryAppConfigurePath, factoryLineDetailPath } from "../lib/factoryPagePaths";
 import {
+  ACME_ONBOARDING_FACTORY,
+  ACME_ONBOARDING_FACTORY_KEY,
+  ACME_ONBOARDING_LINE_ID,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
@@ -140,8 +143,8 @@ describe("LinesPage board", () => {
           <FactoriesLayoutContext.Provider
             value={{
               organizationId: "org-1",
-              factoryId: PRIMARY_FACTORY_ID,
-              factoryKey: PRIMARY_FACTORY_KEY,
+              factoryId: factory.id ?? PRIMARY_FACTORY_ID,
+              factoryKey: factory.key ?? PRIMARY_FACTORY_KEY,
               factory,
               factories: [factory],
               openCreateWorkOrder,
@@ -214,7 +217,32 @@ describe("LinesPage board", () => {
     expect(screen.getByRole("heading", { name: "Plan and Implement" })).toBeInTheDocument();
     expect(screen.getByTestId("line-intake-close")).toBeInTheDocument();
     expect(screen.getByTestId("line-intake-add")).toHaveTextContent("Add intake");
+    expect(screen.getByTestId("line-intake-source-sentry-exceptions")).toBeInTheDocument();
+    expect(screen.getByTestId("line-intake-source-pagerduty-incidents")).toBeInTheDocument();
     expect(screen.queryByTestId("line-intake-analyzing")).not.toBeInTheDocument();
+  });
+
+  it("shows a backlog onboarding card on Acme when the backlog is empty", () => {
+    renderBoard(
+      `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}`,
+      vi.fn(),
+      ACME_ONBOARDING_FACTORY,
+    );
+
+    expect(screen.getByTestId("backlog-onboarding-card")).toBeInTheDocument();
+    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
+  });
+
+  it("shows GitHub issues only on Acme onboarding intake", () => {
+    renderBoard(
+      `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&source=github-issues`,
+      vi.fn(),
+      ACME_ONBOARDING_FACTORY,
+    );
+
+    expect(screen.getByTestId("line-intake-source-github-issues")).toBeInTheDocument();
+    expect(screen.queryByTestId("line-intake-source-sentry-exceptions")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("line-intake-source-pagerduty-incidents")).not.toBeInTheDocument();
   });
 
   it("nests analyzing tickets under GitHub issues when that source is open", () => {
