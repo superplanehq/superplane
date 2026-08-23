@@ -34,6 +34,8 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   href?: string;
   /** When set, the card overlay opens this handler instead of navigating. */
   onOpen?: () => void;
+  /** First-run analysis score. Hides Start on draft cards. */
+  confidencePct?: number;
 }
 
 /**
@@ -41,8 +43,9 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  *
  * Every board uses this complete component. Status is a colored dot next
  * to the title. The footer shows the owner (except on drafts), the age of
- * the work order, and a Start button on drafts or an attention label
- * on waiting cards. The owner is display-only on the card.
+ * the work order, and a Start button on drafts or a score on reviewed
+ * drafts. Waiting cards show an attention label. The owner is
+ * display-only on the card.
  */
 export function WorkOrderCard({
   entry,
@@ -55,6 +58,7 @@ export function WorkOrderCard({
   onDispatch,
   href,
   onOpen,
+  confidencePct,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination =
@@ -62,7 +66,7 @@ export function WorkOrderCard({
     (entry.order.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, entry.order.number) : "#");
   const startedAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const startedLabel = startedAt ? formatTimeAgo(startedAt) : "—";
-  const showStart = entry.displayStatus === "draft";
+  const showStart = entry.displayStatus === "draft" && confidencePct == null;
   const attentionReason = getWorkOrderAttentionReason(entry.order);
   const AttentionIcon = attentionReason ? WORK_ORDER_ATTENTION_ICON[attentionReason] : null;
 
@@ -108,6 +112,14 @@ export function WorkOrderCard({
               {startedLabel}
             </span>
           </div>
+          {confidencePct != null ? (
+            <span
+              className="shrink-0 text-[12px] font-medium tabular-nums text-foreground"
+              data-testid={`work-order-card-score-${entry.id}`}
+            >
+              {confidencePct}%
+            </span>
+          ) : null}
           {showStart ? (
             <StartDraftButton
               entry={entry}
