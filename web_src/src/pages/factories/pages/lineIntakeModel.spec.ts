@@ -53,6 +53,10 @@ describe("lineIntakeModel", () => {
     expect(fixture.title).toBe("Handle duplicate refunds on retry");
     expect(fixture.phases.map((phase) => phase.id)).toEqual(["ingest", "analyze", "plan", "score"]);
     expect(fixture.currentPhaseId).toBe("analyze");
+    expect(
+      intakeTicketAnalysisFixture({ id: "gh-issue-1", title: "Handle duplicate refunds on retry" }, { complete: true })
+        .currentPhaseId,
+    ).toBe("score");
     expect(fixture.phases[0]?.canvas?.nodes.map((node) => node.name)).toEqual([
       "Ingest",
       "Analyze ticket",

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   confidenceBandForScore,
+  isReviewCandidateTab,
   reviewCandidateForWorkOrderId,
   REVIEW_CANDIDATE_WORK_ORDERS,
   REVIEW_CANDIDATES,
@@ -11,6 +12,7 @@ describe("reviewCandidates", () => {
   it("maps a work order id to a review candidate", () => {
     const candidate = reviewCandidateForWorkOrderId("wo-review-pay-842");
     expect(candidate?.ticketKey).toBe("PAY-842");
+    expect(candidate?.ticketBody).toContain("Webhook delivery");
     expect(candidate?.confidencePct).toBe(95);
     expect(candidate?.sections.map((section) => section.title)).toEqual([
       "Requirements understood",
@@ -31,5 +33,12 @@ describe("reviewCandidates", () => {
     expect(confidenceBandForScore(95)).toBe("High");
     expect(confidenceBandForScore(81)).toBe("Medium");
     expect(confidenceBandForScore(68)).toBe("Low");
+  });
+
+  it("accepts only the three review tabs", () => {
+    expect(isReviewCandidateTab("plan")).toBe(true);
+    expect(isReviewCandidateTab("ticket")).toBe(true);
+    expect(isReviewCandidateTab("analysis")).toBe(true);
+    expect(isReviewCandidateTab("runs")).toBe(false);
   });
 });

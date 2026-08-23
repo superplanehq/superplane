@@ -142,6 +142,8 @@ export const LINE_INTAKE_COPY = {
   analyzingEmpty: "No tickets in analysis.",
   analysisHeadline: "SuperPlane is analyzing this ticket",
   analysisHelper: "SuperPlane reads the ticket and the repository. It does not start work yet.",
+  analysisCompleteHeadline: "Ticket analysis finished",
+  analysisCompleteHelper: "SuperPlane did not change the ticket. Review the plan before work starts.",
 } as const;
 
 /** GitHub issues pulled in for first-run analysis. Scores land on the board later. */
@@ -223,27 +225,31 @@ const OWNER = {
  * Ticket click from GitHub issues: same split-run popup, with a canvas
  * for ingest, analyze, create plan, and score.
  */
-export function intakeTicketAnalysisFixture(ticket: LineIntakeAnalyzingTicket): SplitRunFixture {
+export function intakeTicketAnalysisFixture(
+  ticket: LineIntakeAnalyzingTicket,
+  options?: { complete?: boolean },
+): SplitRunFixture {
   const canvas = ticketAnalysisCanvas();
+  const complete = Boolean(options?.complete);
   return {
     title: ticket.title,
     owner: OWNER,
-    elapsed: "Running",
+    elapsed: complete ? "4m 12s" : "Running",
     startedLabel: "Analyze ticket",
-    costUsd: "—",
+    costUsd: complete ? "0.18" : "—",
     tokensLabel: "Analysis",
     lineName: "Intake",
-    lineStatus: "running",
-    currentPhaseId: "analyze",
+    lineStatus: complete ? "passed" : "running",
+    currentPhaseId: complete ? "score" : "analyze",
     waitingNotes: [
       {
-        key: `${ticket.id}-analyzing`,
-        headline: LINE_INTAKE_COPY.analysisHeadline,
-        text: LINE_INTAKE_COPY.analysisHelper,
+        key: `${ticket.id}-${complete ? "complete" : "analyzing"}`,
+        headline: complete ? LINE_INTAKE_COPY.analysisCompleteHeadline : LINE_INTAKE_COPY.analysisHeadline,
+        text: complete ? LINE_INTAKE_COPY.analysisCompleteHelper : LINE_INTAKE_COPY.analysisHelper,
       },
     ],
     checks: [],
-    footerTone: "waiting",
+    footerTone: complete ? undefined : "waiting",
     phases: [
       ticketAnalysisPhase({
         id: "ingest",
@@ -256,25 +262,25 @@ export function intakeTicketAnalysisFixture(ticket: LineIntakeAnalyzingTicket): 
       ticketAnalysisPhase({
         id: "analyze",
         name: "Analyze",
-        status: "running",
+        status: complete ? "passed" : "running",
         componentName: "Analyze ticket",
-        detail: "Reading the ticket and the repository.",
+        detail: complete ? "Read the ticket and the repository." : "Reading the ticket and the repository.",
         canvas,
       }),
       ticketAnalysisPhase({
         id: "plan",
         name: "Create plan",
-        status: "pending",
+        status: complete ? "passed" : "pending",
         componentName: "Create plan",
-        detail: "Waiting for analysis to finish.",
+        detail: complete ? "Wrote the implementation plan." : "Waiting for analysis to finish.",
         canvas,
       }),
       ticketAnalysisPhase({
         id: "score",
         name: "Score",
-        status: "pending",
+        status: complete ? "passed" : "pending",
         componentName: "Score",
-        detail: "Waiting for a plan.",
+        detail: complete ? "Scored the ticket against the codebase." : "Waiting for a plan.",
         canvas,
       }),
     ],

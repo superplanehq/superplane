@@ -15,6 +15,7 @@ export interface ReviewCandidate {
   workOrderId: string;
   ticketKey: string;
   title: string;
+  ticketBody: string;
   confidencePct: number;
   confidenceBand: ReviewConfidenceBand;
   summary: string;
@@ -23,12 +24,24 @@ export interface ReviewCandidate {
   noBlockingQuestions: string;
 }
 
+export type ReviewCandidateTab = "plan" | "ticket" | "analysis";
+
 export const REVIEW_CANDIDATE_COPY = {
   kicker: "Review candidate",
+  tabsLabel: "Review candidate",
+  planTab: "Plan",
+  ticketTab: "Ticket",
+  analysisTab: "Analysis Run",
+  ticketSource: "GitHub Issues",
+  ticketRepository: "acme/payments-service",
   back: "Back to results",
   approve: "Approve plan and start",
   approved: "Plan approved",
 } as const;
+
+export function isReviewCandidateTab(value: string): value is ReviewCandidateTab {
+  return value === "plan" || value === "ticket" || value === "analysis";
+}
 
 export function confidenceBandForScore(confidencePct: number): ReviewConfidenceBand {
   if (confidencePct >= 85) {
@@ -45,6 +58,8 @@ export const REVIEW_CANDIDATES: ReviewCandidate[] = [
     workOrderId: "wo-review-pay-842",
     ticketKey: "PAY-842",
     title: "Add retry handling to webhook delivery",
+    ticketBody:
+      "Webhook delivery stops after a transient provider error. Add bounded retries that stay idempotent and keep the delivery audit trail.",
     confidencePct: 95,
     confidenceBand: "High",
     summary:
@@ -102,6 +117,8 @@ export const REVIEW_CANDIDATES: ReviewCandidate[] = [
     workOrderId: "wo-review-pay-843",
     ticketKey: "PAY-843",
     title: "Handle duplicate refunds on retry",
+    ticketBody:
+      "A retry of a successful refund can post a second ledger entry. Treat the same provider key as the original refund.",
     confidencePct: 94,
     confidenceBand: "High",
     summary:
@@ -112,7 +129,8 @@ export const REVIEW_CANDIDATES: ReviewCandidate[] = [
       {
         number: "01",
         title: "Requirements understood",
-        intro: "The ledger already records refund attempts. SuperPlane found the retry path and the duplicate-guard tests.",
+        intro:
+          "The ledger already records refund attempts. SuperPlane found the retry path and the duplicate-guard tests.",
         items: [
           "Treat a repeated refund request with the same provider key as the original refund.",
           "Do not create a second ledger entry when the first attempt succeeded.",
@@ -156,6 +174,8 @@ export const REVIEW_CANDIDATES: ReviewCandidate[] = [
     workOrderId: "wo-review-pay-844",
     ticketKey: "PAY-844",
     title: "Return 409 when the invoice is already paid",
+    ticketBody:
+      "A second pay on a paid invoice returns HTTP 500. Map the already-paid state to HTTP 409 and leave the invoice unchanged.",
     confidencePct: 88,
     confidenceBand: "High",
     summary:
@@ -210,6 +230,8 @@ export const REVIEW_CANDIDATES: ReviewCandidate[] = [
     workOrderId: "wo-review-pay-845",
     ticketKey: "PAY-845",
     title: "Show a clearer empty state on the billing page",
+    ticketBody:
+      "The billing page empty branch does not tell the user what to do next. Show a short title and one create-invoice action.",
     confidencePct: 81,
     confidenceBand: "Medium",
     summary:
@@ -264,6 +286,8 @@ export const REVIEW_CANDIDATES: ReviewCandidate[] = [
     workOrderId: "wo-review-pay-846",
     ticketKey: "PAY-846",
     title: "Upgrade the Node 20 base image",
+    ticketBody:
+      "The app and worker images still pin Node 18. Move both images to Node 20 and keep the same entrypoint.",
     confidencePct: 76,
     confidenceBand: "Medium",
     summary:
