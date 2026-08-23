@@ -350,7 +350,7 @@ const MERGE_SCREENSHOT: FactoriesWorkOrderArtifact = {
 };
 
 /**
- * One log line per canvas node. Claude Code nodes add a short transcript.
+ * One log line per canvas node. Claude Code nodes add their configured steps.
  * Work-order artifacts and checks hang their file or score on that line.
  */
 export function richStreamForCanvas(
@@ -390,14 +390,15 @@ export function richStreamForCanvas(
     tick += 1;
 
     if (kind === "agent" && nodeStatus !== "did_not_run" && nodeStatus !== "pending") {
-      for (const note of agentNotes(node.id)) {
+      for (const step of claudeCodeSteps(node)) {
         lines.push({
           id: `${node.id}-note-${tick}`,
           nodeId: node.id,
           at: clockAt(tick),
-          componentName: note,
+          componentName: step.name,
           status: lineStatus,
           note: true,
+          componentType: step.type,
         });
         tick += 1;
       }
@@ -464,13 +465,28 @@ function classifyNode(node: ComponentsNode): "agent" | "check" | "artifact" | "s
   return "simple";
 }
 
+export function claudeCodeSteps(node: ComponentsNode): Array<{ name: string; type: string }> {
+  const configured = node.configuration?.steps;
+  if (!Array.isArray(configured) || configured.length === 0) {
+    return agentNotes(node.id).map((name) => ({ name, type: "" }));
+  }
+  const steps: Array<{ name: string; type: string }> = [];
+  for (const step of configured) {
+    if (!step || typeof step !== "object") {
+      continue;
+    }
+    const name = "name" in step && typeof step.name === "string" ? step.name.trim() : "";
+    const type = "type" in step && typeof step.type === "string" ? step.type.trim() : "";
+    if (name) {
+      steps.push({ name, type });
+    }
+  }
+  return steps;
+}
+
 function agentNotes(nodeId: string): string[] {
   if (nodeId.startsWith("planner-agent")) {
-    return [
-      "Reading the work order description.",
-      "Drafting plan.md for the refund reconciliation test.",
-      "Covering the timeout-then-retry path.",
-    ];
+    return ["Clone Repo", "Write Implementation Plan", "Use plan as output"];
   }
   if (nodeId.startsWith("implementation-agent")) {
     return ["Reading plan.md.", "Opening the refund reconciliation worker.", "Adding the timeout-then-retry test."];

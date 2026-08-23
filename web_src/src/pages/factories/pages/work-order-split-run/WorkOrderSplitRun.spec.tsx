@@ -71,7 +71,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-stream-plan")).not.toBeInTheDocument();
 
     const implement = screen.getByTestId("split-run-phase-implement");
-    expect(within(implement).getByText(/Implementation/)).toBeInTheDocument();
+    expect(within(implement).getAllByText(/Implementation/).length).toBeGreaterThan(0);
     expect(within(implement).getByText("4m")).toBeInTheDocument();
     expect(within(implement).getAllByRole("link", { name: /feature\/refund-retry/ }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("split-run-stream-implement")).toBeInTheDocument();
@@ -88,13 +88,14 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(
       within(screen.getByTestId("split-run-stream-line-create-branch")).queryByText("└──"),
     ).not.toBeInTheDocument();
-    const note = within(implement).getByText("Reading plan.md.");
+    const note = within(implement).getByText("Provide Plan");
     expect(note.closest("li")).toHaveTextContent("├──");
+    expect(note.closest("li")).toHaveTextContent("bash");
     expect(within(screen.getByTestId("split-run-stream-implement")).getAllByText("└──").length).toBeGreaterThan(0);
     expect(within(implement).queryByText("did not run")).not.toBeInTheDocument();
 
     expect(screen.getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
-    expect(screen.getByText("Implementation")).toBeInTheDocument();
+    expect(screen.getAllByText("Implementation").length).toBeGreaterThan(0);
     expect(within(screen.getByTestId("run-overlay-compact-canvas")).getByText("Create Branch")).toBeInTheDocument();
     expect(screen.queryByText("Factory Lines")).not.toBeInTheDocument();
   });
@@ -398,9 +399,13 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(screen.getByTestId("split-run-stream-plan")).getAllByText("Create Implementation Plan").length).toBe(
       1,
     );
+    expect(within(screen.getByTestId("split-run-stream-plan")).getByText("Clone Repo")).toBeInTheDocument();
     expect(
-      within(screen.getByTestId("split-run-stream-plan")).getByText("Reading the work order description."),
+      within(screen.getByTestId("split-run-stream-plan")).getByText("Write Implementation Plan"),
     ).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-plan")).getByText("Use plan as output")).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-plan")).getAllByText("bash").length).toBeGreaterThan(0);
+    expect(within(screen.getByTestId("split-run-stream-plan")).getByText("prompt")).toBeInTheDocument();
     expect(screen.getByText("Planning")).toBeInTheDocument();
     expect(screen.getAllByText("From GH issue?").length).toBeGreaterThan(0);
   });

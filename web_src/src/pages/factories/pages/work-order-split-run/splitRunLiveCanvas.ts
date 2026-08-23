@@ -366,29 +366,51 @@ export function resolveSplitRunVisual(
   if (live.canvas && liveCanvasMatchesLineAutomation(lineCanvas, live.canvas)) {
     return {
       canvas: live.canvas,
-      stream: live.stream.length > 0 ? attachMissingStreamArtifacts(live.stream, lineStream) : lineStream,
+      stream: live.stream.length > 0 ? attachMissingStreamChildren(live.stream, lineStream) : lineStream,
     };
   }
   return { canvas: lineCanvas, stream: lineStream };
 }
 
-function attachMissingStreamArtifacts(
-  stream: SplitRunStreamLine[],
-  source: SplitRunStreamLine[],
-): SplitRunStreamLine[] {
+function attachMissingStreamChildren(stream: SplitRunStreamLine[], source: SplitRunStreamLine[]): SplitRunStreamLine[] {
   const artifacts = new Map<string, NonNullable<SplitRunStreamLine["artifact"]>>();
+  const notes = new Map<string, SplitRunStreamLine[]>();
   for (const line of source) {
     if (line.nodeId && line.artifact) {
       artifacts.set(line.nodeId, line.artifact);
     }
+    if (line.note && line.nodeId) {
+      const current = notes.get(line.nodeId) ?? [];
+      current.push(line);
+      notes.set(line.nodeId, current);
+    }
   }
-  return stream.map((line) => {
+  const withArtifacts = stream.map((line) => {
     if (line.artifact || !line.nodeId) {
       return line;
     }
     const artifact = artifacts.get(line.nodeId);
     return artifact ? { ...line, artifact } : line;
   });
+  const result: SplitRunStreamLine[] = [];
+  const seenNotes = new Set<string>();
+  for (const line of withArtifacts) {
+    result.push(line);
+    if (line.note && line.nodeId) {
+      seenNotes.add(line.nodeId);
+      continue;
+    }
+    if (!line.nodeId || seenNotes.has(line.nodeId)) {
+      continue;
+    }
+    const missing = notes.get(line.nodeId);
+    if (!missing?.length) {
+      continue;
+    }
+    seenNotes.add(line.nodeId);
+    result.push(...missing);
+  }
+  return result;
 }
 
 export function liveCanvasKeyForPhase(phase: SplitRunPhase): SplitRunCanvasModel["key"] {

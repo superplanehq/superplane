@@ -4,6 +4,7 @@ import { groupSplitRunStream } from "./PhaseLogCard";
 import {
   canvasKeyForAutomation,
   canvasKeyForPhase,
+  claudeCodeSteps,
   lineAutomationPresentation,
   parseSplitRunCanvasKey,
   richStreamForCanvas,
@@ -221,6 +222,28 @@ describe("splitRunCanvasForPhase", () => {
       componentType: "Run Claude Code",
       componentName: "Agent - Plan for GH Issue",
     });
+    expect(
+      stream
+        .filter((line) => line.nodeId === "planner-agent" && line.note)
+        .map((line) => ({
+          name: line.componentName,
+          type: line.componentType,
+        })),
+    ).toEqual([
+      { name: "Clone Repo", type: "bash" },
+      { name: "Write Implementation Plan", type: "prompt" },
+      { name: "Use plan as output", type: "bash" },
+    ]);
+    expect(claudeCodeSteps(canvas.nodes.find((node) => node.id === "planner-agent") ?? {})).toEqual([
+      { name: "Clone Repo", type: "bash" },
+      { name: "Write Implementation Plan", type: "prompt" },
+      { name: "Use plan as output", type: "bash" },
+    ]);
+    expect(claudeCodeSteps(canvas.nodes.find((node) => node.id === "planner-agent-no-issue") ?? {})).toEqual([
+      { name: "Clone Repo", type: "bash" },
+      { name: "Write Implementation Plan", type: "prompt" },
+      { name: "Use plan as output", type: "bash" },
+    ]);
   });
 
   it("paints the GitHub label path on Ingest and leaves assignment idle", () => {

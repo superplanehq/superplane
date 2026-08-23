@@ -237,6 +237,9 @@ function StreamNode({
               className="flex h-4 w-full items-center whitespace-nowrap"
             >
               <NotePrefix isLast={noteIndex === notes.length - 1} />
+              {note.componentType ? (
+                <span className={cn("mr-2 shrink-0", stepTypeTone(note.componentType))}>{note.componentType}</span>
+              ) : null}
               <span className="min-w-0 truncate text-muted-foreground">{note.componentName}</span>
             </li>
           ))}
@@ -252,6 +255,16 @@ function NodeIndent() {
       {"    "}
     </span>
   );
+}
+
+function stepTypeTone(type: string): string {
+  if (type === "prompt") {
+    return "text-[color:var(--status-running)]";
+  }
+  if (type === "bash") {
+    return "text-[color:var(--status-success)]";
+  }
+  return "text-muted-foreground";
 }
 
 function NotePrefix({ isLast }: { isLast: boolean }) {
