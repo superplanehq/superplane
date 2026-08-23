@@ -42,6 +42,8 @@ import {
   type BoardLaneTone,
 } from "../workOrders/WorkOrderBoardChrome";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
+import { ReviewCandidateModal } from "./onboarding/first-run/ReviewCandidateModal";
+import { reviewCandidateForWorkOrderId } from "./onboarding/first-run/reviewCandidates";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 import type { SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
 import { splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
@@ -52,6 +54,7 @@ import {
   factoryAppSplitRunPath,
   factoryHomePath,
   factoryLineDetailPath,
+  intakeSourceFromSearch,
   isIntakeSearchOpen,
   linesPath,
   workOrderDetailPath,
@@ -67,6 +70,7 @@ import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
+import { isLineIntakeSourceId } from "./lineIntakeModel";
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
 import { LineListCard } from "./LineListCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
@@ -82,6 +86,7 @@ export function LinesPage() {
   const { search } = useLocation();
   const navigate = useNavigate();
   const intakeOpen = isIntakeSearchOpen(search);
+  const intakeSourceId = intakeSourceFromSearch(search);
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
   const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
@@ -118,7 +123,10 @@ export function LinesPage() {
     return (
       <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
         {intakeOpen ? (
-          <LineIntakeDrawer onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))} />
+          <LineIntakeDrawer
+            initialSourceId={isLineIntakeSourceId(intakeSourceId) ? intakeSourceId : undefined}
+            onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
+          />
         ) : null}
         <div className={factoryKanbanPageClassName}>
           <div className="shrink-0">
@@ -290,6 +298,7 @@ function LineDetail({
   const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
   const [peekOrderId, setPeekOrderId] = useState<string | null>(null);
   const peekOrder = workOrders.find((order) => order.id === peekOrderId);
+  const reviewCandidate = reviewCandidateForWorkOrderId(peekOrderId ?? undefined);
   const canvasEditHref = useMemo(
     () => canvasEditHrefForLine(organizationId, factoryKey, line, apps),
     [organizationId, factoryKey, line, apps],
@@ -318,7 +327,9 @@ function LineDetail({
           onOpenWorkOrder={setPeekOrderId}
         />
       )}
-      {peekOrderId ? (
+      {reviewCandidate ? (
+        <ReviewCandidateModal candidate={reviewCandidate} onClose={() => setPeekOrderId(null)} />
+      ) : peekOrderId ? (
         <LineBoardSplitRunPopup
           organizationId={organizationId}
           factoryId={factoryId}
@@ -889,11 +900,13 @@ function LineBoardOrderCard({
 }) {
   const { factory } = useFactoriesLayout();
   const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [order, factory]);
+  const reviewCandidate = reviewCandidateForWorkOrderId(order.id);
 
   return (
     <WorkOrderCard
       {...workOrderCardContext}
       entry={entry}
+      confidencePct={reviewCandidate?.confidencePct}
       onOpen={() => {
         if (order.id) {
           onOpenWorkOrder(order.id);

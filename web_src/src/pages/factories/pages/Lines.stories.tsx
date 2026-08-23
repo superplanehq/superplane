@@ -58,6 +58,19 @@ export const LineBoardIntake: Story = {
   },
 };
 
+export const LineBoardIntakeAnalyzing: Story = {
+  name: "Line board — intake tree",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1&source=github-issues`}
+        factoriesFixture={lineMetricsFactoriesFixture}
+      />
+    );
+  },
+};
+
 export const LineDetailFivePhases: Story = {
   name: "Line detail — five phases",
   render: () => {

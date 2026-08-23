@@ -35,14 +35,30 @@ export function factoryHomePath(organizationId: string, factoryKey: string, line
 
 /** Opens the line board with the Intake drawer beside the columns. */
 export const INTAKE_SEARCH_PARAM = "intake";
+/** Selects an intake source when the drawer opens. */
+export const INTAKE_SOURCE_SEARCH_PARAM = "source";
 
-export function factoryIntakePath(organizationId: string, factoryKey: string, lineId?: string | null) {
-  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${INTAKE_SEARCH_PARAM}=1`;
+export function factoryIntakePath(
+  organizationId: string,
+  factoryKey: string,
+  lineId?: string | null,
+  sourceId?: string,
+) {
+  const path = `${factoryHomePath(organizationId, factoryKey, lineId)}?${INTAKE_SEARCH_PARAM}=1`;
+  if (!sourceId) {
+    return path;
+  }
+  return `${path}&${INTAKE_SOURCE_SEARCH_PARAM}=${encodeURIComponent(sourceId)}`;
 }
 
 export function isIntakeSearchOpen(search: string): boolean {
   const query = search.startsWith("?") ? search.slice(1) : search;
   return new URLSearchParams(query).get(INTAKE_SEARCH_PARAM) === "1";
+}
+
+export function intakeSourceFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(INTAKE_SOURCE_SEARCH_PARAM);
 }
 
 export function factorySetupPath(organizationId: string, factoryKey: string) {
