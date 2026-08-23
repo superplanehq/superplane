@@ -2,7 +2,6 @@ import type { FactoriesWorkOrderArtifact } from "@/api-client";
 
 import {
   CLOSED_WORK_ORDER,
-  EMPTY_FACTORY_ID,
   FACTORIES_ORGANIZATION_ID,
   HOUR_AGO,
   PRIMARY_FACTORY_ID,
@@ -57,8 +56,8 @@ export const emptyFactoriesFixture: FactoriesFixture = {
 export const emptyWorkOrdersFactoriesFixture: FactoriesFixture = {
   ...defaultFactoriesFixture,
   workOrdersByFactoryId: {
+    ...defaultFactoriesFixture.workOrdersByFactoryId,
     [PRIMARY_FACTORY_ID]: [CLOSED_WORK_ORDER],
-    [EMPTY_FACTORY_ID]: [],
   },
 };
 

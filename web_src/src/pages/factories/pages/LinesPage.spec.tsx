@@ -4,9 +4,12 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { FactoriesFactory } from "@/api-client";
+import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 import { editFactoryLinePath, factoryAppConfigurePath, factoryLineDetailPath } from "../lib/factoryPagePaths";
 import {
+  ACME_ONBOARDING_FACTORY,
+  ACME_ONBOARDING_FACTORY_KEY,
+  ACME_ONBOARDING_LINE_ID,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
@@ -15,13 +18,15 @@ import {
 import { withPlanLinePhases } from "../__fixtures__/lineMetricsPlanLine";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { LINE_LIST_METRICS_BY_ID } from "./lineListMetricsMockData";
+import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
 import { LinesPage } from "./LinesPage";
 
 const createFactoryLineMutateAsync = vi.fn();
 const updateFactoryLineMutateAsync = vi.fn();
+const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
-  useFactoryWorkOrders: () => ({ data: [] }),
+  useFactoryWorkOrders: () => useFactoryWorkOrders(),
   useFactoryApps: () => ({ data: [] }),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: updateFactoryLineMutateAsync, isPending: false }),
@@ -124,6 +129,7 @@ describe("LinesPage card menu", () => {
 describe("LinesPage board", () => {
   beforeEach(() => {
     updateFactoryLineMutateAsync.mockReset();
+    useFactoryWorkOrders.mockReturnValue({ data: [] });
   });
 
   function renderBoard(
@@ -137,8 +143,8 @@ describe("LinesPage board", () => {
           <FactoriesLayoutContext.Provider
             value={{
               organizationId: "org-1",
-              factoryId: PRIMARY_FACTORY_ID,
-              factoryKey: PRIMARY_FACTORY_KEY,
+              factoryId: factory.id ?? PRIMARY_FACTORY_ID,
+              factoryKey: factory.key ?? PRIMARY_FACTORY_KEY,
               factory,
               factories: [factory],
               openCreateWorkOrder,
@@ -185,6 +191,24 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
   });
 
+  it("shows a score on a review-candidate backlog card and opens the plan review", async () => {
+    useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
+    const user = userEvent.setup();
+    renderBoard();
+
+    const card = screen.getByTestId("work-order-card-wo-review-pay-842");
+    expect(within(card).getByTestId("work-order-card-score-wo-review-pay-842")).toHaveTextContent("95%");
+    expect(within(card).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
+
+    const dialog = screen.getByTestId("review-candidate-modal");
+    expect(within(dialog).getByRole("heading", { name: "Review candidate" })).toBeInTheDocument();
+    expect(within(dialog).getByText("PAY-842")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("review-candidate-section-04")).toHaveTextContent("Implementation plan");
+    expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
+  });
+
   it("opens the Intake drawer beside the board when the intake query is set", () => {
     renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
 
@@ -193,6 +217,39 @@ describe("LinesPage board", () => {
     expect(screen.getByRole("heading", { name: "Plan and Implement" })).toBeInTheDocument();
     expect(screen.getByTestId("line-intake-close")).toBeInTheDocument();
     expect(screen.getByTestId("line-intake-add")).toHaveTextContent("Add intake");
+    expect(screen.getByTestId("line-intake-source-sentry-exceptions")).toBeInTheDocument();
+    expect(screen.getByTestId("line-intake-source-pagerduty-incidents")).toBeInTheDocument();
+    expect(screen.queryByTestId("line-intake-analyzing")).not.toBeInTheDocument();
+  });
+
+  it("shows a backlog onboarding card on Acme when the backlog is empty", () => {
+    renderBoard(
+      `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}`,
+      vi.fn(),
+      ACME_ONBOARDING_FACTORY,
+    );
+
+    expect(screen.getByTestId("backlog-onboarding-card")).toBeInTheDocument();
+    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
+  });
+
+  it("shows GitHub issues only on Acme onboarding intake", () => {
+    renderBoard(
+      `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&source=github-issues`,
+      vi.fn(),
+      ACME_ONBOARDING_FACTORY,
+    );
+
+    expect(screen.getByTestId("line-intake-source-github-issues")).toBeInTheDocument();
+    expect(screen.queryByTestId("line-intake-source-sentry-exceptions")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("line-intake-source-pagerduty-incidents")).not.toBeInTheDocument();
+  });
+
+  it("nests analyzing tickets under GitHub issues when that source is open", () => {
+    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1&source=github-issues`);
+
+    expect(screen.getByTestId("line-intake-analyzing")).toBeInTheDocument();
+    expect(screen.getByText("Handle duplicate refunds on retry")).toBeInTheDocument();
   });
 
   it("renames the board title on Enter", async () => {

@@ -7,6 +7,7 @@ import {
   factoryDetailPath,
   factoryHomePath,
   factoryIntakePath,
+  intakeSourceFromSearch,
   isIntakeSearchOpen,
   factorySettingsGeneralPathAfterKeyChange,
   firstFactoryLineId,
@@ -43,6 +44,17 @@ describe("factoryIntakePath", () => {
     expect(isIntakeSearchOpen("?intake=1")).toBe(true);
     expect(isIntakeSearchOpen("intake=1")).toBe(true);
     expect(isIntakeSearchOpen("")).toBe(false);
+  });
+
+  it("opens the line board with a selected intake source", () => {
+    expect(factoryIntakePath("org-1", "SP", "line-plan", "github-issues")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?intake=1&source=github-issues",
+    );
+  });
+
+  it("reads the intake source from the search string", () => {
+    expect(intakeSourceFromSearch("?intake=1&source=github-issues")).toBe("github-issues");
+    expect(intakeSourceFromSearch("intake=1")).toBeNull();
   });
 });
 

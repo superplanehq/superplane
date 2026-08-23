@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
+import { ACME_ONBOARDING_FACTORY_KEY, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 import {
   ADD_INTAKE_TEMPLATES,
   filterAddIntakeTemplates,
   intakeAutomationFixture,
+  intakeTicketAnalysisFixture,
   LINE_INTAKE_SOURCES,
   lineIntakeSourceById,
+  lineIntakeSourcesForFactory,
 } from "./lineIntakeModel";
 
 describe("lineIntakeModel", () => {
@@ -19,6 +22,40 @@ describe("lineIntakeModel", () => {
     const github = lineIntakeSourceById("github-issues");
     expect(github?.listen.kind).toBe("webhook");
     expect(github?.accept.destination).toBe("backlog");
+  });
+
+  it("keeps Sentry and PagerDuty on Semaphore and GitHub issues only on Acme", () => {
+    expect(lineIntakeSourcesForFactory(PRIMARY_FACTORY_KEY).map((source) => source.id)).toEqual([
+      "github-issues",
+      "sentry-exceptions",
+      "pagerduty-incidents",
+    ]);
+    expect(lineIntakeSourcesForFactory(ACME_ONBOARDING_FACTORY_KEY).map((source) => source.id)).toEqual([
+      "github-issues",
+    ]);
+  });
+
+  it("builds a ticket analysis fixture with ingest, analyze, plan, and score", () => {
+    const fixture = intakeTicketAnalysisFixture({
+      id: "gh-issue-1",
+      title: "Handle duplicate refunds on retry",
+    });
+
+    expect(fixture.title).toBe("Handle duplicate refunds on retry");
+    expect(fixture.phases.map((phase) => phase.id)).toEqual(["ingest", "analyze", "plan", "score"]);
+    expect(fixture.currentPhaseId).toBe("analyze");
+    expect(fixture.phases[0]?.canvas?.nodes.map((node) => node.name)).toEqual([
+      "Ingest",
+      "Analyze ticket",
+      "Create plan",
+      "Score",
+    ]);
+    expect(fixture.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
+      "github.onIssue",
+      "runnerClaudeCode",
+      "addWorkOrderArtifact",
+      "reportWorkOrderCheck",
+    ]);
   });
 
   it("builds a split-run fixture with listen, evaluate, and backlog steps", () => {
