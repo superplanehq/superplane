@@ -217,6 +217,11 @@ import {
   eventStateRegistry as openrouterEventStateRegistry,
 } from "./openrouter/index";
 import {
+  componentMappers as opencodeGoComponentMappers,
+  triggerRenderers as opencodeGoTriggerRenderers,
+  eventStateRegistry as opencodeGoEventStateRegistry,
+} from "./opencodego/index";
+import {
   componentMappers as prometheusComponentMappers,
   customFieldRenderers as prometheusCustomFieldRenderers,
   triggerRenderers as prometheusTriggerRenderers,
@@ -360,6 +365,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   logfire: logfireComponentMappers,
   perplexity: perplexityComponentMappers,
   openrouter: openrouterComponentMappers,
+  opencodego: opencodeGoComponentMappers,
   gcp: gcpComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
@@ -410,6 +416,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   logfire: logfireTriggerRenderers,
   perplexity: perplexityTriggerRenderers,
   openrouter: openrouterTriggerRenderers,
+  opencodego: opencodeGoTriggerRenderers,
   gcp: gcpTriggerRenderers,
   grafana: grafanaTriggerRenderers,
   bitbucket: bitbucketTriggerRenderers,
@@ -455,6 +462,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   logfire: logfireEventStateRegistry,
   perplexity: perplexityEventStateRegistry,
   openrouter: openrouterEventStateRegistry,
+  opencodego: opencodeGoEventStateRegistry,
   gcp: gcpEventStateRegistry,
   statuspage: statuspageEventStateRegistry,
   aws: awsEventStateRegistry,

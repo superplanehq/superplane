@@ -46,6 +46,7 @@ import gcpMonitoringIcon from "@/assets/icons/integrations/gcp.monitoring.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import perplexityIcon from "@/assets/icons/integrations/perplexity.svg";
 import openRouterIcon from "@/assets/icons/integrations/openrouter.svg";
+import opencodeGoIcon from "@/assets/icons/integrations/opencodego.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import incidentIcon from "@/assets/icons/integrations/incident.svg";
@@ -100,6 +101,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   cursor: cursorIcon,
   perplexity: perplexityIcon,
   openrouter: openRouterIcon,
+  opencodego: opencodeGoIcon,
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
   incident: incidentIcon,
@@ -153,6 +155,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   cursor: cursorIcon,
   perplexity: perplexityIcon,
   openrouter: openRouterIcon,
+  opencodego: opencodeGoIcon,
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
   incident: incidentIcon,
