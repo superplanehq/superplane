@@ -8,8 +8,9 @@ import (
 )
 
 func main() {
-	if cli.ShouldStartUpdateCheck(os.Args[1:]) {
-		cli.StartUpdateCheck()
+	args := os.Args[1:]
+	if cli.ShouldStartUpdateCheck(args) {
+		cli.StartUpdateCheck(args)
 	}
 	err := cli.RootCmd.Execute()
 	cli.PrintUpdateNotice()
