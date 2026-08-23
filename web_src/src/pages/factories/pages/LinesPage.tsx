@@ -1,9 +1,10 @@
-import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryApps, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useMe } from "@/hooks/useMe";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
@@ -29,7 +30,21 @@ import {
 } from "../lib/linePhaseRuns";
 import { isQueuedStepRow } from "../lib/workOrderExecutions";
 import { latestDispatchForLine } from "../lib/workOrderNumberResolution";
-import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
+import {
+  applyWorkOrderFilters,
+  applyWorkOrderScope,
+  applyWorkOrderSearch,
+  buildWorkOrderListEntries,
+  buildWorkOrderListEntry,
+  WORK_ORDER_SCOPES,
+} from "../lib/workOrderListModel";
+import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
+import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
+import { buildAssigneeFilterOptions } from "../lib/workOrderFilterOptions";
+import { FilterChips } from "../workOrders/header/FilterChips";
+import { FilterMenu } from "../workOrders/header/FilterMenu";
+import { ScopePills } from "../workOrders/header/ScopePills";
+import { SearchField } from "../workOrders/header/SearchField";
 import {
   WorkOrderBoardLane,
   WorkOrderKanbanBoard,
@@ -50,7 +65,7 @@ import {
   linesPath,
   workOrderDetailPath,
 } from "../lib/factoryPagePaths";
-import { formatLinePhaseDescription, humanizeLineName } from "../lib/humanizeLineName";
+import { humanizeLineName } from "../lib/humanizeLineName";
 import {
   factoryKanbanPageClassName,
   factorySectionBodyClassName,
@@ -63,16 +78,41 @@ import { useLineCardMutations } from "./useLineCardMutations";
 
 const LIST_SUBTITLE = "Last 30 days. Success rate, completions per day, duration, and cost per merged work order.";
 
+function applyVisibleWorkOrders(
+  workOrders: FactoriesWorkOrder[],
+  factory: FactoriesFactory | null | undefined,
+  state: WorkOrderListState,
+  currentUserId?: string,
+): FactoriesWorkOrder[] {
+  const entries = factory ? buildWorkOrderListEntries(workOrders, factory) : [];
+  const visibleIds = new Set(
+    applyWorkOrderSearch(
+      applyWorkOrderFilters(applyWorkOrderScope(entries, state.scope, currentUserId), {
+        ...state.filters,
+        lineIds: [],
+      }),
+      state.search,
+    ).map((entry) => entry.id),
+  );
+  return workOrders.filter((order) => Boolean(order.id) && visibleIds.has(order.id));
+}
+
 export function LinesPage() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId } = useParams<{ lineId: string }>();
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
   const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
+  const { data: me } = useMe(false);
+  const listState = useWorkOrderListState(factoryId);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
 
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
+  const visibleWorkOrders = useMemo(
+    () => applyVisibleWorkOrders(workOrders, factory, listState, me?.id),
+    [factory, listState.filters, listState.scope, listState.search, me?.id, workOrders],
+  );
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const { actionsForLine } = useLineCardMutations({
     organizationId,
@@ -106,7 +146,9 @@ export function LinesPage() {
             organizationId={organizationId}
             factoryKey={factoryKey}
             line={selectedLine}
-            apps={factoryApps}
+            workOrders={workOrders}
+            factory={factory}
+            state={listState}
             canUpdate={canUpdate}
           />
         </div>
@@ -118,7 +160,7 @@ export function LinesPage() {
             factoryKey={factoryKey}
             line={selectedLine}
             apps={factoryApps}
-            workOrders={workOrders}
+            workOrders={visibleWorkOrders}
             workOrderCardContext={{
               organizationId,
               factoryKey,
@@ -191,26 +233,56 @@ function LineDetailHeader({
   organizationId,
   factoryKey,
   line,
-  apps,
+  workOrders,
+  factory,
+  state,
   canUpdate,
 }: {
   organizationId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
-  apps: Array<{ id?: string; name?: string }>;
+  workOrders: FactoriesWorkOrder[];
+  factory: FactoriesFactory | null;
+  state: WorkOrderListState;
   canUpdate: boolean;
 }) {
+  const searchRef = useWorkOrdersHeaderShortcuts(state);
+  const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [factory, workOrders]);
+  const assigneeOptions = buildAssigneeFilterOptions(entries);
   const editHref = line.id ? editFactoryLinePath(organizationId, factoryKey, line.id) : "#";
+
   return (
     <WorkspacePageHeader
       className={factorySectionHeaderClassName}
+      data-testid="lines-detail-header"
       title={humanizeLineName(line.name)}
-      subtitle={formatLinePhaseDescription(line.steps, apps)}
-      actions={
-        canUpdate ? (
-          <ColumnConfigureMenu title={humanizeLineName(line.name)} href={editHref} testId="lines-edit-menu" />
-        ) : undefined
+      leading={
+        <>
+          <ScopePills
+            value={state.scope}
+            onChange={state.setScope}
+            options={WORK_ORDER_SCOPES}
+            testIdPrefix="work-orders-scope"
+          />
+          <FilterMenu state={state} assigneeOptions={assigneeOptions} />
+        </>
       }
+      actions={
+        <>
+          <SearchField
+            inputRef={searchRef}
+            open={state.searchOpen}
+            value={state.search}
+            onOpen={state.openSearch}
+            onChange={state.setSearch}
+            onClose={state.closeSearch}
+          />
+          {canUpdate ? (
+            <ColumnConfigureMenu title={humanizeLineName(line.name)} href={editHref} testId="lines-edit-menu" />
+          ) : null}
+        </>
+      }
+      belowRow={<FilterChips state={state} assigneeOptions={assigneeOptions} />}
     />
   );
 }

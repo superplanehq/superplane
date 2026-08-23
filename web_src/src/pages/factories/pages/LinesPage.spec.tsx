@@ -2,9 +2,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { FactoriesFactory } from "@/api-client";
+import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 import { editFactoryLinePath, factoryLineDetailPath } from "../lib/factoryPagePaths";
 import {
   PRIMARY_FACTORY_ID,
@@ -12,14 +12,16 @@ import {
   REFUND_FACTORY,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
+import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { LINE_LIST_METRICS_BY_ID } from "./lineListMetricsMockData";
 import { LinesPage } from "./LinesPage";
 
 const createFactoryLineMutateAsync = vi.fn();
+let mockWorkOrders: FactoriesWorkOrder[] = [];
 
 vi.mock("@/hooks/useFactoryData", () => ({
-  useFactoryWorkOrders: () => ({ data: [] }),
+  useFactoryWorkOrders: () => ({ data: mockWorkOrders }),
   useFactoryApps: () => ({ data: [] }),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
 }));
@@ -39,6 +41,10 @@ vi.mock("@/contexts/usePermissions", () => ({
 
 vi.mock("@/hooks/usePageTitle", () => ({
   usePageTitle: () => undefined,
+}));
+
+vi.mock("@/hooks/useMe", () => ({
+  useMe: () => ({ data: { id: "storybook-user" } }),
 }));
 
 function LocationProbe() {
@@ -119,6 +125,11 @@ describe("LinesPage card menu", () => {
 });
 
 describe("LinesPage board", () => {
+  beforeEach(() => {
+    mockWorkOrders = [];
+    window.localStorage.clear();
+  });
+
   function renderBoard() {
     return render(
       <QueryClientProvider client={new QueryClient()}>
@@ -149,6 +160,40 @@ describe("LinesPage board", () => {
 
     expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-back-to-list")).not.toBeInTheDocument();
+  });
+
+  it("hides the phase path and shows work-order filters", async () => {
+    const user = userEvent.setup();
+    renderBoard();
+
+    const header = screen.getByTestId("lines-detail-header");
+    expect(within(header).queryByText(/→/)).not.toBeInTheDocument();
+    expect(within(header).getByTestId("work-orders-scope-all")).toBeInTheDocument();
+    expect(within(header).getByTestId("work-orders-scope-active")).toHaveTextContent("Needs attention");
+    expect(within(header).getByTestId("work-orders-scope-my")).toBeInTheDocument();
+    expect(within(header).getByTestId("work-orders-filter-trigger")).toBeInTheDocument();
+    expect(within(header).getByTestId("work-orders-search-trigger")).toBeInTheDocument();
+    expect(within(header).queryByTestId("work-order-list-create-button")).not.toBeInTheDocument();
+
+    await user.click(within(header).getByTestId("work-orders-filter-trigger"));
+    expect(screen.getByTestId("work-orders-filter-statuses")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-orders-filter-lineIds")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-orders-filter-assigneeIds")).toBeInTheDocument();
+  });
+
+  it("narrows the board when the search query changes", async () => {
+    const user = userEvent.setup();
+    mockWorkOrders = [BOARD_IMPLEMENT_FAILED_ORDER, BOARD_DONE_REJECTED_ORDER];
+    renderBoard();
+
+    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(screen.getByText("Replace the refund batch exporter")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("work-orders-search-trigger"));
+    await user.type(screen.getByTestId("work-orders-search-input"), "timeout");
+
+    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(screen.queryByText("Replace the refund batch exporter")).not.toBeInTheDocument();
   });
 
   it("opens Edit from the line overflow menu", async () => {
