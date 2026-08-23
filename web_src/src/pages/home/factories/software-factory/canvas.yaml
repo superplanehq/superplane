@@ -514,6 +514,7 @@ spec:
             name: Set Up Git User
             type: bash
           - command: |-
+              set -euo pipefail
               rm -rf repo
               git clone --depth 1 --branch "$BRANCH" "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
               cd repo
@@ -552,16 +553,17 @@ spec:
             workingDirectory: repo
           - command: |
               set -euo pipefail
+              echo "cwd=$(pwd -P)"
+              git status
+              git log --oneline -5
               git add -A
               if ! git diff --cached --quiet; then
                 git commit -s -m "fix: implement issue #${ISSUE_NUMBER} via SuperPlane"
               fi
               if git rev-parse --verify "origin/${BRANCH}" >/dev/null 2>&1; then
                 if [ "$(git rev-list --count "origin/${BRANCH}..HEAD")" -eq 0 ]; then
-                  echo "Branch ${BRANCH} is already up to date on origin"
-                  git push origin "$BRANCH"
-                  echo "Pushed implementation to $BRANCH"
-                  exit 0
+                  echo "No file changes and no unpushed commits on ${BRANCH}" >&2
+                  exit 1
                 fi
               fi
               git push origin "$BRANCH"

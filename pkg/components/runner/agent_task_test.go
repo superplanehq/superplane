@@ -64,10 +64,12 @@ func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 	require.Len(t, commands, 4)
 	assert.Equal(t, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`, commands[0].Command)
 	assertAgentStepMergesUsage(t, commands[1].Command, `source "$SUPERPLANE_TASK_DIR/steps/01-clone.sh"`)
-	assert.Contains(t, commands[2].Command, `'repo'`)
+	assert.Contains(t, commands[2].Command, `cat "$SUPERPLANE_TASK_DIR/task_cwd"`)
+	assert.Contains(t, commands[2].Command, `cd "$_sp_root"/'repo'`)
 	assert.Contains(t, commands[2].Command, "node run.js 02-implement.txt")
 	assertAgentStepMergesUsage(t, commands[2].Command, "node run.js 02-implement.txt")
-	assert.Contains(t, commands[3].Command, `'repo'`)
+	assert.Contains(t, commands[3].Command, `cat "$SUPERPLANE_TASK_DIR/task_cwd"`)
+	assert.Contains(t, commands[3].Command, `cd "$_sp_root"/'repo'`)
 	assertAgentStepMergesUsage(t, commands[3].Command, `source "$SUPERPLANE_TASK_DIR/steps/03-push.sh"`)
 
 	prepare := requireBrokerFile(t, files, "prepare.sh").Content

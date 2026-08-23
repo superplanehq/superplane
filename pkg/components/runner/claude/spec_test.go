@@ -150,6 +150,9 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, runScript, "plain terminal text")
 	assert.Contains(t, runScript, "--continue")
 	assert.Contains(t, runScript, "SUPERPLANE_RESULT_FILE")
+	assert.Contains(t, runScript, `"--add-dir"`)
+	assert.Contains(t, runScript, `"--permission-mode"`)
+	assert.Contains(t, runScript, `"acceptEdits"`)
 	assert.NotContains(t, runScript, "workdir")
 }
 

@@ -57,6 +57,8 @@ async function runPrompt(promptFile, model) {
     "--include-partial-messages",
     "--permission-mode",
     "acceptEdits",
+    "--add-dir",
+    ".",
     "--append-system-prompt",
     SYSTEM_PROMPT,
   ];
