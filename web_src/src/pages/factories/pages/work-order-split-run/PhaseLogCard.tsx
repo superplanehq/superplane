@@ -152,7 +152,7 @@ function artifactsProducedBySteps(
  * Terminal log. The automation is the root. Each node hangs under it.
  * Collapsed automations show produced artifacts on the title line.
  * Expanded automations show those artifacts on the producing steps.
- * Node lines indent under the automation. Note lines use ├ and └.
+ * Node lines indent under the automation.
  */
 export function PhaseLogCard({
   phase,
@@ -313,8 +313,8 @@ function StreamNode({
       </div>
       {expanded ? (
         <ol>
-          {steps.map((step, stepIndex) => (
-            <StreamStep key={step.line.id} step={step} isLast={stepIndex === steps.length - 1} />
+          {steps.map((step) => (
+            <StreamStep key={step.line.id} step={step} />
           ))}
         </ol>
       ) : null}
@@ -322,13 +322,13 @@ function StreamNode({
   );
 }
 
-function StreamStep({ step, isLast }: { step: ClaudeStepGroup; isLast: boolean }) {
+function StreamStep({ step }: { step: ClaudeStepGroup }) {
   const [expanded, setExpanded] = useState(false);
   const hasBody = step.events.length > 0;
 
   const header = (
     <>
-      <NotePrefix depth={0} isLast={isLast} parentContinues={false} />
+      <StreamIndent ch={8} />
       {hasBody ? (
         <ChevronRight
           className={cn("mr-1 size-3 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")}
@@ -368,15 +368,15 @@ function StreamStep({ step, isLast }: { step: ClaudeStepGroup; isLast: boolean }
               <div
                 key={event.line.id}
                 data-testid={`split-run-stream-line-${event.line.id}`}
-                className="flex h-4 w-full items-center whitespace-nowrap"
+                className="flex w-full items-start"
               >
-                <span className="inline-block w-[12ch] shrink-0 whitespace-pre" aria-hidden>
-                  {"            "}
+                <StreamIndent ch={12} />
+                <span className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-4 text-foreground">
+                  {event.line.componentName}
                 </span>
-                <span className="min-w-0 truncate text-foreground">{event.line.componentName}</span>
               </div>
             ) : (
-              <StreamToolGroup key={event.id} stepId={event.id} tools={event.tools} parentContinues={!isLast} />
+              <StreamToolGroup key={event.id} stepId={event.id} tools={event.tools} />
             ),
           )
         : null}
@@ -384,15 +384,7 @@ function StreamStep({ step, isLast }: { step: ClaudeStepGroup; isLast: boolean }
   );
 }
 
-function StreamToolGroup({
-  stepId,
-  tools,
-  parentContinues,
-}: {
-  stepId: string;
-  tools: SplitRunStreamLine[];
-  parentContinues: boolean;
-}) {
+function StreamToolGroup({ stepId, tools }: { stepId: string; tools: SplitRunStreamLine[] }) {
   const [expanded, setExpanded] = useState(false);
   const summary = toolCallSummary(tools);
 
@@ -406,21 +398,19 @@ function StreamToolGroup({
         onClick={() => setExpanded((open) => !open)}
         className="flex h-4 w-full items-center whitespace-nowrap text-muted-foreground"
       >
-        <span className="inline-block w-[12ch] shrink-0 whitespace-pre" aria-hidden>
-          {"            "}
-        </span>
+        <StreamIndent ch={12} />
         <ChevronRight className={cn("mr-1 size-3 transition-transform", expanded && "rotate-90")} aria-hidden />
         <span className="min-w-0 truncate">{summary}</span>
       </button>
       {expanded ? (
         <ol>
-          {tools.map((tool, toolIndex) => (
+          {tools.map((tool) => (
             <li
               key={tool.id}
               data-testid={`split-run-stream-line-${tool.id}`}
               className="flex h-4 w-full items-center whitespace-nowrap"
             >
-              <NotePrefix depth={1} isLast={toolIndex === tools.length - 1} parentContinues={parentContinues} />
+              <StreamIndent ch={12} />
               {tool.componentType ? (
                 <span className={cn("mr-2 shrink-0", stepTypeTone(tool.componentType))}>{tool.componentType}</span>
               ) : null}
@@ -434,9 +424,18 @@ function StreamToolGroup({
 }
 
 function NodeIndent() {
+  return <StreamIndent ch={4} testId="split-run-node-indent" />;
+}
+
+function StreamIndent({ ch, testId }: { ch: number; testId?: string }) {
   return (
-    <span data-testid="split-run-node-indent" className="inline-block w-[4ch] shrink-0 whitespace-pre" aria-hidden>
-      {"    "}
+    <span
+      data-testid={testId}
+      className="inline-block shrink-0 whitespace-pre"
+      style={{ width: `${ch}ch` }}
+      aria-hidden
+    >
+      {" ".repeat(ch)}
     </span>
   );
 }
@@ -449,26 +448,6 @@ function stepTypeTone(type: string): string {
     return "text-[color:var(--status-success)]";
   }
   return "text-muted-foreground";
-}
-
-function notePrefixText(depth: number, isLast: boolean, parentContinues: boolean): string {
-  if (depth <= 0) {
-    return isLast ? "    └── " : "    ├── ";
-  }
-  const spine = parentContinues ? "    │   " : "        ";
-  return `${spine}${isLast ? "└── " : "├── "}`;
-}
-
-function NotePrefix({ depth, isLast, parentContinues }: { depth: number; isLast: boolean; parentContinues: boolean }) {
-  return (
-    <span
-      data-testid="split-run-note-prefix"
-      className="inline-block shrink-0 whitespace-pre text-muted-foreground"
-      aria-hidden
-    >
-      {notePrefixText(depth, isLast, parentContinues)}
-    </span>
-  );
 }
 
 function StreamArtifact({ artifact }: { artifact: FactoriesWorkOrderArtifact }) {

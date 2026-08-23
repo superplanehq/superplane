@@ -259,6 +259,49 @@ describe("splitRunCanvasForPhase", () => {
     ]);
   });
 
+  it("uses the implementation runner log under Claude Code", () => {
+    const canvas = splitRunCanvasForPhase({
+      id: "implement",
+      name: "Implement",
+      status: "running",
+      duration: "4m",
+      componentName: "Implementation",
+      artifacts: [],
+      stream: [],
+      canvasSteps: [],
+    });
+    const stream = richStreamForCanvas(canvas);
+    const agentNotes = stream.filter((line) => line.nodeId === "implementation-agent" && line.note);
+    expect(
+      agentNotes
+        .filter((line) => !line.noteParentId)
+        .map((line) => ({
+          name: line.componentName,
+          type: line.componentType,
+        })),
+    ).toEqual([
+      { name: "Set Up Git User", type: "bash" },
+      { name: "Provide order", type: "bash" },
+      { name: "Provide Plan", type: "bash" },
+      { name: "Checkout Branch", type: "bash" },
+      { name: "Set Up DCO Signing", type: "bash" },
+      { name: "Set Up Environment", type: "bash" },
+      { name: "Implementation", type: "prompt" },
+      { name: "Format Code", type: "bash" },
+      { name: "Commit and Push", type: "bash" },
+    ]);
+    expect(agentNotes.some((line) => line.componentName === "cat /tmp/ORDER.md" && line.noteParentId)).toBe(true);
+    expect(
+      agentNotes.some(
+        (line) =>
+          line.componentType === "note" &&
+          line.componentName ===
+            "Now let's look at the messages file, factory_notification_consumer.go, and other referenced files.",
+      ),
+    ).toBe(true);
+    expect(agentNotes.some((line) => line.componentName.includes("package models"))).toBe(false);
+  });
+
   it("paints the GitHub label path on Ingest and leaves assignment idle", () => {
     const canvas = splitRunCanvasForPhase({
       id: "backlog",

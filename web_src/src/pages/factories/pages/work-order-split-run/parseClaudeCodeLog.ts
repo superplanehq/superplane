@@ -11,7 +11,6 @@ export type ClaudeCodeLogStep = {
 
 const HIDDEN_STEP_NAMES = new Set(["Prepare Claude Code"]);
 const COMMAND_DETAIL_MAX = 72;
-const NOTE_DETAIL_MAX = 96;
 const STEP_LINE = /^\$ (.+)$/;
 const TOOL_LINE = /^-> \[([^\]]+)\]\s*(.*)$/;
 const RUNNER_NOISE = /^(Claude Code (ready|started)\b|claude=|node=v|cwd=|[✓✗] |Thinking$)/;
@@ -59,7 +58,7 @@ export function parseClaudeCodeLog(
     }
     current.commands.push({
       type: "note",
-      name: cleanCommandDetail(rawLine.trim(), NOTE_DETAIL_MAX),
+      name: cleanCommandDetail(rawLine.trim()),
     });
   }
 
@@ -94,13 +93,13 @@ function typeForStep(step: ClaudeCodeLogStep, configured: Array<{ name: string; 
   return step.commands.some((command) => command.type !== "note") ? "prompt" : "bash";
 }
 
-function cleanCommandDetail(text: string, max = COMMAND_DETAIL_MAX): string {
+function cleanCommandDetail(text: string, max?: number): string {
   const trimmed = text
     .trim()
     .replace(/\s+/g, " ")
     .replace(/^\/home\/ubuntu\/superplane\//, "")
     .replace(/^\/home\/ubuntu\//, "");
-  if (trimmed.length <= max) {
+  if (max === undefined || trimmed.length <= max) {
     return trimmed;
   }
   const slice = trimmed.slice(0, max - 1);

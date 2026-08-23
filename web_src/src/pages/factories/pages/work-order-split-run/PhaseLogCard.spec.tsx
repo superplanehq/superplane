@@ -16,6 +16,9 @@ const PHASE: SplitRunPhase = {
   canvasSteps: [],
 };
 
+const LONG_NOTE =
+  "Now let me check factories.proto Delete rpc absence explicitly and PermissionTooltip component quickly, plus check showSuccessToast import paths.";
+
 function line(
   partial: Partial<SplitRunStreamLine> & Pick<SplitRunStreamLine, "id" | "componentName">,
 ): SplitRunStreamLine {
@@ -49,7 +52,7 @@ const PLANNING_STREAM: SplitRunStreamLine[] = [
     note: true,
     noteParentId: "step-write",
     noteDepth: 1,
-    componentName: "Let me examine the key files.",
+    componentName: LONG_NOTE,
     componentType: "note",
   }),
   line({
@@ -84,7 +87,7 @@ describe("groupClaudeSteps", () => {
     });
     expect(write?.events[1]).toMatchObject({
       kind: "note",
-      line: { componentName: "Let me examine the key files." },
+      line: { componentName: LONG_NOTE },
     });
     expect(write?.events[2]).toMatchObject({
       kind: "tools",
@@ -100,14 +103,14 @@ describe("PhaseLogCard collapsed stream", () => {
 
     expect(screen.getByText("Agent - Plan for GH Issue")).toBeInTheDocument();
     expect(screen.queryByText("Clone Repo")).not.toBeInTheDocument();
-    expect(screen.queryByText("Let me examine the key files.")).not.toBeInTheDocument();
+    expect(screen.queryByText(LONG_NOTE)).not.toBeInTheDocument();
 
     await user.click(screen.getByText("Agent - Plan for GH Issue"));
 
     expect(screen.getByText("Clone Repo")).toBeInTheDocument();
     expect(screen.getByText("Write Implementation Plan")).toBeInTheDocument();
     expect(screen.getByText("Use plan as output")).toBeInTheDocument();
-    expect(screen.queryByText("Let me examine the key files.")).not.toBeInTheDocument();
+    expect(screen.queryByText(LONG_NOTE)).not.toBeInTheDocument();
     expect(screen.queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();
   });
 
@@ -118,7 +121,10 @@ describe("PhaseLogCard collapsed stream", () => {
     await user.click(screen.getByText("Agent - Plan for GH Issue"));
     await user.click(screen.getByText("Write Implementation Plan"));
 
-    expect(screen.getByText("Let me examine the key files.")).toBeInTheDocument();
+    const note = screen.getByText(LONG_NOTE);
+    expect(note).toBeInTheDocument();
+    expect(note).not.toHaveClass("truncate");
+    expect(note).toHaveClass("whitespace-normal");
     expect(screen.getByRole("button", { name: "Ran 1 command" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Read 1 file" })).toBeInTheDocument();
     expect(screen.queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();

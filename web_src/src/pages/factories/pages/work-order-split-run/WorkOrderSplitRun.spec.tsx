@@ -48,7 +48,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 
-  it("collapses finished steps and expands the running component stream", () => {
+  it("collapses finished steps and expands the running component stream", async () => {
+    const user = userEvent.setup();
     renderSplitRun();
 
     const dialog = screen.getByTestId("work-order-split-run");
@@ -88,10 +89,25 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(
       within(screen.getByTestId("split-run-stream-line-create-branch")).queryByText("└──"),
     ).not.toBeInTheDocument();
-    const note = within(implement).getByText("Provide Plan");
-    expect(note.closest("li")).toHaveTextContent("├──");
+    const implementStream = screen.getByTestId("split-run-stream-implement");
+    const note = within(implementStream).getByText("Provide Plan");
+    expect(note.closest("li")).not.toHaveTextContent("├──");
+    expect(note.closest("li")).not.toHaveTextContent("└──");
     expect(note.closest("li")).toHaveTextContent("bash");
-    expect(within(screen.getByTestId("split-run-stream-implement")).getAllByText("└──").length).toBeGreaterThan(0);
+    expect(within(implementStream).getByText("Set Up Environment")).toBeInTheDocument();
+    expect(
+      within(implementStream).queryByText(
+        "Now let's look at the messages file, factory_notification_consumer.go, and other referenced files.",
+      ),
+    ).not.toBeInTheDocument();
+    await user.click(within(implementStream).getByText("Implementation"));
+    expect(
+      within(implementStream).getByText(
+        "Now let's look at the messages file, factory_notification_consumer.go, and other referenced files.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-implement")).queryByText("├──")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-implement")).queryByText("└──")).not.toBeInTheDocument();
     expect(within(implement).queryByText("did not run")).not.toBeInTheDocument();
 
     expect(screen.getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();

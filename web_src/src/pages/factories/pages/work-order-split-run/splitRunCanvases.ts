@@ -20,6 +20,7 @@ import sentryIntakeYaml from "./sentry-intake.canvas.yaml?raw";
 import slackIntakeYaml from "./slack-intake.canvas.yaml?raw";
 
 import { parseClaudeCodeLog, type ClaudeCodeLogStep } from "./parseClaudeCodeLog";
+import implementationClaudeLog from "./implementation-claude-log.txt?raw";
 import planningClaudeLog from "./planning-claude-log.txt?raw";
 import type { SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamKind, SplitRunStreamLine } from "./splitRunMocks";
 
@@ -501,10 +502,16 @@ export function claudeCodeSteps(node: ComponentsNode): Array<{ name: string; typ
   return steps;
 }
 
+const CLAUDE_CODE_LOGS: Partial<Record<SplitRunCanvasKey, string>> = {
+  planning: planningClaudeLog,
+  implementation: implementationClaudeLog,
+};
+
 function claudeCodeChildren(node: ComponentsNode, canvasKey: SplitRunCanvasKey): ClaudeCodeLogStep[] {
   const configured = claudeCodeSteps(node);
-  if (canvasKey === "planning") {
-    return parseClaudeCodeLog(planningClaudeLog, configured);
+  const log = CLAUDE_CODE_LOGS[canvasKey];
+  if (log) {
+    return parseClaudeCodeLog(log, configured);
   }
   return configured.map((step) => ({ ...step, commands: [] }));
 }

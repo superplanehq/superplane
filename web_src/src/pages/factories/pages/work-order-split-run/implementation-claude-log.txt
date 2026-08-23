@@ -1,0 +1,1275 @@
+$ Prepare Claude Code
+$ Set Up Git User
+$ Provide order
+$ Provide Plan
+$ Checkout Branch
+$ Set Up DCO Signing
+$ Set Up Environment
+$ Implementation
+Claude Code started · model=claude-sonnet-5 · cwd=/home/ubuntu/superplane
+-> [Bash] cat /tmp/ORDER.md
+-> [Bash] cat /tmp/PLAN.md
+     Root cause: setting a work order's status note (the "waiting for review" panel an automation posts, e.g. via the `setWorkOrderStatusNote` component) never triggers an email. Every other work-order mutation (status change, comment, artifact, assignment) publishes a `FactoryWorkOrderNotificationMessage` that the email worker turns into an email; `FactoryContext.SetWorkOrderStatusNote` only fires the websocket-only `order.status_note.updated` reason. Since a work order becoming "Waiting" in the UI is a *derived* display status (order stays `open`, its line dispatch just stops being active) rather than a persisted state transition, the existing `order.status.updated` / "status changes" notification never fires either. Net effect: nothing emails the assignee/creator when a line parks the order…
+     When a work order finishes implementation in my factory and Changes status to Waiting and requests Review of the assigned User, i am not receiving an email notification as it should send.
+-> [Bash] cat /home/ubuntu/superplane/pkg/models/user_notification_settings.go
+     package models
+     import (
+     	"errors"
+     	"slices"
+     	"time"
+     	"github.com/google/uuid"
+     	"gorm.io/datatypes"
+     	"gorm.io/gorm"
+     	"gorm.io/gorm/clause"
+     )
+     const (
+     	NotificationWorkspaceScopeAll      = "all"
+     	NotificationWorkspaceScopeFiltered = "filtered"
+     	NotificationWorkspaceScopeNone     = "none"
+     	NotificationTypeWorkOrderAssigned       = "work_order_assigned"
+     	NotificationTypeWorkOrderCommentOwned   = "work_order_comment_owned"
+     	NotificationTypeWorkOrderCommentCreated = "work_order_comment_created"
+     	NotificationTypeWorkOrderStatusOwned    = "work_order_status_owned"
+     	NotificationTypeWorkOrderArtifactOwned  = "work_order_artifact_owned"
+     	NotificationTypeWorkOrderMention        = "work_order_mention"
+     … (180 more lines)
+-> [Bash] sed -n '1,400p' /home/ubuntu/superplane/pkg/workers/contexts/factory_context.go
+     package contexts
+     import (
+     	"encoding/json"
+     	"errors"
+     	"fmt"
+     	"strings"
+     	"github.com/google/uuid"
+     	"github.com/superplanehq/superplane/pkg/core"
+     	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+     	"github.com/superplanehq/superplane/pkg/models"
+     	"github.com/superplanehq/superplane/pkg/models/factory"
+     	"gorm.io/gorm"
+     )
+     type FactoryContext struct {
+     	tx        *gorm.DB
+     	canvas    *models.Canvas
+     	execution *models.CanvasNodeExecution
+     	// Optional websocket fan-out callback: invoked after every successful
+     	// mutation with a `reason` string (currently the event type that was
+     	// recorded). Wired by the node executor via WithWorkOrderUpdated.
+     … (376 more lines)
+Now let's look at the messages file, factory_notification_consumer.go, and other referenced files.
+-> [Bash] cat /home/ubuntu/superplane/pkg/grpc/actions/messages/factory_work_order_notification.go
+     package messages
+     import "encoding/json"
+     // FactoryWorkOrderNotificationRoutingKey: work order activity -> FactoryNotificationConsumer -> notification emails.
+     const FactoryWorkOrderNotificationRoutingKey = "factory-work-order-notification"
+     // FactoryWorkOrderNotificationMessage carries the notification payload for
+     // one work order event. Publishers emit it after the database transaction
+     // commits, so the consumer never sees rolled-back activity. The payload is
+     // self-contained (actor, comment body, transition) to avoid re-reading the
+     // timeline and racing with later writes.
+     type FactoryWorkOrderNotificationMessage struct {
+     	OrganizationID string `json:"organization_id"`
+     	FactoryID      string `json:"factory_id"`
+     	OrderID        string `json:"order_id"`
+     	// EventType is one of the fa…
+-> [Bash] cat /home/ubuntu/superplane/pkg/workers/factory_notification_consumer.go
+     package workers
+     import (
+     	"encoding/json"
+     	"errors"
+     	"fmt"
+     	"time"
+     	"unicode/utf8"
+     	"github.com/google/uuid"
+     	"github.com/renderedtext/go-tackle"
+     	log "github.com/sirupsen/logrus"
+     	"github.com/superplanehq/superplane/pkg/database"
+     	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+     	"github.com/superplanehq/superplane/pkg/logging"
+     	"github.com/superplanehq/superplane/pkg/models"
+     	"github.com/superplanehq/superplane/pkg/models/factory"
+     	"github.com/superplanehq/superplane/pkg/services"
+     	"gorm.io/gorm"
+     )
+     const FactoryNotificationServiceName = "superplane" + "." + messages.CanvasExchange + "." + messages.FactoryWorkOrderNotificationRoutingKey + ".worker-consumer"
+     const FactoryNotificationConnectionName = "superplane"
+     … (413 more lines)
+-> [Bash] grep -n "EventTypeOrderStatusNoteUpdated\|EventTypeOrder" /home/ubuntu/superplane/pkg/models/factory/events.go
+     <tool_use_error>InputValidationError: Bash failed due to the following issue:
+     An unexpected parameter `command2` was provided</tool_use_error>
+-> [Bash] grep -n "EventTypeOrderStatusNoteUpdated\|EventTypeOrder" /home/ubuntu/superplane/pkg/models/factory/events.go
+-> [Bash] grep -rn "SetStatusNote\|FactoryWorkOrderStatusNoteParams" /home/ubuntu/superplane/pkg/models/ | head -50
+     11:	EventTypeOrderAssigneesUpdated = "order.assignees.updated"
+     12:	EventTypeOrderStatusUpdated    = "order.status.updated"
+     13:	EventTypeOrderCommentAdded     = "order.comment.added"
+     14:	EventTypeOrderArtifactAdded    = "order.artifact.added"
+     15:	// EventTypeOrderArtifactUpdated is a websocket-only notification
+     21:	EventTypeOrderArtifactUpdated = "order.artifact.updated"
+     22:	// EventTypeOrderCheckReported records every check report, including
+     26:	EventTypeOrderCheckReported = "order.check.reported"
+     27:	// EventTypeOrderStatusNoteUpdated is a websocket-only notification
+     28:	// reason (like EventTypeOrderArtifactUpdated) — it does not back a
+     32:	EventTypeOrderStatusNoteUpdated = "order.status_note.updated"
+     /home/ubuntu/superplane/pkg/models/factory_work_order_status_note_test.go:31:func TestFactoryWorkOrder_SetStatusNote_Validation(t *testing.T) {
+     /home/ubuntu/superplane/pkg/models/factory_work_order_status_note_test.go:36:	valid := FactoryWorkOrderStatusNoteParams{
+     /home/ubuntu/superplane/pkg/models/factory_work_order_status_note_test.go:46:		mutate func(params *FactoryWorkOrderStatusNoteParams)
+     /home/ubuntu/superplane/pkg/models/factory_work_order_status_note_test.go:48:		{"missing key", func(p *FactoryWorkOrderStatusNoteParams) { p.Key = "  " }},
+     /home/ubuntu/superplane/pkg/models/factory_work_order_status_note_test.go:49:		{"missing headline", func(p *FactoryWorkOrderStatusNoteParams) { p.Headline = "  " }},
+     /home/ubuntu/superplane/pkg/models/factory_work_order_status_note_test.go:50:…
+-> [Read] /home/ubuntu/superplane/pkg/models/factory_work_order_status_note.go
+     1	package models
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"errors"
+     6		"fmt"
+     7		"net/url"
+     8		"slices"
+     9		"strings"
+     10		"time"
+     11	
+     12		"github.com/superplanehq/superplane/pkg/models/factory"
+     13		"gorm.io/datatypes"
+     14		"gorm.io/gorm"
+     15		"gorm.io/gorm/clause"
+     16	)
+     17	
+     18	const (
+     19		FactoryWorkOrderStatusNoteKindInfo = factory.StatusNoteKindInfo
+     20	
+     21		MaxFactoryWorkOrderStatusNoteKeyBytes      = 255
+     22		MaxFactoryWorkOrderStatusNoteHeadlineBytes = 255
+     23	
+     24		// MaxFactoryWorkOrderStatusNoteBodyBytes caps the markdown body; a
+     … (302 more lines)
+Now let's look at the me.proto and notification_settings.go actions, and frontend notificationSettings.ts.
+-> [Bash] grep -n "NotificationSettings\|TYPE_" /home/ubuntu/superplane/protos/me.proto | head -40
+     <tool_use_error>InputValidationError: Bash failed due to the following issue:
+     An unexpected parameter `command2` was provided</tool_use_error>
+-> [Bash] grep -n "NotificationSettings\|TYPE_" /home/ubuntu/superplane/protos/me.proto
+     59:  rpc DescribeNotificationSettings(DescribeNotificationSettingsRequest) returns (DescribeNotificationSettingsResponse) {
+     70:  rpc UpdateNotificationSettings(UpdateNotificationSettingsRequest) returns (UpdateNotificationSettingsResponse) {
+     107:// NotificationSettings is a user's organization-wide configuration for
+     110:message NotificationSettings {
+     112:    TYPE_UNSPECIFIED = 0;
+     113:    TYPE_WORK_ORDER_ASSIGNED = 1;
+     114:    TYPE_WORK_ORDER_COMMENT_OWNED = 2;
+     115:    TYPE_WORK_ORDER_COMMENT_CREATED = 3;
+     116:    TYPE_WORK_ORDER_STATUS_OWNED = 4;
+     117:    TYPE_WORK_ORDER_ARTIFACT_OWNED = 5;
+     118:    TYPE_WORK_ORDER_MENTIONED = 6;
+     144:message DescribeNotificationSettingsRequest {}
+     146:message DescribeNotificationSettingsResponse {
+     147:  NotificationSettings settings = 1;
+     150:message UpdateNoti…
+-> [Bash] cat /home/ubuntu/superplane/pkg/grpc/actions/me/notification_settings.go
+     package me
+     import (
+     	"context"
+     	"errors"
+     	"fmt"
+     	"github.com/google/uuid"
+     	"github.com/superplanehq/superplane/pkg/authentication"
+     	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+     	"github.com/superplanehq/superplane/pkg/models"
+     	pb "github.com/superplanehq/superplane/pkg/protos/me"
+     	"gorm.io/gorm"
+     )
+     func currentUserID(ctx context.Context) (uuid.UUID, error) {
+     	userIDStr, ok := authentication.GetUserIdFromMetadata(ctx)
+     	if !ok {
+     		return uuid.Nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
+     	}
+     	userID, err := uuid.Parse(userIDStr)
+     	if err != nil {
+     		return uuid.Nil, grpcerrors.InvalidArgument(err, "invalid user id")
+     … (204 more lines)
+Now let's check the codegen setup (Makefile / buf) and frontend notificationSettings.ts.
+-> [Bash] grep -n "proto" /home/ubuntu/superplane/Makefile | head -30
+     <tool_use_error>InputValidationError: Bash failed due to the following issue:
+     An unexpected parameter `command2` was provided</tool_use_error>
+-> [Bash] grep -n "proto" /home/ubuntu/superplane/Makefile | head -30
+     26:GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client api/swagger/superplane.swagger.json
+     175:check.proto.field.numbers:
+     176:	bash ./scripts/check_proto_field_numbers.sh
+     329:	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
+     335:	@$(COMPOSE) exec app /app/scripts/protoc.sh $(MODULES)
+     338:	@$(COMPOSE) exec app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+     341:	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+-> [Bash] cat /home/ubuntu/superplane/web_src/src/lib/notificationSettings.ts
+     import type {
+       MeNotificationSettings,
+       MeNotificationSettingsType,
+       NotificationSettingsWorkspaceFilter,
+     } from "@/api-client";
+     export const NOTIFICATION_SETTINGS_TYPES = [
+       "TYPE_WORK_ORDER_ASSIGNED",
+       "TYPE_WORK_ORDER_COMMENT_OWNED",
+       "TYPE_WORK_ORDER_COMMENT_CREATED",
+       "TYPE_WORK_ORDER_STATUS_OWNED",
+       "TYPE_WORK_ORDER_ARTIFACT_OWNED",
+       "TYPE_WORK_ORDER_MENTIONED",
+     ] as const satisfies readonly Exclude<MeNotificationSettingsType, "TYPE_UNSPECIFIED">[];
+     export type ConfigurableNotificationType = (typeof NOTIFICATION_SETTINGS_TYPES)[number];
+     export type NotificationTypeToggles = Record<ConfigurableNotificationType, boolean>;
+     export type WorkspaceScopeForm = "all" | "filtered" | "none";
+     export interface NotificationTypeOption {
+       key: ConfigurableNotificationType;
+       label: s…
+-> [Bash] cat /home/ubuntu/superplane/scripts/protoc.sh 2>/dev/null; which protoc buf 2>/dev/null; ls /home/ubuntu/superplane/pkg/protos/me/
+     #!/bin/bash
+     << 'DOCS'
+       Generate protobuf files from internal_api definitions.
+     DOCS
+     # When DEBUG env is set - print output of the scripts.
+     if [[ -e $DEBUG ]];
+     then
+       set -x
+     fi
+     INTERNAL_OUT=pkg/protos
+     MODULE_NAME=github.com/superplanehq/superplane
+     MODULES=(${1//,/ })
+     PROTO_DIR="protos"
+     generate_proto_definition() {
+       FILE=$2
+       protoc --proto_path $PROTO_DIR/ \
+             --proto_path $PROTO_DIR/include \
+             --go-grpc_out=. \
+             --go-grpc_opt=module=$MODULE_NAME \
+     … (17 more lines)
+-> [Bash] which protoc; protoc --version 2>/dev/null; which protoc-gen-go protoc-gen-go-grpc 2>/dev/null
+     Exit code 1
+-> [Bash] grep -n "TYPE_WORK_ORDER_MENTIONED\|NotificationSettings_Type\|TYPE_UNSPECIFIED\|TYPE_WORK_ORDER" /home/ubuntu/superplane/pkg/protos/me/me.pb.go | head -80
+     29:type NotificationSettings_Type int32
+     32:	NotificationSettings_TYPE_UNSPECIFIED                NotificationSettings_Type = 0
+     33:	NotificationSettings_TYPE_WORK_ORDER_ASSIGNED        NotificationSettings_Type = 1
+     34:	NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED   NotificationSettings_Type = 2
+     35:	NotificationSettings_TYPE_WORK_ORDER_COMMENT_CREATED NotificationSettings_Type = 3
+     36:	NotificationSettings_TYPE_WORK_ORDER_STATUS_OWNED    NotificationSettings_Type = 4
+     37:	NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED  NotificationSettings_Type = 5
+     38:	NotificationSettings_TYPE_WORK_ORDER_MENTIONED       NotificationSettings_Type = 6
+     41:// Enum value maps for NotificationSettings_Type.
+     43:	NotificationSettings_Type_name = map[int32]string{
+     44:		0: "TYPE_UNSPECIFIED",
+     45:		1: "TYPE_…
+-> [Bash] apt list --installed 2>/dev/null | grep -i protobuf; apt-cache search protobuf-compiler 2>/dev/null; sudo -n true 2>&1; echo "---"; curl -sI https://github.com 2>&1 | head -5
+     libprotobuf-c1/now 1.4.1-1ubuntu4 amd64 [installed,local]
+     ---
+     HTTP/2 200 
+     date: Thu, 20 Aug 2026 17:32:11 GMT
+     content-type: text/html; charset=utf-8
+     content-language: en-US
+     vary: X-PJAX, X-PJAX-Container, Turbo-Visit, Turbo-Frame, X-Requested-With, X-GitHub-Client-Version, Accept-Language, Sec-Fetch-Site,Accept-Encoding, Accept, X-Requested-With
+We have network access. Let's try installing protoc and the go plugins.
+-> [Bash] apt-get install -y protobuf-compiler 2>&1 | tail -20; protoc --version
+     Exit code 127
+     E: Could not open lock file /var/lib/dpkg/lock-frontend - open (13: Permission denied)
+     E: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend), are you root?
+     /bin/bash: line 1: protoc: command not found
+-> [Bash] sudo apt-get update 2>&1 | tail -5; sudo apt-get install -y protobuf-compiler 2>&1 | tail -30
+     Command did not complete within its 120s timeout and was moved to the background (ID: b2aotd192). Output is being written to: /tmp/claude-1000/-home-ubuntu-superplane/c5123cc1-c1dc-46de-8f95-fdde00a9346b/tasks/b2aotd192.output. You will be notified when it completes. To check interim output, use Read on that file path.
+-> [Bash] sleep 30; cat /tmp/claude-1000/-home-ubuntu-superplane/c5123cc1-c1dc-46de-8f95-fdde00a9346b/tasks/b2aotd192.output 2>/dev/null | tail -30
+     <tool_use_error>Blocked: sleep 30 followed by: cat /tmp/claude-1000/-home-ubuntu-superplane/c5123cc1-c1dc-46de-8f95-fdde00a9346b/tasks/b2aotd192.output tail -30. To wait for a condition, use Monitor with an until-loop (e.g. `until <check>; do sleep 2; done`). To wait for a command you started, use run_in_background: true. Do not chain shorter sleeps to work around this block.</tool_use_error>
+-> [Bash] until [ -f /tmp/claude-1000/-home-ubuntu-superplane/c5123cc1-c1dc-46de-8f95-fdde00a9346b/tasks/b2aotd192.output ] && grep -q "\$" /tmp/claude-1000/-home-ubuntu-superplane/c5123cc1-c1dc-46de-8f95-fdde00a9346b/tasks/b2aotd192.output 2>/dev/null; do sleep 3; done; echo done
+     done
+-> [Bash] tail -40 /tmp/claude-1000/-home-ubuntu-superplane/c5123cc1-c1dc-46de-8f95-fdde00a9346b/tasks/b2aotd192.output; protoc --version 2>&1
+     Exit code 127
+     Get:70 http://us-east-1.ec2.archive.ubuntu.com/ubuntu noble-backports/multiverse amd64 Components [212 B]
+     Get:71 http://us-east-1.ec2.archive.ubuntu.com/ubuntu noble-backports/multiverse amd64 c-n-f Metadata [116 B]
+     Get:59 http://us-east-1.ec2.archive.ubuntu.com/ubuntu noble-backports/main Translation-en [9172 B]
+     Fetched 39.5 MB in 3min 18s (200 kB/s)
+     Reading package lists...
+     /bin/bash: line 1: protoc: command not found
+-> [Bash] jobs; ps aux | grep apt
+     ubuntu     23284  0.0  0.0   7912  3824 ?        Ss   17:32   0:00 /bin/bash -c source /home/ubuntu/.claude/shell-snapshots/snapshot-bash-1787247099503-ggnbjw.sh 2>/dev/null || true && shopt -u extglob 2>/dev/null || true && eval 'sudo apt-get update 2>&1 | tail -5; sudo apt-get install -y protobuf-compiler 2>&1 | tail -30' < /dev/null && pwd -P >| /tmp/claude-ecfa-cwd
+     root       29555  0.0  0.0  17164  7048 ?        S    17:35   0:00 sudo apt-get install -y protobuf-compiler
+     root       29557  4.0  1.0  95048 85196 ?        S    17:35   0:00 apt-get install -y protobuf-compiler
+     _apt       29581  0.0  0.1  23304  9996 ?        S    17:35   0:00 /usr/lib/apt/methods/http
+     ubuntu     29713  0.0  0.0   7912  3736 ?        Ss   17:35   0:00 /bin/bash -c source /home/ubuntu/.claude/shell-snapsho…
+Still installing. Let's wait for it in background properly.
+-> [Bash] until ! pgrep -f "apt-get install -y protobuf-compiler" >/dev/null; do sleep 3; done; echo finished; which protoc; protoc --version
+     Command did not complete within its 120s timeout and was moved to the background (ID: boz7ogvx6). Output is being written to: /tmp/claude-1000/-home-ubuntu-superplane/c5123cc1-c1dc-46de-8f95-fdde00a9346b/tasks/boz7ogvx6.output. You will be notified when it completes. To check interim output, use Read on that file path.
+-> [Bash] which protoc; protoc --version
+     /usr/bin/protoc
+     libprotoc 3.21.12
+protoc is now available. Let's check if protoc-gen-go / protoc-gen-go-grpc / protoc-gen-grpc-gateway are available or need installing.
+-> [Bash] which protoc-gen-go protoc-gen-go-grpc protoc-gen-grpc-gateway protoc-gen-openapiv2 2>&1; go env GOPATH 2>&1; cat /home/ubuntu/superplane/scripts/protoc_gateway.sh 2>/dev/null | head -30; cat /home/ubuntu/superplane/protos/include 2>/dev/null; ls /home/ubuntu/superplane/protos/include 2>/dev/null
+     /bin/bash: line 1: go: command not found
+     #!/bin/bash
+     << 'DOCS'
+       Generate gRPC-Gateway from internal_api definitions.
+       This script uses the existing HTTP annotations in the proto file.
+     DOCS
+     # When DEBUG env is set - print output of the scripts.
+     if [[ -e $DEBUG ]];
+     then
+       set -x
+     fi
+     INTERNAL_OUT=pkg/protos
+     GATEWAY_OUT=pkg/protos
+     MODULE_NAME=github.com/superplanehq/superplane
+     MODULES=(${1//,/ })
+     PROTO_DIR="protos"
+     generate_gateway_files() {
+       MODULE=$1
+       FILE=$2
+     … (9 more lines)
+-> [Bash] which go; ls /usr/local/go/bin 2>/dev/null; find / -maxdepth 4 -iname "go" -type f 2>/dev/null | head; go version 2>&1
+     Exit code 127
+     /bin/bash: line 1: go: command not found
+-> [Bash] which docker; docker ps 2>&1 | head -5; find / -maxdepth 3 -iname "go*" 2>/dev/null | grep -v proc | head -20
+     /usr/bin/docker
+     CONTAINER ID   IMAGE                                 COMMAND                  CREATED         STATUS                   PORTS                                                                                                                                                                                                                             NAMES
+     f3e09ddd9200   superplane-app                        "sleep infinity"         8 minutes ago   Up 8 minutes             0.0.0.0:4173->4173/tcp, [::]:4173->4173/tcp, 0.0.0.0:5173->5173/tcp, [::]:5173->5173/tcp, 0.0.0.0:6006->6006/tcp, [::]:6006->6006/tcp, 0.0.0.0:6060->6060/tcp, [::]:6060->6060/tcp, 0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp   superplane-app-1
+     7766737ad696   postgres:17.5                         "docker-entrypoin…
+There's a docker container with the app already set up. Let's use that to run the actual codegen (`make proto`, `make proto.gateway`, etc.), and build/test.
+-> [Bash] docker exec superplane-app-1 bash -lc "go version; which protoc protoc-gen-go protoc-gen-go-grpc protoc-gen-grpc-gateway protoc-gen-openapiv2 2>&1"
+     go version go1.26.2 linux/amd64
+     /usr/local/bin/protoc
+     /go/bin/protoc-gen-go
+     /go/bin/protoc-gen-go-grpc
+     /go/bin/protoc-gen-grpc-gateway
+     /go/bin/protoc-gen-openapiv2
+Everything needed is inside the docker container. Let's check the Makefile targets for proto generation and confirm mounting matches CWD.
+-> [Bash] docker exec superplane-app-1 bash -lc "cat /app/Makefile 2>/dev/null | sed -n '1,40p'; echo ---; ls /app | head"; sed -n '1,40p' /home/ubuntu/superplane/Makefile | grep -n "MODULES\|REST_API_MODULES"
+     .PHONY: lint test test.coverage test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status
+     MAKE=make
+     MAKEFLAGS+=--no-print-directory
+     # Auto-source local overrides from .env so host-side targets (e.g. profiling)
+     # see the same values docker compose interpolates from it. Command-line
+     # overrides still take precedence, and a missing .env file is ignored.
+     -include .env
+     export
+     DB_NAME=superplane
+     DB_PASSWORD=the-cake-is-a-lie
+     BASE_URL?=https://app.superplane.com
+     ifeq ($(DEBUG),1)
+     export BUILDKIT_PROGRESS := plain
+     else
+     export BUILDKIT_PROGRESS := quiet
+     endif
+     PKG_TEST_PACKAGES := ./pkg/...
+     E2E_TEST_PACKAGES := ./test/e2e/...
+     … (27 more lines)
+-> [Bash] docker exec superplane-app-1 bash -lc "cat /app/pkg/protos/me/me.pb.go | head -5"; echo ---; head -5 /home/ubuntu/superplane/pkg/protos/me/me.pb.go echo ---touch-test--- docker exec superplane-app-1 bash -lc "echo hello >> /app/README.md" tail -3 /home/ubuntu/superplane/README.md git -C /home/ubuntu/superplane diff README.md | tail -5 git -C /home/ubuntu/superplane checkout -- README.md
+     // Code generated by protoc-gen-go. DO NOT EDIT.
+     // versions:
+     // 	protoc-gen-go v1.36.6
+     // 	protoc        v3.15.8
+     // source: me.proto
+     ---
+     // Code generated by protoc-gen-go. DO NOT EDIT.
+     // versions:
+     // 	protoc-gen-go v1.36.6
+     // 	protoc        v3.15.8
+     // source: me.proto
+     ---touch-test---
+     - **[Discord](https://discord.superplane.com)** - Join our community for discussions, questions, and collaboration
+     - **[X](https://x.com/superplanehq)** - Follow us for updates and announcements
+     hello
+     @@ -210,3 +210,4 @@ Apache License 2.0. See `LICENSE`.
+      - **[Discord](https://discord.superplane.com)** - Join our community for discussions, questions, and collaboration
+      - **[X](https://x.com/superplanehq)** - Follow us for updates and announcements
+     +hello
+It's a proper bind mount. Now let's implement all changes. Start with backend model changes.
+-> [Edit] /home/ubuntu/superplane/pkg/models/user_notification_settings.go
+     The file /home/ubuntu/superplane/pkg/models/user_notification_settings.go has been updated successfully. (file state is current in your context — no need to Read it back)
+Now update factory events.go docs for EventTypeOrderStatusNoteUpdated.
+-> [Bash] sed -n '1,40p' /home/ubuntu/superplane/pkg/models/factory/events.go
+     package factory
+     import (
+     	"github.com/google/uuid"
+     )
+     const (
+     	// Work order events. `order.status.updated` is the sole authoritative
+     	// lifecycle event: every FSM transition emits one, enriched with the
+     	// actor / automation / originating run / app when applicable.
+     	EventTypeOrderAssigneesUpdated = "order.assignees.updated"
+     	EventTypeOrderStatusUpdated    = "order.status.updated"
+     	EventTypeOrderCommentAdded     = "order.comment.added"
+     	EventTypeOrderArtifactAdded    = "order.artifact.added"
+     	// EventTypeOrderArtifactUpdated is a websocket-only notification
+     	// reason (see FactoryContext.UpdateWorkOrderArtifact) — it does not
+     	// back a timeline event/struct. Flipping a PR artifact's state
+     	// shouldn't spam the timeline with one entry per open/draft/closed/
+     	// merged transition; the…
+-> [Edit] /home/ubuntu/superplane/pkg/models/factory/events.go
+     The file /home/ubuntu/superplane/pkg/models/factory/events.go has been updated successfully. (file state is current in your context — no need to Read it back)
+Now update the message struct to add StatusNote fields.
+-> [Edit] /home/ubuntu/superplane/pkg/grpc/actions/messages/factory_work_order_notification.go
+     The file /home/ubuntu/superplane/pkg/grpc/actions/messages/factory_work_order_notification.go has been updated successfully. (file state is current in your context — no need to Read it back)
+Now update factory_context.go SetWorkOrderStatusNote to publish the notification.
+-> [Edit] /home/ubuntu/superplane/pkg/workers/contexts/factory_context.go
+     The file /home/ubuntu/superplane/pkg/workers/contexts/factory_context.go has been updated successfully. (file state is current in your context — no need to Read it back)
+Now update factory_notification_consumer.go: add candidate case and content building.
+-> [Edit] /home/ubuntu/superplane/pkg/workers/factory_notification_consumer.go
+     The file /home/ubuntu/superplane/pkg/workers/factory_notification_consumer.go has been updated successfully. (file state is current in your context — no need to Read it back)
+Now the content-building switch:
+-> [Edit] /home/ubuntu/superplane/pkg/workers/factory_notification_consumer.go
+     The file /home/ubuntu/superplane/pkg/workers/factory_notification_consumer.go has been updated successfully. (file state is current in your context — no need to Read it back)
+-> [Bash] grep -rn "WorkOrderNotificationTemplateData" /home/ubuntu/superplane/pkg/services/*.go
+     /home/ubuntu/superplane/pkg/services/noop_email.go:14:	Data    WorkOrderNotificationTemplateData
+     /home/ubuntu/superplane/pkg/services/noop_email.go:44:	data WorkOrderNotificationTemplateData,
+     /home/ubuntu/superplane/pkg/services/smtp_email_test.go:223:	err := service.SendWorkOrderNotificationEmail("user@example.com", "[SP-42] New comment", WorkOrderNotificationTemplateData{
+     /home/ubuntu/superplane/pkg/services/smtp_email_test.go:242:		err := service.SendWorkOrderNotificationEmail("user@example.com", "[SP-1] Update", WorkOrderNotificationTemplateData{
+     /home/ubuntu/superplane/pkg/services/smtp_email_test.go:256:		err := service.SendWorkOrderNotificationEmail("user@example.com", "[SP-1] Update", WorkOrderNotificationTemplateData{
+     /home/ubuntu/superplane/pkg/services/smtp_email_test.go:284:	w…
+-> [Read] /home/ubuntu/superplane/pkg/services/email.go
+     1	package services
+     2	
+     3	import (
+     4		"bytes"
+     5		"fmt"
+     6		htmltemplate "html/template"
+     7		"path/filepath"
+     8		"strings"
+     9		texttemplate "text/template"
+     10	
+     11		"github.com/resend/resend-go/v3"
+     12		log "github.com/sirupsen/logrus"
+     13	)
+     14	
+     15	type EmailService interface {
+     16		SendMagicCodeEmail(toEmail, code, magicLink string) error
+     17		SendWorkOrderNotificationEmail(toEmail, subject string, data WorkOrderNotificationTemplateData) error
+     18	}
+     19	
+     20	type MagicCodeTemplateData struct {
+     21		Code      string
+     22		MagicLink string
+     23	}
+     24	
+     … (144 more lines)
+-> [Bash] find /home/ubuntu/superplane -path "*email/work_order_notification*"
+     /home/ubuntu/superplane/templates/email/work_order_notification.html
+     /home/ubuntu/superplane/templates/email/work_order_notification.txt
+-> [Bash] cat /home/ubuntu/superplane/templates/email/work_order_notification.txt; echo ===HTML===; cat /home/ubuntu/superplane/templates/email/work_order_notification.html
+     {{.Summary}}
+     {{.StatusLabel}}  {{.WorkOrderKey}}
+     {{.WorkOrderTitle}}
+     {{if .LineStepLabel}}{{.LineStepLabel}}
+     {{end}}{{.UpdatedLabel}}
+     {{if .Detail}}
+     {{.Detail}}
+     {{end}}
+     Open the work order in SuperPlane:
+     {{.WorkOrderLink}}
+     You receive this email because of your notification settings in SuperPlane. To change them, open workspace settings and select Notifications.
+     Best regards,
+     The SuperPlane Team
+     ===HTML===
+     <!DOCTYPE html>
+     <html lang="en">
+     <head>
+         <meta charset="UTF-8">
+         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+         <title>Work order update</title>
+         <style>
+     … (204 more lines)
+-> [Edit] /home/ubuntu/superplane/pkg/workers/factory_notification_consumer.go
+     The file /home/ubuntu/superplane/pkg/workers/factory_notification_consumer.go has been updated successfully. (file state is current in your context — no need to Read it back)
+Now update proto file, notification_settings.go mapping.
+-> [Bash] sed -n '100,125p' /home/ubuntu/superplane/protos/me.proto
+       repeated string groups = 9;
+     }
+     message RegenerateTokenResponse {
+       string token = 1;
+     }
+     // NotificationSettings is a user's organization-wide configuration for
+     // work order notification emails. A missing row defaults to all
+     // workspace events. Nested `workspaces` leaves room for other levels later.
+     message NotificationSettings {
+       enum Type {
+         TYPE_UNSPECIFIED = 0;
+         TYPE_WORK_ORDER_ASSIGNED = 1;
+         TYPE_WORK_ORDER_COMMENT_OWNED = 2;
+         TYPE_WORK_ORDER_COMMENT_CREATED = 3;
+         TYPE_WORK_ORDER_STATUS_OWNED = 4;
+         TYPE_WORK_ORDER_ARTIFACT_OWNED = 5;
+         TYPE_WORK_ORDER_MENTIONED = 6;
+       }
+       enum WorkspaceScope {
+         WORKSPACE_SCOPE_UNSPECIFIED = 0;
+         WORKSPACE_SCOPE_ALL = 1;
+     … (2 more lines)
+-> [Edit] /home/ubuntu/superplane/protos/me.proto
+     The file /home/ubuntu/superplane/protos/me.proto has been updated successfully. (file state is current in your context — no need to Read it back)
+-> [Edit] /home/ubuntu/superplane/pkg/grpc/actions/me/notification_settings.go
+     The file /home/ubuntu/superplane/pkg/grpc/actions/me/notification_settings.go has been updated successfully. (file state is current in your context — no need to Read it back)
+Now check what modules the proto/openapi generation commands expect ("MODULES") and rerun codegen inside docker.
+-> [Bash] grep -n "^MODULES\|^REST_API_MODULES\|proto\.gen\|proto\.gateway\|openapi" /home/ubuntu/superplane/Makefile | head -40
+     26:GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client api/swagger/superplane.swagger.json
+     27:OPENAPI_GENERATOR_IMAGE := openapitools/openapi-generator-cli:v7.13.0
+     323:MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents,usage,runners
+     324:REST_API_MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents
+     330:	$(MAKE) openapi.spec.gen
+     331:	$(MAKE) openapi.client.gen
+     332:	$(MAKE) openapi.web.client.gen
+     340:openapi.spec.gen: dev.test.is.running
+     341:	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)…
+-> [Bash] sed -n '300,345p' /home/ubuntu/superplane/Makefile
+     	$(MAKE) db.create DB_NAME=superplane_test
+     	$(MAKE) db.migrate DB_NAME=superplane_dev
+     	$(MAKE) db.migrate DB_NAME=superplane_test
+     #
+     # Protobuf / OpenAPI codegen runs in the running `app` container (`make dev.up` first).
+     #
+     gen:
+     	$(MAKE) pb.gen
+     	$(MAKE) format.go
+     	$(MAKE) format.js
+     	$(MAKE) gen.components.docs
+     gen.components.docs:
+     	rm -rf docs/components
+     	go run scripts/generate_components_docs.go
+     check.components.docs:
+     	rm -rf docs/components
+     	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
+     	git diff --exit-code docs/components
+     MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents,usage,runners
+     … (22 more lines)
+-> [Bash] grep -n "dev.test.is.running" -A5 Makefile | head -20
+     98:dev.test.is.running:
+     99-	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
+     100-
+     101-dev.up:
+     102-	@mkdir -p tmp/screenshots
+     103-	$(COMPOSE) up -d --wait --build --pull always --quiet-pull
+     --
+     106:	@$(MAKE) dev.test.is.running
+     107-	$(MAKE) dev.setup.npm
+     108-	$(MAKE) pb.gen
+     109-	$(MAKE) dev.setup.go
+     110-	$(MAKE) db.create DB_NAME=superplane_dev
+     111-	$(MAKE) db.migrate DB_NAME=superplane_dev
+     --
+     123:	@$(MAKE) dev.test.is.running
+     124-	$(COMPOSE) exec app go clean -modcache -cache
+     125-
+     126-dev.setup.no.cache:
+     127-	rm -rf tmp
+     128-	$(COMPOSE) down -v --remove-orphans
+-> [Bash] make dev.test.is.running 2>&1
+     (Bash completed with no output)
+Good, it works. Let's run `make pb.gen.models` and `pb.gen.gateway` (skip full openapi client gen for time reasons, but check if we need it too since web_src uses api-client).
+-> [Bash] timeout 300 make pb.gen.models 2>&1 | tail -60
+     (Bash completed with no output)
+-> [Bash] git -C /home/ubuntu/superplane status --porcelain | head -30; git -C /home/ubuntu/superplane diff --stat pkg/protos | tail -10
+      M pkg/grpc/actions/me/notification_settings.go
+      M pkg/grpc/actions/messages/factory_work_order_notification.go
+      M pkg/models/factory/events.go
+      M pkg/models/user_notification_settings.go
+      M pkg/workers/contexts/factory_context.go
+      M pkg/workers/factory_notification_consumer.go
+      M protos/me.proto
+-> [Bash] grep -n "protos\|openapi_client\|api-client" /home/ubuntu/superplane/.gitignore
+     30:/pkg/protos/
+     31:/pkg/openapi_client/
+     32:/web_src/src/api-client/
+-> [Bash] grep -n "STATUS_NOTE_OWNED" /home/ubuntu/superplane/pkg/protos/me/me.pb.go
+     39:	NotificationSettings_TYPE_WORK_ORDER_STATUS_NOTE_OWNED NotificationSettings_Type = 7
+     52:		7: "TYPE_WORK_ORDER_STATUS_NOTE_OWNED",
+     62:		"TYPE_WORK_ORDER_STATUS_NOTE_OWNED": 7,
+     767:	"!TYPE_WORK_ORDER_STATUS_NOTE_OWNED\x10\a\"\x82\x01\n" +
+Regeneration worked. Since pkg/protos is gitignored, I don't need to worry about committing it, but should gofmt. Let's also run pb.gen.gateway and check for gw file diffs (not needed since me.proto has no new gateway routes, but let's run to keep consistent), and check if openapi client regen is needed for frontend.
+-> [Bash] timeout 300 make pb.gen.gateway 2>&1 | tail -60
+     (Bash completed with no output)
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app && find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
+     (Bash completed with no output)
+Now let's check the openapi spec + web client generation, since those are also gitignored but needed for the frontend api-client types used by notificationSettings.ts.
+-> [Bash] grep -n "TYPE_WORK_ORDER" /home/ubuntu/superplane/web_src/src/api-client/*.ts 2>/dev/null | head -20
+     /home/ubuntu/superplane/web_src/src/api-client/types.gen.ts:1696:  | "TYPE_WORK_ORDER_ASSIGNED"
+     /home/ubuntu/superplane/web_src/src/api-client/types.gen.ts:1697:  | "TYPE_WORK_ORDER_COMMENT_OWNED"
+     /home/ubuntu/superplane/web_src/src/api-client/types.gen.ts:1698:  | "TYPE_WORK_ORDER_COMMENT_CREATED"
+     /home/ubuntu/superplane/web_src/src/api-client/types.gen.ts:1699:  | "TYPE_WORK_ORDER_STATUS_OWNED"
+     /home/ubuntu/superplane/web_src/src/api-client/types.gen.ts:1700:  | "TYPE_WORK_ORDER_ARTIFACT_OWNED"
+     /home/ubuntu/superplane/web_src/src/api-client/types.gen.ts:1701:  | "TYPE_WORK_ORDER_MENTIONED";
+It exists already generated (mounted repo). Let's regenerate the openapi spec/client to include the new type.
+-> [Bash] timeout 300 make openapi.spec.gen 2>&1 | tail -60
+     (Bash completed with no output)
+-> [Bash] grep -n "TYPE_WORK_ORDER" /home/ubuntu/superplane/api/swagger/superplane.swagger.json
+     8811:        "TYPE_WORK_ORDER_ASSIGNED",
+     8812:        "TYPE_WORK_ORDER_COMMENT_OWNED",
+     8813:        "TYPE_WORK_ORDER_COMMENT_CREATED",
+     8814:        "TYPE_WORK_ORDER_STATUS_OWNED",
+     8815:        "TYPE_WORK_ORDER_ARTIFACT_OWNED",
+     8816:        "TYPE_WORK_ORDER_MENTIONED",
+     8817:        "TYPE_WORK_ORDER_STATUS_NOTE_OWNED"
+Now regen openapi client (Go) and web client (TS). Check timing constraints - these use docker images, might take a while. Let's run with longer timeout in background.
+-> [Bash] sed -n '340,380p' /home/ubuntu/superplane/Makefile
+     openapi.spec.gen: dev.test.is.running
+     	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+     openapi.client.gen: dev.test.is.running
+     	@rm -rf pkg/openapi_client
+     	@./scripts/docker-pull-retry $(OPENAPI_GENERATOR_IMAGE)
+     	@log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+     	if ! docker run --rm --user $(shell id -u):$(shell id -g) \
+     		-v ${PWD}:/local $(OPENAPI_GENERATOR_IMAGE) generate \
+     		-i /local/api/swagger/superplane.swagger.json \
+     		-g go \
+     		-o /local/pkg/openapi_client \
+     		--additional-properties=packageName=openapi_client,enumClassPrefix=true,isGoSubmodule=true,withGoMod=false \
+     		>"$$log" 2>&1; then cat "$$log"; exit 1; fi
+     	@rm -rf pkg/openapi_client/test
+     	@rm -rf pkg/openapi_client/docs
+     	@rm -rf pkg/openapi_client/api
+     	@rm -rf pkg/openapi_client/.travis.yml
+     	@rm…
+-> [Bash] make openapi.client.gen > /tmp/openapi_client_gen.log 2>&1 & echo $!
+     38722
+-> [Bash] until ! kill -0 38722 2>/dev/null; do sleep 3; done; tail -60 /tmp/openapi_client_gen.log
+     (Bash completed with no output)
+-> [Bash] wait 38722 2>/dev/null; echo exit:$?; tail -80 /tmp/openapi_client_gen.log; ls /home/ubuntu/superplane/pkg/openapi_client | head
+     exit:127
+     api_action.go
+     api_agent.go
+     api_api_keys.go
+     api_canvas.go
+     api_canvas_event.go
+     api_canvas_folder.go
+     api_canvas_node.go
+     api_canvas_node_execution.go
+     api_canvas_repository.go
+     api_canvas_run.go
+Good, it completed (exit 127 is just because it's not a child job of this shell, ignore). Let's verify content:
+-> [Bash] grep -rn "TYPE_WORK_ORDER_STATUS_NOTE_OWNED" /home/ubuntu/superplane/pkg/openapi_client/ | head
+     /home/ubuntu/superplane/pkg/openapi_client/model_me_notification_settings_type.go:31:	MENOTIFICATIONSETTINGSTYPE_TYPE_WORK_ORDER_STATUS_NOTE_OWNED MeNotificationSettingsType = "TYPE_WORK_ORDER_STATUS_NOTE_OWNED"
+     /home/ubuntu/superplane/pkg/openapi_client/model_me_notification_settings_type.go:43:	"TYPE_WORK_ORDER_STATUS_NOTE_OWNED",
+Now the web client generation.
+-> [Bash] timeout 300 make openapi.web.client.gen 2>&1 | tail -60
+     (Bash completed with no output)
+-> [Bash] grep -n "TYPE_WORK_ORDER_STATUS_NOTE_OWNED" /home/ubuntu/superplane/web_src/src/api-client/types.gen.ts
+     1702:  | "TYPE_WORK_ORDER_STATUS_NOTE_OWNED";
+All codegen worked. Now update the frontend `notificationSettings.ts` and `set_work_order_status_note.go` documentation.
+-> [Edit] /home/ubuntu/superplane/web_src/src/lib/notificationSettings.ts
+     The file /home/ubuntu/superplane/web_src/src/lib/notificationSettings.ts has been updated successfully. (file state is current in your context — no need to Read it back)
+-> [Edit] /home/ubuntu/superplane/web_src/src/lib/notificationSettings.ts
+     The file /home/ubuntu/superplane/web_src/src/lib/notificationSettings.ts has been updated successfully. (file state is current in your context — no need to Read it back)
+Now check for a spec/test file for notificationSettings.ts and FactorySettingsNotificationsPage.
+-> [Bash] grep -rln "NOTIFICATION_SETTINGS_TYPES\|NOTIFICATION_TYPE_OPTIONS\|TYPE_WORK_ORDER_MENTIONED" /home/ubuntu/superplane/web_src/src --include="*.test.*" --include="*.spec.*"
+     /home/ubuntu/superplane/web_src/src/lib/notificationSettings.spec.ts
+-> [Bash] cat /home/ubuntu/superplane/web_src/src/lib/notificationSettings.spec.ts
+     import { describe, expect, it } from "vitest";
+     import {
+       defaultNotificationSettings,
+       defaultNotificationTypeToggles,
+       eventTypesFromToggles,
+       filtersFromSettings,
+       NOTIFICATION_TYPE_OPTIONS,
+       togglesFromAllScopeEventTypes,
+       togglesFromEventTypes,
+       workspaceScopeFromSettings,
+     } from "./notificationSettings";
+     describe("notificationSettings", () => {
+       it("defaults to all workspaces", () => {
+         const settings = defaultNotificationSettings();
+         expect(settings.workspaces?.scope).toBe("WORKSPACE_SCOPE_ALL");
+         expect(settings.workspaces?.filters).toEqual([]);
+         expect(workspaceScopeFromSettings(undefined)).toBe("all");
+         expect(defaultNotificationTypeToggles().TYPE_WORK_ORDER_MENTIONED).toBe(true);
+       });
+       it("treats a missing all-scope type list as every type on", () =>…
+-> [Edit] /home/ubuntu/superplane/web_src/src/lib/notificationSettings.spec.ts
+     The file /home/ubuntu/superplane/web_src/src/lib/notificationSettings.spec.ts has been updated successfully. (file state is current in your context — no need to Read it back)
+Now let's check FactorySettingsNotificationsPage.tsx for any explicit enumeration.
+-> [Bash] grep -n "TYPE_WORK_ORDER\|NOTIFICATION_TYPE_OPTIONS\|NOTIFICATION_SETTINGS_TYPES" /home/ubuntu/superplane/web_src/src/pages/FactorySettingsNotificationsPage.tsx 2>/dev/null; find /home/ubuntu/superplane/web_src -iname "*NotificationsPage*"
+     /home/ubuntu/superplane/web_src/src/pages/factories/pages/settings/FactorySettingsNotificationsPage.spec.tsx
+     /home/ubuntu/superplane/web_src/src/pages/factories/pages/settings/FactorySettingsNotificationsPage.tsx
+-> [Bash] grep -n "TYPE_WORK_ORDER\|NOTIFICATION_TYPE_OPTIONS\|NOTIFICATION_SETTINGS_TYPES\|options\.length\|toHaveLength" /home/ubuntu/superplane/web_src/src/pages/factories/pages/settings/FactorySettingsNotificationsPage.tsx /home/ubuntu/superplane/web_src/src/pages/factories/pages/settings/FactorySettingsNotificationsPage.spec.tsx
+     /home/ubuntu/superplane/web_src/src/pages/factories/pages/settings/FactorySettingsNotificationsPage.tsx:14:  NOTIFICATION_TYPE_OPTIONS,
+     /home/ubuntu/superplane/web_src/src/pages/factories/pages/settings/FactorySettingsNotificationsPage.tsx:431:        {NOTIFICATION_TYPE_OPTIONS.map((option) => (
+     /home/ubuntu/superplane/web_src/src/pages/factories/pages/settings/FactorySettingsNotificationsPage.spec.tsx:21:    filters: [{ workspaceId: REFUND_FACTORY.id, eventTypes: ["TYPE_WORK_ORDER_ASSIGNED"] }],
+     /home/ubuntu/superplane/web_src/src/pages/factories/pages/settings/FactorySettingsNotificationsPage.spec.tsx:93:    expect(screen.getByTestId(`notifications-type-${REFUND_FACTORY.id}-TYPE_WORK_ORDER_ASSIGNED`)).toBeInTheDocument();
+Good, generic rendering, no changes needed there. Now let's update the component documentation for `setWorkOrderStatusNote`.
+-> [Bash] grep -n "Documentation\|func " /home/ubuntu/superplane/pkg/components/factory/set_work_order_status_note.go | head -20
+     14:func init() {
+     30:func (c *SetWorkOrderStatusNote) Name() string {
+     34:func (c *SetWorkOrderStatusNote) Label() string {
+     38:func (c *SetWorkOrderStatusNote) Description() string {
+     42:func (c *SetWorkOrderStatusNote) Documentation() string {
+     55:func (c *SetWorkOrderStatusNote) Icon() string {
+     59:func (c *SetWorkOrderStatusNote) Color() string {
+     63:func (c *SetWorkOrderStatusNote) ExampleOutput() map[string]any {
+     80:func (c *SetWorkOrderStatusNote) OutputChannels(configuration any) []core.OutputChannel {
+     84:func (c *SetWorkOrderStatusNote) Configuration() []configuration.Field {
+     139:func (c *SetWorkOrderStatusNote) Execute(ctx core.ExecutionContext) error {
+     167:func (c *SetWorkOrderStatusNote) Setup(ctx core.SetupContext) error {
+     171:func (c *SetWorkOrderStatusNote) Cancel(ctx core.Executi…
+-> [Bash] sed -n '1,60p' /home/ubuntu/superplane/pkg/components/factory/set_work_order_status_note.go
+     package factory
+     import (
+     	"net/http"
+     	"github.com/go-viper/mapstructure/v2"
+     	"github.com/superplanehq/superplane/pkg/configuration"
+     	"github.com/superplanehq/superplane/pkg/core"
+     	"github.com/superplanehq/superplane/pkg/registry"
+     )
+     const SetWorkOrderStatusNoteComponentName = "setWorkOrderStatusNote"
+     func init() {
+     	registry.RegisterAction(SetWorkOrderStatusNoteComponentName, &SetWorkOrderStatusNote{})
+     }
+     type SetWorkOrderStatusNote struct{}
+     type SetWorkOrderStatusNoteConfiguration struct {
+     	OrderID             string `json:"orderId" mapstructure:"orderId"`
+     	NoteKey             string `json:"noteKey" mapstructure:"noteKey"`
+     	Headline            string `json:"headline" mapstructure:"headline"`
+     	Body                string `json:"body" mapstructure:"body"`
+     … (36 more lines)
+-> [Edit] /home/ubuntu/superplane/pkg/components/factory/set_work_order_status_note.go
+     The file /home/ubuntu/superplane/pkg/components/factory/set_work_order_status_note.go has been updated successfully. (file state is current in your context — no need to Read it back)
+-> [Bash] grep -rln "setWorkOrderStatusNote\|Set Work Order Status Note" /home/ubuntu/superplane/docs 2>/dev/null
+     /home/ubuntu/superplane/docs/components/Core.mdx
+-> [Bash] grep -n "setWorkOrderStatusNote" -A3 -B3 /home/ubuntu/superplane/docs/components/Core.mdx | head -20
+     1586-
+     1587-## Set Work Order Status Note
+     1588-
+     1589:**Component key:** `setWorkOrderStatusNote`
+     1590-
+     1591-The Set Work Order Status Note component announces what a waiting work order is blocked on and what resolves it. The note shows as a "next step" panel on the work order page — for example, a PR watcher can announce "Review the pull request: when it merges, this work order completes automatically."
+     1592-
+This is auto-generated docs (docs/components); regenerate via the make target.
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app && rm -rf docs/components && go run scripts/generate_components_docs.go" 2>&1 | tail -40
+     (Bash completed with no output)
+-> [Bash] git -C /home/ubuntu/superplane diff --stat docs; grep -n "Setting a note also emails" /home/ubuntu/superplane/docs/components/Core.mdx
+      docs/components/Core.mdx | 2 ++
+      1 file changed, 2 insertions(+)
+     1602:Setting a note also emails the work order's owners and creator (excluding whoever triggered the run), so they know it's waiting on their review — every set sends a fresh email, including one that just updates an existing note's body. Recipients can turn this off in their notification settings without affecting other work order emails.
+Now let's check `me.proto` docs for a "changelog" note or the openapi_client golden test check.
+-> [Bash] grep -rn "check_proto_field_numbers\|check.generated.artifacts" /home/ubuntu/superplane/Makefile
+     /home/ubuntu/superplane/Makefile:1:.PHONY: lint test test.coverage test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status
+     /home/ubuntu/superplane/Makefile:176:	bash ./scripts/check_proto_field_numbers.sh
+     /home/ubuntu/superplane/Makefile:227:check.generated.artifacts:
+Now let's run gofmt on our Go changes and build. Let's check the source files we edited for formatting issues (misaligned const block).
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app && gofmt -l ./pkg/... 2>&1 | grep -v '^pkg/protos\|^pkg/openapi_client'"
+     lstat ./pkg/...: no such file or directory
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app && gofmt -l pkg/... 2>&1 | grep -v '^pkg/protos\|^pkg/openapi_client'"
+     lstat pkg/...: no such file or directory
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app && gofmt -l pkg 2>&1 | grep -v '^pkg/protos\|^pkg/openapi_client'"
+     pkg/grpc/actions/me/notification_settings.go
+     pkg/models/user_notification_settings.go
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app && gofmt -w pkg/grpc/actions/me/notification_settings.go pkg/models/user_notification_settings.go && gofmt -l pkg 2>&1 | grep -v '^pkg/protos\|^pkg/openapi_client'"
+     Exit code 1
+Good, gofmt exits 1 for grep finding nothing (no more unformatted files). Let's view the diffs.
+-> [Bash] git -C /home/ubuntu/superplane diff pkg/models/user_notification_settings.go pkg/grpc/actions/me/notification_settings.go
+     diff --git a/pkg/grpc/actions/me/notification_settings.go b/pkg/grpc/actions/me/notification_settings.go
+     index 019d2ce..50ae70c 100644
+     --- a/pkg/grpc/actions/me/notification_settings.go
+     +++ b/pkg/grpc/actions/me/notification_settings.go
+     @@ -104,12 +104,13 @@ func notificationTypesFromProto(eventTypes []pb.NotificationSettings_Type) ([]st
+      }
+      var notificationTypeProto = map[string]pb.NotificationSettings_Type{
+     -	models.NotificationTypeWorkOrderAssigned:       pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED,
+     -	models.NotificationTypeWorkOrderCommentOwned:   pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED,
+     -	models.NotificationTypeWorkOrderCommentCreated: pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_CREATED,
+     -	models.NotificationTypeWorkOrderStatusOwned:    pb.NotificationSetting…
+Now let's build to make sure everything compiles.
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app && go build ./... 2>&1 | tail -100"
+     # github.com/superplanehq/superplane/scripts
+     scripts/check_example_payloads.go:10:6: main redeclared in this block
+     	scripts/check_configuration_fields.go:17:6: other declaration of main
+     scripts/check_go_coverage_budget.go:18:2: defaultBaselinePath redeclared in this block
+     	scripts/check_configuration_fields.go:15:7: other declaration of defaultBaselinePath
+     scripts/check_go_coverage_budget.go:59:6: main redeclared in this block
+     	scripts/check_configuration_fields.go:17:6: other declaration of main
+     scripts/check_go_coverage_budget.go:243:6: readBaseline redeclared in this block
+     	scripts/check_configuration_fields.go:96:6: other declaration of readBaseline
+     scripts/check_go_coverage_budget.go:261:6: writeBaseline redeclared in this block
+     	scripts/check_configuration_fields.go:120:6: other dec…
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app && go build ./pkg/... 2>&1 | tail -100"
+     (Bash completed with no output)
+Builds cleanly. Now let's run the relevant tests.
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app && go vet ./pkg/models/... ./pkg/workers/... ./pkg/grpc/... 2>&1 | tail -100"
+     (Bash completed with no output)
+-> [Bash] grep -n "status change notifies owners and creator" -A60 /home/ubuntu/superplane/pkg/workers/factory_notification_consumer_test.go | head -100
+     233:	t.Run("status change notifies owners and creator", func(t *testing.T) {
+     234-		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+     235-			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+     236-		})
+     237-
+     238-		emailService := services.NewNoopEmailService()
+     239-		consume(t, newConsumer(emailService), messages.FactoryWorkOrderNotificationMessage{
+     240-			OrganizationID: r.Organization.ID.String(),
+     241-			FactoryID:      factoryModel.ID.String(),
+     242-			OrderID:        order.ID.String(),
+     243-			EventType:      factoryevents.EventTypeOrderStatusUpdated,
+     244-			FromState:      models.FactoryWorkOrderStateOpen,
+     245-			ToState:        models.FactoryWorkOrderStateClosed,
+     246-			Result:         models.FactoryWorkOrderResultCompleted,
+     247-		})
+     248-
+     249-		sent := emailServic…
+Let's view the whole test file to understand setup (owner, creator, factoryModel, order, enableNotifications, etc.) and where to best insert new tests.
+-> [Bash] sed -n '1,120p' /home/ubuntu/superplane/pkg/workers/factory_notification_consumer_test.go
+     package workers
+     import (
+     	"encoding/json"
+     	"testing"
+     	"github.com/google/uuid"
+     	"github.com/renderedtext/go-tackle"
+     	"github.com/stretchr/testify/assert"
+     	"github.com/stretchr/testify/require"
+     	"github.com/superplanehq/superplane/pkg/database"
+     	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+     	"github.com/superplanehq/superplane/pkg/models"
+     	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+     	"github.com/superplanehq/superplane/pkg/services"
+     	"github.com/superplanehq/superplane/test/support"
+     )
+     func Test__FactoryNotificationConsumer(t *testing.T) {
+     	r := support.Setup(t)
+     	db := database.Conn()
+     	owner := support.CreateUser(t, r, r.Organization.ID)
+     	creator := support.CreateUser(t, r, r.Organization.ID)
+     … (96 more lines)
+-> [Bash] wc -l /home/ubuntu/superplane/pkg/workers/factory_notification_consumer_test.go; sed -n '120,235p' /home/ubuntu/superplane/pkg/workers/factory_notification_consumer_test.go
+     296 /home/ubuntu/superplane/pkg/workers/factory_notification_consumer_test.go
+     		assert.ElementsMatch(t, []string{mentioned.GetEmail(), owner.GetEmail()}, recipients)
+     	})
+     	t.Run("filtered type list without mentions blocks the mention email", func(t *testing.T) {
+     		mentioned := support.CreateUser(t, r, r.Organization.ID)
+     		enableNotifications(t, mentioned.ID, models.UserNotificationSettingsParams{
+     			WorkspaceScope: models.NotificationWorkspaceScopeFiltered,
+     			WorkspaceFilters: []models.NotificationWorkspaceFilter{{
+     				WorkspaceID: factoryModel.ID.String(),
+     				EventTypes:  []string{models.NotificationTypeWorkOrderAssigned},
+     			}},
+     		})
+     		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+     			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+     		})
+     		emailService :…
+-> [Bash] sed -n '256,296p' /home/ubuntu/superplane/pkg/workers/factory_notification_consumer_test.go
+     	})
+     	t.Run("soft-deleted members are not emailed", func(t *testing.T) {
+     		left := support.CreateUser(t, r, r.Organization.ID)
+     		enableNotifications(t, left.ID, models.UserNotificationSettingsParams{
+     			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+     		})
+     		require.NoError(t, left.Delete())
+     		emailService := services.NewNoopEmailService()
+     		consume(t, newConsumer(emailService), messages.FactoryWorkOrderNotificationMessage{
+     			OrganizationID:  r.Organization.ID.String(),
+     			FactoryID:       factoryModel.ID.String(),
+     			OrderID:         order.ID.String(),
+     			EventType:       factoryevents.EventTypeOrderAssigneesUpdated,
+     			ActorUserID:     creator.ID.String(),
+     			AssignedUserIDs: []string{left.ID.String()},
+     		})
+     		for _, email := range emailService.SentWorkOrderNotificationEmails()…
+Now insert a new subtest after "status change notifies owners and creator" for status notes.
+-> [Edit] /home/ubuntu/superplane/pkg/workers/factory_notification_consumer_test.go
+     The file /home/ubuntu/superplane/pkg/workers/factory_notification_consumer_test.go has been updated successfully. (file state is current in your context — no need to Read it back)
+Now let's add a test for factory_context.go SetWorkOrderStatusNote invoking the notification callback. Check if factory_context_test.go exists.
+-> [Bash] ls /home/ubuntu/superplane/pkg/workers/contexts/
+     app_context.go
+     app_context_test.go
+     app_execution_context.go
+     app_execution_context_test.go
+     auth_reader.go
+     canvas_memory_context.go
+     canvas_memory_context_test.go
+     capability_context.go
+     capability_context_test.go
+     event_context.go
+     event_context_test.go
+     execution_metadata_context.go
+     execution_output_lookup.go
+     execution_output_lookup_test.go
+     execution_request_context.go
+     execution_request_context_test.go
+     execution_state_context.go
+     execution_state_context_test.go
+     expression_context.go
+     factory_context.go
+     factory_context_test.go
+     integration_context.go
+     integration_context_test.go
+     integration_property_storage.go
+     … (23 more lines)
+-> [Bash] grep -n "SetWorkOrderStatusNote\|AddWorkOrderComment\|onWorkOrderNotification\|WithWorkOrderNotification" /home/ubuntu/superplane/pkg/workers/contexts/factory_context_test.go
+     266:func TestFactoryContext_AddWorkOrderComment_EmptyOrderIDIsRejected(t *testing.T) {
+     276:	err = ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
+     353:func TestFactoryContext_AddWorkOrderComment_ExplicitOrderIDOnUnattachedRun(t *testing.T) {
+     366:	require.NoError(t, ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
+     534:func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
+     548:	require.NoError(t, ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
+     574:func TestFactoryContext_AddWorkOrderComment_EmitsNotification(t *testing.T) {
+     588:		WithWorkOrderNotification(func(notification messages.FactoryWorkOrderNotificationMessage) {
+     592:	require.NoError(t, ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
+-> [Bash] sed -n '534,640p' /home/ubuntu/superplane/pkg/workers/contexts/factory_context_test.go
+     func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
+     	r := support.Setup(t)
+     	defer r.Close()
+     	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+     	require.NoError(t, err)
+     	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+     	order, err := factory.CreateWorkOrder(database.Conn(), "Comment target", "", &r.User, nil, nil)
+     	require.NoError(t, err)
+     	line := linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+     	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+     	require.NoError(t, ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
+     		OrderID: order.ID.String(),
+     		Body:    "Ready for review",
+     	}))
+     	commentEvent := findWorkOrderEvent(t, order, "order.comment.added")
+     	var payload struct {…
+-> [Bash] grep -n "SetWorkOrderStatusNote\|func TestFactoryContext_SetWorkOrderStatusNote" /home/ubuntu/superplane/pkg/workers/contexts/factory_context_test.go
+     (Bash completed with no output)
+-> [Bash] grep -n "func (o \*FactoryWorkOrder) CreateWorkOrder\|FactoryWorkOrderStateOpen\|func.*CreateWorkOrder" /home/ubuntu/superplane/pkg/models/factory_work_order.go | head -20
+     19:	FactoryWorkOrderStateOpen   = "open"
+     35:		FactoryWorkOrderStateOpen,
+     44:		FactoryWorkOrderStateOpen: {
+     55:		FactoryWorkOrderStateDraft:  {FactoryWorkOrderStateOpen, FactoryWorkOrderStateClosed},
+     56:		FactoryWorkOrderStateOpen:   {FactoryWorkOrderStateClosed, FactoryWorkOrderStateDraft},
+     57:		FactoryWorkOrderStateClosed: {FactoryWorkOrderStateOpen},
+     94:	return o.State == FactoryWorkOrderStateOpen
+     104:	return o.State == FactoryWorkOrderStateDraft || o.State == FactoryWorkOrderStateOpen
+     273:		if fromState == FactoryWorkOrderStateOpen && toState == FactoryWorkOrderStateDraft {
+     308:		if fromState == FactoryWorkOrderStateDraft && toState == FactoryWorkOrderStateOpen && o.SourceRunID != nil {
+     379:	if o.State == FactoryWorkOrderStateOpen {
+     388:		ToState: FactoryWorkOrderStateOpen,
+-> [Bash] sed -n '1,35p' /home/ubuntu/superplane/pkg/models/factory_work_order_status_note_test.go
+     package models
+     import (
+     	"fmt"
+     	"testing"
+     	"github.com/google/uuid"
+     	"github.com/stretchr/testify/assert"
+     	"github.com/stretchr/testify/require"
+     	"github.com/superplanehq/superplane/pkg/database"
+     	"github.com/superplanehq/superplane/pkg/models/factory"
+     )
+     func openWorkOrderForStatusNote(t *testing.T, suffix string) (*FactoryWorkOrder, uuid.UUID) {
+     	t.Helper()
+     	_, userID, factoryModel := setupFactoryWithUser(t, suffix)
+     	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Note target", "", &userID, nil, nil)
+     	require.NoError(t, err)
+     	_, err = order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+     		ToState: FactoryWorkOrderStateOpen,
+     		Actor:   &userID,
+     … (10 more lines)
+Good, that's the pattern. Now let's add a test in factory_context_test.go.
+-> [Bash] grep -n "^import\|core\.\|package \|FactoryWorkOrderStateOpen\|Actor:" /home/ubuntu/superplane/pkg/workers/contexts/factory_context_test.go | head -20
+     1:package contexts
+     3:import (
+     32:		workOrder, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+     70:			ToState: models.FactoryWorkOrderStateOpen,
+     79:		assert.Equal(t, models.FactoryWorkOrderStateOpen, opened.ToState)
+     90:		_, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "   "})
+     99:		_, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Should fail"})
+     131:		_, err = ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Nested"})
+     151:	updated, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+     153:		State:   models.FactoryWorkOrderStateOpen,
+     157:	assert.Equal(t, models.FactoryWorkOrderStateOpen, updated.State)
+     187:	_, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+     189:		State:   models.FactoryWorkOrderStateOpen,
+     195:	_, changed, e…
+-> [Bash] grep -n "SetWorkOrderStatusNoteParams" /home/ubuntu/superplane/pkg/core/*.go
+     /home/ubuntu/superplane/pkg/core/factory.go:40:	SetWorkOrderStatusNote(params SetWorkOrderStatusNoteParams) (*WorkOrderStatusNote, error)
+     /home/ubuntu/superplane/pkg/core/factory.go:120:// SetWorkOrderStatusNoteParams carries one status note. NoteKey identifies
+     /home/ubuntu/superplane/pkg/core/factory.go:124:type SetWorkOrderStatusNoteParams struct {
+-> [Bash] sed -n '115,140p' /home/ubuntu/superplane/pkg/core/factory.go
+     	Level    string
+     	Summary  string
+     	Analysis string
+     }
+     // SetWorkOrderStatusNoteParams carries one status note. NoteKey identifies
+     // the note across sets (e.g. "pr-closure"). Kind is "info" (the default
+     // when empty); Headline is required; CtaLabel and CtaURL must be set
+     // together and the URL must be absolute http(s).
+     type SetWorkOrderStatusNoteParams struct {
+     	// OrderID identifies the work order to target; see
+     	// UpdateWorkOrderStatusParams.OrderID.
+     	OrderID string
+     	// NoteKey identifies the note across sets (e.g. "pr-closure").
+     	NoteKey             string
+     	Kind                string
+     	Headline            string
+     	Body                string
+     	CtaLabel            string
+     	CtaURL              string
+     	ShowOnlyWhenWaiting bool
+     }
+     type WorkOrder struct {
+     … (2 more lines)
+Now add the test right after `TestFactoryContext_AddWorkOrderComment_EmitsNotification`.
+-> [Edit] /home/ubuntu/superplane/pkg/workers/contexts/factory_context_test.go
+     The file /home/ubuntu/superplane/pkg/workers/contexts/factory_context_test.go has been updated successfully. (file state is current in your context — no need to Read it back)
+Now let's check imports (factoryevents, messages) already present in the file.
+-> [Bash] sed -n '1,25p' /home/ubuntu/superplane/pkg/workers/contexts/factory_context_test.go
+     package contexts
+     import (
+     	"encoding/json"
+     	"errors"
+     	"testing"
+     	"time"
+     	"github.com/google/uuid"
+     	"github.com/stretchr/testify/assert"
+     	"github.com/stretchr/testify/require"
+     	"github.com/superplanehq/superplane/pkg/core"
+     	"github.com/superplanehq/superplane/pkg/database"
+     	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+     	"github.com/superplanehq/superplane/pkg/models"
+     	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+     	"github.com/superplanehq/superplane/test/support"
+     )
+     func TestFactoryContext_CreateWorkOrder(t *testing.T) {
+     	r := support.Setup(t)
+     	defer r.Close()
+     	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+     … (1 more lines)
+Good, all imports already present. Now add a test to `user_notification_settings_test.go` for the new type.
+-> [Bash] grep -n "Notifies\|func Test" /home/ubuntu/superplane/pkg/models/user_notification_settings_test.go | head -40
+     16:func Test__UserNotificationSettings(t *testing.T) {
+     76:func Test__UserNotificationSettings__Notifies(t *testing.T) {
+     82:		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAssigned))
+     83:		assert.True(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderCommentOwned))
+     88:		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAssigned))
+     93:		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderCommentOwned))
+     101:		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAssigned))
+     102:		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderCommentOwned))
+     103:		assert.True(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderAssig…
+-> [Bash] sed -n '76,120p' /home/ubuntu/superplane/pkg/models/user_notification_settings_test.go
+     func Test__UserNotificationSettings__Notifies(t *testing.T) {
+     	workspaceID := uuid.New()
+     	otherWorkspaceID := uuid.New()
+     	t.Run("defaults notify every type in every workspace", func(t *testing.T) {
+     		settings := models.DefaultUserNotificationSettings()
+     		assert.True(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAssigned))
+     		assert.True(t, settings.Notifies(otherWorkspaceID, models.NotificationTypeWorkOrderCommentOwned))
+     	})
+     	t.Run("none scope blocks every type", func(t *testing.T) {
+     		settings := models.UserNotificationSettings{WorkspaceScope: models.NotificationWorkspaceScopeNone}
+     		assert.False(t, settings.Notifies(workspaceID, models.NotificationTypeWorkOrderAssigned))
+     	})
+     	t.Run("all scope keeps a missing type on", func(t *testing.T) {
+     		settings := models.UserN…
+-> [Edit] /home/ubuntu/superplane/pkg/models/user_notification_settings_test.go
+     The file /home/ubuntu/superplane/pkg/models/user_notification_settings_test.go has been updated successfully. (file state is current in your context — no need to Read it back)
+-> [Edit] /home/ubuntu/superplane/pkg/models/user_notification_settings_test.go
+     The file /home/ubuntu/superplane/pkg/models/user_notification_settings_test.go has been updated successfully. (file state is current in your context — no need to Read it back)
+-> [Bash] grep -rln "notificationTypeProto\|TYPE_WORK_ORDER_MENTIONED\|NotificationTypes\b" /home/ubuntu/superplane/pkg/grpc/actions/me/*_test.go
+     (Bash completed with no output)
+-> [Bash] ls /home/ubuntu/superplane/pkg/grpc/actions/me/*_test.go; grep -rln "NotificationTypes\b" /home/ubuntu/superplane/pkg
+     /home/ubuntu/superplane/pkg/grpc/actions/me/get_user_test.go
+     /home/ubuntu/superplane/pkg/grpc/actions/me/notification_settings_test.go
+     /home/ubuntu/superplane/pkg/models/user_notification_settings.go
+-> [Bash] grep -n "TYPE_WORK_ORDER\|func Test" /home/ubuntu/superplane/pkg/grpc/actions/me/notification_settings_test.go
+     18:func Test__DescribeNotificationSettings(t *testing.T) {
+     39:func Test__UpdateNotificationSettings(t *testing.T) {
+     52:						pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED,
+     53:						pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED,
+     62:			pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED,
+     63:			pb.NotificationSettings_TYPE_WORK_ORDER_ARTIFACT_OWNED,
+     92:						EventTypes:  []pb.NotificationSettings_Type{pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED},
+     110:							pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED,
+     111:							pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED,
+     121:			pb.NotificationSettings_TYPE_WORK_ORDER_ASSIGNED,
+     122:			pb.NotificationSettings_TYPE_WORK_ORDER_COMMENT_OWNED,
+     133:						EventTypes:   []pb.NotificationSettings_Type{pb.NotificationSettings_TYPE_WORK_OR…
+-> [Bash] sed -n '1,75p' /home/ubuntu/superplane/pkg/grpc/actions/me/notification_settings_test.go
+     package me
+     import (
+     	"context"
+     	"testing"
+     	"github.com/stretchr/testify/assert"
+     	"github.com/stretchr/testify/require"
+     	"github.com/superplanehq/superplane/pkg/database"
+     	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+     	"github.com/superplanehq/superplane/pkg/models"
+     	pb "github.com/superplanehq/superplane/pkg/protos/me"
+     	"github.com/superplanehq/superplane/test/support"
+     	"google.golang.org/grpc/codes"
+     	"google.golang.org/grpc/metadata"
+     )
+     func Test__DescribeNotificationSettings(t *testing.T) {
+     	r := support.Setup(t)
+     	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+     	t.Run("missing row returns all workspaces", func(t *testing.T) {
+     		resp, err := DescribeNotificationSettings(ctx)
+     		require.NoError(t, err)
+     … (51 more lines)
+I'll add a small subtest for the new type to this existing test function.
+-> [Edit] /home/ubuntu/superplane/pkg/grpc/actions/me/notification_settings_test.go
+     The file /home/ubuntu/superplane/pkg/grpc/actions/me/notification_settings_test.go has been updated successfully. (file state is current in your context — no need to Read it back)
+Now let's run all the relevant Go tests inside docker.
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app && go build ./pkg/... 2>&1 | tail -60"
+     (Bash completed with no output)
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app && DB_NAME=superplane_test go test ./pkg/models/... -run 'UserNotificationSettings|StatusNote' -v 2>&1 | tail -200"
+     === RUN   TestFactoryWorkOrder_SetStatusNote_Validation
+     2026/08/20 17:43:12 [database] enforced timeouts: max_open=20 DB_STATEMENT_TIMEOUT=1m0s DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT=30s host=db dbname=superplane_test
+     === RUN   TestFactoryWorkOrder_SetStatusNote_Validation/missing_key
+     === RUN   TestFactoryWorkOrder_SetStatusNote_Validation/missing_headline
+     === RUN   TestFactoryWorkOrder_SetStatusNote_Validation/unknown_kind
+     === RUN   TestFactoryWorkOrder_SetStatusNote_Validation/cta_label_without_url
+     === RUN   TestFactoryWorkOrder_SetStatusNote_Validation/cta_url_without_label
+     === RUN   TestFactoryWorkOrder_SetStatusNote_Validation/relative_cta_url
+     === RUN   TestFactoryWorkOrder_SetStatusNote_Validation/non-http_cta_url
+     --- PASS: TestFactoryWorkOrder_SetStatusNote_Validation (0.04s)
+         -…
+All model tests pass. Now workers tests.
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app && DB_NAME=superplane_test go test ./pkg/workers/... -run 'FactoryNotificationConsumer|FactoryContext' -v 2>&1 | tail -250"
+     === RUN   Test__FactoryNotificationConsumer/filtered_workspace_scope_excludes_other_factories
+     === RUN   Test__FactoryNotificationConsumer/assignment_notifies_only_the_newly_assigned_user
+     === RUN   Test__FactoryNotificationConsumer/initial_transition_into_draft_sends_nothing
+     === RUN   Test__FactoryNotificationConsumer/status_change_notifies_owners_and_creator
+     === RUN   Test__FactoryNotificationConsumer/status_note_notifies_owners_and_creator
+     === RUN   Test__FactoryNotificationConsumer/status_note_setting_can_be_turned_off_without_affecting_comments
+     === RUN   Test__FactoryNotificationConsumer/soft-deleted_members_are_not_emailed
+     === RUN   Test__FactoryNotificationConsumer/missing_work_order_is_skipped_without_error
+     --- PASS: Test__FactoryNotificationConsumer (0.10s)
+         --- PASS: Test__Fact…
+All passing. Now run the me grpc tests.
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app && DB_NAME=superplane_test go test ./pkg/grpc/actions/me/... -run 'NotificationSettings' -v 2>&1 | tail -80"
+     === RUN   Test__DescribeNotificationSettings
+     2026/08/20 17:43:24 [database] enforced timeouts: max_open=20 DB_STATEMENT_TIMEOUT=1m0s DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT=30s host=db dbname=superplane_test
+     time="2026-08-20T17:43:24Z" level=info msg="Setting up default organization role metadata for acfea345-5c03-4517-823a-61fe84e3b4ab"
+     time="2026-08-20T17:43:24Z" level=info msg="Upserting role metadata for org_owner (acfea345-5c03-4517-823a-61fe84e3b4ab) in org"
+     time="2026-08-20T17:43:24Z" level=info msg="Role metadata not found for org_owner (acfea345-5c03-4517-823a-61fe84e3b4ab) in org - creating new one"
+     time="2026-08-20T17:43:24Z" level=info msg="Upserting role metadata for org_admin (acfea345-5c03-4517-823a-61fe84e3b4ab) in org"
+     time="2026-08-20T17:43:24Z" level=info msg="Role metad…
+All tests pass. Now let's run frontend tests for the changed spec files.
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app/web_src && cat package.json | grep -A3 '\"test\"'"
+         "test": "vitest",
+         "test:ui": "vitest --ui",
+         "test:run": "vitest run",
+         "test:coverage": "vitest run --coverage",
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app/web_src && HOME=/tmp NPM_CONFIG_CACHE=/tmp/.npm npx vitest run src/lib/notificationSettings.spec.ts src/pages/factories/pages/settings/FactorySettingsNotificationsPage.spec.tsx 2>&1 | tail -100"
+      RUN  v4.1.10 /app/web_src
+      ✓ src/pages/factories/pages/settings/FactorySettingsNotificationsPage.spec.tsx (3 tests) 164ms
+      ✓ src/lib/notificationSettings.spec.ts (7 tests) 3ms
+      Test Files  2 passed (2)
+           Tests  10 passed (10)
+        Start at  17:43:29
+        Duration  2.40s (transform 337ms, setup 136ms, import 800ms, tests 167ms, environment 1.16s)
+All frontend tests pass. Now let's check TypeScript typecheck compiles fine.
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app/web_src && HOME=/tmp NPM_CONFIG_CACHE=/tmp/.npm npx tsc --noEmit -p tsconfig.app.json 2>&1 | tail -60"
+     (Bash completed with no output)
+-> [Bash] ls /home/ubuntu/superplane/web_src/tsconfig*.json
+     /home/ubuntu/superplane/web_src/tsconfig.app.json
+     /home/ubuntu/superplane/web_src/tsconfig.json
+     /home/ubuntu/superplane/web_src/tsconfig.node.json
+Good enough. Now let's check for check.grpc.actions.status or similar CI checks, and check_proto_field_numbers.sh, and also check if there's a components docs check test that snapshot-tests Documentation().
+-> [Bash] bash /home/ubuntu/superplane/scripts/check_proto_field_numbers.sh 2>&1 | tail -30
+     Proto message field numbers are contiguous and unique.
+Now let's check overall git diff and status, and also verify the gitignored generated dirs aren't accidentally staged (they won't be tracked, git status should show them as untracked but ignored).
+-> [Bash] git status --porcelain=2 | head -50
+     1 .M N... 100644 100644 100644 5f458539576646a23fd36ca84a55ec278afeabea 5f458539576646a23fd36ca84a55ec278afeabea docs/components/Core.mdx
+     1 .M N... 100644 100644 100644 3b44bf372969242e1a134241225c47b1071756ee 3b44bf372969242e1a134241225c47b1071756ee pkg/components/factory/set_work_order_status_note.go
+     1 .M N... 100644 100644 100644 019d2cead4630778d9910e2200882fa6fefb0aa9 019d2cead4630778d9910e2200882fa6fefb0aa9 pkg/grpc/actions/me/notification_settings.go
+     1 .M N... 100644 100644 100644 c4d484835e7372b119623ac28e732916dd870e2f c4d484835e7372b119623ac28e732916dd870e2f pkg/grpc/actions/me/notification_settings_test.go
+     1 .M N... 100644 100644 100644 a27feba24794add96e1abd09c001ace55b605d1d a27feba24794add96e1abd09c001ace55b605d1d pkg/grpc/actions/messages/factory_work_order_notification.go…
+Clean. Only the intended source files are tracked/modified. Generated dirs are properly gitignored. Let's view the final diffs for the two consumer files one more time for correctness.
+-> [Bash] git -C /home/ubuntu/superplane diff pkg/workers/factory_notification_consumer.go pkg/grpc/actions/messages/factory_work_order_notification.go pkg/workers/contexts/factory_context.go
+     diff --git a/pkg/grpc/actions/messages/factory_work_order_notification.go b/pkg/grpc/actions/messages/factory_work_order_notification.go
+     index a27feba..eec13a2 100644
+     --- a/pkg/grpc/actions/messages/factory_work_order_notification.go
+     +++ b/pkg/grpc/actions/messages/factory_work_order_notification.go
+     @@ -29,6 +29,13 @@ type FactoryWorkOrderNotificationMessage struct {
+      	ToState          string   `json:"to_state,omitempty"`
+      	Result           string   `json:"result,omitempty"`
+      	ArtifactType     string   `json:"artifact_type,omitempty"`
+     +	// StatusNote* carry a `setWorkOrderStatusNote` write into the email,
+     +	// so the consumer never has to re-read the (latest-only, mutable)
+     +	// note off the order row and risk describing a later update.
+     +	StatusNoteHeadline string `json:"status_note_headli…
+This all looks correct and clean. Now let's run the broader test suites once more to be safe (full pkg/models, pkg/workers, pkg/grpc, and full frontend test run), then commit.
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app && DB_NAME=superplane_test go test ./pkg/models/... ./pkg/workers/... ./pkg/grpc/... 2>&1 | tail -100"
+     Command did not complete within its 120s timeout and was moved to the background (ID: bhwj9m8kh). Output is being written to: /tmp/claude-1000/-home-ubuntu-superplane/c5123cc1-c1dc-46de-8f95-fdde00a9346b/tasks/bhwj9m8kh.output. You will be notified when it completes. To check interim output, use Read on that file path.
+-> [Bash] until ! kill -0 $(pgrep -f "go test ./pkg/models" | head -1) 2>/dev/null; do sleep 5; done 2>/dev/null; echo waited
+     Exit code 143
+     Command timed out after 2m 0s
+-> [Bash] tail -150 /tmp/claude-1000/-home-ubuntu-superplane/c5123cc1-c1dc-46de-8f95-fdde00a9346b/tasks/bhwj9m8kh.output
+     time="2026-08-20T17:46:47Z" level=info msg="Integration operation may write secrets" integration_id=8b468f33-ec8b-4566-aab0-869cdb598a32 integration_name=dummy source=integration_create_sync
+     time="2026-08-20T17:46:47Z" level=info msg="Integration operation may write secrets" integration_id=8b468f33-ec8b-4566-aab0-869cdb598a32 integration_name=dummy source=integration_update
+     time="2026-08-20T17:46:47Z" level=info msg="syncing integration 3a46d256-2926-4741-9b56-4e3563a94f6c"
+     time="2026-08-20T17:46:47Z" level=info msg="Integration operation may write secrets" integration_id=3a46d256-2926-4741-9b56-4e3563a94f6c integration_name=dummy source=integration_create_sync
+     time="2026-08-20T17:46:47Z" level=info msg="Integration operation may write secrets" integration_id=3a46d256-2926-4741-9b56-4e356…
+-> [Bash] grep -n "^test:" -A15 /home/ubuntu/superplane/Makefile
+     58:test:
+     59-	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1
+     60-
+     61-test.coverage:
+     62-	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1 -coverprofile=coverage-go.out -covermode=atomic
+     63-	$(COMPOSE) run --rm app go tool cover -func=coverage-go.out | grep '^total:'
+     64-
+     65-test.coverage.check:
+     66-	$(MAKE) test.coverage
+     67-	$(MAKE) check.coverage.go
+     68-
+     69-test.coverage.baseline.update:
+     70-	$(MAKE) test.coverage
+     71-	$(MAKE) check.coverage.go.baseline.update
+     72-
+     73-test.license.check:
+-> [Bash] docker exec superplane-app-1 bash -lc "cd /app && DB_NAME=superplane_test go test -p 1 ./pkg/models/... ./pkg/workers/... ./pkg/grpc/... > /tmp/full_test.log 2>&1; echo EXIT:\$?" & echo started $!
+     started 66153
+-> [Bash] until grep -q "^EXIT:" /tmp/full_test.log 2>/dev/null; do sleep 5; done; tail -5 /tmp/full_test.log
+     Command did not complete within its 120s timeout and was moved to the background (ID: bwa8kli3b). Output is being written to: /tmp/claude-1000/-home-ubuntu-superplane/c5123cc1-c1dc-46de-8f95-fdde00a9346b/tasks/bwa8kli3b.output. You will be notified when it completes. To check interim output, use Read on that file path.
+-> [Bash] tail -20 /tmp/full_test.log
+     ok  	github.com/superplanehq/superplane/pkg/workers	42.576s
+     ok  	github.com/superplanehq/superplane/pkg/workers/contexts	6.430s
+     ok  	github.com/superplanehq/superplane/pkg/workers/eventdistributer	(cached)
+     ok  	github.com/superplanehq/superplane/pkg/grpc	0.128s
+     ok  	github.com/superplanehq/superplane/pkg/grpc/actions	(cached)
+     ok  	github.com/superplanehq/superplane/pkg/grpc/actions/agents	1.079s
+     ok  	github.com/superplanehq/superplane/pkg/grpc/actions/apikeys	0.335s
+     ok  	github.com/superplanehq/superplane/pkg/grpc/actions/auth	(cached)
+     ok  	github.com/superplanehq/superplane/pkg/grpc/actions/canvases	9.630s
+     ok  	github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets	1.943s
+     ok  	github.com/superplanehq/superplane/pkg/grpc/actions/canvasfolders	0.655s
+     ok  	github.com/superp…
+Full suite passes with proper `-p 1` sequential execution. All good. Now let's commit the changes.
+-> [Bash] git add -A -- ':!pkg/protos' ':!pkg/openapi_client' ':!web_src/src/api-client' && git status --short
+     Exit code 1
+     The following paths are ignored by one of your .gitignore files:
+     pkg/openapi_client
+     pkg/protos
+     web_src/src/api-client
+     hint: Use -f if you really want to add them.
+     hint: Turn this message off by running
+     hint: "git config advice.addIgnoredFile false"
+-> [Bash] git add -A && git status --short
+     M  docs/components/Core.mdx
+     M  pkg/components/factory/set_work_order_status_note.go
+     M  pkg/grpc/actions/me/notification_settings.go
+     M  pkg/grpc/actions/me/notification_settings_test.go
+     M  pkg/grpc/actions/messages/factory_work_order_notification.go
+     M  pkg/models/factory/events.go
+     M  pkg/models/user_notification_settings.go
+     M  pkg/models/user_notification_settings_test.go
+     M  pkg/workers/contexts/factory_context.go
+     M  pkg/workers/contexts/factory_context_test.go
+     M  pkg/workers/factory_notification_consumer.go
+     M  pkg/workers/factory_notification_consumer_test.go
+     M  protos/me.proto
+     M  web_src/src/lib/notificationSettings.spec.ts
+     M  web_src/src/lib/notificationSettings.ts
+Good, exactly the intended files. Let's write the commit.
+-> [Bash] git commit -m "Notify work order owners/creator when a status note is set  Setting a work order status note (the panel a factory line posts to say \"waiting for your review\") never emailed anyone: the write only fired the websocket-only order.status_note.updated reason, and since a parked order stays in state open, the status-change notification never fires either. Nothing told an assignee or the order's creator that a line was waiting on them.  - Add a new opt-in notification type, work_order_status_note_owned   (default on), separate from the existing status open/close/draft   type. - FactoryContext.SetWorkOrderStatusNote now publishes a   FactoryWorkOrderNotificationMessage alongside the existing websocket   fan-out, carrying the note's headline/body/CTA. - factory_notification_consumer resolves recipients (assignees +   creator) for the new event and builds an email: subject/summary lead   with the note's headline, and the note body plus CTA land in Detail. - Every set on a note key re-notifies, matching how a new comment   always emails: an updated wait (e.g. \"still waiting\" -> \"ready   now\") is new information worth surfacing again. - Mirror the new type through the me.proto NotificationSettings.Type   enum, the gRPC mapping, and the frontend notification settings   options/tests (generated proto/openapi/client artifacts regenerated   accordingly). - Document the behavior change on the setWorkOrderStatusNote   component.  Tests: pkg/models (Notifies), pkg/workers/contexts (SetWorkOrderStatusNote emits the notification, re-set sends again), pkg/workers (factory_notification_consumer recipient/content/opt-out coverage), pkg/grpc/actions/me (proto round-trip), web_src notificationSettings."
+     [fix/bug-not-getting-notified-for-status-change-when-re-1787246840-4193b6d9 21d499c] Notify work order owners/creator when a status note is set
+      15 files changed, 235 insertions(+), 18 deletions(-)
+Committed. Let's do a final sanity check of the log for the git status and confirm the working tree is clean apart from gitignored generated files.
+-> [Bash] git status --short; git log --oneline -3
+     21d499c Notify work order owners/creator when a status note is set
+     0380513 chore: initialize fix/bug-not-getting-notified-for-status-change-when-re-1787246840-4193b6d9
+Clean working tree, one focused commit on top of the branch's init commit.
+Summary of the fix:
+Root cause: `SetWorkOrderStatusNote` only emitted the websocket-only `order.status_note.updated` reason. It never published a `FactoryWorkOrderNotificationMessage`, so nothing hit the email worker. Because the order stays in state `open` while parked waiting on review, the existing status-change notification path never fired either.
+Changes:
+- `pkg/models/user_notification_settings.go`: new opt-in type `NotificationTypeWorkOrderStatusNoteOwned` (`work_order_status_note_owned`), added to `NotificationTypes`, on by default like the rest.
+- `pkg/grpc/actions/messages/factory_work_order_notification.go`: message now carries `StatusNoteHeadline/Body/CtaLabel/CtaURL`.
+- `pkg/workers/contexts/factory_context.go`: `SetWorkOrderStatusNote` now also publishes a notification message after every set (matches the "a comment always emails" precedent — an updated note is new information for the reviewer).
+- `pkg/workers/factory_notification_consumer.go`: new `case` in `workOrderNotificationCandidates` (assignees + creator) and in `buildWorkOrderNotificationContent` (subject/summary lead with the headline, detail folds in body + CTA link).
+- `protos/me.proto` + `pkg/grpc/actions/me/notification_settings.go`: new `TYPE_WORK_ORDER_STATUS_NOTE_OWNED` enum value wired into the proto <-> model mapping. Regenerated `pkg/protos`, `pkg/openapi_client`, `web_src/src/api-client`, and `api/swagger/superplane.swagger.json` via the repo's docker-based codegen (these are gitignored generated artifacts, not committed, but verified to build/test cleanly with the new type).
+- `web_src/src/lib/notificationSettings.ts` (+ spec): new toggle option, generic settings page needed no changes.
+- `pkg/components/factory/set_work_order_status_note.go` / `docs/components/Core.mdx`: documented the new email behavior.
+Tests added/updated and passing (ran inside the project's docker dev environment with `-p 1` per DB-sharing convention):
+- `pkg/models/user_notification_settings_test.go`
+- `pkg/workers/contexts/factory_context_test.go` (`SetWorkOrderStatusNote` emits notification, re-set fires again)
+- `pkg/workers/factory_notification_consumer_test.go` (recipients, content, opt-out)
+- `pkg/grpc/actions/me/notification_settings_test.go`
+- `web_src/src/lib/notificationSettings.spec.ts`
+Full `go build ./pkg/...` and the full `go test -p 1 ./pkg/models/... ./pkg/workers/... ./pkg/grpc/...` suite pass, as do the touched frontend vitest specs.
+✓ done · 140 turns · $3.9868 · 1158.1s
+$ Format Code
+$ Commit and Push
