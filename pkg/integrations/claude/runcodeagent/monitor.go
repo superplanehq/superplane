@@ -150,6 +150,7 @@ func (a *RunCodeAgent) handleTerminalSession(ctx core.ActionHookContext, client 
 	}
 
 	out := buildOutput(sess.Status, meta.Session.ID, meta.Branch, sm, meta.PrURL)
+	runagent.RecordSessionUsage(ctx.Usage, ctx.Logger, sess)
 	// Past the poll budget the events may still be unavailable (sm == nil);
 	// emit what we have and only look for artifacts when events were read.
 	if sm != nil {

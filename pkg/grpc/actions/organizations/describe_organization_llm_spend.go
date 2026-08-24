@@ -9,6 +9,7 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 )
 
 const (
@@ -37,11 +38,20 @@ func DescribeOrganizationLLMSpend(
 		return nil, grpcerrors.Internal(err, "failed to describe organization LLM spend")
 	}
 
+	credit, err := models.DescribeOrganizationLLMCredit(database.DB(ctx), organizationID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to describe organization LLM credit")
+	}
+
 	return &pb.DescribeOrganizationLLMSpendResponse{
-		TotalTokens:    totals.TotalTokens,
-		TotalCostCents: totals.CostCents(),
-		PeriodDays:     int32(period),
-		ByModel:        serializeLLMSpendByModel(byModel),
+		TotalTokens:            totals.TotalTokens,
+		TotalCostCents:         totals.CostCents(),
+		PeriodDays:             int32(period),
+		ByModel:                serializeLLMSpendByModel(byModel),
+		RemainingCreditCents:   pricebook.MicrosToCents(credit.RemainingMicros),
+		GrantTotalCents:        pricebook.MicrosToCents(credit.GrantMicros),
+		HostedBilledCents:      pricebook.MicrosToCents(credit.BilledMicros),
+		RemainingCreditWarning: credit.Warning,
 	}, nil
 }
 

@@ -1,7 +1,26 @@
 import { describe, expect, it } from "vitest";
+import yaml from "js-yaml";
 
 import { getFactoryDefinition, ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS } from "./index";
 import { FACTORY_CANVAS_ID_PLACEHOLDER, materializeFactoryCanvas } from "./materializeFactoryTemplate";
+
+type AgentStep = { name?: string; command?: string; workingDirectory?: string };
+
+type CanvasNode = {
+  id?: string;
+  configuration?: { steps?: AgentStep[] };
+};
+
+function canvasNodes(canvasYaml: string): CanvasNode[] {
+  const doc = yaml.load(canvasYaml) as { spec?: { nodes?: CanvasNode[] } };
+  return doc.spec?.nodes ?? [];
+}
+
+function nodeStepsByName(nodes: CanvasNode[], nodeId: string): Record<string, AgentStep> {
+  const node = nodes.find((candidate) => candidate.id === nodeId);
+  const steps = node?.configuration?.steps ?? [];
+  return Object.fromEntries(steps.map((step) => [step.name ?? "", step]));
+}
 
 function materializeOnboardingApp(factoryId: string) {
   return materializeFactoryCanvas({
@@ -52,6 +71,9 @@ describe("setup factory line apps", () => {
 
     const implementation = materializeOnboardingApp("line-implementation");
     expect(implementation).toContain("acme/app");
+    expect(implementation).toMatch(
+      /id: add-branch-artifact[\s\S]*component: addWorkOrderArtifact[\s\S]*repository: acme\/app/,
+    );
 
     const pr = materializeOnboardingApp("line-pr");
     expect(pr).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
@@ -73,6 +95,36 @@ describe("setup factory line apps", () => {
     expect(pr).toContain("headline: Review the pull request");
     expect(pr).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data.html_url }}'");
     expect(pr).toContain("showOnlyWhenWaiting: true");
+  });
+
+  it("fails implementation when the agent pushes no file commits", () => {
+    const implementation = materializeOnboardingApp("line-implementation");
+    const nodes = canvasNodes(implementation);
+
+    for (const nodeId of ["implementation-agent", "implementation-agent-no-issue"]) {
+      const steps = nodeStepsByName(nodes, nodeId);
+      const checkout = steps["Checkout Branch"]?.command ?? "";
+      const commit = steps["Commit and Push"]?.command ?? "";
+
+      expect(checkout).toContain("set -euo pipefail");
+      expect(commit).toContain("No file changes and no unpushed commits");
+      expect(commit).toContain("exit 1");
+      expect(commit).not.toContain("already up to date on origin");
+      expect(commit).toContain("git status");
+      expect(commit).toContain("git log --oneline -5");
+    }
+  });
+
+  it("runs implementation prompt and commit steps in the cloned repo", () => {
+    const implementation = materializeOnboardingApp("line-implementation");
+    const nodes = canvasNodes(implementation);
+
+    for (const nodeId of ["implementation-agent", "implementation-agent-no-issue"]) {
+      const steps = nodeStepsByName(nodes, nodeId);
+      expect(steps["Set Up DCO Signing"]?.workingDirectory).toBe("repo");
+      expect(steps["Implementation"]?.workingDirectory).toBe("repo");
+      expect(steps["Commit and Push"]?.workingDirectory).toBe("repo");
+    }
   });
 });
 
