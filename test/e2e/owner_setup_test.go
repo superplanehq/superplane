@@ -21,7 +21,7 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.visitSetupPage()
 		steps.fillInOwnerDetailsAndSubmit("owner@example.com", "Owner", "User", "Password1")
 		steps.assertOwnerAndOrganizationCreated()
-		steps.assertRedirectedToOrganizationHome()
+		steps.assertRedirectedToOrganization()
 		steps.assertOwnerSetupIsNoLongerRequired()
 	})
 
@@ -33,12 +33,12 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.visitSetupPage()
 		steps.fillInOwnerDetailsAndSubmit("owner@example.com", "Owner", "User", "Password1")
 		steps.assertOwnerAndOrganizationCreated()
-		steps.assertRedirectedToOrganizationHome()
+		steps.assertRedirectedToOrganization()
 		steps.clearCookies()
 		steps.visitLoginPage()
 		steps.fillInEmailAndPassword("owner@example.com", "Password1")
 		steps.submitLoginForm()
-		steps.assertRedirectedToOrganizationHome()
+		steps.assertRedirectedToOrganization()
 	})
 }
 
@@ -131,9 +131,9 @@ func (s *ownerSetupSteps) assertOwnerAndOrganizationCreated() {
 	s.orgID = org.ID.String()
 }
 
-func (s *ownerSetupSteps) assertRedirectedToOrganizationHome() {
+func (s *ownerSetupSteps) assertRedirectedToOrganization() {
 	currentURL := s.session.Page().URL()
-	assert.Contains(s.t, currentURL, "/"+s.orgID, "expected to be redirected to organization home")
+	assert.Contains(s.t, currentURL, "/"+s.orgID, "expected to be redirected into the organization")
 }
 
 func (s *ownerSetupSteps) assertOwnerSetupIsNoLongerRequired() {
