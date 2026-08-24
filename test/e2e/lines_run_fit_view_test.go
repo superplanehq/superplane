@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	pw "github.com/mxschmitt/playwright-go"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
@@ -18,22 +19,13 @@ import (
 	"gorm.io/gorm"
 )
 
-// The fixed browser context viewport configured in test_context.go. A node
-// whose card renders outside these bounds is, for all practical purposes,
-// off-screen.
-const (
-	linesRunFitViewportWidth  = 2560
-	linesRunFitViewportHeight = 1440
-)
-
 const (
 	linesRunFitTriggerNodeID = "kickoff"
 	// Factory run inspection re-lays a linear run out in a single vertical
 	// spine from a fixed, small origin (see layoutFactoryRunLeafGraph),
 	// independent of any saved editor position. A dozen chained steps stack
-	// past the fixed browser viewport's height at the canvas's default
-	// (un-fit) zoom, so only an explicit participant fit brings the last one
-	// into view.
+	// past the compact popup canvas at the default (un-fit) zoom, so only
+	// an explicit participant fit brings the last one into view.
 	linesRunFitStepCount = 12
 )
 
@@ -42,9 +34,9 @@ func linesRunFitStepNodeID(index int) string {
 }
 
 // TestLinesPhaseRunFitsIntoView guards against a regression where opening a
-// step run from a Factory Line's phase board landed on the canvas with
-// whatever default/empty viewport ReactFlow happened to initialize with,
-// instead of framing the run's participant nodes. See PR #6715.
+// step run from a Factory Line's phase board showed the compact run canvas
+// with whatever default/empty viewport ReactFlow happened to initialize
+// with, instead of framing the run's participant nodes. See PR #6715.
 func TestLinesPhaseRunFitsIntoView(t *testing.T) {
 	t.Run("opening a phase run card fits its participant nodes into view", func(t *testing.T) {
 		steps := &linesRunFitSteps{t: t}
@@ -67,7 +59,6 @@ type linesRunFitSteps struct {
 	factory *models.Factory
 	line    *models.FactoryLine
 	order   *models.FactoryWorkOrder
-	runID   uuid.UUID
 }
 
 func (s *linesRunFitSteps) start() {
@@ -172,7 +163,7 @@ func (s *linesRunFitSteps) givenALineDispatchedForThatApp() {
 	require.NotNil(s.t, result)
 	require.NotNil(s.t, result.Execution)
 	require.NotNil(s.t, result.Run)
-	s.runID = result.Run.ID
+	runID := result.Run.ID
 
 	createdAt := time.Now()
 	rootEvent := models.CanvasEvent{
@@ -181,7 +172,7 @@ func (s *linesRunFitSteps) givenALineDispatchedForThatApp() {
 		NodeID:     linesRunFitTriggerNodeID,
 		Channel:    "default",
 		Data:       models.NewJSONValue(map[string]any{"message": "kickoff"}),
-		RunID:      s.runID,
+		RunID:      runID,
 		State:      models.CanvasEventStateRouted,
 		CreatedAt:  &createdAt,
 	}
@@ -193,7 +184,7 @@ func (s *linesRunFitSteps) givenALineDispatchedForThatApp() {
 			WorkflowID:    s.canvas.ID,
 			NodeID:        linesRunFitStepNodeID(i),
 			RootEventID:   rootEvent.ID,
-			RunID:         s.runID,
+			RunID:         runID,
 			EventID:       rootEvent.ID,
 			State:         models.CanvasNodeExecutionStateStarted,
 			Metadata:      datatypes.NewJSONType(map[string]any{}),
@@ -212,8 +203,8 @@ func (s *linesRunFitSteps) whenIVisitTheLineDetail() {
 
 func (s *linesRunFitSteps) whenIOpenThePhaseRunCard() {
 	s.session.Click(q.TestID("work-order-card-" + s.order.ID.String()))
-	s.session.AssertURLContains("run=" + s.runID.String())
-	s.session.AssertVisible(q.TestID("factory-app-canvas-page"))
+	s.session.AssertVisible(q.TestID("work-order-split-run"))
+	s.session.AssertVisible(q.TestID("run-overlay-compact-canvas"))
 }
 
 func (s *linesRunFitSteps) thenTheFirstAndLastParticipantsFitIntoView() {
@@ -222,26 +213,35 @@ func (s *linesRunFitSteps) thenTheFirstAndLastParticipantsFitIntoView() {
 }
 
 // Waits for the node card to render, then polls its bounding box until the
-// canvas has panned/zoomed it into the browser's viewport — the observable
-// effect of the participant-fit request this test guards. Targets ReactFlow's
-// own `data-id` attribute rather than a label, since every chain node past
+// compact canvas has panned/zoomed it into the popup pane — the observable
+// effect of the participant-fit request this test guards. Targets the
+// compact-canvas test id rather than a label, since every chain node past
 // the first shares the same "No Operation" component label.
 func (s *linesRunFitSteps) assertNodeFitsIntoView(nodeID string) {
-	locator := q.Locator(fmt.Sprintf(`.react-flow__node[data-id="%s"]`, nodeID)).Run(s.session)
+	canvas := q.TestID("run-overlay-compact-canvas").Run(s.session)
+	locator := canvas.Locator(fmt.Sprintf(`.react-flow__node[data-id="%s"]`, nodeID))
 	require.NoError(s.t, locator.WaitFor(pw.LocatorWaitForOptions{
 		State:   pw.WaitForSelectorStateVisible,
 		Timeout: pw.Float(15000),
 	}))
 
-	require.Eventually(s.t, func() bool {
+	var lastCanvas, lastNode string
+	fitted := assert.Eventually(s.t, func() bool {
+		canvasBox, canvasErr := canvas.BoundingBox()
 		box, err := locator.BoundingBox()
-		if err != nil || box == nil {
+		if canvasErr != nil || canvasBox == nil || err != nil || box == nil {
+			lastCanvas, lastNode = fmt.Sprintf("%v", canvasErr), fmt.Sprintf("%v", err)
 			return false
 		}
 
+		lastCanvas = fmt.Sprintf("x=%.1f y=%.1f w=%.1f h=%.1f", canvasBox.X, canvasBox.Y, canvasBox.Width, canvasBox.Height)
+		lastNode = fmt.Sprintf("x=%.1f y=%.1f w=%.1f h=%.1f", box.X, box.Y, box.Width, box.Height)
 		centerX := box.X + box.Width/2
 		centerY := box.Y + box.Height/2
-		return centerX >= 0 && centerX <= linesRunFitViewportWidth &&
-			centerY >= 0 && centerY <= linesRunFitViewportHeight
-	}, 10*time.Second, 200*time.Millisecond, "expected node %q to be panned/zoomed into view", nodeID)
+		return centerX >= canvasBox.X && centerX <= canvasBox.X+canvasBox.Width &&
+			centerY >= canvasBox.Y && centerY <= canvasBox.Y+canvasBox.Height
+	}, 10*time.Second, 200*time.Millisecond)
+	if !fitted {
+		s.t.Fatalf("expected node %q to be panned/zoomed into the compact canvas (canvas %s, node %s)", nodeID, lastCanvas, lastNode)
+	}
 }

@@ -1,7 +1,7 @@
-import { Handle, Position, ReactFlow, Background, type Node, type NodeProps } from "@xyflow/react";
+import { Handle, Position, ReactFlow, Background, useReactFlow, type Node, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Maximize2, MoreHorizontal, Pencil } from "lucide-react";
-import { useCallback, useMemo, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, type MouseEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/buttonVariants";
@@ -13,6 +13,7 @@ import { Link } from "@/components/Link/link";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { FactoryNodeCardShell } from "@/ui/factoryNodeChrome/FactoryNodeCardShell";
 
+import { COMPACT_CANVAS_FIT_SETTLE_MS, compactCanvasFitKey, shouldFitCompactCanvas } from "./compactCanvasFit";
 import { compactLineCanvasGraph, type LineNodeData } from "./compactLineCanvasGraph";
 import type { SplitRunCanvasModel } from "./splitRunCanvases";
 
@@ -51,6 +52,24 @@ function LineCanvasNode({ data }: NodeProps<Node<LineNodeData>>) {
 
 const nodeTypes = { lineCanvas: LineCanvasNode };
 
+const COMPACT_FIT_VIEW_OPTIONS = { padding: 0.2 } as const;
+
+function FitCompactCanvas({ contentKey }: { contentKey: string }) {
+  const { fitView } = useReactFlow();
+
+  useEffect(() => {
+    if (!shouldFitCompactCanvas(contentKey)) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void fitView(COMPACT_FIT_VIEW_OPTIONS);
+    }, COMPACT_CANVAS_FIT_SETTLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [contentKey, fitView]);
+
+  return null;
+}
+
 /**
  * Real line-app canvas in the run pane. Nodes keep factory card chrome.
  */
@@ -83,6 +102,7 @@ export function CompactLineCanvas({
   );
   const background = factoryCanvasBackground(isDark);
   const palette = factoryEdgePalette(isDark);
+  const contentKey = compactCanvasFitKey(nodes.map((node) => node.id));
 
   const onNodeClick = useCallback(
     (_event: MouseEvent, node: Node) => {
@@ -92,7 +112,7 @@ export function CompactLineCanvas({
   );
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
       {showHeader ? (
         <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-3 pb-2">
           <p className="min-w-0 truncate text-[15px] font-semibold tracking-[-0.02em] text-foreground">
@@ -125,13 +145,15 @@ export function CompactLineCanvas({
           </div>
         </div>
       ) : null}
-      <div className="min-h-0 flex-1" data-testid="run-overlay-compact-canvas">
+      <div className="relative h-full min-h-[18rem] w-full flex-1" data-testid="run-overlay-compact-canvas">
         <ReactFlow
+          key={contentKey}
           nodes={nodes}
           edges={edges.map((edge) => ({ ...edge, style: { ...palette.default, ...edge.style } }))}
           nodeTypes={nodeTypes}
           fitView
-          fitViewOptions={{ padding: 0.2 }}
+          fitViewOptions={COMPACT_FIT_VIEW_OPTIONS}
+          minZoom={0.1}
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable
@@ -144,6 +166,7 @@ export function CompactLineCanvas({
           colorMode={isDark ? "dark" : "light"}
           defaultEdgeOptions={{ type: "smoothstep", style: palette.default }}
         >
+          <FitCompactCanvas contentKey={contentKey} />
           <Background
             gap={background.gap}
             size={background.size}

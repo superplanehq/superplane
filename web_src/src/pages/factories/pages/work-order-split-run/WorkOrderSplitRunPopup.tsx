@@ -52,7 +52,7 @@ export function WorkOrderSplitRunBody({
   );
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+    <div className="grid h-full min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <aside className="flex min-h-0 flex-col border-b border-border bg-muted/25 md:border-r md:border-b-0">
         <div className="mb-2 px-3 pt-3">
           <SectionTitle>Log</SectionTitle>
@@ -91,7 +91,7 @@ export function WorkOrderSplitRunBody({
         />
       </aside>
 
-      <section className="flex min-h-0 min-w-0 flex-col" aria-label="Run">
+      <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden" aria-label="Run">
         <CompactLineCanvas
           key={selectedPhase?.id ?? "empty"}
           canvas={visual.canvas}
