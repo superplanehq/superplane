@@ -4,8 +4,8 @@ import {
   ACME_ONBOARDING_FACTORY_ID,
   ACME_ONBOARDING_FACTORY_KEY,
   ACME_ONBOARDING_LINE_ID,
-  GITHUB_ISSUES_INTAKE_APP,
-} from "../../../__fixtures__/factoryPageResponses";
+} from "../../../__fixtures__/factoryPageIds";
+import { GITHUB_ISSUES_INTAKE_APP } from "../../../__fixtures__/factoryPageResponses";
 import { lineMetricsFactoriesFixture } from "../../../__fixtures__/lineMetricsFactoriesFixture";
 
 /**

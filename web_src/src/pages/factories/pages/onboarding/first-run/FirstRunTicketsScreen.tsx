@@ -8,11 +8,13 @@ import type { FirstRunChrome, FirstRunTicketSource } from "./firstRunTypes";
 export function FirstRunTicketsScreen({
   ticketSource,
   chrome,
+  continueLabel = FIRST_RUN_COPY.tickets.analyze,
   onSelectTicketSource,
   onAnalyzeTickets,
 }: {
   ticketSource: FirstRunTicketSource | null;
   chrome?: FirstRunChrome;
+  continueLabel?: string;
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
   onAnalyzeTickets: () => void;
 }) {
@@ -61,7 +63,7 @@ export function FirstRunTicketsScreen({
             onClick={onAnalyzeTickets}
             data-testid="first-run-analyze-tickets"
           >
-            {copy.analyze}
+            {continueLabel}
           </Button>
         </div>
       </div>

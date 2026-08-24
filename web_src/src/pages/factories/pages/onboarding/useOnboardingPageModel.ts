@@ -1,19 +1,17 @@
 import type { FactoriesFactory, FactoriesFactoryLine, FactoryLineStep } from "@/api-client";
-import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useCreateFactoryLine, useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
+import { useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { githubInstallationUrl } from "@/lib/githubInstallation";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
-import { factoryHomePath, factoryListPath, factorySetupPath } from "../../lib/factoryPagePaths";
-import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
+import { factoryHomePath, factorySetupPath } from "../../lib/factoryPagePaths";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import type { IntegrationId, WizardStepId } from "./onboardingFixtures";
 import {
@@ -29,6 +27,7 @@ import {
   type InstallOnboardingApp,
   type UpdateOnboarding,
 } from "./onboardingProvision";
+import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
@@ -93,6 +92,7 @@ function useSectionSaves(args: {
   selections: IntegrationSelections;
   setSaving: (saving: boolean) => void;
   factoryName: string;
+  takenNames: string[];
   updateFactory: (input: { name: string }) => Promise<unknown>;
   updateOnboarding: UpdateOnboarding;
 }) {
@@ -100,7 +100,13 @@ function useSectionSaves(args: {
     const workspaceName = args.setup.workspaceName.trim();
     if (!workspaceName) return Promise.resolve(false);
     if (workspaceName === args.factoryName) return Promise.resolve(true);
-    return runSave(args.setSaving, () => args.updateFactory({ name: workspaceName }));
+    return runSave(args.setSaving, () =>
+      saveWithFreeWorkspaceName({
+        name: workspaceName,
+        takenNames: args.takenNames,
+        save: (name) => args.updateFactory({ name }),
+      }),
+    );
   };
   const saveRepository = (repository: string) => {
     const integrationId = args.selections.github?.id;
@@ -138,13 +144,20 @@ async function provisionWorkspace(args: {
   installFactory: InstallOnboardingApp;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   workspaceName: string;
+  takenNames: string[];
   appRepository: string;
   backlogRepository: string;
   github: { id: string };
   claude: { id: string };
 }): Promise<{ lineId: string }> {
+  // The name comes from the repository, so another workspace in the
+  // organization can hold it already. Such a name gets a counted suffix.
   if (args.workspaceName !== args.factory?.name) {
-    await args.updateFactory({ name: args.workspaceName });
+    await saveWithFreeWorkspaceName({
+      name: args.workspaceName,
+      takenNames: args.takenNames,
+      save: (name) => args.updateFactory({ name }),
+    });
   }
   await args.updateOnboarding({
     vcsIntegrationId: args.github.id,
@@ -188,6 +201,7 @@ function useFinishOnboarding(args: {
   setup: OnboardingSetupApi;
   selections: IntegrationSelections;
   setSaving: (saving: boolean) => void;
+  takenNames: string[];
   updateFactory: (input: { name: string }) => Promise<unknown>;
   updateOnboarding: UpdateOnboarding;
   installFactory: InstallOnboardingApp;
@@ -229,35 +243,12 @@ function useFinishOnboarding(args: {
   };
 }
 
-function useCancelOnboarding(args: { organizationId: string; factoryId: string; canDelete: boolean }) {
-  const { account } = useAccount();
-  const navigate = useNavigate();
-  const deleteFactory = useDeleteFactory(args.organizationId);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-
-  const cancelSetup = async () => {
-    if (!args.canDelete) {
-      showErrorToast("You do not have permission to delete this workspace.");
-      throw new Error("Missing permission to delete workspace");
-    }
-    try {
-      await deleteFactory.mutateAsync(args.factoryId);
-      clearLastVisitedFactory(account?.id ?? "", args.organizationId, args.factoryId);
-      showSuccessToast("Workspace deleted.");
-      navigate(factoryListPath(args.organizationId), { replace: true });
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to delete workspace"));
-      throw error;
-    }
-  };
-
-  return {
-    canDeleteWorkspace: args.canDelete,
-    deleteOpen,
-    setDeleteOpen,
-    deleting: deleteFactory.isPending,
-    cancelSetup,
-  };
+/** Names held by the other workspaces of the organization. */
+function otherWorkspaceNames(factories: FactoriesFactory[], factoryId: string): string[] {
+  return factories
+    .filter((factory) => factory.id !== factoryId)
+    .map((factory) => factory.name ?? "")
+    .filter(Boolean);
 }
 
 export function useOnboardingPageModel(args: {
@@ -265,6 +256,7 @@ export function useOnboardingPageModel(args: {
   factoryId: string;
   factoryKey: string;
   factory: FactoriesFactory | null;
+  factories: FactoriesFactory[];
 }) {
   const { canAct } = usePermissions();
   const onboarding = args.factory?.onboarding;
@@ -324,11 +316,17 @@ export function useOnboardingPageModel(args: {
     [resources.data],
   );
 
+  const takenNames = useMemo(
+    () => otherWorkspaceNames(args.factories, args.factoryId),
+    [args.factories, args.factoryId],
+  );
+
   const saves = useSectionSaves({
     setup,
     selections: integrations.selections,
     setSaving,
     factoryName: args.factory?.name ?? "",
+    takenNames,
     updateFactory: updateFactory.mutateAsync,
     updateOnboarding: updateOnboarding.mutateAsync,
   });
@@ -337,15 +335,11 @@ export function useOnboardingPageModel(args: {
     setup,
     selections: integrations.selections,
     setSaving,
+    takenNames,
     updateFactory: updateFactory.mutateAsync,
     updateOnboarding: updateOnboarding.mutateAsync,
     installFactory: installer.installFactory,
     createLine: createLine.mutateAsync,
-  });
-  const cancel = useCancelOnboarding({
-    organizationId: args.organizationId,
-    factoryId: args.factoryId,
-    canDelete: canAct("factories", "delete"),
   });
   const finishSetup = useFinishSetupAction({
     organizationId: args.organizationId,
@@ -380,6 +374,5 @@ export function useOnboardingPageModel(args: {
     saving: saving || installer.isInstalling,
     ...saves,
     finish: finishSetup,
-    ...cancel,
   };
 }

@@ -8,10 +8,8 @@ import { FirstRunConnectScreen } from "./onboarding/first-run/FirstRunConnectScr
 import { FirstRunFlow } from "./onboarding/first-run/FirstRunFlow";
 
 /**
- * Separate first-run journey from docs/prd/onboarding-first-run.md.
- * Does not replace the existing workspace setup wizard.
- *
- * Step stories mount the clickable flow so primary buttons advance.
+ * Isolated first-run screens. Step stories mount the clickable flow so
+ * primary buttons advance.
  */
 const meta = {
   title: "Factories/Pages/First run",

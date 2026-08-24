@@ -8,8 +8,9 @@ import { useNavigate, useParams } from "react-router";
 
 import { factoryListPath, factorySetupPath } from "../../lib/factoryPagePaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
+import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
-import { placeholderWorkspaceName } from "./workspaceNames";
+import { PLACEHOLDER_WORKSPACE_NAME } from "./workspaceNames";
 
 /**
  * Creates the workspace with a placeholder name and opens the setup wizard.
@@ -44,11 +45,11 @@ function NewWorkspacePageContent({ organizationId }: { organizationId: string })
 
     const create = async () => {
       try {
-        // An empty key lets the server derive a free key from the name.
-        const factory = await createFactory.mutateAsync({
-          name: placeholderWorkspaceName((factories.data ?? []).map((existing) => existing.name ?? "")),
-          description: "",
-          key: "",
+        const factory = await saveWithFreeWorkspaceName({
+          name: PLACEHOLDER_WORKSPACE_NAME,
+          takenNames: (factories.data ?? []).map((existing) => existing.name ?? ""),
+          // An empty key lets the server derive a free key from the name.
+          save: (name) => createFactory.mutateAsync({ name, description: "", key: "" }),
         });
         if (!factory.id || !factory.key) {
           throw new Error("The workspace was created without a key");

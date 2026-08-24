@@ -47,4 +47,17 @@ describe("FirstRunTicketsScreen", () => {
     await user.click(analyze);
     expect(onAnalyzeTickets).toHaveBeenCalledTimes(1);
   });
+
+  it("uses the next-step label when setup names the coding agent step", () => {
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="github-issues"
+        continueLabel={FIRST_RUN_COPY.tickets.continue}
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.continue })).toBeEnabled();
+  });
 });
