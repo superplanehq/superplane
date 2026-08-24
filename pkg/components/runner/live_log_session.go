@@ -120,8 +120,16 @@ func taskBrokerBaseURL() (string, error) {
 	return base, nil
 }
 
+func taskBrokerLiveLogBaseURL() (string, error) {
+	public := strings.TrimRight(strings.TrimSpace(os.Getenv("TASK_BROKER_PUBLIC_URL")), "/")
+	if public != "" {
+		return public, nil
+	}
+	return taskBrokerBaseURL()
+}
+
 func LiveLogStreamURL(brokerTaskID string) (string, error) {
-	base, err := taskBrokerBaseURL()
+	base, err := taskBrokerLiveLogBaseURL()
 	if err != nil {
 		return "", err
 	}

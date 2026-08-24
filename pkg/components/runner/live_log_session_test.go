@@ -26,6 +26,7 @@ func TestMintAndValidateLiveLogStreamToken(t *testing.T) {
 
 func TestNewLiveLogSession(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_PUBLIC_URL", "")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
 
 	session, err := NewLiveLogSession("task-abc", time.Now())
@@ -33,6 +34,24 @@ func TestNewLiveLogSession(t *testing.T) {
 	assert.Equal(t, "https://broker.example/v1/tasks/task-abc/live-logs", session.StreamURL)
 	assert.NotEmpty(t, session.Token)
 	assert.False(t, session.ExpiresAt.IsZero())
+}
+
+func TestLiveLogStreamURLPrefersPublicURL(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "http://task-broker:8081")
+	t.Setenv("TASK_BROKER_PUBLIC_URL", "http://localhost:8091")
+
+	got, err := LiveLogStreamURL("task-1")
+	require.NoError(t, err)
+	assert.Equal(t, "http://localhost:8091/v1/tasks/task-1/live-logs", got)
+}
+
+func TestLiveLogStreamURLFallsBackToBaseURL(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "http://task-broker:8081")
+	t.Setenv("TASK_BROKER_PUBLIC_URL", "")
+
+	got, err := LiveLogStreamURL("task-1")
+	require.NoError(t, err)
+	assert.Equal(t, "http://task-broker:8081/v1/tasks/task-1/live-logs", got)
 }
 
 func TestBrokerTaskIDFromExecutionMetadata(t *testing.T) {

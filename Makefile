@@ -34,7 +34,7 @@ OPENAPI_GENERATOR_IMAGE := openapitools/openapi-generator-cli:v7.13.0
 # - exports junit report
 # - sets parallelism to 1
 #
-GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml 
+GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test -e TASK_BROKER_FLEET_ID= -e TASK_BROKER_PUBLIC_URL= -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml 
 
 #
 # Targets for test environment

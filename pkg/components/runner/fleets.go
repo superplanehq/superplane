@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -34,4 +35,13 @@ func requireMachineType(machineType string) (string, error) {
 		return "", fmt.Errorf("machine type is required")
 	}
 	return fleet, nil
+}
+
+// resolveCreateTaskFleetID returns TASK_BROKER_FLEET_ID when set (local compose
+// override), otherwise the node machine type.
+func resolveCreateTaskFleetID(machineType string) (string, error) {
+	if override := strings.TrimSpace(os.Getenv("TASK_BROKER_FLEET_ID")); override != "" {
+		return override, nil
+	}
+	return requireMachineType(machineType)
 }
