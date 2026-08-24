@@ -104,7 +104,11 @@ go build -o bin/task-broker ./task-broker/cmd/task-broker
 
 ### Local dev
 
-Use **separate terminals**: **`make task-broker`**, then **`make register-local-fleet`**, then **`make runner`** (optional **`N=3`** runner processes; default **`N=1`**). **`make fleet-manager`** is only needed when testing the EC2 provisioner locally. **`make local-dev-help`** lists this. Defaults (`LOCAL_*`, **`LOCAL_STACK_AUTH_TOKEN`**, **`LOCAL_RUNNER_*`**, **`N`**) are in the **`Makefile`**; override on the command line when needed. Enqueue on the broker with **`Authorization: Bearer dev-local-token`** and **`"fleet_id":"local"`** (unless you changed **`LOCAL_STACK_AUTH_TOKEN`** / **`LOCAL_FLEET_ID`**).
+**One command:** **`make dev`** starts Postgres, task-broker, SuperPlane fleets (`local` plus `e1-*`), and one runner worker. Broker is on **http://127.0.0.1:8091** (host **8081** is SuperPlane pgweb). **`make dev.down`** stops the stack.
+
+SuperPlane compose defaults already point at this stack. Full steps, webhook URLs, and a host worker for Claude Code: [docs/local-dev.md](./docs/local-dev.md).
+
+**Manual (separate terminals):** **`make task-broker`**, then **`make register-local-fleet`**, then **`make runner`** (optional **`N=3`**). **`make register-superplane-fleets`** also registers SuperPlane machine types. **`make fleet-manager`** is only for the EC2 provisioner. **`make local-dev-help`** lists this. Host **`make task-broker`** still listens on **:8081**. Enqueue with **`Authorization: Bearer dev-local-token`** and **`"fleet_id":"local"`**.
 
 ## Run task-broker
 

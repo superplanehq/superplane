@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/superplane/runner/shared/httpaccess"
+	"github.com/superplane/runner/task-broker/internal/livelogs"
 )
 
 // RouterOptions configures HTTP middleware.
@@ -20,6 +21,9 @@ type RouterOptions struct {
 func NewRouter(s *Server, opt RouterOptions) http.Handler {
 	if s.RunnerDrain == nil {
 		s.RunnerDrain = NewRunnerDrainHub()
+	}
+	if s.LiveLogs == nil {
+		s.LiveLogs = livelogs.NewHub()
 	}
 
 	r := chi.NewRouter()
@@ -52,6 +56,7 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 		r.With(s.runnerAuth).Post("/tasks/claim", s.claimTask)
 		r.With(s.runnerAuth).Get("/runners/stream", s.runnerStream)
 		r.With(s.runnerAuth).Post("/tasks/{id}/complete", s.completeTask)
+		r.With(s.runnerAuth).Post("/tasks/{id}/live-log-events", s.appendTaskLiveLogs)
 		r.With(s.runnerAuth).Delete("/runners/self", s.revokeRunner)
 		r.With(s.controlOrRunnerAuth(auth)).Get("/tasks/{id}", s.getTask)
 
