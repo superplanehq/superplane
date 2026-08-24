@@ -28,9 +28,11 @@ interface CanvasCardsGridProps {
   organizationId: string;
   onEditCanvas: (canvas: CanvasCardData) => void;
   onToggleStar: (canvasId: string, starred: boolean) => void;
+  canCreateCanvases: boolean;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
+  allCanvasNames: string[];
 }
 
 export function CanvasCardsGrid({
@@ -39,9 +41,11 @@ export function CanvasCardsGrid({
   organizationId,
   onEditCanvas,
   onToggleStar,
+  canCreateCanvases,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
+  allCanvasNames,
 }: CanvasCardsGridProps) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -53,9 +57,11 @@ export function CanvasCardsGrid({
           organizationId={organizationId}
           onEdit={onEditCanvas}
           onToggleStar={onToggleStar}
+          canCreateCanvases={canCreateCanvases}
           canUpdateCanvases={canUpdateCanvases}
           canDeleteCanvases={canDeleteCanvases}
           permissionsLoading={permissionsLoading}
+          allCanvasNames={allCanvasNames}
         />
       ))}
     </div>
@@ -68,9 +74,11 @@ interface CanvasCardProps {
   organizationId: string;
   onEdit: (canvas: CanvasCardData) => void;
   onToggleStar: (canvasId: string, starred: boolean) => void;
+  canCreateCanvases: boolean;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
+  allCanvasNames: string[];
 }
 
 function CanvasCard({
@@ -79,9 +87,11 @@ function CanvasCard({
   organizationId,
   onEdit,
   onToggleStar,
+  canCreateCanvases,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
+  allCanvasNames,
 }: CanvasCardProps) {
   const canvasHref = appPath(organizationId, canvas.id);
   const previewNodes = canvas.nodes || [];
@@ -122,9 +132,11 @@ function CanvasCard({
                 canvasFolders={canvasFolders}
                 organizationId={organizationId}
                 onEdit={onEdit}
+                canCreateCanvases={canCreateCanvases}
                 canUpdateCanvases={canUpdateCanvases}
                 canDeleteCanvases={canDeleteCanvases}
                 permissionsLoading={permissionsLoading}
+                allCanvasNames={allCanvasNames}
               />
             </div>
           </div>
