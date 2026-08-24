@@ -37,7 +37,7 @@ export function WorkOrdersListView(props: WorkOrdersListViewProps) {
         return (
           <section key={lane.id} aria-label={lane.title} data-testid={`work-orders-list-lane-${lane.id}`}>
             <header className="mb-1.5 flex items-center gap-2 px-1">
-              <h2 className="text-[12px] font-semibold uppercase tracking-[0.06em] text-foreground/80">{lane.title}</h2>
+              <h2 className="workspace-section-title">{lane.title}</h2>
               <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                 {laneEntries.length}
               </span>
