@@ -191,6 +191,14 @@ func Test__GitHub__SetupProvider__OnSecretUpdate(t *testing.T) {
 	})
 }
 
+func Test__GitHub__SetupProvider__FirstStep(t *testing.T) {
+	step := (&SetupProvider{}).FirstStep(core.SetupStepContext{})
+
+	assert.Equal(t, "Select the GitHub user or organization", step.Label)
+	require.Len(t, step.Inputs, 2)
+	assert.Equal(t, "GitHub user or organization name", step.Inputs[1].Label)
+}
+
 func Test__GitHub__SetupProvider__OnStepSubmit(t *testing.T) {
 	g := &SetupProvider{}
 	log := logger.DiscardLogger()

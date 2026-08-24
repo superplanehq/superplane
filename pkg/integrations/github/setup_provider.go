@@ -234,7 +234,7 @@ func (g *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 	return core.SetupStep{
 		Type:  core.SetupStepTypeInputs,
 		Name:  SetupStepSelectOwner,
-		Label: "Select the user account / organization",
+		Label: "Select the GitHub user or organization",
 		Inputs: []configuration.Field{
 			{
 				Name:     common.PropertyOwnerType,
@@ -253,7 +253,7 @@ func (g *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 			},
 			{
 				Name:        common.PropertyOwner,
-				Label:       "User account / organization name",
+				Label:       "GitHub user or organization name",
 				Type:        configuration.FieldTypeString,
 				Required:    true,
 				Placeholder: "e.g. superplanehq",
