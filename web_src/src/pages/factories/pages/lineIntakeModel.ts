@@ -133,8 +133,16 @@ export function isLineIntakeSourceId(id: string | null | undefined): id is LineI
   return Boolean(id && lineIntakeSourceById(id));
 }
 
-export function intakeAutomationAppId(apps: Array<{ id?: string }>): string | undefined {
-  return apps.find((app) => app.id === GITHUB_ISSUES_INTAKE_APP_ID)?.id ?? apps.find((app) => app.id)?.id;
+export function intakeAutomationAppId(apps: Array<{ id?: string; name?: string }>): string | undefined {
+  const byKnownId = apps.find((app) => app.id === GITHUB_ISSUES_INTAKE_APP_ID);
+  if (byKnownId?.id) {
+    return byKnownId.id;
+  }
+  const byIntake = apps.find((app) => /intake/i.test(`${app.id ?? ""} ${app.name ?? ""}`));
+  if (byIntake?.id) {
+    return byIntake.id;
+  }
+  return apps.find((app) => app.id)?.id;
 }
 
 export interface LineIntakeAnalyzingTicket {

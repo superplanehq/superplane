@@ -245,6 +245,7 @@ function FactoriesSidebar({
   permissionsLoading,
   onOpenCreateFactory,
 }: FactoriesSidebarProps) {
+  const { lineId: routeLineId } = useParams<{ lineId?: string }>();
   return (
     <aside
       className="sticky top-0 flex h-screen w-[var(--workspace-navigation-width)] shrink-0 flex-col items-center border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
@@ -261,7 +262,7 @@ function FactoriesSidebar({
       <FactoriesSidebarNav
         organizationId={organizationId}
         factoryKey={factoryKey}
-        lineId={firstFactoryLineId(factory)}
+        lineId={routeLineId ?? firstFactoryLineId(factory)}
         canOpenSettings={canOpenSettings}
         permissionsLoading={permissionsLoading}
       />
