@@ -44,11 +44,7 @@ export function useFactoryAppSplitRunPage() {
   const { appId = "" } = useParams<{ appId: string }>();
   const [nodeId, setNodeId] = useState<string | null>(null);
   const split = useSplitRunPanePercent();
-  const { isLoading, lineName, order, query } = useSplitRunPageSelection(
-    organizationId,
-    factoryId,
-    factory?.lines,
-  );
+  const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
   const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, order?.id ?? "");
   const fixture = useMemo(
     () => fixtureForSplitRunPage(order, orderChecks, query.lineId),

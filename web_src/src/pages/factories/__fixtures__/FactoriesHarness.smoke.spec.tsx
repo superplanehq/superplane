@@ -330,6 +330,8 @@ describe("FactoriesHarness Acme onboarding", () => {
     expect(screen.getByTestId("factories-sidebar")).toBeInTheDocument();
     expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.queryByTestId("workspace-setup")).not.toBeInTheDocument();
-    expect(screen.getAllByTestId(/^work-order-card-/).length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/^work-order-card-/).length).toBeGreaterThan(0);
+    });
   }, 15000);
 });

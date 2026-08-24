@@ -16,11 +16,7 @@ import { intakeCanvasForSource } from "./lineIntakeCanvas";
 import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvases";
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
 
-export {
-  ADD_INTAKE_TEMPLATES,
-  filterAddIntakeTemplates,
-  type AddIntakeTemplate,
-} from "./addIntakeTemplates";
+export { ADD_INTAKE_TEMPLATES, filterAddIntakeTemplates, type AddIntakeTemplate } from "./addIntakeTemplates";
 
 export type LineIntakeSourceId = "github-issues" | "sentry-exceptions" | "pagerduty-incidents";
 
@@ -463,4 +459,3 @@ function backlogPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): Sp
     stream,
   };
 }
-

@@ -11,7 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Check, Plus, Triangle } from "lucide-react";
 import { useNavigate } from "react-router";
-import { factoryDetailPath } from "../lib/factoryPagePaths";
+import { factoryHomePath, firstFactoryLineId } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
 
 interface WorkspaceSwitcherProps {
@@ -55,7 +55,7 @@ export function WorkspaceSwitcher({
           <DropdownMenuLabel>Switch workspace</DropdownMenuLabel>
           {factories.map((entry) => {
             const isCurrent = entry.id === factory.id;
-            const targetHref = entry.key ? factoryDetailPath(organizationId, entry.key) : "";
+            const targetHref = entry.key ? factoryHomePath(organizationId, entry.key, firstFactoryLineId(entry)) : "";
             return (
               <DropdownMenuItem
                 key={entry.id}
