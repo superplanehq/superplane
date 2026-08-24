@@ -217,7 +217,8 @@ describe("FactoriesHarness workspace setup", () => {
       />,
     );
 
-    await user.click(await screen.findByRole("button", { name: /acme-github/ }, { timeout: 8000 }));
+    await user.click(await screen.findByTestId("first-run-get-started", {}, { timeout: 8000 }));
+    await user.click(await screen.findByTestId("first-run-github-continue", {}, { timeout: 8000 }));
 
     expect(await screen.findByRole("option", { name: /acme\/api/ }, { timeout: 8000 })).toBeInTheDocument();
   }, 15000);
@@ -245,8 +246,7 @@ describe("FactoriesHarness workspace setup", () => {
       />,
     );
 
-    expect(
-      await screen.findByRole("button", { name: /Change backlog repository/ }, { timeout: 8000 }),
-    ).toBeInTheDocument();
+    expect(await screen.findByTestId("first-run-tickets", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /GitHub Issues/ }, { timeout: 8000 })).toBeInTheDocument();
   }, 15000);
 });

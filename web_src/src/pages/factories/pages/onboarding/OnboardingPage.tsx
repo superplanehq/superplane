@@ -1,9 +1,8 @@
-import { getApiErrorMessage } from "@/lib/errors";
 import { X } from "lucide-react";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
+import { FirstRunSetup } from "./FirstRunSetup";
 import { OnboardingCancelDialog } from "./OnboardingCancelDialog";
-import { SetupSections } from "./SetupSections";
 import { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 export function OnboardingPage() {
@@ -25,6 +24,8 @@ export function OnboardingPage() {
 
   return (
     <div className="relative min-h-full w-full bg-background text-foreground" data-testid="workspace-setup">
+      <FirstRunSetup model={model} />
+
       {model.canDeleteWorkspace ? (
         <button
           type="button"
@@ -32,43 +33,15 @@ export function OnboardingPage() {
           title="Cancel setup"
           disabled={model.deleting}
           onClick={() => model.setDeleteOpen(true)}
-          className="absolute left-4 top-4 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+          // The setup screens keep their own controls in the top corners, so
+          // the cancel control sits beside the step markers.
+          className="fixed bottom-4 left-4 z-20 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
           data-testid="workspace-setup-cancel"
         >
           <X className="size-6" aria-hidden />
         </button>
       ) : null}
 
-      <div className="mx-auto w-full max-w-3xl px-6 py-8 lg:px-8">
-        {model.repositoriesLoading ? (
-          <p className="mb-6 text-[13px] text-muted-foreground">Loading repositories…</p>
-        ) : null}
-        {model.repositoriesError ? (
-          <p className="mb-6 text-[13px] text-destructive">
-            {getApiErrorMessage(model.repositoriesError, "Failed to load repositories")}
-          </p>
-        ) : null}
-
-        <div>
-          <SetupSections
-            setup={model.setup}
-            openSection={model.openSection}
-            setOpenSection={model.setOpenSection}
-            requestConnect={model.requestConnect}
-            createVcsConnection={model.createVcsConnection}
-            selectVcsConnection={model.selectVcsConnection}
-            githubConnections={model.githubConnections}
-            selectedVcsConnectionId={model.selectedVcsConnectionId}
-            requestConfigure={model.requestConfigure}
-            onContinueName={model.saveName}
-            onContinueRepo={model.saveRepository}
-            onContinueIssues={model.saveIssues}
-            onFinish={model.finish}
-            repos={model.repositories}
-            saving={model.saving}
-          />
-        </div>
-      </div>
       {model.integrationDialogs}
       <OnboardingCancelDialog
         open={model.deleteOpen}
