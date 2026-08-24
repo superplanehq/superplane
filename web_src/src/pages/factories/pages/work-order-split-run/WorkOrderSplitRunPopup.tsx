@@ -7,7 +7,7 @@ import { SplitRunCheckPills, SplitRunReview } from "./SplitRunReview";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { emptySplitRunCanvas, type SplitRunCanvasKey } from "./splitRunCanvases";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
-import { type SplitRunFixture, type SplitRunPhaseId } from "./splitRunMocks";
+import { autoExpandedPhaseId, type SplitRunFixture, type SplitRunPhaseId } from "./splitRunMocks";
 import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
 import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
 
@@ -36,7 +36,7 @@ export function WorkOrderSplitRunBody({
   canDispatch = false,
 }: WorkOrderSplitRunBodyProps) {
   const [phaseId, setPhaseId] = useState<SplitRunPhaseId>(fixture.currentPhaseId);
-  const [openPhaseId, setOpenPhaseId] = useState<SplitRunPhaseId | null>(fixture.currentPhaseId);
+  const [openPhaseId, setOpenPhaseId] = useState<SplitRunPhaseId | null>(() => autoExpandedPhaseId(fixture));
   const [nodeId, setNodeId] = useState<string | null>(null);
   const selectedPhase = fixture.phases.find((entry) => entry.id === phaseId) ?? fixture.phases[0];
   const live = useSplitRunLiveCanvas(organizationId, selectedPhase);

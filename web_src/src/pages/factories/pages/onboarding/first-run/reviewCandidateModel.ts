@@ -39,7 +39,7 @@ export interface ReviewCandidate {
   confidenceBand: ReviewConfidenceBand;
   /** Three reasons SuperPlane can implement this ticket. */
   reasons: [string, string, string];
-  /** Markdown implementation plan shown on the Plan tab. */
+  /** Markdown implementation plan attached as plan.md on Create plan. */
   planMarkdown: string;
   summary: string;
   readyNote: string;
@@ -47,38 +47,12 @@ export interface ReviewCandidate {
   noBlockingQuestions: string;
 }
 
-export type ReviewCandidateTab = "plan" | "ticket" | "analysis";
-
 export const REVIEW_CANDIDATE_COPY = {
-  tabsLabel: "Ticket review",
-  planTab: "Plan",
-  ticketTab: "Ticket",
-  analysisTab: "Analysis Run",
-  ticketSource: "GitHub Issues",
   ticketRepository: "acme/payments-service",
-  openIssue: "Open issue on GitHub",
-  opened: "Opened",
-  updated: "Updated",
-  author: "Author",
-  assignees: "Assignees",
-  noAssignees: "No assignees",
-  reasonsHeading: "Why SuperPlane can implement this",
-  planHeading: "Implementation plan",
-  planFile: "plan.md",
-  editPlan: "Edit",
-  donePlan: "Done",
-  planEditorLabel: "Plan markdown",
-  back: "Back to results",
-  approve: "Approve plan and start",
-  approved: "Plan approved",
 } as const;
 
 export function githubIssueUrl(repository: string, ticketKey: string): string {
   return `https://github.com/${repository}/issues/${ticketKey.replace(/\D/g, "")}`;
-}
-
-export function isReviewCandidateTab(value: string): value is ReviewCandidateTab {
-  return value === "plan" || value === "ticket" || value === "analysis";
 }
 
 export function confidenceBandForScore(score: number): ReviewConfidenceBand {

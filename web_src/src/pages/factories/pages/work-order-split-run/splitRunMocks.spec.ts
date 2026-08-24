@@ -21,6 +21,7 @@ import {
   LINE_BOARD_VERIFY_PR_REVIEW_ORDER,
 } from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { OPEN_WORK_ORDER_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
+import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { splitRunFixtureForWorkOrder, splitRunStatusLabel } from "./splitRunMocks";
 
 function dispatch(state: FactoriesWorkOrderLineDispatch["state"], stepExecutions: FactoriesWorkOrderExecution[]) {
@@ -106,6 +107,17 @@ describe("splitRunFixtureForWorkOrder", () => {
   it("keeps a single Backlog ingest row on an ingest draft", () => {
     const fixture = splitRunFixtureForWorkOrder(INGEST_DRAFT_WORK_ORDER);
     expect(fixture.phases.map((phase) => phase.id)).toEqual(["backlog"]);
+  });
+
+  it("puts complete ingest analysis on a scored review draft", () => {
+    const fixture = splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]);
+    expect(fixture.phases.map((phase) => phase.id)).toEqual(["ingest", "analyze", "plan", "score"]);
+    expect(fixture.footerTone).toBe("draft");
+    expect(fixture.phases.find((phase) => phase.id === "score")?.checks?.[0]).toMatchObject({
+      name: "Confidence score",
+      score: 5,
+    });
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
   });
 
   it("pins a pull request review on a waiting implement card", () => {
@@ -530,7 +542,9 @@ describe("line board work-order examples", () => {
     ]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual([]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts)).toEqual(["#512"]);
-    expect(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts[0]?.data).toMatchObject({ state: "closed" });
+    expect(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts[0]?.data).toMatchObject({
+      state: "closed",
+    });
   });
 
   it("keeps ingest analysis and a cancel note on the canceled done card", () => {

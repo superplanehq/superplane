@@ -58,7 +58,6 @@ import {
 } from "../workOrders/WorkOrderBoardChrome";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
-import { ReviewCandidateModal } from "./onboarding/first-run/ReviewCandidateModal";
 import { reviewCandidateForWorkOrderId } from "./onboarding/first-run/reviewCandidates";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 import type { SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
@@ -389,7 +388,6 @@ function LineDetail({
   const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
   const [peekOrderId, setPeekOrderId] = useState<string | null>(null);
   const peekOrder = workOrders.find((order) => order.id === peekOrderId);
-  const reviewCandidate = reviewCandidateForWorkOrderId(peekOrderId ?? undefined);
   const canvasEditHref = useMemo(
     () => canvasEditHrefForLine(organizationId, factoryKey, line, apps),
     [organizationId, factoryKey, line, apps],
@@ -418,9 +416,7 @@ function LineDetail({
           onOpenWorkOrder={setPeekOrderId}
         />
       )}
-      {reviewCandidate ? (
-        <ReviewCandidateModal candidate={reviewCandidate} onClose={() => setPeekOrderId(null)} />
-      ) : peekOrderId ? (
+      {peekOrderId ? (
         <LineBoardSplitRunPopup
           organizationId={organizationId}
           factoryId={factoryId}

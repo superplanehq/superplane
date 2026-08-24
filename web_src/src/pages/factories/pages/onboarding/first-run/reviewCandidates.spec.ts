@@ -4,7 +4,6 @@ import {
   confidenceBandClassName,
   confidenceBandForScore,
   implementationPlanMarkdown,
-  isReviewCandidateTab,
   githubIssueUrl,
   reviewCandidateForWorkOrderId,
   REVIEW_CANDIDATE_COPY,
@@ -89,12 +88,5 @@ Move both images to Node 20.
     expect(confidenceBandClassName("High")).toMatch(/emerald/);
     expect(confidenceBandClassName("Medium")).toMatch(/orange/);
     expect(confidenceBandClassName("Low")).toMatch(/red/);
-  });
-
-  it("accepts only the three review tabs", () => {
-    expect(isReviewCandidateTab("plan")).toBe(true);
-    expect(isReviewCandidateTab("ticket")).toBe(true);
-    expect(isReviewCandidateTab("analysis")).toBe(true);
-    expect(isReviewCandidateTab("runs")).toBe(false);
   });
 });

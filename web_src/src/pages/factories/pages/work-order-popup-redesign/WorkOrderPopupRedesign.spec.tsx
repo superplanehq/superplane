@@ -253,8 +253,13 @@ describe("Line board job popup", () => {
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
-    dialog = await screen.findByTestId("review-candidate-modal");
+    dialog = await screen.findByTestId("work-order-split-run");
     expect(within(dialog).getByRole("heading", { name: "Add retry handling to webhook delivery" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab", { name: "Plan" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-phase-ingest")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-phase-checks-score")).toHaveTextContent("5/5");
+    expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
     await user.click(screen.getByRole("button", { name: "Open Send refund receipts after provider confirm" }));

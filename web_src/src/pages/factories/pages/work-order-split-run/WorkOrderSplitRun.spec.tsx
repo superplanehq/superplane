@@ -363,7 +363,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(review).getByRole("button", { name: "Dispatch" })).toBeDisabled();
     const backlog = screen.getByTestId("split-run-phase-backlog");
     expect(within(backlog).getByText(/Created manually/)).toBeInTheDocument();
-    expect(within(backlog).getByText("Leonardo DiCaprio created this work order manually.")).toBeInTheDocument();
+    expect(within(backlog).getByRole("button", { name: /Backlog/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("split-run-stream-backlog")).not.toBeInTheDocument();
     expect(within(backlog).getAllByRole("button", { name: "description.md" }).length).toBeGreaterThan(0);
     expect(screen.queryByText("On Issue Label")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
@@ -403,6 +404,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(review).getByRole("link", { name: "Open failed run" })).toBeInTheDocument();
     expect(review.className).toContain("status-failed-bg");
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-stream-implement-0")).toBeInTheDocument();
   });
 
   it("opens the selected step canvas when a log row is clicked", async () => {
@@ -494,6 +496,9 @@ describe("WorkOrderSplitRunPopup", () => {
         ],
       },
     });
+
+    expect(screen.queryByTestId("split-run-stream-done")).not.toBeInTheDocument();
+    await user.click(within(screen.getByTestId("split-run-phase-done")).getByRole("button", { name: /Done/ }));
 
     const stream = screen.getByTestId("split-run-stream-done");
     expect(within(stream).queryByText("Started")).not.toBeInTheDocument();

@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { TooltipProvider } from "@/ui/tooltip";
 import { editFactoryLinePath, factoryAppConfigurePath, factoryLineDetailPath } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
@@ -34,6 +35,8 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryApps: () => useFactoryApps(),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: updateFactoryLineMutateAsync, isPending: false }),
+  useWorkOrderEvents: () => ({ data: { pages: [] } }),
+  useWorkOrderArtifacts: () => ({ data: [] }),
 }));
 
 vi.mock("@/hooks/useWorkOrderCardActions", () => ({
@@ -55,6 +58,10 @@ vi.mock("@/hooks/usePageTitle", () => ({
 
 vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "storybook-user" } }),
+}));
+
+vi.mock("@/hooks/useWorkOrderChecks", () => ({
+  useWorkOrderChecks: () => ({ data: [] }),
 }));
 
 function LocationProbe() {
@@ -150,24 +157,26 @@ describe("LinesPage board", () => {
     return render(
       <QueryClientProvider client={new QueryClient()}>
         <ThemeProvider>
-          <MemoryRouter initialEntries={[path]}>
-            <FactoriesLayoutContext.Provider
-              value={{
-                organizationId: "org-1",
-                factoryId: factory.id ?? PRIMARY_FACTORY_ID,
-                factoryKey: factory.key ?? PRIMARY_FACTORY_KEY,
-                factory,
-                factories: [factory],
-                openCreateWorkOrder,
-              }}
-            >
-              <Routes>
-                <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
-                <Route path="/org-1/workspaces/:factoryKey/lines/:lineId/edit" element={<div>Edit line</div>} />
-              </Routes>
-              <LocationProbe />
-            </FactoriesLayoutContext.Provider>
-          </MemoryRouter>
+          <TooltipProvider>
+            <MemoryRouter initialEntries={[path]}>
+              <FactoriesLayoutContext.Provider
+                value={{
+                  organizationId: "org-1",
+                  factoryId: factory.id ?? PRIMARY_FACTORY_ID,
+                  factoryKey: factory.key ?? PRIMARY_FACTORY_KEY,
+                  factory,
+                  factories: [factory],
+                  openCreateWorkOrder,
+                }}
+              >
+                <Routes>
+                  <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
+                  <Route path="/org-1/workspaces/:factoryKey/lines/:lineId/edit" element={<div>Edit line</div>} />
+                </Routes>
+                <LocationProbe />
+              </FactoriesLayoutContext.Provider>
+            </MemoryRouter>
+          </TooltipProvider>
         </ThemeProvider>
       </QueryClientProvider>,
     );
@@ -203,7 +212,7 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
   });
 
-  it("shows a score on a review-candidate backlog card and opens the plan review", async () => {
+  it("shows a score on a review-candidate backlog card and opens the split run", async () => {
     useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
     const user = userEvent.setup();
     renderBoard();
@@ -219,13 +228,16 @@ describe("LinesPage board", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
-    const dialog = screen.getByTestId("review-candidate-modal");
+    const dialog = screen.getByTestId("work-order-split-run");
     expect(within(dialog).getByRole("heading", { name: "Add retry handling to webhook delivery" })).toBeInTheDocument();
-    expect(within(dialog).getByTestId("review-candidate-score")).toHaveTextContent("5 / 5");
-    expect(within(dialog).getByTestId("review-candidate-plan")).toHaveTextContent(
-      "Add a webhook-specific retry policy using the shared backoff utility.",
-    );
-    expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab", { name: "Plan" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Log" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-phase-ingest")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-phase-analyze")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-phase-plan")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-phase-checks-score")).toHaveTextContent("5/5");
+    expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
   });
 
   it("opens the Intake drawer beside the board when the intake query is set", () => {

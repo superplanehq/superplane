@@ -132,6 +132,17 @@ const IMPLEMENT_FAILED_NOTE: WorkOrderStatusNotePresentation = {
   source: { name: "Implementation" },
 };
 
+const AUTO_EXPAND_STATUSES = new Set<SplitRunPhaseStatus>(["running", "waiting", "failed"]);
+
+/** Open the current step only when it is running, waiting, or failed. */
+export function autoExpandedPhaseId(fixture: SplitRunFixture): SplitRunPhaseId | null {
+  const current = fixture.phases.find((phase) => phase.id === fixture.currentPhaseId);
+  if (!current || !AUTO_EXPAND_STATUSES.has(current.status)) {
+    return null;
+  }
+  return current.id;
+}
+
 export function phaseById(fixture: SplitRunFixture, id: SplitRunPhaseId): SplitRunPhase {
   const phase = fixture.phases.find((entry) => entry.id === id);
   if (!phase) {
@@ -258,6 +269,10 @@ function phasesForOrder(
 }
 
 function sourcePhasesForOrder(order: FactoriesWorkOrder, isDownstream: boolean): SplitRunPhase[] {
+  const candidate = reviewCandidateForWorkOrderId(order.id);
+  if (candidate) {
+    return intakeTicketAnalysisFixture(analysisTicketForOrder(order), { complete: true }).phases;
+  }
   const automation = order.createdBy?.automation;
   const fromGitHubIngest =
     automation && intakeCanvasKeyFor({ id: automation.appId, name: automation.appName }) === "intake";
