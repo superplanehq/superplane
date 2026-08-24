@@ -102,9 +102,9 @@ function FactorySettingsLayoutContent({
 
   return (
     <FactorySettingsLayoutContext.Provider value={{ organizationId, factoryId, factory }}>
-      <div className="flex min-h-screen w-full bg-background text-foreground" data-testid="factory-settings-layout">
+      <div className="flex h-full min-h-0 w-full bg-background text-foreground" data-testid="factory-settings-layout">
         <aside
-          className="sticky top-0 flex h-screen w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
+          className="flex h-full w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
           data-testid="factory-settings-sidebar"
         >
           <div className="border-b border-sidebar-border px-3 py-3">
@@ -136,7 +136,10 @@ function FactorySettingsLayoutContent({
             )}
           </nav>
         </aside>
-        <main className="flex min-h-screen min-w-0 flex-1 flex-col bg-background">
+        <main
+          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-background"
+          data-testid="factory-settings-main"
+        >
           <Outlet />
         </main>
       </div>

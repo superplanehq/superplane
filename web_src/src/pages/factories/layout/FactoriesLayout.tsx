@@ -1,8 +1,8 @@
-import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesFactory } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactories, useFactory, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -15,18 +15,16 @@ import {
   replaceFactoryKeySegment,
   resolveFactoryByKey,
 } from "../lib/factoryKeyResolution";
-import { factoryListPath, newFactoryPath } from "../lib/factoryPagePaths";
+import { factoryListPath, firstFactoryLineId, newFactoryPath } from "../lib/factoryPagePaths";
 import { clearLastVisitedFactory, recordLastVisitedFactory } from "../lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
 import { useOnboardingStorybook } from "../pages/onboarding/useOnboardingStorybook";
 import { isFactoryOnboardingComplete } from "../pages/onboarding/onboardingStatus";
 import { FactoriesLayoutContext } from "./factoriesLayoutContext";
-import { FactoriesNav } from "./FactoriesNav";
+import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
 import { SidebarUserMenu } from "./SidebarUserMenu";
 import { useCreateWorkOrderDialogState } from "./useCreateWorkOrderDialogState";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
-
-const MAX_RECENT_WORK_ORDERS = 5;
 
 function isOnboardingSidebarHidden(pendingWorkspaceId: string | undefined, factoryId: string) {
   return Boolean(pendingWorkspaceId && pendingWorkspaceId === factoryId);
@@ -115,13 +113,16 @@ function FactoriesLayoutContent({
   const navigate = useNavigate();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
-    useCreateWorkOrderDialogState(organizationId, factoryKey, canAct("work_orders", "create"));
-
   const { data: organization } = useOrganization(organizationId);
   const { data: factory, error: factoryError } = useFactory(organizationId, factoryId);
+  const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
+    useCreateWorkOrderDialogState(
+      organizationId,
+      factoryKey,
+      canAct("work_orders", "create"),
+      firstFactoryLineId(factory),
+    );
   useFactoryWebsocket(organizationId, factoryId);
-  const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
 
   const storybookOnboarding = useOnboardingStorybook();
 
@@ -151,7 +152,7 @@ function FactoriesLayoutContent({
     }
   }, [account?.id, factoryError, factoryId, organizationId]);
 
-  const recentWorkOrders = useMemo(() => sortRecentWorkOrders(workOrders), [workOrders]);
+  const canCreateWorkOrder = canAct("work_orders", "create");
 
   const layoutContextValue = useMemo(
     () => ({
@@ -198,7 +199,6 @@ function FactoriesLayoutContent({
             canOpenSettings={canAct("factories", "update")}
             canCreateFactory={canAct("factories", "create")}
             permissionsLoading={permissionsLoading}
-            recentWorkOrders={recentWorkOrders}
             onOpenCreateFactory={() => navigate(newFactoryPath(organizationId))}
           />
         )}
@@ -207,7 +207,7 @@ function FactoriesLayoutContent({
         </main>
       </div>
 
-      {canAct("work_orders", "create") ? (
+      {canCreateWorkOrder ? (
         <CreateWorkOrderDialog
           open={createWorkOrderOpen}
           onClose={closeCreateWorkOrder}
@@ -229,7 +229,6 @@ interface FactoriesSidebarProps {
   canOpenSettings: boolean;
   canCreateFactory: boolean;
   permissionsLoading: boolean;
-  recentWorkOrders: FactoriesWorkOrder[];
   onOpenCreateFactory: () => void;
 }
 
@@ -244,26 +243,29 @@ function FactoriesSidebar({
   canOpenSettings,
   canCreateFactory,
   permissionsLoading,
-  recentWorkOrders,
   onOpenCreateFactory,
 }: FactoriesSidebarProps) {
   return (
     <aside
-      className="sticky top-0 flex h-screen w-[var(--workspace-navigation-width)] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
+      className="sticky top-0 flex h-screen w-[var(--workspace-navigation-width)] shrink-0 flex-col items-center border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
       data-testid="factories-sidebar"
     >
       <WorkspaceSwitcher
         organizationId={organizationId}
         factory={factory}
         factories={factories}
-        canOpenSettings={canOpenSettings}
         canCreateFactory={canCreateFactory}
         permissionsLoading={permissionsLoading}
         onCreateFactory={onOpenCreateFactory}
       />
-      <div className="flex-1 overflow-y-auto">
-        <FactoriesNav organizationId={organizationId} factoryKey={factoryKey} recentWorkOrders={recentWorkOrders} />
-      </div>
+      <FactoriesSidebarNav
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        lineId={firstFactoryLineId(factory)}
+        canOpenSettings={canOpenSettings}
+        permissionsLoading={permissionsLoading}
+      />
+      <div className="flex-1" />
       <SidebarUserMenu
         organizationId={organizationId}
         factoryKey={factoryKey}
@@ -306,15 +308,4 @@ function FactoriesLayoutError({ organizationId }: { organizationId: string }) {
       </div>
     </div>
   );
-}
-
-// Newest first, based on updatedAt then createdAt.
-function sortRecentWorkOrders<T extends { updatedAt?: string; createdAt?: string }>(orders: T[]): T[] {
-  return [...orders]
-    .sort((a, b) => {
-      const aTime = Date.parse(a.updatedAt ?? a.createdAt ?? "") || 0;
-      const bTime = Date.parse(b.updatedAt ?? b.createdAt ?? "") || 0;
-      return bTime - aTime;
-    })
-    .slice(0, MAX_RECENT_WORK_ORDERS);
 }

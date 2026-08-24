@@ -9,15 +9,15 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 import { cn } from "@/lib/utils";
-import { ArrowRightLeft, Check, Plus, Settings, Triangle } from "lucide-react";
-import { Link, useNavigate } from "react-router";
-import { factoryDetailPath, factoryOverviewPath, factorySettingsPath } from "../lib/factoryPagePaths";
+import { Check, Plus, Triangle } from "lucide-react";
+import { useNavigate } from "react-router";
+import { factoryDetailPath } from "../lib/factoryPagePaths";
+import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
 
 interface WorkspaceSwitcherProps {
   organizationId: string;
   factory: FactoriesFactory;
   factories: FactoriesFactory[];
-  canOpenSettings: boolean;
   canCreateFactory: boolean;
   permissionsLoading: boolean;
   onCreateFactory: () => void;
@@ -27,58 +27,31 @@ export function WorkspaceSwitcher({
   organizationId,
   factory,
   factories,
-  canOpenSettings,
   canCreateFactory,
   permissionsLoading,
   onCreateFactory,
 }: WorkspaceSwitcherProps) {
   const navigate = useNavigate();
-  const overviewHref = factory.key ? factoryOverviewPath(organizationId, factory.key) : "#";
-  const settingsHref = factory.key ? factorySettingsPath(organizationId, factory.key) : "#";
+  const workspaceName = factory.name?.trim() || "Workspace";
 
   return (
-    <div className="flex items-center gap-0.5 px-2 pt-3 pb-1" data-testid="factories-workspace-switcher">
-      <Link
-        to={overviewHref}
-        className="min-w-0 flex-1 truncate rounded-md px-2.5 py-1.5 text-[13px] font-medium tracking-[-0.01em] text-foreground hover:bg-sidebar-accent"
-        title={factory.name ?? undefined}
-        data-testid="factories-workspace-overview-link"
-      >
-        {factory.name}
-      </Link>
-      <PermissionTooltip
-        allowed={canOpenSettings || permissionsLoading}
-        message="You don't have permission to open workspace settings."
-      >
-        <Link
-          to={canOpenSettings ? settingsHref : "#"}
-          onClick={(event) => {
-            if (!canOpenSettings) {
-              event.preventDefault();
-            }
-          }}
-          aria-label="Workspace settings"
-          data-testid="factories-workspace-settings-link"
-          className={cn(
-            "flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
-            !canOpenSettings && "pointer-events-none opacity-60",
-          )}
-        >
-          <Settings className="size-3.5" aria-hidden />
-        </Link>
-      </PermissionTooltip>
+    <div className="flex flex-col items-center gap-1 px-1.5 pt-3 pb-1" data-testid="factories-workspace-switcher">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            aria-label="Switch workspace"
-            className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+            aria-label={`Switch workspace, ${workspaceName}`}
+            title={workspaceName}
+            className={cn(
+              factoriesRailControlClassName,
+              "bg-sidebar-accent text-[11px] font-medium tracking-[-0.01em] text-foreground",
+            )}
             data-testid="factories-workspace-switch"
           >
-            <ArrowRightLeft className="size-3.5" aria-hidden />
+            {initialsForName(workspaceName)}
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuContent align="start" side="right" className="w-64">
           <DropdownMenuLabel>Switch workspace</DropdownMenuLabel>
           {factories.map((entry) => {
             const isCurrent = entry.id === factory.id;

@@ -1,5 +1,5 @@
 import { Navigate } from "react-router";
-import { factoryOverviewPath } from "../lib/factoryPagePaths";
+import { factoryHomePath } from "../lib/factoryPagePaths";
 
 export function FactoryAppCanvasRedirect({
   organizationId,
@@ -8,5 +8,5 @@ export function FactoryAppCanvasRedirect({
   organizationId: string;
   factoryKey: string;
 }) {
-  return <Navigate to={factoryOverviewPath(organizationId, factoryKey)} replace />;
+  return <Navigate to={factoryHomePath(organizationId, factoryKey)} replace />;
 }
