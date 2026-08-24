@@ -184,4 +184,33 @@ describe("PhaseLogCard collapsed stream", () => {
     await user.click(screen.getByRole("button", { name: "Read 1 file" }));
     expect(within(stream).getByText("LineListCard.tsx")).toBeInTheDocument();
   });
+
+  it("shows a check pill on the phase title", () => {
+    render(
+      <PhaseLogCard
+        phase={{
+          ...PHASE,
+          id: "score",
+          name: "Score",
+          componentName: "Score",
+          checks: [
+            {
+              id: "wo-review-pay-842-confidence",
+              name: "Confidence score",
+              score: 5,
+              maxScore: 5,
+              format: "fraction",
+              level: "positive",
+              summary: "Analysis complete.",
+              sourceName: "Score",
+            },
+          ],
+        }}
+        expanded
+      />,
+    );
+
+    const score = screen.getByTestId("split-run-phase-score");
+    expect(within(score).getByTestId("split-run-check-wo-review-pay-842-confidence")).toHaveTextContent("5/5");
+  });
 });

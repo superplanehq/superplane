@@ -70,6 +70,8 @@ export interface SplitRunPhase {
   /** Component that ran or is running in this phase. */
   componentName: string;
   artifacts: FactoriesWorkOrderArtifact[];
+  /** Checks this automation reported, shown on the log row. */
+  checks?: WorkOrderCheckPresentation[];
   stream: SplitRunStreamLine[];
   canvasSteps: RunOverlayStep[];
   appId?: string;

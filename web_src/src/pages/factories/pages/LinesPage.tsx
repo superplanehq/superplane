@@ -1007,7 +1007,7 @@ function LineBoardOrderCard({
     <WorkOrderCard
       {...workOrderCardContext}
       entry={entry}
-      confidencePct={reviewCandidate?.confidencePct}
+      confidenceScore={reviewCandidate?.confidenceScore}
       onOpen={() => {
         if (order.id) {
           onOpenWorkOrder(order.id);

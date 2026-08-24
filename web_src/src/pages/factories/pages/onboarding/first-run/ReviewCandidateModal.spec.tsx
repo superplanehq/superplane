@@ -43,7 +43,7 @@ describe("ReviewCandidateModal", () => {
     );
 
     const score = within(dialog).getByTestId("review-candidate-score");
-    expect(score).toHaveTextContent("95%");
+    expect(score).toHaveTextContent("5 / 5");
     expect(score).toHaveTextContent("High");
     expect(within(score).getByText("High").className).toMatch(/emerald/);
     expect(within(dialog).queryByText(candidate.summary)).not.toBeInTheDocument();
@@ -72,6 +72,35 @@ describe("ReviewCandidateModal", () => {
     expect(within(dialog).getByText(LINE_INTAKE_COPY.analysisCompleteHeadline)).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Run")).toBeInTheDocument();
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
+
+    const ingest = within(dialog).getByTestId("split-run-phase-ingest");
+    expect(within(ingest).getByRole("button", { name: "details.md" })).toBeInTheDocument();
+    expect(within(ingest).getByRole("link", { name: candidate.ticketKey })).toHaveAttribute(
+      "href",
+      candidate.issue.url,
+    );
+    expect(ingest).toHaveTextContent("Completed");
+    expect(ingest).toHaveTextContent("2s");
+    expect(within(dialog).getByTestId("split-run-phase-analyze")).toHaveTextContent("3m 45s");
+    expect(within(dialog).getByTestId("split-run-phase-plan")).toHaveTextContent("18s");
+    expect(within(dialog).getByTestId("split-run-phase-score")).toHaveTextContent("7s");
+
+    const scoreStream = within(dialog).getByTestId("split-run-stream-score");
+    expect(within(scoreStream).getByText("triggered")).toBeInTheDocument();
+    expect(within(scoreStream).queryByText("—")).not.toBeInTheDocument();
+
+    const planPhase = within(dialog).getByTestId("split-run-phase-plan");
+    expect(within(planPhase).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
+    await user.click(within(planPhase).getByRole("button", { name: "plan.md" }));
+    const planDialog = await screen.findByRole("dialog", { name: "plan.md" });
+    expect(planDialog).toHaveTextContent("Add a webhook-specific retry policy using the shared backoff utility.");
+    await user.click(within(planDialog).getByRole("button", { name: "Close" }));
+
+    const scorePhase = within(dialog).getByTestId("split-run-phase-score");
+    expect(within(scorePhase).getByTestId("split-run-check-wo-review-pay-842-confidence")).toHaveTextContent("5/5");
+    await user.click(within(scorePhase).getByTestId("split-run-check-wo-review-pay-842-confidence"));
+    expect(screen.getByRole("heading", { name: "Confidence score" })).toBeInTheDocument();
+    expect(screen.getByText(candidate.summary)).toBeInTheDocument();
   });
 
   it("shows GitHub issue fields and opens the issue in a new tab", async () => {

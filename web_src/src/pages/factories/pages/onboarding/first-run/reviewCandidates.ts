@@ -1,5 +1,6 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 
+import { confidenceBandForScore as bandForConfidenceScore, type ConfidenceBand } from "../../../lib/confidenceScore";
 import {
   HOUR_AGO,
   LAST_WEEK,
@@ -12,7 +13,7 @@ import {
   YESTERDAY,
 } from "../../../__fixtures__/factoryPageResponses";
 
-export type ReviewConfidenceBand = "High" | "Medium" | "Low";
+export type ReviewConfidenceBand = ConfidenceBand;
 
 export interface ReviewCandidateSection {
   number: string;
@@ -47,7 +48,7 @@ export interface ReviewCandidate {
   title: string;
   ticketBody: string;
   issue: ReviewIssue;
-  confidencePct: number;
+  confidenceScore: number;
   confidenceBand: ReviewConfidenceBand;
   /** Three reasons SuperPlane can implement this ticket. */
   reasons: [string, string, string];
@@ -93,14 +94,8 @@ export function isReviewCandidateTab(value: string): value is ReviewCandidateTab
   return value === "plan" || value === "ticket" || value === "analysis";
 }
 
-export function confidenceBandForScore(confidencePct: number): ReviewConfidenceBand {
-  if (confidencePct >= 85) {
-    return "High";
-  }
-  if (confidencePct >= 75) {
-    return "Medium";
-  }
-  return "Low";
+export function confidenceBandForScore(score: number): ReviewConfidenceBand {
+  return bandForConfidenceScore(score);
 }
 
 export function implementationPlanMarkdown(parts: {
@@ -210,7 +205,7 @@ export const REVIEW_CANDIDATES: ReviewCandidate[] = [
 Do not retry permanent 4xx responses, except rate limits and timeouts.`,
       ),
     }),
-    confidencePct: 95,
+    confidenceScore: 5,
     confidenceBand: "High",
     reasons: [
       "Acceptance criteria name the retryable status codes and the attempt limit.",
@@ -293,7 +288,7 @@ Do not retry permanent 4xx responses, except rate limits and timeouts.`,
 Reuse the charge idempotency store. Keep the existing refund audit trail.`,
       ),
     }),
-    confidencePct: 94,
+    confidenceScore: 5,
     confidenceBand: "High",
     reasons: [
       "Acceptance criteria require one ledger post per provider key.",
@@ -374,7 +369,7 @@ Reuse the charge idempotency store. Keep the existing refund audit trail.`,
 The domain already rejects a second capture. Only the HTTP mapping is wrong.`,
       ),
     }),
-    confidencePct: 88,
+    confidenceScore: 4,
     confidenceBand: "High",
     reasons: [
       "Acceptance criteria name HTTP 409 for a second pay on a paid invoice.",
@@ -454,7 +449,7 @@ The domain already rejects a second capture. Only the HTTP mapping is wrong.`,
 This change is copy and layout only. Do not add a new billing API.`,
       ),
     }),
-    confidencePct: 81,
+    confidenceScore: 3,
     confidenceBand: "Medium",
     reasons: [
       "Acceptance criteria name the empty-state title and the create-invoice action.",
@@ -534,7 +529,7 @@ This change is copy and layout only. Do not add a new billing API.`,
 Keep the same entrypoint and process user. Do not change application dependencies in this ticket.`,
       ),
     }),
-    confidencePct: 76,
+    confidenceScore: 3,
     confidenceBand: "Medium",
     reasons: [
       "Acceptance criteria name the Node 20 images and the existing smoke tests.",

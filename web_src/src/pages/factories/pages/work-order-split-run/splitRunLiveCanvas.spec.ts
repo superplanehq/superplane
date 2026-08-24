@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { simpleFactoryRunCanvasSpec, simpleFactoryRunExecutions } from "../../__fixtures__/simpleFactoryRunCanvas";
+import { intakeTicketAnalysisFixture } from "../lineIntakeModel";
 import { emptySplitRunCanvas, splitRunCanvasForPhase } from "./splitRunCanvases";
 import { clockLabel } from "./splitRunFormat";
 import {
@@ -234,6 +235,25 @@ describe("resolveSplitRunVisual", () => {
 
     expect(visual.canvas).toEqual(emptySplitRunCanvas(implement!));
     expect(visual.stream).toEqual([]);
+  });
+
+  it("writes the Score check onto the report line", () => {
+    const fixture = intakeTicketAnalysisFixture(
+      {
+        id: "wo-review-pay-842",
+        title: "Add retry handling to webhook delivery",
+        confidenceScore: 5,
+      },
+      { complete: true },
+    );
+    const score = fixture.phases.find((phase) => phase.id === "score");
+    expect(score).toBeDefined();
+    const visual = resolveSplitRunVisual(score!, { enabled: false, stream: [] });
+
+    expect(visual.stream?.find((line) => line.nodeId === "ticket-score")).toMatchObject({
+      kind: "check",
+      action: "5/5",
+    });
   });
 
   it("keeps the manual create log when there is no automation canvas", () => {

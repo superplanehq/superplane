@@ -8,6 +8,7 @@ import type { PhaseGlyphKind } from "../../lib/linePhaseRuns";
 import { toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { WorkOrderArtifactInline } from "../../WorkOrderArtifactInline";
 import { PhaseGlyph } from "../linePhaseGlyph";
+import { SplitRunCheckPills } from "./SplitRunReview";
 import {
   splitRunStatusLabel,
   type SplitRunPhase,
@@ -133,17 +134,22 @@ function artifactsProducedBySteps(
 ): FactoriesWorkOrderArtifact[] {
   const produced: FactoriesWorkOrderArtifact[] = [];
   const seen = new Set<string>();
-  for (const group of groups) {
-    const artifact = group.artifact;
+  const add = (artifact?: FactoriesWorkOrderArtifact) => {
     if (!artifact) {
-      continue;
+      return;
     }
     const key = artifact.id ?? `${artifact.type}`;
     if (seen.has(key)) {
-      continue;
+      return;
     }
     seen.add(key);
     produced.push(artifact);
+  };
+  for (const group of groups) {
+    add(group.artifact);
+    for (const note of group.notes) {
+      add(note.artifact);
+    }
   }
   return produced.length > 0 ? produced : fallback;
 }
@@ -207,6 +213,11 @@ export function PhaseLogCard({
             <PhaseTitle phase={phase} />
           </div>
         )}
+        {phase.checks && phase.checks.length > 0 ? (
+          <span className="shrink-0">
+            <SplitRunCheckPills checks={phase.checks} />
+          </span>
+        ) : null}
         {!expanded && producedArtifacts.length > 0 ? (
           <span
             data-testid={`split-run-phase-artifacts-${phase.id}`}

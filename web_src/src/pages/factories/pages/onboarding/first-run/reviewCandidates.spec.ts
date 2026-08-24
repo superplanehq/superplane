@@ -18,7 +18,7 @@ describe("reviewCandidates", () => {
     expect(candidate?.ticketKey).toBe("PAY-842");
     expect(candidate?.ticketBody).toContain("Webhook delivery");
     expect(candidate?.reasons).toHaveLength(3);
-    expect(candidate?.confidencePct).toBe(95);
+    expect(candidate?.confidenceScore).toBe(5);
     expect(candidate?.sections.map((section) => section.title)).toEqual([
       "Requirements understood",
       "Acceptance criteria",
@@ -73,9 +73,10 @@ Move both images to Node 20.
   });
 
   it("bands confidence scores", () => {
-    expect(confidenceBandForScore(95)).toBe("High");
-    expect(confidenceBandForScore(81)).toBe("Medium");
-    expect(confidenceBandForScore(68)).toBe("Low");
+    expect(confidenceBandForScore(5)).toBe("High");
+    expect(confidenceBandForScore(4)).toBe("High");
+    expect(confidenceBandForScore(3)).toBe("Medium");
+    expect(confidenceBandForScore(2)).toBe("Low");
     expect(confidenceBandClassName("High")).toMatch(/emerald/);
     expect(confidenceBandClassName("Medium")).toMatch(/orange/);
     expect(confidenceBandClassName("Low")).toMatch(/red/);

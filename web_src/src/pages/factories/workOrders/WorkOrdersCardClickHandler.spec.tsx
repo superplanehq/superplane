@@ -326,14 +326,18 @@ describe("WorkOrderCard scores", () => {
             isAssigneesSaving={false}
             onDispatch={vi.fn()}
             onAssigneesSave={vi.fn()}
-            confidencePct={95}
+            confidenceScore={5}
             onOpen={vi.fn()}
           />
         </MemoryRouter>
       </QueryClientProvider>,
     );
 
-    expect(screen.getByTestId("work-order-card-score-wo-draft-scored")).toHaveTextContent("95%");
+    const score = screen.getByTestId("work-order-card-score-wo-draft-scored");
+    expect(score).toHaveAttribute("aria-valuenow", "5");
+    expect(score).toHaveAttribute("aria-valuemax", "5");
+    expect(score.querySelectorAll("[data-filled='true']")).toHaveLength(5);
+    expect(score.querySelectorAll("[data-filled='false']")).toHaveLength(0);
     expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 });

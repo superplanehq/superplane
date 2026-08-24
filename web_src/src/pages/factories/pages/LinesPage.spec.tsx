@@ -209,14 +209,18 @@ describe("LinesPage board", () => {
     renderBoard();
 
     const card = screen.getByTestId("work-order-card-wo-review-pay-842");
-    expect(within(card).getByTestId("work-order-card-score-wo-review-pay-842")).toHaveTextContent("95%");
+    const cardScore = within(card).getByTestId("work-order-card-score-wo-review-pay-842");
+    expect(cardScore).toHaveAttribute("role", "meter");
+    expect(cardScore).toHaveAttribute("aria-valuenow", "5");
+    expect(cardScore).toHaveAttribute("aria-valuemax", "5");
+    expect(cardScore.querySelectorAll("[data-filled='true']")).toHaveLength(5);
     expect(within(card).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
     const dialog = screen.getByTestId("review-candidate-modal");
     expect(within(dialog).getByRole("heading", { name: "Add retry handling to webhook delivery" })).toBeInTheDocument();
-    expect(within(dialog).getByTestId("review-candidate-score")).toHaveTextContent("95%");
+    expect(within(dialog).getByTestId("review-candidate-score")).toHaveTextContent("5 / 5");
     expect(within(dialog).getByTestId("review-candidate-plan")).toHaveTextContent(
       "Add a webhook-specific retry policy using the shared backoff utility.",
     );

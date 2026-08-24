@@ -1,4 +1,8 @@
-import type { ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
+import type {
+  ComponentsEdge,
+  FactoriesWorkOrderArtifact,
+  SuperplaneComponentsNode as ComponentsNode,
+} from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
@@ -11,6 +15,8 @@ import {
   STORYBOOK_ME_USER_ID,
   STORYBOOK_ME_USER_NAME,
 } from "../__fixtures__/factoryPageResponses";
+import { CONFIDENCE_SCORE_MAX, confidenceCheckLevel } from "../lib/confidenceScore";
+import type { WorkOrderCheckPresentation } from "../lib/workOrderChecks";
 import type { WorkOrderStatusNotePresentation } from "../lib/workOrderStatusNote";
 import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvases";
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
@@ -133,6 +139,13 @@ export function intakeAutomationAppId(apps: Array<{ id?: string }>): string | un
 export interface LineIntakeAnalyzingTicket {
   id: string;
   title: string;
+  detailsMarkdown?: string;
+  issueKey?: string;
+  issueUrl?: string;
+  planMarkdown?: string;
+  confidenceScore?: number;
+  confidenceSummary?: string;
+  confidenceAnalysis?: string;
 }
 
 export const LINE_INTAKE_COPY = {
@@ -225,12 +238,21 @@ const OWNER = {
  * Ticket click from GitHub issues: same split-run popup, with a canvas
  * for ingest, analyze, create plan, and score.
  */
+const ANALYSIS_PHASE_DURATION = {
+  ingest: "2s",
+  analyze: "3m 45s",
+  analyzeRunning: "3m 12s so far",
+  plan: "18s",
+  score: "7s",
+} as const;
+
 export function intakeTicketAnalysisFixture(
   ticket: LineIntakeAnalyzingTicket,
   options?: { complete?: boolean },
 ): SplitRunFixture {
-  const canvas = ticketAnalysisCanvas();
   const complete = Boolean(options?.complete);
+  const canvas = ticketAnalysisCanvas(complete);
+  const checks = complete ? confidenceChecks(ticket) : [];
   return {
     title: ticket.title,
     owner: OWNER,
@@ -248,21 +270,24 @@ export function intakeTicketAnalysisFixture(
         text: complete ? LINE_INTAKE_COPY.analysisCompleteHelper : LINE_INTAKE_COPY.analysisHelper,
       },
     ],
-    checks: [],
+    checks,
     footerTone: complete ? undefined : "waiting",
     phases: [
       ticketAnalysisPhase({
         id: "ingest",
         name: "Ingest",
         status: "passed",
+        duration: ANALYSIS_PHASE_DURATION.ingest,
         componentName: "Ingest",
         detail: "Ticket received from GitHub issues.",
         canvas,
+        artifacts: ingestArtifacts(ticket),
       }),
       ticketAnalysisPhase({
         id: "analyze",
         name: "Analyze",
         status: complete ? "passed" : "running",
+        duration: complete ? ANALYSIS_PHASE_DURATION.analyze : ANALYSIS_PHASE_DURATION.analyzeRunning,
         componentName: "Analyze ticket",
         detail: complete ? "Read the ticket and the repository." : "Reading the ticket and the repository.",
         canvas,
@@ -271,44 +296,119 @@ export function intakeTicketAnalysisFixture(
         id: "plan",
         name: "Create plan",
         status: complete ? "passed" : "pending",
+        duration: complete ? ANALYSIS_PHASE_DURATION.plan : "—",
         componentName: "Create plan",
         detail: complete ? "Wrote the implementation plan." : "Waiting for analysis to finish.",
         canvas,
+        artifacts: complete ? planArtifact(ticket) : [],
       }),
       ticketAnalysisPhase({
         id: "score",
         name: "Score",
         status: complete ? "passed" : "pending",
+        duration: complete ? ANALYSIS_PHASE_DURATION.score : "—",
         componentName: "Score",
         detail: complete ? "Scored the ticket against the codebase." : "Waiting for a plan.",
         canvas,
+        checks,
       }),
     ],
   };
+}
+
+function ingestArtifacts(ticket: LineIntakeAnalyzingTicket): FactoriesWorkOrderArtifact[] {
+  const issueKey = ticket.issueKey ?? ticket.id;
+  return [
+    {
+      id: `${ticket.id}-details`,
+      type: "TYPE_MARKDOWN",
+      data: {
+        name: "details.md",
+        title: "details.md",
+        body: ticket.detailsMarkdown ?? ticket.title,
+      },
+    },
+    {
+      id: `${ticket.id}-issue-link`,
+      type: "TYPE_LINK",
+      data: {
+        title: issueKey,
+        url: ticket.issueUrl ?? githubIssueUrlForTicket(issueKey),
+      },
+    },
+  ];
+}
+
+function planArtifact(ticket: LineIntakeAnalyzingTicket): FactoriesWorkOrderArtifact[] {
+  if (!ticket.planMarkdown) {
+    return [];
+  }
+  return [
+    {
+      id: `${ticket.id}-plan`,
+      type: "TYPE_MARKDOWN",
+      data: {
+        name: "plan.md",
+        title: "plan.md",
+        body: ticket.planMarkdown,
+      },
+    },
+  ];
+}
+
+function confidenceChecks(ticket: LineIntakeAnalyzingTicket): WorkOrderCheckPresentation[] {
+  if (ticket.confidenceScore == null) {
+    return [];
+  }
+  return [
+    {
+      id: `${ticket.id}-confidence`,
+      name: "Confidence score",
+      score: ticket.confidenceScore,
+      maxScore: CONFIDENCE_SCORE_MAX,
+      format: "fraction",
+      level: confidenceCheckLevel(ticket.confidenceScore),
+      summary: ticket.confidenceSummary,
+      analysis: ticket.confidenceAnalysis,
+      sourceName: "Score",
+    },
+  ];
+}
+
+function githubIssueUrlForTicket(issueKey: string): string {
+  const number = issueKey.replace(/\D/g, "") || "1";
+  return `https://github.com/acme/payments-service/issues/${number}`;
 }
 
 function ticketAnalysisPhase({
   id,
   name,
   status,
+  duration,
   componentName,
   detail,
   canvas,
+  artifacts = [],
+  checks = [],
 }: {
   id: SplitRunPhase["id"];
   name: string;
   status: SplitRunPhase["status"];
+  duration: string;
   componentName: string;
   detail: string;
   canvas: SplitRunCanvasModel;
+  artifacts?: FactoriesWorkOrderArtifact[];
+  checks?: WorkOrderCheckPresentation[];
 }): SplitRunPhase {
   return {
     id,
     name,
     status,
-    duration: "—",
+    duration,
     componentName,
-    artifacts: [],
+    artifacts,
+    checks,
     canvas,
     stream: [
       {
@@ -322,7 +422,7 @@ function ticketAnalysisPhase({
   };
 }
 
-function ticketAnalysisCanvas(): SplitRunCanvasModel {
+function ticketAnalysisCanvas(complete: boolean): SplitRunCanvasModel {
   const ingestId = "ticket-ingest";
   const analyzeId = "ticket-analyze";
   const planId = "ticket-plan";
@@ -379,11 +479,16 @@ function ticketAnalysisCanvas(): SplitRunCanvasModel {
     ],
     statuses: {
       [ingestId]: "triggered",
-      [analyzeId]: "running",
-      [planId]: "pending",
-      [scoreId]: "pending",
+      [analyzeId]: complete ? "passed" : "running",
+      [planId]: complete ? "passed" : "pending",
+      [scoreId]: complete ? "passed" : "pending",
     } satisfies Record<string, FactoryNodeStatus>,
-    metrics: {},
+    metrics: {
+      [ingestId]: ANALYSIS_PHASE_DURATION.ingest,
+      [analyzeId]: complete ? ANALYSIS_PHASE_DURATION.analyze : ANALYSIS_PHASE_DURATION.analyzeRunning,
+      [planId]: complete ? ANALYSIS_PHASE_DURATION.plan : "—",
+      [scoreId]: complete ? ANALYSIS_PHASE_DURATION.score : "—",
+    },
   };
 }
 

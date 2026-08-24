@@ -11,6 +11,7 @@ import {
 import { workOrderDetailPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
+import { ConfidenceMeter } from "./ConfidenceMeter";
 import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
 
 export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
@@ -34,8 +35,8 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   href?: string;
   /** When set, the card overlay opens this handler instead of navigating. */
   onOpen?: () => void;
-  /** First-run analysis score. Hides Start on draft cards. */
-  confidencePct?: number;
+  /** First-run analysis score from 0 to 5. Hides Start on draft cards. */
+  confidenceScore?: number;
 }
 
 /**
@@ -58,7 +59,7 @@ export function WorkOrderCard({
   onDispatch,
   href,
   onOpen,
-  confidencePct,
+  confidenceScore,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination =
@@ -66,7 +67,7 @@ export function WorkOrderCard({
     (entry.order.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, entry.order.number) : "#");
   const startedAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const startedLabel = startedAt ? formatTimeAgo(startedAt) : "—";
-  const showStart = entry.displayStatus === "draft" && confidencePct == null;
+  const showStart = entry.displayStatus === "draft" && confidenceScore == null;
   const attentionReason = getWorkOrderAttentionReason(entry.order);
   const AttentionIcon = attentionReason ? WORK_ORDER_ATTENTION_ICON[attentionReason] : null;
 
@@ -112,13 +113,12 @@ export function WorkOrderCard({
               {startedLabel}
             </span>
           </div>
-          {confidencePct != null ? (
-            <span
-              className="shrink-0 text-[12px] font-medium tabular-nums text-foreground"
-              data-testid={`work-order-card-score-${entry.id}`}
-            >
-              {confidencePct}%
-            </span>
+          {confidenceScore != null ? (
+            <ConfidenceMeter
+              score={confidenceScore}
+              className="shrink-0"
+              testId={`work-order-card-score-${entry.id}`}
+            />
           ) : null}
           {showStart ? (
             <StartDraftButton

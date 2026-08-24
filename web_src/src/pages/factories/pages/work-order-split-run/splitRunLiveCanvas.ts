@@ -2,11 +2,13 @@ import type {
   CanvasesCanvas,
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasRun,
+  FactoriesWorkOrderArtifact,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { formatMinutesSecondsDuration } from "@/lib/duration";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
+import { formatCheckScore, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import {
   canvasKeyForAutomation,
   canvasKeyForPhase,
@@ -356,7 +358,10 @@ export function resolveSplitRunVisual(
   live: { enabled: boolean; isError?: boolean; canvas?: SplitRunCanvasModel; stream: SplitRunStreamLine[] },
 ): { canvas: SplitRunCanvasModel; stream: SplitRunStreamLine[] | undefined } {
   const lineCanvas = splitRunCanvasForPhase(phase);
-  const lineStream = richStreamForCanvas(lineCanvas, descriptionArtifactFromPhase(phase));
+  const lineStream = attachPhaseChecks(
+    attachPhaseArtifacts(richStreamForCanvas(lineCanvas, descriptionArtifactFromPhase(phase)), phase.artifacts),
+    phase.checks ?? [],
+  );
   if (phase.canvasKey === null || lineCanvas.nodes.length === 0) {
     return { canvas: lineCanvas, stream: phase.stream };
   }
@@ -370,6 +375,90 @@ export function resolveSplitRunVisual(
     };
   }
   return { canvas: lineCanvas, stream: lineStream };
+}
+
+function attachPhaseArtifacts(
+  stream: SplitRunStreamLine[],
+  artifacts: FactoriesWorkOrderArtifact[],
+): SplitRunStreamLine[] {
+  if (artifacts.length === 0) {
+    return stream;
+  }
+  const seen = new Set(stream.flatMap((line) => (line.artifact?.id ? [line.artifact.id] : [])));
+  const pending = artifacts.filter((artifact) => !artifact.id || !seen.has(artifact.id));
+  if (pending.length === 0) {
+    return stream;
+  }
+
+  const hostIndex = hostIndexForArtifacts(stream, pending);
+  if (hostIndex < 0) {
+    return stream;
+  }
+
+  const host = stream[hostIndex]!;
+  const next = [...stream];
+  let insertAt = hostIndex + 1;
+  for (const [index, artifact] of pending.entries()) {
+    if (index === 0 && !host.artifact) {
+      next[hostIndex] = { ...host, artifact };
+      continue;
+    }
+    next.splice(insertAt, 0, {
+      id: `${host.id}-artifact-${artifact.id ?? insertAt}`,
+      nodeId: host.nodeId,
+      at: host.at,
+      componentName: artifactLabel(artifact),
+      status: host.status,
+      artifact,
+      note: true,
+    });
+    insertAt += 1;
+  }
+  return next;
+}
+
+function attachPhaseChecks(stream: SplitRunStreamLine[], checks: WorkOrderCheckPresentation[]): SplitRunStreamLine[] {
+  const check = checks[0];
+  if (!check) {
+    return stream;
+  }
+  const { value, scale } = formatCheckScore(check);
+  const action = `${value}${scale}`;
+  return stream.map((line) =>
+    line.kind === "check" || line.nodeId === "ticket-score" ? { ...line, action } : line,
+  );
+}
+
+function hostIndexForArtifacts(stream: SplitRunStreamLine[], artifacts: FactoriesWorkOrderArtifact[]): number {
+  const names = artifacts.map(artifactName);
+  if (names.includes("plan.md")) {
+    const planIndex = stream.findIndex(
+      (line) => line.nodeId === "ticket-plan" || line.componentName === "Create plan",
+    );
+    if (planIndex >= 0) {
+      return planIndex;
+    }
+  }
+  return stream.findIndex((line) => line.kind === "trigger");
+}
+
+function artifactName(artifact: FactoriesWorkOrderArtifact): string | undefined {
+  const data = artifact.data;
+  if (data && "name" in data && typeof data.name === "string") {
+    return data.name;
+  }
+  return undefined;
+}
+
+function artifactLabel(artifact: FactoriesWorkOrderArtifact): string {
+  const data = artifact.data;
+  if (data && "title" in data && typeof data.title === "string" && data.title) {
+    return data.title;
+  }
+  if (data && "name" in data && typeof data.name === "string" && data.name) {
+    return data.name;
+  }
+  return artifact.type ?? "Artifact";
 }
 
 function attachMissingStreamChildren(stream: SplitRunStreamLine[], source: SplitRunStreamLine[]): SplitRunStreamLine[] {

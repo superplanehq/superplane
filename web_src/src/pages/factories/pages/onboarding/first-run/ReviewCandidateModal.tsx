@@ -11,6 +11,7 @@ import { MarkdownContent } from "@/pages/app/Markdown";
 import { ExternalLink, FileText, Pencil, Ticket, Workflow } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { CONFIDENCE_SCORE_MAX } from "../../../lib/confidenceScore";
 import { intakeTicketAnalysisFixture } from "../../lineIntakeModel";
 import { PopupHeader, PopupShell } from "../../work-order-popup-redesign/popupShared";
 import { WorkOrderSplitRunBody } from "../../work-order-split-run/WorkOrderSplitRunPopup";
@@ -38,8 +39,32 @@ export function ReviewCandidateModal({ candidate, onClose }: ReviewCandidateModa
   const [tab, setTab] = useState<ReviewCandidateTab>("plan");
   const [planMarkdown, setPlanMarkdown] = useState(candidate.planMarkdown);
   const analysisFixture = useMemo(
-    () => intakeTicketAnalysisFixture({ id: candidate.workOrderId, title: candidate.title }, { complete: true }),
-    [candidate.title, candidate.workOrderId],
+    () =>
+      intakeTicketAnalysisFixture(
+        {
+          id: candidate.workOrderId,
+          title: candidate.title,
+          detailsMarkdown: candidate.issue.bodyMarkdown,
+          issueKey: candidate.ticketKey,
+          issueUrl: candidate.issue.url,
+          planMarkdown,
+          confidenceScore: candidate.confidenceScore,
+          confidenceSummary: candidate.summary,
+          confidenceAnalysis: candidate.reasons.map((reason) => `- ${reason}`).join("\n"),
+        },
+        { complete: true },
+      ),
+    [
+      candidate.confidenceScore,
+      candidate.issue.bodyMarkdown,
+      candidate.issue.url,
+      candidate.reasons,
+      candidate.summary,
+      candidate.ticketKey,
+      candidate.title,
+      candidate.workOrderId,
+      planMarkdown,
+    ],
   );
 
   return (
@@ -108,7 +133,9 @@ function PlanPanel({
   return (
     <>
       <p className="text-[22px] font-semibold tracking-[-0.03em] text-foreground" data-testid="review-candidate-score">
-        <span className="tabular-nums">{candidate.confidencePct}%</span>
+        <span className="tabular-nums">
+          {candidate.confidenceScore} / {CONFIDENCE_SCORE_MAX}
+        </span>
         <span className={cn("ml-2 text-[15px] font-medium", confidenceBandClassName(candidate.confidenceBand))}>
           {candidate.confidenceBand}
         </span>
