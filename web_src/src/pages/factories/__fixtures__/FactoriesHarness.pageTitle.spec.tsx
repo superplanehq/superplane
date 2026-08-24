@@ -18,10 +18,7 @@ describe("client-side navigation updates document.title", () => {
     client.setConfig({ baseUrl: "http://localhost" });
   });
 
-  // Visiting a work order sets a specific title. Back now returns to the
-  // workspace board, which must replace that title.
-  it("resets the tab title after navigating from a work order detail page back to the board", async () => {
-    const user = userEvent.setup();
+  it("sends a work-order permalink to the line board", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-order/101`}
@@ -30,16 +27,7 @@ describe("client-side navigation updates document.title", () => {
       />,
     );
 
-    const back = await screen.findByTestId("work-order-detail-back", {}, { timeout: 8000 });
-    expect(back).toHaveTextContent("Workspace");
-    expect(back).not.toHaveTextContent("Line");
-    expect(document.title).toContain("Reconcile duplicate refunds in ledger");
-    expect(document.title).toContain("Semaphore");
-
-    await user.click(back);
-
     expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(document.title).not.toContain("Reconcile duplicate refunds in ledger");
     expect(document.title).toBe("Plan and Implement · Semaphore · SuperPlane");
   }, 15000);
 

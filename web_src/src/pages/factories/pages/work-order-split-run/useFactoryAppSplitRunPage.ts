@@ -8,6 +8,7 @@ import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { resolveFactoryAppCanvasSubtitle, resolveFactoryLineName } from "../../lib/factoryAppCanvasCopy";
 import { resolveFactoryAppBackNav } from "../../lib/factoryAppNav";
 import { factoryAppConfigurePath, parseFactoryAppNavFrom } from "../../lib/factoryPagePaths";
+import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { canvasKeyForAutomation } from "./splitRunCanvases";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
 import {
@@ -20,6 +21,7 @@ import {
 } from "./splitRunPageModel";
 import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
 import { useSplitRunPanePercent } from "./useSplitRunPanePercent";
+import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
 
 export function useFactoryAppSplitRunPage() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
@@ -45,9 +47,10 @@ export function useFactoryAppSplitRunPage() {
     [appId, canvasKey, fixture],
   );
   const live = useSplitRunLiveCanvas(organizationId, phase);
+  const artifactIndex = useSplitRunStreamArtifacts(organizationId, factoryId, order?.id);
   const visual = useMemo(() => resolveSplitRunVisual(phase, live), [live, phase]);
   const canvas = visual.canvas;
-  const stream = visual.stream;
+  const stream = useMemo(() => attachArtifactsToStream(visual.stream, artifactIndex), [artifactIndex, visual.stream]);
   const back = useMemo(
     () =>
       resolveFactoryAppBackNav(organizationId, factoryKey, {

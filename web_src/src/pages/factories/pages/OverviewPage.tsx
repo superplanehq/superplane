@@ -8,7 +8,13 @@ import { ChevronRight, Loader2 } from "lucide-react";
 import { Link } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
-import { factoryLineDetailPath, linesPath, workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
+import {
+  factoryHomePath,
+  factoryLineDetailPath,
+  firstFactoryLineId,
+  linesPath,
+  workOrdersPath,
+} from "../lib/factoryPagePaths";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import {
   factoryCardClassName,
@@ -102,8 +108,7 @@ function WorkOrdersOverviewCard({
             {orders.map((order) => {
               const status = getWorkOrderDisplayStatus(order);
               const statusMeta = getWorkOrderDisplayStatusMeta(status);
-              const href =
-                order.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, order.number) : "#";
+              const href = factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory));
               const updatedAt = order.updatedAt ?? order.createdAt;
               const timeLabel = updatedAt ? formatTimeAgo(new Date(updatedAt)) : "—";
               return (

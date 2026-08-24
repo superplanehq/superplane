@@ -7,13 +7,7 @@ import { client } from "@/api-client/client.gen";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import {
-  FACTORIES_ORGANIZATION_ID,
-  PRIMARY_FACTORY_KEY,
-  REFUND_FACTORY_LINES,
-  RUNNING_WORK_ORDER,
-} from "../../__fixtures__/factoryPageResponses";
-import { workOrderDetailPath } from "../../lib/factoryPagePaths";
+import { PRIMARY_FACTORY_KEY, REFUND_FACTORY_LINES } from "../../__fixtures__/factoryPageResponses";
 import { lineMetricsFactoriesFixture } from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { WorkOrderPopupRedesignPlayground } from "./WorkOrderPopupRedesignPlayground";
 import { AGENT_WORK_POPUP_RUNNING } from "./workOrderPopupMocks";
@@ -194,10 +188,8 @@ describe("Line board job popup", () => {
     const dialog = await screen.findByTestId("work-order-split-run");
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Add refund reconciliation test" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("link", { name: "Open work order" })).toHaveAttribute(
-      "href",
-      workOrderDetailPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, RUNNING_WORK_ORDER.number ?? "103"),
-    );
+    expect(within(dialog).queryByRole("link", { name: "Open work order" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Open work order" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
     expect(within(dialog).queryByText("Backlog")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();

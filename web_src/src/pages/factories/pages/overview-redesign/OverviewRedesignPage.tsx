@@ -9,12 +9,7 @@ import { cn } from "@/lib/utils";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
-import {
-  createWorkOrderPath,
-  factoryVelocityPath,
-  workOrderDetailPath,
-  workOrdersPath,
-} from "../../lib/factoryPagePaths";
+import { createWorkOrderPath, factoryHomePath, factoryVelocityPath, workOrdersPath } from "../../lib/factoryPagePaths";
 import {
   WORK_ORDER_ATTENTION_CHIP_CLASSNAME,
   WORK_ORDER_ATTENTION_ICON,
@@ -165,9 +160,8 @@ const MAX_OVERVIEW_ROWS = 3;
 const MAX_SHIPPED_ROWS = 5;
 
 /** Detail route from a workspace-scoped key like "SP-61" (mock-only parsing). */
-function workOrderHref(organizationId: string, factoryKey: string, workOrderKey: string) {
-  const orderNumber = workOrderKey.split("-")[1] ?? "";
-  return workOrderDetailPath(organizationId, factoryKey, orderNumber);
+function workOrderHref(organizationId: string, factoryKey: string, _workOrderKey: string) {
+  return factoryHomePath(organizationId, factoryKey);
 }
 
 /**

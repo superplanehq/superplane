@@ -193,7 +193,7 @@ function AppRouter() {
                       <Route path="work-orders">
                         <Route index element={<WorkOrdersPage />} />
                         <Route path="new" element={<CreateWorkOrderComposeGate />} />
-                        {/* Legacy `/work-orders/:orderId` bookmark shape — redirects to `/work-order/:number`. */}
+                        {/* Legacy `/work-orders/:orderId` bookmark shape — redirects to the line board. */}
                         <Route path=":orderId" element={<LegacyWorkOrderDetailRedirect />} />
                       </Route>
                       <Route path="work-order/:orderNumber" element={<WorkOrderDetailPage />} />

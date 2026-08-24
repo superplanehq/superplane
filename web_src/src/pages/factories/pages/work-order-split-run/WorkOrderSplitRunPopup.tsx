@@ -4,13 +4,17 @@ import { OwnerTimeCostRow, PopupHeader, PopupShell, SectionTitle } from "../work
 import { CompactLineCanvas } from "./CompactLineCanvas";
 import { PhaseLogCard } from "./PhaseLogCard";
 import { SplitRunCheckPills, SplitRunReview } from "./SplitRunReview";
+import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { emptySplitRunCanvas, type SplitRunCanvasKey } from "./splitRunCanvases";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
 import { type SplitRunFixture, type SplitRunPhaseId } from "./splitRunMocks";
 import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
+import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
 
 type WorkOrderSplitRunBodyProps = {
   organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
   fixture: SplitRunFixture;
   canvasEditHref?: (key: SplitRunCanvasKey) => string | undefined;
   canvasExpandHref?: (key: SplitRunCanvasKey) => string | undefined;
@@ -22,6 +26,8 @@ type WorkOrderSplitRunBodyProps = {
 /** Log and canvas for a split run. The popup wraps this. */
 export function WorkOrderSplitRunBody({
   organizationId,
+  factoryId,
+  orderId,
   fixture,
   canvasEditHref,
   canvasExpandHref,
@@ -34,10 +40,15 @@ export function WorkOrderSplitRunBody({
   const [nodeId, setNodeId] = useState<string | null>(null);
   const selectedPhase = fixture.phases.find((entry) => entry.id === phaseId) ?? fixture.phases[0];
   const live = useSplitRunLiveCanvas(organizationId, selectedPhase);
+  const artifactIndex = useSplitRunStreamArtifacts(organizationId, factoryId, orderId);
   const visual = useMemo(
     () =>
       selectedPhase ? resolveSplitRunVisual(selectedPhase, live) : { canvas: emptySplitRunCanvas(), stream: undefined },
     [live, selectedPhase],
+  );
+  const liveStream = useMemo(
+    () => attachArtifactsToStream(visual.stream, artifactIndex),
+    [artifactIndex, visual.stream],
   );
 
   return (
@@ -54,7 +65,11 @@ export function WorkOrderSplitRunBody({
                 phase={entry}
                 expanded={entry.id === openPhaseId}
                 stream={
-                  entry.id === openPhaseId ? (entry.id === selectedPhase?.id ? visual.stream : entry.stream) : undefined
+                  entry.id === openPhaseId
+                    ? entry.id === selectedPhase?.id
+                      ? liveStream
+                      : attachArtifactsToStream(entry.stream, artifactIndex)
+                    : undefined
                 }
                 selectedNodeId={nodeId}
                 onSelectNode={setNodeId}
@@ -96,29 +111,31 @@ export function WorkOrderSplitRunBody({
  */
 export function WorkOrderSplitRunPopup({
   organizationId,
+  factoryId,
+  orderId,
   fixture,
   onClose,
   fixed = false,
   canvasEditHref,
   canvasExpandHref,
-  detailHref,
   onDispatch,
   isDispatching = false,
   canDispatch = false,
 }: WorkOrderSplitRunBodyProps & {
   onClose?: () => void;
   fixed?: boolean;
-  detailHref?: string;
 }) {
   return (
     <PopupShell testId="work-order-split-run" canvas fixed={fixed} onDismiss={onClose}>
-      <PopupHeader title={fixture.title} onClose={onClose} detailHref={detailHref}>
+      <PopupHeader title={fixture.title} onClose={onClose}>
         <OwnerTimeCostRow fixture={fixture}>
           <SplitRunCheckPills checks={fixture.checks} />
         </OwnerTimeCostRow>
       </PopupHeader>
       <WorkOrderSplitRunBody
         organizationId={organizationId}
+        factoryId={factoryId}
+        orderId={orderId}
         fixture={fixture}
         canvasEditHref={canvasEditHref}
         canvasExpandHref={canvasExpandHref}

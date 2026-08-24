@@ -4,8 +4,6 @@ import {
   factoryHomePath,
   factoryLineDetailPath,
   linesPath,
-  workOrderDetailPath,
-  workOrdersPath,
 } from "./factoryPagePaths";
 
 export type FactoryAppBackNav = {
@@ -55,14 +53,7 @@ export function resolveFactoryAppBackNav(
   }
 
   if (from === "work-order") {
-    const orderRef = options.orderNumber || options.orderId;
-    if (orderRef) {
-      return {
-        label: options.orderTitle?.trim() || "Work Orders",
-        href: workOrderDetailPath(organizationId, factoryKey, orderRef),
-      };
-    }
-    return { label: "Work Orders", href: workOrdersPath(organizationId, factoryKey) };
+    return { label: "Back", href: factoryHomePath(organizationId, factoryKey, options.lineId) };
   }
 
   return { label: "Back", href: factoryHomePath(organizationId, factoryKey) };

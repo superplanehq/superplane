@@ -113,11 +113,15 @@ function FactoriesLayoutContent({
   const navigate = useNavigate();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
-    useCreateWorkOrderDialogState(organizationId, factoryKey, canAct("work_orders", "create"));
-
   const { data: organization } = useOrganization(organizationId);
   const { data: factory, error: factoryError } = useFactory(organizationId, factoryId);
+  const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
+    useCreateWorkOrderDialogState(
+      organizationId,
+      factoryKey,
+      canAct("work_orders", "create"),
+      firstFactoryLineId(factory),
+    );
   useFactoryWebsocket(organizationId, factoryId);
 
   const storybookOnboarding = useOnboardingStorybook();
