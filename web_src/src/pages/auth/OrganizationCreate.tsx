@@ -12,6 +12,7 @@ import { analytics } from "@/lib/analytics";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
+import { newOrganizationLandingPath } from "./newOrganizationLandingPath";
 
 const OrganizationCreate: React.FC = () => {
   const [name, setName] = useState("");
@@ -40,8 +41,7 @@ const OrganizationCreate: React.FC = () => {
       if (response.ok) {
         const org = await response.json();
         analytics.orgCreate(org.id);
-        // Redirect to the new organization
-        window.location.href = `/${org.id}`;
+        window.location.href = newOrganizationLandingPath(org.id);
       } else {
         const fallbackMessage =
           response.status === 409 ? "An organization with this name already exists" : "Failed to create organization";
