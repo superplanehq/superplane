@@ -33,7 +33,7 @@ func Test__DescribeSecret(t *testing.T) {
 		local := map[string]string{"test": "test"}
 		data, _ := json.Marshal(local)
 
-		_, err := models.CreateSecret("test", secrets.ProviderLocal, uuid.NewString(), models.DomainTypeOrganization, r.Organization.ID, data)
+		_, err := models.CreateSecret(uuid.New(), "test", secrets.ProviderLocal, uuid.NewString(), models.DomainTypeOrganization, r.Organization.ID, data)
 		require.NoError(t, err)
 
 		response, err := DescribeSecret(context.Background(), encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), "test")

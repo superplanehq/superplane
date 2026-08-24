@@ -2,10 +2,10 @@ package e2e
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"testing"
 
+	"github.com/google/uuid"
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -297,11 +297,7 @@ func (s *SecretsSteps) assertSecretSavedInDB(name string, expectedData map[strin
 	require.Equal(s.t, s.session.OrgID.String(), secret.DomainID.String())
 
 	// Secrets created via UI are encrypted; decrypt before comparing
-	encryptor := encryptorFromEnv()
-	decrypted, err := encryptor.Decrypt(context.Background(), secret.Data, []byte(secret.Name))
-	require.NoError(s.t, err)
-	var secretData map[string]string
-	err = json.Unmarshal(decrypted, &secretData)
+	secretData, err := secrets.DecryptLocalData(context.Background(), encryptorFromEnv(), secret)
 	require.NoError(s.t, err)
 	require.Equal(s.t, expectedData, secretData)
 }
@@ -343,12 +339,10 @@ func encryptorFromEnv() crypto.Encryptor {
 // givenASecretExists creates a secret directly in the DB (same format as app), then opens the secret detail page.
 // Call after visitSecretsPage(); leaves the user on the secret detail page.
 func (s *SecretsSteps) givenASecretExists(name string, data map[string]string) {
-	encryptor := encryptorFromEnv()
-	raw, err := json.Marshal(data)
+	secretID := uuid.New()
+	encrypted, err := secrets.EncryptLocalData(context.Background(), encryptorFromEnv(), secretID, data)
 	require.NoError(s.t, err)
-	encrypted, err := encryptor.Encrypt(context.Background(), raw, []byte(name))
-	require.NoError(s.t, err)
-	_, err = models.CreateSecret(name, secrets.ProviderLocal, s.session.Account.ID.String(), models.DomainTypeOrganization, s.session.OrgID, encrypted)
+	_, err = models.CreateSecret(secretID, name, secrets.ProviderLocal, s.session.Account.ID.String(), models.DomainTypeOrganization, s.session.OrgID, encrypted)
 	require.NoError(s.t, err)
 	s.clickEditSecret(name)
 }

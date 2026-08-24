@@ -34,6 +34,7 @@ const (
 var (
 	ErrNameAlreadyUsed         = fmt.Errorf("name already used")
 	ErrInvitationAlreadyExists = fmt.Errorf("invitation already exists")
+	ErrSecretIDRequired        = fmt.Errorf("secret ID is required")
 )
 
 func ValidateDomainType(domainType string) error {

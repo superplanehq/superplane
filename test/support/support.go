@@ -151,7 +151,7 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 func CreateSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
 	data, err := json.Marshal(secretData)
 	require.NoError(t, err)
-	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), models.DomainTypeOrganization, r.Organization.ID, data)
+	secret, err := models.CreateSecret(uuid.New(), RandomName("secret"), secrets.ProviderLocal, r.User.String(), models.DomainTypeOrganization, r.Organization.ID, data)
 	require.NoError(t, err)
 	return secret, nil
 }
