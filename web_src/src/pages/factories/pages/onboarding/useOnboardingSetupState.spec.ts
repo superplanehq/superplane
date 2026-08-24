@@ -26,4 +26,66 @@ describe("useOnboardingSetupState", () => {
     expect(result.current.issuesChoice).toBe("vcs");
     expect(result.current.issueCount).toBeUndefined();
   });
+
+  it("marks the agent step ready when remaining credit is greater than zero", () => {
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        connected: new Set<IntegrationId>(),
+        remainingCreditCents: 5000,
+        simulateDiscovery: false,
+      }),
+    );
+
+    expect(result.current.agentReady).toBe(true);
+  });
+
+  it("marks the agent step ready when OpenAI is connected and credit is empty", () => {
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        connected: new Set<IntegrationId>(["openai"]),
+        remainingCreditCents: 0,
+        simulateDiscovery: false,
+      }),
+    );
+
+    expect(result.current.agentReady).toBe(true);
+  });
+
+  it("lets Start finish when OpenRouter is connected", () => {
+    const connected = new Set<IntegrationId>(["github", "openrouter"]);
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        connected,
+        remainingCreditCents: 0,
+        simulateDiscovery: false,
+      }),
+    );
+
+    act(() => {
+      result.current.selectVcsHost("github");
+      result.current.selectRepo("acme/payments");
+    });
+
+    expect(result.current.agentReady).toBe(true);
+    expect(result.current.canFinish).toBe(true);
+  });
+
+  it("lets Start finish when Anthropic is connected or remaining credit is greater than zero", () => {
+    const connected = new Set<IntegrationId>(["github", "claude"]);
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        connected,
+        remainingCreditCents: 0,
+        simulateDiscovery: false,
+      }),
+    );
+
+    act(() => {
+      result.current.selectVcsHost("github");
+      result.current.selectRepo("acme/payments");
+    });
+
+    expect(result.current.agentReady).toBe(true);
+    expect(result.current.canFinish).toBe(true);
+  });
 });

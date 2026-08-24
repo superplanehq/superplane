@@ -97,10 +97,12 @@ spec:
           - name: Clone Repo
             type: bash
             command: |-
+              rm -rf repo
               git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
               cd repo
           - name: Write Implementation Plan
             type: prompt
+            workingDirectory: repo
             prompt: |-
               You are writing an implementation plan for a SuperPlane Work Order. The repository is cloned out in your current working directory.
 
@@ -157,6 +159,7 @@ spec:
           - name: Clone Repo
             type: bash
             command: |-
+              rm -rf repo
               git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
               cd repo
           - name: Provide description
@@ -166,6 +169,7 @@ spec:
               cat /tmp/ORDER.md
           - name: Write Implementation Plan
             type: prompt
+            workingDirectory: repo
             prompt: |-
               You are writing an implementation plan for a SuperPlane Work Order. The repository is cloned out in your current working directory.
 

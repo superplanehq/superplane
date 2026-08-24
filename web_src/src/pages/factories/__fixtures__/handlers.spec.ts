@@ -48,6 +48,14 @@ describe("matchFactoryPageFixture", () => {
       totalTokens: "25600",
       totalCostCents: "876",
     });
+
+    const hosted = await fetchFactoryPageFixture(
+      `/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/hosted-llm-models?provider=anthropic`,
+    );
+    await expect(hosted.json()).resolves.toMatchObject({
+      enabled: true,
+      models: [expect.objectContaining({ id: "claude-sonnet-4-6" })],
+    });
   });
 
   it("returns factory apps for the populated factory", async () => {
