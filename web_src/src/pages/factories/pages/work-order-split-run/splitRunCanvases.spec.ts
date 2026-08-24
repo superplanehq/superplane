@@ -81,10 +81,40 @@ describe("splitRunCanvasForPhase", () => {
     expect(canvas.title).toBe("Implementation");
     expect(canvas.nodes.map((node) => node.name)).toContain("Create Branch");
     expect(canvas.nodes.map((node) => node.name)).toContain("From GH issue?");
+    expect(canvas.nodes.map((node) => node.name)).toContain("Create Draft Pull Request");
+    expect(canvas.nodes.map((node) => node.name)).toContain("Attach PR to Work Order");
     expect(canvas.statuses["create-branch"]).toBe("passed");
     expect(canvas.statuses["implementation-agent"]).toBe("running");
     expect(canvas.statuses["implementation-agent-no-issue"]).toBe("did_not_run");
+    expect(canvas.statuses["create-draft-pr"]).toBe("did_not_run");
+    expect(canvas.statuses["attach-pr-artifact"]).toBe("did_not_run");
     expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
+  });
+
+  it("opens a draft pull request after a finished implement run", () => {
+    const canvas = splitRunCanvasForPhase({
+      id: "implement-0",
+      name: "Implement",
+      status: "passed",
+      duration: "8m",
+      componentName: "Implementation",
+      artifacts: [],
+      stream: [],
+      canvasSteps: [],
+    });
+
+    expect(canvas.statuses["implementation-agent"]).toBe("passed");
+    expect(canvas.statuses["create-draft-pr"]).toBe("passed");
+    expect(canvas.statuses["attach-pr-artifact"]).toBe("passed");
+    expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
+
+    const stream = richStreamForCanvas(canvas);
+    expect(stream.find((line) => line.id === "create-draft-pr")).toMatchObject({
+      componentType: "github.createPullRequest",
+      componentName: "Create Draft Pull Request",
+      action: "passed",
+    });
+    expect(stream.find((line) => line.id === "attach-pr-artifact")?.artifact?.type).toBe("TYPE_PR");
   });
 
   it("opens the planning canvas for a completed plan step", () => {

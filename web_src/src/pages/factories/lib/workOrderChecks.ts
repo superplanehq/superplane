@@ -10,7 +10,7 @@ export type WorkOrderCheckScoreFormat = "fraction" | "percent" | "boolean";
 
 export interface WorkOrderCheckPresentation {
   id: string;
-  /** Short human name, e.g. "Risk review" or "Code coverage". */
+  /** Short human name, e.g. "Risk score" or "Code quality". */
   name: string;
   score: number;
   maxScore: number;

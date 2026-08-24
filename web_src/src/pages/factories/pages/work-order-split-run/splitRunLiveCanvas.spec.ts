@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { RUNNING_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
 import { simpleFactoryRunCanvasSpec, simpleFactoryRunExecutions } from "../../__fixtures__/simpleFactoryRunCanvas";
 import { intakeTicketAnalysisFixture } from "../lineIntakeModel";
 import { emptySplitRunCanvas, splitRunCanvasForPhase } from "./splitRunCanvases";
@@ -12,7 +13,7 @@ import {
   splitRunCanvasFromLive,
   streamFromLiveRun,
 } from "./splitRunLiveCanvas";
-import { SPLIT_RUN_RUNNING } from "./splitRunMocks";
+import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 const LIVE_CANVAS = {
   metadata: { id: "app-refund-implementer", name: "Refund Implementer" },
@@ -191,6 +192,20 @@ describe("resolveSplitRunVisual", () => {
 
     expect(visual.canvas.title).toBe("Implementation (live)");
     expect(visual.stream?.some((line) => line.id === "live-create-branch")).toBe(true);
+  });
+
+  it("replaces the canned implement branch and adds the order pull request", () => {
+    const implement = splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER).phases.find((phase) => phase.id === "implement-0");
+    const visual = resolveSplitRunVisual(implement!, { enabled: false, stream: [] });
+    const branches = (visual.stream ?? [])
+      .map((line) => line.artifact)
+      .filter((artifact) => artifact?.type === "TYPE_BRANCH")
+      .map((artifact) => artifact?.data?.name);
+    const pullRequests = (visual.stream ?? []).filter((line) => line.artifact?.type === "TYPE_PR");
+
+    expect(branches).toEqual(["feature/rf-103"]);
+    expect(pullRequests).toHaveLength(1);
+    expect(pullRequests[0]?.artifact?.data).toMatchObject({ number: 503 });
   });
 
   it("keeps YAML artifacts on a live stream that omits them", () => {

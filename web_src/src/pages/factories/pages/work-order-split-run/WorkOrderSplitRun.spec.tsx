@@ -206,7 +206,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(expand).toHaveAttribute("aria-label", "Open automation run");
   });
 
-  it("keeps every check pill on the owner and cost row for verify", () => {
+  it("puts risk score and code quality on the verify step", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(
         {
@@ -240,11 +240,16 @@ describe("WorkOrderSplitRunPopup", () => {
       ),
     });
 
-    const meta = screen.getByTestId("popup-owner-time-cost");
-    expect(within(meta).getByTestId("split-run-checks")).toBeInTheDocument();
-    expect(within(meta).getByText("Risk review")).toBeInTheDocument();
-    expect(within(meta).getByText("Test coverage")).toBeInTheDocument();
-    expect(within(meta).getByText("Confidence score")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
+    const verifyChecks = screen.getByTestId("split-run-phase-checks-verify-1");
+    const risk = within(verifyChecks).getByRole("button", { name: /Risk score/ });
+    expect(risk).toHaveTextContent("Risk score");
+    expect(risk.className).toContain("bg-amber-500/10");
+    expect(risk.className).not.toContain("bg-red-700");
+    expect(within(verifyChecks).getByText("Code quality")).toBeInTheDocument();
+    expect(within(verifyChecks).queryByText("Test coverage")).not.toBeInTheDocument();
+    expect(within(verifyChecks).queryByText("Confidence score")).not.toBeInTheDocument();
+    expect(within(verifyChecks).queryByText("CI")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
   });
 
@@ -309,7 +314,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     await user.click(screen.getByTestId("split-run-check-check-risk-review"));
 
-    expect(screen.getByRole("heading", { name: "Risk review" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Risk score" })).toBeInTheDocument();
     expect(screen.getByText(/Moderate risk: retry policy/)).toBeInTheDocument();
   });
 

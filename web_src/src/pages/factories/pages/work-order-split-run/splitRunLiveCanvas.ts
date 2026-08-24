@@ -384,19 +384,25 @@ function attachPhaseArtifacts(
   if (artifacts.length === 0) {
     return stream;
   }
-  const seen = new Set(stream.flatMap((line) => (line.artifact?.id ? [line.artifact.id] : [])));
-  const pending = artifacts.filter((artifact) => !artifact.id || !seen.has(artifact.id));
+  const queued = queueArtifactsByKind(artifacts);
+  const next = stream.map((line) => {
+    if (!line.artifact) {
+      return line;
+    }
+    const replacement = takeArtifactOfKind(queued, artifactKind(line.artifact));
+    return replacement ? { ...line, artifact: replacement } : line;
+  });
+  const pending = [...queued.values()].flat();
   if (pending.length === 0) {
-    return stream;
+    return next;
   }
 
-  const hostIndex = hostIndexForArtifacts(stream, pending);
+  const hostIndex = hostIndexForArtifacts(next, pending);
   if (hostIndex < 0) {
-    return stream;
+    return next;
   }
 
-  const host = stream[hostIndex]!;
-  const next = [...stream];
+  const host = next[hostIndex]!;
   let insertAt = hostIndex + 1;
   for (const [index, artifact] of pending.entries()) {
     if (index === 0 && !host.artifact) {
@@ -415,6 +421,36 @@ function attachPhaseArtifacts(
     insertAt += 1;
   }
   return next;
+}
+
+function artifactKind(artifact: FactoriesWorkOrderArtifact): string {
+  return (artifact.type ?? "").replace(/^TYPE_/i, "").toLowerCase();
+}
+
+function queueArtifactsByKind(artifacts: FactoriesWorkOrderArtifact[]): Map<string, FactoriesWorkOrderArtifact[]> {
+  const queued = new Map<string, FactoriesWorkOrderArtifact[]>();
+  for (const artifact of artifacts) {
+    const kind = artifactKind(artifact);
+    const list = queued.get(kind) ?? [];
+    list.push(artifact);
+    queued.set(kind, list);
+  }
+  return queued;
+}
+
+function takeArtifactOfKind(
+  queued: Map<string, FactoriesWorkOrderArtifact[]>,
+  kind: string,
+): FactoriesWorkOrderArtifact | undefined {
+  const list = queued.get(kind);
+  if (!list || list.length === 0) {
+    return undefined;
+  }
+  const artifact = list.shift();
+  if (list.length === 0) {
+    queued.delete(kind);
+  }
+  return artifact;
 }
 
 function attachPhaseChecks(stream: SplitRunStreamLine[], checks: WorkOrderCheckPresentation[]): SplitRunStreamLine[] {
@@ -438,6 +474,13 @@ function hostIndexForArtifacts(stream: SplitRunStreamLine[], artifacts: Factorie
     if (planIndex >= 0) {
       return planIndex;
     }
+  }
+  const branchIndex = stream.findIndex(
+    (line) =>
+      line.nodeId === "add-branch-artifact" || (line.artifact != null && artifactKind(line.artifact) === "branch"),
+  );
+  if (branchIndex >= 0 && artifacts.some((artifact) => artifactKind(artifact) === "pr")) {
+    return branchIndex;
   }
   return stream.findIndex((line) => line.kind === "trigger");
 }

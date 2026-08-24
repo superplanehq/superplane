@@ -173,6 +173,10 @@ function takenNodeIds(
       if (edge.channel === "failed" && status !== "failed") {
         continue;
       }
+      const source = nodes.find((node) => node.id === id);
+      if (edge.channel === "passed" && status === "running" && source?.component === "runnerClaudeCode") {
+        continue;
+      }
       if (outgoing.length === 1 || edge.channel === preferred || edge.channel === "default") {
         queue.push(edge.targetId);
       }
@@ -294,6 +298,7 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; 
   addRunError: { title: "Add Run Error", iconSlug: "triangle-alert" },
   reportWorkOrderCheck: { title: "Report Work Order Check", iconSlug: "factory" },
   "github.createIssueComment": { title: "Create Issue Comment", iconSlug: "github" },
+  "github.createPullRequest": { title: "Create Pull Request", iconSlug: "github" },
   "github.addIssueLabel": { title: "Add Issue Label", iconSlug: "github" },
   "github.onIssue": { title: "On Issue", iconSlug: "github" },
   "github.onPullRequest": { title: "On Pull Request", iconSlug: "github" },
@@ -569,6 +574,9 @@ function artifactForNode(
   }
   if (nodeId === "add-branch-artifact") {
     return OPEN_WORK_ORDER_ARTIFACTS.find((artifact) => artifact.id === "art-branch-1");
+  }
+  if (nodeId === "attach-pr-artifact") {
+    return OPEN_WORK_ORDER_ARTIFACTS.find((artifact) => artifact.id === "art-pr-1");
   }
   if (nodeId === "stamp-pr-merged") {
     return PR_CLOSURE_PR_ARTIFACT;

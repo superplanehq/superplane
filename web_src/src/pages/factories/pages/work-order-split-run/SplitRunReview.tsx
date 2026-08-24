@@ -19,7 +19,7 @@ import type { SplitRunFooterTone } from "./splitRunMocks";
 const PILL_TONE: Record<WorkOrderCheckLevel, string> = {
   positive: "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300",
   neutral: "border-slate-400/40 bg-slate-500/10 text-slate-700 dark:text-slate-300",
-  caution: "border-red-800/30 bg-red-700 text-white hover:bg-red-700/90",
+  caution: "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300",
   critical: "border-red-900/40 bg-red-700 text-white hover:bg-red-700/90",
 };
 

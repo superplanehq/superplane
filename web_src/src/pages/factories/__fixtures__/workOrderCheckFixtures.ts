@@ -77,7 +77,7 @@ export const OPEN_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
   {
     id: "check-risk-review",
     key: "risk-review",
-    name: "Risk review",
+    name: "Risk score",
     score: 65,
     maxScore: 100,
     level: "LEVEL_CAUTION",
@@ -91,7 +91,7 @@ export const OPEN_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
   {
     id: "check-code-coverage",
     key: "code-coverage",
-    name: "Code coverage",
+    name: "Code quality",
     score: 82,
     maxScore: 100,
     format: "FORMAT_PERCENT",
@@ -151,12 +151,19 @@ export const OPEN_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
   },
 ];
 
+const VERIFY_STEP_CHECK_KEYS = new Set(["risk-review", "code-coverage"]);
+
+/** Checks the Verify step reports on the line board. */
+export const VERIFY_STEP_CHECKS: FactoriesWorkOrderCheck[] = OPEN_WORK_ORDER_CHECKS.filter((check) =>
+  VERIFY_STEP_CHECK_KEYS.has(check.key ?? ""),
+);
+
 /** Two checks only — the risk review has landed, coverage is still running. */
 export const RUNNING_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
   {
     id: "check-risk-review-running",
     key: "risk-review",
-    name: "Risk review",
+    name: "Risk score",
     score: 38,
     maxScore: 100,
     level: "LEVEL_NEUTRAL",
@@ -206,10 +213,13 @@ export const RUNNING_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
  * and every other order (closed, draft, failed) has none. */
 export const DEFAULT_CHECKS_BY_ORDER_ID: Record<string, FactoriesWorkOrderCheck[]> = {
   [OPEN_WORK_ORDER.id!]: OPEN_WORK_ORDER_CHECKS,
-  [OPEN_WORK_ORDER_SECONDARY.id!]: OPEN_WORK_ORDER_CHECKS,
+  [OPEN_WORK_ORDER_SECONDARY.id!]: VERIFY_STEP_CHECKS,
   [CLOSED_WORK_ORDER.id!]: OPEN_WORK_ORDER_CHECKS,
-  [PR_CLOSURE_COMPLETED_WORK_ORDER.id!]: OPEN_WORK_ORDER_CHECKS,
+  [PR_CLOSURE_COMPLETED_WORK_ORDER.id!]: VERIFY_STEP_CHECKS,
   [RUNNING_WORK_ORDER.id!]: RUNNING_WORK_ORDER_CHECKS,
+  "wo-failed-refunds": VERIFY_STEP_CHECKS,
+  "wo-board-done-rejected": VERIFY_STEP_CHECKS,
+  "wo-board-done-canceled": VERIFY_STEP_CHECKS,
 };
 
 /** A single critical check — the smallest interesting state. */
@@ -217,7 +227,7 @@ export const CRITICAL_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
   {
     id: "check-risk-review-critical",
     key: "risk-review",
-    name: "Risk review",
+    name: "Risk score",
     score: 91,
     maxScore: 100,
     level: "LEVEL_CRITICAL",

@@ -20,6 +20,7 @@ import {
   LINE_BOARD_VERIFY_ENUM_ORDER,
   LINE_BOARD_VERIFY_PR_REVIEW_ORDER,
 } from "../../__fixtures__/lineMetricsFactoriesFixture";
+import { OPEN_WORK_ORDER_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import { splitRunFixtureForWorkOrder, splitRunStatusLabel } from "./splitRunMocks";
 
 function dispatch(state: FactoriesWorkOrderLineDispatch["state"], stepExecutions: FactoriesWorkOrderExecution[]) {
@@ -99,7 +100,7 @@ describe("splitRunFixtureForWorkOrder", () => {
       name: "Confidence score",
       score: 4,
     });
-    expect(artifactNames(implement?.artifacts)).toEqual(["feature/rf-103"]);
+    expect(artifactNames(implement?.artifacts)).toEqual(["feature/rf-103", "#503"]);
   });
 
   it("keeps a single Backlog ingest row on an ingest draft", () => {
@@ -160,7 +161,27 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes).toEqual([]);
   });
 
-  it("shows checks on verify and done cards only when the API supplies them", () => {
+  it("puts risk score and code quality on the verify step", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Verify job",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          dispatch("STATE_ACTIVE", [
+            { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { id: "e-verify", step: "Verify", stepIndex: 1, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
+          ]),
+        ],
+      }),
+      { checks: OPEN_WORK_ORDER_CHECKS },
+    );
+    const verify = fixture.phases.find((phase) => phase.id === "verify-1");
+    expect(verify?.checks?.map((check) => check.name)).toEqual(["Risk score", "Code quality"]);
+    expect(fixture.phases.find((phase) => phase.id === "implement-0")?.checks).toBeUndefined();
+    expect(fixture.checks).toEqual([]);
+  });
+
+  it("shows no verify checks when the API supplies none", () => {
     const verify = splitRunFixtureForWorkOrder(
       order({
         title: "Verify job",
@@ -171,7 +192,9 @@ describe("splitRunFixtureForWorkOrder", () => {
           ]),
         ],
       }),
+      { checks: [] },
     );
+    expect(verify.phases.find((phase) => phase.id === "verify-2")?.checks).toEqual([]);
     expect(verify.checks).toEqual([]);
 
     const done = splitRunFixtureForWorkOrder(
@@ -389,35 +412,38 @@ describe("splitRunFixtureForWorkOrder", () => {
 });
 
 describe("line board work-order examples", () => {
-  it("keeps a plan and a branch on the running GitHub implement card", () => {
+  it("keeps a plan, a branch, and a pull request on the running GitHub implement card", () => {
     const fixture = splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER);
     expect(fixture.phases.map((phase) => phase.id)).toEqual(["ingest", "analyze", "plan", "score", "implement-0"]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
       "feature/rf-103",
+      "#503",
     ]);
   });
 
-  it("keeps ingest analysis and a branch on the approval implement card", () => {
+  it("keeps ingest analysis, a branch, and a pull request on the approval implement card", () => {
     const fixture = splitRunFixtureForWorkOrder(APPROVAL_WORK_ORDER);
     expect(fixture.phases.map((phase) => phase.id)).toEqual(["ingest", "analyze", "plan", "score", "implement-0"]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
       "feature/rf-109",
+      "#509",
     ]);
   });
 
-  it("keeps ingest analysis and a branch on the failed implement card", () => {
+  it("keeps ingest analysis, a branch, and a pull request on the failed implement card", () => {
     const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER);
     expect(fixture.phases.map((phase) => phase.id)).toEqual(["ingest", "analyze", "plan", "score", "implement-0"]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
       "feature/rf-106",
+      "#506",
     ]);
     expect(fixture.footerTone).toBe("failed");
   });
 
-  it("keeps ingest analysis, a branch, and a pull request on the verify enum card", () => {
+  it("keeps the branch and pull request on implement for the verify enum card", () => {
     const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_ENUM_ORDER);
     expect(fixture.phases.map((phase) => phase.id)).toEqual([
       "ingest",
@@ -430,11 +456,16 @@ describe("line board work-order examples", () => {
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
       "feature/rf-102",
+      "#502",
     ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual(["#502"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual([]);
+    expect(fixture.phases.find((phase) => phase.id === "verify-1")?.checks?.map((check) => check.name)).toEqual([
+      "Risk score",
+      "Code quality",
+    ]);
   });
 
-  it("keeps ingest analysis and PR #6812 on the waiting verify card", () => {
+  it("keeps PR #6812 on implement for the waiting verify card", () => {
     const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER);
     expect(fixture.phases.map((phase) => phase.id)).toEqual([
       "ingest",
@@ -447,8 +478,13 @@ describe("line board work-order examples", () => {
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
       "feature/rf-104",
+      "#6812",
     ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual(["#6812"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual([]);
+    expect(fixture.phases.find((phase) => phase.id === "verify-1")?.checks?.map((check) => check.name)).toEqual([
+      "Risk score",
+      "Code quality",
+    ]);
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
   });
 
@@ -466,8 +502,13 @@ describe("line board work-order examples", () => {
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
       "feature/rf-88",
+      "#510",
     ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual(["#510"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual([]);
+    expect(fixture.phases.find((phase) => phase.id === "verify-1")?.checks?.map((check) => check.name)).toEqual([
+      "Risk score",
+      "Code quality",
+    ]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts)).toEqual(["#510"]);
   });
 
@@ -485,8 +526,9 @@ describe("line board work-order examples", () => {
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
       "feature/rf-112",
+      "#512",
     ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual(["#512"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual([]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts)).toEqual(["#512"]);
     expect(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts[0]?.data).toMatchObject({ state: "closed" });
   });
@@ -505,6 +547,7 @@ describe("line board work-order examples", () => {
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
       "feature/rf-113",
+      "#513",
     ]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts)).toEqual(["notes.md"]);
   });

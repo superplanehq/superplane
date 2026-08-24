@@ -20,6 +20,7 @@ import {
   tokensLabelForDisplay,
 } from "./splitRunWorkOrderDisplay";
 
+import { VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
@@ -166,7 +167,7 @@ function mappedWorkOrderFixture(
   const displayStatus = getWorkOrderDisplayStatus(order);
   const executions = latestDispatchExecutions(order, options?.lineId);
   const current = pickCurrentExecution(executions);
-  const phases = phasesForOrder(order, executions);
+  const phases = phasesForOrder(order, executions, options?.checks);
   return {
     title: order.title ?? "Work order",
     owner: workOrderOwnerDisplay(order, UNKNOWN_OWNER),
@@ -192,8 +193,6 @@ function reviewSurfaces(
   const current = pickCurrentExecution(executions);
   const column = boardColumnFor(current, executions.length);
   const implementFailed = column === "implement" && current?.result === "RESULT_FAILED";
-  const showChecks = column === "verify" || column === "done";
-  const checks = showChecks ? presentWorkOrderChecks(apiChecks ?? []) : [];
 
   if (displayStatus === "draft") {
     return { waitingNotes: [DRAFT_NEXT_STEP], checks: [], footerTone: "draft" };
@@ -215,7 +214,7 @@ function reviewSurfaces(
       footerTone: "waiting",
     };
   }
-  return { waitingNotes: [], checks };
+  return { waitingNotes: [], checks: [] };
 }
 
 function boardColumnFor(current: FactoriesWorkOrderExecution | undefined, executionCount: number): SplitRunBoardColumn {
@@ -245,10 +244,16 @@ function boardColumnFor(current: FactoriesWorkOrderExecution | undefined, execut
   return "backlog";
 }
 
-function phasesForOrder(order: FactoriesWorkOrder, executions: FactoriesWorkOrderExecution[]): SplitRunPhase[] {
+const VERIFY_STEP_KEYS = new Set(VERIFY_STEP_CHECKS.map((check) => check.key).filter(Boolean));
+
+function phasesForOrder(
+  order: FactoriesWorkOrder,
+  executions: FactoriesWorkOrderExecution[],
+  apiChecks?: FactoriesWorkOrderCheck[],
+): SplitRunPhase[] {
   return [
     ...sourcePhasesForOrder(order, executions.length > 0),
-    ...executions.map((execution) => executionToPhase(order, execution)),
+    ...executions.map((execution) => executionToPhase(order, execution, apiChecks)),
   ];
 }
 
@@ -412,7 +417,11 @@ function descriptionArtifactForOrder(order: FactoriesWorkOrder): FactoriesWorkOr
   };
 }
 
-function executionToPhase(order: FactoriesWorkOrder, execution: FactoriesWorkOrderExecution): SplitRunPhase {
+function executionToPhase(
+  order: FactoriesWorkOrder,
+  execution: FactoriesWorkOrderExecution,
+  apiChecks?: FactoriesWorkOrderCheck[],
+): SplitRunPhase {
   const status = statusForExecution(execution);
   const { name, componentName } = lineAutomationPresentation(execution.run, execution.step);
   const duration = durationForExecution(execution, status);
@@ -437,11 +446,23 @@ function executionToPhase(order: FactoriesWorkOrder, execution: FactoriesWorkOrd
     duration,
     componentName,
     artifacts,
+    checks: checksForLineExecution(execution, apiChecks),
     stream: [line],
     canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
     appId: execution.run?.appId,
     runId: execution.run?.id,
   };
+}
+
+function checksForLineExecution(
+  execution: FactoriesWorkOrderExecution,
+  apiChecks?: FactoriesWorkOrderCheck[],
+): WorkOrderCheckPresentation[] | undefined {
+  if (!(execution.step ?? "").toLowerCase().includes("verify")) {
+    return undefined;
+  }
+  const source = apiChecks ?? VERIFY_STEP_CHECKS;
+  return presentWorkOrderChecks(source.filter((check) => VERIFY_STEP_KEYS.has(check.key ?? "")));
 }
 
 function artifactsForLineExecution(
@@ -450,10 +471,10 @@ function artifactsForLineExecution(
 ): FactoriesWorkOrderArtifact[] {
   const step = (execution.step ?? "").toLowerCase();
   if (step.includes("implement")) {
-    return [branchArtifactForOrder(order)];
+    return [branchArtifactForOrder(order), pullRequestArtifactForOrder(order, "open")];
   }
   if (step.includes("verify")) {
-    return [pullRequestArtifactForOrder(order, "open")];
+    return [];
   }
   if (step.includes("done")) {
     if (execution.result === "RESULT_CANCELLED") {

@@ -26,7 +26,7 @@ describe("WorkOrderRunOverlayPlayground", () => {
     expect(screen.getByText(/Run 4182/)).toBeInTheDocument();
     expect(screen.queryByText("Factory Lines")).not.toBeInTheDocument();
     expect(screen.queryByText("Assignees")).not.toBeInTheDocument();
-    expect(screen.getByText("Code coverage")).toBeInTheDocument();
+    expect(screen.getByText("Code quality")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue to Verify" })).toBeInTheDocument();
   });
 
