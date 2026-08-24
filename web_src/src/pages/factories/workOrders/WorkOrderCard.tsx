@@ -8,7 +8,7 @@ import {
   WORK_ORDER_ATTENTION_ICON,
   WORK_ORDER_ATTENTION_LABEL,
 } from "../lib/workOrderAttention";
-import { workOrderDetailPath } from "../lib/factoryPagePaths";
+import { factoryHomePath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { ConfidenceMeter } from "./ConfidenceMeter";
@@ -63,9 +63,7 @@ export function WorkOrderCard({
   confidenceScore,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
-  const destination =
-    href ??
-    (entry.order.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, entry.order.number) : "#");
+  const destination = href ?? factoryHomePath(organizationId, factoryKey, factoryLines[0]?.id);
   const startedAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const startedLabel = startedAt ? formatTimeAgo(startedAt) : "—";
   const showStart = entry.displayStatus === "draft";

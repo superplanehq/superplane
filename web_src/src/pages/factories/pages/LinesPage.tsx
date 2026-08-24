@@ -74,7 +74,6 @@ import {
   intakeSourceFromSearch,
   isIntakeSearchOpen,
   linesPath,
-  workOrderDetailPath,
 } from "../lib/factoryPagePaths";
 import { humanizeLineName } from "../lib/humanizeLineName";
 import {
@@ -425,7 +424,6 @@ function LineDetail({
         <LineBoardSplitRunPopup
           organizationId={organizationId}
           factoryId={factoryId}
-          factoryKey={factoryKey}
           lineId={line.id}
           lineName={line.name}
           peekOrderId={peekOrderId}
@@ -445,7 +443,6 @@ function LineDetail({
 function LineBoardSplitRunPopup({
   organizationId,
   factoryId,
-  factoryKey,
   lineId,
   lineName,
   peekOrderId,
@@ -459,7 +456,6 @@ function LineBoardSplitRunPopup({
 }: {
   organizationId: string;
   factoryId: string;
-  factoryKey: string;
   lineId: string | undefined;
   lineName: string | undefined;
   peekOrderId: string;
@@ -473,13 +469,13 @@ function LineBoardSplitRunPopup({
 }) {
   const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
   const resolvedLineName = lineName?.trim();
-  const detailHref =
-    peekOrder?.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, peekOrder.number) : undefined;
   return (
     <WorkOrderSplitRunPopup
       key={peekOrderId}
       organizationId={organizationId}
-      fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId, detailHref })}
+      factoryId={factoryId}
+      orderId={peekOrderId}
+      fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId })}
       canvasEditHref={canvasEditHref}
       canvasExpandHref={canvasExpandHref}
       canDispatch={canDispatch && Boolean(resolvedLineName)}

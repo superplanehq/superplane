@@ -44,6 +44,7 @@ describe("WorkOrderSplitRunPopup", () => {
     });
 
     expect(screen.queryByTestId("split-run-open-work-order")).not.toBeInTheDocument();
+
     expect(screen.queryByRole("link", { name: "Open work order" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
@@ -312,42 +313,35 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByText(/Moderate risk: retry policy/)).toBeInTheDocument();
   });
 
-  it("asks the assignee for attention when logs are complete and the order waits", () => {
+  it("hides the next-step footer when logs are complete and the order waits with no note", () => {
     renderPopup({
-      fixture: splitRunFixtureForWorkOrder(
-        {
-          ...OPEN_WORK_ORDER,
-          title: "dasdas",
-          statusNotes: [],
-          assignees: [{ id: "user-1", name: "test test" }],
-          lineDispatches: [
-            {
-              id: "dispatch-wait",
-              line: { id: "line-1", name: "plan-and-implement" },
-              state: "STATE_FINISHED",
-              stepExecutions: [
-                {
-                  id: "e-1",
-                  step: "dasdasdas",
-                  stepIndex: 0,
-                  state: "STATE_FINISHED",
-                  result: "RESULT_PASSED",
-                },
-              ],
-            },
-          ],
-        },
-        { detailHref: "/org-1/workspaces/RF/work-order/101" },
-      ),
+      fixture: splitRunFixtureForWorkOrder({
+        ...OPEN_WORK_ORDER,
+        title: "dasdas",
+        statusNotes: [],
+        assignees: [{ id: "user-1", name: "test test" }],
+        lineDispatches: [
+          {
+            id: "dispatch-wait",
+            line: { id: "line-1", name: "plan-and-implement" },
+            state: "STATE_FINISHED",
+            stepExecutions: [
+              {
+                id: "e-1",
+                step: "dasdasdas",
+                stepIndex: 0,
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+              },
+            ],
+          },
+        ],
+      }),
     });
 
-    const review = screen.getByTestId("split-run-review");
-    expect(review).toHaveTextContent("Needs attention");
-    expect(review).toHaveTextContent("This work order needs attention from test test.");
-    expect(within(review).getByRole("link", { name: "Open work order" })).toHaveAttribute(
-      "href",
-      "/org-1/workspaces/RF/work-order/101",
-    );
+    expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
+    expect(screen.queryByText("Needs attention")).not.toBeInTheDocument();
+    expect(screen.queryByText("This work order needs attention from test test.")).not.toBeInTheDocument();
   });
 
   it("hides the review strip when the work order has no note or checks", () => {

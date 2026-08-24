@@ -1,5 +1,3 @@
-/** Copy for the first-run flow. Source: docs/prd/onboarding-first-run.md */
-
 export const FIRST_RUN_COPY = {
   chrome: {
     logOut: "Log out",
@@ -43,6 +41,10 @@ export const FIRST_RUN_COPY = {
     jiraHelper: "Find tickets in your Jira backlog.",
     linearHelper: "Find tickets in your Linear backlog.",
     analyze: "Analyze my tickets",
+    continue: "Connect agent",
+  },
+  agent: {
+    headline: "Connect agent",
   },
   analysis: {
     headline: "Analyzing your backlog",

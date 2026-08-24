@@ -8,6 +8,7 @@ import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { resolveFactoryAppCanvasSubtitle, resolveFactoryLineName } from "../../lib/factoryAppCanvasCopy";
 import { resolveFactoryAppBackNav } from "../../lib/factoryAppNav";
 import { factoryAppConfigurePath, parseFactoryAppNavFrom } from "../../lib/factoryPagePaths";
+import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { canvasKeyForAutomation } from "./splitRunCanvases";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
 import {
@@ -20,19 +21,33 @@ import {
 } from "./splitRunPageModel";
 import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
 import { useSplitRunPanePercent } from "./useSplitRunPanePercent";
+import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
 
-export function useFactoryAppSplitRunPage() {
-  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
-  const { appId = "" } = useParams<{ appId: string }>();
+function useSplitRunPageSelection(
+  organizationId: string,
+  factoryId: string,
+  lines: Array<{ id?: string; name?: string }> | undefined,
+) {
   const [searchParams] = useSearchParams();
-  const [nodeId, setNodeId] = useState<string | null>(null);
-  const split = useSplitRunPanePercent();
   const query = readSplitRunQuery(searchParams);
-  const lineName = useMemo(() => resolveFactoryLineName(factory?.lines, query.lineId), [factory?.lines, query.lineId]);
+  const lineName = useMemo(() => resolveFactoryLineName(lines, query.lineId), [lines, query.lineId]);
   const { data: workOrders = [], isLoading } = useFactoryWorkOrders(organizationId, factoryId);
   const order = useMemo(
     () => resolveSplitRunOrder(workOrders, query.orderNumber, query.runId, isLoading),
     [isLoading, query.orderNumber, query.runId, workOrders],
+  );
+  return { isLoading, lineName, order, query };
+}
+
+export function useFactoryAppSplitRunPage() {
+  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const { appId = "" } = useParams<{ appId: string }>();
+  const [nodeId, setNodeId] = useState<string | null>(null);
+  const split = useSplitRunPanePercent();
+  const { isLoading, lineName, order, query } = useSplitRunPageSelection(
+    organizationId,
+    factoryId,
+    factory?.lines,
   );
   const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, order?.id ?? "");
   const fixture = useMemo(
@@ -45,15 +60,15 @@ export function useFactoryAppSplitRunPage() {
     [appId, canvasKey, fixture],
   );
   const live = useSplitRunLiveCanvas(organizationId, phase);
+  const artifactIndex = useSplitRunStreamArtifacts(organizationId, factoryId, order?.id);
   const visual = useMemo(() => resolveSplitRunVisual(phase, live), [live, phase]);
-  const canvas = visual.canvas;
-  const stream = visual.stream;
+  const stream = useMemo(() => attachArtifactsToStream(visual.stream, artifactIndex), [artifactIndex, visual.stream]);
   const back = useMemo(
     () =>
       resolveFactoryAppBackNav(organizationId, factoryKey, {
         from: query.from,
         appId,
-        appName: canvas.title,
+        appName: visual.canvas.title,
         lineId: query.lineId,
         orderNumber: query.orderNumber,
         lineName,
@@ -61,7 +76,6 @@ export function useFactoryAppSplitRunPage() {
       }),
     [
       appId,
-      canvas.title,
       factoryKey,
       lineName,
       order?.title,
@@ -69,6 +83,7 @@ export function useFactoryAppSplitRunPage() {
       query.from,
       query.lineId,
       query.orderNumber,
+      visual.canvas.title,
     ],
   );
   const editHref = factoryAppConfigurePath(organizationId, factoryKey, appId, {
@@ -78,11 +93,11 @@ export function useFactoryAppSplitRunPage() {
     orderNumber: query.orderNumber ?? undefined,
   });
 
-  usePageTitle([splitRunPageTitle(!order, isLoading, canvas.title), factory?.name ?? "Workspace"]);
+  usePageTitle([splitRunPageTitle(!order, isLoading, visual.canvas.title), factory?.name ?? "Workspace"]);
 
   return {
     back,
-    canvas,
+    canvas: visual.canvas,
     editHref,
     fixture,
     isLoading,

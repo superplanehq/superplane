@@ -126,7 +126,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.checks).toEqual([]);
   });
 
-  it("asks the assignee for attention when a waiting order has no notes", () => {
+  it("hides the next-step footer when a waiting order has no notes", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
         title: "Ship idempotent refund retries",
@@ -138,18 +138,12 @@ describe("splitRunFixtureForWorkOrder", () => {
           ]),
         ],
       }),
-      { detailHref: "/org-1/workspaces/RF/work-order/101" },
     );
     expect(fixture.footerTone).toBe("waiting");
-    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Needs attention"]);
-    expect(fixture.waitingNotes[0]?.text).toBe("This work order needs attention from Ada Lovelace.");
-    expect(fixture.waitingNotes[0]?.cta).toEqual({
-      label: "Open work order",
-      href: "/org-1/workspaces/RF/work-order/101",
-    });
+    expect(fixture.waitingNotes).toEqual([]);
   });
 
-  it("shows the attention footer after a finished unnamed step while the order waits", () => {
+  it("hides the next-step footer after a finished unnamed step while the order waits", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
         title: "dasdas",
@@ -163,7 +157,7 @@ describe("splitRunFixtureForWorkOrder", () => {
       }),
     );
     expect(fixture.footerTone).toBe("waiting");
-    expect(fixture.waitingNotes[0]?.text).toBe("This work order needs attention from test test.");
+    expect(fixture.waitingNotes).toEqual([]);
   });
 
   it("shows checks on verify and done cards only when the API supplies them", () => {

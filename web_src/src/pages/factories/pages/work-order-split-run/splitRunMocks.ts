@@ -151,7 +151,7 @@ const PR_CLOSURE_APP_NAME = "PR Closure";
 
 export function splitRunFixtureForWorkOrder(
   order?: FactoriesWorkOrder,
-  options?: { checks?: FactoriesWorkOrderCheck[]; lineId?: string | null; detailHref?: string },
+  options?: { checks?: FactoriesWorkOrderCheck[]; lineId?: string | null },
 ): SplitRunFixture {
   if (!order) {
     return SPLIT_RUN_RUNNING;
@@ -161,7 +161,7 @@ export function splitRunFixtureForWorkOrder(
 
 function mappedWorkOrderFixture(
   order: FactoriesWorkOrder,
-  options?: { checks?: FactoriesWorkOrderCheck[]; lineId?: string | null; detailHref?: string },
+  options?: { checks?: FactoriesWorkOrderCheck[]; lineId?: string | null },
 ): SplitRunFixture {
   const displayStatus = getWorkOrderDisplayStatus(order);
   const executions = latestDispatchExecutions(order, options?.lineId);
@@ -178,17 +178,7 @@ function mappedWorkOrderFixture(
     lineStatus: lineStatusForDisplay(displayStatus),
     currentPhaseId: current ? phaseIdForExecution(current) : (phases[0]?.id ?? ""),
     phases,
-    ...reviewSurfaces(order, displayStatus, options?.checks, options?.lineId, options?.detailHref),
-  };
-}
-
-function attentionNote(order: FactoriesWorkOrder, detailHref?: string): WorkOrderStatusNotePresentation {
-  const name = order.assignees?.[0]?.name?.trim();
-  return {
-    key: "needs-attention",
-    headline: "Needs attention",
-    text: name ? `This work order needs attention from ${name}.` : "This work order needs attention.",
-    cta: detailHref ? { label: "Open work order", href: detailHref } : undefined,
+    ...reviewSurfaces(order, displayStatus, options?.checks, options?.lineId),
   };
 }
 
@@ -197,7 +187,6 @@ function reviewSurfaces(
   displayStatus: WorkOrderDisplayStatus,
   apiChecks?: FactoriesWorkOrderCheck[],
   lineId?: string | null,
-  detailHref?: string,
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footerTone"> {
   const executions = latestDispatchExecutions(order, lineId);
   const current = pickCurrentExecution(executions);
@@ -213,9 +202,8 @@ function reviewSurfaces(
     return { waitingNotes: [IMPLEMENT_FAILED_NOTE], checks: [], footerTone: "failed" };
   }
   if (displayStatus === "waiting") {
-    const notes = presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
     return {
-      waitingNotes: notes.length > 0 ? notes : [attentionNote(order, detailHref)],
+      waitingNotes: presentWorkOrderStatusNotes(order.statusNotes, displayStatus),
       checks: [],
       footerTone: "waiting",
     };

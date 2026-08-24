@@ -10,7 +10,7 @@ import {
   factoryVelocityPath,
   isIntakeSearchOpen,
 } from "../lib/factoryPagePaths";
-import { factoriesRailControlClassName } from "./factoriesRail";
+import { factoriesRailControlClassName, isBoardPath, isSettingsPath, isVelocityPath } from "./factoriesRail";
 
 interface FactoriesSidebarNavProps {
   organizationId: string;
@@ -112,16 +112,4 @@ export function FactoriesSidebarNav({
       </PermissionTooltip>
     </nav>
   );
-}
-
-export function isBoardPath(pathname: string): boolean {
-  return pathname.includes("/lines");
-}
-
-export function isVelocityPath(pathname: string): boolean {
-  return pathname.includes("/velocity");
-}
-
-export function isSettingsPath(pathname: string): boolean {
-  return pathname.includes("/settings");
 }

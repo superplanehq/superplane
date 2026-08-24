@@ -1,32 +1,20 @@
-import { Handle, Position, ReactFlow, Background, type Edge, type Node, type NodeProps } from "@xyflow/react";
+import { Handle, Position, ReactFlow, Background, type Node, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Maximize2, MoreHorizontal, Pencil } from "lucide-react";
 import { useCallback, useMemo, type MouseEvent } from "react";
 
-import type { ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/buttonVariants";
 import { useTheme } from "@/contexts/useTheme";
-import { factoryCanvasBackground, factoryEdgePalette } from "@/lib/factoryCanvasChrome";
+import { FACTORY_HANDLE_STYLE, factoryCanvasBackground, factoryEdgePalette } from "@/lib/factoryCanvasChrome";
+import { FACTORY_SIDE_HANDLE_ID, FACTORY_SPINE_HANDLE_ID } from "@/lib/layout/factoryRunLeafLayout";
 import { cn } from "@/lib/utils";
 import { Link } from "@/components/Link/link";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { FactoryNodeCardShell } from "@/ui/factoryNodeChrome/FactoryNodeCardShell";
-import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
-import { componentPresentation, type SplitRunCanvasModel } from "./splitRunCanvases";
-
-type LineNodeData = {
-  title: string;
-  subtitle: string;
-  iconSlug: string;
-  iconSrc?: string;
-  status: FactoryNodeStatus;
-  metrics: string;
-  nodeId: string;
-  isSelected: boolean;
-  onSelect?: (id: string) => void;
-} & Record<string, unknown>;
+import { compactLineCanvasGraph, type LineNodeData } from "./compactLineCanvasGraph";
+import type { SplitRunCanvasModel } from "./splitRunCanvases";
 
 function LineCanvasNode({ data }: NodeProps<Node<LineNodeData>>) {
   return (
@@ -44,7 +32,8 @@ function LineCanvasNode({ data }: NodeProps<Node<LineNodeData>>) {
             "ring-2 ring-[color:var(--status-running-dot)] ring-offset-2 ring-offset-[color:var(--status-running-bg)]",
         )}
       >
-        <Handle type="target" position={Position.Top} className="!size-2 !border-border !bg-card" />
+        <Handle type="target" position={Position.Top} style={FACTORY_HANDLE_STYLE} />
+        <Handle type="target" position={Position.Left} style={FACTORY_HANDLE_STYLE} />
         <FactoryNodeCardShell
           title={data.title}
           subtitle={data.subtitle}
@@ -54,79 +43,14 @@ function LineCanvasNode({ data }: NodeProps<Node<LineNodeData>>) {
           metrics={data.metrics}
           selected={data.isSelected}
         />
-        <Handle id="default" type="source" position={Position.Bottom} className="!size-2 !border-border !bg-card" />
-        <Handle id="true" type="source" position={Position.Bottom} className="!size-2 !border-border !bg-card" />
-        <Handle id="passed" type="source" position={Position.Bottom} className="!size-2 !border-border !bg-card" />
-        <Handle id="false" type="source" position={Position.Right} className="!size-2 !border-border !bg-card" />
-        <Handle id="failed" type="source" position={Position.Right} className="!size-2 !border-border !bg-card" />
-        <Handle id="found" type="source" position={Position.Bottom} className="!size-2 !border-border !bg-card" />
+        <Handle id={FACTORY_SPINE_HANDLE_ID} type="source" position={Position.Bottom} style={FACTORY_HANDLE_STYLE} />
+        <Handle id={FACTORY_SIDE_HANDLE_ID} type="source" position={Position.Right} style={FACTORY_HANDLE_STYLE} />
       </div>
     </div>
   );
 }
 
 const nodeTypes = { lineCanvas: LineCanvasNode };
-
-function origin(nodes: ComponentsNode[]): { x: number; y: number } {
-  const xs = nodes.map((node) => node.position?.x ?? 0);
-  const ys = nodes.map((node) => node.position?.y ?? 0);
-  return { x: Math.min(...xs, 0), y: Math.min(...ys, 0) };
-}
-
-function graphFromCanvas(
-  canvas: SplitRunCanvasModel,
-  selectedId: string | null,
-  onSelect?: (id: string) => void,
-): { nodes: Node<LineNodeData>[]; edges: Edge[] } {
-  const zero = origin(canvas.nodes);
-  const nodes: Node<LineNodeData>[] = canvas.nodes
-    .filter((node): node is ComponentsNode & { id: string } => Boolean(node.id))
-    .map((node) => {
-      const presentation = componentPresentation(node.component);
-      return {
-        id: node.id,
-        type: "lineCanvas",
-        position: {
-          x: (node.position?.x ?? 0) - zero.x,
-          y: (node.position?.y ?? 0) - zero.y,
-        },
-        data: {
-          title: presentation.title,
-          subtitle: node.name ?? presentation.title,
-          iconSlug: presentation.iconSlug,
-          iconSrc: presentation.iconSrc,
-          status: canvas.statuses[node.id] ?? "pending",
-          metrics: canvas.metrics[node.id] ?? "—",
-          nodeId: node.id,
-          isSelected: node.id === selectedId,
-          onSelect,
-        },
-        selected: node.id === selectedId,
-        draggable: false,
-      };
-    });
-
-  const edges: Edge[] = canvas.edges.map((edge, index) => toFlowEdge(edge, index));
-  return { nodes, edges };
-}
-
-function toFlowEdge(edge: ComponentsEdge, index: number): Edge {
-  const channel = edge.channel ?? "default";
-  const sideChannel = channel === "false" || channel === "failed";
-  return {
-    id: `e-${edge.sourceId}-${edge.targetId}-${index}`,
-    source: edge.sourceId ?? "",
-    target: edge.targetId ?? "",
-    sourceHandle: channel,
-    type: "smoothstep",
-    label: channel === "default" ? undefined : channel,
-    labelStyle: { fontSize: 10, fill: "#64748b" },
-    labelBgStyle: { fill: "#ffffff", fillOpacity: 1 },
-    labelBgPadding: [6, 2],
-    labelBgBorderRadius: 6,
-    style: sideChannel ? { stroke: "#cbd5e1" } : undefined,
-  };
-}
 
 /**
  * Real line-app canvas in the run pane. Nodes keep factory card chrome.
@@ -152,9 +76,12 @@ export function CompactLineCanvas({
   editLabel?: string;
   onEdit?: () => void;
 }) {
-  const { nodes, edges } = useMemo(() => graphFromCanvas(canvas, selectedId, onSelect), [canvas, selectedId, onSelect]);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
+  const { nodes, edges } = useMemo(
+    () => compactLineCanvasGraph(canvas, selectedId, onSelect, isDark),
+    [canvas, isDark, onSelect, selectedId],
+  );
   const background = factoryCanvasBackground(isDark);
   const palette = factoryEdgePalette(isDark);
 

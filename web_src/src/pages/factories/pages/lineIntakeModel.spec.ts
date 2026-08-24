@@ -40,6 +40,12 @@ describe("lineIntakeModel", () => {
     expect(intakeAutomationAppId([{ id: "app-acme-planner" }, { id: "app-github-issues-intake" }])).toBe(
       "app-github-issues-intake",
     );
+    expect(
+      intakeAutomationAppId([
+        { id: "canvas-planner", name: "Planner" },
+        { id: "canvas-issue-intake", name: "Issue Intake" },
+      ]),
+    ).toBe("canvas-issue-intake");
     expect(intakeAutomationAppId([{ id: "app-acme-planner" }])).toBe("app-acme-planner");
     expect(intakeAutomationAppId([])).toBeUndefined();
   });

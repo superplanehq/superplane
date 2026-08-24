@@ -1,7 +1,7 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { NavLink } from "react-router";
-import { workOrderDetailPath } from "../lib/factoryPagePaths";
+import { factoryHomePath } from "../lib/factoryPagePaths";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { FACTORIES_NAV_ITEMS } from "./factoriesNavItems";
 
@@ -67,7 +67,7 @@ export function FactoriesNav({ organizationId, factoryKey, recentWorkOrders }: F
               return (
                 <li key={order.id}>
                   <NavLink
-                    to={workOrderDetailPath(organizationId, factoryKey, order.number)}
+                    to={factoryHomePath(organizationId, factoryKey)}
                     className={({ isActive }) =>
                       cn(
                         "group block rounded-md px-2.5 py-1.5 text-[13px] tracking-[-0.01em] text-foreground/80 hover:bg-sidebar-accent hover:text-foreground",

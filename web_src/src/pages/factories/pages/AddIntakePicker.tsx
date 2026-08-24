@@ -42,12 +42,13 @@ export function AddIntakePicker({ open, onClose, onSelect }: AddIntakePickerProp
         </DialogHeader>
 
         <div className="border-b border-border px-4 py-3">
-          <label className="relative block">
+          <div className="relative">
             <Search
               className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
               aria-hidden
             />
             <Input
+              id="add-intake-search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search intakes"
@@ -56,7 +57,7 @@ export function AddIntakePicker({ open, onClose, onSelect }: AddIntakePickerProp
               data-testid="add-intake-search"
               autoFocus
             />
-          </label>
+          </div>
         </div>
 
         <ul

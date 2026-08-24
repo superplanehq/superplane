@@ -12,6 +12,7 @@ import {
   isIntakeSearchOpen,
   factorySettingsGeneralPathAfterKeyChange,
   firstFactoryLineId,
+  firstFactoryLineName,
   legacyWorkOrderDetailPath,
   organizationSettingsPath,
   organizationSettingsSectionPath,
@@ -74,6 +75,18 @@ describe("firstFactoryLineId", () => {
 
   it("returns undefined when the factory has no line", () => {
     expect(firstFactoryLineId({ lines: [] })).toBeUndefined();
+  });
+});
+
+describe("firstFactoryLineName", () => {
+  it("returns the first line that has a name", () => {
+    expect(firstFactoryLineName({ lines: [{ name: "plan-and-implement" }, { name: "hotfix" }] })).toBe(
+      "plan-and-implement",
+    );
+  });
+
+  it("returns undefined when the factory has no named line", () => {
+    expect(firstFactoryLineName({ lines: [{ name: "  " }] })).toBeUndefined();
   });
 });
 

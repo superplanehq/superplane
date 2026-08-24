@@ -22,6 +22,13 @@ export function firstFactoryLineId(
   return factory?.lines?.find((line) => Boolean(line.id))?.id;
 }
 
+/** First line name on a factory, used to Start a new work order. */
+export function firstFactoryLineName(
+  factory: { lines?: Array<{ name?: string }> | null } | null | undefined,
+): string | undefined {
+  return factory?.lines?.find((line) => Boolean(line.name?.trim()))?.name?.trim();
+}
+
 /**
  * Workspace home: the first line board when a line exists, otherwise the
  * lines list (empty state).

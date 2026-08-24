@@ -8,6 +8,7 @@ import {
   DEFAULT_GITHUB_INTAKE_SETTINGS,
   type IntakeAutomationRun,
   type IntakeSettingsTab,
+  type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
 import {
   GITHUB_ISSUES_ANALYZING_TICKETS,
@@ -18,6 +19,7 @@ import {
   LINE_INTAKE_COPY,
   LINE_INTAKE_SOURCES,
   lineIntakeSourceById,
+  type AddIntakeTemplate,
   type LineIntakeAnalyzingTicket,
   type LineIntakeSource,
   type LineIntakeSourceId,
@@ -39,16 +41,15 @@ interface LineIntakeDrawerProps {
  * Pane beside the line board. Each intake source is a white card that
  * expands and collapses on its own.
  */
-export function LineIntakeDrawer({
-  onClose,
+function useLineIntakeDrawerState({
   initialSourceId,
-  initialSettingsOpen = false,
-  initialSettingsTab = "general",
-  sources = LINE_INTAKE_SOURCES,
-  analyzingTickets = GITHUB_ISSUES_ANALYZING_TICKETS,
+  initialSettingsOpen,
   onOpenTicket,
-  editAutomationHref,
-}: LineIntakeDrawerProps) {
+}: {
+  initialSourceId?: LineIntakeSourceId;
+  initialSettingsOpen: boolean;
+  onOpenTicket?: (ticket: LineIntakeAnalyzingTicket) => void;
+}) {
   const [expandedSourceIds, setExpandedSourceIds] = useState<ReadonlySet<LineIntakeSourceId>>(
     () => new Set(initialSourceId ? [initialSourceId] : []),
   );
@@ -57,7 +58,6 @@ export function LineIntakeDrawer({
   const [githubSettings, setGithubSettings] = useState(DEFAULT_GITHUB_INTAKE_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(initialSettingsOpen);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const openSource = openSourceId ? lineIntakeSourceById(openSourceId) : undefined;
 
   function toggleSource(sourceId: LineIntakeSourceId) {
     setExpandedSourceIds((current) => {
@@ -80,6 +80,64 @@ export function LineIntakeDrawer({
     setOpenTicket(ticket);
     onOpenTicket?.(ticket);
   }
+
+  function openSourceGear(source: LineIntakeSource) {
+    setOpenTicket(null);
+    if (source.id === "github-issues") {
+      setOpenSourceId(null);
+      setSettingsOpen(true);
+      return;
+    }
+    setSettingsOpen(false);
+    setOpenSourceId(source.id);
+  }
+
+  function openAnalyzingTicket(ticket: LineIntakeAnalyzingTicket) {
+    setOpenSourceId(null);
+    setSettingsOpen(false);
+    setOpenTicket(ticket);
+    onOpenTicket?.(ticket);
+  }
+
+  function selectIntakeTemplate(template: AddIntakeTemplate) {
+    setPickerOpen(false);
+    if (isLineIntakeSourceId(template.id)) {
+      expandSource(template.id);
+    }
+  }
+
+  return {
+    expandedSourceIds,
+    githubSettings,
+    openSource: openSourceId ? lineIntakeSourceById(openSourceId) : undefined,
+    openTicket,
+    pickerOpen,
+    settingsOpen,
+    closeOpenSource: () => setOpenSourceId(null),
+    closeOpenTicket: () => setOpenTicket(null),
+    closePicker: () => setPickerOpen(false),
+    closeSettings: () => setSettingsOpen(false),
+    openAnalyzingTicket,
+    openIntakeRun,
+    openPicker: () => setPickerOpen(true),
+    openSourceGear,
+    saveGithubSettings: setGithubSettings,
+    selectIntakeTemplate,
+    toggleSource,
+  };
+}
+
+export function LineIntakeDrawer({
+  onClose,
+  initialSourceId,
+  initialSettingsOpen = false,
+  initialSettingsTab = "general",
+  sources = LINE_INTAKE_SOURCES,
+  analyzingTickets = GITHUB_ISSUES_ANALYZING_TICKETS,
+  onOpenTicket,
+  editAutomationHref,
+}: LineIntakeDrawerProps) {
+  const drawer = useLineIntakeDrawerState({ initialSourceId, initialSettingsOpen, onOpenTicket });
 
   return (
     <>
@@ -104,97 +162,161 @@ export function LineIntakeDrawer({
         <p className="workspace-body-text shrink-0 px-3 pb-3 text-muted-foreground">
           Automations that listen, evaluate, and create backlog work orders.
         </p>
-        <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 [scrollbar-width:thin]">
-          {sources.map((source) => {
-            const expanded = expandedSourceIds.has(source.id);
-            const tickets = source.id === "github-issues" ? analyzingTickets : [];
-            return (
-              <li key={source.id}>
-                <IntakeSourceCard
-                  source={source}
-                  displayName={source.id === "github-issues" ? githubSettings.name : source.name}
-                  expanded={expanded}
-                  childCount={tickets.length}
-                  onToggle={() => toggleSource(source.id)}
-                  onOpenGear={() => {
-                    setOpenTicket(null);
-                    if (source.id === "github-issues") {
-                      setOpenSourceId(null);
-                      setSettingsOpen(true);
-                      return;
-                    }
-                    setSettingsOpen(false);
-                    setOpenSourceId(source.id);
-                  }}
-                >
-                  {expanded ? (
-                    <AnalyzingTicketList
-                      tickets={tickets}
-                      openTicketId={openTicket?.id ?? null}
-                      onOpenTicket={(ticket) => {
-                        setOpenSourceId(null);
-                        setSettingsOpen(false);
-                        setOpenTicket(ticket);
-                        onOpenTicket?.(ticket);
-                      }}
-                    />
-                  ) : null}
-                </IntakeSourceCard>
-              </li>
-            );
-          })}
-          <li>
-            <button
-              type="button"
-              onClick={() => setPickerOpen(true)}
-              data-testid="line-intake-add"
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/60 px-3 py-3 text-[13px] font-medium tracking-[-0.01em] text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted hover:text-foreground"
-            >
-              <Plus className="size-3.5 shrink-0" aria-hidden />
-              Add intake
-            </button>
-          </li>
-        </ul>
+        <LineIntakeSourceList
+          sources={sources}
+          analyzingTickets={analyzingTickets}
+          expandedSourceIds={drawer.expandedSourceIds}
+          githubName={drawer.githubSettings.name}
+          openTicketId={drawer.openTicket?.id ?? null}
+          onToggleSource={drawer.toggleSource}
+          onOpenGear={drawer.openSourceGear}
+          onOpenAnalyzingTicket={drawer.openAnalyzingTicket}
+          onOpenPicker={drawer.openPicker}
+        />
       </aside>
 
-      <AddIntakePicker
-        open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        onSelect={(template) => {
-          setPickerOpen(false);
-          if (isLineIntakeSourceId(template.id)) {
-            expandSource(template.id);
-          }
-        }}
+      <LineIntakeDrawerPopups
+        pickerOpen={drawer.pickerOpen}
+        settingsOpen={drawer.settingsOpen}
+        githubSettings={drawer.githubSettings}
+        initialSettingsTab={initialSettingsTab}
+        editAutomationHref={editAutomationHref}
+        openSource={drawer.openSource}
+        openTicket={drawer.openTicket}
+        onClosePicker={drawer.closePicker}
+        onSelectTemplate={drawer.selectIntakeTemplate}
+        onSaveGithubSettings={drawer.saveGithubSettings}
+        onOpenRun={drawer.openIntakeRun}
+        onCloseSettings={drawer.closeSettings}
+        onCloseOpenSource={drawer.closeOpenSource}
+        onCloseOpenTicket={drawer.closeOpenTicket}
       />
+    </>
+  );
+}
 
-      {settingsOpen ? (
+function LineIntakeSourceList({
+  sources,
+  analyzingTickets,
+  expandedSourceIds,
+  githubName,
+  openTicketId,
+  onToggleSource,
+  onOpenGear,
+  onOpenAnalyzingTicket,
+  onOpenPicker,
+}: {
+  sources: LineIntakeSource[];
+  analyzingTickets: LineIntakeAnalyzingTicket[];
+  expandedSourceIds: ReadonlySet<LineIntakeSourceId>;
+  githubName: string;
+  openTicketId: string | null;
+  onToggleSource: (sourceId: LineIntakeSourceId) => void;
+  onOpenGear: (source: LineIntakeSource) => void;
+  onOpenAnalyzingTicket: (ticket: LineIntakeAnalyzingTicket) => void;
+  onOpenPicker: () => void;
+}) {
+  return (
+    <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 [scrollbar-width:thin]">
+      {sources.map((source) => {
+        const expanded = expandedSourceIds.has(source.id);
+        const tickets = source.id === "github-issues" ? analyzingTickets : [];
+        return (
+          <li key={source.id}>
+            <IntakeSourceCard
+              source={source}
+              displayName={source.id === "github-issues" ? githubName : source.name}
+              expanded={expanded}
+              childCount={tickets.length}
+              onToggle={() => onToggleSource(source.id)}
+              onOpenGear={() => onOpenGear(source)}
+            >
+              {expanded ? (
+                <AnalyzingTicketList
+                  tickets={tickets}
+                  openTicketId={openTicketId}
+                  onOpenTicket={onOpenAnalyzingTicket}
+                />
+              ) : null}
+            </IntakeSourceCard>
+          </li>
+        );
+      })}
+      <li>
+        <button
+          type="button"
+          onClick={onOpenPicker}
+          data-testid="line-intake-add"
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/60 px-3 py-3 text-[13px] font-medium tracking-[-0.01em] text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted hover:text-foreground"
+        >
+          <Plus className="size-3.5 shrink-0" aria-hidden />
+          Add intake
+        </button>
+      </li>
+    </ul>
+  );
+}
+
+function LineIntakeDrawerPopups({
+  pickerOpen,
+  settingsOpen,
+  githubSettings,
+  initialSettingsTab,
+  editAutomationHref,
+  openSource,
+  openTicket,
+  onClosePicker,
+  onSelectTemplate,
+  onSaveGithubSettings,
+  onOpenRun,
+  onCloseSettings,
+  onCloseOpenSource,
+  onCloseOpenTicket,
+}: {
+  pickerOpen: boolean;
+  settingsOpen: boolean;
+  githubSettings: IntakeSourceSettings;
+  initialSettingsTab: IntakeSettingsTab;
+  editAutomationHref?: string;
+  openSource?: LineIntakeSource;
+  openTicket: LineIntakeAnalyzingTicket | null;
+  onClosePicker: () => void;
+  onSelectTemplate: (template: AddIntakeTemplate) => void;
+  onSaveGithubSettings: (next: IntakeSourceSettings) => void;
+  onOpenRun: (run: IntakeAutomationRun) => void;
+  onCloseSettings: () => void;
+  onCloseOpenSource: () => void;
+  onCloseOpenTicket: () => void;
+}) {
+  const githubSource = lineIntakeSourceById("github-issues");
+  return (
+    <>
+      <AddIntakePicker open={pickerOpen} onClose={onClosePicker} onSelect={onSelectTemplate} />
+      {settingsOpen && githubSource ? (
         <IntakeSourceSettingsPopup
           settings={githubSettings}
-          automationCanvas={intakeAutomationCanvas(lineIntakeSourceById("github-issues")!)}
-          onSave={setGithubSettings}
-          onOpenRun={openIntakeRun}
+          automationCanvas={intakeAutomationCanvas(githubSource)}
+          onSave={onSaveGithubSettings}
+          onOpenRun={onOpenRun}
           editAutomationHref={editAutomationHref}
-          onClose={() => setSettingsOpen(false)}
+          onClose={onCloseSettings}
           initialTab={initialSettingsTab}
           fixed
         />
       ) : null}
-
       {openSource ? (
         <WorkOrderSplitRunPopup
           key={openSource.id}
           fixture={intakeAutomationFixture(openSource)}
-          onClose={() => setOpenSourceId(null)}
+          onClose={onCloseOpenSource}
           fixed
         />
       ) : null}
-
       {openTicket ? (
         <WorkOrderSplitRunPopup
           key={openTicket.id}
           fixture={intakeTicketAnalysisFixture(openTicket)}
-          onClose={() => setOpenTicket(null)}
+          onClose={onCloseOpenTicket}
           fixed
         />
       ) : null}

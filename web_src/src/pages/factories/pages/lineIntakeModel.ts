@@ -1,8 +1,4 @@
-import type {
-  ComponentsEdge,
-  FactoriesWorkOrderArtifact,
-  SuperplaneComponentsNode as ComponentsNode,
-} from "@/api-client";
+import type { FactoriesWorkOrderArtifact, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
@@ -18,8 +14,15 @@ import {
 import { CONFIDENCE_CHECK_NAME, CONFIDENCE_SCORE_MAX, confidenceCheckLevel } from "../lib/confidenceScore";
 import type { WorkOrderCheckPresentation } from "../lib/workOrderChecks";
 import type { WorkOrderStatusNotePresentation } from "../lib/workOrderStatusNote";
+import { intakeCanvasForSource } from "./lineIntakeCanvas";
 import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvases";
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
+
+export {
+  ADD_INTAKE_TEMPLATES,
+  filterAddIntakeTemplates,
+  type AddIntakeTemplate,
+} from "./addIntakeTemplates";
 
 export type LineIntakeSourceId = "github-issues" | "sentry-exceptions" | "pagerduty-incidents";
 
@@ -132,8 +135,16 @@ export function isLineIntakeSourceId(id: string | null | undefined): id is LineI
   return Boolean(id && lineIntakeSourceById(id));
 }
 
-export function intakeAutomationAppId(apps: Array<{ id?: string }>): string | undefined {
-  return apps.find((app) => app.id === GITHUB_ISSUES_INTAKE_APP_ID)?.id ?? apps.find((app) => app.id)?.id;
+export function intakeAutomationAppId(apps: Array<{ id?: string; name?: string }>): string | undefined {
+  const byKnownId = apps.find((app) => app.id === GITHUB_ISSUES_INTAKE_APP_ID);
+  if (byKnownId?.id) {
+    return byKnownId.id;
+  }
+  const byIntake = apps.find((app) => /intake/i.test(`${app.id ?? ""} ${app.name ?? ""}`));
+  if (byIntake?.id) {
+    return byIntake.id;
+  }
+  return apps.find((app) => app.id)?.id;
 }
 
 export interface LineIntakeAnalyzingTicket {
@@ -168,65 +179,6 @@ export const GITHUB_ISSUES_ANALYZING_TICKETS: LineIntakeAnalyzingTicket[] = [
   { id: "gh-issue-5", title: "Add a flake retry to the checkout e2e suite" },
 ];
 
-export interface AddIntakeTemplate {
-  id: string;
-  name: string;
-  description: string;
-  /** Optional integration icon. Letter glyph when omitted. */
-  iconSrc?: string;
-}
-
-/**
- * Templates in the Add intake picker. Source-based intakes and a few
- * common improvement automations.
- */
-export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
-  {
-    id: "github-issues",
-    name: "GitHub issues",
-    description: "Open issues from connected repositories.",
-    iconSrc: githubIcon,
-  },
-  {
-    id: "sentry-exceptions",
-    name: "Sentry exceptions",
-    description: "Unresolved errors from production.",
-    iconSrc: sentryIcon,
-  },
-  {
-    id: "pagerduty-incidents",
-    name: "PagerDuty incidents",
-    description: "Firing incidents that need a work order.",
-    iconSrc: pagerdutyIcon,
-  },
-  {
-    id: "improve-ci-runtime",
-    name: "Improve CI runtime",
-    description: "Find slow jobs and cut pipeline wait time.",
-  },
-  {
-    id: "improve-page-performance",
-    name: "Improve page performance",
-    description: "Track slow pages and open work to speed them up.",
-  },
-  {
-    id: "flaky-tests",
-    name: "Flaky tests",
-    description: "Catch unstable tests and create fix work orders.",
-  },
-];
-
-export function filterAddIntakeTemplates(query: string): AddIntakeTemplate[] {
-  const needle = query.trim().toLowerCase();
-  if (!needle) {
-    return ADD_INTAKE_TEMPLATES;
-  }
-  return ADD_INTAKE_TEMPLATES.filter((template) => {
-    const haystack = `${template.name} ${template.description}`.toLowerCase();
-    return haystack.includes(needle);
-  });
-}
-
 const OWNER = {
   id: STORYBOOK_ME_USER_ID,
   name: STORYBOOK_ME_USER_NAME,
@@ -246,6 +198,24 @@ const ANALYSIS_PHASE_DURATION = {
   score: "7s",
 } as const;
 
+function ticketAnalysisPresentation(complete: boolean) {
+  return {
+    elapsed: complete ? "4m 12s" : "Running",
+    costUsd: complete ? "0.18" : "—",
+    lineStatus: complete ? "passed" : "running",
+    currentPhaseId: complete ? "score" : "analyze",
+    noteKey: complete ? "complete" : "analyzing",
+    headline: complete ? LINE_INTAKE_COPY.analysisCompleteHeadline : LINE_INTAKE_COPY.analysisHeadline,
+    text: complete ? LINE_INTAKE_COPY.analysisCompleteHelper : LINE_INTAKE_COPY.analysisHelper,
+    footerTone: complete ? undefined : ("waiting" as const),
+    analyzeStatus: complete ? "passed" : "running",
+    laterStatus: complete ? "passed" : "pending",
+    analyzeDetail: complete ? "Read the ticket and the repository." : "Reading the ticket and the repository.",
+    planDetail: complete ? "Wrote the implementation plan." : "Waiting for analysis to finish.",
+    scoreDetail: complete ? "Scored the ticket against the codebase." : "Waiting for a plan.",
+  } as const;
+}
+
 export function intakeTicketAnalysisFixture(
   ticket: LineIntakeAnalyzingTicket,
   options?: { complete?: boolean },
@@ -253,25 +223,26 @@ export function intakeTicketAnalysisFixture(
   const complete = Boolean(options?.complete);
   const canvas = ticketAnalysisCanvas(complete);
   const checks = complete ? confidenceChecks(ticket) : [];
+  const view = ticketAnalysisPresentation(complete);
   return {
     title: ticket.title,
     owner: OWNER,
-    elapsed: complete ? "4m 12s" : "Running",
+    elapsed: view.elapsed,
     startedLabel: "Analyze ticket",
-    costUsd: complete ? "0.18" : "—",
+    costUsd: view.costUsd,
     tokensLabel: "Analysis",
     lineName: "Intake",
-    lineStatus: complete ? "passed" : "running",
-    currentPhaseId: complete ? "score" : "analyze",
+    lineStatus: view.lineStatus,
+    currentPhaseId: view.currentPhaseId,
     waitingNotes: [
       {
-        key: `${ticket.id}-${complete ? "complete" : "analyzing"}`,
-        headline: complete ? LINE_INTAKE_COPY.analysisCompleteHeadline : LINE_INTAKE_COPY.analysisHeadline,
-        text: complete ? LINE_INTAKE_COPY.analysisCompleteHelper : LINE_INTAKE_COPY.analysisHelper,
+        key: `${ticket.id}-${view.noteKey}`,
+        headline: view.headline,
+        text: view.text,
       },
     ],
     checks,
-    footerTone: complete ? undefined : "waiting",
+    footerTone: view.footerTone,
     phases: [
       ticketAnalysisPhase({
         id: "ingest",
@@ -286,29 +257,29 @@ export function intakeTicketAnalysisFixture(
       ticketAnalysisPhase({
         id: "analyze",
         name: "Analyze",
-        status: complete ? "passed" : "running",
+        status: view.analyzeStatus,
         duration: complete ? ANALYSIS_PHASE_DURATION.analyze : ANALYSIS_PHASE_DURATION.analyzeRunning,
         componentName: "Analyze ticket",
-        detail: complete ? "Read the ticket and the repository." : "Reading the ticket and the repository.",
+        detail: view.analyzeDetail,
         canvas,
       }),
       ticketAnalysisPhase({
         id: "plan",
         name: "Create plan",
-        status: complete ? "passed" : "pending",
+        status: view.laterStatus,
         duration: complete ? ANALYSIS_PHASE_DURATION.plan : "—",
         componentName: "Create plan",
-        detail: complete ? "Wrote the implementation plan." : "Waiting for analysis to finish.",
+        detail: view.planDetail,
         canvas,
         artifacts: complete ? planArtifact(ticket) : [],
       }),
       ticketAnalysisPhase({
         id: "score",
         name: "Score",
-        status: complete ? "passed" : "pending",
+        status: view.laterStatus,
         duration: complete ? ANALYSIS_PHASE_DURATION.score : "—",
         componentName: "Score",
-        detail: complete ? "Scored the ticket against the codebase." : "Waiting for a plan.",
+        detail: view.scoreDetail,
         canvas,
         checks,
       }),
@@ -410,6 +381,7 @@ function ticketAnalysisPhase({
     artifacts,
     checks,
     canvas,
+    canvasSteps: [],
     stream: [
       {
         id: `ticket-${id}`,
@@ -536,6 +508,7 @@ function listenPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): Spl
     componentName: source.listen.label,
     artifacts: [],
     canvas,
+    canvasSteps: [],
     stream: [
       {
         id: `${source.id}-listen`,
@@ -557,6 +530,7 @@ function evaluatePhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): S
     componentName: source.evaluate.label,
     artifacts: [],
     canvas,
+    canvasSteps: [],
     stream: [
       {
         id: `${source.id}-evaluate`,
@@ -587,97 +561,8 @@ function backlogPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): Sp
     componentName: source.accept.label,
     artifacts: [],
     canvas,
+    canvasSteps: [],
     stream,
   };
 }
 
-interface IntakeCanvasSpec {
-  triggerComponent: string;
-  triggerName: string;
-  classifyPrompt: string;
-  createTitle: string;
-  createDescription: string;
-  title: string;
-}
-
-const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
-  "github-issues": {
-    triggerComponent: "github.onIssue",
-    triggerName: "On Issue",
-    classifyPrompt: "Classify this GitHub issue. Accept it only when it should become a work order.",
-    createTitle: "{{ root().data.issue.title }}",
-    createDescription: "{{ root().data.issue.body }}",
-    title: "GitHub issue intake",
-  },
-  "sentry-exceptions": {
-    triggerComponent: "sentry.onIssue",
-    triggerName: "On Issue",
-    classifyPrompt: "Classify this Sentry exception. Accept it only when it should become a work order.",
-    createTitle: "{{ root().data.data.issue.title }}",
-    createDescription: "{{ root().data.data.issue.permalink }}",
-    title: "Sentry exception intake",
-  },
-  "pagerduty-incidents": {
-    triggerComponent: "pagerduty.onIncident",
-    triggerName: "On Incident",
-    classifyPrompt: "Classify this PagerDuty incident. Accept it only when it should become a work order.",
-    createTitle: "{{ root().data.incident.title }}",
-    createDescription: "{{ root().data.incident.html_url }}",
-    title: "PagerDuty incident intake",
-  },
-};
-
-function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasModel {
-  const spec = INTAKE_CANVAS_BY_SOURCE[source.id];
-  const triggerId = `${source.id}-trigger`;
-  const runnerId = `${source.id}-classify`;
-  const createId = `${source.id}-create`;
-
-  const nodes: ComponentsNode[] = [
-    {
-      id: triggerId,
-      name: spec.triggerName,
-      type: "TYPE_TRIGGER",
-      component: spec.triggerComponent,
-      position: { x: 160, y: 80 },
-    },
-    {
-      id: runnerId,
-      name: "Classify intake",
-      type: "TYPE_ACTION",
-      component: "runnerClaudeCode",
-      configuration: {
-        prompt: spec.classifyPrompt,
-      },
-      position: { x: 160, y: 260 },
-    },
-    {
-      id: createId,
-      name: "Create Work Order",
-      type: "TYPE_ACTION",
-      component: "createWorkOrder",
-      configuration: {
-        title: spec.createTitle,
-        description: spec.createDescription,
-      },
-      position: { x: 160, y: 440 },
-    },
-  ];
-  const edges: ComponentsEdge[] = [
-    { channel: "default", sourceId: triggerId, targetId: runnerId },
-    { channel: "default", sourceId: runnerId, targetId: createId },
-  ];
-
-  return {
-    key: "intake",
-    title: spec.title,
-    nodes,
-    edges,
-    statuses: {
-      [triggerId]: "succeeded",
-      [runnerId]: "running",
-      [createId]: "pending",
-    } satisfies Record<string, FactoryNodeStatus>,
-    metrics: {},
-  };
-}
