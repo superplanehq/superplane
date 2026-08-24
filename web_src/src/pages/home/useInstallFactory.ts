@@ -16,7 +16,7 @@ import {
   materializeAndCommitFactoryTemplate,
   type FactoryCanvasHandle,
 } from "./installFactoryCanvas";
-import { getFactoryDefinition, type FactoryDefinition } from "./factories";
+import { getFactoryDefinition, type FactoryAgentRewrite, type FactoryDefinition } from "./factories";
 import type { IntegrationSelections } from "./homeIntegrationStatus";
 import type { CanvasFolderData } from "./types";
 
@@ -42,6 +42,12 @@ export interface InstallFactoryInput {
    * Defaults to true when `startingTaskPrompt` is non-empty.
    */
   startInitialRun?: boolean;
+  /**
+   * When set, rewrite bundled Claude Code runner nodes to this component,
+   * credential source, and model. Used by workspace setup for hosted credit
+   * and non-Anthropic providers.
+   */
+  agentRewrite?: FactoryAgentRewrite;
 }
 
 export type InstallFactoryResult = FactoryCanvasHandle;
@@ -146,6 +152,7 @@ export function useInstallFactory({ folder }: UseInstallFactoryOptions = {}) {
           definition,
           installParams: input.installParams,
           integrations: input.integrations,
+          agentRewrite: input.agentRewrite,
         });
 
         // Drop the empty canvas cached by create — page load must see the committed template.

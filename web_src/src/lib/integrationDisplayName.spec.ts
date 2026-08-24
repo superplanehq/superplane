@@ -4,6 +4,7 @@ import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 describe("integrationDisplayName", () => {
   it("prefers known canonical display names", () => {
     expect(getIntegrationTypeDisplayName(undefined, "github")).toBe("GitHub");
+    expect(getIntegrationTypeDisplayName(undefined, "openrouter")).toBe("OpenRouter");
   });
 
   it("uses the label when it is already properly capitalized", () => {

@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,7 +22,11 @@ const (
 	UsageProviderOpenAI     = "openai"
 	UsageProviderOpenRouter = "openrouter"
 	UsageProviderPerplexity = "perplexity"
+
+	UsageIdempotencyKeyRunner = "runner"
 )
+
+var ErrHostedUsageUnpriced = errors.New("hosted LLM usage has no price for this model")
 
 // LLMUsageEvent is one append-only LLM spend row. It is the source of truth
 // for reports. Factory execution token/cost columns are cached rollups.
@@ -47,6 +52,7 @@ type LLMUsageEvent struct {
 	ReasoningTokens      int64
 	TotalTokens          int64
 	CostMicros           int64
+	ProviderCostMicros   int64
 	Currency             string
 	PriceBookVersion     string
 	IdempotencyKey       string
@@ -66,6 +72,7 @@ type LLMUsageEventInput struct {
 	NodeID           string
 	Provider         string
 	Model            string
+	FundingSource    string
 	InputTokens      int64
 	OutputTokens     int64
 	CacheReadTokens  int64
@@ -73,6 +80,7 @@ type LLMUsageEventInput struct {
 	ReasoningTokens  int64
 	TotalTokens      int64
 	CostMicros       *int64
+	IdempotencyKey   string
 }
 
 // RecordUsage inserts one factory-linked usage row and copies ledger totals
@@ -98,12 +106,15 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 	}
 
 	version := pricebook.Version
-	costMicros := int64(0)
+	providerCostMicros := int64(0)
 	if in.CostMicros != nil {
-		costMicros = *in.CostMicros
+		providerCostMicros = *in.CostMicros
 		version = pricebook.Version + "+provider"
 	} else {
-		costMicros = pricebook.EstimateMicros(
+		if fundingSourceIsHosted(in.FundingSource) && !pricebook.IsPriced(in.Model) {
+			return fmt.Errorf("%w: %s %s", ErrHostedUsageUnpriced, in.Provider, in.Model)
+		}
+		providerCostMicros = pricebook.EstimateMicros(
 			in.Provider,
 			in.Model,
 			in.InputTokens,
@@ -112,6 +123,20 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 			in.CacheWriteTokens,
 			in.ReasoningTokens,
 		)
+	}
+
+	fundingSource := in.FundingSource
+	if fundingSource == "" {
+		fundingSource = UsageFundingSourceBYOK
+	}
+
+	billedMicros := providerCostMicros
+	if fundingSource == UsageFundingSourceHosted {
+		markupBPS, markupErr := ResolveOrganizationMarkupBPS(tx, execution.OrganizationID)
+		if markupErr != nil {
+			return markupErr
+		}
+		billedMicros = ApplyMarkupMicros(providerCostMicros, markupBPS)
 	}
 
 	now := time.Now()
@@ -129,17 +154,18 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 		Provider:             in.Provider,
 		Model:                in.Model,
 		UsageKind:            UsageKindModel,
-		FundingSource:        UsageFundingSourceBYOK,
+		FundingSource:        fundingSource,
 		InputTokens:          in.InputTokens,
 		OutputTokens:         in.OutputTokens,
 		CacheReadTokens:      in.CacheReadTokens,
 		CacheWriteTokens:     in.CacheWriteTokens,
 		ReasoningTokens:      in.ReasoningTokens,
 		TotalTokens:          total,
-		CostMicros:           costMicros,
+		CostMicros:           billedMicros,
+		ProviderCostMicros:   providerCostMicros,
 		Currency:             "usd",
 		PriceBookVersion:     version,
-		IdempotencyKey:       "call:" + uuid.New().String(),
+		IdempotencyKey:       usageIdempotencyKey(in.IdempotencyKey),
 		OccurredAt:           now,
 		CreatedAt:            now,
 	}
@@ -152,7 +178,21 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 		return err
 	}
 
-	return execution.RollupUsage(tx)
+	if err := execution.RollupUsage(tx); err != nil {
+		return err
+	}
+	return ReleaseHostedCreditHold(tx, in.NodeExecutionID)
+}
+
+func fundingSourceIsHosted(source string) bool {
+	return strings.TrimSpace(source) == UsageFundingSourceHosted
+}
+
+func usageIdempotencyKey(key string) string {
+	if trimmed := strings.TrimSpace(key); trimmed != "" {
+		return trimmed
+	}
+	return "call:" + uuid.New().String()
 }
 
 // UsageReportFilter scopes ledger aggregates.

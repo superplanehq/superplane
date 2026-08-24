@@ -39,6 +39,7 @@ const (
 	FieldTypeApp                 = "app"
 	FieldTypeAppCanvasNode       = "app-canvas-node"
 	FieldTypeRunParameters       = "run-parameters"
+	FieldTypeHostedModel         = "hosted-model"
 )
 
 type Field struct {
@@ -110,6 +111,11 @@ type TypeOptions struct {
 	App              *AppTypeOptions              `json:"app,omitempty"`
 	AppCanvasNode    *AppCanvasNodeTypeOptions    `json:"appCanvasNode,omitempty"`
 	Integration      *IntegrationTypeOptions      `json:"integration,omitempty"`
+	HostedModel      *HostedModelTypeOptions      `json:"hostedModel,omitempty"`
+}
+
+type HostedModelTypeOptions struct {
+	Provider string `json:"provider"`
 }
 
 type IntegrationTypeOptions struct {
