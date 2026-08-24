@@ -18,7 +18,7 @@ export interface MissionRailItem {
   status: MissionDisplayStatus;
 }
 
-const TERMINAL_WORK_ORDER_STATUSES: WorkOrderDisplayStatus[] = ["completed", "failed", "cancelled"];
+const TERMINAL_WORK_ORDER_STATUSES: WorkOrderDisplayStatus[] = ["completed", "failed", "rejected", "cancelled"];
 
 export const MISSION_STATUS_META: Record<
   MissionDisplayStatus,

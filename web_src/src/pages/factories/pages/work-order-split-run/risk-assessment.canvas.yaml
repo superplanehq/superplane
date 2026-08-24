@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Risk Assessment
+  description: Assesses risk.
+spec:
+  edges:
+    - channel: default
+      sourceId: on-run
+      targetId: assess-pr-risk
+    - channel: passed
+      sourceId: assess-pr-risk
+      targetId: format-risk-review
+    - channel: passed
+      sourceId: format-risk-review
+      targetId: report-risk-check
+  nodes:
+    - id: on-run
+      name: Start
+      type: TYPE_TRIGGER
+      component: onRun
+      configuration: {}
+      position:
+        x: 80
+        "y": 40
+    - id: assess-pr-risk
+      name: Assess PR Risk
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      configuration: {}
+      position:
+        x: 80
+        "y": 220
+    - id: format-risk-review
+      name: Format Risk Review
+      type: TYPE_ACTION
+      component: runnerJS
+      configuration: {}
+      position:
+        x: 80
+        "y": 400
+    - id: report-risk-check
+      name: Report Risk Check
+      type: TYPE_ACTION
+      component: reportWorkOrderCheck
+      configuration: {}
+      position:
+        x: 400
+        "y": 400

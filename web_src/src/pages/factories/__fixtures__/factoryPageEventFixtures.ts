@@ -6,6 +6,7 @@ import {
   DRAFT_WORK_ORDER,
   FAILED_WORK_ORDER,
   HOUR_AGO,
+  INGEST_DRAFT_WORK_ORDER,
   LAST_WEEK,
   LINE_RUN_IMPLEMENT_FAILED_ID,
   LINE_RUN_IMPLEMENT_ID,
@@ -14,6 +15,7 @@ import {
   OPEN_WORK_ORDER,
   OPEN_WORK_ORDER_SECONDARY,
   OPERATOR_USER,
+  PR_CLOSURE_COMPLETED_WORK_ORDER,
   REVIEWER_USER,
   RUNNING_WORK_ORDER,
   STORYBOOK_ME_USER_ID,
@@ -249,6 +251,19 @@ export const DRAFT_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
   ),
 ];
 
+export const INGEST_DRAFT_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
+  statusUpdatedEvent(INGEST_DRAFT_WORK_ORDER, TWO_HOURS_AGO, {
+    fromState: "",
+    toState: "draft",
+    automation: {
+      appId: "app-refund-backlog",
+      appName: "Ingest",
+      nodeName: "On Issue Label",
+    },
+    app: { id: "app-refund-backlog" },
+  }),
+];
+
 export const CLOSED_FAILED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
   openedWorkOrderEvent(CLOSED_FAILED_WORK_ORDER, LAST_WEEK),
   artifactAddedEvent(
@@ -409,6 +424,15 @@ export const CLOSED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
   }),
 ];
 
+export const PR_CLOSURE_COMPLETED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
+  openedWorkOrderEvent(PR_CLOSURE_COMPLETED_WORK_ORDER, LAST_WEEK),
+  automationClosedEvent(PR_CLOSURE_COMPLETED_WORK_ORDER, YESTERDAY, "completed", {
+    appId: "app-refund-done",
+    appName: "PR Closure",
+    nodeName: "Complete Work Order",
+  }),
+];
+
 export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
   openedWorkOrderEvent(OPEN_WORK_ORDER, YESTERDAY),
   commentAddedEvent(
@@ -521,7 +545,9 @@ export const DEFAULT_EVENTS_BY_ORDER_ID: Record<string, FactoriesWorkOrderEvent[
   [RUNNING_WORK_ORDER.id!]: RUNNING_WORK_ORDER_EVENTS,
   [FAILED_WORK_ORDER.id!]: FAILED_WORK_ORDER_EVENTS,
   [DRAFT_WORK_ORDER.id!]: DRAFT_WORK_ORDER_EVENTS,
+  [INGEST_DRAFT_WORK_ORDER.id!]: INGEST_DRAFT_WORK_ORDER_EVENTS,
   [CLOSED_WORK_ORDER.id!]: CLOSED_WORK_ORDER_EVENTS,
+  [PR_CLOSURE_COMPLETED_WORK_ORDER.id!]: PR_CLOSURE_COMPLETED_WORK_ORDER_EVENTS,
   [CLOSED_FAILED_WORK_ORDER.id!]: CLOSED_FAILED_WORK_ORDER_EVENTS,
 };
 

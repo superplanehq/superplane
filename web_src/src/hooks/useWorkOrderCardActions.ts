@@ -23,9 +23,9 @@ export function useWorkOrderCardActions(organizationId: string, factoryId: strin
     async (orderId: string, assigneeIds: string[]) => {
       try {
         await updateAssignees.mutateAsync({ orderId, assigneeIds });
-        showSuccessToast("Owners updated.");
+        showSuccessToast("Owner updated.");
       } catch {
-        showErrorToast("Failed to update owners.");
+        showErrorToast("Failed to update the owner.");
       }
     },
     [updateAssignees],

@@ -62,7 +62,7 @@ describe("SidebarUserMenu", () => {
 
     await user.click(trigger);
 
-    expect(screen.getAllByText("Ada Lovelace")).toHaveLength(1);
+    expect(trigger).toHaveAccessibleName(/Ada Lovelace.*SuperPlane/s);
     const organizationName = screen.getByTestId("factories-sidebar-organization-name");
     expect(organizationName.tagName).toBe("P");
     expect(organizationName).toHaveTextContent("SuperPlane");

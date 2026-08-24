@@ -1,18 +1,25 @@
 import { FactoriesHarness } from "../../../__fixtures__/FactoriesHarness";
-import { PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID } from "../../../__fixtures__/factoryPageResponses";
+import { refundLineCanvasFixture } from "../../../__fixtures__/factoryOwnedCanvasFixture";
+import {
+  ACME_ONBOARDING_FACTORY_ID,
+  ACME_ONBOARDING_FACTORY_KEY,
+  ACME_ONBOARDING_LINE_ID,
+} from "../../../__fixtures__/factoryPageIds";
+import { GITHUB_ISSUES_INTAKE_APP } from "../../../__fixtures__/factoryPageResponses";
 import { lineMetricsFactoriesFixture } from "../../../__fixtures__/lineMetricsFactoriesFixture";
 
 /**
  * Storybook stand-in for the real app after first-run analysis.
- * Opens the Semaphore line board. Production will open the workspace line
- * after analysis finishes.
+ * Opens Acme onboarding Intake with GitHub issues selected.
+ * Production will open the workspace line board instead of this fixture.
  */
 export function FirstRunBoardExit() {
   return (
     <div data-testid="first-run-board">
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+        pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&source=github-issues`}
         factoriesFixture={lineMetricsFactoriesFixture}
+        appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP, ACME_ONBOARDING_FACTORY_ID)}
         enableOnboarding={false}
       />
     </div>
