@@ -17,6 +17,7 @@ import {
 } from "./onboardingProvision";
 import { apiIssuesSource } from "./onboardingStatus";
 import { createAndDispatchInitialWorkOrder } from "./onboardingWorkOrder";
+import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { agentRewriteFromPlan } from "./useOnboardingAgentPlan";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
@@ -78,6 +79,7 @@ async function provisionWorkspace(args: {
   }) => Promise<{ id?: string | null; number?: number | string | null }>;
   dispatchWorkOrder: (input: { orderId: string; lineName: string }) => Promise<unknown>;
   workspaceName: string;
+  takenNames: string[];
   appRepository: string;
   backlogRepository: string;
   workOrderTitle: string;
@@ -88,7 +90,11 @@ async function provisionWorkspace(args: {
   agentIntegrationId?: string;
 }): Promise<{ number?: number | string | null }> {
   if (args.workspaceName !== args.factory?.name) {
-    await args.updateFactory({ name: args.workspaceName });
+    await saveWithFreeWorkspaceName({
+      name: args.workspaceName,
+      takenNames: args.takenNames,
+      save: (name) => args.updateFactory({ name }),
+    });
   }
   await args.updateOnboarding({
     vcsIntegrationId: args.github.id,
@@ -149,6 +155,7 @@ export function useFinishOnboarding(args: {
     description: string;
   }) => Promise<{ id?: string | null; number?: number | string | null }>;
   dispatchWorkOrder: (input: { orderId: string; lineName: string }) => Promise<unknown>;
+  takenNames: string[];
   remainingCreditCents: number;
   hostedModelsLoading: boolean;
   plan: OnboardingAgentPlan | undefined;

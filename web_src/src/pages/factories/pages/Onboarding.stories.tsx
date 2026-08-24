@@ -14,10 +14,10 @@ import { NO_GRANT_USAGE_REPORT, type StorybookUsageReport } from "../__fixtures_
 import type { WizardStepId } from "./onboarding/onboardingFixtures";
 
 /**
- * Workspace setup, one story per wizard step. Every story mounts the same
- * `OnboardingPage` the app routes to, so the stories match production. A
- * fixture backend serves the connect flow, the repository list, and the saved
- * setup answers. The sidebar stays hidden until setup finishes.
+ * Workspace setup, one story per step. Every story mounts the same
+ * `OnboardingPage` the app routes to, so the stories match production. Setup
+ * runs on the first-run screens and saves each answer through a fixture
+ * backend. The sidebar stays hidden until setup finishes.
  */
 const meta = {
   title: "Factories/Pages/Setup",
@@ -57,14 +57,27 @@ function SetupStep({
   );
 }
 
+/** A new workspace with no saved answers opens the welcome screen. */
+export const Welcome: Story = {
+  name: "0 Welcome",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup`}
+      factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.none)}
+      onboardingSeed={pendingSeed}
+      orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+    />
+  ),
+};
+
 /** First workspace in a new organization: nothing is connected yet. */
-export const ChooseVcsZero: Story = {
-  name: "1a Choose VCS (zero)",
+export const ConnectZero: Story = {
+  name: "1a Connect GitHub (zero)",
   render: () => <SetupStep step="vcs" orgIntegrations={[]} />,
 };
 
-export const ChooseVcs: Story = {
-  name: "1b Choose VCS",
+export const Connect: Story = {
+  name: "1b Connect GitHub",
   render: () => <SetupStep step="vcs" orgIntegrations={GITHUB_SETUP_INTEGRATIONS} />,
 };
 
@@ -97,9 +110,4 @@ export const AgentWithoutGrant: Story = {
       organizationLlmSpend={NO_GRANT_USAGE_REPORT}
     />
   ),
-};
-
-export const Name: Story = {
-  name: "5 Name",
-  render: () => <SetupStep step="name" answers={SETUP_ANSWERS.agent} />,
 };
