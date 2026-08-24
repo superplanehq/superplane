@@ -145,6 +145,39 @@ function otherWorkspaceNames(factories: FactoriesFactory[], factoryId: string): 
     .filter(Boolean);
 }
 
+function canConfigureWorkspace(canAct: (resource: string, action: string) => boolean): boolean {
+  return (
+    canAct("factories", "update") &&
+    canAct("integrations", "create") &&
+    canAct("canvases", "create") &&
+    canAct("canvases", "update")
+  );
+}
+
+function useOnboardingAgentContext(organizationId: string, connected: Set<IntegrationId>) {
+  const spend = useOrganizationLLMSpend(organizationId);
+  const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
+  return useOnboardingAgentPlan(organizationId, connected, remainingCreditCents);
+}
+
+function useOnboardingGithubRepos(organizationId: string, githubIntegrationId: string) {
+  const githubIntegration = useIntegration(organizationId, githubIntegrationId);
+  const resources = useIntegrationResources(organizationId, githubIntegrationId, "repository");
+  const repositories = useMemo(
+    () =>
+      (resources.data ?? [])
+        .map((resource) => resource.name ?? resource.id ?? "")
+        .filter((repository): repository is string => Boolean(repository)),
+    [resources.data],
+  );
+  return {
+    githubIntegration,
+    repositories,
+    repositoriesLoading: resources.isLoading,
+    repositoriesError: resources.error,
+  };
+}
+
 export function useOnboardingPageModel(args: {
   organizationId: string;
   factoryId: string;
@@ -155,9 +188,7 @@ export function useOnboardingPageModel(args: {
   const { canAct } = usePermissions();
   const onboarding = args.factory?.onboarding;
   const integrations = useIntegrationSelections(onboarding);
-  const spend = useOrganizationLLMSpend(args.organizationId);
-  const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
-  const agent = useOnboardingAgentPlan(args.organizationId, integrations.connected, remainingCreditCents);
+  const agent = useOnboardingAgentContext(args.organizationId, integrations.connected);
   const setup = useOnboardingSetupState(args.factory?.name ?? "", {
     connected: integrations.connected,
     remainingCreditCents: agent.remainingCreditCents,
@@ -171,10 +202,7 @@ export function useOnboardingPageModel(args: {
   });
   const connect = useIntegrationConnectDialog({
     organizationId: args.organizationId,
-    // Carry the current step so the round trip to the provider returns here,
-    // not at the first step. The provider redirects to the integration page,
-    // and IntegrationSetupReturn then sends the browser to this path.
-    // pick=newest asks the VCS step to select the connection just created.
+    // Return to this step after the provider round trip.
     returnTo: `${factorySetupPath(args.organizationId, args.factoryKey)}?step=${openSection}${
       openSection === "vcs" ? "&pick=newest" : ""
     }`,
@@ -197,24 +225,12 @@ export function useOnboardingPageModel(args: {
     selectNewest: searchParams.get("pick") === "newest",
     selections: integrations.selections,
     selectInstance: connect.selectInstance,
-    // The user left the wizard to connect GitHub, so the answer for the VCS
-    // step is in. Open the repository step, the same as a connection the user
-    // selects by hand. The host must be set here too, or the repository step
-    // shows "Connect version control first" until the restore effect runs.
     onConnectionSelected: () => {
       setup.selectVcsHost("github");
       setOpenSection("repo");
     },
   });
-  const githubIntegration = useIntegration(args.organizationId, githubIntegrationId);
-  const resources = useIntegrationResources(args.organizationId, githubIntegrationId, "repository");
-  const repositories = useMemo(
-    () =>
-      (resources.data ?? [])
-        .map((resource) => resource.name ?? resource.id ?? "")
-        .filter((repository): repository is string => Boolean(repository)),
-    [resources.data],
-  );
+  const github = useOnboardingGithubRepos(args.organizationId, githubIntegrationId);
 
   const takenNames = useMemo(
     () => otherWorkspaceNames(args.factories, args.factoryId),
@@ -265,17 +281,13 @@ export function useOnboardingPageModel(args: {
     selectedVcsConnectionId: githubIntegrationId || undefined,
     requestConfigure: () => {
       // Manage which repositories the GitHub App can access, on GitHub itself.
-      window.open(githubInstallationUrl(githubIntegration.data), "_blank", "noopener,noreferrer");
+      window.open(githubInstallationUrl(github.githubIntegration.data), "_blank", "noopener,noreferrer");
     },
     integrationDialogs: connect.dialogs,
-    repositories,
-    repositoriesLoading: resources.isLoading,
-    repositoriesError: resources.error,
-    canConfigureWorkspace:
-      canAct("factories", "update") &&
-      canAct("integrations", "create") &&
-      canAct("canvases", "create") &&
-      canAct("canvases", "update"),
+    repositories: github.repositories,
+    repositoriesLoading: github.repositoriesLoading,
+    repositoriesError: github.repositoriesError,
+    canConfigureWorkspace: canConfigureWorkspace(canAct),
     saving: saving || installer.isInstalling || createWorkOrder.isPending,
     ...saves,
     finish: finishSetup,

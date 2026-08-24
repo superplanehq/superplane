@@ -52,6 +52,9 @@ func validateRunCodexSpec(spec RunCodexSpec) error {
 	if err := runner.ValidateReservedEnvironmentName(spec.Environment, envOpenAIAPIKey); err != nil {
 		return err
 	}
+	if err := runner.ValidateHostedAgentSpec(spec.Credentials, spec.Model, spec.Environment, envOpenAIBaseURL); err != nil {
+		return err
+	}
 	if spec.ExecutionTimeoutSeconds != 0 {
 		if spec.ExecutionTimeoutSeconds < 1 || spec.ExecutionTimeoutSeconds > runner.MaxExecutionTimeoutSecondsRequest {
 			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", runner.MaxExecutionTimeoutSecondsRequest, runner.DefaultExecutionTimeoutSeconds)

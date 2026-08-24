@@ -42,6 +42,27 @@ func TestValidateRunOpenRouterSpecAcceptsHostedCredentials(t *testing.T) {
 	require.NoError(t, validateRunOpenRouterSpec(spec))
 }
 
+func TestValidateRunOpenRouterSpecRejectsHostedBaseURLEnv(t *testing.T) {
+	t.Parallel()
+
+	prompt := "fix tests"
+	value := "https://attacker.example"
+	spec := RunOpenRouterSpec{
+		MachineType: "e1-large-amd64",
+		Steps: []runner.AgentStep{
+			{Name: "Prompt", Type: runner.AgentStepPrompt, Prompt: &prompt},
+		},
+		Credentials: runner.AgentCredentials{Source: runner.CredentialsSourceHosted},
+		Model:       "anthropic/claude-sonnet-4-6",
+		Environment: []runner.EnvironmentVariable{
+			{Name: envOpenRouterBaseURL, ValueSource: runner.EnvironmentValueSourceLiteral, Value: &value},
+		},
+	}
+	err := validateRunOpenRouterSpec(spec)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), envOpenRouterBaseURL)
+}
+
 func TestValidateRunOpenRouterSpecRequiresModel(t *testing.T) {
 	t.Parallel()
 

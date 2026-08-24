@@ -52,6 +52,9 @@ func validateRunOpenRouterSpec(spec RunOpenRouterSpec) error {
 	if err := runner.ValidateReservedEnvironmentName(spec.Environment, envOpenRouterAPIKey); err != nil {
 		return err
 	}
+	if err := runner.ValidateHostedAgentSpec(spec.Credentials, spec.Model, spec.Environment, envOpenRouterBaseURL); err != nil {
+		return err
+	}
 	if strings.TrimSpace(spec.Model) == "" {
 		return fmt.Errorf("model is required")
 	}

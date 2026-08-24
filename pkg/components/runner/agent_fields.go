@@ -304,3 +304,12 @@ func ValidateReservedEnvironmentName(environment []EnvironmentVariable, reserved
 	}
 	return nil
 }
+
+func ValidateReservedEnvironmentNames(environment []EnvironmentVariable, reserved ...string) error {
+	for _, name := range reserved {
+		if err := ValidateReservedEnvironmentName(environment, name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
