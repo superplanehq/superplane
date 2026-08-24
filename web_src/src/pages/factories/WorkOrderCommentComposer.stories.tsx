@@ -1,14 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import type { SuperplaneUsersUser } from "@/api-client";
-import { FACTORIES_ORGANIZATION_ID, ORGANIZATION_USERS } from "./__fixtures__/factoryPageResponses";
+import {
+  FACTORIES_ORGANIZATION_ID,
+  ORGANIZATION_USERS,
+  toStorybookOrganizationUser,
+} from "./__fixtures__/factoryPageResponses";
 import { ComponentStoryShell } from "./__fixtures__/ComponentStoryShell";
 import { WorkOrderCommentComposer } from "./WorkOrderCommentComposer";
 
-const storyMembers: SuperplaneUsersUser[] = ORGANIZATION_USERS.map((user) => ({
-  metadata: { id: user.id, email: user.email },
-  spec: { displayName: user.name },
-}));
+const storyMembers: SuperplaneUsersUser[] = ORGANIZATION_USERS.map(toStorybookOrganizationUser);
 
 /**
  * Inline composer on the work-order detail page. Type @ to mention an

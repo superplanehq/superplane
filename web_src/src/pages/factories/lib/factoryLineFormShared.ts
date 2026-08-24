@@ -2,6 +2,10 @@ import type { FactoryLineStep } from "@/api-client";
 
 export const RUN_APP_TYPE = "runApp";
 
+export const DEFAULT_LINE_STEP_PARALLELISM = 10;
+export const LINE_STEP_PARALLELISM_MIN = 1;
+export const LINE_STEP_PARALLELISM_MAX = 100;
+
 export type DraftStep = {
   appId: string;
   entrypoint: string;
@@ -42,6 +46,39 @@ export function draftStepsToProto(steps: DraftStep[]): FactoryLineStep[] {
 
     return proto;
   });
+}
+
+export function lineStepParallelism(step: { maxParallelism?: number | null } | undefined): number {
+  const value = step?.maxParallelism;
+  if (value == null || value < LINE_STEP_PARALLELISM_MIN || value > LINE_STEP_PARALLELISM_MAX) {
+    return DEFAULT_LINE_STEP_PARALLELISM;
+  }
+  return value;
+}
+
+export function clampLineStepParallelism(value: number): number {
+  return Math.min(LINE_STEP_PARALLELISM_MAX, Math.max(LINE_STEP_PARALLELISM_MIN, Math.round(value)));
+}
+
+export function setParallelismLabel(parallelism: number): string {
+  return `Set parallelism (${parallelism})`;
+}
+
+export function replaceLineStepParallelism(
+  steps: FactoryLineStep[] | undefined,
+  stepIndex: number,
+  parallelism: number,
+): FactoryLineStep[] {
+  const drafts = draftStepsFromLine(steps);
+  const current = drafts[stepIndex];
+  if (!current) {
+    return draftStepsToProto(drafts);
+  }
+  drafts[stepIndex] = {
+    ...current,
+    maxParallelism: String(clampLineStepParallelism(parallelism)),
+  };
+  return draftStepsToProto(drafts);
 }
 
 // Null keeps the server default (10).
