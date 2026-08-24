@@ -23,6 +23,7 @@ type Input struct {
 	RunID               string            `json:"run_id,omitempty"`
 	Limit               uint32            `json:"limit,omitempty"`
 	Before              string            `json:"before,omitempty"`
+	BeforeID            string            `json:"before_id,omitempty"`
 	States              []string          `json:"states,omitempty"`
 	Results             []string          `json:"results,omitempty"`
 	Path                string            `json:"path,omitempty"`

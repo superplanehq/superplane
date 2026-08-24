@@ -57,7 +57,7 @@ func Test__ListNodeQueueItems__ReturnsEmptyListWhenNoQueueItemsExist(t *testing.
 		[]models.Edge{},
 	)
 
-	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 10, nil)
+	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 10, nil, "")
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Empty(t, response.Items)
@@ -92,7 +92,7 @@ func Test__ListNodeQueueItems__ReturnsQueueItemsWithInputData(t *testing.T) {
 
 	queueItem := createNodeQueueItem(t, canvas.ID, "node-1", inputEvent.ID, nil)
 
-	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 10, nil)
+	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 10, nil, "")
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Items, 1)
@@ -138,7 +138,7 @@ func Test__ListNodeQueueItems__ReturnsQueueItemsWithRootEvent(t *testing.T) {
 
 	queueItem := createNodeQueueItem(t, canvas.ID, "node-1", inputEvent.ID, &rootEvent.ID)
 
-	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 10, nil)
+	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 10, nil, "")
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Items, 1)
@@ -178,7 +178,7 @@ func Test__ListNodeQueueItems__HandlesPaginationCorrectly(t *testing.T) {
 		queueItems = append(queueItems, *queueItem)
 	}
 
-	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 3, nil)
+	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 3, nil, "")
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Items, 3)
@@ -221,7 +221,7 @@ func Test__ListNodeQueueItems__FiltersQueueItemsByNodeID(t *testing.T) {
 	queueItem1 := createNodeQueueItem(t, canvas.ID, "node-1", inputEvent1.ID, nil)
 	createNodeQueueItem(t, canvas.ID, "node-2", inputEvent2.ID, nil)
 
-	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 10, nil)
+	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 10, nil, "")
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Items, 1)
@@ -257,15 +257,106 @@ func Test__ListNodeQueueItems__HandlesPaginationWithTimestamp(t *testing.T) {
 		createNodeQueueItem(t, canvas.ID, "node-1", inputEvent.ID, nil)
 	}
 
-	firstResponse, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 2, nil)
+	firstResponse, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 2, nil, "")
 	require.NoError(t, err)
 	require.Len(t, firstResponse.Items, 2)
 	assert.True(t, firstResponse.HasNextPage)
 
-	secondResponse, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 2, firstResponse.LastTimestamp)
+	secondResponse, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 2, firstResponse.LastTimestamp, "")
 	require.NoError(t, err)
 	require.Len(t, secondResponse.Items, 1)
 	assert.False(t, secondResponse.HasNextPage)
+}
+
+func Test__ListNodeQueueItems__PaginatesAcrossRowsSharingATimestamp(t *testing.T) {
+	r := support.Setup(t)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "node-1",
+				Name:   "Node 1",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	//
+	// Three items sharing one created_at, the shape a batch insert produces.
+	// Paging two at a time ends page 1 inside the group, so the cursor has to
+	// carry the id to reach the third row - a timestamp alone excludes it.
+	//
+	sharedCreatedAt := time.Now().UTC().Truncate(time.Microsecond)
+	expectedIDs := []string{}
+	for i := 0; i < 3; i++ {
+		inputEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+		queueItem := createNodeQueueItem(t, canvas.ID, "node-1", inputEvent.ID, nil)
+		require.NoError(t, database.Conn().
+			Model(&models.CanvasNodeQueueItem{}).
+			Where("id = ?", queueItem.ID).
+			Update("created_at", sharedCreatedAt).Error)
+		expectedIDs = append(expectedIDs, queueItem.ID.String())
+	}
+
+	firstResponse, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 2, nil, "")
+	require.NoError(t, err)
+	require.Len(t, firstResponse.Items, 2)
+	require.NotEmpty(t, firstResponse.LastId)
+
+	secondResponse, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 2, firstResponse.LastTimestamp, firstResponse.LastId)
+	require.NoError(t, err)
+	require.Len(t, secondResponse.Items, 1)
+
+	returnedIDs := []string{}
+	for _, item := range append(firstResponse.Items, secondResponse.Items...) {
+		returnedIDs = append(returnedIDs, item.Id)
+	}
+	assert.ElementsMatch(t, expectedIDs, returnedIDs, "no row sharing the boundary timestamp may be skipped")
+}
+
+func Test__ListNodeQueueItems__TimestampOnlyCursorKeepsWorking(t *testing.T) {
+	r := support.Setup(t)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "node-1",
+				Name:   "Node 1",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	//
+	// A client that has not been updated sends `before` without `before_id`.
+	// Distinct timestamps, so it still pages the way it always has.
+	//
+	for i := 0; i < 3; i++ {
+		inputEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+		createNodeQueueItem(t, canvas.ID, "node-1", inputEvent.ID, nil)
+	}
+
+	firstResponse, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 2, nil, "")
+	require.NoError(t, err)
+	require.Len(t, firstResponse.Items, 2)
+
+	secondResponse, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 2, firstResponse.LastTimestamp, "")
+	require.NoError(t, err)
+	require.Len(t, secondResponse.Items, 1)
 }
 
 func Test__SerializeNodeQueueItems__HandlesEmptyList(t *testing.T) {

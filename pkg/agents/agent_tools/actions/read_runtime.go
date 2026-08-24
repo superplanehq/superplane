@@ -160,7 +160,7 @@ func (a readRuntimeAction) read(ctx context.Context, session agents.AgentSession
 		if err != nil {
 			return nil, err
 		}
-		return protoPayload(canvasactions.ListRuns(ctx, database.DB(ctx), canvas, input.Limit, before, states, results))
+		return protoPayload(canvasactions.ListRuns(ctx, database.DB(ctx), canvas, input.Limit, before, input.BeforeID, states, results))
 	case "event_executions":
 		if strings.TrimSpace(input.EventID) == "" {
 			return nil, fmt.Errorf("event_id is required for event_executions")
@@ -178,17 +178,17 @@ func (a readRuntimeAction) read(ctx context.Context, session agents.AgentSession
 		if err != nil {
 			return nil, err
 		}
-		return protoPayload(canvasactions.ListNodeExecutions(ctx, database.DB(ctx), canvas, input.NodeID, states, results, input.Limit, before))
+		return protoPayload(canvasactions.ListNodeExecutions(ctx, database.DB(ctx), canvas, input.NodeID, states, results, input.Limit, before, input.BeforeID))
 	case "node_queue_items":
 		if strings.TrimSpace(input.NodeID) == "" {
 			return nil, fmt.Errorf("node_id is required for node_queue_items")
 		}
-		return protoPayload(canvasactions.ListNodeQueueItems(ctx, database.DB(ctx), canvas, input.NodeID, input.Limit, before))
+		return protoPayload(canvasactions.ListNodeQueueItems(ctx, database.DB(ctx), canvas, input.NodeID, input.Limit, before, input.BeforeID))
 	case "node_events":
 		if strings.TrimSpace(input.NodeID) == "" {
 			return nil, fmt.Errorf("node_id is required for node_events")
 		}
-		return protoPayload(canvasactions.ListNodeEvents(ctx, database.DB(ctx), canvas, input.NodeID, input.Limit, before))
+		return protoPayload(canvasactions.ListNodeEvents(ctx, database.DB(ctx), canvas, input.NodeID, input.Limit, before, input.BeforeID))
 	case "runner_logs":
 		return a.readRunnerLogs(ctx, session, canvasID, input)
 	default:

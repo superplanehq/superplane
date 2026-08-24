@@ -413,16 +413,14 @@ func (o *FactoryWorkOrder) ReplaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID
 	return tx.Create(&assignees).Error
 }
 
-func (o *FactoryWorkOrder) ListEvents(tx *gorm.DB, limit int, before *time.Time) ([]FactoryWorkOrderEvent, error) {
+func (o *FactoryWorkOrder) ListEvents(tx *gorm.DB, limit int, cursor *KeysetCursor) ([]FactoryWorkOrderEvent, error) {
 	query := tx.Where("work_order_id = ?", o.ID)
 
 	if limit > 0 {
 		query = query.Limit(limit)
 	}
 
-	if before != nil {
-		query = query.Where("created_at < ?", before)
-	}
+	query = cursor.Apply(query)
 
 	var events []FactoryWorkOrderEvent
 	err := query.

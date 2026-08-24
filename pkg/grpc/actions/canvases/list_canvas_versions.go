@@ -2,7 +2,6 @@ package canvases
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -23,6 +22,7 @@ func ListCanvasVersionsPaginated(
 	canvas *models.Canvas,
 	limit uint32,
 	before *timestamppb.Timestamp,
+	beforeID string,
 ) (*pb.ListCanvasVersionsResponse, error) {
 	_, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
@@ -30,9 +30,9 @@ func ListCanvasVersionsPaginated(
 	}
 
 	limit = getCanvasVersionLimit(limit)
-	beforeTime := getBefore(before)
+	cursor := getCursor(before, beforeID)
 
-	versions, count, err := listCanvasVersionHistory(ctx, canvas.ID, int(limit), beforeTime)
+	versions, count, err := listCanvasVersionHistory(ctx, canvas.ID, int(limit), cursor)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list canvas versions")
 	}
@@ -44,6 +44,7 @@ func ListCanvasVersionsPaginated(
 		TotalCount:    uint32(count),
 		HasNextPage:   hasNextPage(len(versions), int(limit), count),
 		LastTimestamp: getLastCanvasVersionTimestamp(versions),
+		LastId:        getLastID(len(versions), func() uuid.UUID { return versions[len(versions)-1].ID }),
 	}, nil
 }
 
@@ -72,13 +73,13 @@ func getLastCanvasVersionTimestamp(versions []models.CanvasVersionMetadata) *tim
 	return timestamppb.New(*lastVersion.CreatedAt)
 }
 
-func listCanvasVersionHistory(ctx context.Context, canvasUUID uuid.UUID, limit int, beforeTime *time.Time) (versions []models.CanvasVersionMetadata, count int64, err error) {
+func listCanvasVersionHistory(ctx context.Context, canvasUUID uuid.UUID, limit int, cursor *models.KeysetCursor) (versions []models.CanvasVersionMetadata, count int64, err error) {
 	ctx, done := telemetry.Span(ctx, "canvases.list_version_history")
 	defer done(&err)
 
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		var txErr error
-		versions, txErr = models.ListCanvasVersionHistoryInTransaction(tx, canvasUUID, limit, beforeTime)
+		versions, txErr = models.ListCanvasVersionHistoryInTransaction(tx, canvasUUID, limit, cursor)
 		if txErr != nil {
 			return txErr
 		}

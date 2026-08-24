@@ -159,7 +159,7 @@ func (s *CanvasService) ListCanvasVersions(ctx context.Context, req *pb.ListCanv
 	if err != nil {
 		return nil, err
 	}
-	return canvases.ListCanvasVersionsPaginated(ctx, db, canvas, req.Limit, req.Before)
+	return canvases.ListCanvasVersionsPaginated(ctx, db, canvas, req.Limit, req.Before, req.BeforeId)
 }
 
 func (s *CanvasService) DescribeCanvasVersion(ctx context.Context, req *pb.DescribeCanvasVersionRequest) (*pb.DescribeCanvasVersionResponse, error) {
@@ -186,7 +186,7 @@ func (s *CanvasService) ListNodeQueueItems(ctx context.Context, req *pb.ListNode
 	if err != nil {
 		return nil, err
 	}
-	return canvases.ListNodeQueueItems(ctx, db, canvas, req.NodeId, req.Limit, req.Before)
+	return canvases.ListNodeQueueItems(ctx, db, canvas, req.NodeId, req.Limit, req.Before, req.BeforeId)
 }
 
 func (s *CanvasService) DeleteNodeQueueItem(ctx context.Context, req *pb.DeleteNodeQueueItemRequest) (*pb.DeleteNodeQueueItemResponse, error) {
@@ -204,7 +204,7 @@ func (s *CanvasService) ListNodeExecutions(ctx context.Context, req *pb.ListNode
 	if err != nil {
 		return nil, err
 	}
-	return canvases.ListNodeExecutions(ctx, db, canvas, req.NodeId, req.States, req.Results, req.Limit, req.Before)
+	return canvases.ListNodeExecutions(ctx, db, canvas, req.NodeId, req.States, req.Results, req.Limit, req.Before, req.BeforeId)
 }
 
 func (s *CanvasService) ListNodeEvents(ctx context.Context, req *pb.ListNodeEventsRequest) (*pb.ListNodeEventsResponse, error) {
@@ -218,7 +218,7 @@ func (s *CanvasService) ListNodeEvents(ctx context.Context, req *pb.ListNodeEven
 		return nil, status.Error(codes.InvalidArgument, "node_id is required")
 	}
 
-	return canvases.ListNodeEvents(ctx, db, canvas, req.NodeId, req.Limit, req.Before)
+	return canvases.ListNodeEvents(ctx, db, canvas, req.NodeId, req.Limit, req.Before, req.BeforeId)
 }
 
 func (s *CanvasService) ReemitTriggerEvent(ctx context.Context, req *pb.ReemitTriggerEventRequest) (*pb.ReemitTriggerEventResponse, error) {
@@ -301,7 +301,7 @@ func (s *CanvasService) ListRuns(ctx context.Context, req *pb.ListRunsRequest) (
 		return nil, err
 	}
 
-	return canvases.ListRuns(ctx, db, canvas, req.Limit, req.Before, req.States, req.Results)
+	return canvases.ListRuns(ctx, db, canvas, req.Limit, req.Before, req.BeforeId, req.States, req.Results)
 }
 
 func (s *CanvasService) DescribeRun(ctx context.Context, req *pb.DescribeRunRequest) (*pb.DescribeRunResponse, error) {

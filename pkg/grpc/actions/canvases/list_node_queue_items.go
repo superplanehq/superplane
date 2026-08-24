@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -13,14 +14,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func ListNodeQueueItems(ctx context.Context, db *gorm.DB, canvas *models.Canvas, nodeID string, limit uint32, before *timestamppb.Timestamp) (*pb.ListNodeQueueItemsResponse, error) {
+func ListNodeQueueItems(ctx context.Context, db *gorm.DB, canvas *models.Canvas, nodeID string, limit uint32, before *timestamppb.Timestamp, beforeID string) (*pb.ListNodeQueueItemsResponse, error) {
 	limit = getLimit(limit)
-	beforeTime := getBefore(before)
+	cursor := getCursor(before, beforeID)
 
 	//
 	// List and count queue items
 	//
-	queueItems, err := models.ListNodeQueueItems(db, canvas.ID, nodeID, int(limit), beforeTime)
+	queueItems, err := models.ListNodeQueueItems(db, canvas.ID, nodeID, int(limit), cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -40,6 +41,7 @@ func ListNodeQueueItems(ctx context.Context, db *gorm.DB, canvas *models.Canvas,
 		TotalCount:    uint32(totalCount),
 		HasNextPage:   hasNextPage(len(queueItems), int(limit), totalCount),
 		LastTimestamp: getLastQueueItemTimestamp(queueItems),
+		LastId:        getLastID(len(queueItems), func() uuid.UUID { return queueItems[len(queueItems)-1].ID }),
 	}, nil
 }
 

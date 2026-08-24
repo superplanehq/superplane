@@ -725,6 +725,9 @@ message ListWorkOrderEventsRequest {
   string order_id = 2;
   uint32 limit = 3;
   google.protobuf.Timestamp before = 4;
+  // Id of the last row of the previous page. Echo `last_id` back together
+  // with `before` so rows sharing that timestamp are not skipped.
+  string before_id = 5;
 }
 
 message ListWorkOrderEventsResponse {
@@ -732,6 +735,7 @@ message ListWorkOrderEventsResponse {
   uint32 total_count = 2;
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;
+  string last_id = 5;
 }
 
 message WorkOrderEvent {
