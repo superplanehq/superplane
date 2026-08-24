@@ -4,9 +4,9 @@ import type { ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from 
 import { FACTORY_NODE_CARD_HEIGHT, FACTORY_NODE_CARD_WIDTH } from "@/lib/factoryCanvasChrome";
 import { layoutFactoryRunLeafGraph } from "@/lib/layout/factoryRunLeafLayout";
 import { buildStyledCanvasEdges } from "@/ui/CanvasPage/factoryCanvasEdgeStyle";
+import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
 import { componentPresentation, type SplitRunCanvasModel } from "./splitRunCanvases";
-import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
 export type LineNodeData = {
   title: string;
@@ -35,8 +35,7 @@ function toFlowEdge(edge: ComponentsEdge, index: number): Edge {
     source: edge.sourceId ?? "",
     target: edge.targetId ?? "",
     sourceHandle: channel,
-    type: "smoothstep",
-    label: channel === "default" ? undefined : channel,
+    type: "custom",
   };
 }
 
@@ -106,7 +105,7 @@ export function compactLineCanvasGraph(
       nodes,
       isVerticalFlow: true,
       resolvedThemeIsDark,
-      edgeDefaults: { type: "smoothstep", style: { stroke: "#cbd5e1", strokeWidth: 1.5 } },
+      edgeDefaults: { type: "custom", style: { stroke: "#cbd5e1", strokeWidth: 1.5 } },
       hoveredEdgeId: null,
       isEditMode: false,
       isReadOnly: true,
