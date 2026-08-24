@@ -31,6 +31,15 @@ export const General: Story = {
   ),
 };
 
+export const Automations: Story = {
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/automations`}
+      factoriesFixture={defaultFactoriesFixture}
+    />
+  ),
+};
+
 export const Profile: Story = {
   render: () => (
     <FactoriesHarness

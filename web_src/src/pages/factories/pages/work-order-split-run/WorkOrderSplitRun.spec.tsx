@@ -1,0 +1,379 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
+import { MemoryRouter } from "react-router";
+import { describe, expect, it, vi } from "vitest";
+
+import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { TooltipProvider } from "@/ui/tooltip";
+
+import { DRAFT_WORK_ORDER, FAILED_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
+import { OPEN_WORK_ORDER_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
+import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
+import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
+
+function renderPopup(props: ComponentProps<typeof WorkOrderSplitRunPopup>) {
+  return render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter>
+        <ThemeProvider>
+          <TooltipProvider>
+            <WorkOrderSplitRunPopup {...props} />
+          </TooltipProvider>
+        </ThemeProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+function renderSplitRun() {
+  return renderPopup({ fixture: SPLIT_RUN_RUNNING });
+}
+
+describe("WorkOrderSplitRunPopup", () => {
+  it("does not link to a work order page", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER) });
+
+    expect(screen.queryByRole("link", { name: "Open work order" })).not.toBeInTheDocument();
+  });
+
+  it("collapses finished steps and expands the running component stream", () => {
+    renderSplitRun();
+
+    const dialog = screen.getByTestId("work-order-split-run");
+    expect(within(dialog).getByRole("heading", { name: "Add refund reconciliation test" })).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-review")).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Log" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("region", { name: "Run" })).toBeInTheDocument();
+
+    const backlog = screen.getByTestId("split-run-phase-backlog");
+    expect(within(backlog).getByText("Backlog")).toBeInTheDocument();
+    expect(within(backlog).getByRole("button", { name: "description.md" })).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-stream-backlog")).not.toBeInTheDocument();
+
+    const plan = screen.getByTestId("split-run-phase-plan");
+    expect(within(plan).getByText(/Refund Planner/)).toBeInTheDocument();
+    expect(within(plan).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-stream-plan")).not.toBeInTheDocument();
+
+    const implement = screen.getByTestId("split-run-phase-implement");
+    expect(within(implement).getByText(/Refund Implementer/)).toBeInTheDocument();
+    expect(within(implement).getAllByRole("link", { name: /feature\/refund-retry/ }).length).toBeGreaterThan(0);
+    expect(screen.getByTestId("split-run-stream-implement")).toBeInTheDocument();
+    expect(within(implement).queryByText("Started")).not.toBeInTheDocument();
+    expect(within(implement).getAllByText("Create Branch").length).toBeGreaterThan(0);
+    expect(within(implement).getByText("Reading plan.md.")).toBeInTheDocument();
+
+    expect(screen.getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
+    expect(screen.getByText("Implementation")).toBeInTheDocument();
+    expect(within(screen.getByTestId("run-overlay-compact-canvas")).getByText("Create Branch")).toBeInTheDocument();
+    expect(screen.queryByText("Factory Lines")).not.toBeInTheDocument();
+  });
+
+  it("selects the canvas component when a log line is clicked", async () => {
+    const user = userEvent.setup();
+    renderSplitRun();
+
+    await user.click(within(screen.getByTestId("split-run-stream-line-create-branch")).getByRole("button"));
+
+    expect(screen.getByTestId("split-run-stream-line-create-branch")).toHaveAttribute("data-highlighted", "true");
+    expect(screen.getByTestId("split-run-canvas-node-create-branch")).toHaveAttribute("data-selected", "true");
+    expect(screen.getByTestId("split-run-canvas-node-onrun-implement")).not.toHaveAttribute("data-selected");
+  });
+
+  it("keeps Edit Automation in the canvas overflow menu when no edit href is set", async () => {
+    const user = userEvent.setup();
+    renderSplitRun();
+
+    await user.click(screen.getByTestId("split-run-canvas-menu"));
+    expect(await screen.findByTestId("split-run-canvas-edit")).toHaveTextContent("Edit Automation");
+  });
+
+  it("opens Edit Automation from the canvas overflow menu", async () => {
+    const user = userEvent.setup();
+    renderPopup({ fixture: SPLIT_RUN_RUNNING, canvasEditHref: () => "/edit-implementation" });
+
+    await user.click(screen.getByTestId("split-run-canvas-menu"));
+    const edit = await screen.findByTestId("split-run-canvas-edit");
+    expect(edit).toHaveTextContent("Edit Automation");
+    expect(edit).toHaveAttribute("href", "/edit-implementation");
+  });
+
+  it("places expand before the overflow menu and opens the automation run", () => {
+    renderPopup({
+      fixture: SPLIT_RUN_RUNNING,
+      canvasEditHref: () => "/edit-implementation",
+      canvasExpandHref: () => "/split-run-implementation",
+    });
+
+    const expand = screen.getByTestId("split-run-canvas-expand");
+    const menu = screen.getByTestId("split-run-canvas-menu");
+    expect(expand.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(expand).toHaveAttribute("href", "/split-run-implementation");
+    expect(expand).toHaveAttribute("aria-label", "Open automation run");
+  });
+
+  it("keeps every check pill on the owner and cost row for verify", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(
+        {
+          ...OPEN_WORK_ORDER,
+          title: "Add refund reason enum to schema",
+          lineDispatches: [
+            {
+              id: "dispatch-verify",
+              line: { id: "line-1", name: "plan-and-implement" },
+              state: "STATE_ACTIVE",
+              stepExecutions: [
+                { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+                {
+                  id: "e-impl",
+                  step: "Implement",
+                  stepIndex: 1,
+                  state: "STATE_FINISHED",
+                  result: "RESULT_PASSED",
+                },
+                {
+                  id: "e-verify",
+                  step: "Verify",
+                  stepIndex: 2,
+                  state: "STATE_STARTED",
+                  result: "RESULT_UNKNOWN",
+                },
+              ],
+            },
+          ],
+        },
+        { checks: OPEN_WORK_ORDER_CHECKS },
+      ),
+    });
+
+    const meta = screen.getByTestId("popup-owner-time-cost");
+    expect(within(meta).getByTestId("split-run-checks")).toBeInTheDocument();
+    expect(within(meta).getByText("Risk review")).toBeInTheDocument();
+    expect(within(meta).getByText("Test coverage")).toBeInTheDocument();
+    expect(within(meta).getByText("Confidence score")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
+  });
+
+  it("pins the pull request review to the waiting implement log", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder({
+        ...OPEN_WORK_ORDER,
+        title: "Ship idempotent refund retries",
+        lineDispatches: [
+          {
+            id: "dispatch-waiting",
+            line: { id: "line-1", name: "plan-and-implement" },
+            state: "STATE_FINISHED",
+            stepExecutions: [
+              { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+              {
+                id: "e-impl",
+                step: "Implement",
+                stepIndex: 1,
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    const review = screen.getByTestId("split-run-review");
+    expect(review).toHaveTextContent("Review the pull request");
+    expect(review).toHaveTextContent("Next step");
+    expect(within(review).getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
+  });
+
+  it("opens a compact check in the analysis dialog", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(
+        {
+          ...OPEN_WORK_ORDER,
+          title: "Add refund reason enum to schema",
+          lineDispatches: [
+            {
+              id: "dispatch-verify",
+              line: { id: "line-1", name: "plan-and-implement" },
+              state: "STATE_ACTIVE",
+              stepExecutions: [
+                {
+                  id: "e-verify",
+                  step: "Verify",
+                  stepIndex: 2,
+                  state: "STATE_STARTED",
+                  result: "RESULT_UNKNOWN",
+                },
+              ],
+            },
+          ],
+        },
+        { checks: OPEN_WORK_ORDER_CHECKS },
+      ),
+    });
+
+    await user.click(screen.getByTestId("split-run-check-check-risk-review"));
+
+    expect(screen.getByRole("heading", { name: "Risk review" })).toBeInTheDocument();
+    expect(screen.getByText(/Moderate risk: retry policy/)).toBeInTheDocument();
+  });
+
+  it("hides the next-step footer when logs are complete and the order waits with no note", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder({
+        ...OPEN_WORK_ORDER,
+        title: "dasdas",
+        statusNotes: [],
+        assignees: [{ id: "user-1", name: "test test" }],
+        lineDispatches: [
+          {
+            id: "dispatch-wait",
+            line: { id: "line-1", name: "plan-and-implement" },
+            state: "STATE_FINISHED",
+            stepExecutions: [
+              {
+                id: "e-1",
+                step: "dasdasdas",
+                stepIndex: 0,
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
+    expect(screen.queryByText("Needs attention")).not.toBeInTheDocument();
+    expect(screen.queryByText("This work order needs attention from test test.")).not.toBeInTheDocument();
+  });
+
+  it("hides the review strip when the work order has no note or checks", () => {
+    renderPopup({ fixture: { ...SPLIT_RUN_RUNNING, waitingNotes: [], checks: [] } });
+
+    expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
+  });
+
+  it("prompts a draft backlog card to start the next stage", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
+
+    const review = screen.getByTestId("split-run-review");
+    expect(review).toHaveTextContent("Start the next stage");
+    expect(within(review).getByRole("button", { name: "Dispatch" })).toBeDisabled();
+    expect(screen.queryByTestId("split-run-phase-backlog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
+  });
+
+  it("dispatches the draft to the line from the next-step button", async () => {
+    const user = userEvent.setup();
+    const onDispatch = vi.fn().mockResolvedValue(undefined);
+
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+      canDispatch: true,
+      onDispatch,
+    });
+
+    await user.click(within(screen.getByTestId("split-run-review")).getByRole("button", { name: "Dispatch" }));
+
+    expect(onDispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a failed implement diagnosis in the log footer", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(FAILED_WORK_ORDER) });
+
+    const review = screen.getByTestId("split-run-review");
+    expect(review).toHaveTextContent("Implement did not pass");
+    expect(within(review).getByRole("link", { name: "Open failed run" })).toBeInTheDocument();
+    expect(review.className).toContain("status-failed-bg");
+    expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
+  });
+
+  it("opens the selected step canvas when a log row is clicked", async () => {
+    const user = userEvent.setup();
+    renderSplitRun();
+
+    await user.click(within(screen.getByTestId("split-run-phase-plan")).getByRole("button", { name: /Plan/ }));
+
+    expect(screen.getByTestId("split-run-stream-plan")).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-plan")).queryByText("Started")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-plan")).getAllByText("Create Implementation Plan").length).toBe(
+      1,
+    );
+    expect(
+      within(screen.getByTestId("split-run-stream-plan")).getByText("Reading the work order description."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Planning")).toBeInTheDocument();
+    expect(screen.getAllByText("From GH issue?").length).toBeGreaterThan(0);
+  });
+
+  it("opens a mapped plan-running work order on the plan canvas", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder({
+        ...OPEN_WORK_ORDER,
+        title: "Plan job",
+        lineDispatches: [
+          {
+            id: "dispatch-1",
+            line: { id: "line-1", name: "plan-and-implement" },
+            state: "STATE_ACTIVE",
+            stepExecutions: [
+              { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
+            ],
+          },
+        ],
+      }),
+    });
+
+    expect(screen.getByRole("heading", { name: "Plan job" })).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-stream-plan-0")).toBeInTheDocument();
+    expect(screen.getByText("Planning")).toBeInTheDocument();
+    expect(screen.getAllByText("From GH issue?").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("split-run-phase-implement")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
+  });
+
+  it("highlights the PR Closure log for the selected canvas component", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      fixture: {
+        ...SPLIT_RUN_RUNNING,
+        title: "Send refund receipts after provider confirm",
+        lineStatus: "passed",
+        currentPhaseId: "done",
+        phases: [
+          ...SPLIT_RUN_RUNNING.phases.map((phase) => ({ ...phase, status: "passed" as const })),
+          {
+            id: "done",
+            name: "Done",
+            status: "passed",
+            duration: "1m 12s",
+            componentName: "PR Closure",
+            artifacts: [],
+            stream: [],
+            canvasSteps: [],
+          },
+        ],
+      },
+    });
+
+    const stream = screen.getByTestId("split-run-stream-done");
+    expect(within(stream).queryByText("Started")).not.toBeInTheDocument();
+    expect(within(stream).getByRole("link", { name: /merge-screenshot/ })).toBeInTheDocument();
+    expect(within(stream).getByRole("link", { name: /#510/ })).toBeInTheDocument();
+
+    await user.click(within(screen.getByTestId("split-run-stream-line-find-work-order")).getByRole("button"));
+
+    expect(screen.getByTestId("split-run-stream-line-find-work-order")).toHaveAttribute("data-highlighted", "true");
+    expect(screen.getByTestId("split-run-canvas-node-find-work-order")).toHaveAttribute("data-selected", "true");
+  });
+});

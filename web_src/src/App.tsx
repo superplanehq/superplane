@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams 
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
+import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { Toaster } from "sonner";
 import "./App.css";
 
@@ -29,7 +30,10 @@ import {
   FactoriesIndexPage,
   FactoriesLayout,
   FactoryAppCanvasPage,
+  FactoryAppSplitRunPage,
+  FactoryHomeRedirect,
   FactoryLineEditPage,
+  FactorySettingsAutomationsPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
   FactorySettingsNotificationsPage,
@@ -180,7 +184,7 @@ function AppRouter() {
                     element={withAuthPermissionAndFactoriesFeature(FactoriesLayout, "factories", "read")}
                   >
                     <Route element={<OnboardingGate />}>
-                      <Route index element={<Navigate to="overview" replace />} />
+                      <Route index element={<FactoryHomeRedirect />} />
                       <Route path="setup" element={<OnboardingPage />} />
                       <Route path="onboarding" element={<Navigate to="../setup" replace />} />
                       <Route path="overview" element={<WorkspaceOverviewPage />} />
@@ -190,7 +194,7 @@ function AppRouter() {
                       <Route path="work-orders">
                         <Route index element={<WorkOrdersPage />} />
                         <Route path="new" element={<CreateWorkOrderComposeGate />} />
-                        {/* Legacy `/work-orders/:orderId` bookmark shape — redirects to `/work-order/:number`. */}
+                        {/* Legacy `/work-orders/:orderId` bookmark shape — redirects to the line board. */}
                         <Route path=":orderId" element={<LegacyWorkOrderDetailRedirect />} />
                       </Route>
                       <Route path="work-order/:orderNumber" element={<WorkOrderDetailPage />} />
@@ -207,6 +211,7 @@ function AppRouter() {
                         <Route path=":appId" element={<AutomationsPage />} />
                       </Route>
                       <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
+                      <Route path="apps/:appId/split-run" element={<FactoryAppSplitRunPage />} />
                     </Route>
                     <Route path="settings/*" element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
                   </Route>
@@ -246,10 +251,14 @@ function OrganizationScope() {
   const { account } = useAccount();
 
   useEffect(() => {
-    if (account?.id && organizationId) {
+    if (account?.id && organizationId && !isReservedAppPathSegment(organizationId)) {
       recordLastVisitedOrganization(account.id, organizationId);
     }
   }, [account?.id, organizationId]);
+
+  if (isReservedAppPathSegment(organizationId)) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <PermissionsProvider>
@@ -277,6 +286,7 @@ function FactoryLineEditPageGate() {
 const factorySettingsSectionRoutes = [
   <Route key="factory-settings-index" index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />,
   <Route key="factory-settings-general" path="general" element={<FactorySettingsGeneralPage />} />,
+  <Route key="factory-settings-automations" path="automations" element={<FactorySettingsAutomationsPage />} />,
   <Route key="factory-settings-usage" path="usage" element={<FactorySettingsUsagePage />} />,
   <Route key="factory-settings-profile" path="profile" element={<FactorySettingsProfilePage />} />,
   <Route key="factory-settings-notifications" path="notifications" element={<FactorySettingsNotificationsPage />} />,

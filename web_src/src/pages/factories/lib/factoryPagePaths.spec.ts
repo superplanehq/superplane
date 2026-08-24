@@ -2,9 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   factoryAppConfigurePath,
   factoryAppPath,
+  factoryAppSplitRunPath,
   factoryAppViewPath,
   factoryDetailPath,
+  factoryHomePath,
+  factoryIntakePath,
+  intakeSettingsTabFromSearch,
+  intakeSourceFromSearch,
+  isIntakeSearchOpen,
   factorySettingsGeneralPathAfterKeyChange,
+  firstFactoryLineId,
+  firstFactoryLineName,
   legacyWorkOrderDetailPath,
   organizationSettingsPath,
   organizationSettingsSectionPath,
@@ -16,6 +24,69 @@ import {
 describe("factoryDetailPath", () => {
   it("builds the workspace URL from the workspace key", () => {
     expect(factoryDetailPath("org-1", "SP")).toBe("/org-1/workspaces/SP");
+  });
+});
+
+describe("factoryHomePath", () => {
+  it("opens the first line board when a line id is present", () => {
+    expect(factoryHomePath("org-1", "SP", "line-plan")).toBe("/org-1/workspaces/SP/lines/line-plan");
+  });
+
+  it("opens the lines list when no line id is present", () => {
+    expect(factoryHomePath("org-1", "SP")).toBe("/org-1/workspaces/SP/lines");
+  });
+});
+
+describe("factoryIntakePath", () => {
+  it("opens the line board with the intake query", () => {
+    expect(factoryIntakePath("org-1", "SP", "line-plan")).toBe("/org-1/workspaces/SP/lines/line-plan?intake=1");
+  });
+
+  it("reads the intake query from the search string", () => {
+    expect(isIntakeSearchOpen("?intake=1")).toBe(true);
+    expect(isIntakeSearchOpen("intake=1")).toBe(true);
+    expect(isIntakeSearchOpen("")).toBe(false);
+  });
+
+  it("opens the line board with a selected intake source", () => {
+    expect(factoryIntakePath("org-1", "SP", "line-plan", "github-issues")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?intake=1&source=github-issues",
+    );
+    expect(factoryIntakePath("org-1", "SP", "line-plan", "github-issues", "automation")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?intake=1&source=github-issues&settings=automation",
+    );
+  });
+
+  it("reads the intake source from the search string", () => {
+    expect(intakeSourceFromSearch("?intake=1&source=github-issues")).toBe("github-issues");
+    expect(intakeSourceFromSearch("intake=1")).toBeNull();
+  });
+
+  it("reads the settings tab from the search string", () => {
+    expect(intakeSettingsTabFromSearch("?intake=1&settings=automation")).toBe("automation");
+    expect(intakeSettingsTabFromSearch("intake=1")).toBeNull();
+  });
+});
+
+describe("firstFactoryLineId", () => {
+  it("returns the first line that has an id", () => {
+    expect(firstFactoryLineId({ lines: [{ id: "line-a" }, { id: "line-b" }] })).toBe("line-a");
+  });
+
+  it("returns undefined when the factory has no line", () => {
+    expect(firstFactoryLineId({ lines: [] })).toBeUndefined();
+  });
+});
+
+describe("firstFactoryLineName", () => {
+  it("returns the first line that has a name", () => {
+    expect(firstFactoryLineName({ lines: [{ name: "plan-and-implement" }, { name: "hotfix" }] })).toBe(
+      "plan-and-implement",
+    );
+  });
+
+  it("returns undefined when the factory has no named line", () => {
+    expect(firstFactoryLineName({ lines: [{ name: "  " }] })).toBeUndefined();
   });
 });
 
@@ -75,10 +146,26 @@ describe("factoryAppConfigurePath", () => {
   });
 });
 
+describe("factoryAppSplitRunPath", () => {
+  it("opens the split run page with canvas and line context", () => {
+    expect(
+      factoryAppSplitRunPath("org-1", "SP", "app-1", {
+        from: "lines",
+        lineId: "line-1",
+        runId: "run-9",
+        orderNumber: "103",
+        canvas: "implementation",
+      }),
+    ).toBe(
+      "/org-1/workspaces/SP/apps/app-1/split-run?run=run-9&from=lines&lineId=line-1&orderNumber=103&canvas=implementation",
+    );
+  });
+});
+
 describe("factoryAppViewPath", () => {
-  it("returns the canvas run page without edit chrome", () => {
+  it("opens the split run page when a run id is present", () => {
     expect(factoryAppViewPath("org-1", "SP", "app-1", { from: "lines", lineId: "line-1", runId: "run-9" })).toBe(
-      "/org-1/workspaces/SP/apps/app-1?run=run-9&from=lines&lineId=line-1",
+      "/org-1/workspaces/SP/apps/app-1/split-run?run=run-9&from=lines&lineId=line-1",
     );
   });
 });

@@ -4,7 +4,7 @@ import type {
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
-import { automationNameForLineStep } from "./factoryLineFormShared";
+import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, linesPath } from "./factoryPagePaths";
 import {
   dispatchStepRows,
@@ -31,6 +31,8 @@ export type LinePhaseColumn = {
   stepIndex: number;
   /** Factory app id for this runApp step, when present. */
   appId?: string;
+  /** In-flight cap for this step. Defaults to 10 when the line omits it. */
+  maxParallelism: number;
   runs: LinePhaseRunCard[];
   tick: LinePhaseTick;
 };
@@ -39,7 +41,7 @@ export type LinePhaseColumn = {
 export const LINE_PHASE_RUNS_PAGE_SIZE = 3;
 
 /**
- * Destination for a phase-board card: the canvas run for this phase.
+ * Destination for a phase-board card: the split-run page for this phase.
  * Never the work order page — that destination stays on the Work Orders list.
  */
 export function linePhaseRunHref(
@@ -52,7 +54,11 @@ export function linePhaseRunHref(
   const appId = run.execution.run?.appId || stepAppId;
   const runId = run.execution.run?.id;
   if (appId && runId) {
-    return factoryAppRunPath(organizationId, factoryKey, appId, runId, { from: "lines", lineId });
+    return factoryAppRunPath(organizationId, factoryKey, appId, runId, {
+      from: "lines",
+      lineId,
+      orderNumber: run.order.number,
+    });
   }
   if (appId) {
     return factoryAppPath(organizationId, factoryKey, appId, { from: "lines", lineId });
@@ -85,10 +91,72 @@ export function buildLinePhaseBoard(
       stepName: automationNameForLineStep(step, apps, stepIndex),
       stepIndex,
       appId,
+      maxParallelism: lineStepParallelism(step),
       runs,
       tick: resolvePhaseTick(runs),
     };
   });
+}
+
+/**
+ * Draft work orders that are not on a line yet. Newest updated drafts
+ * come first.
+ */
+export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
+  return workOrders.filter(isLineBacklogOrder).sort(compareOrdersNewestFirst);
+}
+
+/** Factory-level intake automation. It is not a line step. */
+export function findBacklogAutomationApp(
+  apps: Array<{ id?: string; name?: string }>,
+): { id: string; name: string } | undefined {
+  const match = apps.find((app) => app.id && (app.name === "Backlog" || app.id === "app-refund-backlog"));
+  if (!match?.id) {
+    return undefined;
+  }
+  return { id: match.id, name: match.name ?? "Backlog" };
+}
+
+/** Factory-level PR Closure automation. It is not a line step. */
+export function findClosureAutomationApp(
+  apps: Array<{ id?: string; name?: string }>,
+): { id: string; name: string } | undefined {
+  const match = apps.find(
+    (app) =>
+      Boolean(app.id) &&
+      (app.name === "PR Closure" || app.id === "app-refund-done" || (app.id ?? "").includes("pr-closure")),
+  );
+  if (!match?.id) {
+    return undefined;
+  }
+  return { id: match.id, name: match.name ?? "PR Closure" };
+}
+
+/** Backlog and Done are not canvas-backed columns. */
+export function isDoneLineColumn(column: Pick<LinePhaseColumn, "stepName" | "appId">): boolean {
+  if (column.stepName.trim().toLowerCase() === "done") {
+    return true;
+  }
+  if (!column.appId) {
+    return false;
+  }
+  return column.appId === "app-refund-done" || column.appId.includes("pr-closure");
+}
+
+function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {
+  if (!order.id || order.state !== "STATE_DRAFT") {
+    return false;
+  }
+  return (order.lineDispatches ?? []).length === 0;
+}
+
+function compareOrdersNewestFirst(left: FactoriesWorkOrder, right: FactoriesWorkOrder): number {
+  const leftTime = Date.parse(left.updatedAt ?? left.createdAt ?? "") || 0;
+  const rightTime = Date.parse(right.updatedAt ?? right.createdAt ?? "") || 0;
+  if (leftTime !== rightTime) {
+    return rightTime - leftTime;
+  }
+  return (right.id ?? "").localeCompare(left.id ?? "");
 }
 
 export function resolvePhaseRunStatus(execution: WorkOrderStepRow): {
@@ -185,6 +253,14 @@ function liveColumnIndexForExecution(
     return undefined;
   }
 
+  return closestAppColumnIndex(steps, executionAppId, stepIndex);
+}
+
+function closestAppColumnIndex(
+  steps: NonNullable<FactoriesFactoryLine["steps"]>,
+  executionAppId: string,
+  stepIndex: number,
+): number | undefined {
   const matches: number[] = [];
   for (let index = 0; index < steps.length; index++) {
     if (steps[index]?.app?.app?.trim() === executionAppId) {
