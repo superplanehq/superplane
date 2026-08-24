@@ -20,24 +20,3 @@ export function humanizeLineName(name: string | undefined | null): string {
     })
     .join(" ");
 }
-
-/**
- * Short line description when the API has no description field:
- * automation names joined as a flow, e.g. `Refund Planner → Refund Implementer`.
- */
-export function formatLinePhaseDescription(
-  steps: Array<{ app?: { app?: string } }> | undefined | null,
-  apps: Array<{ id?: string; name?: string }> | undefined | null,
-): string | undefined {
-  const names = (steps ?? [])
-    .map((step) => {
-      const appId = step.app?.app?.trim();
-      return apps?.find((app) => app.id === appId)?.name?.trim();
-    })
-    .filter((name): name is string => Boolean(name));
-
-  if (names.length === 0) {
-    return undefined;
-  }
-  return names.join(" → ");
-}

@@ -29,6 +29,7 @@ import type {
   RunOverlayStep,
   RunOverlayStepStatus,
 } from "../work-order-run-overlay/workOrderRunOverlayMocks";
+import type { SplitRunCanvasModel } from "./splitRunCanvases";
 
 export type SplitRunPhaseId = string;
 
@@ -77,6 +78,8 @@ export interface SplitRunPhase {
   canvasKey?: SplitRunIntakeCanvasKey | null;
   /** Trigger node that ran when the canvas has more than one start. */
   triggerName?: string;
+  /** When set, the popup shows this canvas instead of the phase-name map. */
+  canvas?: SplitRunCanvasModel;
 }
 
 export type SplitRunFooterTone = "waiting" | "draft" | "failed";

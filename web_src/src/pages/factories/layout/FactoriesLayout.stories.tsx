@@ -5,8 +5,8 @@ import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../__fixtures__/fa
 import { FactoriesLayout } from "./FactoriesLayout";
 
 /**
- * The Factories layout shell: a thin icon rail (workspace, settings, new
- * work order, user) and the line board as the main pane.
+ * The Factories layout shell: a thin icon rail (workspace, intake, board,
+ * velocity, settings, new work order, user) and the line board as the main pane.
  * Stories mount the layout with a live route so the rail controls behave.
  */
 const meta = {

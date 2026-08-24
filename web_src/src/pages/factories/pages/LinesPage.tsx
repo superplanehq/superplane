@@ -3,17 +3,20 @@ import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactoryApps, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryApps, useFactoryWorkOrders, useUpdateFactoryLine } from "@/hooks/useFactoryData";
 import { useMe } from "@/hooks/useMe";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Clock, Inbox, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
+import { Clock, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router";
+import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import {
@@ -21,6 +24,7 @@ import {
   collectLineBacklogOrders,
   findBacklogAutomationApp,
   findClosureAutomationApp,
+  isDoneLineColumn,
   LINE_PHASE_RUNS_PAGE_SIZE,
   resolveColumnGlyph,
   resolvePhaseRunStatus,
@@ -53,6 +57,9 @@ import {
   type BoardLaneTone,
 } from "../workOrders/WorkOrderBoardChrome";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
+import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
+import { ReviewCandidateModal } from "./onboarding/first-run/ReviewCandidateModal";
+import { reviewCandidateForWorkOrderId } from "./onboarding/first-run/reviewCandidates";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 import type { SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
 import { splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
@@ -61,7 +68,11 @@ import {
   editFactoryLinePath,
   factoryAppConfigurePath,
   factoryAppSplitRunPath,
+  factoryHomePath,
   factoryLineDetailPath,
+  intakeSettingsTabFromSearch,
+  intakeSourceFromSearch,
+  isIntakeSearchOpen,
   linesPath,
   workOrderDetailPath,
 } from "../lib/factoryPagePaths";
@@ -72,7 +83,20 @@ import {
   factorySectionHeaderClassName,
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
+import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
+import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
+import { ColumnLaneMenu } from "./ColumnLaneMenu";
+import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
+import {
+  intakeAutomationAppId,
+  isFirstRunOnboardingFactory,
+  isLineIntakeSourceId,
+  lineIntakeSourcesForFactory,
+} from "./lineIntakeModel";
+import { isIntakeSettingsTab } from "./intakeSourceSettingsModel";
+import { LineIntakeDrawer } from "./LineIntakeDrawer";
 import { LineListCard } from "./LineListCard";
+import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { descriptionForLine, toLineListMetrics } from "./lineListMetricsMockData";
 import { useLineCardMutations } from "./useLineCardMutations";
 
@@ -98,9 +122,14 @@ function applyVisibleWorkOrders(
 }
 
 export function LinesPage() {
-  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId } = useParams<{ lineId: string }>();
+  const { search } = useLocation();
+  const navigate = useNavigate();
+  const intakeOpen = isIntakeSearchOpen(search);
+  const intakeSourceId = intakeSourceFromSearch(search);
+  const intakeSettingsTab = intakeSettingsTabFromSearch(search);
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
   const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
   const { data: me } = useMe(false);
@@ -109,6 +138,7 @@ export function LinesPage() {
 
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
+  const canCreateWorkOrder = canAct("work_orders", "create");
   const visibleWorkOrders = useMemo(
     () => applyVisibleWorkOrders(workOrders, factory, listState, me?.id),
     [factory, listState.filters, listState.scope, listState.search, me?.id, workOrders],
@@ -139,38 +169,60 @@ export function LinesPage() {
   // The phase board is a Kanban surface: it claims the full viewport height so
   // the lanes read as columns rather than as boxes around their cards.
   if (selectedLine) {
+    const intakeEditAppId = intakeAutomationAppId(factoryApps);
+    const editAutomationHref = intakeEditAppId
+      ? factoryAppConfigurePath(organizationId, factoryKey, intakeEditAppId, {
+          from: "lines",
+          lineId: selectedLine.id,
+        })
+      : undefined;
     return (
-      <div className={factoryKanbanPageClassName} data-testid="lines-detail-page">
-        <div className="shrink-0">
-          <LineDetailHeader
-            organizationId={organizationId}
-            factoryKey={factoryKey}
-            line={selectedLine}
-            workOrders={workOrders}
-            factory={factory}
-            state={listState}
-            canUpdate={canUpdate}
+      <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
+        {intakeOpen ? (
+          <LineIntakeDrawer
+            sources={lineIntakeSourcesForFactory(factoryKey)}
+            initialSourceId={isLineIntakeSourceId(intakeSourceId) ? intakeSourceId : undefined}
+            initialSettingsOpen={isIntakeSettingsTab(intakeSettingsTab)}
+            initialSettingsTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
+            editAutomationHref={editAutomationHref}
+            onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
           />
-        </div>
-
-        <div className={factoryWorkOrdersBodyClassName}>
-          <LineDetail
-            organizationId={organizationId}
-            factoryId={factoryId}
-            factoryKey={factoryKey}
-            line={selectedLine}
-            apps={factoryApps}
-            workOrders={visibleWorkOrders}
-            workOrderCardContext={{
-              organizationId,
-              factoryKey,
-              factoryLines: lines,
-              canDispatch: canUpdateWorkOrders,
-              preferredLineName: selectedLine.name,
-              canAssign: canUpdateWorkOrders,
-              ...cardActions,
-            }}
-          />
+        ) : null}
+        <div className={factoryKanbanPageClassName}>
+          <div className="shrink-0">
+            <LineDetailHeader
+              organizationId={organizationId}
+              factoryId={factoryId}
+              factoryKey={factoryKey}
+              line={selectedLine}
+              workOrders={workOrders}
+              factory={factory}
+              state={listState}
+              canUpdate={canUpdate}
+            />
+          </div>
+          <div className={factoryWorkOrdersBodyClassName}>
+            <LineDetail
+              organizationId={organizationId}
+              factoryId={factoryId}
+              factoryKey={factoryKey}
+              line={selectedLine}
+              apps={factoryApps}
+              workOrders={visibleWorkOrders}
+              canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
+              canUpdate={canUpdate}
+              onCreateWorkOrder={openCreateWorkOrder}
+              workOrderCardContext={{
+                organizationId,
+                factoryKey,
+                factoryLines: lines,
+                canDispatch: canUpdateWorkOrders,
+                preferredLineName: selectedLine.name,
+                canAssign: canUpdateWorkOrders,
+                ...cardActions,
+              }}
+            />
+          </div>
         </div>
       </div>
     );
@@ -231,6 +283,7 @@ export function LinesPage() {
 
 function LineDetailHeader({
   organizationId,
+  factoryId,
   factoryKey,
   line,
   workOrders,
@@ -239,6 +292,7 @@ function LineDetailHeader({
   canUpdate,
 }: {
   organizationId: string;
+  factoryId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
   workOrders: FactoriesWorkOrder[];
@@ -246,16 +300,39 @@ function LineDetailHeader({
   state: WorkOrderListState;
   canUpdate: boolean;
 }) {
+  const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const searchRef = useWorkOrdersHeaderShortcuts(state);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [factory, workOrders]);
   const assigneeOptions = buildAssigneeFilterOptions(entries);
+  const title = humanizeLineName(line.name);
   const editHref = line.id ? editFactoryLinePath(organizationId, factoryKey, line.id) : "#";
+
+  const handleRename = async (name: string) => {
+    if (!line.id) {
+      return;
+    }
+    try {
+      await updateLine.mutateAsync({ lineId: line.id, name });
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to rename line"));
+    }
+  };
 
   return (
     <WorkspacePageHeader
       className={factorySectionHeaderClassName}
       data-testid="lines-detail-header"
-      title={humanizeLineName(line.name)}
+      title={
+        <ClickToRename
+          value={title}
+          onSave={(name) => void handleRename(name)}
+          canEdit={canUpdate && Boolean(line.id)}
+          busy={updateLine.isPending}
+          testId="lines-board-title"
+          ariaLabel="Line name"
+          inputClassName="font-medium text-[length:var(--workspace-page-title-size)] leading-[var(--workspace-page-title-line-height)] tracking-[var(--workspace-page-title-tracking)]"
+        />
+      }
       leading={
         <>
           <ScopePills
@@ -277,9 +354,7 @@ function LineDetailHeader({
             onChange={state.setSearch}
             onClose={state.closeSearch}
           />
-          {canUpdate ? (
-            <ColumnConfigureMenu title={humanizeLineName(line.name)} href={editHref} testId="lines-edit-menu" />
-          ) : null}
+          {canUpdate && line.id ? <ColumnConfigureMenu title={title} href={editHref} testId="lines-edit-menu" /> : null}
         </>
       }
       belowRow={<FilterChips state={state} assigneeOptions={assigneeOptions} />}
@@ -294,6 +369,9 @@ function LineDetail({
   line,
   apps,
   workOrders,
+  canCreateWorkOrder,
+  canUpdate,
+  onCreateWorkOrder,
   workOrderCardContext,
 }: {
   organizationId: string;
@@ -302,6 +380,9 @@ function LineDetail({
   line: FactoriesFactoryLine;
   apps: Array<{ id?: string; name?: string }>;
   workOrders: FactoriesWorkOrder[];
+  canCreateWorkOrder: boolean;
+  canUpdate: boolean;
+  onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
 }) {
   const steps = line.steps ?? [];
@@ -309,6 +390,7 @@ function LineDetail({
   const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
   const [peekOrderId, setPeekOrderId] = useState<string | null>(null);
   const peekOrder = workOrders.find((order) => order.id === peekOrderId);
+  const reviewCandidate = reviewCandidateForWorkOrderId(peekOrderId ?? undefined);
   const canvasEditHref = useMemo(
     () => canvasEditHrefForLine(organizationId, factoryKey, line, apps),
     [organizationId, factoryKey, line, apps],
@@ -325,16 +407,21 @@ function LineDetail({
       ) : (
         <PhaseBoard
           organizationId={organizationId}
+          factoryId={factoryId}
           factoryKey={factoryKey}
-          lineId={line.id}
-          apps={apps}
+          line={line}
           backlogOrders={backlogOrders}
           columns={board}
+          canCreateWorkOrder={canCreateWorkOrder}
+          canRename={canUpdate}
+          onCreateWorkOrder={onCreateWorkOrder}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={setPeekOrderId}
         />
       )}
-      {peekOrderId ? (
+      {reviewCandidate ? (
+        <ReviewCandidateModal candidate={reviewCandidate} onClose={() => setPeekOrderId(null)} />
+      ) : peekOrderId ? (
         <LineBoardSplitRunPopup
           organizationId={organizationId}
           factoryId={factoryId}
@@ -498,97 +585,229 @@ function executionRunIdForCanvas(
 
 function PhaseBoard({
   organizationId,
+  factoryId,
   factoryKey,
-  lineId,
-  apps,
+  line,
   backlogOrders,
   columns,
+  canCreateWorkOrder,
+  canRename,
+  onCreateWorkOrder,
   workOrderCardContext,
   onOpenWorkOrder,
 }: {
   organizationId: string;
+  factoryId: string;
   factoryKey: string;
-  lineId?: string;
-  apps: Array<{ id?: string; name?: string }>;
+  line: FactoriesFactoryLine;
   backlogOrders: FactoriesWorkOrder[];
   columns: LinePhaseColumn[];
+  canCreateWorkOrder: boolean;
+  canRename: boolean;
+  onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string) => void;
 }) {
-  const backlogApp = findBacklogAutomationApp(apps);
-  const backlogConfigureHref = backlogApp
-    ? factoryAppConfigurePath(organizationId, factoryKey, backlogApp.id, { from: "lines", lineId })
-    : null;
+  const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>({});
+  const [columnTitles, setColumnTitles] = useState<Record<string, string>>({});
+  const [backlogSize, setBacklogSize] = useState<number | null>(null);
+  const [backlogSettingsOpen, setBacklogSettingsOpen] = useState(false);
+  const [parallelismByStep, setParallelismByStep] = useState<Record<number, number>>({});
+  const updateLine = useUpdateFactoryLine(organizationId, factoryId);
+  const lineId = line.id;
+
+  const setColumnColor = useCallback((columnKey: string, colorId: LineBoardColumnColorId | null) => {
+    setColumnColors((current) => ({ ...current, [columnKey]: colorId }));
+  }, []);
+
+  const setColumnTitle = useCallback((columnKey: string, title: string) => {
+    setColumnTitles((current) => ({ ...current, [columnKey]: title }));
+  }, []);
+
+  const saveParallelism = useCallback(
+    async (stepIndex: number, value: number) => {
+      setParallelismByStep((current) => ({ ...current, [stepIndex]: value }));
+      if (!line.id) {
+        return;
+      }
+      try {
+        await updateLine.mutateAsync({
+          lineId: line.id,
+          steps: replaceLineStepParallelism(line.steps, stepIndex, value),
+        });
+      } catch (error) {
+        setParallelismByStep((current) => {
+          const next = { ...current };
+          delete next[stepIndex];
+          return next;
+        });
+        showErrorToast(getApiErrorMessage(error, "Failed to update parallelism"));
+      }
+    },
+    [line.id, line.steps, updateLine],
+  );
 
   return (
     <WorkOrderKanbanBoard testId="lines-phase-board">
       <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
         <BacklogColumn
+          factoryKey={factoryKey}
           orders={backlogOrders}
-          configureHref={backlogConfigureHref}
+          title={columnTitles.backlog ?? "Backlog"}
+          size={backlogSize}
+          settingsOpen={backlogSettingsOpen}
+          onOpenSettings={() => setBacklogSettingsOpen(true)}
+          onCloseSettings={() => setBacklogSettingsOpen(false)}
+          onSaveSettings={({ name, size }) => {
+            setColumnTitle("backlog", name);
+            setBacklogSize(size);
+            setBacklogSettingsOpen(false);
+          }}
+          colorId={columnColors.backlog ?? null}
+          onColorChange={(colorId) => setColumnColor("backlog", colorId)}
+          canCreateWorkOrder={canCreateWorkOrder}
+          canRename={canRename}
+          onRename={(title) => setColumnTitle("backlog", title)}
+          onCreateWorkOrder={onCreateWorkOrder}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
         />
       </div>
-      {columns.map((column, index) => (
-        <div
-          key={`${column.stepIndex}-${column.stepName}`}
-          className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}
-        >
-          {index < columns.length - 1 ? (
-            <span className="absolute top-[21px] left-full z-[1] h-px w-3 bg-border" aria-hidden />
-          ) : null}
-          <PhaseColumn
-            organizationId={organizationId}
-            factoryKey={factoryKey}
-            lineId={lineId}
-            column={column}
-            workOrderCardContext={workOrderCardContext}
-            onOpenWorkOrder={onOpenWorkOrder}
-          />
-        </div>
-      ))}
+      {columns.map((column, index) => {
+        const columnKey = `phase-${column.stepIndex}`;
+        return (
+          <div
+            key={`${column.stepIndex}-${column.stepName}`}
+            className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}
+          >
+            {index < columns.length - 1 ? (
+              <span className="absolute top-[21px] left-full z-[1] h-px w-3 bg-border" aria-hidden />
+            ) : null}
+            <PhaseColumn
+              organizationId={organizationId}
+              factoryKey={factoryKey}
+              lineId={lineId}
+              column={column}
+              title={columnTitles[columnKey] ?? column.stepName}
+              parallelism={parallelismByStep[column.stepIndex] ?? column.maxParallelism}
+              onSaveParallelism={(value) => void saveParallelism(column.stepIndex, value)}
+              colorId={columnColors[columnKey] ?? null}
+              onColorChange={(colorId) => setColumnColor(columnKey, colorId)}
+              canRename={canRename}
+              onRename={(title) => setColumnTitle(columnKey, title)}
+              workOrderCardContext={workOrderCardContext}
+              onOpenWorkOrder={onOpenWorkOrder}
+            />
+          </div>
+        );
+      })}
     </WorkOrderKanbanBoard>
   );
 }
 
 function BacklogColumn({
+  factoryKey,
   orders,
-  configureHref,
+  title,
+  size,
+  settingsOpen,
+  onOpenSettings,
+  onCloseSettings,
+  onSaveSettings,
+  colorId,
+  onColorChange,
+  canCreateWorkOrder,
+  canRename,
+  onRename,
+  onCreateWorkOrder,
   workOrderCardContext,
   onOpenWorkOrder,
 }: {
+  factoryKey: string;
   orders: FactoriesWorkOrder[];
-  configureHref: string | null;
+  title: string;
+  size: number | null;
+  settingsOpen: boolean;
+  onOpenSettings: () => void;
+  onCloseSettings: () => void;
+  onSaveSettings: (settings: { name: string; size: number | null }) => void;
+  colorId: LineBoardColumnColorId | null;
+  onColorChange: (colorId: LineBoardColumnColorId | null) => void;
+  canCreateWorkOrder: boolean;
+  canRename: boolean;
+  onRename: (title: string) => void;
+  onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string) => void;
 }) {
+  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
+  const atCapacity = size != null && orders.length >= size;
+  const canAdd = canCreateWorkOrder && !atCapacity;
+
   return (
-    <WorkOrderBoardLane
-      title="Backlog"
-      label="Backlog"
-      count={orders.length}
-      tone="neutral"
-      emptyDescription="No work orders in the backlog."
-      className="bg-muted"
-      leading={<Inbox className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />}
-      actions={
-        configureHref ? <ColumnConfigureMenu title="Backlog" href={configureHref} testId="lines-backlog-menu" /> : null
-      }
-      testId="lines-backlog-column"
-    >
-      <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-backlog-column-scroll">
-        {orders.map((order) => (
-          <li key={order.id}>
-            <LineBoardOrderCard
-              order={order}
-              workOrderCardContext={workOrderCardContext}
-              onOpenWorkOrder={onOpenWorkOrder}
+    <>
+      <WorkOrderBoardLane
+        title={title}
+        label={title}
+        canRename={canRename}
+        onRename={onRename}
+        titleTestId="lines-column-title-backlog"
+        count={orders.length}
+        tone="neutral"
+        surfaceClassName={surfaceClassName}
+        emptyDescription="No work orders in the backlog."
+        emptyContent={isFirstRunOnboardingFactory(factoryKey) ? <BacklogOnboardingCard /> : undefined}
+        className={surfaceClassName ? undefined : "bg-muted"}
+        actions={
+          <div className="flex shrink-0 items-center gap-0.5">
+            <PermissionTooltip allowed={canCreateWorkOrder} message="You don't have permission to create work orders.">
+              <button
+                type="button"
+                onClick={() => {
+                  if (canAdd) {
+                    onCreateWorkOrder();
+                  }
+                }}
+                disabled={!canAdd}
+                aria-label="Create work order"
+                title={atCapacity ? "The backlog is full." : "Create work order"}
+                data-testid="lines-backlog-create"
+                className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-60"
+              >
+                <Plus className="size-3.5" aria-hidden />
+              </button>
+            </PermissionTooltip>
+            <ColumnLaneMenu
+              title={title}
+              testId="lines-backlog-menu"
+              onEdit={onOpenSettings}
+              colorId={colorId}
+              onColorChange={onColorChange}
             />
-          </li>
-        ))}
-      </ul>
-    </WorkOrderBoardLane>
+          </div>
+        }
+        testId="lines-backlog-column"
+      >
+        <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-backlog-column-scroll">
+          {orders.map((order) => (
+            <li key={order.id}>
+              <LineBoardOrderCard
+                order={order}
+                workOrderCardContext={workOrderCardContext}
+                onOpenWorkOrder={onOpenWorkOrder}
+              />
+            </li>
+          ))}
+        </ul>
+      </WorkOrderBoardLane>
+      <BacklogSettingsDialog
+        open={settingsOpen}
+        name={title}
+        size={size}
+        onSave={onSaveSettings}
+        onClose={onCloseSettings}
+      />
+    </>
   );
 }
 
@@ -632,6 +851,13 @@ function PhaseColumn({
   factoryKey,
   lineId,
   column,
+  title,
+  parallelism,
+  onSaveParallelism,
+  colorId,
+  onColorChange,
+  canRename,
+  onRename,
   workOrderCardContext,
   onOpenWorkOrder,
 }: {
@@ -639,11 +865,19 @@ function PhaseColumn({
   factoryKey: string;
   lineId?: string;
   column: LinePhaseColumn;
+  title: string;
+  parallelism: number;
+  onSaveParallelism: (value: number) => void;
+  colorId: LineBoardColumnColorId | null;
+  onColorChange: (colorId: LineBoardColumnColorId | null) => void;
+  canRename: boolean;
+  onRename: (title: string) => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string) => void;
 }) {
   const scrollRef = useRef<HTMLUListElement>(null);
   const [visibleCount, setVisibleCount] = useState(LINE_PHASE_RUNS_PAGE_SIZE);
+  const [parallelismOpen, setParallelismOpen] = useState(false);
   const totalRuns = column.runs.length;
   const hasMore = visibleCount < totalRuns;
 
@@ -662,60 +896,63 @@ function PhaseColumn({
     loadMoreIfNeeded(scrollRef.current);
   }, [visibleCount, loadMoreIfNeeded]);
 
-  const navigate = useNavigate();
   const visibleRuns = column.runs.slice(0, Math.min(visibleCount, totalRuns));
-  const configureHref = column.appId
-    ? factoryAppConfigurePath(organizationId, factoryKey, column.appId, { from: "lines", lineId })
-    : null;
+  const configureHref =
+    !isDoneLineColumn(column) && column.appId
+      ? factoryAppConfigurePath(organizationId, factoryKey, column.appId, { from: "lines", lineId })
+      : null;
   const glyph = resolveColumnGlyph(column);
+  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
 
   return (
-    <WorkOrderBoardLane
-      title={column.stepName}
-      label={`${column.stepName} phase`}
-      count={totalRuns}
-      tone={PHASE_LANE_TONE[glyph]}
-      emptyDescription="No work orders in this phase."
-      testId={`lines-phase-column-${column.stepIndex}`}
-      actions={
-        configureHref ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label={`${column.stepName} menu`}
-                className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                data-testid={`lines-phase-menu-${column.stepIndex}`}
-              >
-                <MoreHorizontal className="size-3.5" aria-hidden />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem
-                onClick={() => navigate(configureHref)}
-                data-testid={`lines-phase-edit-${column.stepIndex}`}
-              >
-                <Pencil className="h-3.5 w-3.5" aria-hidden />
-                Edit
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null
-      }
-    >
-      <ul
-        ref={scrollRef}
-        className={workOrderKanbanLaneScrollClassName}
-        onScroll={(event) => loadMoreIfNeeded(event.currentTarget)}
-        data-testid={`lines-phase-column-scroll-${column.stepIndex}`}
+    <>
+      <WorkOrderBoardLane
+        title={title}
+        label={`${title} phase`}
+        count={totalRuns}
+        tone={PHASE_LANE_TONE[glyph]}
+        surfaceClassName={surfaceClassName}
+        emptyDescription="Nothing here."
+        canRename={canRename}
+        onRename={onRename}
+        titleTestId={`lines-column-title-phase-${column.stepIndex}`}
+        testId={`lines-phase-column-${column.stepIndex}`}
+        actions={
+          <ColumnLaneMenu
+            title={title}
+            testId={`lines-phase-menu-${column.stepIndex}`}
+            editHref={configureHref}
+            editLabel={configureHref ? "Edit Automation" : undefined}
+            onSetParallelism={configureHref ? () => setParallelismOpen(true) : undefined}
+            parallelism={parallelism}
+            colorId={colorId}
+            onColorChange={onColorChange}
+          />
+        }
       >
-        {visibleRuns.map((run) => (
-          <li key={run.executionId}>
-            <PhaseRunCard run={run} workOrderCardContext={workOrderCardContext} onOpenWorkOrder={onOpenWorkOrder} />
-          </li>
-        ))}
-      </ul>
-    </WorkOrderBoardLane>
+        <ul
+          ref={scrollRef}
+          className={workOrderKanbanLaneScrollClassName}
+          onScroll={(event) => loadMoreIfNeeded(event.currentTarget)}
+          data-testid={`lines-phase-column-scroll-${column.stepIndex}`}
+        >
+          {visibleRuns.map((run) => (
+            <li key={run.executionId}>
+              <PhaseRunCard run={run} workOrderCardContext={workOrderCardContext} onOpenWorkOrder={onOpenWorkOrder} />
+            </li>
+          ))}
+        </ul>
+      </WorkOrderBoardLane>
+      <ParallelismSettingsDialog
+        open={parallelismOpen}
+        value={parallelism}
+        onSave={(value) => {
+          onSaveParallelism(value);
+          setParallelismOpen(false);
+        }}
+        onClose={() => setParallelismOpen(false)}
+      />
+    </>
   );
 }
 
@@ -764,11 +1001,13 @@ function LineBoardOrderCard({
 }) {
   const { factory } = useFactoriesLayout();
   const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [order, factory]);
+  const reviewCandidate = reviewCandidateForWorkOrderId(order.id);
 
   return (
     <WorkOrderCard
       {...workOrderCardContext}
       entry={entry}
+      confidencePct={reviewCandidate?.confidencePct}
       onOpen={() => {
         if (order.id) {
           onOpenWorkOrder(order.id);

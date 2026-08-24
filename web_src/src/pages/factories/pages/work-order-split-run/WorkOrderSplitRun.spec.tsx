@@ -173,21 +173,21 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-canvas-node-onrun-implement")).not.toHaveAttribute("data-selected");
   });
 
-  it("keeps Edit in the canvas overflow menu when no edit href is set", async () => {
+  it("keeps Edit Automation in the canvas overflow menu when no edit href is set", async () => {
     const user = userEvent.setup();
     renderSplitRun();
 
     await user.click(screen.getByTestId("split-run-canvas-menu"));
-    expect(await screen.findByTestId("split-run-canvas-edit")).toHaveTextContent("Edit");
+    expect(await screen.findByTestId("split-run-canvas-edit")).toHaveTextContent("Edit Automation");
   });
 
-  it("opens Edit from the canvas overflow menu", async () => {
+  it("opens Edit Automation from the canvas overflow menu", async () => {
     const user = userEvent.setup();
     renderPopup({ fixture: SPLIT_RUN_RUNNING, canvasEditHref: () => "/edit-implementation" });
 
     await user.click(screen.getByTestId("split-run-canvas-menu"));
     const edit = await screen.findByTestId("split-run-canvas-edit");
-    expect(edit).toHaveTextContent("Edit");
+    expect(edit).toHaveTextContent("Edit Automation");
     expect(edit).toHaveAttribute("href", "/edit-implementation");
   });
 

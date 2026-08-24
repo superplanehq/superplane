@@ -4,7 +4,7 @@ import type {
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
-import { automationNameForLineStep } from "./factoryLineFormShared";
+import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, linesPath } from "./factoryPagePaths";
 import {
   dispatchStepRows,
@@ -31,6 +31,8 @@ export type LinePhaseColumn = {
   stepIndex: number;
   /** Factory app id for this runApp step, when present. */
   appId?: string;
+  /** In-flight cap for this step. Defaults to 10 when the line omits it. */
+  maxParallelism: number;
   runs: LinePhaseRunCard[];
   tick: LinePhaseTick;
 };
@@ -89,6 +91,7 @@ export function buildLinePhaseBoard(
       stepName: automationNameForLineStep(step, apps, stepIndex),
       stepIndex,
       appId,
+      maxParallelism: lineStepParallelism(step),
       runs,
       tick: resolvePhaseTick(runs),
     };
@@ -129,6 +132,17 @@ export function findClosureAutomationApp(
     return undefined;
   }
   return { id: match.id, name: match.name ?? "PR Closure" };
+}
+
+/** Backlog and Done are not canvas-backed columns. */
+export function isDoneLineColumn(column: Pick<LinePhaseColumn, "stepName" | "appId">): boolean {
+  if (column.stepName.trim().toLowerCase() === "done") {
+    return true;
+  }
+  if (!column.appId) {
+    return false;
+  }
+  return column.appId === "app-refund-done" || column.appId.includes("pr-closure");
 }
 
 function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {

@@ -6,6 +6,10 @@ import {
   factoryAppViewPath,
   factoryDetailPath,
   factoryHomePath,
+  factoryIntakePath,
+  intakeSettingsTabFromSearch,
+  intakeSourceFromSearch,
+  isIntakeSearchOpen,
   factorySettingsGeneralPathAfterKeyChange,
   firstFactoryLineId,
   legacyWorkOrderDetailPath,
@@ -29,6 +33,37 @@ describe("factoryHomePath", () => {
 
   it("opens the lines list when no line id is present", () => {
     expect(factoryHomePath("org-1", "SP")).toBe("/org-1/workspaces/SP/lines");
+  });
+});
+
+describe("factoryIntakePath", () => {
+  it("opens the line board with the intake query", () => {
+    expect(factoryIntakePath("org-1", "SP", "line-plan")).toBe("/org-1/workspaces/SP/lines/line-plan?intake=1");
+  });
+
+  it("reads the intake query from the search string", () => {
+    expect(isIntakeSearchOpen("?intake=1")).toBe(true);
+    expect(isIntakeSearchOpen("intake=1")).toBe(true);
+    expect(isIntakeSearchOpen("")).toBe(false);
+  });
+
+  it("opens the line board with a selected intake source", () => {
+    expect(factoryIntakePath("org-1", "SP", "line-plan", "github-issues")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?intake=1&source=github-issues",
+    );
+    expect(factoryIntakePath("org-1", "SP", "line-plan", "github-issues", "automation")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?intake=1&source=github-issues&settings=automation",
+    );
+  });
+
+  it("reads the intake source from the search string", () => {
+    expect(intakeSourceFromSearch("?intake=1&source=github-issues")).toBe("github-issues");
+    expect(intakeSourceFromSearch("intake=1")).toBeNull();
+  });
+
+  it("reads the settings tab from the search string", () => {
+    expect(intakeSettingsTabFromSearch("?intake=1&settings=automation")).toBe("automation");
+    expect(intakeSettingsTabFromSearch("intake=1")).toBeNull();
   });
 });
 

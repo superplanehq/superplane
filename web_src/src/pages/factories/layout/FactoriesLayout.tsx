@@ -1,13 +1,12 @@
 import type { FactoriesFactory } from "@/api-client";
 import { Link } from "@/components/Link/link";
-import { PermissionTooltip } from "@/components/PermissionGate";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { AlertTriangle, Plus } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from "react-router";
 import { CreateWorkOrderDialog } from "../CreateWorkOrderDialog";
@@ -16,13 +15,13 @@ import {
   replaceFactoryKeySegment,
   resolveFactoryByKey,
 } from "../lib/factoryKeyResolution";
-import { factoryListPath, newFactoryPath } from "../lib/factoryPagePaths";
+import { factoryListPath, firstFactoryLineId, newFactoryPath } from "../lib/factoryPagePaths";
 import { clearLastVisitedFactory, recordLastVisitedFactory } from "../lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
 import { useOnboardingStorybook } from "../pages/onboarding/useOnboardingStorybook";
 import { isFactoryOnboardingComplete } from "../pages/onboarding/onboardingStatus";
 import { FactoriesLayoutContext } from "./factoriesLayoutContext";
-import { factoriesRailControlClassName } from "./factoriesRail";
+import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
 import { SidebarUserMenu } from "./SidebarUserMenu";
 import { useCreateWorkOrderDialogState } from "./useCreateWorkOrderDialogState";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
@@ -195,10 +194,8 @@ function FactoriesLayoutContent({
             accountAvatarUrl={account?.avatar_url}
             canOpenSettings={canAct("factories", "update")}
             canCreateFactory={canAct("factories", "create")}
-            canCreateWorkOrder={canCreateWorkOrder}
             permissionsLoading={permissionsLoading}
             onOpenCreateFactory={() => navigate(newFactoryPath(organizationId))}
-            onCreateWorkOrder={openCreateWorkOrder}
           />
         )}
         <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
@@ -227,10 +224,8 @@ interface FactoriesSidebarProps {
   accountAvatarUrl?: string | null;
   canOpenSettings: boolean;
   canCreateFactory: boolean;
-  canCreateWorkOrder: boolean;
   permissionsLoading: boolean;
   onOpenCreateFactory: () => void;
-  onCreateWorkOrder: () => void;
 }
 
 function FactoriesSidebar({
@@ -243,10 +238,8 @@ function FactoriesSidebar({
   accountAvatarUrl,
   canOpenSettings,
   canCreateFactory,
-  canCreateWorkOrder,
   permissionsLoading,
   onOpenCreateFactory,
-  onCreateWorkOrder,
 }: FactoriesSidebarProps) {
   return (
     <aside
@@ -257,31 +250,17 @@ function FactoriesSidebar({
         organizationId={organizationId}
         factory={factory}
         factories={factories}
-        canOpenSettings={canOpenSettings}
         canCreateFactory={canCreateFactory}
         permissionsLoading={permissionsLoading}
         onCreateFactory={onOpenCreateFactory}
       />
-      <PermissionTooltip
-        allowed={canCreateWorkOrder || permissionsLoading}
-        message="You don't have permission to create work orders."
-      >
-        <button
-          type="button"
-          onClick={() => {
-            if (canCreateWorkOrder) {
-              onCreateWorkOrder();
-            }
-          }}
-          disabled={!canCreateWorkOrder}
-          aria-label="Create work order"
-          title="Create work order"
-          data-testid="factories-sidebar-create-work-order"
-          className={factoriesRailControlClassName}
-        >
-          <Plus className="size-3.5" aria-hidden />
-        </button>
-      </PermissionTooltip>
+      <FactoriesSidebarNav
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        lineId={firstFactoryLineId(factory)}
+        canOpenSettings={canOpenSettings}
+        permissionsLoading={permissionsLoading}
+      />
       <div className="flex-1" />
       <SidebarUserMenu
         organizationId={organizationId}

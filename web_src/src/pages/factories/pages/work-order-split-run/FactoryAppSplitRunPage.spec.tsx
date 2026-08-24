@@ -40,7 +40,7 @@ describe("FactoryAppSplitRunPage", () => {
     expect(within(page).getByTestId("split-run-resize-handle")).toBeInTheDocument();
     expect(within(page).queryByTestId("split-run-canvas-expand")).not.toBeInTheDocument();
     expect(within(page).queryByTestId("split-run-canvas-menu")).not.toBeInTheDocument();
-    expect(within(page).getByTestId("factory-app-edit")).toHaveTextContent("Edit");
+    expect(within(page).getByTestId("factory-app-edit")).toHaveTextContent("Edit Automation");
   }, 10000);
 
   it("opens the planner canvas when the URL omits canvas", async () => {

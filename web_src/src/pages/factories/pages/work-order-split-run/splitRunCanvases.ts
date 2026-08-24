@@ -119,6 +119,9 @@ export function emptySplitRunCanvas(phase?: SplitRunPhase, title?: string): Spli
 }
 
 export function splitRunCanvasForPhase(phase: SplitRunPhase): SplitRunCanvasModel {
+  if (phase.canvas) {
+    return phase.canvas;
+  }
   if (phase.canvasKey === null) {
     return emptySplitRunCanvas(undefined, "");
   }
@@ -296,6 +299,7 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; 
   "github.onPullRequest": { title: "On Pull Request", iconSlug: "github" },
   "sentry.onIssue": { title: "On Issue", iconSlug: "bug", iconSrc: sentryIcon },
   "slack.onAppMention": { title: "On Mention", iconSlug: "slack", iconSrc: slackIcon },
+  "pagerduty.onIncident": { title: "On Incident", iconSlug: "pagerduty" },
   findWorkOrder: { title: "Find Work Order", iconSlug: "factory" },
   updateWorkOrderArtifact: { title: "Update Work Order Artifact", iconSlug: "factory" },
   createWorkOrder: { title: "Create Work Order", iconSlug: "factory" },
