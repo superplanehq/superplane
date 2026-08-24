@@ -170,22 +170,22 @@ dev.pr.clean.checkout:
 	bash ./scripts/clean-pr-checkout $(PR)
 
 check.example.payloads:
-	$(COMPOSE) run --rm app bash -c "go run scripts/check_example_payloads.go"
+	$(COMPOSE) run --rm app bash -c "go run ./scripts/check_example_payloads"
 
 check.proto.field.numbers:
 	bash ./scripts/check_proto_field_numbers.sh
 
 check.configuration.fields:
-	$(COMPOSE) run --rm app bash -c "go run scripts/check_configuration_fields.go"
+	$(COMPOSE) run --rm app bash -c "go run ./scripts/check_configuration_fields"
 
 check.configuration.fields.baseline.update:
-	$(COMPOSE) run --rm app bash -c "go run scripts/check_configuration_fields.go --update-baseline"
+	$(COMPOSE) run --rm app bash -c "go run ./scripts/check_configuration_fields --update-baseline"
 
 check.models.tx.debt:
-	@$(COMPOSE) exec app go run ./scripts/check_models_tx_debt.go
+	@$(COMPOSE) exec app go run ./scripts/check_models_tx_debt
 
 check.models.tx.debt.baseline.update:
-	@$(COMPOSE) exec app go run ./scripts/check_models_tx_debt.go --update-baseline
+	@$(COMPOSE) exec app go run ./scripts/check_models_tx_debt --update-baseline
 
 check.grpc.actions.status:
 	bash ./scripts/verify_grpc_actions_status.sh
@@ -233,10 +233,10 @@ check.generated.artifacts:
 	fi
 
 check.coverage.go:
-	go run ./scripts/check_go_coverage_budget.go --profile coverage-go.out
+	go run ./scripts/check_go_coverage_budget --profile coverage-go.out
 
 check.coverage.go.baseline.update:
-	go run ./scripts/check_go_coverage_budget.go --profile coverage-go.out --update-baseline
+	go run ./scripts/check_go_coverage_budget --profile coverage-go.out --update-baseline
 
 #
 # Performance profiling against the running dev server (PPROF_ENABLED=yes).
@@ -313,11 +313,11 @@ gen:
 
 gen.components.docs:
 	rm -rf docs/components
-	go run scripts/generate_components_docs.go
+	go run ./scripts/generate_components_docs
 
 check.components.docs:
 	rm -rf docs/components
-	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
+	$(COMPOSE) run --rm app bash -c "go run ./scripts/generate_components_docs"
 	git diff --exit-code docs/components
 
 MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents,usage,runners
