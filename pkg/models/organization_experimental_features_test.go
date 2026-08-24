@@ -14,13 +14,14 @@ import (
 func Test__ExperimentalFeatures(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
-	t.Run("new org has empty enabled list", func(t *testing.T) {
+	t.Run("new org has factories enabled", func(t *testing.T) {
 		org, err := CreateOrganization("expfeat-new", "")
 		require.NoError(t, err)
 
 		reloaded, err := FindOrganizationByID(org.ID.String())
 		require.NoError(t, err)
-		assert.Empty(t, []string(reloaded.EnabledExperimentalFeatures))
+		assert.Equal(t, []string{features.FeatureFactories}, []string(reloaded.EnabledExperimentalFeatures))
+		assert.True(t, reloaded.HasExperimentalFeature(features.FeatureFactories))
 	})
 
 	t.Run("Enable adds the feature and is idempotent", func(t *testing.T) {
@@ -31,13 +32,13 @@ func Test__ExperimentalFeatures(t *testing.T) {
 
 		reloaded, err := FindOrganizationByID(org.ID.String())
 		require.NoError(t, err)
-		assert.Equal(t, []string{"exp-feature"}, []string(reloaded.EnabledExperimentalFeatures))
+		assert.Equal(t, []string{features.FeatureFactories, "exp-feature"}, []string(reloaded.EnabledExperimentalFeatures))
 
 		require.NoError(t, EnableExperimentalFeature(org.ID, "exp-feature"))
 
 		reloaded, err = FindOrganizationByID(org.ID.String())
 		require.NoError(t, err)
-		assert.Equal(t, []string{"exp-feature"}, []string(reloaded.EnabledExperimentalFeatures))
+		assert.Equal(t, []string{features.FeatureFactories, "exp-feature"}, []string(reloaded.EnabledExperimentalFeatures))
 	})
 
 	t.Run("Disable removes the feature and is idempotent", func(t *testing.T) {
@@ -49,7 +50,7 @@ func Test__ExperimentalFeatures(t *testing.T) {
 
 		reloaded, err := FindOrganizationByID(org.ID.String())
 		require.NoError(t, err)
-		assert.Empty(t, []string(reloaded.EnabledExperimentalFeatures))
+		assert.Equal(t, []string{features.FeatureFactories}, []string(reloaded.EnabledExperimentalFeatures))
 
 		// Disabling again is a no-op.
 		require.NoError(t, DisableExperimentalFeature(org.ID, "exp-feature"))
@@ -126,7 +127,8 @@ func Test__ExperimentalFeatures(t *testing.T) {
 
 		reloaded, err := FindOrganizationByID(org.ID.String())
 		require.NoError(t, err)
-		assert.ElementsMatch(t, ids, []string(reloaded.EnabledExperimentalFeatures))
+		expected := append([]string{features.FeatureFactories}, ids...)
+		assert.ElementsMatch(t, expected, []string(reloaded.EnabledExperimentalFeatures))
 	})
 }
 
