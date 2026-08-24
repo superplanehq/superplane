@@ -1,8 +1,5 @@
-import { X } from "lucide-react";
-
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { FirstRunSetup } from "./FirstRunSetup";
-import { OnboardingCancelDialog } from "./OnboardingCancelDialog";
 import { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 export function OnboardingPage() {
@@ -25,31 +22,7 @@ export function OnboardingPage() {
   return (
     <div className="relative min-h-full w-full bg-background text-foreground" data-testid="workspace-setup">
       <FirstRunSetup model={model} />
-
-      {model.canDeleteWorkspace ? (
-        <button
-          type="button"
-          aria-label="Cancel setup and delete this workspace"
-          title="Cancel setup"
-          disabled={model.deleting}
-          onClick={() => model.setDeleteOpen(true)}
-          // The setup screens keep their own controls in the top corners, so
-          // the cancel control sits beside the step markers.
-          className="fixed bottom-4 left-4 z-20 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
-          data-testid="workspace-setup-cancel"
-        >
-          <X className="size-6" aria-hidden />
-        </button>
-      ) : null}
-
       {model.integrationDialogs}
-      <OnboardingCancelDialog
-        open={model.deleteOpen}
-        canDelete={model.canDeleteWorkspace}
-        isDeleting={model.deleting}
-        onClose={() => model.setDeleteOpen(false)}
-        onConfirm={model.cancelSetup}
-      />
     </div>
   );
 }

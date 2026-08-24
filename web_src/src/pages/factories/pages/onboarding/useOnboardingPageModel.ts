@@ -1,19 +1,17 @@
 import type { FactoriesFactory, FactoriesFactoryLine, FactoryLineStep } from "@/api-client";
-import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useCreateFactoryLine, useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
+import { useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { githubInstallationUrl } from "@/lib/githubInstallation";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
-import { factoryListPath, factoryOverviewPath, factorySetupPath } from "../../lib/factoryPagePaths";
-import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
+import { factoryOverviewPath, factorySetupPath } from "../../lib/factoryPagePaths";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import type { IntegrationId, WizardStepId } from "./onboardingFixtures";
 import {
@@ -252,37 +250,6 @@ function otherWorkspaceNames(factories: FactoriesFactory[], factoryId: string): 
     .filter(Boolean);
 }
 
-function useCancelOnboarding(args: { organizationId: string; factoryId: string; canDelete: boolean }) {
-  const { account } = useAccount();
-  const navigate = useNavigate();
-  const deleteFactory = useDeleteFactory(args.organizationId);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-
-  const cancelSetup = async () => {
-    if (!args.canDelete) {
-      showErrorToast("You do not have permission to delete this workspace.");
-      throw new Error("Missing permission to delete workspace");
-    }
-    try {
-      await deleteFactory.mutateAsync(args.factoryId);
-      clearLastVisitedFactory(account?.id ?? "", args.organizationId, args.factoryId);
-      showSuccessToast("Workspace deleted.");
-      navigate(factoryListPath(args.organizationId), { replace: true });
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to delete workspace"));
-      throw error;
-    }
-  };
-
-  return {
-    canDeleteWorkspace: args.canDelete,
-    deleteOpen,
-    setDeleteOpen,
-    deleting: deleteFactory.isPending,
-    cancelSetup,
-  };
-}
-
 export function useOnboardingPageModel(args: {
   organizationId: string;
   factoryId: string;
@@ -373,11 +340,6 @@ export function useOnboardingPageModel(args: {
     installFactory: installer.installFactory,
     createLine: createLine.mutateAsync,
   });
-  const cancel = useCancelOnboarding({
-    organizationId: args.organizationId,
-    factoryId: args.factoryId,
-    canDelete: canAct("factories", "delete"),
-  });
   const finishSetup = useFinishSetupAction({
     organizationId: args.organizationId,
     factoryId: args.factoryId,
@@ -411,6 +373,5 @@ export function useOnboardingPageModel(args: {
     saving: saving || installer.isInstalling,
     ...saves,
     finish: finishSetup,
-    ...cancel,
   };
 }

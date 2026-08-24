@@ -13,6 +13,7 @@ import { FirstRunConnectScreen } from "./first-run/FirstRunConnectScreen";
 import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./first-run/FirstRunShell";
 import { FirstRunTicketsScreen } from "./first-run/FirstRunTicketsScreen";
 import type { FirstRunChrome, FirstRunTicketSource } from "./first-run/firstRunTypes";
+import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
 import { WIZARD_STEPS, type IntegrationId, type WizardStepId } from "./onboardingFixtures";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -109,7 +110,7 @@ function AgentScreen({
 }) {
   return (
     <FirstRunShell testId="first-run-agent" chrome={chrome} width="wide">
-      <FirstRunHeading headline={AGENT_STEP.label}>
+      <FirstRunHeading headline={FIRST_RUN_COPY.agent.headline}>
         <p className="text-[13px] text-muted-foreground">{AGENT_STEP.purpose}</p>
       </FirstRunHeading>
 
@@ -253,6 +254,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       <FirstRunTicketsScreen
         ticketSource={setup.issuesChoice === "vcs" ? "github-issues" : null}
         chrome={chromeFor("tickets")}
+        continueLabel={FIRST_RUN_COPY.tickets.continue}
         onSelectTicketSource={flow.selectTicketSource}
         onAnalyzeTickets={() => void flow.continueFromTickets()}
       />

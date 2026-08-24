@@ -202,7 +202,7 @@ describe("FactoriesHarness workspace setup", () => {
     );
 
     expect(await screen.findByTestId("workspace-setup", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.getByTestId("workspace-setup-cancel")).toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-setup-cancel")).not.toBeInTheDocument();
     expect(screen.queryByTestId("factories-sidebar")).not.toBeInTheDocument();
   }, 10000);
 
