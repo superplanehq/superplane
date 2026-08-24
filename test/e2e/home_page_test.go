@@ -159,11 +159,8 @@ func (steps *TestHomePageSteps) AssertUpdatePermissionToast() {
 }
 
 func (steps *TestHomePageSteps) ClickNewApp() {
-	newAppButton := q.Locator(`button[aria-label="Create new app"]`).Run(steps.session)
-	if visible, _ := newAppButton.IsVisible(); visible {
-		steps.session.Click(q.Locator(`button[aria-label="Create new app"]`))
-	}
-
-	steps.session.Click(q.Text("Create a blank app"))
-	steps.session.Sleep(3000)
+	steps.session.Click(q.Locator(`button[aria-label="Create new app"]`))
+	steps.session.WaitForBrowserPath("/" + steps.session.OrgID.String() + "/apps/new")
+	steps.ClickStartFromScratch()
+	steps.session.Sleep(2500)
 }
