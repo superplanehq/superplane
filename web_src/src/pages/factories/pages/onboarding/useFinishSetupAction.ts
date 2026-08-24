@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router";
 
-import { factoryOverviewPath } from "../../lib/factoryPagePaths";
+import { factoryHomePath } from "../../lib/factoryPagePaths";
 import type { OnboardingRepo } from "./onboardingMocks";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
@@ -20,7 +20,7 @@ function storybookRepos(setup: OnboardingSetupApi): OnboardingRepo[] {
  * Picks the finish action for the last setup step. The app provisions the
  * workspace. Provisioning creates a canvas and materializes a template, which
  * the Storybook fixture backend cannot serve, so stories mark the workspace
- * ready through the setup context and open the overview instead.
+ * ready through the setup context and open the line board instead.
  */
 export function useFinishSetupAction(args: {
   organizationId: string;
@@ -38,6 +38,6 @@ export function useFinishSetupAction(args: {
 
   return () => {
     onboarding.completeOnboarding(args.factoryId, storybookRepos(args.setup));
-    navigate(factoryOverviewPath(args.organizationId, args.factoryKey), { replace: true });
+    navigate(factoryHomePath(args.organizationId, args.factoryKey), { replace: true });
   };
 }

@@ -6,13 +6,14 @@ import { SegmentedNav } from "@/ui/SegmentedNav";
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "../__fixtures__/factoriesStoryTheme";
 import {
+  ACME_ONBOARDING_FACTORY,
   EMPTY_FACTORY,
   FACTORIES_ORGANIZATION_ID,
-  PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
+  REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { factorySectionHeaderClassName } from "../pages/factoryPageLayoutStyles";
-import { FactoriesNav } from "./FactoriesNav";
+import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
 import { WorkspacePageHeader } from "./WorkspacePageHeader";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
@@ -200,32 +201,33 @@ export const EntityWorkOrder: Story = {
   },
 };
 
-/** Compact section title lines up with the sidebar workspace name. */
+/** Compact section title lines up with the sidebar workspace control. */
 export const AlignedWithSidebar: Story = {
   name: "Aligned with sidebar",
   render: () => (
     <div className="flex min-h-screen bg-background">
-      <aside className="flex w-[var(--workspace-navigation-width)] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+      <aside className="flex w-[var(--workspace-navigation-width)] shrink-0 flex-col items-center border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
         <WorkspaceSwitcher
           organizationId={FACTORIES_ORGANIZATION_ID}
           factory={REFUND_FACTORY}
-          factories={[REFUND_FACTORY, EMPTY_FACTORY]}
-          canOpenSettings
+          factories={[REFUND_FACTORY, EMPTY_FACTORY, ACME_ONBOARDING_FACTORY]}
           canCreateFactory
           permissionsLoading={false}
           onCreateFactory={() => console.log("create workspace")}
         />
-        <FactoriesNav
+        <FactoriesSidebarNav
           organizationId={FACTORIES_ORGANIZATION_ID}
-          factoryKey={PRIMARY_FACTORY_KEY}
-          recentWorkOrders={[]}
+          factoryKey={REFUND_FACTORY.key!}
+          lineId={REFUND_LINE_PLAN_ID}
+          canOpenSettings
+          permissionsLoading={false}
         />
       </aside>
       <div className="min-w-0 flex-1">
         <WorkspacePageHeader
           className={factorySectionHeaderClassName}
-          title="Overview"
-          subtitle="Your workspace at a glance. Content for this page comes next."
+          title="Plan and Implement"
+          subtitle="Refund Planner → Refund Implementer"
         />
       </div>
     </div>
