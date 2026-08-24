@@ -39,7 +39,7 @@ export function FirstRunAnalysisScreen({
           <ol className="space-y-3">
             {FIRST_RUN_STAGES.map((stage, index) => {
               const done = index < currentStageIndex;
-              const current = index === currentStageIndex && status !== "failed";
+              const current = index === currentStageIndex;
               return (
                 <li key={stage} className="flex items-center gap-3 text-[13px]">
                   {done ? (

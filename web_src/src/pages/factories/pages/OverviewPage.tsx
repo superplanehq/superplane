@@ -56,6 +56,7 @@ export function OverviewPage() {
           <WorkOrdersOverviewCard
             organizationId={organizationId}
             factoryKey={factoryKey}
+            lineId={firstFactoryLineId(factory)}
             orders={recentOrders}
             isLoading={workOrdersLoading}
             error={workOrdersError}
@@ -70,12 +71,14 @@ export function OverviewPage() {
 function WorkOrdersOverviewCard({
   organizationId,
   factoryKey,
+  lineId,
   orders,
   isLoading,
   error,
 }: {
   organizationId: string;
   factoryKey: string;
+  lineId: string | undefined;
   orders: FactoriesWorkOrder[];
   isLoading: boolean;
   error: Error | null;
@@ -108,7 +111,7 @@ function WorkOrdersOverviewCard({
             {orders.map((order) => {
               const status = getWorkOrderDisplayStatus(order);
               const statusMeta = getWorkOrderDisplayStatusMeta(status);
-              const href = factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory));
+              const href = factoryHomePath(organizationId, factoryKey, lineId);
               const updatedAt = order.updatedAt ?? order.createdAt;
               const timeLabel = updatedAt ? formatTimeAgo(new Date(updatedAt)) : "—";
               return (

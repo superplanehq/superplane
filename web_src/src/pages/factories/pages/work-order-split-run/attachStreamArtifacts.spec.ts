@@ -34,7 +34,7 @@ function streamLine(nodeId: string, componentName = nodeId): SplitRunStreamLine 
 
 function artifactAddedEvent(
   at: string,
-  artifact: { id: string; type: string; data?: Record<string, unknown> },
+  artifact: { id?: string; type?: string; data?: Record<string, unknown> },
   automation?: { nodeId?: string; nodeName?: string },
 ): FactoriesWorkOrderEvent {
   return {
