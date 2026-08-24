@@ -214,7 +214,8 @@ describe("LinesPage board", () => {
     expect(cardScore).toHaveAttribute("aria-valuenow", "5");
     expect(cardScore).toHaveAttribute("aria-valuemax", "5");
     expect(cardScore.querySelectorAll("[data-filled='true']")).toHaveLength(5);
-    expect(within(card).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    const start = within(card).getByRole("button", { name: "Start" });
+    expect(cardScore.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 

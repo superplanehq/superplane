@@ -49,16 +49,33 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(implement?.appId).toBe("app-refund-implementer");
     expect(implement?.runId).toBe(RUNNING_WORK_ORDER.lineDispatches?.[0]?.stepExecutions?.[1]?.run?.id);
     expect(implement?.stream.map((line) => line.componentName)).toEqual(["Implementation"]);
-    expect(fixture.phases[0]).toMatchObject({
-      id: "backlog",
-      name: "Backlog",
-      componentName: "Ingest",
-      status: "passed",
-      canvasKey: "intake",
-    });
-    expect(fixture.phases[0]?.artifacts[0]?.data).toMatchObject({ name: "description.md" });
+    expect(fixture.phases.map((phase) => [phase.id, phase.name, phase.status])).toEqual([
+      ["ingest", "Ingest", "passed"],
+      ["analyze", "Analyze", "passed"],
+      ["plan", "Create plan", "passed"],
+      ["score", "Score", "passed"],
+      ["plan-0", "Plan", "passed"],
+      ["implement-1", "Implement", "running"],
+    ]);
+    expect(fixture.phases.find((phase) => phase.id === "ingest")?.artifacts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "TYPE_MARKDOWN",
+          data: expect.objectContaining({ name: "details.md", body: RUNNING_WORK_ORDER.description }),
+        }),
+        expect.objectContaining({
+          type: "TYPE_LINK",
+          data: expect.objectContaining({ title: "RF-103" }),
+        }),
+      ]),
+    );
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.checks).toEqual([]);
+  });
+
+  it("keeps a single Backlog ingest row on an ingest draft", () => {
+    const fixture = splitRunFixtureForWorkOrder(INGEST_DRAFT_WORK_ORDER);
+    expect(fixture.phases.map((phase) => phase.id)).toEqual(["backlog"]);
   });
 
   it("pins a pull request review on a waiting implement card", () => {

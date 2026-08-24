@@ -2,6 +2,8 @@ import type { WorkOrderCheckLevel } from "./workOrderChecks";
 
 export const CONFIDENCE_SCORE_MAX = 5;
 
+export const CONFIDENCE_CHECK_NAME = "Confidence score";
+
 export type ConfidenceBand = "High" | "Medium" | "Low";
 
 export function clampConfidenceScore(score: number): number {

@@ -15,7 +15,7 @@ import {
   STORYBOOK_ME_USER_ID,
   STORYBOOK_ME_USER_NAME,
 } from "../__fixtures__/factoryPageResponses";
-import { CONFIDENCE_SCORE_MAX, confidenceCheckLevel } from "../lib/confidenceScore";
+import { CONFIDENCE_CHECK_NAME, CONFIDENCE_SCORE_MAX, confidenceCheckLevel } from "../lib/confidenceScore";
 import type { WorkOrderCheckPresentation } from "../lib/workOrderChecks";
 import type { WorkOrderStatusNotePresentation } from "../lib/workOrderStatusNote";
 import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvases";
@@ -363,7 +363,7 @@ function confidenceChecks(ticket: LineIntakeAnalyzingTicket): WorkOrderCheckPres
   return [
     {
       id: `${ticket.id}-confidence`,
-      name: "Confidence score",
+      name: CONFIDENCE_CHECK_NAME,
       score: ticket.confidenceScore,
       maxScore: CONFIDENCE_SCORE_MAX,
       format: "fraction",

@@ -190,8 +190,11 @@ describe("Line board job popup", () => {
     expect(within(dialog).getByRole("heading", { name: "Add refund reconciliation test" })).toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-open-work-order")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("link", { name: "Open work order" })).not.toBeInTheDocument();
-    expect(within(dialog).getByText("Backlog")).toBeInTheDocument();
-    expect(within(dialog).getAllByRole("button", { name: "description.md" }).length).toBeGreaterThan(0);
+    expect(within(dialog).getByTestId("split-run-phase-ingest")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-phase-analyze")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-phase-plan")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-phase-score")).toBeInTheDocument();
+    expect(within(dialog).getAllByRole("button", { name: "details.md" }).length).toBeGreaterThan(0);
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Log" })).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-phase-implement-1")).toBeInTheDocument();

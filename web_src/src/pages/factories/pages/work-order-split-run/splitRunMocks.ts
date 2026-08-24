@@ -23,6 +23,8 @@ import {
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
+import { intakeTicketAnalysisFixture, type LineIntakeAnalyzingTicket } from "../lineIntakeModel";
+import { reviewCandidateForWorkOrderId } from "../onboarding/first-run/reviewCandidates";
 import { DESCRIPTION_ARTIFACT, PR_CLOSURE_PR_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
 import type {
   RunOverlayProvider,
@@ -250,7 +252,43 @@ function boardColumnFor(current: FactoriesWorkOrderExecution | undefined, execut
 }
 
 function phasesForOrder(order: FactoriesWorkOrder, executions: FactoriesWorkOrderExecution[]): SplitRunPhase[] {
-  return [backlogSourcePhase(order), ...executions.map((execution) => executionToPhase(execution))];
+  return [
+    ...sourcePhasesForOrder(order, executions.length > 0),
+    ...executions.map((execution) => executionToPhase(execution)),
+  ];
+}
+
+function sourcePhasesForOrder(order: FactoriesWorkOrder, isDownstream: boolean): SplitRunPhase[] {
+  const automation = order.createdBy?.automation;
+  const fromGitHubIngest =
+    automation && intakeCanvasKeyFor({ id: automation.appId, name: automation.appName }) === "intake";
+  if (fromGitHubIngest && isDownstream) {
+    return intakeTicketAnalysisFixture(analysisTicketForOrder(order), { complete: true }).phases;
+  }
+  return [backlogSourcePhase(order)];
+}
+
+function analysisTicketForOrder(order: FactoriesWorkOrder): LineIntakeAnalyzingTicket {
+  const candidate = reviewCandidateForWorkOrderId(order.id);
+  if (candidate) {
+    return {
+      id: candidate.workOrderId,
+      title: candidate.title,
+      detailsMarkdown: candidate.issue.bodyMarkdown,
+      issueKey: candidate.ticketKey,
+      issueUrl: candidate.issue.url,
+      planMarkdown: candidate.planMarkdown,
+      confidenceScore: candidate.confidenceScore,
+      confidenceSummary: candidate.summary,
+      confidenceAnalysis: candidate.reasons.map((reason) => `- ${reason}`).join("\n"),
+    };
+  }
+  return {
+    id: order.id ?? "work-order",
+    title: order.title ?? "Work order",
+    detailsMarkdown: order.description,
+    issueKey: order.key,
+  };
 }
 
 function backlogSourcePhase(order: FactoriesWorkOrder): SplitRunPhase {

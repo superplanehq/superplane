@@ -35,7 +35,7 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   href?: string;
   /** When set, the card overlay opens this handler instead of navigating. */
   onOpen?: () => void;
-  /** First-run analysis score from 0 to 5. Hides Start on draft cards. */
+  /** First-run analysis score from 0 to 5. Shown to the left of Start. */
   confidenceScore?: number;
 }
 
@@ -44,8 +44,9 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  *
  * Every board uses this complete component. Status is a colored dot next
  * to the title. The footer shows the owner (except on drafts), the age of
- * the work order, and a Start button on drafts or a score on reviewed
- * drafts. Waiting cards show an attention label. The owner is
+ * the work order, and a Start button on drafts. Reviewed drafts also
+ * show a score to the left of Start. Waiting cards show an attention
+ * label. The owner is
  * display-only on the card.
  */
 export function WorkOrderCard({
@@ -67,7 +68,7 @@ export function WorkOrderCard({
     (entry.order.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, entry.order.number) : "#");
   const startedAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const startedLabel = startedAt ? formatTimeAgo(startedAt) : "—";
-  const showStart = entry.displayStatus === "draft" && confidenceScore == null;
+  const showStart = entry.displayStatus === "draft";
   const attentionReason = getWorkOrderAttentionReason(entry.order);
   const AttentionIcon = attentionReason ? WORK_ORDER_ATTENTION_ICON[attentionReason] : null;
 
@@ -113,22 +114,26 @@ export function WorkOrderCard({
               {startedLabel}
             </span>
           </div>
-          {confidenceScore != null ? (
-            <ConfidenceMeter
-              score={confidenceScore}
-              className="shrink-0"
-              testId={`work-order-card-score-${entry.id}`}
-            />
-          ) : null}
-          {showStart ? (
-            <StartDraftButton
-              entry={entry}
-              lines={factoryLines}
-              preferredLineName={preferredLineName}
-              canDispatch={canDispatch}
-              isDispatching={isDispatching}
-              onDispatch={onDispatch}
-            />
+          {confidenceScore != null || showStart ? (
+            <div className="flex shrink-0 items-center gap-1.5">
+              {confidenceScore != null ? (
+                <ConfidenceMeter
+                  score={confidenceScore}
+                  className="shrink-0"
+                  testId={`work-order-card-score-${entry.id}`}
+                />
+              ) : null}
+              {showStart ? (
+                <StartDraftButton
+                  entry={entry}
+                  lines={factoryLines}
+                  preferredLineName={preferredLineName}
+                  canDispatch={canDispatch}
+                  isDispatching={isDispatching}
+                  onDispatch={onDispatch}
+                />
+              ) : null}
+            </div>
           ) : null}
           {attentionReason && AttentionIcon ? (
             <span
