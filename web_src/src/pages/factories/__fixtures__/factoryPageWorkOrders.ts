@@ -9,7 +9,6 @@ import {
   LINE_RUN_IMPLEMENT_ID,
   LINE_RUN_IMPLEMENT_PASSED_ID,
   LINE_RUN_VERIFY_PASSED_ID,
-  REVIEWER_USER,
   STORYBOOK_ME_USER_ID,
   STORYBOOK_ME_USER_NAME,
   TWO_HOURS_AGO,
@@ -129,13 +128,17 @@ export const APPROVAL_WORK_ORDER: FactoriesWorkOrder = {
   key: "RF-109",
   title: "Review the refund webhook schema change",
   description: [
-    "The implement step opened a pull request for the webhook schema. A person must review it before the line can continue.",
+    "The refund webhook payload dropped the `event_version` field. Restore it on the schema and keep older clients working.",
+    "",
+    "- Add `event_version` back to the webhook schema.",
+    "- Accept a missing version as `1` so current senders keep working.",
+    "- Add a contract test for the v1 and v2 payloads.",
   ].join("\n"),
   state: "STATE_OPEN",
   result: "RESULT_UNSPECIFIED",
   createdAt: TWO_HOURS_AGO,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: REVIEWER_USER.id, name: REVIEWER_USER.name } },
+  createdBy: INGEST_CREATED_BY,
   assignees: [{ id: ARNOLD_USER.id, name: ARNOLD_USER.name }],
   lineDispatches: [
     planLineDispatch([

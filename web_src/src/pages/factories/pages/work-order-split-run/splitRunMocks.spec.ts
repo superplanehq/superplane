@@ -404,14 +404,13 @@ describe("line board work-order examples", () => {
     ]);
   });
 
-  it("keeps a manual create and a branch on the approval implement card", () => {
+  it("keeps ingest analysis and a branch on the approval implement card", () => {
     const fixture = splitRunFixtureForWorkOrder(APPROVAL_WORK_ORDER);
-    expect(fixture.phases.map((phase) => [phase.id, phase.name])).toEqual([
-      ["backlog", "Backlog"],
-      ["implement-0", "Implement"],
+    expect(fixture.phases.map((phase) => phase.id)).toEqual(["ingest", "analyze", "plan", "score", "implement-0"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
+      "feature/rf-109",
     ]);
-    expect(artifactNames(fixture.phases[0]?.artifacts)).toEqual(["description.md"]);
-    expect(artifactNames(fixture.phases[1]?.artifacts)).toEqual(["feature/rf-109"]);
   });
 
   it("keeps ingest analysis and a branch on the failed implement card", () => {
@@ -424,17 +423,21 @@ describe("line board work-order examples", () => {
     expect(fixture.footerTone).toBe("failed");
   });
 
-  it("keeps Sentry intake, a branch, and a pull request on the verify enum card", () => {
+  it("keeps ingest analysis, a branch, and a pull request on the verify enum card", () => {
     const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_ENUM_ORDER);
-    expect(fixture.phases.map((phase) => [phase.id, phase.name])).toEqual([
-      ["backlog", "Backlog"],
-      ["implement-0", "Implement"],
-      ["verify-1", "Verify"],
+    expect(fixture.phases.map((phase) => phase.id)).toEqual([
+      "ingest",
+      "analyze",
+      "plan",
+      "score",
+      "implement-0",
+      "verify-1",
     ]);
-    expect(fixture.phases[0]?.componentName).toBe("Sentry");
-    expect(artifactNames(fixture.phases[0]?.artifacts)).toEqual(["description.md"]);
-    expect(artifactNames(fixture.phases[1]?.artifacts)).toEqual(["feature/rf-102"]);
-    expect(artifactNames(fixture.phases[2]?.artifacts)).toEqual(["#502"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
+      "feature/rf-102",
+    ]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual(["#502"]);
   });
 
   it("keeps ingest analysis and PR #6812 on the waiting verify card", () => {
@@ -474,20 +477,24 @@ describe("line board work-order examples", () => {
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts)).toEqual(["#510"]);
   });
 
-  it("keeps Sentry intake and a rejected pull request on the rejected done card", () => {
+  it("keeps ingest analysis and a rejected pull request on the rejected done card", () => {
     const fixture = splitRunFixtureForWorkOrder(BOARD_DONE_REJECTED_ORDER);
-    expect(fixture.phases.map((phase) => [phase.id, phase.name])).toEqual([
-      ["backlog", "Backlog"],
-      ["implement-0", "Implement"],
-      ["verify-1", "Verify"],
-      ["done-2", "Done"],
+    expect(fixture.phases.map((phase) => phase.id)).toEqual([
+      "ingest",
+      "analyze",
+      "plan",
+      "score",
+      "implement-0",
+      "verify-1",
+      "done-2",
     ]);
-    expect(fixture.phases[0]?.componentName).toBe("Sentry");
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
       "feature/rf-112",
     ]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual(["#512"]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts)).toEqual(["#512"]);
+    expect(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts[0]?.data).toMatchObject({ state: "closed" });
   });
 
   it("keeps ingest analysis and a cancel note on the canceled done card", () => {

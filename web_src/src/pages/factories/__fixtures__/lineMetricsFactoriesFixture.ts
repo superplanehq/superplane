@@ -1,6 +1,7 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 
 import { BOARD_REVIEW_CANDIDATE_WORK_ORDERS } from "../pages/onboarding/first-run/reviewCandidates";
+import { INGEST_CREATED_BY } from "./factoryPageWorkOrders";
 import {
   APPROVAL_WORK_ORDER,
   FAILED_WORK_ORDER,
@@ -144,7 +145,10 @@ function withDonePhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
  * Extra lines for the populated Lines list: unused onboarding plus a
  * four-phase feature line.
  */
-export const LINE_BOARD_VERIFY_ENUM_ORDER = withVerifyPhase(OPEN_WORK_ORDER_SECONDARY);
+export const LINE_BOARD_VERIFY_ENUM_ORDER = {
+  ...withVerifyPhase(OPEN_WORK_ORDER_SECONDARY),
+  createdBy: INGEST_CREATED_BY,
+};
 export const LINE_BOARD_VERIFY_PR_REVIEW_ORDER = withWaitingPrReview(FAILED_WORK_ORDER);
 export const LINE_BOARD_DONE_RECEIPTS_ORDER = withDonePhase(PR_CLOSURE_COMPLETED_WORK_ORDER);
 

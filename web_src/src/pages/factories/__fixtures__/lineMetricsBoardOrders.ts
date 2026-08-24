@@ -177,7 +177,6 @@ export const BOARD_DONE_REJECTED_ORDER: FactoriesWorkOrder = boardDoneOrder({
   doneResult: "RESULT_PASSED",
   updatedAt: HOUR_AGO,
   assignee: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-  createdBy: SENTRY_CREATED_BY,
 });
 
 export const BOARD_DONE_CANCELED_ORDER: FactoriesWorkOrder = boardDoneOrder({
