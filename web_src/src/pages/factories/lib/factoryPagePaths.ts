@@ -11,6 +11,10 @@ export function factoryDetailPath(organizationId: string, factoryKey: string) {
   return `${factoryListPath(organizationId)}/${factoryKey}`;
 }
 
+export function factoryHomePath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/home`;
+}
+
 export function factoryOverviewPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/overview`;
 }

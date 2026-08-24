@@ -13,6 +13,8 @@ import prCanvasYaml from "./line-apps/pr.canvas.yaml?raw";
 import prClosureCanvasYaml from "./line-apps/pr-closure.canvas.yaml?raw";
 import issueIntakeCanvasYaml from "./line-apps/issue-intake.canvas.yaml?raw";
 import issueIntakeConsoleYaml from "./line-apps/issue-intake.console.yaml?raw";
+import sentryIssueIntakeCanvasYaml from "./line-apps/sentry-issue-intake.canvas.yaml?raw";
+import sentryIssueIntakeConsoleYaml from "./line-apps/sentry-issue-intake.console.yaml?raw";
 
 export type { FactoryDefinition, FactoryStartingTask, FactoryRunDefinition } from "./types";
 export {
@@ -59,6 +61,7 @@ function buildOnboardingApp(args: {
   integrations: string[];
   componentIntegrations: Record<string, string>;
   entrypointNodeId: string;
+  runTemplate?: string;
 }): FactoryDefinition {
   return {
     id: args.id,
@@ -67,11 +70,12 @@ function buildOnboardingApp(args: {
     integrations: args.integrations,
     componentIntegrations: args.componentIntegrations,
     startingTasks: [],
-    // Onboarding never triggers the entrypoint directly.
+    // Onboarding never triggers the entrypoint. Apps that expose a manual
+    // Start template name it here so the UI can run them on demand.
     run: {
       nodeId: args.entrypointNodeId,
       hookName: "run",
-      template: "",
+      template: args.runTemplate ?? "",
       parameters: {},
     },
     source: { type: "bundled" },
@@ -97,9 +101,10 @@ function buildLineApp(args: {
 }
 
 const EVENT_APP_COMPONENT_INTEGRATIONS: Record<string, string> = {
-  "github.addIssueLabel": "github",
   "github.onIssue": "github",
   "github.onPullRequest": "github",
+  "sentry.getIssue": "sentry",
+  "sentry.onIssue": "sentry",
 };
 
 function buildEventApp(args: {
@@ -110,6 +115,7 @@ function buildEventApp(args: {
   consoleYaml?: string;
   triggerNodeId: string;
   integrations?: string[];
+  runTemplate?: string;
 }): FactoryDefinition {
   return buildOnboardingApp({
     id: args.id,
@@ -120,6 +126,7 @@ function buildEventApp(args: {
     integrations: args.integrations ?? ["github"],
     componentIntegrations: EVENT_APP_COMPONENT_INTEGRATIONS,
     entrypointNodeId: args.triggerNodeId,
+    runTemplate: args.runTemplate,
   });
 }
 
@@ -138,9 +145,13 @@ export const ONBOARDING_LINE_APPS: OnboardingLineApp[] = [
   { factoryId: "line-pr", entrypointNodeId: "onrun-open-pr" },
 ];
 
-// Event-driven factory apps provisioned during onboarding. These listen for
-// GitHub events or a schedule; they are not factory line steps.
-export const ONBOARDING_EVENT_APPS = ["issue-intake", "pr-closure"] as const;
+// PR closure is required by the delivery line. Ingestion apps are optional and
+// are installed only when the user selects one on the post-setup page.
+export const ONBOARDING_EVENT_APPS = ["pr-closure"] as const;
+
+/** Bundled apps that turn external issues into draft work orders. */
+export const INGESTION_FACTORY_ID = "issue-intake";
+export const SENTRY_INGESTION_FACTORY_ID = "sentry-issue-intake";
 
 const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
   "software-factory": buildSoftwareFactory(),
@@ -168,11 +179,22 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
   "issue-intake": buildEventApp({
     id: "issue-intake",
     title: "Issue Ingestion",
-    description: "Create a draft work order from new issues and from a 10-minute backlog scan, then attach an implementation plan.",
+    description:
+      "Create a draft work order from new issues and from a 10-minute backlog scan, then attach an implementation plan.",
     canvasYaml: issueIntakeCanvasYaml,
     consoleYaml: issueIntakeConsoleYaml,
-    triggerNodeId: "on-schedule",
+    triggerNodeId: "manual-start",
+    runTemplate: "Scan backlog now",
     integrations: ["github", "claude"],
+  }),
+  "sentry-issue-intake": buildEventApp({
+    id: "sentry-issue-intake",
+    title: "Sentry Issue Ingestion",
+    description: "Create a draft work order with an implementation plan when Sentry reports a new issue.",
+    canvasYaml: sentryIssueIntakeCanvasYaml,
+    consoleYaml: sentryIssueIntakeConsoleYaml,
+    triggerNodeId: "on-sentry-issue",
+    integrations: ["sentry", "github", "claude"],
   }),
   "pr-closure": buildEventApp({
     id: "pr-closure",

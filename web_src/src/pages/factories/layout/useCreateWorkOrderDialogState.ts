@@ -8,15 +8,21 @@ export function useCreateWorkOrderDialogState(organizationId: string, factoryKey
   const location = useLocation();
   const isCreateWorkOrderRoute = location.pathname === createWorkOrderPath(organizationId, factoryKey);
   const [createWorkOrderOpen, setCreateWorkOrderOpen] = useState(false);
+  const [createWorkOrderTitle, setCreateWorkOrderTitle] = useState("");
 
-  const openCreateWorkOrder = useCallback(() => {
-    if (!canCreate) {
-      return;
-    }
-    setCreateWorkOrderOpen(true);
-  }, [canCreate]);
+  const openCreateWorkOrder = useCallback(
+    (initialTitle?: string) => {
+      if (!canCreate) {
+        return;
+      }
+      setCreateWorkOrderTitle(initialTitle ?? "");
+      setCreateWorkOrderOpen(true);
+    },
+    [canCreate],
+  );
 
   useEffect(() => {
+    setCreateWorkOrderTitle("");
     setCreateWorkOrderOpen(canCreate && isCreateWorkOrderRoute);
   }, [canCreate, factoryKey, isCreateWorkOrderRoute, location.pathname]);
 
@@ -37,5 +43,11 @@ export function useCreateWorkOrderDialogState(organizationId: string, factoryKey
     [factoryKey, isCreateWorkOrderRoute, navigate, organizationId],
   );
 
-  return { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder };
+  return {
+    createWorkOrderOpen,
+    createWorkOrderTitle,
+    openCreateWorkOrder,
+    closeCreateWorkOrder,
+    completeCreateWorkOrder,
+  };
 }

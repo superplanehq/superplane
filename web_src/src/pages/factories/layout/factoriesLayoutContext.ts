@@ -9,7 +9,8 @@ export interface FactoriesLayoutContextValue {
   factoryKey: string;
   factory: FactoriesFactory | null;
   factories: FactoriesFactory[];
-  openCreateWorkOrder: () => void;
+  /** Opens the work order composer, optionally seeded with a title. */
+  openCreateWorkOrder: (initialTitle?: string) => void;
 }
 
 export const FactoriesLayoutContext = createContext<FactoriesLayoutContextValue | null>(null);

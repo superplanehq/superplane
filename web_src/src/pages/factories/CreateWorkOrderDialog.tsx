@@ -18,28 +18,32 @@ import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
 
 interface CreateWorkOrderDialogProps {
   open: boolean;
+  /** Title typed on the surface that opened the dialog (e.g. workspace Home). */
+  initialTitle?: string;
   onClose: () => void;
   onCreated: (orderNumber: string) => void;
 }
 
-export function CreateWorkOrderDialog({ open, onClose, onCreated }: CreateWorkOrderDialogProps) {
+export function CreateWorkOrderDialog({ open, initialTitle, onClose, onCreated }: CreateWorkOrderDialogProps) {
   if (!open) {
     return null;
   }
 
-  return <CreateWorkOrderDialogSession onClose={onClose} onCreated={onCreated} />;
+  return <CreateWorkOrderDialogSession initialTitle={initialTitle} onClose={onClose} onCreated={onCreated} />;
 }
 
 function CreateWorkOrderDialogSession({
+  initialTitle,
   onClose,
   onCreated,
 }: {
+  initialTitle?: string;
   onClose: () => void;
   onCreated: (orderNumber: string) => void;
 }) {
   const { organizationId, factoryId, factory } = useFactoriesLayout();
   const { canAct } = usePermissions();
-  const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });
+  const composer = useCreateWorkOrderComposer({ organizationId, factoryId, initialTitle, onClose, onCreated });
   const lines = factory?.lines ?? [];
   const [isExpanded, setIsExpanded] = useState(false);
   const canDispatch = canAct("work_orders", "update");

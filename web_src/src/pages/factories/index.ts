@@ -4,6 +4,7 @@ export {
   AutomationsPage,
   CreateWorkOrderComposeRedirect,
   FactoryAppCanvasPage,
+  FactoryHomePage,
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
@@ -28,5 +29,4 @@ export {
   WikiPage,
   WorkOrderDetailPage,
   WorkOrdersPage,
-  WorkspaceOverviewPage,
 } from "./pages";

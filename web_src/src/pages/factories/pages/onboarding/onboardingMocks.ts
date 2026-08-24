@@ -15,5 +15,4 @@ export type PendingOnboarding = {
 export type OnboardingStorybookSeed = {
   pending?: PendingOnboarding | null;
   enabledReposByWorkspace?: Record<string, OnboardingRepo[]>;
-  overviewTipsWorkspaceId?: string | null;
 };

@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Console
+metadata:
+  name: Sentry Issue Ingestion
+  canvasId: __FACTORY_CANVAS_ID__
+spec:
+  panels:
+    - id: about
+      type: markdown
+      content:
+        title: About this app
+        body: |
+          > [!SECTION:setup] Sentry issue ingestion
+          >
+          > This app creates a draft work order when Sentry reports a new issue.
+          >
+          > The agent inspects the app repository. It writes a title, a
+          > description, and an implementation plan. The work order includes
+          > links to the Sentry issue and the plan. It also includes an
+          > implementation confidence check with the main risks.
+  layout:
+    - i: about
+      x: 0
+      "y": 0
+      w: 12
+      h: 6
+      minW: 3
+      minH: 5

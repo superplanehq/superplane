@@ -18,16 +18,18 @@ spec:
           > It runs when:
           > - The schedule fires every 10 minutes. An agent then picks the open
           >   issue it is most confident it can implement.
+          > - You start the `Scan Backlog Now` trigger. This does the same scan
+          >   immediately.
           > - Someone opens a new issue.
-          > - An issue gets the `factory` label.
-          > - An issue is assigned to `superplaneagent`.
           >
           > For each ingested issue, the app writes a title and description,
           > creates a draft work order, and attaches an implementation plan.
+          > It also reports an implementation confidence check with its
+          > evidence, assumptions, and main risks.
   layout:
     - i: about
       x: 0
-      'y': 0
+      "y": 0
       w: 12
       h: 8
       minW: 3

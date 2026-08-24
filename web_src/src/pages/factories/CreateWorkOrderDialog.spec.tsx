@@ -50,7 +50,7 @@ vi.mock("./CreateWorkOrderPropertyPills", async () => {
   };
 });
 
-function renderDialog(factory = REFUND_FACTORY) {
+function renderDialog(factory = REFUND_FACTORY, initialTitle?: string) {
   return render(
     <FactoriesLayoutContext.Provider
       value={{
@@ -62,7 +62,7 @@ function renderDialog(factory = REFUND_FACTORY) {
         openCreateWorkOrder: vi.fn(),
       }}
     >
-      <CreateWorkOrderDialog open onClose={vi.fn()} onCreated={vi.fn()} />
+      <CreateWorkOrderDialog open initialTitle={initialTitle} onClose={vi.fn()} onCreated={vi.fn()} />
     </FactoriesLayoutContext.Provider>,
   );
 }
@@ -81,6 +81,12 @@ describe("CreateWorkOrderDialog", () => {
 
     expect(screen.getByRole("dialog", { name: "New work order" })).toBeInTheDocument();
     expect(screen.queryByText("Dialog")).not.toBeInTheDocument();
+  });
+
+  it("seeds the title from the surface that opened it", () => {
+    renderDialog(REFUND_FACTORY, "Fix the billing export");
+
+    expect(screen.getByTestId("work-order-title-input")).toHaveValue("Fix the billing export");
   });
 
   it("keeps only expand and close controls in the header", () => {

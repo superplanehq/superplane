@@ -66,7 +66,7 @@ describe("provisionLine", () => {
 });
 
 describe("provisionEventApps", () => {
-  it("installs issue intake and PR closure for the workspace", async () => {
+  it("installs PR closure without installing issue ingestion", async () => {
     const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
       canvasId: `canvas-${factoryId}`,
       canvasName: factoryId,
@@ -83,20 +83,10 @@ describe("provisionEventApps", () => {
     expect(installFactory).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        factoryId: "issue-intake",
-        workspaceFactoryId: "factory-1",
-        installParams: {
-          appRepository: "acme/app",
-          backlogRepository: "acme/backlog",
-        },
-      }),
-    );
-    expect(installFactory).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
         factoryId: "pr-closure",
         workspaceFactoryId: "factory-1",
       }),
     );
+    expect(installFactory).toHaveBeenCalledTimes(1);
   });
 });

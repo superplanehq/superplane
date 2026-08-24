@@ -10,6 +10,8 @@ const MAX_DESCRIPTION_LENGTH = 5000;
 interface UseCreateWorkOrderComposerArgs {
   organizationId: string;
   factoryId: string;
+  /** Title carried over from the surface that opened the composer. */
+  initialTitle?: string;
   onClose: () => void;
   onCreated: (orderNumber: string) => void;
 }
@@ -17,6 +19,7 @@ interface UseCreateWorkOrderComposerArgs {
 export function useCreateWorkOrderComposer({
   organizationId,
   factoryId,
+  initialTitle = "",
   onClose,
   onCreated,
 }: UseCreateWorkOrderComposerArgs) {
@@ -24,7 +27,7 @@ export function useCreateWorkOrderComposer({
   const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);
   const { data: me } = useMe(false, organizationId);
 
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(() => initialTitle.slice(0, MAX_TITLE_LENGTH));
   const [description, setDescription] = useState("");
   const [assigneeIds, setAssigneeIdsInternal] = useState<string[]>([]);
   const [titleError, setTitleError] = useState("");

@@ -12,9 +12,8 @@ import { useInstallFactory } from "@/pages/home/useInstallFactory";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
-import { factoryListPath, factoryOverviewPath, factorySetupPath } from "../../lib/factoryPagePaths";
+import { factoryHomePath, factoryListPath, factorySetupPath } from "../../lib/factoryPagePaths";
 import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
-import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import type { IntegrationId, WizardStepId } from "./onboardingFixtures";
 import {
   apiIssuesSource,
@@ -218,8 +217,7 @@ function useFinishOnboarding(args: {
         github,
         claude,
       });
-      markWorkspaceGettingStarted(args.organizationId, args.factoryId);
-      navigate(factoryOverviewPath(args.organizationId, args.factoryKey), { replace: true });
+      navigate(factoryHomePath(args.organizationId, args.factoryKey), { replace: true });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
     } finally {

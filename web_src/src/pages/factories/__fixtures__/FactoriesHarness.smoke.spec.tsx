@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { client } from "@/api-client/client.gen";
 
-import { factorySettingsPath } from "../lib/factoryPagePaths";
+import { factoryHomePath, factorySettingsPath } from "../lib/factoryPagePaths";
 import { FactoriesHarness } from "./FactoriesHarness";
 import { REFUND_IMPLEMENTER_APP, refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
 import {
@@ -93,6 +93,26 @@ describe("FactoriesHarness work orders", () => {
 
     expect(screen.queryByTestId("building-blocks-sidebar")).not.toBeInTheDocument();
     expect(componentsToggle).toHaveAttribute("aria-pressed", "false");
+  }, 15000);
+
+  it("opens the workspace Home page from the sidebar, inside the workspace chrome", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/overview`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    const homeLink = await screen.findByTestId("factories-nav-home", {}, { timeout: 8000 });
+    expect(homeLink).toHaveAttribute("href", factoryHomePath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY));
+
+    await user.click(homeLink);
+
+    expect(await screen.findByTestId("factory-home", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.getByTestId("factories-nav")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Start a task" })).toBeInTheDocument();
+    expect(screen.getByText("Auto Ingestion")).toBeInTheDocument();
   }, 15000);
 
   it("lets the signed-in user open workspace settings from the sidebar cog", async () => {

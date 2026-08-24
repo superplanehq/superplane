@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { TooltipProvider } from "@/ui/tooltip";
 import { FACTORIES_ORGANIZATION_ID, REFUND_FACTORY } from "../__fixtures__/factoryPageResponses";
-import { factoryOverviewPath } from "../lib/factoryPagePaths";
+import { factoryHomePath } from "../lib/factoryPagePaths";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 function renderSwitcher() {
@@ -26,11 +26,11 @@ function renderSwitcher() {
 }
 
 describe("WorkspaceSwitcher", () => {
-  it("links the workspace name to the overview page", () => {
+  it("links the workspace name to the Home page", () => {
     renderSwitcher();
 
-    const nameLink = screen.getByTestId("factories-workspace-overview-link");
+    const nameLink = screen.getByTestId("factories-workspace-home-link");
     expect(nameLink).toHaveTextContent("Semaphore");
-    expect(nameLink).toHaveAttribute("href", factoryOverviewPath(FACTORIES_ORGANIZATION_ID, REFUND_FACTORY.key!));
+    expect(nameLink).toHaveAttribute("href", factoryHomePath(FACTORIES_ORGANIZATION_ID, REFUND_FACTORY.key!));
   });
 });

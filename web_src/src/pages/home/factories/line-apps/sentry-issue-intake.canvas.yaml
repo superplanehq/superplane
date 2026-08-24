@@ -1,0 +1,221 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Sentry Issue Ingestion
+  description: Create a draft work order with an implementation plan when Sentry reports a new issue.
+spec:
+  edges:
+    - channel: default
+      sourceId: on-sentry-issue
+      targetId: find-work-order
+    - channel: notFound
+      sourceId: find-work-order
+      targetId: get-sentry-issue
+    - channel: default
+      sourceId: get-sentry-issue
+      targetId: prepare-work-order
+    - channel: passed
+      sourceId: prepare-work-order
+      targetId: create-work-order
+    - channel: default
+      sourceId: create-work-order
+      targetId: attach-issue-link
+    - channel: default
+      sourceId: attach-issue-link
+      targetId: add-plan-artifact
+    - channel: default
+      sourceId: add-plan-artifact
+      targetId: report-confidence
+  nodes:
+    - id: on-sentry-issue
+      name: On New Sentry Issue
+      type: TYPE_TRIGGER
+      component: sentry.onIssue
+      configuration:
+        actions:
+          - created
+      position:
+        x: 144
+        "y": 72
+      isCollapsed: false
+    - id: find-work-order
+      name: Find Work Order
+      type: TYPE_ACTION
+      component: findWorkOrder
+      configuration:
+        artifactKey: "{{ root().data.data.issue.web_url }}"
+        by: artifactKey
+      position:
+        x: 144
+        "y": 432
+      isCollapsed: true
+    - id: get-sentry-issue
+      name: Get Sentry Issue
+      type: TYPE_ACTION
+      component: sentry.getIssue
+      configuration:
+        issueId: "{{ root().data.data.issue.id }}"
+      position:
+        x: 144
+        "y": 792
+      isCollapsed: true
+    - id: prepare-work-order
+      name: Prepare Work Order
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      concurrency:
+        max: 5
+      configuration:
+        credentials:
+          source: integration
+          integration:
+            name: claude
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
+        environment:
+          - name: APP_REPO
+            value: "{{ install_params.appRepository }}"
+            valueSource: literal
+          - name: SENTRY_ISSUE_ID
+            value: '{{ $["Get Sentry Issue"].data.id }}'
+            valueSource: literal
+          - name: SENTRY_ISSUE_KEY
+            value: '{{ $["Get Sentry Issue"].data.shortId }}'
+            valueSource: literal
+          - name: SENTRY_ISSUE_TITLE
+            value: '{{ $["Get Sentry Issue"].data.title }}'
+            valueSource: literal
+          - name: SENTRY_ISSUE_URL
+            value: '{{ $["Get Sentry Issue"].data.web_url }}'
+            valueSource: literal
+          - name: SENTRY_PROJECT
+            value: '{{ $["Get Sentry Issue"].data.project.slug }}'
+            valueSource: literal
+          - name: SENTRY_STATUS
+            value: '{{ $["Get Sentry Issue"].data.status }}'
+            valueSource: literal
+        executionTimeoutSeconds: 3600
+        machineType: e1-large-amd64
+        model: sonnet
+        steps:
+          - name: Clone app repository
+            type: bash
+            command: |-
+              git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${APP_REPO}.git" repo
+              cd repo
+          - name: Write title, description, and plan
+            type: prompt
+            prompt: |-
+              You are preparing a SuperPlane draft work order from a new Sentry issue.
+
+              App repository (cloned in the current working directory): {{ install_params.appRepository }}
+              Sentry issue: use SENTRY_ISSUE_KEY and SENTRY_ISSUE_TITLE
+              Sentry project: use SENTRY_PROJECT
+              Sentry status: use SENTRY_STATUS
+              Sentry issue URL: use SENTRY_ISSUE_URL
+
+              1. Inspect the cloned app repository to find the likely cause and implementation area.
+              2. Assess how confident you are that a coding agent can implement and verify the change from the available information.
+              3. Write five files:
+                 - /tmp/title.txt — one line. A clear work-order title. No surrounding quotes.
+                 - /tmp/description.md — include the error, relevant repository context, and the Sentry issue link.
+                 - /tmp/plan.md — start with a short summary. Then list concrete implementation and verification steps.
+                 - /tmp/confidence.txt — one integer from 0 through 100.
+                 - /tmp/confidence.md — explain the score. Identify evidence, assumptions, and the main implementation risks.
+
+              Do not create files inside the repository. Do not commit anything.
+          - name: Emit work-order draft
+            type: bash
+            command: |-
+              if [ ! -s /tmp/title.txt ] || [ ! -s /tmp/description.md ] || [ ! -s /tmp/plan.md ] || [ ! -s /tmp/confidence.txt ] || [ ! -s /tmp/confidence.md ]; then
+                echo "Missing title, description, plan, or confidence assessment" >&2
+                exit 1
+              fi
+              TITLE="$(tr -d '\n' < /tmp/title.txt)"
+              CONFIDENCE="$(tr -d '[:space:]' < /tmp/confidence.txt)"
+              if ! echo "$CONFIDENCE" | grep -Eq '^[0-9]+$' || [ "$CONFIDENCE" -gt 100 ]; then
+                echo "Confidence must be an integer from 0 through 100" >&2
+                exit 1
+              fi
+              jq -n \
+                --arg title "$TITLE" \
+                --rawfile description /tmp/description.md \
+                --rawfile plan /tmp/plan.md \
+                --argjson confidence "$CONFIDENCE" \
+                --rawfile confidence_analysis /tmp/confidence.md \
+                --arg issue_url "$SENTRY_ISSUE_URL" \
+                --arg issue_key "$SENTRY_ISSUE_KEY" \
+                '{
+                  title: $title,
+                  description: ($description | @base64),
+                  plan: ($plan | @base64),
+                  confidence: $confidence,
+                  confidence_summary: ("Implementation confidence: " + ($confidence | tostring) + "%"),
+                  confidence_analysis: ($confidence_analysis | @base64),
+                  issue_url: $issue_url,
+                  issue_key: $issue_key
+                }' > "$SUPERPLANE_RESULT_FILE"
+      position:
+        x: 144
+        "y": 1152
+      isCollapsed: false
+    - id: create-work-order
+      name: Create Work Order
+      type: TYPE_ACTION
+      component: createWorkOrder
+      configuration:
+        description: '{{ fromBase64($["Prepare Work Order"].data.result.description) }}'
+        title: '{{ $["Prepare Work Order"].data.result.title }}'
+      position:
+        x: 144
+        "y": 1512
+      isCollapsed: true
+    - id: attach-issue-link
+      name: Attach Sentry Issue
+      type: TYPE_ACTION
+      component: addWorkOrderArtifact
+      configuration:
+        artifactKey: '{{ $["Prepare Work Order"].data.result.issue_url }}'
+        artifactType: link
+        orderId: '{{ $["Create Work Order"].data.workOrder.id }}'
+        title: '{{ $["Prepare Work Order"].data.result.issue_key }}'
+        url: '{{ $["Prepare Work Order"].data.result.issue_url }}'
+      position:
+        x: 144
+        "y": 1692
+      isCollapsed: true
+    - id: add-plan-artifact
+      name: Add Plan Artifact
+      type: TYPE_ACTION
+      component: addWorkOrderArtifact
+      configuration:
+        artifactType: markdown
+        body: '{{ fromBase64($["Prepare Work Order"].data.result.plan) }}'
+        orderId: '{{ $["Create Work Order"].data.workOrder.id }}'
+        title: PLAN.md
+      position:
+        x: 144
+        "y": 1872
+      isCollapsed: true
+    - id: report-confidence
+      name: Report Implementation Confidence
+      type: TYPE_ACTION
+      component: reportWorkOrderCheck
+      configuration:
+        orderId: '{{ $["Create Work Order"].data.workOrder.id }}'
+        checkKey: implementation-confidence
+        name: Implementation confidence
+        format: percent
+        score: '{{ $["Prepare Work Order"].data.result.confidence }}'
+        maxScore: "100"
+        direction: higherIsBetter
+        cautionAt: 70
+        criticalAt: 40
+        summary: '{{ $["Prepare Work Order"].data.result.confidence_summary }}'
+        analysis: '{{ fromBase64($["Prepare Work Order"].data.result.confidence_analysis) }}'
+      position:
+        x: 144
+        "y": 2052
+      isCollapsed: true

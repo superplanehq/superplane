@@ -1,7 +1,8 @@
-import { BookOpen, ClipboardList, Gauge, Layers, LayoutDashboard, Workflow } from "lucide-react";
+import { BookOpen, ClipboardList, Gauge, House, Layers, LayoutDashboard, Workflow } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
   automationsPath,
+  factoryHomePath,
   factoryOverviewPath,
   factoryVelocityPath,
   factoryWikiPath,
@@ -9,7 +10,7 @@ import {
   workOrdersPath,
 } from "../lib/factoryPagePaths";
 
-export type FactoriesNavKind = "overview" | "work-orders" | "lines" | "automations" | "wiki" | "velocity";
+export type FactoriesNavKind = "home" | "overview" | "work-orders" | "lines" | "automations" | "wiki" | "velocity";
 
 export interface FactoriesNavItem {
   id: FactoriesNavKind;
@@ -19,6 +20,12 @@ export interface FactoriesNavItem {
 }
 
 export const FACTORIES_NAV_ITEMS: FactoriesNavItem[] = [
+  {
+    id: "home",
+    label: "Home",
+    Icon: House,
+    buildHref: factoryHomePath,
+  },
   {
     id: "overview",
     label: "Overview",

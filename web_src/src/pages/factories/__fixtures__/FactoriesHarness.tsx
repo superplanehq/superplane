@@ -8,7 +8,6 @@ import { FactoryCanvasEditWorkspaceProvider } from "../pages/FactoryCanvasEditWo
 import { OnboardingStorybookProvider } from "../pages/onboarding/OnboardingStorybookContext";
 import { OnboardingPage } from "../pages/onboarding/OnboardingPage";
 import type { OnboardingStorybookSeed } from "../pages/onboarding/onboardingMocks";
-import { StorybookOverviewPage } from "../pages/onboarding/StorybookOverviewPage";
 import { WikiWireframe } from "../pages/wiki/WikiWireframe";
 import { WIKI_DOCUMENTS_DEFAULT, WIKI_DOCUMENTS_REFRESHED } from "../pages/wiki/wikiMocks";
 import { defaultFactoriesFixture, FACTORIES_ORGANIZATION_ID, type FactoriesFixture } from "./factoryPageResponses";
@@ -30,7 +29,7 @@ interface FactoriesHarnessProps {
    * Wiki defaults to the wireframe so sidebar navigation shows it; pass
    * `pageOverrides={{ wiki: WikiPage }}` to keep Coming Soon.
    * Work Orders defaults to the missions page so the sidebar keeps missions.
-   * Setup + Get started overview are enabled by default.
+   * Setup is enabled by default.
    */
   pageOverrides?: OrgWorkspacePageOverrides;
   /** Seed pending providers/repos/tips for setup stories. */
@@ -92,7 +91,6 @@ export function FactoriesHarness({
         enableOnboarding
           ? {
               wiki: DefaultWikiWireframe,
-              overview: StorybookOverviewPage,
               onboarding: OnboardingPage,
               workOrders: MissionsWorkOrdersPage,
               ...pageOverrides,

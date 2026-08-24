@@ -115,8 +115,13 @@ function FactoriesLayoutContent({
   const navigate = useNavigate();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
-    useCreateWorkOrderDialogState(organizationId, factoryKey, canAct("work_orders", "create"));
+  const {
+    createWorkOrderOpen,
+    createWorkOrderTitle,
+    openCreateWorkOrder,
+    closeCreateWorkOrder,
+    completeCreateWorkOrder,
+  } = useCreateWorkOrderDialogState(organizationId, factoryKey, canAct("work_orders", "create"));
 
   const { data: organization } = useOrganization(organizationId);
   const { data: factory, error: factoryError } = useFactory(organizationId, factoryId);
@@ -210,6 +215,7 @@ function FactoriesLayoutContent({
       {canAct("work_orders", "create") ? (
         <CreateWorkOrderDialog
           open={createWorkOrderOpen}
+          initialTitle={createWorkOrderTitle}
           onClose={closeCreateWorkOrder}
           onCreated={completeCreateWorkOrder}
         />

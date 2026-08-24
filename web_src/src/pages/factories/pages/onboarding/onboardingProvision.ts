@@ -84,9 +84,9 @@ async function provisionLineApps(args: {
   return steps;
 }
 
-// Event apps listen for GitHub events and are not factory line steps. Install
-// them even when the line already exists, so a retry after a failed finish
-// still creates PR Closure.
+// Required event apps are not factory line steps. Install them even when the
+// line exists, so a retry after a failed finish still creates PR Closure.
+// Optional ingestion apps are installed later, only after the user selects one.
 export async function provisionEventApps(args: {
   factoryId: string;
   selections: IntegrationSelections;

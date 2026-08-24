@@ -30,6 +30,7 @@ import {
   FactorySettingsUsagePage,
   FACTORY_SETTINGS_NAV_ITEMS,
   isFactorySettingsComingSoon,
+  FactoryHomePage,
   LegacyWorkOrderDetailRedirect,
   LinesPage,
   MissionsPage,
@@ -242,8 +243,9 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
           <Route path="new" element={factoryRoute(<NewWorkspacePage />)} />
           <Route path=":factoryKey" element={factoryRoute(<FactoriesLayout />)}>
             <Route element={<OptionalOnboardingGate enabled={onboardingEnabled} />}>
-              <Route index element={<Navigate to="overview" replace />} />
+              <Route index element={<Navigate to="home" replace />} />
               {OnboardingRoutePage ? <Route path="setup" element={<OnboardingRoutePage />} /> : null}
+              <Route path="home" element={<FactoryHomePage />} />
               <Route path="overview" element={<OverviewRoutePage />} />
               <Route path="missions" element={<MissionsPage />} />
               <Route path="missions/:missionId" element={<MissionDetailPage />} />

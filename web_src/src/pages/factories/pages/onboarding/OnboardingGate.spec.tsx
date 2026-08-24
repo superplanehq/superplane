@@ -31,6 +31,7 @@ function renderRoute(path: string) {
       <Routes>
         <Route path="/org-1/workspaces/PAY" element={<Layout />}>
           <Route element={<OnboardingGate />}>
+            <Route path="home" element={<CurrentPath />} />
             <Route path="overview" element={<CurrentPath />} />
             <Route path="setup" element={<CurrentPath />} />
           </Route>
@@ -55,6 +56,6 @@ describe("OnboardingGate", () => {
     factory = { id: "factory-1", onboarding: { completedAt: "2026-08-17T12:00:00Z" } };
     renderRoute("/org-1/workspaces/PAY/setup");
 
-    expect(await screen.findByText("/org-1/workspaces/PAY/overview")).toBeInTheDocument();
+    expect(await screen.findByText("/org-1/workspaces/PAY/home")).toBeInTheDocument();
   });
 });

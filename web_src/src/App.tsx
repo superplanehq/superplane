@@ -29,6 +29,7 @@ import {
   FactoriesIndexPage,
   FactoriesLayout,
   FactoryAppCanvasPage,
+  FactoryHomePage,
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
@@ -46,11 +47,11 @@ import {
   OnboardingPage,
   OrganizationSettingsLayout,
   organizationSettingsSectionRoutes,
+  OverviewPage,
   VelocityPage,
   WikiPage,
   WorkOrderDetailPage,
   WorkOrdersPage,
-  WorkspaceOverviewPage,
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
 import { HomePage } from "./pages/home";
@@ -180,10 +181,11 @@ function AppRouter() {
                     element={withAuthPermissionAndFactoriesFeature(FactoriesLayout, "factories", "read")}
                   >
                     <Route element={<OnboardingGate />}>
-                      <Route index element={<Navigate to="overview" replace />} />
+                      <Route index element={<Navigate to="home" replace />} />
                       <Route path="setup" element={<OnboardingPage />} />
                       <Route path="onboarding" element={<Navigate to="../setup" replace />} />
-                      <Route path="overview" element={<WorkspaceOverviewPage />} />
+                      <Route path="home" element={<FactoryHomePage />} />
+                      <Route path="overview" element={<OverviewPage />} />
                       <Route path="missions" element={<MissionsPage />} />
                       <Route path="wiki" element={<WikiPage />} />
                       <Route path="velocity" element={<VelocityPage />} />

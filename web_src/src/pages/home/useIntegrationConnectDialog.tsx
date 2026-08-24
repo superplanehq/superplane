@@ -47,7 +47,11 @@ export function useIntegrationConnectDialog({
   /** When set, a new connection uses this name instead of the integration type name. */
   preferredCreateNames?: Record<string, string>;
 }) {
-  const { data: connected = [], refetch } = useConnectedIntegrations(organizationId, {
+  const {
+    data: connected = [],
+    refetch,
+    isLoading: integrationsLoading,
+  } = useConnectedIntegrations(organizationId, {
     enabled: !!organizationId,
   });
   const { data: availableIntegrations = [] } = useAvailableIntegrations({ enabled: !!organizationId });
@@ -156,6 +160,7 @@ export function useIntegrationConnectDialog({
 
   return {
     integrationData,
+    integrationsLoading,
     requestConnect: openConnectDialog,
     createNew: openCreateIntegrationModal,
     selectInstance,

@@ -12,6 +12,7 @@ function materializeOnboardingApp(factoryId: string) {
     integrations: {
       github: { id: "int-1", name: "acme-github", ready: true },
       claude: { id: "int-2", name: "acme-claude", ready: true },
+      sentry: { id: "int-3", name: "acme-sentry", ready: true },
     },
   });
 }
@@ -77,9 +78,10 @@ describe("setup factory line apps", () => {
 });
 
 describe("setup factory event apps", () => {
-  it("provisions issue intake and PR closure outside the factory line", () => {
-    expect(ONBOARDING_EVENT_APPS).toEqual(["issue-intake", "pr-closure"]);
+  it("provisions only PR closure during onboarding", () => {
+    expect(ONBOARDING_EVENT_APPS).toEqual(["pr-closure"]);
     expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("issue-intake");
+    expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("sentry-issue-intake");
     expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("pr-closure");
   });
 
@@ -87,12 +89,17 @@ describe("setup factory event apps", () => {
     const canvasYaml = materializeOnboardingApp("issue-intake");
 
     expect(canvasYaml).toMatch(/component: schedule[\s\S]*type: minutes[\s\S]*minutesInterval: 10/);
+    expect(canvasYaml).toContain("id: manual-start");
+    expect(canvasYaml).toMatch(/component: start[\s\S]*templates:/);
+    expect(canvasYaml).toMatch(/sourceId: manual-start\n\s+targetId: pick-issue/);
     expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*actions:[\s\S]*- opened/);
-    expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*actions:[\s\S]*- labeled/);
-    expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*actions:[\s\S]*- assigned/);
     expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*repository: acme\/backlog/);
-    expect(canvasYaml).toContain('root().data.label.name == "factory"');
-    expect(canvasYaml).toContain('root().data.assignee.login == "superplaneagent"');
+    expect(canvasYaml).not.toContain("actions:\n          - labeled");
+    expect(canvasYaml).not.toContain("actions:\n          - assigned");
+    expect(canvasYaml).not.toContain("id: on-issue-labeled");
+    expect(canvasYaml).not.toContain("id: on-issue-assigned");
+    expect(canvasYaml).not.toContain("id: has-factory-label");
+    expect(canvasYaml).not.toContain("id: assigned-to-agent");
     expect(canvasYaml).toContain("component: runnerClaudeCode");
     expect(canvasYaml).toContain("id: pick-issue");
     expect(canvasYaml).toContain("id: prepare-work-order");
@@ -102,7 +109,18 @@ describe("setup factory event apps", () => {
     expect(canvasYaml).toContain("title: '{{ $[\"Prepare Work Order\"].data.result.title }}'");
     expect(canvasYaml).toContain("description: '{{ fromBase64($[\"Prepare Work Order\"].data.result.description) }}'");
     expect(canvasYaml).toMatch(/component: addWorkOrderArtifact[\s\S]*artifactType: markdown[\s\S]*title: PLAN.md/);
-    expect(canvasYaml).toMatch(/component: addWorkOrderArtifact[\s\S]*artifactType: link[\s\S]*artifactKey:/);
+    expect(canvasYaml).toMatch(
+      /artifactKey: '\{\{ \$\["Prepare Work Order"\]\.data\.result\.html_url \}\}'\n\s+artifactType: link/,
+    );
+    expect(canvasYaml).toMatch(/sourceId: add-plan-artifact[\s\S]*targetId: report-confidence/);
+    expect(canvasYaml).toMatch(
+      /component: reportWorkOrderCheck[\s\S]*checkKey: implementation-confidence[\s\S]*format: percent/,
+    );
+    expect(canvasYaml).toContain("score: '{{ $[\"Prepare Work Order\"].data.result.confidence }}'");
+    expect(canvasYaml).toContain("direction: higherIsBetter");
+    expect(canvasYaml).toContain("cautionAt: 70");
+    expect(canvasYaml).toContain("criticalAt: 40");
+    expect(canvasYaml).not.toContain("github.addIssueLabel");
     expect(canvasYaml).toContain("id: int-1");
     expect(canvasYaml).toContain("name: acme-github");
     expect(canvasYaml).toContain("name: acme-claude");
@@ -110,6 +128,29 @@ describe("setup factory event apps", () => {
     expect(canvasYaml).not.toContain("{{ install_params.");
     expect(canvasYaml).not.toContain(FACTORY_CANVAS_ID_PLACEHOLDER);
     expect(canvasYaml).not.toContain("superplanehq");
+    expect(canvasYaml).not.toMatch(/component: onRun/);
+  });
+
+  it("ingests new Sentry issues into draft work orders", () => {
+    const canvasYaml = materializeOnboardingApp("sentry-issue-intake");
+
+    expect(canvasYaml).toMatch(/component: sentry\.onIssue[\s\S]*actions:[\s\S]*- created/);
+    expect(canvasYaml).toMatch(/component: sentry\.getIssue[\s\S]*issueId:/);
+    expect(canvasYaml).toContain("component: findWorkOrder");
+    expect(canvasYaml).toContain("component: runnerClaudeCode");
+    expect(canvasYaml).toContain("component: createWorkOrder");
+    expect(canvasYaml).toMatch(/component: addWorkOrderArtifact[\s\S]*artifactType: markdown[\s\S]*title: PLAN.md/);
+    expect(canvasYaml).toMatch(/component: addWorkOrderArtifact[\s\S]*artifactType: link/);
+    expect(canvasYaml).toMatch(/sourceId: add-plan-artifact[\s\S]*targetId: report-confidence/);
+    expect(canvasYaml).toMatch(
+      /component: reportWorkOrderCheck[\s\S]*checkKey: implementation-confidence[\s\S]*format: percent/,
+    );
+    expect(canvasYaml).toContain("score: '{{ $[\"Prepare Work Order\"].data.result.confidence }}'");
+    expect(canvasYaml).toContain("name: acme-sentry");
+    expect(canvasYaml).toContain("name: acme-github");
+    expect(canvasYaml).toContain("name: acme-claude");
+    expect(canvasYaml).toContain("acme/app");
+    expect(canvasYaml).not.toContain("{{ install_params.");
     expect(canvasYaml).not.toMatch(/component: onRun/);
   });
 

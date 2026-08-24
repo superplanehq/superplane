@@ -6,8 +6,6 @@ export type OnboardingStorybookContextValue = {
   pending: PendingOnboarding | null;
   beginOnboarding: (pending: PendingOnboarding) => void;
   completeOnboarding: (workspaceId: string, repos: OnboardingRepo[]) => void;
-  shouldShowOverviewTips: (workspaceId: string) => boolean;
-  clearOverviewTips: () => void;
   enabledRepos: (workspaceId: string) => OnboardingRepo[];
 };
 
