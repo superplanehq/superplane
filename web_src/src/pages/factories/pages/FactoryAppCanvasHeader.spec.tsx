@@ -113,6 +113,8 @@ describe("FactoryAppCanvasHeader", () => {
     );
 
     expect(screen.queryByTestId("factory-app-view-yaml")).not.toBeInTheDocument();
+    expect(screen.getByTestId("factory-app-edit")).toHaveTextContent("Edit Automation");
+    expect(screen.getByTestId("factory-app-edit").className).toContain("rounded-md");
     await user.click(screen.getByTestId("factory-app-edit"));
     expect(onOpenVisualEditor).toHaveBeenCalledTimes(1);
   });

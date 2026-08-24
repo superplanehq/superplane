@@ -8,6 +8,7 @@ import { useNavigate, useParams } from "react-router";
 
 import { factoryListPath, factorySetupPath } from "../../lib/factoryPagePaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
+import { useOnboardingStorybook } from "./useOnboardingStorybook";
 import { placeholderWorkspaceName } from "./workspaceNames";
 
 /**
@@ -31,6 +32,7 @@ function NewWorkspacePageContent({ organizationId }: { organizationId: string })
   const navigate = useNavigate();
   const factories = useFactories(organizationId);
   const createFactory = useCreateFactory(organizationId);
+  const storybookOnboarding = useOnboardingStorybook();
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   // Workspace creation must run once per attempt, not on every render.
@@ -48,9 +50,15 @@ function NewWorkspacePageContent({ organizationId }: { organizationId: string })
           description: "",
           key: "",
         });
-        if (!factory.key) {
+        if (!factory.id || !factory.key) {
           throw new Error("The workspace was created without a key");
         }
+        // Storybook gates setup on this pending pointer. Production uses the
+        // server-backed onboarding record and ignores the storybook context.
+        storybookOnboarding?.beginOnboarding({
+          workspaceId: factory.id,
+          workspaceName: factory.name ?? "",
+        });
         navigate(factorySetupPath(organizationId, factory.key), { replace: true });
       } catch (creationError) {
         setError(getApiErrorMessage(creationError, "Failed to create workspace"));
@@ -58,7 +66,7 @@ function NewWorkspacePageContent({ organizationId }: { organizationId: string })
     };
 
     void create();
-  }, [attempt, createFactory, factories.data, factories.isLoading, navigate, organizationId]);
+  }, [attempt, createFactory, factories.data, factories.isLoading, navigate, organizationId, storybookOnboarding]);
 
   const retry = () => {
     setError(null);

@@ -47,11 +47,11 @@ export function resolveFactoryAppBackNav(
   if (from === "lines") {
     if (options.lineId) {
       return {
-        label: options.lineName?.trim() || "All lines",
+        label: "Back",
         href: factoryLineDetailPath(organizationId, factoryKey, options.lineId),
       };
     }
-    return { label: "All lines", href: linesPath(organizationId, factoryKey) };
+    return { label: "Back", href: linesPath(organizationId, factoryKey) };
   }
 
   if (from === "work-order") {
@@ -65,5 +65,5 @@ export function resolveFactoryAppBackNav(
     return { label: "Work Orders", href: workOrdersPath(organizationId, factoryKey) };
   }
 
-  return { label: "Line", href: factoryHomePath(organizationId, factoryKey) };
+  return { label: "Back", href: factoryHomePath(organizationId, factoryKey) };
 }

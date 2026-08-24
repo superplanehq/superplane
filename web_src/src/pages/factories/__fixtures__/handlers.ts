@@ -22,6 +22,7 @@ import type {
 import { defaultNotificationSettings } from "@/lib/notificationSettings";
 import { buildStorybookMeUser, fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
 import { automationNameForLineStep } from "../lib/factoryLineFormShared";
+import { isValidWorkspaceKey, suggestWorkspaceKeyFromName, WORKSPACE_KEY_MAX_LENGTH } from "../lib/workspaceKey";
 import { metricsForLine } from "../pages/lineListMetricsMockData";
 
 export type { FactoriesFixture };
@@ -41,6 +42,7 @@ interface RequestBody {
   name?: unknown;
   title?: unknown;
   description?: unknown;
+  key?: unknown;
   assigneeIds?: unknown;
   assignee_ids?: unknown;
   lineName?: unknown;
@@ -76,6 +78,28 @@ function ensureFactoryWorkOrders(fixture: FactoriesFixture, factoryId: string): 
   return created;
 }
 
+function takenFactoryKeys(factories: FactoriesFactory[]): Set<string> {
+  return new Set(factories.map((factory) => factory.key).filter((key): key is string => Boolean(key)));
+}
+
+/** Same letter-only keys the live API derives when the client omits `key`. */
+function unusedFactoryKey(factories: FactoriesFactory[], name: string, requestedKey: string): string {
+  const taken = takenFactoryKeys(factories);
+  const seed = isValidWorkspaceKey(requestedKey) ? requestedKey : suggestWorkspaceKeyFromName(name) || "WS";
+  if (!taken.has(seed)) {
+    return seed;
+  }
+
+  const prefix = seed.slice(0, WORKSPACE_KEY_MAX_LENGTH - 1);
+  for (let code = 65; code <= 90; code += 1) {
+    const candidate = `${prefix}${String.fromCharCode(code)}`;
+    if (!taken.has(candidate)) {
+      return candidate;
+    }
+  }
+  return `${prefix}Z`;
+}
+
 function factoriesCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
     pattern: re("/api/v1/factories"),
@@ -84,11 +108,14 @@ function factoriesCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {
         return { json: { factories: fixture.factories } };
       }
       const request = (body ?? {}) as RequestBody;
+      const name = stringOrEmpty(request.name) || "New workspace";
       const created = {
         id: `storybook-factory-${fixture.factories.length + 1}`,
-        name: stringOrEmpty(request.name) || "New workspace",
+        name,
+        key: unusedFactoryKey(fixture.factories, name, stringOrEmpty(request.key)),
         description: stringOrEmpty(request.description),
         lines: [],
+        onboarding: {},
       };
       fixture.factories.push(created);
       fixture.workOrdersByFactoryId[created.id] = [];
