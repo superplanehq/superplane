@@ -77,10 +77,10 @@ func TestGatewayAuthorizationMiddlewareReturnsNotFoundWhenPermissionDenied(t *te
 	})
 
 	assert.False(t, called)
-	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
 	assert.Contains(t, rec.Header().Get("Content-Type"), "application/json")
 
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-	assert.Equal(t, "Not found", body["message"])
+	assert.Equal(t, "Permission denied", body["message"])
 }

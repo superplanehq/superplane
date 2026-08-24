@@ -8,6 +8,7 @@ import {
   canvasesReemitTriggerEvent,
   type CanvasesCanvasRun,
 } from "@/api-client";
+import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { RunInspectorNodeSection } from "./types";
@@ -139,8 +140,9 @@ function useRerunMutation({
       showSuccessToast("Run restarted");
     },
     onError: (error) => {
-      console.error("Failed to restart run", error);
-      showErrorToast("Failed to restart run");
+      const message = getApiErrorMessage(error, "Failed to restart run");
+      console.error(`Failed to restart run: ${message}`);
+      showErrorToast(message);
     },
   });
 }
@@ -173,8 +175,9 @@ function useStopMutation({
       await refreshRunQueries();
     },
     onError: (error) => {
-      console.error("Failed to stop run", error);
-      showErrorToast("Failed to stop run");
+      const message = getApiErrorMessage(error, "Failed to stop run");
+      console.error(`Failed to stop run: ${message}`);
+      showErrorToast(message);
     },
   });
 }
@@ -193,8 +196,9 @@ function useCancelQueuedItemMutation({
       showSuccessToast("Queued step cancelled");
     },
     onError: (error) => {
-      console.error("Failed to cancel queued step", error);
-      showErrorToast("Failed to cancel queued step");
+      const message = getApiErrorMessage(error, "Failed to cancel queued step");
+      console.error(`Failed to cancel queued step: ${message}`);
+      showErrorToast(message);
     },
   });
 }
@@ -213,8 +217,9 @@ function useStopNodeMutation({
       showSuccessToast("Step stopped");
     },
     onError: (error) => {
-      console.error("Failed to stop step", error);
-      showErrorToast("Failed to stop step");
+      const message = getApiErrorMessage(error, "Failed to stop step");
+      console.error(`Failed to stop step: ${message}`);
+      showErrorToast(message);
     },
   });
 }
@@ -233,8 +238,10 @@ function useExecutionHookMutation({
       showSuccessToast(successMessageForHook(variables.hookName));
     },
     onError: (error, variables) => {
-      console.error(`Failed to invoke ${variables.hookName} hook`, error);
-      showErrorToast(errorMessageForHook(variables.hookName));
+      const fallback = errorMessageForHook(variables.hookName);
+      const message = getApiErrorMessage(error, fallback);
+      console.error(`Failed to invoke ${variables.hookName} hook: ${message}`);
+      showErrorToast(message);
     },
   });
 }

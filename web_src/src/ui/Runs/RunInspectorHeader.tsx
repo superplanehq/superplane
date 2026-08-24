@@ -4,6 +4,7 @@ import type { CanvasesCanvasRun } from "@/api-client";
 import { Timestamp } from "@/components/Timestamp";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { usePermissions } from "@/contexts/usePermissions";
 import { appRunPath } from "@/lib/appPaths";
 import { formatMinutesSecondsDuration } from "@/lib/duration";
 import { cn } from "@/lib/utils";
@@ -71,6 +72,8 @@ export function RunInspectorHeader({
   const { organizationId: routeOrganizationId } = useParams<{ organizationId: string }>();
   const resolvedOrganizationId = organizationId ?? routeOrganizationId;
   const parentRunHref = resolveParentRunHref(run, resolvedOrganizationId);
+  const { canAct } = usePermissions();
+  const canUpdateCanvas = canAct("canvases", "update");
   const status = getRunStatus(run);
   const duration = calculateRunDuration(run);
   const durationText = duration !== null ? formatMinutesSecondsDuration(duration) : "";
@@ -114,27 +117,29 @@ export function RunInspectorHeader({
               {stepCount} {stepCount === 1 ? "step" : "steps"}
             </span>
           </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="inline-flex">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  disabled={actionDisabled || actionPending}
-                  onClick={onAction}
-                  className={cn(
-                    isStopAction &&
-                      "border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/50 dark:hover:text-red-200",
-                  )}
-                >
-                  {actionPending ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : null}
-                  {actionPending ? `${actionLabel}...` : actionLabel}
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{actionTooltip}</TooltipContent>
-          </Tooltip>
+          {canUpdateCanvas ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    disabled={actionDisabled || actionPending}
+                    onClick={onAction}
+                    className={cn(
+                      isStopAction &&
+                        "border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/50 dark:hover:text-red-200",
+                    )}
+                  >
+                    {actionPending ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : null}
+                    {actionPending ? `${actionLabel}...` : actionLabel}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{actionTooltip}</TooltipContent>
+            </Tooltip>
+          ) : null}
         </div>
       </div>
     </div>

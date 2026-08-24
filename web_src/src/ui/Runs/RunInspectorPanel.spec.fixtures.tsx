@@ -9,8 +9,15 @@ import type {
   SuperplaneComponentsNode,
 } from "@/api-client";
 import { AccountContext } from "@/contexts/accountContextState";
+import { PermissionsContext } from "@/contexts/permissionsContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { RunInspectorPanel } from "./RunInspectorPanel";
+
+const defaultPermissionsValue = {
+  permissions: [],
+  isLoading: false,
+  canAct: () => true,
+} as unknown as React.ContextType<typeof PermissionsContext>;
 
 export const executions: CanvasesCanvasNodeExecution[] = [
   {
@@ -121,39 +128,41 @@ export function renderInspector({
   });
 
   return render(
-    <QueryClientProvider client={queryClient}>
-      <AccountContext.Provider
-        value={{
-          account: account ? { ...account, has_password: account.has_password ?? false } : null,
-          loading: false,
-          setupRequired: false,
-        }}
-      >
-        <ThemeProvider>
-          <RunInspectorPanel
-            canvasId="canvas-1"
-            organizationId="org-1"
-            run={inspectedRun}
-            workflowNodes={inspectedWorkflowNodes}
-            componentDefinitions={inspectedComponentDefinitions}
-            currentUser={
-              passCurrentUser && account
-                ? { id: account.id, email: account.email, roles: account.roles, groups: account.groups }
-                : undefined
-            }
-            selectedNodeId={selectedNodeId}
-            onSelectNode={onSelectNode}
-            onEditNode={onEditNode}
-            onRerunCreated={onRerunCreated}
-            runNavigation={runNavigation}
-            onNavigateRun={onNavigateRun}
-            onNavigateOlder={onNavigateOlder}
-            factoryContext={factoryContext}
-            onClose={onClose}
-          />
-        </ThemeProvider>
-      </AccountContext.Provider>
-    </QueryClientProvider>,
+    <PermissionsContext.Provider value={defaultPermissionsValue}>
+      <QueryClientProvider client={queryClient}>
+        <AccountContext.Provider
+          value={{
+            account: account ? { ...account, has_password: account.has_password ?? false } : null,
+            loading: false,
+            setupRequired: false,
+          }}
+        >
+          <ThemeProvider>
+            <RunInspectorPanel
+              canvasId="canvas-1"
+              organizationId="org-1"
+              run={inspectedRun}
+              workflowNodes={inspectedWorkflowNodes}
+              componentDefinitions={inspectedComponentDefinitions}
+              currentUser={
+                passCurrentUser && account
+                  ? { id: account.id, email: account.email, roles: account.roles, groups: account.groups }
+                  : undefined
+              }
+              selectedNodeId={selectedNodeId}
+              onSelectNode={onSelectNode}
+              onEditNode={onEditNode}
+              onRerunCreated={onRerunCreated}
+              runNavigation={runNavigation}
+              onNavigateRun={onNavigateRun}
+              onNavigateOlder={onNavigateOlder}
+              factoryContext={factoryContext}
+              onClose={onClose}
+            />
+          </ThemeProvider>
+        </AccountContext.Provider>
+      </QueryClientProvider>
+    </PermissionsContext.Provider>,
   );
 }
 
@@ -169,21 +178,23 @@ export function renderInteractiveInspector() {
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
     return (
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <RunInspectorPanel
-            canvasId="canvas-1"
-            organizationId="org-1"
-            run={run}
-            workflowNodes={workflowNodes}
-            componentDefinitions={componentDefinitions}
-            selectedNodeId={selectedNodeId}
-            onSelectNode={setSelectedNodeId}
-            onClearSelectedNode={() => setSelectedNodeId(null)}
-            onClose={vi.fn()}
-          />
-        </ThemeProvider>
-      </QueryClientProvider>
+      <PermissionsContext.Provider value={defaultPermissionsValue}>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider>
+            <RunInspectorPanel
+              canvasId="canvas-1"
+              organizationId="org-1"
+              run={run}
+              workflowNodes={workflowNodes}
+              componentDefinitions={componentDefinitions}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={setSelectedNodeId}
+              onClearSelectedNode={() => setSelectedNodeId(null)}
+              onClose={vi.fn()}
+            />
+          </ThemeProvider>
+        </QueryClientProvider>
+      </PermissionsContext.Provider>
     );
   }
 
