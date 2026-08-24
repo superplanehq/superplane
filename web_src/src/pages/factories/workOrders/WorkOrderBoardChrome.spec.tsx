@@ -11,7 +11,7 @@ describe("WorkOrderKanbanBoard", () => {
         <WorkOrderBoardLane
           title="Plan"
           count={0}
-          emptyDescription="No work orders in this phase."
+          emptyDescription="Nothing here."
           testId="lane-plan"
         />
       </WorkOrderKanbanBoard>,
@@ -29,15 +29,30 @@ describe("WorkOrderKanbanBoard", () => {
       <WorkOrderBoardLane
         title="Verify"
         count={0}
-        emptyDescription="No work orders in this phase."
+        emptyDescription="Nothing here."
         testId="lane-empty"
       />,
     );
 
-    const emptyCopy = screen.getByText("No work orders in this phase.");
+    const emptyCopy = screen.getByText("Nothing here.");
     expect(emptyCopy).toBeInTheDocument();
     expect(emptyCopy.className).toContain("flex-1");
     expect(screen.queryByText("0")).not.toBeInTheDocument();
+  });
+
+  it("renders custom empty content instead of the dashed copy", () => {
+    render(
+      <WorkOrderBoardLane
+        title="Backlog"
+        count={0}
+        emptyDescription="No work orders in the backlog."
+        emptyContent={<p data-testid="custom-empty">Tickets land here first.</p>}
+        testId="lane-hint"
+      />,
+    );
+
+    expect(screen.getByTestId("custom-empty")).toHaveTextContent("Tickets land here first.");
+    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
   });
 
   it("renames the lane title on Enter when canRename is set", async () => {

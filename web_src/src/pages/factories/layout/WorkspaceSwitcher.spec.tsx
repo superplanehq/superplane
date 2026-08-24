@@ -4,7 +4,11 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { TooltipProvider } from "@/ui/tooltip";
-import { FACTORIES_ORGANIZATION_ID, REFUND_FACTORY } from "../__fixtures__/factoryPageResponses";
+import {
+  ACME_ONBOARDING_FACTORY,
+  FACTORIES_ORGANIZATION_ID,
+  REFUND_FACTORY,
+} from "../__fixtures__/factoryPageResponses";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 function renderSwitcher() {
@@ -14,7 +18,7 @@ function renderSwitcher() {
         <WorkspaceSwitcher
           organizationId={FACTORIES_ORGANIZATION_ID}
           factory={REFUND_FACTORY}
-          factories={[REFUND_FACTORY]}
+          factories={[REFUND_FACTORY, ACME_ONBOARDING_FACTORY]}
           canCreateFactory
           permissionsLoading={false}
           onCreateFactory={() => undefined}
@@ -33,5 +37,8 @@ describe("WorkspaceSwitcher", () => {
     expect(trigger).toHaveAccessibleName(/Switch workspace, Semaphore/);
     await user.click(trigger);
     expect(screen.getByTestId(`factories-workspace-option-${REFUND_FACTORY.id}`)).toHaveTextContent("Semaphore");
+    expect(screen.getByTestId(`factories-workspace-option-${ACME_ONBOARDING_FACTORY.id}`)).toHaveTextContent(
+      "Acme onboarding",
+    );
   });
 });

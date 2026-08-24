@@ -4,6 +4,8 @@ import { Maximize2, MoreHorizontal, Pencil } from "lucide-react";
 import { useCallback, useMemo, type MouseEvent } from "react";
 
 import type { ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
+import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/buttonVariants";
 import { useTheme } from "@/contexts/useTheme";
 import { factoryCanvasBackground, factoryEdgePalette } from "@/lib/factoryCanvasChrome";
 import { cn } from "@/lib/utils";
@@ -133,6 +135,9 @@ export function CompactLineCanvas({
   editHref,
   expandHref,
   showHeader = true,
+  headerEdit = "menu",
+  editLabel = "Edit Automation",
+  onEdit,
 }: {
   canvas: SplitRunCanvasModel;
   selectedId: string | null;
@@ -140,6 +145,9 @@ export function CompactLineCanvas({
   editHref?: string;
   expandHref?: string;
   showHeader?: boolean;
+  headerEdit?: "menu" | "button";
+  editLabel?: string;
+  onEdit?: () => void;
 }) {
   const { nodes, edges } = useMemo(() => graphFromCanvas(canvas, selectedId, onSelect), [canvas, selectedId, onSelect]);
   const { resolvedTheme } = useTheme();
@@ -161,7 +169,7 @@ export function CompactLineCanvas({
           <p className="min-w-0 truncate text-[15px] font-semibold tracking-[-0.02em] text-foreground">
             {canvas.title}
           </p>
-          <div className="flex shrink-0 items-center gap-0.5">
+          <div className="flex shrink-0 items-center gap-2">
             {expandHref ? (
               <Link
                 href={expandHref}
@@ -172,7 +180,19 @@ export function CompactLineCanvas({
                 <Maximize2 className="size-3.5" aria-hidden />
               </Link>
             ) : null}
-            <CanvasOverflowMenu title={canvas.title} editHref={editHref} />
+            {headerEdit === "button" ? (
+              editHref ? (
+                <Link href={editHref} className={buttonVariants({ size: "sm" })} data-testid="split-run-canvas-edit">
+                  {editLabel}
+                </Link>
+              ) : (
+                <Button type="button" size="sm" onClick={onEdit} data-testid="split-run-canvas-edit">
+                  {editLabel}
+                </Button>
+              )
+            ) : (
+              <CanvasOverflowMenu title={canvas.title} editHref={editHref} />
+            )}
           </div>
         </div>
       ) : null}
