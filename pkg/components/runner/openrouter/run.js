@@ -4,14 +4,17 @@
 /**
  * SuperPlane OpenRouter agent: bash, read, edit, write tools.
  *
- *   node run.js <prompt-file> [model]
+ *   node run.js <prompt-file> [model] [max-turns]
  */
 
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const MAX_TURNS = 32;
+const DEFAULT_MAX_TURNS = 128;
+const MAX_TURNS_LIMIT = 256;
+const WRAP_UP_PROMPT =
+  "You have no remaining tool turns. Do not call tools. Write a plain-text summary of what you completed and what remains.";
 const TOOLS = [
   {
     type: "function",
@@ -70,10 +73,10 @@ const TOOLS = [
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    console.error("usage: node run.js <prompt-file> [model]");
+    console.error("usage: node run.js <prompt-file> [model] [max-turns]");
     process.exit(2);
   }
-  runPrompt(args[0], args[1] || "")
+  runPrompt(args[0], args[1] || "", args[2])
     .then((code) => process.exit(code))
     .catch((err) => {
       console.error(err && err.message ? err.message : err);
@@ -81,7 +84,7 @@ function main() {
     });
 }
 
-async function runPrompt(promptFile, model, maxTurns = MAX_TURNS) {
+async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
   const resultFile = process.env.SUPERPLANE_RESULT_FILE;
   if (!resultFile) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
@@ -114,19 +117,18 @@ async function runPrompt(promptFile, model, maxTurns = MAX_TURNS) {
   let lastText = "";
   let costMicros = 0;
   let pendingToolCalls = false;
-  const turnLimit = Number(maxTurns) > 0 ? Number(maxTurns) : MAX_TURNS;
+  const turnLimit = resolveMaxTurns(maxTurns);
 
   for (let turn = 0; turn < turnLimit; turn += 1) {
-    const response = await chat(baseURL, apiKey, model, messages);
+    const response = await chat(baseURL, apiKey, model, messages, true);
     addUsage(usage, response.usage);
     costMicros += usageCostMicros(response.usage);
 
     const message = (response.choices && response.choices[0] && response.choices[0].message) || {};
     messages.push(message);
-    if (message.content) {
-      lastText = Array.isArray(message.content)
-        ? message.content.map((part) => part.text || "").join("")
-        : String(message.content);
+    const text = assistantText(message);
+    if (text) {
+      lastText = text;
       process.stdout.write(`${lastText}\n`);
     }
 
@@ -148,6 +150,12 @@ async function runPrompt(promptFile, model, maxTurns = MAX_TURNS) {
     }
   }
 
+  if (pendingToolCalls) {
+    const wrapUp = await requestWrapUp(baseURL, apiKey, model, messages, usage, lastText, turnLimit);
+    lastText = wrapUp.text;
+    costMicros += wrapUp.costMicros;
+  }
+
   fs.writeFileSync(
     resultFile,
     `${JSON.stringify({
@@ -163,26 +171,61 @@ async function runPrompt(promptFile, model, maxTurns = MAX_TURNS) {
     usage,
     total_cost_usd: costMicros > 0 ? costMicros / 1000000 : undefined,
   });
-  if (pendingToolCalls) {
-    process.stderr.write(`OpenRouter agent reached ${turnLimit} turns with pending tool calls\n`);
-    return 1;
-  }
   return 0;
 }
 
-async function chat(baseURL, apiKey, model, messages) {
+function resolveMaxTurns(maxTurns) {
+  const n = Number(maxTurns);
+  if (!(n > 0)) {
+    return DEFAULT_MAX_TURNS;
+  }
+  return Math.min(Math.floor(n), MAX_TURNS_LIMIT);
+}
+
+function assistantText(message) {
+  if (!message || !message.content) {
+    return "";
+  }
+  if (Array.isArray(message.content)) {
+    return message.content.map((part) => part.text || "").join("");
+  }
+  return String(message.content);
+}
+
+async function requestWrapUp(baseURL, apiKey, model, messages, usage, lastText, turnLimit) {
+  process.stderr.write(
+    `OpenRouter agent reached ${turnLimit} turns; requesting a final response without tools\n`,
+  );
+  messages.push({ role: "user", content: WRAP_UP_PROMPT });
+  const response = await chat(baseURL, apiKey, model, messages, false);
+  addUsage(usage, response.usage);
+  const message = (response.choices && response.choices[0] && response.choices[0].message) || {};
+  const text = assistantText(message);
+  if (text) {
+    process.stdout.write(`${text}\n`);
+  }
+  return {
+    text: text || lastText,
+    costMicros: usageCostMicros(response.usage),
+  };
+}
+
+async function chat(baseURL, apiKey, model, messages, withTools) {
+  const payload = {
+    model,
+    messages,
+    usage: { include: true },
+  };
+  if (withTools) {
+    payload.tools = TOOLS;
+  }
   const response = await fetch(`${baseURL}/chat/completions`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model,
-      messages,
-      tools: TOOLS,
-      usage: { include: true },
-    }),
+    body: JSON.stringify(payload),
   });
   const body = await response.json();
   if (!response.ok) {
@@ -283,4 +326,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { runPrompt, MAX_TURNS };
+module.exports = { runPrompt, DEFAULT_MAX_TURNS, MAX_TURNS_LIMIT };

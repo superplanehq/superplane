@@ -7,6 +7,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner"
 )
 
+const (
+	DefaultMaxTurns = 128
+	MaxTurnsLimit   = 256
+)
+
 type RunOpenRouterSpec struct {
 	MachineType             string                        `mapstructure:"machineType"`
 	Steps                   []runner.AgentStep            `mapstructure:"steps"`
@@ -16,6 +21,7 @@ type RunOpenRouterSpec struct {
 	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
 	Environment             []runner.EnvironmentVariable  `mapstructure:"environment"`
 	ExecutionTimeoutSeconds int                           `mapstructure:"executionTimeoutSeconds"`
+	MaxTurns                int                           `mapstructure:"maxTurns"`
 }
 
 func decodeRunOpenRouterSpec(raw any) (RunOpenRouterSpec, error) {
@@ -30,6 +36,7 @@ func decodeRunOpenRouterSpec(raw any) (RunOpenRouterSpec, error) {
 	if spec.ExecutionTimeoutSeconds <= 0 {
 		spec.ExecutionTimeoutSeconds = runner.DefaultExecutionTimeoutSeconds
 	}
+	spec.MaxTurns = effectiveMaxTurns(spec.MaxTurns)
 	return spec, nil
 }
 
@@ -63,10 +70,16 @@ func validateRunOpenRouterSpec(spec RunOpenRouterSpec) error {
 			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", runner.MaxExecutionTimeoutSecondsRequest, runner.DefaultExecutionTimeoutSeconds)
 		}
 	}
+	if spec.MaxTurns != 0 {
+		if spec.MaxTurns < 1 || spec.MaxTurns > MaxTurnsLimit {
+			return fmt.Errorf("max turns must be between 1 and %d, or 0 to use the default (%d)", MaxTurnsLimit, DefaultMaxTurns)
+		}
+	}
 	return nil
 }
 
 func buildOpenRouterBrokerTask(spec RunOpenRouterSpec) ([]runner.BrokerCommand, []runner.BrokerTaskFile) {
+	maxTurns := effectiveMaxTurns(spec.MaxTurns)
 	return runner.BuildAgentBrokerTask(
 		"Prepare OpenRouter agent",
 		runner.NodePrepareScript("", "", spec.WorkingDirectory),
@@ -77,10 +90,18 @@ func buildOpenRouterBrokerTask(spec RunOpenRouterSpec) ([]runner.BrokerCommand, 
 		strings.TrimSpace(spec.Model),
 		func(promptName, model string) string {
 			return fmt.Sprintf(
-				`node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/%s" %s`,
+				`node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/%s" %s %d`,
 				promptName,
 				runner.ShellSingleQuote(model),
+				maxTurns,
 			)
 		},
 	)
+}
+
+func effectiveMaxTurns(maxTurns int) int {
+	if maxTurns <= 0 {
+		return DefaultMaxTurns
+	}
+	return maxTurns
 }
