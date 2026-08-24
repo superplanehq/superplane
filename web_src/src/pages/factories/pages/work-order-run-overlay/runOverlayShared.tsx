@@ -24,7 +24,7 @@ import {
 export function RunOverlayBoardBackdrop() {
   return (
     <div className="flex min-h-svh gap-3 bg-muted/40 p-4" aria-hidden>
-      {["Plan", "Implement", "Verify"].map((lane) => (
+      {["Implement", "Verify", "Done"].map((lane) => (
         <div key={lane} className="flex min-h-[36rem] min-w-72 flex-1 flex-col rounded-xl bg-card/70 p-3">
           <p className="mb-3 text-[13px] font-medium text-muted-foreground">{lane}</p>
           <div className="space-y-2">
@@ -32,7 +32,7 @@ export function RunOverlayBoardBackdrop() {
               {lane === "Implement" ? "Ship idempotent refund retries" : "Queued work order"}
             </div>
             <div className="rounded-lg border border-border bg-card px-3 py-2.5 text-[13px] text-muted-foreground">
-              {lane === "Plan" ? "Draft retry telemetry" : "Follow-up work"}
+              {lane === "Verify" ? "Draft retry telemetry" : "Follow-up work"}
             </div>
           </div>
         </div>

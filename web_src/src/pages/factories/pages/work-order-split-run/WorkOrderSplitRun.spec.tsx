@@ -66,7 +66,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-stream-backlog")).not.toBeInTheDocument();
 
     const plan = screen.getByTestId("split-run-phase-plan");
-    expect(within(plan).getByText(/Planning/)).toBeInTheDocument();
+    expect(within(plan).getAllByText(/Create plan/).length).toBeGreaterThan(0);
     expect(within(plan).getByText("1m 12s")).toBeInTheDocument();
     expect(within(plan).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stream-plan")).not.toBeInTheDocument();
@@ -125,7 +125,7 @@ describe("WorkOrderSplitRunPopup", () => {
     renderSplitRun();
 
     const plan = screen.getByTestId("split-run-phase-plan");
-    const planToggle = within(plan).getByRole("button", { name: /Plan/ });
+    const planToggle = within(plan).getByRole("button", { name: /Create plan/ });
     const planArtifacts = within(plan).getByTestId("split-run-phase-artifacts-plan");
     expect(planToggle.parentElement).toBe(planArtifacts.parentElement);
     expect(within(planArtifacts).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
@@ -154,11 +154,11 @@ describe("WorkOrderSplitRunPopup", () => {
   });
 
   it("shows canvas artifacts on a collapsed automation before it is opened", () => {
-    renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER) });
+    renderSplitRun();
 
-    const plan = screen.getByTestId("split-run-phase-plan-0");
-    expect(screen.queryByTestId("split-run-stream-plan-0")).not.toBeInTheDocument();
-    expect(within(plan).getByTestId("split-run-phase-artifacts-plan-0")).toBeInTheDocument();
+    const plan = screen.getByTestId("split-run-phase-plan");
+    expect(screen.queryByTestId("split-run-stream-plan")).not.toBeInTheDocument();
+    expect(within(plan).getByTestId("split-run-phase-artifacts-plan")).toBeInTheDocument();
     expect(within(plan).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
   });
 
@@ -217,18 +217,17 @@ describe("WorkOrderSplitRunPopup", () => {
               line: { id: "line-1", name: "plan-and-implement" },
               state: "STATE_ACTIVE",
               stepExecutions: [
-                { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
                 {
                   id: "e-impl",
                   step: "Implement",
-                  stepIndex: 1,
+                  stepIndex: 0,
                   state: "STATE_FINISHED",
                   result: "RESULT_PASSED",
                 },
                 {
                   id: "e-verify",
                   step: "Verify",
-                  stepIndex: 2,
+                  stepIndex: 1,
                   state: "STATE_STARTED",
                   result: "RESULT_UNKNOWN",
                 },
@@ -259,11 +258,10 @@ describe("WorkOrderSplitRunPopup", () => {
             line: { id: "line-1", name: "plan-and-implement" },
             state: "STATE_FINISHED",
             stepExecutions: [
-              { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
               {
                 id: "e-impl",
                 step: "Implement",
-                stepIndex: 1,
+                stepIndex: 0,
                 state: "STATE_FINISHED",
                 result: "RESULT_PASSED",
               },
@@ -412,7 +410,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const user = userEvent.setup();
     renderSplitRun();
 
-    await user.click(within(screen.getByTestId("split-run-phase-plan")).getByRole("button", { name: /Plan/ }));
+    await user.click(within(screen.getByTestId("split-run-phase-plan")).getByRole("button", { name: /Create plan/ }));
 
     expect(screen.getByTestId("split-run-stream-plan")).toBeInTheDocument();
     expect(within(screen.getByTestId("split-run-stream-plan")).queryByText("Started")).not.toBeInTheDocument();
@@ -444,33 +442,32 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getAllByText("From GH issue?").length).toBeGreaterThan(0);
   });
 
-  it("opens a mapped plan-running work order on the plan canvas", () => {
+  it("opens a mapped implement-running work order on the implement canvas", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({
         ...OPEN_WORK_ORDER,
-        title: "Plan job",
+        title: "Implement job",
         lineDispatches: [
           {
             id: "dispatch-1",
             line: { id: "line-1", name: "plan-and-implement" },
             state: "STATE_ACTIVE",
             stepExecutions: [
-              { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
+              { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
             ],
           },
         ],
       }),
     });
 
-    expect(screen.getByRole("heading", { name: "Plan job" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Implement job" })).toBeInTheDocument();
     expect(screen.getByTestId("split-run-phase-ingest")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-phase-analyze")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-phase-plan")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-phase-score")).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-stream-plan-0")).toBeInTheDocument();
-    expect(screen.getByText("Planning")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-stream-implement-0")).toBeInTheDocument();
+    expect(screen.getAllByText("Implementation").length).toBeGreaterThan(0);
     expect(screen.getAllByText("From GH issue?").length).toBeGreaterThan(0);
-    expect(screen.queryByTestId("split-run-phase-implement")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
   });

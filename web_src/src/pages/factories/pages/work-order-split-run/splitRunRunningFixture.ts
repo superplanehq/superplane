@@ -78,11 +78,12 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
     },
     {
       id: "plan",
-      name: "Plan",
+      name: "Create plan",
       status: "passed",
       duration: "1m 12s",
-      componentName: "Planning",
+      componentName: "Create plan",
       artifacts: [PLAN_ARTIFACT],
+      canvasKey: "planning",
       stream: [
         {
           id: "plan-read",

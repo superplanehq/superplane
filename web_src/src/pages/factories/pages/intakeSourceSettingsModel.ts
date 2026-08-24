@@ -9,7 +9,7 @@ export function isIntakeSettingsTab(value: string | null | undefined): value is 
   return value === "general" || value === "runs" || value === "automation";
 }
 export type IntakeTicketPlacement = "backlog" | "rejected" | "progressed" | "below-threshold";
-export type IntakeLineStage = "plan" | "implement" | "verify" | "done";
+export type IntakeLineStage = "implement" | "verify" | "done";
 
 export interface IntakeAutomationRun {
   id: string;
@@ -61,7 +61,6 @@ export const INTAKE_SETTINGS_COPY = {
   rejectedActivity: "A person rejected this ticket.",
   belowThreshold: "Not moved to Backlog",
   belowThresholdActivity: "Score is below the minimum confidence.",
-  stagePlan: "Plan",
   stageImplement: "Implement",
   stageVerify: "Verify",
   stageDone: "Done",
@@ -87,7 +86,6 @@ export const INTAKE_SETTINGS_COPY = {
 } as const;
 
 const STAGE_LABEL: Record<IntakeLineStage, string> = {
-  plan: INTAKE_SETTINGS_COPY.stagePlan,
   implement: INTAKE_SETTINGS_COPY.stageImplement,
   verify: INTAKE_SETTINGS_COPY.stageVerify,
   done: INTAKE_SETTINGS_COPY.stageDone,
@@ -115,8 +113,8 @@ export const GITHUB_INTAKE_RUNS: IntakeAutomationRun[] = [
     ranMinutesAgo: 120,
     analyzedMinutesAgo: 110,
     placement: "progressed",
-    stage: "plan",
-    activity: "Drafting the 409 response plan.",
+    stage: "verify",
+    activity: "Checking the 409 response.",
   },
   {
     id: "gh-issue-3",

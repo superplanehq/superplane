@@ -1,8 +1,8 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 
-import { REVIEW_CANDIDATE_WORK_ORDERS } from "../pages/onboarding/first-run/reviewCandidates";
+import { BOARD_REVIEW_CANDIDATE_WORK_ORDERS } from "../pages/onboarding/first-run/reviewCandidates";
 import {
-  CLOSED_WORK_ORDER,
+  APPROVAL_WORK_ORDER,
   FAILED_WORK_ORDER,
   HOUR_AGO,
   OPEN_WORK_ORDER,
@@ -10,6 +10,7 @@ import {
   PR_CLOSURE_COMPLETED_WORK_ORDER,
   PRIMARY_FACTORY_ID,
   REFUND_LINE_PLAN_ID,
+  RUNNING_WORK_ORDER,
   TWO_HOURS_AGO,
   YESTERDAY,
   defaultFactoriesFixture,
@@ -25,8 +26,6 @@ import {
 } from "./lineMetricsPlanLine";
 import {
   BOARD_DONE_CANCELED_ORDER,
-  BOARD_DONE_COMPLETED_PLAYBOOK,
-  BOARD_DONE_COMPLETED_SLA,
   BOARD_DONE_REJECTED_ORDER,
   BOARD_IMPLEMENT_FAILED_ORDER,
   FEATURE_CI_WORK_ORDER,
@@ -35,30 +34,6 @@ import {
   FEATURE_RUNNING_WORK_ORDER,
   ONBOARDING_FACTORY_LINE,
 } from "./lineMetricsBoardOrders";
-
-function withPlanPhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
-  const orderId = order.id;
-  if (!orderId || orderId !== OPEN_WORK_ORDER.id) {
-    return order;
-  }
-  return {
-    ...order,
-    lineDispatches: [
-      planLineActiveDispatch(orderId, [
-        {
-          id: "exec-plan-open",
-          step: "Plan",
-          stepIndex: 0,
-          state: "STATE_STARTED",
-          result: "RESULT_UNKNOWN",
-          createdAt: HOUR_AGO,
-          updatedAt: HOUR_AGO,
-          run: { id: "run-plan-open", appId: "app-refund-planner", appName: "Plan" },
-        },
-      ]),
-    ],
-  };
-}
 
 function withVerifyPhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
   const orderId = order.id;
@@ -70,19 +45,9 @@ function withVerifyPhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
     lineDispatches: [
       planLineActiveDispatch(orderId, [
         {
-          id: "exec-verify-plan",
-          step: "Plan",
-          stepIndex: 0,
-          state: "STATE_FINISHED",
-          result: "RESULT_PASSED",
-          createdAt: TWO_HOURS_AGO,
-          updatedAt: TWO_HOURS_AGO,
-          run: { id: "run-verify-plan", appId: "app-refund-planner", appName: "Plan" },
-        },
-        {
           id: "exec-verify-implement",
           step: "Implement",
-          stepIndex: 1,
+          stepIndex: 0,
           state: "STATE_FINISHED",
           result: "RESULT_PASSED",
           createdAt: TWO_HOURS_AGO,
@@ -92,7 +57,7 @@ function withVerifyPhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
         {
           id: "exec-verify-open",
           step: "Verify",
-          stepIndex: 2,
+          stepIndex: 1,
           state: "STATE_STARTED",
           result: "RESULT_UNKNOWN",
           createdAt: HOUR_AGO,
@@ -121,12 +86,12 @@ function withWaitingPrReview(order: FactoriesWorkOrder): FactoriesWorkOrder {
         result: "RESULT_UNKNOWN",
         stepExecutions: [
           ...(dispatch.stepExecutions ?? []).map((execution) =>
-            execution.stepIndex === 1 ? { ...execution, result: "RESULT_PASSED" as const } : execution,
+            execution.step === "Implement" ? { ...execution, result: "RESULT_PASSED" as const } : execution,
           ),
           {
             id: "exec-verify-pr",
             step: "Verify",
-            stepIndex: 2,
+            stepIndex: 1,
             state: "STATE_FINISHED",
             result: "RESULT_PASSED" as const,
             createdAt: HOUR_AGO,
@@ -141,11 +106,9 @@ function withWaitingPrReview(order: FactoriesWorkOrder): FactoriesWorkOrder {
 
 function withDonePhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
   const doneRun =
-    order.id === CLOSED_WORK_ORDER.id
-      ? { executionId: "exec-done-closed", runId: "run-done-closed", appName: "Done" }
-      : order.id === PR_CLOSURE_COMPLETED_WORK_ORDER.id
-        ? { executionId: "exec-done-pr-closure", runId: "run-done-pr-closure", appName: "PR Closure" }
-        : null;
+    order.id === PR_CLOSURE_COMPLETED_WORK_ORDER.id
+      ? { executionId: "exec-done-pr-closure", runId: "run-done-pr-closure", appName: "PR Closure" }
+      : null;
   if (!doneRun) {
     return order;
   }
@@ -158,13 +121,13 @@ function withDonePhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
     lineDispatches: [
       {
         ...dispatch,
-        steps: [...(dispatch.steps ?? []), { name: "Done", stepIndex: 3 }],
+        steps: [...(dispatch.steps ?? []), { name: "Done", stepIndex: 2 }],
         stepExecutions: [
           ...(dispatch.stepExecutions ?? []),
           {
             id: doneRun.executionId,
             step: "Done",
-            stepIndex: 3,
+            stepIndex: 2,
             state: "STATE_FINISHED",
             result: "RESULT_PASSED",
             createdAt: YESTERDAY,
@@ -181,6 +144,10 @@ function withDonePhase(order: FactoriesWorkOrder): FactoriesWorkOrder {
  * Extra lines for the populated Lines list: unused onboarding plus a
  * four-phase feature line.
  */
+export const LINE_BOARD_VERIFY_ENUM_ORDER = withVerifyPhase(OPEN_WORK_ORDER_SECONDARY);
+export const LINE_BOARD_VERIFY_PR_REVIEW_ORDER = withWaitingPrReview(FAILED_WORK_ORDER);
+export const LINE_BOARD_DONE_RECEIPTS_ORDER = withDonePhase(PR_CLOSURE_COMPLETED_WORK_ORDER);
+
 export const lineMetricsFactoriesFixture: FactoriesFixture = {
   ...defaultFactoriesFixture,
   factories: defaultFactoriesFixture.factories.map((factory) => {
@@ -199,15 +166,14 @@ export const lineMetricsFactoriesFixture: FactoriesFixture = {
   workOrdersByFactoryId: {
     ...defaultFactoriesFixture.workOrdersByFactoryId,
     [PRIMARY_FACTORY_ID]: [
-      ...REVIEW_CANDIDATE_WORK_ORDERS,
-      ...(defaultFactoriesFixture.workOrdersByFactoryId[PRIMARY_FACTORY_ID] ?? [])
-        .map(withPlanPhase)
-        .map(withVerifyPhase)
-        .map(withWaitingPrReview)
-        .map(withDonePhase),
+      // Board inventory: 3 backlog, 3 implement, 2 verify, 3 done.
+      ...BOARD_REVIEW_CANDIDATE_WORK_ORDERS,
+      RUNNING_WORK_ORDER,
+      APPROVAL_WORK_ORDER,
       BOARD_IMPLEMENT_FAILED_ORDER,
-      BOARD_DONE_COMPLETED_SLA,
-      BOARD_DONE_COMPLETED_PLAYBOOK,
+      LINE_BOARD_VERIFY_ENUM_ORDER,
+      LINE_BOARD_VERIFY_PR_REVIEW_ORDER,
+      LINE_BOARD_DONE_RECEIPTS_ORDER,
       BOARD_DONE_REJECTED_ORDER,
       BOARD_DONE_CANCELED_ORDER,
       FEATURE_RUNNING_WORK_ORDER,
@@ -235,7 +201,7 @@ export const fiveStepLineFactoriesFixture: FactoriesFixture = {
           steps: [
             ...(line.steps ?? []),
             runAppStep("app-refund-verifier", "start-verification"),
-            runAppStep("app-refund-planner", "start-plan"),
+            runAppStep("app-refund-implementer", "start-observe"),
           ],
         };
       }),

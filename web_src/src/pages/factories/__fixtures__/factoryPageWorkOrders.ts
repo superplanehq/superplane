@@ -93,17 +93,7 @@ export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
   updatedAt: TWO_HOURS_AGO,
   createdBy: SENTRY_CREATED_BY,
   assignees: [{ id: ARNOLD_USER.id, name: ARNOLD_USER.name }],
-  lineDispatches: [
-    planLineDispatch([
-      planLineExecution("plan", {
-        id: "schema-plan",
-        state: "STATE_FINISHED",
-        result: "RESULT_PASSED",
-        createdAt: LAST_WEEK,
-        updatedAt: LAST_WEEK,
-      }),
-    ]),
-  ],
+  lineDispatches: [],
 };
 
 export const QUESTION_WORK_ORDER: FactoriesWorkOrder = {
@@ -120,23 +110,14 @@ export const QUESTION_WORK_ORDER: FactoriesWorkOrder = {
   updatedAt: HOUR_AGO,
   createdBy: SLACK_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  lineDispatches: [
-    planLineDispatch([
-      planLineExecution("plan", {
-        id: "question-plan",
-        state: "STATE_FINISHED",
-        result: "RESULT_PASSED",
-        updatedAt: HOUR_AGO,
-      }),
-    ]),
-  ],
+  lineDispatches: [],
   statusNotes: [
     {
       key: "agent-question",
       kind: "info",
       headline: "The agent has a question",
       body: "Should the poller fail closed on the first timeout, or retry with backoff?",
-      automation: { appId: "app-refund-planner", appName: "Planning" },
+      automation: { appId: "app-refund-backlog", appName: "Ingest" },
       updatedAt: HOUR_AGO,
     },
   ],
@@ -158,12 +139,6 @@ export const APPROVAL_WORK_ORDER: FactoriesWorkOrder = {
   assignees: [{ id: ARNOLD_USER.id, name: ARNOLD_USER.name }],
   lineDispatches: [
     planLineDispatch([
-      planLineExecution("plan", {
-        id: "approval-plan",
-        state: "STATE_FINISHED",
-        result: "RESULT_PASSED",
-        updatedAt: TWO_HOURS_AGO,
-      }),
       planLineExecution("implement", {
         id: "approval-impl",
         state: "STATE_STARTED",
@@ -186,7 +161,7 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
     "",
     "- Seed a ledger with one refund and replay the retry burst from the incident.",
     "- Assert the ledger contains exactly one entry per refund after reconciliation.",
-    "- Run the test in the `verify` step of the plan-and-implement line.",
+    "- Run the test in the `verify` step of the line.",
   ].join("\n"),
   state: "STATE_OPEN",
   result: "RESULT_UNSPECIFIED",
@@ -196,14 +171,6 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     planLineDispatch([
-      planLineExecution("plan", {
-        id: "1",
-        state: "STATE_FINISHED",
-        result: "RESULT_PASSED",
-        updatedAt: TWO_HOURS_AGO,
-        totalTokens: "1800",
-        costCents: "45",
-      }),
       planLineExecution("implement", {
         id: "2",
         state: "STATE_STARTED",
@@ -238,14 +205,6 @@ export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
   assignees: [{ id: ARNOLD_USER.id, name: ARNOLD_USER.name }],
   lineDispatches: [
     planLineDispatch([
-      planLineExecution("plan", {
-        id: "3",
-        state: "STATE_FINISHED",
-        result: "RESULT_PASSED",
-        updatedAt: TWO_HOURS_AGO,
-        totalTokens: "2200",
-        costCents: "55",
-      }),
       planLineExecution("implement", {
         id: "4",
         state: "STATE_FINISHED",
@@ -410,14 +369,6 @@ export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     planLineDispatch([
-      planLineExecution("plan", {
-        id: "5",
-        state: "STATE_FINISHED",
-        result: "RESULT_PASSED",
-        updatedAt: LAST_WEEK,
-        totalTokens: "1500",
-        costCents: "40",
-      }),
       planLineExecution("implement", {
         id: "6",
         state: "STATE_FINISHED",
@@ -460,14 +411,6 @@ export const PR_CLOSURE_COMPLETED_WORK_ORDER: FactoriesWorkOrder = {
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     planLineDispatch([
-      planLineExecution("plan", {
-        id: "pr-plan",
-        state: "STATE_FINISHED",
-        result: "RESULT_PASSED",
-        updatedAt: LAST_WEEK,
-        totalTokens: "900",
-        costCents: "22",
-      }),
       planLineExecution("implement", {
         id: "pr-impl",
         state: "STATE_FINISHED",

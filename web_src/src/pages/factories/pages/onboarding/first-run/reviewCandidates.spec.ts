@@ -8,6 +8,7 @@ import {
   githubIssueUrl,
   reviewCandidateForWorkOrderId,
   REVIEW_CANDIDATE_COPY,
+  BOARD_REVIEW_CANDIDATES,
   REVIEW_CANDIDATE_WORK_ORDERS,
   REVIEW_CANDIDATES,
 } from "./reviewCandidates";
@@ -63,6 +64,14 @@ Move both images to Node 20.
 ## Verify
 
 - CI builds both images and runs the existing image smoke tests.`);
+  });
+
+  it("puts mixed confidence scores on the three board review tickets", () => {
+    expect(BOARD_REVIEW_CANDIDATES.map((candidate) => [candidate.ticketKey, candidate.confidenceScore])).toEqual([
+      ["PAY-842", 5],
+      ["PAY-844", 4],
+      ["PAY-845", 3],
+    ]);
   });
 
   it("builds draft backlog work orders for each candidate", () => {

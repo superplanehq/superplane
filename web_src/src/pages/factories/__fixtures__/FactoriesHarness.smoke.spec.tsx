@@ -297,17 +297,17 @@ describe("FactoriesHarness Acme onboarding", () => {
     expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getByTestId("lines-column-title-backlog")).toHaveTextContent("Backlog");
     await waitFor(() => {
-      expect(screen.getByTestId("lines-column-title-phase-0")).toHaveTextContent("Plan");
+      expect(screen.getByTestId("lines-column-title-phase-0")).toHaveTextContent("Implement");
     });
-    expect(screen.getByTestId("lines-column-title-phase-1")).toHaveTextContent("Implement");
-    expect(screen.getByTestId("lines-column-title-phase-2")).toHaveTextContent("Verify");
-    expect(screen.getByTestId("lines-column-title-phase-3")).toHaveTextContent("Done");
+    expect(screen.getByTestId("lines-column-title-phase-1")).toHaveTextContent("Verify");
+    expect(screen.getByTestId("lines-column-title-phase-2")).toHaveTextContent("Done");
+    expect(screen.queryByTestId("lines-column-title-phase-3")).not.toBeInTheDocument();
     expect(screen.getByTestId("backlog-onboarding-card")).toBeInTheDocument();
     expect(screen.getByTestId("lines-backlog-column")).not.toHaveTextContent("No work orders in the backlog.");
     expect(screen.getByTestId("lines-phase-column-0")).toHaveTextContent("Nothing here.");
     expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
     expect(screen.getByTestId("lines-phase-column-2")).toHaveTextContent("Nothing here.");
-    expect(screen.getByTestId("lines-phase-column-3")).toHaveTextContent("Nothing here.");
+    expect(screen.queryByTestId("lines-phase-column-3")).not.toBeInTheDocument();
     expect(screen.queryAllByTestId(/^work-order-card-/)).toHaveLength(0);
   }, 15000);
 
@@ -330,6 +330,6 @@ describe("FactoriesHarness Acme onboarding", () => {
     expect(screen.getByTestId("factories-sidebar")).toBeInTheDocument();
     expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.queryByTestId("workspace-setup")).not.toBeInTheDocument();
-    expect(screen.getAllByTestId(/^work-order-card-/).length).toBeGreaterThan(0);
+    expect((await screen.findAllByTestId(/^work-order-card-/, {}, { timeout: 8000 })).length).toBeGreaterThan(0);
   }, 15000);
 });

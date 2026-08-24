@@ -49,9 +49,6 @@ export const PLAN_LINE_APPS: FactoryApp[] = [
   SENTRY_INTAKE_APP,
   SLACK_INTAKE_APP,
   ...REFUND_FACTORY_APPS.map((app) => {
-    if (app.id === "app-refund-planner") {
-      return { ...app, name: "Plan" };
-    }
     if (app.id === "app-refund-implementer") {
       return { ...app, name: "Implement" };
     }
@@ -76,7 +73,6 @@ export function withPlanLinePhases(line: FactoriesFactoryLine): FactoriesFactory
   return {
     ...line,
     steps: [
-      runAppStep("app-refund-planner", "start-plan"),
       runAppStep("app-refund-implementer", "start-implementation"),
       runAppStep("app-refund-verifier", "start-verification"),
       runAppStep(PLAN_LINE_DONE_APP_ID, "start-done"),
@@ -92,10 +88,9 @@ export function planLineActiveDispatch(
     id: `dispatch-${REFUND_LINE_PLAN_ID}-${orderId}`,
     line: { id: REFUND_LINE_PLAN_ID, name: "plan-and-implement" },
     steps: [
-      { name: "Plan", stepIndex: 0 },
-      { name: "Implement", stepIndex: 1 },
-      { name: "Verify", stepIndex: 2 },
-      { name: "Done", stepIndex: 3 },
+      { name: "Implement", stepIndex: 0 },
+      { name: "Verify", stepIndex: 1 },
+      { name: "Done", stepIndex: 2 },
     ],
     state: "STATE_ACTIVE",
     result: "RESULT_UNKNOWN",

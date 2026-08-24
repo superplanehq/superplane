@@ -215,7 +215,7 @@ export function PhaseLogCard({
         )}
         {phase.checks && phase.checks.length > 0 ? (
           <span className="shrink-0">
-            <SplitRunCheckPills checks={phase.checks} />
+            <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
           </span>
         ) : null}
         {!expanded && producedArtifacts.length > 0 ? (

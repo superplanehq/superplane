@@ -609,3 +609,14 @@ export const REVIEW_CANDIDATE_WORK_ORDERS: FactoriesWorkOrder[] = REVIEW_CANDIDA
   assignees: [],
   lineDispatches: [],
 }));
+
+const BOARD_REVIEW_TICKET_KEYS = new Set(["PAY-842", "PAY-844", "PAY-845"]);
+
+/** Three backlog tickets on the populated line board. Scores are 5, 4, and 3. */
+export const BOARD_REVIEW_CANDIDATES = REVIEW_CANDIDATES.filter((candidate) =>
+  BOARD_REVIEW_TICKET_KEYS.has(candidate.ticketKey),
+);
+
+export const BOARD_REVIEW_CANDIDATE_WORK_ORDERS = REVIEW_CANDIDATE_WORK_ORDERS.filter((order) =>
+  BOARD_REVIEW_CANDIDATES.some((candidate) => candidate.workOrderId === order.id),
+);

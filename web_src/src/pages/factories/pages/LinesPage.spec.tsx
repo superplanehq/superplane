@@ -397,8 +397,8 @@ describe("LinesPage board", () => {
     };
     renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), factory);
 
-    await user.click(screen.getByTestId("lines-phase-menu-3"));
-    expect(screen.queryByTestId("lines-phase-menu-3-edit")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-phase-menu-2"));
+    expect(screen.queryByTestId("lines-phase-menu-2-edit")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent(
       factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, "app-refund-done", {
         from: "lines",

@@ -24,7 +24,7 @@ import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../l
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 import { intakeTicketAnalysisFixture, type LineIntakeAnalyzingTicket } from "../lineIntakeModel";
-import { reviewCandidateForWorkOrderId } from "../onboarding/first-run/reviewCandidates";
+import { implementationPlanMarkdown, reviewCandidateForWorkOrderId } from "../onboarding/first-run/reviewCandidates";
 import { DESCRIPTION_ARTIFACT, PR_CLOSURE_PR_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
 import type {
   RunOverlayProvider,
@@ -88,7 +88,7 @@ export interface SplitRunPhase {
 
 export type SplitRunFooterTone = "waiting" | "draft" | "failed";
 
-export type SplitRunBoardColumn = "backlog" | "plan" | "implement" | "verify" | "done";
+export type SplitRunBoardColumn = "backlog" | "implement" | "verify" | "done";
 
 export type SplitRunIntakeCanvasKey = "intake" | "sentry" | "slack";
 
@@ -119,7 +119,7 @@ const UNKNOWN_OWNER: OrgUserDisplay = {
 const DRAFT_NEXT_STEP: WorkOrderStatusNotePresentation = {
   key: "start-plan",
   headline: "Start the next stage",
-  text: "This work order is a draft. Dispatch it to the Plan and Implement line to start Plan.",
+  text: "This work order is a draft. Dispatch it to the Plan and Implement line to start Implement.",
   cta: { label: "Dispatch" },
 };
 
@@ -236,17 +236,23 @@ function boardColumnFor(current: FactoriesWorkOrderExecution | undefined, execut
   }
   const step = (current.step ?? "").toLowerCase();
   const index = current.stepIndex ?? -1;
-  if (step.includes("done") || index >= 3) {
+  if (step.includes("done")) {
     return "done";
   }
-  if (step.includes("verify") || index === 2) {
+  if (step.includes("verify")) {
     return "verify";
   }
-  if (step.includes("implement") || index === 1) {
+  if (step.includes("implement")) {
     return "implement";
   }
-  if (step.includes("plan") || index === 0) {
-    return "plan";
+  if (index >= 2) {
+    return "done";
+  }
+  if (index === 1) {
+    return "verify";
+  }
+  if (index === 0) {
+    return "implement";
   }
   return "backlog";
 }
@@ -254,7 +260,7 @@ function boardColumnFor(current: FactoriesWorkOrderExecution | undefined, execut
 function phasesForOrder(order: FactoriesWorkOrder, executions: FactoriesWorkOrderExecution[]): SplitRunPhase[] {
   return [
     ...sourcePhasesForOrder(order, executions.length > 0),
-    ...executions.map((execution) => executionToPhase(execution)),
+    ...executions.map((execution) => executionToPhase(order, execution)),
   ];
 }
 
@@ -288,7 +294,39 @@ function analysisTicketForOrder(order: FactoriesWorkOrder): LineIntakeAnalyzingT
     title: order.title ?? "Work order",
     detailsMarkdown: order.description,
     issueKey: order.key,
+    planMarkdown: fallbackPlanMarkdown(order),
+    confidenceScore: exampleConfidenceScore(order),
+    confidenceSummary: order.title,
   };
+}
+
+function fallbackPlanMarkdown(order: FactoriesWorkOrder): string {
+  const goal = order.title ?? "Implement the change.";
+  return implementationPlanMarkdown({
+    goal,
+    files: ["See the work-order description for the files to change."],
+    steps: [
+      "Read the work order and the current implementation.",
+      "Apply the change described in the work order.",
+      "Add or update tests for the new behavior.",
+    ],
+    verify: ["The existing suite passes.", "The notes in the work order hold."],
+  });
+}
+
+const EXAMPLE_CONFIDENCE_BY_ORDER_ID: Record<string, number> = {
+  "wo-running-refunds": 4,
+  "wo-board-implement-failed": 3,
+  "wo-failed-refunds": 4,
+  "wo-pr-closure-receipts": 5,
+  "wo-board-done-canceled": 3,
+};
+
+function exampleConfidenceScore(order: FactoriesWorkOrder): number {
+  if (order.id && EXAMPLE_CONFIDENCE_BY_ORDER_ID[order.id] != null) {
+    return EXAMPLE_CONFIDENCE_BY_ORDER_ID[order.id];
+  }
+  return 4;
 }
 
 function backlogSourcePhase(order: FactoriesWorkOrder): SplitRunPhase {
@@ -386,10 +424,11 @@ function descriptionArtifactForOrder(order: FactoriesWorkOrder): FactoriesWorkOr
   };
 }
 
-function executionToPhase(execution: FactoriesWorkOrderExecution): SplitRunPhase {
+function executionToPhase(order: FactoriesWorkOrder, execution: FactoriesWorkOrderExecution): SplitRunPhase {
   const status = statusForExecution(execution);
   const { name, componentName } = lineAutomationPresentation(execution.run, execution.step);
   const duration = durationForExecution(execution, status);
+  const artifacts = artifactsForLineExecution(order, execution);
   const line: SplitRunStreamLine = {
     id: execution.id ?? name,
     at: clockLabel(execution.updatedAt ?? execution.createdAt),
@@ -397,6 +436,7 @@ function executionToPhase(execution: FactoriesWorkOrderExecution): SplitRunPhase
     status,
     duration,
     detail: execution.step,
+    artifact: artifacts[0],
     kind: "action",
     componentType: componentName,
     action: status === "passed" ? "passed" : status === "failed" ? "failed" : status === "running" ? "running" : "—",
@@ -408,11 +448,83 @@ function executionToPhase(execution: FactoriesWorkOrderExecution): SplitRunPhase
     status,
     duration,
     componentName,
-    artifacts: isPrClosureRun(execution) ? [PR_CLOSURE_PR_ARTIFACT] : [],
+    artifacts,
     stream: [line],
     canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
     appId: execution.run?.appId,
     runId: execution.run?.id,
+  };
+}
+
+function artifactsForLineExecution(
+  order: FactoriesWorkOrder,
+  execution: FactoriesWorkOrderExecution,
+): FactoriesWorkOrderArtifact[] {
+  const step = (execution.step ?? "").toLowerCase();
+  if (step.includes("implement")) {
+    return [branchArtifactForOrder(order)];
+  }
+  if (step.includes("verify")) {
+    return [pullRequestArtifactForOrder(order, "open")];
+  }
+  if (step.includes("done")) {
+    if (execution.result === "RESULT_CANCELLED") {
+      return [canceledNotesArtifact(order)];
+    }
+    if (isPrClosureRun(execution)) {
+      return [PR_CLOSURE_PR_ARTIFACT];
+    }
+    return [pullRequestArtifactForOrder(order, order.result === "RESULT_REJECTED" ? "closed" : "merged")];
+  }
+  return [];
+}
+
+function branchArtifactForOrder(order: FactoriesWorkOrder): FactoriesWorkOrderArtifact {
+  const name = `feature/${(order.key ?? order.id ?? "change").toLowerCase()}`;
+  return {
+    id: `art-branch-${order.id ?? "order"}`,
+    type: "TYPE_BRANCH",
+    data: {
+      name,
+      url: `https://github.com/example/ledger/tree/${name}`,
+    },
+  };
+}
+
+function pullRequestNumberForOrder(order: FactoriesWorkOrder): number {
+  if (order.id === "wo-failed-refunds") {
+    return 6812;
+  }
+  if (order.id === "wo-pr-closure-receipts") {
+    return 510;
+  }
+  const number = Number(order.number);
+  return Number.isFinite(number) && number > 0 ? number + 400 : 400;
+}
+
+function pullRequestArtifactForOrder(order: FactoriesWorkOrder, state: string): FactoriesWorkOrderArtifact {
+  const number = pullRequestNumberForOrder(order);
+  return {
+    id: `art-pr-${order.id ?? "order"}`,
+    type: "TYPE_PR",
+    data: {
+      url: `https://github.com/example/ledger/pull/${number}`,
+      title: order.title ?? "Pull request",
+      number,
+      state,
+    },
+  };
+}
+
+function canceledNotesArtifact(order: FactoriesWorkOrder): FactoriesWorkOrderArtifact {
+  return {
+    id: `art-notes-${order.id ?? "order"}`,
+    type: "TYPE_MARKDOWN",
+    data: {
+      name: "notes.md",
+      title: "notes.md",
+      body: "The work order was canceled.",
+    },
   };
 }
 

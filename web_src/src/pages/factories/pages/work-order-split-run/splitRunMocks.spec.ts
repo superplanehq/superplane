@@ -2,6 +2,7 @@ import type { FactoriesWorkOrder, FactoriesWorkOrderExecution, FactoriesWorkOrde
 import { describe, expect, it } from "vitest";
 
 import {
+  APPROVAL_WORK_ORDER,
   DRAFT_WORK_ORDER,
   INGEST_DRAFT_WORK_ORDER,
   OPEN_WORK_ORDER,
@@ -9,6 +10,16 @@ import {
   SENTRY_DRAFT_WORK_ORDER,
   SLACK_DRAFT_WORK_ORDER,
 } from "../../__fixtures__/factoryPageResponses";
+import {
+  BOARD_DONE_CANCELED_ORDER,
+  BOARD_DONE_REJECTED_ORDER,
+  BOARD_IMPLEMENT_FAILED_ORDER,
+} from "../../__fixtures__/lineMetricsBoardOrders";
+import {
+  LINE_BOARD_DONE_RECEIPTS_ORDER,
+  LINE_BOARD_VERIFY_ENUM_ORDER,
+  LINE_BOARD_VERIFY_PR_REVIEW_ORDER,
+} from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { splitRunFixtureForWorkOrder, splitRunStatusLabel } from "./splitRunMocks";
 
 function dispatch(state: FactoriesWorkOrderLineDispatch["state"], stepExecutions: FactoriesWorkOrderExecution[]) {
@@ -24,6 +35,19 @@ function order(overrides: FactoriesWorkOrder): FactoriesWorkOrder {
   return { id: "wo-1", ...overrides };
 }
 
+function artifactNames(artifacts: Array<{ data?: Record<string, unknown> }> | undefined): string[] {
+  return (artifacts ?? []).map((artifact) => {
+    const data = artifact.data ?? {};
+    if (typeof data.name === "string") {
+      return data.name;
+    }
+    if (typeof data.number === "number") {
+      return `#${data.number}`;
+    }
+    return typeof data.title === "string" ? data.title : "";
+  });
+}
+
 describe("splitRunFixtureForWorkOrder", () => {
   it("uses the designed running fixture when the order is missing", () => {
     const fixture = splitRunFixtureForWorkOrder();
@@ -31,7 +55,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.currentPhaseId).toBe("implement");
     expect(fixture.phases.map((phase) => [phase.name, phase.status])).toEqual([
       ["Backlog", "passed"],
-      ["Plan", "passed"],
+      ["Create plan", "passed"],
       ["Implement", "running"],
     ]);
   });
@@ -47,15 +71,14 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(implement?.status).toBe("running");
     expect(implement?.componentName).toBe("Implementation");
     expect(implement?.appId).toBe("app-refund-implementer");
-    expect(implement?.runId).toBe(RUNNING_WORK_ORDER.lineDispatches?.[0]?.stepExecutions?.[1]?.run?.id);
+    expect(implement?.runId).toBe(RUNNING_WORK_ORDER.lineDispatches?.[0]?.stepExecutions?.[0]?.run?.id);
     expect(implement?.stream.map((line) => line.componentName)).toEqual(["Implementation"]);
     expect(fixture.phases.map((phase) => [phase.id, phase.name, phase.status])).toEqual([
       ["ingest", "Ingest", "passed"],
       ["analyze", "Analyze", "passed"],
       ["plan", "Create plan", "passed"],
       ["score", "Score", "passed"],
-      ["plan-0", "Plan", "passed"],
-      ["implement-1", "Implement", "running"],
+      ["implement-0", "Implement", "running"],
     ]);
     expect(fixture.phases.find((phase) => phase.id === "ingest")?.artifacts).toEqual(
       expect.arrayContaining([
@@ -71,6 +94,12 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.checks).toEqual([]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
+    expect(fixture.phases.find((phase) => phase.id === "score")?.checks?.[0]).toMatchObject({
+      name: "Confidence score",
+      score: 4,
+    });
+    expect(artifactNames(implement?.artifacts)).toEqual(["feature/rf-103"]);
   });
 
   it("keeps a single Backlog ingest row on an ingest draft", () => {
@@ -86,8 +115,7 @@ describe("splitRunFixtureForWorkOrder", () => {
         statusNotes: OPEN_WORK_ORDER.statusNotes,
         lineDispatches: [
           dispatch("STATE_FINISHED", [
-            { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
-            { id: "e-impl", step: "Implement", stepIndex: 1, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
           ]),
         ],
       }),
@@ -106,8 +134,7 @@ describe("splitRunFixtureForWorkOrder", () => {
         assignees: [{ id: "user-1", name: "Ada Lovelace" }],
         lineDispatches: [
           dispatch("STATE_FINISHED", [
-            { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
-            { id: "e-impl", step: "Implement", stepIndex: 1, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
           ]),
         ],
       }),
@@ -190,7 +217,7 @@ describe("splitRunFixtureForWorkOrder", () => {
             line: { id: "line-1", name: "plan-and-implement" },
             state: "STATE_ACTIVE",
             stepExecutions: [
-              { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
+              { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
             ],
           },
         ],
@@ -198,8 +225,8 @@ describe("splitRunFixtureForWorkOrder", () => {
       { lineId: "line-1" },
     );
     expect(fixture.lineName).toBe("plan-and-implement");
-    expect(fixture.currentPhaseId).toMatch(/^plan-/);
-    expect(fixture.phases.some((phase) => phase.name === "Plan")).toBe(true);
+    expect(fixture.currentPhaseId).toMatch(/^implement-/);
+    expect(fixture.phases.some((phase) => phase.name === "Implement")).toBe(true);
   });
 
   it("uses supplied checks instead of the fixture pills", () => {
@@ -218,26 +245,26 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.checks).toEqual([]);
   });
 
-  it("opens a running plan on the current phase and hides later steps", () => {
+  it("opens a running implement on the current phase and hides later steps", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
-        title: "Plan job",
+        title: "Implement job",
         state: "STATE_OPEN",
         lineDispatches: [
           dispatch("STATE_ACTIVE", [
-            { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
+            { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
           ]),
         ],
       }),
     );
 
-    expect(fixture.title).toBe("Plan job");
+    expect(fixture.title).toBe("Implement job");
     expect(fixture.lineStatus).toBe("running");
     expect(fixture.phases.map((phase) => [phase.name, phase.status])).toEqual([
       ["Backlog", "passed"],
-      ["Plan", "running"],
+      ["Implement", "running"],
     ]);
-    expect(fixture.currentPhaseId).toBe("plan-0");
+    expect(fixture.currentPhaseId).toBe("implement-0");
     expect(fixture.phases.at(-1)?.canvasSteps.at(-1)?.status).toBe("running");
   });
 
@@ -248,7 +275,7 @@ describe("splitRunFixtureForWorkOrder", () => {
         state: "STATE_OPEN",
         lineDispatches: [
           dispatch("STATE_FINISHED", [
-            { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
             { id: "e-pr", step: "Open pull request", stepIndex: 1, state: "STATE_PENDING", result: "RESULT_UNKNOWN" },
           ]),
         ],
@@ -267,8 +294,7 @@ describe("splitRunFixtureForWorkOrder", () => {
         state: "STATE_OPEN",
         lineDispatches: [
           dispatch("STATE_FINISHED", [
-            { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
-            { id: "e-impl", step: "Implement", stepIndex: 1, state: "STATE_FINISHED", result: "RESULT_FAILED" },
+            { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_FAILED" },
           ]),
         ],
       }),
@@ -365,5 +391,120 @@ describe("splitRunFixtureForWorkOrder", () => {
       body: OPEN_WORK_ORDER.description,
     });
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Dispatch");
+  });
+});
+
+describe("line board work-order examples", () => {
+  it("keeps a plan and a branch on the running GitHub implement card", () => {
+    const fixture = splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER);
+    expect(fixture.phases.map((phase) => phase.id)).toEqual(["ingest", "analyze", "plan", "score", "implement-0"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
+      "feature/rf-103",
+    ]);
+  });
+
+  it("keeps a manual create and a branch on the approval implement card", () => {
+    const fixture = splitRunFixtureForWorkOrder(APPROVAL_WORK_ORDER);
+    expect(fixture.phases.map((phase) => [phase.id, phase.name])).toEqual([
+      ["backlog", "Backlog"],
+      ["implement-0", "Implement"],
+    ]);
+    expect(artifactNames(fixture.phases[0]?.artifacts)).toEqual(["description.md"]);
+    expect(artifactNames(fixture.phases[1]?.artifacts)).toEqual(["feature/rf-109"]);
+  });
+
+  it("keeps ingest analysis and a branch on the failed implement card", () => {
+    const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER);
+    expect(fixture.phases.map((phase) => phase.id)).toEqual(["ingest", "analyze", "plan", "score", "implement-0"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
+      "feature/rf-106",
+    ]);
+    expect(fixture.footerTone).toBe("failed");
+  });
+
+  it("keeps Sentry intake, a branch, and a pull request on the verify enum card", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_ENUM_ORDER);
+    expect(fixture.phases.map((phase) => [phase.id, phase.name])).toEqual([
+      ["backlog", "Backlog"],
+      ["implement-0", "Implement"],
+      ["verify-1", "Verify"],
+    ]);
+    expect(fixture.phases[0]?.componentName).toBe("Sentry");
+    expect(artifactNames(fixture.phases[0]?.artifacts)).toEqual(["description.md"]);
+    expect(artifactNames(fixture.phases[1]?.artifacts)).toEqual(["feature/rf-102"]);
+    expect(artifactNames(fixture.phases[2]?.artifacts)).toEqual(["#502"]);
+  });
+
+  it("keeps ingest analysis and PR #6812 on the waiting verify card", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER);
+    expect(fixture.phases.map((phase) => phase.id)).toEqual([
+      "ingest",
+      "analyze",
+      "plan",
+      "score",
+      "implement-0",
+      "verify-1",
+    ]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
+      "feature/rf-104",
+    ]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual(["#6812"]);
+    expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
+  });
+
+  it("keeps ingest analysis and the merged receipts pull request on the done card", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER);
+    expect(fixture.phases.map((phase) => phase.id)).toEqual([
+      "ingest",
+      "analyze",
+      "plan",
+      "score",
+      "implement-0",
+      "verify-1",
+      "done-2",
+    ]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
+      "feature/rf-88",
+    ]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual(["#510"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts)).toEqual(["#510"]);
+  });
+
+  it("keeps Sentry intake and a rejected pull request on the rejected done card", () => {
+    const fixture = splitRunFixtureForWorkOrder(BOARD_DONE_REJECTED_ORDER);
+    expect(fixture.phases.map((phase) => [phase.id, phase.name])).toEqual([
+      ["backlog", "Backlog"],
+      ["implement-0", "Implement"],
+      ["verify-1", "Verify"],
+      ["done-2", "Done"],
+    ]);
+    expect(fixture.phases[0]?.componentName).toBe("Sentry");
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
+      "feature/rf-112",
+    ]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual(["#512"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts)).toEqual(["#512"]);
+  });
+
+  it("keeps ingest analysis and a cancel note on the canceled done card", () => {
+    const fixture = splitRunFixtureForWorkOrder(BOARD_DONE_CANCELED_ORDER);
+    expect(fixture.phases.map((phase) => phase.id)).toEqual([
+      "ingest",
+      "analyze",
+      "plan",
+      "score",
+      "implement-0",
+      "verify-1",
+      "done-2",
+    ]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
+      "feature/rf-113",
+    ]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts)).toEqual(["notes.md"]);
   });
 });
