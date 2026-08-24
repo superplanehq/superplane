@@ -59,6 +59,10 @@ Run these three steps once, in order:
    server. UI at http://localhost:8000; health check at
    http://localhost:8000/health. Use `make dev.server.fg` for foreground logs.
 
+To run Runner nodes locally, start `make dev` in the runner repository.
+Compose defaults already point at that broker. Set `TASK_BROKER_*` in `.env`
+only for a remote broker (see `.env.example`).
+
 On first UI load, owner setup is enabled (`OWNER_SETUP_ENABLED=yes`), so you are
 prompted to create an admin account. Open registration is disabled by default
 (`BLOCK_SIGNUP=yes`).

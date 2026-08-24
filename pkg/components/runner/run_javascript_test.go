@@ -31,6 +31,7 @@ func (s *stubMessageChainBuilder) BuildExecutionMessageChain() (map[string]any, 
 func TestRunJSExecuteSendsJavaScriptPayloadToBroker(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
