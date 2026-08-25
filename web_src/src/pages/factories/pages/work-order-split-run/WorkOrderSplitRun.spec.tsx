@@ -67,7 +67,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(implement).getByText("Reading plan.md.")).toBeInTheDocument();
 
     expect(screen.getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
-    expect(screen.getByText("Implementation")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-canvas-menu")).toHaveAccessibleName("Implement menu");
     expect(within(screen.getByTestId("run-overlay-compact-canvas")).getByText("Create Branch")).toBeInTheDocument();
     expect(screen.queryByText("Factory Lines")).not.toBeInTheDocument();
   });
@@ -311,7 +311,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(
       within(screen.getByTestId("split-run-stream-plan")).getByText("Reading the work order description."),
     ).toBeInTheDocument();
-    expect(screen.getByText("Planning")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-canvas-menu")).toHaveAccessibleName("Plan menu");
     expect(screen.getAllByText("From GH issue?").length).toBeGreaterThan(0);
   });
 
@@ -335,7 +335,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(screen.getByRole("heading", { name: "Plan job" })).toBeInTheDocument();
     expect(screen.getByTestId("split-run-stream-plan-0")).toBeInTheDocument();
-    expect(screen.getByText("Planning")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-canvas-menu")).toHaveAccessibleName("Plan menu");
     expect(screen.getAllByText("From GH issue?").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("split-run-phase-implement")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
