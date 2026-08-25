@@ -6,7 +6,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
+import type * as ComponentDataModule from "@/hooks/useComponentData";
 import type * as FactoryIntakeDataModule from "@/hooks/useFactoryIntakeData";
+import type * as IntegrationsModule from "@/hooks/useIntegrations";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
@@ -18,15 +20,30 @@ import {
 import { DEFAULT_GITHUB_INTAKE_SETTINGS } from "./intakeSourceSettingsModel";
 import type { LineIntakeDrawerProps } from "./lineIntakeDrawerTypes";
 
-const { useCanvas, useFactoryIntakeRuns, updateIntake } = vi.hoisted(() => ({
-  useCanvas: vi.fn(),
-  useFactoryIntakeRuns: vi.fn(),
-  updateIntake: vi.fn(),
-}));
+const { useCanvas, useTriggers, useComponents, useAvailableIntegrations, useFactoryIntakeRuns, updateIntake } =
+  vi.hoisted(() => ({
+    useCanvas: vi.fn(),
+    useTriggers: vi.fn(),
+    useComponents: vi.fn(),
+    useAvailableIntegrations: vi.fn(),
+    useFactoryIntakeRuns: vi.fn(),
+    updateIntake: vi.fn(),
+  }));
 
 vi.mock("@/hooks/useCanvasData", async (importOriginal) => ({
   ...(await importOriginal<typeof CanvasDataModule>()),
   useCanvas,
+  useTriggers,
+}));
+
+vi.mock("@/hooks/useComponentData", async (importOriginal) => ({
+  ...(await importOriginal<typeof ComponentDataModule>()),
+  useComponents,
+}));
+
+vi.mock("@/hooks/useIntegrations", async (importOriginal) => ({
+  ...(await importOriginal<typeof IntegrationsModule>()),
+  useAvailableIntegrations,
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", async (importOriginal) => ({
@@ -108,6 +125,15 @@ describe("LineIntakeDrawer", () => {
       isError: false,
       refetch: vi.fn().mockResolvedValue(undefined),
     });
+    useTriggers.mockReturnValue({ data: [{ name: "github.onIssue", label: "On Issue" }], isLoading: false });
+    useComponents.mockReturnValue({
+      data: [
+        { name: "runnerClaudeCode", label: "Run Claude Code" },
+        { name: "createWorkOrder", label: "Create Work Order" },
+      ],
+      isLoading: false,
+    });
+    useAvailableIntegrations.mockReturnValue({ data: [], isLoading: false });
     intakeRuns([]);
     updateIntake.mockResolvedValue({ id: "intake-github" });
   });
@@ -335,8 +361,8 @@ describe("LineIntakeDrawer", () => {
 
     expect(useCanvas).toHaveBeenCalledWith("org-1", "app-github-issues-intake", { enabled: true });
     const automation = within(screen.getByTestId("intake-source-settings")).getByTestId("intake-source-automation");
-    expect(within(automation).getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
-    expect(within(automation).getByTestId("split-run-canvas-node-github-issues-trigger")).toBeInTheDocument();
+    expect(within(automation).getByTestId("rf__node-github-issues-trigger")).toBeInTheDocument();
+    expect(within(automation).getByText("Analyze intake")).toBeInTheDocument();
     expect(within(automation).getByRole("link", { name: "Edit automation" })).toHaveAttribute(
       "href",
       "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&from=lines",
@@ -353,7 +379,7 @@ describe("LineIntakeDrawer", () => {
 
     const automation = screen.getByTestId("intake-source-automation");
     expect(automation).toHaveTextContent("This intake has no automation yet.");
-    expect(within(automation).queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
+    expect(within(automation).queryByTestId("rf__node-github-issues-trigger")).not.toBeInTheDocument();
   });
 
   it("shows the placement and score the server reported for each run", async () => {

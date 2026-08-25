@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { CanvasPage } from "@/ui/CanvasPage";
 import { History, Settings, Workflow } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -25,14 +26,13 @@ import {
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
 import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
-import { CompactLineCanvas } from "./work-order-split-run/CompactLineCanvas";
-import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvases";
+import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
 
 interface IntakeSourceSettingsPopupProps {
   settings: IntakeSourceSettings;
   sourceId?: LineIntakeSourceId;
-  automationCanvas?: SplitRunCanvasModel;
+  automationGraph?: IntakeAutomationGraph;
   automationLoading?: boolean;
   automationError?: boolean;
   onRetryAutomation?: () => void;
@@ -53,7 +53,7 @@ interface IntakeSourceSettingsPopupProps {
 export function IntakeSourceSettingsPopup({
   settings,
   sourceId = "github-issues",
-  automationCanvas,
+  automationGraph,
   automationLoading = false,
   automationError = false,
   onRetryAutomation,
@@ -102,15 +102,14 @@ export function IntakeSourceSettingsPopup({
         </Tabs>
       </PopupHeader>
       {tab === "automation" ? (
-        automationCanvas ? (
-          <IntakeAutomationCanvas canvas={automationCanvas} editHref={editAutomationHref} />
-        ) : (
-          <IntakeAutomationEmpty
-            message={automationEmptyMessage(automationLoading, automationError)}
-            editHref={editAutomationHref}
-            onRetry={automationRetry(automationError, onRetryAutomation)}
-          />
-        )
+        <IntakeAutomationTab
+          graph={automationGraph}
+          title={settings.name}
+          editHref={editAutomationHref}
+          loading={automationLoading}
+          error={automationError}
+          onRetry={onRetryAutomation}
+        />
       ) : tab === "runs" ? (
         <IntakeRunsList
           runs={runs}
@@ -219,8 +218,30 @@ export function IntakeSourceSettingsPopup({
   );
 }
 
-function IntakeAutomationCanvas({ canvas, editHref }: { canvas: SplitRunCanvasModel; editHref?: string }) {
-  const [nodeId, setNodeId] = useState<string | null>(null);
+function IntakeAutomationTab({
+  graph,
+  title,
+  editHref,
+  loading,
+  error,
+  onRetry,
+}: {
+  graph?: IntakeAutomationGraph;
+  title: string;
+  editHref?: string;
+  loading: boolean;
+  error: boolean;
+  onRetry?: () => void;
+}) {
+  if (!graph || graph.nodes.length === 0) {
+    return (
+      <IntakeAutomationEmpty
+        message={automationEmptyMessage(loading, error)}
+        editHref={editHref}
+        onRetry={automationRetry(error, onRetry)}
+      />
+    );
+  }
 
   return (
     <section
@@ -228,14 +249,30 @@ function IntakeAutomationCanvas({ canvas, editHref }: { canvas: SplitRunCanvasMo
       aria-label="Automation"
       data-testid="intake-source-automation"
     >
-      <CompactLineCanvas
-        canvas={canvas}
-        selectedId={nodeId}
-        onSelect={setNodeId}
-        headerEdit="button"
-        editHref={editHref}
-        editLabel={INTAKE_SETTINGS_COPY.editAutomation}
-      />
+      <div className="flex shrink-0 items-center justify-between gap-2 px-5 pt-3 pb-2">
+        <p className="min-w-0 truncate text-[15px] font-semibold tracking-[-0.02em] text-foreground">{title}</p>
+        {editHref ? (
+          <Link href={editHref} className={buttonVariants({ size: "sm" })} data-testid="split-run-canvas-edit">
+            {INTAKE_SETTINGS_COPY.editAutomation}
+          </Link>
+        ) : null}
+      </div>
+      <div className="min-h-[18rem] flex-1">
+        <CanvasPage
+          nodes={graph.nodes}
+          edges={graph.edges}
+          factoryId={graph.factoryId}
+          factoryEmbed
+          isEditing
+          readOnly
+          hidePageChrome
+          hideAddControls
+          hideCanvasToolSidebar
+          hideRightSideControls
+          buildingBlocks={[]}
+          activeCanvasVersionId=""
+        />
+      </div>
     </section>
   );
 }
