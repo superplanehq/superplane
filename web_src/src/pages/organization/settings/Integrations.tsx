@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PermissionTooltip } from "@/components/PermissionGate";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { usePermissions } from "@/contexts/usePermissions";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { IntegrationsIntegrationDefinition } from "../../../api-client/types.gen";
@@ -25,7 +26,9 @@ import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { analytics } from "@/lib/analytics";
+import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { isCapabilityBasedIntegrationDefinition } from "@/lib/integrations";
+import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
 import { posthog, isPostHogEnabled } from "@/posthog";
 import { cn } from "@/lib/utils";
 import {
@@ -53,6 +56,8 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   const [isIntegrationSurveyActive, setIsIntegrationSurveyActive] = useState(false);
   const canCreateIntegrations = canAct("integrations", "create");
   const canUpdateIntegrations = canAct("integrations", "update");
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const useHostedGitHubApp = hasExperimentalFeature(FEATURE_FACTORIES);
 
   useEffect(() => {
     if (!isPostHogEnabled) return;
@@ -192,6 +197,23 @@ export function Integrations({ organizationId }: IntegrationsProps) {
 
   const handleConnectClick = (integration: IntegrationsIntegrationDefinition) => {
     if (!canCreateIntegrations) return;
+
+    if (integration.name === "github" && useHostedGitHubApp) {
+      analytics.integrationConnectStart("github", "integrations_page", organizationId);
+      void startDirectGitHubConnect({
+        organizationId,
+        returnTo: `/${organizationId}/settings/integrations`,
+        existingNames: integrationNames,
+        connected: organizationIntegrations,
+        create: async (payload) => {
+          const response = await createIntegrationMutation.mutateAsync(payload);
+          return response.data;
+        },
+      }).catch((error) => {
+        showErrorToast(getUsageLimitToastMessage(error, "Failed to connect GitHub"));
+      });
+      return;
+    }
 
     if (isCapabilityBasedIntegrationDefinition(integration)) {
       if (!integration.name) return;
