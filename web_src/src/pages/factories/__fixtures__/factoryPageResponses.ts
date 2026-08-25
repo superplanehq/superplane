@@ -1,5 +1,7 @@
 import type {
   FactoriesFactory,
+  FactoriesFactoryIntake,
+  FactoriesFactoryIntakeRun,
   FactoriesFactoryLine,
   MeNotificationSettings,
   FactoriesWorkOrder,
@@ -58,6 +60,70 @@ export const GITHUB_ISSUES_INTAKE_APP: FactoryApp = {
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
 };
+
+export const GITHUB_ISSUES_INTAKE_ID = "intake-github-issues";
+
+export const GITHUB_ISSUES_INTAKE: FactoriesFactoryIntake = {
+  id: GITHUB_ISSUES_INTAKE_ID,
+  canvasId: GITHUB_ISSUES_INTAKE_APP_ID,
+  name: "GitHub issues",
+  description: "Listens for GitHub issues and creates backlog work orders.",
+  source: "SOURCE_GITHUB_ISSUES",
+  settings: {
+    confidencePct: 65,
+    labels: [],
+    labelFilterMode: "LABEL_FILTER_MODE_INCLUDE",
+    assignment: "ASSIGNMENT_ANY",
+  },
+  healthy: true,
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+};
+
+function minutesBefore(minutes: number): string {
+  return new Date(Date.now() - minutes * 60_000).toISOString();
+}
+
+/** Two tickets still in analysis, plus scored runs for the Runs tab. */
+export const GITHUB_ISSUES_INTAKE_RUNS: FactoriesFactoryIntakeRun[] = [
+  {
+    id: "intake-run-analyzing-1",
+    title: "Handle duplicate refunds on retry",
+    placement: "PLACEMENT_ANALYZING",
+    createdAt: minutesBefore(4),
+  },
+  {
+    id: "intake-run-analyzing-2",
+    title: "Return 409 when the invoice is already paid",
+    placement: "PLACEMENT_ANALYZING",
+    createdAt: minutesBefore(2),
+  },
+  {
+    id: "intake-run-progressed",
+    title: "Show a clearer empty state on the billing page",
+    confidencePct: 94,
+    placement: "PLACEMENT_PROGRESSED",
+    stage: "implement",
+    createdAt: minutesBefore(180),
+    analyzedAt: minutesBefore(170),
+  },
+  {
+    id: "intake-run-backlog",
+    title: "Upgrade the Node 20 base image",
+    confidencePct: 81,
+    placement: "PLACEMENT_BACKLOG",
+    createdAt: minutesBefore(90),
+    analyzedAt: minutesBefore(80),
+  },
+  {
+    id: "intake-run-below-threshold",
+    title: "Document the refund webhook contract",
+    confidencePct: 52,
+    placement: "PLACEMENT_BELOW_THRESHOLD",
+    createdAt: minutesBefore(8),
+    analyzedAt: minutesBefore(5),
+  },
+];
 
 const RUN_APP_TYPE = "runApp";
 
@@ -222,6 +288,10 @@ export interface FactoriesFixture {
   factories: FactoriesFactory[];
   workOrdersByFactoryId: Record<string, FactoriesWorkOrder[]>;
   appsByFactoryId: Record<string, FactoryApp[]>;
+  /** Intakes the workspace declared. Created intakes are appended here. */
+  intakesByFactoryId?: Record<string, FactoriesFactoryIntake[]>;
+  /** Runs the intake produced, keyed by intake id. */
+  intakeRunsByIntakeId?: Record<string, FactoriesFactoryIntakeRun[]>;
   usageByFactoryId?: Record<string, StorybookUsageReport>;
   organizationLlmSpend?: StorybookUsageReport;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
@@ -249,6 +319,14 @@ export const defaultFactoriesFixture: FactoriesFixture = {
     [PRIMARY_FACTORY_ID]: REFUND_FACTORY_APPS,
     [EMPTY_FACTORY_ID]: [],
     [ACME_ONBOARDING_FACTORY_ID]: ACME_ONBOARDING_APPS,
+  },
+  intakesByFactoryId: {
+    [PRIMARY_FACTORY_ID]: [GITHUB_ISSUES_INTAKE],
+    [EMPTY_FACTORY_ID]: [],
+    [ACME_ONBOARDING_FACTORY_ID]: [GITHUB_ISSUES_INTAKE],
+  },
+  intakeRunsByIntakeId: {
+    [GITHUB_ISSUES_INTAKE_ID]: GITHUB_ISSUES_INTAKE_RUNS,
   },
   usageByFactoryId: {
     [PRIMARY_FACTORY_ID]: DEFAULT_FACTORY_USAGE,

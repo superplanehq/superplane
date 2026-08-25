@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
@@ -8,7 +8,11 @@ import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
-import { DEFAULT_GITHUB_INTAKE_SETTINGS, type IntakeAutomationRun } from "./intakeSourceSettingsModel";
+import {
+  DEFAULT_GITHUB_INTAKE_SETTINGS,
+  GITHUB_INTAKE_RUNS,
+  type IntakeAutomationRun,
+} from "./intakeSourceSettingsModel";
 import { intakeAutomationCanvas, lineIntakeSourceById } from "./lineIntakeModel";
 
 const githubAutomationCanvas = intakeAutomationCanvas(lineIntakeSourceById("github-issues")!);
@@ -18,6 +22,7 @@ function renderPopup(
     onSave?: (next: typeof DEFAULT_GITHUB_INTAKE_SETTINGS) => void;
     onClose?: () => void;
     onOpenRun?: (run: IntakeAutomationRun) => void;
+    runs?: IntakeAutomationRun[];
     editAutomationHref?: string;
     initialTab?: "general" | "runs" | "automation";
   } = {},
@@ -32,6 +37,7 @@ function renderPopup(
               automationCanvas={githubAutomationCanvas}
               onSave={props.onSave ?? vi.fn()}
               onOpenRun={props.onOpenRun}
+              runs={props.runs}
               editAutomationHref={props.editAutomationHref}
               onClose={props.onClose ?? vi.fn()}
               initialTab={props.initialTab}
@@ -93,7 +99,7 @@ describe("IntakeSourceSettingsPopup", () => {
   it("lists scored intake runs on the Runs tab", async () => {
     const onOpenRun = vi.fn();
     const user = userEvent.setup();
-    renderPopup({ onOpenRun });
+    renderPopup({ onOpenRun, runs: GITHUB_INTAKE_RUNS });
 
     await user.click(screen.getByRole("tab", { name: "Runs" }));
 
@@ -137,20 +143,21 @@ describe("IntakeSourceSettingsPopup", () => {
 
     await user.clear(screen.getByLabelText("Name"));
     await user.type(screen.getByLabelText("Name"), "Acme GitHub issues");
-    await user.click(screen.getByRole("radio", { name: /Run on a schedule/ }));
     await user.click(screen.getByRole("radio", { name: "Exclude these labels" }));
     await user.click(screen.getByRole("checkbox", { name: "bug" }));
     await user.click(screen.getByRole("radio", { name: "Unassigned" }));
     await user.click(screen.getByTestId("intake-source-settings-save"));
 
-    expect(onSave).toHaveBeenCalledWith({
-      name: "Acme GitHub issues",
-      listenMode: "schedule",
-      confidencePct: 65,
-      labelFilterMode: "exclude",
-      labels: ["bug"],
-      assignment: "unassigned",
-    });
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith({
+        name: "Acme GitHub issues",
+        listenMode: "listen",
+        confidencePct: 65,
+        labelFilterMode: "exclude",
+        labels: ["bug"],
+        assignment: "unassigned",
+      }),
+    );
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

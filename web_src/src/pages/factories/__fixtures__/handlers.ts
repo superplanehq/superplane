@@ -1,4 +1,5 @@
 import { EMPTY_USAGE_REPORT } from "./usageReportFixtures";
+import { factoryIntakeRoutes } from "./factoryIntakeHandlers";
 import {
   defaultFactoriesFixture,
   ORGANIZATION_USERS,
@@ -27,10 +28,6 @@ import { isValidWorkspaceKey, suggestWorkspaceKeyFromName, WORKSPACE_KEY_MAX_LEN
 import { metricsForLine } from "../pages/lineListMetricsMockData";
 
 export type { FactoriesFixture };
-
-export const factoryPageIds = {
-  organizationId: defaultFactoriesFixture.organizationId,
-};
 
 const re = (pattern: string): RegExp => new RegExp(`^${pattern}$`);
 
@@ -178,6 +175,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
       pattern: re("/api/v1/factories/([^/]+)/apps"),
       resolve: (match) => ({ json: { apps: fixture.appsByFactoryId[match[1]] ?? [] } }),
     },
+    ...factoryIntakeRoutes(fixture),
     {
       pattern: re("/api/v1/factories/([^/]+)/usage"),
       resolve: (match) => ({ json: fixture.usageByFactoryId?.[match[1]] ?? EMPTY_USAGE_REPORT }),

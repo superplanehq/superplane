@@ -1,17 +1,22 @@
-import type { SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
+import type {
+  FactoriesFactoryIntake,
+  FactoriesFactoryIntakeSource,
+  SuperplaneComponentsNode as ComponentsNode,
+} from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { getUserInitials } from "@/lib/orgUserDisplay";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
-import { ACME_ONBOARDING_FACTORY_KEY, GITHUB_ISSUES_INTAKE_APP_ID } from "../__fixtures__/factoryPageIds";
+import { ACME_ONBOARDING_FACTORY_KEY } from "../__fixtures__/factoryPageIds";
 import {
   STORYBOOK_ME_USER_AVATAR_URL,
   STORYBOOK_ME_USER_ID,
   STORYBOOK_ME_USER_NAME,
 } from "../__fixtures__/factoryPageResponses";
 import type { WorkOrderStatusNotePresentation } from "../lib/workOrderStatusNote";
+import { intakeSettingsFromApi, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
 import { intakeCanvasForSource } from "./lineIntakeCanvas";
 import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvases";
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
@@ -117,33 +122,67 @@ export function isFirstRunOnboardingFactory(factoryKey: string | undefined): boo
   return factoryKey === ACME_ONBOARDING_FACTORY_KEY;
 }
 
-/** Acme onboarding starts with GitHub issues only. Semaphore keeps the full set. */
-export function lineIntakeSourcesForFactory(factoryKey: string | undefined): LineIntakeSource[] {
-  if (isFirstRunOnboardingFactory(factoryKey)) {
-    return LINE_INTAKE_SOURCES.filter((source) => source.id === "github-issues");
-  }
-  return LINE_INTAKE_SOURCES;
-}
-
 export function isLineIntakeSourceId(id: string | null | undefined): id is LineIntakeSourceId {
   return Boolean(id && lineIntakeSourceById(id));
 }
 
-export function intakeAutomationAppId(apps: Array<{ id?: string; name?: string }>): string | undefined {
-  const byKnownId = apps.find((app) => app.id === GITHUB_ISSUES_INTAKE_APP_ID);
-  if (byKnownId?.id) {
-    return byKnownId.id;
-  }
-  const byIntake = apps.find((app) => /intake/i.test(`${app.id ?? ""} ${app.name ?? ""}`));
-  if (byIntake?.id) {
-    return byIntake.id;
-  }
-  return apps.find((app) => app.id)?.id;
+/**
+ * An intake the workspace has declared, joined with the presentation copy for
+ * its source. `intakeId` is the identity: a workspace can run two GitHub
+ * intakes with different filters.
+ */
+export interface ConfiguredLineIntakeSource {
+  intakeId: string;
+  /** Canvas that implements the intake, used to open the automation editor. */
+  appId: string;
+  healthy: boolean;
+  settings: IntakeSourceSettings;
+  source: LineIntakeSource;
+}
+
+const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = {
+  SOURCE_GITHUB_ISSUES: "github-issues",
+  SOURCE_SENTRY_EXCEPTIONS: "sentry-exceptions",
+  SOURCE_PAGERDUTY_INCIDENTS: "pagerduty-incidents",
+};
+
+const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesFactoryIntakeSource> = {
+  "github-issues": "SOURCE_GITHUB_ISSUES",
+  "sentry-exceptions": "SOURCE_SENTRY_EXCEPTIONS",
+  "pagerduty-incidents": "SOURCE_PAGERDUTY_INCIDENTS",
+};
+
+export function apiIntakeSource(sourceId: LineIntakeSourceId): FactoriesFactoryIntakeSource {
+  return API_SOURCE_BY_LINE_INTAKE_SOURCE_ID[sourceId];
+}
+
+export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[]): ConfiguredLineIntakeSource[] {
+  return intakes.flatMap((intake) => {
+    const intakeId = intake.id?.trim();
+    const sourceId = intake.source ? LINE_INTAKE_SOURCE_ID_BY_API_SOURCE[intake.source] : undefined;
+    const source = sourceId ? lineIntakeSourceById(sourceId) : undefined;
+    if (!intakeId || !source) {
+      return [];
+    }
+
+    const name = intake.name?.trim() || source.name;
+    return [
+      {
+        intakeId,
+        appId: intake.canvasId?.trim() ?? "",
+        healthy: intake.healthy !== false,
+        settings: intakeSettingsFromApi(name, intake.settings),
+        source: { ...source, name },
+      },
+    ];
+  });
 }
 
 export interface LineIntakeAnalyzingTicket {
   id: string;
   title: string;
+  appId?: string;
+  runId?: string;
 }
 
 export const LINE_INTAKE_COPY = {
@@ -151,6 +190,8 @@ export const LINE_INTAKE_COPY = {
   analyzingHelper: "Tickets from this intake.",
   analyzingStatus: "Analyzing",
   analyzingEmpty: "No tickets in analysis.",
+  needsRepair: "Needs repair",
+  needsRepairHelper: "The automation can no longer create work orders. Open it to repair the steps.",
   analysisHeadline: "SuperPlane is analyzing this ticket",
   analysisHelper: "SuperPlane reads the ticket and the repository. It does not start work yet.",
   analysisCompleteHeadline: "Ticket analysis finished",

@@ -8,7 +8,7 @@ import {
   factoryHomePath,
   factoryIntakePath,
   intakeSettingsTabFromSearch,
-  intakeSourceFromSearch,
+  intakeIdFromSearch,
   isIntakeSearchOpen,
   factorySettingsGeneralPathAfterKeyChange,
   firstFactoryLineId,
@@ -48,18 +48,18 @@ describe("factoryIntakePath", () => {
     expect(isIntakeSearchOpen("")).toBe(false);
   });
 
-  it("opens the line board with a selected intake source", () => {
-    expect(factoryIntakePath("org-1", "SP", "line-plan", "github-issues")).toBe(
-      "/org-1/workspaces/SP/lines/line-plan?intake=1&source=github-issues",
+  it("opens the line board with a selected intake", () => {
+    expect(factoryIntakePath("org-1", "SP", "line-plan", "intake-1")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?intake=1&intakeId=intake-1",
     );
-    expect(factoryIntakePath("org-1", "SP", "line-plan", "github-issues", "automation")).toBe(
-      "/org-1/workspaces/SP/lines/line-plan?intake=1&source=github-issues&settings=automation",
+    expect(factoryIntakePath("org-1", "SP", "line-plan", "intake-1", "automation")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?intake=1&intakeId=intake-1&settings=automation",
     );
   });
 
-  it("reads the intake source from the search string", () => {
-    expect(intakeSourceFromSearch("?intake=1&source=github-issues")).toBe("github-issues");
-    expect(intakeSourceFromSearch("intake=1")).toBeNull();
+  it("reads the intake id from the search string", () => {
+    expect(intakeIdFromSearch("?intake=1&intakeId=intake-1")).toBe("intake-1");
+    expect(intakeIdFromSearch("intake=1")).toBeNull();
   });
 
   it("reads the settings tab from the search string", () => {
