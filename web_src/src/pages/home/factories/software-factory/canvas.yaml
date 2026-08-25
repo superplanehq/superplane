@@ -166,6 +166,7 @@ spec:
             type: bash
           - command: |-
               export GH_TOKEN="$GITHUB_TOKEN"
+              rm -rf repo
               gh repo clone "$REPO" repo
               cd repo
               gh pr checkout "$PR_NUMBER"
@@ -176,7 +177,9 @@ spec:
           - command: 'echo "REPLACE ME WITH: commit signing / DCO prepare-commit-msg hook for your org"'
             name: Set Up DCO Signing
             type: bash
+            workingDirectory: repo
           - name: Apply requested changes
+            workingDirectory: repo
             prompt: |-
               You are addressing a reviewer's requested changes on an open pull request. The repository is already checked out in your current working directory, on the PR branch.
 
@@ -200,12 +203,24 @@ spec:
             type: prompt
           - command: |-
               export GIT_TERMINAL_PROMPT=0
+              set -euo pipefail
               git add -A
-              git commit -s -m "chore: apply requested changes on PR #${PR_NUMBER}" || echo "Nothing new to commit"
+              if ! git diff --cached --quiet; then
+                git commit -s -m "chore: apply requested changes on PR #${PR_NUMBER}"
+              fi
+              if git rev-parse --verify "@{u}" >/dev/null 2>&1; then
+                if [ "$(git rev-list --count "@{u}..HEAD")" -eq 0 ]; then
+                  echo "Branch is already up to date with upstream"
+                  git push origin HEAD
+                  echo "Pushed changes for PR #${PR_NUMBER}"
+                  exit 0
+                fi
+              fi
               git push origin HEAD
               echo "Pushed changes for PR #${PR_NUMBER}"
             name: Commit and push
             type: bash
+            workingDirectory: repo
         credentials:
           source: integration
           integration:
@@ -367,11 +382,13 @@ spec:
         steps:
           - command: |-
               export GH_TOKEN="$GITHUB_TOKEN"
+              rm -rf repo
               git clone --depth 1 --branch "$BRANCH" "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
               cd repo
             name: Checkout branch
             type: bash
           - name: Write implementation plan
+            workingDirectory: repo
             prompt: |-
               You are writing an implementation plan for a GitHub issue. The repository is checked out in your current working directory on the working branch.
 
@@ -497,6 +514,8 @@ spec:
             name: Set Up Git User
             type: bash
           - command: |-
+              set -euo pipefail
+              rm -rf repo
               git clone --depth 1 --branch "$BRANCH" "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
               cd repo
             name: Checkout branch
@@ -504,10 +523,13 @@ spec:
           - command: 'echo "REPLACE ME WITH: commit signing / DCO prepare-commit-msg hook for your org"'
             name: Set Up DCO Signing
             type: bash
+            workingDirectory: repo
           - command: 'echo "REPLACE ME WITH: project setup commands (install deps, start services, etc.)"'
             name: Set up DevEnv
             type: bash
+            workingDirectory: repo
           - name: Implementation
+            workingDirectory: repo
             prompt: |-
               You are implementing a fix for a GitHub issue. The repository is already checked out in your current working directory, on the branch to work on.
 
@@ -528,13 +550,27 @@ spec:
           - command: 'echo "REPLACE ME WITH: project format/lint commands"'
             name: Format JS and Go code
             type: bash
+            workingDirectory: repo
           - command: |
+              set -euo pipefail
+              echo "cwd=$(pwd -P)"
+              git status
+              git log --oneline -5
               git add -A
-              git commit -s -m "fix: implement issue #${ISSUE_NUMBER} via Claude Code" || echo "Nothing new to commit"
+              if ! git diff --cached --quiet; then
+                git commit -s -m "fix: implement issue #${ISSUE_NUMBER} via SuperPlane"
+              fi
+              if git rev-parse --verify "origin/${BRANCH}" >/dev/null 2>&1; then
+                if [ "$(git rev-list --count "origin/${BRANCH}..HEAD")" -eq 0 ]; then
+                  echo "No file changes and no unpushed commits on ${BRANCH}" >&2
+                  exit 1
+                fi
+              fi
               git push origin "$BRANCH"
               echo "Pushed implementation to $BRANCH"
             name: Commit and push
             type: bash
+            workingDirectory: repo
         credentials:
           source: integration
           integration:
@@ -627,6 +663,7 @@ spec:
             type: bash
           - command: |-
               export GH_TOKEN="$GITHUB_TOKEN"
+              rm -rf repo
               gh repo clone "$REPO" repo
               cd repo
               gh pr checkout "$PR_NUMBER"
@@ -637,7 +674,9 @@ spec:
           - command: 'echo "REPLACE ME WITH: commit signing / DCO prepare-commit-msg hook for your org"'
             name: Set Up DCO Signing
             type: bash
+            workingDirectory: repo
           - name: Review and fix failing checks
+            workingDirectory: repo
             prompt: |-
               One or more checks are failing on this pull request. The repository is already checked out in your current working directory, on the PR branch.
 
@@ -665,12 +704,24 @@ spec:
             type: prompt
           - command: |-
               export GIT_TERMINAL_PROMPT=0
+              set -euo pipefail
               git add -A
-              git commit -s -m "fix: address failing checks on PR #${PR_NUMBER}" || echo "Nothing new to commit"
+              if ! git diff --cached --quiet; then
+                git commit -s -m "fix: address failing checks on PR #${PR_NUMBER}"
+              fi
+              if git rev-parse --verify "@{u}" >/dev/null 2>&1; then
+                if [ "$(git rev-list --count "@{u}..HEAD")" -eq 0 ]; then
+                  echo "Branch is already up to date with upstream"
+                  git push origin HEAD
+                  echo "Pushed fixes for PR #${PR_NUMBER}"
+                  exit 0
+                fi
+              fi
               git push origin HEAD
               echo "Pushed fixes for PR #${PR_NUMBER}"
             name: Commit and push
             type: bash
+            workingDirectory: repo
         credentials:
           source: integration
           integration:
@@ -775,6 +826,7 @@ spec:
           git config --global user.email "automation@example.com"
           git config --global user.name "Factory Automation"
 
+          rm -rf "$WORKDIR"
           git clone --depth 1 --branch "$BASE" "$GITURL" "$WORKDIR"
           cd "$WORKDIR"
 
@@ -1181,11 +1233,13 @@ spec:
         machineType: e1-large-amd64
         steps:
           - command: |-
+              rm -rf repo
               gh repo clone "$REPO" repo -- --depth=1
               cd repo
             name: Clone Repository
             type: bash
           - name: Draft issue
+            workingDirectory: repo
             prompt: |
               Analyze the task description below and produce a GitHub issue.
 
