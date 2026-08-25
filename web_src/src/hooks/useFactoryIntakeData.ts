@@ -64,6 +64,9 @@ export function useFactoryIntakeRuns(
       return response.data?.runs ?? [];
     },
     enabled: Boolean(organizationId && factoryId && intakeId) && enabled,
+    // Items leave the analysis on their own. The open list has to follow them,
+    // because a new intake starts with a batch that drains within minutes.
+    refetchInterval: 10_000,
   });
 }
 
