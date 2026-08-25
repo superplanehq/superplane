@@ -7,7 +7,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
-import { editFactoryLinePath, factoryAppConfigurePath, factoryLineDetailPath } from "../lib/factoryPagePaths";
+import {
+  editFactoryLinePath,
+  factoryAppConfigurePath,
+  factoryAppRunPath,
+  factoryLineDetailPath,
+} from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_KEY,
@@ -15,9 +20,11 @@ import {
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_APP,
   GITHUB_ISSUES_INTAKE_ID,
+  LINE_RUN_IMPLEMENT_FAILED_ID,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
+  REFUND_FACTORY_APPS,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
@@ -25,7 +32,7 @@ import { withPlanLinePhases } from "../__fixtures__/lineMetricsPlanLine";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { LINE_LIST_METRICS_BY_ID } from "./lineListMetricsMockData";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
-import { LinesPage } from "./LinesPage";
+import { canvasExpandHrefForLine, LinesPage } from "./LinesPage";
 
 const createFactoryLineMutateAsync = vi.fn();
 const updateFactoryLineMutateAsync = vi.fn();
@@ -577,5 +584,63 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       editFactoryLinePath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
     );
+  });
+});
+
+describe("canvasExpandHrefForLine", () => {
+  const line = REFUND_FACTORY.lines?.[0];
+
+  it("opens the factory run inspector when the canvas has a run", () => {
+    expect(line).toBeDefined();
+    const hrefFor = canvasExpandHrefForLine(
+      "org-1",
+      PRIMARY_FACTORY_KEY,
+      line!,
+      REFUND_FACTORY_APPS,
+      BOARD_IMPLEMENT_FAILED_ORDER,
+    );
+
+    expect(hrefFor("implementation")).toBe(
+      factoryAppRunPath("org-1", PRIMARY_FACTORY_KEY, "app-refund-implementer", LINE_RUN_IMPLEMENT_FAILED_ID, {
+        from: "lines",
+        lineId: REFUND_LINE_PLAN_ID,
+        orderNumber: BOARD_IMPLEMENT_FAILED_ORDER.number,
+      }),
+    );
+    expect(hrefFor("implementation")).toContain(`run=${LINE_RUN_IMPLEMENT_FAILED_ID}`);
+    expect(hrefFor("planning")).toBeUndefined();
+  });
+
+  it("uses the selected phase run when the canvas name is not a known key", () => {
+    expect(line).toBeDefined();
+    const hrefFor = canvasExpandHrefForLine("org-1", PRIMARY_FACTORY_KEY, line!, REFUND_FACTORY_APPS, {
+      ...BOARD_IMPLEMENT_FAILED_ORDER,
+      lineDispatches: [],
+    });
+
+    expect(hrefFor("closure", { appId: "app-pr-creation", runId: "run-pr-creation" })).toBe(
+      factoryAppRunPath("org-1", PRIMARY_FACTORY_KEY, "app-pr-creation", "run-pr-creation", {
+        from: "lines",
+        lineId: REFUND_LINE_PLAN_ID,
+        orderNumber: BOARD_IMPLEMENT_FAILED_ORDER.number,
+      }),
+    );
+  });
+
+  it("hides expand when the canvas has no run", () => {
+    expect(line).toBeDefined();
+    const hrefFor = canvasExpandHrefForLine("org-1", PRIMARY_FACTORY_KEY, line!, REFUND_FACTORY_APPS, {
+      ...BOARD_IMPLEMENT_FAILED_ORDER,
+      lineDispatches: [],
+    });
+
+    expect(hrefFor("implementation")).toBeUndefined();
+  });
+
+  it("hides expand when the line has no app", () => {
+    expect(line).toBeDefined();
+    const hrefFor = canvasExpandHrefForLine("org-1", PRIMARY_FACTORY_KEY, { ...line!, steps: [] }, [], undefined);
+
+    expect(hrefFor("implementation")).toBeUndefined();
   });
 });

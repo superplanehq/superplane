@@ -95,7 +95,7 @@ describe("FactoryAppSplitRunPage", () => {
     expect(screen.queryByText("Add refund reconciliation test")).not.toBeInTheDocument();
   }, 10000);
 
-  it("redirects the deprecated canvas run view to the split run page", async () => {
+  it("keeps the canvas run view on the factory run inspector page", async () => {
     const line = REFUND_FACTORY_LINES[0];
     const appId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
 
@@ -106,7 +106,8 @@ describe("FactoryAppSplitRunPage", () => {
       />,
     );
 
-    expect(await screen.findByTestId("factory-app-split-run-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByTestId("factory-app-canvas-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("factory-app-split-run-page")).not.toBeInTheDocument();
   }, 10000);
 
   it("points Edit at the configure canvas", async () => {

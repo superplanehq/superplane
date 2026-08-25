@@ -1,13 +1,11 @@
 import { AppPage } from "@/pages/app";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { Navigate } from "react-router";
 import {
   DEFAULT_SUPERPLANE_BASE_URL,
   buildAgentCliInstallCommands,
   buildAgentCliInstallInstructions,
   buildAgentEditPrompt,
 } from "../lib/agentEditPrompt";
-import { factoryAppSplitRunPath, parseFactoryAppNavFrom } from "../lib/factoryPagePaths";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { AgentSetupPromptDialog } from "./AgentSetupPromptDialog";
 import { FactoryAppCanvasHeader } from "./FactoryAppCanvasHeader";
@@ -17,9 +15,8 @@ import { useFactoryAppCanvasPageModel } from "./useFactoryAppCanvasPageModel";
 
 /**
  * Factory-shell embed for a factory-owned app/canvas. Configure (`?configure=1`)
- * stays here and opens the edit workspace. Viewing a run (`?run=` without
- * configure) redirects to the split-run page — the line-board popup is the
- * run surface.
+ * opens the edit workspace. Viewing a run (`?run=` without configure) stays
+ * here so the factory Run inspector can open on node click.
  */
 export function FactoryAppCanvasPage() {
   const { factory } = useFactoriesLayout();
@@ -42,20 +39,6 @@ export function FactoryAppCanvasPage() {
 
   if (model.shouldRedirect) {
     return <FactoryAppCanvasRedirect organizationId={model.organizationId} factoryKey={model.factoryKey} />;
-  }
-
-  if (model.runId && !model.isConfigure) {
-    return (
-      <Navigate
-        to={factoryAppSplitRunPath(model.organizationId, model.factoryKey, model.appId, {
-          from: parseFactoryAppNavFrom(model.from),
-          lineId: model.lineId ?? undefined,
-          runId: model.runId,
-          orderNumber: model.orderNumber ?? undefined,
-        })}
-        replace
-      />
-    );
   }
 
   return (
@@ -97,7 +80,7 @@ export function FactoryAppCanvasPage() {
             factoryEmbed
             factoryConfigure={model.isConfigure}
             factoryAgentEnabled={model.isConfigure}
-            factoryEditWorkspace
+            factoryEditWorkspace={model.isConfigure}
             factoryConfigureActionsRef={model.configureActionsRef}
             onFactoryConfigureBusyChange={model.handleConfigureBusyChange}
             onFactoryConfigureDone={model.handleConfigureDone}
