@@ -18,6 +18,7 @@ import (
 func TestRunBashExecuteSendsBashPayloadToBroker(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -66,6 +67,7 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"`,
 func TestRunBashExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -143,7 +145,7 @@ func TestRunBashProcessTaskStatusIncludesResult(t *testing.T) {
 		ExitCode: &exit,
 		Result:   json.RawMessage(`{"ok":true}`),
 	}
-	require.NoError(t, processBrokerTaskStatus(state, task, RunBashFinishedEventType, "", nil))
+	require.NoError(t, processBrokerTaskStatus(state, task, RunBashFinishedEventType, "", nil, nil, nil))
 	require.Equal(t, PassedOutputChannel, state.Channel)
 
 	wrapped := state.Payloads[0].(map[string]any)
@@ -160,7 +162,7 @@ func TestRunBashProcessTaskStatusIncludesError(t *testing.T) {
 		ExitCode: &exit,
 		Error:    "runner lost before completion",
 	}
-	require.NoError(t, processBrokerTaskStatus(state, task, RunBashFinishedEventType, "", nil))
+	require.NoError(t, processBrokerTaskStatus(state, task, RunBashFinishedEventType, "", nil, nil, nil))
 	require.Equal(t, FailedOutputChannel, state.Channel)
 
 	wrapped := state.Payloads[0].(map[string]any)

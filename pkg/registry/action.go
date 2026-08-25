@@ -57,6 +57,14 @@ func (s *PanicableAction) Configuration() []configuration.Field {
 	return s.underlying.Configuration()
 }
 
+func (s *PanicableAction) ValidateNodeConfiguration(config map[string]any) error {
+	validator, ok := s.underlying.(core.NodeConfigurationValidator)
+	if !ok {
+		return nil
+	}
+	return validator.ValidateNodeConfiguration(config)
+}
+
 func (s *PanicableAction) Hooks() []core.Hook {
 	return s.underlying.Hooks()
 }

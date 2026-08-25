@@ -1,14 +1,18 @@
 import type {
   FactoriesFactory,
+  FactoriesFactoryIntake,
+  FactoriesFactoryIntakeSource,
   FactoriesFactoryLine,
   FactoriesUpdateFactoryOnboardingBody,
   FactoryLineStep,
 } from "@/api-client";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
-import { ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS } from "@/pages/home/factories";
+import { ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS, type FactoryAgentRewrite } from "@/pages/home/factories";
 import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
 
 export const DEFAULT_LINE_NAME = "Software delivery";
+
+export const GITHUB_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_GITHUB_ISSUES";
 
 const PRIMARY_LINE_APP_ENTRYPOINT = ONBOARDING_LINE_APPS[0].entrypointNodeId;
 
@@ -38,6 +42,7 @@ async function installOnboardingApp(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
+  agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
 }): Promise<{ canvasId: string; canvasName: string }> {
   const installed = await args.installFactory({
@@ -51,6 +56,7 @@ async function installOnboardingApp(args: {
     startingTaskPrompt: "",
     navigateOnComplete: false,
     startInitialRun: false,
+    agentRewrite: args.agentRewrite,
   });
   if (!installed?.canvasId) throw new Error(`Failed to create the ${args.appFactoryId} app`);
   return installed;
@@ -64,6 +70,7 @@ async function provisionLineApps(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
+  agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
 }): Promise<FactoryLineStep[]> {
   const steps: FactoryLineStep[] = [];
@@ -74,6 +81,7 @@ async function provisionLineApps(args: {
       selections: args.selections,
       appRepository: args.appRepository,
       backlogRepository: args.backlogRepository,
+      agentRewrite: args.agentRewrite,
       installFactory: args.installFactory,
     });
     steps.push({
@@ -92,6 +100,7 @@ export async function provisionEventApps(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
+  agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
 }): Promise<void> {
   for (const appFactoryId of ONBOARDING_EVENT_APPS) {
@@ -101,9 +110,30 @@ export async function provisionEventApps(args: {
       selections: args.selections,
       appRepository: args.appRepository,
       backlogRepository: args.backlogRepository,
+      agentRewrite: args.agentRewrite,
       installFactory: args.installFactory,
     });
   }
+}
+
+export type ListFactoryIntakes = () => Promise<FactoriesFactoryIntake[]>;
+
+export type CreateFactoryIntake = (input: { source: FactoriesFactoryIntakeSource }) => Promise<FactoriesFactoryIntake>;
+
+// The GitHub intake scores new issues and opens a work order for the ones it
+// trusts. The backend reads the connection and the backlog repository from the
+// saved onboarding config, so this runs after the wizard choices are stored. A
+// retried finish must not add a second copy.
+export async function provisionGithubIntake(args: {
+  listIntakes: ListFactoryIntakes;
+  createIntake: CreateFactoryIntake;
+}): Promise<void> {
+  const intakes = await args.listIntakes();
+  if (intakes.some((intake) => intake.source === GITHUB_INTAKE_SOURCE)) {
+    return;
+  }
+
+  await args.createIntake({ source: GITHUB_INTAKE_SOURCE });
 }
 
 export async function provisionLine(args: {
@@ -113,15 +143,14 @@ export async function provisionLine(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
+  agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   updateOnboarding: UpdateOnboarding;
 }): Promise<ProvisionedLine> {
-  const existing = findProvisionedLine(args.factory);
-  const lineId = args.savedLineId ?? existing?.id;
-  if (lineId) {
-    const primaryAppId = args.savedAppId ?? existing?.steps?.[0]?.app?.app;
-    if (primaryAppId) return { lineId, primaryAppId };
+  const existing = existingProvisionedLine(args.factory, args.savedLineId, args.savedAppId);
+  if (existing) {
+    return existing;
   }
 
   const steps = await provisionLineApps({
@@ -129,6 +158,7 @@ export async function provisionLine(args: {
     selections: args.selections,
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
+    agentRewrite: args.agentRewrite,
     installFactory: args.installFactory,
   });
   const primaryAppId = steps[0]?.app?.app;
@@ -138,4 +168,18 @@ export async function provisionLine(args: {
   if (!line.id) throw new Error("Software delivery line was not created");
   await args.updateOnboarding({ provisionedAppId: primaryAppId, provisionedLineId: line.id });
   return { lineId: line.id, primaryAppId };
+}
+
+function existingProvisionedLine(
+  factory: FactoriesFactory | null,
+  savedLineId?: string,
+  savedAppId?: string,
+): ProvisionedLine | undefined {
+  const existing = findProvisionedLine(factory);
+  const lineId = savedLineId ?? existing?.id;
+  const primaryAppId = savedAppId ?? existing?.steps?.[0]?.app?.app;
+  if (lineId && primaryAppId) {
+    return { lineId, primaryAppId };
+  }
+  return undefined;
 }

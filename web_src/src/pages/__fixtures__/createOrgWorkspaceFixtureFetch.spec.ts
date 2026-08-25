@@ -27,7 +27,12 @@ describe("createOrgWorkspaceFixtureFetch", () => {
 
     const response = await fixtureFetch("http://localhost/api/v1/integrations");
     const body = await response.json();
-    expect(body.integrations.map((item: { name: string }) => item.name)).toEqual(["github", "claude"]);
+    expect(body.integrations.map((item: { name: string }) => item.name)).toEqual([
+      "github",
+      "claude",
+      "openai",
+      "openrouter",
+    ]);
   });
 
   it("serves factory definitions when the canvas fixture declares no integrations", async () => {
@@ -38,7 +43,12 @@ describe("createOrgWorkspaceFixtureFetch", () => {
 
     const response = await fixtureFetch("http://localhost/api/v1/integrations");
     const body = await response.json();
-    expect(body.integrations.map((item: { name: string }) => item.name)).toEqual(["github", "claude"]);
+    expect(body.integrations.map((item: { name: string }) => item.name)).toEqual([
+      "github",
+      "claude",
+      "openai",
+      "openrouter",
+    ]);
   });
 
   it("starts with the organization connections the story seeds", async () => {
