@@ -105,26 +105,29 @@ describe("provisionGithubIntake", () => {
     const listIntakes = vi.fn().mockResolvedValue([]);
     const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" } as FactoriesFactoryIntake);
 
-    await provisionGithubIntake({ listIntakes, createIntake });
+    const intake = await provisionGithubIntake({ listIntakes, createIntake });
 
     expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
+    expect(intake.id).toBe("intake-1");
   });
 
   it("leaves an existing GitHub intake alone so a retry adds no second copy", async () => {
     const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-1", source: GITHUB_INTAKE_SOURCE }]);
     const createIntake = vi.fn();
 
-    await provisionGithubIntake({ listIntakes, createIntake });
+    const intake = await provisionGithubIntake({ listIntakes, createIntake });
 
     expect(createIntake).not.toHaveBeenCalled();
+    expect(intake.id).toBe("intake-1");
   });
 
   it("creates the GitHub intake next to an intake of another source", async () => {
     const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-1", source: "SOURCE_SENTRY_EXCEPTIONS" }]);
     const createIntake = vi.fn().mockResolvedValue({ id: "intake-2" } as FactoriesFactoryIntake);
 
-    await provisionGithubIntake({ listIntakes, createIntake });
+    const intake = await provisionGithubIntake({ listIntakes, createIntake });
 
     expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
+    expect(intake.id).toBe("intake-2");
   });
 });
