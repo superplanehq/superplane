@@ -61,11 +61,9 @@ describe("matchFactoryPageFixture", () => {
 
   it("returns factory apps for the populated factory", async () => {
     const apps = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/apps`);
-    const body = (await apps.json()) as { apps: Array<{ id?: string; name?: string }> };
-    expect(body).toMatchObject({
+    await expect(apps.json()).resolves.toMatchObject({
       apps: expect.arrayContaining([expect.objectContaining({ name: "Refund Planner" })]),
     });
-    expect(body.apps.map((app) => app.id)).not.toContain("app-refund-implementer");
   });
 
   it("includes agent permissions on the factory me user", async () => {

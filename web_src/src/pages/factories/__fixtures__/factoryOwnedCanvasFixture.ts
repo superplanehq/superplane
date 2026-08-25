@@ -41,15 +41,8 @@ function refundFactoryApp(id: string): FactoryApp {
 }
 
 export const REFUND_PLANNER_APP = refundFactoryApp("app-refund-planner");
+export const REFUND_IMPLEMENTER_APP = refundFactoryApp("app-refund-implementer");
 export const REFUND_VERIFIER_APP = refundFactoryApp("app-refund-verifier");
-
-export const REFUND_IMPLEMENTER_APP: FactoryApp = {
-  id: "app-refund-implementer",
-  name: "Refund Implementer",
-  description: "Applies the plan across affected repos and opens PRs.",
-  createdAt: LAST_WEEK,
-  updatedAt: YESTERDAY,
-};
 
 /**
  * Clone of the captured Software Factory canvas, owned by Semaphore
@@ -91,7 +84,7 @@ export function factoryOwnedCanvasFixture(
 
 /** Canvas runs that Line phase cards open. Ids are UUIDs so `?run=` stays on AppPage. */
 export function refundFactoryLineRuns(): NonNullable<CanvasAppFixture["runs"]> {
-  const implementerId = "app-refund-implementer";
+  const implementerId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
   const verifierId = REFUND_VERIFIER_APP.id ?? "app-refund-verifier";
 
   return {
@@ -144,7 +137,7 @@ export function refundFactoryLineRuns(): NonNullable<CanvasAppFixture["runs"]> {
 
 /** Factory-owned compact CI canvas plus the runs that Line cards open. */
 export function refundLineCanvasFixture(
-  app: Pick<FactoryApp, "id" | "name" | "description"> = REFUND_PLANNER_APP,
+  app: Pick<FactoryApp, "id" | "name" | "description"> = REFUND_IMPLEMENTER_APP,
   factoryId = PRIMARY_FACTORY_ID,
 ): CanvasAppFixture {
   return factoryOwnedCanvasFixture(

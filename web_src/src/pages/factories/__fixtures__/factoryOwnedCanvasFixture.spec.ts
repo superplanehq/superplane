@@ -5,11 +5,10 @@ import { isValidRunId } from "@/pages/app/workflowPageHelpers";
 
 import {
   factoryOwnedCanvasFixture,
-  REFUND_PLANNER_APP,
+  REFUND_IMPLEMENTER_APP,
   refundFactoryLineRuns,
   refundLineCanvasFixture,
 } from "./factoryOwnedCanvasFixture";
-import { REFUND_FACTORY_APPS } from "./factoryPageResponses";
 import {
   LINE_RUN_IMPLEMENT_FAILED_ID,
   LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID,
@@ -21,17 +20,13 @@ import {
 import { SIMPLE_FACTORY_RUN_EDGES, SIMPLE_FACTORY_RUN_NODE_IDS } from "./simpleFactoryRunCanvas";
 
 describe("factoryOwnedCanvasFixture", () => {
-  it("omits the refund implementer canvas from the factory apps model", () => {
-    expect(REFUND_FACTORY_APPS.map((app) => app.id)).not.toContain("app-refund-implementer");
-  });
-
   it("marks the canvas as owned by Semaphore", () => {
-    const fixture = factoryOwnedCanvasFixture(REFUND_PLANNER_APP);
+    const fixture = factoryOwnedCanvasFixture(REFUND_IMPLEMENTER_APP);
 
-    expect(fixture.canvasId).toBe(REFUND_PLANNER_APP.id);
+    expect(fixture.canvasId).toBe(REFUND_IMPLEMENTER_APP.id);
     expect(fixture.canvas?.canvas?.metadata).toMatchObject({
-      id: REFUND_PLANNER_APP.id,
-      name: REFUND_PLANNER_APP.name,
+      id: REFUND_IMPLEMENTER_APP.id,
+      name: REFUND_IMPLEMENTER_APP.name,
       factoryId: PRIMARY_FACTORY_ID,
     });
   });
