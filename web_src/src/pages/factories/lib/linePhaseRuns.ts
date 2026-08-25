@@ -106,6 +106,16 @@ export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): Fact
   return workOrders.filter(isLineBacklogOrder).sort(compareOrdersNewestFirst);
 }
 
+/** Closed work orders. Newest closed orders come first. */
+export function collectLineDoneOrders(workOrders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
+  return workOrders.filter((order) => order.state === "STATE_CLOSED").sort(compareOrdersNewestFirst);
+}
+
+/** Stage columns only. Done is a fixed bookend, not a line step. */
+export function lineStageColumns(columns: LinePhaseColumn[]): LinePhaseColumn[] {
+  return columns.filter((column) => !isDoneLineColumn(column));
+}
+
 /** Factory-level intake automation. It is not a line step. */
 export function findBacklogAutomationApp(
   apps: Array<{ id?: string; name?: string }>,
@@ -284,7 +294,7 @@ function appendCurrentRunForOrder(
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
   runsByStep: Map<number, LinePhaseRunCard[]>,
 ): void {
-  if (!order.id) {
+  if (!order.id || order.state === "STATE_CLOSED") {
     return;
   }
 

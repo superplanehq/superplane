@@ -10,10 +10,12 @@ import { factoryAppPath, factoryAppRunPath, linesPath } from "./factoryPagePaths
 import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
+  collectLineDoneOrders,
   findBacklogAutomationApp,
   findClosureAutomationApp,
   isDoneLineColumn,
   linePhaseRunHref,
+  lineStageColumns,
   resolvePhaseRunStatus,
 } from "./linePhaseRuns";
 
@@ -132,6 +134,28 @@ describe("buildLinePhaseBoard", () => {
     expect(board[1].tick).toBeNull();
     expect(board[2].runs).toEqual([]);
     expect(workOrderIds(board)).toEqual(["wo-b", "wo-c", "wo-a", "wo-d"]);
+  });
+
+  it("keeps closed work orders off the stage columns", () => {
+    const closed = {
+      ...order("wo-closed", "Closed", [
+        {
+          id: "e-closed",
+          line: { id: "line-1", name: "poc" },
+          step: "plan",
+          stepIndex: 0,
+          state: "STATE_FINISHED",
+          result: "RESULT_FAILED",
+          createdAt: "2026-08-11T12:00:00.000Z",
+          updatedAt: "2026-08-11T12:00:00.000Z",
+        },
+      ]),
+      state: "STATE_CLOSED" as const,
+    };
+
+    const board = buildLinePhaseBoard(LINE, [closed], APPS);
+
+    expect(workOrderIds(board)).toEqual([]);
   });
 
   it("places a multi-step work order only in its furthest active step", () => {
@@ -349,6 +373,58 @@ describe("linePhaseRunHref", () => {
     });
 
     expect(href).toBe(linesPath("org-1", "RF"));
+  });
+});
+
+describe("collectLineDoneOrders", () => {
+  it("returns only closed work orders, newest first", () => {
+    const closedOld: FactoriesWorkOrder = {
+      id: "wo-closed-old",
+      title: "Old",
+      state: "STATE_CLOSED",
+      updatedAt: "2026-08-11T10:00:00.000Z",
+      lineDispatches: [{ id: "d-old", line: { id: "line-1" }, stepExecutions: [] }],
+    };
+    const closedNew: FactoriesWorkOrder = {
+      id: "wo-closed-new",
+      title: "New",
+      state: "STATE_CLOSED",
+      updatedAt: "2026-08-11T14:00:00.000Z",
+      lineDispatches: [],
+    };
+    const draft: FactoriesWorkOrder = {
+      id: "wo-draft",
+      title: "Draft",
+      state: "STATE_DRAFT",
+      updatedAt: "2026-08-11T15:00:00.000Z",
+      lineDispatches: [],
+    };
+    const open = order("wo-open", "Open", [
+      {
+        id: "e-open",
+        line: { id: "line-1", name: "poc" },
+        step: "plan",
+        stepIndex: 0,
+        state: "STATE_STARTED",
+        createdAt: "2026-08-11T13:00:00.000Z",
+      },
+    ]);
+
+    const done = collectLineDoneOrders([closedOld, draft, open, closedNew]);
+
+    expect(done.map((entry) => entry.id)).toEqual(["wo-closed-new", "wo-closed-old"]);
+  });
+});
+
+describe("lineStageColumns", () => {
+  it("drops Done-named and PR-closure columns from the stage row", () => {
+    const columns = [
+      { stepName: "Planning", stepIndex: 0, appId: "app-plan", maxParallelism: 10, runs: [], tick: null },
+      { stepName: "Open PR", stepIndex: 1, appId: "app-pr", maxParallelism: 10, runs: [], tick: null },
+      { stepName: "Done", stepIndex: 2, appId: "app-refund-done", maxParallelism: 10, runs: [], tick: null },
+    ] as const;
+
+    expect(lineStageColumns([...columns]).map((column) => column.stepName)).toEqual(["Planning", "Open PR"]);
   });
 });
 
