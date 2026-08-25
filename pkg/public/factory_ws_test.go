@@ -19,6 +19,7 @@ func TestFactoryWebSocketRequiresFactoriesFeature(t *testing.T) {
 
 	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, "ws-factory", "desc", "")
 	require.NoError(t, err)
+	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
 
 	response := execRequest(server, requestParams{
 		method:     http.MethodGet,

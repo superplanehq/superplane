@@ -168,6 +168,52 @@ func Test__RecordUsage__SkipsRunsWithoutWorkOrderExecution(t *testing.T) {
 	assert.Empty(t, byModel)
 }
 
+func Test__RecordUsage__SameIdempotencyKeyRecordsOnce(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	execution := dispatchWorkOrderExecution(t, r)
+	nodeExecutionID := uuid.New()
+	key := models.UsageIdempotencyKeyRunner + ":" + nodeExecutionID.String()
+
+	input := models.LLMUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     requireExecutionRunID(t, execution),
+		NodeExecutionID: nodeExecutionID,
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000_000,
+		TotalTokens:     1_000_000,
+		IdempotencyKey:  key,
+	}
+	require.NoError(t, models.RecordUsage(db, input))
+	require.NoError(t, models.RecordUsage(db, input))
+
+	var count int64
+	require.NoError(t, db.Model(&models.LLMUsageEvent{}).Where("idempotency_key = ?", key).Count(&count).Error)
+	assert.Equal(t, int64(1), count)
+	assertInProgressExecutionUsage(t, db, execution.ID, 1_000_000, 300)
+}
+
+func Test__RecordUsage__HostedUnknownModelFailsClosed(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	execution := dispatchWorkOrderExecution(t, r)
+
+	err := models.RecordUsage(db, models.LLMUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     requireExecutionRunID(t, execution),
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderOpenRouter,
+		Model:           "unknown-hosted-model",
+		InputTokens:     100,
+		TotalTokens:     100,
+		FundingSource:   models.UsageFundingSourceHosted,
+	})
+	require.ErrorIs(t, err, models.ErrHostedUsageUnpriced)
+}
+
 func assertInProgressExecutionUsage(t *testing.T, db *gorm.DB, executionID uuid.UUID, tokens, cents int64) {
 	t.Helper()
 

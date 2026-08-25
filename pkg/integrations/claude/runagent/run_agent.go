@@ -397,6 +397,7 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 			out := buildOutputFromSessionMessages(refreshed.Status, session.ID, sm)
 			applyStructuredOutput(&out, refreshed.Status, schema)
 			out.Artifacts = CollectSessionArtifacts(client, session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
+			RecordSessionUsage(ctx.Usage, ctx.Logger, refreshed)
 			if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
 				cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 				return emitErr
