@@ -74,7 +74,15 @@ export function WorkOrderChecksSection({
   );
 }
 
-function WorkOrderCheckCard({ check, runHref }: { check: WorkOrderCheckPresentation; runHref: string | null }) {
+export function WorkOrderCheckCard({
+  check,
+  runHref = null,
+  className,
+}: {
+  check: WorkOrderCheckPresentation;
+  runHref?: string | null;
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -82,7 +90,10 @@ function WorkOrderCheckCard({ check, runHref }: { check: WorkOrderCheckPresentat
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="group rounded-lg border border-border bg-card px-4 py-3 text-left transition-colors hover:border-foreground/20 hover:bg-accent/40"
+        className={cn(
+          "group rounded-lg border border-border bg-card px-4 py-3 text-left transition-colors hover:border-foreground/20 hover:bg-accent/40",
+          className,
+        )}
         data-testid={`work-order-check-${check.id}`}
       >
         <span className="block truncate text-[12px] font-medium text-muted-foreground">{check.name}</span>

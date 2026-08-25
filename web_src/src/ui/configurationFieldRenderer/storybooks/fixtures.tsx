@@ -8,8 +8,10 @@ import type {
 } from "@/api-client";
 import { integrationKeys } from "@/hooks/useIntegrations";
 import { canvasKeys } from "@/hooks/useCanvasData";
+import { hostedLLMModelsQueryKey } from "@/hooks/useHostedLLMModels";
 import { organizationKeys } from "@/hooks/useOrganizationData";
 import { secretKeys } from "@/hooks/useSecrets";
+import { storybookHostedLlmModels } from "@/pages/home/__fixtures__/hostedLlmModels";
 
 export type RendererCategory =
   | "Basic Inputs"
@@ -731,6 +733,31 @@ export const rendererExamples: RendererExample[] = [
     },
   },
   {
+    id: "hosted-model",
+    storyName: "HostedModelField",
+    category: "Context-Aware Inputs",
+    source: "Special field type",
+    goType: "FieldTypeHostedModel",
+    docsDescription:
+      "Use `hosted-model` when SuperPlane-hosted credentials are selected so the operator picks a model from the installation allowlist.",
+    field: baseField({
+      name: "model",
+      label: "Model",
+      type: "hosted-model",
+      description: "Select a SuperPlane-hosted model from the installation allowlist.",
+      placeholder: "Select a SuperPlane-hosted model",
+      typeOptions: {
+        hostedModel: {
+          provider: "anthropic",
+        },
+      },
+    }),
+    allValues: {
+      credentials: { source: "hosted" },
+    },
+    initialValue: "claude-sonnet-4-6",
+  },
+  {
     id: "url",
     storyName: "UrlField",
     category: "Compatibility",
@@ -951,6 +978,10 @@ export function seedConfigurationStoryQueryCache(queryClient: QueryClient) {
   );
   queryClient.setQueryData(integrationKeys.connected(STORY_ORGANIZATION_ID), STORY_INTEGRATIONS);
   queryClient.setQueryData(secretKeys.byDomain(STORY_DOMAIN_ID, STORY_DOMAIN_TYPE), mockSecrets);
+  queryClient.setQueryData(
+    hostedLLMModelsQueryKey(STORY_DOMAIN_ID, "anthropic"),
+    storybookHostedLlmModels("anthropic"),
+  );
 
   Object.entries(mockSecretDetails).forEach(([secretRef, secret]) => {
     queryClient.setQueryData(secretKeys.detail(STORY_DOMAIN_ID, STORY_DOMAIN_TYPE, secretRef), secret);

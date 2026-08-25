@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/gorm"
@@ -206,7 +207,7 @@ func (p *CanvasPatcher) addNode(change *Change) error {
 		nodeConfiguration = node.Configuration.AsMap()
 	}
 
-	err = configuration.ValidateConfiguration(schema, nodeConfiguration)
+	err = p.validateNodeConfiguration(nodeType, *nodeRef, schema, nodeConfiguration)
 	if err != nil {
 		errorMessage := err.Error()
 		newNode.ErrorMessage = &errorMessage
@@ -365,7 +366,7 @@ func (p *CanvasPatcher) updateNode(change *Change) error {
 			currentNode.Configuration = node.Configuration.AsMap()
 		}
 
-		err = configuration.ValidateConfiguration(schema, currentNode.Configuration)
+		err = p.validateNodeConfiguration(currentNode.Type, currentNode.Ref, schema, currentNode.Configuration)
 		if err != nil {
 			errorMessage := err.Error()
 			currentNode.ErrorMessage = &errorMessage
@@ -378,6 +379,25 @@ func (p *CanvasPatcher) updateNode(change *Change) error {
 
 	p.nodes[nodeID] = currentNode
 	return nil
+}
+
+func (p *CanvasPatcher) validateNodeConfiguration(nodeType string, nodeRef models.NodeRef, schema []configuration.Field, config map[string]any) error {
+	if err := configuration.ValidateConfiguration(schema, config); err != nil {
+		return err
+	}
+	if nodeType != models.NodeTypeComponent || nodeRef.Component == nil {
+		return nil
+	}
+
+	action, err := p.registry.GetAction(nodeRef.Component.Name)
+	if err != nil {
+		return err
+	}
+	validator, ok := action.(core.NodeConfigurationValidator)
+	if !ok {
+		return nil
+	}
+	return validator.ValidateNodeConfiguration(config)
 }
 
 func (p *CanvasPatcher) findConfigurationSchemaForNode(nodeType string, nodeRef models.NodeRef) ([]configuration.Field, error) {

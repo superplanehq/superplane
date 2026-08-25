@@ -1,3 +1,4 @@
+import type { CanvasesCanvasNodeExecutionRef } from "@/api-client";
 import { parseCanvasYamlToSpec } from "@/pages/app/lib/canvas-yaml-staging";
 
 import simpleFactoryRunCanvasYaml from "./simpleFactoryRunCanvas.yaml?raw";
@@ -66,7 +67,11 @@ export function mergeSimpleFactoryRunActions(baseActions: unknown): { actions: u
   return { actions: [...existing, ...simpleFactoryRunCatalogActions()] };
 }
 
-function passedExecution(id: string, nodeId: string, extras: Record<string, unknown> = {}) {
+function passedExecution(
+  id: string,
+  nodeId: string,
+  extras: Record<string, unknown> = {},
+): CanvasesCanvasNodeExecutionRef {
   return {
     id,
     nodeId,
@@ -75,7 +80,7 @@ function passedExecution(id: string, nodeId: string, extras: Record<string, unkn
     createdAt: SIMPLE_FACTORY_RUN_EVENT_AT,
     updatedAt: SIMPLE_FACTORY_RUN_EVENT_AT,
     ...extras,
-  };
+  } as CanvasesCanvasNodeExecutionRef;
 }
 
 /**

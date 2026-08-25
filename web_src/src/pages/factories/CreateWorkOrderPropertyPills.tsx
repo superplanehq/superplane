@@ -202,13 +202,8 @@ function AssigneePillBody({
   assigneeIds: string[];
   resolveUser: ReturnType<typeof useOrgUserLookup>["resolveUser"];
 }) {
-  if (assigneeIds.length === 1) {
-    return <OrgUserReference display={resolveUser(assigneeIds[0])} size="xs" nameClassName="truncate text-[12px]" />;
+  if (assigneeIds.length === 0) {
+    return null;
   }
-  return (
-    <>
-      <OrgUserReference display={resolveUser(assigneeIds[0])} size="xs" nameClassName="truncate text-[12px]" />
-      <span className="shrink-0 text-[12px] text-muted-foreground">+{assigneeIds.length - 1}</span>
-    </>
-  );
+  return <OrgUserReference display={resolveUser(assigneeIds[0])} size="xs" nameClassName="truncate text-[12px]" />;
 }

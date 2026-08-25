@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
@@ -214,9 +214,10 @@ describe("AutomationDetail tabs", () => {
 
     const card = screen.getByTestId("work-order-card-wo-1");
     expect(card).toHaveTextContent("Add refund reconciliation test");
-    expect(card).toHaveTextContent("Running");
-    expect(card).toHaveTextContent("SP-103");
+    expect(within(card).getByLabelText("Running")).toBeInTheDocument();
+    expect(card).not.toHaveTextContent("SP-103");
     expect(screen.getByTestId("work-order-row-assignees-wo-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-row-dispatch-wo-1")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open Add refund reconciliation test" })).toHaveAttribute(
       "href",
       expect.stringContaining("run=run-c1111111"),

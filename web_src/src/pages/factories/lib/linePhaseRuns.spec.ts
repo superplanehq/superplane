@@ -7,7 +7,15 @@ import type {
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
 import { factoryAppPath, factoryAppRunPath, linesPath } from "./factoryPagePaths";
-import { buildLinePhaseBoard, linePhaseRunHref, resolvePhaseRunStatus } from "./linePhaseRuns";
+import {
+  buildLinePhaseBoard,
+  collectLineBacklogOrders,
+  findBacklogAutomationApp,
+  findClosureAutomationApp,
+  isDoneLineColumn,
+  linePhaseRunHref,
+  resolvePhaseRunStatus,
+} from "./linePhaseRuns";
 
 const APPS = [
   { id: "app-plan", name: "plan" },
@@ -310,6 +318,7 @@ describe("linePhaseRunHref", () => {
       factoryAppRunPath("org-1", "RF", "app-refund-implementer", "run-implement", {
         from: "lines",
         lineId: "line-1",
+        orderNumber: "42",
       }),
     );
   });
@@ -340,6 +349,94 @@ describe("linePhaseRunHref", () => {
     });
 
     expect(href).toBe(linesPath("org-1", "RF"));
+  });
+});
+
+describe("collectLineBacklogOrders", () => {
+  it("returns only draft orders that are not on a line", () => {
+    const onLine = order("wo-on-line", "On line", [
+      {
+        id: "e-on",
+        line: { id: "line-1", name: "poc" },
+        step: "plan",
+        stepIndex: 0,
+        state: "STATE_STARTED",
+        createdAt: "2026-08-11T12:00:00.000Z",
+        updatedAt: "2026-08-11T12:00:00.000Z",
+      },
+    ]);
+    const otherLine = order("wo-other-line", "Other line", [
+      {
+        id: "e-other",
+        line: { id: "line-other", name: "other" },
+        step: "plan",
+        stepIndex: 0,
+        state: "STATE_STARTED",
+        createdAt: "2026-08-11T13:00:00.000Z",
+        updatedAt: "2026-08-11T13:00:00.000Z",
+      },
+    ]);
+    const draft: FactoriesWorkOrder = {
+      id: "wo-draft",
+      title: "Draft",
+      state: "STATE_DRAFT",
+      updatedAt: "2026-08-11T14:00:00.000Z",
+      lineDispatches: [],
+    };
+    const open: FactoriesWorkOrder = {
+      id: "wo-open",
+      title: "Open",
+      state: "STATE_OPEN",
+      updatedAt: "2026-08-11T11:00:00.000Z",
+      lineDispatches: [],
+    };
+    const closed: FactoriesWorkOrder = {
+      id: "wo-closed",
+      title: "Closed",
+      state: "STATE_CLOSED",
+      lineDispatches: [],
+    };
+
+    const backlog = collectLineBacklogOrders([onLine, otherLine, draft, open, closed]);
+
+    expect(backlog.map((entry) => entry.id)).toEqual(["wo-draft"]);
+  });
+});
+
+describe("findBacklogAutomationApp", () => {
+  it("returns the factory backlog automation", () => {
+    expect(
+      findBacklogAutomationApp([
+        { id: "app-plan", name: "Plan" },
+        { id: "app-refund-backlog", name: "Backlog" },
+      ]),
+    ).toEqual({ id: "app-refund-backlog", name: "Backlog" });
+  });
+});
+
+describe("findClosureAutomationApp", () => {
+  it("returns the factory PR Closure automation", () => {
+    expect(
+      findClosureAutomationApp([
+        { id: "app-plan", name: "Plan" },
+        { id: "app-pr-closure", name: "PR Closure" },
+      ]),
+    ).toEqual({ id: "app-pr-closure", name: "PR Closure" });
+  });
+
+  it("matches the refund done app id when the name is absent", () => {
+    expect(findClosureAutomationApp([{ id: "app-refund-done" }])).toEqual({
+      id: "app-refund-done",
+      name: "PR Closure",
+    });
+  });
+});
+
+describe("isDoneLineColumn", () => {
+  it("treats the Done name and the closure app id as special columns", () => {
+    expect(isDoneLineColumn({ stepName: "Done", appId: "app-plan" })).toBe(true);
+    expect(isDoneLineColumn({ stepName: "Phase 4", appId: "app-refund-done" })).toBe(true);
+    expect(isDoneLineColumn({ stepName: "Plan", appId: "app-plan" })).toBe(false);
   });
 });
 

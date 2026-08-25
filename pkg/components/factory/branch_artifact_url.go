@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 )
@@ -81,6 +82,44 @@ func applyBranchTreeURL(config AddWorkOrderArtifactConfiguration, data map[strin
 	data = ensureArtifactData(data)
 	data["url"] = tree
 	return data
+}
+
+func branchArtifactHasURLOrRepository(config AddWorkOrderArtifactConfiguration) bool {
+	if strings.TrimSpace(config.URL) != "" || strings.TrimSpace(config.Repository) != "" {
+		return true
+	}
+	for _, entry := range config.Data {
+		switch strings.TrimSpace(entry.Name) {
+		case "url", "html_url", "repository", "repo":
+			if strings.TrimSpace(entry.Value) != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func validateBranchArtifactConfiguration(config AddWorkOrderArtifactConfiguration) error {
+	if config.ArtifactType != "branch" {
+		return nil
+	}
+	if branchArtifactHasURLOrRepository(config) {
+		return nil
+	}
+	return fmt.Errorf("branch artifact requires a url or a repository that can produce a tree URL")
+}
+
+// requireReachableBranchURL rejects a branch attach that still has no
+// browse URL after applyBranchTreeURL. A remote branch is reachable as
+// soon as it is pushed; SuperPlane does not wait for a pull request.
+func requireReachableBranchURL(artifactType string, data map[string]any) error {
+	if artifactType != "branch" {
+		return nil
+	}
+	if artifactString(data, "url") != "" || artifactString(data, "html_url") != "" {
+		return nil
+	}
+	return fmt.Errorf("branch artifact requires a url or a repository that can produce a tree URL")
 }
 
 // parseHTTPRepositoryURL returns a credential-free repository URL.
