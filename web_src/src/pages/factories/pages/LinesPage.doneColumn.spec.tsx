@@ -12,6 +12,7 @@ import {
   REFUND_FACTORY,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
+import { BOARD_DONE_REJECTED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import { withPlanLinePhases } from "../__fixtures__/lineMetricsPlanLine";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { LinesPage } from "./LinesPage";
@@ -96,6 +97,34 @@ describe("LinesPage Done column", () => {
     useFactoryWorkOrders.mockReturnValue({ data: [] });
   });
 
+  it("always shows a Done column after the line stages", () => {
+    renderBoard();
+
+    expect(screen.getByTestId("lines-column-title-backlog")).toHaveTextContent("Backlog");
+    expect(screen.getByTestId("lines-column-title-phase-0")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-column-title-phase-1")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-column-title-done")).toHaveTextContent("Done");
+    expect(screen.getByTestId("lines-done-column")).toHaveTextContent("No work orders in Done.");
+    expect(screen.queryByTestId("lines-column-title-phase-2")).not.toBeInTheDocument();
+  });
+
+  it("puts a closed work order in Done instead of the last stage", () => {
+    useFactoryWorkOrders.mockReturnValue({
+      data: [BOARD_DONE_REJECTED_ORDER],
+    });
+    renderBoard();
+
+    expect(
+      within(screen.getByTestId("lines-done-column")).getByText("Replace the refund batch exporter"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("lines-phase-column-0")).queryByText("Replace the refund batch exporter"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("lines-phase-column-1")).queryByText("Replace the refund batch exporter"),
+    ).not.toBeInTheDocument();
+  });
+
   it("collects finished work orders in the Done column", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [
@@ -115,14 +144,14 @@ describe("LinesPage Done column", () => {
     expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
   });
 
-  it("hides the Done column when the line ends with its own Done automation", () => {
+  it("keeps the bookend Done column when the line has its own Done automation", () => {
     const factory: FactoriesFactory = {
       ...REFUND_FACTORY,
       lines: (REFUND_FACTORY.lines ?? []).map(withPlanLinePhases),
     };
     renderBoard(factory);
 
-    expect(screen.queryByTestId("lines-done-column")).not.toBeInTheDocument();
-    expect(screen.getByTestId("lines-phase-column-2")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-done-column")).toBeInTheDocument();
+    expect(screen.queryByTestId("lines-phase-column-2")).not.toBeInTheDocument();
   });
 });
