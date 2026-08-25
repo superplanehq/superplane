@@ -106,9 +106,36 @@ export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): Fact
   return workOrders.filter(isLineBacklogOrder).sort(compareOrdersNewestFirst);
 }
 
-/** Closed work orders. Newest closed orders come first. */
-export function collectLineDoneOrders(workOrders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
-  return workOrders.filter((order) => order.state === "STATE_CLOSED").sort(compareOrdersNewestFirst);
+/**
+ * Closed work that ran on this line, plus open work still on a Done or
+ * PR-closure step. Newest orders come first.
+ */
+export function collectLineDoneOrders(
+  workOrders: FactoriesWorkOrder[],
+  line: FactoriesFactoryLine,
+  board: LinePhaseColumn[] = [],
+): FactoriesWorkOrder[] {
+  const doneById = new Map<string, FactoriesWorkOrder>();
+
+  for (const order of workOrders) {
+    if (!order.id || !isClosedOnLine(order, line.id)) {
+      continue;
+    }
+    doneById.set(order.id, order);
+  }
+
+  for (const column of board) {
+    if (!isDoneLineColumn(column)) {
+      continue;
+    }
+    for (const run of column.runs) {
+      if (run.order.id) {
+        doneById.set(run.order.id, run.order);
+      }
+    }
+  }
+
+  return [...doneById.values()].sort(compareOrdersNewestFirst);
 }
 
 /** Stage columns only. Done is a fixed bookend, not a line step. */
@@ -153,6 +180,13 @@ export function isDoneLineColumn(column: Pick<LinePhaseColumn, "stepName" | "app
     return false;
   }
   return column.appId === "app-refund-done" || column.appId.includes("pr-closure");
+}
+
+function isClosedOnLine(order: FactoriesWorkOrder, lineId: string | undefined): boolean {
+  if (!order.id || order.state !== "STATE_CLOSED" || !lineId) {
+    return false;
+  }
+  return (order.lineDispatches ?? []).some((dispatch) => dispatch.line?.id === lineId);
 }
 
 function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {

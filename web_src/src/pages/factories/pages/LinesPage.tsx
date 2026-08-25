@@ -437,12 +437,13 @@ function LineDetail({
   workOrderCardContext: WorkOrderCardContext;
 }) {
   const steps = line.steps ?? [];
-  const board = useMemo(
-    () => lineStageColumns(buildLinePhaseBoard(line, workOrders ?? [], apps)),
-    [line, workOrders, apps],
-  );
+  const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
+  const board = useMemo(() => lineStageColumns(fullBoard), [fullBoard]);
   const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
-  const doneOrders = useMemo(() => collectLineDoneOrders(workOrders ?? []), [workOrders]);
+  const doneOrders = useMemo(
+    () => collectLineDoneOrders(workOrders ?? [], line, fullBoard),
+    [workOrders, line, fullBoard],
+  );
   const [peekOrderId, setPeekOrderId] = useState<string | null>(null);
   const peekOrder = workOrders.find((order) => order.id === peekOrderId);
   const canvasEditHref = useMemo(

@@ -21,7 +21,6 @@ import {
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
-import { withPlanLinePhases } from "../__fixtures__/lineMetricsPlanLine";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { LINE_LIST_METRICS_BY_ID } from "./lineListMetricsMockData";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
