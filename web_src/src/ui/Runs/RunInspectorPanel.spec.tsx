@@ -595,4 +595,18 @@ describe("RunInspectorPanel run errors", () => {
     expect(screen.getByTestId("run-errors-card")).toHaveTextContent("This run has an error");
     expect(screen.getByText("work order check failed")).toBeInTheDocument();
   });
+
+  it("opens factory node timeline cards for the selected node", () => {
+    renderInspector({
+      factoryContext: true,
+      selectedNodeId: "action-2",
+    });
+
+    const panel = screen.getByTestId("run-inspector-panel");
+    expect(panel).toHaveAttribute("data-factory-context", "true");
+    expect(screen.getByTestId("factory-run-node-detail")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Input/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Runtime Config/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Output/i })).toBeInTheDocument();
+  });
 });

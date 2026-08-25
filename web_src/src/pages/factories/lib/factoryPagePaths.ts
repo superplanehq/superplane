@@ -196,16 +196,13 @@ export function factoryAppConfigurePath(
   });
 }
 
-/** Factory canvas view URL. Run views use the split-run page. */
+/** Factory canvas view URL. `runId` opens the dedicated run inspector. */
 export function factoryAppViewPath(
   organizationId: string,
   factoryKey: string,
   appId: string,
   options?: Pick<FactoryAppNavOptions, "from" | "lineId" | "orderNumber" | "runId">,
 ) {
-  if (options?.runId) {
-    return factoryAppSplitRunPath(organizationId, factoryKey, appId, options);
-  }
   return factoryAppPath(organizationId, factoryKey, appId, options);
 }
 
@@ -225,7 +222,7 @@ export function factoryAppRunPath(
   runId: string,
   options?: Omit<FactoryAppNavOptions, "runId">,
 ) {
-  return factoryAppSplitRunPath(organizationId, factoryKey, appId, { ...options, runId });
+  return factoryAppPath(organizationId, factoryKey, appId, { ...options, runId });
 }
 
 export function factoryAppSplitRunPath(
