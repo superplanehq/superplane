@@ -1,10 +1,11 @@
-import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryApps, useFactoryWorkOrders, useUpdateFactoryLine } from "@/hooks/useFactoryData";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
+import { useMe } from "@/hooks/useMe";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
@@ -35,7 +36,21 @@ import {
 } from "../lib/linePhaseRuns";
 import { isQueuedStepRow } from "../lib/workOrderExecutions";
 import { latestDispatchForLine } from "../lib/workOrderNumberResolution";
-import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
+import {
+  applyWorkOrderFilters,
+  applyWorkOrderScope,
+  applyWorkOrderSearch,
+  buildWorkOrderListEntries,
+  buildWorkOrderListEntry,
+  WORK_ORDER_SCOPES,
+} from "../lib/workOrderListModel";
+import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
+import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
+import { buildAssigneeFilterOptions } from "../lib/workOrderFilterOptions";
+import { FilterChips } from "../workOrders/header/FilterChips";
+import { FilterMenu } from "../workOrders/header/FilterMenu";
+import { ScopePills } from "../workOrders/header/ScopePills";
+import { SearchField } from "../workOrders/header/SearchField";
 import {
   WorkOrderBoardLane,
   WorkOrderKanbanBoard,
@@ -45,7 +60,6 @@ import {
 } from "../workOrders/WorkOrderBoardChrome";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
-import { ReviewCandidateModal } from "./onboarding/first-run/ReviewCandidateModal";
 import { reviewCandidateForWorkOrderId } from "./onboarding/first-run/reviewCandidates";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 import type { SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
@@ -89,6 +103,25 @@ import { useLineCardMutations } from "./useLineCardMutations";
 
 const LIST_SUBTITLE = "Last 30 days. Success rate, completions per day, duration, and cost per merged work order.";
 
+function applyVisibleWorkOrders(
+  workOrders: FactoriesWorkOrder[],
+  factory: FactoriesFactory | null | undefined,
+  state: WorkOrderListState,
+  currentUserId?: string,
+): FactoriesWorkOrder[] {
+  const entries = factory ? buildWorkOrderListEntries(workOrders, factory) : [];
+  const visibleIds = new Set(
+    applyWorkOrderSearch(
+      applyWorkOrderFilters(applyWorkOrderScope(entries, state.scope, currentUserId), {
+        ...state.filters,
+        lineIds: [],
+      }),
+      state.search,
+    ).map((entry) => entry.id),
+  );
+  return workOrders.filter((order) => Boolean(order.id) && visibleIds.has(order.id));
+}
+
 export function LinesPage() {
   const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
@@ -100,6 +133,8 @@ export function LinesPage() {
   const intakeSettingsTab = intakeSettingsTabFromSearch(search);
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
   const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
+  const { data: me } = useMe(false);
+  const listState = useWorkOrderListState(factoryId);
   const { data: factoryIntakes = [] } = useFactoryIntakes(organizationId, factoryId);
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
@@ -108,6 +143,10 @@ export function LinesPage() {
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
+  const visibleWorkOrders = useMemo(
+    () => applyVisibleWorkOrders(workOrders, factory, listState, me?.id),
+    [factory, listState.filters, listState.scope, listState.search, me?.id, workOrders],
+  );
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const { actionsForLine } = useLineCardMutations({
     organizationId,
@@ -198,10 +237,12 @@ export function LinesPage() {
               factoryId={factoryId}
               factoryKey={factoryKey}
               line={selectedLine}
+              workOrders={workOrders}
+              factory={factory}
+              state={listState}
               canUpdate={canUpdate}
             />
           </div>
-
           <div className={factoryWorkOrdersBodyClassName}>
             <LineDetail
               organizationId={organizationId}
@@ -209,7 +250,7 @@ export function LinesPage() {
               factoryKey={factoryKey}
               line={selectedLine}
               apps={factoryApps}
-              workOrders={workOrders}
+              workOrders={visibleWorkOrders}
               canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
               canUpdate={canUpdate}
               onCreateWorkOrder={openCreateWorkOrder}
@@ -287,15 +328,24 @@ function LineDetailHeader({
   factoryId,
   factoryKey,
   line,
+  workOrders,
+  factory,
+  state,
   canUpdate,
 }: {
   organizationId: string;
   factoryId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
+  workOrders: FactoriesWorkOrder[];
+  factory: FactoriesFactory | null;
+  state: WorkOrderListState;
   canUpdate: boolean;
 }) {
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
+  const searchRef = useWorkOrdersHeaderShortcuts(state);
+  const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [factory, workOrders]);
+  const assigneeOptions = buildAssigneeFilterOptions(entries);
   const title = humanizeLineName(line.name);
   const editHref = line.id ? editFactoryLinePath(organizationId, factoryKey, line.id) : "#";
 
@@ -313,6 +363,7 @@ function LineDetailHeader({
   return (
     <WorkspacePageHeader
       className={factorySectionHeaderClassName}
+      data-testid="lines-detail-header"
       title={
         <ClickToRename
           value={title}
@@ -324,11 +375,31 @@ function LineDetailHeader({
           inputClassName="font-medium text-[length:var(--workspace-page-title-size)] leading-[var(--workspace-page-title-line-height)] tracking-[var(--workspace-page-title-tracking)]"
         />
       }
-      actions={
-        canUpdate && line.id ? (
-          <ColumnConfigureMenu title={title} href={editHref} testId="lines-edit-menu" />
-        ) : undefined
+      leading={
+        <>
+          <ScopePills
+            value={state.scope}
+            onChange={state.setScope}
+            options={WORK_ORDER_SCOPES}
+            testIdPrefix="work-orders-scope"
+          />
+          <FilterMenu state={state} assigneeOptions={assigneeOptions} />
+        </>
       }
+      actions={
+        <>
+          <SearchField
+            inputRef={searchRef}
+            open={state.searchOpen}
+            value={state.search}
+            onOpen={state.openSearch}
+            onChange={state.setSearch}
+            onClose={state.closeSearch}
+          />
+          {canUpdate && line.id ? <ColumnConfigureMenu title={title} href={editHref} testId="lines-edit-menu" /> : null}
+        </>
+      }
+      belowRow={<FilterChips state={state} assigneeOptions={assigneeOptions} />}
     />
   );
 }
@@ -361,7 +432,6 @@ function LineDetail({
   const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
   const [peekOrderId, setPeekOrderId] = useState<string | null>(null);
   const peekOrder = workOrders.find((order) => order.id === peekOrderId);
-  const reviewCandidate = reviewCandidateForWorkOrderId(peekOrderId ?? undefined);
   const canvasEditHref = useMemo(
     () => canvasEditHrefForLine(organizationId, factoryKey, line, apps),
     [organizationId, factoryKey, line, apps],
@@ -390,12 +460,11 @@ function LineDetail({
           onOpenWorkOrder={setPeekOrderId}
         />
       )}
-      {reviewCandidate ? (
-        <ReviewCandidateModal candidate={reviewCandidate} onClose={() => setPeekOrderId(null)} />
-      ) : peekOrderId ? (
+      {peekOrderId ? (
         <LineBoardSplitRunPopup
           organizationId={organizationId}
           factoryId={factoryId}
+          factoryKey={factoryKey}
           lineId={line.id}
           lineName={line.name}
           peekOrderId={peekOrderId}
@@ -403,6 +472,7 @@ function LineDetail({
           canvasEditHref={canvasEditHref}
           canvasExpandHref={canvasExpandHref}
           canDispatch={workOrderCardContext.canDispatch}
+          canUpdate={workOrderCardContext.canAssign}
           isDispatching={workOrderCardContext.isDispatching}
           onDispatch={workOrderCardContext.onDispatch}
           onClose={() => setPeekOrderId(null)}
@@ -415,6 +485,7 @@ function LineDetail({
 function LineBoardSplitRunPopup({
   organizationId,
   factoryId,
+  factoryKey,
   lineId,
   lineName,
   peekOrderId,
@@ -422,12 +493,14 @@ function LineBoardSplitRunPopup({
   canvasEditHref,
   canvasExpandHref,
   canDispatch,
+  canUpdate,
   isDispatching,
   onDispatch,
   onClose,
 }: {
   organizationId: string;
   factoryId: string;
+  factoryKey: string;
   lineId: string | undefined;
   lineName: string | undefined;
   peekOrderId: string;
@@ -435,6 +508,7 @@ function LineBoardSplitRunPopup({
   canvasEditHref: (key: SplitRunCanvasKey) => string | undefined;
   canvasExpandHref: (key: SplitRunCanvasKey) => string | undefined;
   canDispatch: boolean;
+  canUpdate: boolean;
   isDispatching: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onClose: () => void;
@@ -446,11 +520,14 @@ function LineBoardSplitRunPopup({
       key={peekOrderId}
       organizationId={organizationId}
       factoryId={factoryId}
+      factoryKey={factoryKey}
       orderId={peekOrderId}
-      fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId })}
+      orderNumber={peekOrder?.number}
+      fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId, demoArtifacts: false })}
       canvasEditHref={canvasEditHref}
       canvasExpandHref={canvasExpandHref}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
+      canUpdate={canUpdate}
       isDispatching={isDispatching}
       onDispatch={resolvedLineName ? () => onDispatch(peekOrderId, { lineName: resolvedLineName }) : undefined}
       onClose={onClose}
@@ -478,11 +555,17 @@ function canvasAppIdsForLine(
   const steps = line.steps ?? [];
   return {
     intake: backlog?.id,
+    sentry: appIdNamed(apps, "Sentry"),
+    slack: appIdNamed(apps, "Slack"),
     planning: steps[0]?.app?.app,
     implementation: steps[1]?.app?.app,
     risk: steps[2]?.app?.app,
     closure: steps[3]?.app?.app ?? closure?.id,
   };
+}
+
+function appIdNamed(apps: Array<{ id?: string; name?: string }>, name: string): string | undefined {
+  return apps.find((app) => app.id && app.name === name)?.id;
 }
 
 function canvasEditHrefForLine(
@@ -969,7 +1052,7 @@ function LineBoardOrderCard({
     <WorkOrderCard
       {...workOrderCardContext}
       entry={entry}
-      confidencePct={reviewCandidate?.confidencePct}
+      confidenceScore={reviewCandidate?.confidenceScore}
       onOpen={() => {
         if (order.id) {
           onOpenWorkOrder(order.id);

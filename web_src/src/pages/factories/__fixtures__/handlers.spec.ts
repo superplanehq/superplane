@@ -129,6 +129,22 @@ describe("matchFactoryPageFixture", () => {
     expect(body.factory?.key).toBe("NEWWA");
   });
 
+  it("updates a work order title and description", async () => {
+    const fixture = structuredClone(defaultFactoriesFixture);
+    const response = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders/${OPEN_WORK_ORDER.id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ title: "New title", description: "New body" }),
+      },
+      fixture,
+    );
+    const body = (await response.json()) as { order?: { title?: string; description?: string } };
+
+    expect(body.order?.title).toBe("New title");
+    expect(body.order?.description).toBe("New body");
+  });
+
   it("does not serve a separate line-metrics route", async () => {
     const response = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/line-metrics`);
     expect(response.status).toBe(404);

@@ -12,20 +12,29 @@ import issueIntakeYaml from "@/pages/home/factories/line-apps/issue-intake.canva
 import planningYaml from "@/pages/home/factories/line-apps/planning.canvas.yaml?raw";
 import implementationYaml from "@/pages/home/factories/line-apps/implementation.canvas.yaml?raw";
 import prClosureYaml from "@/pages/home/factories/line-apps/pr-closure.canvas.yaml?raw";
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
+import slackIcon from "@/assets/icons/integrations/slack.svg";
 import { DESCRIPTION_ARTIFACT, PR_CLOSURE_PR_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
 import riskAssessmentYaml from "./risk-assessment.canvas.yaml?raw";
+import sentryIntakeYaml from "./sentry-intake.canvas.yaml?raw";
+import slackIntakeYaml from "./slack-intake.canvas.yaml?raw";
 
-import type { SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamLine } from "./splitRunMocks";
+import { parseClaudeCodeLog, type ClaudeCodeLogStep } from "./parseClaudeCodeLog";
+import implementationClaudeLog from "./implementation-claude-log.txt?raw";
+import planningClaudeLog from "./planning-claude-log.txt?raw";
+import type { SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamKind, SplitRunStreamLine } from "./splitRunMocks";
 
-export type SplitRunCanvasKey = "intake" | "planning" | "implementation" | "risk" | "closure";
+export type SplitRunCanvasKey = "intake" | "sentry" | "slack" | "planning" | "implementation" | "risk" | "closure";
 
-const CANVAS_KEYS: SplitRunCanvasKey[] = ["intake", "planning", "implementation", "risk", "closure"];
+const CANVAS_KEYS: SplitRunCanvasKey[] = ["intake", "sentry", "slack", "planning", "implementation", "risk", "closure"];
 
 const CANVAS_HINTS: { needles: string[]; key: SplitRunCanvasKey }[] = [
-  { needles: ["backlog", "intake", "create work order"], key: "intake" },
+  { needles: ["sentry"], key: "sentry" },
+  { needles: ["slack"], key: "slack" },
+  { needles: ["ingest", "intake", "backlog"], key: "intake" },
   { needles: ["plan"], key: "planning" },
   { needles: ["implement"], key: "implementation" },
-  { needles: ["verify", "risk", "ci"], key: "risk" },
+  { needles: ["verify", "verifier", "risk", "ci"], key: "risk" },
   { needles: ["closure", "done"], key: "closure" },
 ];
 
@@ -48,6 +57,29 @@ export function canvasKeyForAutomation(app: { id?: string; name?: string } | und
   return canvasKeyFromLabel(`${app.id ?? ""} ${app.name ?? ""}`.toLowerCase());
 }
 
+const LINE_AUTOMATION_LABEL: Record<SplitRunCanvasKey, { name: string; componentName: string }> = {
+  intake: { name: "Backlog", componentName: "Ingest" },
+  sentry: { name: "Backlog", componentName: "Sentry" },
+  slack: { name: "Backlog", componentName: "Slack" },
+  planning: { name: "Plan", componentName: "Planning" },
+  implementation: { name: "Implement", componentName: "Implementation" },
+  risk: { name: "Verify", componentName: "Risk Assessment" },
+  closure: { name: "Done", componentName: "PR Closure" },
+};
+
+/** Column + canvas titles for a line step, even when the app still has an old name. */
+export function lineAutomationPresentation(
+  app: { id?: string; name?: string } | undefined,
+  step?: string,
+): { name: string; componentName: string } {
+  const key = canvasKeyForAutomation(app) ?? canvasKeyFromLabel((step ?? "").toLowerCase());
+  if (key) {
+    return LINE_AUTOMATION_LABEL[key];
+  }
+  const fallback = step?.trim() || app?.name?.trim() || "Step";
+  return { name: fallback, componentName: app?.name?.trim() || fallback };
+}
+
 export interface SplitRunCanvasModel {
   key: SplitRunCanvasKey;
   title: string;
@@ -59,6 +91,8 @@ export interface SplitRunCanvasModel {
 
 const CANVAS_YAML: Record<SplitRunCanvasKey, string> = {
   intake: issueIntakeYaml,
+  sentry: sentryIntakeYaml,
+  slack: slackIntakeYaml,
   planning: planningYaml,
   implementation: implementationYaml,
   risk: riskAssessmentYaml,
@@ -66,6 +100,9 @@ const CANVAS_YAML: Record<SplitRunCanvasKey, string> = {
 };
 
 export function canvasKeyForPhase(phase: SplitRunPhase): SplitRunCanvasKey {
+  if (phase.canvasKey) {
+    return phase.canvasKey;
+  }
   const label = `${phase.id} ${phase.name} ${phase.componentName}`.toLowerCase();
   return canvasKeyFromLabel(label) ?? "closure";
 }
@@ -85,6 +122,9 @@ export function splitRunCanvasForPhase(phase: SplitRunPhase): SplitRunCanvasMode
   if (phase.canvas) {
     return phase.canvas;
   }
+  if (phase.canvasKey === null) {
+    return emptySplitRunCanvas(undefined, "");
+  }
   const key = canvasKeyForPhase(phase);
   const yaml = CANVAS_YAML[key];
   const spec = parseCanvasYamlToSpec(yaml);
@@ -95,7 +135,7 @@ export function splitRunCanvasForPhase(phase: SplitRunPhase): SplitRunCanvasMode
 
   const nodes = spec.nodes;
   const edges = spec.edges ?? [];
-  const taken = takenNodeIds(key, nodes, edges);
+  const taken = takenNodeIds(key, nodes, edges, phase.status, phase.triggerName);
 
   return {
     key,
@@ -107,12 +147,15 @@ export function splitRunCanvasForPhase(phase: SplitRunPhase): SplitRunCanvasMode
   };
 }
 
-function takenNodeIds(key: SplitRunCanvasKey, nodes: ComponentsNode[], edges: ComponentsEdge[]): Set<string> {
+function takenNodeIds(
+  key: SplitRunCanvasKey,
+  nodes: ComponentsNode[],
+  edges: ComponentsEdge[],
+  status: SplitRunPhaseStatus,
+  triggerName?: string,
+): Set<string> {
   const taken = new Set<string>();
-  const starts = nodes
-    .filter((node) => node.type === "TYPE_TRIGGER")
-    .map((node) => node.id)
-    .filter(Boolean) as string[];
+  const starts = triggerIdsToWalk(nodes, triggerName);
   const queue = [...starts];
 
   while (queue.length > 0) {
@@ -122,15 +165,19 @@ function takenNodeIds(key: SplitRunCanvasKey, nodes: ComponentsNode[], edges: Co
     }
     taken.add(id);
     const outgoing = edges.filter((edge) => edge.sourceId === id);
-    const preferred = preferredChannel(key, outgoing);
+    const preferred = preferredChannel(key, outgoing, status);
     for (const edge of outgoing) {
       if (!edge.targetId) {
         continue;
       }
+      if (edge.channel === "failed" && status !== "failed") {
+        continue;
+      }
+      const source = nodes.find((node) => node.id === id);
+      if (edge.channel === "passed" && status === "running" && source?.component === "runnerClaudeCode") {
+        continue;
+      }
       if (outgoing.length === 1 || edge.channel === preferred || edge.channel === "default") {
-        if (edge.channel === "true" && preferred === "false") {
-          continue;
-        }
         queue.push(edge.targetId);
       }
     }
@@ -139,17 +186,32 @@ function takenNodeIds(key: SplitRunCanvasKey, nodes: ComponentsNode[], edges: Co
   return taken;
 }
 
-function preferredChannel(key: SplitRunCanvasKey, edges: ComponentsEdge[]): string | undefined {
-  if (key === "closure" && edges.some((edge) => edge.channel === "true")) {
-    return "true";
+function triggerIdsToWalk(nodes: ComponentsNode[], triggerName?: string): string[] {
+  const triggers = nodes.filter((node) => node.type === "TYPE_TRIGGER" && node.id);
+  if (triggerName) {
+    const named = triggers.find((node) => node.name === triggerName);
+    if (named?.id) {
+      return [named.id];
+    }
   }
-  if (edges.some((edge) => edge.channel === "false")) {
-    return "false";
+  return triggers.map((node) => node.id).filter((id): id is string => Boolean(id));
+}
+
+function preferredChannel(
+  _key: SplitRunCanvasKey,
+  edges: ComponentsEdge[],
+  status: SplitRunPhaseStatus,
+): string | undefined {
+  if (status === "failed" && edges.some((edge) => edge.channel === "failed")) {
+    return "failed";
+  }
+  if (edges.some((edge) => edge.channel === "true")) {
+    return "true";
   }
   if (edges.some((edge) => edge.channel === "passed")) {
     return "passed";
   }
-  return edges[0]?.channel;
+  return edges.find((edge) => edge.channel !== "failed")?.channel ?? edges[0]?.channel;
 }
 
 function paintStatuses(
@@ -225,33 +287,46 @@ function paintMetrics(nodes: ComponentsNode[], taken: Set<string>, phase: SplitR
   return metrics;
 }
 
-const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string }> = {
+const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; iconSrc?: string }> = {
   onRun: { title: "On Run", iconSlug: "play" },
   runnerBash: { title: "Run Bash", iconSlug: "code" },
   runnerClaudeCode: { title: "Run Claude Code", iconSlug: "code" },
   runnerJS: { title: "Run JavaScript", iconSlug: "code" },
-  if: { title: "If", iconSlug: "git-branch" },
-  filter: { title: "Filter", iconSlug: "filter" },
-  addWorkOrderArtifact: { title: "Add Work Order Artifact", iconSlug: "file-text" },
+  if: { title: "If", iconSlug: "split" },
+  filter: { title: "Filter", iconSlug: "funnel" },
+  addWorkOrderArtifact: { title: "Add Work Order Artifact", iconSlug: "factory" },
   addRunError: { title: "Add Run Error", iconSlug: "triangle-alert" },
-  reportWorkOrderCheck: { title: "Report Work Order Check", iconSlug: "clipboard-check" },
-  "github.createIssueComment": { title: "Create Issue Comment", iconSlug: "message-square" },
-  "github.addIssueLabel": { title: "Add Issue Label", iconSlug: "tag" },
+  reportWorkOrderCheck: { title: "Report Work Order Check", iconSlug: "factory" },
+  "github.createIssueComment": { title: "Create Issue Comment", iconSlug: "github" },
+  "github.createPullRequest": { title: "Create Pull Request", iconSlug: "github" },
+  "github.addIssueLabel": { title: "Add Issue Label", iconSlug: "github" },
   "github.onIssue": { title: "On Issue", iconSlug: "github" },
-  "sentry.onIssue": { title: "On Issue", iconSlug: "sentry" },
+  "github.onPullRequest": { title: "On Pull Request", iconSlug: "github" },
+  "sentry.onIssue": { title: "On Issue", iconSlug: "bug", iconSrc: sentryIcon },
+  "slack.onAppMention": { title: "On Mention", iconSlug: "slack", iconSrc: slackIcon },
   "pagerduty.onIncident": { title: "On Incident", iconSlug: "pagerduty" },
-  "github.onPullRequest": { title: "On Pull Request", iconSlug: "git-pull-request" },
-  findWorkOrder: { title: "Find Work Order", iconSlug: "search" },
-  updateWorkOrderArtifact: { title: "Update Work Order Artifact", iconSlug: "file-pen" },
-  createWorkOrder: { title: "Create Work Order", iconSlug: "plus" },
-  updateWorkOrderStatus: { title: "Update Work Order Status", iconSlug: "circle-check" },
+  findWorkOrder: { title: "Find Work Order", iconSlug: "factory" },
+  updateWorkOrderArtifact: { title: "Update Work Order Artifact", iconSlug: "factory" },
+  createWorkOrder: { title: "Create Work Order", iconSlug: "factory" },
+  updateWorkOrderStatus: { title: "Update Work Order Status", iconSlug: "factory" },
 };
 
-export function componentPresentation(component?: string): { title: string; iconSlug: string } {
+export function componentPresentation(component?: string): { title: string; iconSlug: string; iconSrc?: string } {
   if (!component) {
     return { title: "Component", iconSlug: "box" };
   }
   return COMPONENT_PRESENTATION[component] ?? { title: component, iconSlug: "box" };
+}
+
+/** Integration ids stay namespaced. Core components use their catalog label. */
+export function componentTypeLabel(component?: string): string {
+  if (!component) {
+    return "Component";
+  }
+  if (component.includes(".")) {
+    return component;
+  }
+  return componentPresentation(component).title;
 }
 
 const PLAN_ARTIFACT: FactoriesWorkOrderArtifact = {
@@ -287,10 +362,14 @@ const MERGE_SCREENSHOT: FactoriesWorkOrderArtifact = {
 };
 
 /**
- * One log line per canvas node. Claude Code nodes add a short transcript.
+ * One log line per canvas node. Claude Code nodes add their configured steps.
  * Work-order artifacts and checks hang their file or score on that line.
  */
-export function richStreamForCanvas(canvas: SplitRunCanvasModel): SplitRunStreamLine[] {
+export function richStreamForCanvas(
+  canvas: SplitRunCanvasModel,
+  description?: FactoriesWorkOrderArtifact,
+  options?: { demoArtifacts?: boolean },
+): SplitRunStreamLine[] {
   const lines: SplitRunStreamLine[] = [];
   let tick = 0;
 
@@ -299,36 +378,108 @@ export function richStreamForCanvas(canvas: SplitRunCanvasModel): SplitRunStream
       continue;
     }
     const nodeStatus = canvas.statuses[node.id] ?? "pending";
-    const componentName = node.name ?? componentPresentation(node.component).title;
+    const presentation = componentPresentation(node.component);
+    const componentName = node.name ?? presentation.title;
     const lineStatus = streamStatusForNode(nodeStatus);
     const kind = classifyNode(node);
+    const streamKind = streamKindForNode(node);
 
-    if (kind === "agent" && nodeStatus !== "did_not_run" && nodeStatus !== "pending") {
-      for (const note of agentNotes(node.id)) {
-        lines.push({
-          id: `${node.id}-note-${tick}`,
-          nodeId: node.id,
-          at: clockAt(tick),
-          componentName: note,
-          status: lineStatus,
-          note: true,
-        });
-        tick += 1;
-      }
-    }
-
+    const artifact =
+      kind === "check" || nodeStatus === "did_not_run"
+        ? undefined
+        : artifactForNode(node.id, canvas.key, description, options?.demoArtifacts !== false);
+    const name = kind === "check" ? checkName(node.id, componentName) : componentName;
     lines.push({
       id: node.id,
       nodeId: node.id,
       at: clockAt(tick),
-      componentName: kind === "check" ? checkLine(node.id, componentName) : componentName,
+      componentName: name,
       status: lineStatus,
-      artifact: kind === "check" || nodeStatus === "did_not_run" ? undefined : artifactForNode(node.id, canvas.key),
+      artifact,
+      kind: streamKind,
+      componentType: componentTypeLabel(node.component),
+      action: actionForStreamLine(streamKind, nodeStatus, node.id),
+      iconSlug: presentation.iconSlug,
+      iconSrc: presentation.iconSrc,
     });
     tick += 1;
+
+    if (kind === "agent" && nodeStatus !== "did_not_run" && nodeStatus !== "pending") {
+      for (const step of claudeCodeChildren(node, canvas.key, options?.demoArtifacts !== false)) {
+        const stepId = `${node.id}-note-${tick}`;
+        lines.push({
+          id: stepId,
+          nodeId: node.id,
+          at: clockAt(tick),
+          componentName: step.name,
+          status: step.status,
+          detail: step.output,
+          note: true,
+          componentType: step.type,
+        });
+        tick += 1;
+        for (const command of step.commands) {
+          lines.push({
+            id: `${node.id}-cmd-${tick}`,
+            nodeId: node.id,
+            at: clockAt(tick),
+            componentName: command.name,
+            status: command.status,
+            detail: command.output,
+            note: true,
+            noteParentId: stepId,
+            noteDepth: 1,
+            componentType: command.type,
+          });
+          tick += 1;
+        }
+      }
+    }
   }
 
   return lines;
+}
+
+export function streamKindForNode(node: ComponentsNode): SplitRunStreamKind {
+  if (node.type === "TYPE_TRIGGER") {
+    return "trigger";
+  }
+  const component = node.component ?? "";
+  if (component === "filter") {
+    return "filter";
+  }
+  if (component === "if") {
+    return "if";
+  }
+  if (component === "runnerClaudeCode") {
+    return "agent";
+  }
+  if (component === "reportWorkOrderCheck") {
+    return "check";
+  }
+  return "action";
+}
+
+function actionForStreamLine(kind: SplitRunStreamKind, nodeStatus: FactoryNodeStatus, nodeId: string): string {
+  if (nodeStatus === "did_not_run") {
+    return "did not run";
+  }
+  if (nodeStatus === "pending") {
+    return "—";
+  }
+  if (nodeStatus === "failed") {
+    return "failed";
+  }
+  if (nodeStatus === "running") {
+    return "running";
+  }
+  if (kind === "check") {
+    return checkScore(nodeId);
+  }
+  if (kind === "trigger" || nodeStatus === "triggered") {
+    return "triggered";
+  }
+  return "passed";
 }
 
 function classifyNode(node: ComponentsNode): "agent" | "check" | "artifact" | "simple" {
@@ -346,13 +497,46 @@ function classifyNode(node: ComponentsNode): "agent" | "check" | "artifact" | "s
   return "simple";
 }
 
+export function claudeCodeSteps(node: ComponentsNode): Array<{ name: string; type: string }> {
+  const configured = node.configuration?.steps;
+  if (!Array.isArray(configured) || configured.length === 0) {
+    return agentNotes(node.id).map((name) => ({ name, type: "" }));
+  }
+  const steps: Array<{ name: string; type: string }> = [];
+  for (const step of configured) {
+    if (!step || typeof step !== "object") {
+      continue;
+    }
+    const name = "name" in step && typeof step.name === "string" ? step.name.trim() : "";
+    const type = "type" in step && typeof step.type === "string" ? step.type.trim() : "";
+    if (name) {
+      steps.push({ name, type });
+    }
+  }
+  return steps;
+}
+
+const CLAUDE_CODE_LOGS: Partial<Record<SplitRunCanvasKey, string>> = {
+  planning: planningClaudeLog,
+  implementation: implementationClaudeLog,
+};
+
+function claudeCodeChildren(
+  node: ComponentsNode,
+  canvasKey: SplitRunCanvasKey,
+  demoArtifacts: boolean,
+): ClaudeCodeLogStep[] {
+  const configured = claudeCodeSteps(node);
+  const log = demoArtifacts ? CLAUDE_CODE_LOGS[canvasKey] : undefined;
+  if (log) {
+    return parseClaudeCodeLog(log, configured);
+  }
+  return configured.map((step) => ({ ...step, commands: [] }));
+}
+
 function agentNotes(nodeId: string): string[] {
   if (nodeId.startsWith("planner-agent")) {
-    return [
-      "Reading the work order description.",
-      "Drafting plan.md for the refund reconciliation test.",
-      "Covering the timeout-then-retry path.",
-    ];
+    return ["Clone Repo", "Write Implementation Plan", "Use plan as output"];
   }
   if (nodeId.startsWith("implementation-agent")) {
     return ["Reading plan.md.", "Opening the refund reconciliation worker.", "Adding the timeout-then-retry test."];
@@ -363,11 +547,18 @@ function agentNotes(nodeId: string): string[] {
   return ["Reading the work order.", "Writing the change.", "Running the local checks."];
 }
 
-function checkLine(nodeId: string, fallback: string): string {
+function checkName(nodeId: string, fallback: string): string {
   if (nodeId === "report-risk-check") {
-    return "Risk review  65/100";
+    return "Risk review";
   }
   return fallback;
+}
+
+function checkScore(nodeId: string): string {
+  if (nodeId === "report-risk-check") {
+    return "65/100";
+  }
+  return "passed";
 }
 
 function streamStatusForNode(status: FactoryNodeStatus): SplitRunPhaseStatus {
@@ -377,15 +568,26 @@ function streamStatusForNode(status: FactoryNodeStatus): SplitRunPhaseStatus {
   return "pending";
 }
 
-function artifactForNode(nodeId: string, key: SplitRunCanvasKey): FactoriesWorkOrderArtifact | undefined {
+function artifactForNode(
+  nodeId: string,
+  key: SplitRunCanvasKey,
+  description?: FactoriesWorkOrderArtifact,
+  demoArtifacts = true,
+): FactoriesWorkOrderArtifact | undefined {
   if (nodeId === "create-work-order") {
-    return DESCRIPTION_ARTIFACT;
+    return demoArtifacts ? (description ?? DESCRIPTION_ARTIFACT) : description;
+  }
+  if (!demoArtifacts) {
+    return undefined;
   }
   if (nodeId === "add-plan-artifact") {
     return PLAN_ARTIFACT;
   }
   if (nodeId === "add-branch-artifact") {
     return OPEN_WORK_ORDER_ARTIFACTS.find((artifact) => artifact.id === "art-branch-1");
+  }
+  if (nodeId === "attach-pr-artifact") {
+    return OPEN_WORK_ORDER_ARTIFACTS.find((artifact) => artifact.id === "art-pr-1");
   }
   if (nodeId === "stamp-pr-merged") {
     return PR_CLOSURE_PR_ARTIFACT;
