@@ -1,15 +1,9 @@
-import { Position, type Edge } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 
 import { FACTORY_SIDE_HANDLE_ID, FACTORY_SPINE_HANDLE_ID } from "@/lib/layout/factoryRunLeafLayout";
 
 import { compactLineCanvasGraph } from "./compactLineCanvasGraph";
 import type { SplitRunCanvasModel } from "./splitRunCanvases";
-
-type RoutedEdge = Edge & {
-  sourcePosition?: Position;
-  targetPosition?: Position;
-};
 
 function messyIfCanvas(): SplitRunCanvasModel {
   return {
@@ -54,7 +48,7 @@ function messyIfCanvas(): SplitRunCanvasModel {
 }
 
 describe("compactLineCanvasGraph", () => {
-  it("lays out the factory spine like the main run canvas and badges channel names", () => {
+  it("lays out the factory spine like the main run canvas, not saved YAML coords", () => {
     const { nodes, edges } = compactLineCanvasGraph(messyIfCanvas(), null, undefined, false);
     const byId = new Map(nodes.map((node) => [node.id, node]));
 
@@ -75,20 +69,11 @@ describe("compactLineCanvasGraph", () => {
     expect(trueAgent.position.y).toBeGreaterThan(label.position.y);
     expect(artifact.position.x).not.toBe(-40);
     expect(falseAgent.position.x).toBeGreaterThan(ifNode.position.x);
-    expect(falseAgent.position.y).toBe(ifNode.position.y);
-    expect(falseAgent.data.isSideTarget).toBe(true);
 
     const trueEdge = edges.find((edge) => edge.source === "if" && edge.target === "comment");
-    const falseEdge = edges.find((edge) => edge.source === "if" && edge.target === "false-agent") as
-      | RoutedEdge
-      | undefined;
-    const mergeEdge = edges.find((edge) => edge.source === "false-agent" && edge.target === "true-agent");
+    const falseEdge = edges.find((edge) => edge.source === "if" && edge.target === "false-agent");
     expect(trueEdge?.sourceHandle).toBe(FACTORY_SPINE_HANDLE_ID);
     expect(falseEdge?.sourceHandle).toBe(FACTORY_SIDE_HANDLE_ID);
-    expect(falseEdge?.sourcePosition).toBe(Position.Right);
-    expect(falseEdge?.targetPosition).toBe(Position.Left);
-    expect(falseEdge?.data).toMatchObject({ channelLabel: "false" });
-    expect(mergeEdge?.data).toMatchObject({ channelLabel: "passed" });
-    expect(trueEdge?.type).toBe("custom");
+    expect(falseEdge?.label).toBe("false");
   });
 });

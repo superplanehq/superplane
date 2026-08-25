@@ -5,12 +5,15 @@ import { OPEN_WORK_ORDER_ARTIFACTS } from "../../__fixtures__/factoryPageFixture
 import {
   HOUR_AGO,
   REVIEWER_USER,
+  RUNNING_WORK_ORDER,
   STORYBOOK_ME_USER_AVATAR_URL,
   STORYBOOK_ME_USER_ID,
   STORYBOOK_ME_USER_NAME,
 } from "../../__fixtures__/factoryPageResponses";
 import { DESCRIPTION_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
+import { buildSplitRunFooter } from "./splitRunFooter";
 import type { SplitRunFixture } from "./splitRunMocks";
+import { splitRunSourceForOrder } from "./splitRunSource";
 
 const PLAN_ARTIFACT: FactoriesWorkOrderArtifact = {
   id: "art-plan-md",
@@ -43,14 +46,27 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
   currentPhaseId: "implement",
   waitingNotes: [],
   checks: [],
+  footer: buildSplitRunFooter({
+    kind: "running",
+    note: {
+      key: "running-step",
+      headline: "Implement is running",
+      text: "Implementation works on this step now. The log shows live progress.",
+    },
+  }),
+  footerTone: "running",
+  source: splitRunSourceForOrder(RUNNING_WORK_ORDER),
   phases: [
     {
       id: "backlog",
       name: "Backlog",
       status: "passed",
       duration: "2s",
-      componentName: "Create work order",
+      componentName: "Ingest",
       artifacts: [DESCRIPTION_ARTIFACT],
+      canvasKey: "intake",
+      triggerName: "On Issue Label",
+      appId: "app-refund-backlog",
       stream: [
         {
           id: "backlog-create",
@@ -75,11 +91,12 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
     },
     {
       id: "plan",
-      name: "Plan",
+      name: "Create plan",
       status: "passed",
       duration: "1m 12s",
-      componentName: "Refund Planner",
+      componentName: "Create plan",
       artifacts: [PLAN_ARTIFACT],
+      canvasKey: "planning",
       stream: [
         {
           id: "plan-read",
@@ -92,7 +109,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
         {
           id: "plan-write",
           at: "12:24:09",
-          componentName: "Refund Planner",
+          componentName: "Planning",
           status: "passed",
           duration: "1m 8s",
           detail: "plan.md",
@@ -111,7 +128,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
         {
           id: "refund-planner",
           title: "Write plan",
-          componentName: "Refund Planner",
+          componentName: "Planning",
           provider: "superplane",
           status: "passed",
           detail: "plan.md",
@@ -123,8 +140,8 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
       id: "implement",
       name: "Implement",
       status: "running",
-      duration: "4m so far",
-      componentName: "Refund Implementer",
+      duration: "4m",
+      componentName: "Implementation",
       artifacts: OPEN_WORK_ORDER_ARTIFACTS.filter((artifact) => artifact.id === "art-branch-1"),
       stream: [
         {
@@ -154,7 +171,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
         {
           id: "impl-agent",
           at: "12:25:33",
-          componentName: "Refund Implementer",
+          componentName: "Implementation",
           status: "running",
           duration: "4m so far",
           detail: "reconciliation_worker_test.go",
@@ -164,7 +181,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
           at: "—",
           componentName: "Create Pull Request",
           status: "pending",
-          detail: "Waits on Refund Implementer",
+          detail: "Waits on Implementation",
         },
       ],
       canvasSteps: [
@@ -180,7 +197,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
         {
           id: "refund-implementer",
           title: "Write test",
-          componentName: "Refund Implementer",
+          componentName: "Implementation",
           provider: "superplane",
           status: "running",
           detail: "reconciliation_worker_test.go",
@@ -192,7 +209,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
           componentName: "Create Pull Request",
           provider: "github",
           status: "pending",
-          detail: "Waits on Refund Implementer",
+          detail: "Waits on Implementation",
         },
       ],
     },

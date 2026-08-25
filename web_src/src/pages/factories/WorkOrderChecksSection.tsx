@@ -7,6 +7,7 @@ import {
   booleanCheckVerdict,
   formatCheckScore,
   LEVEL_LABEL,
+  workOrderCheckStatus,
   type WorkOrderCheckLevel,
   type WorkOrderCheckPresentation,
 } from "./lib/workOrderChecks";
@@ -120,8 +121,8 @@ function ScoredCheckCardBody({ check }: { check: WorkOrderCheckPresentation }) {
           <span className="text-[12px] text-muted-foreground">{scale}</span>
           <CheckTrendDelta check={check} />
         </span>
-        <span className={cn("truncate text-[11px] font-medium", LEVEL_LABEL[check.level].className)}>
-          {LEVEL_LABEL[check.level].label}
+        <span className={cn("truncate text-[11px] font-medium", workOrderCheckStatus(check).className)}>
+          {workOrderCheckStatus(check).label}
         </span>
       </span>
       <span aria-hidden className="mt-2 block h-1 overflow-hidden rounded-full bg-muted">
