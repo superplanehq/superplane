@@ -1,15 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { ACME_ONBOARDING_FACTORY_KEY, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 import {
   ADD_INTAKE_TEMPLATES,
   filterAddIntakeTemplates,
-  intakeAutomationAppId,
   intakeAutomationFixture,
+  intakeSourcesFromFactoryIntakes,
   intakeTicketAnalysisFixture,
   LINE_INTAKE_SOURCES,
   lineIntakeSourceById,
-  lineIntakeSourcesForFactory,
 } from "./lineIntakeModel";
 
 describe("lineIntakeModel", () => {
@@ -25,29 +23,46 @@ describe("lineIntakeModel", () => {
     expect(github?.accept.destination).toBe("backlog");
   });
 
-  it("keeps Sentry and PagerDuty on Semaphore and GitHub issues only on Acme", () => {
-    expect(lineIntakeSourcesForFactory(PRIMARY_FACTORY_KEY).map((source) => source.id)).toEqual([
-      "github-issues",
-      "sentry-exceptions",
-      "pagerduty-incidents",
-    ]);
-    expect(lineIntakeSourcesForFactory(ACME_ONBOARDING_FACTORY_KEY).map((source) => source.id)).toEqual([
-      "github-issues",
+  it("maps declared intakes to configured sources, keyed by intake id", () => {
+    expect(
+      intakeSourcesFromFactoryIntakes([
+        { id: "intake-1", canvasId: "canvas-1", name: "Repository issues", source: "SOURCE_GITHUB_ISSUES" },
+        { id: "intake-2", canvasId: "canvas-2", name: "Triage issues", source: "SOURCE_GITHUB_ISSUES" },
+        { id: "intake-3", canvasId: "canvas-3", name: "Production errors", source: "SOURCE_SENTRY_EXCEPTIONS" },
+        { id: "intake-4", canvasId: "canvas-4", name: "Release notes" },
+      ]).map(({ intakeId, appId, source }) => ({ intakeId, appId, id: source.id, name: source.name })),
+    ).toEqual([
+      { intakeId: "intake-1", appId: "canvas-1", id: "github-issues", name: "Repository issues" },
+      { intakeId: "intake-2", appId: "canvas-2", id: "github-issues", name: "Triage issues" },
+      { intakeId: "intake-3", appId: "canvas-3", id: "sentry-exceptions", name: "Production errors" },
     ]);
   });
 
-  it("prefers the GitHub issues intake app for the editor", () => {
-    expect(intakeAutomationAppId([{ id: "app-acme-planner" }, { id: "app-github-issues-intake" }])).toBe(
-      "app-github-issues-intake",
-    );
-    expect(
-      intakeAutomationAppId([
-        { id: "canvas-planner", name: "Planner" },
-        { id: "canvas-issue-intake", name: "Issue Intake" },
-      ]),
-    ).toBe("canvas-issue-intake");
-    expect(intakeAutomationAppId([{ id: "app-acme-planner" }])).toBe("app-acme-planner");
-    expect(intakeAutomationAppId([])).toBeUndefined();
+  it("falls back to the source name and reads settings and health", () => {
+    const [intake] = intakeSourcesFromFactoryIntakes([
+      {
+        id: "intake-1",
+        canvasId: "canvas-1",
+        source: "SOURCE_GITHUB_ISSUES",
+        healthy: false,
+        settings: {
+          confidencePct: 80,
+          labels: ["bug"],
+          labelFilterMode: "LABEL_FILTER_MODE_EXCLUDE",
+          assignment: "ASSIGNMENT_UNASSIGNED",
+        },
+      },
+    ]);
+
+    expect(intake?.source.name).toBe("GitHub issues");
+    expect(intake?.healthy).toBe(false);
+    expect(intake?.settings).toMatchObject({
+      name: "GitHub issues",
+      confidencePct: 80,
+      labels: ["bug"],
+      labelFilterMode: "exclude",
+      assignment: "unassigned",
+    });
   });
 
   it("builds a ticket analysis fixture with ingest, analyze, plan, and score", () => {
@@ -118,10 +133,9 @@ describe("lineIntakeModel", () => {
   });
 
   it("filters add-intake templates by name or description", () => {
+    expect(filterAddIntakeTemplates("production").map((template) => template.id)).toEqual(["sentry-exceptions"]);
+    expect(filterAddIntakeTemplates("incident").map((template) => template.id)).toEqual(["pagerduty-incidents"]);
     expect(filterAddIntakeTemplates("runtime").map((template) => template.id)).toEqual(["improve-ci-runtime"]);
-    expect(filterAddIntakeTemplates("page performance").map((template) => template.id)).toEqual([
-      "improve-page-performance",
-    ]);
     expect(filterAddIntakeTemplates("")).toHaveLength(6);
   });
 });

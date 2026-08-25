@@ -302,6 +302,38 @@ func ListCanvases(orgID string) ([]Canvas, error) {
 	return canvases, nil
 }
 
+// AvailableCanvasName returns preferred, or preferred with the lowest " (n)"
+// suffix that no canvas in the organization holds. Canvas names are unique per
+// organization, so a generated canvas has to pick a free name before insert.
+func AvailableCanvasName(tx *gorm.DB, organizationID uuid.UUID, preferred string) (string, error) {
+	var names []string
+	err := tx.
+		Model(&Canvas{}).
+		Where("organization_id = ?", organizationID).
+		Where("name = ? OR name LIKE ?", preferred, preferred+" (%)").
+		Pluck("name", &names).
+		Error
+	if err != nil {
+		return "", err
+	}
+
+	taken := make(map[string]bool, len(names))
+	for _, name := range names {
+		taken[name] = true
+	}
+
+	if !taken[preferred] {
+		return preferred, nil
+	}
+
+	for suffix := 2; ; suffix++ {
+		candidate := fmt.Sprintf("%s (%d)", preferred, suffix)
+		if !taken[candidate] {
+			return candidate, nil
+		}
+	}
+}
+
 func ListOrganizationCanvases(tx *gorm.DB, organizationID uuid.UUID) ([]Canvas, error) {
 	var canvases []Canvas
 	err := tx.
