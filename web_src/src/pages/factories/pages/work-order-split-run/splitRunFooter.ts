@@ -6,7 +6,7 @@ export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "d
 /** @deprecated Use SplitRunFooterKind. Kept for fixture field name. */
 export type SplitRunFooterTone = SplitRunFooterKind;
 
-export type SplitRunFooterActionKind = "start" | "reject" | "cancel" | "stop" | "note-cta";
+export type SplitRunFooterActionKind = "start" | "reject" | "stop";
 
 export type SplitRunStopChoice = "canceled" | "completed" | "draft";
 
@@ -43,7 +43,6 @@ export interface SplitRunFooterAction {
   kind: SplitRunFooterActionKind;
   label: string;
   emphasis: "primary" | "quiet";
-  href?: string;
 }
 
 export interface SplitRunFooterNote {
@@ -61,7 +60,6 @@ export interface SplitRunFooter {
 
 const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
 const REJECT: SplitRunFooterAction = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
-const CANCEL: SplitRunFooterAction = { id: "cancel", kind: "cancel", label: "Cancel", emphasis: "quiet" };
 const STOP: SplitRunFooterAction = { id: "stop", kind: "stop", label: "Stop", emphasis: "quiet" };
 
 export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFooterNote {
@@ -72,24 +70,10 @@ export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFoo
   };
 }
 
-function noteCta(note?: WorkOrderStatusNotePresentation): SplitRunFooterAction | undefined {
-  if (!note?.cta) {
-    return undefined;
-  }
-  return {
-    id: "note-cta",
-    kind: "note-cta",
-    label: note.cta.label,
-    emphasis: "primary",
-    href: note.cta.href,
-  };
-}
-
 /**
- * The footer is the human-readable centerpiece under the Log: the note row
- * tells the reader where the order came from, what SuperPlane did, and what
- * to do next; the state bar below it holds the always-on actions. Callers
- * synthesize a note for every state — the log carries the raw detail.
+ * The footer is the action bar under Description and Log. Draft keeps
+ * Reject and Start. Implement and Verify keep Stop. Review and failed-run
+ * links stay off this bar.
  */
 export function buildSplitRunFooter(input: {
   kind: SplitRunFooterKind;
@@ -104,12 +88,11 @@ export function buildSplitRunFooter(input: {
     return { kind: "running", sentence: "This work order is running.", note, actions: [STOP] };
   }
   if (input.kind === "waiting" || input.kind === "failed") {
-    const cta = noteCta(input.note);
     return {
       kind: input.kind,
       sentence: "This work order needs attention.",
       note,
-      actions: cta ? [CANCEL, cta] : [CANCEL],
+      actions: [STOP],
     };
   }
   return {

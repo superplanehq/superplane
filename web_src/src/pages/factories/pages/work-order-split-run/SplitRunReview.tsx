@@ -1,8 +1,7 @@
-import { Link } from "@/components/Link/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { CircleAlert, CircleCheck, ExternalLink, Loader2, Minus, TriangleAlert } from "lucide-react";
+import { CircleAlert, CircleCheck, Loader2, Minus, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -108,22 +107,6 @@ function FooterAction({
       >
         {startBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
         {action.label}
-      </Button>
-    );
-  }
-
-  if (action.href) {
-    const inApp = action.href.startsWith("/");
-    return (
-      <Button asChild size="sm" variant={variant} data-testid={testId}>
-        {inApp ? (
-          <Link href={action.href}>{action.label}</Link>
-        ) : (
-          <a href={action.href} target="_blank" rel="noreferrer">
-            {action.label}
-            <ExternalLink className="size-3.5" aria-hidden />
-          </a>
-        )}
       </Button>
     );
   }

@@ -59,7 +59,7 @@ describe("buildSplitRunFooter", () => {
     ]);
   });
 
-  it("puts the run note above the bar and repeats the note CTA next to Cancel", () => {
+  it("keeps a waiting note off the bar and shows Stop", () => {
     const footer = buildSplitRunFooter({ kind: "waiting", note: PR_NOTE });
 
     expect(footer.note).toEqual({
@@ -68,24 +68,23 @@ describe("buildSplitRunFooter", () => {
       sourceName: "PR Closure",
     });
     expect(footer.sentence).toBe("This work order needs attention.");
-    expect(footer.actions.map((action) => action.label)).toEqual(["Cancel", "Review PR #6812"]);
-    expect(footer.actions[1]).toMatchObject({ kind: "note-cta", href: PR_NOTE.cta.href });
+    expect(footer.actions).toEqual([{ id: "stop", kind: "stop", label: "Stop", emphasis: "quiet" }]);
   });
 
-  it("still shows Cancel when a waiting order has no run note", () => {
+  it("still shows Stop when a waiting order has no run note", () => {
     expect(buildSplitRunFooter({ kind: "waiting" })).toEqual({
       kind: "waiting",
       sentence: "This work order needs attention.",
-      actions: [{ id: "cancel", kind: "cancel", label: "Cancel", emphasis: "quiet" }],
+      actions: [{ id: "stop", kind: "stop", label: "Stop", emphasis: "quiet" }],
     });
   });
 
-  it("treats a failed implement as a run note plus the needs-attention bar", () => {
+  it("treats a failed implement as a run note plus Stop", () => {
     const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE });
 
     expect(footer.note?.headline).toBe("Implement did not pass");
     expect(footer.sentence).toBe("This work order needs attention.");
-    expect(footer.actions.map((action) => action.label)).toEqual(["Cancel", "Open failed run"]);
+    expect(footer.actions).toEqual([{ id: "stop", kind: "stop", label: "Stop", emphasis: "quiet" }]);
   });
 
   it("shows a done summary with no actions", () => {
