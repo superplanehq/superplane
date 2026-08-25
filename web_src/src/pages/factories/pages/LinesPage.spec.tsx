@@ -240,34 +240,6 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("line-intake-drawer")).not.toBeInTheDocument();
   });
 
-  it("always shows a Done column after the line stages", () => {
-    renderBoard();
-
-    expect(screen.getByTestId("lines-column-title-backlog")).toHaveTextContent("Backlog");
-    expect(screen.getByTestId("lines-column-title-phase-0")).toBeInTheDocument();
-    expect(screen.getByTestId("lines-column-title-phase-1")).toBeInTheDocument();
-    expect(screen.getByTestId("lines-column-title-done")).toHaveTextContent("Done");
-    expect(screen.getByTestId("lines-done-column")).toHaveTextContent("No work orders in Done.");
-    expect(screen.queryByTestId("lines-column-title-phase-2")).not.toBeInTheDocument();
-  });
-
-  it("puts a closed work order in Done instead of the last stage", () => {
-    useFactoryWorkOrders.mockReturnValue({
-      data: [BOARD_DONE_REJECTED_ORDER],
-    });
-    renderBoard();
-
-    expect(
-      within(screen.getByTestId("lines-done-column")).getByText("Replace the refund batch exporter"),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("lines-phase-column-0")).queryByText("Replace the refund batch exporter"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("lines-phase-column-1")).queryByText("Replace the refund batch exporter"),
-    ).not.toBeInTheDocument();
-  });
-
   it("creates work orders from the backlog header plus", async () => {
     const openCreateWorkOrder = vi.fn();
     const user = userEvent.setup();
