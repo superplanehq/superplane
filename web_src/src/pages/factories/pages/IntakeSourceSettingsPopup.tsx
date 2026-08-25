@@ -1,6 +1,7 @@
+import { Link } from "@/components/Link/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { buttonVariants } from "@/components/ui/buttonVariants";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -10,31 +11,38 @@ import { History, Settings, Workflow } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
-  GITHUB_INTAKE_LABEL_OPTIONS,
-  GITHUB_INTAKE_RUNS,
   INTAKE_SETTINGS_COPY,
   intakePlacementActivity,
   intakePlacementLabel,
   intakeRelativeTime,
   normalizeIntakeSourceSettings,
-  toggleIntakeLabel,
-  type IntakeAssignmentFilter,
   type IntakeAutomationRun,
-  type IntakeLabelFilterMode,
   type IntakeListenMode,
   type IntakeSettingsTab,
   type IntakeSourceSettings,
   type IntakeTicketPlacement,
 } from "./intakeSourceSettingsModel";
+import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
+import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import { CompactLineCanvas } from "./work-order-split-run/CompactLineCanvas";
 import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvases";
+import type { LineIntakeSourceId } from "./lineIntakeModel";
 
 interface IntakeSourceSettingsPopupProps {
   settings: IntakeSourceSettings;
-  automationCanvas: SplitRunCanvasModel;
+  sourceId?: LineIntakeSourceId;
+  automationCanvas?: SplitRunCanvasModel;
+  automationLoading?: boolean;
+  automationError?: boolean;
+  onRetryAutomation?: () => void;
   runs?: IntakeAutomationRun[];
-  onSave: (next: IntakeSourceSettings) => void;
+  runsLoading?: boolean;
+  runsError?: boolean;
+  onRetryRuns?: () => void;
+  onSave: (next: IntakeSourceSettings) => Promise<void> | void;
+  savePending?: boolean;
+  saveError?: string;
   onOpenRun?: (run: IntakeAutomationRun) => void;
   editAutomationHref?: string;
   onClose: () => void;
@@ -44,9 +52,18 @@ interface IntakeSourceSettingsPopupProps {
 
 export function IntakeSourceSettingsPopup({
   settings,
+  sourceId = "github-issues",
   automationCanvas,
-  runs = GITHUB_INTAKE_RUNS,
+  automationLoading = false,
+  automationError = false,
+  onRetryAutomation,
+  runs = [],
+  runsLoading = false,
+  runsError = false,
+  onRetryRuns,
   onSave,
+  savePending = false,
+  saveError,
   onOpenRun,
   editAutomationHref,
   onClose,
@@ -66,7 +83,7 @@ export function IntakeSourceSettingsPopup({
 
   return (
     <PopupShell testId="intake-source-settings" canvas fixed={fixed} onDismiss={onClose}>
-      <PopupHeader title={INTAKE_SETTINGS_COPY.title} onClose={onClose}>
+      <PopupHeader title={`Intake ${settings.name}`} onClose={onClose}>
         <Tabs value={tab} onValueChange={(value) => setTab(value as IntakeSettingsTab)} className="mt-3">
           <TabsList aria-label={INTAKE_SETTINGS_COPY.tabsLabel}>
             <TabsTrigger value="general" data-testid="intake-settings-tab-general">
@@ -85,9 +102,23 @@ export function IntakeSourceSettingsPopup({
         </Tabs>
       </PopupHeader>
       {tab === "automation" ? (
-        <IntakeAutomationCanvas canvas={automationCanvas} editHref={editAutomationHref} />
+        automationCanvas ? (
+          <IntakeAutomationCanvas canvas={automationCanvas} editHref={editAutomationHref} />
+        ) : (
+          <IntakeAutomationEmpty
+            message={automationEmptyMessage(automationLoading, automationError)}
+            editHref={editAutomationHref}
+            onRetry={automationRetry(automationError, onRetryAutomation)}
+          />
+        )
       ) : tab === "runs" ? (
-        <IntakeRunsList runs={runs} onOpenRun={onOpenRun} />
+        <IntakeRunsList
+          runs={runs}
+          loading={runsLoading}
+          error={runsError}
+          onRetry={onRetryRuns}
+          onOpenRun={onOpenRun}
+        />
       ) : (
         <>
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
@@ -109,7 +140,7 @@ export function IntakeSourceSettingsPopup({
                   {INTAKE_SETTINGS_COPY.listenLabel}
                 </legend>
                 <div className="mt-2 flex flex-col gap-2">
-                  <RadioOption
+                  <IntakeSettingsRadioOption
                     name="intake-listen-mode"
                     value="listen"
                     checked={draft.listenMode === "listen"}
@@ -117,12 +148,13 @@ export function IntakeSourceSettingsPopup({
                     helper={INTAKE_SETTINGS_COPY.listenHelper}
                     onChange={() => update("listenMode", "listen" satisfies IntakeListenMode)}
                   />
-                  <RadioOption
+                  <IntakeSettingsRadioOption
                     name="intake-listen-mode"
                     value="schedule"
                     checked={draft.listenMode === "schedule"}
                     title={INTAKE_SETTINGS_COPY.scheduleOption}
                     helper={INTAKE_SETTINGS_COPY.scheduleHelper}
+                    disabled
                     onChange={() => update("listenMode", "schedule" satisfies IntakeListenMode)}
                   />
                 </div>
@@ -154,140 +186,36 @@ export function IntakeSourceSettingsPopup({
                 />
               </section>
 
-              <section className="flex flex-col gap-6">
-                <h3 className="workspace-section-title">{INTAKE_SETTINGS_COPY.filtersLabel}</h3>
-
-                <fieldset className="min-w-0">
-                  <legend className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                    {INTAKE_SETTINGS_COPY.labelsLabel}
-                  </legend>
-                  <p className="workspace-body-text mt-1 text-muted-foreground">{INTAKE_SETTINGS_COPY.labelsHelper}</p>
-                  <div className="mt-2 flex flex-col gap-2">
-                    <RadioOption
-                      name="intake-label-filter"
-                      value="include"
-                      checked={draft.labelFilterMode === "include"}
-                      title={INTAKE_SETTINGS_COPY.includeLabels}
-                      onChange={() => update("labelFilterMode", "include" satisfies IntakeLabelFilterMode)}
-                    />
-                    <RadioOption
-                      name="intake-label-filter"
-                      value="exclude"
-                      checked={draft.labelFilterMode === "exclude"}
-                      title={INTAKE_SETTINGS_COPY.excludeLabels}
-                      onChange={() => update("labelFilterMode", "exclude" satisfies IntakeLabelFilterMode)}
-                    />
-                  </div>
-                  <ul className="mt-3 flex flex-wrap gap-2" data-testid="intake-label-options">
-                    {GITHUB_INTAKE_LABEL_OPTIONS.map((label) => {
-                      const checked = draft.labels.includes(label);
-                      return (
-                        <li key={label}>
-                          <label
-                            className={cn(
-                              "inline-flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-[13px]",
-                              checked
-                                ? "border-foreground/20 bg-accent/50 text-foreground"
-                                : "border-border bg-card text-muted-foreground hover:border-foreground/15",
-                            )}
-                          >
-                            <Checkbox
-                              checked={checked}
-                              onChange={() => update("labels", toggleIntakeLabel(draft.labels, label))}
-                              aria-label={label}
-                            />
-                            {label}
-                          </label>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </fieldset>
-
-                <fieldset className="min-w-0">
-                  <legend className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                    {INTAKE_SETTINGS_COPY.assignmentLabel}
-                  </legend>
-                  <div className="mt-2 flex flex-col gap-2">
-                    <RadioOption
-                      name="intake-assignment"
-                      value="any"
-                      checked={draft.assignment === "any"}
-                      title={INTAKE_SETTINGS_COPY.assignmentAny}
-                      onChange={() => update("assignment", "any" satisfies IntakeAssignmentFilter)}
-                    />
-                    <RadioOption
-                      name="intake-assignment"
-                      value="assigned"
-                      checked={draft.assignment === "assigned"}
-                      title={INTAKE_SETTINGS_COPY.assignmentAssigned}
-                      onChange={() => update("assignment", "assigned" satisfies IntakeAssignmentFilter)}
-                    />
-                    <RadioOption
-                      name="intake-assignment"
-                      value="unassigned"
-                      checked={draft.assignment === "unassigned"}
-                      title={INTAKE_SETTINGS_COPY.assignmentUnassigned}
-                      onChange={() => update("assignment", "unassigned" satisfies IntakeAssignmentFilter)}
-                    />
-                  </div>
-                </fieldset>
-              </section>
+              <GitHubIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={setDraft} />
             </div>
           </div>
-          <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-3">
+          <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
+            {saveError ? (
+              <p className="workspace-body-text text-destructive" role="alert">
+                {saveError}
+              </p>
+            ) : (
+              <span />
+            )}
             <Button
               type="button"
-              onClick={() => {
-                onSave(normalizeIntakeSourceSettings(draft));
-                onClose();
+              disabled={savePending}
+              onClick={async () => {
+                try {
+                  await onSave(normalizeIntakeSourceSettings(draft));
+                  onClose();
+                } catch {
+                  // The parent supplies the actionable error message.
+                }
               }}
               data-testid="intake-source-settings-save"
             >
-              {INTAKE_SETTINGS_COPY.save}
+              {savePending ? INTAKE_SETTINGS_COPY.saving : INTAKE_SETTINGS_COPY.save}
             </Button>
           </footer>
         </>
       )}
     </PopupShell>
-  );
-}
-
-function RadioOption({
-  name,
-  value,
-  checked,
-  title,
-  helper,
-  onChange,
-}: {
-  name: string;
-  value: string;
-  checked: boolean;
-  title: string;
-  helper?: string;
-  onChange: () => void;
-}) {
-  return (
-    <label
-      className={cn(
-        "flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors",
-        checked ? "border-foreground/20 bg-accent/50" : "border-border bg-card hover:border-foreground/15",
-      )}
-    >
-      <input
-        type="radio"
-        name={name}
-        value={value}
-        checked={checked}
-        onChange={onChange}
-        className="mt-0.5 size-4 accent-gray-900"
-      />
-      <span className="min-w-0">
-        <span className="block text-[13px] font-medium tracking-[-0.01em] text-foreground">{title}</span>
-        {helper ? <span className="mt-0.5 block text-[12px] leading-5 text-muted-foreground">{helper}</span> : null}
-      </span>
-    </label>
   );
 }
 
@@ -312,6 +240,47 @@ function IntakeAutomationCanvas({ canvas, editHref }: { canvas: SplitRunCanvasMo
   );
 }
 
+function automationEmptyMessage(loading: boolean, error: boolean): string {
+  if (loading) {
+    return INTAKE_SETTINGS_COPY.automationLoading;
+  }
+  return error ? INTAKE_SETTINGS_COPY.automationError : INTAKE_SETTINGS_COPY.automationEmpty;
+}
+
+function automationRetry(error: boolean, onRetry: (() => void) | undefined): (() => void) | undefined {
+  return error ? onRetry : undefined;
+}
+
+function IntakeAutomationEmpty({
+  message,
+  editHref,
+  onRetry,
+}: {
+  message: string;
+  editHref?: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <section
+      className="flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6"
+      aria-label="Automation"
+      data-testid="intake-source-automation"
+    >
+      <p className="workspace-body-text text-muted-foreground">{message}</p>
+      {onRetry ? (
+        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+          {INTAKE_SETTINGS_COPY.retryAutomation}
+        </Button>
+      ) : null}
+      {editHref ? (
+        <Link href={editHref} className={buttonVariants({ size: "sm" })} data-testid="split-run-canvas-edit">
+          {INTAKE_SETTINGS_COPY.editAutomation}
+        </Link>
+      ) : null}
+    </section>
+  );
+}
+
 const PLACEMENT_CHIP_CLASS: Record<IntakeTicketPlacement, string> = {
   progressed:
     "border-[color:var(--status-running-border)] bg-[color:var(--status-running-bg)] text-[color:var(--status-running-fg)]",
@@ -332,11 +301,38 @@ const PLACEMENT_DOT_CLASS: Record<IntakeTicketPlacement, string> = {
 
 function IntakeRunsList({
   runs,
+  loading,
+  error,
+  onRetry,
   onOpenRun,
 }: {
   runs: IntakeAutomationRun[];
+  loading: boolean;
+  error: boolean;
+  onRetry?: () => void;
   onOpenRun?: (run: IntakeAutomationRun) => void;
 }) {
+  if (loading) {
+    return (
+      <p className="workspace-body-text px-6 py-6 text-muted-foreground" data-testid="intake-source-runs">
+        {INTAKE_SETTINGS_COPY.runsLoading}
+      </p>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center gap-3 px-6 py-6" data-testid="intake-source-runs">
+        <p className="workspace-body-text text-destructive">{INTAKE_SETTINGS_COPY.runsError}</p>
+        {onRetry ? (
+          <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+            {INTAKE_SETTINGS_COPY.retryRuns}
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
+
   if (runs.length === 0) {
     return (
       <p className="workspace-body-text px-6 py-6 text-muted-foreground" data-testid="intake-source-runs">

@@ -134,6 +134,65 @@ service Factories {
     };
   }
 
+  // Factory intake APIs
+
+  rpc ListFactoryIntakes(ListFactoryIntakesRequest) returns (ListFactoryIntakesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/intakes"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory intakes";
+      description: "Returns the intakes of a factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateFactoryIntake(CreateFactoryIntakeRequest) returns (CreateFactoryIntakeResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/intakes"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create factory intake";
+      description: "Creates an intake and the canvas that runs it";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryIntake(UpdateFactoryIntakeRequest) returns (UpdateFactoryIntakeResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/intakes/{intake_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory intake";
+      description: "Updates the name and settings of an intake";
+      tags: "Factory";
+    };
+  }
+
+  rpc DeleteFactoryIntake(DeleteFactoryIntakeRequest) returns (DeleteFactoryIntakeResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/intakes/{intake_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete factory intake";
+      description: "Deletes an intake and its canvas";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListFactoryIntakeRuns(ListFactoryIntakeRunsRequest) returns (ListFactoryIntakeRunsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/intakes/{intake_id}/runs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory intake runs";
+      description: "Returns what an intake received, how it scored, and where it went";
+      tags: "Factory";
+    };
+  }
+
   // Work orders APIs
 
   rpc ListWorkOrders(ListWorkOrdersRequest) returns (ListWorkOrdersResponse) {
@@ -467,6 +526,135 @@ message ListFactoryAppsRequest {
 
 message ListFactoryAppsResponse {
   repeated Factory.App apps = 1;
+}
+
+// Factory intakes
+
+message FactoryIntake {
+  enum Source {
+    SOURCE_UNSPECIFIED = 0;
+    SOURCE_GITHUB_ISSUES = 1;
+    SOURCE_SENTRY_EXCEPTIONS = 2;
+    SOURCE_PAGERDUTY_INCIDENTS = 3;
+  }
+
+  // Settings that change what the intake does. They are stored in the canvas
+  // graph, because the canvas is what the workers run. This block is a
+  // read/write facade over that graph.
+  message Settings {
+    enum LabelFilterMode {
+      LABEL_FILTER_MODE_UNSPECIFIED = 0;
+      // Analyze only items that carry one of the labels.
+      LABEL_FILTER_MODE_INCLUDE = 1;
+      // Skip items that carry one of the labels.
+      LABEL_FILTER_MODE_EXCLUDE = 2;
+    }
+
+    enum Assignment {
+      ASSIGNMENT_UNSPECIFIED = 0;
+      ASSIGNMENT_ANY = 1;
+      ASSIGNMENT_ASSIGNED = 2;
+      ASSIGNMENT_UNASSIGNED = 3;
+    }
+
+    // Lowest analysis score that still creates a work order.
+    int32 confidence_pct = 1;
+    // Labels the filter applies to. Used by GitHub issue intakes only.
+    repeated string labels = 2;
+    LabelFilterMode label_filter_mode = 3;
+    Assignment assignment = 4;
+  }
+
+  string id = 1;
+  string factory_id = 2;
+  // Canvas that implements the intake. Use it to open the automation editor.
+  string canvas_id = 3;
+  string name = 4;
+  string description = 5;
+  Source source = 6;
+  Settings settings = 7;
+  // False when the canvas can no longer receive an item, score it, and create
+  // a work order. The intake stays listed so the user can repair it.
+  bool healthy = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message FactoryIntakeRun {
+  // Where the item ended up after the intake scored it.
+  enum Placement {
+    PLACEMENT_UNSPECIFIED = 0;
+    // The analysis is still running.
+    PLACEMENT_ANALYZING = 1;
+    // The score was below the threshold, so no work order was created.
+    PLACEMENT_BELOW_THRESHOLD = 2;
+    PLACEMENT_BACKLOG = 3;
+    PLACEMENT_REJECTED = 4;
+    // The work order started on a line.
+    PLACEMENT_PROGRESSED = 5;
+  }
+
+  string id = 1;
+  string title = 2;
+  // Unset while the analysis runs, or when the analysis returned no score.
+  optional int32 confidence_pct = 3;
+  Placement placement = 4;
+  string work_order_id = 5;
+  // Line step the work order reached. Set only when progressed.
+  string stage = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp analyzed_at = 8;
+}
+
+message ListFactoryIntakesRequest {
+  string factory_id = 1;
+}
+
+message ListFactoryIntakesResponse {
+  repeated FactoryIntake intakes = 1;
+}
+
+message CreateFactoryIntakeRequest {
+  string factory_id = 1;
+  FactoryIntake.Source source = 2;
+  // Defaults to a name derived from the source when empty.
+  string name = 3;
+  optional int32 confidence_pct = 4;
+}
+
+message CreateFactoryIntakeResponse {
+  FactoryIntake intake = 1;
+}
+
+message UpdateFactoryIntakeRequest {
+  string factory_id = 1;
+  string intake_id = 2;
+  optional string name = 3;
+  optional FactoryIntake.Settings settings = 4;
+}
+
+message UpdateFactoryIntakeResponse {
+  FactoryIntake intake = 1;
+}
+
+message DeleteFactoryIntakeRequest {
+  string factory_id = 1;
+  string intake_id = 2;
+}
+
+message DeleteFactoryIntakeResponse {}
+
+message ListFactoryIntakeRunsRequest {
+  string factory_id = 1;
+  string intake_id = 2;
+  int32 limit = 3;
+  // Page backwards from this timestamp.
+  google.protobuf.Timestamp before = 4;
+}
+
+message ListFactoryIntakeRunsResponse {
+  repeated FactoryIntakeRun runs = 1;
+  google.protobuf.Timestamp last_timestamp = 2;
 }
 
 // Work orders
