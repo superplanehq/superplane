@@ -230,6 +230,8 @@ func AssertHostedCreditAvailable(tx *gorm.DB, orgID uuid.UUID) error {
 	return nil
 }
 
+// ReserveHostedCredit takes a short FOR UPDATE lock on organization LLM settings.
+// Pass a committed connection, not a long-lived executor transaction.
 func ReserveHostedCredit(tx *gorm.DB, orgID, nodeExecutionID uuid.UUID) error {
 	if orgID == uuid.Nil {
 		return fmt.Errorf("organization is required for hosted LLM credit")
