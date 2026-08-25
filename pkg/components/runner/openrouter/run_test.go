@@ -47,16 +47,39 @@ func TestRunPromptRunsLegacyFunctionCall(t *testing.T) {
 	assert.Contains(t, result.output, "[bash]")
 }
 
+func TestRunPromptKeepsUsageWhenLaterChatFails(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{alwaysTools: true, maxTurns: 4, failOnRequest: 2})
+	assert.Equal(t, 1, result.exitCode)
+	assert.Contains(t, result.output, "provider exploded")
+
+	payload := resultPayload(t, result.resultFile)
+	usage, ok := payload["usage"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(11), usage["input_tokens"])
+	assert.Equal(t, float64(3), usage["output_tokens"])
+	assert.InDelta(t, 0.002, payload["total_cost_usd"], 1e-9)
+	assert.Equal(t, "openai/gpt-4.1", payload["model"])
+
+	sidecar := resultPayload(t, filepath.Join(result.taskDir, "llm_usage.json"))
+	sidecarUsage, ok := sidecar["usage"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(11), sidecarUsage["input_tokens"])
+	assert.Equal(t, float64(3), sidecarUsage["output_tokens"])
+	assert.InDelta(t, 0.002, sidecar["total_cost_usd"], 1e-9)
+}
+
 type promptHarness struct {
 	alwaysTools        bool
 	legacyFunctionCall bool
 	maxTurns           int
+	failOnRequest      int
 }
 
 type openRouterPromptResult struct {
 	exitCode   int
 	output     string
 	resultFile string
+	taskDir    string
 	requests   []map[string]any
 }
 
@@ -72,6 +95,11 @@ func runOpenRouterPrompt(t *testing.T, harness promptHarness) openRouterPromptRe
 
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
+	usageScript, err := filepath.Abs("../llm_usage.js")
+	require.NoError(t, err)
+	usageBody, err := os.ReadFile(usageScript)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "llm_usage.js"), usageBody, 0o644))
 
 	require.NoError(t, os.WriteFile(harnessFile, []byte(fmt.Sprintf(`
 const fs = require("fs");
@@ -79,10 +107,20 @@ const { runPrompt } = require(%q);
 const requests = [];
 const alwaysTools = %t;
 const legacyFunctionCall = %t;
+const failOnRequest = %d;
 let toolTurns = 0;
+let requestCount = 0;
 global.fetch = async (_url, init) => {
   const body = JSON.parse(init.body);
   requests.push(body);
+  requestCount += 1;
+  if (failOnRequest > 0 && requestCount === failOnRequest) {
+    return {
+      ok: false,
+      status: 502,
+      json: async () => ({ error: { message: "provider exploded" } }),
+    };
+  }
   const hasTools = Array.isArray(body.tools) && body.tools.length > 0;
   let message = { content: hasTools ? "working" : "final summary" };
   if (alwaysTools && hasTools) {
@@ -104,16 +142,22 @@ global.fetch = async (_url, init) => {
   return {
     ok: true,
     json: async () => ({
-      usage: { prompt_tokens: 1, completion_tokens: 1 },
+      usage: { prompt_tokens: 11, completion_tokens: 3, cost: 0.002 },
       choices: [{ message }],
     }),
   };
 };
-runPrompt(%q, "openai/gpt-4.1", %d).then((code) => {
-  fs.writeFileSync(process.env.REQUESTS_FILE, JSON.stringify(requests));
-  process.exit(code);
-});
-`, script, harness.alwaysTools, harness.legacyFunctionCall, promptFile, harness.maxTurns)), 0o644))
+runPrompt(%q, "openai/gpt-4.1", %d)
+  .then((code) => {
+    fs.writeFileSync(process.env.REQUESTS_FILE, JSON.stringify(requests));
+    process.exit(code);
+  })
+  .catch((err) => {
+    fs.writeFileSync(process.env.REQUESTS_FILE, JSON.stringify(requests));
+    console.error(err && err.message ? err.message : err);
+    process.exit(1);
+  });
+`, script, harness.alwaysTools, harness.legacyFunctionCall, harness.failOnRequest, promptFile, harness.maxTurns)), 0o644))
 
 	cmd := exec.Command("node", harnessFile)
 	cmd.Dir = dir
@@ -140,6 +184,7 @@ runPrompt(%q, "openai/gpt-4.1", %d).then((code) => {
 		exitCode:   exitCode,
 		output:     string(out),
 		resultFile: resultFile,
+		taskDir:    dir,
 		requests:   requests,
 	}
 }
@@ -164,10 +209,15 @@ func assertToolRouting(t *testing.T, request map[string]any, wantTools bool) {
 
 func resultText(t *testing.T, resultFile string) string {
 	t.Helper()
-	raw, err := os.ReadFile(resultFile)
+	text, _ := resultPayload(t, resultFile)["result"].(string)
+	return text
+}
+
+func resultPayload(t *testing.T, path string) map[string]any {
+	t.Helper()
+	raw, err := os.ReadFile(path)
 	require.NoError(t, err)
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(raw, &payload))
-	text, _ := payload["result"].(string)
-	return text
+	return payload
 }

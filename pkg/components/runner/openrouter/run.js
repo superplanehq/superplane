@@ -122,65 +122,70 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
   let nudgedForTools = false;
   const turnLimit = resolveMaxTurns(maxTurns);
 
-  for (let turn = 0; turn < turnLimit; turn += 1) {
-    const response = await chat(baseURL, apiKey, model, messages, true);
-    addUsage(usage, response.usage);
-    costMicros += usageCostMicros(response.usage);
+  try {
+    for (let turn = 0; turn < turnLimit; turn += 1) {
+      const response = await chat(baseURL, apiKey, model, messages, true);
+      addUsage(usage, response.usage);
+      costMicros += usageCostMicros(response.usage);
 
-    const message = (response.choices && response.choices[0] && response.choices[0].message) || {};
-    messages.push(message);
-    const text = assistantText(message);
-    if (text) {
-      lastText = text;
-      process.stdout.write(`${lastText}\n`);
-    }
-
-    const toolCalls = extractToolCalls(message);
-    pendingToolCalls = toolCalls.length > 0;
-    if (!pendingToolCalls) {
-      if (!nudgedForTools) {
-        nudgedForTools = true;
-        process.stderr.write("OpenRouter agent returned no tool calls; asking it to use tools\n");
-        messages.push({ role: "user", content: TOOL_NUDGE });
-        continue;
+      const message = (response.choices && response.choices[0] && response.choices[0].message) || {};
+      messages.push(message);
+      const text = assistantText(message);
+      if (text) {
+        lastText = text;
+        process.stdout.write(`${lastText}\n`);
       }
-      break;
-    }
-    for (const call of toolCalls) {
-      const name = call.function && call.function.name;
-      const args = parseArgs(call.function && call.function.arguments);
-      const output = runTool(name, args);
-      process.stdout.write(`[${name}] ${summarize(output)}\n`);
-      messages.push({
-        role: "tool",
-        tool_call_id: call.id,
-        content: output,
-      });
-    }
-  }
 
-  if (pendingToolCalls) {
-    const wrapUp = await requestWrapUp(baseURL, apiKey, model, messages, usage, lastText, turnLimit);
-    lastText = wrapUp.text;
-    costMicros += wrapUp.costMicros;
-  }
+      const toolCalls = extractToolCalls(message);
+      pendingToolCalls = toolCalls.length > 0;
+      if (!pendingToolCalls) {
+        if (!nudgedForTools) {
+          nudgedForTools = true;
+          process.stderr.write("OpenRouter agent returned no tool calls; asking it to use tools\n");
+          messages.push({ role: "user", content: TOOL_NUDGE });
+          continue;
+        }
+        break;
+      }
+      for (const call of toolCalls) {
+        const name = call.function && call.function.name;
+        const args = parseArgs(call.function && call.function.arguments);
+        const output = runTool(name, args);
+        process.stdout.write(`[${name}] ${summarize(output)}\n`);
+        messages.push({
+          role: "tool",
+          tool_call_id: call.id,
+          content: output,
+        });
+      }
+    }
 
-  fs.writeFileSync(
-    resultFile,
-    `${JSON.stringify({
-      type: "result",
-      result: lastText,
-      model,
-      usage,
-      total_cost_usd: costMicros > 0 ? costMicros / 1000000 : undefined,
-    })}\n`,
-  );
-  accumulateLLMUsage({
+    if (pendingToolCalls) {
+      const wrapUp = await requestWrapUp(baseURL, apiKey, model, messages, usage, lastText, turnLimit);
+      lastText = wrapUp.text;
+      costMicros += wrapUp.costMicros;
+    }
+    return 0;
+  } catch (err) {
+    console.error(err && err.message ? err.message : err);
+    return 1;
+  } finally {
+    writeResult(resultFile, model, usage, costMicros, lastText);
+  }
+}
+
+function writeResult(resultFile, model, usage, costMicros, lastText) {
+  const payload = {
+    type: "result",
+    result: lastText,
     model,
     usage,
-    total_cost_usd: costMicros > 0 ? costMicros / 1000000 : undefined,
-  });
-  return 0;
+  };
+  if (costMicros > 0) {
+    payload.total_cost_usd = costMicros / 1000000;
+  }
+  fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
+  accumulateLLMUsage(payload);
 }
 
 function resolveMaxTurns(maxTurns) {
