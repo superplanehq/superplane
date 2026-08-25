@@ -76,7 +76,7 @@ describe("collectLineDoneOrders", () => {
 
     const done = collectLineDoneOrders([closedOld, draft, open, closedNew, closedOtherLine, closedNoLine], LINE);
 
-    expect(done.map((entry) => entry.id)).toEqual(["wo-closed-new", "wo-closed-old"]);
+    expect(done.map((entry) => entry.id)).toEqual(["wo-no-line", "wo-closed-new", "wo-closed-old"]);
   });
 
   it("keeps open work that is still on a Done step after the stage column is dropped", () => {

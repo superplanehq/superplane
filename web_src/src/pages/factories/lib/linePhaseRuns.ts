@@ -12,7 +12,6 @@ import {
   isQueuedStepRow,
   type WorkOrderStepRow,
 } from "./workOrderExecutions";
-
 export type LinePhaseTick = "running" | "waiting" | "queued" | "failed" | null;
 
 /** Phase status expressed with a distinct glyph shape, not colour alone. */
@@ -69,7 +68,8 @@ export function linePhaseRunHref(
 /**
  * Builds the Lines detail board: one column per line step. Each work order
  * appears once, in the column for its current (furthest active, else furthest
- * finished) step on this line — newest cards first within a column.
+ * finished) step on this line — newest cards first within a column. Work
+ * orders that reached a terminal outcome move to the Done column instead.
  */
 export function buildLinePhaseBoard(
   line: FactoriesFactoryLine,
@@ -82,20 +82,32 @@ export function buildLinePhaseBoard(
     return [];
   }
 
-  const runsByStep = collectCurrentRunsByStep(lineId, steps, workOrders);
+  const columns: LinePhaseColumn[] = steps.map((step, stepIndex) => ({
+    stepName: automationNameForLineStep(step, apps, stepIndex),
+    stepIndex,
+    appId: step.app?.app?.trim() || undefined,
+    maxParallelism: lineStepParallelism(step),
+    runs: [],
+    tick: null,
+  }));
 
-  return steps.map((step, stepIndex) => {
-    const runs = runsByStep.get(stepIndex) ?? [];
-    const appId = step.app?.app?.trim() || undefined;
-    return {
-      stepName: automationNameForLineStep(step, apps, stepIndex),
-      stepIndex,
-      appId,
-      maxParallelism: lineStepParallelism(step),
-      runs,
-      tick: resolvePhaseTick(runs),
-    };
-  });
+  const runsByStep = collectCurrentRunsByStep(lineId, steps, workOrders);
+  for (const column of columns) {
+    column.runs = runsByStep.get(column.stepIndex) ?? [];
+    column.tick = resolvePhaseTick(column.runs);
+  }
+
+  return columns;
+}
+
+/**
+ * True when the last step is the line's own Done automation. Such a line keeps
+ * finished work orders on that step; every other line hands them to the board
+ * Done column, which no app backs.
+ */
+export function lineBoardEndsWithDoneStep(columns: LinePhaseColumn[]): boolean {
+  const last = columns[columns.length - 1];
+  return last ? isDoneLineColumn(last) : false;
 }
 
 /**
@@ -107,7 +119,7 @@ export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): Fact
 }
 
 /**
- * Closed work that ran on this line, plus open work still on a Done or
+ * Closed work that belongs on this line, plus open work still on a Done or
  * PR-closure step. Newest orders come first.
  */
 export function collectLineDoneOrders(
@@ -118,7 +130,7 @@ export function collectLineDoneOrders(
   const doneById = new Map<string, FactoriesWorkOrder>();
 
   for (const order of workOrders) {
-    if (!order.id || !isClosedOnLine(order, line.id)) {
+    if (!order.id || order.state !== "STATE_CLOSED" || !belongsToLineBoard(order, line.id)) {
       continue;
     }
     doneById.set(order.id, order);
@@ -182,18 +194,22 @@ export function isDoneLineColumn(column: Pick<LinePhaseColumn, "stepName" | "app
   return column.appId === "app-refund-done" || column.appId.includes("pr-closure");
 }
 
-function isClosedOnLine(order: FactoriesWorkOrder, lineId: string | undefined): boolean {
-  if (!order.id || order.state !== "STATE_CLOSED" || !lineId) {
-    return false;
-  }
-  return (order.lineDispatches ?? []).some((dispatch) => dispatch.line?.id === lineId);
-}
-
 function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {
   if (!order.id || order.state !== "STATE_DRAFT") {
     return false;
   }
   return (order.lineDispatches ?? []).length === 0;
+}
+
+// A finished work order belongs on this board when it ran on this line, or
+// when it closed before any line picked it up — the same rule the shared
+// backlog follows.
+function belongsToLineBoard(order: FactoriesWorkOrder, lineId: string | undefined): boolean {
+  const dispatches = order.lineDispatches ?? [];
+  if (dispatches.length === 0) {
+    return true;
+  }
+  return dispatches.some((dispatch) => dispatch.line?.id === lineId);
 }
 
 function compareOrdersNewestFirst(left: FactoriesWorkOrder, right: FactoriesWorkOrder): number {
