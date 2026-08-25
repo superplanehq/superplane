@@ -143,19 +143,12 @@ describe("Line board job popup", () => {
     expect(screen.getByTestId("work-order-card-score-wo-review-pay-844")).toHaveAttribute("aria-valuenow", "4");
     expect(screen.getByTestId("work-order-card-score-wo-review-pay-845")).toHaveAttribute("aria-valuenow", "3");
     expect(screen.queryByLabelText("Plan phase")).not.toBeInTheDocument();
-    expect(within(screen.getByLabelText("Implement phase")).getAllByRole("button", { name: /^Open / })).toHaveLength(3);
+    expect(within(screen.getByLabelText("Implement phase")).getAllByRole("button", { name: /^Open / })).toHaveLength(2);
     expect(
       within(screen.getByLabelText("Implement phase")).getByRole("button", {
         name: "Open Add refund reconciliation test",
       }),
     ).toBeInTheDocument();
-    const failedCard = within(screen.getByLabelText("Implement phase"))
-      .getByRole("button", {
-        name: "Open Fix refund dispatcher timeout loop",
-      })
-      .closest("article") as HTMLElement;
-    expect(within(failedCard).getByLabelText("Failed")).toBeInTheDocument();
-    expect(within(failedCard).getByText("Run failed")).toBeInTheDocument();
     const webhookCard = within(screen.getByLabelText("Implement phase"))
       .getByRole("button", {
         name: "Open Review the refund webhook schema change",
@@ -178,17 +171,24 @@ describe("Line board job popup", () => {
         name: "Open Add refund reason enum to schema",
       }),
     ).toBeInTheDocument();
-    expect(within(screen.getByLabelText("Done phase")).getAllByRole("button", { name: /^Open / })).toHaveLength(3);
+    expect(within(screen.getByTestId("lines-done-column")).getAllByRole("button", { name: /^Open / })).toHaveLength(4);
+    const failedCard = within(screen.getByTestId("lines-done-column"))
+      .getByRole("button", {
+        name: "Open Fix refund dispatcher timeout loop",
+      })
+      .closest("article") as HTMLElement;
+    expect(within(failedCard).getByLabelText("Failed")).toBeInTheDocument();
+    expect(within(failedCard).getByText("Run failed")).toBeInTheDocument();
     expect(
-      within(screen.getByLabelText("Done phase")).getByRole("button", {
+      within(screen.getByTestId("lines-done-column")).getByRole("button", {
         name: "Open Send refund receipts after provider confirm",
       }),
     ).toBeInTheDocument();
-    const rejectedCard = within(screen.getByLabelText("Done phase"))
+    const rejectedCard = within(screen.getByTestId("lines-done-column"))
       .getByRole("button", { name: "Open Replace the refund batch exporter" })
       .closest("article") as HTMLElement;
     expect(within(rejectedCard).getByLabelText("Rejected")).toBeInTheDocument();
-    const canceledCard = within(screen.getByLabelText("Done phase"))
+    const canceledCard = within(screen.getByTestId("lines-done-column"))
       .getByRole("button", { name: "Open Migrate refunds to the v2 provider API" })
       .closest("article") as HTMLElement;
     expect(within(canceledCard).getByLabelText("Canceled")).toBeInTheDocument();

@@ -12,8 +12,6 @@ import {
   isQueuedStepRow,
   type WorkOrderStepRow,
 } from "./workOrderExecutions";
-import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "./workOrderProgress";
-
 export type LinePhaseTick = "running" | "waiting" | "queued" | "failed" | null;
 
 /** Phase status expressed with a distinct glyph shape, not colour alone. */
@@ -93,7 +91,7 @@ export function buildLinePhaseBoard(
     tick: null,
   }));
 
-  const runsByStep = collectCurrentRunsByStep(lineId, steps, workOrders, lineBoardEndsWithDoneStep(columns));
+  const runsByStep = collectCurrentRunsByStep(lineId, steps, workOrders);
   for (const column of columns) {
     column.runs = runsByStep.get(column.stepIndex) ?? [];
     column.tick = resolvePhaseTick(column.runs);
@@ -121,17 +119,40 @@ export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): Fact
 }
 
 /**
- * Work orders for the Done column: completed, rejected, or canceled. Failed
- * work orders stay on the phase where they stopped, so the team can see what
- * to retry. Newest updated orders come first.
+ * Closed work that belongs on this line, plus open work still on a Done or
+ * PR-closure step. Newest orders come first.
  */
 export function collectLineDoneOrders(
-  lineId: string | undefined,
   workOrders: FactoriesWorkOrder[],
+  line: FactoriesFactoryLine,
+  board: LinePhaseColumn[] = [],
 ): FactoriesWorkOrder[] {
-  return workOrders
-    .filter((order) => isLineDoneOrder(order) && belongsToLineBoard(order, lineId))
-    .sort(compareOrdersNewestFirst);
+  const doneById = new Map<string, FactoriesWorkOrder>();
+
+  for (const order of workOrders) {
+    if (!order.id || order.state !== "STATE_CLOSED" || !belongsToLineBoard(order, line.id)) {
+      continue;
+    }
+    doneById.set(order.id, order);
+  }
+
+  for (const column of board) {
+    if (!isDoneLineColumn(column)) {
+      continue;
+    }
+    for (const run of column.runs) {
+      if (run.order.id) {
+        doneById.set(run.order.id, run.order);
+      }
+    }
+  }
+
+  return [...doneById.values()].sort(compareOrdersNewestFirst);
+}
+
+/** Stage columns only. Done is a fixed bookend, not a line step. */
+export function lineStageColumns(columns: LinePhaseColumn[]): LinePhaseColumn[] {
+  return columns.filter((column) => !isDoneLineColumn(column));
 }
 
 /** Factory-level intake automation. It is not a line step. */
@@ -178,16 +199,6 @@ function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {
     return false;
   }
   return (order.lineDispatches ?? []).length === 0;
-}
-
-/** Terminal outcomes that take a work order off the phase columns. */
-const DONE_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["completed", "rejected", "cancelled"];
-
-function isLineDoneOrder(order: FactoriesWorkOrder): boolean {
-  if (!order.id) {
-    return false;
-  }
-  return DONE_DISPLAY_STATUSES.includes(getWorkOrderDisplayStatus(order));
 }
 
 // A finished work order belongs on this board when it ran on this line, or
@@ -263,13 +274,9 @@ function collectCurrentRunsByStep(
   lineId: string,
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
   workOrders: FactoriesWorkOrder[],
-  keepFinishedOrders: boolean,
 ): Map<number, LinePhaseRunCard[]> {
   const runsByStep = new Map<number, LinePhaseRunCard[]>();
   for (const order of workOrders) {
-    if (!keepFinishedOrders && isLineDoneOrder(order)) {
-      continue;
-    }
     appendCurrentRunForOrder(order, lineId, steps, runsByStep);
   }
   for (const runs of runsByStep.values()) {
@@ -337,7 +344,7 @@ function appendCurrentRunForOrder(
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
   runsByStep: Map<number, LinePhaseRunCard[]>,
 ): void {
-  if (!order.id) {
+  if (!order.id || order.state === "STATE_CLOSED") {
     return;
   }
 
