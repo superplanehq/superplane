@@ -19,6 +19,7 @@ const (
 	UsageFundingSourceHosted = "hosted"
 
 	UsageProviderAnthropic  = "anthropic"
+	UsageProviderGroq       = "groq"
 	UsageProviderOpenAI     = "openai"
 	UsageProviderOpenRouter = "openrouter"
 	UsageProviderPerplexity = "perplexity"

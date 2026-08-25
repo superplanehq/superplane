@@ -217,6 +217,11 @@ import {
   eventStateRegistry as openrouterEventStateRegistry,
 } from "./openrouter/index";
 import {
+  componentMappers as groqComponentMappers,
+  triggerRenderers as groqTriggerRenderers,
+  eventStateRegistry as groqEventStateRegistry,
+} from "./groq/index";
+import {
   componentMappers as prometheusComponentMappers,
   customFieldRenderers as prometheusCustomFieldRenderers,
   triggerRenderers as prometheusTriggerRenderers,
@@ -362,6 +367,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   logfire: logfireComponentMappers,
   perplexity: perplexityComponentMappers,
   openrouter: openrouterComponentMappers,
+  groq: groqComponentMappers,
   gcp: gcpComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
@@ -412,6 +418,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   logfire: logfireTriggerRenderers,
   perplexity: perplexityTriggerRenderers,
   openrouter: openrouterTriggerRenderers,
+  groq: groqTriggerRenderers,
   gcp: gcpTriggerRenderers,
   grafana: grafanaTriggerRenderers,
   bitbucket: bitbucketTriggerRenderers,
@@ -457,6 +464,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   logfire: logfireEventStateRegistry,
   perplexity: perplexityEventStateRegistry,
   openrouter: openrouterEventStateRegistry,
+  groq: groqEventStateRegistry,
   gcp: gcpEventStateRegistry,
   statuspage: statuspageEventStateRegistry,
   aws: awsEventStateRegistry,
