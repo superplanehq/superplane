@@ -69,6 +69,32 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Len(t, liveVersion.Edges, 3)
 	})
 
+	t.Run("a GitHub intake listens with the workspace connection", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		backlogRepository := "acme/backlog"
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			VCSIntegrationID:  &integrationID,
+			BacklogRepository: &backlogRepository,
+		}))
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, integrationID, *trigger.IntegrationID)
+		assert.Equal(t, backlogRepository, trigger.Configuration["repository"])
+	})
+
+	t.Run("an intake stays unbound when setup named no repository", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		assert.Nil(t, trigger.IntegrationID)
+		assert.NotContains(t, trigger.Configuration, "repository")
+	})
+
 	t.Run("a source can have several intakes", func(t *testing.T) {
 		factory := newFactory(t)
 		first := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
@@ -273,4 +299,23 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, response.GetRuns())
 	})
+}
+
+func liveIntakeTrigger(t *testing.T, organizationID uuid.UUID, intake *pb.FactoryIntake) models.Node {
+	t.Helper()
+
+	canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), organizationID, uuid.MustParse(intake.GetCanvasId()))
+	require.NoError(t, err)
+
+	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+	require.NoError(t, err)
+
+	for _, node := range liveVersion.Nodes {
+		if node.ID == intakeTriggerNodeID {
+			return node
+		}
+	}
+
+	require.Failf(t, "trigger not found", "intake canvas %s has no node %q", intake.GetCanvasId(), intakeTriggerNodeID)
+	return models.Node{}
 }

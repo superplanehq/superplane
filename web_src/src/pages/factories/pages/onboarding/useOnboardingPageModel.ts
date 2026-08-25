@@ -6,6 +6,7 @@ import {
   useDispatchWorkOrder,
   useUpdateFactory,
 } from "@/hooks/useFactoryData";
+import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { useOrganizationLLMSpend } from "@/hooks/useOrganizationLLMSpend";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -215,6 +216,7 @@ export function useOnboardingPageModel(args: {
   const updateFactory = useUpdateFactory(args.organizationId, args.factoryId);
   const updateOnboarding = useFactoryOnboarding(args.organizationId, args.factoryId);
   const createLine = useCreateFactoryLine(args.organizationId, args.factoryId);
+  const createIntake = useCreateFactoryIntake(args.organizationId, args.factoryId);
   const createWorkOrder = useCreateWorkOrder(args.organizationId, args.factoryId);
   const dispatchWorkOrder = useDispatchWorkOrder(args.organizationId, args.factoryId);
   const installer = useInstallFactory();
@@ -256,6 +258,8 @@ export function useOnboardingPageModel(args: {
     updateOnboarding: updateOnboarding.mutateAsync,
     installFactory: installer.installFactory,
     createLine: createLine.mutateAsync,
+    listIntakes: () => fetchFactoryIntakes(args.organizationId, args.factoryId),
+    createIntake: createIntake.mutateAsync,
     createWorkOrder: createWorkOrder.mutateAsync,
     dispatchWorkOrder: dispatchWorkOrder.mutateAsync,
     remainingCreditCents: agent.remainingCreditCents,
@@ -288,7 +292,7 @@ export function useOnboardingPageModel(args: {
     repositoriesLoading: github.repositoriesLoading,
     repositoriesError: github.repositoriesError,
     canConfigureWorkspace: canConfigureWorkspace(canAct),
-    saving: saving || installer.isInstalling || createWorkOrder.isPending,
+    saving: saving || installer.isInstalling || createIntake.isPending || createWorkOrder.isPending,
     ...saves,
     finish: finishSetup,
   };

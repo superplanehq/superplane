@@ -16,7 +16,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			models.FactoryIntakeSourceSentryExceptions:   "sentry.onIssue",
 			models.FactoryIntakeSourcePagerDutyIncidents: "pagerduty.onIncident",
 		} {
-			canvas, err := buildIntakeCanvas(source, "", DefaultIntakeConfidencePct)
+			canvas, err := buildIntakeCanvas(source, "", DefaultIntakeConfidencePct, nil)
 			require.NoError(t, err)
 
 			trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
@@ -26,7 +26,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 	})
 
 	t.Run("the item flows from the trigger to the work order", func(t *testing.T) {
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct)
+		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, nil)
 		require.NoError(t, err)
 
 		assert.Equal(t, []yaml.Edge{
@@ -37,7 +37,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 	})
 
 	t.Run("the threshold gates on the analysis score", func(t *testing.T) {
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", 80)
+		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", 80, nil)
 		require.NoError(t, err)
 
 		threshold := findSpecNode(t, canvas, intakeThresholdNodeID)
@@ -46,7 +46,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 
 	t.Run("confidence outside the scale is clamped", func(t *testing.T) {
 		for confidence, expected := range map[int]int{-20: 0, 0: 0, 65: 65, 100: 100, 140: 100} {
-			canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", confidence)
+			canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", confidence, nil)
 			require.NoError(t, err)
 
 			threshold := findSpecNode(t, canvas, intakeThresholdNodeID)
@@ -57,18 +57,47 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 	})
 
 	t.Run("a given name wins over the source default", func(t *testing.T) {
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "Backlog triage", DefaultIntakeConfidencePct)
+		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "Backlog triage", DefaultIntakeConfidencePct, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "Backlog triage", canvas.Metadata.Name)
 
-		canvas, err = buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "   ", DefaultIntakeConfidencePct)
+		canvas, err = buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "   ", DefaultIntakeConfidencePct, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "GitHub issues", canvas.Metadata.Name)
 	})
 
 	t.Run("an unknown source has no graph", func(t *testing.T) {
-		_, err := buildIntakeCanvas("linear-issues", "", DefaultIntakeConfidencePct)
+		_, err := buildIntakeCanvas("linear-issues", "", DefaultIntakeConfidencePct, nil)
 		assert.ErrorIs(t, err, models.ErrFactoryIntakeSourceInvalid)
+	})
+
+	t.Run("the binding tells the trigger what to listen on", func(t *testing.T) {
+		binding := &intakeBinding{
+			Integration:   &yaml.IntegrationRef{ID: "integration-1", Name: "acme-github"},
+			Configuration: map[string]any{"repository": "acme/backlog"},
+		}
+		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, binding)
+		require.NoError(t, err)
+
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, binding.Integration, trigger.Integration)
+		assert.Equal(t, "acme/backlog", trigger.Configuration["repository"])
+		// The binding names the resource; the template still picks the events.
+		assert.Equal(t, []any{"opened"}, trigger.Configuration["actions"])
+	})
+
+	t.Run("a binding does not leak into the next intake", func(t *testing.T) {
+		_, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, &intakeBinding{
+			Configuration: map[string]any{"repository": "acme/backlog"},
+		})
+		require.NoError(t, err)
+
+		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, nil)
+		require.NoError(t, err)
+
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Nil(t, trigger.Integration)
+		assert.NotContains(t, trigger.Configuration, "repository")
 	})
 }
 
