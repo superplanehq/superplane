@@ -71,7 +71,14 @@ func CreateFactoryIntake(
 		confidencePct = int(req.GetConfidencePct())
 	}
 
-	canvasID, err := createIntakeCanvas(ctx, deps, orgID, factoryID, source, name, confidencePct)
+	canvasID, err := createIntakeCanvas(ctx, deps, intakeCanvasRequest{
+		OrganizationID: orgID,
+		FactoryID:      factoryID,
+		Source:         source,
+		Name:           name,
+		ConfidencePct:  confidencePct,
+		Binding:        resolveIntakeBinding(db, factory, source),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -99,17 +106,26 @@ func CreateFactoryIntake(
 	}, nil
 }
 
+// intakeCanvasRequest describes the graph to generate for a new intake.
+type intakeCanvasRequest struct {
+	OrganizationID uuid.UUID
+	FactoryID      uuid.UUID
+	Source         string
+	Name           string
+	ConfidencePct  int
+	Binding        *intakeBinding
+}
+
 // createIntakeCanvas builds the intake graph and commits it as the canvas's
 // live version in one step. The graph has to be live from the start: a staged
 // graph never receives events.
 func createIntakeCanvas(
 	ctx context.Context,
 	deps IntakeDependencies,
-	orgID, factoryID uuid.UUID,
-	source, name string,
-	confidencePct int,
+	request intakeCanvasRequest,
 ) (uuid.UUID, error) {
-	canvasDoc, err := buildIntakeCanvas(source, name, confidencePct)
+	orgID := request.OrganizationID
+	canvasDoc, err := buildIntakeCanvas(request.Source, request.Name, request.ConfidencePct, request.Binding)
 	if err != nil {
 		return uuid.Nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}
@@ -129,7 +145,7 @@ func createIntakeCanvas(
 		orgID,
 		canvasDoc.Metadata.Name,
 		canvasDoc.Metadata.Description,
-		&factoryID,
+		&request.FactoryID,
 		nodes,
 		edges,
 		deps.UsageService,

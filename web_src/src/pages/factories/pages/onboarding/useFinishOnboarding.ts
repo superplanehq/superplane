@@ -11,8 +11,11 @@ import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboarding
 import {
   DEFAULT_LINE_NAME,
   provisionEventApps,
+  provisionGithubIntake,
   provisionLine,
+  type CreateFactoryIntake,
   type InstallOnboardingApp,
+  type ListFactoryIntakes,
   type UpdateOnboarding,
 } from "./onboardingProvision";
 import { apiIssuesSource } from "./onboardingStatus";
@@ -73,6 +76,8 @@ async function provisionWorkspace(args: {
   updateOnboarding: UpdateOnboarding;
   installFactory: InstallOnboardingApp;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
+  listIntakes: ListFactoryIntakes;
+  createIntake: CreateFactoryIntake;
   createWorkOrder: (input: {
     title: string;
     description: string;
@@ -124,6 +129,11 @@ async function provisionWorkspace(args: {
     agentRewrite: args.agentRewrite,
     installFactory: args.installFactory,
   });
+  // The intake needs the line: it opens work orders that the line runs.
+  await provisionGithubIntake({
+    listIntakes: args.listIntakes,
+    createIntake: args.createIntake,
+  });
   await args.updateOnboarding({
     provisionedAppId: primaryAppId,
     provisionedLineId: lineId,
@@ -150,6 +160,8 @@ export function useFinishOnboarding(args: {
   updateOnboarding: UpdateOnboarding;
   installFactory: InstallOnboardingApp;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
+  listIntakes: ListFactoryIntakes;
+  createIntake: CreateFactoryIntake;
   createWorkOrder: (input: {
     title: string;
     description: string;

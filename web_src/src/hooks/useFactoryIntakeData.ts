@@ -25,18 +25,23 @@ export function factoryIntakesKey(organizationId: string, factoryId: string) {
   return factoryIntakeQueryKeys.list(organizationId, factoryId);
 }
 
+export async function fetchFactoryIntakes(
+  organizationId: string,
+  factoryId: string,
+): Promise<FactoriesFactoryIntake[]> {
+  const response = await factoriesListFactoryIntakes(
+    withOrganizationHeader({
+      organizationId,
+      path: { factoryId },
+    }),
+  );
+  return response.data?.intakes ?? [];
+}
+
 export function useFactoryIntakes(organizationId: string, factoryId: string) {
   return useQuery({
     queryKey: factoryIntakesKey(organizationId, factoryId),
-    queryFn: async (): Promise<FactoriesFactoryIntake[]> => {
-      const response = await factoriesListFactoryIntakes(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId },
-        }),
-      );
-      return response.data?.intakes ?? [];
-    },
+    queryFn: () => fetchFactoryIntakes(organizationId, factoryId),
     enabled: Boolean(organizationId && factoryId),
   });
 }
