@@ -15,6 +15,8 @@ const DEFAULT_MAX_TURNS = 128;
 const MAX_TURNS_LIMIT = 256;
 const WRAP_UP_PROMPT =
   "You have no remaining tool turns. Do not call tools. Write a plain-text summary of what you completed and what remains.";
+const TOOL_NUDGE =
+  "Use the bash, read, edit, or write tools to do the work. Do not only describe the changes.";
 const TOOLS = [
   {
     type: "function",
@@ -117,6 +119,7 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
   let lastText = "";
   let costMicros = 0;
   let pendingToolCalls = false;
+  let nudgedForTools = false;
   const turnLimit = resolveMaxTurns(maxTurns);
 
   for (let turn = 0; turn < turnLimit; turn += 1) {
@@ -132,9 +135,15 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
       process.stdout.write(`${lastText}\n`);
     }
 
-    const toolCalls = message.tool_calls || [];
+    const toolCalls = extractToolCalls(message);
     pendingToolCalls = toolCalls.length > 0;
     if (!pendingToolCalls) {
+      if (!nudgedForTools) {
+        nudgedForTools = true;
+        process.stderr.write("OpenRouter agent returned no tool calls; asking it to use tools\n");
+        messages.push({ role: "user", content: TOOL_NUDGE });
+        continue;
+      }
       break;
     }
     for (const call of toolCalls) {
@@ -182,6 +191,44 @@ function resolveMaxTurns(maxTurns) {
   return Math.min(Math.floor(n), MAX_TURNS_LIMIT);
 }
 
+function extractToolCalls(message) {
+  if (!message) {
+    return [];
+  }
+  if (Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
+    return message.tool_calls;
+  }
+  if (message.function_call && message.function_call.name) {
+    return [
+      {
+        id: String(message.function_call.name) + "-legacy",
+        type: "function",
+        function: message.function_call,
+      },
+    ];
+  }
+  if (!Array.isArray(message.content)) {
+    return [];
+  }
+  const calls = [];
+  for (const part of message.content) {
+    const fn = (part && (part.functionCall || part.function_call)) || null;
+    if (!fn || !fn.name) {
+      continue;
+    }
+    const rawArgs = fn.arguments || fn.args || {};
+    calls.push({
+      id: String(fn.id || fn.name),
+      type: "function",
+      function: {
+        name: fn.name,
+        arguments: typeof rawArgs === "string" ? rawArgs : JSON.stringify(rawArgs),
+      },
+    });
+  }
+  return calls;
+}
+
 function assistantText(message) {
   if (!message || !message.content) {
     return "";
@@ -218,6 +265,8 @@ async function chat(baseURL, apiKey, model, messages, withTools) {
   };
   if (withTools) {
     payload.tools = TOOLS;
+    payload.tool_choice = "auto";
+    payload.provider = { require_parameters: true };
   }
   const response = await fetch(`${baseURL}/chat/completions`, {
     method: "POST",

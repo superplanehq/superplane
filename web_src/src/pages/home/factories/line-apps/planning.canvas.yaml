@@ -125,6 +125,7 @@ spec:
               else
                 jq -n '{error: "No plan produced at /tmp/plan.md"}' > "$SUPERPLANE_RESULT_FILE"
                 echo "No plan produced at /tmp/plan.md" >&2
+                exit 1
               fi
       position:
         x: 407
@@ -191,6 +192,7 @@ spec:
               else
                 jq -n '{error: "No plan produced at /tmp/plan.md"}' > "$SUPERPLANE_RESULT_FILE"
                 echo "No plan produced at /tmp/plan.md" >&2
+                exit 1
               fi
       position:
         x: 735

@@ -121,6 +121,7 @@ spec:
                 jq -n '{error: "Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md"}' \
                   > "$SUPERPLANE_RESULT_FILE"
                 echo "Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md" >&2
+                exit 1
               fi
       position:
         x: 1753

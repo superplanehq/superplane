@@ -97,6 +97,18 @@ describe("setup factory line apps", () => {
     expect(pr).toContain("showOnlyWhenWaiting: true");
   });
 
+  it("fails planning when the agent does not write the plan file", () => {
+    const planning = materializeOnboardingApp("line-planning");
+    expect(planning).toContain("No plan produced at /tmp/plan.md");
+    expect(planning).toContain("exit 1");
+  });
+
+  it("fails PR title generation when the agent does not write title files", () => {
+    const pr = materializeOnboardingApp("line-pr");
+    expect(pr).toContain("Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md");
+    expect(pr).toContain("exit 1");
+  });
+
   it("fails implementation when the agent pushes no file commits", () => {
     const implementation = materializeOnboardingApp("line-implementation");
     const nodes = canvasNodes(implementation);
