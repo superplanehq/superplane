@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
@@ -13,9 +14,43 @@ import {
   GITHUB_INTAKE_RUNS,
   type IntakeAutomationRun,
 } from "./intakeSourceSettingsModel";
-import { intakeAutomationCanvas, lineIntakeSourceById } from "./lineIntakeModel";
+import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
-const githubAutomationCanvas = intakeAutomationCanvas(lineIntakeSourceById("github-issues")!);
+const githubAutomationGraph = githubIntakeGraph();
+
+/** Same pipeline the canvas editor uses, so the popup renders editor nodes. */
+function githubIntakeGraph(): IntakeAutomationGraph {
+  const { nodes, edges } = prepareData(
+    {
+      metadata: { id: "app-github-issues-intake", name: "GitHub issues", factoryId: "factory-1" },
+      spec: {
+        nodes: [
+          { id: "trigger", name: "On Issue", type: "TYPE_TRIGGER", component: "github.onIssue" },
+          { id: "analysis", name: "Analyze intake", type: "TYPE_ACTION", component: "runnerClaudeCode" },
+          { id: "create", name: "Create Work Order", type: "TYPE_ACTION", component: "createWorkOrder" },
+        ],
+        edges: [
+          { channel: "default", sourceId: "trigger", targetId: "analysis" },
+          { channel: "passed", sourceId: "analysis", targetId: "create" },
+        ],
+      },
+    },
+    [{ name: "github.onIssue", label: "On Issue" }],
+    [
+      { name: "runnerClaudeCode", label: "Run Claude Code" },
+      { name: "createWorkOrder", label: "Create Work Order" },
+    ],
+    {},
+    {},
+    {},
+    "app-github-issues-intake",
+    new QueryClient(),
+    null,
+    "edit",
+  );
+
+  return { nodes, edges, factoryId: "factory-1" };
+}
 
 function renderPopup(
   props: {
@@ -34,7 +69,7 @@ function renderPopup(
           <TooltipProvider>
             <IntakeSourceSettingsPopup
               settings={DEFAULT_GITHUB_INTAKE_SETTINGS}
-              automationCanvas={githubAutomationCanvas}
+              automationGraph={githubAutomationGraph}
               onSave={props.onSave ?? vi.fn()}
               onOpenRun={props.onOpenRun}
               runs={props.runs}
@@ -79,18 +114,14 @@ describe("IntakeSourceSettingsPopup", () => {
 
     const automation = screen.getByTestId("intake-source-automation");
     expect(automation).toHaveAccessibleName("Automation");
-    expect(within(automation).getByText("GitHub issue intake")).toBeInTheDocument();
-    expect(within(automation).getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
-    expect(within(automation).getByTestId("split-run-canvas-node-github-issues-trigger")).toBeInTheDocument();
-    expect(within(automation).getByTestId("split-run-canvas-node-github-issues-classify")).toBeInTheDocument();
-    expect(within(automation).getByTestId("split-run-canvas-node-github-issues-create")).toBeInTheDocument();
+    expect(within(automation).getByTestId("rf__node-trigger")).toBeInTheDocument();
+    expect(within(automation).getAllByText("On Issue").length).toBeGreaterThan(0);
+    expect(within(automation).getByText("Analyze intake")).toBeInTheDocument();
+    expect(within(automation).getAllByText("Create Work Order").length).toBeGreaterThan(0);
     expect(within(automation).getByRole("link", { name: "Edit automation" })).toHaveAttribute(
       "href",
       "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1",
     );
-    expect(within(automation).queryByTestId("split-run-canvas-menu")).not.toBeInTheDocument();
-    expect(within(automation).queryByTestId("split-run-phase-listen")).not.toBeInTheDocument();
-    expect(within(automation).queryByRole("heading", { name: "Log" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Accepted events go to Backlog" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-settings-save")).not.toBeInTheDocument();

@@ -1,32 +1,39 @@
-import type { CanvasesCanvas } from "@/api-client";
 import { useCanvas } from "@/hooks/useCanvasData";
-import { useMemo } from "react";
+import { usePreparedCanvasGraph } from "@/pages/app/usePreparedCanvasGraph";
+import type { CanvasEdge, CanvasNode } from "@/ui/CanvasPage";
 
-import { intakeAutomationCanvasFromApp } from "./intakeAutomationCanvasModel";
-import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvases";
+export interface IntakeAutomationGraph {
+  nodes: CanvasNode[];
+  edges: CanvasEdge[];
+  factoryId?: string;
+}
 
 interface IntakeAutomationCanvasResult {
-  canvas?: SplitRunCanvasModel;
-  sourceCanvas?: CanvasesCanvas;
+  graph: IntakeAutomationGraph;
   isLoading: boolean;
   isError: boolean;
   refetch: () => Promise<unknown>;
 }
 
-/** Loads the graph of the app that backs an intake source. */
+/**
+ * Loads the graph of the app that backs an intake source, prepared the same way
+ * as on the canvas editor page so both views show the same nodes and edges.
+ */
 export function useIntakeAutomationCanvas(
   organizationId: string | undefined,
   appId: string | undefined,
-  title: string,
 ): IntakeAutomationCanvasResult {
   const enabled = Boolean(organizationId && appId);
   const query = useCanvas(organizationId ?? "", appId ?? "", { enabled });
-  const canvas = useMemo(() => intakeAutomationCanvasFromApp(title, query.data), [query.data, title]);
+  const prepared = usePreparedCanvasGraph(query.data, organizationId);
 
   return {
-    canvas,
-    sourceCanvas: query.data,
-    isLoading: enabled && query.isPending,
+    graph: {
+      nodes: prepared.nodes,
+      edges: prepared.edges,
+      factoryId: query.data?.metadata?.factoryId,
+    },
+    isLoading: enabled && (query.isPending || prepared.isLoading),
     isError: query.isError,
     refetch: query.refetch,
   };
