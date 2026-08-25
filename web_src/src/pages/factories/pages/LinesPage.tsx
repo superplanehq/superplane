@@ -28,7 +28,7 @@ import {
   findBacklogAutomationApp,
   findClosureAutomationApp,
   isDoneLineColumn,
-  lineBoardEndsWithDoneStep,
+  lineStageColumns,
   LINE_PHASE_RUNS_PAGE_SIZE,
   resolveColumnGlyph,
   resolvePhaseRunStatus,
@@ -437,12 +437,12 @@ function LineDetail({
   workOrderCardContext: WorkOrderCardContext;
 }) {
   const steps = line.steps ?? [];
-  const board = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
+  const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
+  const board = useMemo(() => lineStageColumns(fullBoard), [fullBoard]);
   const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
-  const hasDoneStep = lineBoardEndsWithDoneStep(board);
   const doneOrders = useMemo(
-    () => (hasDoneStep ? [] : collectLineDoneOrders(line.id, workOrders ?? [])),
-    [hasDoneStep, line.id, workOrders],
+    () => collectLineDoneOrders(workOrders ?? [], line, fullBoard),
+    [workOrders, line, fullBoard],
   );
   const [peekOrderId, setPeekOrderId] = useState<string | null>(null);
   const peekOrder = workOrders.find((order) => order.id === peekOrderId);
@@ -457,7 +457,7 @@ function LineDetail({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
-      {steps.length === 0 && backlogOrders.length === 0 ? (
+      {steps.length === 0 && backlogOrders.length === 0 && doneOrders.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">No phases yet. Edit this line to add app-driven phases.</p>
       ) : (
         <PhaseBoard
@@ -466,7 +466,7 @@ function LineDetail({
           factoryKey={factoryKey}
           line={line}
           backlogOrders={backlogOrders}
-          doneOrders={hasDoneStep ? null : doneOrders}
+          doneOrders={doneOrders}
           columns={board}
           canCreateWorkOrder={canCreateWorkOrder}
           canRename={canUpdate}
@@ -672,8 +672,7 @@ function PhaseBoard({
   factoryKey: string;
   line: FactoriesFactoryLine;
   backlogOrders: FactoriesWorkOrder[];
-  /** Null when the line ends with its own Done automation. */
-  doneOrders: FactoriesWorkOrder[] | null;
+  doneOrders: FactoriesWorkOrder[];
   columns: LinePhaseColumn[];
   canCreateWorkOrder: boolean;
   canRename: boolean;
@@ -753,7 +752,7 @@ function PhaseBoard({
             key={`${column.stepIndex}-${column.stepName}`}
             className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}
           >
-            {index < columns.length - 1 || doneOrders ? (
+            {index < columns.length - 1 || columns.length > 0 ? (
               <span className="absolute top-[21px] left-full z-[1] h-px w-3 bg-border" aria-hidden />
             ) : null}
             <PhaseColumn
@@ -774,77 +773,19 @@ function PhaseBoard({
           </div>
         );
       })}
-      {doneOrders ? (
-        <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
-          <DoneColumn
-            orders={doneOrders}
-            title={columnTitles.done ?? "Done"}
-            colorId={columnColors.done ?? null}
-            onColorChange={(colorId) => setColumnColor("done", colorId)}
-            canRename={canRename}
-            onRename={(title) => setColumnTitle("done", title)}
-            workOrderCardContext={workOrderCardContext}
-            onOpenWorkOrder={onOpenWorkOrder}
-          />
-        </div>
-      ) : null}
+      <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
+        <DoneColumn
+          orders={doneOrders}
+          title={columnTitles.done ?? "Done"}
+          colorId={columnColors.done ?? null}
+          onColorChange={(colorId) => setColumnColor("done", colorId)}
+          canRename={canRename}
+          onRename={(title) => setColumnTitle("done", title)}
+          workOrderCardContext={workOrderCardContext}
+          onOpenWorkOrder={onOpenWorkOrder}
+        />
+      </div>
     </WorkOrderKanbanBoard>
-  );
-}
-
-/**
- * Terminal lane. Like Backlog, it is not backed by an app: it collects the
- * work orders that completed, were rejected, or were canceled.
- */
-function DoneColumn({
-  orders,
-  title,
-  colorId,
-  onColorChange,
-  canRename,
-  onRename,
-  workOrderCardContext,
-  onOpenWorkOrder,
-}: {
-  orders: FactoriesWorkOrder[];
-  title: string;
-  colorId: LineBoardColumnColorId | null;
-  onColorChange: (colorId: LineBoardColumnColorId | null) => void;
-  canRename: boolean;
-  onRename: (title: string) => void;
-  workOrderCardContext: WorkOrderCardContext;
-  onOpenWorkOrder: (orderId: string) => void;
-}) {
-  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
-
-  return (
-    <WorkOrderBoardLane
-      title={title}
-      label={title}
-      count={orders.length}
-      tone="done"
-      surfaceClassName={surfaceClassName}
-      emptyDescription="No finished work orders yet."
-      canRename={canRename}
-      onRename={onRename}
-      titleTestId="lines-column-title-done"
-      testId="lines-done-column"
-      actions={
-        <ColumnLaneMenu title={title} testId="lines-done-menu" colorId={colorId} onColorChange={onColorChange} />
-      }
-    >
-      <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-done-column-scroll">
-        {orders.map((order) => (
-          <li key={order.id}>
-            <LineBoardOrderCard
-              order={order}
-              workOrderCardContext={workOrderCardContext}
-              onOpenWorkOrder={onOpenWorkOrder}
-            />
-          </li>
-        ))}
-      </ul>
-    </WorkOrderBoardLane>
   );
 }
 
@@ -951,6 +892,59 @@ function BacklogColumn({
         onClose={onCloseSettings}
       />
     </>
+  );
+}
+
+function DoneColumn({
+  orders,
+  title,
+  colorId,
+  onColorChange,
+  canRename,
+  onRename,
+  workOrderCardContext,
+  onOpenWorkOrder,
+}: {
+  orders: FactoriesWorkOrder[];
+  title: string;
+  colorId: LineBoardColumnColorId | null;
+  onColorChange: (colorId: LineBoardColumnColorId | null) => void;
+  canRename: boolean;
+  onRename: (title: string) => void;
+  workOrderCardContext: WorkOrderCardContext;
+  onOpenWorkOrder: (orderId: string) => void;
+}) {
+  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
+
+  return (
+    <WorkOrderBoardLane
+      title={title}
+      label={title}
+      canRename={canRename}
+      onRename={onRename}
+      titleTestId="lines-column-title-done"
+      count={orders.length}
+      tone="done"
+      surfaceClassName={surfaceClassName}
+      emptyDescription="No work orders in Done."
+      className={surfaceClassName ? undefined : "bg-muted"}
+      actions={
+        <ColumnLaneMenu title={title} testId="lines-done-menu" colorId={colorId} onColorChange={onColorChange} />
+      }
+      testId="lines-done-column"
+    >
+      <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-done-column-scroll">
+        {orders.map((order) => (
+          <li key={order.id}>
+            <LineBoardOrderCard
+              order={order}
+              workOrderCardContext={workOrderCardContext}
+              onOpenWorkOrder={onOpenWorkOrder}
+            />
+          </li>
+        ))}
+      </ul>
+    </WorkOrderBoardLane>
   );
 }
 

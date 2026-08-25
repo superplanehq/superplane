@@ -115,14 +115,14 @@ describe("LinesPage Done column", () => {
     expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
   });
 
-  it("hides the Done column when the line ends with its own Done automation", () => {
+  it("keeps the bookend Done column when the line has its own Done automation", () => {
     const factory: FactoriesFactory = {
       ...REFUND_FACTORY,
       lines: (REFUND_FACTORY.lines ?? []).map(withPlanLinePhases),
     };
     renderBoard(factory);
 
-    expect(screen.queryByTestId("lines-done-column")).not.toBeInTheDocument();
-    expect(screen.getByTestId("lines-phase-column-2")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-done-column")).toBeInTheDocument();
+    expect(screen.queryByTestId("lines-phase-column-2")).not.toBeInTheDocument();
   });
 });

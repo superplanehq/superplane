@@ -5,7 +5,12 @@ import type {
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
-import { buildLinePhaseBoard, collectLineDoneOrders, lineBoardEndsWithDoneStep } from "./linePhaseRuns";
+import {
+  buildLinePhaseBoard,
+  collectLineDoneOrders,
+  lineBoardEndsWithDoneStep,
+  lineStageColumns,
+} from "./linePhaseRuns";
 
 const APPS = [
   { id: "app-plan", name: "plan" },
@@ -68,7 +73,7 @@ describe("buildLinePhaseBoard with a board Done column", () => {
     expect(board.flatMap((column) => column.runs)).toEqual([]);
   });
 
-  it("keeps a failed work order on the phase where it stopped", () => {
+  it("takes a failed work order off the phase columns", () => {
     const failed = closedOrder({
       id: "wo-failed",
       result: "RESULT_FAILED",
@@ -79,11 +84,11 @@ describe("buildLinePhaseBoard with a board Done column", () => {
 
     const board = buildLinePhaseBoard(LINE, [failed], APPS);
 
-    expect(board[1].runs).toHaveLength(1);
-    expect(board[1].runs[0].workOrderId).toBe("wo-failed");
+    expect(board.flatMap((column) => column.runs)).toEqual([]);
+    expect(collectLineDoneOrders([failed], LINE, board).map((entry) => entry.id)).toEqual(["wo-failed"]);
   });
 
-  it("keeps completed work orders on a line that ends with its own Done automation", () => {
+  it("moves completed work off a line that ends with its own Done automation", () => {
     const line: FactoriesFactoryLine = {
       id: "line-1",
       name: "poc",
@@ -94,7 +99,8 @@ describe("buildLinePhaseBoard with a board Done column", () => {
     const board = buildLinePhaseBoard(line, [done], [...APPS, { id: "app-done", name: "Done" }]);
 
     expect(lineBoardEndsWithDoneStep(board)).toBe(true);
-    expect(board[1].runs).toHaveLength(1);
+    expect(lineStageColumns(board).flatMap((column) => column.runs)).toEqual([]);
+    expect(collectLineDoneOrders([done], line, board).map((entry) => entry.id)).toEqual(["wo-done"]);
   });
 });
 
@@ -120,17 +126,16 @@ describe("collectLineDoneOrders", () => {
       updatedAt: "2026-08-11T13:00:00.000Z",
     });
 
-    const done = collectLineDoneOrders("line-1", [completed, rejected, canceled]);
+    const done = collectLineDoneOrders([completed, rejected, canceled], LINE);
 
     expect(done.map((entry) => entry.id)).toEqual(["wo-rejected", "wo-canceled", "wo-completed"]);
   });
 
-  it("leaves out failed orders, open orders, and orders of another line", () => {
-    const failed = closedOrder({ id: "wo-failed", result: "RESULT_FAILED", lineId: "line-1" });
+  it("leaves out open orders and orders of another line", () => {
     const otherLine = closedOrder({ id: "wo-other", result: "RESULT_COMPLETED", lineId: "line-other" });
     const open: FactoriesWorkOrder = { id: "wo-open", title: "Open", state: "STATE_OPEN", lineDispatches: [] };
 
-    const done = collectLineDoneOrders("line-1", [failed, otherLine, open]);
+    const done = collectLineDoneOrders([otherLine, open], LINE);
 
     expect(done).toEqual([]);
   });
@@ -138,7 +143,7 @@ describe("collectLineDoneOrders", () => {
   it("includes an order that closed before it reached a line", () => {
     const closedInBacklog = closedOrder({ id: "wo-backlog-closed", result: "RESULT_COMPLETED" });
 
-    const done = collectLineDoneOrders("line-1", [closedInBacklog]);
+    const done = collectLineDoneOrders([closedInBacklog], LINE);
 
     expect(done.map((entry) => entry.id)).toEqual(["wo-backlog-closed"]);
   });

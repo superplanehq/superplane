@@ -134,6 +134,28 @@ describe("buildLinePhaseBoard", () => {
     expect(workOrderIds(board)).toEqual(["wo-b", "wo-c", "wo-a", "wo-d"]);
   });
 
+  it("keeps closed work orders off the stage columns", () => {
+    const closed = {
+      ...order("wo-closed", "Closed", [
+        {
+          id: "e-closed",
+          line: { id: "line-1", name: "poc" },
+          step: "plan",
+          stepIndex: 0,
+          state: "STATE_FINISHED",
+          result: "RESULT_FAILED",
+          createdAt: "2026-08-11T12:00:00.000Z",
+          updatedAt: "2026-08-11T12:00:00.000Z",
+        },
+      ]),
+      state: "STATE_CLOSED" as const,
+    };
+
+    const board = buildLinePhaseBoard(LINE, [closed], APPS);
+
+    expect(workOrderIds(board)).toEqual([]);
+  });
+
   it("places a multi-step work order only in its furthest active step", () => {
     const orders = [
       order("wo-progress", "Progressing", [

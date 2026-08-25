@@ -21,7 +21,6 @@ import {
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
-import { withPlanLinePhases } from "../__fixtures__/lineMetricsPlanLine";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { LINE_LIST_METRICS_BY_ID } from "./lineListMetricsMockData";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
@@ -239,6 +238,34 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-back-to-list")).not.toBeInTheDocument();
     expect(screen.queryByTestId("line-intake-drawer")).not.toBeInTheDocument();
+  });
+
+  it("always shows a Done column after the line stages", () => {
+    renderBoard();
+
+    expect(screen.getByTestId("lines-column-title-backlog")).toHaveTextContent("Backlog");
+    expect(screen.getByTestId("lines-column-title-phase-0")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-column-title-phase-1")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-column-title-done")).toHaveTextContent("Done");
+    expect(screen.getByTestId("lines-done-column")).toHaveTextContent("No work orders in Done.");
+    expect(screen.queryByTestId("lines-column-title-phase-2")).not.toBeInTheDocument();
+  });
+
+  it("puts a closed work order in Done instead of the last stage", () => {
+    useFactoryWorkOrders.mockReturnValue({
+      data: [BOARD_DONE_REJECTED_ORDER],
+    });
+    renderBoard();
+
+    expect(
+      within(screen.getByTestId("lines-done-column")).getByText("Replace the refund batch exporter"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("lines-phase-column-0")).queryByText("Replace the refund batch exporter"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("lines-phase-column-1")).queryByText("Replace the refund batch exporter"),
+    ).not.toBeInTheDocument();
   });
 
   it("creates work orders from the backlog header plus", async () => {
@@ -514,20 +541,11 @@ describe("LinesPage board", () => {
 
   it("hides Edit on the Done column", async () => {
     const user = userEvent.setup();
-    const factory: FactoriesFactory = {
-      ...REFUND_FACTORY,
-      lines: (REFUND_FACTORY.lines ?? []).map(withPlanLinePhases),
-    };
-    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), factory);
+    renderBoard();
 
-    await user.click(screen.getByTestId("lines-phase-menu-2"));
-    expect(screen.queryByTestId("lines-phase-menu-2-edit")).not.toBeInTheDocument();
-    expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent(
-      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, "app-refund-done", {
-        from: "lines",
-        lineId: REFUND_LINE_PLAN_ID,
-      }),
-    );
+    await user.click(screen.getByTestId("lines-done-menu"));
+    expect(screen.queryByTestId("lines-done-menu-edit")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lines-done-create")).not.toBeInTheDocument();
   });
 
   it("hides the phase path and shows work-order filters", async () => {
