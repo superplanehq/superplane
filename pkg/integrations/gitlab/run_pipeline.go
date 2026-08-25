@@ -448,7 +448,7 @@ func (r *RunPipeline) poll(ctx core.ActionHookContext) error {
 	}
 
 	channel := PipelineFailedOutputChannel
-	if metadata.Pipeline != nil && metadata.Pipeline.Status == PipelineStatusSuccess {
+	if pipeline.Status == PipelineStatusSuccess {
 		channel = PipelinePassedOutputChannel
 	}
 
