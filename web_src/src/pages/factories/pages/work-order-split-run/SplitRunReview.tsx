@@ -10,7 +10,9 @@ import {
   type WorkOrderCheckLevel,
   type WorkOrderCheckPresentation,
 } from "../../lib/workOrderChecks";
+import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import { WorkOrderCheckDialog } from "../../WorkOrderCheckDialog";
+import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
 import type { SplitRunFooter, SplitRunFooterAction } from "./splitRunFooter";
 import { SplitRunStopButton } from "./SplitRunStopButton";
 
@@ -29,50 +31,73 @@ const PILL_ICON = {
 } as const;
 
 /**
- * Action bar under the Description and Log reading columns. Source,
- * description, and checks carry the note. This row holds the next action.
+ * Sticky stack under Description and Log. A waiting note is its own
+ * card. The footer bar below it stays a separate bordered strip.
  */
 export function SplitRunReview({
   footer,
   className,
+  organizationId,
+  factoryKey,
   onStart,
   startBusy = false,
   startDisabled = false,
 }: {
   footer: SplitRunFooter;
   className?: string;
+  organizationId?: string;
+  factoryKey?: string;
   onStart?: () => void | Promise<void>;
   startBusy?: boolean;
   startDisabled?: boolean;
 }) {
+  const showCard = Boolean(footer.attentionCard && footer.note);
   const showBar = footer.sentence !== "" || footer.actions.length > 0;
+  if (!showCard && !showBar) {
+    return null;
+  }
+  const runHref =
+    organizationId && factoryKey && footer.run
+      ? getWorkOrderRunHref(organizationId, factoryKey, footer.run.appId, footer.run.runId)
+      : null;
 
   return (
-    <aside
-      className={cn("shrink-0 border-t border-border bg-background px-4 py-3 text-foreground", className)}
-      role="complementary"
-      aria-label="Work order status"
-      data-testid="split-run-review"
-    >
-      {showBar ? (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="min-w-0 text-[13px] leading-5 text-muted-foreground">{footer.sentence}</p>
-          {footer.actions.length > 0 ? (
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-              {footer.actions.map((action) => (
-                <FooterAction
-                  key={action.id}
-                  action={action}
-                  onStart={onStart}
-                  startBusy={startBusy}
-                  startDisabled={startDisabled}
-                />
-              ))}
-            </div>
-          ) : null}
-        </div>
+    <div className={cn("shrink-0", className)}>
+      {showCard && footer.note ? (
+        <SplitRunAttentionNote
+          note={footer.note}
+          tone={footer.kind === "failed" ? "failed" : "waiting"}
+          runHref={runHref}
+        />
       ) : null}
-    </aside>
+      {showBar ? (
+        <aside
+          className="border-t border-border bg-background px-4 py-3 text-foreground"
+          role="complementary"
+          aria-label="Work order status"
+          data-testid="split-run-review"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {footer.sentence !== "" ? (
+              <p className="min-w-0 text-[13px] leading-5 text-muted-foreground">{footer.sentence}</p>
+            ) : null}
+            {footer.actions.length > 0 ? (
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                {footer.actions.map((action) => (
+                  <FooterAction
+                    key={action.id}
+                    action={action}
+                    onStart={onStart}
+                    startBusy={startBusy}
+                    startDisabled={startDisabled}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </aside>
+      ) : null}
+    </div>
   );
 }
 

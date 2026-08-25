@@ -62,8 +62,8 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
     {
       key: "pr-closure",
       kind: "info",
-      headline: "Review the pull request",
-      body: "The Refund Processing line opened [PR #6812](https://github.com/superplanehq/superplane/pull/6812). When it merges, this work order completes automatically. If it closes without a merge, the work order is rejected.",
+      headline: "Listening for user review",
+      body: "This automation finished and opened [PR #6812](https://github.com/superplanehq/superplane/pull/6812). Tag `@superplaneagent` in comment to request changes. Task will automatically close when the pull request is closed or merged.",
       ctaLabel: "Review PR #6812",
       ctaUrl: "https://github.com/superplanehq/superplane/pull/6812",
       automation: { appId: "app-refund-verifier", appName: "PR Closure" },

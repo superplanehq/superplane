@@ -134,13 +134,24 @@ const UNKNOWN_OWNER: OrgUserDisplay = {
   initials: getUserInitials(UNKNOWN_ORG_USER_NAME) || "U",
 };
 
-const IMPLEMENT_FAILED_NOTE: WorkOrderStatusNotePresentation = {
-  key: "implement-failed",
-  headline: "Implement did not pass",
-  text: "Backend tests failed on the reconciliation worker. The implement step stopped. Open the run to see the diagnosis, then dispatch the line again.",
-  cta: { label: "Open failed run", href: "https://superplanehq.semaphoreci.com/" },
-  source: { name: "Implementation" },
-};
+function failedFooterNote(current: FactoriesWorkOrderExecution | undefined): WorkOrderStatusNotePresentation {
+  const step = current?.step?.trim();
+  return {
+    key: "step-failed",
+    headline: step ? `${step} did not pass` : "The run did not pass",
+    text: "Open the run to see what failed. Then start the line again.",
+    cta: { label: "Review the run" },
+  };
+}
+
+function footerRun(current: FactoriesWorkOrderExecution | undefined): { appId: string; runId: string } | undefined {
+  const appId = current?.run?.appId;
+  const runId = current?.run?.id;
+  if (!appId || !runId) {
+    return undefined;
+  }
+  return { appId, runId };
+}
 
 const WAITING_FALLBACK_NOTE: WorkOrderStatusNotePresentation = {
   key: "waiting-person",
@@ -282,20 +293,37 @@ function reviewSurfaces(
   if (displayStatus === "draft") {
     return surfaces(buildSplitRunFooter({ kind: "draft", note: draftFooterNote(order) }), [], checks);
   }
-  if (implementFailed) {
+  if (implementFailed || current?.result === "RESULT_FAILED") {
+    const note = failedFooterNote(current);
     return surfaces(
-      buildSplitRunFooter({ kind: "failed", note: IMPLEMENT_FAILED_NOTE }),
-      [IMPLEMENT_FAILED_NOTE],
+      buildSplitRunFooter({ kind: "failed", note, attentionCard: true, run: footerRun(current) }),
+      [note],
       checks,
     );
   }
   if (displayStatus === "waiting") {
     const notes = presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
-    return surfaces(buildSplitRunFooter({ kind: "waiting", note: notes[0] ?? WAITING_FALLBACK_NOTE }), notes, checks);
+    return surfaces(
+      buildSplitRunFooter({
+        kind: "waiting",
+        note: notes[0] ?? WAITING_FALLBACK_NOTE,
+        attentionCard: notes.length > 0,
+      }),
+      notes,
+      checks,
+    );
   }
   if (column === "implement" && current?.state === "STATE_PENDING") {
     const notes = presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
-    return surfaces(buildSplitRunFooter({ kind: "waiting", note: notes[0] ?? WAITING_FALLBACK_NOTE }), notes, checks);
+    return surfaces(
+      buildSplitRunFooter({
+        kind: "waiting",
+        note: notes[0] ?? WAITING_FALLBACK_NOTE,
+        attentionCard: notes.length > 0,
+      }),
+      notes,
+      checks,
+    );
   }
   if (displayStatus === "running") {
     return surfaces(buildSplitRunFooter({ kind: "running", note: runningFooterNote(current) }), [], checks);

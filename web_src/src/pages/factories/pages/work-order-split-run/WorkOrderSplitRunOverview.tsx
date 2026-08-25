@@ -72,7 +72,14 @@ export function WorkOrderSplitRunOverview({
           ) : null}
         </div>
         {footer ? (
-          <SplitRunReview footer={footer} onStart={onStart} startBusy={startBusy} startDisabled={startDisabled} />
+          <SplitRunReview
+            footer={footer}
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            onStart={onStart}
+            startBusy={startBusy}
+            startDisabled={startDisabled}
+          />
         ) : null}
       </div>
 

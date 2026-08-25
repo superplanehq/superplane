@@ -19,7 +19,7 @@ const FAILED_NOTE = {
   key: "implement-failed",
   headline: "Implement did not pass",
   text: "Backend tests failed on the reconciliation worker.",
-  cta: { label: "Open failed run", href: "https://superplanehq.semaphoreci.com/" },
+  cta: { label: "Review the run" },
   source: { name: "Implementation" },
 };
 
@@ -57,17 +57,37 @@ describe("buildSplitRunFooter", () => {
       "Stop as Completed",
       "Stop and return to Draft",
     ]);
+    expect(SPLIT_RUN_STOP_CHOICES.map((choice) => choice.actionLabel)).toEqual([
+      "Stop & Cancel",
+      "Mark as Complete",
+      "Return to Draft",
+    ]);
+    expect(SPLIT_RUN_STOP_CHOICES.map((choice) => choice.description)).toEqual([
+      "Marks this task as Canceled",
+      "Marks this task as Completed",
+      "Returns this task to Backlog",
+    ]);
   });
 
   it("keeps a waiting note off the bar and shows Stop", () => {
     const footer = buildSplitRunFooter({ kind: "waiting", note: PR_NOTE });
 
+    expect(footer.attentionCard).toBeUndefined();
     expect(footer.note).toEqual({
       headline: "Review the pull request",
       text: "Merge #6812 to continue Verify.",
       sourceName: "PR Closure",
+      cta: PR_NOTE.cta,
     });
     expect(footer.sentence).toBe("This work order needs attention.");
+    expect(footer.actions).toEqual([{ id: "stop", kind: "stop", label: "Stop", emphasis: "quiet" }]);
+  });
+
+  it("flags a visible waiting note as an attention card", () => {
+    const footer = buildSplitRunFooter({ kind: "waiting", note: PR_NOTE, attentionCard: true });
+
+    expect(footer.attentionCard).toBe(true);
+    expect(footer.note?.cta).toEqual(PR_NOTE.cta);
     expect(footer.actions).toEqual([{ id: "stop", kind: "stop", label: "Stop", emphasis: "quiet" }]);
   });
 
@@ -80,9 +100,11 @@ describe("buildSplitRunFooter", () => {
   });
 
   it("treats a failed implement as a run note plus Stop", () => {
-    const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE });
+    const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE, attentionCard: true });
 
+    expect(footer.attentionCard).toBe(true);
     expect(footer.note?.headline).toBe("Implement did not pass");
+    expect(footer.note?.cta?.label).toBe("Review the run");
     expect(footer.sentence).toBe("This work order needs attention.");
     expect(footer.actions).toEqual([{ id: "stop", kind: "stop", label: "Stop", emphasis: "quiet" }]);
   });

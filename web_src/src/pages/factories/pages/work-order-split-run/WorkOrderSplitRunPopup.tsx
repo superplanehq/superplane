@@ -40,6 +40,7 @@ type WorkOrderSplitRunBodyProps = {
 export function WorkOrderSplitRunBody({
   organizationId,
   factoryId,
+  factoryKey,
   orderId,
   fixture,
   canvasEditHref,
@@ -99,6 +100,8 @@ export function WorkOrderSplitRunBody({
         </ol>
         <SplitRunReview
           footer={fixture.footer}
+          organizationId={organizationId}
+          factoryKey={factoryKey}
           onStart={fixture.footer.kind === "draft" ? onDispatch : undefined}
           startBusy={isDispatching}
           startDisabled={!canDispatch}

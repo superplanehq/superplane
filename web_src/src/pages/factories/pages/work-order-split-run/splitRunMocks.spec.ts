@@ -160,9 +160,10 @@ describe("splitRunFixtureForWorkOrder", () => {
       }),
     );
     expect(fixture.footerTone).toBe("waiting");
-    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Review the pull request"]);
+    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Listening for user review"]);
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
-    expect(fixture.footer.note?.headline).toBe("Review the pull request");
+    expect(fixture.footer.note?.headline).toBe("Listening for user review");
+    expect(fixture.footer.attentionCard).toBe(true);
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Stop"]);
     expect(fixture.checks).toEqual([]);
   });
@@ -183,6 +184,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.footerTone).toBe("waiting");
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.footer.note?.headline).toBe("A person must act");
+    expect(fixture.footer.attentionCard).toBeUndefined();
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Stop"]);
   });
 
@@ -375,7 +377,8 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.phases.at(-1)?.canvasSteps.at(-1)?.status).toBe("failed");
     expect(fixture.footerTone).toBe("failed");
     expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Implement did not pass"]);
-    expect(fixture.waitingNotes[0]?.cta?.label).toBe("Open failed run");
+    expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review the run");
+    expect(fixture.footer.attentionCard).toBe(true);
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Stop"]);
     expect(fixture.checks).toEqual([]);
   });

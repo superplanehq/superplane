@@ -3,12 +3,13 @@ import { CircleCheck, CircleX, MessageCircleQuestion, Timer, type LucideIcon } f
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
 
 import { getWorkOrderDisplayStatus } from "./workOrderProgress";
+import { presentWorkOrderStatusNotes } from "./workOrderStatusNote";
 
 /** Why a waiting work order needs a person. Matches the Overview redesign. */
 export type WorkOrderAttentionReason = "approval" | "question" | "failed" | "stalled";
 
 export const WORK_ORDER_ATTENTION_LABEL: Record<WorkOrderAttentionReason, string> = {
-  approval: "Approval needed",
+  approval: "Review needed",
   question: "Agent question",
   failed: "Run failed",
   stalled: "No progress",
@@ -30,9 +31,9 @@ export const WORK_ORDER_ATTENTION_ICON: Record<WorkOrderAttentionReason, LucideI
 
 /**
  * Maps a work order to an attention reason. Closed failed orders and
- * waiting orders with a failed latest step are Run failed. Other waiting
- * orders use status-note wording, else No progress. Other statuses return
- * null.
+ * waiting orders with a failed latest step are Run failed. A visible
+ * status note is Review needed. Waiting with no note is No progress.
+ * Other statuses return null. The note body is not classified.
  */
 export function getWorkOrderAttentionReason(order: FactoriesWorkOrder): WorkOrderAttentionReason | null {
   const status = getWorkOrderDisplayStatus(order);
@@ -48,16 +49,8 @@ export function getWorkOrderAttentionReason(order: FactoriesWorkOrder): WorkOrde
     return "failed";
   }
 
-  const noteText = (order.statusNotes ?? [])
-    .flatMap((note) => [note.key, note.headline, note.body, note.kind])
-    .filter((part): part is string => Boolean(part))
-    .join(" ")
-    .toLowerCase();
-
-  if (/\b(question|answer)\b/.test(noteText) || noteText.includes("agent")) {
-    return "question";
-  }
-  if (/\b(pr|pull request|review|approv)/.test(noteText)) {
+  const notes = presentWorkOrderStatusNotes(order.statusNotes, status);
+  if (notes.length > 0) {
     return "approval";
   }
 

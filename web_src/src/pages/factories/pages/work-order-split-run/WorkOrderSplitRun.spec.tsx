@@ -10,10 +10,14 @@ import { TooltipProvider } from "@/ui/tooltip";
 
 import {
   DRAFT_WORK_ORDER,
+  FACTORIES_ORGANIZATION_ID,
   FAILED_WORK_ORDER,
   INGEST_DRAFT_WORK_ORDER,
+  LINE_RUN_IMPLEMENT_FAILED_ID,
   OPEN_WORK_ORDER,
+  PRIMARY_FACTORY_KEY,
 } from "../../__fixtures__/factoryPageResponses";
+import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../__fixtures__/lineMetricsBoardOrders";
 import {
   LINE_BOARD_DONE_RECEIPTS_ORDER,
   LINE_BOARD_VERIFY_ENUM_ORDER,
@@ -363,27 +367,70 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByRole("heading", { name: "Log" })).toBeInTheDocument();
   });
 
+  it("pins a review note above Stop and keeps Update manually off the footer", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER) });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    const footer = screen.getByTestId("split-run-review");
+    expect(note.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(note).getByRole("heading", { name: "Listening for user review" })).toBeInTheDocument();
+    expect(note).toHaveTextContent("This automation finished and opened PR #6812.");
+    expect(note).toHaveTextContent("Tag @superplaneagent in comment to request changes.");
+    expect(note).toHaveTextContent("Task will automatically close when the pull request is closed or merged.");
+    expect(within(note).getByRole("link", { name: "Review PR #6812" })).toHaveAttribute(
+      "href",
+      "https://github.com/superplanehq/superplane/pull/6812",
+    );
+    expect(within(note).queryByText("PR Closure")).not.toBeInTheDocument();
+    expect(within(note).queryByText(/ago/)).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: /Update manually/ })).not.toBeInTheDocument();
+    expect(within(footer).queryByRole("heading", { name: "Listening for user review" })).not.toBeInTheDocument();
+    expect(within(footer).getByText("This work order needs attention.")).toBeInTheDocument();
+    expect(within(footer).getByRole("button", { name: "Stop & Cancel" })).toBeInTheDocument();
+  });
+
+  it("pins a default failed note above Stop with a Review the run link", () => {
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryKey: PRIMARY_FACTORY_KEY,
+      fixture: splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER),
+    });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    const footer = screen.getByTestId("split-run-review");
+    expect(within(note).getByRole("heading", { name: "Implement did not pass" })).toBeInTheDocument();
+    expect(within(note).getByText(/Open the run to see what failed/)).toBeInTheDocument();
+    expect(within(note).getByRole("link", { name: "Review the run" })).toHaveAttribute(
+      "href",
+      expect.stringContaining(LINE_RUN_IMPLEMENT_FAILED_ID),
+    );
+    expect(within(footer).getByText("This work order needs attention.")).toBeInTheDocument();
+    expect(within(footer).getByRole("button", { name: "Stop & Cancel" })).toBeInTheDocument();
+  });
+
   it("offers one Stop control with Canceled as the default outcome", async () => {
     const user = userEvent.setup();
     renderSplitRun();
 
     const footer = screen.getByTestId("split-run-review");
     expect(within(footer).getByTestId("split-run-stop")).toHaveClass("bg-primary", "overflow-hidden", "rounded-md");
-    expect(within(footer).getByRole("button", { name: "Stop" })).toBeInTheDocument();
+    expect(within(footer).getByRole("button", { name: "Stop & Cancel" })).toBeInTheDocument();
     expect(within(footer).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
     expect(within(footer).queryByRole("button", { name: "Stop and send to Draft" })).not.toBeInTheDocument();
 
     await user.click(within(footer).getByRole("button", { name: "Choose how to stop" }));
     const menu = await screen.findByRole("menu");
     expect(within(menu).getByRole("menuitem", { name: /Stop as Canceled/ })).toHaveAttribute("data-selected", "true");
-    expect(within(menu).getByText("End the work order. Do not complete it.")).toBeInTheDocument();
+    expect(within(menu).getByText("Marks this task as Canceled")).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: /Stop as Completed/ })).toHaveAttribute("data-selected", "false");
     expect(within(menu).getByRole("menuitem", { name: /Stop and return to Draft/ })).toHaveAttribute(
       "data-selected",
       "false",
     );
+    expect(within(menu).getByText("Returns this task to Backlog")).toBeInTheDocument();
 
     await user.click(within(menu).getByRole("menuitem", { name: /Stop as Completed/ }));
+    expect(within(footer).getByRole("button", { name: "Mark as Complete" })).toBeInTheDocument();
     await user.click(within(footer).getByRole("button", { name: "Choose how to stop" }));
     expect(
       within(await screen.findByRole("menu")).getByRole("menuitem", { name: /Stop as Completed/ }),

@@ -15,25 +15,29 @@ export const DEFAULT_SPLIT_RUN_STOP_CHOICE: SplitRunStopChoice = "canceled";
 export const SPLIT_RUN_STOP_CHOICES: {
   id: SplitRunStopChoice;
   label: string;
+  actionLabel: string;
   description: string;
   status: "cancelled" | "completed" | "draft";
 }[] = [
   {
     id: "canceled",
     label: "Stop as Canceled",
-    description: "End the work order. Do not complete it.",
+    actionLabel: "Stop & Cancel",
+    description: "Marks this task as Canceled",
     status: "cancelled",
   },
   {
     id: "completed",
     label: "Stop as Completed",
-    description: "Mark the work order as done.",
+    actionLabel: "Mark as Complete",
+    description: "Marks this task as Completed",
     status: "completed",
   },
   {
     id: "draft",
     label: "Stop and return to Draft",
-    description: "Stop the run. Keep the work order as a draft.",
+    actionLabel: "Return to Draft",
+    description: "Returns this task to Backlog",
     status: "draft",
   },
 ];
@@ -49,6 +53,9 @@ export interface SplitRunFooterNote {
   headline: string;
   text?: string;
   sourceName?: string;
+  sourceAppId?: string;
+  updatedAt?: string;
+  cta?: { label: string; href?: string };
 }
 
 export interface SplitRunFooter {
@@ -56,6 +63,9 @@ export interface SplitRunFooter {
   sentence: string;
   actions: SplitRunFooterAction[];
   note?: SplitRunFooterNote;
+  /** When true, the waiting or failed note renders as a sticky strip above Stop. */
+  attentionCard?: boolean;
+  run?: { appId: string; runId: string };
 }
 
 const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
@@ -65,22 +75,28 @@ const STOP: SplitRunFooterAction = { id: "stop", kind: "stop", label: "Stop", em
 export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFooterNote {
   return {
     headline: note.headline,
-    text: note.text || undefined,
-    sourceName: note.source?.name,
+    ...(note.text ? { text: note.text } : {}),
+    ...(note.source?.name ? { sourceName: note.source.name } : {}),
+    ...(note.source?.appId ? { sourceAppId: note.source.appId } : {}),
+    ...(note.updatedAt ? { updatedAt: note.updatedAt } : {}),
+    ...(note.cta ? { cta: note.cta } : {}),
   };
 }
 
 /**
  * The footer is the action bar under Description and Log. Draft keeps
- * Reject and Start. Implement and Verify keep Stop. Review and failed-run
- * links stay off this bar.
+ * Reject and Start. Implement and Verify keep Stop. A visible waiting
+ * note sits above Stop as an attention card.
  */
 export function buildSplitRunFooter(input: {
   kind: SplitRunFooterKind;
   note?: WorkOrderStatusNotePresentation;
   doneSummary?: string;
+  attentionCard?: boolean;
+  run?: { appId: string; runId: string };
 }): SplitRunFooter {
   const note = input.note ? toFooterNote(input.note) : undefined;
+  const attentionCard = input.attentionCard || undefined;
   if (input.kind === "draft") {
     return { kind: "draft", sentence: "This work order is a draft.", note, actions: [REJECT, START] };
   }
@@ -92,6 +108,8 @@ export function buildSplitRunFooter(input: {
       kind: input.kind,
       sentence: "This work order needs attention.",
       note,
+      attentionCard,
+      run: input.run,
       actions: [STOP],
     };
   }

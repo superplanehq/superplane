@@ -96,7 +96,7 @@ describe("setup factory line apps", () => {
     expect(pr).toMatch(/sourceId: attach-pr-artifact[\s\S]*targetId: set-pr-closure-note/);
     expect(pr).toContain("component: setWorkOrderStatusNote");
     expect(pr).toContain("noteKey: pr-closure");
-    expect(pr).toContain("headline: Review the pull request");
+    expect(pr).toContain("headline: Listening for user review");
     expect(pr).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data.html_url }}'");
     expect(pr).toContain("showOnlyWhenWaiting: true");
   });

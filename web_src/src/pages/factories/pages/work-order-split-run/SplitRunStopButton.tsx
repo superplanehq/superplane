@@ -9,8 +9,6 @@ import {
 import { Check, ChevronDown } from "lucide-react";
 import { useState } from "react";
 
-import { getWorkOrderDisplayStatusMeta } from "../../lib/workOrderProgress";
-import { WorkOrderStatusDot } from "../../workOrders/WorkOrderStatusDot";
 import { DEFAULT_SPLIT_RUN_STOP_CHOICE, SPLIT_RUN_STOP_CHOICES, type SplitRunStopChoice } from "./splitRunFooter";
 
 const SEGMENT_CLASSNAME =
@@ -22,6 +20,7 @@ const SEGMENT_CLASSNAME =
  */
 export function SplitRunStopButton() {
   const [choice, setChoice] = useState<SplitRunStopChoice>(DEFAULT_SPLIT_RUN_STOP_CHOICE);
+  const selected = SPLIT_RUN_STOP_CHOICES.find((item) => item.id === choice) ?? SPLIT_RUN_STOP_CHOICES[0];
 
   return (
     <div
@@ -29,7 +28,7 @@ export function SplitRunStopButton() {
       data-testid="split-run-stop"
     >
       <button type="button" className={cn(SEGMENT_CLASSNAME, "px-3")} data-testid="split-run-footer-stop">
-        Stop
+        {selected.actionLabel}
       </button>
       <span className="w-px self-stretch bg-primary-foreground/25" aria-hidden />
       <DropdownMenu>
@@ -55,13 +54,9 @@ export function SplitRunStopButton() {
                   data-testid={`split-run-stop-${item.id}`}
                   onSelect={() => setChoice(item.id)}
                 >
-                  <span className="mt-0.5 flex w-3.5 shrink-0 justify-center">
-                    {selected ? <Check className="size-3.5" aria-hidden /> : null}
+                  <span className="mt-0.5 flex w-3.5 shrink-0 justify-center" aria-hidden>
+                    {selected ? <Check className="size-3.5" /> : null}
                   </span>
-                  <WorkOrderStatusDot
-                    colorClassName={getWorkOrderDisplayStatusMeta(item.status).dotClassName}
-                    aria-hidden
-                  />
                   <span className="flex min-w-0 flex-col gap-0.5">
                     <span className="text-[13px] font-medium text-foreground">{item.label}</span>
                     <span className="text-[12px] leading-4 text-muted-foreground">{item.description}</span>
