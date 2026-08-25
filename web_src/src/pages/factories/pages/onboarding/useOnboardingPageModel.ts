@@ -270,6 +270,7 @@ export function useOnboardingPageModel(args: {
     organizationId: args.organizationId,
     factoryId: args.factoryId,
     factoryKey: args.factoryKey,
+    factory: args.factory,
     setup,
     finish,
   });
