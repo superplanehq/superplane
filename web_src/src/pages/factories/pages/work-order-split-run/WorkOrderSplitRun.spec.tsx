@@ -8,9 +8,20 @@ import { describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { DRAFT_WORK_ORDER, FAILED_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
-import { OPEN_WORK_ORDER_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
+import {
+  DRAFT_WORK_ORDER,
+  FAILED_WORK_ORDER,
+  INGEST_DRAFT_WORK_ORDER,
+  OPEN_WORK_ORDER,
+} from "../../__fixtures__/factoryPageResponses";
+import {
+  LINE_BOARD_DONE_RECEIPTS_ORDER,
+  LINE_BOARD_VERIFY_ENUM_ORDER,
+} from "../../__fixtures__/lineMetricsFactoriesFixture";
+import { OPEN_WORK_ORDER_CHECKS, VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
+import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
+import { buildSplitRunFooter } from "./splitRunFooter";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 function renderPopup(props: ComponentProps<typeof WorkOrderSplitRunPopup>) {
@@ -31,45 +42,138 @@ function renderSplitRun() {
   return renderPopup({ fixture: SPLIT_RUN_RUNNING });
 }
 
+async function openLogTab(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("tab", { name: "Log" }));
+}
+
 describe("WorkOrderSplitRunPopup", () => {
-  it("does not link to a work order page", () => {
-    renderPopup({ fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER) });
+  it("does not put an Open work order link next to close", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER),
+    });
+
+    expect(screen.queryByTestId("split-run-open-work-order")).not.toBeInTheDocument();
 
     expect(screen.queryByRole("link", { name: "Open work order" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 
-  it("collapses finished steps and expands the running component stream", () => {
+  it("collapses finished steps and expands the running component stream", async () => {
+    const user = userEvent.setup();
     renderSplitRun();
 
     const dialog = screen.getByTestId("work-order-split-run");
     expect(within(dialog).getByRole("heading", { name: "Add refund reconciliation test" })).toBeInTheDocument();
-    expect(within(dialog).queryByTestId("split-run-review")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("tab", { name: "Description" })).toBeInTheDocument();
+    const runningDot = within(dialog).getByTestId("split-run-log-tab-dot");
+    expect(runningDot).toHaveAttribute("title", "Running");
+    expect(runningDot.querySelector(".animate-ping")).toBeTruthy();
+    expect(within(dialog).getByTestId("split-run-review")).toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Log" })).toBeInTheDocument();
     expect(within(dialog).getByRole("region", { name: "Run" })).toBeInTheDocument();
 
     const backlog = screen.getByTestId("split-run-phase-backlog");
     expect(within(backlog).getByText("Backlog")).toBeInTheDocument();
+    expect(within(backlog).getByText("2s")).toBeInTheDocument();
     expect(within(backlog).getByRole("button", { name: "description.md" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stream-backlog")).not.toBeInTheDocument();
 
     const plan = screen.getByTestId("split-run-phase-plan");
-    expect(within(plan).getByText(/Refund Planner/)).toBeInTheDocument();
+    expect(within(plan).getAllByText(/Create plan/).length).toBeGreaterThan(0);
+    expect(within(plan).getByText("1m 12s")).toBeInTheDocument();
     expect(within(plan).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stream-plan")).not.toBeInTheDocument();
 
     const implement = screen.getByTestId("split-run-phase-implement");
-    expect(within(implement).getByText(/Refund Implementer/)).toBeInTheDocument();
+    expect(within(implement).getAllByText(/Implementation/).length).toBeGreaterThan(0);
+    expect(within(implement).getByText("4m")).toBeInTheDocument();
     expect(within(implement).getAllByRole("link", { name: /feature\/refund-retry/ }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("split-run-stream-implement")).toBeInTheDocument();
     expect(within(implement).queryByText("Started")).not.toBeInTheDocument();
     expect(within(implement).getAllByText("Create Branch").length).toBeGreaterThan(0);
-    expect(within(implement).getByText("Reading plan.md.")).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-line-create-branch")).getByText("Run Bash")).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-line-create-branch")).getByText(">")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-stream-line-create-branch")).getByTestId("split-run-node-indent"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-stream-line-create-branch")).queryByText("├──"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-stream-line-create-branch")).queryByText("└──"),
+    ).not.toBeInTheDocument();
+    const implementStream = screen.getByTestId("split-run-stream-implement");
+    const note = within(implementStream).getByText("Provide Plan");
+    expect(note.closest("li")).not.toHaveTextContent("├──");
+    expect(note.closest("li")).not.toHaveTextContent("└──");
+    expect(note.closest("li")).toHaveTextContent("bash");
+    expect(within(implementStream).getByText("Set Up Environment")).toBeInTheDocument();
+    expect(within(implementStream).getAllByText("✓").length).toBeGreaterThan(0);
+    expect(within(implementStream).queryByText(/superplaneagent@superplane.com/)).not.toBeInTheDocument();
+    await user.click(within(implementStream).getByText("Set Up Git User"));
+    expect(within(implementStream).getByText(/superplaneagent@superplane.com/)).toBeInTheDocument();
+    expect(
+      within(implementStream).queryByText(
+        "Now let's look at the messages file, factory_notification_consumer.go, and other referenced files.",
+      ),
+    ).not.toBeInTheDocument();
+    await user.click(within(implementStream).getByText("Implementation"));
+    expect(
+      within(implementStream).getByText(
+        "Now let's look at the messages file, factory_notification_consumer.go, and other referenced files.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-implement")).queryByText("├──")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-implement")).queryByText("└──")).not.toBeInTheDocument();
+    expect(within(implement).queryByText("did not run")).not.toBeInTheDocument();
 
     expect(screen.getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
-    expect(screen.getByText("Implementation")).toBeInTheDocument();
+    expect(screen.getAllByText("Implementation").length).toBeGreaterThan(0);
     expect(within(screen.getByTestId("run-overlay-compact-canvas")).getByText("Create Branch")).toBeInTheDocument();
     expect(screen.queryByText("Factory Lines")).not.toBeInTheDocument();
+  });
+
+  it("shows produced artifacts on the collapsed automation line", async () => {
+    const user = userEvent.setup();
+    renderSplitRun();
+
+    const plan = screen.getByTestId("split-run-phase-plan");
+    const planToggle = within(plan).getByRole("button", { name: /Create plan/ });
+    const planArtifacts = within(plan).getByTestId("split-run-phase-artifacts-plan");
+    expect(planToggle.parentElement).toBe(planArtifacts.parentElement);
+    expect(within(planArtifacts).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-stream-plan")).not.toBeInTheDocument();
+
+    await user.click(planToggle);
+
+    expect(within(plan).queryByTestId("split-run-phase-artifacts-plan")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-stream-plan")).getByRole("button", { name: "plan.md" }),
+    ).toBeInTheDocument();
+
+    const implement = screen.getByTestId("split-run-phase-implement");
+    const implementToggle = within(implement).getByRole("button", { name: /Implement/ });
+    const implementArtifacts = within(implement).getByTestId("split-run-phase-artifacts-implement");
+    expect(implementToggle.parentElement).toBe(implementArtifacts.parentElement);
+    expect(within(implementArtifacts).getByRole("link", { name: /feature\/refund-retry/ })).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-stream-implement")).not.toBeInTheDocument();
+
+    await user.click(implementToggle);
+
+    expect(within(implement).queryByTestId("split-run-phase-artifacts-implement")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-stream-implement")).getByRole("link", { name: /feature\/refund-retry/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows canvas artifacts on a collapsed automation before it is opened", () => {
+    renderSplitRun();
+
+    const plan = screen.getByTestId("split-run-phase-plan");
+    expect(screen.queryByTestId("split-run-stream-plan")).not.toBeInTheDocument();
+    expect(within(plan).getByTestId("split-run-phase-artifacts-plan")).toBeInTheDocument();
+    expect(within(plan).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
   });
 
   it("selects the canvas component when a log line is clicked", async () => {
@@ -115,7 +219,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(expand).toHaveAttribute("aria-label", "Open automation run");
   });
 
-  it("keeps every check pill on the owner and cost row for verify", () => {
+  it("puts risk score and code quality on the verify step", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(
         {
@@ -127,18 +231,17 @@ describe("WorkOrderSplitRunPopup", () => {
               line: { id: "line-1", name: "plan-and-implement" },
               state: "STATE_ACTIVE",
               stepExecutions: [
-                { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
                 {
                   id: "e-impl",
                   step: "Implement",
-                  stepIndex: 1,
+                  stepIndex: 0,
                   state: "STATE_FINISHED",
                   result: "RESULT_PASSED",
                 },
                 {
                   id: "e-verify",
                   step: "Verify",
-                  stepIndex: 2,
+                  stepIndex: 1,
                   state: "STATE_STARTED",
                   result: "RESULT_UNKNOWN",
                 },
@@ -150,12 +253,16 @@ describe("WorkOrderSplitRunPopup", () => {
       ),
     });
 
-    const meta = screen.getByTestId("popup-owner-time-cost");
-    expect(within(meta).getByTestId("split-run-checks")).toBeInTheDocument();
-    expect(within(meta).getByText("Risk review")).toBeInTheDocument();
-    expect(within(meta).getByText("Test coverage")).toBeInTheDocument();
-    expect(within(meta).getByText("Confidence score")).toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
+    const verifyChecks = screen.getByTestId("split-run-phase-checks-verify-1");
+    const risk = within(verifyChecks).getByRole("button", { name: /Risk score/ });
+    expect(risk).toHaveTextContent("Risk score");
+    expect(risk.className).toContain("bg-amber-500/10");
+    expect(risk.className).not.toContain("bg-red-700");
+    expect(within(verifyChecks).getByText("Code quality")).toBeInTheDocument();
+    expect(within(verifyChecks).queryByText("Test coverage")).not.toBeInTheDocument();
+    expect(within(verifyChecks).queryByText("Confidence score")).not.toBeInTheDocument();
+    expect(within(verifyChecks).queryByText("CI")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
   });
 
   it("pins the pull request review to the waiting implement log", () => {
@@ -169,11 +276,10 @@ describe("WorkOrderSplitRunPopup", () => {
             line: { id: "line-1", name: "plan-and-implement" },
             state: "STATE_FINISHED",
             stepExecutions: [
-              { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
               {
                 id: "e-impl",
                 step: "Implement",
-                stepIndex: 1,
+                stepIndex: 0,
                 state: "STATE_FINISHED",
                 result: "RESULT_PASSED",
               },
@@ -183,11 +289,7 @@ describe("WorkOrderSplitRunPopup", () => {
       }),
     });
 
-    const review = screen.getByTestId("split-run-review");
-    expect(review).toHaveTextContent("Review the pull request");
-    expect(review).toHaveTextContent("Next step");
-    expect(within(review).getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
   });
 
   it("opens a compact check in the analysis dialog", async () => {
@@ -220,11 +322,11 @@ describe("WorkOrderSplitRunPopup", () => {
 
     await user.click(screen.getByTestId("split-run-check-check-risk-review"));
 
-    expect(screen.getByRole("heading", { name: "Risk review" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Risk score" })).toBeInTheDocument();
     expect(screen.getByText(/Moderate risk: retry policy/)).toBeInTheDocument();
   });
 
-  it("hides the next-step footer when logs are complete and the order waits with no note", () => {
+  it("keeps the state bar when logs are complete and the order waits with no note", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({
         ...OPEN_WORK_ORDER,
@@ -250,96 +352,285 @@ describe("WorkOrderSplitRunPopup", () => {
       }),
     });
 
-    expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
-    expect(screen.queryByText("Needs attention")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
     expect(screen.queryByText("This work order needs attention from test test.")).not.toBeInTheDocument();
   });
 
-  it("hides the review strip when the work order has no note or checks", () => {
+  it("keeps the running log visible when the work order has no note or checks", () => {
     renderPopup({ fixture: { ...SPLIT_RUN_RUNNING, waitingNotes: [], checks: [] } });
 
-    expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Log" })).toBeInTheDocument();
   });
 
-  it("prompts a draft backlog card to start the next stage", () => {
+  it("offers one Stop control with Canceled as the default outcome", async () => {
+    const user = userEvent.setup();
+    renderSplitRun();
+
+    const footer = screen.getByTestId("split-run-review");
+    expect(within(footer).getByTestId("split-run-stop")).toHaveClass("bg-primary", "overflow-hidden", "rounded-md");
+    expect(within(footer).getByRole("button", { name: "Stop" })).toBeInTheDocument();
+    expect(within(footer).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+    expect(within(footer).queryByRole("button", { name: "Stop and send to Draft" })).not.toBeInTheDocument();
+
+    await user.click(within(footer).getByRole("button", { name: "Choose how to stop" }));
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getByRole("menuitem", { name: /Stop as Canceled/ })).toHaveAttribute("data-selected", "true");
+    expect(within(menu).getByText("End the work order. Do not complete it.")).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /Stop as Completed/ })).toHaveAttribute("data-selected", "false");
+    expect(within(menu).getByRole("menuitem", { name: /Stop and return to Draft/ })).toHaveAttribute(
+      "data-selected",
+      "false",
+    );
+
+    await user.click(within(menu).getByRole("menuitem", { name: /Stop as Completed/ }));
+    await user.click(within(footer).getByRole("button", { name: "Choose how to stop" }));
+    expect(
+      within(await screen.findByRole("menu")).getByRole("menuitem", { name: /Stop as Completed/ }),
+    ).toHaveAttribute("data-selected", "true");
+  });
+
+  it("opens a draft on the description tab and keeps the log collapsed", async () => {
+    const user = userEvent.setup();
     renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
 
-    const review = screen.getByTestId("split-run-review");
-    expect(review).toHaveTextContent("Start the next stage");
-    expect(within(review).getByRole("button", { name: "Dispatch" })).toBeDisabled();
-    expect(screen.queryByTestId("split-run-phase-backlog")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByTestId("split-run-work-order-tab").className).toContain("minmax(0,3fr)_minmax(0,2fr)");
+    expect(screen.getByTestId("split-run-work-order-tab")).toBeInTheDocument();
+    const pendingDot = screen.getByTestId("split-run-log-tab-dot");
+    expect(pendingDot).toHaveAttribute("title", "Pending");
+    expect(pendingDot.querySelector(".animate-ping")).toBeNull();
+    const source = screen.getByTestId("split-run-source");
+    expect(within(source).getByRole("img", { name: "Leonardo DiCaprio" })).toBeInTheDocument();
+    expect(within(source).getByText("Created manually")).toBeInTheDocument();
+    const descriptionFooter = within(screen.getByTestId("split-run-work-order-tab")).getByTestId("split-run-review");
+    expect(within(descriptionFooter).getByText("This work order is a draft.")).toBeInTheDocument();
+    const descriptionStart = within(descriptionFooter).getByRole("button", { name: "Start" });
+    const descriptionReject = within(descriptionFooter).getByRole("button", { name: "Reject" });
+    expect(descriptionReject.compareDocumentPosition(descriptionStart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(descriptionFooter).queryByText("Start this work order")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-overview-sidebar")).queryByTestId("split-run-review"),
+    ).not.toBeInTheDocument();
+    await openLogTab(user);
+    expect(screen.getByTestId("split-run-log-pane").className).toContain("minmax(0,3fr)_minmax(0,2fr)");
+    const logFooter = screen.getByTestId("split-run-review");
+    expect(within(logFooter).getByText("This work order is a draft.")).toBeInTheDocument();
+    const logStart = within(logFooter).getByRole("button", { name: "Start" });
+    const logReject = within(logFooter).getByRole("button", { name: "Reject" });
+    expect(logReject.compareDocumentPosition(logStart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const backlog = screen.getByTestId("split-run-phase-backlog");
+    expect(within(backlog).getByText(/Created manually/)).toBeInTheDocument();
+    expect(within(backlog).getByRole("button", { name: /Backlog/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("split-run-stream-backlog")).not.toBeInTheDocument();
+    expect(within(backlog).getAllByRole("button", { name: "description.md" }).length).toBeGreaterThan(0);
+    expect(screen.queryByText("On Issue Label")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
   });
 
-  it("dispatches the draft to the line from the next-step button", async () => {
-    const user = userEvent.setup();
-    const onDispatch = vi.fn().mockResolvedValue(undefined);
-
+  it("puts artifacts on the right and check analyses under the description", () => {
     renderPopup({
-      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
-      canDispatch: true,
-      onDispatch,
+      fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
     });
 
-    await user.click(within(screen.getByTestId("split-run-review")).getByRole("button", { name: "Dispatch" }));
-
-    expect(onDispatch).toHaveBeenCalledTimes(1);
+    const tab = screen.getByTestId("split-run-work-order-tab");
+    expect(within(tab).getByTestId("split-run-description")).toHaveTextContent(
+      "Webhook delivery stops after a transient provider error",
+    );
+    expect(within(tab).getByRole("button", { name: "Edit" })).toBeInTheDocument();
+    const sidebar = within(tab).getByTestId("split-run-overview-sidebar");
+    expect(within(sidebar).getByRole("heading", { name: "Source" })).toBeInTheDocument();
+    expect(within(sidebar).getByText("GitHub issues")).toBeInTheDocument();
+    expect(within(sidebar).getByRole("link", { name: "acme/payments-service#842" })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/payments-service/issues/842",
+    );
+    expect(within(sidebar).getByRole("heading", { name: "Artifacts" })).toBeInTheDocument();
+    expect(within(sidebar).getByText("plan.md")).toBeInTheDocument();
+    expect(within(sidebar).queryByText("PAY-842")).not.toBeInTheDocument();
+    expect(within(sidebar).queryByText("details.md")).not.toBeInTheDocument();
+    expect(within(tab).getByTestId("split-run-overview-checks")).toBeInTheDocument();
+    expect(within(tab).getByTestId("split-run-check-comment-wo-review-pay-842-confidence")).toHaveAttribute("open");
+    expect(within(tab).getByTestId("split-run-check-comment-check-risk-review")).not.toHaveAttribute("open");
+    expect(within(tab).getByTestId("split-run-check-comment-check-code-coverage")).not.toHaveAttribute("open");
+    expect(within(tab).getByText(/Moderate risk: retry policy/)).toBeInTheDocument();
+    expect(within(tab).getByText(/The change replaces the retry policy/)).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
   });
 
-  it("shows a failed implement diagnosis in the log footer", () => {
+  it("scores a review draft by how suitable the GitHub issue is for an agent", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]) });
+
+    const tab = screen.getByTestId("split-run-work-order-tab");
+    const check = within(tab).getByTestId("split-run-check-comment-wo-review-pay-842-confidence");
+    expect(check).toHaveAttribute("open");
+    expect(within(check).getByText("Confidence score")).toBeInTheDocument();
+    expect(within(check).getByText("High")).toBeInTheDocument();
+    expect(within(check).getByText("This issue is a good fit for an agent on this factory line.")).toBeInTheDocument();
+    expect(within(check).getByText(/The automation read this GitHub issue/)).toBeInTheDocument();
+    expect(within(check).getByText(/how suitable the work is for an agent/)).toBeInTheDocument();
+    expect(within(check).getByText(/retryable status codes and a hard attempt limit/)).toBeInTheDocument();
+  });
+
+  it("opens and closes a check with details and summary", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
+    });
+
+    const confidence = screen.getByTestId("split-run-check-comment-wo-review-pay-842-confidence");
+    const risk = screen.getByTestId("split-run-check-comment-check-risk-review");
+    const coverage = screen.getByTestId("split-run-check-comment-check-code-coverage");
+    expect(confidence).toHaveAttribute("open");
+    expect(risk).not.toHaveAttribute("open");
+    expect(coverage).not.toHaveAttribute("open");
+
+    await user.click(screen.getByTestId("split-run-check-comment-toggle-wo-review-pay-842-confidence"));
+    expect(confidence).not.toHaveAttribute("open");
+
+    await user.click(screen.getByTestId("split-run-check-comment-toggle-check-code-coverage"));
+    expect(coverage).toHaveAttribute("open");
+  });
+
+  it("keeps description checks collapsed when the work order is not a draft", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(
+        {
+          ...OPEN_WORK_ORDER,
+          title: "Add refund reason enum to schema",
+          lineDispatches: [
+            {
+              id: "dispatch-verify",
+              line: { id: "line-1", name: "plan-and-implement" },
+              state: "STATE_ACTIVE",
+              stepExecutions: [
+                {
+                  id: "e-verify",
+                  step: "Verify",
+                  stepIndex: 2,
+                  state: "STATE_STARTED",
+                  result: "RESULT_UNKNOWN",
+                },
+              ],
+            },
+          ],
+        },
+        { checks: OPEN_WORK_ORDER_CHECKS },
+      ),
+    });
+
+    await user.click(screen.getByRole("tab", { name: "Description" }));
+    expect(screen.getByTestId("split-run-check-comment-check-risk-review")).not.toHaveAttribute("open");
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the ingest confidence check on a downstream Description tab", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_ENUM_ORDER, { checks: VERIFY_STEP_CHECKS }),
+    });
+
+    await user.click(screen.getByRole("tab", { name: "Description" }));
+    const tab = screen.getByTestId("split-run-work-order-tab");
+    const check = within(tab).getByTestId(`split-run-check-comment-${LINE_BOARD_VERIFY_ENUM_ORDER.id}-confidence`);
+    expect(check).not.toHaveAttribute("open");
+    expect(within(check).getByText("Confidence score")).toBeInTheDocument();
+    expect(within(check).getByText(/fit for an agent on this factory line/)).toBeInTheDocument();
+    expect(within(tab).getByText("Risk score")).toBeInTheDocument();
+  });
+
+  it("shows the Ingest canvas when a GitHub automation created the draft", async () => {
+    const user = userEvent.setup();
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(INGEST_DRAFT_WORK_ORDER) });
+
+    await openLogTab(user);
+    expect(screen.getByText("Ingest")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-canvas-node-on-issue-labeled")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-canvas-node-on-issue-assigned")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-phase-backlog")).getAllByRole("button", { name: "description.md" }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("opens a done card on the description tab with the action footer", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER) });
+
+    expect(within(screen.getByTestId("split-run-work-order-tab")).getByTestId("split-run-review")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+  });
+
+  it("shows a failed implement stream with the action footer", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(FAILED_WORK_ORDER) });
 
-    const review = screen.getByTestId("split-run-review");
-    expect(review).toHaveTextContent("Implement did not pass");
-    expect(within(review).getByRole("link", { name: "Open failed run" })).toBeInTheDocument();
-    expect(review.className).toContain("status-failed-bg");
-    expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-stream-implement-0")).toBeInTheDocument();
   });
 
   it("opens the selected step canvas when a log row is clicked", async () => {
     const user = userEvent.setup();
     renderSplitRun();
 
-    await user.click(within(screen.getByTestId("split-run-phase-plan")).getByRole("button", { name: /Plan/ }));
+    await user.click(within(screen.getByTestId("split-run-phase-plan")).getByRole("button", { name: /Create plan/ }));
 
     expect(screen.getByTestId("split-run-stream-plan")).toBeInTheDocument();
     expect(within(screen.getByTestId("split-run-stream-plan")).queryByText("Started")).not.toBeInTheDocument();
     expect(within(screen.getByTestId("split-run-stream-plan")).getAllByText("Create Implementation Plan").length).toBe(
       1,
     );
-    expect(
-      within(screen.getByTestId("split-run-stream-plan")).getByText("Reading the work order description."),
-    ).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-plan")).queryByText("Clone Repo")).not.toBeInTheDocument();
+
+    await user.click(within(screen.getByTestId("split-run-stream-plan")).getByText("Agent - Plan for GH Issue"));
+    const planStream = screen.getByTestId("split-run-stream-plan");
+    expect(within(planStream).getByText("Clone Repo")).toBeInTheDocument();
+    expect(within(planStream).getAllByText("✓").length).toBeGreaterThan(0);
+    expect(within(planStream).queryByText(/Cloning into/)).not.toBeInTheDocument();
+    await user.click(within(planStream).getByText("Clone Repo"));
+    expect(within(planStream).getByText(/Cloning into/)).toBeInTheDocument();
+    expect(within(planStream).getByText("Provide description")).toBeInTheDocument();
+    expect(within(planStream).getByText("Write Implementation Plan")).toBeInTheDocument();
+    expect(within(planStream).getByText("Use plan as output")).toBeInTheDocument();
+    expect(within(planStream).getAllByText("bash").length).toBeGreaterThan(0);
+    expect(within(planStream).getByText("prompt")).toBeInTheDocument();
+    expect(within(planStream).queryByText("Let me examine the key reference files in detail.")).not.toBeInTheDocument();
+
+    await user.click(within(planStream).getByText("Write Implementation Plan"));
+    expect(within(planStream).getByText("Let me examine the key reference files in detail.")).toBeInTheDocument();
+    expect(within(planStream).getByRole("button", { name: "Ran 2 commands" })).toBeInTheDocument();
+    expect(within(planStream).queryByRole("button", { name: "Read 7 files, ran 35 commands" })).not.toBeInTheDocument();
+    expect(within(planStream).queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();
     expect(screen.getByText("Planning")).toBeInTheDocument();
     expect(screen.getAllByText("From GH issue?").length).toBeGreaterThan(0);
   });
 
-  it("opens a mapped plan-running work order on the plan canvas", () => {
+  it("opens a mapped implement-running work order on the implement canvas", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({
         ...OPEN_WORK_ORDER,
-        title: "Plan job",
+        title: "Implement job",
         lineDispatches: [
           {
             id: "dispatch-1",
             line: { id: "line-1", name: "plan-and-implement" },
             state: "STATE_ACTIVE",
             stepExecutions: [
-              { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
+              { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
             ],
           },
         ],
       }),
     });
 
-    expect(screen.getByRole("heading", { name: "Plan job" })).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-stream-plan-0")).toBeInTheDocument();
-    expect(screen.getByText("Planning")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Implement job" })).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-phase-ingest")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-phase-analyze")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-phase-plan")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-phase-score")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-stream-implement-0")).toBeInTheDocument();
+    expect(screen.getAllByText("Implementation").length).toBeGreaterThan(0);
     expect(screen.getAllByText("From GH issue?").length).toBeGreaterThan(0);
-    expect(screen.queryByTestId("split-run-phase-implement")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
   });
 
   it("highlights the PR Closure log for the selected canvas component", async () => {
@@ -349,6 +640,8 @@ describe("WorkOrderSplitRunPopup", () => {
         ...SPLIT_RUN_RUNNING,
         title: "Send refund receipts after provider confirm",
         lineStatus: "passed",
+        footer: buildSplitRunFooter({ kind: "done" }),
+        footerTone: "done",
         currentPhaseId: "done",
         phases: [
           ...SPLIT_RUN_RUNNING.phases.map((phase) => ({ ...phase, status: "passed" as const })),
@@ -365,6 +658,10 @@ describe("WorkOrderSplitRunPopup", () => {
         ],
       },
     });
+
+    await openLogTab(user);
+    expect(screen.queryByTestId("split-run-stream-done")).not.toBeInTheDocument();
+    await user.click(within(screen.getByTestId("split-run-phase-done")).getByRole("button", { name: /Done/ }));
 
     const stream = screen.getByTestId("split-run-stream-done");
     expect(within(stream).queryByText("Started")).not.toBeInTheDocument();

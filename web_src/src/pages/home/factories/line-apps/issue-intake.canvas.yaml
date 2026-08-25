@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Canvas
 metadata:
-  name: Issue Intake
+  name: Ingest
   description: Create a work order when an issue gets the factory label or is assigned to the SuperPlane agent.
 spec:
   edges:

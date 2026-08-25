@@ -1,4 +1,6 @@
-export type ReviewConfidenceBand = "High" | "Medium" | "Low";
+import { confidenceBandForScore as bandForConfidenceScore, type ConfidenceBand } from "../../../lib/confidenceScore";
+
+export type ReviewConfidenceBand = ConfidenceBand;
 
 export interface ReviewCandidateSection {
   number: string;
@@ -33,11 +35,11 @@ export interface ReviewCandidate {
   title: string;
   ticketBody: string;
   issue: ReviewIssue;
-  confidencePct: number;
+  confidenceScore: number;
   confidenceBand: ReviewConfidenceBand;
-  /** Three reasons SuperPlane can implement this ticket. */
+  /** Three reasons this issue is or is not a good fit for an agent. */
   reasons: [string, string, string];
-  /** Markdown implementation plan shown on the Plan tab. */
+  /** Markdown implementation plan attached as plan.md on Create plan. */
   planMarkdown: string;
   summary: string;
   readyNote: string;
@@ -45,48 +47,16 @@ export interface ReviewCandidate {
   noBlockingQuestions: string;
 }
 
-export type ReviewCandidateTab = "plan" | "ticket" | "analysis";
-
 export const REVIEW_CANDIDATE_COPY = {
-  tabsLabel: "Ticket review",
-  planTab: "Plan",
-  ticketTab: "Ticket",
-  analysisTab: "Analysis Run",
-  ticketSource: "GitHub Issues",
   ticketRepository: "acme/payments-service",
-  openIssue: "Open issue on GitHub",
-  opened: "Opened",
-  updated: "Updated",
-  author: "Author",
-  assignees: "Assignees",
-  noAssignees: "No assignees",
-  reasonsHeading: "Why SuperPlane can implement this",
-  planHeading: "Implementation plan",
-  planFile: "plan.md",
-  editPlan: "Edit",
-  donePlan: "Done",
-  planEditorLabel: "Plan markdown",
-  back: "Back to results",
-  approve: "Approve plan and start",
-  approved: "Plan approved",
 } as const;
 
 export function githubIssueUrl(repository: string, ticketKey: string): string {
   return `https://github.com/${repository}/issues/${ticketKey.replace(/\D/g, "")}`;
 }
 
-export function isReviewCandidateTab(value: string): value is ReviewCandidateTab {
-  return value === "plan" || value === "ticket" || value === "analysis";
-}
-
-export function confidenceBandForScore(confidencePct: number): ReviewConfidenceBand {
-  if (confidencePct >= 85) {
-    return "High";
-  }
-  if (confidencePct >= 75) {
-    return "Medium";
-  }
-  return "Low";
+export function confidenceBandForScore(score: number): ReviewConfidenceBand {
+  return bandForConfidenceScore(score);
 }
 
 export function implementationPlanMarkdown(parts: {
