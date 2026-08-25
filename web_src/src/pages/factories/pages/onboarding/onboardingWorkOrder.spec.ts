@@ -10,7 +10,7 @@ describe("createAndDispatchInitialWorkOrder", () => {
     const order = await createAndDispatchInitialWorkOrder({
       title: "Improve AGENTS.md",
       description: "Document the repository conventions.",
-      lineName: "Software delivery",
+      lineName: "plan-and-implement",
       createWorkOrder,
       dispatchWorkOrder,
     });
@@ -21,7 +21,7 @@ describe("createAndDispatchInitialWorkOrder", () => {
     });
     expect(dispatchWorkOrder).toHaveBeenCalledWith({
       orderId: "order-1",
-      lineName: "Software delivery",
+      lineName: "plan-and-implement",
     });
     expect(order).toEqual({ id: "order-1", number: 42 });
   });
@@ -33,7 +33,7 @@ describe("createAndDispatchInitialWorkOrder", () => {
       createAndDispatchInitialWorkOrder({
         title: "Improve AGENTS.md",
         description: "Document the repository conventions.",
-        lineName: "Software delivery",
+        lineName: "plan-and-implement",
         createWorkOrder: vi.fn().mockResolvedValue({ number: 42 }),
         dispatchWorkOrder,
       }),
