@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams 
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
+import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { Toaster } from "sonner";
 import "./App.css";
 
@@ -250,10 +251,14 @@ function OrganizationScope() {
   const { account } = useAccount();
 
   useEffect(() => {
-    if (account?.id && organizationId) {
+    if (account?.id && organizationId && !isReservedAppPathSegment(organizationId)) {
       recordLastVisitedOrganization(account.id, organizationId);
     }
   }, [account?.id, organizationId]);
+
+  if (isReservedAppPathSegment(organizationId)) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <PermissionsProvider>

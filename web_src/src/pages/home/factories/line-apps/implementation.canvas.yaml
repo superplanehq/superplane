@@ -83,6 +83,7 @@ spec:
 
           GITURL="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git"
           WORKDIR="repo"
+          rm -rf "$WORKDIR"
 
           git config --global user.email "superplaneagent@superplane.com"
           git config --global user.name "SuperPlane Agent"
@@ -112,6 +113,7 @@ spec:
         artifactType: branch
         name: '{{ $["Create Branch"].data.result.branch }}'
         orderId: '{{ order().id }}'
+        repository: '{{ install_params.appRepository }}'
       position:
         x: 1489
         'y': 480
@@ -172,10 +174,13 @@ spec:
           - name: Checkout Branch
             type: bash
             command: |-
+              set -euo pipefail
+              rm -rf repo
               git clone --depth 1 --branch "$BRANCH" "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
               cd repo
           - name: Set Up DCO Signing
             type: bash
+            workingDirectory: repo
             command: |-
               cat > .git/hooks/prepare-commit-msg <<'HOOK'
               printf '\n%s\n' "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>" >> "$1"
@@ -184,6 +189,7 @@ spec:
               chmod +x .git/hooks/prepare-commit-msg
           - name: Implementation
             type: prompt
+            workingDirectory: repo
             prompt: |-
               You are implementing a fix for a SuperPlane work order. The repository is already checked out in your current working directory, on the branch to work on.
 
@@ -203,9 +209,22 @@ spec:
               3/ Add tests where it makes sense.
           - name: Commit and Push
             type: bash
+            workingDirectory: repo
             command: |-
+              set -euo pipefail
+              echo "cwd=$(pwd -P)"
+              git status
+              git log --oneline -5
               git add -A
-              git commit -s -m "fix: implement issue #${ISSUE_NUMBER} via Claude Code" || echo "Nothing new to commit"
+              if ! git diff --cached --quiet; then
+                git commit -s -m "fix: implement issue #${ISSUE_NUMBER} via SuperPlane"
+              fi
+              if git rev-parse --verify "origin/${BRANCH}" >/dev/null 2>&1; then
+                if [ "$(git rev-list --count "origin/${BRANCH}..HEAD")" -eq 0 ]; then
+                  echo "No file changes and no unpushed commits on ${BRANCH}" >&2
+                  exit 1
+                fi
+              fi
               git push origin "$BRANCH"
               echo "Pushed implementation to $BRANCH"
       position:
@@ -263,10 +282,13 @@ spec:
           - name: Checkout Branch
             type: bash
             command: |-
+              set -euo pipefail
+              rm -rf repo
               git clone --depth 1 --branch "$BRANCH" "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
               cd repo
           - name: Set Up DCO Signing
             type: bash
+            workingDirectory: repo
             command: |-
               cat > .git/hooks/prepare-commit-msg <<'HOOK'
               printf '\n%s\n' "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>" >> "$1"
@@ -275,6 +297,7 @@ spec:
               chmod +x .git/hooks/prepare-commit-msg
           - name: Implementation
             type: prompt
+            workingDirectory: repo
             prompt: |-
               You are implementing a fix for a SuperPlane work order. The repository is already checked out in your current working directory, on the branch to work on.
 
@@ -293,9 +316,22 @@ spec:
               3/ Add tests where it makes sense.
           - name: Commit and Push
             type: bash
+            workingDirectory: repo
             command: |-
+              set -euo pipefail
+              echo "cwd=$(pwd -P)"
+              git status
+              git log --oneline -5
               git add -A
-              git commit -s -m "fix: implement work order via Claude Code" || echo "Nothing new to commit"
+              if ! git diff --cached --quiet; then
+                git commit -s -m "fix: implement work order via SuperPlane"
+              fi
+              if git rev-parse --verify "origin/${BRANCH}" >/dev/null 2>&1; then
+                if [ "$(git rev-list --count "origin/${BRANCH}..HEAD")" -eq 0 ]; then
+                  echo "No file changes and no unpushed commits on ${BRANCH}" >&2
+                  exit 1
+                fi
+              fi
               git push origin "$BRANCH"
               echo "Pushed implementation to $BRANCH"
       position:

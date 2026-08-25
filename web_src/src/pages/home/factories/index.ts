@@ -23,6 +23,7 @@ export {
   substituteInstallParams,
   wireFactoryIntegrations,
 } from "./materializeFactoryTemplate";
+export type { FactoryAgentRewrite } from "./materializeFactoryTemplate";
 
 function buildSoftwareFactory(): FactoryDefinition {
   return {

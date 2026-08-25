@@ -97,10 +97,12 @@ spec:
           - name: Clone Repo
             type: bash
             command: |-
+              rm -rf repo
               git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
               cd repo
           - name: Write Implementation Plan
             type: prompt
+            workingDirectory: repo
             prompt: |-
               You are writing an implementation plan for a SuperPlane Work Order. The repository is cloned out in your current working directory.
 
@@ -123,6 +125,7 @@ spec:
               else
                 jq -n '{error: "No plan produced at /tmp/plan.md"}' > "$SUPERPLANE_RESULT_FILE"
                 echo "No plan produced at /tmp/plan.md" >&2
+                exit 1
               fi
       position:
         x: 407
@@ -157,12 +160,14 @@ spec:
           - name: Clone Repo
             type: bash
             command: |-
+              rm -rf repo
               git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
               cd repo
               echo $ORDER_DESCRIPTION | base64 -d > /tmp/ORDER.md
               cat /tmp/ORDER.md
           - name: Write Implementation Plan
             type: prompt
+            workingDirectory: repo
             prompt: |-
               You are writing an implementation plan for a SuperPlane Work Order. The repository is cloned out in your current working directory.
 
@@ -184,6 +189,7 @@ spec:
               else
                 jq -n '{error: "No plan produced at /tmp/plan.md"}' > "$SUPERPLANE_RESULT_FILE"
                 echo "No plan produced at /tmp/plan.md" >&2
+                exit 1
               fi
       position:
         x: 735
