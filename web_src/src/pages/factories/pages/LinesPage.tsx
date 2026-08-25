@@ -34,7 +34,7 @@ import {
   type LinePhaseRunCard,
   type PhaseGlyphKind,
 } from "../lib/linePhaseRuns";
-import { isQueuedStepRow } from "../lib/workOrderExecutions";
+import { flattenWorkOrderExecutions, isQueuedStepRow } from "../lib/workOrderExecutions";
 import { latestDispatchForLine } from "../lib/workOrderNumberResolution";
 import {
   applyWorkOrderFilters,
@@ -68,7 +68,7 @@ import {
   createFactoryLinePath,
   editFactoryLinePath,
   factoryAppConfigurePath,
-  factoryAppSplitRunPath,
+  factoryAppRunPath,
   factoryHomePath,
   factoryLineDetailPath,
   intakeIdFromSearch,
@@ -198,10 +198,9 @@ export function LinesPage() {
                 return;
               }
               navigate(
-                factoryAppSplitRunPath(organizationId, factoryKey, ticket.appId, {
+                factoryAppRunPath(organizationId, factoryKey, ticket.appId, ticket.runId, {
                   from: "lines",
                   lineId: selectedLine.id,
-                  runId: ticket.runId,
                 }),
               );
             }}
@@ -513,7 +512,7 @@ function LineBoardSplitRunPopup({
   peekOrderId: string;
   peekOrder: FactoriesWorkOrder | undefined;
   canvasEditHref: (key: SplitRunCanvasKey) => string | undefined;
-  canvasExpandHref: (key: SplitRunCanvasKey) => string | undefined;
+  canvasExpandHref: CanvasExpandHref;
   canDispatch: boolean;
   canUpdate: boolean;
   isDispatching: boolean;
@@ -606,26 +605,31 @@ function canvasEditHrefForLine(
   };
 }
 
-function canvasExpandHrefForLine(
+export type CanvasExpandHref = (
+  key: SplitRunCanvasKey,
+  phase?: { appId?: string; runId?: string },
+) => string | undefined;
+
+export function canvasExpandHrefForLine(
   organizationId: string,
   factoryKey: string,
   line: FactoriesFactoryLine,
   apps: Array<{ id?: string; name?: string }>,
   order: FactoriesWorkOrder | undefined,
-): (key: SplitRunCanvasKey) => string | undefined {
+): CanvasExpandHref {
   const appIdByCanvas = canvasAppIdsForLine(line, apps);
 
-  return (key) => {
-    const appId = appIdByCanvas[key];
-    if (!appId) {
+  return (key, phase) => {
+    const appId =
+      phase?.appId ?? appIdByCanvas[key] ?? firstCanvasAppId(appIdByCanvas) ?? apps.find((app) => app.id)?.id;
+    const runId = phase?.runId ?? executionRunIdForCanvas(order, key, line.id, appId);
+    if (!appId || !runId) {
       return undefined;
     }
-    return factoryAppSplitRunPath(organizationId, factoryKey, appId, {
+    return factoryAppRunPath(organizationId, factoryKey, appId, runId, {
       from: "lines",
       lineId: line.id,
-      runId: executionRunIdForCanvas(order, key, line.id),
       orderNumber: order?.number,
-      canvas: key,
     });
   };
 }
@@ -634,9 +638,33 @@ function executionRunIdForCanvas(
   order: FactoriesWorkOrder | undefined,
   key: SplitRunCanvasKey,
   lineId: string | undefined,
+  appId?: string,
 ): string | undefined {
-  const executions = latestDispatchForLine(order, lineId)?.stepExecutions ?? [];
-  return executions.find((execution) => {
+  const dispatchExecutions = latestDispatchForLine(order, lineId)?.stepExecutions ?? [];
+  const allExecutions = order ? flattenWorkOrderExecutions(order) : [];
+  return (
+    runIdMatchingApp(dispatchExecutions, appId) ??
+    runIdMatchingApp(allExecutions, appId) ??
+    runIdMatchingCanvasKey(dispatchExecutions, key) ??
+    runIdMatchingCanvasKey(allExecutions, key)
+  );
+}
+
+function runIdMatchingApp(
+  executions: Array<{ run?: { id?: string; appId?: string } }>,
+  appId: string | undefined,
+): string | undefined {
+  if (!appId) {
+    return undefined;
+  }
+  return [...executions].reverse().find((execution) => execution.run?.appId === appId)?.run?.id;
+}
+
+function runIdMatchingCanvasKey(
+  executions: Array<{ step?: string; run?: { id?: string; appId?: string; appName?: string } }>,
+  key: SplitRunCanvasKey,
+): string | undefined {
+  return [...executions].reverse().find((execution) => {
     const matched = canvasKeyForAutomation({
       id: execution.run?.appId,
       name: execution.run?.appName ?? execution.step,
