@@ -70,6 +70,7 @@ function LineCanvasNode({ data }: NodeProps<Node<LineNodeData>>) {
           title={data.title}
           subtitle={data.subtitle}
           iconSlug={data.iconSlug}
+          iconSrc={data.iconSrc}
           status={data.status}
           metrics={data.metrics}
           selected={data.isSelected}

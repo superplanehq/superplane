@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Sentry
+  description: Create a work order when Sentry opens an issue in the factory project.
+spec:
+  edges:
+    - channel: default
+      sourceId: on-sentry-issue
+      targetId: factory-project
+    - channel: default
+      sourceId: factory-project
+      targetId: create-work-order
+  nodes:
+    - id: on-sentry-issue
+      name: On Issue
+      type: TYPE_TRIGGER
+      component: sentry.onIssue
+      configuration:
+        actions:
+          - created
+      position:
+        x: 576
+        'y': 258
+      isCollapsed: false
+    - id: factory-project
+      name: Factory project?
+      type: TYPE_ACTION
+      component: filter
+      configuration:
+        expression: root().data.issue.project.slug == "refunds"
+      position:
+        x: 576
+        'y': 618
+      isCollapsed: false
+    - id: create-work-order
+      name: Create Work Order
+      type: TYPE_ACTION
+      component: createWorkOrder
+      configuration:
+        title: '{{ root().data.issue.title }}'
+        description: '{{ root().data.issue.permalink }}'
+      position:
+        x: 576
+        'y': 978
+      isCollapsed: false
