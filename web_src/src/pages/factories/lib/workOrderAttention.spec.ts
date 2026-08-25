@@ -50,7 +50,7 @@ describe("getWorkOrderAttentionReason", () => {
     expect(WORK_ORDER_ATTENTION_LABEL.failed).toBe("Run failed");
   });
 
-  it("labels a pull-request note as Approval needed", () => {
+  it("labels a visible status note as Review requested", () => {
     expect(
       getWorkOrderAttentionReason(
         order({
@@ -58,18 +58,34 @@ describe("getWorkOrderAttentionReason", () => {
         }),
       ),
     ).toBe("approval");
-    expect(WORK_ORDER_ATTENTION_LABEL.approval).toBe("Approval needed");
-  });
-
-  it("labels an agent question note as Agent question", () => {
+    expect(
+      getWorkOrderAttentionReason(
+        order({
+          statusNotes: [{ key: "decision", headline: "Confirm the cutover window", body: "Pick a date." }],
+        }),
+      ),
+    ).toBe("approval");
+    expect(
+      getWorkOrderAttentionReason(
+        order({
+          statusNotes: [
+            {
+              key: "pr-closure",
+              headline: "Waiting for user review",
+              body: "Tag `@superplaneagent` to request changes.",
+            },
+          ],
+        }),
+      ),
+    ).toBe("approval");
     expect(
       getWorkOrderAttentionReason(
         order({
           statusNotes: [{ key: "agent-question", headline: "The agent has a question", body: "Which provider?" }],
         }),
       ),
-    ).toBe("question");
-    expect(WORK_ORDER_ATTENTION_LABEL.question).toBe("Agent question");
+    ).toBe("approval");
+    expect(WORK_ORDER_ATTENTION_LABEL.approval).toBe("Review requested");
   });
 
   it("labels idle waiting work as No progress", () => {

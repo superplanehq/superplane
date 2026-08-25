@@ -35,6 +35,8 @@ import {
   FAILED_WORK_ORDER,
   INGEST_DRAFT_WORK_ORDER,
   OPEN_WORK_ORDER,
+  SENTRY_DRAFT_WORK_ORDER,
+  SLACK_DRAFT_WORK_ORDER,
   OPEN_WORK_ORDER_SECONDARY,
   PR_CLOSURE_COMPLETED_WORK_ORDER,
   QUESTION_WORK_ORDER,
@@ -173,7 +175,6 @@ export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
     steps: [
-      runAppStep("app-refund-planner", "start-plan"),
       runAppStep("app-refund-implementer", "start-implementation"),
       runAppStep("app-refund-verifier", "start-verification"),
     ],
@@ -192,7 +193,7 @@ export const REFUND_FACTORY: FactoriesFactory = {
   name: "Semaphore",
   key: "RF",
   description:
-    "Handles reconciliation work: plan a change, implement across affected services, and verify with regression suites.",
+    "Handles reconciliation work: implement a change across affected services, and verify with regression suites.",
   lines: REFUND_FACTORY_LINES,
   onboarding: { completedAt: LAST_WEEK },
 };
@@ -213,13 +214,6 @@ export const ACME_ONBOARDING_APPS: FactoryApp[] = [
     id: ACME_ONBOARDING_BACKLOG_APP_ID,
     name: "Backlog",
     description: "Scopes work orders before they enter a line.",
-    createdAt: LAST_WEEK,
-    updatedAt: YESTERDAY,
-  },
-  {
-    id: "app-acme-planner",
-    name: "Plan",
-    description: "Plans work from the backlog.",
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
   },
@@ -253,7 +247,6 @@ export const ACME_ONBOARDING_LINE: FactoriesFactoryLine = {
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
   steps: [
-    runAppStep("app-acme-planner", "start-plan"),
     runAppStep("app-acme-implementer", "start-implementation"),
     runAppStep("app-acme-verifier", "start-verification"),
     runAppStep(ACME_ONBOARDING_DONE_APP_ID, "start-done"),
@@ -278,6 +271,8 @@ export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
   FAILED_WORK_ORDER,
   DRAFT_WORK_ORDER,
   INGEST_DRAFT_WORK_ORDER,
+  SENTRY_DRAFT_WORK_ORDER,
+  SLACK_DRAFT_WORK_ORDER,
   CLOSED_WORK_ORDER,
   PR_CLOSURE_COMPLETED_WORK_ORDER,
   CLOSED_FAILED_WORK_ORDER,

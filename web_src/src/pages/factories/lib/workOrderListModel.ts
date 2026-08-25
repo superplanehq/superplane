@@ -256,19 +256,24 @@ function formatUsageTooltip(totalTokens: number, totalCostCents: number): string
 }
 
 /**
- * Scope pills next to the page title. `active` hides everything that
- * reached a terminal status, `my` keeps only work assigned to the viewer.
+ * Scope pills next to the page title. `active` (Needs attention) keeps
+ * drafts, waiting work, and failed runs. `my` keeps work assigned to the
+ * viewer.
  */
 export type WorkOrderScope = "all" | "active" | "my";
 
 export const WORK_ORDER_SCOPES: Array<{ id: WorkOrderScope; label: string; tooltip: string }> = [
   { id: "all", label: "All", tooltip: "Every work order in this workspace." },
-  { id: "active", label: "Active", tooltip: "Work orders that are not completed, failed, or cancelled." },
-  { id: "my", label: "My", tooltip: "Work orders assigned to you." },
+  { id: "active", label: "Needs attention", tooltip: "Work orders that need your attention." },
+  {
+    id: "my",
+    label: "My",
+    tooltip: "Work orders you created or started. SuperPlane assigns those to you.",
+  },
 ];
 
-/** Statuses that the `active` scope keeps. */
-const ACTIVE_SCOPE_STATUSES: WorkOrderDisplayStatus[] = ["draft", "running", "waiting"];
+/** Statuses that the Needs attention scope keeps. Running is in flight. */
+const ACTIVE_SCOPE_STATUSES: WorkOrderDisplayStatus[] = ["draft", "waiting", "failed"];
 
 /** Ordering options in the Display menu. `updated` is the default. */
 export type WorkOrderOrdering = "updated" | "status" | "spend" | "key";

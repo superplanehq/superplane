@@ -8,6 +8,8 @@ import {
   HOUR_AGO,
   INGEST_DRAFT_WORK_ORDER,
   LAST_WEEK,
+  SENTRY_DRAFT_WORK_ORDER,
+  SLACK_DRAFT_WORK_ORDER,
   LINE_RUN_IMPLEMENT_FAILED_ID,
   LINE_RUN_IMPLEMENT_ID,
   LINE_RUN_IMPLEMENT_PASSED_ID,
@@ -261,6 +263,32 @@ export const INGEST_DRAFT_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
       nodeName: "On Issue Label",
     },
     app: { id: "app-refund-backlog" },
+  }),
+];
+
+export const SENTRY_DRAFT_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
+  statusUpdatedEvent(SENTRY_DRAFT_WORK_ORDER, YESTERDAY, {
+    fromState: "",
+    toState: "draft",
+    automation: {
+      appId: "app-refund-sentry",
+      appName: "Sentry",
+      nodeName: "On Issue",
+    },
+    app: { id: "app-refund-sentry" },
+  }),
+];
+
+export const SLACK_DRAFT_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
+  statusUpdatedEvent(SLACK_DRAFT_WORK_ORDER, TWO_HOURS_AGO, {
+    fromState: "",
+    toState: "draft",
+    automation: {
+      appId: "app-refund-slack",
+      appName: "Slack",
+      nodeName: "On Mention",
+    },
+    app: { id: "app-refund-slack" },
   }),
 ];
 
@@ -546,12 +574,30 @@ export const DEFAULT_EVENTS_BY_ORDER_ID: Record<string, FactoriesWorkOrderEvent[
   [FAILED_WORK_ORDER.id!]: FAILED_WORK_ORDER_EVENTS,
   [DRAFT_WORK_ORDER.id!]: DRAFT_WORK_ORDER_EVENTS,
   [INGEST_DRAFT_WORK_ORDER.id!]: INGEST_DRAFT_WORK_ORDER_EVENTS,
+  [SENTRY_DRAFT_WORK_ORDER.id!]: SENTRY_DRAFT_WORK_ORDER_EVENTS,
+  [SLACK_DRAFT_WORK_ORDER.id!]: SLACK_DRAFT_WORK_ORDER_EVENTS,
   [CLOSED_WORK_ORDER.id!]: CLOSED_WORK_ORDER_EVENTS,
   [PR_CLOSURE_COMPLETED_WORK_ORDER.id!]: PR_CLOSURE_COMPLETED_WORK_ORDER_EVENTS,
   [CLOSED_FAILED_WORK_ORDER.id!]: CLOSED_FAILED_WORK_ORDER_EVENTS,
 };
 
 /** Artifacts served by the fixture HTTP handlers (`GET …/orders/{orderId}/artifacts`). */
+function descriptionArtifact(order: FactoriesWorkOrder): FactoriesWorkOrderArtifact {
+  return {
+    id: `art-description-${order.id}`,
+    type: "TYPE_MARKDOWN",
+    data: {
+      name: "description.md",
+      title: "description.md",
+      body: order.description ?? "",
+    },
+  };
+}
+
 export const DEFAULT_ARTIFACTS_BY_ORDER_ID: Record<string, FactoriesWorkOrderArtifact[]> = {
   [OPEN_WORK_ORDER.id!]: OPEN_WORK_ORDER_ARTIFACTS,
+  [DRAFT_WORK_ORDER.id!]: [descriptionArtifact(DRAFT_WORK_ORDER)],
+  [INGEST_DRAFT_WORK_ORDER.id!]: [descriptionArtifact(INGEST_DRAFT_WORK_ORDER)],
+  [SENTRY_DRAFT_WORK_ORDER.id!]: [descriptionArtifact(SENTRY_DRAFT_WORK_ORDER)],
+  [SLACK_DRAFT_WORK_ORDER.id!]: [descriptionArtifact(SLACK_DRAFT_WORK_ORDER)],
 };

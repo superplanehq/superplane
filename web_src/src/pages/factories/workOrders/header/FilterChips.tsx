@@ -4,17 +4,21 @@ import { buildWorkOrderFilterChips, type WorkOrderFilterOption } from "../../lib
 
 interface FilterChipsProps {
   state: WorkOrderListState;
-  lineOptions: WorkOrderFilterOption[];
+  /** Omit on a line board so leftover Work Orders line filters stay hidden. */
+  lineOptions?: WorkOrderFilterOption[];
   assigneeOptions: WorkOrderFilterOption[];
 }
 
 /** Applied filters, rendered under the title bar only when something is set. */
 export function FilterChips({ state, lineOptions, assigneeOptions }: FilterChipsProps) {
-  if (state.filterCount === 0) {
+  const chips = buildWorkOrderFilterChips(state.filters, {
+    lines: lineOptions ?? [],
+    assignees: assigneeOptions,
+  }).filter((chip) => lineOptions || chip.dimension !== "lineIds");
+
+  if (chips.length === 0) {
     return null;
   }
-
-  const chips = buildWorkOrderFilterChips(state.filters, { lines: lineOptions, assignees: assigneeOptions });
 
   return (
     <div className="flex flex-wrap items-center gap-1.5" data-testid="work-orders-filter-chips">

@@ -5,7 +5,12 @@ import { useQuery } from "@tanstack/react-query";
 
 import { factoryQueryKeys } from "./useFactoryData";
 
-export function useWorkOrderChecks(organizationId: string, factoryId: string, orderId: string) {
+export function useWorkOrderChecks(
+  organizationId: string,
+  factoryId: string,
+  orderId: string,
+  options?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: factoryQueryKeys.workOrderChecks(organizationId, factoryId, orderId),
     queryFn: async (): Promise<FactoriesWorkOrderCheck[]> => {
@@ -17,6 +22,6 @@ export function useWorkOrderChecks(organizationId: string, factoryId: string, or
       );
       return response.data?.checks ?? [];
     },
-    enabled: Boolean(organizationId && factoryId && orderId),
+    enabled: Boolean(organizationId && factoryId && orderId) && (options?.enabled ?? true),
   });
 }

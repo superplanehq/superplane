@@ -7,17 +7,21 @@ import type {
 
 import { HOUR_AGO, REFUND_LINE_PLAN_ID, TWO_HOURS_AGO } from "./factoryPageIds";
 
-const PLAN_STEP_INDEX: Record<string, number> = { plan: 0, implement: 1, verify: 2 };
+const PLAN_STEP_INDEX: Record<string, number> = { implement: 0, verify: 1 };
 const PLAN_STEP_LABEL: Record<string, string> = {
-  plan: "Refund Planner",
-  implement: "Refund Implementer",
-  verify: "Refund Verifier",
+  implement: "Implement",
+  verify: "Verify",
+};
+const PLAN_STEP_RUN: Record<string, { appId: string; appName: string }> = {
+  implement: { appId: "app-refund-implementer", appName: "Implementation" },
+  verify: { appId: "app-refund-verifier", appName: "Risk Assessment" },
 };
 
 export function planLineExecution(
   step: string,
   overrides: Partial<FactoriesWorkOrderExecution> = {},
 ): FactoriesWorkOrderExecution {
+  const run = PLAN_STEP_RUN[step] ?? PLAN_STEP_RUN.implement;
   return {
     id: `exec-${step}-${overrides.id ?? Math.random().toString(36).slice(2, 8)}`,
     step: PLAN_STEP_LABEL[step] ?? step,
@@ -28,8 +32,8 @@ export function planLineExecution(
     updatedAt: HOUR_AGO,
     run: {
       id: `run-${step}`,
-      appId: "app-refund-planner",
-      appName: "Refund Planner",
+      appId: run.appId,
+      appName: run.appName,
     },
     ...overrides,
   };
@@ -58,9 +62,8 @@ export function planLineDispatch(
     id: `dispatch-${REFUND_LINE_PLAN_ID}-${stepExecutions[0]?.id ?? "empty"}`,
     line: { id: REFUND_LINE_PLAN_ID, name: "plan-and-implement" },
     steps: [
-      { name: "Refund Planner", stepIndex: 0 },
-      { name: "Refund Implementer", stepIndex: 1 },
-      { name: "Refund Verifier", stepIndex: 2 },
+      { name: "Implement", stepIndex: 0 },
+      { name: "Verify", stepIndex: 1 },
     ],
     state,
     result,

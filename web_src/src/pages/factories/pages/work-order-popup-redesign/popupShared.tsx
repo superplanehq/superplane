@@ -2,13 +2,15 @@ import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
-import { CircleDollarSign, Clock, FileText, XIcon } from "lucide-react";
+import { CircleDollarSign, Clock, FileText, UserPlus, XIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { FACTORIES_ORGANIZATION_ID } from "../../__fixtures__/factoryPageResponses";
+import { ClickToRename } from "../../layout/ClickToRename";
 import { extractArtifactMarkdownBody, toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { OrgUserReference } from "../../OrgUserReference";
 import { WorkOrderArtifactInline } from "../../WorkOrderArtifactInline";
+import { WorkOrderAssigneesPopover } from "../../WorkOrderAssigneesPopover";
 import { WorkOrderStatusNote } from "../../WorkOrderStatusNote";
 import { RunOverlayBoardBackdrop, RunOverlayFrame } from "../work-order-run-overlay/runOverlayShared";
 import type { PopupFixture, PopupLogEntry, PopupLogState } from "./workOrderPopupMocks";
@@ -41,16 +43,35 @@ export function PopupHeader({
   title,
   children,
   onClose,
+  canEditTitle = false,
+  titleBusy = false,
+  onTitleSave,
 }: {
   title: string;
   children?: ReactNode;
   onClose?: () => void;
+  canEditTitle?: boolean;
+  titleBusy?: boolean;
+  onTitleSave?: (next: string) => void;
 }) {
   return (
     <header className="relative shrink-0 border-b border-border px-5 py-3 pr-12">
       <div className="flex min-w-0 items-center gap-3">
         <h2 className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-[-0.02em] text-foreground">
-          {title}
+          {canEditTitle && onTitleSave ? (
+            <ClickToRename
+              value={title}
+              onSave={onTitleSave}
+              canEdit={canEditTitle}
+              busy={titleBusy}
+              testId="popup-work-order-title"
+              ariaLabel="Work order title"
+              className="max-w-full text-[16px] font-semibold tracking-[-0.02em]"
+              inputClassName="text-[16px] font-semibold tracking-[-0.02em]"
+            />
+          ) : (
+            title
+          )}
         </h2>
       </div>
       {children}
@@ -73,19 +94,61 @@ export function OwnerTimeCostRow({
   fixture,
   className,
   children,
+  organizationId,
+  canEditOwner = false,
+  assigneeIds = [],
+  ownerBusy = false,
+  onOwnerSave,
 }: {
   fixture: OwnerTimeCostFields;
   className?: string;
   children?: ReactNode;
+  organizationId?: string;
+  canEditOwner?: boolean;
+  assigneeIds?: string[];
+  ownerBusy?: boolean;
+  onOwnerSave?: (assigneeIds: string[]) => Promise<void>;
 }) {
+  const ownerMark = (
+    <span className="inline-flex min-w-0 items-center gap-1.5">
+      {assigneeIds.length > 0 || !canEditOwner ? (
+        <OrgUserReference display={fixture.owner} size="xs" nameClassName="truncate text-[13px]" />
+      ) : (
+        <span className="inline-flex items-center gap-1 text-muted-foreground">
+          <UserPlus className="size-3.5 shrink-0" aria-hidden />
+          Assign
+        </span>
+      )}
+    </span>
+  );
+
   return (
     <div
       className={cn("mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-foreground", className)}
       data-testid="popup-owner-time-cost"
     >
-      <span className="inline-flex min-w-0 items-center gap-1.5">
-        <OrgUserReference display={fixture.owner} size="xs" nameClassName="truncate text-[13px]" />
-      </span>
+      {canEditOwner && organizationId && onOwnerSave ? (
+        <WorkOrderAssigneesPopover
+          organizationId={organizationId}
+          selectedIds={assigneeIds}
+          canEdit={canEditOwner}
+          isSaving={ownerBusy}
+          onSave={onOwnerSave}
+          align="start"
+        >
+          <button
+            type="button"
+            className="inline-flex min-w-0 items-center gap-1.5 rounded-sm hover:bg-muted/60"
+            aria-label={assigneeIds.length > 0 ? `Owner: ${fixture.owner.name}` : "Assign owner"}
+            data-testid="popup-edit-owner"
+            disabled={ownerBusy}
+          >
+            {ownerMark}
+          </button>
+        </WorkOrderAssigneesPopover>
+      ) : (
+        ownerMark
+      )}
       <span className="inline-flex items-center gap-1.5 text-muted-foreground" title={fixture.startedLabel}>
         <Clock className="size-3.5 shrink-0" aria-hidden />
         <span className="text-foreground">{fixture.elapsed}</span>

@@ -252,6 +252,18 @@ service Factories {
     };
   }
 
+  rpc UpdateWorkOrder(UpdateWorkOrderRequest) returns (UpdateWorkOrderResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory work order";
+      description: "Updates the title and description of a work order";
+      tags: "Factory";
+    };
+  }
+
   rpc DispatchWorkOrder(DispatchWorkOrderRequest) returns (DispatchWorkOrderResponse) {
     option (google.api.http) = {
       patch: "/api/v1/factories/{factory_id}/orders/{order_id}/dispatch"
@@ -895,6 +907,17 @@ message UpdateWorkOrderAssigneesRequest {
 }
 
 message UpdateWorkOrderAssigneesResponse {
+  WorkOrder order = 1;
+}
+
+message UpdateWorkOrderRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  optional string title = 3;
+  optional string description = 4;
+}
+
+message UpdateWorkOrderResponse {
   WorkOrder order = 1;
 }
 
