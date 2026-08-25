@@ -1,6 +1,7 @@
 import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
 
-import type { SplitRunFooterKind, SplitRunStopChoice } from "./splitRunFooter";
+import type { WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
+import { isClosedWorkOrderDisplayStatus, type SplitRunFooterKind, type SplitRunStopChoice } from "./splitRunFooter";
 
 export type SplitRunStopRun = { appId: string; runId: string };
 
@@ -13,6 +14,7 @@ export async function applySplitRunStopChoice(
   handlers: {
     onClose: (result: FactoriesWorkOrderResult) => void | Promise<void>;
     onStatusChange: (state: FactoriesWorkOrderState) => void | Promise<void>;
+    status?: WorkOrderDisplayStatus;
   },
 ): Promise<void> {
   if (choice === "canceled") {
@@ -21,6 +23,10 @@ export async function applySplitRunStopChoice(
   }
   if (choice === "completed") {
     await handlers.onClose("RESULT_COMPLETED");
+    return;
+  }
+  if (choice === "reopen" || isClosedWorkOrderDisplayStatus(handlers.status)) {
+    await handlers.onStatusChange("STATE_OPEN");
     return;
   }
   await handlers.onStatusChange("STATE_DRAFT");
@@ -38,6 +44,7 @@ export async function applySplitRunStop(
     cancelRun?: (run: SplitRunStopRun) => Promise<void>;
     onClose: (result: FactoriesWorkOrderResult) => void | Promise<void>;
     onStatusChange: (state: FactoriesWorkOrderState) => void | Promise<void>;
+    status?: WorkOrderDisplayStatus;
   },
 ): Promise<void> {
   if (input.kind === "running" && input.run && input.cancelRun) {

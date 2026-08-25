@@ -32,6 +32,26 @@ describe("applySplitRunStopChoice", () => {
     expect(onStatusChange).toHaveBeenCalledWith("STATE_DRAFT");
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it("reopens a closed work order instead of moving it to draft", async () => {
+    const onClose = vi.fn();
+    const onStatusChange = vi.fn();
+
+    await applySplitRunStopChoice("draft", { onClose, onStatusChange, status: "failed" });
+
+    expect(onStatusChange).toHaveBeenCalledWith("STATE_OPEN");
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("reopens for the Reopen outcome", async () => {
+    const onClose = vi.fn();
+    const onStatusChange = vi.fn();
+
+    await applySplitRunStopChoice("reopen", { onClose, onStatusChange });
+
+    expect(onStatusChange).toHaveBeenCalledWith("STATE_OPEN");
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });
 
 describe("applySplitRunStop", () => {
@@ -85,6 +105,23 @@ describe("applySplitRunStop", () => {
 
     expect(cancelRun).not.toHaveBeenCalled();
     expect(onStatusChange).toHaveBeenCalledWith("STATE_DRAFT");
+  });
+
+  it("reopens a closed failed order instead of moving it to draft", async () => {
+    const cancelRun = vi.fn();
+    const onStatusChange = vi.fn();
+
+    await applySplitRunStop("draft", {
+      kind: "failed",
+      status: "failed",
+      run,
+      cancelRun,
+      onClose: vi.fn(),
+      onStatusChange,
+    });
+
+    expect(cancelRun).not.toHaveBeenCalled();
+    expect(onStatusChange).toHaveBeenCalledWith("STATE_OPEN");
   });
 
   it("still closes when a running order has no run id", async () => {

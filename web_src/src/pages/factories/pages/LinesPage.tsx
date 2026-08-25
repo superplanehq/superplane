@@ -60,9 +60,9 @@ import {
 } from "../workOrders/WorkOrderBoardChrome";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
-import { reviewCandidateForWorkOrderId } from "./onboarding/first-run/reviewCandidates";
+import { confidenceScoreFromChecks } from "../lib/confidenceScore";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
-import type { SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
+import { canvasKeyForAutomation, type SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
 import { splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
 import {
   createFactoryLinePath,
@@ -119,7 +119,13 @@ function applyVisibleWorkOrders(
       state.search,
     ).map((entry) => entry.id),
   );
-  return workOrders.filter((order) => Boolean(order.id) && visibleIds.has(order.id));
+  return workOrders.filter((order) => {
+    const id = order.id;
+    if (!id) {
+      return false;
+    }
+    return visibleIds.has(id);
+  });
 }
 
 export function LinesPage() {
@@ -256,6 +262,7 @@ export function LinesPage() {
               onCreateWorkOrder={openCreateWorkOrder}
               workOrderCardContext={{
                 organizationId,
+                factoryId,
                 factoryKey,
                 factoryLines: lines,
                 canDispatch: canUpdateWorkOrders,
@@ -552,16 +559,30 @@ function canvasAppIdsForLine(
 ): Record<SplitRunCanvasKey, string | undefined> {
   const backlog = findBacklogAutomationApp(apps);
   const closure = findClosureAutomationApp(apps);
-  const steps = line.steps ?? [];
-  return {
+  const ids: Record<SplitRunCanvasKey, string | undefined> = {
     intake: backlog?.id,
     sentry: appIdNamed(apps, "Sentry"),
     slack: appIdNamed(apps, "Slack"),
-    planning: steps[0]?.app?.app,
-    implementation: steps[1]?.app?.app,
-    risk: steps[2]?.app?.app,
-    closure: steps[3]?.app?.app ?? closure?.id,
+    planning: undefined,
+    implementation: undefined,
+    risk: undefined,
+    closure: closure?.id,
   };
+  for (const step of line.steps ?? []) {
+    const appId = step.app?.app;
+    if (!appId) {
+      continue;
+    }
+    const app = apps.find((entry) => entry.id === appId);
+    const key = canvasKeyForAutomation({
+      id: appId,
+      name: app?.name,
+    });
+    if (key === "planning" || key === "implementation" || key === "risk" || key === "closure") {
+      ids[key] = appId;
+    }
+  }
+  return ids;
 }
 
 function appIdNamed(apps: Array<{ id?: string; name?: string }>, name: string): string | undefined {
@@ -614,18 +635,14 @@ function executionRunIdForCanvas(
   key: SplitRunCanvasKey,
   lineId: string | undefined,
 ): string | undefined {
-  const stepIndex: Partial<Record<SplitRunCanvasKey, number>> = {
-    planning: 0,
-    implementation: 1,
-    risk: 2,
-    closure: 3,
-  };
-  const index = stepIndex[key];
-  if (index == null) {
-    return undefined;
-  }
   const executions = latestDispatchForLine(order, lineId)?.stepExecutions ?? [];
-  return executions.find((execution) => execution.stepIndex === index)?.run?.id;
+  return executions.find((execution) => {
+    const matched = canvasKeyForAutomation({
+      id: execution.run?.appId,
+      name: execution.run?.appName ?? execution.step,
+    });
+    return matched === key;
+  })?.run?.id;
 }
 
 function PhaseBoard({
@@ -1010,15 +1027,13 @@ function PhaseRunCard({
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string) => void;
 }) {
-  const { factory } = useFactoriesLayout();
-  const entry = useMemo(() => buildWorkOrderListEntry(run.order, factory), [run.order, factory]);
   const queuedLabel = isQueuedStepRow(run.execution) ? resolvePhaseRunStatus(run.execution).label : null;
 
   return (
     <div data-testid={`lines-phase-run-${run.executionId}`}>
-      <WorkOrderCard
-        {...workOrderCardContext}
-        entry={entry}
+      <LineBoardWorkOrderCard
+        order={run.order}
+        workOrderCardContext={workOrderCardContext}
         onOpen={() => {
           if (run.workOrderId) {
             onOpenWorkOrder(run.workOrderId);
@@ -1044,20 +1059,42 @@ function LineBoardOrderCard({
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string) => void;
 }) {
-  const { factory } = useFactoriesLayout();
-  const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [order, factory]);
-  const reviewCandidate = reviewCandidateForWorkOrderId(order.id);
-
   return (
-    <WorkOrderCard
-      {...workOrderCardContext}
-      entry={entry}
-      confidenceScore={reviewCandidate?.confidenceScore}
+    <LineBoardWorkOrderCard
+      order={order}
+      workOrderCardContext={workOrderCardContext}
       onOpen={() => {
         if (order.id) {
           onOpenWorkOrder(order.id);
         }
       }}
+    />
+  );
+}
+
+function LineBoardWorkOrderCard({
+  order,
+  workOrderCardContext,
+  onOpen,
+}: {
+  order: FactoriesWorkOrder;
+  workOrderCardContext: WorkOrderCardContext;
+  onOpen: () => void;
+}) {
+  const { factory } = useFactoriesLayout();
+  const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [factory, order]);
+  const { data: checks = [] } = useWorkOrderChecks(
+    workOrderCardContext.organizationId,
+    workOrderCardContext.factoryId ?? "",
+    order.id ?? "",
+  );
+
+  return (
+    <WorkOrderCard
+      {...workOrderCardContext}
+      entry={entry}
+      confidenceScore={confidenceScoreFromChecks(checks)}
+      onOpen={onOpen}
     />
   );
 }

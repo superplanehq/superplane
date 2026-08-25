@@ -9,7 +9,7 @@ import { presentWorkOrderStatusNotes } from "./workOrderStatusNote";
 export type WorkOrderAttentionReason = "approval" | "question" | "failed" | "stalled";
 
 export const WORK_ORDER_ATTENTION_LABEL: Record<WorkOrderAttentionReason, string> = {
-  approval: "Review needed",
+  approval: "Review requested",
   question: "Agent question",
   failed: "Run failed",
   stalled: "No progress",
@@ -32,7 +32,7 @@ export const WORK_ORDER_ATTENTION_ICON: Record<WorkOrderAttentionReason, LucideI
 /**
  * Maps a work order to an attention reason. Closed failed orders and
  * waiting orders with a failed latest step are Run failed. A visible
- * status note is Review needed. Waiting with no note is No progress.
+ * status note is Review requested. Waiting with no note is No progress.
  * Other statuses return null. The note body is not classified.
  */
 export function getWorkOrderAttentionReason(order: FactoriesWorkOrder): WorkOrderAttentionReason | null {

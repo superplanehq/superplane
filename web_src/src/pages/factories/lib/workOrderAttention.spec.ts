@@ -50,7 +50,7 @@ describe("getWorkOrderAttentionReason", () => {
     expect(WORK_ORDER_ATTENTION_LABEL.failed).toBe("Run failed");
   });
 
-  it("labels a visible status note as Review needed", () => {
+  it("labels a visible status note as Review requested", () => {
     expect(
       getWorkOrderAttentionReason(
         order({
@@ -85,7 +85,7 @@ describe("getWorkOrderAttentionReason", () => {
         }),
       ),
     ).toBe("approval");
-    expect(WORK_ORDER_ATTENTION_LABEL.approval).toBe("Review needed");
+    expect(WORK_ORDER_ATTENTION_LABEL.approval).toBe("Review requested");
   });
 
   it("labels idle waiting work as No progress", () => {

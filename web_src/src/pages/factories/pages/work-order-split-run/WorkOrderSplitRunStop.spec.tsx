@@ -22,6 +22,7 @@ import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { DRAFT_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
+import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../__fixtures__/lineMetricsBoardOrders";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
@@ -79,5 +80,31 @@ describe("WorkOrderSplitRunPopup stop actions", () => {
 
     await user.click(within(screen.getByTestId("split-run-review")).getByRole("button", { name: "Reject" }));
     expect(handleRejectMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reopens a closed work order from Reopen", async () => {
+    const user = userEvent.setup();
+    renderPopup(splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER));
+
+    expect(screen.queryByRole("button", { name: "Return to Draft" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Reopen" }));
+    expect(handleStopMock).toHaveBeenCalledWith(
+      "reopen",
+      expect.objectContaining({ kind: "failed", status: "failed" }),
+    );
+  });
+
+  it("hides Return to Draft when the work order is already a draft", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      ...SPLIT_RUN_RUNNING,
+      footer: { ...SPLIT_RUN_RUNNING.footer, status: "draft" },
+    });
+
+    await user.click(screen.getByRole("button", { name: "Choose how to stop" }));
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).queryByRole("menuitem", { name: /Stop and return to Draft/ })).not.toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /Stop as Canceled/ })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /Stop as Completed/ })).toBeInTheDocument();
   });
 });

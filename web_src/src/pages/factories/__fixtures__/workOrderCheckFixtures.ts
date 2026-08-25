@@ -1,6 +1,14 @@
 import type { FactoriesWorkOrderCheck } from "@/api-client";
 
-import { confidenceSuitabilityAnalysis, confidenceSuitabilitySummary } from "../lib/confidenceScore";
+import {
+  CONFIDENCE_CHECK_NAME,
+  CONFIDENCE_SCORE_MAX,
+  confidenceBandForScore,
+  confidenceCheckLevel,
+  confidenceSuitabilityAnalysis,
+  confidenceSuitabilitySummary,
+} from "../lib/confidenceScore";
+import { REVIEW_CANDIDATES } from "../pages/onboarding/first-run/reviewCandidateFixtures";
 import {
   CLOSED_WORK_ORDER,
   OPEN_WORK_ORDER,
@@ -223,6 +231,34 @@ export const RUNNING_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
 /** Fallback map for fixtures that do not override `checksByOrderId` —
  * the open order carries the full set, the running order a partial one,
  * and every other order (closed, draft, failed) has none. */
+const LEVEL_FOR_CHECK: Record<ReturnType<typeof confidenceCheckLevel>, FactoriesWorkOrderCheck["level"]> = {
+  positive: "LEVEL_POSITIVE",
+  neutral: "LEVEL_NEUTRAL",
+  caution: "LEVEL_CAUTION",
+  critical: "LEVEL_CRITICAL",
+};
+
+const REVIEW_CANDIDATE_CHECKS_BY_ORDER_ID: Record<string, FactoriesWorkOrderCheck[]> = Object.fromEntries(
+  REVIEW_CANDIDATES.map((candidate) => [
+    candidate.workOrderId,
+    [
+      {
+        id: `check-confidence-${candidate.workOrderId}`,
+        key: "confidence",
+        name: CONFIDENCE_CHECK_NAME,
+        score: candidate.confidenceScore,
+        maxScore: CONFIDENCE_SCORE_MAX,
+        level: LEVEL_FOR_CHECK[confidenceCheckLevel(candidate.confidenceScore)],
+        summary: confidenceSuitabilitySummary(confidenceBandForScore(candidate.confidenceScore)),
+        analysis: confidenceSuitabilityAnalysis({ source: "GitHub", reasons: candidate.reasons }),
+        automation: { appId: "app-line-confidence", appName: "Line Confidence" },
+        runId: `run-confidence-${candidate.workOrderId}`,
+        updatedAt: minutesAgo(4),
+      },
+    ],
+  ]),
+);
+
 export const DEFAULT_CHECKS_BY_ORDER_ID: Record<string, FactoriesWorkOrderCheck[]> = {
   [OPEN_WORK_ORDER.id!]: OPEN_WORK_ORDER_CHECKS,
   [OPEN_WORK_ORDER_SECONDARY.id!]: VERIFY_STEP_CHECKS,
@@ -232,6 +268,7 @@ export const DEFAULT_CHECKS_BY_ORDER_ID: Record<string, FactoriesWorkOrderCheck[
   "wo-failed-refunds": VERIFY_STEP_CHECKS,
   "wo-board-done-rejected": VERIFY_STEP_CHECKS,
   "wo-board-done-canceled": VERIFY_STEP_CHECKS,
+  ...REVIEW_CANDIDATE_CHECKS_BY_ORDER_ID,
 };
 
 /** A single critical check — the smallest interesting state. */

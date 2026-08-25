@@ -9,7 +9,13 @@ import {
 import { Check, ChevronDown } from "lucide-react";
 import { useState } from "react";
 
-import { DEFAULT_SPLIT_RUN_STOP_CHOICE, SPLIT_RUN_STOP_CHOICES, type SplitRunStopChoice } from "./splitRunFooter";
+import type { WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
+import {
+  availableSplitRunStopChoices,
+  DEFAULT_SPLIT_RUN_STOP_CHOICE,
+  defaultSplitRunStopChoice,
+  type SplitRunStopChoice,
+} from "./splitRunFooter";
 
 const SEGMENT_CLASSNAME =
   "inline-flex h-7 items-center justify-center text-[13px] font-medium text-primary-foreground hover:bg-primary-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
@@ -21,12 +27,22 @@ const SEGMENT_CLASSNAME =
 export function SplitRunStopButton({
   onStop,
   busy = false,
+  status,
 }: {
   onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
   busy?: boolean;
+  status?: WorkOrderDisplayStatus;
 }) {
-  const [choice, setChoice] = useState<SplitRunStopChoice>(DEFAULT_SPLIT_RUN_STOP_CHOICE);
-  const selected = SPLIT_RUN_STOP_CHOICES.find((item) => item.id === choice) ?? SPLIT_RUN_STOP_CHOICES[0];
+  const choices = availableSplitRunStopChoices(status);
+  const [choice, setChoice] = useState<SplitRunStopChoice>(
+    () => defaultSplitRunStopChoice(status) ?? DEFAULT_SPLIT_RUN_STOP_CHOICE,
+  );
+  const selectedId = choices.some((item) => item.id === choice) ? choice : choices[0]?.id;
+  const selected = choices.find((item) => item.id === selectedId);
+
+  if (!selected) {
+    return null;
+  }
 
   return (
     <div
@@ -37,7 +53,7 @@ export function SplitRunStopButton({
         type="button"
         className={cn(SEGMENT_CLASSNAME, "px-3")}
         disabled={busy}
-        onClick={() => void onStop?.(choice)}
+        onClick={() => void onStop?.(selected.id)}
         data-testid="split-run-footer-stop"
       >
         {selected.actionLabel}
@@ -56,8 +72,8 @@ export function SplitRunStopButton({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" side="top" className="w-72">
-          {SPLIT_RUN_STOP_CHOICES.map((item, index) => {
-            const selected = item.id === choice;
+          {choices.map((item, index) => {
+            const selected = item.id === selectedId;
             return (
               <div key={item.id}>
                 {index > 0 ? <DropdownMenuSeparator /> : null}

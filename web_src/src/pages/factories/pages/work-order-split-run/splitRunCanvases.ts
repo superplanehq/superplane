@@ -500,7 +500,7 @@ function classifyNode(node: ComponentsNode): "agent" | "check" | "artifact" | "s
 export function claudeCodeSteps(node: ComponentsNode): Array<{ name: string; type: string }> {
   const configured = node.configuration?.steps;
   if (!Array.isArray(configured) || configured.length === 0) {
-    return agentNotes(node.id).map((name) => ({ name, type: "" }));
+    return agentNotes(node.id ?? "").map((name) => ({ name, type: "" }));
   }
   const steps: Array<{ name: string; type: string }> = [];
   for (const step of configured) {
@@ -531,7 +531,7 @@ function claudeCodeChildren(
   if (log) {
     return parseClaudeCodeLog(log, configured);
   }
-  return configured.map((step) => ({ ...step, commands: [] }));
+  return configured.map((step) => ({ ...step, commands: [], status: "passed" as const }));
 }
 
 function agentNotes(nodeId: string): string[] {

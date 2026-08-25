@@ -4,12 +4,24 @@ import {
   clampConfidenceScore,
   confidenceBandForScore,
   confidenceCheckLevel,
+  confidenceScoreFromChecks,
   confidenceSuitabilityAnalysis,
   confidenceSuitabilitySummary,
 } from "./confidenceScore";
 import { workOrderCheckStatus } from "./workOrderChecks";
 
 describe("confidenceScore", () => {
+  it("reads the Confidence score check and ignores other checks", () => {
+    expect(
+      confidenceScoreFromChecks([
+        { name: "Code quality", score: 82 },
+        { name: "Confidence score", score: 4.2 },
+      ]),
+    ).toBe(4);
+    expect(confidenceScoreFromChecks([{ name: "Code quality", score: 82 }])).toBeUndefined();
+    expect(confidenceScoreFromChecks([])).toBeUndefined();
+  });
+
   it("clamps scores to 0 through 5", () => {
     expect(clampConfidenceScore(-1)).toBe(0);
     expect(clampConfidenceScore(5.4)).toBe(5);

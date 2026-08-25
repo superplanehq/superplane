@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  availableSplitRunStopChoices,
   buildSplitRunFooter,
   DEFAULT_SPLIT_RUN_STOP_CHOICE,
+  defaultSplitRunStopChoice,
   doneFooterForStatus,
   SPLIT_RUN_STOP_CHOICES,
 } from "./splitRunFooter";
@@ -110,14 +112,49 @@ describe("buildSplitRunFooter", () => {
     expect(footer.actions).toEqual([{ id: "stop", kind: "stop", label: "Stop", emphasis: "quiet" }]);
   });
 
-  it("shows a done summary with no actions", () => {
+  it("shows a done summary with Reopen", () => {
     expect(doneFooterForStatus("completed")).toEqual({
       kind: "done",
       sentence: "Work order completed successfully.",
-      actions: [],
+      actions: [{ id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" }],
+      status: "completed",
     });
     expect(doneFooterForStatus("rejected").sentence).toBe("A person rejected this work order.");
     expect(doneFooterForStatus("cancelled").sentence).toBe("This work order was canceled.");
     expect(doneFooterForStatus("failed").sentence).toBe("Closed as failed. Line execution did not pass.");
+  });
+
+  it("offers Reopen on a closed failed footer instead of Stop", () => {
+    const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE, attentionCard: true, status: "failed" });
+
+    expect(footer.actions).toEqual([{ id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" }]);
+  });
+});
+
+describe("availableSplitRunStopChoices", () => {
+  it("keeps every Stop outcome while the work order is still open", () => {
+    expect(availableSplitRunStopChoices("running").map((choice) => choice.id)).toEqual([
+      "canceled",
+      "completed",
+      "draft",
+    ]);
+    expect(availableSplitRunStopChoices("waiting").map((choice) => choice.id)).toEqual([
+      "canceled",
+      "completed",
+      "draft",
+    ]);
+    expect(defaultSplitRunStopChoice("running")).toBe("canceled");
+  });
+
+  it("drops the outcome that already matches the work order", () => {
+    expect(availableSplitRunStopChoices("draft").map((choice) => choice.id)).toEqual(["canceled", "completed"]);
+  });
+
+  it("offers Reopen when the work order is already closed", () => {
+    expect(availableSplitRunStopChoices("completed").map((choice) => choice.id)).toEqual(["reopen"]);
+    expect(availableSplitRunStopChoices("cancelled").map((choice) => choice.id)).toEqual(["reopen"]);
+    expect(availableSplitRunStopChoices("rejected").map((choice) => choice.id)).toEqual(["reopen"]);
+    expect(availableSplitRunStopChoices("failed").map((choice) => choice.id)).toEqual(["reopen"]);
+    expect(defaultSplitRunStopChoice("completed")).toBe("reopen");
   });
 });

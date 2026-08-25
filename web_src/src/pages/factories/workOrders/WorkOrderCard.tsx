@@ -17,6 +17,7 @@ import { WorkOrderStatusDot } from "./WorkOrderStatusDot";
 
 export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   organizationId: string;
+  factoryId?: string;
   factoryKey: string;
   factoryLines: FactoriesFactoryLine[];
   /** When set, Start on a draft sends the work order to this line. */
@@ -36,7 +37,7 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   href?: string;
   /** When set, the card overlay opens this handler instead of navigating. */
   onOpen?: () => void;
-  /** First-run analysis score from 0 to 5. Shown to the left of Start. */
+  /** Confidence score from ListWorkOrderChecks, 0 to 5. Shown left of Start. */
   confidenceScore?: number;
 }
 
@@ -47,8 +48,7 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  * to the title. The footer shows the owner (except on drafts), the age of
  * the work order, and a Start button on drafts. Reviewed drafts also
  * show a score to the left of Start. Waiting cards show an attention
- * label. The owner is
- * display-only on the card.
+ * label such as Review requested. The owner is display-only on the card.
  */
 export function WorkOrderCard({
   entry,

@@ -245,8 +245,8 @@ const PLACEMENT_BY_API: Record<string, IntakeTicketPlacement> = {
 };
 
 const STAGE_BY_NAME: Record<string, IntakeLineStage> = {
-  plan: "plan",
-  planning: "plan",
+  plan: "implement",
+  planning: "implement",
   implement: "implement",
   implementation: "implement",
   verify: "verify",

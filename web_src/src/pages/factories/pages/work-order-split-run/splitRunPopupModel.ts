@@ -66,6 +66,20 @@ export function splitRunDescriptionMarkdown(artifacts: FactoriesWorkOrderArtifac
   return "";
 }
 
+/** Live saves win. Storybook still prefers artifact markdown. */
+export function splitRunSourceDescription(args: {
+  workOrderDescription?: string;
+  artifactDescription?: string;
+  preferWorkOrder?: boolean;
+}): string {
+  const workOrder = args.workOrderDescription?.trim() ?? "";
+  const artifact = args.artifactDescription?.trim() ?? "";
+  if (args.preferWorkOrder) {
+    return workOrder || artifact;
+  }
+  return artifact || workOrder;
+}
+
 /** Files and links that are not already the description body. Oldest first. */
 export function splitRunLinkedArtifacts(
   artifacts: FactoriesWorkOrderArtifact[],

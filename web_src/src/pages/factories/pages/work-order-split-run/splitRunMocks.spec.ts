@@ -268,7 +268,26 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(done.waitingNotes).toEqual([]);
     expect(done.footerTone).toBe("done");
     expect(done.footer.sentence).toBe("Work order completed successfully.");
-    expect(done.footer.actions).toEqual([]);
+    expect(done.footer.actions.map((action) => action.label)).toEqual(["Reopen"]);
+  });
+
+  it("keeps a completed order on the done footer when a leftover step failed", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Done job",
+        state: "STATE_CLOSED",
+        result: "RESULT_COMPLETED",
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            { id: "e-done", step: "Implement", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_FAILED" },
+          ]),
+        ],
+      }),
+    );
+
+    expect(fixture.footerTone).toBe("done");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reopen"]);
+    expect(fixture.footer.status).toBe("completed");
   });
 
   it("uses the newest dispatch on the viewed line", () => {
@@ -517,6 +536,7 @@ describe("line board work-order examples", () => {
       "#506",
     ]);
     expect(fixture.footerTone).toBe("failed");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reopen"]);
   });
 
   it("keeps the branch and pull request on implement for the verify enum card", () => {

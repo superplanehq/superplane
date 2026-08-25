@@ -7,11 +7,15 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
 import type { SplitRunFooter, SplitRunStopChoice } from "./splitRunFooter";
+import { isClosedWorkOrderDisplayStatus } from "./splitRunFooter";
 import { applySplitRunStop, type SplitRunStopRun } from "./splitRunStop";
 
-function closeToast(choice: SplitRunStopChoice): string {
+function closeToast(choice: SplitRunStopChoice, status?: SplitRunFooter["status"]): string {
   if (choice === "completed") {
     return "Work order closed as completed.";
+  }
+  if (choice === "reopen" || (choice === "draft" && isClosedWorkOrderDisplayStatus(status))) {
+    return "Work order reopened.";
   }
   if (choice === "draft") {
     return "Work order moved to draft.";
@@ -51,7 +55,7 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
   }, [closeWorkOrder, live, orderId]);
 
   const handleStop = useCallback(
-    async (choice: SplitRunStopChoice, footer: Pick<SplitRunFooter, "kind" | "run">) => {
+    async (choice: SplitRunStopChoice, footer: Pick<SplitRunFooter, "kind" | "run" | "status">) => {
       if (!live || !orderId) {
         return;
       }
@@ -59,19 +63,24 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
         await applySplitRunStop(choice, {
           kind: footer.kind,
           run: footer.run,
+          status: footer.status,
           cancelRun: (run) => cancelRun.mutateAsync(run),
           onClose: async (result) => {
             await closeWorkOrder.mutateAsync({ orderId, result });
-            showSuccessToast(closeToast(choice));
+            showSuccessToast(closeToast(choice, footer.status));
           },
           onStatusChange: async (state) => {
             await updateStatus.mutateAsync({ orderId, state });
-            showSuccessToast(closeToast(choice));
+            showSuccessToast(closeToast(choice, footer.status));
           },
         });
       } catch (error) {
         const fallback =
-          footer.kind === "running" && footer.run ? "Failed to stop the run" : "Failed to close work order";
+          choice === "reopen" || (choice === "draft" && isClosedWorkOrderDisplayStatus(footer.status))
+            ? "Failed to reopen work order"
+            : footer.kind === "running" && footer.run
+              ? "Failed to stop the run"
+              : "Failed to close work order";
         showErrorToast(getApiErrorMessage(error, fallback));
       }
     },

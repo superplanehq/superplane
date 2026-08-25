@@ -4,6 +4,16 @@ export const CONFIDENCE_SCORE_MAX = 5;
 
 export const CONFIDENCE_CHECK_NAME = "Confidence score";
 
+export function confidenceScoreFromChecks(
+  checks: Array<{ name?: string; score?: number }> | undefined,
+): number | undefined {
+  const check = (checks ?? []).find((entry) => entry.name === CONFIDENCE_CHECK_NAME);
+  if (check?.score == null) {
+    return undefined;
+  }
+  return clampConfidenceScore(check.score);
+}
+
 export type ConfidenceBand = "High" | "Medium" | "Low";
 
 export function clampConfidenceScore(score: number): number {

@@ -390,10 +390,21 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(footer).getByRole("button", { name: "Stop & Cancel" })).toBeInTheDocument();
   });
 
-  it("pins a default failed note above Stop with a Review the run link", () => {
+  it("hides Stop when the user cannot update the work order", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER),
+      canUpdate: false,
+    });
+
+    expect(screen.queryByRole("button", { name: "Stop & Cancel" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-stop")).not.toBeInTheDocument();
+  });
+
+  it("pins a default failed note above Reopen with a Review the run link", () => {
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
       factoryKey: PRIMARY_FACTORY_KEY,
+      orderNumber: BOARD_IMPLEMENT_FAILED_ORDER.number,
       fixture: splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER),
     });
 
@@ -405,8 +416,13 @@ describe("WorkOrderSplitRunPopup", () => {
       "href",
       expect.stringContaining(LINE_RUN_IMPLEMENT_FAILED_ID),
     );
+    expect(within(note).getByRole("link", { name: "Review the run" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("orderNumber=106"),
+    );
     expect(within(footer).getByText("This work order needs attention.")).toBeInTheDocument();
-    expect(within(footer).getByRole("button", { name: "Stop & Cancel" })).toBeInTheDocument();
+    expect(within(footer).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
+    expect(within(footer).queryByRole("button", { name: "Stop & Cancel" })).not.toBeInTheDocument();
   });
 
   it("offers one Stop control with Canceled as the default outcome", async () => {

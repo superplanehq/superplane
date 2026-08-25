@@ -96,9 +96,14 @@ vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "storybook-user" } }),
 }));
 
-vi.mock("@/hooks/useWorkOrderChecks", () => ({
-  useWorkOrderChecks: () => ({ data: [] }),
-}));
+vi.mock("@/hooks/useWorkOrderChecks", async () => {
+  const { DEFAULT_CHECKS_BY_ORDER_ID } = await import("../__fixtures__/workOrderCheckFixtures");
+  return {
+    useWorkOrderChecks: (_organizationId: string, _factoryId: string, orderId: string) => ({
+      data: DEFAULT_CHECKS_BY_ORDER_ID[orderId] ?? [],
+    }),
+  };
+});
 
 function LocationProbe() {
   const location = useLocation();
@@ -272,6 +277,7 @@ describe("LinesPage board", () => {
     expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
     expect(within(dialog).getByTestId("split-run-work-order-tab")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
     expect(within(dialog).getByTestId("split-run-review")).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole("tab", { name: "Log" }));

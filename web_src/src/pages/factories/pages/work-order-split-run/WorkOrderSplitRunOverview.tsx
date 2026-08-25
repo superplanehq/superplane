@@ -93,6 +93,7 @@ export function WorkOrderSplitRunOverview({
             footer={footer}
             organizationId={organizationId}
             factoryKey={factoryKey}
+            orderNumber={orderNumber}
             onStart={onStart}
             onStop={onStop}
             onReject={onReject}

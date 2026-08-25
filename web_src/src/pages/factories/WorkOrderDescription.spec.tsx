@@ -44,7 +44,7 @@ describe("WorkOrderDescription", () => {
   });
 
   it("keeps the body open when it fits the scroll pane", () => {
-    let contentHeight = 360;
+    const contentHeight = 360;
     render(
       <div data-testid="description-pane" style={{ overflowY: "auto", padding: "24px 0" }}>
         <WorkOrderDescription description="# Test description" />

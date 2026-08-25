@@ -74,6 +74,15 @@ describe("useSplitRunFooterActions", () => {
     expect(showSuccessToast).toHaveBeenCalledWith("Work order moved to draft.");
   });
 
+  it("reopens a closed work order", async () => {
+    const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
+
+    await result.current.handleStop("reopen", { kind: "failed", status: "failed" });
+
+    expect(updateMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", state: "STATE_OPEN" });
+    expect(showSuccessToast).toHaveBeenCalledWith("Work order reopened.");
+  });
+
   it("cancels the canvas run before closing a running order", async () => {
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 

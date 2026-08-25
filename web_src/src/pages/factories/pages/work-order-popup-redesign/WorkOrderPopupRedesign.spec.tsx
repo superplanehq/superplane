@@ -137,7 +137,9 @@ describe("Line board job popup", () => {
         name: "Open Show a clearer empty state on the billing page",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("work-order-card-score-wo-review-pay-842")).toHaveAttribute("aria-valuenow", "5");
+    await waitFor(() => {
+      expect(screen.getByTestId("work-order-card-score-wo-review-pay-842")).toHaveAttribute("aria-valuenow", "5");
+    });
     expect(screen.getByTestId("work-order-card-score-wo-review-pay-844")).toHaveAttribute("aria-valuenow", "4");
     expect(screen.getByTestId("work-order-card-score-wo-review-pay-845")).toHaveAttribute("aria-valuenow", "3");
     expect(screen.queryByLabelText("Plan phase")).not.toBeInTheDocument();
@@ -160,12 +162,15 @@ describe("Line board job popup", () => {
       })
       .closest("article") as HTMLElement;
     expect(within(webhookCard).getByLabelText("Running")).toBeInTheDocument();
-    expect(within(webhookCard).queryByText("Review needed")).not.toBeInTheDocument();
+    expect(within(webhookCard).queryByText("Review requested")).not.toBeInTheDocument();
     expect(within(webhookCard).queryByText("Run failed")).not.toBeInTheDocument();
     expect(
       within(screen.getByLabelText("Verify phase")).getByRole("button", {
         name: "Open Ship idempotent refund retries",
       }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("work-order-card-wo-failed-refunds")).getByText("Review requested"),
     ).toBeInTheDocument();
     expect(within(screen.getByLabelText("Verify phase")).getAllByRole("button", { name: /^Open / })).toHaveLength(2);
     expect(
@@ -255,7 +260,7 @@ describe("Line board job popup", () => {
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
     expect(
-      within(screen.getByTestId("work-order-card-wo-failed-refunds")).getByText("Review needed"),
+      within(screen.getByTestId("work-order-card-wo-failed-refunds")).getByText("Review requested"),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Open Ship idempotent refund retries" }));
@@ -271,7 +276,8 @@ describe("Line board job popup", () => {
     dialog = await screen.findByTestId("work-order-split-run");
     expect(within(dialog).getByRole("heading", { name: "Implement did not pass" })).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "Review the run" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Stop & Cancel" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Stop & Cancel" })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
@@ -290,6 +296,7 @@ describe("Line board job popup", () => {
     expect(within(dialog).getByRole("heading", { name: "Add retry handling to webhook delivery" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Plan" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
     await user.click(within(dialog).getByRole("tab", { name: "Log" }));
     expect(within(dialog).queryByTestId("split-run-phase-ingest")).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-phase-backlog")).toBeInTheDocument();

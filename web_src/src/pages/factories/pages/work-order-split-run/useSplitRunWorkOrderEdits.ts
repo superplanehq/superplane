@@ -37,6 +37,8 @@ export function useSplitRunWorkOrderEdits(args: {
   const [owner, setOwner] = useState(args.owner);
   const [assigneeIds, setAssigneeIds] = useState(args.assigneeIds);
   const descriptionSaved = useRef(false);
+  const latestDescription = useRef(args.description);
+  latestDescription.current = args.description;
 
   useEffect(() => {
     setTitle(args.title);
@@ -44,7 +46,7 @@ export function useSplitRunWorkOrderEdits(args: {
 
   useEffect(() => {
     descriptionSaved.current = false;
-    setDescription(args.description);
+    setDescription(latestDescription.current);
   }, [args.orderId]);
 
   useEffect(() => {
@@ -54,13 +56,24 @@ export function useSplitRunWorkOrderEdits(args: {
     setDescription(args.description);
   }, [args.description]);
 
-  useEffect(() => {
-    setOwner(args.owner);
-  }, [args.owner]);
+  const ownerId = args.owner.id;
+  const ownerName = args.owner.name;
+  const ownerInitials = args.owner.initials;
+  const ownerAvatarUrl = args.owner.avatarUrl;
+  const assigneeKey = args.assigneeIds.join("\0");
 
   useEffect(() => {
-    setAssigneeIds(args.assigneeIds);
-  }, [args.assigneeIds]);
+    setOwner({
+      id: ownerId,
+      name: ownerName,
+      initials: ownerInitials,
+      avatarUrl: ownerAvatarUrl,
+    });
+  }, [ownerAvatarUrl, ownerId, ownerInitials, ownerName]);
+
+  useEffect(() => {
+    setAssigneeIds(assigneeKey === "" ? [] : assigneeKey.split("\0"));
+  }, [assigneeKey]);
 
   const saveTitle = useCallback(
     async (next: string) => {

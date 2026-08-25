@@ -78,7 +78,7 @@ export function durationForExecution(
   const end = status === "running" || !Number.isFinite(parsedEnd) ? now : parsedEnd;
   const label = formatMinutesSecondsDuration(Math.max(0, end - start));
   if (!label) {
-    return status === "waiting" || status === "pending" ? durationForStatus(status) : "<1s";
+    return "<1s";
   }
   return label;
 }

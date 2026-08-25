@@ -11,6 +11,7 @@ import {
   splitRunDescriptionMarkdown,
   splitRunLinkedArtifacts,
   splitRunLogTabDotClass,
+  splitRunSourceDescription,
 } from "./splitRunPopupModel";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
@@ -31,6 +32,25 @@ describe("splitRunPopupModel", () => {
     expect(splitRunLogTabDotClass("failed")).toContain("--status-failed-dot");
     expect(splitRunLogTabDotClass("passed")).toContain("--status-completed-dot");
     expect(splitRunLogTabDotClass("pending")).toContain("--status-draft-dot");
+  });
+
+  it("prefers the saved work-order description on a live order", () => {
+    expect(
+      splitRunSourceDescription({
+        workOrderDescription: "Saved on the work order",
+        artifactDescription: "Stale artifact body",
+        preferWorkOrder: true,
+      }),
+    ).toBe("Saved on the work order");
+    expect(
+      splitRunSourceDescription({
+        workOrderDescription: "Saved on the work order",
+        artifactDescription: "Storybook artifact body",
+      }),
+    ).toBe("Storybook artifact body");
+    expect(splitRunSourceDescription({ workOrderDescription: "  ", artifactDescription: "Artifact fallback" })).toBe(
+      "Artifact fallback",
+    );
   });
 
   it("reads details.md as the work-order description", () => {

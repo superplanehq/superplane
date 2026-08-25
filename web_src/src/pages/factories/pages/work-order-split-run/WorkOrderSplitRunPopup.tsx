@@ -20,6 +20,7 @@ import {
   SPLIT_RUN_PANE_GRID_CLASSNAME,
   splitRunDescriptionMarkdown,
   splitRunLogTabDotClass,
+  splitRunSourceDescription,
 } from "./splitRunPopupModel";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
@@ -27,6 +28,20 @@ import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
 import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
 import { WorkOrderStatusDot } from "../../workOrders/WorkOrderStatusDot";
 import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
+
+function footerMutationHandlers(
+  canUpdate: boolean,
+  footerActions: ReturnType<typeof useSplitRunFooterActions>,
+  footer: SplitRunFixture["footer"],
+) {
+  if (!canUpdate) {
+    return { onStop: undefined, onReject: undefined };
+  }
+  return {
+    onStop: (choice: Parameters<typeof footerActions.handleStop>[0]) => void footerActions.handleStop(choice, footer),
+    onReject: footerActions.handleReject,
+  };
+}
 
 type WorkOrderSplitRunBodyProps = {
   organizationId?: string;
@@ -49,14 +64,17 @@ export function WorkOrderSplitRunBody({
   factoryId,
   factoryKey,
   orderId,
+  orderNumber,
   fixture,
   canvasEditHref,
   canvasExpandHref,
   onDispatch,
   isDispatching = false,
   canDispatch = false,
+  canUpdate = true,
 }: WorkOrderSplitRunBodyProps) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
+  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture.footer);
   const [phaseId, setPhaseId] = useState<SplitRunPhaseId>(fixture.currentPhaseId);
   const [openPhaseId, setOpenPhaseId] = useState<SplitRunPhaseId | null>(() => autoExpandedPhaseId(fixture));
   const [nodeId, setNodeId] = useState<string | null>(null);
@@ -115,9 +133,10 @@ export function WorkOrderSplitRunBody({
           footer={fixture.footer}
           organizationId={organizationId}
           factoryKey={factoryKey}
+          orderNumber={orderNumber}
           onStart={fixture.footer.kind === "draft" ? onDispatch : undefined}
-          onStop={(choice) => void footerActions.handleStop(choice, fixture.footer)}
-          onReject={footerActions.handleReject}
+          onStop={mutations.onStop}
+          onReject={mutations.onReject}
           startBusy={isDispatching}
           stopBusy={footerActions.busy}
           startDisabled={!canDispatch}
@@ -162,6 +181,7 @@ export function WorkOrderSplitRunPopup({
   fixed?: boolean;
 }) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
+  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture.footer);
   const fixtureArtifacts = collectSplitRunArtifacts(fixture);
   const useLiveArtifacts = Boolean(organizationId && factoryId && orderId);
   const liveArtifactsQuery = useWorkOrderArtifacts(organizationId ?? "", factoryId ?? "", orderId ?? "");
@@ -171,7 +191,11 @@ export function WorkOrderSplitRunPopup({
     useLive: useLiveArtifacts,
   });
   const artifactDescription = splitRunDescriptionMarkdown(artifacts) || splitRunDescriptionMarkdown(fixtureArtifacts);
-  const sourceDescription = artifactDescription || fixture.descriptionText || "";
+  const sourceDescription = splitRunSourceDescription({
+    workOrderDescription: fixture.descriptionText,
+    artifactDescription,
+    preferWorkOrder: useLiveArtifacts,
+  });
   const edits = useSplitRunWorkOrderEdits({
     organizationId,
     factoryId,
@@ -237,8 +261,8 @@ export function WorkOrderSplitRunPopup({
             source={fixture.source}
             footer={fixture.footer}
             onStart={fixture.footer.kind === "draft" ? onDispatch : undefined}
-            onStop={(choice) => void footerActions.handleStop(choice, fixture.footer)}
-            onReject={footerActions.handleReject}
+            onStop={mutations.onStop}
+            onReject={mutations.onReject}
             startBusy={isDispatching}
             stopBusy={footerActions.busy}
             startDisabled={!canDispatch}
@@ -257,6 +281,7 @@ export function WorkOrderSplitRunPopup({
             onDispatch={onDispatch}
             isDispatching={isDispatching}
             canDispatch={canDispatch}
+            canUpdate={canUpdate}
           />
         </TabsContent>
       </Tabs>

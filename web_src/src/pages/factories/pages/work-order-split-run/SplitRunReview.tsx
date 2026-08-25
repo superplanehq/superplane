@@ -13,6 +13,7 @@ import {
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import { WorkOrderCheckDialog } from "../../WorkOrderCheckDialog";
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
+import type { WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import type { SplitRunFooter, SplitRunFooterAction, SplitRunStopChoice } from "./splitRunFooter";
 import { SplitRunStopButton } from "./SplitRunStopButton";
 
@@ -30,6 +31,34 @@ const PILL_ICON = {
   critical: CircleAlert,
 } as const;
 
+function reviewRunHref(
+  organizationId: string | undefined,
+  factoryKey: string | undefined,
+  run: SplitRunFooter["run"],
+  orderNumber?: string,
+) {
+  if (!organizationId || !factoryKey || !run) {
+    return null;
+  }
+  return getWorkOrderRunHref(organizationId, factoryKey, run.appId, run.runId, { orderNumber });
+}
+
+function visibleFooterActions(
+  actions: SplitRunFooter["actions"],
+  onStop?: (choice: SplitRunStopChoice) => void | Promise<void>,
+  onReject?: () => void | Promise<void>,
+) {
+  return actions.filter((action) => {
+    if (action.kind === "stop" || action.kind === "reopen") {
+      return Boolean(onStop);
+    }
+    if (action.kind === "reject") {
+      return Boolean(onReject);
+    }
+    return true;
+  });
+}
+
 /**
  * Sticky stack under Description and Log. A waiting note is its own
  * card. The footer bar below it stays a separate bordered strip.
@@ -39,6 +68,7 @@ export function SplitRunReview({
   className,
   organizationId,
   factoryKey,
+  orderNumber,
   onStart,
   onStop,
   onReject,
@@ -50,6 +80,7 @@ export function SplitRunReview({
   className?: string;
   organizationId?: string;
   factoryKey?: string;
+  orderNumber?: string;
   onStart?: () => void | Promise<void>;
   onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
   onReject?: () => void | Promise<void>;
@@ -58,14 +89,12 @@ export function SplitRunReview({
   startDisabled?: boolean;
 }) {
   const showCard = Boolean(footer.attentionCard && footer.note);
-  const showBar = footer.sentence !== "" || footer.actions.length > 0;
+  const actions = visibleFooterActions(footer.actions, onStop, onReject);
+  const showBar = footer.sentence !== "" || actions.length > 0;
   if (!showCard && !showBar) {
     return null;
   }
-  const runHref =
-    organizationId && factoryKey && footer.run
-      ? getWorkOrderRunHref(organizationId, factoryKey, footer.run.appId, footer.run.runId)
-      : null;
+  const runHref = reviewRunHref(organizationId, factoryKey, footer.run, orderNumber);
 
   return (
     <div className={cn("shrink-0", className)}>
@@ -87,12 +116,13 @@ export function SplitRunReview({
             {footer.sentence !== "" ? (
               <p className="min-w-0 text-[13px] leading-5 text-muted-foreground">{footer.sentence}</p>
             ) : null}
-            {footer.actions.length > 0 ? (
+            {actions.length > 0 ? (
               <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                {footer.actions.map((action) => (
+                {actions.map((action) => (
                   <FooterAction
                     key={action.id}
                     action={action}
+                    status={footer.status}
                     onStart={onStart}
                     onStop={onStop}
                     onReject={onReject}
@@ -112,6 +142,7 @@ export function SplitRunReview({
 
 function FooterAction({
   action,
+  status,
   onStart,
   onStop,
   onReject,
@@ -120,6 +151,7 @@ function FooterAction({
   startDisabled,
 }: {
   action: SplitRunFooterAction;
+  status?: WorkOrderDisplayStatus;
   onStart?: () => void | Promise<void>;
   onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
   onReject?: () => void | Promise<void>;
@@ -132,7 +164,7 @@ function FooterAction({
   const testId = primary ? "split-run-review-cta" : `split-run-footer-${action.id}`;
 
   if (action.kind === "stop") {
-    return <SplitRunStopButton onStop={onStop} busy={stopBusy} />;
+    return <SplitRunStopButton onStop={onStop} busy={stopBusy} status={status} />;
   }
 
   if (action.kind === "start") {
@@ -146,6 +178,22 @@ function FooterAction({
         data-testid={testId}
       >
         {startBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
+        {action.label}
+      </Button>
+    );
+  }
+
+  if (action.kind === "reopen") {
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant={variant}
+        disabled={stopBusy}
+        onClick={() => void onStop?.("reopen")}
+        data-testid={testId}
+      >
+        {stopBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
         {action.label}
       </Button>
     );
