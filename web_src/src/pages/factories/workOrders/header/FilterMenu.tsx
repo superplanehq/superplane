@@ -18,12 +18,14 @@ import { MENU_ITEM_CLASSNAME, MENU_LABEL_CLASSNAME, MENU_TRIGGER_CLASSNAME } fro
 
 interface FilterMenuProps {
   state: WorkOrderListState;
-  lineOptions: WorkOrderFilterOption[];
+  /** Omit on a line board: the page is already scoped to one line. */
+  lineOptions?: WorkOrderFilterOption[];
   assigneeOptions: WorkOrderFilterOption[];
 }
 
 /** Filter trigger plus one submenu per dimension. Selections are additive. */
 export function FilterMenu({ state, lineOptions, assigneeOptions }: FilterMenuProps) {
+  const filterCount = lineOptions ? state.filterCount : state.filterCount - state.filters.lineIds.length;
   return (
     <DropdownMenu open={state.filterMenuOpen} onOpenChange={state.setFilterMenuOpen}>
       <DropdownMenuTrigger asChild>
@@ -36,8 +38,8 @@ export function FilterMenu({ state, lineOptions, assigneeOptions }: FilterMenuPr
         >
           <Funnel className="size-3.5" aria-hidden />
           Filter
-          {state.filterCount > 0 ? (
-            <span className="ml-0.5 rounded bg-accent px-1 text-[10px] text-foreground">{state.filterCount}</span>
+          {filterCount > 0 ? (
+            <span className="ml-0.5 rounded bg-accent px-1 text-[10px] text-foreground">{filterCount}</span>
           ) : (
             <kbd className="ml-0.5 hidden rounded border border-border px-1 font-sans text-[10px] text-muted-foreground sm:inline">
               F
@@ -56,14 +58,16 @@ export function FilterMenu({ state, lineOptions, assigneeOptions }: FilterMenuPr
           options={buildStatusFilterOptions()}
         />
 
-        <FilterSubMenu
-          label="Line"
-          resetLabel="Any line"
-          dimension="lineIds"
-          state={state}
-          options={lineOptions}
-          emptyLabel="No lines yet"
-        />
+        {lineOptions ? (
+          <FilterSubMenu
+            label="Line"
+            resetLabel="Any line"
+            dimension="lineIds"
+            state={state}
+            options={lineOptions}
+            emptyLabel="No lines yet"
+          />
+        ) : null}
 
         <FilterSubMenu
           label="Owner"

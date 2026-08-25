@@ -297,7 +297,7 @@ describe.each(viewsWithDispatch)("$name dispatch control", ({ Component }) => {
 });
 
 describe("WorkOrderCard scores", () => {
-  it("shows a score and hides Start on a scored draft card", () => {
+  it("shows a score and a Start button to the right of the score", () => {
     const draft = buildWorkOrderListEntry(
       {
         id: "wo-draft-scored",
@@ -326,14 +326,67 @@ describe("WorkOrderCard scores", () => {
             isAssigneesSaving={false}
             onDispatch={vi.fn()}
             onAssigneesSave={vi.fn()}
-            confidencePct={95}
+            confidenceScore={5}
             onOpen={vi.fn()}
           />
         </MemoryRouter>
       </QueryClientProvider>,
     );
 
-    expect(screen.getByTestId("work-order-card-score-wo-draft-scored")).toHaveTextContent("95%");
-    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    const score = screen.getByTestId("work-order-card-score-wo-draft-scored");
+    expect(score).toHaveAttribute("aria-valuenow", "5");
+    expect(score).toHaveAttribute("aria-valuemax", "5");
+    expect(score.querySelectorAll("[data-filled='true']")).toHaveLength(5);
+    expect(score.querySelectorAll("[data-filled='false']")).toHaveLength(0);
+    const start = screen.getByRole("button", { name: "Start" });
+    expect(start).toBeInTheDocument();
+    expect(score.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows the check name and score when the bars are hovered", async () => {
+    const user = userEvent.setup();
+    const draft = buildWorkOrderListEntry(
+      {
+        id: "wo-draft-scored",
+        number: "842",
+        title: "Add retry handling to webhook delivery",
+        state: "STATE_DRAFT",
+        createdAt: "2024-06-01T00:00:00Z",
+        updatedAt: "2024-06-02T00:00:00Z",
+        lineDispatches: [],
+        assignees: [],
+      },
+      factory,
+    );
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <WorkOrderCard
+            entry={draft}
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            factoryLines={[{ id: "line-a", name: "hotfix" }]}
+            canDispatch
+            canAssign
+            isDispatching={false}
+            isAssigneesSaving={false}
+            onDispatch={vi.fn()}
+            onAssigneesSave={vi.fn()}
+            confidenceScore={4}
+            onOpen={vi.fn()}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const score = screen.getByTestId("work-order-card-score-wo-draft-scored");
+    expect(effectivePointerEvents(score)).toBe("auto");
+
+    await user.hover(score);
+
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("Confidence score");
+    expect(tip).toHaveTextContent("4/5");
   });
 });

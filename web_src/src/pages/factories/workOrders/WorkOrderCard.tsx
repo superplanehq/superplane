@@ -11,10 +11,13 @@ import {
 import { factoryHomePath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
+import { ConfidenceMeter } from "./ConfidenceMeter";
 import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
+import { WorkOrderStatusDot } from "./WorkOrderStatusDot";
 
 export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   organizationId: string;
+  factoryId?: string;
   factoryKey: string;
   factoryLines: FactoriesFactoryLine[];
   /** When set, Start on a draft sends the work order to this line. */
@@ -34,8 +37,8 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   href?: string;
   /** When set, the card overlay opens this handler instead of navigating. */
   onOpen?: () => void;
-  /** First-run analysis score. Hides Start on draft cards. */
-  confidencePct?: number;
+  /** Confidence score from ListWorkOrderChecks, 0 to 5. Shown left of Start. */
+  confidenceScore?: number;
 }
 
 /**
@@ -43,9 +46,9 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  *
  * Every board uses this complete component. Status is a colored dot next
  * to the title. The footer shows the owner (except on drafts), the age of
- * the work order, and a Start button on drafts or a score on reviewed
- * drafts. Waiting cards show an attention label. The owner is
- * display-only on the card.
+ * the work order, and a Start button on drafts. Reviewed drafts also
+ * show a score to the left of Start. Waiting cards show an attention
+ * label such as Review requested. The owner is display-only on the card.
  */
 export function WorkOrderCard({
   entry,
@@ -58,13 +61,13 @@ export function WorkOrderCard({
   onDispatch,
   href,
   onOpen,
-  confidencePct,
+  confidenceScore,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination = href ?? factoryHomePath(organizationId, factoryKey, factoryLines[0]?.id);
   const startedAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const startedLabel = startedAt ? formatTimeAgo(startedAt) : "—";
-  const showStart = entry.displayStatus === "draft" && confidencePct == null;
+  const showStart = entry.displayStatus === "draft";
   const attentionReason = getWorkOrderAttentionReason(entry.order);
   const AttentionIcon = attentionReason ? WORK_ORDER_ATTENTION_ICON[attentionReason] : null;
 
@@ -86,15 +89,12 @@ export function WorkOrderCard({
 
       <div className="relative z-10 pointer-events-none">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="relative size-2 shrink-0" title={meta.label} aria-label={meta.label}>
-            {entry.displayStatus === "running" ? (
-              <span
-                className={cn("absolute inset-0 rounded-full opacity-60 animate-ping", meta.dotClassName)}
-                aria-hidden
-              />
-            ) : null}
-            <span className={cn("relative block size-2 rounded-full", meta.dotClassName)} />
-          </span>
+          <WorkOrderStatusDot
+            colorClassName={meta.dotClassName}
+            pulsing={entry.displayStatus === "running"}
+            title={meta.label}
+            aria-label={meta.label}
+          />
           <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-snug text-foreground">
             {entry.title}
           </h3>
@@ -110,23 +110,26 @@ export function WorkOrderCard({
               {startedLabel}
             </span>
           </div>
-          {confidencePct != null ? (
-            <span
-              className="shrink-0 text-[12px] font-medium tabular-nums text-foreground"
-              data-testid={`work-order-card-score-${entry.id}`}
-            >
-              {confidencePct}%
-            </span>
-          ) : null}
-          {showStart ? (
-            <StartDraftButton
-              entry={entry}
-              lines={factoryLines}
-              preferredLineName={preferredLineName}
-              canDispatch={canDispatch}
-              isDispatching={isDispatching}
-              onDispatch={onDispatch}
-            />
+          {confidenceScore != null || showStart ? (
+            <div className="flex shrink-0 items-center gap-1.5">
+              {confidenceScore != null ? (
+                <ConfidenceMeter
+                  score={confidenceScore}
+                  className="shrink-0"
+                  testId={`work-order-card-score-${entry.id}`}
+                />
+              ) : null}
+              {showStart ? (
+                <StartDraftButton
+                  entry={entry}
+                  lines={factoryLines}
+                  preferredLineName={preferredLineName}
+                  canDispatch={canDispatch}
+                  isDispatching={isDispatching}
+                  onDispatch={onDispatch}
+                />
+              ) : null}
+            </div>
           ) : null}
           {attentionReason && AttentionIcon ? (
             <span

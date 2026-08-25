@@ -1,11 +1,14 @@
-import { cn } from "@/lib/utils";
+import { cn, resolveIcon } from "@/lib/utils";
 import { ChevronRight } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+
+import type { FactoriesWorkOrderArtifact } from "@/api-client";
 
 import type { PhaseGlyphKind } from "../../lib/linePhaseRuns";
 import { toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { WorkOrderArtifactInline } from "../../WorkOrderArtifactInline";
 import { PhaseGlyph } from "../linePhaseGlyph";
+import { SplitRunCheckPills } from "./SplitRunReview";
 import {
   splitRunStatusLabel,
   type SplitRunPhase,
@@ -29,9 +32,133 @@ function streamTone(status: SplitRunPhaseStatus): string {
   return "text-muted-foreground";
 }
 
+type StreamNodeGroup = {
+  line: SplitRunStreamLine;
+  notes: SplitRunStreamLine[];
+  artifact?: FactoriesWorkOrderArtifact;
+};
+
+export function toolCallSummary(tools: Array<{ type?: string; componentType?: string }>): string {
+  const files = tools.filter((tool) => (tool.type ?? tool.componentType) === "read").length;
+  const commands = tools.length - files;
+  const parts: string[] = [];
+  if (files > 0) {
+    parts.push(files === 1 ? "Read 1 file" : `Read ${files} files`);
+  }
+  if (commands > 0) {
+    const ran = commands === 1 ? "ran 1 command" : `ran ${commands} commands`;
+    parts.push(parts.length === 0 ? ran.charAt(0).toUpperCase() + ran.slice(1) : ran);
+  }
+  return parts.join(", ");
+}
+
+export type ClaudeStepEvent =
+  | { kind: "note"; line: SplitRunStreamLine }
+  | { kind: "tools"; id: string; tools: SplitRunStreamLine[] };
+
+export type ClaudeStepGroup = {
+  line: SplitRunStreamLine;
+  events: ClaudeStepEvent[];
+};
+
+export function groupClaudeSteps(notes: SplitRunStreamLine[]): ClaudeStepGroup[] {
+  const steps: ClaudeStepGroup[] = [];
+  let pendingTools: SplitRunStreamLine[] = [];
+  let toolGroup = 0;
+
+  const flushTools = (parent: ClaudeStepGroup) => {
+    if (pendingTools.length === 0) {
+      return;
+    }
+    parent.events.push({
+      kind: "tools",
+      id: `${parent.line.id}-tools-${toolGroup}`,
+      tools: pendingTools,
+    });
+    toolGroup += 1;
+    pendingTools = [];
+  };
+
+  for (const line of notes) {
+    if (!line.noteParentId) {
+      const current = steps.at(-1);
+      if (current) {
+        flushTools(current);
+      }
+      toolGroup = 0;
+      steps.push({ line, events: [] });
+      continue;
+    }
+    const parent = steps.find((step) => step.line.id === line.noteParentId);
+    if (!parent) {
+      continue;
+    }
+    if (line.componentType === "note") {
+      flushTools(parent);
+      parent.events.push({ kind: "note", line });
+      continue;
+    }
+    pendingTools.push(line);
+  }
+
+  const last = steps.at(-1);
+  if (last) {
+    flushTools(last);
+  }
+  return steps;
+}
+
+export function groupSplitRunStream(lines: SplitRunStreamLine[]): StreamNodeGroup[] {
+  const notesByNode = new Map<string, SplitRunStreamLine[]>();
+  for (const line of lines) {
+    if (!line.note || !line.nodeId) {
+      continue;
+    }
+    const notes = notesByNode.get(line.nodeId) ?? [];
+    notes.push(line);
+    notesByNode.set(line.nodeId, notes);
+  }
+
+  return lines
+    .filter((line) => !line.note && line.action !== "did not run")
+    .map((line) => ({
+      line,
+      notes: notesByNode.get(line.nodeId ?? "") ?? [],
+      artifact: line.artifact,
+    }));
+}
+
+function artifactsProducedBySteps(
+  groups: StreamNodeGroup[],
+  fallback: FactoriesWorkOrderArtifact[],
+): FactoriesWorkOrderArtifact[] {
+  const produced: FactoriesWorkOrderArtifact[] = [];
+  const seen = new Set<string>();
+  const add = (artifact?: FactoriesWorkOrderArtifact) => {
+    if (!artifact) {
+      return;
+    }
+    const key = artifact.id ?? `${artifact.type}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    produced.push(artifact);
+  };
+  for (const group of groups) {
+    add(group.artifact);
+    for (const note of group.notes) {
+      add(note.artifact);
+    }
+  }
+  return produced.length > 0 ? produced : fallback;
+}
+
 /**
- * Terminal log row. Completed phases stay collapsed. The open phase
- * lists one line per canvas node.
+ * Terminal log. The automation is the root. Each node hangs under it.
+ * Collapsed automations show produced artifacts on the title line.
+ * Expanded automations show those artifacts on the producing steps.
+ * Node lines indent under the automation.
  */
 export function PhaseLogCard({
   phase,
@@ -50,7 +177,8 @@ export function PhaseLogCard({
   onSelectNode?: (nodeId: string) => void;
   collapsible?: boolean;
 }) {
-  const lines = stream ?? phase.stream;
+  const groups = groupSplitRunStream(stream ?? phase.stream);
+  const producedArtifacts = artifactsProducedBySteps(groups, phase.artifacts);
 
   useEffect(() => {
     if (!selectedNodeId) {
@@ -64,66 +192,51 @@ export function PhaseLogCard({
 
   return (
     <div data-testid={`split-run-phase-${phase.id}`} aria-current={expanded ? "step" : undefined}>
-      <div className="flex items-start gap-1.5">
+      <div className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
         {collapsible ? (
           <button
             type="button"
             onClick={onToggle}
             aria-expanded={expanded}
-            className="flex min-w-0 flex-1 items-start gap-1.5 py-0.5 text-left font-mono text-[12px] leading-5"
+            className="flex min-w-0 items-center gap-1.5 text-left font-mono text-[12px] leading-none"
           >
             <ChevronRight
-              className={cn(
-                "mt-0.5 size-3 shrink-0 text-muted-foreground transition-transform",
-                expanded && "rotate-90",
-              )}
+              className={cn("size-3 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")}
               aria-hidden
             />
-            <PhaseGlyph kind={statusGlyph(phase.status)} className="mt-0.5 size-3" />
-            <span className="min-w-0 flex-1">
-              <span className="text-foreground">{phase.name}</span>
-              <span className="text-muted-foreground"> · {phase.componentName}</span>
-            </span>
-            <span className={cn("shrink-0", streamTone(phase.status))}>{splitRunStatusLabel(phase.status)}</span>
-            <span className="w-16 shrink-0 text-right tabular-nums text-muted-foreground">{phase.duration}</span>
+            <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3" />
+            <PhaseTitle phase={phase} />
           </button>
         ) : (
-          <div className="flex min-w-0 flex-1 items-start gap-1.5 py-0.5 font-mono text-[12px] leading-5">
-            <PhaseGlyph kind={statusGlyph(phase.status)} className="mt-0.5 size-3" />
-            <span className="min-w-0 flex-1">
-              <span className="text-foreground">{phase.name}</span>
-              <span className="text-muted-foreground"> · {phase.componentName}</span>
-            </span>
-            <span className={cn("shrink-0", streamTone(phase.status))}>{splitRunStatusLabel(phase.status)}</span>
-            <span className="w-16 shrink-0 text-right tabular-nums text-muted-foreground">{phase.duration}</span>
+          <div className="flex min-w-0 items-center gap-1.5 font-mono text-[12px] leading-none">
+            <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3" />
+            <PhaseTitle phase={phase} />
           </div>
         )}
+        {phase.checks && phase.checks.length > 0 ? (
+          <span className="shrink-0">
+            <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
+          </span>
+        ) : null}
+        {!expanded && producedArtifacts.length > 0 ? (
+          <span
+            data-testid={`split-run-phase-artifacts-${phase.id}`}
+            className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap"
+          >
+            {producedArtifacts.map((artifact) => (
+              <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
+            ))}
+          </span>
+        ) : null}
       </div>
 
-      {phase.artifacts.length > 0 ? (
-        <ul className="mt-0.5 ml-8 flex flex-wrap gap-x-3 gap-y-0.5">
-          {phase.artifacts.map((artifact) => (
-            <li key={artifact.id ?? `${artifact.type}`}>
-              <WorkOrderArtifactInline
-                className="font-mono text-[12px] font-normal tracking-normal"
-                artifact={{
-                  id: artifact.id,
-                  type: artifact.type ?? "TYPE_UNSPECIFIED",
-                  data: toArtifactDataRecord(artifact.data),
-                }}
-              />
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
       {expanded ? (
-        <ol className="mt-1 mb-1 ml-8 space-y-0.5" data-testid={`split-run-stream-${phase.id}`}>
-          {lines.map((line) => (
-            <StreamLine
-              key={line.id}
-              line={line}
-              highlighted={Boolean(line.nodeId && line.nodeId === selectedNodeId)}
+        <ol className="mt-0.5 mb-1 font-mono text-[12px] leading-none" data-testid={`split-run-stream-${phase.id}`}>
+          {groups.map((group) => (
+            <StreamNode
+              key={group.line.id}
+              group={group}
+              highlighted={Boolean(group.line.nodeId && group.line.nodeId === selectedNodeId)}
               onSelect={onSelectNode}
             />
           ))}
@@ -133,17 +246,38 @@ export function PhaseLogCard({
   );
 }
 
-function StreamLine({
-  line,
+function PhaseTitle({ phase }: { phase: SplitRunPhase }) {
+  const duration = phase.duration.replace(/\s+so far$/i, "").trim() || "—";
+  return (
+    <span className="min-w-0 flex-1 whitespace-nowrap">
+      <span className="text-foreground">{phase.name}</span>
+      <span className="text-muted-foreground">{` > ${phase.componentName}`}</span>
+      <span className={cn("ml-2", streamTone(phase.status))}>{splitRunStatusLabel(phase.status)}</span>
+      <span className="ml-2 tabular-nums text-muted-foreground">{duration}</span>
+    </span>
+  );
+}
+
+function StreamNode({
+  group,
   highlighted,
   onSelect,
 }: {
-  line: SplitRunStreamLine;
+  group: StreamNodeGroup;
   highlighted: boolean;
   onSelect?: (nodeId: string) => void;
 }) {
-  const passed = !line.note && line.status === "passed";
-  const failed = !line.note && line.status === "failed";
+  const { line, notes, artifact } = group;
+  const action = streamActionOf(line);
+  const steps = groupClaudeSteps(notes);
+  const hasChildren = steps.length > 0;
+  const [expanded, setExpanded] = useState(line.status === "running" || highlighted);
+
+  useEffect(() => {
+    if (highlighted && hasChildren) {
+      setExpanded(true);
+    }
+  }, [highlighted, hasChildren]);
 
   return (
     <li>
@@ -152,54 +286,293 @@ function StreamLine({
         data-highlighted={highlighted ? "true" : undefined}
         aria-current={highlighted ? "true" : undefined}
         className={cn(
-          "flex w-full items-baseline gap-2 rounded-sm px-1 py-0.5 font-mono text-[12px] leading-5",
+          "flex h-4 w-full items-center whitespace-nowrap rounded-sm",
           highlighted && "bg-accent ring-1 ring-foreground/15",
         )}
       >
+        <NodeIndent />
         <button
           type="button"
+          data-testid={`split-run-node-toggle-${line.id}`}
+          aria-expanded={hasChildren ? expanded : undefined}
           onClick={() => {
+            if (hasChildren) {
+              setExpanded((open) => !open);
+            }
             if (line.nodeId) {
               onSelect?.(line.nodeId);
             }
           }}
           className={cn(
-            "flex min-w-0 flex-1 items-baseline gap-2 text-left",
-            line.nodeId && "cursor-pointer hover:text-foreground",
+            "flex min-w-0 flex-1 items-center gap-2 text-left",
+            (hasChildren || line.nodeId) && "cursor-pointer hover:text-foreground",
           )}
         >
+          <span className="inline-flex w-3 shrink-0 items-center justify-center text-muted-foreground">
+            {hasChildren ? (
+              <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} aria-hidden />
+            ) : null}
+          </span>
           <span className="w-14 shrink-0 tabular-nums text-muted-foreground">{line.at}</span>
+          <StreamLineIcon iconSlug={line.iconSlug} iconSrc={line.iconSrc} />
+          {line.componentType ? <span className="shrink-0 text-muted-foreground">{line.componentType}</span> : null}
           <span
-            className={cn(
-              "min-w-0 flex-1 truncate",
-              line.note || line.status === "pending" ? "text-muted-foreground" : "text-foreground",
-            )}
+            className={cn("min-w-0 truncate", line.status === "pending" ? "text-muted-foreground" : "text-foreground")}
           >
             {line.componentName}
           </span>
+          <span className="shrink-0 text-muted-foreground" aria-hidden>
+            {">"}
+          </span>
+          <span className={cn("shrink-0", streamTone(line.status))}>{action}</span>
         </button>
-        {line.artifact ? (
-          <WorkOrderArtifactInline
-            className="font-mono text-[12px] font-normal tracking-normal"
-            artifact={{
-              id: line.artifact.id,
-              type: line.artifact.type ?? "TYPE_UNSPECIFIED",
-              data: toArtifactDataRecord(line.artifact.data),
-            }}
-          />
-        ) : null}
-        {passed ? (
-          <span className="w-4 shrink-0 text-right text-[color:var(--status-success)]" aria-label="Completed">
-            ✓
-          </span>
-        ) : failed ? (
-          <span className="w-4 shrink-0 text-right text-[color:var(--status-failed-fg)]" aria-label="Failed">
-            ×
-          </span>
-        ) : (
-          <span className="w-4 shrink-0" aria-hidden />
-        )}
+        {artifact ? <StreamArtifact artifact={artifact} /> : null}
       </div>
+      {expanded ? (
+        <ol>
+          {steps.map((step) => (
+            <StreamStep key={step.line.id} step={step} />
+          ))}
+        </ol>
+      ) : null}
     </li>
   );
+}
+
+function StreamStep({ step }: { step: ClaudeStepGroup }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasOutput = Boolean(step.line.detail);
+  const hasBody = step.events.length > 0 || hasOutput;
+
+  const header = (
+    <>
+      <StreamIndent ch={8} />
+      <ExpandChevron expanded={expanded} visible={hasBody} />
+      {step.line.componentType ? (
+        <span className={cn("mr-2 shrink-0", stepTypeTone(step.line.componentType))}>{step.line.componentType}</span>
+      ) : null}
+      <span className="min-w-0 truncate text-muted-foreground">{step.line.componentName}</span>
+      <StepStatusMark status={step.line.status} />
+    </>
+  );
+
+  return (
+    <li>
+      {hasBody ? (
+        <button
+          type="button"
+          data-testid={`split-run-stream-line-${step.line.id}`}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((open) => !open)}
+          className="flex h-4 w-full cursor-pointer items-center whitespace-nowrap text-left hover:text-foreground"
+        >
+          {header}
+        </button>
+      ) : (
+        <div
+          data-testid={`split-run-stream-line-${step.line.id}`}
+          className="flex h-4 w-full items-center whitespace-nowrap"
+        >
+          {header}
+        </div>
+      )}
+      {expanded ? (
+        <>
+          {hasOutput ? <StreamOutput text={step.line.detail ?? ""} /> : null}
+          {step.events.map((event) =>
+            event.kind === "note" ? (
+              <div
+                key={event.line.id}
+                data-testid={`split-run-stream-line-${event.line.id}`}
+                className="flex w-full items-start"
+              >
+                <StreamIndent ch={12} />
+                <span className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-4 text-foreground">
+                  {event.line.componentName}
+                </span>
+              </div>
+            ) : (
+              <StreamToolGroup key={event.id} stepId={event.id} tools={event.tools} />
+            ),
+          )}
+        </>
+      ) : null}
+    </li>
+  );
+}
+
+function StreamToolGroup({ stepId, tools }: { stepId: string; tools: SplitRunStreamLine[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const summary = toolCallSummary(tools);
+
+  return (
+    <div>
+      <button
+        type="button"
+        data-testid={`split-run-tools-toggle-${stepId}`}
+        aria-expanded={expanded}
+        aria-label={summary}
+        onClick={() => setExpanded((open) => !open)}
+        className="flex h-4 w-full items-center whitespace-nowrap text-muted-foreground"
+      >
+        <StreamIndent ch={12} />
+        <ChevronRight className={cn("mr-1 size-3 transition-transform", expanded && "rotate-90")} aria-hidden />
+        <span className="min-w-0 truncate">{summary}</span>
+      </button>
+      {expanded ? (
+        <ol>
+          {tools.map((tool) => (
+            <StreamTool key={tool.id} tool={tool} />
+          ))}
+        </ol>
+      ) : null}
+    </div>
+  );
+}
+
+function StreamTool({ tool }: { tool: SplitRunStreamLine }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasOutput = Boolean(tool.detail);
+  const row = (
+    <>
+      <StreamIndent ch={12} />
+      <ExpandChevron expanded={expanded} visible={hasOutput} />
+      {tool.componentType ? (
+        <span className={cn("mr-2 shrink-0", stepTypeTone(tool.componentType))}>{tool.componentType}</span>
+      ) : null}
+      <span className="min-w-0 truncate text-muted-foreground">{tool.componentName}</span>
+      <StepStatusMark status={tool.status} />
+    </>
+  );
+
+  return (
+    <li>
+      {hasOutput ? (
+        <button
+          type="button"
+          data-testid={`split-run-stream-line-${tool.id}`}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((open) => !open)}
+          className="flex h-4 w-full cursor-pointer items-center whitespace-nowrap text-left hover:text-foreground"
+        >
+          {row}
+        </button>
+      ) : (
+        <div
+          data-testid={`split-run-stream-line-${tool.id}`}
+          className="flex h-4 w-full items-center whitespace-nowrap"
+        >
+          {row}
+        </div>
+      )}
+      {expanded && hasOutput ? <StreamOutput text={tool.detail ?? ""} /> : null}
+    </li>
+  );
+}
+
+function StreamOutput({ text }: { text: string }) {
+  return (
+    <div className="flex w-full items-start">
+      <StreamIndent ch={12} />
+      <pre className="min-w-0 flex-1 whitespace-pre-wrap break-words py-0.5 font-mono text-[12px] leading-4 text-muted-foreground">
+        {text}
+      </pre>
+    </div>
+  );
+}
+
+function StepStatusMark({ status }: { status: SplitRunPhaseStatus }) {
+  if (status === "failed") {
+    return (
+      <span className="ml-auto shrink-0 pl-2 text-[color:var(--status-failed-fg)]" aria-label="failed">
+        ✗
+      </span>
+    );
+  }
+  if (status === "passed") {
+    return (
+      <span className="ml-auto shrink-0 pl-2 text-[color:var(--status-success)]" aria-label="passed">
+        ✓
+      </span>
+    );
+  }
+  return null;
+}
+
+function NodeIndent() {
+  return <StreamIndent ch={4} testId="split-run-node-indent" />;
+}
+
+function StreamIndent({ ch, testId }: { ch: number; testId?: string }) {
+  return (
+    <span
+      data-testid={testId}
+      className="inline-block shrink-0 whitespace-pre"
+      style={{ width: `${ch}ch` }}
+      aria-hidden
+    >
+      {" ".repeat(ch)}
+    </span>
+  );
+}
+
+function ExpandChevron({ expanded, visible }: { expanded: boolean; visible: boolean }) {
+  return (
+    <span className="inline-flex w-4 shrink-0 items-center justify-start text-muted-foreground">
+      {visible ? (
+        <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} aria-hidden />
+      ) : null}
+    </span>
+  );
+}
+
+function stepTypeTone(type: string): string {
+  if (type === "prompt") {
+    return "text-[#8658d6]";
+  }
+  if (type === "bash") {
+    return "text-[#fd7e14]";
+  }
+  return "text-muted-foreground";
+}
+
+function StreamArtifact({ artifact }: { artifact: FactoriesWorkOrderArtifact }) {
+  return (
+    <WorkOrderArtifactInline
+      className="font-mono text-[12px] font-normal tracking-normal"
+      artifact={{
+        id: artifact.id,
+        type: artifact.type ?? "TYPE_UNSPECIFIED",
+        data: toArtifactDataRecord(artifact.data),
+      }}
+    />
+  );
+}
+
+function StreamLineIcon({ iconSlug, iconSrc }: { iconSlug?: string; iconSrc?: string }) {
+  const Icon = resolveIcon(iconSlug ?? "box");
+  return (
+    <span className="inline-flex size-3 shrink-0 items-center justify-center text-muted-foreground" aria-hidden>
+      {iconSrc ? <img src={iconSrc} alt="" className="size-3 object-contain" /> : <Icon className="size-3" />}
+    </span>
+  );
+}
+
+function streamActionOf(line: SplitRunStreamLine): string {
+  if (line.action) {
+    return line.action;
+  }
+  if (line.status === "passed") {
+    return "passed";
+  }
+  if (line.status === "failed") {
+    return "failed";
+  }
+  if (line.status === "running") {
+    return "running";
+  }
+  if (line.status === "waiting") {
+    return "waiting";
+  }
+  return "—";
 }

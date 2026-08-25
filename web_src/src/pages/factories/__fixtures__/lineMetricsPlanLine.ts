@@ -22,18 +22,33 @@ const PLAN_LINE_BACKLOG_APP_ID = "app-refund-backlog";
 
 export const BACKLOG_APP: FactoryApp = {
   id: PLAN_LINE_BACKLOG_APP_ID,
-  name: "Backlog",
-  description: "Scopes work orders before they enter a line.",
+  name: "Ingest",
+  description: "Create a work order when a GitHub issue gets the factory label or is assigned to the SuperPlane agent.",
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+};
+
+export const SENTRY_INTAKE_APP: FactoryApp = {
+  id: "app-refund-sentry",
+  name: "Sentry",
+  description: "Create a work order when Sentry opens an issue.",
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+};
+
+export const SLACK_INTAKE_APP: FactoryApp = {
+  id: "app-refund-slack",
+  name: "Slack",
+  description: "Create a work order when someone mentions the SuperPlane agent in Slack.",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
 };
 
 export const PLAN_LINE_APPS: FactoryApp[] = [
   BACKLOG_APP,
+  SENTRY_INTAKE_APP,
+  SLACK_INTAKE_APP,
   ...REFUND_FACTORY_APPS.map((app) => {
-    if (app.id === "app-refund-planner") {
-      return { ...app, name: "Plan" };
-    }
     if (app.id === "app-refund-implementer") {
       return { ...app, name: "Implement" };
     }
@@ -58,7 +73,6 @@ export function withPlanLinePhases(line: FactoriesFactoryLine): FactoriesFactory
   return {
     ...line,
     steps: [
-      runAppStep("app-refund-planner", "start-plan"),
       runAppStep("app-refund-implementer", "start-implementation"),
       runAppStep("app-refund-verifier", "start-verification"),
       runAppStep(PLAN_LINE_DONE_APP_ID, "start-done"),
@@ -74,10 +88,9 @@ export function planLineActiveDispatch(
     id: `dispatch-${REFUND_LINE_PLAN_ID}-${orderId}`,
     line: { id: REFUND_LINE_PLAN_ID, name: "plan-and-implement" },
     steps: [
-      { name: "Plan", stepIndex: 0 },
-      { name: "Implement", stepIndex: 1 },
-      { name: "Verify", stepIndex: 2 },
-      { name: "Done", stepIndex: 3 },
+      { name: "Implement", stepIndex: 0 },
+      { name: "Verify", stepIndex: 1 },
+      { name: "Done", stepIndex: 2 },
     ],
     state: "STATE_ACTIVE",
     result: "RESULT_UNKNOWN",
