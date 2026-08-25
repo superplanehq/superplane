@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
-import { CircleAlert, CircleCheck, ExternalLink, Hourglass, Loader2, Minus, Play, TriangleAlert } from "lucide-react";
+import { CircleAlert, CircleCheck, ExternalLink, Loader2, Minus, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -12,9 +12,8 @@ import {
   type WorkOrderCheckLevel,
   type WorkOrderCheckPresentation,
 } from "../../lib/workOrderChecks";
-import type { WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 import { WorkOrderCheckDialog } from "../../WorkOrderCheckDialog";
-import type { SplitRunFooterTone } from "./splitRunMocks";
+import type { SplitRunFooter, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
 
 const PILL_TONE: Record<WorkOrderCheckLevel, string> = {
   positive: "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300",
@@ -30,160 +29,119 @@ const PILL_ICON = {
   critical: CircleAlert,
 } as const;
 
-const FOOTER_TONE: Record<
-  SplitRunFooterTone,
-  { panel: string; label: string; iconWrap: string; icon: string; Icon: typeof Hourglass }
-> = {
-  waiting: {
-    panel: "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)]",
-    label: "text-[color:var(--status-waiting-fg)]",
-    iconWrap: "bg-[color:var(--status-waiting-dot)]/15",
-    icon: "text-[color:var(--status-waiting-fg)]",
-    Icon: Hourglass,
-  },
-  draft: {
-    panel: "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)]",
-    label: "text-[color:var(--status-waiting-fg)]",
-    iconWrap: "bg-[color:var(--status-waiting-dot)]/15",
-    icon: "text-[color:var(--status-waiting-fg)]",
-    Icon: Play,
-  },
-  failed: {
-    panel: "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)]",
-    label: "text-[color:var(--status-failed-fg)]",
-    iconWrap: "bg-[color:var(--status-failed-dot)]/15",
-    icon: "text-[color:var(--status-failed-fg)]",
-    Icon: CircleAlert,
-  },
-};
-
 /**
- * Sticky next-step footer at the bottom of the Log. Check pills sit in
- * the header next to owner and cost.
+ * Quiet two-row footer under the Log. A run note sits above an always-on
+ * state bar. Check pills sit in the header next to owner and cost.
  */
 export function SplitRunReview({
-  notes,
-  tone = "waiting",
+  footer,
   className,
-  onAction,
-  actionBusy = false,
-  actionDisabled = false,
+  onStart,
+  startBusy = false,
+  startDisabled = false,
 }: {
-  notes: WorkOrderStatusNotePresentation[];
-  tone?: SplitRunFooterTone;
+  footer: SplitRunFooter;
   className?: string;
-  onAction?: () => void | Promise<void>;
-  actionBusy?: boolean;
-  actionDisabled?: boolean;
+  onStart?: () => void | Promise<void>;
+  startBusy?: boolean;
+  startDisabled?: boolean;
 }) {
-  const note = notes[0];
-
-  if (!note) {
-    return null;
-  }
-
-  const chrome = FOOTER_TONE[tone];
-  const Icon = chrome.Icon;
+  const showBar = footer.sentence !== "" || footer.actions.length > 0;
 
   return (
     <aside
-      className={cn(
-        "flex h-[11.5rem] shrink-0 flex-col justify-between border-t px-4 py-3 text-foreground",
-        chrome.panel,
-        className,
-      )}
+      className={cn("shrink-0 border-t border-border bg-background px-4 py-3 text-foreground", className)}
       role="complementary"
-      aria-label="Next step"
+      aria-label="Work order status"
       data-testid="split-run-review"
     >
-      <div className="min-h-0">
-        <p className={cn("text-[11px] font-semibold tracking-[0.06em] uppercase", chrome.label)}>Next step</p>
-        <div className="mt-1.5 flex items-start gap-2.5">
-          <span
-            className={cn("flex size-8 shrink-0 items-center justify-center rounded-full", chrome.iconWrap)}
-            aria-hidden
-          >
-            <Icon className={cn("size-4", chrome.icon)} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-[15px] font-semibold tracking-[-0.01em]">{note.headline}</h3>
-            {note.text ? (
-              <div className="mt-1 line-clamp-3 text-[13px] leading-5 [&_a]:underline">
-                <MarkdownContent content={note.text} variant="workspace" />
-              </div>
-            ) : null}
-          </div>
+      {footer.note ? <FooterNote note={footer.note} /> : null}
+      {showBar ? (
+        <div className={cn("flex flex-wrap items-center justify-between gap-3", footer.note && "mt-3")}>
+          <p className="min-w-0 text-[13px] leading-5 text-muted-foreground">{footer.sentence}</p>
+          {footer.actions.length > 0 ? (
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              {footer.actions.map((action) => (
+                <FooterAction
+                  key={action.id}
+                  action={action}
+                  onStart={onStart}
+                  startBusy={startBusy}
+                  startDisabled={startDisabled}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
-      </div>
-
-      <div className="mt-3 flex items-center justify-between gap-3">
-        {note.source?.name ? (
-          <p className="truncate text-[12px] text-muted-foreground">{note.source.name}</p>
-        ) : (
-          <span />
-        )}
-        <ReviewCta
-          cta={note.cta}
-          tone={tone}
-          onAction={onAction}
-          actionBusy={actionBusy}
-          actionDisabled={actionDisabled}
-        />
-      </div>
+      ) : null}
     </aside>
   );
 }
 
-function ReviewCta({
-  cta,
-  tone,
-  onAction,
-  actionBusy,
-  actionDisabled,
-}: {
-  cta?: WorkOrderStatusNotePresentation["cta"];
-  tone: SplitRunFooterTone;
-  onAction?: () => void | Promise<void>;
-  actionBusy: boolean;
-  actionDisabled: boolean;
-}) {
-  if (!cta) {
-    return null;
-  }
+function FooterNote({ note }: { note: SplitRunFooterNote }) {
+  return (
+    <div className="min-w-0">
+      <h3 className="text-[15px] font-semibold tracking-[-0.01em]">{note.headline}</h3>
+      {note.text ? (
+        <div className="mt-1 text-[13px] leading-5 text-muted-foreground [&_a]:underline">
+          <MarkdownContent content={note.text} variant="workspace" />
+        </div>
+      ) : null}
+      {note.sourceName ? <p className="mt-1.5 truncate text-[12px] text-muted-foreground">{note.sourceName}</p> : null}
+    </div>
+  );
+}
 
-  const failedClass = tone === "failed" ? "bg-red-700 text-white hover:bg-red-700/90" : undefined;
-  if (onAction) {
+function FooterAction({
+  action,
+  onStart,
+  startBusy,
+  startDisabled,
+}: {
+  action: SplitRunFooterAction;
+  onStart?: () => void | Promise<void>;
+  startBusy: boolean;
+  startDisabled: boolean;
+}) {
+  const primary = action.emphasis === "primary";
+  const variant = primary ? "default" : "outline";
+  const testId = primary ? "split-run-review-cta" : `split-run-footer-${action.id}`;
+
+  if (action.kind === "start") {
     return (
       <Button
         type="button"
-        className={cn("shrink-0", failedClass)}
-        disabled={actionDisabled || actionBusy}
-        onClick={() => void onAction()}
-        data-testid="split-run-review-cta"
+        size="sm"
+        variant={variant}
+        disabled={startDisabled || startBusy}
+        onClick={() => void onStart?.()}
+        data-testid={testId}
       >
-        {actionBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
-        {cta.label}
+        {startBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
+        {action.label}
       </Button>
     );
   }
-  if (cta.href) {
-    const inApp = cta.href.startsWith("/");
+
+  if (action.href) {
+    const inApp = action.href.startsWith("/");
     return (
-      <Button asChild className={cn("shrink-0", failedClass)}>
+      <Button asChild size="sm" variant={variant} data-testid={testId}>
         {inApp ? (
-          <Link href={cta.href}>{cta.label}</Link>
+          <Link href={action.href}>{action.label}</Link>
         ) : (
-          <a href={cta.href} target="_blank" rel="noreferrer">
-            {cta.label}
+          <a href={action.href} target="_blank" rel="noreferrer">
+            {action.label}
             <ExternalLink className="size-3.5" aria-hidden />
           </a>
         )}
       </Button>
     );
   }
+
   return (
-    <Button type="button" className="shrink-0" disabled data-testid="split-run-review-cta">
-      {cta.label}
+    <Button type="button" size="sm" variant={variant} data-testid={testId}>
+      {action.label}
     </Button>
   );
 }

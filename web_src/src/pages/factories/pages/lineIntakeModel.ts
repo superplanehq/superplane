@@ -18,11 +18,7 @@ import { intakeCanvasForSource } from "./lineIntakeCanvas";
 import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvases";
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
 
-export {
-  ADD_INTAKE_TEMPLATES,
-  filterAddIntakeTemplates,
-  type AddIntakeTemplate,
-} from "./addIntakeTemplates";
+export { ADD_INTAKE_TEMPLATES, filterAddIntakeTemplates, type AddIntakeTemplate } from "./addIntakeTemplates";
 
 export type LineIntakeSourceId = "github-issues" | "sentry-exceptions" | "pagerduty-incidents";
 
@@ -207,7 +203,6 @@ function ticketAnalysisPresentation(complete: boolean) {
     noteKey: complete ? "complete" : "analyzing",
     headline: complete ? LINE_INTAKE_COPY.analysisCompleteHeadline : LINE_INTAKE_COPY.analysisHeadline,
     text: complete ? LINE_INTAKE_COPY.analysisCompleteHelper : LINE_INTAKE_COPY.analysisHelper,
-    footerTone: complete ? undefined : ("waiting" as const),
     analyzeStatus: complete ? "passed" : "running",
     laterStatus: complete ? "passed" : "pending",
     analyzeDetail: complete ? "Read the ticket and the repository." : "Reading the ticket and the repository.",
@@ -242,7 +237,14 @@ export function intakeTicketAnalysisFixture(
       },
     ],
     checks,
-    footerTone: view.footerTone,
+    // Analysis is not a line run — the footer narrates without line actions.
+    footer: {
+      kind: complete ? "done" : "running",
+      sentence: "",
+      actions: [],
+      note: { headline: view.headline, text: view.text },
+    },
+    footerTone: complete ? "done" : "running",
     phases: [
       ticketAnalysisPhase({
         id: "ingest",
@@ -494,7 +496,14 @@ export function intakeAutomationFixture(source: LineIntakeSource): SplitRunFixtu
     currentPhaseId: "evaluate",
     waitingNotes,
     checks: [],
-    footerTone: "waiting",
+    // An always-on automation, not a line run — no line actions in the footer.
+    footer: {
+      kind: "running",
+      sentence: "",
+      actions: [],
+      note: { headline: waitingNotes[0].headline, text: waitingNotes[0].text },
+    },
+    footerTone: "running",
     phases: [listenPhase(source, canvas), evaluatePhase(source, canvas), backlogPhase(source, canvas)],
   };
 }
@@ -565,4 +574,3 @@ function backlogPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): Sp
     stream,
   };
 }
-

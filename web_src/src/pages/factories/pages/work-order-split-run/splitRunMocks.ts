@@ -21,9 +21,17 @@ import {
 } from "./splitRunWorkOrderDisplay";
 
 import { VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
+import { CONFIDENCE_SCORE_MAX } from "../../lib/confidenceScore";
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
+import {
+  buildSplitRunFooter,
+  doneFooterForStatus,
+  type SplitRunFooter,
+  type SplitRunFooterKind,
+  type SplitRunFooterTone,
+} from "./splitRunFooter";
 import { intakeTicketAnalysisFixture, type LineIntakeAnalyzingTicket } from "../lineIntakeModel";
 import { implementationPlanMarkdown, reviewCandidateForWorkOrderId } from "../onboarding/first-run/reviewCandidates";
 import { DESCRIPTION_ARTIFACT, PR_CLOSURE_PR_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
@@ -32,7 +40,7 @@ import type {
   RunOverlayStep,
   RunOverlayStepStatus,
 } from "../work-order-run-overlay/workOrderRunOverlayMocks";
-import type { SplitRunCanvasModel } from "./splitRunCanvases";
+import type { SplitRunCanvasKey, SplitRunCanvasModel } from "./splitRunCanvases";
 
 export type SplitRunPhaseId = string;
 
@@ -80,14 +88,14 @@ export interface SplitRunPhase {
   appId?: string;
   runId?: string;
   /** Line automation canvas. `null` means a person created the work order. */
-  canvasKey?: SplitRunIntakeCanvasKey | null;
+  canvasKey?: SplitRunCanvasKey | null;
   /** Trigger node that ran when the canvas has more than one start. */
   triggerName?: string;
   /** When set, the popup shows this canvas instead of the phase-name map. */
   canvas?: SplitRunCanvasModel;
 }
 
-export type SplitRunFooterTone = "waiting" | "draft" | "failed";
+export type { SplitRunFooter, SplitRunFooterKind, SplitRunFooterTone };
 
 export type SplitRunBoardColumn = "backlog" | "implement" | "verify" | "done";
 
@@ -106,7 +114,8 @@ export interface SplitRunFixture {
   phases: SplitRunPhase[];
   waitingNotes: WorkOrderStatusNotePresentation[];
   checks: WorkOrderCheckPresentation[];
-  footerTone?: SplitRunFooterTone;
+  footer: SplitRunFooter;
+  footerTone: SplitRunFooterTone;
 }
 
 export { SPLIT_RUN_RUNNING };
@@ -117,13 +126,6 @@ const UNKNOWN_OWNER: OrgUserDisplay = {
   initials: getUserInitials(UNKNOWN_ORG_USER_NAME) || "U",
 };
 
-const DRAFT_NEXT_STEP: WorkOrderStatusNotePresentation = {
-  key: "start-plan",
-  headline: "Start the next stage",
-  text: "This work order is a draft. Dispatch it to the Plan and Implement line to start Implement.",
-  cta: { label: "Dispatch" },
-};
-
 const IMPLEMENT_FAILED_NOTE: WorkOrderStatusNotePresentation = {
   key: "implement-failed",
   headline: "Implement did not pass",
@@ -131,6 +133,67 @@ const IMPLEMENT_FAILED_NOTE: WorkOrderStatusNotePresentation = {
   cta: { label: "Open failed run", href: "https://superplanehq.semaphoreci.com/" },
   source: { name: "Implementation" },
 };
+
+const WAITING_FALLBACK_NOTE: WorkOrderStatusNotePresentation = {
+  key: "waiting-person",
+  headline: "A person must act",
+  text: "The line stopped and waits on a person. Open the last step in the log to see what stopped it.",
+};
+
+/**
+ * The footer note for a draft: where the order came from, that a plan
+ * exists and is editable, and the confidence reasoning. The log holds the
+ * step-by-step detail; this is the readable summary.
+ */
+function draftFooterNote(order: FactoriesWorkOrder): WorkOrderStatusNotePresentation {
+  const candidate = reviewCandidateForWorkOrderId(order.id);
+  if (candidate) {
+    return {
+      key: "draft-plan-ready",
+      headline: "Review the plan, then start",
+      text: [
+        `From GitHub issue [${candidate.ticketKey}](${candidate.issue.url}). SuperPlane analyzed the ticket and wrote an implementation plan. Open **plan.md** in the Create plan step to review or edit it.`,
+        "",
+        `Confidence ${candidate.confidenceScore}/${CONFIDENCE_SCORE_MAX} (${candidate.confidenceBand}):`,
+        ...candidate.reasons.map((reason) => `- ${reason}`),
+      ].join("\n"),
+    };
+  }
+  return {
+    key: "draft-start",
+    headline: "Start this work order",
+    text: `${draftSourceSentence(order)} The details are in **description.md**. Start it to plan and implement the change.`,
+  };
+}
+
+function draftSourceSentence(order: FactoriesWorkOrder): string {
+  const automation = order.createdBy?.automation;
+  if (automation) {
+    const { componentName } = lineAutomationPresentation({ id: automation.appId, name: automation.appName });
+    return `${componentName} created this work order.`;
+  }
+  const creator = order.createdBy?.user?.name?.trim();
+  if (creator) {
+    return `${creator} created this work order manually.`;
+  }
+  return "A person created this work order manually.";
+}
+
+function runningFooterNote(current: FactoriesWorkOrderExecution | undefined): WorkOrderStatusNotePresentation {
+  if (!current) {
+    return {
+      key: "running-step",
+      headline: "The line is running",
+      text: "SuperPlane works on this order now. The log shows live progress.",
+    };
+  }
+  const { name, componentName } = lineAutomationPresentation(current.run, current.step);
+  return {
+    key: "running-step",
+    headline: `${name} is running`,
+    text: `${componentName} works on this step now. The log shows live progress.`,
+  };
+}
 
 const AUTO_EXPAND_STATUSES = new Set<SplitRunPhaseStatus>(["running", "waiting", "failed"]);
 
@@ -190,42 +253,45 @@ function mappedWorkOrderFixture(
     lineStatus: lineStatusForDisplay(displayStatus),
     currentPhaseId: current ? phaseIdForExecution(current) : (phases[0]?.id ?? ""),
     phases,
-    ...reviewSurfaces(order, displayStatus, options?.checks, options?.lineId),
+    ...reviewSurfaces(order, displayStatus, options?.lineId),
   };
 }
 
 function reviewSurfaces(
   order: FactoriesWorkOrder,
   displayStatus: WorkOrderDisplayStatus,
-  apiChecks?: FactoriesWorkOrderCheck[],
   lineId?: string | null,
-): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footerTone"> {
+): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   const executions = latestDispatchExecutions(order, lineId);
   const current = pickCurrentExecution(executions);
   const column = boardColumnFor(current, executions.length);
   const implementFailed = column === "implement" && current?.result === "RESULT_FAILED";
 
   if (displayStatus === "draft") {
-    return { waitingNotes: [DRAFT_NEXT_STEP], checks: [], footerTone: "draft" };
+    return surfaces(buildSplitRunFooter({ kind: "draft", note: draftFooterNote(order) }));
   }
   if (implementFailed) {
-    return { waitingNotes: [IMPLEMENT_FAILED_NOTE], checks: [], footerTone: "failed" };
+    return surfaces(buildSplitRunFooter({ kind: "failed", note: IMPLEMENT_FAILED_NOTE }), [IMPLEMENT_FAILED_NOTE]);
   }
   if (displayStatus === "waiting") {
-    return {
-      waitingNotes: presentWorkOrderStatusNotes(order.statusNotes, displayStatus),
-      checks: [],
-      footerTone: "waiting",
-    };
+    const notes = presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
+    return surfaces(buildSplitRunFooter({ kind: "waiting", note: notes[0] ?? WAITING_FALLBACK_NOTE }), notes);
   }
   if (column === "implement" && current?.state === "STATE_PENDING") {
-    return {
-      waitingNotes: presentWorkOrderStatusNotes(order.statusNotes, displayStatus),
-      checks: [],
-      footerTone: "waiting",
-    };
+    const notes = presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
+    return surfaces(buildSplitRunFooter({ kind: "waiting", note: notes[0] ?? WAITING_FALLBACK_NOTE }), notes);
   }
-  return { waitingNotes: [], checks: [] };
+  if (displayStatus === "running") {
+    return surfaces(buildSplitRunFooter({ kind: "running", note: runningFooterNote(current) }));
+  }
+  return surfaces(doneFooterForStatus(displayStatus));
+}
+
+function surfaces(
+  footer: SplitRunFooter,
+  waitingNotes: WorkOrderStatusNotePresentation[] = [],
+): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
+  return { waitingNotes, checks: [], footer, footerTone: footer.kind };
 }
 
 function boardColumnFor(current: FactoriesWorkOrderExecution | undefined, executionCount: number): SplitRunBoardColumn {

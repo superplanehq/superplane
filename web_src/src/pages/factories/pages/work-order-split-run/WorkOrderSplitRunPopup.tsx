@@ -85,11 +85,10 @@ export function WorkOrderSplitRunBody({
           ))}
         </ol>
         <SplitRunReview
-          notes={fixture.waitingNotes}
-          tone={fixture.footerTone}
-          onAction={fixture.footerTone === "draft" ? onDispatch : undefined}
-          actionBusy={isDispatching}
-          actionDisabled={!canDispatch}
+          footer={fixture.footer}
+          onStart={fixture.footer.kind === "draft" ? onDispatch : undefined}
+          startBusy={isDispatching}
+          startDisabled={!canDispatch}
         />
       </aside>
 

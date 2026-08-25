@@ -95,6 +95,9 @@ describe("splitRunFixtureForWorkOrder", () => {
       ]),
     );
     expect(fixture.waitingNotes).toEqual([]);
+    expect(fixture.footerTone).toBe("running");
+    expect(fixture.footer.note?.headline).toBe("Implement is running");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Stop and send to Draft", "Cancel"]);
     expect(fixture.checks).toEqual([]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
     expect(fixture.phases.find((phase) => phase.id === "score")?.checks?.[0]).toMatchObject({
@@ -120,6 +123,18 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
   });
 
+  it("narrates source, plan, and confidence reasons on a scored draft footer", () => {
+    const fixture = splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]);
+    const note = fixture.footer.note;
+
+    expect(note?.headline).toBe("Review the plan, then start");
+    expect(note?.text).toContain("[PAY-842](https://github.com/acme/payments-service/issues/842)");
+    expect(note?.text).toContain("**plan.md**");
+    expect(note?.text).toContain("Confidence 5/5 (High):");
+    expect(note?.text).toContain("- Acceptance criteria name the retryable status codes and the attempt limit.");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Start", "Reject"]);
+  });
+
   it("pins a pull request review on a waiting implement card", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
@@ -136,10 +151,12 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.footerTone).toBe("waiting");
     expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Review the pull request"]);
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
+    expect(fixture.footer.note?.headline).toBe("Review the pull request");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Cancel", "Review PR #6812"]);
     expect(fixture.checks).toEqual([]);
   });
 
-  it("hides the next-step footer when a waiting order has no notes", () => {
+  it("keeps a waiting state bar when a waiting order has no notes", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
         title: "Ship idempotent refund retries",
@@ -154,9 +171,11 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
     expect(fixture.footerTone).toBe("waiting");
     expect(fixture.waitingNotes).toEqual([]);
+    expect(fixture.footer.note?.headline).toBe("A person must act");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Cancel"]);
   });
 
-  it("hides the next-step footer after a finished unnamed step while the order waits", () => {
+  it("keeps a waiting state bar after a finished unnamed step while the order waits", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
         title: "dasdas",
@@ -171,6 +190,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
     expect(fixture.footerTone).toBe("waiting");
     expect(fixture.waitingNotes).toEqual([]);
+    expect(fixture.footer.sentence).toBe("This work order needs attention.");
   });
 
   it("puts risk score and code quality on the verify step", () => {
@@ -223,6 +243,9 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
     expect(done.checks).toEqual([]);
     expect(done.waitingNotes).toEqual([]);
+    expect(done.footerTone).toBe("done");
+    expect(done.footer.sentence).toBe("Work order completed successfully.");
+    expect(done.footer.actions).toEqual([]);
   });
 
   it("uses the newest dispatch on the viewed line", () => {
@@ -336,6 +359,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.footerTone).toBe("failed");
     expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Implement did not pass"]);
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Open failed run");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Cancel", "Open failed run"]);
     expect(fixture.checks).toEqual([]);
   });
 
@@ -361,6 +385,7 @@ describe("splitRunFixtureForWorkOrder", () => {
       body: DRAFT_WORK_ORDER.description,
     });
     expect(backlog?.stream[0]?.artifact?.data).toMatchObject({ name: "description.md" });
+    expect(fixture.footer.note?.text).toContain("Leonardo DiCaprio created this work order manually.");
   });
 
   it("logs GitHub ingest as the backlog source", () => {
@@ -402,7 +427,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(slack?.artifacts[0]?.data).toMatchObject({ name: "description.md" });
   });
 
-  it("still prompts a draft with no creator to start the next stage", () => {
+  it("still prompts a draft with no creator to start", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
         title: OPEN_WORK_ORDER.title,
@@ -419,7 +444,10 @@ describe("splitRunFixtureForWorkOrder", () => {
       name: "description.md",
       body: OPEN_WORK_ORDER.description,
     });
-    expect(fixture.waitingNotes[0]?.cta?.label).toBe("Dispatch");
+    expect(fixture.waitingNotes).toEqual([]);
+    expect(fixture.footer.note?.headline).toBe("Start this work order");
+    expect(fixture.footer.note?.text).toContain("A person created this work order manually.");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Start", "Reject"]);
   });
 });
 

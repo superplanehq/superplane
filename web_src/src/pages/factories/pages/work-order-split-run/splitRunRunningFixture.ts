@@ -10,6 +10,7 @@ import {
   STORYBOOK_ME_USER_NAME,
 } from "../../__fixtures__/factoryPageResponses";
 import { DESCRIPTION_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
+import { buildSplitRunFooter } from "./splitRunFooter";
 import type { SplitRunFixture } from "./splitRunMocks";
 
 const PLAN_ARTIFACT: FactoriesWorkOrderArtifact = {
@@ -43,6 +44,15 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
   currentPhaseId: "implement",
   waitingNotes: [],
   checks: [],
+  footer: buildSplitRunFooter({
+    kind: "running",
+    note: {
+      key: "running-step",
+      headline: "Implement is running",
+      text: "Implementation works on this step now. The log shows live progress.",
+    },
+  }),
+  footerTone: "running",
   phases: [
     {
       id: "backlog",
