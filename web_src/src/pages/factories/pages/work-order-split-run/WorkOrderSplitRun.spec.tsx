@@ -214,13 +214,13 @@ describe("WorkOrderSplitRunPopup", () => {
     renderPopup({
       fixture: SPLIT_RUN_RUNNING,
       canvasEditHref: () => "/edit-implementation",
-      canvasExpandHref: () => "/split-run-implementation",
+      canvasExpandHref: () => "/apps/app-refund-implementer?run=run-implement",
     });
 
     const expand = screen.getByTestId("split-run-canvas-expand");
     const menu = screen.getByTestId("split-run-canvas-menu");
     expect(expand.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(expand).toHaveAttribute("href", "/split-run-implementation");
+    expect(expand).toHaveAttribute("href", "/apps/app-refund-implementer?run=run-implement");
     expect(expand).toHaveAttribute("aria-label", "Open automation run");
   });
 

@@ -51,7 +51,7 @@ type WorkOrderSplitRunBodyProps = {
   orderNumber?: string;
   fixture: SplitRunFixture;
   canvasEditHref?: (key: SplitRunCanvasKey) => string | undefined;
-  canvasExpandHref?: (key: SplitRunCanvasKey) => string | undefined;
+  canvasExpandHref?: (key: SplitRunCanvasKey, phase?: { appId?: string; runId?: string }) => string | undefined;
   onDispatch?: () => Promise<void>;
   isDispatching?: boolean;
   canDispatch?: boolean;
@@ -150,7 +150,7 @@ export function WorkOrderSplitRunBody({
           selectedId={nodeId}
           onSelect={setNodeId}
           editHref={canvasEditHref?.(visual.canvas.key)}
-          expandHref={canvasExpandHref?.(visual.canvas.key)}
+          expandHref={canvasExpandHref?.(visual.canvas.key, selectedPhase)}
         />
       </section>
     </div>
