@@ -9,9 +9,13 @@ const (
 	// lifecycle event: every FSM transition emits one, enriched with the
 	// actor / automation / originating run / app when applicable.
 	EventTypeOrderAssigneesUpdated = "order.assignees.updated"
-	EventTypeOrderStatusUpdated    = "order.status.updated"
-	EventTypeOrderCommentAdded     = "order.comment.added"
-	EventTypeOrderArtifactAdded    = "order.artifact.added"
+	// EventTypeOrderUpdated is a websocket-only notification reason.
+	// Title and description edits update the row in place and do not
+	// write a timeline event.
+	EventTypeOrderUpdated       = "order.updated"
+	EventTypeOrderStatusUpdated = "order.status.updated"
+	EventTypeOrderCommentAdded  = "order.comment.added"
+	EventTypeOrderArtifactAdded = "order.artifact.added"
 	// EventTypeOrderArtifactUpdated is a websocket-only notification
 	// reason (see FactoryContext.UpdateWorkOrderArtifact) — it does not
 	// back a timeline event/struct. Flipping a PR artifact's state

@@ -15,31 +15,31 @@ export const FIRST_RUN_SCORED_TICKETS: FirstRunScoredTicket[] = [
     id: "ticket-1",
     title: "Handle duplicate refunds on retry",
     source: "acme/payments-service",
-    confidencePct: 94,
+    confidenceScore: 5,
   },
   {
     id: "ticket-2",
     title: "Return 409 when the invoice is already paid",
     source: "acme/api",
-    confidencePct: 88,
+    confidenceScore: 4,
   },
   {
     id: "ticket-3",
     title: "Show a clearer empty state on the billing page",
     source: "acme/web",
-    confidencePct: 81,
+    confidenceScore: 3,
   },
   {
     id: "ticket-4",
     title: "Upgrade the Node 20 base image",
     source: "acme/infra",
-    confidencePct: 76,
+    confidenceScore: 3,
   },
   {
     id: "ticket-5",
     title: "Add a flake retry to the checkout e2e suite",
     source: "acme/web",
-    confidencePct: 68,
+    confidenceScore: 2,
   },
 ];
 
