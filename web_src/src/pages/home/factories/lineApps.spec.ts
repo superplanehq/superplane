@@ -1,7 +1,26 @@
 import { describe, expect, it } from "vitest";
+import yaml from "js-yaml";
 
 import { getFactoryDefinition, ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS } from "./index";
 import { FACTORY_CANVAS_ID_PLACEHOLDER, materializeFactoryCanvas } from "./materializeFactoryTemplate";
+
+type AgentStep = { name?: string; command?: string; workingDirectory?: string };
+
+type CanvasNode = {
+  id?: string;
+  configuration?: { steps?: AgentStep[] };
+};
+
+function canvasNodes(canvasYaml: string): CanvasNode[] {
+  const doc = yaml.load(canvasYaml) as { spec?: { nodes?: CanvasNode[] } };
+  return doc.spec?.nodes ?? [];
+}
+
+function nodeStepsByName(nodes: CanvasNode[], nodeId: string): Record<string, AgentStep> {
+  const node = nodes.find((candidate) => candidate.id === nodeId);
+  const steps = node?.configuration?.steps ?? [];
+  return Object.fromEntries(steps.map((step) => [step.name ?? "", step]));
+}
 
 function materializeOnboardingApp(factoryId: string) {
   return materializeFactoryCanvas({
@@ -52,6 +71,9 @@ describe("setup factory line apps", () => {
 
     const implementation = materializeOnboardingApp("line-implementation");
     expect(implementation).toContain("acme/app");
+    expect(implementation).toMatch(
+      /id: add-branch-artifact[\s\S]*component: addWorkOrderArtifact[\s\S]*repository: acme\/app/,
+    );
 
     const pr = materializeOnboardingApp("line-pr");
     expect(pr).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
@@ -74,31 +96,56 @@ describe("setup factory line apps", () => {
     expect(pr).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data.html_url }}'");
     expect(pr).toContain("showOnlyWhenWaiting: true");
   });
+
+  it("fails planning when the agent does not write the plan file", () => {
+    const planning = materializeOnboardingApp("line-planning");
+    expect(planning).toContain("No plan produced at /tmp/plan.md");
+    expect(planning).toContain("exit 1");
+  });
+
+  it("fails PR title generation when the agent does not write title files", () => {
+    const pr = materializeOnboardingApp("line-pr");
+    expect(pr).toContain("Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md");
+    expect(pr).toContain("exit 1");
+  });
+
+  it("fails implementation when the agent pushes no file commits", () => {
+    const implementation = materializeOnboardingApp("line-implementation");
+    const nodes = canvasNodes(implementation);
+
+    for (const nodeId of ["implementation-agent", "implementation-agent-no-issue"]) {
+      const steps = nodeStepsByName(nodes, nodeId);
+      const checkout = steps["Checkout Branch"]?.command ?? "";
+      const commit = steps["Commit and Push"]?.command ?? "";
+
+      expect(checkout).toContain("set -euo pipefail");
+      expect(commit).toContain("No file changes and no unpushed commits");
+      expect(commit).toContain("exit 1");
+      expect(commit).not.toContain("already up to date on origin");
+      expect(commit).toContain("git status");
+      expect(commit).toContain("git log --oneline -5");
+    }
+  });
+
+  it("runs implementation prompt and commit steps in the cloned repo", () => {
+    const implementation = materializeOnboardingApp("line-implementation");
+    const nodes = canvasNodes(implementation);
+
+    for (const nodeId of ["implementation-agent", "implementation-agent-no-issue"]) {
+      const steps = nodeStepsByName(nodes, nodeId);
+      expect(steps["Set Up DCO Signing"]?.workingDirectory).toBe("repo");
+      expect(steps["Implementation"]?.workingDirectory).toBe("repo");
+      expect(steps["Commit and Push"]?.workingDirectory).toBe("repo");
+    }
+  });
 });
 
 describe("setup factory event apps", () => {
-  it("provisions issue intake and PR closure outside the factory line", () => {
-    expect(ONBOARDING_EVENT_APPS).toEqual(["issue-intake", "pr-closure"]);
-    expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("issue-intake");
+  // Issue intake is a factory intake now, so setup provisions it through the
+  // intake API rather than as a bundled app.
+  it("provisions PR closure outside the factory line", () => {
+    expect(ONBOARDING_EVENT_APPS).toEqual(["pr-closure"]);
     expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("pr-closure");
-  });
-
-  it("creates work orders for factory-labeled or agent-assigned issues", () => {
-    const canvasYaml = materializeOnboardingApp("issue-intake");
-
-    expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*actions:[\s\S]*- labeled/);
-    expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*actions:[\s\S]*- assigned/);
-    expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*repository: acme\/backlog/);
-    expect(canvasYaml).toContain('root().data.label.name == "factory"');
-    expect(canvasYaml).toContain('root().data.assignee.login == "superplaneagent"');
-    expect(canvasYaml).toMatch(/component: createWorkOrder[\s\S]*title: '{{ root\(\)\.data\.issue\.title }}'/);
-    expect(canvasYaml).toContain("description: '{{ root().data.issue.body }}'");
-    expect(canvasYaml).toContain("id: int-1");
-    expect(canvasYaml).toContain("name: acme-github");
-    expect(canvasYaml).not.toContain("{{ install_params.");
-    expect(canvasYaml).not.toContain(FACTORY_CANVAS_ID_PLACEHOLDER);
-    expect(canvasYaml).not.toContain("superplanehq");
-    expect(canvasYaml).not.toMatch(/component: onRun/);
   });
 
   it("closes the work order when a factory pull request is closed", () => {

@@ -392,9 +392,62 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":      "{{ order().id }}",
 			"artifactType": "branch",
+			"repository":   "example/repo",
 		})
 		if err == nil {
 			t.Fatal("expected error for branch without name")
+		}
+	})
+
+	t.Run("accepts branch with name and url without repository", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
+			"url":          "https://github.com/example/repo/tree/feature/refund-retry",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("rejects name-only branch on component validator", func(t *testing.T) {
+		config := map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
+		}
+		err := configuration.ValidateConfiguration(fields, config)
+		if err != nil {
+			t.Fatalf("schema should still allow name-only branch: %v", err)
+		}
+		err = c.ValidateNodeConfiguration(config)
+		if err == nil {
+			t.Fatal("expected error for branch without url or repository")
+		}
+	})
+
+	t.Run("component validator accepts url-only branch", func(t *testing.T) {
+		err := c.ValidateNodeConfiguration(map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
+			"url":          "https://github.com/example/repo/tree/feature/refund-retry",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("component validator accepts repository expression without url", func(t *testing.T) {
+		err := c.ValidateNodeConfiguration(map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"name":         "{{ previous().result.branch }}",
+			"repository":   "{{ install_params.appRepository }}",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
 		}
 	})
 
@@ -443,35 +496,25 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
-	t.Run("accepts branch with name", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"orderId":      "{{ order().id }}",
-			"artifactType": "branch",
-			"name":         "feature/refund-retry",
-		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("accepts branch with name and url", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"orderId":      "{{ order().id }}",
-			"artifactType": "branch",
-			"name":         "feature/refund-retry",
-			"url":          "https://github.com/example/repo/tree/feature/refund-retry",
-		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
 	t.Run("accepts branch with name and repository", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":      "{{ order().id }}",
 			"artifactType": "branch",
 			"name":         "feature/refund-retry",
 			"repository":   "example/repo",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("accepts branch with name, repository, and url", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
+			"repository":   "example/repo",
+			"url":          "https://github.com/example/repo/tree/feature/refund-retry",
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -500,6 +543,9 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 		if repositoryField == nil {
 			t.Fatal("expected a repository field in configuration")
+		}
+		if len(repositoryField.RequiredConditions) != 0 {
+			t.Fatalf("expected repository not to be required when URL is set, got %d required conditions", len(repositoryField.RequiredConditions))
 		}
 		if len(repositoryField.VisibilityConditions) != 1 {
 			t.Fatalf("expected a single visibility condition for repository, got %d", len(repositoryField.VisibilityConditions))
@@ -912,6 +958,7 @@ func TestBuildArtifactData_IgnoresPrLifecycleOnNonPr(t *testing.T) {
 	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
 		ArtifactType: "branch",
 		Name:         "feature/refund-retry",
+		Repository:   "example/repo",
 		State:        "open",
 		Merged:       true,
 		Draft:        true,

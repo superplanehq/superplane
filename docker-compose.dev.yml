@@ -92,6 +92,7 @@ services:
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://host.docker.internal:8000}
       # Task broker /v1 (Runner component). Defaults match runner `make dev` (host port 8091).
       # Base URL has no trailing slash. Set TASK_BROKER_* in .env only for a remote broker.
+      # FLEET_ID, when set, is the create-task fleet_id (overrides node machine type).
       # Empty TASK_BROKER_FLEET_ID in .env keeps node machine types.
       TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-http://host.docker.internal:8091}
       TASK_BROKER_PUBLIC_URL: ${TASK_BROKER_PUBLIC_URL:-http://localhost:8091}

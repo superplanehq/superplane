@@ -113,7 +113,7 @@ dev.setup:
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
 dev.setup.npm:
-	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --silent"
+	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --loglevel error"
 
 dev.setup.go:
 	@$(COMPOSE) exec app bash /app/scripts/go-mod-download

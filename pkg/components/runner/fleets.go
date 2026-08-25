@@ -13,8 +13,9 @@ const ComponentName = "runner"
 
 const configurationFieldMachineType = "machine_type"
 
-// Machine type names, which are also the task-broker fleet IDs (GET /v1/fleets)
-// stored in node configuration and sent as fleet_id.
+// Machine type names, which are also the default task-broker fleet IDs
+// (GET /v1/fleets) stored in node configuration and sent as fleet_id
+// unless TASK_BROKER_FLEET_ID is set.
 const (
 	MachineTypeE1LargeAMD64 = "e1-large-amd64"
 	MachineTypeE1LargeARM64 = "e1-large-arm64"
@@ -37,11 +38,16 @@ func requireMachineType(machineType string) (string, error) {
 	return fleet, nil
 }
 
-// resolveCreateTaskFleetID returns TASK_BROKER_FLEET_ID when set (local compose
-// override), otherwise the node machine type.
-func resolveCreateTaskFleetID(machineType string) (string, error) {
-	if override := strings.TrimSpace(os.Getenv("TASK_BROKER_FLEET_ID")); override != "" {
-		return override, nil
+// resolveBrokerFleetID is the fleet_id sent to the task broker.
+// TASK_BROKER_FLEET_ID overrides the node machine type when set, so a local
+// broker with one fleet (for example local) can run nodes that still
+// select e1-large-amd64 in the canvas.
+func resolveBrokerFleetID(machineType string) (string, error) {
+	if _, err := requireMachineType(machineType); err != nil {
+		return "", err
 	}
-	return requireMachineType(machineType)
+	if fleet := strings.TrimSpace(os.Getenv("TASK_BROKER_FLEET_ID")); fleet != "" {
+		return fleet, nil
+	}
+	return strings.TrimSpace(machineType), nil
 }

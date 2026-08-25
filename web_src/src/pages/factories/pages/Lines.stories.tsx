@@ -7,6 +7,7 @@ import {
   ACME_ONBOARDING_FACTORY_KEY,
   ACME_ONBOARDING_LINE_ID,
   GITHUB_ISSUES_INTAKE_APP,
+  GITHUB_ISSUES_INTAKE_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
 } from "../__fixtures__/factoryPageResponses";
@@ -68,7 +69,7 @@ export const AcmeOnboardingIntake: Story = {
   name: "Acme onboarding — intake",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&source=github-issues`}
+      pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`}
       factoriesFixture={lineMetricsFactoriesFixture}
       appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP, ACME_ONBOARDING_FACTORY_ID)}
     />
@@ -94,7 +95,7 @@ export const LineBoardIntakeAnalyzing: Story = {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1&source=github-issues`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`}
         factoriesFixture={lineMetricsFactoriesFixture}
       />
     );

@@ -3,6 +3,8 @@ package canvases
 import (
 	"context"
 	"errors"
+	"slices"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
@@ -10,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/telemetry"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -74,6 +77,47 @@ func mapCanvasNameUniqueConstraintError(err error) error {
 		return grpcerrors.AlreadyExists(err, canvasNameAlreadyExistsMessage)
 	}
 
+	return err
+}
+
+// PublishGeneratedCanvasNodes commits nodes and edges straight to the canvas's
+// live version. Use it for canvases the server generates and owns, where there
+// is no user draft to reconcile with and a staged graph would never receive
+// events.
+func PublishGeneratedCanvasNodes(
+	ctx context.Context,
+	tx *gorm.DB,
+	canvas *models.Canvas,
+	userID uuid.UUID,
+	commitMessage string,
+	nodes []models.Node,
+	edges []models.Edge,
+	options changesets.CanvasPublisherOptions,
+) error {
+	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	nextVersion := &models.CanvasVersion{
+		ID:            uuid.New(),
+		WorkflowID:    canvas.ID,
+		OwnerID:       &userID,
+		CommitMessage: commitMessage,
+		Nodes:         datatypes.NewJSONSlice(nodes),
+		Edges:         datatypes.NewJSONSlice(edges),
+		ConsolePanels: datatypes.NewJSONType(slices.Clone(liveVersion.ConsolePanels.Data())),
+		ConsoleLayout: datatypes.NewJSONType(slices.Clone(liveVersion.ConsoleLayout.Data())),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}
+
+	if err := tx.Create(nextVersion).Error; err != nil {
+		return err
+	}
+
+	_, err = publishCanvasVersionInTransaction(ctx, tx, canvas, liveVersion, nextVersion, options)
 	return err
 }
 

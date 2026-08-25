@@ -5,7 +5,7 @@ import {
   ACME_ONBOARDING_FACTORY_KEY,
   ACME_ONBOARDING_LINE_ID,
 } from "../../../__fixtures__/factoryPageIds";
-import { GITHUB_ISSUES_INTAKE_APP } from "../../../__fixtures__/factoryPageResponses";
+import { GITHUB_ISSUES_INTAKE_APP, GITHUB_ISSUES_INTAKE_ID } from "../../../__fixtures__/factoryPageResponses";
 import { lineMetricsFactoriesFixture } from "../../../__fixtures__/lineMetricsFactoriesFixture";
 
 /**
@@ -17,7 +17,7 @@ export function FirstRunBoardExit() {
   return (
     <div data-testid="first-run-board">
       <FactoriesHarness
-        pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&source=github-issues`}
+        pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`}
         factoriesFixture={lineMetricsFactoriesFixture}
         appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP, ACME_ONBOARDING_FACTORY_ID)}
         enableOnboarding={false}

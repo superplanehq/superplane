@@ -230,7 +230,7 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 		webhookPayloadSizeLimit = config.MaxWebhookPayloadSize
 	}
 
-	fleetID, err := resolveCreateTaskFleetID(p.MachineType)
+	fleetID, err := resolveBrokerFleetID(p.MachineType)
 	if err != nil {
 		return "", err
 	}

@@ -496,6 +496,7 @@ func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {
 func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -525,6 +526,7 @@ func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
 func TestRunnerExecuteFailsWhenSecretCannotBeResolved(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{}
 
@@ -613,6 +615,7 @@ func TestRunnerProcessTaskStatusCanceledUsesFailedChannel(t *testing.T) {
 func TestBrokerCancelTaskSuccess(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -633,6 +636,7 @@ func TestBrokerCancelTaskSuccess(t *testing.T) {
 func TestBrokerCancelTask404Noop(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -649,6 +653,7 @@ func TestBrokerCancelTask404Noop(t *testing.T) {
 func TestBrokerCancelTask409RetriesThenSucceeds(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -668,6 +673,7 @@ func TestBrokerCancelTask409RetriesThenSucceeds(t *testing.T) {
 func TestRunnerCancelCallsBroker(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -688,6 +694,7 @@ func TestRunnerCancelCallsBroker(t *testing.T) {
 func TestBrokerListActiveTasks(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{

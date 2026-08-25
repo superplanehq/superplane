@@ -126,6 +126,62 @@ func serializeFactoryApps(canvases []models.Canvas) []*pb.Factory_App {
 	return result
 }
 
+func serializeFactoryIntakes(intakes []models.FactoryIntake, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryIntake {
+	result := make([]*pb.FactoryIntake, len(intakes))
+	for i := range intakes {
+		result[i] = serializeFactoryIntake(&intakes[i], specs[intakes[i].CanvasID])
+	}
+	return result
+}
+
+func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvasSpec) *pb.FactoryIntake {
+	graph := resolveIntakeGraph(intake.Source, spec)
+
+	serialized := &pb.FactoryIntake{
+		Id:        intake.ID.String(),
+		FactoryId: intake.FactoryID.String(),
+		CanvasId:  intake.CanvasID.String(),
+		Name:      intake.Name(),
+		Source:    serializeFactoryIntakeSource(intake.Source),
+		Settings:  serializeIntakeSettings(intakeSettingsFromGraph(graph, spec)),
+		Healthy:   graph.Healthy(spec.Edges),
+		CreatedAt: timestamppb.New(intake.CreatedAt),
+		UpdatedAt: timestamppb.New(intake.UpdatedAt),
+	}
+
+	if intake.Canvas != nil {
+		serialized.Description = intake.Canvas.Description
+	}
+
+	return serialized
+}
+
+func serializeFactoryIntakeSource(source string) pb.FactoryIntake_Source {
+	switch source {
+	case models.FactoryIntakeSourceGitHubIssues:
+		return pb.FactoryIntake_SOURCE_GITHUB_ISSUES
+	case models.FactoryIntakeSourceSentryExceptions:
+		return pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS
+	case models.FactoryIntakeSourcePagerDutyIncidents:
+		return pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS
+	default:
+		return pb.FactoryIntake_SOURCE_UNSPECIFIED
+	}
+}
+
+func parseFactoryIntakeSource(source pb.FactoryIntake_Source) (string, error) {
+	switch source {
+	case pb.FactoryIntake_SOURCE_GITHUB_ISSUES:
+		return models.FactoryIntakeSourceGitHubIssues, nil
+	case pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS:
+		return models.FactoryIntakeSourceSentryExceptions, nil
+	case pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS:
+		return models.FactoryIntakeSourcePagerDutyIncidents, nil
+	default:
+		return "", invalidArgument("intake source is required")
+	}
+}
+
 func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 	steps := make([]*pb.FactoryLine_Step, len(line.Steps))
 	for i, step := range line.Steps {

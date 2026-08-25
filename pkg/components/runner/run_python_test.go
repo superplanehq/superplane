@@ -65,6 +65,7 @@ func TestRunPythonExecuteSendsPythonPayloadToBroker(t *testing.T) {
 func TestRunPythonExecuteSendsSetupCommandsWhenEnabled(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -133,7 +134,7 @@ func TestRunPythonProcessTaskStatusIncludesResult(t *testing.T) {
 		ExitCode: &exit,
 		Result:   json.RawMessage(`{"ok":true}`),
 	}
-	require.NoError(t, processBrokerTaskStatus(state, task, RunPythonFinishedEventType, "", nil))
+	require.NoError(t, processBrokerTaskStatus(state, task, RunPythonFinishedEventType, "", nil, nil, nil))
 	require.Equal(t, PassedOutputChannel, state.Channel)
 
 	wrapped := state.Payloads[0].(map[string]any)

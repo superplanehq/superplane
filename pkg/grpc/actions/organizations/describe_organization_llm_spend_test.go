@@ -16,6 +16,12 @@ import (
 )
 
 func Test__DescribeOrganizationLLMSpend(t *testing.T) {
+	_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
+		WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
+		MarkupBPS:           models.DefaultMarkupBPS,
+		WarningThresholdBPS: models.DefaultWarningThresholdBPS,
+	})
+	require.NoError(t, err)
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
@@ -66,4 +72,8 @@ func Test__DescribeOrganizationLLMSpend(t *testing.T) {
 	assert.Equal(t, int64(250), resp.TotalCostCents)
 	require.Len(t, resp.ByModel, 1)
 	assert.Equal(t, "openai", resp.ByModel[0].Provider)
+	assert.Equal(t, models.DefaultWelcomeGrantCents, resp.RemainingCreditCents)
+	assert.Equal(t, models.DefaultWelcomeGrantCents, resp.GrantTotalCents)
+	assert.Equal(t, int64(0), resp.HostedBilledCents)
+	assert.False(t, resp.RemainingCreditWarning)
 }

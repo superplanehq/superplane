@@ -128,16 +128,30 @@ func taskBrokerLiveLogBaseURL() (string, error) {
 	return taskBrokerBaseURL()
 }
 
-func LiveLogStreamURL(brokerTaskID string) (string, error) {
-	base, err := taskBrokerLiveLogBaseURL()
-	if err != nil {
-		return "", err
-	}
+func liveLogURL(base, brokerTaskID string) (string, error) {
 	brokerTaskID = strings.TrimSpace(brokerTaskID)
 	if brokerTaskID == "" {
 		return "", fmt.Errorf("broker task id is empty")
 	}
 	return base + "/v1/tasks/" + brokerTaskID + "/live-logs", nil
+}
+
+func LiveLogStreamURL(brokerTaskID string) (string, error) {
+	base, err := taskBrokerLiveLogBaseURL()
+	if err != nil {
+		return "", err
+	}
+	return liveLogURL(base, brokerTaskID)
+}
+
+// liveLogInternalStreamURL is for SuperPlane server fetches inside Docker.
+// LiveLogStreamURL is the browser URL (TASK_BROKER_PUBLIC_URL).
+func liveLogInternalStreamURL(brokerTaskID string) (string, error) {
+	base, err := taskBrokerBaseURL()
+	if err != nil {
+		return "", err
+	}
+	return liveLogURL(base, brokerTaskID)
 }
 
 func taskBrokerAuthToken() (string, error) {
@@ -181,7 +195,15 @@ func MintLiveLogStreamToken(brokerTaskID string, now time.Time) (string, time.Ti
 }
 
 func NewLiveLogSession(brokerTaskID string, now time.Time) (*LiveLogSession, error) {
-	streamURL, err := LiveLogStreamURL(brokerTaskID)
+	return newLiveLogSession(brokerTaskID, now, LiveLogStreamURL)
+}
+
+func newInternalLiveLogSession(brokerTaskID string, now time.Time) (*LiveLogSession, error) {
+	return newLiveLogSession(brokerTaskID, now, liveLogInternalStreamURL)
+}
+
+func newLiveLogSession(brokerTaskID string, now time.Time, streamURL func(string) (string, error)) (*LiveLogSession, error) {
+	url, err := streamURL(brokerTaskID)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +214,7 @@ func NewLiveLogSession(brokerTaskID string, now time.Time) (*LiveLogSession, err
 	}
 
 	return &LiveLogSession{
-		StreamURL: streamURL,
+		StreamURL: url,
 		Token:     token,
 		ExpiresAt: expiresAt,
 	}, nil
