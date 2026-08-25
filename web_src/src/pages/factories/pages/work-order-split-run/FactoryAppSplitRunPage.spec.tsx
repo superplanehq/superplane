@@ -33,7 +33,7 @@ describe("FactoryAppSplitRunPage", () => {
       expect(screen.getByTestId("split-run-phase-implement-0")).toBeInTheDocument();
     });
     const page = screen.getByTestId("factory-app-split-run-page");
-    expect(screen.getByTestId("factory-app-canvas-title")).toHaveTextContent("Implementation");
+    expect(screen.getByTestId("factory-app-canvas-title")).toHaveTextContent("Refund Implementer");
     expect(within(page).queryByTestId("split-run-phase-refund-planner-0")).not.toBeInTheDocument();
     expect(within(page).getByTestId("split-run-stream-implement-0")).toBeInTheDocument();
     expect(within(page).getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
