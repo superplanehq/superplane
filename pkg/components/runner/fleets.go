@@ -40,7 +40,7 @@ func requireMachineType(machineType string) (string, error) {
 
 // resolveBrokerFleetID is the fleet_id sent to the task broker.
 // TASK_BROKER_FLEET_ID overrides the node machine type when set, so a local
-// broker with one fleet (for example aws-standard-1) can run nodes that still
+// broker with one fleet (for example local) can run nodes that still
 // select e1-large-amd64 in the canvas.
 func resolveBrokerFleetID(machineType string) (string, error) {
 	if _, err := requireMachineType(machineType); err != nil {

@@ -23,10 +23,10 @@ func TestResolveBrokerFleetIDUsesEnvOverride(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, MachineTypeE1LargeAMD64, got)
 
-	t.Setenv("TASK_BROKER_FLEET_ID", "aws-standard-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", " local ")
 	got, err = resolveBrokerFleetID(MachineTypeE1LargeAMD64)
 	require.NoError(t, err)
-	assert.Equal(t, "aws-standard-1", got)
+	assert.Equal(t, "local", got)
 
 	_, err = resolveBrokerFleetID("")
 	require.Error(t, err)

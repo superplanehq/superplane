@@ -63,6 +63,10 @@ After the first setup, run `make dev.up` when the stack is not running, then `ma
 
 When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
 
+To run Runner nodes locally, start `make dev` in the runner repository.
+Compose defaults already point at that broker. Set `TASK_BROKER_*` in `.env`
+only for a remote broker (see `.env.example`).
+
 ## Additional Development Resources
 
 ### Overview
