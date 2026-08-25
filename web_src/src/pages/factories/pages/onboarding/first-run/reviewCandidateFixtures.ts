@@ -68,7 +68,9 @@ function issueMarkdown(summary: string, extra: string): string {
   return `${summary}\n\n${extra}`;
 }
 
-const SENTRY_FACTORY_HTTP_500_MARKDOWN = `[View in Sentry](https://superplane.sentry.io/issues/7670162495/events/0653054e91914677a2eb40b852d01fee/)
+export const SENTRY_FACTORY_HTTP_500_URL = "https://superplane.sentry.io/issues/7670162495/";
+
+const SENTRY_FACTORY_HTTP_500_MARKDOWN = `[View in Sentry](${SENTRY_FACTORY_HTTP_500_URL}events/0653054e91914677a2eb40b852d01fee/)
 
 ## Summary
 
@@ -269,14 +271,17 @@ Reuse the charge idempotency store. Keep the existing refund audit trail.`,
     ticketKey: "PAY-844",
     title: "HTTP 500 /api/v1/factories/0644043d-564b-47e4-95b0-f5be415d0742",
     ticketBody: "GET /api/v1/factories/{id} returned HTTP 500 while PR #6671's factories schema migration rolled out.",
-    issue: reviewIssue("PAY-844", {
-      createdAt: YESTERDAY,
-      updatedAt: TWO_HOURS_AGO,
-      author: ISSUE_AUTHOR,
-      assignees: [ISSUE_ASSIGNEE_ALEX],
-      labels: [{ name: "bug" }, { name: "sentry" }, { name: "api" }],
-      bodyMarkdown: SENTRY_FACTORY_HTTP_500_MARKDOWN,
-    }),
+    issue: {
+      ...reviewIssue("PAY-844", {
+        createdAt: YESTERDAY,
+        updatedAt: TWO_HOURS_AGO,
+        author: ISSUE_AUTHOR,
+        assignees: [ISSUE_ASSIGNEE_ALEX],
+        labels: [{ name: "bug" }, { name: "sentry" }, { name: "api" }],
+        bodyMarkdown: SENTRY_FACTORY_HTTP_500_MARKDOWN,
+      }),
+      url: SENTRY_FACTORY_HTTP_500_URL,
+    },
     confidenceScore: 4,
     confidenceBand: "High",
     reasons: [

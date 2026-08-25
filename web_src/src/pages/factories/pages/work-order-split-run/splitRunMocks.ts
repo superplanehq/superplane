@@ -47,6 +47,7 @@ import type {
   RunOverlayStepStatus,
 } from "../work-order-run-overlay/workOrderRunOverlayMocks";
 import type { SplitRunCanvasKey, SplitRunCanvasModel } from "./splitRunCanvases";
+import { splitRunSourceForOrder, type SplitRunSource } from "./splitRunSource";
 
 export type SplitRunPhaseId = string;
 
@@ -122,6 +123,7 @@ export interface SplitRunFixture {
   checks: WorkOrderCheckPresentation[];
   footer: SplitRunFooter;
   footerTone: SplitRunFooterTone;
+  source?: SplitRunSource;
 }
 
 export { SPLIT_RUN_RUNNING };
@@ -259,6 +261,7 @@ function mappedWorkOrderFixture(
     lineStatus: lineStatusForDisplay(displayStatus),
     currentPhaseId: current ? phaseIdForExecution(current) : (phases[0]?.id ?? ""),
     phases,
+    source: splitRunSourceForOrder(order),
     ...reviewSurfaces(order, displayStatus, options?.lineId, phases, options?.checks),
   };
 }

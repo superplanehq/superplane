@@ -13,6 +13,7 @@ import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { ConfidenceMeter } from "./ConfidenceMeter";
 import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
+import { WorkOrderStatusDot } from "./WorkOrderStatusDot";
 
 export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   organizationId: string;
@@ -88,15 +89,12 @@ export function WorkOrderCard({
 
       <div className="relative z-10 pointer-events-none">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="relative size-2 shrink-0" title={meta.label} aria-label={meta.label}>
-            {entry.displayStatus === "running" ? (
-              <span
-                className={cn("absolute inset-0 rounded-full opacity-60 animate-ping", meta.dotClassName)}
-                aria-hidden
-              />
-            ) : null}
-            <span className={cn("relative block size-2 rounded-full", meta.dotClassName)} />
-          </span>
+          <WorkOrderStatusDot
+            colorClassName={meta.dotClassName}
+            pulsing={entry.displayStatus === "running"}
+            title={meta.label}
+            aria-label={meta.label}
+          />
           <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-snug text-foreground">
             {entry.title}
           </h3>

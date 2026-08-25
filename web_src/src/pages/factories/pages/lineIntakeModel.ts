@@ -17,6 +17,7 @@ import type { WorkOrderStatusNotePresentation } from "../lib/workOrderStatusNote
 import { intakeCanvasForSource } from "./lineIntakeCanvas";
 import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvases";
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
+import { splitRunIntakeSource } from "./work-order-split-run/splitRunSource";
 
 export { ADD_INTAKE_TEMPLATES, filterAddIntakeTemplates, type AddIntakeTemplate } from "./addIntakeTemplates";
 
@@ -245,6 +246,7 @@ export function intakeTicketAnalysisFixture(
       note: { headline: view.headline, text: view.text },
     },
     footerTone: complete ? "done" : "running",
+    source: splitRunIntakeSource(ticket.issueUrl ?? githubIssueUrlForTicket(ticket.issueKey ?? ticket.id)),
     phases: [
       ticketAnalysisPhase({
         id: "ingest",

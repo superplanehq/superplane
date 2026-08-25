@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSplitRunFooter, doneFooterForStatus } from "./splitRunFooter";
+import {
+  buildSplitRunFooter,
+  DEFAULT_SPLIT_RUN_STOP_CHOICE,
+  doneFooterForStatus,
+  SPLIT_RUN_STOP_CHOICES,
+} from "./splitRunFooter";
 
 const PR_NOTE = {
   key: "pr",
@@ -31,13 +36,13 @@ describe("buildSplitRunFooter", () => {
       sentence: "This work order is a draft.",
       note: { headline: "Review the plan, then start", text: "From GitHub issue PAY-842. Confidence 5/5." },
       actions: [
-        { id: "start", kind: "start", label: "Start", emphasis: "primary" },
         { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" },
+        { id: "start", kind: "start", label: "Start", emphasis: "primary" },
       ],
     });
   });
 
-  it("keeps a running order on the state bar with Stop and Cancel", () => {
+  it("keeps a running order on the state bar with Stop", () => {
     const footer = buildSplitRunFooter({
       kind: "running",
       note: { key: "running-step", headline: "Implement is running", text: "The log shows live progress." },
@@ -45,9 +50,12 @@ describe("buildSplitRunFooter", () => {
 
     expect(footer.sentence).toBe("This work order is running.");
     expect(footer.note?.headline).toBe("Implement is running");
-    expect(footer.actions).toEqual([
-      { id: "stop-to-draft", kind: "stop-to-draft", label: "Stop and send to Draft", emphasis: "quiet" },
-      { id: "cancel", kind: "cancel", label: "Cancel", emphasis: "quiet" },
+    expect(footer.actions).toEqual([{ id: "stop", kind: "stop", label: "Stop", emphasis: "quiet" }]);
+    expect(DEFAULT_SPLIT_RUN_STOP_CHOICE).toBe("canceled");
+    expect(SPLIT_RUN_STOP_CHOICES.map((choice) => choice.label)).toEqual([
+      "Stop as Canceled",
+      "Stop as Completed",
+      "Stop and return to Draft",
     ]);
   });
 

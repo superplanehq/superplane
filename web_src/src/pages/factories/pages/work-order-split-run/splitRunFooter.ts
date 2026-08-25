@@ -6,7 +6,37 @@ export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "d
 /** @deprecated Use SplitRunFooterKind. Kept for fixture field name. */
 export type SplitRunFooterTone = SplitRunFooterKind;
 
-export type SplitRunFooterActionKind = "start" | "reject" | "cancel" | "stop-to-draft" | "note-cta";
+export type SplitRunFooterActionKind = "start" | "reject" | "cancel" | "stop" | "note-cta";
+
+export type SplitRunStopChoice = "canceled" | "completed" | "draft";
+
+export const DEFAULT_SPLIT_RUN_STOP_CHOICE: SplitRunStopChoice = "canceled";
+
+export const SPLIT_RUN_STOP_CHOICES: {
+  id: SplitRunStopChoice;
+  label: string;
+  description: string;
+  status: "cancelled" | "completed" | "draft";
+}[] = [
+  {
+    id: "canceled",
+    label: "Stop as Canceled",
+    description: "End the work order. Do not complete it.",
+    status: "cancelled",
+  },
+  {
+    id: "completed",
+    label: "Stop as Completed",
+    description: "Mark the work order as done.",
+    status: "completed",
+  },
+  {
+    id: "draft",
+    label: "Stop and return to Draft",
+    description: "Stop the run. Keep the work order as a draft.",
+    status: "draft",
+  },
+];
 
 export interface SplitRunFooterAction {
   id: string;
@@ -32,12 +62,7 @@ export interface SplitRunFooter {
 const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
 const REJECT: SplitRunFooterAction = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
 const CANCEL: SplitRunFooterAction = { id: "cancel", kind: "cancel", label: "Cancel", emphasis: "quiet" };
-const STOP_TO_DRAFT: SplitRunFooterAction = {
-  id: "stop-to-draft",
-  kind: "stop-to-draft",
-  label: "Stop and send to Draft",
-  emphasis: "quiet",
-};
+const STOP: SplitRunFooterAction = { id: "stop", kind: "stop", label: "Stop", emphasis: "quiet" };
 
 export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFooterNote {
   return {
@@ -73,10 +98,10 @@ export function buildSplitRunFooter(input: {
 }): SplitRunFooter {
   const note = input.note ? toFooterNote(input.note) : undefined;
   if (input.kind === "draft") {
-    return { kind: "draft", sentence: "This work order is a draft.", note, actions: [START, REJECT] };
+    return { kind: "draft", sentence: "This work order is a draft.", note, actions: [REJECT, START] };
   }
   if (input.kind === "running") {
-    return { kind: "running", sentence: "This work order is running.", note, actions: [STOP_TO_DRAFT, CANCEL] };
+    return { kind: "running", sentence: "This work order is running.", note, actions: [STOP] };
   }
   if (input.kind === "waiting" || input.kind === "failed") {
     const cta = noteCta(input.note);

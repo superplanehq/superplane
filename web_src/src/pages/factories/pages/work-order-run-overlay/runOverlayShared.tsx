@@ -60,19 +60,19 @@ export function RunOverlayFrame({
   return (
     <div
       className={cn(
-        "inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-6",
+        "inset-0 z-50 flex items-center justify-center bg-black/50 p-5 sm:p-10",
         fixed ? "fixed" : "absolute",
       )}
       onClick={onDismiss}
     >
       <div
         className={cn(
-          "flex max-h-[min(52rem,calc(100vh-2.5rem))] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-lg dark:bg-gray-900",
+          "flex max-h-[min(52rem,calc(100vh-5rem))] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-lg dark:bg-gray-900",
           canvas
-            ? "h-[min(52rem,calc(100vh-2.5rem))] w-[min(90vw,84rem)]"
+            ? "h-[min(52rem,calc(100vh-5rem))] w-[min(84rem,calc(100vw-5rem))]"
             : wide
-              ? "h-[min(48rem,calc(100vh-2.5rem))] w-[min(72rem,calc(100vw-2rem))]"
-              : "h-[min(46rem,calc(100vh-2.5rem))] w-[min(56rem,calc(100vw-2rem))]",
+              ? "h-[min(48rem,calc(100vh-5rem))] w-[min(72rem,calc(100vw-5rem))]"
+              : "h-[min(46rem,calc(100vh-5rem))] w-[min(56rem,calc(100vw-5rem))]",
         )}
         data-testid={testId}
         role="dialog"

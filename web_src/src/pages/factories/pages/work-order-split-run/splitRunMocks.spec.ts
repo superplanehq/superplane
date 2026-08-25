@@ -101,7 +101,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.footerTone).toBe("running");
     expect(fixture.footer.note?.headline).toBe("Implement is running");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Stop and send to Draft", "Cancel"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Stop"]);
     expect(fixture.checks).toMatchObject([{ id: "wo-running-refunds-confidence", name: "Confidence score", score: 4 }]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
     expect(fixture.phases.find((phase) => phase.id === "score")?.checks?.[0]).toMatchObject({
@@ -143,7 +143,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(note?.text).toContain("**plan.md**");
     expect(note?.text).toContain("Confidence 5/5 (High):");
     expect(note?.text).toContain("- The GitHub issue names retryable status codes and a hard attempt limit.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Start", "Reject"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Start"]);
   });
 
   it("pins a pull request review on a waiting implement card", () => {
@@ -464,7 +464,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.footer.note?.headline).toBe("Start this work order");
     expect(fixture.footer.note?.text).toContain("A person created this work order manually.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Start", "Reject"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Start"]);
   });
 });
 

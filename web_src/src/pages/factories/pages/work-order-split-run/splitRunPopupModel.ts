@@ -2,8 +2,13 @@ import type { FactoriesWorkOrderArtifact } from "@/api-client";
 
 import { extractArtifactMarkdownBody, toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import type { SplitRunFixture, SplitRunPhaseStatus } from "./splitRunMocks";
+import { isOriginTicketArtifact, type SplitRunSource } from "./splitRunSource";
 
 export type SplitRunPopupTab = "description" | "log";
+
+/** Description and Log use the same 3/2 reading-to-side split. */
+export const SPLIT_RUN_PANE_GRID_CLASSNAME =
+  "grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]";
 
 const DESCRIPTION_NAMES = ["details.md", "description.md"];
 
@@ -51,8 +56,16 @@ export function splitRunDescriptionMarkdown(artifacts: FactoriesWorkOrderArtifac
 }
 
 /** Files and links that are not already the description body. */
-export function splitRunLinkedArtifacts(artifacts: FactoriesWorkOrderArtifact[]): FactoriesWorkOrderArtifact[] {
-  return artifacts.filter((artifact) => !DESCRIPTION_NAMES.includes(artifactName(artifact)));
+export function splitRunLinkedArtifacts(
+  artifacts: FactoriesWorkOrderArtifact[],
+  source?: SplitRunSource,
+): FactoriesWorkOrderArtifact[] {
+  return artifacts.filter((artifact) => {
+    if (DESCRIPTION_NAMES.includes(artifactName(artifact))) {
+      return false;
+    }
+    return !isOriginTicketArtifact(artifact, source);
+  });
 }
 
 function artifactName(artifact: FactoriesWorkOrderArtifact): string {

@@ -115,8 +115,13 @@ describe("Line board job popup", () => {
     expect(screen.getByTestId("lines-backlog-column")).toBeInTheDocument();
     expect(screen.getByLabelText("Backlog menu")).toBeInTheDocument();
     expect(within(screen.getByTestId("lines-backlog-column")).getAllByRole("button", { name: /^Open / })).toHaveLength(
-      3,
+      4,
     );
+    expect(
+      within(screen.getByTestId("lines-backlog-column")).getByRole("button", {
+        name: "Open Draft: rework refund telemetry",
+      }),
+    ).toBeInTheDocument();
     expect(
       within(screen.getByTestId("lines-backlog-column")).getByRole("button", {
         name: "Open Add retry handling to webhook delivery",
@@ -206,6 +211,30 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByText("Review the pull request")).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/Users see duplicate refund/)).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-peek-dialog")).not.toBeInTheDocument();
+  }, 15000);
+
+  it("opens a manually created backlog card with person source", async () => {
+    const user = userEvent.setup();
+    const line = REFUND_FACTORY_LINES[0];
+
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={lineMetricsFactoriesFixture}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole("button", { name: "Open Draft: rework refund telemetry" }, { timeout: 8000 }),
+    );
+
+    const dialog = await screen.findByTestId("work-order-split-run");
+    const source = within(dialog).getByTestId("split-run-source");
+    expect(within(source).getByRole("img", { name: "Leonardo DiCaprio" })).toBeInTheDocument();
+    expect(within(source).getByText("Created manually")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-description")).toHaveTextContent(
+      "Let a user add emoji reactions on a work order itself (not only on comments).",
+    );
   }, 15000);
 
   it("matches popup content to the card state", async () => {

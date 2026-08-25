@@ -5,6 +5,7 @@ import { OPEN_WORK_ORDER_ARTIFACTS } from "../../__fixtures__/factoryPageFixture
 import {
   HOUR_AGO,
   REVIEWER_USER,
+  RUNNING_WORK_ORDER,
   STORYBOOK_ME_USER_AVATAR_URL,
   STORYBOOK_ME_USER_ID,
   STORYBOOK_ME_USER_NAME,
@@ -12,6 +13,7 @@ import {
 import { DESCRIPTION_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
 import { buildSplitRunFooter } from "./splitRunFooter";
 import type { SplitRunFixture } from "./splitRunMocks";
+import { splitRunSourceForOrder } from "./splitRunSource";
 
 const PLAN_ARTIFACT: FactoriesWorkOrderArtifact = {
   id: "art-plan-md",
@@ -53,6 +55,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
     },
   }),
   footerTone: "running",
+  source: splitRunSourceForOrder(RUNNING_WORK_ORDER),
   phases: [
     {
       id: "backlog",

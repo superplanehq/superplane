@@ -4,6 +4,7 @@ import { BOARD_REVIEW_CANDIDATE_WORK_ORDERS } from "../pages/onboarding/first-ru
 import { INGEST_CREATED_BY } from "./factoryPageWorkOrders";
 import {
   APPROVAL_WORK_ORDER,
+  DRAFT_WORK_ORDER,
   FAILED_WORK_ORDER,
   HOUR_AGO,
   OPEN_WORK_ORDER,
@@ -170,8 +171,9 @@ export const lineMetricsFactoriesFixture: FactoriesFixture = {
   workOrdersByFactoryId: {
     ...defaultFactoriesFixture.workOrdersByFactoryId,
     [PRIMARY_FACTORY_ID]: [
-      // Board inventory: 3 backlog, 3 implement, 2 verify, 3 done.
+      // Board inventory: 4 backlog, 3 implement, 2 verify, 3 done.
       ...BOARD_REVIEW_CANDIDATE_WORK_ORDERS,
+      DRAFT_WORK_ORDER,
       RUNNING_WORK_ORDER,
       APPROVAL_WORK_ORDER,
       BOARD_IMPLEMENT_FAILED_ORDER,

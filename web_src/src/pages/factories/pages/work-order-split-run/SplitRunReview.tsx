@@ -2,7 +2,6 @@ import { Link } from "@/components/Link/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { MarkdownContent } from "@/pages/app/Markdown";
 import { CircleAlert, CircleCheck, ExternalLink, Loader2, Minus, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
@@ -13,7 +12,8 @@ import {
   type WorkOrderCheckPresentation,
 } from "../../lib/workOrderChecks";
 import { WorkOrderCheckDialog } from "../../WorkOrderCheckDialog";
-import type { SplitRunFooter, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
+import type { SplitRunFooter, SplitRunFooterAction } from "./splitRunFooter";
+import { SplitRunStopButton } from "./SplitRunStopButton";
 
 const PILL_TONE: Record<WorkOrderCheckLevel, string> = {
   positive: "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300",
@@ -30,8 +30,8 @@ const PILL_ICON = {
 } as const;
 
 /**
- * Quiet two-row footer under the Log. A run note sits above an always-on
- * state bar. Check pills sit in the header next to owner and cost.
+ * Action bar under the Description and Log reading columns. Source,
+ * description, and checks carry the note. This row holds the next action.
  */
 export function SplitRunReview({
   footer,
@@ -55,9 +55,8 @@ export function SplitRunReview({
       aria-label="Work order status"
       data-testid="split-run-review"
     >
-      {footer.note ? <FooterNote note={footer.note} /> : null}
       {showBar ? (
-        <div className={cn("flex flex-wrap items-center justify-between gap-3", footer.note && "mt-3")}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="min-w-0 text-[13px] leading-5 text-muted-foreground">{footer.sentence}</p>
           {footer.actions.length > 0 ? (
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
@@ -78,20 +77,6 @@ export function SplitRunReview({
   );
 }
 
-function FooterNote({ note }: { note: SplitRunFooterNote }) {
-  return (
-    <div className="min-w-0">
-      <h3 className="text-[15px] font-semibold tracking-[-0.01em]">{note.headline}</h3>
-      {note.text ? (
-        <div className="mt-1 text-[13px] leading-5 text-muted-foreground [&_a]:underline">
-          <MarkdownContent content={note.text} variant="workspace" />
-        </div>
-      ) : null}
-      {note.sourceName ? <p className="mt-1.5 truncate text-[12px] text-muted-foreground">{note.sourceName}</p> : null}
-    </div>
-  );
-}
-
 function FooterAction({
   action,
   onStart,
@@ -106,6 +91,10 @@ function FooterAction({
   const primary = action.emphasis === "primary";
   const variant = primary ? "default" : "outline";
   const testId = primary ? "split-run-review-cta" : `split-run-footer-${action.id}`;
+
+  if (action.kind === "stop") {
+    return <SplitRunStopButton />;
+  }
 
   if (action.kind === "start") {
     return (

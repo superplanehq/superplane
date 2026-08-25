@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
 
 import { OwnerTimeCostRow, PopupHeader, PopupShell, SectionTitle } from "../work-order-popup-redesign/popupShared";
 import { CompactLineCanvas } from "./CompactLineCanvas";
@@ -14,11 +13,13 @@ import { autoExpandedPhaseId, splitRunStatusLabel, type SplitRunFixture, type Sp
 import {
   collectSplitRunArtifacts,
   defaultSplitRunPopupTab,
+  SPLIT_RUN_PANE_GRID_CLASSNAME,
   splitRunDescriptionMarkdown,
   splitRunLogTabDotClass,
 } from "./splitRunPopupModel";
 import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
 import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
+import { WorkOrderStatusDot } from "../../workOrders/WorkOrderStatusDot";
 import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
 
 type WorkOrderSplitRunBodyProps = {
@@ -33,8 +34,6 @@ type WorkOrderSplitRunBodyProps = {
   onDispatch?: () => Promise<void>;
   isDispatching?: boolean;
   canDispatch?: boolean;
-  /** Footer is hidden while the description tab is designed. */
-  showFooter?: boolean;
 };
 
 /** Log and canvas for a split run. The popup wraps this. */
@@ -48,7 +47,6 @@ export function WorkOrderSplitRunBody({
   onDispatch,
   isDispatching = false,
   canDispatch = false,
-  showFooter = false,
 }: WorkOrderSplitRunBodyProps) {
   const [phaseId, setPhaseId] = useState<SplitRunPhaseId>(fixture.currentPhaseId);
   const [openPhaseId, setOpenPhaseId] = useState<SplitRunPhaseId | null>(() => autoExpandedPhaseId(fixture));
@@ -75,7 +73,7 @@ export function WorkOrderSplitRunBody({
   }, [artifactIndex, fixture.phases, selectedPhase?.id, visual.stream]);
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+    <div className={SPLIT_RUN_PANE_GRID_CLASSNAME} data-testid="split-run-log-pane">
       <aside className="flex min-h-0 flex-col border-b border-border bg-muted/25 md:border-r md:border-b-0">
         <div className="mb-2 px-3 pt-3">
           <SectionTitle>Log</SectionTitle>
@@ -99,14 +97,12 @@ export function WorkOrderSplitRunBody({
             </li>
           ))}
         </ol>
-        {showFooter ? (
-          <SplitRunReview
-            footer={fixture.footer}
-            onStart={fixture.footer.kind === "draft" ? onDispatch : undefined}
-            startBusy={isDispatching}
-            startDisabled={!canDispatch}
-          />
-        ) : null}
+        <SplitRunReview
+          footer={fixture.footer}
+          onStart={fixture.footer.kind === "draft" ? onDispatch : undefined}
+          startBusy={isDispatching}
+          startDisabled={!canDispatch}
+        />
       </aside>
 
       <section className="flex min-h-0 min-w-0 flex-col" aria-label="Run">
@@ -141,7 +137,6 @@ export function WorkOrderSplitRunPopup({
   onDispatch,
   isDispatching = false,
   canDispatch = false,
-  showFooter = false,
 }: WorkOrderSplitRunBodyProps & {
   onClose?: () => void;
   fixed?: boolean;
@@ -160,9 +155,11 @@ export function WorkOrderSplitRunPopup({
           <TabsList aria-label="Work order views">
             <TabsTrigger value="description">Description</TabsTrigger>
             <TabsTrigger value="log">
-              <span
-                className={cn("size-1.5 shrink-0 rounded-full", splitRunLogTabDotClass(fixture.lineStatus))}
+              <WorkOrderStatusDot
+                colorClassName={splitRunLogTabDotClass(fixture.lineStatus)}
+                pulsing={fixture.lineStatus === "running"}
                 title={splitRunStatusLabel(fixture.lineStatus)}
+                className="size-1.5"
                 data-testid="split-run-log-tab-dot"
                 aria-hidden
               />
@@ -180,6 +177,11 @@ export function WorkOrderSplitRunPopup({
             orderNumber={orderNumber}
             expandFirstCheck={fixture.footer.kind === "draft"}
             canEditDescription={fixture.footer.kind === "draft"}
+            source={fixture.source}
+            footer={fixture.footer}
+            onStart={fixture.footer.kind === "draft" ? onDispatch : undefined}
+            startBusy={isDispatching}
+            startDisabled={!canDispatch}
           />
         </TabsContent>
         <TabsContent value="log" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -195,7 +197,6 @@ export function WorkOrderSplitRunPopup({
             onDispatch={onDispatch}
             isDispatching={isDispatching}
             canDispatch={canDispatch}
-            showFooter={showFooter}
           />
         </TabsContent>
       </Tabs>
