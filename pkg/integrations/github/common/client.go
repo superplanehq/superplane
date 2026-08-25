@@ -307,6 +307,14 @@ func (c *Client) GetIssue(ctx context.Context, repository string, issueNumber in
 	return c.underlying.Issues.Get(ctx, owner, name, issueNumber)
 }
 
+// ListIssues wraps the repository issue list. GitHub answers this endpoint with
+// pull requests too, so a caller that wants issues only must skip the entries
+// that report IsPullRequest.
+func (c *Client) ListIssues(ctx context.Context, repository string, opts *github.IssueListByRepoOptions) ([]*github.Issue, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.ListByRepo(ctx, owner, name, opts)
+}
+
 func (c *Client) EditIssue(ctx context.Context, repository string, issueNumber int, issue *github.IssueRequest) (*github.Issue, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Issues.Edit(ctx, owner, name, issueNumber, issue)

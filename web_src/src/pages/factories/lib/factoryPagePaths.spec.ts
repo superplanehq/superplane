@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   factoryAppConfigurePath,
   factoryAppPath,
+  factoryAppRunPath,
   factoryAppSplitRunPath,
   factoryAppViewPath,
   factoryDetailPath,
@@ -163,9 +164,17 @@ describe("factoryAppSplitRunPath", () => {
 });
 
 describe("factoryAppViewPath", () => {
-  it("opens the split run page when a run id is present", () => {
+  it("opens the canvas run inspector when a run id is present", () => {
     expect(factoryAppViewPath("org-1", "SP", "app-1", { from: "lines", lineId: "line-1", runId: "run-9" })).toBe(
-      "/org-1/workspaces/SP/apps/app-1/split-run?run=run-9&from=lines&lineId=line-1",
+      "/org-1/workspaces/SP/apps/app-1?run=run-9&from=lines&lineId=line-1",
+    );
+  });
+});
+
+describe("factoryAppRunPath", () => {
+  it("opens the canvas run inspector", () => {
+    expect(factoryAppRunPath("org-1", "SP", "app-1", "run-9", { from: "lines", lineId: "line-1" })).toBe(
+      "/org-1/workspaces/SP/apps/app-1?run=run-9&from=lines&lineId=line-1",
     );
   });
 });

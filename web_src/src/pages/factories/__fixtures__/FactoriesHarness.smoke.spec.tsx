@@ -54,7 +54,7 @@ describe("FactoriesHarness work orders", () => {
     expect(body.canvas?.metadata?.factoryId).toBe(PRIMARY_FACTORY_ID);
   }, 10000);
 
-  it("sends a canvas run view to the split-run page with Edit", async () => {
+  it("keeps a canvas run view on the factory inspector page", async () => {
     const implementerAppId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
     const lineId = REFUND_FACTORY_LINES[0]?.id ?? "line-plan-and-implement";
 
@@ -66,9 +66,9 @@ describe("FactoriesHarness work orders", () => {
       />,
     );
 
-    expect(await screen.findByTestId("factory-app-split-run-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByTestId("factory-app-canvas-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(await screen.findByTestId("factory-app-edit", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.queryByTestId("factory-app-canvas-page")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factory-app-split-run-page")).not.toBeInTheDocument();
     expect(screen.queryByTestId("factory-app-workspace-toggles")).not.toBeInTheDocument();
   }, 15000);
 
@@ -301,14 +301,14 @@ describe("FactoriesHarness Acme onboarding", () => {
       expect(screen.getByTestId("lines-column-title-phase-0")).toHaveTextContent("Implement");
     });
     expect(screen.getByTestId("lines-column-title-phase-1")).toHaveTextContent("Verify");
-    expect(screen.getByTestId("lines-column-title-phase-2")).toHaveTextContent("Done");
-    expect(screen.queryByTestId("lines-column-title-phase-3")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-column-title-done")).toHaveTextContent("Done");
+    expect(screen.queryByTestId("lines-column-title-phase-2")).not.toBeInTheDocument();
     expect(screen.getByTestId("backlog-onboarding-card")).toBeInTheDocument();
     expect(screen.getByTestId("lines-backlog-column")).not.toHaveTextContent("No work orders in the backlog.");
     expect(screen.getByTestId("lines-phase-column-0")).toHaveTextContent("Nothing here.");
     expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
-    expect(screen.getByTestId("lines-phase-column-2")).toHaveTextContent("Nothing here.");
-    expect(screen.queryByTestId("lines-phase-column-3")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-done-column")).toHaveTextContent("No work orders in Done.");
+    expect(screen.queryByTestId("lines-phase-column-2")).not.toBeInTheDocument();
     expect(screen.queryAllByTestId(/^work-order-card-/)).toHaveLength(0);
   }, 15000);
 
