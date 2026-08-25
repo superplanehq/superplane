@@ -134,7 +134,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(implement).queryByText("did not run")).not.toBeInTheDocument();
 
     expect(screen.getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
-    expect(screen.getAllByText("Implementation").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("split-run-canvas-menu")).toHaveAccessibleName("Implement menu");
     expect(within(screen.getByTestId("run-overlay-compact-canvas")).getByText("Create Branch")).toBeInTheDocument();
     expect(screen.queryByText("Factory Lines")).not.toBeInTheDocument();
   });
@@ -682,7 +682,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(planStream).getByRole("button", { name: "Ran 2 commands" })).toBeInTheDocument();
     expect(within(planStream).queryByRole("button", { name: "Read 7 files, ran 35 commands" })).not.toBeInTheDocument();
     expect(within(planStream).queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();
-    expect(screen.getByText("Planning")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-canvas-menu")).toHaveAccessibleName("Plan menu");
     expect(screen.getAllByText("From GH issue?").length).toBeGreaterThan(0);
   });
 
@@ -710,7 +710,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-phase-plan")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-phase-score")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-stream-implement-0")).toBeInTheDocument();
-    expect(screen.getAllByText("Implementation").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("split-run-canvas-menu")).toHaveAccessibleName("Implement menu");
     expect(screen.getAllByText("From GH issue?").length).toBeGreaterThan(0);
     expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
   });

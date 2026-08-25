@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Canvas
 metadata:
-  name: Implementation
+  name: Implement
   description: Create a branch, implement the plan, and open a draft pull request.
 spec:
   edges:

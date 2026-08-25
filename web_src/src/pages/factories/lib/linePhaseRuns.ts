@@ -12,6 +12,7 @@ import {
   isQueuedStepRow,
   type WorkOrderStepRow,
 } from "./workOrderExecutions";
+import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "./workOrderProgress";
 
 export type LinePhaseTick = "running" | "waiting" | "queued" | "failed" | null;
 
@@ -69,7 +70,8 @@ export function linePhaseRunHref(
 /**
  * Builds the Lines detail board: one column per line step. Each work order
  * appears once, in the column for its current (furthest active, else furthest
- * finished) step on this line — newest cards first within a column.
+ * finished) step on this line — newest cards first within a column. Work
+ * orders that reached a terminal outcome move to the Done column instead.
  */
 export function buildLinePhaseBoard(
   line: FactoriesFactoryLine,
@@ -82,20 +84,32 @@ export function buildLinePhaseBoard(
     return [];
   }
 
-  const runsByStep = collectCurrentRunsByStep(lineId, steps, workOrders);
+  const columns: LinePhaseColumn[] = steps.map((step, stepIndex) => ({
+    stepName: automationNameForLineStep(step, apps, stepIndex),
+    stepIndex,
+    appId: step.app?.app?.trim() || undefined,
+    maxParallelism: lineStepParallelism(step),
+    runs: [],
+    tick: null,
+  }));
 
-  return steps.map((step, stepIndex) => {
-    const runs = runsByStep.get(stepIndex) ?? [];
-    const appId = step.app?.app?.trim() || undefined;
-    return {
-      stepName: automationNameForLineStep(step, apps, stepIndex),
-      stepIndex,
-      appId,
-      maxParallelism: lineStepParallelism(step),
-      runs,
-      tick: resolvePhaseTick(runs),
-    };
-  });
+  const runsByStep = collectCurrentRunsByStep(lineId, steps, workOrders, lineBoardEndsWithDoneStep(columns));
+  for (const column of columns) {
+    column.runs = runsByStep.get(column.stepIndex) ?? [];
+    column.tick = resolvePhaseTick(column.runs);
+  }
+
+  return columns;
+}
+
+/**
+ * True when the last step is the line's own Done automation. Such a line keeps
+ * finished work orders on that step; every other line hands them to the board
+ * Done column, which no app backs.
+ */
+export function lineBoardEndsWithDoneStep(columns: LinePhaseColumn[]): boolean {
+  const last = columns[columns.length - 1];
+  return last ? isDoneLineColumn(last) : false;
 }
 
 /**
@@ -104,6 +118,20 @@ export function buildLinePhaseBoard(
  */
 export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
   return workOrders.filter(isLineBacklogOrder).sort(compareOrdersNewestFirst);
+}
+
+/**
+ * Work orders for the Done column: completed, rejected, or canceled. Failed
+ * work orders stay on the phase where they stopped, so the team can see what
+ * to retry. Newest updated orders come first.
+ */
+export function collectLineDoneOrders(
+  lineId: string | undefined,
+  workOrders: FactoriesWorkOrder[],
+): FactoriesWorkOrder[] {
+  return workOrders
+    .filter((order) => isLineDoneOrder(order) && belongsToLineBoard(order, lineId))
+    .sort(compareOrdersNewestFirst);
 }
 
 /** Factory-level intake automation. It is not a line step. */
@@ -150,6 +178,27 @@ function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {
     return false;
   }
   return (order.lineDispatches ?? []).length === 0;
+}
+
+/** Terminal outcomes that take a work order off the phase columns. */
+const DONE_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = ["completed", "rejected", "cancelled"];
+
+function isLineDoneOrder(order: FactoriesWorkOrder): boolean {
+  if (!order.id) {
+    return false;
+  }
+  return DONE_DISPLAY_STATUSES.includes(getWorkOrderDisplayStatus(order));
+}
+
+// A finished work order belongs on this board when it ran on this line, or
+// when it closed before any line picked it up — the same rule the shared
+// backlog follows.
+function belongsToLineBoard(order: FactoriesWorkOrder, lineId: string | undefined): boolean {
+  const dispatches = order.lineDispatches ?? [];
+  if (dispatches.length === 0) {
+    return true;
+  }
+  return dispatches.some((dispatch) => dispatch.line?.id === lineId);
 }
 
 function compareOrdersNewestFirst(left: FactoriesWorkOrder, right: FactoriesWorkOrder): number {
@@ -214,9 +263,13 @@ function collectCurrentRunsByStep(
   lineId: string,
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
   workOrders: FactoriesWorkOrder[],
+  keepFinishedOrders: boolean,
 ): Map<number, LinePhaseRunCard[]> {
   const runsByStep = new Map<number, LinePhaseRunCard[]>();
   for (const order of workOrders) {
+    if (!keepFinishedOrders && isLineDoneOrder(order)) {
+      continue;
+    }
     appendCurrentRunForOrder(order, lineId, steps, runsByStep);
   }
   for (const runs of runsByStep.values()) {
