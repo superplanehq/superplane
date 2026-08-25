@@ -18,6 +18,7 @@ func TestRequireMachineType(t *testing.T) {
 }
 
 func TestResolveBrokerFleetIDUsesEnvOverride(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_FLEET_ID", "")
 	got, err := resolveBrokerFleetID(MachineTypeE1LargeAMD64)
 	require.NoError(t, err)
@@ -30,4 +31,12 @@ func TestResolveBrokerFleetIDUsesEnvOverride(t *testing.T) {
 
 	_, err = resolveBrokerFleetID("")
 	require.Error(t, err)
+}
+
+func TestResolveBrokerFleetIDUsesLocalComposeFleet(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "http://host.docker.internal:8091")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
+	got, err := resolveBrokerFleetID(MachineTypeE1LargeAMD64)
+	require.NoError(t, err)
+	assert.Equal(t, localComposeFleetID, got)
 }

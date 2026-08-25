@@ -125,7 +125,11 @@ func taskBrokerLiveLogBaseURL() (string, error) {
 	if public != "" {
 		return public, nil
 	}
-	return taskBrokerBaseURL()
+	base, err := taskBrokerBaseURL()
+	if err != nil {
+		return "", err
+	}
+	return browserTaskBrokerBaseURL(base), nil
 }
 
 func liveLogURL(base, brokerTaskID string) (string, error) {

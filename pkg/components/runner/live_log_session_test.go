@@ -54,6 +54,15 @@ func TestLiveLogStreamURLFallsBackToBaseURL(t *testing.T) {
 	assert.Equal(t, "http://task-broker:8081/v1/tasks/task-1/live-logs", got)
 }
 
+func TestLiveLogStreamURLRewritesDockerInternalHost(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "http://host.docker.internal:8091")
+	t.Setenv("TASK_BROKER_PUBLIC_URL", "")
+
+	got, err := LiveLogStreamURL("task-1")
+	require.NoError(t, err)
+	assert.Equal(t, "http://localhost:8091/v1/tasks/task-1/live-logs", got)
+}
+
 func TestLiveLogInternalStreamURLUsesBaseURL(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "http://host.docker.internal:8091")
 	t.Setenv("TASK_BROKER_PUBLIC_URL", "http://localhost:8091")
