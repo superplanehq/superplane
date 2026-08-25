@@ -14,7 +14,7 @@ import { WorkOrderSplitRunSource } from "./WorkOrderSplitRunSource";
 
 /**
  * Description tab: reading column on the left, Source and Artifacts on the
- * right. Column widths match the Log tab.
+ * right.
  */
 export function WorkOrderSplitRunOverview({
   description,

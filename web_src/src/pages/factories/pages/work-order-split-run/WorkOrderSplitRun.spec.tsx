@@ -68,6 +68,7 @@ describe("WorkOrderSplitRunPopup", () => {
     renderSplitRun();
 
     const dialog = screen.getByTestId("work-order-split-run");
+    expect(dialog.className).toContain("w-[min(56rem,calc(100vw-5rem))]");
     expect(within(dialog).getByRole("heading", { name: "Add refund reconciliation test" })).toBeInTheDocument();
     expect(within(dialog).getByRole("tab", { name: "Description" })).toBeInTheDocument();
     const runningDot = within(dialog).getByTestId("split-run-log-tab-dot");
@@ -76,7 +77,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(dialog).getByTestId("split-run-review")).toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Log" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("region", { name: "Run" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("region", { name: "Run" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
 
     const backlog = screen.getByTestId("split-run-phase-backlog");
     expect(within(backlog).getByText("Backlog")).toBeInTheDocument();
@@ -133,9 +135,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(screen.getByTestId("split-run-stream-implement")).queryByText("└──")).not.toBeInTheDocument();
     expect(within(implement).queryByText("did not run")).not.toBeInTheDocument();
 
-    expect(screen.getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-canvas-menu")).toHaveAccessibleName("Implement menu");
-    expect(within(screen.getByTestId("run-overlay-compact-canvas")).getByText("Create Branch")).toBeInTheDocument();
+    expect(screen.getAllByText("Implementation").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
     expect(screen.queryByText("Factory Lines")).not.toBeInTheDocument();
   });
 
@@ -181,47 +182,14 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(plan).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
   });
 
-  it("selects the canvas component when a log line is clicked", async () => {
+  it("highlights a log line when it is clicked", async () => {
     const user = userEvent.setup();
     renderSplitRun();
 
     await user.click(within(screen.getByTestId("split-run-stream-line-create-branch")).getByRole("button"));
 
     expect(screen.getByTestId("split-run-stream-line-create-branch")).toHaveAttribute("data-highlighted", "true");
-    expect(screen.getByTestId("split-run-canvas-node-create-branch")).toHaveAttribute("data-selected", "true");
-    expect(screen.getByTestId("split-run-canvas-node-onrun-implement")).not.toHaveAttribute("data-selected");
-  });
-
-  it("keeps Edit Automation in the canvas overflow menu when no edit href is set", async () => {
-    const user = userEvent.setup();
-    renderSplitRun();
-
-    await user.click(screen.getByTestId("split-run-canvas-menu"));
-    expect(await screen.findByTestId("split-run-canvas-edit")).toHaveTextContent("Edit Automation");
-  });
-
-  it("opens Edit Automation from the canvas overflow menu", async () => {
-    const user = userEvent.setup();
-    renderPopup({ fixture: SPLIT_RUN_RUNNING, canvasEditHref: () => "/edit-implementation" });
-
-    await user.click(screen.getByTestId("split-run-canvas-menu"));
-    const edit = await screen.findByTestId("split-run-canvas-edit");
-    expect(edit).toHaveTextContent("Edit Automation");
-    expect(edit).toHaveAttribute("href", "/edit-implementation");
-  });
-
-  it("places expand before the overflow menu and opens the automation run", () => {
-    renderPopup({
-      fixture: SPLIT_RUN_RUNNING,
-      canvasEditHref: () => "/edit-implementation",
-      canvasExpandHref: () => "/apps/app-refund-implementer?run=run-implement",
-    });
-
-    const expand = screen.getByTestId("split-run-canvas-expand");
-    const menu = screen.getByTestId("split-run-canvas-menu");
-    expect(expand.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(expand).toHaveAttribute("href", "/apps/app-refund-implementer?run=run-implement");
-    expect(expand).toHaveAttribute("aria-label", "Open automation run");
+    expect(screen.queryByTestId("split-run-canvas-node-create-branch")).not.toBeInTheDocument();
   });
 
   it("puts risk score and code quality on the verify step", () => {
@@ -477,7 +445,7 @@ describe("WorkOrderSplitRunPopup", () => {
       within(screen.getByTestId("split-run-overview-sidebar")).queryByTestId("split-run-review"),
     ).not.toBeInTheDocument();
     await openLogTab(user);
-    expect(screen.getByTestId("split-run-log-pane").className).toContain("minmax(0,3fr)_minmax(0,2fr)");
+    expect(screen.getByTestId("split-run-log-pane").className).not.toContain("minmax(0,3fr)_minmax(0,2fr)");
     const logFooter = screen.getByTestId("split-run-review");
     expect(within(logFooter).getByText("This work order is a draft.")).toBeInTheDocument();
     const logStart = within(logFooter).getByRole("button", { name: "Start" });
@@ -605,14 +573,13 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(tab).getByText("Risk score")).toBeInTheDocument();
   });
 
-  it("shows the Ingest canvas when a GitHub automation created the draft", async () => {
+  it("shows the Ingest log when a GitHub automation created the draft", async () => {
     const user = userEvent.setup();
     renderPopup({ fixture: splitRunFixtureForWorkOrder(INGEST_DRAFT_WORK_ORDER) });
 
     await openLogTab(user);
-    expect(screen.getByText("Ingest")).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-canvas-node-on-issue-labeled")).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-canvas-node-on-issue-assigned")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-phase-backlog")).toBeInTheDocument();
+    expect(screen.queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId("split-run-phase-backlog")).getAllByRole("button", { name: "description.md" }).length,
     ).toBeGreaterThan(0);
@@ -650,7 +617,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-stream-implement-0")).toBeInTheDocument();
   });
 
-  it("opens the selected step canvas when a log row is clicked", async () => {
+  it("opens the selected step log when a log row is clicked", async () => {
     const user = userEvent.setup();
     renderSplitRun();
 
@@ -682,11 +649,10 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(planStream).getByRole("button", { name: "Ran 2 commands" })).toBeInTheDocument();
     expect(within(planStream).queryByRole("button", { name: "Read 7 files, ran 35 commands" })).not.toBeInTheDocument();
     expect(within(planStream).queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-canvas-menu")).toHaveAccessibleName("Plan menu");
-    expect(screen.getAllByText("From GH issue?").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
   });
 
-  it("opens a mapped implement-running work order on the implement canvas", () => {
+  it("opens a mapped implement-running work order on the implement log", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({
         ...OPEN_WORK_ORDER,
@@ -710,8 +676,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-phase-plan")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-phase-score")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-stream-implement-0")).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-canvas-menu")).toHaveAccessibleName("Implement menu");
-    expect(screen.getAllByText("From GH issue?").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Implementation").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
   });
 
@@ -753,7 +719,7 @@ describe("WorkOrderSplitRunPopup", () => {
     await user.click(within(screen.getByTestId("split-run-stream-line-find-work-order")).getByRole("button"));
 
     expect(screen.getByTestId("split-run-stream-line-find-work-order")).toHaveAttribute("data-highlighted", "true");
-    expect(screen.getByTestId("split-run-canvas-node-find-work-order")).toHaveAttribute("data-selected", "true");
+    expect(screen.queryByTestId("split-run-canvas-node-find-work-order")).not.toBeInTheDocument();
   });
 
   it("lets you rename the title and edit the description on a draft", async () => {

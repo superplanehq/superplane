@@ -6,7 +6,7 @@ import { isOriginTicketArtifact, type SplitRunSource } from "./splitRunSource";
 
 export type SplitRunPopupTab = "description" | "log";
 
-/** Description and Log use the same 3/2 reading-to-side split. */
+/** Description uses a 3/2 reading-to-side split. */
 export const SPLIT_RUN_PANE_GRID_CLASSNAME =
   "grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]";
 
