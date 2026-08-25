@@ -620,8 +620,7 @@ export function canvasExpandHrefForLine(
   const appIdByCanvas = canvasAppIdsForLine(line, apps);
 
   return (key, phase) => {
-    const appId =
-      phase?.appId ?? appIdByCanvas[key] ?? firstCanvasAppId(appIdByCanvas) ?? apps.find((app) => app.id)?.id;
+    const appId = phase?.appId ?? appIdByCanvas[key];
     const runId = phase?.runId ?? executionRunIdForCanvas(order, key, line.id, appId);
     if (!appId || !runId) {
       return undefined;
