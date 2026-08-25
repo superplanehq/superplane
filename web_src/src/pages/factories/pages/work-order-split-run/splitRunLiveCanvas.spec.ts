@@ -173,6 +173,41 @@ describe("resolveSplitRunVisual", () => {
     expect(visual.stream?.some((line) => line.nodeId === "run-workflow")).toBe(false);
   });
 
+  it("uses the live canvas for a custom app when demo artifacts are off", () => {
+    const phase = {
+      id: "build-0",
+      name: "Build",
+      status: "running" as const,
+      duration: "1s",
+      componentName: "Wide chain",
+      artifacts: [],
+      stream: [],
+      canvasSteps: [],
+      appId: "app-custom",
+      runId: "run-wide",
+    };
+    const liveCanvas = splitRunCanvasFromLive({
+      canvas: {
+        metadata: { id: "app-custom", name: "Wide chain" },
+        spec: {
+          nodes: [
+            { id: "kickoff", name: "Kickoff", type: "TYPE_TRIGGER" },
+            { id: "step-11", name: "Step 11", type: "TYPE_ACTION" },
+          ],
+          edges: [{ sourceId: "kickoff", targetId: "step-11" }],
+        },
+      },
+      fallbackTitle: "Wide chain",
+    });
+    const visual = resolveSplitRunVisual(
+      phase,
+      { enabled: true, canvas: liveCanvas, stream: [] },
+      { demoArtifacts: false },
+    );
+
+    expect(visual.canvas.nodes.map((node) => node.id)).toEqual(["kickoff", "step-11"]);
+  });
+
   it("uses the live canvas when it is the same line automation", () => {
     const implement = SPLIT_RUN_RUNNING.phases.find((phase) => phase.id === "implement");
     const yaml = splitRunCanvasForPhase(implement!);

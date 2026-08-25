@@ -373,7 +373,7 @@ export function resolveSplitRunVisual(
   if (live.isError) {
     return { canvas: emptySplitRunCanvas(phase), stream: [] };
   }
-  if (live.canvas && liveCanvasMatchesLineAutomation(lineCanvas, live.canvas)) {
+  if (live.canvas && (!demoArtifacts || liveCanvasMatchesLineAutomation(lineCanvas, live.canvas))) {
     return {
       canvas: live.canvas,
       stream:
