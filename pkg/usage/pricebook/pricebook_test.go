@@ -48,6 +48,11 @@ func TestEstimateMicros_UnknownModelIsZero(t *testing.T) {
 	assert.Equal(t, int64(0), got)
 }
 
+func TestIsPriced(t *testing.T) {
+	assert.True(t, IsPriced("claude-sonnet-4-6"))
+	assert.False(t, IsPriced("unknown-lab-model"))
+}
+
 func TestEstimateMicros_OpenAICacheReadIsPriced(t *testing.T) {
 	uncached := EstimateMicros("openai", "gpt-4o", 1_000_000, 0, 0, 0, 0)
 	cached := EstimateMicros("openai", "gpt-4o", 0, 0, 1_000_000, 0, 0)

@@ -5,9 +5,9 @@ import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../__fixtures__/fa
 import { FactoriesLayout } from "./FactoriesLayout";
 
 /**
- * The Factories layout shell: workspace name (opens Overview), nav + recent
- * orders, bottom-left user menu, and a compact section header in the pane.
- * Stories mount the layout with a live route so the sidebar links behave.
+ * The Factories layout shell: a thin icon rail (workspace, intake, board,
+ * velocity, settings, new work order, user) and the line board as the main pane.
+ * Stories mount the layout with a live route so the rail controls behave.
  */
 const meta = {
   title: "Factories/Layout/FactoriesLayout",
@@ -22,7 +22,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/overview`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/line-plan-and-implement`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),

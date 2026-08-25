@@ -1,9 +1,9 @@
 export type VcsHostId = "github" | "gitlab";
 /** Matches SuperPlane integration registry names (Claude = `claude`, not anthropic). */
-export type IntegrationId = "github" | "gitlab" | "claude" | "cursor" | "openai" | "linear" | "jira";
+export type IntegrationId = "github" | "gitlab" | "claude" | "cursor" | "openai" | "openrouter" | "linear" | "jira";
 export type AgentHarnessId = "claude-code" | "cursor" | "codex";
 export type IssuesChoiceId = "vcs" | "linear" | "jira" | "skip";
-export type WizardStepId = "vcs" | "repo" | "issues" | "agent" | "name";
+export type WizardStepId = "vcs" | "repo" | "issues" | "agent" | "name" | "start";
 
 export type IntegrationOption = {
   id: IntegrationId;
@@ -18,31 +18,26 @@ export const VCS_OPTIONS: IntegrationOption[] = [
   { id: "gitlab", label: "GitLab", detail: "Connect GitLab to list repositories and open merge requests.", soon: true },
 ];
 
-export const AGENT_OPTIONS: {
-  id: AgentHarnessId;
-  label: string;
-  integrationId: IntegrationId;
-  detail: string;
-  soon?: boolean;
-}[] = [
+export const AGENT_OPTIONS: IntegrationOption[] = [
   {
-    id: "claude-code",
-    label: "Claude Code",
-    integrationId: "claude",
-    detail: "Cloud agent that changes the app repository and opens pull requests.",
+    id: "claude",
+    label: "Anthropic",
+    detail: "Connect an Anthropic API key for Claude Code.",
+  },
+  {
+    id: "openai",
+    label: "OpenAI",
+    detail: "Connect an OpenAI API key for Codex and OpenAI models.",
+  },
+  {
+    id: "openrouter",
+    label: "OpenRouter",
+    detail: "Connect an OpenRouter API key for many model providers.",
   },
   {
     id: "cursor",
     label: "Cursor",
-    integrationId: "cursor",
     detail: "Cloud agent that changes the app repository and opens pull requests.",
-    soon: true,
-  },
-  {
-    id: "codex",
-    label: "Codex",
-    integrationId: "openai",
-    detail: "Cloud agent (OpenAI) that changes the app repository and opens pull requests.",
     soon: true,
   },
 ];
@@ -131,15 +126,27 @@ export const WIZARD_STEPS = [
   {
     id: "agent" as const,
     label: "Agent",
-    purpose:
-      "Connect a cloud coding agent. It works issues in the app repository and opens pull requests without engineers watching each run.",
+    purpose: "Connect Anthropic, OpenAI, or OpenRouter. Hosted credit lets you continue without your own keys.",
   },
   {
     id: "name" as const,
     label: "Name",
     purpose: "Name the workspace for the app or product area you want to improve.",
   },
+  {
+    id: "start" as const,
+    label: "Start",
+    purpose:
+      "Review the first work order. The coding agent will improve AGENTS.md so later work follows your repository conventions.",
+  },
 ] as const;
+
+/** First work order the Start step proposes after setup. */
+export const START_WORK_ORDER = {
+  title: "Improve AGENTS.md",
+  description:
+    "Improve AGENTS.md for this repo (create it if missing).\n\n- Review the repository to understand layout, build/test, and conventions\n- Cover build/test, key packages, and repo-specific guidance\n- Keep useful guidance; remove generic or outdated advice\n- One focused pass only — do not rewrite unrelated docs",
+} as const;
 
 export function vcsLabel(host: VcsHostId) {
   return host === "github" ? "GitHub" : "GitLab";
@@ -157,6 +164,8 @@ export function integrationLabel(id: IntegrationId) {
       return "Cursor";
     case "openai":
       return "OpenAI";
+    case "openrouter":
+      return "OpenRouter";
     case "linear":
       return "Linear";
     case "jira":

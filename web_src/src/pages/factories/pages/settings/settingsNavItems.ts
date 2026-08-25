@@ -1,8 +1,9 @@
 import type { LucideIcon } from "lucide-react";
-import { BarChart3, Bell, Blocks, Box, CircleUser, Cpu, Grid3x3, Key, Plug, Users } from "lucide-react";
+import { BarChart3, Bell, Blocks, Box, CircleUser, Cpu, Grid3x3, Key, Plug, Users, Workflow } from "lucide-react";
 
 export type FactorySettingsSection =
   | "general"
+  | "automations"
   | "repositories"
   | "environments"
   | "models"
@@ -24,6 +25,7 @@ export interface FactorySettingsNavItem {
 
 export const FACTORY_SETTINGS_NAV_ITEMS: FactorySettingsNavItem[] = [
   { id: "general", label: "General", Icon: Grid3x3, group: "workspace" },
+  { id: "automations", label: "Automations", Icon: Workflow, group: "workspace" },
   { id: "repositories", label: "Repositories", Icon: Blocks, group: "workspace" },
   { id: "environments", label: "Environments", Icon: Box, group: "workspace" },
   { id: "models", label: "Models", Icon: Cpu, group: "workspace" },
@@ -35,7 +37,13 @@ export const FACTORY_SETTINGS_NAV_ITEMS: FactorySettingsNavItem[] = [
   { id: "notifications", label: "Notifications", Icon: Bell, group: "you" },
 ];
 
-const IMPLEMENTED_SETTINGS_SECTIONS = new Set<FactorySettingsSection>(["general", "usage", "profile", "notifications"]);
+const IMPLEMENTED_SETTINGS_SECTIONS = new Set<FactorySettingsSection>([
+  "general",
+  "automations",
+  "usage",
+  "profile",
+  "notifications",
+]);
 const SETTINGS_SECTIONS = new Set<string>(FACTORY_SETTINGS_NAV_ITEMS.map((item) => item.id));
 
 export function isFactorySettingsComingSoon(item: FactorySettingsNavItem) {

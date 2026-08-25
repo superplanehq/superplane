@@ -77,14 +77,15 @@ describe("VcsStep", () => {
   });
 });
 
-describe("SetupSections name step", () => {
-  function renderNameStep(saving: boolean) {
+describe("SetupSections start step", () => {
+  function renderStartStep(saving: boolean) {
     const { result } = renderHook(() => useOnboardingSetupState("Payments Service"));
 
     render(
       <SetupSections
         setup={result.current}
-        openSection="name"
+        organizationId="org-1"
+        openSection="start"
         setOpenSection={vi.fn()}
         requestConnect={vi.fn()}
         createVcsConnection={vi.fn()}
@@ -96,19 +97,19 @@ describe("SetupSections name step", () => {
     );
   }
 
-  it("shows the finish action with no spinner while idle", () => {
-    renderNameStep(false);
+  it("shows the create action with no spinner while idle", () => {
+    renderStartStep(false);
 
     const button = screen.getByTestId("workspace-setup-continue");
-    expect(button).toHaveTextContent("Finish setup");
+    expect(button).toHaveTextContent("Create work order");
     expect(button.querySelector("svg.animate-spin")).toBeNull();
   });
 
-  it("shows a spinner and disables the button while setup finishes", () => {
-    renderNameStep(true);
+  it("shows a spinner and disables the button while the work order is created", () => {
+    renderStartStep(true);
 
     const button = screen.getByTestId("workspace-setup-continue");
-    expect(button).toHaveTextContent("Finishing setup...");
+    expect(button).toHaveTextContent("Creating work order...");
     expect(button).toBeDisabled();
     expect(button.querySelector("svg.animate-spin")).not.toBeNull();
   });

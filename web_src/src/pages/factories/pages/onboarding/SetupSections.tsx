@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { AgentStep } from "./AgentStep";
 import { WIZARD_STEPS, type IntegrationId, type WizardStepId } from "./onboardingFixtures";
 import { IssuesStep } from "./onboardingIssuesStep";
-import { NameStep, RepositoryStep, VcsStep } from "./onboardingSteps";
+import { NameStep, RepositoryStep, StartStep, VcsStep } from "./onboardingSteps";
 import { WizardStepFooter } from "./WizardStepFooter";
 import { type OnboardingSetupApi } from "./useOnboardingSetupState";
 
@@ -18,6 +18,7 @@ const WIZARD_STEP_INDEX: Record<WizardStepId, number> = {
   issues: 2,
   agent: 3,
   name: 4,
+  start: 5,
 };
 
 function stepComplete(setup: OnboardingSetupApi, step: WizardStepId): boolean {
@@ -32,6 +33,8 @@ function stepComplete(setup: OnboardingSetupApi, step: WizardStepId): boolean {
       return setup.agentReady;
     case "name":
       return setup.nameReady;
+    case "start":
+      return setup.startReady;
   }
 }
 
@@ -46,6 +49,8 @@ function canAdvance(setup: OnboardingSetupApi, step: WizardStepId): boolean {
     case "agent":
       return setup.agentReady;
     case "name":
+      return setup.nameReady;
+    case "start":
       return setup.canFinish;
   }
 }
@@ -116,6 +121,7 @@ function WizardProgress({
 function WizardStepBody({
   step,
   setup,
+  organizationId,
   requestConnect,
   repos,
   onSelectRepository,
@@ -127,6 +133,7 @@ function WizardStepBody({
 }: {
   step: WizardStepId;
   setup: OnboardingSetupApi;
+  organizationId: string;
   requestConnect: (id: IntegrationId) => void;
   repos?: string[];
   onSelectRepository: (repo: string) => void;
@@ -158,9 +165,11 @@ function WizardStepBody({
     case "issues":
       return <IssuesStep setup={setup} onRequestConnect={requestConnect} autoDiscover repos={repos} />;
     case "agent":
-      return <AgentStep setup={setup} onRequestConnect={requestConnect} />;
+      return <AgentStep organizationId={organizationId} setup={setup} onRequestConnect={requestConnect} />;
     case "name":
       return <NameStep setup={setup} />;
+    case "start":
+      return <StartStep setup={setup} />;
   }
 }
 
@@ -233,6 +242,7 @@ function repositoryStepNavigation(args: {
 
 export function SetupSections({
   setup,
+  organizationId,
   openSection,
   setOpenSection,
   requestConnect,
@@ -249,6 +259,7 @@ export function SetupSections({
   saving = false,
 }: {
   setup: OnboardingSetupApi;
+  organizationId: string;
   openSection: WizardStepId;
   setOpenSection: (id: WizardStepId) => void;
   requestConnect: (id: IntegrationId) => void;
@@ -286,13 +297,14 @@ export function SetupSections({
 
   const goNext = () => {
     if (!nextStep) {
-      void (async () => {
-        if (onContinueName && !(await onContinueName())) return;
-        await onFinish();
-      })();
+      void onFinish();
       return;
     }
 
+    if (openSection === "name") {
+      void continueToStep(onContinueName, nextStep.id, setOpenSection);
+      return;
+    }
     if (openSection === "repo") {
       if (setup.selectedRepo) repositoryNavigation.continueFromRepository(setup.selectedRepo);
       return;
@@ -309,6 +321,7 @@ export function SetupSections({
     <WizardStepBody
       step={openSection}
       setup={setup}
+      organizationId={organizationId}
       requestConnect={requestConnect}
       repos={repos}
       onSelectRepository={repositoryNavigation.selectRepository}

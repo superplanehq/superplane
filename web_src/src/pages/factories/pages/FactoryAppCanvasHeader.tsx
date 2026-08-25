@@ -30,6 +30,7 @@ type FactoryAppCanvasHeaderProps = {
   /** Local draft only — persisted when the user clicks Save. */
   onDraftTitleChange?: (name: string) => void;
   onOpenVisualEditor?: () => void;
+  editHref?: string;
   workspace?: FactoryAppCanvasWorkspaceChrome;
 };
 
@@ -45,6 +46,7 @@ export function FactoryAppCanvasHeader({
   onSave,
   onDraftTitleChange,
   onOpenVisualEditor,
+  editHref,
   workspace,
 }: FactoryAppCanvasHeaderProps) {
   const renameEnabled = Boolean(isConfigure && canRename && onDraftTitleChange);
@@ -88,8 +90,8 @@ export function FactoryAppCanvasHeader({
             onDiscard={onDiscard}
             onSave={onSave}
           />
-        ) : onOpenVisualEditor ? (
-          <FactoryAppCanvasViewActions onOpenVisualEditor={onOpenVisualEditor} />
+        ) : editHref || onOpenVisualEditor ? (
+          <FactoryAppCanvasViewActions href={editHref} onOpenVisualEditor={onOpenVisualEditor} />
         ) : null}
       </div>
     </div>

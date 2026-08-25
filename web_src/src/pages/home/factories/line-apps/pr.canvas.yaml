@@ -87,10 +87,12 @@ spec:
           - name: Checkout Branch
             type: bash
             command: |-
+              rm -rf repo
               git clone --depth 1 --branch "$BRANCH" "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
               cd repo
           - name: Generate PR title and description
             type: prompt
+            workingDirectory: repo
             prompt: |-
               You are writing a pull request title and description for an implementation done to complete a SuperPlane Work Order.
               The repository is cloned out in your current working directory.
@@ -119,6 +121,7 @@ spec:
                 jq -n '{error: "Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md"}' \
                   > "$SUPERPLANE_RESULT_FILE"
                 echo "Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md" >&2
+                exit 1
               fi
       position:
         x: 1753
