@@ -127,13 +127,14 @@ export type CreateFactoryIntake = (input: { source: FactoriesFactoryIntakeSource
 export async function provisionGithubIntake(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
-}): Promise<void> {
+}): Promise<FactoriesFactoryIntake> {
   const intakes = await args.listIntakes();
-  if (intakes.some((intake) => intake.source === GITHUB_INTAKE_SOURCE)) {
-    return;
+  const existing = intakes.find((intake) => intake.source === GITHUB_INTAKE_SOURCE);
+  if (existing) {
+    return existing;
   }
 
-  await args.createIntake({ source: GITHUB_INTAKE_SOURCE });
+  return args.createIntake({ source: GITHUB_INTAKE_SOURCE });
 }
 
 export async function provisionLine(args: {
