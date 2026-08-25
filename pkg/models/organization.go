@@ -180,7 +180,7 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		Name:                        name,
 		Description:                 description,
 		AllowedProviders:            datatypes.JSONSlice[string]{ProviderGitHub},
-		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{},
+		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{features.FeatureFactories},
 		CreatedAt:                   &now,
 		UpdatedAt:                   &now,
 	}
@@ -194,6 +194,9 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		_, inviteErr := CreateInviteLink(tx, organization.ID)
 		if inviteErr != nil {
 			return nil, inviteErr
+		}
+		if grantErr := GrantWelcomeCredit(tx, organization.ID); grantErr != nil {
+			return nil, grantErr
 		}
 
 		return &organization, nil

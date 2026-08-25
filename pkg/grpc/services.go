@@ -89,8 +89,15 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 			cfg.UsageService,
 		),
 		CanvasFolders: NewCanvasFolderService(),
-		Factories:     NewFactoryService(cfg.Registry),
-		APIKeys:       NewAPIKeysService(cfg.AuthService),
-		Agents:        NewAgentsService(cfg.AgentService),
+		Factories: NewFactoryService(
+			cfg.Registry,
+			cfg.Encryptor,
+			cfg.AuthService,
+			cfg.GitProvider,
+			cfg.WebhooksBaseURL,
+			cfg.UsageService,
+		),
+		APIKeys: NewAPIKeysService(cfg.AuthService),
+		Agents:  NewAgentsService(cfg.AgentService),
 	}, nil
 }

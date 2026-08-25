@@ -1,6 +1,12 @@
 import type { FactoriesWorkOrderCheck } from "@/api-client";
 
-import { OPEN_WORK_ORDER, RUNNING_WORK_ORDER } from "./factoryPageResponses";
+import {
+  CLOSED_WORK_ORDER,
+  OPEN_WORK_ORDER,
+  OPEN_WORK_ORDER_SECONDARY,
+  PR_CLOSURE_COMPLETED_WORK_ORDER,
+  RUNNING_WORK_ORDER,
+} from "./factoryPageResponses";
 
 /**
  * Mock checks for Storybook — scores that dedicated automations attach to a
@@ -200,6 +206,9 @@ export const RUNNING_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
  * and every other order (closed, draft, failed) has none. */
 export const DEFAULT_CHECKS_BY_ORDER_ID: Record<string, FactoriesWorkOrderCheck[]> = {
   [OPEN_WORK_ORDER.id!]: OPEN_WORK_ORDER_CHECKS,
+  [OPEN_WORK_ORDER_SECONDARY.id!]: OPEN_WORK_ORDER_CHECKS,
+  [CLOSED_WORK_ORDER.id!]: OPEN_WORK_ORDER_CHECKS,
+  [PR_CLOSURE_COMPLETED_WORK_ORDER.id!]: OPEN_WORK_ORDER_CHECKS,
   [RUNNING_WORK_ORDER.id!]: RUNNING_WORK_ORDER_CHECKS,
 };
 

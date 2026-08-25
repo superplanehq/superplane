@@ -728,6 +728,9 @@ func validateFieldValue(field Field, value any) error {
 
 	case FieldTypeSecret:
 		return validateSecret(value)
+
+	case FieldTypeHostedModel:
+		return validateHostedModel(value)
 	}
 
 	return nil
@@ -756,6 +759,13 @@ func validateSecret(value any) error {
 		return fmt.Errorf("secret is required")
 	}
 
+	return nil
+}
+
+func validateHostedModel(value any) error {
+	if _, ok := value.(string); !ok {
+		return fmt.Errorf("must be a string")
+	}
 	return nil
 }
 

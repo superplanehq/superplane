@@ -338,7 +338,15 @@ func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 		AppCanvasNode:    appCanvasNodeTypeOptionsToProto(opts.AppCanvasNode),
 		App:              appTypeOptionsToProto(opts.App),
 		Integration:      integrationTypeOptionsToProto(opts.Integration),
+		HostedModel:      hostedModelTypeOptionsToProto(opts.HostedModel),
 	}
+}
+
+func hostedModelTypeOptionsToProto(opts *configuration.HostedModelTypeOptions) *configpb.HostedModelTypeOptions {
+	if opts == nil {
+		return nil
+	}
+	return &configpb.HostedModelTypeOptions{Provider: opts.Provider}
 }
 
 func ConfigurationFieldToProto(field configuration.Field) *configpb.Field {
