@@ -1,6 +1,7 @@
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useOrganizationLLMSpend } from "@/hooks/useOrganizationLLMSpend";
 import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
+import { HostedCreditSummary } from "./HostedCreditSummary";
 import { settingsCardClassName, settingsInnerMetricCardClassName } from "./settingsPageStyles";
 
 interface LLMSpendProps {
@@ -48,6 +49,15 @@ export function LLMSpend({ organizationId }: LLMSpendProps) {
           <p className="mt-2 text-lg font-semibold">{formatUsdCents(totalCostCents)}</p>
         </div>
       </div>
+      <HostedCreditSummary
+        remainingCreditCents={data?.remainingCreditCents}
+        grantTotalCents={data?.grantTotalCents}
+        hostedBilledCents={data?.hostedBilledCents}
+        remainingCreditWarning={data?.remainingCreditWarning}
+        cardClassName={settingsCardClassName}
+        labelClassName="text-xs font-medium tracking-wide text-gray-500 uppercase"
+        valueClassName="mt-2 text-lg font-semibold"
+      />
       <div className={settingsCardClassName}>
         <p className="text-sm font-semibold">By model</p>
         {byModel.length === 0 ? (

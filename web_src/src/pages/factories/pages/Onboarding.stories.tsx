@@ -10,6 +10,7 @@ import {
   SETUP_ANSWERS,
   factoriesFixtureWithSetupAnswers,
 } from "../__fixtures__/setupStoryFixtures";
+import { NO_GRANT_USAGE_REPORT, type StorybookUsageReport } from "../__fixtures__/usageReportFixtures";
 import type { WizardStepId } from "./onboarding/onboardingFixtures";
 
 /**
@@ -39,15 +40,17 @@ function SetupStep({
   step,
   answers = SETUP_ANSWERS.none,
   orgIntegrations = CONNECTED_SETUP_INTEGRATIONS,
+  organizationLlmSpend,
 }: {
   step: WizardStepId;
   answers?: FactoriesFactoryOnboarding;
   orgIntegrations?: StorybookOrgIntegration[];
+  organizationLlmSpend?: StorybookUsageReport;
 }) {
   return (
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=${step}`}
-      factoriesFixture={factoriesFixtureWithSetupAnswers(answers)}
+      factoriesFixture={factoriesFixtureWithSetupAnswers(answers, { organizationLlmSpend })}
       onboardingSeed={pendingSeed}
       orgIntegrations={orgIntegrations}
     />
@@ -90,8 +93,21 @@ export const Issues: Story = {
   ),
 };
 
-/** The organization has GitHub but no coding agent, so the step asks to connect one. */
-export const Agent: Story = {
-  name: "4 Agent",
+/** The organization has hosted credit, so the user can continue without keys. */
+export const AgentWithGrant: Story = {
+  name: "4a Agent (hosted credit)",
   render: () => <SetupStep step="agent" answers={SETUP_ANSWERS.issues} orgIntegrations={GITHUB_SETUP_INTEGRATIONS} />,
+};
+
+/** No grant: the user must connect Anthropic, OpenAI, or OpenRouter. */
+export const AgentWithoutGrant: Story = {
+  name: "4b Agent (connect a provider)",
+  render: () => (
+    <SetupStep
+      step="agent"
+      answers={SETUP_ANSWERS.issues}
+      orgIntegrations={GITHUB_SETUP_INTEGRATIONS}
+      organizationLlmSpend={NO_GRANT_USAGE_REPORT}
+    />
+  ),
 };

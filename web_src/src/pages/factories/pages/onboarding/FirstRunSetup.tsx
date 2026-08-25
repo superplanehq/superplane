@@ -31,6 +31,7 @@ const SCREEN_FOR_STEP: Record<WizardStepId, FirstRunScreen> = {
   // The first-run screens derive the workspace name from the repository, so the
   // last saved answer opens the coding agent screen.
   name: "agent",
+  start: "agent",
 };
 
 const STEP_FOR_SCREEN: Partial<Record<FirstRunScreen, WizardStepId>> = {
@@ -96,12 +97,14 @@ function useRepositoryErrorToast(error: unknown) {
 }
 
 function AgentScreen({
+  organizationId,
   setup,
   chrome,
   saving,
   onRequestConnect,
   onContinue,
 }: {
+  organizationId: string;
   setup: OnboardingSetupApi;
   chrome: FirstRunChrome;
   saving: boolean;
@@ -116,7 +119,7 @@ function AgentScreen({
 
       <div className="mt-8 space-y-4">
         <FirstRunPanel>
-          <AgentStep setup={setup} onRequestConnect={onRequestConnect} />
+          <AgentStep organizationId={organizationId} setup={setup} onRequestConnect={onRequestConnect} />
         </FirstRunPanel>
         <LoadingButton
           type="button"
@@ -205,6 +208,7 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
  */
 export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const { account } = useAccount();
+  const { organizationId } = useFactoriesLayout();
   const flow = useFirstRunSetupFlow(model);
   const setup = model.setup;
 
@@ -263,6 +267,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
 
   return (
     <AgentScreen
+      organizationId={organizationId}
       setup={setup}
       chrome={chromeFor("agent")}
       saving={model.saving}

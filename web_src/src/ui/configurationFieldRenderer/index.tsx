@@ -470,6 +470,7 @@ function shouldRenderFieldForReadOnly(field: ConfigurationField): boolean {
     "integration",
     "secret",
     "run-parameters",
+    "hosted-model",
   ];
 
   return (
