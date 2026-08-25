@@ -168,7 +168,7 @@ describe("resolveSplitRunVisual", () => {
       stream: liveStream,
     });
 
-    expect(visual.canvas.title).toBe("Implementation");
+    expect(visual.canvas.title).toBe("Implement");
     expect(visual.stream?.some((line) => line.componentName === "Create Branch")).toBe(true);
     expect(visual.stream?.some((line) => line.nodeId === "run-workflow")).toBe(false);
   });
@@ -281,7 +281,7 @@ describe("resolveSplitRunVisual", () => {
     const implement = SPLIT_RUN_RUNNING.phases.find((phase) => phase.id === "implement");
     const visual = resolveSplitRunVisual(implement!, { enabled: true, stream: [] });
 
-    expect(visual.canvas.title).toBe("Implementation");
+    expect(visual.canvas.title).toBe("Implement");
     expect(visual.stream?.some((line) => line.componentName === "Create Branch")).toBe(true);
   });
 
