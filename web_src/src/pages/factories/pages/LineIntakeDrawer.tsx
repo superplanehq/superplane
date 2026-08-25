@@ -330,11 +330,7 @@ function LineIntakeDrawerPopups({
   onClosePreview: () => void;
   onCloseOpenTicket: () => void;
 }) {
-  const automation = useIntakeAutomationCanvas(
-    organizationId,
-    settingsIntake?.appId,
-    settingsIntake?.source.name ?? "",
-  );
+  const automation = useIntakeAutomationCanvas(organizationId, settingsIntake?.appId);
   const runs = useIntakeAutomationRuns(organizationId, factoryId, settingsIntake);
   const updateIntake = useUpdateFactoryIntake(organizationId ?? "", factoryId ?? "");
 
@@ -362,7 +358,7 @@ function LineIntakeDrawerPopups({
           key={settingsIntake.intakeId}
           settings={settingsIntake.settings}
           sourceId={settingsIntake.source.id}
-          automationCanvas={automation.canvas}
+          automationGraph={automation.graph}
           automationLoading={automation.isLoading}
           automationError={automation.isError}
           onRetryAutomation={automation.refetch}
