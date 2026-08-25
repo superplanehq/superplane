@@ -10,7 +10,7 @@ import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSect
 import { ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS, type FactoryAgentRewrite } from "@/pages/home/factories";
 import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
 
-export const DEFAULT_LINE_NAME = "Software delivery";
+export const DEFAULT_LINE_NAME = "plan-and-implement";
 
 export const GITHUB_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_GITHUB_ISSUES";
 
@@ -163,10 +163,10 @@ export async function provisionLine(args: {
     installFactory: args.installFactory,
   });
   const primaryAppId = steps[0]?.app?.app;
-  if (!primaryAppId) throw new Error("Software delivery apps were not created");
+  if (!primaryAppId) throw new Error("Line apps were not created");
 
   const line = await args.createLine({ name: DEFAULT_LINE_NAME, steps });
-  if (!line.id) throw new Error("Software delivery line was not created");
+  if (!line.id) throw new Error("Line was not created");
   await args.updateOnboarding({ provisionedAppId: primaryAppId, provisionedLineId: line.id });
   return { lineId: line.id, primaryAppId };
 }

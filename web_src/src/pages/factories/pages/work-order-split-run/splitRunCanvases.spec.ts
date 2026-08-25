@@ -38,7 +38,7 @@ describe("splitRunCanvasForPhase", () => {
     expect(canvasKeyForPhase(implement!)).toBe("implementation");
 
     const canvas = splitRunCanvasForPhase(implement!);
-    expect(canvas.title).toBe("Implementation");
+    expect(canvas.title).toBe("Implement");
     expect(canvas.nodes.map((node) => node.name)).toContain("Create Branch");
     expect(canvas.nodes.map((node) => node.name)).toContain("From GH issue?");
     expect(canvas.statuses["create-branch"]).toBe("passed");
@@ -51,7 +51,7 @@ describe("splitRunCanvasForPhase", () => {
     expect(canvasKeyForPhase(plan!)).toBe("planning");
 
     const canvas = splitRunCanvasForPhase(plan!);
-    expect(canvas.title).toBe("Planning");
+    expect(canvas.title).toBe("Plan");
     expect(canvas.statuses["onrun-create-plan"]).toBe("triggered");
     expect(canvas.statuses["planner-agent"]).toBe("did_not_run");
     expect(canvas.statuses["planner-agent-no-issue"]).toBe("passed");

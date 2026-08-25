@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: Canvas
 metadata:
-  name: PR Creation
-  description: Generate a pull request title and body, then open a draft PR.
+  name: Verify
+  description: Open a draft pull request and hand the work order to review.
 spec:
   edges:
     - channel: default

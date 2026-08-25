@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Canvas
 metadata:
-  name: Planning
+  name: Plan
   description: Read the work order and write an implementation plan.
 spec:
   edges:

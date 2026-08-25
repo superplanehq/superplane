@@ -175,7 +175,7 @@ describe("resolveSplitRunVisual", () => {
     const implement = SPLIT_RUN_RUNNING.phases.find((phase) => phase.id === "implement");
     const visual = resolveSplitRunVisual(implement!, { enabled: false, stream: [] });
 
-    expect(visual.canvas.title).toBe("Implementation");
+    expect(visual.canvas.title).toBe("Implement");
     expect(visual.stream?.some((line) => line.componentName === "Create Branch")).toBe(true);
   });
 
