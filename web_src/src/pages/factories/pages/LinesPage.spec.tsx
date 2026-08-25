@@ -232,6 +232,11 @@ describe("LinesPage board", () => {
     expect(within(dialog).getByRole("heading", { name: "Add retry handling to webhook delivery" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Plan" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+    expect(within(dialog).getByTestId("split-run-work-order-tab")).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-review")).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("tab", { name: "Log" }));
     expect(within(dialog).getByRole("heading", { name: "Log" })).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-phase-ingest")).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-phase-analyze")).toBeInTheDocument();

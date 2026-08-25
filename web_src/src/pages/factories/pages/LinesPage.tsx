@@ -420,6 +420,7 @@ function LineDetail({
         <LineBoardSplitRunPopup
           organizationId={organizationId}
           factoryId={factoryId}
+          factoryKey={factoryKey}
           lineId={line.id}
           lineName={line.name}
           peekOrderId={peekOrderId}
@@ -439,6 +440,7 @@ function LineDetail({
 function LineBoardSplitRunPopup({
   organizationId,
   factoryId,
+  factoryKey,
   lineId,
   lineName,
   peekOrderId,
@@ -452,6 +454,7 @@ function LineBoardSplitRunPopup({
 }: {
   organizationId: string;
   factoryId: string;
+  factoryKey: string;
   lineId: string | undefined;
   lineName: string | undefined;
   peekOrderId: string;
@@ -470,7 +473,9 @@ function LineBoardSplitRunPopup({
       key={peekOrderId}
       organizationId={organizationId}
       factoryId={factoryId}
+      factoryKey={factoryKey}
       orderId={peekOrderId}
+      orderNumber={peekOrder?.number}
       fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId })}
       canvasEditHref={canvasEditHref}
       canvasExpandHref={canvasExpandHref}

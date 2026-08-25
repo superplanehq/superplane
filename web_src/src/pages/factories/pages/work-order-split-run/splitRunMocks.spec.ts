@@ -98,7 +98,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.footerTone).toBe("running");
     expect(fixture.footer.note?.headline).toBe("Implement is running");
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Stop and send to Draft", "Cancel"]);
-    expect(fixture.checks).toEqual([]);
+    expect(fixture.checks).toMatchObject([{ id: "wo-running-refunds-confidence", name: "Confidence score", score: 4 }]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
     expect(fixture.phases.find((phase) => phase.id === "score")?.checks?.[0]).toMatchObject({
       name: "Confidence score",
@@ -210,7 +210,13 @@ describe("splitRunFixtureForWorkOrder", () => {
     const verify = fixture.phases.find((phase) => phase.id === "verify-1");
     expect(verify?.checks?.map((check) => check.name)).toEqual(["Risk score", "Code quality"]);
     expect(fixture.phases.find((phase) => phase.id === "implement-0")?.checks).toBeUndefined();
-    expect(fixture.checks).toEqual([]);
+    expect(fixture.checks.map((check) => check.name)).toEqual([
+      "Risk score",
+      "Code quality",
+      "Test coverage",
+      "Confidence score",
+      "CI",
+    ]);
   });
 
   it("shows no verify checks when the API supplies none", () => {

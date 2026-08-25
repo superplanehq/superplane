@@ -253,45 +253,61 @@ function mappedWorkOrderFixture(
     lineStatus: lineStatusForDisplay(displayStatus),
     currentPhaseId: current ? phaseIdForExecution(current) : (phases[0]?.id ?? ""),
     phases,
-    ...reviewSurfaces(order, displayStatus, options?.lineId),
+    ...reviewSurfaces(order, displayStatus, options?.lineId, phases, options?.checks),
   };
 }
 
 function reviewSurfaces(
   order: FactoriesWorkOrder,
   displayStatus: WorkOrderDisplayStatus,
-  lineId?: string | null,
+  lineId: string | null | undefined,
+  phases: SplitRunPhase[],
+  apiChecks?: FactoriesWorkOrderCheck[],
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   const executions = latestDispatchExecutions(order, lineId);
   const current = pickCurrentExecution(executions);
   const column = boardColumnFor(current, executions.length);
   const implementFailed = column === "implement" && current?.result === "RESULT_FAILED";
+  const checks = overviewChecks(phases, apiChecks);
 
   if (displayStatus === "draft") {
-    return surfaces(buildSplitRunFooter({ kind: "draft", note: draftFooterNote(order) }));
+    return surfaces(buildSplitRunFooter({ kind: "draft", note: draftFooterNote(order) }), [], checks);
   }
   if (implementFailed) {
-    return surfaces(buildSplitRunFooter({ kind: "failed", note: IMPLEMENT_FAILED_NOTE }), [IMPLEMENT_FAILED_NOTE]);
+    return surfaces(
+      buildSplitRunFooter({ kind: "failed", note: IMPLEMENT_FAILED_NOTE }),
+      [IMPLEMENT_FAILED_NOTE],
+      checks,
+    );
   }
   if (displayStatus === "waiting") {
     const notes = presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
-    return surfaces(buildSplitRunFooter({ kind: "waiting", note: notes[0] ?? WAITING_FALLBACK_NOTE }), notes);
+    return surfaces(buildSplitRunFooter({ kind: "waiting", note: notes[0] ?? WAITING_FALLBACK_NOTE }), notes, checks);
   }
   if (column === "implement" && current?.state === "STATE_PENDING") {
     const notes = presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
-    return surfaces(buildSplitRunFooter({ kind: "waiting", note: notes[0] ?? WAITING_FALLBACK_NOTE }), notes);
+    return surfaces(buildSplitRunFooter({ kind: "waiting", note: notes[0] ?? WAITING_FALLBACK_NOTE }), notes, checks);
   }
   if (displayStatus === "running") {
-    return surfaces(buildSplitRunFooter({ kind: "running", note: runningFooterNote(current) }));
+    return surfaces(buildSplitRunFooter({ kind: "running", note: runningFooterNote(current) }), [], checks);
   }
-  return surfaces(doneFooterForStatus(displayStatus));
+  return surfaces(doneFooterForStatus(displayStatus), [], checks);
+}
+
+function overviewChecks(phases: SplitRunPhase[], apiChecks?: FactoriesWorkOrderCheck[]): WorkOrderCheckPresentation[] {
+  const presented = presentWorkOrderChecks(apiChecks ?? []);
+  if (presented.length > 0) {
+    return presented;
+  }
+  return phases.flatMap((phase) => phase.checks ?? []);
 }
 
 function surfaces(
   footer: SplitRunFooter,
   waitingNotes: WorkOrderStatusNotePresentation[] = [],
+  checks: WorkOrderCheckPresentation[] = [],
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
-  return { waitingNotes, checks: [], footer, footerTone: footer.kind };
+  return { waitingNotes, checks, footer, footerTone: footer.kind };
 }
 
 function boardColumnFor(current: FactoriesWorkOrderExecution | undefined, executionCount: number): SplitRunBoardColumn {
