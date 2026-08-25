@@ -9,13 +9,14 @@ const CONTINUE_LABELS: Record<WizardStepId, string> = {
   repo: "Next",
   issues: "Next",
   agent: "Next",
-  name: "Finish setup",
+  name: "Next",
+  start: "Create work order",
 };
 
-// The Name step provisions the apps and the line, so it runs long enough that
-// the button must say what it does.
+// The Start step provisions the apps, the line, and the work order, so it runs
+// long enough that the button must say what it does.
 const CONTINUE_LOADING_LABELS: Partial<Record<WizardStepId, string>> = {
-  name: "Finishing setup...",
+  start: "Creating work order...",
 };
 
 export function WizardStepFooter({

@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -146,4 +147,28 @@ func TestPanicableAction_Cleanup_CatchesPanic(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "panicking-action panicked in Cleanup()")
 	assert.Contains(t, err.Error(), "cleanup panic")
+}
+
+type validatingAction struct {
+	panickingAction
+}
+
+func (v *validatingAction) ValidateNodeConfiguration(config map[string]any) error {
+	if config["fail"] == true {
+		return fmt.Errorf("invalid node configuration")
+	}
+	return nil
+}
+
+func TestPanicableAction_ValidateNodeConfiguration_Forwards(t *testing.T) {
+	panicable := NewPanicableAction(&validatingAction{panickingAction: panickingAction{name: "validating-action"}})
+	require.NoError(t, panicable.ValidateNodeConfiguration(map[string]any{}))
+
+	err := panicable.ValidateNodeConfiguration(map[string]any{"fail": true})
+	require.EqualError(t, err, "invalid node configuration")
+}
+
+func TestPanicableAction_ValidateNodeConfiguration_NoOpWhenMissing(t *testing.T) {
+	panicable := NewPanicableAction(&panickingAction{name: "plain-action"})
+	require.NoError(t, panicable.ValidateNodeConfiguration(nil))
 }

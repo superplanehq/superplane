@@ -203,10 +203,14 @@ function sumUsage(
 }
 
 function collectAssignees(order: FactoriesWorkOrder): { assigneeIds: string[]; assigneeNames: string[] } {
-  const assignees = order.assignees ?? [];
+  const owner = order.assignees?.[0];
+  if (!owner?.id) {
+    return { assigneeIds: [], assigneeNames: [] };
+  }
+  const name = (owner.name ?? "").trim();
   return {
-    assigneeIds: assignees.map((assignee) => assignee.id).filter((id): id is string => Boolean(id)),
-    assigneeNames: assignees.map((assignee) => (assignee.name ?? "").trim()).filter(Boolean),
+    assigneeIds: [owner.id],
+    assigneeNames: name ? [name] : [],
   };
 }
 

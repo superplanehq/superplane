@@ -19,6 +19,7 @@ describe("FactorySettingsLayout sidebar", () => {
     );
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(screen.getByTestId("factory-settings-main").className).toMatch(/overflow-y-auto/);
     expect(within(sidebar).getByTestId("factory-settings-back")).toHaveTextContent("Back to workspace");
     expect(within(sidebar).queryByText("Semaphore")).not.toBeInTheDocument();
     expect(within(sidebar).queryByText("Workspace")).not.toBeInTheDocument();

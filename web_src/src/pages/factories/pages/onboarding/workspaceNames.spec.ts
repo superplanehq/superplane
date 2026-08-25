@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { isPlaceholderWorkspaceName, placeholderWorkspaceName, workspaceNameFromRepository } from "./workspaceNames";
+import { isPlaceholderWorkspaceName, uniqueWorkspaceName, workspaceNameFromRepository } from "./workspaceNames";
 
-describe("placeholderWorkspaceName", () => {
-  it("uses the base name when the organization has no workspace with it", () => {
-    expect(placeholderWorkspaceName(["Payments"])).toBe("New workspace");
+describe("uniqueWorkspaceName", () => {
+  it("keeps the name when the organization has no workspace with it", () => {
+    expect(uniqueWorkspaceName("New workspace", ["Payments"])).toBe("New workspace");
   });
 
   it("counts up until the name is free", () => {
-    expect(placeholderWorkspaceName(["New workspace", "new workspace 2"])).toBe("New workspace 3");
+    expect(uniqueWorkspaceName("New workspace", ["New workspace", "new workspace 2"])).toBe("New workspace 3");
+  });
+
+  it("ignores case and surrounding spaces", () => {
+    expect(uniqueWorkspaceName("  Payments Service ", ["payments service"])).toBe("Payments Service 2");
   });
 });
 
