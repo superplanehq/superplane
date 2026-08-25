@@ -360,6 +360,21 @@ CREATE TABLE public.factories (
 
 
 --
+-- Name: factory_intakes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_intakes (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    canvas_id uuid NOT NULL,
+    source character varying(64) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_lines; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1309,6 +1324,14 @@ ALTER TABLE ONLY public.factories
 
 
 --
+-- Name: factory_intakes factory_intakes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_intakes
+    ADD CONSTRAINT factory_intakes_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: factory_lines factory_lines_factory_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1989,6 +2012,20 @@ CREATE INDEX idx_factories_organization_id ON public.factories USING btree (orga
 
 
 --
+-- Name: idx_factory_intakes_canvas_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_intakes_canvas_id ON public.factory_intakes USING btree (canvas_id);
+
+
+--
+-- Name: idx_factory_intakes_factory_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_intakes_factory_id ON public.factory_intakes USING btree (factory_id);
+
+
+--
 -- Name: idx_factory_lines_factory_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2654,6 +2691,22 @@ ALTER TABLE ONLY public.canvas_subscriptions
 
 ALTER TABLE ONLY public.canvas_subscriptions
     ADD CONSTRAINT canvas_subscriptions_target_canvas_id_target_node_id_fkey FOREIGN KEY (target_canvas_id, target_node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_intakes factory_intakes_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_intakes
+    ADD CONSTRAINT factory_intakes_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_intakes factory_intakes_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_intakes
+    ADD CONSTRAINT factory_intakes_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
 
 
 --
@@ -3352,7 +3405,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260822194140	f
+20260825074144	f
 \.
 
 

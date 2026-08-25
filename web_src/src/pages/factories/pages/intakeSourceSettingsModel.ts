@@ -1,3 +1,4 @@
+import type { FactoriesFactoryIntakeRun, FactoryIntakeSettings } from "@/api-client";
 import { formatTimeAgo } from "@/lib/date";
 
 export type IntakeListenMode = "listen" | "schedule";
@@ -13,6 +14,8 @@ export type IntakeLineStage = "implement" | "verify" | "done";
 
 export interface IntakeAutomationRun {
   id: string;
+  appId?: string;
+  runId?: string;
   title: string;
   confidencePct: number;
   ranMinutesAgo: number;
@@ -48,8 +51,15 @@ export const INTAKE_SETTINGS_COPY = {
   generalTab: "General",
   automationTab: "Automation",
   editAutomation: "Edit automation",
+  automationLoading: "The automation is loading.",
+  automationEmpty: "This intake has no automation yet.",
+  automationError: "SuperPlane could not load the automation.",
+  retryAutomation: "Try again",
   runsTab: "Runs",
   runsEmpty: "No runs yet.",
+  runsLoading: "Runs are loading.",
+  runsError: "SuperPlane could not load the runs.",
+  retryRuns: "Try again",
   runWhen: "Run",
   analysisWhen: "Analysis",
   scoreWhen: "Score",
@@ -70,7 +80,7 @@ export const INTAKE_SETTINGS_COPY = {
   listenOption: "Listen for new issues",
   listenHelper: "Analyze a GitHub issue when it is created.",
   scheduleOption: "Run on a schedule",
-  scheduleHelper: "Analyze open issues every few hours.",
+  scheduleHelper: "Scheduled intake is not available.",
   confidenceLabel: "Minimum confidence",
   confidenceHelper: "Move a ticket to Backlog when the score is this value or higher.",
   filtersLabel: "Filters",
@@ -83,6 +93,8 @@ export const INTAKE_SETTINGS_COPY = {
   assignmentAssigned: "Assigned",
   assignmentUnassigned: "Unassigned",
   save: "Save",
+  saving: "Saving",
+  saveError: "SuperPlane could not save the intake settings. Try again.",
 } as const;
 
 const STAGE_LABEL: Record<IntakeLineStage, string> = {
@@ -188,4 +200,114 @@ export function normalizeIntakeSourceSettings(draft: IntakeSourceSettings): Inta
   const name = draft.name.trim() || DEFAULT_GITHUB_INTAKE_SETTINGS.name;
   const confidencePct = Math.min(100, Math.max(0, Math.round(draft.confidencePct)));
   return { ...draft, name, confidencePct };
+}
+
+export function intakeSettingsFromApi(name: string, settings: FactoryIntakeSettings | undefined): IntakeSourceSettings {
+  return {
+    name,
+    listenMode: "listen",
+    confidencePct: settings?.confidencePct ?? DEFAULT_GITHUB_INTAKE_SETTINGS.confidencePct,
+    labelFilterMode: settings?.labelFilterMode === "LABEL_FILTER_MODE_EXCLUDE" ? "exclude" : "include",
+    labels: settings?.labels ?? [],
+    assignment: assignmentFromApi(settings?.assignment),
+  };
+}
+
+export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoryIntakeSettings {
+  return {
+    confidencePct: settings.confidencePct,
+    labels: settings.labels,
+    labelFilterMode: settings.labelFilterMode === "exclude" ? "LABEL_FILTER_MODE_EXCLUDE" : "LABEL_FILTER_MODE_INCLUDE",
+    assignment:
+      settings.assignment === "assigned"
+        ? "ASSIGNMENT_ASSIGNED"
+        : settings.assignment === "unassigned"
+          ? "ASSIGNMENT_UNASSIGNED"
+          : "ASSIGNMENT_ANY",
+  };
+}
+
+function assignmentFromApi(assignment: FactoryIntakeSettings["assignment"]): IntakeAssignmentFilter {
+  if (assignment === "ASSIGNMENT_ASSIGNED") {
+    return "assigned";
+  }
+  if (assignment === "ASSIGNMENT_UNASSIGNED") {
+    return "unassigned";
+  }
+  return "any";
+}
+
+const PLACEMENT_BY_API: Record<string, IntakeTicketPlacement> = {
+  PLACEMENT_BACKLOG: "backlog",
+  PLACEMENT_REJECTED: "rejected",
+  PLACEMENT_PROGRESSED: "progressed",
+  PLACEMENT_BELOW_THRESHOLD: "below-threshold",
+};
+
+const STAGE_BY_NAME: Record<string, IntakeLineStage> = {
+  plan: "plan",
+  planning: "plan",
+  implement: "implement",
+  implementation: "implement",
+  verify: "verify",
+  verification: "verify",
+  done: "done",
+};
+
+/**
+ * The server decides placement, confidence, and stage. This only turns the
+ * response into the shape the list renders, and drops runs that are still
+ * being analyzed: those belong in the Analyzing list.
+ */
+export function intakeRunsFromApi(
+  runs: FactoriesFactoryIntakeRun[],
+  appId: string | undefined,
+  now = new Date(),
+): IntakeAutomationRun[] {
+  return runs.flatMap((run) => {
+    const id = run.id?.trim();
+    const title = run.title?.trim();
+    const placement = run.placement ? PLACEMENT_BY_API[run.placement] : undefined;
+    if (!id || !title || !placement) {
+      return [];
+    }
+
+    const stage = run.stage ? STAGE_BY_NAME[run.stage.trim().toLowerCase()] : undefined;
+    return [
+      {
+        id,
+        runId: id,
+        ...(appId ? { appId } : {}),
+        title,
+        confidencePct: run.confidencePct ?? 0,
+        ranMinutesAgo: minutesAgo(run.createdAt, now),
+        analyzedMinutesAgo: minutesAgo(run.analyzedAt ?? run.createdAt, now),
+        placement,
+        ...(stage ? { stage } : {}),
+      },
+    ];
+  });
+}
+
+/** Runs the intake is still analyzing, shown as tickets under the source. */
+export function analyzingTicketsFromApi(
+  runs: FactoriesFactoryIntakeRun[],
+  appId: string | undefined,
+): Array<{ id: string; title: string; appId?: string; runId?: string }> {
+  return runs.flatMap((run) => {
+    const id = run.id?.trim();
+    const title = run.title?.trim();
+    if (!id || !title || run.placement !== "PLACEMENT_ANALYZING") {
+      return [];
+    }
+    return [{ id, title, runId: id, ...(appId ? { appId } : {}) }];
+  });
+}
+
+function minutesAgo(timestamp: string | undefined, now: Date): number {
+  const value = timestamp ? Date.parse(timestamp) : Number.NaN;
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.floor((now.getTime() - value) / 60_000));
 }
