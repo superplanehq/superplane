@@ -383,6 +383,17 @@ func (s *TestSession) HoverOver(q queries.Query) {
 	}
 }
 
+func (s *TestSession) WaitUntilURLDoesNotContain(part string) {
+	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if !strings.Contains(s.page.URL(), part) {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	s.t.Fatalf("timed out waiting for URL to drop %q, last URL was %q", part, s.page.URL())
+}
+
 func (s *TestSession) AssertURLContains(part string) {
 	s.t.Logf("Asserting URL contains %q", part)
 	current := s.page.URL()

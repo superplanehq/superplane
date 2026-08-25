@@ -10,13 +10,14 @@ import {
   SETUP_ANSWERS,
   factoriesFixtureWithSetupAnswers,
 } from "../__fixtures__/setupStoryFixtures";
+import { NO_GRANT_USAGE_REPORT, type StorybookUsageReport } from "../__fixtures__/usageReportFixtures";
 import type { WizardStepId } from "./onboarding/onboardingFixtures";
 
 /**
- * Workspace setup, one story per wizard step. Every story mounts the same
- * `OnboardingPage` the app routes to, so the stories match production. A
- * fixture backend serves the connect flow, the repository list, and the saved
- * setup answers. The sidebar stays hidden until setup finishes.
+ * Workspace setup, one story per step. Every story mounts the same
+ * `OnboardingPage` the app routes to, so the stories match production. Setup
+ * runs on the first-run screens and saves each answer through a fixture
+ * backend. The sidebar stays hidden until setup finishes.
  */
 const meta = {
   title: "Factories/Pages/Setup",
@@ -39,29 +40,44 @@ function SetupStep({
   step,
   answers = SETUP_ANSWERS.none,
   orgIntegrations = CONNECTED_SETUP_INTEGRATIONS,
+  organizationLlmSpend,
 }: {
   step: WizardStepId;
   answers?: FactoriesFactoryOnboarding;
   orgIntegrations?: StorybookOrgIntegration[];
+  organizationLlmSpend?: StorybookUsageReport;
 }) {
   return (
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=${step}`}
-      factoriesFixture={factoriesFixtureWithSetupAnswers(answers)}
+      factoriesFixture={factoriesFixtureWithSetupAnswers(answers, { organizationLlmSpend })}
       onboardingSeed={pendingSeed}
       orgIntegrations={orgIntegrations}
     />
   );
 }
 
+/** A new workspace with no saved answers opens the welcome screen. */
+export const Welcome: Story = {
+  name: "0 Welcome",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup`}
+      factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.none)}
+      onboardingSeed={pendingSeed}
+      orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+    />
+  ),
+};
+
 /** First workspace in a new organization: nothing is connected yet. */
-export const ChooseVcsZero: Story = {
-  name: "1a Choose VCS (zero)",
+export const ConnectZero: Story = {
+  name: "1a Connect GitHub (zero)",
   render: () => <SetupStep step="vcs" orgIntegrations={[]} />,
 };
 
-export const ChooseVcs: Story = {
-  name: "1b Choose VCS",
+export const Connect: Story = {
+  name: "1b Connect GitHub",
   render: () => <SetupStep step="vcs" orgIntegrations={GITHUB_SETUP_INTEGRATIONS} />,
 };
 
@@ -77,13 +93,21 @@ export const Issues: Story = {
   ),
 };
 
-/** The organization has GitHub but no coding agent, so the step asks to connect one. */
-export const Agent: Story = {
-  name: "4 Agent",
+/** The organization has hosted credit, so the user can continue without keys. */
+export const AgentWithGrant: Story = {
+  name: "4a Agent (hosted credit)",
   render: () => <SetupStep step="agent" answers={SETUP_ANSWERS.issues} orgIntegrations={GITHUB_SETUP_INTEGRATIONS} />,
 };
 
-export const Name: Story = {
-  name: "5 Name",
-  render: () => <SetupStep step="name" answers={SETUP_ANSWERS.agent} />,
+/** No grant: the user must connect Anthropic, OpenAI, or OpenRouter. */
+export const AgentWithoutGrant: Story = {
+  name: "4b Agent (connect a provider)",
+  render: () => (
+    <SetupStep
+      step="agent"
+      answers={SETUP_ANSWERS.issues}
+      orgIntegrations={GITHUB_SETUP_INTEGRATIONS}
+      organizationLlmSpend={NO_GRANT_USAGE_REPORT}
+    />
+  ),
 };

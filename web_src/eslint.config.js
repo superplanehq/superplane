@@ -122,5 +122,8 @@ export default tseslint.config({ ignores: ['dist', 'dist-ssr', 'storybook-static
         skipComments: true,
       },
     ],
+    // Specs assert many facts in one example. Count those expects as
+    // coverage, not as production-function statement budget.
+    'max-statements': 'off',
   },
 }, storybook.configs["flat/recommended"]);

@@ -39,5 +39,18 @@ func (c *UsageContext) Record(record core.UsageRecord) error {
 		ReasoningTokens:  record.ReasoningTokens,
 		TotalTokens:      record.TotalTokens,
 		CostMicros:       record.CostMicros,
+		FundingSource:    record.FundingSource,
+		IdempotencyKey:   usageIdempotencyKey(record.IdempotencyKey, c.execution.ID),
 	})
+}
+
+func (c *UsageContext) ReleaseHostedCreditHold() error {
+	return models.ReleaseHostedCreditHold(database.Conn(), c.execution.ID)
+}
+
+func usageIdempotencyKey(key string, executionID uuid.UUID) string {
+	if key == "" {
+		return ""
+	}
+	return key + ":" + executionID.String()
 }

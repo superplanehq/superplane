@@ -3,6 +3,7 @@ import { useFactoryUsage } from "@/hooks/useFactoryUsage";
 import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import { factoryCardClassName, factoryContentBodyClassName } from "../factoryPageLayoutStyles";
+import { HostedCreditSummary } from "@/pages/organization/settings/HostedCreditSummary";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 
 export function FactorySettingsUsagePage() {
@@ -36,6 +37,15 @@ export function FactorySettingsUsagePage() {
                 <p className="workspace-page-title mt-1">{formatUsdCents(totalCostCents)}</p>
               </div>
             </div>
+            <HostedCreditSummary
+              remainingCreditCents={data?.remainingCreditCents}
+              grantTotalCents={data?.grantTotalCents}
+              hostedBilledCents={data?.hostedBilledCents}
+              remainingCreditWarning={data?.remainingCreditWarning}
+              cardClassName={`${factoryCardClassName} p-4`}
+              labelClassName="workspace-section-label"
+              valueClassName="workspace-page-title mt-1"
+            />
             <div className={factoryCardClassName}>
               <p className="workspace-section-title px-4 pt-4">By model</p>
               {byModel.length === 0 ? (

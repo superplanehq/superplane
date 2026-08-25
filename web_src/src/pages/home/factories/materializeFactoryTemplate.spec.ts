@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import yaml from "js-yaml";
 
 import { getFactoryDefinition } from "./index";
 import {
@@ -10,6 +11,24 @@ import {
   substituteInstallParams,
   wireFactoryIntegrations,
 } from "./materializeFactoryTemplate";
+
+type AgentStep = { name?: string; command?: string; workingDirectory?: string };
+
+type CanvasNode = {
+  id?: string;
+  configuration?: { steps?: AgentStep[] };
+};
+
+function canvasNodes(canvasYaml: string): CanvasNode[] {
+  const doc = yaml.load(canvasYaml) as { spec?: { nodes?: CanvasNode[] } };
+  return doc.spec?.nodes ?? [];
+}
+
+function nodeStepsByName(nodes: CanvasNode[], nodeId: string): Record<string, AgentStep> {
+  const node = nodes.find((candidate) => candidate.id === nodeId);
+  const steps = node?.configuration?.steps ?? [];
+  return Object.fromEntries(steps.map((step) => [step.name ?? "", step]));
+}
 
 function materializeSoftwareFactory(installParams: Record<string, string> = { repository: "acme/web" }) {
   return materializeFactoryCanvas({
@@ -136,6 +155,29 @@ spec:
     expect(canvasYaml).toContain("root().data.description");
   });
 
+  it("fails software-factory implementation when the agent pushes no file commits", () => {
+    const canvasYaml = materializeSoftwareFactory();
+    const steps = nodeStepsByName(canvasNodes(canvasYaml), "run-claude-code-implementation");
+    const checkout = steps["Checkout branch"]?.command ?? "";
+    const commit = steps["Commit and push"]?.command ?? "";
+
+    expect(checkout).toContain("set -euo pipefail");
+    expect(commit).toContain("No file changes and no unpushed commits");
+    expect(commit).toContain("exit 1");
+    expect(commit).not.toContain("already up to date on origin");
+    expect(commit).toContain("git status");
+    expect(commit).toContain("git log --oneline -5");
+  });
+
+  it("runs software-factory implementation prompt and commit steps in the cloned repo", () => {
+    const canvasYaml = materializeSoftwareFactory();
+    const steps = nodeStepsByName(canvasNodes(canvasYaml), "run-claude-code-implementation");
+
+    expect(steps["Set Up DCO Signing"]?.workingDirectory).toBe("repo");
+    expect(steps["Implementation"]?.workingDirectory).toBe("repo");
+    expect(steps["Commit and push"]?.workingDirectory).toBe("repo");
+  });
+
   it("materializes runners with integration-sourced credentials", () => {
     const canvasYaml = materializeSoftwareFactory();
 
@@ -174,5 +216,69 @@ spec:
   it("exposes separate app and backlog install params on the bundled definition", () => {
     const definition = getFactoryDefinition("software-factory");
     expect(definition.installParams.map((param) => param.name)).toEqual(["appRepository", "backlogRepository"]);
+  });
+
+  it("rewrites Claude Code credentials to hosted when Claude is not connected", () => {
+    const canvasYaml = materializeFactoryCanvas({
+      definition: getFactoryDefinition("line-implementation"),
+      canvasName: "Implementation",
+      canvasId: "canvas-hosted",
+      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
+      integrations: {
+        github: { id: "int-1", name: "acme-github", ready: true },
+      },
+      agentRewrite: {
+        component: "runnerClaudeCode",
+        model: "claude-sonnet-4-6",
+        credentials: { source: "hosted" },
+      },
+    });
+
+    expect(canvasYaml).toMatch(/component: runnerClaudeCode[\s\S]*credentials:[\s\S]*source: hosted/);
+    expect(canvasYaml).toContain("model: claude-sonnet-4-6");
+    expect(canvasYaml).not.toMatch(/credentials:[\s\S]*source: integration[\s\S]*name: claude/);
+    expect(canvasYaml).not.toContain("model: sonnet");
+  });
+
+  it("rewrites Claude Code nodes to hosted OpenRouter with an allowlisted model", () => {
+    const canvasYaml = materializeFactoryCanvas({
+      definition: getFactoryDefinition("line-planning"),
+      canvasName: "Planning",
+      canvasId: "canvas-openrouter",
+      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
+      integrations: {
+        github: { id: "int-1", name: "acme-github", ready: true },
+      },
+      agentRewrite: {
+        component: "runnerOpenRouter",
+        model: "openai/gpt-4.1",
+        credentials: { source: "hosted" },
+      },
+    });
+
+    expect(canvasYaml).toMatch(/component: runnerOpenRouter[\s\S]*credentials:[\s\S]*source: hosted/);
+    expect(canvasYaml).toContain("model: openai/gpt-4.1");
+    expect(canvasYaml).not.toContain("runnerClaudeCode");
+  });
+
+  it("rewrites Claude Code nodes to an OpenRouter integration", () => {
+    const canvasYaml = materializeFactoryCanvas({
+      definition: getFactoryDefinition("line-pr"),
+      canvasName: "PR Creation",
+      canvasId: "canvas-or-byok",
+      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
+      integrations: {
+        github: { id: "int-1", name: "acme-github", ready: true },
+        openrouter: { id: "int-3", name: "acme-openrouter", ready: true },
+      },
+      agentRewrite: {
+        component: "runnerOpenRouter",
+        model: "anthropic/claude-sonnet-4-6",
+        credentials: { source: "integration", name: "acme-openrouter" },
+      },
+    });
+
+    expect(canvasYaml).toMatch(/component: runnerOpenRouter[\s\S]*credentials:[\s\S]*name: acme-openrouter/);
+    expect(canvasYaml).not.toContain("runnerClaudeCode");
   });
 });

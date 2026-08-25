@@ -19,7 +19,6 @@ func TestAdminDashboard(t *testing.T) {
 		steps.session.Login()
 		steps.session.Visit("/admin")
 		// The frontend AdminLayout checks installation_admin and redirects to /
-		steps.session.Sleep(1000)
 		steps.assertNotOnAdminPage()
 	})
 
@@ -136,10 +135,7 @@ func (s *adminSteps) assertOnAdminPage() {
 }
 
 func (s *adminSteps) assertNotOnAdminPage() {
-	s.session.AssertURLContains("/")
-	// Should NOT be on /admin - the admin layout redirects non-admins
-	url := s.session.Page().URL()
-	assert.NotContains(s.t, url, "/admin")
+	s.session.WaitUntilURLDoesNotContain("/admin")
 }
 
 func (s *adminSteps) assertOrganizationVisible(name string) {

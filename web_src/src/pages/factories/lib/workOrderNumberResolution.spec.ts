@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { FactoriesWorkOrder } from "@/api-client";
 import {
   canonicalWorkOrderNumber,
+  findWorkOrderByRunId,
+  latestDispatchForLine,
   resolveWorkOrderByNumber,
   workOrderRouteNeedsCanonicalRedirect,
 } from "./workOrderNumberResolution";
@@ -72,5 +74,59 @@ describe("canonicalWorkOrderNumber", () => {
   it("returns null when there is no order or number", () => {
     expect(canonicalWorkOrderNumber(null)).toBeNull();
     expect(canonicalWorkOrderNumber({ id: "x" })).toBeNull();
+  });
+});
+
+describe("findWorkOrderByRunId", () => {
+  it("returns the order whose dispatch ran this canvas run", () => {
+    const withRun: FactoriesWorkOrder = {
+      id: "order-run",
+      number: "9",
+      lineDispatches: [
+        {
+          id: "d-old",
+          stepExecutions: [{ id: "e-old", run: { id: "run-old" } }],
+        },
+        {
+          id: "d-new",
+          stepExecutions: [{ id: "e-new", run: { id: "run-new" } }],
+        },
+      ],
+    };
+
+    expect(findWorkOrderByRunId([ORDERS[0], withRun], "run-new")?.id).toBe("order-run");
+    expect(findWorkOrderByRunId([withRun], "missing")).toBeUndefined();
+    expect(findWorkOrderByRunId([withRun], "  ")).toBeUndefined();
+  });
+});
+
+describe("latestDispatchForLine", () => {
+  it("picks the newest dispatch on the viewed line", () => {
+    const order: FactoriesWorkOrder = {
+      id: "order-1",
+      lineDispatches: [
+        {
+          id: "d-other",
+          createdAt: "2026-08-21T10:00:00.000Z",
+          line: { id: "line-other" },
+          stepExecutions: [{ id: "e-other", run: { id: "run-other" } }],
+        },
+        {
+          id: "d-old",
+          createdAt: "2026-08-21T11:00:00.000Z",
+          line: { id: "line-1" },
+          stepExecutions: [{ id: "e-old", run: { id: "run-old" } }],
+        },
+        {
+          id: "d-new",
+          createdAt: "2026-08-21T12:00:00.000Z",
+          line: { id: "line-1" },
+          stepExecutions: [{ id: "e-new", run: { id: "run-new" } }],
+        },
+      ],
+    };
+
+    expect(latestDispatchForLine(order, "line-1")?.id).toBe("d-new");
+    expect(latestDispatchForLine(order)?.id).toBe("d-new");
   });
 });

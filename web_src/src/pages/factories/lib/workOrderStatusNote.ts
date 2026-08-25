@@ -15,7 +15,7 @@ export interface WorkOrderStatusNotePresentation {
   /** Markdown body explaining what resolves the wait. */
   text: string;
   /** Primary call to action, usually the thing to review. */
-  cta?: { label: string; href: string };
+  cta?: { label: string; href?: string };
   /** Automation that owns the wait, linked so users can inspect it. */
   source?: { name: string; appId?: string };
   updatedAt?: string;
