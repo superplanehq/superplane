@@ -18,6 +18,9 @@ type intakeBinding struct {
 	// Configuration carries the trigger fields that name the resource to
 	// listen on, such as the repository of a GitHub intake.
 	Configuration map[string]any
+	// Installation is the row the reference points at. Seeding the intake
+	// reads the source through the same installation the trigger listens with.
+	Installation *models.Integration
 }
 
 func (b *intakeBinding) integrationRef() *yaml.IntegrationRef {
@@ -32,6 +35,13 @@ func (b *intakeBinding) configuration() map[string]any {
 		return nil
 	}
 	return b.Configuration
+}
+
+func (b *intakeBinding) installation() *models.Integration {
+	if b == nil {
+		return nil
+	}
+	return b.Installation
 }
 
 // resolveIntakeBinding takes what the trigger needs from the workspace setup:
@@ -59,6 +69,7 @@ func resolveIntakeBinding(tx *gorm.DB, factory *models.Factory, source string) *
 			Name: integration.InstallationName,
 		},
 		Configuration: map[string]any{"repository": config.BacklogRepository},
+		Installation:  integration,
 	}
 }
 
