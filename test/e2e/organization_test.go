@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,7 +11,7 @@ import (
 )
 
 func TestOrganizationCreation(t *testing.T) {
-	t.Run("creating a new organization from the create page", func(t *testing.T) {
+	t.Run("creating a new organization starts workspace setup", func(t *testing.T) {
 		steps := &organizationCreationSteps{t: t}
 		orgName := "E2E Created Organization"
 		steps.start()
@@ -18,7 +19,7 @@ func TestOrganizationCreation(t *testing.T) {
 		steps.fillInOrganizationName(orgName)
 		steps.submitOrganizationForm()
 		steps.assertOrganizationSavedInDB(orgName)
-		steps.assertRedirectedToOrganizationHome(orgName)
+		steps.assertRedirectedToWorkspaceSetup(orgName)
 	})
 }
 
@@ -55,10 +56,19 @@ func (s *organizationCreationSteps) assertOrganizationSavedInDB(name string) {
 	require.Equal(s.t, name, org.Name)
 }
 
-func (s *organizationCreationSteps) assertRedirectedToOrganizationHome(name string) {
+// A new organization holds no workspace, so the owner must land in the setup
+// steps of a new workspace.
+func (s *organizationCreationSteps) assertRedirectedToWorkspaceSetup(name string) {
 	org, err := models.FindOrganizationByName(name)
 	require.NoError(s.t, err)
 
-	currentURL := s.session.Page().URL()
-	require.Contains(s.t, currentURL, "/"+org.ID.String())
+	setupPath := regexp.MustCompile("/" + org.ID.String() + "/workspaces/[^/]+/setup")
+	for i := 0; i < 25; i++ {
+		if setupPath.MatchString(s.session.Page().URL()) {
+			return
+		}
+		s.session.Sleep(200)
+	}
+
+	require.Regexp(s.t, setupPath, s.session.Page().URL())
 }
