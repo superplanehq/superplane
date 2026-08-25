@@ -14,6 +14,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/datatypes"
+
+	_ "github.com/superplanehq/superplane/pkg/components/factory"
 )
 
 func Test__CanvasPatcher(t *testing.T) {
@@ -593,6 +595,33 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps.assertNoError()
 		steps.assertHasNode("node-a", "Node A", map[string]any{"expression": nil})
 		steps.assertNodeErrorContains("node-a", "field 'expression' is required")
+	})
+
+	t.Run("add component node -> name-only branch artifact sets node error", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(nil, nil)
+
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
+				{
+					Type: ChangeTypeAddNode,
+					Node: &ChangeNode{
+						ID:    "node-a",
+						Name:  "Add Branch Artifact",
+						Block: "addWorkOrderArtifact",
+						Configuration: structFromMap(t, map[string]any{
+							"orderId":      "{{ order().id }}",
+							"artifactType": "branch",
+							"name":         "feature/refund-retry",
+						}),
+					},
+				},
+			},
+		})
+
+		steps.assertNoError()
+		steps.assertNodeCount(1)
+		steps.assertNodeErrorContains("node-a", "branch artifact requires a url or a repository")
 	})
 
 	t.Run("rejects self-loop edge", func(t *testing.T) {

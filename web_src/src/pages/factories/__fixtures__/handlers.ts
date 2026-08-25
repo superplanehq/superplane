@@ -21,6 +21,7 @@ import type {
 } from "@/api-client";
 import { defaultNotificationSettings } from "@/lib/notificationSettings";
 import { buildStorybookMeUser, fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
+import { storybookHostedLlmModels } from "@/pages/home/__fixtures__/hostedLlmModels";
 import { automationNameForLineStep } from "../lib/factoryLineFormShared";
 import { isValidWorkspaceKey, suggestWorkspaceKeyFromName, WORKSPACE_KEY_MAX_LENGTH } from "../lib/workspaceKey";
 import { metricsForLine } from "../pages/lineListMetricsMockData";
@@ -35,7 +36,7 @@ const re = (pattern: string): RegExp => new RegExp(`^${pattern}$`);
 
 interface FactoriesRoute {
   pattern: RegExp;
-  resolve: (match: RegExpExecArray, method: string, body: Record<string, unknown> | null) => FixtureResult;
+  resolve: (match: RegExpExecArray, method: string, body: Record<string, unknown> | null, url: URL) => FixtureResult;
 }
 
 interface RequestBody {
@@ -437,6 +438,13 @@ function organizationLlmSpendRoute(fixture: FactoriesFixture): FactoriesRoute {
   };
 }
 
+function hostedLlmModelsRoute(): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/hosted-llm-models"),
+    resolve: (_match, _method, _body, url) => ({ json: storybookHostedLlmModels(url.searchParams.get("provider")) }),
+  };
+}
+
 const STORYBOOK_ME_MEMBER_PERMISSIONS = ["members"].flatMap((resource) =>
   ["read", "create", "update", "delete"].map((action) => ({ resource, action })),
 );
@@ -488,6 +496,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...factoryLinesRoutes(fixture),
     ...workOrderRoutes(fixture),
     organizationLlmSpendRoute(fixture),
+    hostedLlmModelsRoute(),
   ];
 }
 
@@ -504,7 +513,7 @@ export function matchFactoryPageFixture(
   for (const route of buildRoutes(fixture)) {
     const match = route.pattern.exec(url.pathname);
     if (match) {
-      return route.resolve(match, method, body);
+      return route.resolve(match, method, body, url);
     }
   }
   return null;
