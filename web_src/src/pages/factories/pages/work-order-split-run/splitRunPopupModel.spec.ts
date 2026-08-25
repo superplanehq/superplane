@@ -16,7 +16,7 @@ import {
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 describe("splitRunPopupModel", () => {
-  it("uses a 3/2 pane split for Description and Log", () => {
+  it("uses a 3/2 pane split for Description", () => {
     expect(SPLIT_RUN_PANE_GRID_CLASSNAME).toContain("minmax(0,3fr)_minmax(0,2fr)");
   });
 

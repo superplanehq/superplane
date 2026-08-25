@@ -24,7 +24,7 @@ const (
 	// Factory run inspection re-lays a linear run out in a single vertical
 	// spine from a fixed, small origin (see layoutFactoryRunLeafGraph),
 	// independent of any saved editor position. A dozen chained steps stack
-	// past the compact popup canvas at the default (un-fit) zoom, so only
+	// past the compact run canvas at the default (un-fit) zoom, so only
 	// an explicit participant fit brings the last one into view.
 	linesRunFitStepCount = 12
 )
@@ -33,20 +33,20 @@ func linesRunFitStepNodeID(index int) string {
 	return fmt.Sprintf("step-%d", index)
 }
 
-// TestLinesPhaseRunFitsIntoView guards against a regression where opening a
-// step run from a Factory Line's phase board showed the compact run canvas
-// with whatever default/empty viewport ReactFlow happened to initialize
-// with, instead of framing the run's participant nodes. See PR #6715.
+// TestLinesPhaseRunFitsIntoView guards against a regression where the
+// automation run page showed the compact run canvas with whatever
+// default/empty viewport ReactFlow happened to initialize with, instead of
+// framing the run's participant nodes. See PR #6715. The work-order popup
+// on the line board no longer embeds this canvas.
 func TestLinesPhaseRunFitsIntoView(t *testing.T) {
-	t.Run("opening a phase run card fits its participant nodes into view", func(t *testing.T) {
+	t.Run("opening the automation run page fits its participant nodes into view", func(t *testing.T) {
 		steps := &linesRunFitSteps{t: t}
 
 		steps.start()
 		steps.givenAFactory()
 		steps.givenAFactoryAppWithAWideParticipantChain()
 		steps.givenALineDispatchedForThatApp()
-		steps.whenIVisitTheLineDetail()
-		steps.whenIOpenThePhaseRunCard()
+		steps.whenIOpenTheAutomationRunPage()
 		steps.thenTheFirstAndLastParticipantsFitIntoView()
 	})
 }
@@ -58,7 +58,7 @@ type linesRunFitSteps struct {
 	canvas  *models.Canvas
 	factory *models.Factory
 	line    *models.FactoryLine
-	order   *models.FactoryWorkOrder
+	runID   uuid.UUID
 }
 
 func (s *linesRunFitSteps) start() {
@@ -152,7 +152,6 @@ func (s *linesRunFitSteps) givenALineDispatchedForThatApp() {
 	order, err := s.factory.CreateWorkOrder(database.Conn(), support.RandomName("work order"), "", nil, nil, nil)
 	require.NoError(s.t, err)
 	require.NoError(s.t, order.TransitionOnDispatch(database.Conn(), nil))
-	s.order = order
 
 	var result *models.FactoryLineStepResult
 	require.NoError(s.t, database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -163,7 +162,7 @@ func (s *linesRunFitSteps) givenALineDispatchedForThatApp() {
 	require.NotNil(s.t, result)
 	require.NotNil(s.t, result.Execution)
 	require.NotNil(s.t, result.Run)
-	runID := result.Run.ID
+	s.runID = result.Run.ID
 
 	createdAt := time.Now()
 	rootEvent := models.CanvasEvent{
@@ -172,7 +171,7 @@ func (s *linesRunFitSteps) givenALineDispatchedForThatApp() {
 		NodeID:     linesRunFitTriggerNodeID,
 		Channel:    "default",
 		Data:       models.NewJSONValue(map[string]any{"message": "kickoff"}),
-		RunID:      runID,
+		RunID:      s.runID,
 		State:      models.CanvasEventStateRouted,
 		CreatedAt:  &createdAt,
 	}
@@ -184,7 +183,7 @@ func (s *linesRunFitSteps) givenALineDispatchedForThatApp() {
 			WorkflowID:    s.canvas.ID,
 			NodeID:        linesRunFitStepNodeID(i),
 			RootEventID:   rootEvent.ID,
-			RunID:         runID,
+			RunID:         s.runID,
 			EventID:       rootEvent.ID,
 			State:         models.CanvasNodeExecutionStateStarted,
 			Metadata:      datatypes.NewJSONType(map[string]any{}),
@@ -196,14 +195,11 @@ func (s *linesRunFitSteps) givenALineDispatchedForThatApp() {
 	}
 }
 
-func (s *linesRunFitSteps) whenIVisitTheLineDetail() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/workspaces/" + s.factory.Key + "/lines/" + s.line.ID.String())
-	s.session.AssertVisible(q.TestID("lines-detail"))
-}
-
-func (s *linesRunFitSteps) whenIOpenThePhaseRunCard() {
-	s.session.Click(q.TestID("work-order-card-" + s.order.ID.String()))
-	s.session.AssertVisible(q.TestID("work-order-split-run"))
+func (s *linesRunFitSteps) whenIOpenTheAutomationRunPage() {
+	s.session.Visit("/" + s.session.OrgID.String() + "/workspaces/" + s.factory.Key +
+		"/apps/" + s.canvas.ID.String() + "/split-run?from=lines&lineId=" + s.line.ID.String() +
+		"&run=" + s.runID.String())
+	s.session.AssertVisible(q.TestID("factory-app-split-run-page"))
 	s.session.AssertVisible(q.TestID("run-overlay-compact-canvas"))
 }
 
@@ -213,7 +209,7 @@ func (s *linesRunFitSteps) thenTheFirstAndLastParticipantsFitIntoView() {
 }
 
 // Waits for the node card to render, then polls its bounding box until the
-// compact canvas has panned/zoomed it into the popup pane — the observable
+// compact canvas has panned/zoomed it into the run pane — the observable
 // effect of the participant-fit request this test guards. Targets the
 // compact-canvas test id rather than a label, since every chain node past
 // the first shares the same "No Operation" component label.

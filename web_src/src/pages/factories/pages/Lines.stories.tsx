@@ -17,7 +17,7 @@ import { LinesPage } from "./LinesPage";
 
 /**
  * Line board is the workspace home: phase columns fill the pane. Cards open
- * the terminal-log run popup. The list story remains for line management.
+ * the work-order popup. The list story remains for line management.
  */
 const meta = {
   title: "Factories/Pages/Lines",

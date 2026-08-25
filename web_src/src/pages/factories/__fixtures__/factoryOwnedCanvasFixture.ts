@@ -32,9 +32,17 @@ export {
   LINE_RUN_VERIFY_PASSED_ID,
 };
 
-export const REFUND_PLANNER_APP = REFUND_FACTORY_APPS[0];
-export const REFUND_IMPLEMENTER_APP = REFUND_FACTORY_APPS[1];
-export const REFUND_VERIFIER_APP = REFUND_FACTORY_APPS[2];
+function refundFactoryApp(id: string): FactoryApp {
+  const app = REFUND_FACTORY_APPS.find((candidate) => candidate.id === id);
+  if (!app) {
+    throw new Error(`Unknown refund factory app: ${id}`);
+  }
+  return app;
+}
+
+export const REFUND_PLANNER_APP = refundFactoryApp("app-refund-planner");
+export const REFUND_IMPLEMENTER_APP = refundFactoryApp("app-refund-implementer");
+export const REFUND_VERIFIER_APP = refundFactoryApp("app-refund-verifier");
 
 /**
  * Clone of the captured Software Factory canvas, owned by Semaphore
