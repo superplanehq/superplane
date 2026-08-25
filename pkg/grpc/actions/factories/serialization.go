@@ -107,13 +107,16 @@ func serializeFactoryLines(lines []models.FactoryLine, metricsByLine map[uuid.UU
 	return result
 }
 
-func serializeFactoryApps(canvases []models.Canvas) []*pb.Factory_App {
+func serializeFactoryApps(canvases []models.Canvas, intakes map[uuid.UUID]factoryIntake) []*pb.Factory_App {
 	result := make([]*pb.Factory_App, len(canvases))
 	for i, canvas := range canvases {
 		app := &pb.Factory_App{
 			Id:          canvas.ID.String(),
 			Name:        canvas.Name,
 			Description: canvas.Description,
+		}
+		if intake, ok := intakes[canvas.ID]; ok {
+			app.Intake = serializeFactoryIntake(intake)
 		}
 		if canvas.CreatedAt != nil {
 			app.CreatedAt = timestamppb.New(*canvas.CreatedAt)
@@ -124,6 +127,28 @@ func serializeFactoryApps(canvases []models.Canvas) []*pb.Factory_App {
 		result[i] = app
 	}
 	return result
+}
+
+func serializeFactoryIntake(intake factoryIntake) *pb.Factory_App_Intake {
+	return &pb.Factory_App_Intake{
+		Source:                serializeFactoryIntakeSource(intake.Source),
+		TriggerNodeId:         intake.TriggerNodeID,
+		AnalysisNodeId:        intake.AnalysisNodeID,
+		CreateWorkOrderNodeId: intake.CreateWorkOrderNodeID,
+	}
+}
+
+func serializeFactoryIntakeSource(source factoryIntakeSource) pb.Factory_App_Intake_Source {
+	switch source {
+	case factoryIntakeSourceGitHubIssues:
+		return pb.Factory_App_Intake_SOURCE_GITHUB_ISSUES
+	case factoryIntakeSourceSentryExceptions:
+		return pb.Factory_App_Intake_SOURCE_SENTRY_EXCEPTIONS
+	case factoryIntakeSourcePagerDutyIncidents:
+		return pb.Factory_App_Intake_SOURCE_PAGERDUTY_INCIDENTS
+	default:
+		return pb.Factory_App_Intake_SOURCE_UNSPECIFIED
+	}
 }
 
 func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {

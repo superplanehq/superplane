@@ -400,11 +400,26 @@ message FactoryOnboarding {
 
 message Factory {
   message App {
+    message Intake {
+      enum Source {
+        SOURCE_UNSPECIFIED = 0;
+        SOURCE_GITHUB_ISSUES = 1;
+        SOURCE_SENTRY_EXCEPTIONS = 2;
+        SOURCE_PAGERDUTY_INCIDENTS = 3;
+      }
+
+      Source source = 1;
+      string trigger_node_id = 2;
+      string analysis_node_id = 3;
+      string create_work_order_node_id = 4;
+    }
+
     string id = 1;
     string name = 2;
     string description = 3;
     google.protobuf.Timestamp created_at = 4;
     google.protobuf.Timestamp updated_at = 5;
+    optional Intake intake = 6;
   }
 
   string id = 1;

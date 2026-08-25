@@ -13,6 +13,8 @@ export type IntakeLineStage = "plan" | "implement" | "verify" | "done";
 
 export interface IntakeAutomationRun {
   id: string;
+  appId?: string;
+  runId?: string;
   title: string;
   confidencePct: number;
   ranMinutesAgo: number;
@@ -48,8 +50,15 @@ export const INTAKE_SETTINGS_COPY = {
   generalTab: "General",
   automationTab: "Automation",
   editAutomation: "Edit automation",
+  automationLoading: "The automation is loading.",
+  automationEmpty: "This intake has no automation yet.",
+  automationError: "SuperPlane could not load the automation.",
+  retryAutomation: "Try again",
   runsTab: "Runs",
   runsEmpty: "No runs yet.",
+  runsLoading: "Runs are loading.",
+  runsError: "SuperPlane could not load the runs.",
+  retryRuns: "Try again",
   runWhen: "Run",
   analysisWhen: "Analysis",
   scoreWhen: "Score",
@@ -71,7 +80,7 @@ export const INTAKE_SETTINGS_COPY = {
   listenOption: "Listen for new issues",
   listenHelper: "Analyze a GitHub issue when it is created.",
   scheduleOption: "Run on a schedule",
-  scheduleHelper: "Analyze open issues every few hours.",
+  scheduleHelper: "Scheduled intake is not available.",
   confidenceLabel: "Minimum confidence",
   confidenceHelper: "Move a ticket to Backlog when the score is this value or higher.",
   filtersLabel: "Filters",
@@ -84,6 +93,8 @@ export const INTAKE_SETTINGS_COPY = {
   assignmentAssigned: "Assigned",
   assignmentUnassigned: "Unassigned",
   save: "Save",
+  saving: "Saving",
+  saveError: "SuperPlane could not save the intake settings. Try again.",
 } as const;
 
 const STAGE_LABEL: Record<IntakeLineStage, string> = {

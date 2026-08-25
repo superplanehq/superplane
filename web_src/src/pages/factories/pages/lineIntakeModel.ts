@@ -129,21 +129,69 @@ export function isLineIntakeSourceId(id: string | null | undefined): id is LineI
   return Boolean(id && lineIntakeSourceById(id));
 }
 
-export function intakeAutomationAppId(apps: Array<{ id?: string; name?: string }>): string | undefined {
-  const byKnownId = apps.find((app) => app.id === GITHUB_ISSUES_INTAKE_APP_ID);
-  if (byKnownId?.id) {
-    return byKnownId.id;
-  }
-  const byIntake = apps.find((app) => /intake/i.test(`${app.id ?? ""} ${app.name ?? ""}`));
-  if (byIntake?.id) {
-    return byIntake.id;
-  }
-  return apps.find((app) => app.id)?.id;
+interface FactoryIntakeApp {
+  id?: string;
+  name?: string;
+  intake?: {
+    source?: string;
+    triggerNodeId?: string;
+    analysisNodeId?: string;
+    createWorkOrderNodeId?: string;
+  };
+}
+
+export interface ConfiguredLineIntakeSource {
+  appId: string;
+  triggerNodeId: string;
+  analysisNodeId: string;
+  createWorkOrderNodeId: string;
+  source: LineIntakeSource;
+}
+
+const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = {
+  SOURCE_GITHUB_ISSUES: "github-issues",
+  SOURCE_SENTRY_EXCEPTIONS: "sentry-exceptions",
+  SOURCE_PAGERDUTY_INCIDENTS: "pagerduty-incidents",
+};
+
+export function intakeSourcesFromFactoryApps(apps: FactoryIntakeApp[]): ConfiguredLineIntakeSource[] {
+  return apps.flatMap((app) => {
+    const appId = app.id?.trim();
+    const sourceId = app.intake?.source ? LINE_INTAKE_SOURCE_ID_BY_API_SOURCE[app.intake.source] : undefined;
+    const source = sourceId ? lineIntakeSourceById(sourceId) : undefined;
+    if (!appId || !source) {
+      return [];
+    }
+
+    return [
+      {
+        appId,
+        triggerNodeId: app.intake?.triggerNodeId ?? "",
+        analysisNodeId: app.intake?.analysisNodeId ?? "",
+        createWorkOrderNodeId: app.intake?.createWorkOrderNodeId ?? "",
+        source: {
+          ...source,
+          name: app.name?.trim() || source.name,
+        },
+      },
+    ];
+  });
+}
+
+export function intakeAutomationAppId(apps: FactoryIntakeApp[]): string | undefined {
+  return (
+    apps.find((app) => app.intake?.source === "SOURCE_GITHUB_ISSUES")?.id ??
+    apps.find((app) => app.id === GITHUB_ISSUES_INTAKE_APP_ID)?.id ??
+    apps.find((app) => /intake/i.test(`${app.id ?? ""} ${app.name ?? ""}`))?.id ??
+    apps.find((app) => app.id)?.id
+  );
 }
 
 export interface LineIntakeAnalyzingTicket {
   id: string;
   title: string;
+  appId?: string;
+  runId?: string;
 }
 
 export const LINE_INTAKE_COPY = {

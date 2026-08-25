@@ -3,16 +3,19 @@ import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactoryApps, useFactoryWorkOrders, useUpdateFactoryLine } from "@/hooks/useFactoryData";
+import { useCreateCanvas, useDeleteCanvas } from "@/hooks/useCanvasData";
+import { factoryAppsKey, useFactoryApps, useFactoryWorkOrders, useUpdateFactoryLine } from "@/hooks/useFactoryData";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
+import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Clock, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { ClickToRename } from "../layout/ClickToRename";
@@ -70,12 +73,14 @@ import {
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
+import { createIntakeAutomation } from "./createIntakeAutomation";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
 import {
   intakeAutomationAppId,
+  intakeSourcesFromFactoryApps,
   isFirstRunOnboardingFactory,
   isLineIntakeSourceId,
-  lineIntakeSourcesForFactory,
+  type LineIntakeSourceId,
 } from "./lineIntakeModel";
 import { isIntakeSettingsTab } from "./intakeSourceSettingsModel";
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
@@ -97,6 +102,10 @@ export function LinesPage() {
   const intakeSettingsTab = intakeSettingsTabFromSearch(search);
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
   const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
+  const createCanvas = useCreateCanvas(organizationId);
+  const deleteCanvas = useDeleteCanvas(organizationId);
+  const queryClient = useQueryClient();
+  const configuredIntakes = useMemo(() => intakeSourcesFromFactoryApps(factoryApps), [factoryApps]);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
 
   const canUpdate = canAct("factories", "update");
@@ -128,22 +137,74 @@ export function LinesPage() {
   // The phase board is a Kanban surface: it claims the full viewport height so
   // the lanes read as columns rather than as boxes around their cards.
   if (selectedLine) {
-    const intakeEditAppId = intakeAutomationAppId(factoryApps);
-    const editAutomationHref = intakeEditAppId
-      ? factoryAppConfigurePath(organizationId, factoryKey, intakeEditAppId, {
-          from: "lines",
-          lineId: selectedLine.id,
-        })
-      : undefined;
+    const editAutomationHrefFor = (sourceId?: LineIntakeSourceId) => {
+      const appId =
+        configuredIntakes.find((configured) => configured.source.id === sourceId)?.appId ??
+        intakeAutomationAppId(factoryApps);
+      if (!appId) {
+        return undefined;
+      }
+      return factoryAppConfigurePath(organizationId, factoryKey, appId, {
+        from: "lines",
+        lineId: selectedLine.id,
+      });
+    };
     return (
       <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
         {intakeOpen ? (
           <LineIntakeDrawer
-            sources={lineIntakeSourcesForFactory(factoryKey)}
+            sources={configuredIntakes.map((intake) => intake.source)}
+            configuredSources={configuredIntakes}
+            onOpenTicket={(ticket) => {
+              if (!ticket.appId || !ticket.runId) {
+                return;
+              }
+              navigate(
+                factoryAppSplitRunPath(organizationId, factoryKey, ticket.appId, {
+                  from: "lines",
+                  lineId: selectedLine.id,
+                  runId: ticket.runId,
+                }),
+              );
+            }}
             initialSourceId={isLineIntakeSourceId(intakeSourceId) ? intakeSourceId : undefined}
             initialSettingsOpen={isIntakeSettingsTab(intakeSettingsTab)}
             initialSettingsTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
-            editAutomationHref={editAutomationHref}
+            organizationId={organizationId}
+            editAutomationHrefFor={(source) => editAutomationHrefFor(source.id)}
+            onSettingsSaved={() => {
+              void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+            }}
+            onSelectIntakeTemplate={(template) => {
+              if (!isLineIntakeSourceId(template.id)) {
+                showErrorToast("This intake template is not available yet.");
+                return;
+              }
+              if (configuredIntakes.some((configured) => configured.source.id === template.id)) {
+                showErrorToast(`${template.name} intake already exists.`);
+                return;
+              }
+              void createIntakeAutomation({
+                factoryId,
+                sourceId: template.id,
+                confidencePct: 65,
+                createCanvas: createCanvas.mutateAsync,
+                existingCanvasNames: factoryApps.map((app) => app.name ?? ""),
+                deleteCanvas: deleteCanvas.mutateAsync,
+              })
+                .then((canvasId) => {
+                  void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+                  navigate(
+                    factoryAppConfigurePath(organizationId, factoryKey, canvasId, {
+                      from: "lines",
+                      lineId: selectedLine.id,
+                    }),
+                  );
+                })
+                .catch((error) => {
+                  showErrorToast(getUsageLimitToastMessage(error, "Failed to create intake automation"));
+                });
+            }}
             onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
           />
         ) : null}
