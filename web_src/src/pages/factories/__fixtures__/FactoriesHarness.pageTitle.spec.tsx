@@ -100,14 +100,14 @@ describe("client-side navigation updates document.title", () => {
   it("sets the tab title from the canvas name on a factory-owned app canvas", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/app-refund-implementer`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/app-refund-planner`}
         factoriesFixture={defaultFactoriesFixture}
         pageOverrides={pageOverrides}
       />,
     );
 
-    expect(await screen.findByText("Refund Implementer", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(document.title).toBe("Refund Implementer · Semaphore · SuperPlane");
+    expect(await screen.findByText("Refund Planner", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(document.title).toBe("Refund Planner · Semaphore · SuperPlane");
   }, 15000);
 
   it("sets a distinct tab title for each factory settings section", async () => {

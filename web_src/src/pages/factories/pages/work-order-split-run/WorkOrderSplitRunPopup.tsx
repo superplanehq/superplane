@@ -6,18 +6,16 @@ import { FACTORIES_ORGANIZATION_ID } from "../../__fixtures__/factoryPageRespons
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { OwnerTimeCostRow, PopupHeader, PopupShell, SectionTitle } from "../work-order-popup-redesign/popupShared";
-import { CompactLineCanvas } from "./CompactLineCanvas";
 import { PhaseLogCard } from "./PhaseLogCard";
 import { SplitRunReview } from "./SplitRunReview";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
-import { emptySplitRunCanvas, type SplitRunCanvasKey } from "./splitRunCanvases";
+import { emptySplitRunCanvas } from "./splitRunCanvases";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
 import { autoExpandedPhaseId, splitRunStatusLabel, type SplitRunFixture, type SplitRunPhaseId } from "./splitRunMocks";
 import {
   collectSplitRunArtifacts,
   defaultSplitRunPopupTab,
   resolveSplitRunPopupArtifacts,
-  SPLIT_RUN_PANE_GRID_CLASSNAME,
   splitRunDescriptionMarkdown,
   splitRunLogTabDotClass,
   splitRunSourceDescription,
@@ -50,15 +48,13 @@ type WorkOrderSplitRunBodyProps = {
   orderId?: string;
   orderNumber?: string;
   fixture: SplitRunFixture;
-  canvasEditHref?: (key: SplitRunCanvasKey) => string | undefined;
-  canvasExpandHref?: (key: SplitRunCanvasKey, phase?: { appId?: string; runId?: string }) => string | undefined;
   onDispatch?: () => Promise<void>;
   isDispatching?: boolean;
   canDispatch?: boolean;
   canUpdate?: boolean;
 };
 
-/** Log and canvas for a split run. The popup wraps this. */
+/** Phase log for a work-order popup. The popup wraps this. */
 export function WorkOrderSplitRunBody({
   organizationId,
   factoryId,
@@ -66,8 +62,6 @@ export function WorkOrderSplitRunBody({
   orderId,
   orderNumber,
   fixture,
-  canvasEditHref,
-  canvasExpandHref,
   onDispatch,
   isDispatching = false,
   canDispatch = false,
@@ -105,61 +99,48 @@ export function WorkOrderSplitRunBody({
   }, [artifactIndex, demoArtifacts, fixture.phases, selectedPhase?.id, visual.stream]);
 
   return (
-    <div className={SPLIT_RUN_PANE_GRID_CLASSNAME} data-testid="split-run-log-pane">
-      <aside className="flex min-h-0 flex-col border-b border-border bg-muted/25 md:border-r md:border-b-0">
-        <div className="mb-2 px-3 pt-3">
-          <SectionTitle>Log</SectionTitle>
-        </div>
+    <div className="flex min-h-0 flex-1 flex-col" data-testid="split-run-log-pane">
+      <div className="mb-2 px-3 pt-3">
+        <SectionTitle>Log</SectionTitle>
+      </div>
 
-        <ol className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-          {fixture.phases.map((entry) => (
-            <li key={entry.id} className="border-b border-border/70 py-1 last:border-b-0">
-              <PhaseLogCard
-                phase={entry}
-                expanded={entry.id === openPhaseId}
-                stream={streams.get(entry.id) ?? entry.stream}
-                selectedNodeId={nodeId}
-                onSelectNode={setNodeId}
-                onToggle={() => {
-                  setPhaseId(entry.id);
-                  setNodeId(null);
-                  setOpenPhaseId((current) => (current === entry.id ? null : entry.id));
-                }}
-              />
-            </li>
-          ))}
-        </ol>
-        <SplitRunReview
-          footer={fixture.footer}
-          organizationId={organizationId}
-          factoryKey={factoryKey}
-          orderNumber={orderNumber}
-          onStart={fixture.footer.kind === "draft" ? onDispatch : undefined}
-          onStop={mutations.onStop}
-          onReject={mutations.onReject}
-          startBusy={isDispatching}
-          stopBusy={footerActions.busy}
-          startDisabled={!canDispatch}
-        />
-      </aside>
-
-      <section className="flex min-h-0 min-w-0 flex-col" aria-label="Run">
-        <CompactLineCanvas
-          key={selectedPhase?.id ?? "empty"}
-          canvas={visual.canvas}
-          selectedId={nodeId}
-          onSelect={setNodeId}
-          editHref={canvasEditHref?.(visual.canvas.key)}
-          expandHref={canvasExpandHref?.(visual.canvas.key, selectedPhase)}
-        />
-      </section>
+      <ol className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+        {fixture.phases.map((entry) => (
+          <li key={entry.id} className="border-b border-border/70 py-1 last:border-b-0">
+            <PhaseLogCard
+              phase={entry}
+              expanded={entry.id === openPhaseId}
+              stream={streams.get(entry.id) ?? entry.stream}
+              selectedNodeId={nodeId}
+              onSelectNode={setNodeId}
+              onToggle={() => {
+                setPhaseId(entry.id);
+                setNodeId(null);
+                setOpenPhaseId((current) => (current === entry.id ? null : entry.id));
+              }}
+            />
+          </li>
+        ))}
+      </ol>
+      <SplitRunReview
+        footer={fixture.footer}
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
+        onStart={fixture.footer.kind === "draft" ? onDispatch : undefined}
+        onStop={mutations.onStop}
+        onReject={mutations.onReject}
+        startBusy={isDispatching}
+        stopBusy={footerActions.busy}
+        startDisabled={!canDispatch}
+      />
     </div>
   );
 }
 
 /**
- * Split run popup. Left 60% is a terminal log. Right 40% is the canvas
- * for the selected log step. Storybook and the line board.
+ * Work-order popup from a line-board card. Description and a phase log.
+ * The automation canvas lives on the full run page, not here.
  */
 export function WorkOrderSplitRunPopup({
   organizationId,
@@ -170,8 +151,6 @@ export function WorkOrderSplitRunPopup({
   fixture,
   onClose,
   fixed = false,
-  canvasEditHref,
-  canvasExpandHref,
   onDispatch,
   isDispatching = false,
   canDispatch = false,
@@ -211,7 +190,7 @@ export function WorkOrderSplitRunPopup({
   const ownerOrganizationId = organizationId ?? (edits.canEdit ? FACTORIES_ORGANIZATION_ID : undefined);
 
   return (
-    <PopupShell testId="work-order-split-run" canvas fixed={fixed} onDismiss={onClose}>
+    <PopupShell testId="work-order-split-run" fixed={fixed} onDismiss={onClose}>
       <PopupHeader
         title={edits.title}
         onClose={onClose}
@@ -276,8 +255,6 @@ export function WorkOrderSplitRunPopup({
             orderId={orderId}
             orderNumber={orderNumber}
             fixture={fixture}
-            canvasEditHref={canvasEditHref}
-            canvasExpandHref={canvasExpandHref}
             onDispatch={onDispatch}
             isDispatching={isDispatching}
             canDispatch={canDispatch}

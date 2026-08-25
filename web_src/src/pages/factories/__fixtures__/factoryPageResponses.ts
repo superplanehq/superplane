@@ -145,13 +145,6 @@ export const REFUND_FACTORY_APPS: FactoryApp[] = [
     updatedAt: YESTERDAY,
   },
   {
-    id: "app-refund-implementer",
-    name: "Refund Implementer",
-    description: "Applies the plan across affected repos and opens PRs.",
-    createdAt: LAST_WEEK,
-    updatedAt: YESTERDAY,
-  },
-  {
     id: "app-refund-verifier",
     name: "Refund Verifier",
     description: "Runs verification suites and gates merge.",
