@@ -60,7 +60,7 @@ import {
 } from "../workOrders/WorkOrderBoardChrome";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
-import { confidenceScoreFromChecks } from "../lib/confidenceScore";
+import { boardCardLoadsConfidenceChecks, confidenceScoreFromChecks } from "../lib/confidenceScore";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 import { canvasKeyForAutomation, type SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
 import { splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
@@ -1083,17 +1083,19 @@ function LineBoardWorkOrderCard({
 }) {
   const { factory } = useFactoriesLayout();
   const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [factory, order]);
+  const showConfidence = boardCardLoadsConfidenceChecks(entry.displayStatus);
   const { data: checks = [] } = useWorkOrderChecks(
     workOrderCardContext.organizationId,
     workOrderCardContext.factoryId ?? "",
     order.id ?? "",
+    { enabled: showConfidence },
   );
 
   return (
     <WorkOrderCard
       {...workOrderCardContext}
       entry={entry}
-      confidenceScore={confidenceScoreFromChecks(checks)}
+      confidenceScore={showConfidence ? confidenceScoreFromChecks(checks) : undefined}
       onOpen={onOpen}
     />
   );

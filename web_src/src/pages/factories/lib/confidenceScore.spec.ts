@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  boardCardLoadsConfidenceChecks,
   clampConfidenceScore,
   confidenceBandForScore,
   confidenceCheckLevel,
@@ -11,6 +12,14 @@ import {
 import { workOrderCheckStatus } from "./workOrderChecks";
 
 describe("confidenceScore", () => {
+  it("loads board confidence checks only for draft cards", () => {
+    expect(boardCardLoadsConfidenceChecks("draft")).toBe(true);
+    expect(boardCardLoadsConfidenceChecks("waiting")).toBe(false);
+    expect(boardCardLoadsConfidenceChecks("running")).toBe(false);
+    expect(boardCardLoadsConfidenceChecks("failed")).toBe(false);
+    expect(boardCardLoadsConfidenceChecks("completed")).toBe(false);
+  });
+
   it("reads the Confidence score check and ignores other checks", () => {
     expect(
       confidenceScoreFromChecks([

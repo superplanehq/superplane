@@ -96,14 +96,15 @@ vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "storybook-user" } }),
 }));
 
-vi.mock("@/hooks/useWorkOrderChecks", async () => {
-  const { DEFAULT_CHECKS_BY_ORDER_ID } = await import("../__fixtures__/workOrderCheckFixtures");
-  return {
-    useWorkOrderChecks: (_organizationId: string, _factoryId: string, orderId: string) => ({
-      data: DEFAULT_CHECKS_BY_ORDER_ID[orderId] ?? [],
-    }),
-  };
-});
+const useWorkOrderChecks = vi.hoisted(() =>
+  vi.fn((_organizationId: string, _factoryId: string, _orderId: string, _options?: { enabled?: boolean }) => ({
+    data: [] as unknown[],
+  })),
+);
+
+vi.mock("@/hooks/useWorkOrderChecks", () => ({
+  useWorkOrderChecks,
+}));
 
 function LocationProbe() {
   const location = useLocation();
@@ -183,13 +184,20 @@ describe("LinesPage card menu", () => {
 });
 
 describe("LinesPage board", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    const { DEFAULT_CHECKS_BY_ORDER_ID } = await import("../__fixtures__/workOrderCheckFixtures");
     window.localStorage.clear();
     updateFactoryLineMutateAsync.mockReset();
     useFactoryWorkOrders.mockReturnValue({ data: [] });
     useFactoryApps.mockReturnValue({ data: [] });
     useFactoryIntakes.mockReturnValue({ data: [] });
     createFactoryIntakeMutateAsync.mockReset();
+    useWorkOrderChecks.mockReset();
+    useWorkOrderChecks.mockImplementation(
+      (_organizationId: string, _factoryId: string, orderId: string, options?: { enabled?: boolean }) => ({
+        data: options?.enabled === false ? [] : (DEFAULT_CHECKS_BY_ORDER_ID[orderId] ?? []),
+      }),
+    );
   });
 
   function renderBoard(
@@ -253,6 +261,21 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-backlog-menu-color-lime"));
 
     expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
+  });
+
+  it("loads checks only for draft cards that can show a score", () => {
+    useFactoryWorkOrders.mockReturnValue({
+      data: [...REVIEW_CANDIDATE_WORK_ORDERS, BOARD_IMPLEMENT_FAILED_ORDER],
+    });
+    renderBoard();
+
+    const fetchedIds = useWorkOrderChecks.mock.calls
+      .filter(([, , orderId, options]) => Boolean(orderId) && options?.enabled !== false)
+      .map(([, , orderId]) => orderId);
+
+    expect(fetchedIds).toContain("wo-review-pay-842");
+    expect(fetchedIds).not.toContain("wo-board-implement-failed");
+    expect(screen.queryByTestId("work-order-card-score-wo-board-implement-failed")).not.toBeInTheDocument();
   });
 
   it("shows a score on a review-candidate backlog card and opens the split run", async () => {

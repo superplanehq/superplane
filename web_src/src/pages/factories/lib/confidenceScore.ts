@@ -1,8 +1,14 @@
 import type { WorkOrderCheckLevel } from "./workOrderChecks";
+import type { WorkOrderDisplayStatus } from "./workOrderProgress";
 
 export const CONFIDENCE_SCORE_MAX = 5;
 
 export const CONFIDENCE_CHECK_NAME = "Confidence score";
+
+/** Board cards show the meter next to Start. Only drafts need the request. */
+export function boardCardLoadsConfidenceChecks(displayStatus: WorkOrderDisplayStatus): boolean {
+  return displayStatus === "draft";
+}
 
 export function confidenceScoreFromChecks(
   checks: Array<{ name?: string; score?: number }> | undefined,
