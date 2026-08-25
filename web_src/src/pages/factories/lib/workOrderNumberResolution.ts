@@ -1,4 +1,5 @@
-import type { FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesWorkOrder, FactoriesWorkOrderLineDispatch } from "@/api-client";
+import { flattenWorkOrderExecutions } from "./workOrderExecutions";
 
 export type WorkOrderResolutionStatus = "loading" | "found" | "not-found";
 
@@ -75,6 +76,34 @@ export function workOrderRouteNeedsCanonicalRedirect(resolution: WorkOrderResolu
     return false;
   }
   return String(Number(resolution.order.number)) !== routeNumber;
+}
+
+/** Find the work order whose line dispatch ran this canvas run. */
+export function findWorkOrderByRunId(
+  orders: FactoriesWorkOrder[],
+  runId: string | null | undefined,
+): FactoriesWorkOrder | undefined {
+  const id = runId?.trim();
+  if (!id) {
+    return undefined;
+  }
+  return orders.find((order) => flattenWorkOrderExecutions(order).some((execution) => execution.run?.id === id));
+}
+
+/** Latest dispatch on this line, or the latest dispatch on the order. */
+export function latestDispatchForLine(
+  order: FactoriesWorkOrder | undefined,
+  lineId?: string | null,
+): FactoriesWorkOrderLineDispatch | undefined {
+  const dispatches = (order?.lineDispatches ?? []).filter((dispatch) => !lineId || dispatch.line?.id === lineId);
+  if (dispatches.length === 0) {
+    return undefined;
+  }
+  return dispatches.reduce((best, candidate) => {
+    const bestAt = Date.parse(best.createdAt ?? "") || 0;
+    const candidateAt = Date.parse(candidate.createdAt ?? "") || 0;
+    return candidateAt >= bestAt ? candidate : best;
+  });
 }
 
 /** Canonical route identifier for a resolved work order, or `null`. */

@@ -4,6 +4,7 @@ import { fetchFactoryPageFixture } from "./handlers";
 import { lineMetricsFactoriesFixture } from "./lineMetricsFactoriesFixture";
 import {
   CLOSED_WORK_ORDER,
+  defaultFactoriesFixture,
   FACTORIES_ORGANIZATION_ID,
   OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
@@ -48,6 +49,14 @@ describe("matchFactoryPageFixture", () => {
       totalTokens: "25600",
       totalCostCents: "876",
     });
+
+    const hosted = await fetchFactoryPageFixture(
+      `/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/hosted-llm-models?provider=anthropic`,
+    );
+    await expect(hosted.json()).resolves.toMatchObject({
+      enabled: true,
+      models: [expect.objectContaining({ id: "claude-sonnet-4-6" })],
+    });
   });
 
   it("returns factory apps for the populated factory", async () => {
@@ -89,6 +98,35 @@ describe("matchFactoryPageFixture", () => {
     const onboarding = body.factory.lines?.find((line) => line.id === REFUND_LINE_ONBOARDING_ID);
     expect(onboarding).toBeDefined();
     expect(onboarding?.metrics).toBeUndefined();
+  });
+
+  it("creates a workspace with a unique key derived from the name", async () => {
+    const response = await fetchFactoryPageFixture("/api/v1/factories", {
+      method: "POST",
+      body: JSON.stringify({ name: "New workspace", description: "", key: "" }),
+    });
+    const body = (await response.json()) as { factory?: { id?: string; name?: string; key?: string } };
+
+    expect(body.factory?.name).toBe("New workspace");
+    expect(body.factory?.id).toMatch(/^storybook-factory-/);
+    expect(body.factory?.key).toBe("NEWWO");
+  });
+
+  it("walks to a free key when the name-derived key is already taken", async () => {
+    const fixture = structuredClone(defaultFactoriesFixture);
+    fixture.factories.push({ id: "taken-newwo", name: "Taken", key: "NEWWO", lines: [] });
+
+    const response = await fetchFactoryPageFixture(
+      "/api/v1/factories",
+      {
+        method: "POST",
+        body: JSON.stringify({ name: "New workspace", description: "", key: "" }),
+      },
+      fixture,
+    );
+    const body = (await response.json()) as { factory?: { key?: string } };
+
+    expect(body.factory?.key).toBe("NEWWA");
   });
 
   it("does not serve a separate line-metrics route", async () => {

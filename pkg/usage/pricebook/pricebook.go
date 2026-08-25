@@ -68,6 +68,12 @@ func EstimateMicros(provider, model string, input, output, cacheRead, cacheWrite
 		micros(reasoning, rate.Reasoning)
 }
 
+// IsPriced is true when the price book has a rate for the model id.
+func IsPriced(model string) bool {
+	_, ok := lookup(model)
+	return ok
+}
+
 // MicrosToCents converts millionths of a dollar to whole cents.
 func MicrosToCents(micros int64) int64 {
 	if micros < 0 {

@@ -62,7 +62,7 @@ export function WorkOrderStatusNote({
 
           {note.cta || statusActions.length > 0 ? (
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              {note.cta ? (
+              {note.cta?.href ? (
                 <Button asChild size="sm">
                   <a href={note.cta.href} target="_blank" rel="noreferrer">
                     {note.cta.label}

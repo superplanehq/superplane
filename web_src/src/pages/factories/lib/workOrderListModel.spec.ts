@@ -90,6 +90,21 @@ describe("buildWorkOrderListEntry", () => {
     expect(entry.isDispatchable).toBe(true);
   });
 
+  it("keeps only the first assignee as the owner", () => {
+    const entry = buildWorkOrderListEntry(
+      order({
+        assignees: [
+          { id: "u1", name: "Alex Reviewer" },
+          { id: "u2", name: "Grace" },
+        ],
+      }),
+      factory,
+    );
+
+    expect(entry.assigneeIds).toEqual(["u1"]);
+    expect(entry.assigneeNames).toEqual(["Alex Reviewer"]);
+  });
+
   it("picks the latest execution and counts distinct lines", () => {
     const entry = buildWorkOrderListEntry(
       order({
