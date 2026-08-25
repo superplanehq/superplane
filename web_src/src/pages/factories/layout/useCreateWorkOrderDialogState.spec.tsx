@@ -3,7 +3,7 @@ import { type ReactNode } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { createWorkOrderPath, linesPath, workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
+import { createWorkOrderPath, factoryHomePath, linesPath, workOrdersPath } from "../lib/factoryPagePaths";
 import { useCreateWorkOrderDialogState } from "./useCreateWorkOrderDialogState";
 
 const ORGANIZATION_ID = "org-1";
@@ -15,10 +15,10 @@ function wrapper(path: string) {
   };
 }
 
-function useDialogState(canCreate: boolean) {
+function useDialogState(canCreate: boolean, firstLineId = "line-plan-and-implement") {
   const location = useLocation();
   const navigate = useNavigate();
-  const state = useCreateWorkOrderDialogState(ORGANIZATION_ID, FACTORY_KEY, canCreate);
+  const state = useCreateWorkOrderDialogState(ORGANIZATION_ID, FACTORY_KEY, canCreate, firstLineId);
   return { ...state, pathname: location.pathname, navigate };
 }
 
@@ -39,7 +39,7 @@ describe("useCreateWorkOrderDialogState", () => {
     expect(result.current.createWorkOrderOpen).toBe(true);
   });
 
-  it("replaces the deep link with the new work order path after create", () => {
+  it("replaces the deep link with the line board after create", () => {
     const { result } = renderHook(() => useDialogState(true), {
       wrapper: wrapper(createWorkOrderPath(ORGANIZATION_ID, FACTORY_KEY)),
     });
@@ -49,7 +49,7 @@ describe("useCreateWorkOrderDialogState", () => {
     });
 
     expect(result.current.createWorkOrderOpen).toBe(false);
-    expect(result.current.pathname).toBe(workOrderDetailPath(ORGANIZATION_ID, FACTORY_KEY, "101"));
+    expect(result.current.pathname).toBe(factoryHomePath(ORGANIZATION_ID, FACTORY_KEY, "line-plan-and-implement"));
   });
 
   it("does not open from New Work Order when create is not allowed", () => {

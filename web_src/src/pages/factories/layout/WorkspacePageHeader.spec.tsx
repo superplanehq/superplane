@@ -75,6 +75,12 @@ describe("WorkspacePageHeader (entity variant)", () => {
     expect(screen.getByTestId("workspace-page-header-subtitle")).toHaveTextContent("Ledger cleanup");
   });
 
+  it("omits the back link when backHref is not provided", () => {
+    renderHeader(<WorkspacePageHeader variant="entity" title="Refund line" />);
+    expect(screen.queryByTestId("workspace-page-header-back")).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent("Refund line");
+  });
+
   it("omits the kicker when none is provided", () => {
     renderHeader(<WorkspacePageHeader variant="entity" title="Refund line" backHref="/lines" backLabel="Lines" />);
     expect(screen.queryByTestId("workspace-page-header-kicker")).not.toBeInTheDocument();

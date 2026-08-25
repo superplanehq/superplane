@@ -8,13 +8,18 @@ import { factorySettingsPath } from "../lib/factoryPagePaths";
 import { FactoriesHarness } from "./FactoriesHarness";
 import { REFUND_IMPLEMENTER_APP, refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
 import {
+  ACME_ONBOARDING_FACTORY_ID,
+  ACME_ONBOARDING_FACTORY_KEY,
+  ACME_ONBOARDING_LINE_ID,
   FACTORIES_ORGANIZATION_ID,
+  GITHUB_ISSUES_INTAKE_ID,
   LINE_RUN_IMPLEMENT_FAILED_ID,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
   defaultFactoriesFixture,
 } from "./factoryPageResponses";
+import { lineMetricsFactoriesFixture } from "./lineMetricsFactoriesFixture";
 import { CONNECTED_SETUP_INTEGRATIONS, SETUP_ANSWERS, factoriesFixtureWithSetupAnswers } from "./setupStoryFixtures";
 
 describe("FactoriesHarness work orders", () => {
@@ -49,7 +54,7 @@ describe("FactoriesHarness work orders", () => {
     expect(body.canvas?.metadata?.factoryId).toBe(PRIMARY_FACTORY_ID);
   }, 10000);
 
-  it("shows Edit on the factory canvas view page", async () => {
+  it("sends a canvas run view to the split-run page with Edit", async () => {
     const implementerAppId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
     const lineId = REFUND_FACTORY_LINES[0]?.id ?? "line-plan-and-implement";
 
@@ -61,8 +66,9 @@ describe("FactoriesHarness work orders", () => {
       />,
     );
 
-    expect(await screen.findByTestId("factory-app-canvas-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByTestId("factory-app-split-run-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(await screen.findByTestId("factory-app-edit", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("factory-app-canvas-page")).not.toBeInTheDocument();
     expect(screen.queryByTestId("factory-app-workspace-toggles")).not.toBeInTheDocument();
   }, 15000);
 
@@ -202,7 +208,7 @@ describe("FactoriesHarness workspace setup", () => {
     );
 
     expect(await screen.findByTestId("workspace-setup", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.getByTestId("workspace-setup-cancel")).toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-setup-cancel")).not.toBeInTheDocument();
     expect(screen.queryByTestId("factories-sidebar")).not.toBeInTheDocument();
   }, 10000);
 
@@ -217,7 +223,8 @@ describe("FactoriesHarness workspace setup", () => {
       />,
     );
 
-    await user.click(await screen.findByRole("button", { name: /acme-github/ }, { timeout: 8000 }));
+    await user.click(await screen.findByTestId("first-run-get-started", {}, { timeout: 8000 }));
+    await user.click(await screen.findByTestId("first-run-github-continue", {}, { timeout: 8000 }));
 
     expect(await screen.findByRole("option", { name: /acme\/api/ }, { timeout: 8000 })).toBeInTheDocument();
   }, 15000);
@@ -235,6 +242,23 @@ describe("FactoriesHarness workspace setup", () => {
     expect(await screen.findByRole("option", { name: /acme\/api/ }, { timeout: 8000 })).toBeInTheDocument();
   }, 15000);
 
+  it("opens setup after Create new workspace", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/overview`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    await user.click(await screen.findByTestId("factories-workspace-switch", {}, { timeout: 8000 }));
+    await user.click(screen.getByTestId("factories-workspace-create"));
+
+    expect(await screen.findByTestId("workspace-setup", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByText("The workspace was created without a key")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factories-sidebar")).not.toBeInTheDocument();
+  }, 15000);
+
   it("opens the step from the URL with the saved answers restored", async () => {
     render(
       <FactoriesHarness
@@ -245,8 +269,70 @@ describe("FactoriesHarness workspace setup", () => {
       />,
     );
 
+    expect(await screen.findByTestId("first-run-tickets", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /GitHub Issues/ }, { timeout: 8000 })).toBeInTheDocument();
+  }, 15000);
+});
+
+describe("FactoriesHarness Acme onboarding", () => {
+  beforeAll(() => {
+    client.setConfig({ baseUrl: "http://localhost" });
+  });
+
+  it("opens Acme onboarding from the switcher with an empty line board", async () => {
+    const user = userEvent.setup();
+    const planLineId = REFUND_FACTORY_LINES[0]?.id;
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${planLineId}`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    await user.click(await screen.findByTestId("factories-workspace-switch", {}, { timeout: 8000 }));
+    await user.click(screen.getByTestId(`factories-workspace-option-${ACME_ONBOARDING_FACTORY_ID}`));
+
     expect(
-      await screen.findByRole("button", { name: /Change backlog repository/ }, { timeout: 8000 }),
+      await screen.findByRole("button", { name: /Switch workspace, Acme onboarding/ }, { timeout: 8000 }),
     ).toBeInTheDocument();
+    expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.getByTestId("lines-column-title-backlog")).toHaveTextContent("Backlog");
+    await waitFor(() => {
+      expect(screen.getByTestId("lines-column-title-phase-0")).toHaveTextContent("Plan");
+    });
+    expect(screen.getByTestId("lines-column-title-phase-1")).toHaveTextContent("Implement");
+    expect(screen.getByTestId("lines-column-title-phase-2")).toHaveTextContent("Verify");
+    expect(screen.getByTestId("lines-column-title-phase-3")).toHaveTextContent("Done");
+    expect(screen.getByTestId("backlog-onboarding-card")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-column")).not.toHaveTextContent("No work orders in the backlog.");
+    expect(screen.getByTestId("lines-phase-column-0")).toHaveTextContent("Nothing here.");
+    expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
+    expect(screen.getByTestId("lines-phase-column-2")).toHaveTextContent("Nothing here.");
+    expect(screen.getByTestId("lines-phase-column-3")).toHaveTextContent("Nothing here.");
+    expect(screen.queryAllByTestId(/^work-order-card-/)).toHaveLength(0);
+  }, 15000);
+
+  it("opens the populated Semaphore line board from the first-run Acme board", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`}
+        factoriesFixture={lineMetricsFactoriesFixture}
+        enableOnboarding={false}
+      />,
+    );
+
+    await user.click(await screen.findByTestId("factories-workspace-switch", {}, { timeout: 8000 }));
+    await user.click(screen.getByTestId(`factories-workspace-option-${PRIMARY_FACTORY_ID}`));
+
+    expect(
+      await screen.findByRole("button", { name: /Switch workspace, Semaphore/ }, { timeout: 8000 }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("factories-sidebar")).toBeInTheDocument();
+    expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-setup")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/^work-order-card-/).length).toBeGreaterThan(0);
+    });
   }, 15000);
 });

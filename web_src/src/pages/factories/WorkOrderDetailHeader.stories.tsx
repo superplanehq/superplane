@@ -42,7 +42,7 @@ const commonFlags = {
   isRejecting: false,
   isClosing: false,
   isUpdatingStatus: false,
-  backHref: "/org-1/workspaces/SP/work-orders",
+  backHref: "/org-1/workspaces/SP/lines/line-plan-and-implement",
   orderIdentifier: "SP-42",
 };
 

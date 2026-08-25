@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { SuperplaneUsersUser } from "@/api-client";
@@ -30,6 +30,14 @@ function renderPicker(overrides: Partial<Parameters<typeof WorkOrderAssigneePick
 
 function renderedNames() {
   return screen.getAllByRole("listitem").map((item) => item.textContent?.trim());
+}
+
+function checkboxFor(name: string) {
+  const item = screen.getAllByRole("listitem").find((el) => el.textContent?.includes(name));
+  if (!item) {
+    throw new Error(`Could not find list item for ${name}`);
+  }
+  return within(item).getByRole("checkbox");
 }
 
 describe("WorkOrderAssigneePicker", () => {
@@ -93,5 +101,22 @@ describe("WorkOrderAssigneePicker", () => {
       expect.stringContaining("Alice Anderson"),
       expect.stringContaining("Carol Clark"),
     ]);
+  });
+
+  it("clears the owner when the selected person is unchecked", () => {
+    const { onChange } = renderPicker({ selectedIds: ["alice"] });
+
+    fireEvent.click(checkboxFor("Alice Anderson"));
+
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it("replaces the current owner when another person is selected", () => {
+    const { onChange } = renderPicker({ selectedIds: ["alice"] });
+
+    fireEvent.click(checkboxFor("Bob Brown"));
+
+    expect(onChange).toHaveBeenCalledWith(["bob"]);
+    expect(onChange).not.toHaveBeenCalledWith(["alice", "bob"]);
   });
 });

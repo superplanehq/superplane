@@ -1,14 +1,4 @@
-import {
-  CircleCheck,
-  CircleX,
-  GitMerge,
-  GitPullRequestArrow,
-  Loader2,
-  MessageCircleQuestion,
-  Plus,
-  Timer,
-  UserPlus,
-} from "lucide-react";
+import { CircleCheck, CircleX, GitMerge, GitPullRequestArrow, Loader2, Plus, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 
@@ -19,12 +9,12 @@ import { cn } from "@/lib/utils";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
+import { createWorkOrderPath, factoryHomePath, factoryVelocityPath, workOrdersPath } from "../../lib/factoryPagePaths";
 import {
-  createWorkOrderPath,
-  factoryVelocityPath,
-  workOrderDetailPath,
-  workOrdersPath,
-} from "../../lib/factoryPagePaths";
+  WORK_ORDER_ATTENTION_CHIP_CLASSNAME,
+  WORK_ORDER_ATTENTION_ICON,
+  WORK_ORDER_ATTENTION_LABEL,
+} from "../../lib/workOrderAttention";
 import { factorySectionBodyClassName, factorySectionHeaderClassName } from "../factoryPageLayoutStyles";
 import { CardEmptyState, CardViewAllLink, OverviewCard } from "./overviewRedesignCardParts";
 import { HealthScorecards } from "./HealthScorecards";
@@ -170,9 +160,8 @@ const MAX_OVERVIEW_ROWS = 3;
 const MAX_SHIPPED_ROWS = 5;
 
 /** Detail route from a workspace-scoped key like "SP-61" (mock-only parsing). */
-function workOrderHref(organizationId: string, factoryKey: string, workOrderKey: string) {
-  const orderNumber = workOrderKey.split("-")[1] ?? "";
-  return workOrderDetailPath(organizationId, factoryKey, orderNumber);
+function workOrderHref(organizationId: string, factoryKey: string, _workOrderKey: string) {
+  return factoryHomePath(organizationId, factoryKey);
 }
 
 /**
@@ -196,28 +185,28 @@ const ATTENTION_META: Record<
   { label: string; actionLabel: string; icon: typeof CircleCheck; chipClassName: string }
 > = {
   approval: {
-    label: "Approval needed",
+    label: WORK_ORDER_ATTENTION_LABEL.approval,
     actionLabel: "Approve",
-    icon: CircleCheck,
-    chipClassName: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    icon: WORK_ORDER_ATTENTION_ICON.approval,
+    chipClassName: WORK_ORDER_ATTENTION_CHIP_CLASSNAME.approval,
   },
   question: {
-    label: "Agent question",
+    label: WORK_ORDER_ATTENTION_LABEL.question,
     actionLabel: "Answer",
-    icon: MessageCircleQuestion,
-    chipClassName: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400",
+    icon: WORK_ORDER_ATTENTION_ICON.question,
+    chipClassName: WORK_ORDER_ATTENTION_CHIP_CLASSNAME.question,
   },
   failed: {
-    label: "Run failed",
+    label: WORK_ORDER_ATTENTION_LABEL.failed,
     actionLabel: "Retry",
-    icon: CircleX,
-    chipClassName: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400",
+    icon: WORK_ORDER_ATTENTION_ICON.failed,
+    chipClassName: WORK_ORDER_ATTENTION_CHIP_CLASSNAME.failed,
   },
   stalled: {
-    label: "No progress",
+    label: WORK_ORDER_ATTENTION_LABEL.stalled,
     actionLabel: "Open",
-    icon: Timer,
-    chipClassName: "border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-400",
+    icon: WORK_ORDER_ATTENTION_ICON.stalled,
+    chipClassName: WORK_ORDER_ATTENTION_CHIP_CLASSNAME.stalled,
   },
 };
 
