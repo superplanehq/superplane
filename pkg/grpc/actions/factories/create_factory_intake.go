@@ -71,13 +71,14 @@ func CreateFactoryIntake(
 		confidencePct = int(req.GetConfidencePct())
 	}
 
+	binding := resolveIntakeBinding(db, factory, source)
 	canvasID, err := createIntakeCanvas(ctx, deps, intakeCanvasRequest{
 		OrganizationID: orgID,
 		FactoryID:      factoryID,
 		Source:         source,
 		Name:           name,
 		ConfidencePct:  confidencePct,
-		Binding:        resolveIntakeBinding(db, factory, source),
+		Binding:        binding,
 	})
 	if err != nil {
 		return nil, err
@@ -89,6 +90,12 @@ func CreateFactoryIntake(
 		// linger as an unexplained factory app. Retire it.
 		discardIntakeCanvas(db, orgID, canvasID)
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+
+	// An intake works without a first batch, so a source that cannot be read
+	// now costs the head start and nothing more.
+	if err := seedIntake(ctx, deps, db, canvasID, source, binding); err != nil {
+		log.Warnf("factory %s: intake %s starts without a first batch: %v", factory.ID, intake.ID, err)
 	}
 
 	intake, err = factory.FindIntake(db, intake.ID)
