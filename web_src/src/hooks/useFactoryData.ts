@@ -15,6 +15,7 @@ import {
   factoriesListWorkOrders,
   factoriesUpdateFactory,
   factoriesUpdateFactoryLine,
+  factoriesUpdateWorkOrder,
   factoriesUpdateWorkOrderAssignees,
   factoriesUpdateWorkOrderStatus,
 } from "@/api-client";
@@ -283,6 +284,41 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
           queryKey: workOrderEventsKey(organizationId, factoryId, order.id),
         });
       }
+    },
+  });
+}
+
+export function useUpdateWorkOrder(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { orderId: string; title?: string; description?: string }) => {
+      const response = await factoriesUpdateWorkOrder(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId: input.orderId },
+          body: {
+            title: input.title,
+            description: input.description,
+          },
+        }),
+      );
+      if (!response.data?.order) {
+        throw new Error("Failed to update work order");
+      }
+      return response.data.order;
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, variables.orderId),
+      });
     },
   });
 }

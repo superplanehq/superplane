@@ -15,5 +15,5 @@ export type FirstRunScoredTicket = {
   id: string;
   title: string;
   source: string;
-  confidencePct: number;
+  confidenceScore: number;
 };

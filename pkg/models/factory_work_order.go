@@ -222,6 +222,27 @@ func ResolveFactoryWorkOrderCreatorAutomations(
 	return result, nil
 }
 
+func (o *FactoryWorkOrder) UpdateContent(tx *gorm.DB, title *string, description *string) error {
+	if title == nil && description == nil {
+		return nil
+	}
+
+	updates := map[string]any{}
+	if title != nil {
+		o.Title = *title
+		updates["title"] = *title
+	}
+	if description != nil {
+		o.Description = *description
+		updates["description"] = *description
+	}
+
+	now := time.Now()
+	o.UpdatedAt = now
+	updates["updated_at"] = now
+	return tx.Model(o).Omit(clause.Associations).Updates(updates).Error
+}
+
 func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID, updatedBy uuid.UUID) error {
 	previousAssignees := o.AssigneeIDs()
 

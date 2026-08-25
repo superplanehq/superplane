@@ -89,7 +89,7 @@ export const AGENT_WORK_POPUP: PopupFixture = {
     },
     {
       id: "plan",
-      actor: "Plan",
+      actor: "Create plan",
       title: "Write investigation notes",
       duration: "1m 12s",
       state: "passed",
@@ -143,7 +143,7 @@ export const AGENT_WORK_POPUP_RUNNING: PopupFixture = {
     },
     {
       id: "plan",
-      actor: "Plan",
+      actor: "Create plan",
       title: "Write test plan",
       duration: "1m 48s",
       state: "passed",
@@ -211,7 +211,7 @@ export function buildPopupDispatchEvent(fixture: PopupFixture): WorkOrderTimelin
   };
 }
 
-const PHASE_NAMES = ["Plan", "Implement", "Verify", "Done"] as const;
+const PHASE_NAMES = ["Implement", "Verify", "Done"] as const;
 const PR_CLOSURE_APP_NAME = "PR Closure";
 
 export const PR_CLOSURE_PR_ARTIFACT: FactoriesWorkOrderArtifact = {
@@ -256,7 +256,7 @@ export function popupFixtureForWorkOrder(order?: FactoriesWorkOrder): PopupFixtu
   const displayStatus = getWorkOrderDisplayStatus(order);
   const executions = latestDispatchExecutions(order);
   const current = pickCurrentExecution(executions);
-  const inVerify = current?.stepIndex === 2;
+  const inVerify = (current?.step ?? "").toLowerCase().includes("verify");
   const base = displayStatus === "running" ? AGENT_WORK_POPUP_RUNNING : AGENT_WORK_POPUP;
 
   return {
@@ -317,9 +317,9 @@ function doneLogTitle(order: FactoriesWorkOrder, execution: FactoriesWorkOrderEx
 
 function executionToLogEntry(order: FactoriesWorkOrder, execution: FactoriesWorkOrderExecution): PopupLogEntry {
   const stepIndex = execution.stepIndex ?? 0;
-  const actor = PHASE_NAMES[stepIndex] ?? execution.step ?? "Step";
+  const actor = execution.step?.trim() || PHASE_NAMES[stepIndex] || "Step";
   const state = logStateForExecution(execution);
-  const isDone = stepIndex === 3;
+  const isDone = stepIndex === 2 || (execution.step ?? "").toLowerCase().includes("done");
   return {
     id: execution.id ?? actor,
     actor,

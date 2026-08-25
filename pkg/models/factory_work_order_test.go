@@ -37,6 +37,24 @@ func TestFactoryWorkOrder_CreateStartsAsDraft(t *testing.T) {
 	assert.Equal(t, FactoryWorkOrderStateDraft, payload.ToState)
 }
 
+func TestFactoryWorkOrder_UpdateContent(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "update-content")
+	tx := database.DB(t.Context())
+	order, err := factoryModel.CreateWorkOrder(tx, "Old title", "Old body", &userID, nil, nil)
+	require.NoError(t, err)
+
+	title := "New title"
+	description := "New body"
+	require.NoError(t, order.UpdateContent(tx, &title, &description))
+
+	refreshed, err := factoryModel.FindWorkOrder(tx, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "New title", refreshed.Title)
+	assert.Equal(t, "New body", refreshed.Description)
+}
+
 func TestResolveFactoryWorkOrderCreatorAutomations(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 

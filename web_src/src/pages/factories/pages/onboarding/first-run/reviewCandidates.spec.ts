@@ -4,10 +4,10 @@ import {
   confidenceBandClassName,
   confidenceBandForScore,
   implementationPlanMarkdown,
-  isReviewCandidateTab,
   githubIssueUrl,
   reviewCandidateForWorkOrderId,
   REVIEW_CANDIDATE_COPY,
+  BOARD_REVIEW_CANDIDATES,
   REVIEW_CANDIDATE_WORK_ORDERS,
   REVIEW_CANDIDATES,
 } from "./reviewCandidates";
@@ -18,7 +18,7 @@ describe("reviewCandidates", () => {
     expect(candidate?.ticketKey).toBe("PAY-842");
     expect(candidate?.ticketBody).toContain("Webhook delivery");
     expect(candidate?.reasons).toHaveLength(3);
-    expect(candidate?.confidencePct).toBe(95);
+    expect(candidate?.confidenceScore).toBe(5);
     expect(candidate?.sections.map((section) => section.title)).toEqual([
       "Requirements understood",
       "Acceptance criteria",
@@ -65,6 +65,14 @@ Move both images to Node 20.
 - CI builds both images and runs the existing image smoke tests.`);
   });
 
+  it("puts mixed confidence scores on the three board review tickets", () => {
+    expect(BOARD_REVIEW_CANDIDATES.map((candidate) => [candidate.ticketKey, candidate.confidenceScore])).toEqual([
+      ["PAY-842", 5],
+      ["PAY-844", 4],
+      ["PAY-845", 3],
+    ]);
+  });
+
   it("builds draft backlog work orders for each candidate", () => {
     expect(REVIEW_CANDIDATE_WORK_ORDERS).toHaveLength(REVIEW_CANDIDATES.length);
     expect(REVIEW_CANDIDATE_WORK_ORDERS[0]?.state).toBe("STATE_DRAFT");
@@ -73,18 +81,12 @@ Move both images to Node 20.
   });
 
   it("bands confidence scores", () => {
-    expect(confidenceBandForScore(95)).toBe("High");
-    expect(confidenceBandForScore(81)).toBe("Medium");
-    expect(confidenceBandForScore(68)).toBe("Low");
+    expect(confidenceBandForScore(5)).toBe("High");
+    expect(confidenceBandForScore(4)).toBe("High");
+    expect(confidenceBandForScore(3)).toBe("Medium");
+    expect(confidenceBandForScore(2)).toBe("Low");
     expect(confidenceBandClassName("High")).toMatch(/emerald/);
     expect(confidenceBandClassName("Medium")).toMatch(/orange/);
     expect(confidenceBandClassName("Low")).toMatch(/red/);
-  });
-
-  it("accepts only the three review tabs", () => {
-    expect(isReviewCandidateTab("plan")).toBe(true);
-    expect(isReviewCandidateTab("ticket")).toBe(true);
-    expect(isReviewCandidateTab("analysis")).toBe(true);
-    expect(isReviewCandidateTab("runs")).toBe(false);
   });
 });
