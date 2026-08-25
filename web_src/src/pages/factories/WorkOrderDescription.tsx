@@ -5,17 +5,27 @@ import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { ChevronDown } from "lucide-react";
 
+import {
+  FALLBACK_COLLAPSED_MAX_HEIGHT_PX,
+  collapsedDescriptionMaxHeight,
+  descriptionLeftoverCapacity,
+  descriptionNeedsCollapse,
+  descriptionPaneCapacity,
+  nearestScrollParent,
+  readScrollPaneMetrics,
+  reservedPaneSiblingHeight,
+} from "./workOrderDescriptionOverflow";
+
 interface WorkOrderDescriptionProps {
   description: string;
   className?: string;
 }
 
-const COLLAPSED_MAX_HEIGHT_PX = 220;
-
 export function WorkOrderDescription({ description, className }: WorkOrderDescriptionProps) {
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [needsToggle, setNeedsToggle] = useState(false);
+  const [collapsedMaxHeight, setCollapsedMaxHeight] = useState(FALLBACK_COLLAPSED_MAX_HEIGHT_PX);
 
   useLayoutEffect(() => {
     const content = contentRef.current;
@@ -24,12 +34,23 @@ export function WorkOrderDescription({ description, className }: WorkOrderDescri
     }
 
     const updateOverflow = () => {
-      setNeedsToggle(content.scrollHeight > COLLAPSED_MAX_HEIGHT_PX + 4);
+      const pane = nearestScrollParent(content);
+      const capacity = descriptionPaneCapacity(readScrollPaneMetrics(content));
+      const leftover = descriptionLeftoverCapacity(capacity, pane ? reservedPaneSiblingHeight(content, pane) : 0);
+      setNeedsToggle(descriptionNeedsCollapse(content.scrollHeight, leftover));
+      setCollapsedMaxHeight(collapsedDescriptionMaxHeight(leftover));
     };
     updateOverflow();
 
     const observer = new ResizeObserver(updateOverflow);
     observer.observe(content);
+    const pane = nearestScrollParent(content);
+    if (pane) {
+      observer.observe(pane);
+      for (const child of Array.from(pane.children)) {
+        observer.observe(child);
+      }
+    }
     return () => observer.disconnect();
   }, [description]);
 
@@ -44,9 +65,7 @@ export function WorkOrderDescription({ description, className }: WorkOrderDescri
       <div className="relative">
         <div
           ref={contentRef}
-          style={
-            !isExpanded && needsToggle ? { maxHeight: `${COLLAPSED_MAX_HEIGHT_PX}px`, overflow: "hidden" } : undefined
-          }
+          style={!isExpanded && needsToggle ? { maxHeight: `${collapsedMaxHeight}px`, overflow: "hidden" } : undefined}
         >
           <MarkdownContent content={description} variant="workspace" data-testid="work-order-description-markdown" />
         </div>

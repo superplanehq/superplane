@@ -49,6 +49,26 @@ describe("fixtureForSplitRunPage", () => {
   it("maps a loaded work order", () => {
     expect(fixtureForSplitRunPage(RUNNING_WORK_ORDER, [], null)?.title).toBe(RUNNING_WORK_ORDER.title);
   });
+
+  it("omits invented files and ledger pull requests on the live page", () => {
+    const fixture = fixtureForSplitRunPage(RUNNING_WORK_ORDER, [], null);
+    const names = (fixture?.phases ?? []).flatMap((phase) =>
+      phase.artifacts.map((artifact) => {
+        const data = artifact.data ?? {};
+        if (typeof data.name === "string") {
+          return data.name;
+        }
+        if (typeof data.number === "number") {
+          return `#${data.number}`;
+        }
+        return "";
+      }),
+    );
+
+    expect(names).not.toContain("plan.md");
+    expect(names).not.toContain("#503");
+    expect(names.some((name) => name.startsWith("feature/"))).toBe(false);
+  });
 });
 
 describe("phaseForSplitRunCanvas", () => {

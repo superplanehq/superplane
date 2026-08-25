@@ -148,7 +148,7 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(implement).toHaveTextContent("Writing the retry handler.");
     expect(implement).not.toHaveTextContent("Moved to Backlog");
 
-    expect(within(runs).getByTestId("intake-source-run-gh-issue-2")).toHaveTextContent("Plan");
+    expect(within(runs).getByTestId("intake-source-run-gh-issue-2")).toHaveTextContent("Verify");
     expect(within(runs).getByTestId("intake-source-run-gh-issue-3")).toHaveTextContent("In Backlog");
     expect(within(runs).getByTestId("intake-source-run-gh-issue-4")).toHaveTextContent("Rejected");
     expect(within(runs).getByTestId("intake-source-run-gh-issue-5")).toHaveTextContent("Waiting for review.");
