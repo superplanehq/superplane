@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { FactoriesFactory } from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryIntake } from "@/api-client";
 
-import { DEFAULT_LINE_NAME, provisionEventApps, provisionLine } from "./onboardingProvision";
+import {
+  DEFAULT_LINE_NAME,
+  GITHUB_INTAKE_SOURCE,
+  provisionEventApps,
+  provisionGithubIntake,
+  provisionLine,
+} from "./onboardingProvision";
 
 describe("provisionLine", () => {
   it("reuses a line that already has the planning entrypoint", async () => {
@@ -66,7 +72,7 @@ describe("provisionLine", () => {
 });
 
 describe("provisionEventApps", () => {
-  it("installs issue intake and PR closure for the workspace", async () => {
+  it("installs PR closure for the workspace", async () => {
     const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
       canvasId: `canvas-${factoryId}`,
       canvasName: factoryId,
@@ -80,10 +86,10 @@ describe("provisionEventApps", () => {
       installFactory,
     });
 
-    expect(installFactory).toHaveBeenNthCalledWith(
-      1,
+    expect(installFactory).toHaveBeenCalledTimes(1);
+    expect(installFactory).toHaveBeenCalledWith(
       expect.objectContaining({
-        factoryId: "issue-intake",
+        factoryId: "pr-closure",
         workspaceFactoryId: "factory-1",
         installParams: {
           appRepository: "acme/app",
@@ -91,12 +97,34 @@ describe("provisionEventApps", () => {
         },
       }),
     );
-    expect(installFactory).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        factoryId: "pr-closure",
-        workspaceFactoryId: "factory-1",
-      }),
-    );
+  });
+});
+
+describe("provisionGithubIntake", () => {
+  it("creates the GitHub intake for a workspace that has none", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([]);
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" } as FactoriesFactoryIntake);
+
+    await provisionGithubIntake({ listIntakes, createIntake });
+
+    expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
+  });
+
+  it("leaves an existing GitHub intake alone so a retry adds no second copy", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-1", source: GITHUB_INTAKE_SOURCE }]);
+    const createIntake = vi.fn();
+
+    await provisionGithubIntake({ listIntakes, createIntake });
+
+    expect(createIntake).not.toHaveBeenCalled();
+  });
+
+  it("creates the GitHub intake next to an intake of another source", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-1", source: "SOURCE_SENTRY_EXCEPTIONS" }]);
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-2" } as FactoriesFactoryIntake);
+
+    await provisionGithubIntake({ listIntakes, createIntake });
+
+    expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
   });
 });

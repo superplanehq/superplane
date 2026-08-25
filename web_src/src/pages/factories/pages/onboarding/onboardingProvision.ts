@@ -1,5 +1,7 @@
 import type {
   FactoriesFactory,
+  FactoriesFactoryIntake,
+  FactoriesFactoryIntakeSource,
   FactoriesFactoryLine,
   FactoriesUpdateFactoryOnboardingBody,
   FactoryLineStep,
@@ -9,6 +11,8 @@ import { ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS, type FactoryAgentRewrite }
 import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
 
 export const DEFAULT_LINE_NAME = "Software delivery";
+
+export const GITHUB_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_GITHUB_ISSUES";
 
 const PRIMARY_LINE_APP_ENTRYPOINT = ONBOARDING_LINE_APPS[0].entrypointNodeId;
 
@@ -110,6 +114,26 @@ export async function provisionEventApps(args: {
       installFactory: args.installFactory,
     });
   }
+}
+
+export type ListFactoryIntakes = () => Promise<FactoriesFactoryIntake[]>;
+
+export type CreateFactoryIntake = (input: { source: FactoriesFactoryIntakeSource }) => Promise<FactoriesFactoryIntake>;
+
+// The GitHub intake scores new issues and opens a work order for the ones it
+// trusts. The backend reads the connection and the backlog repository from the
+// saved onboarding config, so this runs after the wizard choices are stored. A
+// retried finish must not add a second copy.
+export async function provisionGithubIntake(args: {
+  listIntakes: ListFactoryIntakes;
+  createIntake: CreateFactoryIntake;
+}): Promise<void> {
+  const intakes = await args.listIntakes();
+  if (intakes.some((intake) => intake.source === GITHUB_INTAKE_SOURCE)) {
+    return;
+  }
+
+  await args.createIntake({ source: GITHUB_INTAKE_SOURCE });
 }
 
 export async function provisionLine(args: {

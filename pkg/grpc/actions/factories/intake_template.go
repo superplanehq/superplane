@@ -103,8 +103,9 @@ func intakeDefaultDescription(source string) string {
 
 // buildIntakeCanvas returns the canvas document for a new intake: listen on the
 // source, score the item with an agent, and create a work order when the score
-// clears the threshold.
-func buildIntakeCanvas(source, name string, confidencePct int) (*yaml.Canvas, error) {
+// clears the threshold. The binding tells the trigger which installation and
+// resource to listen on; without one the user completes the trigger by hand.
+func buildIntakeCanvas(source, name string, confidencePct int, binding *intakeBinding) (*yaml.Canvas, error) {
 	spec, ok := intakeSpecsBySource[source]
 	if !ok {
 		return nil, models.ErrFactoryIntakeSourceInvalid
@@ -133,7 +134,8 @@ func buildIntakeCanvas(source, name string, confidencePct int) (*yaml.Canvas, er
 					Name:          spec.triggerName,
 					Type:          yaml.NodeTypeTrigger,
 					Component:     spec.triggerComponent,
-					Configuration: spec.triggerConfiguration,
+					Configuration: intakeTriggerConfiguration(spec, binding),
+					Integration:   binding.integrationRef(),
 					Position:      yaml.Position{X: 160, Y: 80},
 				},
 				{
@@ -176,6 +178,21 @@ func buildIntakeCanvas(source, name string, confidencePct int) (*yaml.Canvas, er
 			},
 		},
 	}, nil
+}
+
+// intakeTriggerConfiguration lays the binding over the template so the trigger
+// listens on a concrete resource. The template map is shared between intakes,
+// so it is copied rather than written to.
+func intakeTriggerConfiguration(spec intakeSpec, binding *intakeBinding) map[string]any {
+	configuration := make(map[string]any, len(spec.triggerConfiguration)+len(binding.configuration()))
+	for name, value := range spec.triggerConfiguration {
+		configuration[name] = value
+	}
+	for name, value := range binding.configuration() {
+		configuration[name] = value
+	}
+
+	return configuration
 }
 
 func intakeAnalysisPrompt(subject string) string {
