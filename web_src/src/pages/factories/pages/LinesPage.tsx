@@ -445,14 +445,6 @@ function LineDetail({
   );
   const [peekOrderId, setPeekOrderId] = useState<string | null>(null);
   const peekOrder = workOrders.find((order) => order.id === peekOrderId);
-  const canvasEditHref = useMemo(
-    () => canvasEditHrefForLine(organizationId, factoryKey, line, apps),
-    [organizationId, factoryKey, line, apps],
-  );
-  const canvasExpandHref = useMemo(
-    () => canvasExpandHrefForLine(organizationId, factoryKey, line, apps, peekOrder),
-    [organizationId, factoryKey, line, apps, peekOrder],
-  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
@@ -483,8 +475,6 @@ function LineDetail({
           lineName={line.name}
           peekOrderId={peekOrderId}
           peekOrder={peekOrder}
-          canvasEditHref={canvasEditHref}
-          canvasExpandHref={canvasExpandHref}
           canDispatch={workOrderCardContext.canDispatch}
           canUpdate={workOrderCardContext.canAssign}
           isDispatching={workOrderCardContext.isDispatching}
@@ -504,8 +494,6 @@ function LineBoardSplitRunPopup({
   lineName,
   peekOrderId,
   peekOrder,
-  canvasEditHref,
-  canvasExpandHref,
   canDispatch,
   canUpdate,
   isDispatching,
@@ -519,8 +507,6 @@ function LineBoardSplitRunPopup({
   lineName: string | undefined;
   peekOrderId: string;
   peekOrder: FactoriesWorkOrder | undefined;
-  canvasEditHref: (key: SplitRunCanvasKey) => string | undefined;
-  canvasExpandHref: CanvasExpandHref;
   canDispatch: boolean;
   canUpdate: boolean;
   isDispatching: boolean;
@@ -538,8 +524,6 @@ function LineBoardSplitRunPopup({
       orderId={peekOrderId}
       orderNumber={peekOrder?.number}
       fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId, demoArtifacts: false })}
-      canvasEditHref={canvasEditHref}
-      canvasExpandHref={canvasExpandHref}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}
       isDispatching={isDispatching}
@@ -547,16 +531,6 @@ function LineBoardSplitRunPopup({
       onClose={onClose}
       fixed
     />
-  );
-}
-
-function firstCanvasAppId(appIdByCanvas: Record<SplitRunCanvasKey, string | undefined>): string | undefined {
-  return (
-    appIdByCanvas.planning ??
-    appIdByCanvas.implementation ??
-    appIdByCanvas.risk ??
-    appIdByCanvas.closure ??
-    appIdByCanvas.intake
   );
 }
 
@@ -594,23 +568,6 @@ function canvasAppIdsForLine(
 
 function appIdNamed(apps: Array<{ id?: string; name?: string }>, name: string): string | undefined {
   return apps.find((app) => app.id && app.name === name)?.id;
-}
-
-function canvasEditHrefForLine(
-  organizationId: string,
-  factoryKey: string,
-  line: FactoriesFactoryLine,
-  apps: Array<{ id?: string; name?: string }>,
-): (key: SplitRunCanvasKey) => string | undefined {
-  const appIdByCanvas = canvasAppIdsForLine(line, apps);
-
-  return (key) => {
-    const appId = appIdByCanvas[key] ?? firstCanvasAppId(appIdByCanvas) ?? apps.find((app) => app.id)?.id;
-    if (!appId) {
-      return undefined;
-    }
-    return factoryAppConfigurePath(organizationId, factoryKey, appId, { from: "lines", lineId: line.id });
-  };
 }
 
 export type CanvasExpandHref = (
