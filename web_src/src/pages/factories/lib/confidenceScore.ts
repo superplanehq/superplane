@@ -29,3 +29,27 @@ export function confidenceCheckLevel(score: number): WorkOrderCheckLevel {
   }
   return "caution";
 }
+
+/** One-line result: how suitable the source issue is for an agent on this line. */
+export function confidenceSuitabilitySummary(band: ConfidenceBand): string {
+  if (band === "High") {
+    return "This issue is a good fit for an agent on this factory line.";
+  }
+  if (band === "Medium") {
+    return "This issue is a mixed fit for an agent on this factory line.";
+  }
+  return "This issue is a poor fit for an agent on this factory line.";
+}
+
+/** Analysis: SuperPlane read the source issue and scored agent suitability. */
+export function confidenceSuitabilityAnalysis(params: { source?: string; reasons?: readonly string[] }): string {
+  const source = params.source?.trim();
+  const intro = source
+    ? `The automation read this ${source} issue. It scored how suitable the work is for an agent on this factory line.`
+    : "The automation read this issue. It scored how suitable the work is for an agent on this factory line.";
+  const reasons = params.reasons ?? [];
+  if (reasons.length === 0) {
+    return intro;
+  }
+  return [intro, "", "### Why this score", ...reasons.map((reason) => `- ${reason}`)].join("\n");
+}

@@ -1,5 +1,6 @@
 import type { FactoriesWorkOrderCheck } from "@/api-client";
 
+import { confidenceSuitabilityAnalysis, confidenceSuitabilitySummary } from "../lib/confidenceScore";
 import {
   CLOSED_WORK_ORDER,
   OPEN_WORK_ORDER,
@@ -52,9 +53,14 @@ const TEST_COVERAGE_ANALYSIS = `### New code in this work order
 
 Uncovered lines are concentrated in error handling, which is also where the risk review raised concerns. Prioritize \`RetryPolicy\` tests before merging.`;
 
-const CONFIDENCE_ANALYSIS = `The agent completed all planned steps without human correction. Static checks, unit tests, and the E2E refund suite passed on the first run.
-
-Confidence is not higher because the change modifies retry behavior that only manifests under provider degradation, which no automated test simulates.`;
+const CONFIDENCE_ANALYSIS = confidenceSuitabilityAnalysis({
+  source: "GitHub",
+  reasons: [
+    "The GitHub issue names a testable retry policy for the refund dispatcher.",
+    "The dispatcher and the provider client are mapped in the repository.",
+    "The score is not 5 because no test simulates provider degradation.",
+  ],
+});
 
 const CI_PASSED_ANALYSIS = `### Pipeline
 
@@ -121,11 +127,11 @@ export const OPEN_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
     id: "check-confidence",
     key: "confidence",
     name: "Confidence score",
-    score: 8,
-    maxScore: 10,
+    score: 4,
+    maxScore: 5,
     level: "LEVEL_POSITIVE",
-    previousScore: 7,
-    summary: "All planned steps completed without human correction; every automated suite passed first try.",
+    previousScore: 3,
+    summary: confidenceSuitabilitySummary("High"),
     analysis: CONFIDENCE_ANALYSIS,
     automation: { appId: "app-line-confidence", appName: "Line Confidence" },
     runId: "run-confidence-101",
@@ -178,13 +184,19 @@ export const RUNNING_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
     id: "check-confidence-running",
     key: "confidence",
     name: "Confidence score",
-    score: 6,
-    maxScore: 10,
-    level: "LEVEL_CAUTION",
-    previousScore: 8,
-    summary: "The agent needed one human correction during planning; verification has not run yet.",
-    analysis:
-      "The plan step was corrected once: the agent initially targeted the wrong ledger table. Implementation followed the corrected plan without further intervention.\n\nVerification is still in progress, so this score may change.",
+    score: 3,
+    maxScore: 5,
+    level: "LEVEL_NEUTRAL",
+    previousScore: 4,
+    summary: confidenceSuitabilitySummary("Medium"),
+    analysis: confidenceSuitabilityAnalysis({
+      source: "GitHub",
+      reasons: [
+        "The GitHub issue names the refund retry, but the target ledger table is still unclear.",
+        "The refund post path is mapped. The agent needed one correction during planning.",
+        "Verification has not run yet, so this score can still change.",
+      ],
+    }),
     automation: { appId: "app-line-confidence", appName: "Line Confidence" },
     runId: "run-confidence-102",
     updatedAt: minutesAgo(11),

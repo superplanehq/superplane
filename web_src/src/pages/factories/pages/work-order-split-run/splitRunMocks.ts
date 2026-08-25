@@ -21,7 +21,13 @@ import {
 } from "./splitRunWorkOrderDisplay";
 
 import { VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
-import { CONFIDENCE_SCORE_MAX } from "../../lib/confidenceScore";
+import {
+  CONFIDENCE_CHECK_NAME,
+  CONFIDENCE_SCORE_MAX,
+  confidenceBandForScore,
+  confidenceSuitabilityAnalysis,
+  confidenceSuitabilitySummary,
+} from "../../lib/confidenceScore";
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
@@ -295,11 +301,13 @@ function reviewSurfaces(
 }
 
 function overviewChecks(phases: SplitRunPhase[], apiChecks?: FactoriesWorkOrderCheck[]): WorkOrderCheckPresentation[] {
+  const intake = phases.find((phase) => phase.id === "score")?.checks ?? [];
   const presented = presentWorkOrderChecks(apiChecks ?? []);
-  if (presented.length > 0) {
-    return presented;
+  if (presented.length === 0) {
+    return phases.flatMap((phase) => phase.checks ?? []);
   }
-  return phases.flatMap((phase) => phase.checks ?? []);
+  const later = intake.length > 0 ? presented.filter((check) => check.name !== CONFIDENCE_CHECK_NAME) : presented;
+  return [...intake, ...later];
 }
 
 function surfaces(
@@ -376,18 +384,45 @@ function analysisTicketForOrder(order: FactoriesWorkOrder): LineIntakeAnalyzingT
       planMarkdown: candidate.planMarkdown,
       confidenceScore: candidate.confidenceScore,
       confidenceSummary: candidate.summary,
-      confidenceAnalysis: candidate.reasons.map((reason) => `- ${reason}`).join("\n"),
+      confidenceAnalysis: confidenceSuitabilityAnalysis({
+        source: "GitHub",
+        reasons: candidate.reasons,
+      }),
     };
   }
+  const confidenceScore = exampleConfidenceScore(order);
   return {
     id: order.id ?? "work-order",
     title: order.title ?? "Work order",
     detailsMarkdown: order.description,
     issueKey: order.key,
     planMarkdown: fallbackPlanMarkdown(order),
-    confidenceScore: exampleConfidenceScore(order),
-    confidenceSummary: order.title,
+    confidenceScore,
+    confidenceSummary: confidenceSuitabilitySummary(confidenceBandForScore(confidenceScore)),
+    confidenceAnalysis: confidenceSuitabilityAnalysis({ source: issueSourceForOrder(order) }),
   };
+}
+
+function issueSourceForOrder(order: FactoriesWorkOrder): string | undefined {
+  const automation = order.createdBy?.automation;
+  if (!automation) {
+    return undefined;
+  }
+  const key = canvasKeyForAutomation({ id: automation.appId, name: automation.appName });
+  if (key === "intake") {
+    return "GitHub";
+  }
+  if (key === "sentry") {
+    return "Sentry";
+  }
+  if (key === "slack") {
+    return "Slack";
+  }
+  const name = automation.appName?.trim();
+  if (name && /pagerduty/i.test(name)) {
+    return "PagerDuty";
+  }
+  return name || undefined;
 }
 
 function fallbackPlanMarkdown(order: FactoriesWorkOrder): string {

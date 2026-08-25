@@ -1,13 +1,16 @@
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
-import { MarkdownContent } from "@/pages/app/Markdown";
 
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
+import { SidebarSectionHeading } from "../../sidebar/SidebarPrimitives";
 import { WorkOrderArtifactsList } from "../../WorkOrderArtifactsList";
-import { WorkOrderCheckCard } from "../../WorkOrderChecksSection";
+import { WorkOrderCheckComment } from "../../WorkOrderCheckComment";
+import { splitRunLinkedArtifacts } from "./splitRunPopupModel";
+import { WorkOrderSplitRunDescription } from "./WorkOrderSplitRunDescription";
 
 /**
- * Description tab: markdown on the left, checks and artifacts on the right.
+ * Description tab: reading column on the left, Source and Artifacts on the
+ * right — the same sidebar model as the work-order page.
  */
 export function WorkOrderSplitRunOverview({
   description,
@@ -16,6 +19,8 @@ export function WorkOrderSplitRunOverview({
   organizationId,
   factoryKey,
   orderNumber,
+  expandFirstCheck = false,
+  canEditDescription = false,
 }: {
   description: string;
   artifacts: FactoriesWorkOrderArtifact[];
@@ -23,44 +28,46 @@ export function WorkOrderSplitRunOverview({
   organizationId?: string;
   factoryKey?: string;
   orderNumber?: string;
+  expandFirstCheck?: boolean;
+  canEditDescription?: boolean;
 }) {
   return (
     <div
-      className="grid min-h-0 flex-1 grid-cols-[minmax(0,3fr)_minmax(16rem,2fr)]"
+      className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)] gap-x-[var(--workspace-column-gap)]"
       data-testid="split-run-work-order-tab"
     >
-      <section className="min-h-0 overflow-y-auto px-5 py-4" aria-label="Description">
-        {description.trim() ? (
-          <MarkdownContent content={description} variant="workspace" data-testid="split-run-description" />
-        ) : (
-          <p className="text-[13px] text-muted-foreground">No description yet.</p>
-        )}
-      </section>
+      <div className="min-h-0 overflow-y-auto px-8 py-6">
+        <WorkOrderSplitRunDescription description={description} canEdit={canEditDescription} />
 
-      <aside
-        className="min-h-0 overflow-y-auto border-l border-border px-5 py-4"
-        data-testid="split-run-overview-sidebar"
-      >
         {checks.length > 0 ? (
-          <section className="mb-8" data-testid="split-run-overview-checks">
+          <section className="mt-10" data-testid="split-run-overview-checks" aria-label="Checks">
             <h3 className="workspace-section-label">Checks</h3>
-            <ul className="mt-3 flex flex-col gap-3">
-              {checks.map((check) => (
-                <li key={check.id}>
-                  <WorkOrderCheckCard
-                    check={check}
-                    runHref={
-                      organizationId && factoryKey
-                        ? getWorkOrderRunHref(organizationId, factoryKey, check.appId, check.runId, { orderNumber })
-                        : null
-                    }
-                  />
-                </li>
+            <div className="mt-1">
+              {checks.map((check, index) => (
+                <WorkOrderCheckComment
+                  key={check.id}
+                  check={check}
+                  defaultOpen={expandFirstCheck && index === 0}
+                  runHref={
+                    organizationId && factoryKey
+                      ? getWorkOrderRunHref(organizationId, factoryKey, check.appId, check.runId, { orderNumber })
+                      : null
+                  }
+                />
               ))}
-            </ul>
+            </div>
           </section>
         ) : null}
-        <WorkOrderArtifactsList artifacts={artifacts} isLoading={false} />
+      </div>
+
+      <aside className="min-h-0 overflow-y-auto py-6 pr-6" data-testid="split-run-overview-sidebar">
+        <div className="flex flex-col gap-6">
+          <section aria-label="Source">
+            <SidebarSectionHeading>Source</SidebarSectionHeading>
+            <p className="mt-2 text-[13px] text-muted-foreground">No source yet.</p>
+          </section>
+          <WorkOrderArtifactsList artifacts={splitRunLinkedArtifacts(artifacts)} isLoading={false} />
+        </div>
       </aside>
     </div>
   );

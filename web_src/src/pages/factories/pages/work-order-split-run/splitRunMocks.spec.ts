@@ -20,7 +20,11 @@ import {
   LINE_BOARD_VERIFY_ENUM_ORDER,
   LINE_BOARD_VERIFY_PR_REVIEW_ORDER,
 } from "../../__fixtures__/lineMetricsFactoriesFixture";
-import { OPEN_WORK_ORDER_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
+import {
+  OPEN_WORK_ORDER_CHECKS,
+  RUNNING_WORK_ORDER_CHECKS,
+  VERIFY_STEP_CHECKS,
+} from "../../__fixtures__/workOrderCheckFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { splitRunFixtureForWorkOrder, splitRunStatusLabel } from "./splitRunMocks";
 
@@ -119,7 +123,14 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.phases.find((phase) => phase.id === "score")?.checks?.[0]).toMatchObject({
       name: "Confidence score",
       score: 5,
+      summary: "This issue is a good fit for an agent on this factory line.",
     });
+    expect(fixture.checks[0]).toMatchObject({
+      name: "Confidence score",
+      summary: "This issue is a good fit for an agent on this factory line.",
+    });
+    expect(fixture.checks[0]?.analysis).toContain("The automation read this GitHub issue.");
+    expect(fixture.checks[0]?.analysis).toContain("how suitable the work is for an agent");
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
   });
 
@@ -131,7 +142,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(note?.text).toContain("[PAY-842](https://github.com/acme/payments-service/issues/842)");
     expect(note?.text).toContain("**plan.md**");
     expect(note?.text).toContain("Confidence 5/5 (High):");
-    expect(note?.text).toContain("- Acceptance criteria name the retryable status codes and the attempt limit.");
+    expect(note?.text).toContain("- The GitHub issue names retryable status codes and a hard attempt limit.");
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Start", "Reject"]);
   });
 
@@ -509,6 +520,20 @@ describe("line board work-order examples", () => {
       "Risk score",
       "Code quality",
     ]);
+  });
+
+  it("keeps the ingest confidence check when later steps report their own checks", () => {
+    const verify = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_ENUM_ORDER, { checks: VERIFY_STEP_CHECKS });
+    const done = splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER, { checks: VERIFY_STEP_CHECKS });
+    const failed = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER, { checks: VERIFY_STEP_CHECKS });
+    const running = splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER, { checks: RUNNING_WORK_ORDER_CHECKS });
+
+    expect(verify.checks.map((check) => check.name)).toEqual(["Confidence score", "Risk score", "Code quality"]);
+    expect(done.checks.map((check) => check.name)).toEqual(["Confidence score", "Risk score", "Code quality"]);
+    expect(failed.checks.map((check) => check.name)).toEqual(["Confidence score", "Risk score", "Code quality"]);
+    expect(running.checks.map((check) => check.name)).toEqual(["Confidence score", "Risk score", "CI"]);
+    expect(verify.checks[0]?.summary).toContain("fit for an agent");
+    expect(running.checks.filter((check) => check.name === "Confidence score")).toHaveLength(1);
   });
 
   it("keeps PR #6812 on implement for the waiting verify card", () => {

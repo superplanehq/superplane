@@ -133,8 +133,8 @@ describe("lineIntakeModel", () => {
         id: "gh-issue-1",
         title: "Handle duplicate refunds on retry",
         confidenceScore: 5,
-        confidenceSummary: "Analysis complete. The ticket is ready to implement.",
-        confidenceAnalysis: "Acceptance criteria name the retryable status codes.",
+        confidenceSummary: "This issue is a good fit for an agent on this factory line.",
+        confidenceAnalysis: "The GitHub issue names the retryable status codes.",
       },
       { complete: true },
     );
@@ -146,8 +146,8 @@ describe("lineIntakeModel", () => {
       maxScore: 5,
       format: "fraction",
       level: "positive",
-      summary: "Analysis complete. The ticket is ready to implement.",
-      analysis: "Acceptance criteria name the retryable status codes.",
+      summary: "This issue is a good fit for an agent on this factory line.",
+      analysis: "The GitHub issue names the retryable status codes.",
       sourceName: "Score",
     };
     expect(fixture.checks).toEqual([check]);

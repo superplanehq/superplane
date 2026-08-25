@@ -1,18 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
+import { LINE_BOARD_DONE_RECEIPTS_ORDER } from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import {
   collectSplitRunArtifacts,
   defaultSplitRunPopupTab,
   splitRunDescriptionMarkdown,
+  splitRunLinkedArtifacts,
   splitRunLogTabDotClass,
 } from "./splitRunPopupModel";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 describe("splitRunPopupModel", () => {
-  it("opens the description tab for drafts and the log for later states", () => {
+  it("opens the description tab for drafts and done cards, and the log for later states", () => {
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER))).toBe("description");
+    expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER))).toBe("description");
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER))).toBe("log");
   });
 
@@ -31,5 +34,7 @@ describe("splitRunPopupModel", () => {
 
     expect(description).toContain("Webhook delivery stops after a transient provider error");
     expect(artifacts.some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
+    expect(splitRunLinkedArtifacts(artifacts).some((artifact) => artifact.id?.endsWith("-details"))).toBe(false);
+    expect(splitRunLinkedArtifacts(artifacts).some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
   });
 });

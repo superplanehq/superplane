@@ -11,20 +11,24 @@ const COMPARE_CLIENT = new QueryClient({
 });
 
 /**
- * Storybook preview of the working two-column work-order tab.
- * Description on the left. Checks and artifacts on the right. No footer.
+ * Storybook preview of the Description tab.
+ * Description and checks on the left. Source and artifacts on the right.
  */
 export function WorkOrderPopupTabsCompare() {
-  const fixture = {
-    ...splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
-    checks: presentWorkOrderChecks(
-      OPEN_WORK_ORDER_CHECKS.filter((check) => check.key === "risk-review" || check.key === "code-coverage"),
-    ),
+  const fixture = splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]);
+  const compareFixture = {
+    ...fixture,
+    checks: [
+      ...fixture.checks,
+      ...presentWorkOrderChecks(
+        OPEN_WORK_ORDER_CHECKS.filter((check) => check.key === "risk-review" || check.key === "code-coverage"),
+      ),
+    ],
   };
 
   return (
     <QueryClientProvider client={COMPARE_CLIENT}>
-      <WorkOrderSplitRunPopup fixture={fixture} />
+      <WorkOrderSplitRunPopup fixture={compareFixture} />
     </QueryClientProvider>
   );
 }

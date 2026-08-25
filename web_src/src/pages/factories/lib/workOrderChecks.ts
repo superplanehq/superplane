@@ -1,5 +1,7 @@
 import type { FactoriesWorkOrderCheck, WorkOrderCheckLevel as ApiWorkOrderCheckLevel } from "@/api-client";
 
+import { CONFIDENCE_CHECK_NAME, confidenceBandForScore, type ConfidenceBand } from "./confidenceScore";
+
 /** How strongly the reported score should alarm (or reassure) the reader.
  * The emitting automation decides — the UI cannot know whether a high
  * number is good (coverage) or bad (risk). */
@@ -59,6 +61,32 @@ export const LEVEL_LABEL: Record<WorkOrderCheckLevel, { label: string; className
     badgeClassName: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400",
   },
 };
+
+const CONFIDENCE_BAND_LABEL: Record<ConfidenceBand, (typeof LEVEL_LABEL)[WorkOrderCheckLevel]> = {
+  High: {
+    label: "High",
+    className: "text-emerald-700 dark:text-emerald-400",
+    badgeClassName: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  },
+  Medium: {
+    label: "Medium",
+    className: "text-orange-700 dark:text-orange-400",
+    badgeClassName: "border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-400",
+  },
+  Low: {
+    label: "Low",
+    className: "text-red-700 dark:text-red-400",
+    badgeClassName: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400",
+  },
+};
+
+/** Confidence uses High / Medium / Low. Other checks use Healthy / Needs attention. */
+export function workOrderCheckStatus(check: Pick<WorkOrderCheckPresentation, "name" | "score" | "level">) {
+  if (check.name === CONFIDENCE_CHECK_NAME) {
+    return CONFIDENCE_BAND_LABEL[confidenceBandForScore(check.score)];
+  }
+  return LEVEL_LABEL[check.level];
+}
 
 /** Verdict text for a boolean (pass/fail) check score. */
 export function booleanCheckVerdict(score: number): "Pass" | "Fail" {

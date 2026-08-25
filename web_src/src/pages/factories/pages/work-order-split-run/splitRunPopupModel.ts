@@ -16,7 +16,7 @@ const LOG_TAB_DOT: Record<SplitRunPhaseStatus, string> = {
 };
 
 export function defaultSplitRunPopupTab(fixture: SplitRunFixture): SplitRunPopupTab {
-  return fixture.footer.kind === "draft" ? "description" : "log";
+  return fixture.footer.kind === "draft" || fixture.footer.kind === "done" ? "description" : "log";
 }
 
 export function splitRunLogTabDotClass(status: SplitRunPhaseStatus): string {
@@ -48,6 +48,11 @@ export function splitRunDescriptionMarkdown(artifacts: FactoriesWorkOrderArtifac
     }
   }
   return "";
+}
+
+/** Files and links that are not already the description body. */
+export function splitRunLinkedArtifacts(artifacts: FactoriesWorkOrderArtifact[]): FactoriesWorkOrderArtifact[] {
+  return artifacts.filter((artifact) => !DESCRIPTION_NAMES.includes(artifactName(artifact)));
 }
 
 function artifactName(artifact: FactoriesWorkOrderArtifact): string {

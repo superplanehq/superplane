@@ -14,8 +14,11 @@ import {
   INGEST_DRAFT_WORK_ORDER,
   OPEN_WORK_ORDER,
 } from "../../__fixtures__/factoryPageResponses";
-import { LINE_BOARD_DONE_RECEIPTS_ORDER } from "../../__fixtures__/lineMetricsFactoriesFixture";
-import { OPEN_WORK_ORDER_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
+import {
+  LINE_BOARD_DONE_RECEIPTS_ORDER,
+  LINE_BOARD_VERIFY_ENUM_ORDER,
+} from "../../__fixtures__/lineMetricsFactoriesFixture";
+import { OPEN_WORK_ORDER_CHECKS, VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { buildSplitRunFooter } from "./splitRunFooter";
@@ -376,7 +379,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
   });
 
-  it("puts description on the left and checks plus artifacts on the right", () => {
+  it("puts artifacts on the right and check analyses under the description", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
     });
@@ -385,12 +388,103 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(tab).getByTestId("split-run-description")).toHaveTextContent(
       "Webhook delivery stops after a transient provider error",
     );
+    expect(within(tab).getByRole("button", { name: "Edit" })).toBeInTheDocument();
     const sidebar = within(tab).getByTestId("split-run-overview-sidebar");
-    expect(within(sidebar).getByTestId("split-run-overview-checks")).toBeInTheDocument();
-    expect(within(sidebar).getByText("plan.md")).toBeInTheDocument();
+    expect(within(sidebar).getByRole("heading", { name: "Source" })).toBeInTheDocument();
     expect(within(sidebar).getByRole("heading", { name: "Artifacts" })).toBeInTheDocument();
+    expect(within(sidebar).getByText("plan.md")).toBeInTheDocument();
+    expect(within(sidebar).getByText("PAY-842")).toBeInTheDocument();
+    expect(within(sidebar).queryByText("details.md")).not.toBeInTheDocument();
+    expect(within(tab).getByTestId("split-run-overview-checks")).toBeInTheDocument();
+    expect(within(tab).getByTestId("split-run-check-comment-wo-review-pay-842-confidence")).toHaveAttribute("open");
+    expect(within(tab).getByTestId("split-run-check-comment-check-risk-review")).not.toHaveAttribute("open");
+    expect(within(tab).getByTestId("split-run-check-comment-check-code-coverage")).not.toHaveAttribute("open");
+    expect(within(tab).getByText(/Moderate risk: retry policy/)).toBeInTheDocument();
+    expect(within(tab).getByText(/The change replaces the retry policy/)).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
+  });
+
+  it("scores a review draft by how suitable the GitHub issue is for an agent", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]) });
+
+    const tab = screen.getByTestId("split-run-work-order-tab");
+    const check = within(tab).getByTestId("split-run-check-comment-wo-review-pay-842-confidence");
+    expect(check).toHaveAttribute("open");
+    expect(within(check).getByText("Confidence score")).toBeInTheDocument();
+    expect(within(check).getByText("High")).toBeInTheDocument();
+    expect(within(check).getByText("This issue is a good fit for an agent on this factory line.")).toBeInTheDocument();
+    expect(within(check).getByText(/The automation read this GitHub issue/)).toBeInTheDocument();
+    expect(within(check).getByText(/how suitable the work is for an agent/)).toBeInTheDocument();
+    expect(within(check).getByText(/retryable status codes and a hard attempt limit/)).toBeInTheDocument();
+  });
+
+  it("opens and closes a check with details and summary", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
+    });
+
+    const confidence = screen.getByTestId("split-run-check-comment-wo-review-pay-842-confidence");
+    const risk = screen.getByTestId("split-run-check-comment-check-risk-review");
+    const coverage = screen.getByTestId("split-run-check-comment-check-code-coverage");
+    expect(confidence).toHaveAttribute("open");
+    expect(risk).not.toHaveAttribute("open");
+    expect(coverage).not.toHaveAttribute("open");
+
+    await user.click(screen.getByTestId("split-run-check-comment-toggle-wo-review-pay-842-confidence"));
+    expect(confidence).not.toHaveAttribute("open");
+
+    await user.click(screen.getByTestId("split-run-check-comment-toggle-check-code-coverage"));
+    expect(coverage).toHaveAttribute("open");
+  });
+
+  it("keeps description checks collapsed when the work order is not a draft", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(
+        {
+          ...OPEN_WORK_ORDER,
+          title: "Add refund reason enum to schema",
+          lineDispatches: [
+            {
+              id: "dispatch-verify",
+              line: { id: "line-1", name: "plan-and-implement" },
+              state: "STATE_ACTIVE",
+              stepExecutions: [
+                {
+                  id: "e-verify",
+                  step: "Verify",
+                  stepIndex: 2,
+                  state: "STATE_STARTED",
+                  result: "RESULT_UNKNOWN",
+                },
+              ],
+            },
+          ],
+        },
+        { checks: OPEN_WORK_ORDER_CHECKS },
+      ),
+    });
+
+    await user.click(screen.getByRole("tab", { name: "Description" }));
+    expect(screen.getByTestId("split-run-check-comment-check-risk-review")).not.toHaveAttribute("open");
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the ingest confidence check on a downstream Description tab", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_ENUM_ORDER, { checks: VERIFY_STEP_CHECKS }),
+    });
+
+    await user.click(screen.getByRole("tab", { name: "Description" }));
+    const tab = screen.getByTestId("split-run-work-order-tab");
+    const check = within(tab).getByTestId(`split-run-check-comment-${LINE_BOARD_VERIFY_ENUM_ORDER.id}-confidence`);
+    expect(check).not.toHaveAttribute("open");
+    expect(within(check).getByText("Confidence score")).toBeInTheDocument();
+    expect(within(check).getByText(/fit for an agent on this factory line/)).toBeInTheDocument();
+    expect(within(tab).getByText("Risk score")).toBeInTheDocument();
   });
 
   it("shows the Ingest canvas when a GitHub automation created the draft", async () => {
@@ -406,11 +500,11 @@ describe("WorkOrderSplitRunPopup", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("shows a completed log without a footer", () => {
+  it("opens a done card on the description tab without a footer", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER) });
 
     expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Log" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
   });
 
   it("shows a failed implement stream without a footer", () => {
@@ -511,6 +605,7 @@ describe("WorkOrderSplitRunPopup", () => {
       },
     });
 
+    await openLogTab(user);
     expect(screen.queryByTestId("split-run-stream-done")).not.toBeInTheDocument();
     await user.click(within(screen.getByTestId("split-run-phase-done")).getByRole("button", { name: /Done/ }));
 

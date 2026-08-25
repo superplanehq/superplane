@@ -124,7 +124,7 @@ describe("Line board job popup", () => {
     ).toBeInTheDocument();
     expect(
       within(screen.getByTestId("lines-backlog-column")).getByRole("button", {
-        name: "Open Return 409 when the invoice is already paid",
+        name: "Open HTTP 500 /api/v1/factories/0644043d-564b-47e4-95b0-f5be415d0742",
       }),
     ).toBeInTheDocument();
     expect(

@@ -37,7 +37,7 @@ export interface ReviewCandidate {
   issue: ReviewIssue;
   confidenceScore: number;
   confidenceBand: ReviewConfidenceBand;
-  /** Three reasons SuperPlane can implement this ticket. */
+  /** Three reasons this issue is or is not a good fit for an agent. */
   reasons: [string, string, string];
   /** Markdown implementation plan attached as plan.md on Create plan. */
   planMarkdown: string;

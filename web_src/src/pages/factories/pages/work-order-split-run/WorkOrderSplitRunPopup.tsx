@@ -10,12 +10,7 @@ import { SplitRunReview } from "./SplitRunReview";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { emptySplitRunCanvas, type SplitRunCanvasKey } from "./splitRunCanvases";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
-import {
-  autoExpandedPhaseId,
-  splitRunStatusLabel,
-  type SplitRunFixture,
-  type SplitRunPhaseId,
-} from "./splitRunMocks";
+import { autoExpandedPhaseId, splitRunStatusLabel, type SplitRunFixture, type SplitRunPhaseId } from "./splitRunMocks";
 import {
   collectSplitRunArtifacts,
   defaultSplitRunPopupTab,
@@ -183,6 +178,8 @@ export function WorkOrderSplitRunPopup({
             organizationId={organizationId}
             factoryKey={factoryKey}
             orderNumber={orderNumber}
+            expandFirstCheck={fixture.footer.kind === "draft"}
+            canEditDescription={fixture.footer.kind === "draft"}
           />
         </TabsContent>
         <TabsContent value="log" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
