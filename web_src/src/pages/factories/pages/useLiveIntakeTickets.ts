@@ -1,7 +1,7 @@
-import { useEventExecutionsBatch, useInfiniteNodeEvents } from "@/hooks/useCanvasData";
+import { useFactoryIntakeRuns } from "@/hooks/useFactoryData";
 import { useMemo } from "react";
 
-import { analyzingTicketsFromIntakeRuns } from "./intakeRunModel";
+import { analyzingTicketsFromApi } from "./intakeSourceSettingsModel";
 import type { ConfiguredLineIntakeSource, LineIntakeAnalyzingTicket } from "./lineIntakeModel";
 
 interface LiveIntakeTickets {
@@ -12,42 +12,21 @@ interface LiveIntakeTickets {
 }
 
 export function useLiveIntakeTickets(
+  organizationId: string | undefined,
+  factoryId: string | undefined,
   configuredSource: ConfiguredLineIntakeSource | undefined,
   enabled: boolean,
 ): LiveIntakeTickets {
-  const eventsQuery = useInfiniteNodeEvents(
-    configuredSource?.appId ?? "",
-    configuredSource?.triggerNodeId ?? "",
-    enabled && Boolean(configuredSource),
+  const query = useFactoryIntakeRuns(organizationId ?? "", factoryId ?? "", configuredSource?.intakeId, enabled);
+  const tickets = useMemo(
+    () => analyzingTicketsFromApi(query.data ?? [], configuredSource?.appId),
+    [query.data, configuredSource?.appId],
   );
-  const events = useMemo(
-    () => eventsQuery.data?.pages.flatMap((page) => page?.events ?? []) ?? [],
-    [eventsQuery.data?.pages],
-  );
-  const eventIds = useMemo(() => events.flatMap((event) => (event.id ? [event.id] : [])), [events]);
-  const executions = useEventExecutionsBatch(configuredSource?.appId ?? "", eventIds);
-
-  const tickets = useMemo(() => {
-    if (!configuredSource) {
-      return [];
-    }
-    return analyzingTicketsFromIntakeRuns(
-      configuredSource.source.id,
-      configuredSource.analysisNodeId,
-      events,
-      executions.queries.map((query) => query.data),
-    ).map((ticket) => ({ ...ticket, appId: configuredSource.appId }));
-  }, [configuredSource, events, executions.queries]);
 
   return {
     tickets,
-    isLoading: eventsQuery.isLoading || executions.isLoading,
-    isError: eventsQuery.isError || executions.queries.some((query) => query.isError),
-    retry: () => {
-      void eventsQuery.refetch();
-      for (const query of executions.queries) {
-        void query.refetch();
-      }
-    },
+    isLoading: query.isLoading,
+    isError: query.isError,
+    retry: () => void query.refetch(),
   };
 }

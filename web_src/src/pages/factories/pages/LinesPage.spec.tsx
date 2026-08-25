@@ -4,14 +4,16 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { FactoriesFactory, FactoriesWorkOrder, FactoryApp } from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { editFactoryLinePath, factoryAppConfigurePath, factoryLineDetailPath } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_KEY,
   ACME_ONBOARDING_LINE_ID,
+  GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_APP,
+  GITHUB_ISSUES_INTAKE_ID,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
@@ -27,34 +29,37 @@ const createFactoryLineMutateAsync = vi.fn();
 const updateFactoryLineMutateAsync = vi.fn();
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
 const useFactoryApps = vi.fn(() => ({ data: [] as FactoryApp[] }));
+const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
+const createFactoryIntakeMutateAsync = vi.fn();
 
-const CONFIGURED_INTAKE_APPS: FactoryApp[] = [
-  GITHUB_ISSUES_INTAKE_APP,
+const SENTRY_INTAKE_ID = "intake-sentry";
+const PAGERDUTY_INTAKE_ID = "intake-pagerduty";
+
+const CONFIGURED_INTAKES: FactoriesFactoryIntake[] = [
+  GITHUB_ISSUES_INTAKE,
   {
-    id: "app-sentry-intake",
+    id: SENTRY_INTAKE_ID,
+    canvasId: "app-sentry-intake",
     name: "Sentry exceptions",
-    intake: {
-      source: "SOURCE_SENTRY_EXCEPTIONS",
-      triggerNodeId: "sentry-trigger",
-      analysisNodeId: "sentry-analysis",
-      createWorkOrderNodeId: "sentry-create",
-    },
+    source: "SOURCE_SENTRY_EXCEPTIONS",
+    healthy: true,
   },
   {
-    id: "app-pagerduty-intake",
+    id: PAGERDUTY_INTAKE_ID,
+    canvasId: "app-pagerduty-intake",
     name: "PagerDuty incidents",
-    intake: {
-      source: "SOURCE_PAGERDUTY_INCIDENTS",
-      triggerNodeId: "pagerduty-trigger",
-      analysisNodeId: "pagerduty-analysis",
-      createWorkOrderNodeId: "pagerduty-create",
-    },
+    source: "SOURCE_PAGERDUTY_INCIDENTS",
+    healthy: true,
   },
 ];
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
   useFactoryApps: () => useFactoryApps(),
+  useFactoryIntakes: () => useFactoryIntakes(),
+  useFactoryIntakeRuns: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
+  useCreateFactoryIntake: () => ({ mutateAsync: createFactoryIntakeMutateAsync, isPending: false }),
+  useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: updateFactoryLineMutateAsync, isPending: false }),
 }));
@@ -158,6 +163,8 @@ describe("LinesPage board", () => {
     updateFactoryLineMutateAsync.mockReset();
     useFactoryWorkOrders.mockReturnValue({ data: [] });
     useFactoryApps.mockReturnValue({ data: [] });
+    useFactoryIntakes.mockReturnValue({ data: [] });
+    createFactoryIntakeMutateAsync.mockReset();
   });
 
   function renderBoard(
@@ -242,7 +249,7 @@ describe("LinesPage board", () => {
   });
 
   it("opens the Intake drawer beside the board when the intake query is set", () => {
-    useFactoryApps.mockReturnValue({ data: CONFIGURED_INTAKE_APPS });
+    useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
     renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
 
     expect(screen.getByTestId("line-intake-drawer")).toBeInTheDocument();
@@ -250,9 +257,40 @@ describe("LinesPage board", () => {
     expect(screen.getByRole("heading", { name: "Plan and Implement" })).toBeInTheDocument();
     expect(screen.getByTestId("line-intake-close")).toBeInTheDocument();
     expect(screen.getByTestId("line-intake-add")).toHaveTextContent("Add intake");
-    expect(screen.getByTestId("line-intake-source-sentry-exceptions")).toBeInTheDocument();
-    expect(screen.getByTestId("line-intake-source-pagerduty-incidents")).toBeInTheDocument();
+    expect(screen.getByTestId(`line-intake-source-${SENTRY_INTAKE_ID}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`line-intake-source-${PAGERDUTY_INTAKE_ID}`)).toBeInTheDocument();
     expect(screen.queryByTestId("line-intake-analyzing")).not.toBeInTheDocument();
+  });
+
+  it("lists two intakes on the same source", () => {
+    useFactoryIntakes.mockReturnValue({
+      data: [
+        GITHUB_ISSUES_INTAKE,
+        { id: "intake-triage", canvasId: "app-triage", name: "Triage issues", source: "SOURCE_GITHUB_ISSUES" },
+      ],
+    });
+    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
+
+    expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toHaveTextContent("GitHub issues");
+    expect(screen.getByTestId("line-intake-source-intake-triage")).toHaveTextContent("Triage issues");
+  });
+
+  it("creates an intake from the picker and opens its canvas", async () => {
+    createFactoryIntakeMutateAsync.mockResolvedValueOnce({ id: "intake-new", canvasId: "canvas-new" });
+    const user = userEvent.setup();
+    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
+
+    await user.click(screen.getByTestId("line-intake-add"));
+    await user.click(screen.getByTestId("add-intake-template-github-issues"));
+
+    await waitFor(() => {
+      expect(createFactoryIntakeMutateAsync).toHaveBeenCalledWith({ source: "SOURCE_GITHUB_ISSUES" });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+        `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/apps/canvas-new`,
+      );
+    });
   });
 
   it("shows a backlog onboarding card on Acme when the backlog is empty", () => {
@@ -267,24 +305,26 @@ describe("LinesPage board", () => {
   });
 
   it("shows GitHub issues only on Acme onboarding intake", () => {
-    useFactoryApps.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE_APP] });
+    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     renderBoard(
-      `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&source=github-issues`,
+      `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
       vi.fn(),
       ACME_ONBOARDING_FACTORY,
     );
 
-    expect(screen.getByTestId("line-intake-source-github-issues")).toBeInTheDocument();
-    expect(screen.queryByTestId("line-intake-source-sentry-exceptions")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("line-intake-source-pagerduty-incidents")).not.toBeInTheDocument();
+    expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`line-intake-source-${SENTRY_INTAKE_ID}`)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`line-intake-source-${PAGERDUTY_INTAKE_ID}`)).not.toBeInTheDocument();
   });
 
   it("opens the factory canvas editor from Edit automation", async () => {
-    useFactoryApps.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE_APP] });
+    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     const user = userEvent.setup();
-    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1&source=github-issues`);
+    renderBoard(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
+    );
 
-    await user.click(screen.getByRole("button", { name: `Open ${GITHUB_ISSUES_INTAKE_APP.name} settings` }));
+    await user.click(screen.getByRole("button", { name: `Open ${GITHUB_ISSUES_INTAKE.name} settings` }));
     await user.click(screen.getByRole("tab", { name: "Automation" }));
 
     expect(screen.getByRole("link", { name: "Edit automation" })).toHaveAttribute(
@@ -297,10 +337,12 @@ describe("LinesPage board", () => {
   });
 
   it("loads analyzing tickets from the configured GitHub intake", () => {
-    useFactoryApps.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE_APP] });
-    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1&source=github-issues`);
+    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
+    renderBoard(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
+    );
 
-    expect(screen.getByTestId("line-intake-source-github-issues")).toBeInTheDocument();
+    expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toBeInTheDocument();
     expect(screen.queryByText("Handle duplicate refunds on retry")).not.toBeInTheDocument();
   });
 

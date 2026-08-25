@@ -1,8 +1,7 @@
-import { useEventExecutionsBatch, useInfiniteNodeEvents } from "@/hooks/useCanvasData";
+import { useFactoryIntakeRuns } from "@/hooks/useFactoryData";
 import { useMemo } from "react";
 
-import { automationRunsFromIntakeEvents } from "./intakeRunModel";
-import type { IntakeAutomationRun } from "./intakeSourceSettingsModel";
+import { intakeRunsFromApi, type IntakeAutomationRun } from "./intakeSourceSettingsModel";
 import type { ConfiguredLineIntakeSource } from "./lineIntakeModel";
 
 interface LiveIntakeRuns {
@@ -12,44 +11,21 @@ interface LiveIntakeRuns {
   retry: () => void;
 }
 
-export function useIntakeAutomationRuns(configuredSource: ConfiguredLineIntakeSource | undefined): LiveIntakeRuns {
-  const eventsQuery = useInfiniteNodeEvents(
-    configuredSource?.appId ?? "",
-    configuredSource?.triggerNodeId ?? "",
-    Boolean(configuredSource),
+export function useIntakeAutomationRuns(
+  organizationId: string | undefined,
+  factoryId: string | undefined,
+  configuredSource: ConfiguredLineIntakeSource | undefined,
+): LiveIntakeRuns {
+  const query = useFactoryIntakeRuns(organizationId ?? "", factoryId ?? "", configuredSource?.intakeId);
+  const runs = useMemo(
+    () => intakeRunsFromApi(query.data ?? [], configuredSource?.appId),
+    [query.data, configuredSource?.appId],
   );
-  const events = useMemo(
-    () => eventsQuery.data?.pages.flatMap((page) => page?.events ?? []) ?? [],
-    [eventsQuery.data?.pages],
-  );
-  const eventIds = useMemo(() => events.flatMap((event) => (event.id ? [event.id] : [])), [events]);
-  const executions = useEventExecutionsBatch(configuredSource?.appId ?? "", eventIds);
-
-  const runs = useMemo(() => {
-    if (!configuredSource) {
-      return [];
-    }
-    return automationRunsFromIntakeEvents(
-      {
-        appId: configuredSource.appId,
-        sourceId: configuredSource.source.id,
-        analysisNodeId: configuredSource.analysisNodeId,
-        createWorkOrderNodeId: configuredSource.createWorkOrderNodeId,
-      },
-      events,
-      executions.queries.map((query) => query.data),
-    );
-  }, [configuredSource, events, executions.queries]);
 
   return {
     runs,
-    isLoading: eventsQuery.isLoading || executions.isLoading,
-    isError: eventsQuery.isError || executions.queries.some((query) => query.isError),
-    retry: () => {
-      void eventsQuery.refetch();
-      for (const query of executions.queries) {
-        void query.refetch();
-      }
-    },
+    isLoading: query.isLoading,
+    isError: query.isError,
+    retry: () => void query.refetch(),
   };
 }

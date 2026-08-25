@@ -4,19 +4,42 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/crypto"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	actions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/usage"
 )
 
 type FactoryService struct {
 	pb.UnimplementedFactoriesServer
 
 	registry *registry.Registry
+	// An intake owns a canvas, so creating one needs everything canvas
+	// creation needs.
+	intakeDeps actions.IntakeDependencies
 }
 
-func NewFactoryService(reg *registry.Registry) *FactoryService {
-	return &FactoryService{registry: reg}
+func NewFactoryService(
+	reg *registry.Registry,
+	encryptor crypto.Encryptor,
+	authService authorization.Authorization,
+	gitProvider git.Provider,
+	webhookBaseURL string,
+	usageService usage.Service,
+) *FactoryService {
+	return &FactoryService{
+		registry: reg,
+		intakeDeps: actions.IntakeDependencies{
+			Registry:       reg,
+			Encryptor:      encryptor,
+			AuthService:    authService,
+			GitProvider:    gitProvider,
+			WebhookBaseURL: webhookBaseURL,
+			UsageService:   usageService,
+		},
+	}
 }
 
 func (s *FactoryService) ListFactories(ctx context.Context, req *pb.ListFactoriesRequest) (*pb.ListFactoriesResponse, error) {
@@ -62,6 +85,31 @@ func (s *FactoryService) UpdateFactoryLine(ctx context.Context, req *pb.UpdateFa
 func (s *FactoryService) ListFactoryApps(ctx context.Context, req *pb.ListFactoryAppsRequest) (*pb.ListFactoryAppsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListFactoryApps(ctx, organizationID, req)
+}
+
+func (s *FactoryService) ListFactoryIntakes(ctx context.Context, req *pb.ListFactoryIntakesRequest) (*pb.ListFactoryIntakesResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryIntakes(ctx, organizationID, req)
+}
+
+func (s *FactoryService) CreateFactoryIntake(ctx context.Context, req *pb.CreateFactoryIntakeRequest) (*pb.CreateFactoryIntakeResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.CreateFactoryIntake(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) UpdateFactoryIntake(ctx context.Context, req *pb.UpdateFactoryIntakeRequest) (*pb.UpdateFactoryIntakeResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.UpdateFactoryIntake(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) DeleteFactoryIntake(ctx context.Context, req *pb.DeleteFactoryIntakeRequest) (*pb.DeleteFactoryIntakeResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DeleteFactoryIntake(ctx, organizationID, req)
+}
+
+func (s *FactoryService) ListFactoryIntakeRuns(ctx context.Context, req *pb.ListFactoryIntakeRunsRequest) (*pb.ListFactoryIntakeRunsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryIntakeRuns(ctx, organizationID, req)
 }
 
 func (s *FactoryService) ListWorkOrders(ctx context.Context, req *pb.ListWorkOrdersRequest) (*pb.ListWorkOrdersResponse, error) {

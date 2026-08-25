@@ -107,16 +107,13 @@ func serializeFactoryLines(lines []models.FactoryLine, metricsByLine map[uuid.UU
 	return result
 }
 
-func serializeFactoryApps(canvases []models.Canvas, intakes map[uuid.UUID]factoryIntake) []*pb.Factory_App {
+func serializeFactoryApps(canvases []models.Canvas) []*pb.Factory_App {
 	result := make([]*pb.Factory_App, len(canvases))
 	for i, canvas := range canvases {
 		app := &pb.Factory_App{
 			Id:          canvas.ID.String(),
 			Name:        canvas.Name,
 			Description: canvas.Description,
-		}
-		if intake, ok := intakes[canvas.ID]; ok {
-			app.Intake = serializeFactoryIntake(intake)
 		}
 		if canvas.CreatedAt != nil {
 			app.CreatedAt = timestamppb.New(*canvas.CreatedAt)
@@ -129,25 +126,59 @@ func serializeFactoryApps(canvases []models.Canvas, intakes map[uuid.UUID]factor
 	return result
 }
 
-func serializeFactoryIntake(intake factoryIntake) *pb.Factory_App_Intake {
-	return &pb.Factory_App_Intake{
-		Source:                serializeFactoryIntakeSource(intake.Source),
-		TriggerNodeId:         intake.TriggerNodeID,
-		AnalysisNodeId:        intake.AnalysisNodeID,
-		CreateWorkOrderNodeId: intake.CreateWorkOrderNodeID,
+func serializeFactoryIntakes(intakes []models.FactoryIntake, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryIntake {
+	result := make([]*pb.FactoryIntake, len(intakes))
+	for i := range intakes {
+		result[i] = serializeFactoryIntake(&intakes[i], specs[intakes[i].CanvasID])
+	}
+	return result
+}
+
+func serializeFactoryIntake(intake *models.FactoryIntake, spec models.LiveCanvasSpec) *pb.FactoryIntake {
+	graph := resolveIntakeGraph(intake.Source, spec)
+
+	serialized := &pb.FactoryIntake{
+		Id:        intake.ID.String(),
+		FactoryId: intake.FactoryID.String(),
+		CanvasId:  intake.CanvasID.String(),
+		Name:      intake.Name(),
+		Source:    serializeFactoryIntakeSource(intake.Source),
+		Settings:  serializeIntakeSettings(intakeSettingsFromGraph(graph, spec)),
+		Healthy:   graph.Healthy(spec.Edges),
+		CreatedAt: timestamppb.New(intake.CreatedAt),
+		UpdatedAt: timestamppb.New(intake.UpdatedAt),
+	}
+
+	if intake.Canvas != nil {
+		serialized.Description = intake.Canvas.Description
+	}
+
+	return serialized
+}
+
+func serializeFactoryIntakeSource(source string) pb.FactoryIntake_Source {
+	switch source {
+	case models.FactoryIntakeSourceGitHubIssues:
+		return pb.FactoryIntake_SOURCE_GITHUB_ISSUES
+	case models.FactoryIntakeSourceSentryExceptions:
+		return pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS
+	case models.FactoryIntakeSourcePagerDutyIncidents:
+		return pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS
+	default:
+		return pb.FactoryIntake_SOURCE_UNSPECIFIED
 	}
 }
 
-func serializeFactoryIntakeSource(source factoryIntakeSource) pb.Factory_App_Intake_Source {
+func parseFactoryIntakeSource(source pb.FactoryIntake_Source) (string, error) {
 	switch source {
-	case factoryIntakeSourceGitHubIssues:
-		return pb.Factory_App_Intake_SOURCE_GITHUB_ISSUES
-	case factoryIntakeSourceSentryExceptions:
-		return pb.Factory_App_Intake_SOURCE_SENTRY_EXCEPTIONS
-	case factoryIntakeSourcePagerDutyIncidents:
-		return pb.Factory_App_Intake_SOURCE_PAGERDUTY_INCIDENTS
+	case pb.FactoryIntake_SOURCE_GITHUB_ISSUES:
+		return models.FactoryIntakeSourceGitHubIssues, nil
+	case pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS:
+		return models.FactoryIntakeSourceSentryExceptions, nil
+	case pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS:
+		return models.FactoryIntakeSourcePagerDutyIncidents, nil
 	default:
-		return pb.Factory_App_Intake_SOURCE_UNSPECIFIED
+		return "", invalidArgument("intake source is required")
 	}
 }
 

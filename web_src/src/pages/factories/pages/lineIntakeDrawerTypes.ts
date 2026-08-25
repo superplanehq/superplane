@@ -4,21 +4,23 @@ import type {
   ConfiguredLineIntakeSource,
   LineIntakeAnalyzingTicket,
   LineIntakeSource,
-  LineIntakeSourceId,
 } from "./lineIntakeModel";
 
 export interface LineIntakeDrawerProps {
   onClose: () => void;
-  initialSourceId?: LineIntakeSourceId;
+  initialIntakeId?: string;
   initialSettingsOpen?: boolean;
   initialSettingsTab?: IntakeSettingsTab;
-  sources?: LineIntakeSource[];
   configuredSources?: ConfiguredLineIntakeSource[];
+  /** Shown under a source that has no runs yet, for Storybook and first run. */
   analyzingTickets?: LineIntakeAnalyzingTicket[];
   onOpenTicket?: (ticket: LineIntakeAnalyzingTicket) => void;
   onSelectIntakeTemplate?: (template: AddIntakeTemplate) => void;
   organizationId?: string;
+  factoryId?: string;
   editAutomationHref?: string;
-  editAutomationHrefFor?: (source: LineIntakeSource) => string | undefined;
+  editAutomationHrefFor?: (intake: ConfiguredLineIntakeSource) => string | undefined;
+  /** Preview an unconfigured source, used by the picker in Storybook. */
+  previewSource?: LineIntakeSource;
   onSettingsSaved?: () => void;
 }

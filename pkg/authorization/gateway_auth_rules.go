@@ -43,6 +43,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		{Method: "DELETE", Pattern: "/api/v1/factories/{factory_id}/intakes/{intake_id}"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
 		{Method: "DELETE", Pattern: "/api/v1/groups/{group_name}"}: {
 			Resource:   "groups",
 			Action:     "delete",
@@ -230,6 +236,18 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/intakes"}: {
+			Resource:                     "factories",
+			Action:                       "read",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/intakes/{intake_id}/runs"}: {
+			Resource:                     "factories",
+			Action:                       "read",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}"}: {
 			Resource:                     "work_orders",
 			Action:                       "read",
@@ -406,6 +424,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		{Method: "PATCH", Pattern: "/api/v1/factories/{factory_id}/intakes/{intake_id}"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
 		{Method: "PATCH", Pattern: "/api/v1/factories/{id}/onboarding"}: {
 			Resource:                     "factories",
 			Action:                       "update",
@@ -560,6 +584,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/artifacts"}: {
 			Resource:                     "work_orders",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/intakes"}: {
+			Resource:                     "factories",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},

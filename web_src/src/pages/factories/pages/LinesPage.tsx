@@ -3,8 +3,13 @@ import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useCreateCanvas, useDeleteCanvas } from "@/hooks/useCanvasData";
-import { factoryAppsKey, useFactoryApps, useFactoryWorkOrders, useUpdateFactoryLine } from "@/hooks/useFactoryData";
+import {
+  useCreateFactoryIntake,
+  useFactoryApps,
+  useFactoryIntakes,
+  useFactoryWorkOrders,
+  useUpdateFactoryLine,
+} from "@/hooks/useFactoryData";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
@@ -15,7 +20,6 @@ import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Clock, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { ClickToRename } from "../layout/ClickToRename";
@@ -58,8 +62,8 @@ import {
   factoryAppSplitRunPath,
   factoryHomePath,
   factoryLineDetailPath,
+  intakeIdFromSearch,
   intakeSettingsTabFromSearch,
-  intakeSourceFromSearch,
   isIntakeSearchOpen,
   linesPath,
 } from "../lib/factoryPagePaths";
@@ -73,14 +77,13 @@ import {
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
-import { createIntakeAutomation } from "./createIntakeAutomation";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
 import {
-  intakeAutomationAppId,
-  intakeSourcesFromFactoryApps,
+  apiIntakeSource,
+  intakeSourcesFromFactoryIntakes,
   isFirstRunOnboardingFactory,
   isLineIntakeSourceId,
-  type LineIntakeSourceId,
+  type ConfiguredLineIntakeSource,
 } from "./lineIntakeModel";
 import { isIntakeSettingsTab } from "./intakeSourceSettingsModel";
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
@@ -98,14 +101,13 @@ export function LinesPage() {
   const { search } = useLocation();
   const navigate = useNavigate();
   const intakeOpen = isIntakeSearchOpen(search);
-  const intakeSourceId = intakeSourceFromSearch(search);
+  const intakeId = intakeIdFromSearch(search);
   const intakeSettingsTab = intakeSettingsTabFromSearch(search);
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
   const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
-  const createCanvas = useCreateCanvas(organizationId);
-  const deleteCanvas = useDeleteCanvas(organizationId);
-  const queryClient = useQueryClient();
-  const configuredIntakes = useMemo(() => intakeSourcesFromFactoryApps(factoryApps), [factoryApps]);
+  const { data: factoryIntakes = [] } = useFactoryIntakes(organizationId, factoryId);
+  const createIntake = useCreateFactoryIntake(organizationId, factoryId);
+  const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
 
   const canUpdate = canAct("factories", "update");
@@ -137,14 +139,11 @@ export function LinesPage() {
   // The phase board is a Kanban surface: it claims the full viewport height so
   // the lanes read as columns rather than as boxes around their cards.
   if (selectedLine) {
-    const editAutomationHrefFor = (sourceId?: LineIntakeSourceId) => {
-      const appId =
-        configuredIntakes.find((configured) => configured.source.id === sourceId)?.appId ??
-        intakeAutomationAppId(factoryApps);
-      if (!appId) {
+    const editAutomationHrefFor = (intake: ConfiguredLineIntakeSource) => {
+      if (!intake.appId) {
         return undefined;
       }
-      return factoryAppConfigurePath(organizationId, factoryKey, appId, {
+      return factoryAppConfigurePath(organizationId, factoryKey, intake.appId, {
         from: "lines",
         lineId: selectedLine.id,
       });
@@ -153,7 +152,6 @@ export function LinesPage() {
       <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
         {intakeOpen ? (
           <LineIntakeDrawer
-            sources={configuredIntakes.map((intake) => intake.source)}
             configuredSources={configuredIntakes}
             onOpenTicket={(ticket) => {
               if (!ticket.appId || !ticket.runId) {
@@ -167,35 +165,25 @@ export function LinesPage() {
                 }),
               );
             }}
-            initialSourceId={isLineIntakeSourceId(intakeSourceId) ? intakeSourceId : undefined}
+            initialIntakeId={intakeId ?? undefined}
             initialSettingsOpen={isIntakeSettingsTab(intakeSettingsTab)}
             initialSettingsTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
             organizationId={organizationId}
-            editAutomationHrefFor={(source) => editAutomationHrefFor(source.id)}
-            onSettingsSaved={() => {
-              void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
-            }}
+            factoryId={factoryId}
+            editAutomationHrefFor={editAutomationHrefFor}
             onSelectIntakeTemplate={(template) => {
               if (!isLineIntakeSourceId(template.id)) {
                 showErrorToast("This intake template is not available yet.");
                 return;
               }
-              if (configuredIntakes.some((configured) => configured.source.id === template.id)) {
-                showErrorToast(`${template.name} intake already exists.`);
-                return;
-              }
-              void createIntakeAutomation({
-                factoryId,
-                sourceId: template.id,
-                confidencePct: 65,
-                createCanvas: createCanvas.mutateAsync,
-                existingCanvasNames: factoryApps.map((app) => app.name ?? ""),
-                deleteCanvas: deleteCanvas.mutateAsync,
-              })
-                .then((canvasId) => {
-                  void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+              createIntake
+                .mutateAsync({ source: apiIntakeSource(template.id) })
+                .then((intake) => {
+                  if (!intake.canvasId) {
+                    return;
+                  }
                   navigate(
-                    factoryAppConfigurePath(organizationId, factoryKey, canvasId, {
+                    factoryAppConfigurePath(organizationId, factoryKey, intake.canvasId, {
                       from: "lines",
                       lineId: selectedLine.id,
                     }),
