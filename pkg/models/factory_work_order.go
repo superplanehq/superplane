@@ -140,6 +140,33 @@ func FindUnscopedWorkOrder(db *gorm.DB, id uuid.UUID) (*FactoryWorkOrder, error)
 	return &order, nil
 }
 
+// ListWorkOrdersBySourceRunIDs returns the work order each run created, keyed
+// by run id. A run creates at most one work order.
+func ListWorkOrdersBySourceRunIDs(tx *gorm.DB, factoryID uuid.UUID, runIDs []uuid.UUID) (map[uuid.UUID]FactoryWorkOrder, error) {
+	ordersByRunID := make(map[uuid.UUID]FactoryWorkOrder, len(runIDs))
+	if len(runIDs) == 0 {
+		return ordersByRunID, nil
+	}
+
+	var orders []FactoryWorkOrder
+	err := tx.
+		Where("factory_id = ?", factoryID).
+		Where("source_run_id IN ?", runIDs).
+		Find(&orders).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, order := range orders {
+		if order.SourceRunID != nil {
+			ordersByRunID[*order.SourceRunID] = order
+		}
+	}
+
+	return ordersByRunID, nil
+}
+
 func ResolveFactoryWorkOrderCreatorAutomations(
 	tx *gorm.DB,
 	orders []FactoryWorkOrder,

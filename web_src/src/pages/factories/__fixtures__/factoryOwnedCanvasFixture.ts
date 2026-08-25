@@ -43,6 +43,7 @@ export const REFUND_VERIFIER_APP = REFUND_FACTORY_APPS[2];
 export function factoryOwnedCanvasFixture(
   app: Pick<FactoryApp, "id" | "name" | "description"> = REFUND_PLANNER_APP,
   extras: Partial<CanvasAppFixture> = {},
+  factoryId = PRIMARY_FACTORY_ID,
 ): CanvasAppFixture {
   const baseCanvas = defaultCanvasAppFixture.canvas?.canvas as
     | { metadata?: Record<string, unknown>; spec?: unknown }
@@ -66,7 +67,7 @@ export function factoryOwnedCanvasFixture(
           id: canvasId,
           name: app.name,
           description: app.description,
-          factoryId: PRIMARY_FACTORY_ID,
+          factoryId,
         },
       },
     } as CanvasAppFixture["canvas"],
@@ -129,19 +130,24 @@ export function refundFactoryLineRuns(): NonNullable<CanvasAppFixture["runs"]> {
 /** Factory-owned compact CI canvas plus the runs that Line cards open. */
 export function refundLineCanvasFixture(
   app: Pick<FactoryApp, "id" | "name" | "description"> = REFUND_IMPLEMENTER_APP,
+  factoryId = PRIMARY_FACTORY_ID,
 ): CanvasAppFixture {
-  return factoryOwnedCanvasFixture(app, {
-    runs: refundFactoryLineRuns(),
-    triggers: { triggers: [simpleFactoryRunOnRunTrigger()] },
-    actions: mergeSimpleFactoryRunActions(defaultCanvasAppFixture.actions),
-    executionsByEventId: {
-      [LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID]: { executions: simpleFactoryRunExecutions() },
-    },
-    agentMessages: factoryAgentChatMessages(),
-    canvas: {
+  return factoryOwnedCanvasFixture(
+    app,
+    {
+      runs: refundFactoryLineRuns(),
+      triggers: { triggers: [simpleFactoryRunOnRunTrigger()] },
+      actions: mergeSimpleFactoryRunActions(defaultCanvasAppFixture.actions),
+      executionsByEventId: {
+        [LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID]: { executions: simpleFactoryRunExecutions() },
+      },
+      agentMessages: factoryAgentChatMessages(),
       canvas: {
-        spec: simpleFactoryRunCanvasSpec(),
+        canvas: {
+          spec: simpleFactoryRunCanvasSpec(),
+        },
       },
     },
-  });
+    factoryId,
+  );
 }

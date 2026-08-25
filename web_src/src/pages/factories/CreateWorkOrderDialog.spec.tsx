@@ -91,12 +91,13 @@ describe("CreateWorkOrderDialog", () => {
     expect(within(header).queryByTestId("work-order-create-draft-button")).not.toBeInTheDocument();
   });
 
-  it("renders Save as draft in the footer next to Send to line, with no separate Line control", () => {
+  it("renders Save as draft in the footer next to Start, with no line picker", () => {
     renderDialog();
 
     expect(screen.getByTestId("work-order-create-draft-button")).toBeInTheDocument();
-    expect(screen.getByTestId("work-order-create-send-to-line")).toBeInTheDocument();
+    expect(screen.getByTestId("work-order-create-start")).toHaveTextContent("Start");
     expect(screen.queryByTestId("work-order-line-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-line-picker-panel")).not.toBeInTheDocument();
   });
 
   it("defaults Owner to the current user without any click", () => {
@@ -112,21 +113,21 @@ describe("CreateWorkOrderDialog", () => {
     expect(screen.getByTestId("mock-owner-pill")).toHaveTextContent("no owner");
   });
 
-  it("disables Send to line when the user cannot dispatch work orders", () => {
+  it("disables Start when the user cannot dispatch work orders", () => {
     renderDialog();
 
-    expect(screen.getByTestId("work-order-create-send-to-line").closest(".pointer-events-none")).toBeInTheDocument();
+    expect(screen.getByTestId("work-order-create-start").closest(".pointer-events-none")).toBeInTheDocument();
   });
 
-  it("keeps Send to line closed while permissions load", () => {
+  it("keeps Start closed while permissions load", () => {
     permissions.isLoading = true;
     canAct.mockReturnValue(false);
     renderDialog();
 
-    expect(screen.getByTestId("work-order-create-send-to-line").closest(".pointer-events-none")).toBeInTheDocument();
+    expect(screen.getByTestId("work-order-create-start").closest(".pointer-events-none")).toBeInTheDocument();
   });
 
-  it("opens the line list and dispatches immediately when a line is picked", async () => {
+  it("starts the work order on the first line", async () => {
     const user = userEvent.setup();
     canAct.mockReturnValue(true);
     createMutate.mockResolvedValue({ id: "order-1", number: "101" });
@@ -134,23 +135,19 @@ describe("CreateWorkOrderDialog", () => {
     renderDialog();
 
     await user.type(screen.getByTestId("work-order-title-input"), "Ship the refunds line");
-    await user.click(screen.getByTestId("work-order-create-send-to-line"));
+    await user.click(screen.getByTestId("work-order-create-start"));
 
-    const panel = screen.getByTestId("work-order-line-picker-panel");
-    expect(panel).toHaveAttribute("data-align", "end");
-
-    await user.click(screen.getByTestId("work-order-line-option-plan-and-implement"));
-
+    expect(screen.queryByTestId("work-order-line-picker-panel")).not.toBeInTheDocument();
     expect(dispatchMutate).toHaveBeenCalledWith({ orderId: "order-1", lineName: "plan-and-implement" });
   });
 
-  it("disables Send to line with a tooltip when the workspace has no lines, while Save as draft stays enabled", async () => {
+  it("disables Start when the workspace has no lines, while Save as draft stays enabled", async () => {
     canAct.mockReturnValue(true);
     renderDialog(EMPTY_FACTORY);
 
     await userEvent.setup().type(screen.getByTestId("work-order-title-input"), "Draft only");
 
-    expect(screen.getByTestId("work-order-create-send-to-line")).toBeDisabled();
+    expect(screen.getByTestId("work-order-create-start")).toBeDisabled();
     expect(screen.getByTestId("work-order-create-draft-button")).not.toBeDisabled();
   });
 });

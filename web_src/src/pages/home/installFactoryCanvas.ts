@@ -19,6 +19,7 @@ import {
   buildFactoryRunParameters,
   materializeFactoryCanvas,
   materializeFactoryConsole,
+  type FactoryAgentRewrite,
   type FactoryDefinition,
 } from "./factories";
 import type { IntegrationSelections } from "./homeIntegrationStatus";
@@ -86,6 +87,7 @@ export async function materializeAndCommitFactoryTemplate(args: {
   definition: FactoryDefinition;
   installParams: Record<string, string>;
   integrations: IntegrationSelections;
+  agentRewrite?: FactoryAgentRewrite;
 }) {
   const canvasYaml = materializeFactoryCanvas({
     definition: args.definition,
@@ -93,6 +95,7 @@ export async function materializeAndCommitFactoryTemplate(args: {
     canvasId: args.canvasId,
     installParams: args.installParams,
     integrations: args.integrations,
+    agentRewrite: args.agentRewrite,
   });
   const consoleYaml = materializeFactoryConsole(args.definition, args.canvasName, args.canvasId);
   await stageAndCommitFactorySpecs(args.canvasId, canvasYaml, consoleYaml);

@@ -101,6 +101,13 @@ type Action interface {
 	Cleanup(ctx SetupContext) error
 }
 
+// NodeConfigurationValidator is implemented by actions whose field schema
+// cannot express every save-time rule. Canvas updates call this after
+// schema validation and store a failure on the node error message.
+type NodeConfigurationValidator interface {
+	ValidateNodeConfiguration(config map[string]any) error
+}
+
 /*
  * QueueItemProcessor is implemented by actions that process their node's
  * queue items themselves (merge, loop) instead of the engine's default

@@ -1,6 +1,7 @@
 import type { FactoriesFactoryLine } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { cn } from "@/lib/utils";
@@ -10,10 +11,45 @@ import { OrgUserReference } from "../OrgUserReference";
 import { WorkOrderAssigneesPopover } from "../WorkOrderAssigneesPopover";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 
-/** Actions callable from any Work Orders layout (board card, list row, table row). */
+/** Actions callable from list and table rows. Cards do not change the owner. */
 export interface WorkOrderRowCallbacks {
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
+}
+
+interface CardOwnerMarkProps {
+  entry: WorkOrderListEntry;
+  organizationId: string;
+}
+
+/**
+ * Display-only owner avatar for cards. The owner cannot be changed here.
+ */
+export function CardOwnerMark({ entry, organizationId }: CardOwnerMarkProps) {
+  const { resolveUser } = useOrgUserLookup(organizationId);
+  if (entry.displayStatus === "draft") {
+    return null;
+  }
+
+  const owner = entry.order.assignees?.[0];
+  if (!owner) {
+    return null;
+  }
+
+  return (
+    <span
+      className="inline-flex size-5 shrink-0 items-center justify-center"
+      data-testid={`work-order-row-assignees-${entry.id}`}
+      title={owner.name}
+    >
+      <OrgUserReference
+        display={resolveUser(owner.id, owner.name)}
+        size="xs"
+        showName={false}
+        className="rounded-full leading-none"
+      />
+    </span>
+  );
 }
 
 interface AssigneeGroupProps {
@@ -22,15 +58,12 @@ interface AssigneeGroupProps {
   canAssign: boolean;
   isAssigneesSaving: boolean;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
-  /** Cap for the visible avatars before "+N" collapses the rest. */
-  maxVisible?: number;
   size?: "sm" | "md";
 }
 
 /**
- * Small avatar stack with a `+N` overflow indicator and, when the caller
- * has permission, an inline picker to change assignees without opening
- * the detail page. Shared across board, list, and table.
+ * Single owner avatar, or an Assign chip when nobody owns the work order.
+ * The picker replaces the owner; a work order cannot have two people.
  */
 export function AssigneeGroup({
   entry,
@@ -38,13 +71,10 @@ export function AssigneeGroup({
   canAssign,
   isAssigneesSaving,
   onAssigneesSave,
-  maxVisible = 1,
   size = "sm",
 }: AssigneeGroupProps) {
   const { resolveUser } = useOrgUserLookup(organizationId);
-  const assignees = entry.order.assignees ?? [];
-  const visible = assignees.slice(0, maxVisible);
-  const hiddenCount = Math.max(assignees.length - visible.length, 0);
+  const owner = entry.order.assignees?.[0];
 
   const stack = (
     <button
@@ -53,11 +83,18 @@ export function AssigneeGroup({
         "inline-flex items-center gap-1 rounded-full transition-colors",
         canAssign ? "hover:bg-accent" : "cursor-default",
       )}
-      aria-label="Change owners"
+      aria-label="Change owner"
       data-testid={`work-order-row-assignees-${entry.id}`}
       disabled={!canAssign}
     >
-      {assignees.length === 0 ? (
+      {owner ? (
+        <OrgUserReference
+          display={resolveUser(owner.id, owner.name)}
+          size={size}
+          showName={false}
+          className="rounded-full ring-2 ring-background"
+        />
+      ) : (
         <span
           className={cn(
             "inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-[11px] text-muted-foreground",
@@ -66,26 +103,6 @@ export function AssigneeGroup({
         >
           <UserPlus className="size-3" aria-hidden />
           Assign
-        </span>
-      ) : (
-        <span className="inline-flex items-center -space-x-1.5">
-          {visible.map((assignee, index) => (
-            <OrgUserReference
-              key={assignee.id ?? index}
-              display={resolveUser(assignee.id, assignee.name)}
-              size={size}
-              showName={false}
-              className="rounded-full ring-2 ring-background"
-            />
-          ))}
-          {hiddenCount > 0 ? (
-            <span
-              className="inline-flex items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground ring-2 ring-background"
-              aria-label={`${hiddenCount} more owners`}
-            >
-              +{hiddenCount}
-            </span>
-          ) : null}
         </span>
       )}
     </button>
@@ -96,7 +113,7 @@ export function AssigneeGroup({
   ) : (
     <Tooltip>
       <TooltipTrigger asChild>{stack}</TooltipTrigger>
-      <TooltipContent>You don't have permission to update owners.</TooltipContent>
+      <TooltipContent>You don't have permission to update the owner.</TooltipContent>
     </Tooltip>
   );
 
@@ -119,6 +136,82 @@ export function AssigneeGroup({
       >
         {trigger}
       </WorkOrderAssigneesPopover>
+    </div>
+  );
+}
+
+/** Line to start on: the preferred line when it exists, else the only line. */
+function resolveStartLineName(lines: FactoriesFactoryLine[], preferredLineName?: string): string | undefined {
+  const names = lines.map((line) => line.name?.trim()).filter((name): name is string => Boolean(name));
+  if (preferredLineName && names.includes(preferredLineName)) {
+    return preferredLineName;
+  }
+  if (names.length === 1) {
+    return names[0];
+  }
+  return undefined;
+}
+
+interface StartDraftButtonProps {
+  entry: WorkOrderListEntry;
+  lines: FactoriesFactoryLine[];
+  preferredLineName?: string;
+  canDispatch: boolean;
+  isDispatching: boolean;
+  onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
+}
+
+/**
+ * Persistent Start control on a draft card. One click sends the work order
+ * to the preferred line, or opens the line picker when more than one line
+ * exists.
+ */
+export function StartDraftButton({
+  entry,
+  lines,
+  preferredLineName,
+  canDispatch,
+  isDispatching,
+  onDispatch,
+}: StartDraftButtonProps) {
+  if (entry.displayStatus !== "draft") {
+    return null;
+  }
+
+  const lineName = resolveStartLineName(lines, preferredLineName);
+  const disabled = !canDispatch || lines.length === 0;
+
+  const startButton = (
+    <LoadingButton
+      type="button"
+      size="xs"
+      disabled={disabled}
+      loading={isDispatching}
+      loadingText="Starting..."
+      data-testid={`work-order-card-start-${entry.id}`}
+      onClick={lineName ? () => void onDispatch(entry.id, { lineName }) : undefined}
+    >
+      Start
+    </LoadingButton>
+  );
+
+  return (
+    <div className="pointer-events-auto" onClick={(event) => event.stopPropagation()}>
+      <PermissionTooltip allowed={canDispatch} message="You don't have permission to start this work order.">
+        {lineName ? (
+          startButton
+        ) : (
+          <DispatchWorkOrderPopover
+            lines={lines}
+            isSaving={isDispatching}
+            canDispatch={canDispatch}
+            submitLabel="Start"
+            onDispatch={(input) => onDispatch(entry.id, input)}
+          >
+            {startButton}
+          </DispatchWorkOrderPopover>
+        )}
+      </PermissionTooltip>
     </div>
   );
 }

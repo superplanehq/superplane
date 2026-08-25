@@ -57,8 +57,17 @@ type FileResource struct {
 
 // ManagedSession is a subset of the session resource returned by the API.
 type ManagedSession struct {
-	ID     string `json:"id"`
-	Status string `json:"status"`
+	ID     string               `json:"id"`
+	Status string               `json:"status"`
+	Model  string               `json:"model,omitempty"`
+	Usage  *ManagedSessionUsage `json:"usage,omitempty"`
+}
+
+type ManagedSessionUsage struct {
+	InputTokens              int64 `json:"input_tokens"`
+	OutputTokens             int64 `json:"output_tokens"`
+	CacheReadInputTokens     int64 `json:"cache_read_input_tokens"`
+	CacheCreationInputTokens int64 `json:"cache_creation_input_tokens"`
 }
 
 type ManagedSessionEvent struct {

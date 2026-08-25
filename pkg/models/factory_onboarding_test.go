@@ -100,6 +100,16 @@ func Test__FactoryOnboarding(t *testing.T) {
 		assert.Equal(t, firstCompletedAt, *factory.OnboardingCompletedAt)
 		assert.True(t, factory.IsOnboardingComplete())
 	})
+
+	t.Run("complete allows empty agent integration", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		ready := readyOnboardingPatch()
+		ready.AgentIntegrationID = nil
+		require.NoError(t, factory.CompleteOnboarding(db, ready))
+		assert.Empty(t, factory.OnboardingConfigValue().AgentIntegrationID)
+	})
 }
 
 func readyOnboardingPatch() models.FactoryOnboardingPatch {

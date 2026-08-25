@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import { factoryOverviewPath, factorySetupPath } from "../../lib/factoryPagePaths";
+import { factoryHomePath, factorySetupPath, firstFactoryLineId } from "../../lib/factoryPagePaths";
 import { isFactoryOnboardingComplete } from "./onboardingStatus";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
@@ -24,7 +24,7 @@ export function OnboardingGate() {
 
   if (!isIncomplete) {
     if (isSetupRoute) {
-      return <Navigate to={factoryOverviewPath(organizationId, factoryKey)} replace />;
+      return <Navigate to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))} replace />;
     }
     return <Outlet />;
   }
