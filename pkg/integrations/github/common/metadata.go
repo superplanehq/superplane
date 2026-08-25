@@ -6,6 +6,9 @@ type Metadata struct {
 	Owner          string            `mapstructure:"owner" json:"owner"`
 	Repositories   []Repository      `mapstructure:"repositories" json:"repositories"`
 	GitHubApp      GitHubAppMetadata `mapstructure:"githubApp" json:"githubApp"`
+	// HostedApp is true when this connection installs SuperPlane's public
+	// GitHub App. Credentials stay on the process, not on the integration.
+	HostedApp bool `mapstructure:"hostedApp" json:"hostedApp"`
 }
 
 type GitHubAppMetadata struct {
