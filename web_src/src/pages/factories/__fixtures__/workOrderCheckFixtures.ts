@@ -1,5 +1,6 @@
 import type { FactoriesWorkOrderCheck } from "@/api-client";
 
+import { confidenceSuitabilityAnalysis, confidenceSuitabilitySummary } from "../lib/confidenceScore";
 import {
   CLOSED_WORK_ORDER,
   OPEN_WORK_ORDER,
@@ -52,9 +53,14 @@ const TEST_COVERAGE_ANALYSIS = `### New code in this work order
 
 Uncovered lines are concentrated in error handling, which is also where the risk review raised concerns. Prioritize \`RetryPolicy\` tests before merging.`;
 
-const CONFIDENCE_ANALYSIS = `The agent completed all planned steps without human correction. Static checks, unit tests, and the E2E refund suite passed on the first run.
-
-Confidence is not higher because the change modifies retry behavior that only manifests under provider degradation, which no automated test simulates.`;
+const CONFIDENCE_ANALYSIS = confidenceSuitabilityAnalysis({
+  source: "GitHub",
+  reasons: [
+    "The GitHub issue names a testable retry policy for the refund dispatcher.",
+    "The dispatcher and the provider client are mapped in the repository.",
+    "The score is not 5 because no test simulates provider degradation.",
+  ],
+});
 
 const CI_PASSED_ANALYSIS = `### Pipeline
 
@@ -77,7 +83,7 @@ export const OPEN_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
   {
     id: "check-risk-review",
     key: "risk-review",
-    name: "Risk review",
+    name: "Risk score",
     score: 65,
     maxScore: 100,
     level: "LEVEL_CAUTION",
@@ -91,7 +97,7 @@ export const OPEN_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
   {
     id: "check-code-coverage",
     key: "code-coverage",
-    name: "Code coverage",
+    name: "Code quality",
     score: 82,
     maxScore: 100,
     format: "FORMAT_PERCENT",
@@ -121,11 +127,11 @@ export const OPEN_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
     id: "check-confidence",
     key: "confidence",
     name: "Confidence score",
-    score: 8,
-    maxScore: 10,
+    score: 4,
+    maxScore: 5,
     level: "LEVEL_POSITIVE",
-    previousScore: 7,
-    summary: "All planned steps completed without human correction; every automated suite passed first try.",
+    previousScore: 3,
+    summary: confidenceSuitabilitySummary("High"),
     analysis: CONFIDENCE_ANALYSIS,
     automation: { appId: "app-line-confidence", appName: "Line Confidence" },
     runId: "run-confidence-101",
@@ -151,12 +157,19 @@ export const OPEN_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
   },
 ];
 
+const VERIFY_STEP_CHECK_KEYS = new Set(["risk-review", "code-coverage"]);
+
+/** Checks the Verify step reports on the line board. */
+export const VERIFY_STEP_CHECKS: FactoriesWorkOrderCheck[] = OPEN_WORK_ORDER_CHECKS.filter((check) =>
+  VERIFY_STEP_CHECK_KEYS.has(check.key ?? ""),
+);
+
 /** Two checks only — the risk review has landed, coverage is still running. */
 export const RUNNING_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
   {
     id: "check-risk-review-running",
     key: "risk-review",
-    name: "Risk review",
+    name: "Risk score",
     score: 38,
     maxScore: 100,
     level: "LEVEL_NEUTRAL",
@@ -171,13 +184,19 @@ export const RUNNING_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
     id: "check-confidence-running",
     key: "confidence",
     name: "Confidence score",
-    score: 6,
-    maxScore: 10,
-    level: "LEVEL_CAUTION",
-    previousScore: 8,
-    summary: "The agent needed one human correction during planning; verification has not run yet.",
-    analysis:
-      "The plan step was corrected once: the agent initially targeted the wrong ledger table. Implementation followed the corrected plan without further intervention.\n\nVerification is still in progress, so this score may change.",
+    score: 3,
+    maxScore: 5,
+    level: "LEVEL_NEUTRAL",
+    previousScore: 4,
+    summary: confidenceSuitabilitySummary("Medium"),
+    analysis: confidenceSuitabilityAnalysis({
+      source: "GitHub",
+      reasons: [
+        "The GitHub issue names the refund retry, but the target ledger table is still unclear.",
+        "The refund post path is mapped. The agent needed one correction during planning.",
+        "Verification has not run yet, so this score can still change.",
+      ],
+    }),
     automation: { appId: "app-line-confidence", appName: "Line Confidence" },
     runId: "run-confidence-102",
     updatedAt: minutesAgo(11),
@@ -206,10 +225,13 @@ export const RUNNING_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
  * and every other order (closed, draft, failed) has none. */
 export const DEFAULT_CHECKS_BY_ORDER_ID: Record<string, FactoriesWorkOrderCheck[]> = {
   [OPEN_WORK_ORDER.id!]: OPEN_WORK_ORDER_CHECKS,
-  [OPEN_WORK_ORDER_SECONDARY.id!]: OPEN_WORK_ORDER_CHECKS,
+  [OPEN_WORK_ORDER_SECONDARY.id!]: VERIFY_STEP_CHECKS,
   [CLOSED_WORK_ORDER.id!]: OPEN_WORK_ORDER_CHECKS,
-  [PR_CLOSURE_COMPLETED_WORK_ORDER.id!]: OPEN_WORK_ORDER_CHECKS,
+  [PR_CLOSURE_COMPLETED_WORK_ORDER.id!]: VERIFY_STEP_CHECKS,
   [RUNNING_WORK_ORDER.id!]: RUNNING_WORK_ORDER_CHECKS,
+  "wo-failed-refunds": VERIFY_STEP_CHECKS,
+  "wo-board-done-rejected": VERIFY_STEP_CHECKS,
+  "wo-board-done-canceled": VERIFY_STEP_CHECKS,
 };
 
 /** A single critical check — the smallest interesting state. */
@@ -217,7 +239,7 @@ export const CRITICAL_WORK_ORDER_CHECKS: FactoriesWorkOrderCheck[] = [
   {
     id: "check-risk-review-critical",
     key: "risk-review",
-    name: "Risk review",
+    name: "Risk score",
     score: 91,
     maxScore: 100,
     level: "LEVEL_CRITICAL",

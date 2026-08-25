@@ -8,7 +8,12 @@ describe("WorkOrderKanbanBoard", () => {
   it("scrolls extra lanes on the x axis", () => {
     render(
       <WorkOrderKanbanBoard testId="kanban-board">
-        <WorkOrderBoardLane title="Plan" count={0} emptyDescription="Nothing here." testId="lane-plan" />
+        <WorkOrderBoardLane
+          title="Plan"
+          count={0}
+          emptyDescription="Nothing here."
+          testId="lane-plan"
+        />
       </WorkOrderKanbanBoard>,
     );
 
@@ -20,7 +25,14 @@ describe("WorkOrderKanbanBoard", () => {
   });
 
   it("keeps empty-lane copy and stretches the empty body", () => {
-    render(<WorkOrderBoardLane title="Verify" count={0} emptyDescription="Nothing here." testId="lane-empty" />);
+    render(
+      <WorkOrderBoardLane
+        title="Verify"
+        count={0}
+        emptyDescription="Nothing here."
+        testId="lane-empty"
+      />,
+    );
 
     const emptyCopy = screen.getByText("Nothing here.");
     expect(emptyCopy).toBeInTheDocument();

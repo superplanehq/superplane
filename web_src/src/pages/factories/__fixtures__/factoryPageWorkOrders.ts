@@ -9,14 +9,24 @@ import {
   LINE_RUN_IMPLEMENT_ID,
   LINE_RUN_IMPLEMENT_PASSED_ID,
   LINE_RUN_VERIFY_PASSED_ID,
-  OPERATOR_USER,
-  REVIEWER_USER,
   STORYBOOK_ME_USER_ID,
   STORYBOOK_ME_USER_NAME,
   TWO_HOURS_AGO,
   YESTERDAY,
   minutesAgo,
 } from "./factoryPageIds";
+
+export const INGEST_CREATED_BY = {
+  automation: { appId: "app-refund-backlog", appName: "Ingest", nodeName: "On Issue Label" },
+} as const;
+
+export const SENTRY_CREATED_BY = {
+  automation: { appId: "app-refund-sentry", appName: "Sentry", nodeName: "On Issue" },
+} as const;
+
+export const SLACK_CREATED_BY = {
+  automation: { appId: "app-refund-slack", appName: "Slack", nodeName: "On Mention" },
+} as const;
 
 export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
   id: "wo-open-refunds",
@@ -43,7 +53,7 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: HOUR_AGO,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
+  createdBy: INGEST_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [],
   // A watcher automation announcing why the order needs attention — the detail
@@ -52,8 +62,8 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
     {
       key: "pr-closure",
       kind: "info",
-      headline: "Review the pull request",
-      body: "The Refund Processing line opened [PR #6812](https://github.com/superplanehq/superplane/pull/6812). When it merges, this work order completes automatically. If it closes without a merge, the work order is rejected.",
+      headline: "Listening for user review",
+      body: "This automation finished and opened [PR #6812](https://github.com/superplanehq/superplane/pull/6812). Tag `@superplaneagent` in comment to request changes. Task will automatically close when the pull request is closed or merged.",
       ctaLabel: "Review PR #6812",
       ctaUrl: "https://github.com/superplanehq/superplane/pull/6812",
       automation: { appId: "app-refund-verifier", appName: "PR Closure" },
@@ -80,19 +90,9 @@ export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: TWO_HOURS_AGO,
   updatedAt: TWO_HOURS_AGO,
-  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
+  createdBy: SENTRY_CREATED_BY,
   assignees: [{ id: ARNOLD_USER.id, name: ARNOLD_USER.name }],
-  lineDispatches: [
-    planLineDispatch([
-      planLineExecution("plan", {
-        id: "schema-plan",
-        state: "STATE_FINISHED",
-        result: "RESULT_PASSED",
-        createdAt: LAST_WEEK,
-        updatedAt: LAST_WEEK,
-      }),
-    ]),
-  ],
+  lineDispatches: [],
 };
 
 export const QUESTION_WORK_ORDER: FactoriesWorkOrder = {
@@ -107,25 +107,16 @@ export const QUESTION_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: TWO_HOURS_AGO,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
+  createdBy: SLACK_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  lineDispatches: [
-    planLineDispatch([
-      planLineExecution("plan", {
-        id: "question-plan",
-        state: "STATE_FINISHED",
-        result: "RESULT_PASSED",
-        updatedAt: HOUR_AGO,
-      }),
-    ]),
-  ],
+  lineDispatches: [],
   statusNotes: [
     {
       key: "agent-question",
       kind: "info",
       headline: "The agent has a question",
       body: "Should the poller fail closed on the first timeout, or retry with backoff?",
-      automation: { appId: "app-refund-planner", appName: "Refund Planner" },
+      automation: { appId: "app-refund-backlog", appName: "Ingest" },
       updatedAt: HOUR_AGO,
     },
   ],
@@ -137,27 +128,25 @@ export const APPROVAL_WORK_ORDER: FactoriesWorkOrder = {
   key: "RF-109",
   title: "Review the refund webhook schema change",
   description: [
-    "The implement step opened a pull request for the webhook schema. A person must review it before the line can continue.",
+    "The refund webhook payload dropped the `event_version` field. Restore it on the schema and keep older clients working.",
+    "",
+    "- Add `event_version` back to the webhook schema.",
+    "- Accept a missing version as `1` so current senders keep working.",
+    "- Add a contract test for the v1 and v2 payloads.",
   ].join("\n"),
   state: "STATE_OPEN",
   result: "RESULT_UNSPECIFIED",
   createdAt: TWO_HOURS_AGO,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: REVIEWER_USER.id, name: REVIEWER_USER.name } },
+  createdBy: INGEST_CREATED_BY,
   assignees: [{ id: ARNOLD_USER.id, name: ARNOLD_USER.name }],
   lineDispatches: [
     planLineDispatch([
-      planLineExecution("plan", {
-        id: "approval-plan",
-        state: "STATE_FINISHED",
-        result: "RESULT_PASSED",
-        updatedAt: TWO_HOURS_AGO,
-      }),
       planLineExecution("implement", {
         id: "approval-impl",
         state: "STATE_STARTED",
         result: "RESULT_UNKNOWN",
-        run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+        run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Implementation" },
         updatedAt: HOUR_AGO,
       }),
     ]),
@@ -175,29 +164,21 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
     "",
     "- Seed a ledger with one refund and replay the retry burst from the incident.",
     "- Assert the ledger contains exactly one entry per refund after reconciliation.",
-    "- Run the test in the `verify` step of the plan-and-implement line.",
+    "- Run the test in the `verify` step of the line.",
   ].join("\n"),
   state: "STATE_OPEN",
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: REVIEWER_USER.id, name: REVIEWER_USER.name } },
+  createdBy: INGEST_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     planLineDispatch([
-      planLineExecution("plan", {
-        id: "1",
-        state: "STATE_FINISHED",
-        result: "RESULT_PASSED",
-        updatedAt: TWO_HOURS_AGO,
-        totalTokens: "1800",
-        costCents: "45",
-      }),
       planLineExecution("implement", {
         id: "2",
         state: "STATE_STARTED",
         result: "RESULT_UNKNOWN",
-        run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+        run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Implementation" },
         updatedAt: HOUR_AGO,
         totalTokens: "900",
         costCents: "28",
@@ -223,23 +204,15 @@ export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+  createdBy: INGEST_CREATED_BY,
   assignees: [{ id: ARNOLD_USER.id, name: ARNOLD_USER.name }],
   lineDispatches: [
     planLineDispatch([
-      planLineExecution("plan", {
-        id: "3",
-        state: "STATE_FINISHED",
-        result: "RESULT_PASSED",
-        updatedAt: TWO_HOURS_AGO,
-        totalTokens: "2200",
-        costCents: "55",
-      }),
       planLineExecution("implement", {
         id: "4",
         state: "STATE_FINISHED",
         result: "RESULT_FAILED",
-        run: { id: LINE_RUN_IMPLEMENT_FAILED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+        run: { id: LINE_RUN_IMPLEMENT_FAILED_ID, appId: "app-refund-implementer", appName: "Implementation" },
         updatedAt: HOUR_AGO,
         totalTokens: "6400",
         costCents: "210",
@@ -256,13 +229,20 @@ export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   key: "RF-105",
   title: "Draft: rework refund telemetry",
   description: [
-    "Still scoping. The current refund metrics count events but hide latency, so we cannot tell whether reconciliation slows down under load.",
+    "**Describe the request:**",
+    "Let a user add emoji reactions on a work order itself (not only on comments).",
     "",
-    "Open questions before this is ready:",
+    "___",
     "",
-    "- Which percentiles do the dashboards need (p50/p95/p99)?",
-    "- Do we tag metrics by provider, by line, or both?",
-    "- Can we reuse the payment-poller histogram buckets?",
+    "**Describe your use-case:**",
+    "There is no reaction UI on a work order. People need a quick signal on the order (acknowledge, +1) without leaving a comment.",
+    "",
+    "___",
+    "",
+    "**Describe functionality:**",
+    "- React to an existing work order with an emoji.",
+    "- Show reactions on the work order details page.",
+    "- A user can add or remove their own reaction.",
   ].join("\n"),
   state: "STATE_DRAFT",
   result: "RESULT_UNSPECIFIED",
@@ -306,13 +286,58 @@ export const INGEST_DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: TWO_HOURS_AGO,
   updatedAt: TWO_HOURS_AGO,
-  createdBy: {
-    automation: {
-      appId: "app-refund-backlog",
-      appName: "Ingest",
-      nodeName: "On Issue Label",
-    },
-  },
+  createdBy: INGEST_CREATED_BY,
+  assignees: [],
+  lineDispatches: [],
+};
+
+export const SENTRY_DRAFT_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-sentry-refund-amount",
+  number: "68",
+  key: "RF-68",
+  title: "TypeError: Cannot read properties of undefined (reading 'amount')",
+  description: [
+    "Sentry opened this issue after checkout failed to read `amount` on a refund payload.",
+    "",
+    "### What happens",
+    "",
+    "The refund worker throws when the provider omits `amount` on a retry callback. The request then returns `HTTP 500`.",
+    "",
+    "### Expected",
+    "",
+    "Treat a missing amount as a validation error. Do not fail the worker.",
+  ].join("\n"),
+  state: "STATE_DRAFT",
+  result: "RESULT_UNSPECIFIED",
+  createdAt: YESTERDAY,
+  updatedAt: YESTERDAY,
+  createdBy: SENTRY_CREATED_BY,
+  assignees: [],
+  lineDispatches: [],
+};
+
+export const SLACK_DRAFT_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-slack-missing-email",
+  number: "64",
+  key: "RF-64",
+  title: "Customer reported a missing refund email",
+  description: [
+    "Support mentioned the SuperPlane agent in Slack. A customer did not receive a refund confirmation email after a successful refund.",
+    "",
+    "### Context",
+    "",
+    "Channel: #refunds-support",
+    "Message: The customer completed a refund yesterday. The ledger shows the refund. The confirmation email is missing.",
+    "",
+    "### Expected",
+    "",
+    "Send the confirmation email after the provider confirms the refund.",
+  ].join("\n"),
+  state: "STATE_DRAFT",
+  result: "RESULT_UNSPECIFIED",
+  createdAt: TWO_HOURS_AGO,
+  updatedAt: TWO_HOURS_AGO,
+  createdBy: SLACK_CREATED_BY,
   assignees: [],
   lineDispatches: [],
 };
@@ -331,7 +356,7 @@ export const CLOSED_FAILED_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_FAILED",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
-  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+  createdBy: SENTRY_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [],
 };
@@ -350,23 +375,15 @@ export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_COMPLETED",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
-  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
+  createdBy: INGEST_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     planLineDispatch([
-      planLineExecution("plan", {
-        id: "5",
-        state: "STATE_FINISHED",
-        result: "RESULT_PASSED",
-        updatedAt: LAST_WEEK,
-        totalTokens: "1500",
-        costCents: "40",
-      }),
       planLineExecution("implement", {
         id: "6",
         state: "STATE_FINISHED",
         result: "RESULT_PASSED",
-        run: { id: LINE_RUN_IMPLEMENT_PASSED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+        run: { id: LINE_RUN_IMPLEMENT_PASSED_ID, appId: "app-refund-implementer", appName: "Implementation" },
         updatedAt: LAST_WEEK,
         totalTokens: "12000",
         costCents: "480",
@@ -375,7 +392,7 @@ export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
         id: "7",
         state: "STATE_FINISHED",
         result: "RESULT_PASSED",
-        run: { id: LINE_RUN_VERIFY_PASSED_ID, appId: "app-refund-verifier", appName: "Refund Verifier" },
+        run: { id: LINE_RUN_VERIFY_PASSED_ID, appId: "app-refund-verifier", appName: "Risk Assessment" },
         updatedAt: YESTERDAY,
         totalTokens: "800",
         costCents: "18",
@@ -400,23 +417,15 @@ export const PR_CLOSURE_COMPLETED_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_COMPLETED",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
-  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+  createdBy: INGEST_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     planLineDispatch([
-      planLineExecution("plan", {
-        id: "pr-plan",
-        state: "STATE_FINISHED",
-        result: "RESULT_PASSED",
-        updatedAt: LAST_WEEK,
-        totalTokens: "900",
-        costCents: "22",
-      }),
       planLineExecution("implement", {
         id: "pr-impl",
         state: "STATE_FINISHED",
         result: "RESULT_PASSED",
-        run: { id: "run-pr-closure-implement", appId: "app-refund-implementer", appName: "Refund Implementer" },
+        run: { id: "run-pr-closure-implement", appId: "app-refund-implementer", appName: "Implementation" },
         updatedAt: LAST_WEEK,
         totalTokens: "5400",
         costCents: "180",
@@ -425,7 +434,7 @@ export const PR_CLOSURE_COMPLETED_WORK_ORDER: FactoriesWorkOrder = {
         id: "pr-verify",
         state: "STATE_FINISHED",
         result: "RESULT_PASSED",
-        run: { id: "run-pr-closure-verify", appId: "app-refund-verifier", appName: "Refund Verifier" },
+        run: { id: "run-pr-closure-verify", appId: "app-refund-verifier", appName: "Risk Assessment" },
         updatedAt: YESTERDAY,
         totalTokens: "700",
         costCents: "16",

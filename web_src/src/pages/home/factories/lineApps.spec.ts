@@ -74,6 +74,10 @@ describe("setup factory line apps", () => {
     expect(implementation).toMatch(
       /id: add-branch-artifact[\s\S]*component: addWorkOrderArtifact[\s\S]*repository: acme\/app/,
     );
+    expect(implementation).toMatch(/sourceId: implementation-agent\n\s+targetId: create-draft-pr/);
+    expect(implementation).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
+    expect(implementation).toMatch(/sourceId: create-draft-pr\n\s+targetId: attach-pr-artifact/);
+    expect(implementation).toMatch(/id: attach-pr-artifact[\s\S]*artifactType: pr/);
 
     const pr = materializeOnboardingApp("line-pr");
     expect(pr).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
@@ -92,7 +96,7 @@ describe("setup factory line apps", () => {
     expect(pr).toMatch(/sourceId: attach-pr-artifact[\s\S]*targetId: set-pr-closure-note/);
     expect(pr).toContain("component: setWorkOrderStatusNote");
     expect(pr).toContain("noteKey: pr-closure");
-    expect(pr).toContain("headline: Review the pull request");
+    expect(pr).toContain("headline: Listening for user review");
     expect(pr).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data.html_url }}'");
     expect(pr).toContain("showOnlyWhenWaiting: true");
   });

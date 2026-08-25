@@ -1,7 +1,7 @@
-import { Handle, Position, ReactFlow, Background, useReactFlow, type Node, type NodeProps } from "@xyflow/react";
+import { Handle, Position, ReactFlow, Background, type Node, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Maximize2, MoreHorizontal, Pencil } from "lucide-react";
-import { useCallback, useEffect, useMemo, type MouseEvent } from "react";
+import { useCallback, useMemo, type MouseEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/buttonVariants";
@@ -10,49 +10,16 @@ import { FACTORY_HANDLE_STYLE, factoryCanvasBackground, factoryEdgePalette } fro
 import { FACTORY_SIDE_HANDLE_ID, FACTORY_SPINE_HANDLE_ID } from "@/lib/layout/factoryRunLeafLayout";
 import { cn } from "@/lib/utils";
 import { Link } from "@/components/Link/link";
-import { FACTORY_HANDLE_OUTSET_PX } from "@/ui/CanvasPage/Block/handleStyle";
-import { CustomEdge } from "@/ui/CanvasPage/CustomEdge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { FactoryNodeCardShell } from "@/ui/factoryNodeChrome/FactoryNodeCardShell";
 
-import { COMPACT_CANVAS_FIT_SETTLE_MS, compactCanvasFitKey, shouldFitCompactCanvas } from "./compactCanvasFit";
 import { compactLineCanvasGraph, type LineNodeData } from "./compactLineCanvasGraph";
 import type { SplitRunCanvasModel } from "./splitRunCanvases";
-
-function LineCanvasTargetHandle({ isSideTarget }: { isSideTarget: boolean }) {
-  if (isSideTarget) {
-    return (
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={{
-          ...FACTORY_HANDLE_STYLE,
-          left: -FACTORY_HANDLE_OUTSET_PX,
-          top: "50%",
-          transform: "translateY(-50%)",
-        }}
-      />
-    );
-  }
-
-  return (
-    <Handle
-      type="target"
-      position={Position.Top}
-      style={{
-        ...FACTORY_HANDLE_STYLE,
-        left: "50%",
-        top: -FACTORY_HANDLE_OUTSET_PX,
-        transform: "translateX(-50%)",
-      }}
-    />
-  );
-}
 
 function LineCanvasNode({ data }: NodeProps<Node<LineNodeData>>) {
   return (
     <div
-      className={cn("relative overflow-visible rounded-2xl", data.isSelected && "z-10")}
+      className={cn("relative rounded-2xl", data.isSelected && "z-10")}
       data-testid={`split-run-canvas-node-${data.nodeId}`}
       data-selected={data.isSelected ? "true" : undefined}
       aria-selected={data.isSelected}
@@ -60,67 +27,30 @@ function LineCanvasNode({ data }: NodeProps<Node<LineNodeData>>) {
     >
       <div
         className={cn(
-          "relative overflow-visible rounded-2xl",
+          "rounded-2xl",
           data.isSelected &&
             "ring-2 ring-[color:var(--status-running-dot)] ring-offset-2 ring-offset-[color:var(--status-running-bg)]",
         )}
       >
-        <LineCanvasTargetHandle isSideTarget={data.isSideTarget} />
+        <Handle type="target" position={Position.Top} style={FACTORY_HANDLE_STYLE} />
+        <Handle type="target" position={Position.Left} style={FACTORY_HANDLE_STYLE} />
         <FactoryNodeCardShell
           title={data.title}
           subtitle={data.subtitle}
           iconSlug={data.iconSlug}
+          iconSrc={data.iconSrc}
           status={data.status}
           metrics={data.metrics}
           selected={data.isSelected}
         />
-        <Handle
-          id={FACTORY_SPINE_HANDLE_ID}
-          type="source"
-          position={Position.Bottom}
-          style={{
-            ...FACTORY_HANDLE_STYLE,
-            left: "50%",
-            bottom: -FACTORY_HANDLE_OUTSET_PX,
-            transform: "translateX(-50%)",
-          }}
-        />
-        <Handle
-          id={FACTORY_SIDE_HANDLE_ID}
-          type="source"
-          position={Position.Right}
-          style={{
-            ...FACTORY_HANDLE_STYLE,
-            right: -FACTORY_HANDLE_OUTSET_PX,
-            top: "50%",
-            transform: "translateY(-50%)",
-          }}
-        />
+        <Handle id={FACTORY_SPINE_HANDLE_ID} type="source" position={Position.Bottom} style={FACTORY_HANDLE_STYLE} />
+        <Handle id={FACTORY_SIDE_HANDLE_ID} type="source" position={Position.Right} style={FACTORY_HANDLE_STYLE} />
       </div>
     </div>
   );
 }
 
 const nodeTypes = { lineCanvas: LineCanvasNode };
-const edgeTypes = { custom: CustomEdge };
-
-const COMPACT_FIT_VIEW_OPTIONS = { padding: 0.2 } as const;
-
-function FitCompactCanvas({ contentKey }: { contentKey: string }) {
-  const { fitView } = useReactFlow();
-
-  useEffect(() => {
-    if (!shouldFitCompactCanvas(contentKey)) {
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      void fitView(COMPACT_FIT_VIEW_OPTIONS);
-    }, COMPACT_CANVAS_FIT_SETTLE_MS);
-    return () => window.clearTimeout(timer);
-  }, [contentKey, fitView]);
-
-  return null;
-}
 
 /**
  * Real line-app canvas in the run pane. Nodes keep factory card chrome.
@@ -154,7 +84,6 @@ export function CompactLineCanvas({
   );
   const background = factoryCanvasBackground(isDark);
   const palette = factoryEdgePalette(isDark);
-  const contentKey = compactCanvasFitKey(nodes.map((node) => node.id));
 
   const onNodeClick = useCallback(
     (_event: MouseEvent, node: Node) => {
@@ -164,7 +93,7 @@ export function CompactLineCanvas({
   );
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 w-full flex-col">
       {showHeader ? (
         <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-3 pb-2">
           <p className="min-w-0 truncate text-[15px] font-semibold tracking-[-0.02em] text-foreground">
@@ -197,16 +126,13 @@ export function CompactLineCanvas({
           </div>
         </div>
       ) : null}
-      <div className="relative h-full min-h-[18rem] w-full flex-1" data-testid="run-overlay-compact-canvas">
+      <div className="min-h-0 flex-1" data-testid="run-overlay-compact-canvas">
         <ReactFlow
-          key={contentKey}
           nodes={nodes}
           edges={edges.map((edge) => ({ ...edge, style: { ...palette.default, ...edge.style } }))}
           nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
           fitView
-          fitViewOptions={COMPACT_FIT_VIEW_OPTIONS}
-          minZoom={0.1}
+          fitViewOptions={{ padding: 0.2 }}
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable
@@ -217,9 +143,8 @@ export function CompactLineCanvas({
           onPaneClick={() => onSelect(null)}
           proOptions={{ hideAttribution: true }}
           colorMode={isDark ? "dark" : "light"}
-          defaultEdgeOptions={{ type: "custom", style: palette.default }}
+          defaultEdgeOptions={{ type: "smoothstep", style: palette.default }}
         >
-          <FitCompactCanvas contentKey={contentKey} />
           <Background
             gap={background.gap}
             size={background.size}
