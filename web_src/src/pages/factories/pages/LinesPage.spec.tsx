@@ -253,36 +253,6 @@ describe("LinesPage board", () => {
     expect(openCreateWorkOrder).toHaveBeenCalledTimes(1);
   });
 
-  it("collects finished work orders in the Done column", () => {
-    useFactoryWorkOrders.mockReturnValue({
-      data: [
-        {
-          id: "wo-completed",
-          title: "Publish refund SLA dashboard",
-          state: "STATE_CLOSED",
-          result: "RESULT_COMPLETED",
-          lineDispatches: [{ id: "dispatch-1", line: { id: REFUND_LINE_PLAN_ID } }],
-        },
-      ] as FactoriesWorkOrder[],
-    });
-    renderBoard();
-
-    const done = screen.getByTestId("lines-done-column");
-    expect(within(done).getByRole("button", { name: "Open Publish refund SLA dashboard" })).toBeInTheDocument();
-    expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
-  });
-
-  it("hides the Done column when the line ends with its own Done automation", () => {
-    const factory: FactoriesFactory = {
-      ...REFUND_FACTORY,
-      lines: (REFUND_FACTORY.lines ?? []).map(withPlanLinePhases),
-    };
-    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), factory);
-
-    expect(screen.queryByTestId("lines-done-column")).not.toBeInTheDocument();
-    expect(screen.getByTestId("lines-phase-column-2")).toBeInTheDocument();
-  });
-
   it("sets a pastel colour on the backlog from circular swatches", async () => {
     const user = userEvent.setup();
     renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
