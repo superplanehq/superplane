@@ -49,9 +49,6 @@ export const PLAN_LINE_APPS: FactoryApp[] = [
   SENTRY_INTAKE_APP,
   SLACK_INTAKE_APP,
   ...REFUND_FACTORY_APPS.map((app) => {
-    if (app.id === "app-refund-implementer") {
-      return { ...app, name: "Implement" };
-    }
     if (app.id === "app-refund-verifier") {
       return { ...app, name: "Verify" };
     }

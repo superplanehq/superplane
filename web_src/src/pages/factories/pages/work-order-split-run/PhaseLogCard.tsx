@@ -198,7 +198,7 @@ export function PhaseLogCard({
             type="button"
             onClick={onToggle}
             aria-expanded={expanded}
-            className="flex min-w-0 items-center gap-1.5 text-left font-mono text-[12px] leading-none"
+            className="flex min-w-0 items-center gap-1.5 text-left font-mono text-[13px] leading-tight"
           >
             <ChevronRight
               className={cn("size-3 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")}
@@ -208,7 +208,7 @@ export function PhaseLogCard({
             <PhaseTitle phase={phase} />
           </button>
         ) : (
-          <div className="flex min-w-0 items-center gap-1.5 font-mono text-[12px] leading-none">
+          <div className="flex min-w-0 items-center gap-1.5 font-mono text-[13px] leading-tight">
             <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3" />
             <PhaseTitle phase={phase} />
           </div>
@@ -231,7 +231,7 @@ export function PhaseLogCard({
       </div>
 
       {expanded ? (
-        <ol className="mt-0.5 mb-1 font-mono text-[12px] leading-none" data-testid={`split-run-stream-${phase.id}`}>
+        <ol className="mt-0.5 mb-1 font-mono text-[13px] leading-tight" data-testid={`split-run-stream-${phase.id}`}>
           {groups.map((group) => (
             <StreamNode
               key={group.line.id}
@@ -286,7 +286,7 @@ function StreamNode({
         data-highlighted={highlighted ? "true" : undefined}
         aria-current={highlighted ? "true" : undefined}
         className={cn(
-          "flex h-4 w-full items-center whitespace-nowrap rounded-sm",
+          "flex h-[1.375rem] w-full items-center whitespace-nowrap rounded-sm",
           highlighted && "bg-accent ring-1 ring-foreground/15",
         )}
       >
@@ -364,14 +364,14 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
           data-testid={`split-run-stream-line-${step.line.id}`}
           aria-expanded={expanded}
           onClick={() => setExpanded((open) => !open)}
-          className="flex h-4 w-full cursor-pointer items-center whitespace-nowrap text-left hover:text-foreground"
+          className="flex h-[1.375rem] w-full cursor-pointer items-center whitespace-nowrap text-left hover:text-foreground"
         >
           {header}
         </button>
       ) : (
         <div
           data-testid={`split-run-stream-line-${step.line.id}`}
-          className="flex h-4 w-full items-center whitespace-nowrap"
+          className="flex h-[1.375rem] w-full items-center whitespace-nowrap"
         >
           {header}
         </div>
@@ -387,7 +387,7 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
                 className="flex w-full items-start"
               >
                 <StreamIndent ch={12} />
-                <span className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-4 text-foreground">
+                <span className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground">
                   {event.line.componentName}
                 </span>
               </div>
@@ -413,7 +413,7 @@ function StreamToolGroup({ stepId, tools }: { stepId: string; tools: SplitRunStr
         aria-expanded={expanded}
         aria-label={summary}
         onClick={() => setExpanded((open) => !open)}
-        className="flex h-4 w-full items-center whitespace-nowrap text-muted-foreground"
+        className="flex h-[1.375rem] w-full items-center whitespace-nowrap text-muted-foreground"
       >
         <StreamIndent ch={12} />
         <ChevronRight className={cn("mr-1 size-3 transition-transform", expanded && "rotate-90")} aria-hidden />
@@ -453,14 +453,14 @@ function StreamTool({ tool }: { tool: SplitRunStreamLine }) {
           data-testid={`split-run-stream-line-${tool.id}`}
           aria-expanded={expanded}
           onClick={() => setExpanded((open) => !open)}
-          className="flex h-4 w-full cursor-pointer items-center whitespace-nowrap text-left hover:text-foreground"
+          className="flex h-[1.375rem] w-full cursor-pointer items-center whitespace-nowrap text-left hover:text-foreground"
         >
           {row}
         </button>
       ) : (
         <div
           data-testid={`split-run-stream-line-${tool.id}`}
-          className="flex h-4 w-full items-center whitespace-nowrap"
+          className="flex h-[1.375rem] w-full items-center whitespace-nowrap"
         >
           {row}
         </div>
@@ -474,7 +474,7 @@ function StreamOutput({ text }: { text: string }) {
   return (
     <div className="flex w-full items-start">
       <StreamIndent ch={12} />
-      <pre className="min-w-0 flex-1 whitespace-pre-wrap break-words py-0.5 font-mono text-[12px] leading-4 text-muted-foreground">
+      <pre className="min-w-0 flex-1 whitespace-pre-wrap break-words py-0.5 font-mono text-[13px] leading-5 text-muted-foreground">
         {text}
       </pre>
     </div>
@@ -539,7 +539,7 @@ function stepTypeTone(type: string): string {
 function StreamArtifact({ artifact }: { artifact: FactoriesWorkOrderArtifact }) {
   return (
     <WorkOrderArtifactInline
-      className="font-mono text-[12px] font-normal tracking-normal"
+      className="font-mono text-[13px] font-normal tracking-normal"
       artifact={{
         id: artifact.id,
         type: artifact.type ?? "TYPE_UNSPECIFIED",
