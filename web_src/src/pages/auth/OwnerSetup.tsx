@@ -5,6 +5,7 @@ import { OwnerStep } from "./ownerSetup/OwnerStep";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
+import { newOrganizationLandingPath } from "./newOrganizationLandingPath";
 
 const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
 
@@ -106,7 +107,7 @@ const OwnerSetup: React.FC = () => {
       const orgId = data.organization_id;
 
       if (!isPostHogEnabled) {
-        window.location.href = `/${orgId}`;
+        window.location.href = newOrganizationLandingPath(orgId);
         return;
       }
 
@@ -120,7 +121,7 @@ const OwnerSetup: React.FC = () => {
           usableSurveys.find((survey) => survey.name === OWNER_SETUP_SURVEY_NAME) ?? usableSurveys[0];
 
         if (!selectedSurvey) {
-          window.location.href = `/${orgId}`;
+          window.location.href = newOrganizationLandingPath(orgId);
           return;
         }
 
@@ -174,7 +175,7 @@ const OwnerSetup: React.FC = () => {
         )}
 
         {step === "survey" && activeSurvey && pendingOrganizationId && (
-          <PostHogSurveyForm survey={activeSurvey} redirectTo={`/${pendingOrganizationId}`} />
+          <PostHogSurveyForm survey={activeSurvey} redirectTo={newOrganizationLandingPath(pendingOrganizationId)} />
         )}
       </div>
     </div>

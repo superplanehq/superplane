@@ -1,10 +1,12 @@
 import { EMPTY_USAGE_REPORT } from "./usageReportFixtures";
+import { factoryIntakeRoutes } from "./factoryIntakeHandlers";
 import {
   defaultFactoriesFixture,
   ORGANIZATION_USERS,
   STORYBOOK_ME_USER_EMAIL,
   STORYBOOK_ME_USER_ID,
   STORYBOOK_ME_USER_NAME,
+  toStorybookOrganizationUser,
   type FactoriesFixture,
 } from "./factoryPageResponses";
 import { DEFAULT_ARTIFACTS_BY_ORDER_ID, DEFAULT_EVENTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
@@ -20,26 +22,25 @@ import type {
 } from "@/api-client";
 import { defaultNotificationSettings } from "@/lib/notificationSettings";
 import { buildStorybookMeUser, fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
+import { storybookHostedLlmModels } from "@/pages/home/__fixtures__/hostedLlmModels";
 import { automationNameForLineStep } from "../lib/factoryLineFormShared";
+import { isValidWorkspaceKey, suggestWorkspaceKeyFromName, WORKSPACE_KEY_MAX_LENGTH } from "../lib/workspaceKey";
 import { metricsForLine } from "../pages/lineListMetricsMockData";
 
 export type { FactoriesFixture };
-
-export const factoryPageIds = {
-  organizationId: defaultFactoriesFixture.organizationId,
-};
 
 const re = (pattern: string): RegExp => new RegExp(`^${pattern}$`);
 
 interface FactoriesRoute {
   pattern: RegExp;
-  resolve: (match: RegExpExecArray, method: string, body: Record<string, unknown> | null) => FixtureResult;
+  resolve: (match: RegExpExecArray, method: string, body: Record<string, unknown> | null, url: URL) => FixtureResult;
 }
 
 interface RequestBody {
   name?: unknown;
   title?: unknown;
   description?: unknown;
+  key?: unknown;
   assigneeIds?: unknown;
   assignee_ids?: unknown;
   lineName?: unknown;
@@ -75,6 +76,28 @@ function ensureFactoryWorkOrders(fixture: FactoriesFixture, factoryId: string): 
   return created;
 }
 
+function takenFactoryKeys(factories: FactoriesFactory[]): Set<string> {
+  return new Set(factories.map((factory) => factory.key).filter((key): key is string => Boolean(key)));
+}
+
+/** Same letter-only keys the live API derives when the client omits `key`. */
+function unusedFactoryKey(factories: FactoriesFactory[], name: string, requestedKey: string): string {
+  const taken = takenFactoryKeys(factories);
+  const seed = isValidWorkspaceKey(requestedKey) ? requestedKey : suggestWorkspaceKeyFromName(name) || "WS";
+  if (!taken.has(seed)) {
+    return seed;
+  }
+
+  const prefix = seed.slice(0, WORKSPACE_KEY_MAX_LENGTH - 1);
+  for (let code = 65; code <= 90; code += 1) {
+    const candidate = `${prefix}${String.fromCharCode(code)}`;
+    if (!taken.has(candidate)) {
+      return candidate;
+    }
+  }
+  return `${prefix}Z`;
+}
+
 function factoriesCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
     pattern: re("/api/v1/factories"),
@@ -83,11 +106,14 @@ function factoriesCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {
         return { json: { factories: fixture.factories } };
       }
       const request = (body ?? {}) as RequestBody;
+      const name = stringOrEmpty(request.name) || "New workspace";
       const created = {
         id: `storybook-factory-${fixture.factories.length + 1}`,
-        name: stringOrEmpty(request.name) || "New workspace",
+        name,
+        key: unusedFactoryKey(fixture.factories, name, stringOrEmpty(request.key)),
         description: stringOrEmpty(request.description),
         lines: [],
+        onboarding: {},
       };
       fixture.factories.push(created);
       fixture.workOrdersByFactoryId[created.id] = [];
@@ -149,6 +175,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
       pattern: re("/api/v1/factories/([^/]+)/apps"),
       resolve: (match) => ({ json: { apps: fixture.appsByFactoryId[match[1]] ?? [] } }),
     },
+    ...factoryIntakeRoutes(fixture),
     {
       pattern: re("/api/v1/factories/([^/]+)/usage"),
       resolve: (match) => ({ json: fixture.usageByFactoryId?.[match[1]] ?? EMPTY_USAGE_REPORT }),
@@ -235,7 +262,7 @@ function createWorkOrderFromRequest(request: RequestBody, orderCount: number): F
     createdAt: nowIso,
     updatedAt: nowIso,
     createdBy: { user: { id: ORGANIZATION_USERS[0].id, name: ORGANIZATION_USERS[0].name } },
-    assignees: findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids)),
+    assignees: findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids).slice(0, 1)),
     lineDispatches: [],
   };
 }
@@ -291,6 +318,9 @@ function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: st
   const line = factory?.lines?.find((entry) => entry.name === lineName) ?? factory?.lines?.[0];
   const now = new Date().toISOString();
   order.updatedAt = now;
+  if (order.state === "STATE_DRAFT") {
+    order.state = "STATE_OPEN";
+  }
 
   const apps = fixture.appsByFactoryId[factoryId] ?? [];
   const newDispatch = buildDispatchedLineDispatch(line, lineName, now, apps);
@@ -324,7 +354,7 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         const order = findOrder(fixture, match[1], match[2]);
         if (!order) return { json: {} };
         const request = (body ?? {}) as RequestBody;
-        order.assignees = findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids));
+        order.assignees = findUsersByIds(stringArrayOrEmpty(request.assigneeIds ?? request.assignee_ids).slice(0, 1));
         order.updatedAt = new Date().toISOString();
         return { json: { order } };
       },
@@ -406,6 +436,13 @@ function organizationLlmSpendRoute(fixture: FactoriesFixture): FactoriesRoute {
   };
 }
 
+function hostedLlmModelsRoute(): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/hosted-llm-models"),
+    resolve: (_match, _method, _body, url) => ({ json: storybookHostedLlmModels(url.searchParams.get("provider")) }),
+  };
+}
+
 const STORYBOOK_ME_MEMBER_PERMISSIONS = ["members"].flatMap((resource) =>
   ["read", "create", "update", "delete"].map((action) => ({ resource, action })),
 );
@@ -457,6 +494,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...factoryLinesRoutes(fixture),
     ...workOrderRoutes(fixture),
     organizationLlmSpendRoute(fixture),
+    hostedLlmModelsRoute(),
   ];
 }
 
@@ -473,7 +511,7 @@ export function matchFactoryPageFixture(
   for (const route of buildRoutes(fixture)) {
     const match = route.pattern.exec(url.pathname);
     if (match) {
-      return route.resolve(match, method, body);
+      return route.resolve(match, method, body, url);
     }
   }
   return null;
@@ -483,10 +521,7 @@ export function matchFactoryPageFixture(
 export function factoriesOrganizationUsersResponse(): FixtureResult {
   return {
     json: {
-      users: ORGANIZATION_USERS.map((user) => ({
-        metadata: { id: user.id, email: user.email },
-        spec: { displayName: user.name },
-      })),
+      users: ORGANIZATION_USERS.map(toStorybookOrganizationUser),
     },
   };
 }

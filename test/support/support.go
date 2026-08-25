@@ -34,6 +34,8 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/readmemory"
 	_ "github.com/superplanehq/superplane/pkg/components/runner"
 	_ "github.com/superplanehq/superplane/pkg/components/runner/claude"
+	_ "github.com/superplanehq/superplane/pkg/components/runner/codex"
+	_ "github.com/superplanehq/superplane/pkg/components/runner/openrouter"
 	_ "github.com/superplanehq/superplane/pkg/components/ssh"
 	_ "github.com/superplanehq/superplane/pkg/components/updatememory"
 	_ "github.com/superplanehq/superplane/pkg/components/upsertmemory"
@@ -461,6 +463,43 @@ func CreateFactoryAppWithOnRunTrigger(
 	}))
 
 	return canvas, entrypoint
+}
+
+// CreateFactoryCanvas creates a factory-owned canvas with an empty live
+// version. Use it when a test needs a factory app to point at and does not
+// care about the graph.
+func CreateFactoryCanvas(t require.TestingT, r *ResourceRegistry, factoryID uuid.UUID, name string) *models.Canvas {
+	now := time.Now()
+	liveVersionID := uuid.New()
+	canvas := &models.Canvas{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		LiveVersionID:  &liveVersionID,
+		FactoryID:      &factoryID,
+		Name:           RandomName(name),
+		CreatedBy:      &r.User,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(canvas).Error; err != nil {
+			return err
+		}
+
+		version := models.CanvasVersion{
+			ID:         liveVersionID,
+			WorkflowID: canvas.ID,
+			OwnerID:    &r.User,
+			Nodes:      datatypes.NewJSONSlice([]models.Node{}),
+			Edges:      datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt:  &now,
+			UpdatedAt:  &now,
+		}
+		return tx.Create(&version).Error
+	}))
+
+	return canvas
 }
 
 func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {

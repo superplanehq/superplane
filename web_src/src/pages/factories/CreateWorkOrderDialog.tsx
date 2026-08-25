@@ -7,12 +7,12 @@ import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { cn } from "@/lib/utils";
-import { Popover, PopoverTrigger } from "@/ui/popover";
-import { ChevronRight, Factory as FactoryIcon, Layers, Maximize2, Minimize2, XIcon } from "lucide-react";
+import { ChevronRight, Factory as FactoryIcon, Maximize2, Minimize2, Play, XIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { useFactoriesLayout } from "./layout/factoriesLayoutContext";
-import { CreateWorkOrderPropertyPills, LinePickerPanel } from "./CreateWorkOrderPropertyPills";
+import { CreateWorkOrderPropertyPills } from "./CreateWorkOrderPropertyPills";
+import { firstFactoryLineName } from "./lib/factoryPagePaths";
 import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
 
@@ -117,7 +117,12 @@ function CreateWorkOrderDialogSession({
           isSendingToLine={composer.isSendingToLine}
           onAssigneeChange={composer.setAssigneeIds}
           onSaveDraft={() => void composer.handleSaveDraft()}
-          onSendToLine={(lineName) => void composer.handleSendToLine(lineName)}
+          onStart={() => {
+            const lineName = firstFactoryLineName({ lines });
+            if (lineName) {
+              void composer.handleSendToLine(lineName);
+            }
+          }}
         />
       </DialogContent>
     </Dialog>
@@ -183,7 +188,7 @@ function CreateWorkOrderDialogFooter({
   isSendingToLine,
   onAssigneeChange,
   onSaveDraft,
-  onSendToLine,
+  onStart,
 }: {
   organizationId: string;
   assigneeIds: string[];
@@ -195,7 +200,7 @@ function CreateWorkOrderDialogFooter({
   isSendingToLine: boolean;
   onAssigneeChange: (ids: string[]) => void;
   onSaveDraft: () => void;
-  onSendToLine: (lineName: string) => void;
+  onStart: () => void;
 }) {
   return (
     <div className="relative z-10 flex items-center justify-between gap-3 border-t border-border px-4 py-3">
@@ -220,81 +225,51 @@ function CreateWorkOrderDialogFooter({
           Save as draft
         </LoadingButton>
 
-        <SendToLinePopover
+        <StartWorkOrderButton
           lines={lines}
-          isSaving={isSaving}
           canDispatch={canDispatch}
           canSaveDraft={canSaveDraft}
           isSendingToLine={isSendingToLine}
-          onSendToLine={onSendToLine}
+          onStart={onStart}
         />
       </div>
     </div>
   );
 }
 
-function SendToLinePopover({
+function StartWorkOrderButton({
   lines,
-  isSaving,
   canDispatch,
   canSaveDraft,
   isSendingToLine,
-  onSendToLine,
+  onStart,
 }: {
   lines: FactoriesFactoryLine[];
-  isSaving: boolean;
   canDispatch: boolean;
   canSaveDraft: boolean;
   isSendingToLine: boolean;
-  onSendToLine: (lineName: string) => void;
+  onStart: () => void;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [portalRoot, setPortalRoot] = useState<HTMLDivElement | null>(null);
-  const hasLines = lines.length > 0;
+  const hasLines = Boolean(firstFactoryLineName({ lines }));
   const isDisabled = !canDispatch || !canSaveDraft || !hasLines;
-
-  const handleOpenChange = (nextOpen: boolean) => {
-    if (isSaving || isDisabled) {
-      return;
-    }
-    setIsOpen(nextOpen);
-  };
-
-  const handleSelect = (lineName: string) => {
-    setIsOpen(false);
-    onSendToLine(lineName);
-  };
-
   const tooltipMessage = !canDispatch
-    ? "You don't have permission to dispatch work orders."
-    : "This workspace has no lines to send this work order to.";
+    ? "You don't have permission to start work orders."
+    : "This workspace has no line to start this work order on.";
 
   return (
-    <div ref={setPortalRoot} className="relative shrink-0">
-      <PermissionTooltip allowed={canDispatch && hasLines} message={tooltipMessage}>
-        <Popover modal={false} open={isOpen} onOpenChange={handleOpenChange}>
-          <PopoverTrigger asChild>
-            <LoadingButton
-              type="button"
-              disabled={isDisabled}
-              loading={isSendingToLine}
-              loadingText="Sending..."
-              className="h-8 shrink-0 rounded-full px-4"
-              data-testid="work-order-create-send-to-line"
-            >
-              <Layers className="size-3.5" aria-hidden />
-              Send to line
-            </LoadingButton>
-          </PopoverTrigger>
-          <LinePickerPanel
-            lines={lines}
-            isSaving={isSaving}
-            portalRoot={portalRoot}
-            align="end"
-            onSelect={handleSelect}
-          />
-        </Popover>
-      </PermissionTooltip>
-    </div>
+    <PermissionTooltip allowed={canDispatch && hasLines} message={tooltipMessage}>
+      <LoadingButton
+        type="button"
+        disabled={isDisabled}
+        loading={isSendingToLine}
+        loadingText="Starting..."
+        onClick={onStart}
+        className="h-8 shrink-0 rounded-full px-4"
+        data-testid="work-order-create-start"
+      >
+        <Play className="size-3.5" aria-hidden />
+        Start
+      </LoadingButton>
+    </PermissionTooltip>
   );
 }

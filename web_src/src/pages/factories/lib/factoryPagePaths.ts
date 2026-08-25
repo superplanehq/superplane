@@ -15,6 +15,69 @@ export function factoryOverviewPath(organizationId: string, factoryKey: string) 
   return `${factoryDetailPath(organizationId, factoryKey)}/overview`;
 }
 
+/** First line id on a factory, when the factory has at least one line. */
+export function firstFactoryLineId(
+  factory: { lines?: Array<{ id?: string }> | null } | null | undefined,
+): string | undefined {
+  return factory?.lines?.find((line) => Boolean(line.id))?.id;
+}
+
+/** First line name on a factory, used to Start a new work order. */
+export function firstFactoryLineName(
+  factory: { lines?: Array<{ name?: string }> | null } | null | undefined,
+): string | undefined {
+  return factory?.lines?.find((line) => Boolean(line.name?.trim()))?.name?.trim();
+}
+
+/**
+ * Workspace home: the first line board when a line exists, otherwise the
+ * lines list (empty state).
+ */
+export function factoryHomePath(organizationId: string, factoryKey: string, lineId?: string | null) {
+  if (lineId) {
+    return factoryLineDetailPath(organizationId, factoryKey, lineId);
+  }
+  return linesPath(organizationId, factoryKey);
+}
+
+/** Opens the line board with the Intake drawer beside the columns. */
+export const INTAKE_SEARCH_PARAM = "intake";
+/**
+ * Selects one intake when the drawer opens. A workspace can run several
+ * intakes on the same source, so the identifier is the intake, not the source.
+ */
+export const INTAKE_ID_SEARCH_PARAM = "intakeId";
+/** Opens intake settings on a tab: general, runs, or automation. */
+export const INTAKE_SETTINGS_SEARCH_PARAM = "settings";
+
+export function factoryIntakePath(
+  organizationId: string,
+  factoryKey: string,
+  lineId?: string | null,
+  intakeId?: string,
+  settingsTab?: string,
+) {
+  const path = `${factoryHomePath(organizationId, factoryKey, lineId)}?${INTAKE_SEARCH_PARAM}=1`;
+  const intakeQuery = intakeId ? `&${INTAKE_ID_SEARCH_PARAM}=${encodeURIComponent(intakeId)}` : "";
+  const settingsQuery = settingsTab ? `&${INTAKE_SETTINGS_SEARCH_PARAM}=${encodeURIComponent(settingsTab)}` : "";
+  return `${path}${intakeQuery}${settingsQuery}`;
+}
+
+export function isIntakeSearchOpen(search: string): boolean {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(INTAKE_SEARCH_PARAM) === "1";
+}
+
+export function intakeIdFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(INTAKE_ID_SEARCH_PARAM);
+}
+
+export function intakeSettingsTabFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(INTAKE_SETTINGS_SEARCH_PARAM);
+}
+
 export function factorySetupPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/setup`;
 }
@@ -133,13 +196,16 @@ export function factoryAppConfigurePath(
   });
 }
 
-/** Factory canvas view URL. Keeps run/from context and omits edit chrome. */
+/** Factory canvas view URL. Run views use the split-run page. */
 export function factoryAppViewPath(
   organizationId: string,
   factoryKey: string,
   appId: string,
   options?: Pick<FactoryAppNavOptions, "from" | "lineId" | "orderNumber" | "runId">,
 ) {
+  if (options?.runId) {
+    return factoryAppSplitRunPath(organizationId, factoryKey, appId, options);
+  }
   return factoryAppPath(organizationId, factoryKey, appId, options);
 }
 
@@ -159,7 +225,33 @@ export function factoryAppRunPath(
   runId: string,
   options?: Omit<FactoryAppNavOptions, "runId">,
 ) {
-  return factoryAppPath(organizationId, factoryKey, appId, { ...options, runId });
+  return factoryAppSplitRunPath(organizationId, factoryKey, appId, { ...options, runId });
+}
+
+export function factoryAppSplitRunPath(
+  organizationId: string,
+  factoryKey: string,
+  appId: string,
+  options?: Omit<FactoryAppNavOptions, "configure" | "blocks"> & { canvas?: string },
+) {
+  const search = new URLSearchParams();
+  if (options?.runId) {
+    search.set("run", options.runId);
+  }
+  if (options?.from) {
+    search.set("from", options.from);
+  }
+  if (options?.lineId) {
+    search.set("lineId", options.lineId);
+  }
+  if (options?.orderNumber) {
+    search.set("orderNumber", options.orderNumber);
+  }
+  if (options?.canvas) {
+    search.set("canvas", options.canvas);
+  }
+  const qs = search.toString();
+  return `${factoryDetailPath(organizationId, factoryKey)}/apps/${appId}/split-run${qs ? `?${qs}` : ""}`;
 }
 
 export function factorySettingsPath(organizationId: string, factoryKey: string) {

@@ -16,3 +16,18 @@ func TestRequireMachineType(t *testing.T) {
 	_, err = requireMachineType("")
 	require.Error(t, err)
 }
+
+func TestResolveBrokerFleetIDUsesEnvOverride(t *testing.T) {
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
+	got, err := resolveBrokerFleetID(MachineTypeE1LargeAMD64)
+	require.NoError(t, err)
+	assert.Equal(t, MachineTypeE1LargeAMD64, got)
+
+	t.Setenv("TASK_BROKER_FLEET_ID", "aws-standard-1")
+	got, err = resolveBrokerFleetID(MachineTypeE1LargeAMD64)
+	require.NoError(t, err)
+	assert.Equal(t, "aws-standard-1", got)
+
+	_, err = resolveBrokerFleetID("")
+	require.Error(t, err)
+}

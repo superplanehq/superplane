@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { createWorkOrderPath, workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
+import { createWorkOrderPath, factoryHomePath } from "../lib/factoryPagePaths";
 
-export function useCreateWorkOrderDialogState(organizationId: string, factoryKey: string, canCreate: boolean) {
+export function useCreateWorkOrderDialogState(
+  organizationId: string,
+  factoryKey: string,
+  canCreate: boolean,
+  firstLineId?: string,
+) {
   const navigate = useNavigate();
   const location = useLocation();
   const isCreateWorkOrderRoute = location.pathname === createWorkOrderPath(organizationId, factoryKey);
@@ -23,18 +28,18 @@ export function useCreateWorkOrderDialogState(organizationId: string, factoryKey
   const closeCreateWorkOrder = useCallback(() => {
     setCreateWorkOrderOpen(false);
     if (isCreateWorkOrderRoute) {
-      navigate(workOrdersPath(organizationId, factoryKey), { replace: true });
+      navigate(factoryHomePath(organizationId, factoryKey, firstLineId), { replace: true });
     }
-  }, [factoryKey, isCreateWorkOrderRoute, navigate, organizationId]);
+  }, [factoryKey, firstLineId, isCreateWorkOrderRoute, navigate, organizationId]);
 
   const completeCreateWorkOrder = useCallback(
-    (orderNumber: string) => {
+    (_orderNumber: string) => {
       setCreateWorkOrderOpen(false);
-      navigate(workOrderDetailPath(organizationId, factoryKey, orderNumber), {
+      navigate(factoryHomePath(organizationId, factoryKey, firstLineId), {
         replace: isCreateWorkOrderRoute,
       });
     },
-    [factoryKey, isCreateWorkOrderRoute, navigate, organizationId],
+    [factoryKey, firstLineId, isCreateWorkOrderRoute, navigate, organizationId],
   );
 
   return { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder };

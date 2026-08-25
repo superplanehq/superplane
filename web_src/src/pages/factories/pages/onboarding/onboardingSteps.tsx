@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
@@ -142,6 +143,39 @@ export function NameStep({ setup }: { setup: OnboardingSetupApi }) {
       <p className="mt-1.5 text-[12px] text-muted-foreground">
         Use a name for the app or product area this workspace will improve.
       </p>
+    </div>
+  );
+}
+
+export function StartStep({ setup }: { setup: OnboardingSetupApi }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label htmlFor="start-work-order-title" className="text-[13px] font-medium">
+          Work order title
+        </Label>
+        <Input
+          id="start-work-order-title"
+          value={setup.workOrderTitle}
+          onChange={(event) => setup.setWorkOrderTitle(event.target.value)}
+          className="mt-2 h-10"
+          autoFocus
+        />
+      </div>
+      <div>
+        <Label htmlFor="start-work-order-description" className="text-[13px] font-medium">
+          Description
+        </Label>
+        <Textarea
+          id="start-work-order-description"
+          value={setup.workOrderDescription}
+          onChange={(event) => setup.setWorkOrderDescription(event.target.value)}
+          className="mt-2 min-h-40"
+        />
+        <p className="mt-1.5 text-[12px] text-muted-foreground">
+          The agent uses this description when it improves AGENTS.md in the app repository.
+        </p>
+      </div>
     </div>
   );
 }
