@@ -1,4 +1,4 @@
-import { useFactoryIntakeRuns } from "@/hooks/useFactoryData";
+import { useFactoryIntakeRuns } from "@/hooks/useFactoryIntakeData";
 import { useMemo } from "react";
 
 import { analyzingTicketsFromApi } from "./intakeSourceSettingsModel";

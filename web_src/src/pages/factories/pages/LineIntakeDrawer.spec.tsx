@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
-import type * as FactoryDataModule from "@/hooks/useFactoryData";
+import type * as FactoryIntakeDataModule from "@/hooks/useFactoryIntakeData";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
@@ -29,8 +29,8 @@ vi.mock("@/hooks/useCanvasData", async (importOriginal) => ({
   useCanvas,
 }));
 
-vi.mock("@/hooks/useFactoryData", async (importOriginal) => ({
-  ...(await importOriginal<typeof FactoryDataModule>()),
+vi.mock("@/hooks/useFactoryIntakeData", async (importOriginal) => ({
+  ...(await importOriginal<typeof FactoryIntakeDataModule>()),
   useFactoryIntakeRuns,
   useUpdateFactoryIntake: () => ({ mutateAsync: updateIntake, isPending: false, error: null }),
 }));

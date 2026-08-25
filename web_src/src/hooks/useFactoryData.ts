@@ -2,7 +2,6 @@ import {
   factoriesAddWorkOrderComment,
   factoriesCloseWorkOrder,
   factoriesCreateFactory,
-  factoriesCreateFactoryIntake,
   factoriesCreateFactoryLine,
   factoriesCreateWorkOrder,
   factoriesDeleteFactory,
@@ -11,29 +10,22 @@ import {
   factoriesDispatchWorkOrder,
   factoriesListFactories,
   factoriesListFactoryApps,
-  factoriesListFactoryIntakeRuns,
-  factoriesListFactoryIntakes,
   factoriesListWorkOrderArtifacts,
   factoriesListWorkOrderEvents,
   factoriesListWorkOrders,
   factoriesUpdateFactory,
-  factoriesUpdateFactoryIntake,
   factoriesUpdateFactoryLine,
   factoriesUpdateWorkOrderAssignees,
   factoriesUpdateWorkOrderStatus,
 } from "@/api-client";
 import type {
   FactoriesFactory,
-  FactoriesFactoryIntake,
-  FactoriesFactoryIntakeRun,
-  FactoriesFactoryIntakeSource,
   FactoriesFactoryLine,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderResult,
   FactoriesWorkOrderState,
   FactoryApp,
-  FactoryIntakeSettings,
   FactoryLineStep,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -57,9 +49,6 @@ export const factoryQueryKeys = {
   workOrderChecks: (organizationId: string, factoryId: string, orderId: string) =>
     ["factories", organizationId, factoryId, "work-orders", orderId, "checks"] as const,
   apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
-  intakes: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "intakes"] as const,
-  intakeRuns: (organizationId: string, factoryId: string, intakeId: string) =>
-    ["factories", organizationId, factoryId, "intakes", intakeId, "runs"] as const,
   velocity: (
     organizationId: string,
     factoryId: string,
@@ -95,10 +84,6 @@ function workOrderArtifactsKey(organizationId: string, factoryId: string, orderI
 
 export function factoryAppsKey(organizationId: string, factoryId: string) {
   return factoryQueryKeys.apps(organizationId, factoryId);
-}
-
-export function factoryIntakesKey(organizationId: string, factoryId: string) {
-  return factoryQueryKeys.intakes(organizationId, factoryId);
 }
 
 export function useFactories(organizationId: string, enabled = true) {
@@ -488,101 +473,6 @@ export function useFactoryApps(organizationId: string, factoryId: string) {
       return response.data?.apps ?? [];
     },
     enabled: Boolean(organizationId && factoryId),
-  });
-}
-
-export function useFactoryIntakes(organizationId: string, factoryId: string) {
-  return useQuery({
-    queryKey: factoryIntakesKey(organizationId, factoryId),
-    queryFn: async (): Promise<FactoriesFactoryIntake[]> => {
-      const response = await factoriesListFactoryIntakes(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId },
-        }),
-      );
-      return response.data?.intakes ?? [];
-    },
-    enabled: Boolean(organizationId && factoryId),
-  });
-}
-
-export function useFactoryIntakeRuns(
-  organizationId: string,
-  factoryId: string,
-  intakeId: string | undefined,
-  enabled = true,
-) {
-  return useQuery({
-    queryKey: factoryQueryKeys.intakeRuns(organizationId, factoryId, intakeId ?? ""),
-    queryFn: async (): Promise<FactoriesFactoryIntakeRun[]> => {
-      const response = await factoriesListFactoryIntakeRuns(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId, intakeId: intakeId ?? "" },
-        }),
-      );
-      return response.data?.runs ?? [];
-    },
-    enabled: Boolean(organizationId && factoryId && intakeId) && enabled,
-  });
-}
-
-export function useCreateFactoryIntake(organizationId: string, factoryId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (input: { source: FactoriesFactoryIntakeSource; name?: string; confidencePct?: number }) => {
-      const response = await factoriesCreateFactoryIntake(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId },
-          body: {
-            source: input.source,
-            name: input.name,
-            confidencePct: input.confidencePct,
-          },
-        }),
-      );
-      if (!response.data?.intake) {
-        throw new Error("Failed to create intake");
-      }
-      return response.data.intake;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: factoryIntakesKey(organizationId, factoryId) });
-      void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
-    },
-  });
-}
-
-export function useUpdateFactoryIntake(organizationId: string, factoryId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (input: { intakeId: string; name?: string; settings?: FactoryIntakeSettings }) => {
-      const response = await factoriesUpdateFactoryIntake(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId, intakeId: input.intakeId },
-          body: {
-            name: input.name,
-            settings: input.settings,
-          },
-        }),
-      );
-      if (!response.data?.intake) {
-        throw new Error("Failed to update intake");
-      }
-      return response.data.intake;
-    },
-    onSuccess: (_intake, variables) => {
-      void queryClient.invalidateQueries({ queryKey: factoryIntakesKey(organizationId, factoryId) });
-      void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
-      void queryClient.invalidateQueries({
-        queryKey: factoryQueryKeys.intakeRuns(organizationId, factoryId, variables.intakeId),
-      });
-    },
   });
 }
 

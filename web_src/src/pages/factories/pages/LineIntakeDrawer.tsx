@@ -1,8 +1,8 @@
-import { useUpdateFactoryIntake } from "@/hooks/useFactoryData";
+import { useUpdateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Plus, Settings, XIcon } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AnalyzingIntakeTicketList } from "./AnalyzingIntakeTicketList";
@@ -338,18 +338,21 @@ function LineIntakeDrawerPopups({
   const runs = useIntakeAutomationRuns(organizationId, factoryId, settingsIntake);
   const updateIntake = useUpdateFactoryIntake(organizationId ?? "", factoryId ?? "");
 
-  async function saveSettings(next: IntakeSourceSettings) {
-    if (!settingsIntake) {
-      throw new Error("The intake automation is not available.");
-    }
-    await updateIntake.mutateAsync({
-      intakeId: settingsIntake.intakeId,
-      name: next.name,
-      settings: intakeSettingsToApi(next),
-    });
-    await automation.refetch();
-    onSettingsSaved?.();
-  }
+  const saveSettings = useCallback(
+    async (next: IntakeSourceSettings) => {
+      if (!settingsIntake) {
+        throw new Error("The intake automation is not available.");
+      }
+      await updateIntake.mutateAsync({
+        intakeId: settingsIntake.intakeId,
+        name: next.name,
+        settings: intakeSettingsToApi(next),
+      });
+      await automation.refetch();
+      onSettingsSaved?.();
+    },
+    [automation, onSettingsSaved, settingsIntake, updateIntake],
+  );
 
   return (
     <>
