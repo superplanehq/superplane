@@ -13,7 +13,7 @@ import {
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import { WorkOrderCheckDialog } from "../../WorkOrderCheckDialog";
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
-import type { SplitRunFooter, SplitRunFooterAction } from "./splitRunFooter";
+import type { SplitRunFooter, SplitRunFooterAction, SplitRunStopChoice } from "./splitRunFooter";
 import { SplitRunStopButton } from "./SplitRunStopButton";
 
 const PILL_TONE: Record<WorkOrderCheckLevel, string> = {
@@ -40,7 +40,10 @@ export function SplitRunReview({
   organizationId,
   factoryKey,
   onStart,
+  onStop,
+  onReject,
   startBusy = false,
+  stopBusy = false,
   startDisabled = false,
 }: {
   footer: SplitRunFooter;
@@ -48,7 +51,10 @@ export function SplitRunReview({
   organizationId?: string;
   factoryKey?: string;
   onStart?: () => void | Promise<void>;
+  onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
+  onReject?: () => void | Promise<void>;
   startBusy?: boolean;
+  stopBusy?: boolean;
   startDisabled?: boolean;
 }) {
   const showCard = Boolean(footer.attentionCard && footer.note);
@@ -88,7 +94,10 @@ export function SplitRunReview({
                     key={action.id}
                     action={action}
                     onStart={onStart}
+                    onStop={onStop}
+                    onReject={onReject}
                     startBusy={startBusy}
+                    stopBusy={stopBusy}
                     startDisabled={startDisabled}
                   />
                 ))}
@@ -104,12 +113,18 @@ export function SplitRunReview({
 function FooterAction({
   action,
   onStart,
+  onStop,
+  onReject,
   startBusy,
+  stopBusy,
   startDisabled,
 }: {
   action: SplitRunFooterAction;
   onStart?: () => void | Promise<void>;
+  onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
+  onReject?: () => void | Promise<void>;
   startBusy: boolean;
+  stopBusy: boolean;
   startDisabled: boolean;
 }) {
   const primary = action.emphasis === "primary";
@@ -117,7 +132,7 @@ function FooterAction({
   const testId = primary ? "split-run-review-cta" : `split-run-footer-${action.id}`;
 
   if (action.kind === "stop") {
-    return <SplitRunStopButton />;
+    return <SplitRunStopButton onStop={onStop} busy={stopBusy} />;
   }
 
   if (action.kind === "start") {
@@ -131,6 +146,22 @@ function FooterAction({
         data-testid={testId}
       >
         {startBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
+        {action.label}
+      </Button>
+    );
+  }
+
+  if (action.kind === "reject") {
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant={variant}
+        disabled={stopBusy}
+        onClick={() => void onReject?.()}
+        data-testid={testId}
+      >
+        {stopBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
         {action.label}
       </Button>
     );

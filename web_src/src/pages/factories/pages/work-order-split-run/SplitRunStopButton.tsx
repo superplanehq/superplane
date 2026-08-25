@@ -18,7 +18,13 @@ const SEGMENT_CLASSNAME =
  * Running-footer Stop control. One shell, two hit targets, same pattern
  * as GitHub Close issue.
  */
-export function SplitRunStopButton() {
+export function SplitRunStopButton({
+  onStop,
+  busy = false,
+}: {
+  onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
+  busy?: boolean;
+}) {
   const [choice, setChoice] = useState<SplitRunStopChoice>(DEFAULT_SPLIT_RUN_STOP_CHOICE);
   const selected = SPLIT_RUN_STOP_CHOICES.find((item) => item.id === choice) ?? SPLIT_RUN_STOP_CHOICES[0];
 
@@ -27,7 +33,13 @@ export function SplitRunStopButton() {
       className="inline-flex items-stretch overflow-hidden rounded-md bg-primary shadow-sm"
       data-testid="split-run-stop"
     >
-      <button type="button" className={cn(SEGMENT_CLASSNAME, "px-3")} data-testid="split-run-footer-stop">
+      <button
+        type="button"
+        className={cn(SEGMENT_CLASSNAME, "px-3")}
+        disabled={busy}
+        onClick={() => void onStop?.(choice)}
+        data-testid="split-run-footer-stop"
+      >
         {selected.actionLabel}
       </button>
       <span className="w-px self-stretch bg-primary-foreground/25" aria-hidden />
@@ -37,6 +49,7 @@ export function SplitRunStopButton() {
             type="button"
             className={cn(SEGMENT_CLASSNAME, "px-2")}
             aria-label="Choose how to stop"
+            disabled={busy}
             data-testid="split-run-stop-menu"
           >
             <ChevronDown className="size-3.5" aria-hidden />

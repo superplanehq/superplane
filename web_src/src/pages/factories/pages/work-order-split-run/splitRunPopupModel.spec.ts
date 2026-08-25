@@ -6,6 +6,7 @@ import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCand
 import {
   collectSplitRunArtifacts,
   defaultSplitRunPopupTab,
+  resolveSplitRunPopupArtifacts,
   SPLIT_RUN_PANE_GRID_CLASSNAME,
   splitRunDescriptionMarkdown,
   splitRunLinkedArtifacts,
@@ -41,5 +42,47 @@ describe("splitRunPopupModel", () => {
     expect(artifacts.some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
     expect(splitRunLinkedArtifacts(artifacts).some((artifact) => artifact.id?.endsWith("-details"))).toBe(false);
     expect(splitRunLinkedArtifacts(artifacts).some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
+  });
+
+  it("uses live artifacts for a real work order and fixture artifacts in Storybook", () => {
+    const fixtureArtifacts = collectSplitRunArtifacts(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER));
+    const liveArtifacts = [
+      {
+        id: "art-live-pr",
+        type: "TYPE_PR" as const,
+        data: { number: 88, url: "https://github.com/acme/app/pull/88" },
+      },
+    ];
+
+    expect(resolveSplitRunPopupArtifacts({ fixtureArtifacts, liveArtifacts, useLive: true })).toEqual(liveArtifacts);
+    expect(resolveSplitRunPopupArtifacts({ fixtureArtifacts, liveArtifacts, useLive: false })).toEqual(
+      fixtureArtifacts,
+    );
+  });
+
+  it("lists description artifacts oldest first", () => {
+    const artifacts = splitRunLinkedArtifacts([
+      {
+        id: "newer",
+        type: "TYPE_PR",
+        createdAt: "2026-08-25T12:00:00.000Z",
+        data: { number: 2 },
+      },
+      {
+        id: "older",
+        type: "TYPE_BRANCH",
+        createdAt: "2026-08-25T10:00:00.000Z",
+        data: { name: "feature/a" },
+      },
+      {
+        id: "description",
+        type: "TYPE_MARKDOWN",
+        createdAt: "2026-08-25T09:00:00.000Z",
+        data: { name: "description.md" },
+      },
+      { id: "undated", type: "TYPE_LINK", data: { title: "late" } },
+    ]);
+
+    expect(artifacts.map((artifact) => artifact.id)).toEqual(["older", "newer", "undated"]);
   });
 });

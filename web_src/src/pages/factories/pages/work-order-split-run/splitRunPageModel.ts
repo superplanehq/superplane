@@ -45,7 +45,7 @@ export function fixtureForSplitRunPage(
   if (!order) {
     return null;
   }
-  return splitRunFixtureForWorkOrder(order, { checks: orderChecks, lineId });
+  return splitRunFixtureForWorkOrder(order, { checks: orderChecks, lineId, demoArtifacts: false });
 }
 
 export function phaseForSplitRunCanvas(fixture: SplitRunFixture | null, canvasKey?: SplitRunCanvasKey): SplitRunPhase {

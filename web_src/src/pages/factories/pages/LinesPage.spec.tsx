@@ -62,6 +62,10 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useUpdateFactoryLine: () => ({ mutateAsync: updateFactoryLineMutateAsync, isPending: false }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
+  useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
@@ -272,10 +276,10 @@ describe("LinesPage board", () => {
 
     await user.click(within(dialog).getByRole("tab", { name: "Log" }));
     expect(within(dialog).getByRole("heading", { name: "Log" })).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-ingest")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-analyze")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-plan")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-checks-score")).toHaveTextContent("5/5");
+    expect(within(dialog).getByTestId("split-run-phase-backlog")).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-phase-ingest")).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-phase-analyze")).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-phase-plan")).not.toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
   });
 

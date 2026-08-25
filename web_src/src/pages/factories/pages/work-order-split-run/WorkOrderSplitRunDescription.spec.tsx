@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { WorkOrderSplitRunDescription } from "./WorkOrderSplitRunDescription";
 
@@ -83,5 +83,20 @@ describe("WorkOrderSplitRunDescription", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.getByTestId("work-order-description-markdown")).toHaveTextContent("Saved retry policy.");
     expect(screen.queryByText("Discard this.")).not.toBeInTheDocument();
+  });
+
+  it("calls onSave with the draft when Save is clicked", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<WorkOrderSplitRunDescription canEdit description="Retry webhooks after a timeout." onSave={onSave} />);
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    const input = await screen.findByTestId("work-order-description-input");
+    await user.click(input);
+    await user.paste("Persisted retry policy.");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.stringContaining("Persisted retry policy."));
+    expect(screen.getByTestId("work-order-description-markdown")).toHaveTextContent("Persisted retry policy.");
   });
 });

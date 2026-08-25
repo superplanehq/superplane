@@ -69,9 +69,9 @@ export function WorkOrderCheckScoreRow({ check }: { check: WorkOrderCheckPresent
           <span className="text-sm text-muted-foreground">{scale}</span>
         </span>
       </span>
-        <Badge variant="outline" className={cn("border", status.badgeClassName)}>
-          {status.label}
-        </Badge>
+      <Badge variant="outline" className={cn("border", status.badgeClassName)}>
+        {status.label}
+      </Badge>
     </div>
   );
 }

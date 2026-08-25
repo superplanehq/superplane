@@ -50,6 +50,7 @@ describe("buildSplitRunFooter", () => {
 
     expect(footer.sentence).toBe("This work order is running.");
     expect(footer.note?.headline).toBe("Implement is running");
+    expect(footer.run).toBeUndefined();
     expect(footer.actions).toEqual([{ id: "stop", kind: "stop", label: "Stop", emphasis: "quiet" }]);
     expect(DEFAULT_SPLIT_RUN_STOP_CHOICE).toBe("canceled");
     expect(SPLIT_RUN_STOP_CHOICES.map((choice) => choice.label)).toEqual([

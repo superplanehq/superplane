@@ -101,7 +101,7 @@ export function buildSplitRunFooter(input: {
     return { kind: "draft", sentence: "This work order is a draft.", note, actions: [REJECT, START] };
   }
   if (input.kind === "running") {
-    return { kind: "running", sentence: "This work order is running.", note, actions: [STOP] };
+    return { kind: "running", sentence: "This work order is running.", note, run: input.run, actions: [STOP] };
   }
   if (input.kind === "waiting" || input.kind === "failed") {
     return {

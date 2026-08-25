@@ -28,6 +28,17 @@ export function splitRunLogTabDotClass(status: SplitRunPhaseStatus): string {
   return LOG_TAB_DOT[status];
 }
 
+export function resolveSplitRunPopupArtifacts(args: {
+  fixtureArtifacts: FactoriesWorkOrderArtifact[];
+  liveArtifacts?: FactoriesWorkOrderArtifact[];
+  useLive: boolean;
+}): FactoriesWorkOrderArtifact[] {
+  if (args.useLive) {
+    return args.liveArtifacts ?? [];
+  }
+  return args.fixtureArtifacts;
+}
+
 export function collectSplitRunArtifacts(fixture: SplitRunFixture): FactoriesWorkOrderArtifact[] {
   const seen = new Set<string>();
   const artifacts: FactoriesWorkOrderArtifact[] = [];
@@ -55,17 +66,28 @@ export function splitRunDescriptionMarkdown(artifacts: FactoriesWorkOrderArtifac
   return "";
 }
 
-/** Files and links that are not already the description body. */
+/** Files and links that are not already the description body. Oldest first. */
 export function splitRunLinkedArtifacts(
   artifacts: FactoriesWorkOrderArtifact[],
   source?: SplitRunSource,
 ): FactoriesWorkOrderArtifact[] {
-  return artifacts.filter((artifact) => {
-    if (DESCRIPTION_NAMES.includes(artifactName(artifact))) {
-      return false;
-    }
-    return !isOriginTicketArtifact(artifact, source);
-  });
+  return artifacts
+    .filter((artifact) => {
+      if (DESCRIPTION_NAMES.includes(artifactName(artifact))) {
+        return false;
+      }
+      return !isOriginTicketArtifact(artifact, source);
+    })
+    .sort(compareArtifactsByCreatedAt);
+}
+
+function compareArtifactsByCreatedAt(left: FactoriesWorkOrderArtifact, right: FactoriesWorkOrderArtifact): number {
+  return artifactCreatedAtMs(left) - artifactCreatedAtMs(right);
+}
+
+function artifactCreatedAtMs(artifact: FactoriesWorkOrderArtifact): number {
+  const parsed = Date.parse(artifact.createdAt ?? "");
+  return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
 }
 
 function artifactName(artifact: FactoriesWorkOrderArtifact): string {

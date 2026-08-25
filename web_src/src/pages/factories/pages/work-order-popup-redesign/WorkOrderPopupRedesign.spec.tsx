@@ -195,16 +195,12 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByTestId("split-run-open-work-order")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("link", { name: "Open work order" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Open work order" })).not.toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-ingest")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-analyze")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-plan")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-score")).toBeInTheDocument();
-    expect(within(dialog).getAllByRole("button", { name: "details.md" }).length).toBeGreaterThan(0);
-    expect(within(dialog).getAllByRole("button", { name: "plan.md" }).length).toBeGreaterThan(0);
-    expect(within(dialog).getByRole("link", { name: /feature\/rf-103/ })).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-checks-score")).toHaveTextContent("4/5");
-    expect(within(dialog).queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByText("Backlog")).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-phase-ingest")).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-phase-analyze")).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-phase-plan")).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-phase-score")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "plan.md" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("link", { name: /feature\/rf-103/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Log" })).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-phase-implement-0")).toBeInTheDocument();
@@ -254,7 +250,8 @@ describe("Line board job popup", () => {
     let dialog = await screen.findByTestId("work-order-split-run");
     expect(within(dialog).queryByText("Listening for user review")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
-    expect(within(dialog).getByText("Create plan")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Create plan")).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-phase-implement-0")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
     expect(
@@ -294,8 +291,8 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByRole("tab", { name: "Plan" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("tab", { name: "Log" }));
-    expect(within(dialog).getByTestId("split-run-phase-ingest")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-checks-score")).toHaveTextContent("5/5");
+    expect(within(dialog).queryByTestId("split-run-phase-ingest")).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-phase-backlog")).toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
@@ -306,10 +303,7 @@ describe("Line board job popup", () => {
     expect(await within(dialog).findByTestId("split-run-phase-checks-verify-1")).toBeInTheDocument();
     expect(within(dialog).getByText("Risk score")).toBeInTheDocument();
     expect(within(dialog).getByText("Code quality")).toBeInTheDocument();
-    expect(within(dialog).getAllByRole("link", { name: /#510|Send refund receipts/ })[0]).toHaveAttribute(
-      "target",
-      "_blank",
-    );
+    expect(within(dialog).queryByRole("link", { name: /#510/ })).not.toBeInTheDocument();
   }, 20000);
 
   it("dispatches a draft work order to the open line", async () => {

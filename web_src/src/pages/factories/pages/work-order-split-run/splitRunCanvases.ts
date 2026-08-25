@@ -368,6 +368,7 @@ const MERGE_SCREENSHOT: FactoriesWorkOrderArtifact = {
 export function richStreamForCanvas(
   canvas: SplitRunCanvasModel,
   description?: FactoriesWorkOrderArtifact,
+  options?: { demoArtifacts?: boolean },
 ): SplitRunStreamLine[] {
   const lines: SplitRunStreamLine[] = [];
   let tick = 0;
@@ -384,7 +385,9 @@ export function richStreamForCanvas(
     const streamKind = streamKindForNode(node);
 
     const artifact =
-      kind === "check" || nodeStatus === "did_not_run" ? undefined : artifactForNode(node.id, canvas.key, description);
+      kind === "check" || nodeStatus === "did_not_run"
+        ? undefined
+        : artifactForNode(node.id, canvas.key, description, options?.demoArtifacts !== false);
     const name = kind === "check" ? checkName(node.id, componentName) : componentName;
     lines.push({
       id: node.id,
@@ -402,7 +405,7 @@ export function richStreamForCanvas(
     tick += 1;
 
     if (kind === "agent" && nodeStatus !== "did_not_run" && nodeStatus !== "pending") {
-      for (const step of claudeCodeChildren(node, canvas.key)) {
+      for (const step of claudeCodeChildren(node, canvas.key, options?.demoArtifacts !== false)) {
         const stepId = `${node.id}-note-${tick}`;
         lines.push({
           id: stepId,
@@ -518,9 +521,13 @@ const CLAUDE_CODE_LOGS: Partial<Record<SplitRunCanvasKey, string>> = {
   implementation: implementationClaudeLog,
 };
 
-function claudeCodeChildren(node: ComponentsNode, canvasKey: SplitRunCanvasKey): ClaudeCodeLogStep[] {
+function claudeCodeChildren(
+  node: ComponentsNode,
+  canvasKey: SplitRunCanvasKey,
+  demoArtifacts: boolean,
+): ClaudeCodeLogStep[] {
   const configured = claudeCodeSteps(node);
-  const log = CLAUDE_CODE_LOGS[canvasKey];
+  const log = demoArtifacts ? CLAUDE_CODE_LOGS[canvasKey] : undefined;
   if (log) {
     return parseClaudeCodeLog(log, configured);
   }
@@ -565,9 +572,13 @@ function artifactForNode(
   nodeId: string,
   key: SplitRunCanvasKey,
   description?: FactoriesWorkOrderArtifact,
+  demoArtifacts = true,
 ): FactoriesWorkOrderArtifact | undefined {
   if (nodeId === "create-work-order") {
-    return description ?? DESCRIPTION_ARTIFACT;
+    return demoArtifacts ? (description ?? DESCRIPTION_ARTIFACT) : description;
+  }
+  if (!demoArtifacts) {
+    return undefined;
   }
   if (nodeId === "add-plan-artifact") {
     return PLAN_ARTIFACT;

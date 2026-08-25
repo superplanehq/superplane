@@ -2,8 +2,10 @@ import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
 
 import { OPEN_WORK_ORDER_ARTIFACTS } from "../../__fixtures__/factoryPageFixtureVariants";
+import { LINE_RUN_IMPLEMENT_ID } from "../../__fixtures__/factoryPageIds";
 import {
   HOUR_AGO,
+  OPEN_WORK_ORDER,
   REVIEWER_USER,
   RUNNING_WORK_ORDER,
   STORYBOOK_ME_USER_AVATAR_URL,
@@ -36,7 +38,9 @@ const OWNER: OrgUserDisplay = {
 
 export const SPLIT_RUN_RUNNING: SplitRunFixture = {
   title: "Add refund reconciliation test",
+  descriptionText: OPEN_WORK_ORDER.description ?? "",
   owner: OWNER,
+  assigneeIds: [STORYBOOK_ME_USER_ID],
   elapsed: "4 min so far",
   startedLabel: "Started 1h ago",
   costUsd: "$0.73",
@@ -53,6 +57,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
       headline: "Implement is running",
       text: "Implementation works on this step now. The log shows live progress.",
     },
+    run: { appId: "app-refund-implementer", runId: LINE_RUN_IMPLEMENT_ID },
   }),
   footerTone: "running",
   source: splitRunSourceForOrder(RUNNING_WORK_ORDER),

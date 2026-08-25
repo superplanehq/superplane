@@ -14,9 +14,13 @@ const MAX_DESCRIPTION_LENGTH = 5000;
 export function WorkOrderSplitRunDescription({
   description,
   canEdit = false,
+  busy = false,
+  onSave,
 }: {
   description: string;
   canEdit?: boolean;
+  busy?: boolean;
+  onSave?: (next: string) => void | Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(description);
@@ -32,9 +36,14 @@ export function WorkOrderSplitRunDescription({
     setEditing(false);
   };
 
-  const handleSave = () => {
-    setSaved(draft);
-    setEditing(false);
+  const handleSave = async () => {
+    try {
+      await onSave?.(draft);
+      setSaved(draft);
+      setEditing(false);
+    } catch {
+      // Caller shows the error. Keep the editor open.
+    }
   };
 
   const body = saved.trim() ? (
@@ -74,14 +83,20 @@ export function WorkOrderSplitRunDescription({
             >
               Cancel
             </Button>
-            <Button type="button" size="sm" className="h-6 px-2.5 text-[13px]" onClick={handleSave}>
+            <Button
+              type="button"
+              size="sm"
+              className="h-6 px-2.5 text-[13px]"
+              disabled={busy}
+              onClick={() => void handleSave()}
+            >
               Save
             </Button>
           </div>
           <WorkOrderDescriptionEditor
             value={draft}
             maxLength={MAX_DESCRIPTION_LENGTH}
-            disabled={false}
+            disabled={busy}
             className="min-h-32 pr-28 text-[13px] leading-[1.625] [&>p:first-child]:mt-0"
             onChange={setDraft}
           />

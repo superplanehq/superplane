@@ -101,6 +101,10 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.footerTone).toBe("running");
     expect(fixture.footer.note?.headline).toBe("Implement is running");
+    expect(fixture.footer.run).toEqual({
+      appId: "app-refund-implementer",
+      runId: RUNNING_WORK_ORDER.lineDispatches?.[0]?.stepExecutions?.[0]?.run?.id,
+    });
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Stop"]);
     expect(fixture.checks).toMatchObject([{ id: "wo-running-refunds-confidence", name: "Confidence score", score: 4 }]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
@@ -468,6 +472,18 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.footer.note?.headline).toBe("Start this work order");
     expect(fixture.footer.note?.text).toContain("A person created this work order manually.");
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Start"]);
+  });
+
+  it("omits invented files and ledger pull requests for a live order", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER, { demoArtifacts: false });
+    const names = fixture.phases.flatMap((phase) => artifactNames(phase.artifacts));
+
+    expect(names).not.toContain("merge-screenshot.png");
+    expect(names).not.toContain("closure.md");
+    expect(names).not.toContain("plan.md");
+    expect(names).not.toContain("#510");
+    expect(names.some((name) => name.startsWith("feature/"))).toBe(false);
+    expect(names.filter((name) => name !== "description.md")).toEqual([]);
   });
 });
 

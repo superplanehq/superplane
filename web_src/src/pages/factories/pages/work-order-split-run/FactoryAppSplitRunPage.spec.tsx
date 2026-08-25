@@ -43,7 +43,7 @@ describe("FactoryAppSplitRunPage", () => {
     expect(within(page).getByTestId("factory-app-edit")).toHaveTextContent("Edit Automation");
   }, 10000);
 
-  it("opens the planning canvas from ingest when the URL omits canvas", async () => {
+  it("does not invent a planning ingest phase for a live order", async () => {
     const line = REFUND_FACTORY_LINES[0];
 
     render(
@@ -54,11 +54,10 @@ describe("FactoryAppSplitRunPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("split-run-phase-plan")).toBeInTheDocument();
+      expect(screen.getByTestId("factory-app-split-run-page")).toBeInTheDocument();
     });
-    expect(within(screen.getByTestId("factory-app-split-run-page")).getAllByText("Create plan").length).toBeGreaterThan(
-      0,
-    );
+    expect(screen.queryByTestId("split-run-phase-plan")).not.toBeInTheDocument();
+    expect(screen.queryByText("Create plan")).not.toBeInTheDocument();
   }, 10000);
 
   it("does not show the demo run when no run is selected", async () => {

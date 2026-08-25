@@ -156,6 +156,22 @@ describe("splitRunCanvasForPhase", () => {
     expect(stream.some((line) => line.artifact?.type === "TYPE_MARKDOWN")).toBe(true);
   });
 
+  it("omits invented files and ledger pull requests when demo artifacts are off", () => {
+    const canvas = splitRunCanvasForPhase({
+      id: "done",
+      name: "Done",
+      status: "passed",
+      duration: "1m 12s",
+      componentName: "PR Closure",
+      artifacts: [],
+      stream: [],
+      canvasSteps: [],
+    });
+    const stream = richStreamForCanvas(canvas, undefined, { demoArtifacts: false });
+
+    expect(stream.some((line) => line.artifact)).toBe(false);
+  });
+
   it("adds a verbose transcript for Claude Code and a score for checks", () => {
     const canvas = splitRunCanvasForPhase({
       id: "verify",

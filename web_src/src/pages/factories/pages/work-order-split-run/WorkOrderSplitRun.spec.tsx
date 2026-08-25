@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -15,6 +15,7 @@ import {
   INGEST_DRAFT_WORK_ORDER,
   LINE_RUN_IMPLEMENT_FAILED_ID,
   OPEN_WORK_ORDER,
+  PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
 } from "../../__fixtures__/factoryPageResponses";
 import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../__fixtures__/lineMetricsBoardOrders";
@@ -608,6 +609,24 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
   });
 
+  it("hides invented files and ledger pull requests on a live work order", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: LINE_BOARD_DONE_RECEIPTS_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER, { demoArtifacts: false }),
+    });
+
+    expect(screen.queryByRole("link", { name: /#510/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "closure.md" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /merge-screenshot/ })).not.toBeInTheDocument();
+
+    await openLogTab(user);
+    expect(screen.queryByRole("link", { name: /merge-screenshot/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /#510/ })).not.toBeInTheDocument();
+  });
+
   it("shows a failed implement stream with the action footer", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(FAILED_WORK_ORDER) });
 
@@ -719,5 +738,32 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(screen.getByTestId("split-run-stream-line-find-work-order")).toHaveAttribute("data-highlighted", "true");
     expect(screen.getByTestId("split-run-canvas-node-find-work-order")).toHaveAttribute("data-selected", "true");
+  });
+
+  it("lets you rename the title and edit the description on a draft", async () => {
+    const user = userEvent.setup();
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
+
+    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+    await user.click(screen.getByTestId("popup-work-order-title"));
+    const titleInput = await screen.findByTestId("popup-work-order-title-input");
+    await user.clear(titleInput);
+    await user.type(titleInput, "Renamed draft");
+    await user.keyboard("{Enter}");
+    expect(screen.getByTestId("popup-work-order-title")).toHaveTextContent("Renamed draft");
+  });
+
+  it("does not let you edit a completed work order", () => {
+    renderPopup({
+      fixture: {
+        ...SPLIT_RUN_RUNNING,
+        footer: buildSplitRunFooter({ kind: "done" }),
+        footerTone: "done",
+      },
+    });
+
+    expect(screen.queryByTestId("popup-work-order-title")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("popup-edit-owner")).not.toBeInTheDocument();
   });
 });

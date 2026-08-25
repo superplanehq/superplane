@@ -195,7 +195,9 @@ describe("resolveSplitRunVisual", () => {
   });
 
   it("replaces the canned implement branch and adds the order pull request", () => {
-    const implement = splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER).phases.find((phase) => phase.id === "implement-0");
+    const implement = splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER).phases.find(
+      (phase) => phase.id === "implement-0",
+    );
     const visual = resolveSplitRunVisual(implement!, { enabled: false, stream: [] });
     const branches = (visual.stream ?? [])
       .map((line) => line.artifact)
@@ -208,24 +210,28 @@ describe("resolveSplitRunVisual", () => {
     expect(pullRequests[0]?.artifact?.data).toMatchObject({ number: 503 });
   });
 
-  it("keeps YAML artifacts on a live stream that omits them", () => {
+  it("does not copy demo YAML artifacts onto a live stream", () => {
     const implement = SPLIT_RUN_RUNNING.phases.find((phase) => phase.id === "implement");
     const yaml = splitRunCanvasForPhase(implement!);
-    const visual = resolveSplitRunVisual(implement!, {
-      enabled: true,
-      canvas: yaml,
-      stream: [
-        {
-          id: "add-branch-artifact",
-          nodeId: "add-branch-artifact",
-          at: "00:00:01",
-          componentName: "Add Branch Artifact",
-          status: "passed",
-        },
-      ],
-    });
+    const visual = resolveSplitRunVisual(
+      implement!,
+      {
+        enabled: true,
+        canvas: yaml,
+        stream: [
+          {
+            id: "add-branch-artifact",
+            nodeId: "add-branch-artifact",
+            at: "00:00:01",
+            componentName: "Add Branch Artifact",
+            status: "passed",
+          },
+        ],
+      },
+      { demoArtifacts: false },
+    );
 
-    expect(visual.stream?.some((line) => line.artifact?.id === "art-branch-1")).toBe(true);
+    expect(visual.stream?.some((line) => line.artifact)).toBe(false);
   });
 
   it("keeps the YAML canvas when no live run is wired", () => {

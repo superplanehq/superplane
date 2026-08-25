@@ -356,10 +356,15 @@ function liveCanvasMatchesLineAutomation(line: SplitRunCanvasModel, live: SplitR
 export function resolveSplitRunVisual(
   phase: SplitRunPhase,
   live: { enabled: boolean; isError?: boolean; canvas?: SplitRunCanvasModel; stream: SplitRunStreamLine[] },
+  options?: { demoArtifacts?: boolean },
 ): { canvas: SplitRunCanvasModel; stream: SplitRunStreamLine[] | undefined } {
+  const demoArtifacts = options?.demoArtifacts !== false;
   const lineCanvas = splitRunCanvasForPhase(phase);
   const lineStream = attachPhaseChecks(
-    attachPhaseArtifacts(richStreamForCanvas(lineCanvas, descriptionArtifactFromPhase(phase)), phase.artifacts),
+    attachPhaseArtifacts(
+      richStreamForCanvas(lineCanvas, descriptionArtifactFromPhase(phase), { demoArtifacts }),
+      demoArtifacts ? phase.artifacts : [],
+    ),
     phase.checks ?? [],
   );
   if (phase.canvasKey === null || lineCanvas.nodes.length === 0) {
@@ -371,7 +376,12 @@ export function resolveSplitRunVisual(
   if (live.canvas && liveCanvasMatchesLineAutomation(lineCanvas, live.canvas)) {
     return {
       canvas: live.canvas,
-      stream: live.stream.length > 0 ? attachMissingStreamChildren(live.stream, lineStream) : lineStream,
+      stream:
+        live.stream.length > 0
+          ? demoArtifacts
+            ? attachMissingStreamChildren(live.stream, lineStream)
+            : live.stream
+          : lineStream,
     };
   }
   return { canvas: lineCanvas, stream: lineStream };
@@ -460,17 +470,13 @@ function attachPhaseChecks(stream: SplitRunStreamLine[], checks: WorkOrderCheckP
   }
   const { value, scale } = formatCheckScore(check);
   const action = `${value}${scale}`;
-  return stream.map((line) =>
-    line.kind === "check" || line.nodeId === "ticket-score" ? { ...line, action } : line,
-  );
+  return stream.map((line) => (line.kind === "check" || line.nodeId === "ticket-score" ? { ...line, action } : line));
 }
 
 function hostIndexForArtifacts(stream: SplitRunStreamLine[], artifacts: FactoriesWorkOrderArtifact[]): number {
   const names = artifacts.map(artifactName);
   if (names.includes("plan.md")) {
-    const planIndex = stream.findIndex(
-      (line) => line.nodeId === "ticket-plan" || line.componentName === "Create plan",
-    );
+    const planIndex = stream.findIndex((line) => line.nodeId === "ticket-plan" || line.componentName === "Create plan");
     if (planIndex >= 0) {
       return planIndex;
     }

@@ -110,7 +110,10 @@ export type SplitRunIntakeCanvasKey = "intake" | "sentry" | "slack";
 
 export interface SplitRunFixture {
   title: string;
+  /** Work-order description field. Artifact markdown is a fallback. */
+  descriptionText?: string;
   owner: OrgUserDisplay;
+  assigneeIds?: string[];
   elapsed: string;
   startedLabel: string;
   costUsd: string;
@@ -133,6 +136,19 @@ const UNKNOWN_OWNER: OrgUserDisplay = {
   name: UNKNOWN_ORG_USER_NAME,
   initials: getUserInitials(UNKNOWN_ORG_USER_NAME) || "U",
 };
+
+function splitRunOwnerDisplay(order: FactoriesWorkOrder): OrgUserDisplay {
+  const assignee = order.assignees?.[0];
+  if (assignee?.id) {
+    const name = assignee.name?.trim() || UNKNOWN_OWNER.name;
+    return {
+      id: assignee.id,
+      name,
+      initials: getUserInitials(name) || UNKNOWN_OWNER.initials,
+    };
+  }
+  return workOrderOwnerDisplay(order, UNKNOWN_OWNER);
+}
 
 function failedFooterNote(current: FactoriesWorkOrderExecution | undefined): WorkOrderStatusNotePresentation {
   const step = current?.step?.trim();
@@ -243,9 +259,16 @@ export function splitRunStatusLabel(status: SplitRunPhaseStatus): string {
 
 const PR_CLOSURE_APP_NAME = "PR Closure";
 
+export type SplitRunFixtureOptions = {
+  checks?: FactoriesWorkOrderCheck[];
+  lineId?: string | null;
+  /** Storybook keeps invented files and pull requests. Live orders do not. */
+  demoArtifacts?: boolean;
+};
+
 export function splitRunFixtureForWorkOrder(
   order?: FactoriesWorkOrder,
-  options?: { checks?: FactoriesWorkOrderCheck[]; lineId?: string | null },
+  options?: SplitRunFixtureOptions,
 ): SplitRunFixture {
   if (!order) {
     return SPLIT_RUN_RUNNING;
@@ -253,17 +276,17 @@ export function splitRunFixtureForWorkOrder(
   return mappedWorkOrderFixture(order, options);
 }
 
-function mappedWorkOrderFixture(
-  order: FactoriesWorkOrder,
-  options?: { checks?: FactoriesWorkOrderCheck[]; lineId?: string | null },
-): SplitRunFixture {
+function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFixtureOptions): SplitRunFixture {
   const displayStatus = getWorkOrderDisplayStatus(order);
   const executions = latestDispatchExecutions(order, options?.lineId);
   const current = pickCurrentExecution(executions);
-  const phases = phasesForOrder(order, executions, options?.checks);
+  const demoArtifacts = options?.demoArtifacts !== false;
+  const phases = phasesForOrder(order, executions, options?.checks, demoArtifacts);
   return {
     title: order.title ?? "Work order",
-    owner: workOrderOwnerDisplay(order, UNKNOWN_OWNER),
+    descriptionText: order.description ?? "",
+    owner: splitRunOwnerDisplay(order),
+    assigneeIds: (order.assignees ?? []).map((assignee) => assignee.id).filter((id): id is string => Boolean(id)),
     elapsed: elapsedForDisplay(displayStatus, order),
     startedLabel: startedLabelForOrder(order),
     costUsd: costUsdForDisplay(order),
@@ -273,7 +296,7 @@ function mappedWorkOrderFixture(
     currentPhaseId: current ? phaseIdForExecution(current) : (phases[0]?.id ?? ""),
     phases,
     source: splitRunSourceForOrder(order),
-    ...reviewSurfaces(order, displayStatus, options?.lineId, phases, options?.checks),
+    ...reviewSurfaces(order, displayStatus, options?.lineId, phases, options?.checks, demoArtifacts),
   };
 }
 
@@ -283,12 +306,13 @@ function reviewSurfaces(
   lineId: string | null | undefined,
   phases: SplitRunPhase[],
   apiChecks?: FactoriesWorkOrderCheck[],
+  demoArtifacts = true,
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   const executions = latestDispatchExecutions(order, lineId);
   const current = pickCurrentExecution(executions);
   const column = boardColumnFor(current, executions.length);
   const implementFailed = column === "implement" && current?.result === "RESULT_FAILED";
-  const checks = overviewChecks(phases, apiChecks);
+  const checks = overviewChecks(phases, apiChecks, demoArtifacts);
 
   if (displayStatus === "draft") {
     return surfaces(buildSplitRunFooter({ kind: "draft", note: draftFooterNote(order) }), [], checks);
@@ -326,14 +350,25 @@ function reviewSurfaces(
     );
   }
   if (displayStatus === "running") {
-    return surfaces(buildSplitRunFooter({ kind: "running", note: runningFooterNote(current) }), [], checks);
+    return surfaces(
+      buildSplitRunFooter({ kind: "running", note: runningFooterNote(current), run: footerRun(current) }),
+      [],
+      checks,
+    );
   }
   return surfaces(doneFooterForStatus(displayStatus), [], checks);
 }
 
-function overviewChecks(phases: SplitRunPhase[], apiChecks?: FactoriesWorkOrderCheck[]): WorkOrderCheckPresentation[] {
-  const intake = phases.find((phase) => phase.id === "score")?.checks ?? [];
+function overviewChecks(
+  phases: SplitRunPhase[],
+  apiChecks?: FactoriesWorkOrderCheck[],
+  demoArtifacts = true,
+): WorkOrderCheckPresentation[] {
   const presented = presentWorkOrderChecks(apiChecks ?? []);
+  if (!demoArtifacts) {
+    return presented;
+  }
+  const intake = phases.find((phase) => phase.id === "score")?.checks ?? [];
   if (presented.length === 0) {
     return phases.flatMap((phase) => phase.checks ?? []);
   }
@@ -382,14 +417,22 @@ function phasesForOrder(
   order: FactoriesWorkOrder,
   executions: FactoriesWorkOrderExecution[],
   apiChecks?: FactoriesWorkOrderCheck[],
+  demoArtifacts = true,
 ): SplitRunPhase[] {
   return [
-    ...sourcePhasesForOrder(order, executions.length > 0),
-    ...executions.map((execution) => executionToPhase(order, execution, apiChecks)),
+    ...sourcePhasesForOrder(order, executions.length > 0, demoArtifacts),
+    ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts)),
   ];
 }
 
-function sourcePhasesForOrder(order: FactoriesWorkOrder, isDownstream: boolean): SplitRunPhase[] {
+function sourcePhasesForOrder(
+  order: FactoriesWorkOrder,
+  isDownstream: boolean,
+  demoArtifacts: boolean,
+): SplitRunPhase[] {
+  if (!demoArtifacts) {
+    return [backlogSourcePhase(order)];
+  }
   const candidate = reviewCandidateForWorkOrderId(order.id);
   if (candidate) {
     return intakeTicketAnalysisFixture(analysisTicketForOrder(order), { complete: true }).phases;
@@ -584,11 +627,12 @@ function executionToPhase(
   order: FactoriesWorkOrder,
   execution: FactoriesWorkOrderExecution,
   apiChecks?: FactoriesWorkOrderCheck[],
+  demoArtifacts = true,
 ): SplitRunPhase {
   const status = statusForExecution(execution);
   const { name, componentName } = lineAutomationPresentation(execution.run, execution.step);
   const duration = durationForExecution(execution, status);
-  const artifacts = artifactsForLineExecution(order, execution);
+  const artifacts = demoArtifacts ? artifactsForLineExecution(order, execution) : [];
   const line: SplitRunStreamLine = {
     id: execution.id ?? name,
     at: clockLabel(execution.updatedAt ?? execution.createdAt),
@@ -609,7 +653,7 @@ function executionToPhase(
     duration,
     componentName,
     artifacts,
-    checks: checksForLineExecution(execution, apiChecks),
+    checks: checksForLineExecution(execution, apiChecks, demoArtifacts),
     stream: [line],
     canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
     appId: execution.run?.appId,
@@ -620,11 +664,12 @@ function executionToPhase(
 function checksForLineExecution(
   execution: FactoriesWorkOrderExecution,
   apiChecks?: FactoriesWorkOrderCheck[],
+  demoArtifacts = true,
 ): WorkOrderCheckPresentation[] | undefined {
   if (!(execution.step ?? "").toLowerCase().includes("verify")) {
     return undefined;
   }
-  const source = apiChecks ?? VERIFY_STEP_CHECKS;
+  const source = demoArtifacts ? (apiChecks ?? VERIFY_STEP_CHECKS) : (apiChecks ?? []);
   return presentWorkOrderChecks(source.filter((check) => VERIFY_STEP_KEYS.has(check.key ?? "")));
 }
 

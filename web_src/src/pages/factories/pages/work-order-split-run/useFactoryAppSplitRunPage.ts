@@ -44,11 +44,7 @@ export function useFactoryAppSplitRunPage() {
   const { appId = "" } = useParams<{ appId: string }>();
   const [nodeId, setNodeId] = useState<string | null>(null);
   const split = useSplitRunPanePercent();
-  const { isLoading, lineName, order, query } = useSplitRunPageSelection(
-    organizationId,
-    factoryId,
-    factory?.lines,
-  );
+  const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
   const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, order?.id ?? "");
   const fixture = useMemo(
     () => fixtureForSplitRunPage(order, orderChecks, query.lineId),
@@ -61,7 +57,7 @@ export function useFactoryAppSplitRunPage() {
   );
   const live = useSplitRunLiveCanvas(organizationId, phase);
   const artifactIndex = useSplitRunStreamArtifacts(organizationId, factoryId, order?.id);
-  const visual = useMemo(() => resolveSplitRunVisual(phase, live), [live, phase]);
+  const visual = useMemo(() => resolveSplitRunVisual(phase, live, { demoArtifacts: false }), [live, phase]);
   const stream = useMemo(() => attachArtifactsToStream(visual.stream, artifactIndex), [artifactIndex, visual.stream]);
   const back = useMemo(
     () =>

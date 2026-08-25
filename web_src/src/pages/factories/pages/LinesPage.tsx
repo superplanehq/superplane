@@ -472,6 +472,7 @@ function LineDetail({
           canvasEditHref={canvasEditHref}
           canvasExpandHref={canvasExpandHref}
           canDispatch={workOrderCardContext.canDispatch}
+          canUpdate={workOrderCardContext.canAssign}
           isDispatching={workOrderCardContext.isDispatching}
           onDispatch={workOrderCardContext.onDispatch}
           onClose={() => setPeekOrderId(null)}
@@ -492,6 +493,7 @@ function LineBoardSplitRunPopup({
   canvasEditHref,
   canvasExpandHref,
   canDispatch,
+  canUpdate,
   isDispatching,
   onDispatch,
   onClose,
@@ -506,6 +508,7 @@ function LineBoardSplitRunPopup({
   canvasEditHref: (key: SplitRunCanvasKey) => string | undefined;
   canvasExpandHref: (key: SplitRunCanvasKey) => string | undefined;
   canDispatch: boolean;
+  canUpdate: boolean;
   isDispatching: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onClose: () => void;
@@ -520,10 +523,11 @@ function LineBoardSplitRunPopup({
       factoryKey={factoryKey}
       orderId={peekOrderId}
       orderNumber={peekOrder?.number}
-      fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId })}
+      fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId, demoArtifacts: false })}
       canvasEditHref={canvasEditHref}
       canvasExpandHref={canvasExpandHref}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
+      canUpdate={canUpdate}
       isDispatching={isDispatching}
       onDispatch={resolvedLineName ? () => onDispatch(peekOrderId, { lineName: resolvedLineName }) : undefined}
       onClose={onClose}
