@@ -163,9 +163,6 @@ spec:
               rm -rf repo
               git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
               cd repo
-          - name: Provide description
-            type: bash
-            command: |-
               echo $ORDER_DESCRIPTION | base64 -d > /tmp/ORDER.md
               cat /tmp/ORDER.md
           - name: Write Implementation Plan

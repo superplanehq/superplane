@@ -184,8 +184,8 @@ spec:
       configuration:
         orderId: '{{ order().id }}'
         noteKey: pr-closure
-        headline: Review the pull request
-        body: When the pull request merges, this work order completes. If it closes without a merge, SuperPlane rejects the work order.
+        headline: Listening for user review
+        body: This automation finished and opened this pull request. Tag `@superplaneagent` in comment to request changes. Task will automatically close when the pull request is closed or merged.
         ctaLabel: 'Review PR #{{ $["Create Draft Pull Request"].data.number }}'
         ctaUrl: '{{ $["Create Draft Pull Request"].data.html_url }}'
         showOnlyWhenWaiting: true

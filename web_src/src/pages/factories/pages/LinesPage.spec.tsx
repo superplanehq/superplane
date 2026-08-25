@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { TooltipProvider } from "@/ui/tooltip";
 import { editFactoryLinePath, factoryAppConfigurePath, factoryLineDetailPath } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
@@ -19,6 +20,7 @@ import {
   REFUND_FACTORY,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
+import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import { withPlanLinePhases } from "../__fixtures__/lineMetricsPlanLine";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { LINE_LIST_METRICS_BY_ID } from "./lineListMetricsMockData";
@@ -58,6 +60,12 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryApps: () => useFactoryApps(),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: updateFactoryLineMutateAsync, isPending: false }),
+  useWorkOrderEvents: () => ({ data: { pages: [] } }),
+  useWorkOrderArtifacts: () => ({ data: [] }),
+  useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
@@ -82,6 +90,20 @@ vi.mock("@/contexts/usePermissions", () => ({
 
 vi.mock("@/hooks/usePageTitle", () => ({
   usePageTitle: () => undefined,
+}));
+
+vi.mock("@/hooks/useMe", () => ({
+  useMe: () => ({ data: { id: "storybook-user" } }),
+}));
+
+const useWorkOrderChecks = vi.hoisted(() =>
+  vi.fn((_organizationId: string, _factoryId: string, _orderId: string, _options?: { enabled?: boolean }) => ({
+    data: [] as unknown[],
+  })),
+);
+
+vi.mock("@/hooks/useWorkOrderChecks", () => ({
+  useWorkOrderChecks,
 }));
 
 function LocationProbe() {
@@ -162,12 +184,20 @@ describe("LinesPage card menu", () => {
 });
 
 describe("LinesPage board", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    const { DEFAULT_CHECKS_BY_ORDER_ID } = await import("../__fixtures__/workOrderCheckFixtures");
+    window.localStorage.clear();
     updateFactoryLineMutateAsync.mockReset();
     useFactoryWorkOrders.mockReturnValue({ data: [] });
     useFactoryApps.mockReturnValue({ data: [] });
     useFactoryIntakes.mockReturnValue({ data: [] });
     createFactoryIntakeMutateAsync.mockReset();
+    useWorkOrderChecks.mockReset();
+    useWorkOrderChecks.mockImplementation(
+      (_organizationId: string, _factoryId: string, orderId: string, options?: { enabled?: boolean }) => ({
+        data: options?.enabled === false ? [] : (DEFAULT_CHECKS_BY_ORDER_ID[orderId] ?? []),
+      }),
+    );
   });
 
   function renderBoard(
@@ -178,24 +208,26 @@ describe("LinesPage board", () => {
     return render(
       <QueryClientProvider client={new QueryClient()}>
         <ThemeProvider>
-          <MemoryRouter initialEntries={[path]}>
-            <FactoriesLayoutContext.Provider
-              value={{
-                organizationId: "org-1",
-                factoryId: factory.id ?? PRIMARY_FACTORY_ID,
-                factoryKey: factory.key ?? PRIMARY_FACTORY_KEY,
-                factory,
-                factories: [factory],
-                openCreateWorkOrder,
-              }}
-            >
-              <Routes>
-                <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
-                <Route path="/org-1/workspaces/:factoryKey/lines/:lineId/edit" element={<div>Edit line</div>} />
-              </Routes>
-              <LocationProbe />
-            </FactoriesLayoutContext.Provider>
-          </MemoryRouter>
+          <TooltipProvider>
+            <MemoryRouter initialEntries={[path]}>
+              <FactoriesLayoutContext.Provider
+                value={{
+                  organizationId: "org-1",
+                  factoryId: factory.id ?? PRIMARY_FACTORY_ID,
+                  factoryKey: factory.key ?? PRIMARY_FACTORY_KEY,
+                  factory,
+                  factories: [factory],
+                  openCreateWorkOrder,
+                }}
+              >
+                <Routes>
+                  <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
+                  <Route path="/org-1/workspaces/:factoryKey/lines/:lineId/edit" element={<div>Edit line</div>} />
+                </Routes>
+                <LocationProbe />
+              </FactoriesLayoutContext.Provider>
+            </MemoryRouter>
+          </TooltipProvider>
         </ThemeProvider>
       </QueryClientProvider>,
     );
@@ -237,7 +269,7 @@ describe("LinesPage board", () => {
 
     const done = screen.getByTestId("lines-done-column");
     expect(within(done).getByRole("button", { name: "Open Publish refund SLA dashboard" })).toBeInTheDocument();
-    expect(screen.getByTestId("lines-phase-column-2")).toHaveTextContent("Nothing here.");
+    expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
   });
 
   it("hides the Done column when the line ends with its own Done automation", () => {
@@ -248,7 +280,7 @@ describe("LinesPage board", () => {
     renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), factory);
 
     expect(screen.queryByTestId("lines-done-column")).not.toBeInTheDocument();
-    expect(screen.getByTestId("lines-phase-column-3")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-phase-column-2")).toBeInTheDocument();
   });
 
   it("sets a pastel colour on the backlog from circular swatches", async () => {
@@ -261,24 +293,53 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-backlog-column").className).toContain("bg-lime-300");
   });
 
-  it("shows a score on a review-candidate backlog card and opens the plan review", async () => {
+  it("loads checks only for draft cards that can show a score", () => {
+    useFactoryWorkOrders.mockReturnValue({
+      data: [...REVIEW_CANDIDATE_WORK_ORDERS, BOARD_IMPLEMENT_FAILED_ORDER],
+    });
+    renderBoard();
+
+    const fetchedIds = useWorkOrderChecks.mock.calls
+      .filter(([, , orderId, options]) => Boolean(orderId) && options?.enabled !== false)
+      .map(([, , orderId]) => orderId);
+
+    expect(fetchedIds).toContain("wo-review-pay-842");
+    expect(fetchedIds).not.toContain("wo-board-implement-failed");
+    expect(screen.queryByTestId("work-order-card-score-wo-board-implement-failed")).not.toBeInTheDocument();
+  });
+
+  it("shows a score on a review-candidate backlog card and opens the split run", async () => {
     useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
     const user = userEvent.setup();
     renderBoard();
 
     const card = screen.getByTestId("work-order-card-wo-review-pay-842");
-    expect(within(card).getByTestId("work-order-card-score-wo-review-pay-842")).toHaveTextContent("95%");
-    expect(within(card).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    const cardScore = within(card).getByTestId("work-order-card-score-wo-review-pay-842");
+    expect(cardScore).toHaveAttribute("role", "meter");
+    expect(cardScore).toHaveAttribute("aria-valuenow", "5");
+    expect(cardScore).toHaveAttribute("aria-valuemax", "5");
+    expect(cardScore.querySelectorAll("[data-filled='true']")).toHaveLength(5);
+    const start = within(card).getByRole("button", { name: "Start" });
+    expect(cardScore.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
-    const dialog = screen.getByTestId("review-candidate-modal");
+    const dialog = screen.getByTestId("work-order-split-run");
     expect(within(dialog).getByRole("heading", { name: "Add retry handling to webhook delivery" })).toBeInTheDocument();
-    expect(within(dialog).getByTestId("review-candidate-score")).toHaveTextContent("95%");
-    expect(within(dialog).getByTestId("review-candidate-plan")).toHaveTextContent(
-      "Add a webhook-specific retry policy using the shared backoff utility.",
-    );
-    expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab", { name: "Plan" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+    expect(within(dialog).getByTestId("split-run-work-order-tab")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
+    expect(within(dialog).getByTestId("split-run-review")).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("tab", { name: "Log" }));
+    expect(within(dialog).getByRole("heading", { name: "Log" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-phase-backlog")).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-phase-ingest")).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-phase-analyze")).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-phase-plan")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
   });
 
   it("opens the Intake drawer beside the board when the intake query is set", () => {
@@ -489,14 +550,50 @@ describe("LinesPage board", () => {
     };
     renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), factory);
 
-    await user.click(screen.getByTestId("lines-phase-menu-3"));
-    expect(screen.queryByTestId("lines-phase-menu-3-edit")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-phase-menu-2"));
+    expect(screen.queryByTestId("lines-phase-menu-2-edit")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent(
       factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, "app-refund-done", {
         from: "lines",
         lineId: REFUND_LINE_PLAN_ID,
       }),
     );
+  });
+
+  it("hides the phase path and shows work-order filters", async () => {
+    const user = userEvent.setup();
+    renderBoard();
+
+    const header = screen.getByTestId("lines-detail-header");
+    expect(within(header).queryByText(/→/)).not.toBeInTheDocument();
+    expect(within(header).getByTestId("work-orders-scope-all")).toBeInTheDocument();
+    expect(within(header).getByTestId("work-orders-scope-active")).toHaveTextContent("Needs attention");
+    expect(within(header).getByTestId("work-orders-scope-my")).toBeInTheDocument();
+    expect(within(header).getByTestId("work-orders-filter-trigger")).toBeInTheDocument();
+    expect(within(header).getByTestId("work-orders-search-trigger")).toBeInTheDocument();
+    expect(within(header).queryByTestId("work-order-list-create-button")).not.toBeInTheDocument();
+
+    await user.click(within(header).getByTestId("work-orders-filter-trigger"));
+    expect(screen.getByTestId("work-orders-filter-statuses")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-orders-filter-lineIds")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-orders-filter-assigneeIds")).toBeInTheDocument();
+  });
+
+  it("narrows the board when the search query changes", async () => {
+    const user = userEvent.setup();
+    useFactoryWorkOrders.mockReturnValue({
+      data: [BOARD_IMPLEMENT_FAILED_ORDER, BOARD_DONE_REJECTED_ORDER],
+    });
+    renderBoard();
+
+    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(screen.getByText("Replace the refund batch exporter")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("work-orders-search-trigger"));
+    await user.type(screen.getByTestId("work-orders-search-input"), "timeout");
+
+    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(screen.queryByText("Replace the refund batch exporter")).not.toBeInTheDocument();
   });
 
   it("opens Edit from the line overflow menu", async () => {

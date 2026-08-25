@@ -5,6 +5,8 @@ import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import { useEffect, useRef } from "react";
 
+import { cn } from "@/lib/utils";
+
 import { pasteMarkdownFromClipboard } from "./lib/workOrderDescriptionMarkdown";
 import { WorkspaceUnderline } from "./lib/workspaceUnderline";
 import { WorkOrderDescriptionFormatToolbar } from "./WorkOrderDescriptionFormatToolbar";
@@ -16,6 +18,7 @@ interface WorkOrderDescriptionEditorProps {
   onChange: (next: string) => void;
   onFocus?: () => void;
   onBlur?: () => void;
+  className?: string;
 }
 
 export function WorkOrderDescriptionEditor({
@@ -25,6 +28,7 @@ export function WorkOrderDescriptionEditor({
   onChange,
   onFocus,
   onBlur,
+  className,
 }: WorkOrderDescriptionEditorProps) {
   const editorRef = useRef<Editor | null>(null);
   const onChangeRef = useRef(onChange);
@@ -57,7 +61,10 @@ export function WorkOrderDescriptionEditor({
     editorProps: {
       attributes: {
         id: "work-order-description-input",
-        class: "work-order-description-editor workspace-markdown min-h-40 text-[15px] leading-6 outline-none",
+        class: cn(
+          "work-order-description-editor workspace-markdown min-h-40 outline-none",
+          className ?? "text-[15px] leading-6",
+        ),
         "data-testid": "work-order-description-input",
       },
       handlePaste: (_view, event) => {
@@ -132,6 +139,7 @@ export function WorkOrderDescriptionEditor({
           updateDelay={0}
           appendTo={() =>
             editor.view.dom.closest('[data-testid="create-work-order-dialog"]') ??
+            editor.view.dom.closest('[data-testid="work-order-split-run"]') ??
             editor.view.dom.parentElement ??
             document.body
           }

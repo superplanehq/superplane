@@ -48,7 +48,7 @@ export interface RunOverlayFixture {
 const CHECKS = presentWorkOrderChecks(OPEN_WORK_ORDER_CHECKS);
 
 /**
- * Mid-flight run on the Implement phase. Plan already attached a note.
+ * Mid-flight run on the Implement phase. Ingest already attached a plan.
  * Implement attached a branch and a pull request, plus the check cards.
  */
 export const IMPLEMENT_RUN_OVERLAY: RunOverlayFixture = {
@@ -61,10 +61,10 @@ export const IMPLEMENT_RUN_OVERLAY: RunOverlayFixture = {
   phases: [
     {
       id: "plan",
-      name: "Plan",
+      name: "Create plan",
       status: "passed",
       duration: "4 min",
-      summary: "The agent wrote the plan and attached investigation notes.",
+      summary: "Ingest wrote the plan and attached investigation notes.",
       checkIds: ["check-confidence"],
       artifactIds: ["art-md-1"],
       steps: [

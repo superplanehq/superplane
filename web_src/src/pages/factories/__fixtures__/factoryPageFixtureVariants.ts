@@ -81,7 +81,7 @@ export const fiveStepLineFactoriesFixture: FactoriesFixture = {
           steps: [
             ...(line.steps ?? []),
             { name: "release", type: "runApp", app: { app: "app-refund-verifier", entrypoint: "start-verification" } },
-            { name: "observe", type: "runApp", app: { app: "app-refund-planner", entrypoint: "start-plan" } },
+            { name: "observe", type: "runApp", app: { app: "app-refund-implementer", entrypoint: "start-observe" } },
           ],
         };
       }),

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Canvas
 metadata:
   name: Implement
-  description: Create a branch and implement the plan with an agent.
+  description: Create a branch, implement the plan, and open a draft pull request.
 spec:
   edges:
     - channel: default
@@ -20,9 +20,24 @@ spec:
     - channel: "false"
       sourceId: from-gh-issue-check
       targetId: implementation-agent-no-issue
+    - channel: passed
+      sourceId: implementation-agent
+      targetId: create-draft-pr
+    - channel: passed
+      sourceId: implementation-agent-no-issue
+      targetId: create-draft-pr
+    - channel: default
+      sourceId: create-draft-pr
+      targetId: attach-pr-artifact
+    - channel: failed
+      sourceId: implementation-agent
+      targetId: add-run-error
+    - channel: failed
+      sourceId: implementation-agent-no-issue
+      targetId: add-run-error
   nodes:
     - id: onrun-implement
-      name: Implement
+      name: Start
       type: TYPE_TRIGGER
       component: onRun
       configuration: {}
@@ -323,3 +338,51 @@ spec:
         x: 1770
         'y': 816
       isCollapsed: false
+    - id: create-draft-pr
+      name: Create Draft Pull Request
+      type: TYPE_ACTION
+      component: github.createPullRequest
+      configuration:
+        base: main
+        body: |-
+          [Work Order]({{ order().url }}).
+
+          {{ order().title }}
+
+          <hr>
+
+          Created via [SuperPlane](https://superplane.com).
+        draft: true
+        head: '{{ $["Create Branch"].data.result.branch }}'
+        repository: '{{ install_params.appRepository }}'
+        title: '{{ order().title }}'
+      position:
+        x: 1442
+        'y': 984
+      isCollapsed: true
+    - id: attach-pr-artifact
+      name: Attach PR to Work Order
+      type: TYPE_ACTION
+      component: addWorkOrderArtifact
+      configuration:
+        artifactKey: '{{ $["Create Draft Pull Request"].data.html_url }}'
+        artifactType: pr
+        draft: true
+        number: '{{ $["Create Draft Pull Request"].data.number }}'
+        orderId: '{{ order().id }}'
+        state: draft
+        title: '{{ $["Create Draft Pull Request"].data.title }}'
+        url: '{{ $["Create Draft Pull Request"].data.html_url }}'
+      position:
+        x: 1442
+        'y': 1152
+      isCollapsed: true
+    - id: add-run-error
+      name: addRunError
+      type: TYPE_ACTION
+      component: addRunError
+      configuration: {}
+      position:
+        x: 1770
+        'y': 984
+      isCollapsed: true

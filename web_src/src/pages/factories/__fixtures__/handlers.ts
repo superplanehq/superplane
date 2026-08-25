@@ -46,6 +46,7 @@ interface RequestBody {
   lineName?: unknown;
   line_name?: unknown;
   result?: unknown;
+  state?: unknown;
   steps?: unknown;
   body?: unknown;
 }
@@ -342,9 +343,20 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     },
     {
       pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)"),
-      resolve: (match) => {
+      resolve: (match, method, body) => {
         const order = findOrder(fixture, match[1], match[2]);
-        return order ? { json: { order } } : { json: {} };
+        if (!order) return { json: {} };
+        if (method === "PATCH") {
+          const request = (body ?? {}) as RequestBody;
+          if (typeof request.title === "string") {
+            order.title = request.title.trim();
+          }
+          if (typeof request.description === "string") {
+            order.description = request.description;
+          }
+          order.updatedAt = new Date().toISOString();
+        }
+        return { json: { order } };
       },
     },
     {
@@ -375,6 +387,27 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         const request = (body ?? {}) as RequestBody;
         order.state = "STATE_CLOSED";
         order.result = stringOrEmpty(request.result) === "RESULT_REJECTED" ? "RESULT_REJECTED" : "RESULT_COMPLETED";
+        order.updatedAt = new Date().toISOString();
+        return { json: { order } };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/status"),
+      resolve: (match, method, body) => {
+        if (method !== "PATCH") return null;
+        const order = findOrder(fixture, match[1], match[2]);
+        if (!order) return { json: {} };
+        const request = (body ?? {}) as RequestBody;
+        const state = stringOrEmpty(request.state);
+        if (state === "STATE_DRAFT") {
+          order.state = "STATE_DRAFT";
+          order.result = "RESULT_UNSPECIFIED";
+        } else if (state === "STATE_OPEN") {
+          order.state = "STATE_OPEN";
+        } else if (state === "STATE_CLOSED") {
+          order.state = "STATE_CLOSED";
+          order.result = stringOrEmpty(request.result) === "RESULT_REJECTED" ? "RESULT_REJECTED" : "RESULT_COMPLETED";
+        }
         order.updatedAt = new Date().toISOString();
         return { json: { order } };
       },
