@@ -55,6 +55,12 @@ export const GITHUB_ISSUES_INTAKE_APP: FactoryApp = {
   id: GITHUB_ISSUES_INTAKE_APP_ID,
   name: "GitHub issue intake",
   description: "Listens for GitHub issues and creates backlog work orders.",
+  intake: {
+    source: "SOURCE_GITHUB_ISSUES",
+    triggerNodeId: "github-issues-trigger",
+    analysisNodeId: "github-issues-analysis",
+    createWorkOrderNodeId: "github-issues-create",
+  },
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
 };

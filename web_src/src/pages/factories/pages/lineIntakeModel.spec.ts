@@ -6,6 +6,7 @@ import {
   filterAddIntakeTemplates,
   intakeAutomationAppId,
   intakeAutomationFixture,
+  intakeSourcesFromFactoryApps,
   intakeTicketAnalysisFixture,
   LINE_INTAKE_SOURCES,
   lineIntakeSourceById,
@@ -46,8 +47,27 @@ describe("lineIntakeModel", () => {
         { id: "canvas-issue-intake", name: "Issue Intake" },
       ]),
     ).toBe("canvas-issue-intake");
+    expect(
+      intakeAutomationAppId([
+        { id: "app-acme-planner" },
+        { id: "app-github-issues-intake", intake: { source: "SOURCE_GITHUB_ISSUES" } },
+      ]),
+    ).toBe("app-github-issues-intake");
     expect(intakeAutomationAppId([{ id: "app-acme-planner" }])).toBe("app-acme-planner");
     expect(intakeAutomationAppId([])).toBeUndefined();
+  });
+
+  it("maps factory intake apps to configured sources", () => {
+    expect(
+      intakeSourcesFromFactoryApps([
+        { id: "github", name: "Repository issues", intake: { source: "SOURCE_GITHUB_ISSUES" } },
+        { id: "sentry", name: "Production errors", intake: { source: "SOURCE_SENTRY_EXCEPTIONS" } },
+        { id: "other", name: "Release notes" },
+      ]).map(({ appId, source }) => ({ appId, id: source.id, name: source.name })),
+    ).toEqual([
+      { appId: "github", id: "github-issues", name: "Repository issues" },
+      { appId: "sentry", id: "sentry-exceptions", name: "Production errors" },
+    ]);
   });
 
   it("builds a ticket analysis fixture with ingest, analyze, plan, and score", () => {
@@ -118,10 +138,9 @@ describe("lineIntakeModel", () => {
   });
 
   it("filters add-intake templates by name or description", () => {
+    expect(filterAddIntakeTemplates("production").map((template) => template.id)).toEqual(["sentry-exceptions"]);
+    expect(filterAddIntakeTemplates("incident").map((template) => template.id)).toEqual(["pagerduty-incidents"]);
     expect(filterAddIntakeTemplates("runtime").map((template) => template.id)).toEqual(["improve-ci-runtime"]);
-    expect(filterAddIntakeTemplates("page performance").map((template) => template.id)).toEqual([
-      "improve-page-performance",
-    ]);
     expect(filterAddIntakeTemplates("")).toHaveLength(6);
   });
 });
