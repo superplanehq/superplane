@@ -69,8 +69,10 @@ export type FormatDurationOptions = {
 };
 
 export function formatDuration(durationMs: number, options?: FormatDurationOptions): string {
+  if (!Number.isFinite(durationMs)) return "";
+
   if (options?.precision === "second") {
-    if (!Number.isFinite(durationMs) || durationMs <= 0) return "";
+    if (durationMs <= 0) return "";
     if (durationMs < 1000) return "< 1s";
 
     durationMs = Math.round(durationMs / 1000) * 1000;
@@ -87,7 +89,7 @@ export function formatDuration(durationMs: number, options?: FormatDurationOptio
 }
 
 export function formatMinutesSecondsDuration(durationMs: number): string {
-  if (durationMs <= 0) return "";
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return "";
   if (durationMs < 1000) return "<1s";
 
   const totalSeconds = Math.floor(durationMs / 1000);
