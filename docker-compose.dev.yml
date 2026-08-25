@@ -87,14 +87,18 @@ services:
       # Browser / links. For tunnels: match your public UI URL if you load the app through it.
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       # Runner + node webhooks: URLs sent to externals use this origin (must reach this process on PUBLIC_API_PORT).
-      # Tunnel example: ngrok http 8000 then set WEBHOOKS_BASE_URL=https://<subdomain>.ngrok-free.app (no trailing slash).
-      WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
-      # Task broker /v1 (Runner component). Base URL has no trailing slash.
-      # FLEET_ID, when set, is the create-task fleet_id (overrides node machine type).
-      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-}
+      # Default reaches this app from the runner-repo task-broker container (`make dev` there).
+      # Tunnel example: ngrok http 8000 then set WEBHOOKS_BASE_URL in .env (no trailing slash).
+      WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://host.docker.internal:8000}
+      # Task broker /v1 (Runner component). Defaults match runner `make dev` (host port 8091).
+      # Base URL has no trailing slash. Set TASK_BROKER_BASE_URL in .env for a remote broker.
+      # Empty TASK_BROKER_FLEET_ID keeps node machine types. Unset FLEET_ID uses fleet
+      # `local` only when BASE_URL is the local Docker host.
+      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-http://host.docker.internal:8091}
+      TASK_BROKER_PUBLIC_URL: ${TASK_BROKER_PUBLIC_URL:-}
       TASK_BROKER_FLEET_ID: ${TASK_BROKER_FLEET_ID:-}
-      # Bearer; must match broker AUTH_TOKEN when auth is enabled
-      TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-}
+      # Bearer; must match broker AUTH_TOKEN (runner compose default: dev-local-token).
+      TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-dev-local-token}
       ALLOWED_WS_ORIGINS: ${ALLOWED_WS_ORIGINS:-http://localhost:8000}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_AGENT_ID: ${ANTHROPIC_AGENT_ID:-}
@@ -138,6 +142,9 @@ services:
       - ${STORYBOOK_PORT:-6006}:${STORYBOOK_PORT:-6006}
       - ${PUBLIC_API_PORT:-8000}:${PUBLIC_API_PORT:-8000}
       - ${PPROF_PORT:-6060}:${PPROF_PORT:-6060}
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
     links:
       - db:db
