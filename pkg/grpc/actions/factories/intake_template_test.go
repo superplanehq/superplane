@@ -1,8 +1,11 @@
 package factories
 
 import (
+	"strconv"
+	"strings"
 	"testing"
 
+	"github.com/expr-lang/expr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/components/runner"
@@ -34,7 +37,50 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeAnalysisNodeID},
 			{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeThresholdNodeID},
 			{Channel: "true", SourceID: intakeThresholdNodeID, TargetID: intakeCreateNodeID},
+			{Channel: "default", SourceID: intakeCreateNodeID, TargetID: intakeReportConfidenceNodeID},
 		}, canvas.Spec.Edges)
+	})
+
+	t.Run("the created work order receives the intake confidence score", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, nil)
+		require.NoError(t, err)
+
+		report := findSpecNode(t, canvas, intakeReportConfidenceNodeID)
+		assert.Equal(t, intakeReportConfidenceComponent, report.Component)
+		assert.Equal(t, "{{ $[\"Create Work Order\"].data.workOrder.id }}", report.Configuration["orderId"])
+		assert.Equal(t, "confidence", report.Configuration["checkKey"])
+		assert.Equal(t, "Confidence score", report.Configuration["name"])
+		assert.Equal(t, "5", report.Configuration["maxScore"])
+		assert.Equal(t, "fraction", report.Configuration["format"])
+	})
+
+	t.Run("the score rounds onto the meter scale like the UI does", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, nil)
+		require.NoError(t, err)
+
+		report := findSpecNode(t, canvas, intakeReportConfidenceNodeID)
+		assert.Equal(
+			t,
+			`{{ int(round(int($["Analyze intake"].data[0].result.result) / 20.0)) }}`,
+			report.Configuration["score"],
+		)
+
+		expression := report.Configuration["score"].(string)
+		for pct, expected := range map[int]int{0: 0, 49: 2, 50: 3, 69: 3, 70: 4, 89: 4, 90: 5, 100: 5} {
+			assert.Equal(t, expected, evaluateIntakeConfidenceScore(t, expression, pct), "confidence %d%%", pct)
+		}
+	})
+
+	t.Run("the check level follows the meter bands", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, nil)
+		require.NoError(t, err)
+
+		report := findSpecNode(t, canvas, intakeReportConfidenceNodeID)
+		assert.Equal(t, "higherIsBetter", report.Configuration["direction"])
+		// High starts at 4, so 3 is caution (Medium) and 2 and below is
+		// critical (Low).
+		assert.Equal(t, float64(3), report.Configuration["cautionAt"])
+		assert.Equal(t, float64(2), report.Configuration["criticalAt"])
 	})
 
 	t.Run("the analysis runner asks for a machine", func(t *testing.T) {
@@ -121,6 +167,30 @@ func Test__IntakeConfidenceFromExpression(t *testing.T) {
 		_, ok := intakeConfidenceFromExpression("$.result == 'ship it'")
 		assert.False(t, ok)
 	})
+}
+
+// evaluateIntakeConfidenceScore runs the generated score expression against an
+// analysis result of pct, so the band edges are checked with the same engine
+// that resolves node configuration at run time.
+func evaluateIntakeConfidenceScore(t *testing.T, expression string, pct int) int {
+	t.Helper()
+
+	inner := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(expression, "{{"), "}}"))
+	analysis := map[string]any{
+		"data": []any{
+			map[string]any{"result": map[string]any{"result": strconv.Itoa(pct)}},
+		},
+	}
+
+	output, err := expr.Eval(inner, map[string]any{
+		"$": map[string]any{intakeAnalysisNodeName: analysis},
+	})
+	require.NoError(t, err)
+
+	score, ok := output.(int)
+	require.Truef(t, ok, "expression returned %T, want int", output)
+
+	return score
 }
 
 func findSpecNode(t *testing.T, canvas *yaml.Canvas, nodeID string) yaml.Node {
