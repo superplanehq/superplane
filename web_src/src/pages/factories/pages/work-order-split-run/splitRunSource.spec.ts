@@ -57,6 +57,24 @@ describe("splitRunSourceForOrder", () => {
     );
   });
 
+  it("uses the persisted origin label when the order has one", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        origin: {
+          url: "https://github.com/acme/payments/issues/12",
+          label: "acme/payments#12",
+        },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "intake",
+        name: "GitHub issues",
+        ticket: { label: "acme/payments#12", href: "https://github.com/acme/payments/issues/12" },
+      }),
+    );
+  });
+
   it("maps ingest, Sentry, and Slack automations to the drawer intake names", () => {
     expect(splitRunSourceForOrder(RUNNING_WORK_ORDER)).toEqual(
       expect.objectContaining({
