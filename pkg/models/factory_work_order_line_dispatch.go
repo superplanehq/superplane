@@ -65,8 +65,18 @@ func (l *FactoryWorkOrderLineDispatch) Ref() *factory.LineRef {
 // writes happen in the caller's transaction so a partial dispatch (parent
 // created, step 0 failed) can never be observed.
 func (l *FactoryLine) Dispatch(tx *gorm.DB, order *FactoryWorkOrder) (*FactoryWorkOrderLineDispatch, *FactoryLineStepResult, error) {
+	return l.DispatchFrom(tx, order, 0)
+}
+
+// DispatchFrom creates a line dispatch and starts (or queues) the step at
+// startIndex. Rerun from the start uses 0. Rerun this step uses the
+// current step.
+func (l *FactoryLine) DispatchFrom(tx *gorm.DB, order *FactoryWorkOrder, startIndex int) (*FactoryWorkOrderLineDispatch, *FactoryLineStepResult, error) {
 	if len(l.Steps) == 0 {
 		return nil, nil, ErrFactoryLineHasNoSteps
+	}
+	if startIndex < 0 || startIndex >= len(l.Steps) {
+		return nil, nil, ErrFactoryLineStepOutOfRange
 	}
 
 	now := time.Now()
@@ -88,7 +98,7 @@ func (l *FactoryLine) Dispatch(tx *gorm.DB, order *FactoryWorkOrder) (*FactoryWo
 		return nil, nil, err
 	}
 
-	result, err := dispatch.EnqueueOrStartStep(tx, order, 0)
+	result, err := dispatch.EnqueueOrStartStep(tx, order, startIndex)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -320,9 +330,27 @@ func (l *FactoryWorkOrderLineDispatch) RecordStepExecutionCreated(
 	return tx.Create(event).Error
 }
 
-// Finish transitions the dispatch to its terminal state. Called from the
-// advancement path when a step run fails, is cancelled, or the last step in
-// the snapshot passes. No-op if already finished.
+// Reactivate opens a finished traversal again so a later step can start
+// on the same history. No-op if the dispatch is already active.
+func (l *FactoryWorkOrderLineDispatch) Reactivate(tx *gorm.DB) error {
+	if l.State != FactoryWorkOrderLineDispatchStateFinished {
+		return nil
+	}
+
+	now := time.Now()
+	l.State = FactoryWorkOrderLineDispatchStateActive
+	l.Result = ""
+	l.FinishedAt = nil
+	l.UpdatedAt = now
+
+	return tx.Model(l).Updates(map[string]any{
+		"state":       l.State,
+		"result":      l.Result,
+		"finished_at": nil,
+		"updated_at":  l.UpdatedAt,
+	}).Error
+}
+
 func (l *FactoryWorkOrderLineDispatch) Finish(tx *gorm.DB, result string) error {
 	if l.State == FactoryWorkOrderLineDispatchStateFinished {
 		return nil
@@ -340,6 +368,130 @@ func (l *FactoryWorkOrderLineDispatch) Finish(tx *gorm.DB, result string) error 
 		"updated_at":  l.UpdatedAt,
 		"finished_at": l.FinishedAt,
 	}).Error
+}
+
+// AbandonActiveLineDispatch finishes the current traversal as cancelled
+// so a new dispatch can start. No-op when no active dispatch exists.
+func (o *FactoryWorkOrder) AbandonActiveLineDispatch(tx *gorm.DB) error {
+	if err := o.dropQueuedLineWork(tx); err != nil {
+		return err
+	}
+
+	dispatch, err := o.FindActiveLineDispatch(tx)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	return dispatch.Finish(tx, CanvasRunResultCancelled)
+}
+
+// RetryLineStep starts stepIndex again on a traversal that already ran
+// earlier steps. It does not open a new dispatch, so earlier steps stay
+// on the same history.
+func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepIndex int) (*FactoryLineStepResult, error) {
+	if stepIndex < 0 {
+		return nil, ErrFactoryLineStepOutOfRange
+	}
+
+	byOrder, err := ListWorkOrderLineDispatchesByWorkOrderIDs(tx, []uuid.UUID{o.ID})
+	if err != nil {
+		return nil, err
+	}
+
+	var onLine []FactoryWorkOrderLineDispatchRecord
+	for _, record := range byOrder[o.ID] {
+		if record.LineID == line.ID {
+			onLine = append(onLine, record)
+		}
+	}
+
+	target := pickDispatchForStepRetry(onLine, stepIndex)
+	if target == nil {
+		_, result, err := line.DispatchFrom(tx, o, stepIndex)
+		return result, err
+	}
+
+	active, err := o.FindActiveLineDispatch(tx)
+	if err == nil && active.ID != target.ID {
+		if err := o.AbandonActiveLineDispatch(tx); err != nil {
+			return nil, err
+		}
+	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	if err := target.Reactivate(tx); err != nil {
+		return nil, err
+	}
+
+	if err := target.settleOpenWorkFrom(tx, stepIndex); err != nil {
+		return nil, err
+	}
+
+	for index := stepIndex; index < len(target.Steps); index++ {
+		if _, err := AdmitQueuedForStep(tx, line.ID, index); err != nil {
+			return nil, err
+		}
+	}
+
+	return target.EnqueueOrStartStep(tx, o, stepIndex)
+}
+
+func (l *FactoryWorkOrderLineDispatch) settleOpenWorkFrom(tx *gorm.DB, stepIndex int) error {
+	if err := tx.
+		Where("line_dispatch_id = ? AND step_index >= ?", l.ID, stepIndex).
+		Delete(&FactoryWorkOrderQueueItem{}).Error; err != nil {
+		return err
+	}
+
+	var executions []FactoryWorkOrderExecution
+	err := tx.
+		Where("line_dispatch_id = ? AND step_index >= ?", l.ID, stepIndex).
+		Where("status IN ?", []string{
+			FactoryWorkOrderExecutionStatusPending,
+			FactoryWorkOrderExecutionStatusRunning,
+		}).
+		Find(&executions).Error
+	if err != nil {
+		return err
+	}
+
+	for i := range executions {
+		if err := executions[i].MarkFinished(tx, CanvasRunResultCancelled); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func pickDispatchForStepRetry(records []FactoryWorkOrderLineDispatchRecord, stepIndex int) *FactoryWorkOrderLineDispatch {
+	for i := len(records) - 1; i >= 0; i-- {
+		if dispatchHasEarlierStep(records[i], stepIndex) {
+			dispatch := records[i].FactoryWorkOrderLineDispatch
+			return &dispatch
+		}
+	}
+	if len(records) == 0 {
+		return nil
+	}
+	dispatch := records[len(records)-1].FactoryWorkOrderLineDispatch
+	return &dispatch
+}
+
+func dispatchHasEarlierStep(record FactoryWorkOrderLineDispatchRecord, stepIndex int) bool {
+	if stepIndex <= 0 {
+		return true
+	}
+	for _, execution := range record.Executions {
+		if execution.StepIndex < stepIndex {
+			return true
+		}
+	}
+	return false
 }
 
 // FindActiveLineDispatch is a single indexed lookup ("does an active

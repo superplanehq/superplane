@@ -925,6 +925,8 @@ message DispatchWorkOrderRequest {
   string factory_id = 1;
   string order_id = 2;
   string line_name = 3;
+  int32 start_step_index = 4;
+  bool replace_active = 5;
 }
 
 message DispatchWorkOrderResponse {

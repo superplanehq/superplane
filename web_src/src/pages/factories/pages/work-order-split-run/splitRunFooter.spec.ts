@@ -6,6 +6,7 @@ import {
   DEFAULT_SPLIT_RUN_STOP_CHOICE,
   defaultSplitRunStopChoice,
   doneFooterForStatus,
+  rerunStartStepIndex,
   SPLIT_RUN_STOP_CHOICES,
 } from "./splitRunFooter";
 
@@ -56,19 +57,22 @@ describe("buildSplitRunFooter", () => {
     expect(footer.actions).toEqual([{ id: "stop", kind: "stop", label: "Stop", emphasis: "quiet" }]);
     expect(DEFAULT_SPLIT_RUN_STOP_CHOICE).toBe("canceled");
     expect(SPLIT_RUN_STOP_CHOICES.map((choice) => choice.label)).toEqual([
-      "Stop as Canceled",
-      "Stop as Completed",
-      "Stop and return to Draft",
+      "Stop and Close",
+      "Stop and Complete",
+      "Rerun this step",
+      "Rerun from the start",
     ]);
     expect(SPLIT_RUN_STOP_CHOICES.map((choice) => choice.actionLabel)).toEqual([
-      "Stop & Cancel",
-      "Mark as Complete",
-      "Return to Draft",
+      "Stop and Close",
+      "Stop and Complete",
+      "Rerun step",
+      "Rerun from start",
     ]);
     expect(SPLIT_RUN_STOP_CHOICES.map((choice) => choice.description)).toEqual([
       "Marks this task as Canceled",
       "Marks this task as Completed",
-      "Returns this task to Backlog",
+      "Starts this step again",
+      "Starts this task from the first step",
     ]);
   });
 
@@ -136,14 +140,18 @@ describe("availableSplitRunStopChoices", () => {
     expect(availableSplitRunStopChoices("running").map((choice) => choice.id)).toEqual([
       "canceled",
       "completed",
-      "draft",
+      "rerun-step",
+      "rerun-start",
     ]);
     expect(availableSplitRunStopChoices("waiting").map((choice) => choice.id)).toEqual([
       "canceled",
       "completed",
-      "draft",
+      "rerun-step",
+      "rerun-start",
     ]);
     expect(defaultSplitRunStopChoice("running")).toBe("canceled");
+    expect(defaultSplitRunStopChoice("waiting")).toBe("canceled");
+    expect(defaultSplitRunStopChoice("waiting", "failed")).toBe("rerun-step");
   });
 
   it("drops the outcome that already matches the work order", () => {
@@ -156,5 +164,15 @@ describe("availableSplitRunStopChoices", () => {
     expect(availableSplitRunStopChoices("rejected").map((choice) => choice.id)).toEqual(["reopen"]);
     expect(availableSplitRunStopChoices("failed").map((choice) => choice.id)).toEqual(["reopen"]);
     expect(defaultSplitRunStopChoice("completed")).toBe("reopen");
+  });
+});
+
+describe("rerunStartStepIndex", () => {
+  it("uses the first step for Rerun from the start", () => {
+    expect(rerunStartStepIndex("rerun-start", 2)).toBe(0);
+  });
+
+  it("keeps the current step for Rerun this step", () => {
+    expect(rerunStartStepIndex("rerun-step", 2)).toBe(2);
   });
 });
