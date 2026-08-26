@@ -16,6 +16,7 @@ import {
 import {
   intakeAutomationFixture,
   intakeTicketAnalysisFixture,
+  isBelowThresholdTicket,
   LINE_INTAKE_COPY,
   type AddIntakeTemplate,
   type ConfiguredLineIntakeSource,
@@ -295,13 +296,15 @@ function IntakeListItem({
   const live = useLiveIntakeTickets(organizationId, factoryId, intake, expanded);
   const connected = Boolean(organizationId && factoryId);
   const tickets = connected ? live.tickets : fallbackTickets;
+  const belowThresholdCount = tickets.filter(isBelowThresholdTicket).length;
 
   return (
     <li>
       <IntakeCard
         intake={intake}
         expanded={expanded}
-        childCount={tickets.length}
+        analyzingCount={tickets.length - belowThresholdCount}
+        belowThresholdCount={belowThresholdCount}
         onToggle={() => onToggleIntake(intake.intakeId)}
         onOpenGear={() => onOpenGear(intake)}
       >
@@ -426,14 +429,16 @@ function LineIntakeDrawerPopups({
 function IntakeCard({
   intake,
   expanded,
-  childCount,
+  analyzingCount,
+  belowThresholdCount,
   onToggle,
   onOpenGear,
   children,
 }: {
   intake: ConfiguredLineIntakeSource;
   expanded: boolean;
-  childCount: number;
+  analyzingCount: number;
+  belowThresholdCount: number;
   onToggle: () => void;
   onOpenGear: () => void;
   children?: ReactNode;
@@ -466,11 +471,15 @@ function IntakeCard({
         <div className="relative z-10 min-w-0 flex-1 pointer-events-none">
           <h3 className="flex flex-wrap items-center gap-1.5 text-[13px] font-medium tracking-[-0.01em] leading-[19.5px] text-foreground">
             {displayName}
-            {expanded && childCount > 0 ? (
-              <span className="text-[11px] font-medium tabular-nums text-muted-foreground">{childCount}</span>
+            {expanded && analyzingCount > 0 ? (
+              <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+                {analyzingCount} {LINE_INTAKE_COPY.analyzingStatus}
+              </span>
             ) : null}
-            {expanded && childCount > 0 ? (
-              <span className="text-[11px] font-medium text-muted-foreground">{LINE_INTAKE_COPY.analyzingStatus}</span>
+            {expanded && belowThresholdCount > 0 ? (
+              <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+                {belowThresholdCount} {LINE_INTAKE_COPY.belowThresholdStatus}
+              </span>
             ) : null}
             {intake.healthy ? null : (
               <span

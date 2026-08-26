@@ -3,11 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   ADD_INTAKE_TEMPLATES,
   filterAddIntakeTemplates,
+  GITHUB_ISSUES_ANALYZING_TICKETS,
   intakeAutomationFixture,
   intakeSourcesFromFactoryIntakes,
   intakeTicketAnalysisFixture,
+  intakeTicketConfidenceScore,
   LINE_INTAKE_SOURCES,
   lineIntakeSourceById,
+  sortIntakeTicketsByOutcome,
 } from "./lineIntakeModel";
 
 describe("lineIntakeModel", () => {
@@ -167,6 +170,50 @@ describe("lineIntakeModel", () => {
     };
     expect(fixture.checks).toEqual([check]);
     expect(fixture.phases.find((phase) => phase.id === "score")?.checks).toEqual([check]);
+  });
+
+  it("reads the ticket score from the intake percentage", () => {
+    expect(intakeTicketConfidenceScore({ id: "gh-1", title: "Ticket", confidencePct: 58 })).toBe(3);
+    expect(intakeTicketConfidenceScore({ id: "gh-1", title: "Ticket", confidencePct: 12 })).toBe(1);
+    expect(intakeTicketConfidenceScore({ id: "gh-1", title: "Ticket", confidenceScore: 5, confidencePct: 12 })).toBe(5);
+    expect(intakeTicketConfidenceScore({ id: "gh-1", title: "Ticket" })).toBeUndefined();
+  });
+
+  it("keeps analyzing tickets over the tickets below the minimum confidence", () => {
+    expect(
+      sortIntakeTicketsByOutcome([
+        { id: "gh-1", title: "Below", outcome: "below-threshold", confidencePct: 20 },
+        { id: "gh-2", title: "Analyzing" },
+      ]).map((ticket) => ticket.id),
+    ).toEqual(["gh-2", "gh-1"]);
+
+    expect(GITHUB_ISSUES_ANALYZING_TICKETS.filter((ticket) => ticket.outcome === "below-threshold")).toHaveLength(6);
+    expect(
+      GITHUB_ISSUES_ANALYZING_TICKETS.filter((ticket) => ticket.outcome === "below-threshold").every(
+        (ticket) => (ticket.confidencePct ?? 100) < 60,
+      ),
+    ).toBe(true);
+  });
+
+  // The analysis of a ticket under the minimum confidence is over. The popup
+  // must show the finished run and the score, not a run that is still going.
+  it("marks the analysis of a ticket below the minimum confidence as finished", () => {
+    const fixture = intakeTicketAnalysisFixture({
+      id: "gh-issue-11",
+      title: "Payments break for some customers",
+      outcome: "below-threshold",
+      confidencePct: 12,
+    });
+
+    expect(fixture.phases.map((phase) => phase.status)).toEqual(["passed", "passed", "passed", "passed"]);
+    expect(fixture.checks).toEqual([
+      expect.objectContaining({
+        name: "Confidence score",
+        score: 1,
+        level: "caution",
+        summary: "This issue is a poor fit for an agent on this factory line.",
+      }),
+    ]);
   });
 
   it("keeps later analysis steps pending while analyze runs", () => {
