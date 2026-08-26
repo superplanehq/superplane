@@ -24,7 +24,8 @@ export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   preferredLineName?: string;
   canDispatch: boolean;
   canAssign: boolean;
-  isDispatching: boolean;
+  /** Work orders with a dispatch in flight. Only their controls show a busy state. */
+  dispatchingOrderIds: ReadonlySet<string>;
   isAssigneesSaving: boolean;
 }
 
@@ -57,7 +58,7 @@ export function WorkOrderCard({
   factoryLines,
   preferredLineName,
   canDispatch,
-  isDispatching,
+  dispatchingOrderIds,
   onDispatch,
   href,
   onOpen,
@@ -125,7 +126,7 @@ export function WorkOrderCard({
                   lines={factoryLines}
                   preferredLineName={preferredLineName}
                   canDispatch={canDispatch}
-                  isDispatching={isDispatching}
+                  isDispatching={dispatchingOrderIds.has(entry.id)}
                   onDispatch={onDispatch}
                 />
               ) : null}

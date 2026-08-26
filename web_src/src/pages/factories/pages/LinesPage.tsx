@@ -477,7 +477,7 @@ function LineDetail({
           peekOrder={peekOrder}
           canDispatch={workOrderCardContext.canDispatch}
           canUpdate={workOrderCardContext.canAssign}
-          isDispatching={workOrderCardContext.isDispatching}
+          isDispatching={workOrderCardContext.dispatchingOrderIds.has(peekOrderId)}
           onDispatch={workOrderCardContext.onDispatch}
           onClose={() => setPeekOrderId(null)}
         />

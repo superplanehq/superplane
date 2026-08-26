@@ -33,7 +33,8 @@ export interface MissionsWorkOrdersLoadedViewProps {
   canDispatch: boolean;
   canAssign: boolean;
   permissionsLoading: boolean;
-  isDispatching: boolean;
+  /** Work orders with a dispatch in flight. Only their controls show a busy state. */
+  dispatchingOrderIds: ReadonlySet<string>;
   isAssigneesSaving: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
@@ -82,7 +83,7 @@ export function MissionsWorkOrdersLoadedView(props: MissionsWorkOrdersLoadedView
       factoryLines: props.factoryLines,
       canDispatch: props.canDispatch,
       canAssign: props.canAssign,
-      isDispatching: props.isDispatching,
+      dispatchingOrderIds: props.dispatchingOrderIds,
       isAssigneesSaving: props.isAssigneesSaving,
       onDispatch: props.onDispatch,
       onAssigneesSave: props.onAssigneesSave,
