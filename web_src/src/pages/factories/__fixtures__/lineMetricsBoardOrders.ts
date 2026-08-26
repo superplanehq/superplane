@@ -325,6 +325,10 @@ export const FEATURE_RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
   createdBy: SLACK_CREATED_BY,
+  origin: {
+    url: "https://acme.slack.com/archives/C0REFUNDS/p1710000000000000",
+    label: "acme#C0REFUNDS",
+  },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     featureLineDispatch([

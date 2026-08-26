@@ -13,6 +13,7 @@ import {
 } from "../__fixtures__/factoryPageResponses";
 import { emptyFactoriesFixture } from "../__fixtures__/factoryPageFixtureVariants";
 import { fiveStepLineFactoriesFixture, lineMetricsFactoriesFixture } from "../__fixtures__/lineMetricsFactoriesFixture";
+import { noIntakeFactoriesFixture, severalIntakeFactoriesFixture } from "../__fixtures__/backlogIntakeItemFixtures";
 import { LinesPage } from "./LinesPage";
 
 /**
@@ -97,6 +98,32 @@ export const LineBoardIntakeAnalyzing: Story = {
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`}
         factoriesFixture={lineMetricsFactoriesFixture}
+      />
+    );
+  },
+};
+
+export const LineBoardSeveralIntakes: Story = {
+  name: "Line board — several intakes",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={severalIntakeFactoriesFixture}
+      />
+    );
+  },
+};
+
+export const LineBoardNoIntakes: Story = {
+  name: "Line board — no intakes",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={noIntakeFactoriesFixture}
       />
     );
   },

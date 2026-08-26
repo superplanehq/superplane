@@ -10,12 +10,14 @@ import type { OnboardingStorybookSeed } from "../pages/onboarding/onboardingMock
 import { StorybookOverviewPage } from "../pages/onboarding/StorybookOverviewPage";
 import { WikiWireframe } from "../pages/wiki/WikiWireframe";
 import { WIKI_DOCUMENTS_DEFAULT, WIKI_DOCUMENTS_REFRESHED } from "../pages/wiki/wikiMocks";
+import { defaultBacklogIntakeItemCatalog } from "./backlogIntakeItemFixtures";
 import { defaultFactoriesFixture, FACTORIES_ORGANIZATION_ID, type FactoriesFixture } from "./factoryPageResponses";
 import { refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
 import { MissionAssignmentProvider } from "../pages/missions/MissionAssignmentContext";
 import { MissionsWorkOrdersPage } from "../pages/missions/MissionsWorkOrdersPage";
 import { WorkOrderMissionOverviewRow } from "../pages/missions/WorkOrderMissionOverviewRow";
 import { WorkOrderOverviewMissionSlotContext } from "../sidebar/workOrderOverviewSlots";
+import { BacklogIntakeItemsProvider } from "../pages/BacklogIntakeItemsContext";
 
 interface FactoriesHarnessProps {
   /** Path under the org. Defaults to `workspaces` (list page). */
@@ -109,9 +111,15 @@ export function FactoriesHarness({
     </MissionAssignmentProvider>
   );
 
+  const withIntakeItems = (
+    <BacklogIntakeItemsProvider catalog={factoriesFixture.intakeItemCatalog ?? defaultBacklogIntakeItemCatalog}>
+      {withMissions}
+    </BacklogIntakeItemsProvider>
+  );
+
   if (!enableOnboarding) {
-    return withMissions;
+    return withIntakeItems;
   }
 
-  return <OnboardingStorybookProvider initial={onboardingSeed}>{withMissions}</OnboardingStorybookProvider>;
+  return <OnboardingStorybookProvider initial={onboardingSeed}>{withIntakeItems}</OnboardingStorybookProvider>;
 }

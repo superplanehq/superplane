@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -60,6 +61,11 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 	logger = logging.WithWorkOrder(logger, *order)
 	fromState := order.State
 	wasClosed := order.IsClosed()
+	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to close work order")
+	}
+
 	order, err = order.Close(db, result, &closedBy)
 	if err != nil {
 		logger.WithError(err).Error("close work order failed")
@@ -72,6 +78,14 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 		factoryevents.EventTypeOrderStatusUpdated,
 	); err != nil {
 		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
+	}
+
+	refreshed, err := factory.FindWorkOrder(db, orderID)
+	if errors.Is(err, models.ErrFactoryWorkOrderNotFound) {
+		return &pb.CloseWorkOrderResponse{Order: serialized}, nil
+	}
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
 	if !wasClosed {
@@ -90,12 +104,7 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 		}
 	}
 
-	order, err = factory.FindWorkOrder(db, orderID)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to close work order")
-	}
-
-	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
+	serialized, err = loadAndSerializeWorkOrder(ctx, factory, refreshed)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}

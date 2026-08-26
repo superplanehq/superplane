@@ -116,6 +116,19 @@ func Test__FactoryIntake(t *testing.T) {
 		assert.Zero(t, count)
 	})
 
+	t.Run("finds an intake by canvas", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "GitHub issues")
+		created, err := factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+
+		found, err := models.FindFactoryIntakeByCanvasID(db, canvas.ID)
+		require.NoError(t, err)
+		assert.Equal(t, created.ID, found.ID)
+		assert.Equal(t, models.FactoryIntakeSourceGitHubIssues, found.Source)
+	})
+
 	t.Run("missing intake reports not found", func(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
