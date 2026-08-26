@@ -1,13 +1,17 @@
 package e2e
 
 import (
+	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 )
@@ -141,4 +145,125 @@ func (steps *TestLoginPageSteps) SetInvalidAuthCookie() {
 		HttpOnly: pw.Bool(true),
 	}})
 	assert.NoError(steps.t, err)
+}
+
+const googleDevAccountEmail = "dev@superplane.local"
+
+func TestGoogleSSONoAccountSignup(t *testing.T) {
+	t.Run("google sign-in without an account asks to create one", func(t *testing.T) {
+		steps := &googleSSONoAccountSteps{t: t}
+		steps.start()
+		steps.visitLoginPage()
+		steps.capture("01-login")
+		steps.clickContinueWithGoogle()
+		steps.assertNoAccountPromptVisible()
+		steps.capture("02-prompt")
+		steps.clickCreateAccount()
+		steps.assertAccountCreatedAndSignedIn()
+		steps.capture("03-after-create")
+	})
+
+	t.Run("use a different account returns to sign in", func(t *testing.T) {
+		steps := &googleSSONoAccountSteps{t: t}
+		steps.start()
+		steps.visitLoginPage()
+		steps.clickContinueWithGoogle()
+		steps.assertNoAccountPromptVisible()
+		steps.clickUseADifferentAccount()
+		steps.assertLoginPageVisible()
+	})
+
+	t.Run("existing google user signs in from the login page", func(t *testing.T) {
+		steps := &googleSSONoAccountSteps{t: t}
+		steps.start()
+		steps.givenTheGoogleDevAccountExists()
+		steps.visitLoginPage()
+		steps.clickContinueWithGoogle()
+		steps.assertLeftLoginPage()
+	})
+}
+
+type googleSSONoAccountSteps struct {
+	t       *testing.T
+	session *session.TestSession
+}
+
+func (s *googleSSONoAccountSteps) start() {
+	s.session = ctx.NewSession(s.t)
+	s.session.Start()
+}
+
+func (s *googleSSONoAccountSteps) visitLoginPage() {
+	s.session.Visit("/login")
+	s.session.AssertVisible(q.Text("Continue with Google"))
+}
+
+func (s *googleSSONoAccountSteps) clickContinueWithGoogle() {
+	s.session.Click(q.Text("Continue with Google"))
+}
+
+func (s *googleSSONoAccountSteps) assertNoAccountPromptVisible() {
+	s.session.AssertVisible(q.Text("No account found"))
+	s.session.AssertVisible(q.Text("This Google account does not have a SuperPlane account."))
+	s.session.AssertVisible(q.Text("Create an account to continue."))
+	s.session.AssertVisible(q.Text("Create account"))
+	s.session.AssertVisible(q.Text("Use a different account"))
+	s.session.AssertURLContains("auth_error=signup_required")
+	s.session.AssertURLContains("provider=google")
+}
+
+func (s *googleSSONoAccountSteps) clickCreateAccount() {
+	s.session.Click(q.Text("Create account"))
+}
+
+func (s *googleSSONoAccountSteps) clickUseADifferentAccount() {
+	s.session.Click(q.Text("Use a different account"))
+}
+
+func (s *googleSSONoAccountSteps) assertAccountCreatedAndSignedIn() {
+	waitErr := s.session.Page().WaitForURL("**/welcome**", pw.PageWaitForURLOptions{
+		Timeout: pw.Float(s.sessionTimeout()),
+	})
+	require.NoError(s.t, waitErr)
+
+	account, err := models.FindAccountByEmail(googleDevAccountEmail)
+	require.NoError(s.t, err)
+	assert.Equal(s.t, googleDevAccountEmail, account.Email)
+}
+
+func (s *googleSSONoAccountSteps) assertLoginPageVisible() {
+	s.session.AssertVisible(q.Text("Welcome to SuperPlane"))
+	s.session.AssertVisible(q.Text("Continue with Google"))
+	assert.NotContains(s.t, s.session.Page().URL(), "auth_error=signup_required")
+}
+
+func (s *googleSSONoAccountSteps) givenTheGoogleDevAccountExists() {
+	_, err := models.CreateAccount("Dev User", googleDevAccountEmail)
+	require.NoError(s.t, err)
+}
+
+func (s *googleSSONoAccountSteps) assertLeftLoginPage() {
+	s.session.WaitUntilURLDoesNotContain("/login")
+	currentURL := s.session.Page().URL()
+	assert.NotContains(s.t, currentURL, "auth_error=signup_required")
+}
+
+func (s *googleSSONoAccountSteps) capture(name string) {
+	s.session.Sleep(300)
+	path := fmt.Sprintf("/app/tmp/screenshots/sso-no-account-%s.png", name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		s.t.Fatalf("screenshot dir %s: %v", path, err)
+	}
+
+	if _, err := s.session.Page().Screenshot(pw.PageScreenshotOptions{
+		Path:     pw.String(path),
+		FullPage: pw.Bool(true),
+		Type:     pw.ScreenshotTypePng,
+	}); err != nil {
+		s.t.Fatalf("screenshot %s: %v", name, err)
+	}
+}
+
+func (s *googleSSONoAccountSteps) sessionTimeout() float64 {
+	return 15000
 }
