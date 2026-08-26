@@ -1,10 +1,7 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { type ReactNode } from "react";
 
 import { type BacklogIntakeItemCatalog } from "./backlogIntakeItems";
-
-const EMPTY_CATALOG: BacklogIntakeItemCatalog = { items: [] };
-
-const BacklogIntakeItemsContext = createContext<BacklogIntakeItemCatalog>(EMPTY_CATALOG);
+import { BacklogIntakeItemsContext, EMPTY_BACKLOG_INTAKE_CATALOG } from "./useBacklogIntakeItemCatalog";
 
 export function BacklogIntakeItemsProvider({
   catalog,
@@ -14,10 +11,8 @@ export function BacklogIntakeItemsProvider({
   children: ReactNode;
 }) {
   return (
-    <BacklogIntakeItemsContext.Provider value={catalog ?? EMPTY_CATALOG}>{children}</BacklogIntakeItemsContext.Provider>
+    <BacklogIntakeItemsContext.Provider value={catalog ?? EMPTY_BACKLOG_INTAKE_CATALOG}>
+      {children}
+    </BacklogIntakeItemsContext.Provider>
   );
-}
-
-export function useBacklogIntakeItemCatalog(): BacklogIntakeItemCatalog {
-  return useContext(BacklogIntakeItemsContext);
 }

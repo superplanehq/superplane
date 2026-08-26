@@ -9,7 +9,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useEffect, useMemo, useState } from "react";
 
-import { useBacklogIntakeItemCatalog } from "./BacklogIntakeItemsContext";
+import { useBacklogIntakeItemCatalog } from "./useBacklogIntakeItemCatalog";
 import {
   BACKLOG_CREATE_COPY,
   BACKLOG_SEARCH_MAX_ITEMS,
@@ -34,7 +34,7 @@ export function useBacklogCreateMenu(
   const [visibleCount, setVisibleCount] = useState(BACKLOG_SEARCH_PAGE_SIZE);
   const createWorkOrder = useCreateWorkOrder(organizationId, factoryId);
   const importIntakeItem = useImportFactoryIntakeItem(organizationId, factoryId);
-  const intakes = intakesQuery.data ?? [];
+  const intakes = useMemo(() => intakesQuery.data ?? [], [intakesQuery.data]);
   const hasCatalog = catalog.items.length > 0;
 
   useEffect(() => {
@@ -46,14 +46,14 @@ export function useBacklogCreateMenu(
     setVisibleCount(BACKLOG_SEARCH_PAGE_SIZE);
   }, [focusedIntakeId, debouncedQuery]);
 
-  const searchQuery = useSearchFactoryIntakeItems(
+  const searchQuery = useSearchFactoryIntakeItems({
     organizationId,
     factoryId,
-    focusedIntakeId,
-    debouncedQuery,
-    !hasCatalog && Boolean(focusedIntakeId),
-    visibleCount,
-  );
+    intakeId: focusedIntakeId,
+    query: debouncedQuery,
+    enabled: !hasCatalog && Boolean(focusedIntakeId),
+    limit: visibleCount,
+  });
 
   const sources = useMemo(() => listBacklogIntakeSources({ intakes, catalog }), [intakes, catalog]);
 
@@ -67,23 +67,15 @@ export function useBacklogCreateMenu(
     [focusedIntakes, catalog, query],
   );
 
-  const liveItems = useMemo<BacklogIntakeItem[]>(() => {
-    if (!focusedIntakeId) {
-      return [];
-    }
-    return (searchQuery.data ?? []).map((item) => ({
-      id: item.id ?? "",
-      intakeId: focusedIntakeId,
-      key: item.key ?? "",
-      title: item.title ?? "",
-      body: item.body ?? "",
-    }));
-  }, [focusedIntakeId, searchQuery.data]);
+  const liveItems = useMemo(
+    () => liveBacklogItems(focusedIntakeId, searchQuery.data),
+    [focusedIntakeId, searchQuery.data],
+  );
 
   const items = (hasCatalog ? catalogItems : liveItems).slice(0, visibleCount);
   const hasMore = hasCatalog
     ? catalogItems.length > visibleCount
-    : liveItems.length >= visibleCount && visibleCount < BACKLOG_SEARCH_MAX_ITEMS && !searchQuery.isError;
+    : canPageLiveItems(liveItems.length, visibleCount, searchQuery.isError);
 
   const setFocusedIntake = (intakeId: string | null) => {
     if (intakeId !== focusedIntakeId) {
@@ -134,4 +126,24 @@ export function useBacklogCreateMenu(
       : undefined,
     importItem,
   };
+}
+
+function liveBacklogItems(
+  intakeId: string | null,
+  items: { id?: string; key?: string; title?: string; body?: string }[] | undefined,
+): BacklogIntakeItem[] {
+  if (!intakeId) {
+    return [];
+  }
+  return (items ?? []).map((item) => ({
+    id: item.id ?? "",
+    intakeId,
+    key: item.key ?? "",
+    title: item.title ?? "",
+    body: item.body ?? "",
+  }));
+}
+
+function canPageLiveItems(itemCount: number, visibleCount: number, isError: boolean): boolean {
+  return itemCount >= visibleCount && visibleCount < BACKLOG_SEARCH_MAX_ITEMS && !isError;
 }

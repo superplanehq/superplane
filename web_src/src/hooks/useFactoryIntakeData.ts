@@ -15,7 +15,7 @@ import type {
   FactoryIntakeSettings,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { factoryAppsKey, factoryQueryKeys } from "./useFactoryData";
 
@@ -134,28 +134,41 @@ export function useUpdateFactoryIntake(organizationId: string, factoryId: string
   });
 }
 
-export function useSearchFactoryIntakeItems(
-  organizationId: string,
-  factoryId: string,
-  intakeId: string | null,
-  query: string,
+export function useSearchFactoryIntakeItems({
+  organizationId,
+  factoryId,
+  intakeId,
+  query,
   enabled = true,
   limit = 5,
-) {
+}: {
+  organizationId: string;
+  factoryId: string;
+  intakeId: string | null;
+  query: string;
+  enabled?: boolean;
+  limit?: number;
+}) {
+  const scopedIntakeId = intakeId ?? "";
   return useQuery({
-    queryKey: factoryIntakeQueryKeys.items(organizationId, factoryId, intakeId ?? "", query, limit),
+    queryKey: factoryIntakeQueryKeys.items(organizationId, factoryId, scopedIntakeId, query, limit),
     queryFn: async (): Promise<FactoriesFactoryIntakeItem[]> => {
       const response = await factoriesSearchFactoryIntakeItems(
         withOrganizationHeader({
           organizationId,
-          path: { factoryId, intakeId: intakeId ?? "" },
+          path: { factoryId, intakeId: scopedIntakeId },
           query: { query, limit },
         }),
       );
       return response.data?.items ?? [];
     },
     enabled: Boolean(organizationId && factoryId && intakeId) && enabled,
-    placeholderData: keepPreviousData,
+    placeholderData: (previousData, previousQuery) => {
+      if (previousQuery?.queryKey[4] !== scopedIntakeId) {
+        return undefined;
+      }
+      return previousData;
+    },
   });
 }
 

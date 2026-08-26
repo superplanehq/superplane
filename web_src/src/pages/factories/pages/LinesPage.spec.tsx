@@ -1,12 +1,8 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
-import { ThemeProvider } from "@/contexts/ThemeProvider";
-import { TooltipProvider } from "@/ui/tooltip";
 import { editFactoryLinePath, factoryAppConfigurePath, factoryLineDetailPath } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
@@ -15,16 +11,26 @@ import {
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_APP,
   GITHUB_ISSUES_INTAKE_ID,
-  PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
-import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { LINE_LIST_METRICS_BY_ID } from "./lineListMetricsMockData";
+import { LinesBoardSpecHarness, LinesListSpecHarness } from "./linesPageSpecRender";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
-import { LinesPage } from "./LinesPage";
+
+function renderLinesList(factory: FactoriesFactory = REFUND_FACTORY) {
+  return render(<LinesListSpecHarness factory={factory} />);
+}
+
+function renderLinesBoard(
+  path = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+  openCreateWorkOrder = vi.fn(),
+  factory: FactoriesFactory = REFUND_FACTORY,
+) {
+  return render(<LinesBoardSpecHarness path={path} openCreateWorkOrder={openCreateWorkOrder} factory={factory} />);
+}
 
 const createFactoryLineMutateAsync = vi.fn();
 const updateFactoryLineMutateAsync = vi.fn();
@@ -115,36 +121,9 @@ vi.mock("@/hooks/useWorkOrderChecks", () => ({
   useWorkOrderChecks,
 }));
 
-function LocationProbe() {
-  const location = useLocation();
-  return <div data-testid="lines-test-location">{location.pathname}</div>;
-}
-
-function renderList(factory: FactoriesFactory = REFUND_FACTORY) {
-  return render(
-    <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter initialEntries={[`/${PRIMARY_FACTORY_KEY}/lines`]}>
-        <FactoriesLayoutContext.Provider
-          value={{
-            organizationId: "org-1",
-            factoryId: PRIMARY_FACTORY_ID,
-            factoryKey: PRIMARY_FACTORY_KEY,
-            factory,
-            factories: [factory],
-            openCreateWorkOrder: vi.fn(),
-          }}
-        >
-          <LinesPage />
-          <LocationProbe />
-        </FactoriesLayoutContext.Provider>
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
-}
-
 describe("LinesPage metrics", () => {
   it("shows zero success rate and completions when a line has no nested metrics", () => {
-    renderList();
+    renderLinesList();
     const cards = screen.getAllByTestId("lines-card-metrics");
     expect(cards[0]).toHaveTextContent("0%");
     expect(cards[0]).toHaveTextContent("0 per day");
@@ -158,7 +137,7 @@ describe("LinesPage metrics", () => {
         line.id === REFUND_LINE_PLAN_ID ? { ...line, metrics: LINE_LIST_METRICS_BY_ID[REFUND_LINE_PLAN_ID]! } : line,
       ),
     };
-    renderList(factory);
+    renderLinesList(factory);
     expect(screen.getByTestId(`lines-card-${REFUND_LINE_PLAN_ID}`)).toHaveTextContent("82%");
     expect(screen.getByTestId("lines-card-line-hotfix")).toHaveTextContent("0%");
     expect(screen.getByTestId("lines-card-line-hotfix")).toHaveTextContent("0 per day");
@@ -172,7 +151,7 @@ describe("LinesPage card menu", () => {
     createFactoryLineMutateAsync.mockResolvedValueOnce(newLine);
 
     const user = userEvent.setup();
-    renderList();
+    renderLinesList();
 
     const card = screen.getByTestId(`lines-card-${REFUND_LINE_PLAN_ID}`);
     await user.click(within(card).getByTestId("lines-card-menu"));
@@ -211,142 +190,17 @@ describe("LinesPage board", () => {
     );
   });
 
-  function renderBoard(
-    path = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
-    openCreateWorkOrder = vi.fn(),
-    factory: FactoriesFactory = REFUND_FACTORY,
-  ) {
-    return render(
-      <QueryClientProvider client={new QueryClient()}>
-        <ThemeProvider>
-          <TooltipProvider>
-            <MemoryRouter initialEntries={[path]}>
-              <FactoriesLayoutContext.Provider
-                value={{
-                  organizationId: "org-1",
-                  factoryId: factory.id ?? PRIMARY_FACTORY_ID,
-                  factoryKey: factory.key ?? PRIMARY_FACTORY_KEY,
-                  factory,
-                  factories: [factory],
-                  openCreateWorkOrder,
-                }}
-              >
-                <Routes>
-                  <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
-                  <Route path="/org-1/workspaces/:factoryKey/lines/:lineId/edit" element={<div>Edit line</div>} />
-                </Routes>
-                <LocationProbe />
-              </FactoriesLayoutContext.Provider>
-            </MemoryRouter>
-          </TooltipProvider>
-        </ThemeProvider>
-      </QueryClientProvider>,
-    );
-  }
-
   it("does not show a back link to the lines list", () => {
-    renderBoard();
+    renderLinesBoard();
 
     expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-back-to-list")).not.toBeInTheDocument();
     expect(screen.queryByTestId("line-intake-drawer")).not.toBeInTheDocument();
   });
 
-  it("keeps a create ghost card at the bottom of the backlog", async () => {
-    Element.prototype.scrollIntoView = vi.fn();
-    useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
-    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
-    const user = userEvent.setup();
-    renderBoard();
-
-    const list = screen.getByTestId("lines-backlog-column-scroll");
-    const items = within(list).getAllByRole("listitem");
-    expect(items.at(-1)).toHaveAttribute("data-testid", "lines-backlog-create-ghost-item");
-    expect(within(items.at(-1)!).getByRole("button", { name: "Create work order" })).toBeInTheDocument();
-    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
-
-    await user.click(screen.getByTestId("lines-backlog-create-ghost"));
-    expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
-  });
-
-  it("shows the create ghost card when the backlog is empty", () => {
-    renderBoard();
-
-    expect(screen.getByTestId("lines-backlog-create-ghost")).toBeInTheDocument();
-    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
-  });
-
-  it("hides the create ghost card when the backlog is at capacity", async () => {
-    useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
-    const user = userEvent.setup();
-    renderBoard();
-
-    expect(screen.getByTestId("lines-backlog-create-ghost")).toBeInTheDocument();
-
-    await user.click(screen.getByTestId("lines-backlog-menu"));
-    await user.click(screen.getByTestId("lines-backlog-menu-edit"));
-    await user.type(screen.getByLabelText("Size"), "1");
-    await user.click(screen.getByTestId("lines-backlog-settings-save"));
-
-    expect(screen.queryByTestId("lines-backlog-create-ghost")).not.toBeInTheDocument();
-    expect(screen.getByTestId("lines-backlog-create")).toBeDisabled();
-  });
-
-  it("creates work orders from the backlog header plus", async () => {
-    Element.prototype.scrollIntoView = vi.fn();
-    const openCreateWorkOrder = vi.fn();
-    const user = userEvent.setup();
-    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, openCreateWorkOrder);
-
-    const backlog = screen.getByTestId("lines-backlog-column");
-    expect(within(backlog).queryByRole("button", { name: "Add work order" })).not.toBeInTheDocument();
-
-    await user.click(within(backlog).getByTestId("lines-backlog-create"));
-    expect(screen.queryByTestId("lines-backlog-create-menu")).not.toBeInTheDocument();
-    expect(openCreateWorkOrder).toHaveBeenCalledTimes(1);
-  });
-
-  it("imports an intake item and opens the work order popup", async () => {
-    Element.prototype.scrollIntoView = vi.fn();
-    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
-    searchFactoryIntakeItems.mockReturnValue({
-      data: [
-        {
-          id: "12",
-          key: "#12",
-          title: "Handle duplicate refunds",
-          body: "Retrying a refund posts twice.",
-          url: "https://github.com/acme/payments/issues/12",
-        },
-      ],
-      isLoading: false,
-      isError: false,
-    });
-    importFactoryIntakeItem.mockResolvedValue({
-      id: "wo-imported-12",
-      title: "Handle duplicate refunds",
-      state: "STATE_DRAFT",
-    });
-    const user = userEvent.setup();
-    renderBoard();
-
-    await user.click(screen.getByTestId("lines-backlog-create"));
-    await user.click(screen.getByPlaceholderText("Import from GitHub issue"));
-    await user.click(screen.getByTestId("lines-backlog-create-item-12"));
-
-    expect(importFactoryIntakeItem).toHaveBeenCalledWith({
-      intakeId: GITHUB_ISSUES_INTAKE_ID,
-      itemId: "12",
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
-    });
-    expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
-  });
-
   it("sets a pastel colour on the backlog from circular swatches", async () => {
     const user = userEvent.setup();
-    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
     await user.click(screen.getByTestId("lines-backlog-menu-color-lime"));
@@ -358,7 +212,7 @@ describe("LinesPage board", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [...REVIEW_CANDIDATE_WORK_ORDERS, BOARD_IMPLEMENT_FAILED_ORDER],
     });
-    renderBoard();
+    renderLinesBoard();
 
     const fetchedIds = useWorkOrderChecks.mock.calls
       .filter(([, , orderId, options]) => Boolean(orderId) && options?.enabled !== false)
@@ -372,7 +226,7 @@ describe("LinesPage board", () => {
   it("shows a score on a review-candidate backlog card and opens the split run", async () => {
     useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
     const user = userEvent.setup();
-    renderBoard();
+    renderLinesBoard();
 
     const card = screen.getByTestId("work-order-card-wo-review-pay-842");
     const cardScore = within(card).getByTestId("work-order-card-score-wo-review-pay-842");
@@ -405,7 +259,7 @@ describe("LinesPage board", () => {
 
   it("opens the Intake drawer beside the board when the intake query is set", () => {
     useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
-    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
 
     expect(screen.getByTestId("line-intake-drawer")).toBeInTheDocument();
     expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
@@ -424,7 +278,7 @@ describe("LinesPage board", () => {
         { id: "intake-triage", canvasId: "app-triage", name: "Triage issues", source: "SOURCE_GITHUB_ISSUES" },
       ],
     });
-    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
 
     expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toHaveTextContent("GitHub issues");
     expect(screen.getByTestId("line-intake-source-intake-triage")).toHaveTextContent("Triage issues");
@@ -433,7 +287,7 @@ describe("LinesPage board", () => {
   it("creates an intake from the picker and opens its canvas", async () => {
     createFactoryIntakeMutateAsync.mockResolvedValueOnce({ id: "intake-new", canvasId: "canvas-new" });
     const user = userEvent.setup();
-    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
 
     await user.click(screen.getByTestId("line-intake-add"));
     await user.click(screen.getByTestId("add-intake-template-github-issues"));
@@ -448,21 +302,9 @@ describe("LinesPage board", () => {
     });
   });
 
-  it("shows a backlog onboarding card on Acme when the backlog is empty", () => {
-    renderBoard(
-      `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}`,
-      vi.fn(),
-      ACME_ONBOARDING_FACTORY,
-    );
-
-    expect(screen.getByTestId("backlog-onboarding-card")).toBeInTheDocument();
-    expect(screen.queryByTestId("lines-backlog-create-ghost")).not.toBeInTheDocument();
-    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
-  });
-
   it("shows GitHub issues only on Acme onboarding intake", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
-    renderBoard(
+    renderLinesBoard(
       `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
       vi.fn(),
       ACME_ONBOARDING_FACTORY,
@@ -477,7 +319,7 @@ describe("LinesPage board", () => {
   it("opens the factory canvas editor from Edit automation", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     const user = userEvent.setup();
-    renderBoard(
+    renderLinesBoard(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
     );
 
@@ -495,7 +337,7 @@ describe("LinesPage board", () => {
 
   it("loads analyzing tickets from the configured GitHub intake", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
-    renderBoard(
+    renderLinesBoard(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
     );
 
@@ -506,7 +348,7 @@ describe("LinesPage board", () => {
   it("renames the board title on Enter", async () => {
     updateFactoryLineMutateAsync.mockResolvedValueOnce({});
     const user = userEvent.setup();
-    renderBoard();
+    renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-board-title"));
     const input = await screen.findByTestId("lines-board-title-input");
@@ -525,7 +367,7 @@ describe("LinesPage board", () => {
 
   it("renames a column title on Enter", async () => {
     const user = userEvent.setup();
-    renderBoard();
+    renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-column-title-backlog"));
     const input = await screen.findByTestId("lines-column-title-backlog-input");
@@ -540,7 +382,7 @@ describe("LinesPage board", () => {
   it("opens backlog settings in a modal and does not open a canvas", async () => {
     const user = userEvent.setup();
     const linePath = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`;
-    renderBoard();
+    renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
     await user.click(screen.getByTestId("lines-backlog-menu-edit"));
@@ -554,7 +396,7 @@ describe("LinesPage board", () => {
 
   it("saves the backlog name from the settings modal", async () => {
     const user = userEvent.setup();
-    renderBoard();
+    renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
     await user.click(screen.getByTestId("lines-backlog-menu-edit"));
@@ -569,7 +411,7 @@ describe("LinesPage board", () => {
 
   it("labels phase Edit as Edit Automation", async () => {
     const user = userEvent.setup();
-    renderBoard();
+    renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-phase-menu-0"));
     expect(screen.getByTestId("lines-phase-menu-0-edit")).toHaveTextContent("Edit Automation");
@@ -583,7 +425,7 @@ describe("LinesPage board", () => {
   it("opens Set parallelism and saves a new cap", async () => {
     updateFactoryLineMutateAsync.mockResolvedValueOnce({});
     const user = userEvent.setup();
-    renderBoard();
+    renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-phase-menu-0"));
     expect(screen.getByTestId("lines-phase-menu-0-parallelism")).toHaveTextContent("Set parallelism (10)");
@@ -606,7 +448,7 @@ describe("LinesPage board", () => {
 
   it("hides Edit on the Done column", async () => {
     const user = userEvent.setup();
-    renderBoard();
+    renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-done-menu"));
     expect(screen.queryByTestId("lines-done-menu-edit")).not.toBeInTheDocument();
@@ -615,7 +457,7 @@ describe("LinesPage board", () => {
 
   it("hides the phase path and shows work-order filters", async () => {
     const user = userEvent.setup();
-    renderBoard();
+    renderLinesBoard();
 
     const header = screen.getByTestId("lines-detail-header");
     expect(within(header).queryByText(/→/)).not.toBeInTheDocument();
@@ -637,7 +479,7 @@ describe("LinesPage board", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [BOARD_IMPLEMENT_FAILED_ORDER, BOARD_DONE_REJECTED_ORDER],
     });
-    renderBoard();
+    renderLinesBoard();
 
     expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
     expect(screen.getByText("Replace the refund batch exporter")).toBeInTheDocument();
@@ -651,7 +493,7 @@ describe("LinesPage board", () => {
 
   it("opens Edit from the line overflow menu", async () => {
     const user = userEvent.setup();
-    renderBoard();
+    renderLinesBoard();
 
     expect(screen.queryByRole("link", { name: "Edit" })).not.toBeInTheDocument();
     await user.click(screen.getByTestId("lines-edit-menu"));

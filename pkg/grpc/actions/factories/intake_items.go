@@ -132,7 +132,7 @@ func (s *liveIntakeItemSource) searchGitHub(ctx context.Context, query string, l
 		return gitHubIssueItems(issues, limit), nil
 	}
 
-	result, _, err := s.github.SearchIssues(ctx, fmt.Sprintf("repo:%s is:issue is:open %s", s.repository, trimmed), &github.SearchOptions{
+	result, _, err := s.github.SearchIssues(ctx, gitHubIssueSearchQuery(s.repository, trimmed), &github.SearchOptions{
 		ListOptions: github.ListOptions{PerPage: gitHubIntakePageSize(limit)},
 	})
 	if err != nil {
@@ -170,7 +170,7 @@ func (s *liveIntakeItemSource) searchSentry(query string, limit int) ([]IntakeIt
 
 	items := make([]IntakeItem, 0, len(issues))
 	for _, issue := range issues {
-		if s.sentryProject != "" && issue.Project != nil && issue.Project.Slug != s.sentryProject {
+		if !s.sentryIssueInProject(&issue) {
 			continue
 		}
 		items = append(items, sentryIssueItem(issue))
@@ -185,7 +185,7 @@ func (s *liveIntakeItemSource) getSentry(id string) (*IntakeItem, error) {
 	if err != nil {
 		return nil, err
 	}
-	if issue == nil || issue.ID == "" {
+	if issue == nil || issue.ID == "" || !s.sentryIssueInProject(issue) {
 		return nil, errIntakeItemNotFound
 	}
 
@@ -313,6 +313,17 @@ func gitHubIssueItem(issue *github.Issue) IntakeItem {
 		Body:  issue.GetBody(),
 		URL:   issue.GetHTMLURL(),
 	}
+}
+
+func gitHubIssueSearchQuery(repository, query string) string {
+	return fmt.Sprintf("repo:%s is:issue is:open %q", repository, query)
+}
+
+func (s *liveIntakeItemSource) sentryIssueInProject(issue *sentry.Issue) bool {
+	if s.sentryProject == "" {
+		return true
+	}
+	return issue != nil && issue.Project != nil && issue.Project.Slug == s.sentryProject
 }
 
 func sentryIssueItem(issue sentry.Issue) IntakeItem {
