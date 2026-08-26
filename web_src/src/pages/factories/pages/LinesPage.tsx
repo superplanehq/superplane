@@ -952,8 +952,9 @@ function PhaseColumn({
           <ColumnLaneMenu
             title={title}
             testId={`lines-phase-menu-${column.stepIndex}`}
-            onEdit={configureHref ? () => setPlanningReviewOpen(true) : undefined}
+            editHref={configureHref}
             editLabel={configureHref ? "Edit Automation" : undefined}
+            onEditAgent={configureHref ? () => setPlanningReviewOpen(true) : undefined}
             onSetParallelism={configureHref ? () => setParallelismOpen(true) : undefined}
             parallelism={parallelism}
             colorId={colorId}
@@ -986,9 +987,8 @@ function PhaseColumn({
       {planningReviewOpen ? (
         <PlanningReviewPopup
           onClose={() => setPlanningReviewOpen(false)}
-          canRename={canRename}
-          onRename={onRename}
           organizationId={organizationId}
+          automationHref={configureHref ?? undefined}
           initialDraft={{ ...PLANNING_REVIEW_DRAFT, title }}
         />
       ) : null}

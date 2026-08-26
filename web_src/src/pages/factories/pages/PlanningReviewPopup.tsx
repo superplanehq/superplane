@@ -1,47 +1,75 @@
+import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
+import { Workflow } from "lucide-react";
 import { useState } from "react";
 
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import { PLANNING_REVIEW_DRAFT, type PlanningReviewDraft } from "./planningReviewMockup";
 import { PopupBody, PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 
+const MULTI_AGENT_TITLE = "Editing Agent";
+
+export function planningReviewPopupTitle(draft: PlanningReviewDraft): string {
+  if (draft.components.length === 1) {
+    return draft.components[0].title;
+  }
+  return MULTI_AGENT_TITLE;
+}
+
+/**
+ * Note that puts the agent in context. Agents run as part of an automation,
+ * so the full automation editor stays one click away.
+ */
+function AutomationNote({ href }: { href?: string }) {
+  return (
+    <section
+      className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm"
+      data-testid="planning-review-automation-note"
+    >
+      <Workflow className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+      <p className="min-w-0 flex-1 text-[12px] text-muted-foreground">
+        Agents are part of an automation. Open the automation to add an agent or to change the order of the steps.
+      </p>
+      {href ? (
+        <Button asChild size="sm" variant="outline" className="shrink-0">
+          <Link href={href} data-testid="planning-review-edit-automation">
+            Edit Automation
+          </Link>
+        </Button>
+      ) : null}
+    </section>
+  );
+}
+
 /**
  * Simple editing mode for a phase. The canvas stays hidden while each
  * automation component exposes its configuration in a collapsible block.
- * The header title is the column name.
+ * One agent uses the agent name as the title. Two or more agents use
+ * Editing Agent.
  */
 export function PlanningReviewPopup({
   onClose,
   initialDraft = PLANNING_REVIEW_DRAFT,
   onSave,
-  onRename,
-  canRename = true,
   organizationId,
+  automationHref,
 }: {
   onClose: () => void;
   initialDraft?: PlanningReviewDraft;
   onSave?: (draft: PlanningReviewDraft) => void;
-  onRename?: (title: string) => void;
-  canRename?: boolean;
   organizationId?: string;
+  automationHref?: string;
 }) {
   const [draft, setDraft] = useState(initialDraft);
 
   return (
     <PopupShell testId="lines-planning-review" fixed onDismiss={onClose}>
-      <PopupHeader
-        title={draft.title}
-        onClose={onClose}
-        canEditTitle={canRename}
-        onTitleSave={(title) => {
-          setDraft({ ...draft, title });
-          onRename?.(title);
-        }}
-        titleTestId="planning-review-title"
-        titleAriaLabel="Column title"
-      />
+      <PopupHeader title={planningReviewPopupTitle(draft)} onClose={onClose} />
       <PopupBody className="bg-muted">
-        <PlanningReviewForm draft={draft} onChange={setDraft} organizationId={organizationId} />
+        <div className="flex flex-col gap-3">
+          <AutomationNote href={automationHref} />
+          <PlanningReviewForm draft={draft} onChange={setDraft} organizationId={organizationId} />
+        </div>
       </PopupBody>
       <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-3">
         <Button type="button" size="sm" variant="outline" onClick={onClose}>
@@ -56,7 +84,7 @@ export function PlanningReviewPopup({
           }}
           data-testid="planning-review-save"
         >
-          Save automation
+          Save Agent
         </Button>
       </footer>
     </PopupShell>

@@ -1,4 +1,4 @@
-import { Check, MoreHorizontal, Pencil, SlidersHorizontal, XIcon } from "lucide-react";
+import { Bot, Check, MoreHorizontal, Pencil, SlidersHorizontal, XIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { cn } from "@/lib/utils";
@@ -19,10 +19,12 @@ interface ColumnLaneMenuProps {
   testId: string;
   /** Opens the automation canvas. Ignored when onEdit is set. */
   editHref?: string | null;
-  /** Opens the edit surface without route navigation. */
+  /** Opens the primary edit surface without route navigation. */
   onEdit?: () => void;
   /** Menu item copy. Defaults to Edit. */
   editLabel?: string;
+  /** Opens the inline agent editor. */
+  onEditAgent?: () => void;
   /** Opens the parallelism modal for canvas-backed phases. */
   onSetParallelism?: () => void;
   parallelism?: number;
@@ -39,6 +41,7 @@ export function ColumnLaneMenu({
   editHref,
   onEdit,
   editLabel = "Edit",
+  onEditAgent,
   onSetParallelism,
   parallelism = DEFAULT_LINE_STEP_PARALLELISM,
   colorId,
@@ -46,7 +49,7 @@ export function ColumnLaneMenu({
 }: ColumnLaneMenuProps) {
   const navigate = useNavigate();
   const canEdit = Boolean(onEdit || editHref);
-  const hasActions = canEdit || Boolean(onSetParallelism);
+  const hasActions = canEdit || Boolean(onEditAgent || onSetParallelism);
 
   const handleEdit = () => {
     if (onEdit) {
@@ -78,6 +81,12 @@ export function ColumnLaneMenu({
                 <DropdownMenuItem onSelect={handleEdit} data-testid={`${testId}-edit`}>
                   <Pencil className="h-3.5 w-3.5" aria-hidden />
                   {editLabel}
+                </DropdownMenuItem>
+              ) : null}
+              {onEditAgent ? (
+                <DropdownMenuItem onSelect={onEditAgent} data-testid={`${testId}-edit-agent`}>
+                  <Bot className="h-3.5 w-3.5" aria-hidden />
+                  Edit Agent
                 </DropdownMenuItem>
               ) : null}
               {onSetParallelism ? (

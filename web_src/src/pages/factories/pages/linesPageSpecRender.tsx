@@ -16,7 +16,7 @@ import { LinesPage } from "./LinesPage";
 
 export function LocationProbe() {
   const location = useLocation();
-  return <div data-testid="lines-test-location">{location.pathname}</div>;
+  return <div data-testid="lines-test-location">{`${location.pathname}${location.search}`}</div>;
 }
 
 export function LinesListSpecHarness({ factory = REFUND_FACTORY }: { factory?: FactoriesFactory }) {
