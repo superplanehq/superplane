@@ -1,10 +1,7 @@
 import type { CanvasesCanvas, ActionsAction, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import type { CanvasFlowDirection } from "@/lib/canvasFlowDirection";
-import {
-  FACTORY_NODE_CARD_HEIGHT,
-  FACTORY_NODE_CARD_WIDTH,
-  FACTORY_NODE_VERTICAL_GAP,
-} from "@/lib/factoryCanvasChrome";
+import { agentRunnerStepTitles } from "@/lib/agentRunnerSteps";
+import { FACTORY_NODE_VERTICAL_GAP, factoryNodeCardSize } from "@/lib/factoryCanvasChrome";
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { LayoutEngine, LayoutEngineApplyOptions } from "./types";
 import { appendUniqueChannels, resolveForwardLayoutEdges } from "./layoutGraph";
@@ -46,10 +43,8 @@ export class ElkLayoutEngine implements LayoutEngine {
     }
 
     if (direction === "vertical") {
-      return {
-        width: FACTORY_NODE_CARD_WIDTH,
-        height: FACTORY_NODE_CARD_HEIGHT,
-      };
+      const stepCount = node.component === "runnerClaudeCode" ? agentRunnerStepTitles(node.configuration).length : 0;
+      return factoryNodeCardSize(stepCount);
     }
 
     return {

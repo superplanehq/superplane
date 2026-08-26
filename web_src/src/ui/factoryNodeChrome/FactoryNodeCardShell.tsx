@@ -1,6 +1,7 @@
 import React from "react";
 import { getDraftDiffOutlineClassName, type DraftDiffStatus } from "@/lib/draftDiff";
 import { resolveNodeIconColorClass } from "@/lib/colors";
+import { FACTORY_NODE_CARD_WIDTH, FACTORY_NODE_STEP_CARD_WIDTH } from "@/lib/factoryCanvasChrome";
 import { cn, resolveIcon } from "@/lib/utils";
 import { toTestId } from "@/lib/testID";
 import { NodeStatusFooter } from "./NodeStatusFooter";
@@ -20,6 +21,7 @@ type FactoryNodeCardShellProps = {
   isCompactView?: boolean;
   showStatusFooter?: boolean;
   statusLabel?: string;
+  body?: React.ReactNode;
 };
 
 /** Monochrome logos (github / SuperPlane) need invert on dark card chrome. */
@@ -27,6 +29,14 @@ function shouldInvertMonoFactoryIcon(iconSrc: string | undefined): boolean {
   if (!iconSrc) return false;
   const lower = iconSrc.toLowerCase();
   return lower.includes("github") || lower.includes("superplane");
+}
+
+function factoryNodeWidth(body: React.ReactNode, isCompactView: boolean | undefined): number {
+  return body && !isCompactView ? FACTORY_NODE_STEP_CARD_WIDTH : FACTORY_NODE_CARD_WIDTH;
+}
+
+function FactoryNodeBody({ body, isCompactView }: { body: React.ReactNode; isCompactView?: boolean }) {
+  return body && !isCompactView ? body : null;
 }
 
 export function FactoryNodeCardShell({
@@ -43,6 +53,7 @@ export function FactoryNodeCardShell({
   isCompactView,
   showStatusFooter = true,
   statusLabel,
+  body,
 }: FactoryNodeCardShellProps) {
   const Icon = React.useMemo(() => resolveIcon(iconSlug), [iconSlug]);
   const invertMonoIcon = shouldInvertMonoFactoryIcon(iconSrc);
@@ -50,9 +61,10 @@ export function FactoryNodeCardShell({
   return (
     <div
       data-testid={toTestId(`factory-node-${title}`)}
+      style={{ width: factoryNodeWidth(body, isCompactView) }}
       className={cn(
         // No border box — transparent border left a 1px canvas gap that read as white rim.
-        "canvas-node-drag-handle cursor-pointer overflow-hidden rounded-2xl border-0 bg-card text-left shadow-[0_1px_3px_rgba(15,23,42,0.06),0_2px_6px_rgba(15,23,42,0.04)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.28)] w-[280px]",
+        "canvas-node-drag-handle cursor-pointer overflow-hidden rounded-2xl border-0 bg-card text-left shadow-[0_1px_3px_rgba(15,23,42,0.06),0_2px_6px_rgba(15,23,42,0.04)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.28)]",
         draftDiffStatus
           ? getDraftDiffOutlineClassName(draftDiffStatus)
           : "outline-1 outline-black/[0.04] dark:outline-white/[0.06]",
@@ -84,6 +96,7 @@ export function FactoryNodeCardShell({
           </div>
         </div>
       </div>
+      <FactoryNodeBody body={body} isCompactView={isCompactView} />
       {showStatusFooter ? <NodeStatusFooter status={status} metrics={metrics} label={statusLabel} /> : null}
     </div>
   );
