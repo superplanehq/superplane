@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
@@ -34,6 +35,14 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeThresholdNodeID},
 			{Channel: "true", SourceID: intakeThresholdNodeID, TargetID: intakeCreateNodeID},
 		}, canvas.Spec.Edges)
+	})
+
+	t.Run("the analysis runner asks for a machine", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, nil)
+		require.NoError(t, err)
+
+		analysis := findSpecNode(t, canvas, intakeAnalysisNodeID)
+		assert.Equal(t, runner.MachineTypeE1LargeAMD64, analysis.Configuration["machineType"])
 	})
 
 	t.Run("the threshold gates on the analysis score", func(t *testing.T) {

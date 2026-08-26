@@ -3,7 +3,7 @@ export type VcsHostId = "github" | "gitlab";
 export type IntegrationId = "github" | "gitlab" | "claude" | "cursor" | "openai" | "openrouter" | "linear" | "jira";
 export type AgentHarnessId = "claude-code" | "cursor" | "codex";
 export type IssuesChoiceId = "vcs" | "linear" | "jira" | "skip";
-export type WizardStepId = "vcs" | "repo" | "issues" | "agent" | "name" | "start";
+export type WizardStepId = "vcs" | "repo" | "issues" | "agent" | "name";
 
 export type IntegrationOption = {
   id: IntegrationId;
@@ -133,20 +133,7 @@ export const WIZARD_STEPS = [
     label: "Name",
     purpose: "Name the workspace for the app or product area you want to improve.",
   },
-  {
-    id: "start" as const,
-    label: "Start",
-    purpose:
-      "Review the first work order. The coding agent will improve AGENTS.md so later work follows your repository conventions.",
-  },
 ] as const;
-
-/** First work order the Start step proposes after setup. */
-export const START_WORK_ORDER = {
-  title: "Improve AGENTS.md",
-  description:
-    "Improve AGENTS.md for this repo (create it if missing).\n\n- Review the repository to understand layout, build/test, and conventions\n- Cover build/test, key packages, and repo-specific guidance\n- Keep useful guidance; remove generic or outdated advice\n- One focused pass only — do not rewrite unrelated docs",
-} as const;
 
 export function vcsLabel(host: VcsHostId) {
   return host === "github" ? "GitHub" : "GitLab";

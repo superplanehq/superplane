@@ -31,7 +31,6 @@ const SCREEN_FOR_STEP: Record<WizardStepId, FirstRunScreen> = {
   // The first-run screens derive the workspace name from the repository, so the
   // last saved answer opens the coding agent screen.
   name: "agent",
-  start: "agent",
 };
 
 const STEP_FOR_SCREEN: Partial<Record<FirstRunScreen, WizardStepId>> = {
