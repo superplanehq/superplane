@@ -83,7 +83,7 @@ What to do:
 
 - ✅ Follow the existing structure and patterns in the codebase for integrations.
 - ✅ Write clean, modular, and well-documented code.
-- ✅ Add examples output for the components.
+- ✅ Add example output for the components.
 
 What not to do:
 
@@ -111,7 +111,7 @@ What not to do:
 
 ## Docs
 
-Documentation is generated based the code from the `pkg/integrations/`.
+Documentation is generated based on the code from `pkg/integrations/`.
 Run `make gen.components.docs` to generate the docs after implementing the backend code. 
 This will create a doc in `docs/components/` (e.g. `Rootly.mdx`).
 
