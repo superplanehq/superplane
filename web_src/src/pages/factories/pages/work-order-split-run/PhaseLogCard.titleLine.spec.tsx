@@ -207,6 +207,40 @@ describe("PhaseLogCard title line", () => {
   });
 });
 
+describe("PhaseLogCard edit control", () => {
+  it("stays off collapsed phases", () => {
+    render(<PhaseLogCard phase={PHASE} expanded={false} onEdit={vi.fn()} />);
+
+    expect(screen.queryByTestId("split-run-phase-edit-plan")).not.toBeInTheDocument();
+  });
+
+  it("sits next to the name of an expanded phase", () => {
+    render(<PhaseLogCard phase={PHASE} expanded onEdit={vi.fn()} />);
+
+    const edit = screen.getByTestId("split-run-phase-edit-plan");
+    expect(edit).toHaveAccessibleName("Edit Plan automation");
+    expect(edit.previousElementSibling).toBe(screen.getByRole("button", { name: "Plan" }));
+  });
+
+  it("opens the automation editor without collapsing the phase", async () => {
+    const onEdit = vi.fn();
+    const onToggle = vi.fn();
+    const user = userEvent.setup();
+    render(<PhaseLogCard phase={PHASE} expanded onEdit={onEdit} onToggle={onToggle} />);
+
+    await user.click(screen.getByTestId("split-run-phase-edit-plan"));
+
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it("is absent when the log cannot edit automations", () => {
+    render(<PhaseLogCard phase={PHASE} expanded />);
+
+    expect(screen.queryByTestId("split-run-phase-edit-plan")).not.toBeInTheDocument();
+  });
+});
+
 describe("PhaseLogCard node line", () => {
   const NODE_STREAM: SplitRunStreamLine[] = [
     line({

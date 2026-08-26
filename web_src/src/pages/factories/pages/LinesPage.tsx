@@ -87,6 +87,8 @@ import {
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
+import { PlanningReviewPopup } from "./PlanningReviewPopup";
+import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import {
   apiIntakeSource,
   intakeSourcesFromFactoryIntakes,
@@ -906,6 +908,7 @@ function PhaseColumn({
   const scrollRef = useRef<HTMLUListElement>(null);
   const [visibleCount, setVisibleCount] = useState(LINE_PHASE_RUNS_PAGE_SIZE);
   const [parallelismOpen, setParallelismOpen] = useState(false);
+  const [planningReviewOpen, setPlanningReviewOpen] = useState(false);
   const totalRuns = column.runs.length;
   const hasMore = visibleCount < totalRuns;
 
@@ -949,7 +952,7 @@ function PhaseColumn({
           <ColumnLaneMenu
             title={title}
             testId={`lines-phase-menu-${column.stepIndex}`}
-            editHref={configureHref}
+            onEdit={configureHref ? () => setPlanningReviewOpen(true) : undefined}
             editLabel={configureHref ? "Edit Automation" : undefined}
             onSetParallelism={configureHref ? () => setParallelismOpen(true) : undefined}
             parallelism={parallelism}
@@ -980,6 +983,15 @@ function PhaseColumn({
         }}
         onClose={() => setParallelismOpen(false)}
       />
+      {planningReviewOpen ? (
+        <PlanningReviewPopup
+          onClose={() => setPlanningReviewOpen(false)}
+          canRename={canRename}
+          onRename={onRename}
+          organizationId={organizationId}
+          initialDraft={{ ...PLANNING_REVIEW_DRAFT, title }}
+        />
+      ) : null}
     </>
   );
 }

@@ -19,7 +19,7 @@ interface ColumnLaneMenuProps {
   testId: string;
   /** Opens the automation canvas. Ignored when onEdit is set. */
   editHref?: string | null;
-  /** Opens column settings. Use this for Backlog instead of a canvas href. */
+  /** Opens the edit surface without route navigation. */
   onEdit?: () => void;
   /** Menu item copy. Defaults to Edit. */
   editLabel?: string;
@@ -75,13 +75,13 @@ export function ColumnLaneMenu({
           <>
             <div className="p-1">
               {canEdit ? (
-                <DropdownMenuItem onClick={handleEdit} data-testid={`${testId}-edit`}>
+                <DropdownMenuItem onSelect={handleEdit} data-testid={`${testId}-edit`}>
                   <Pencil className="h-3.5 w-3.5" aria-hidden />
                   {editLabel}
                 </DropdownMenuItem>
               ) : null}
               {onSetParallelism ? (
-                <DropdownMenuItem onClick={onSetParallelism} data-testid={`${testId}-parallelism`}>
+                <DropdownMenuItem onSelect={onSetParallelism} data-testid={`${testId}-parallelism`}>
                   <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
                   {setParallelismLabel(parallelism)}
                 </DropdownMenuItem>
