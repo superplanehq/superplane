@@ -264,9 +264,38 @@ describe("PhaseLogCard node line", () => {
 
     const statusTime = within(row).getByTestId("split-run-stream-duration-planner-agent");
     expect(statusTime).toHaveTextContent("Passed 01:20");
-    expect(statusTime.className).toMatch(/ml-auto/);
+    expect(statusTime.parentElement?.className).toMatch(/ml-auto/);
     expect(statusTime.className).toMatch(/text-right/);
     expect(screen.getByTestId("split-run-stream-plan").className).toMatch(/font-mono/);
+  });
+
+  it("floats the produced artifact next to the duration", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        stream={[
+          line({
+            id: "planner-agent",
+            componentName: "Agent - Plan for GH Issue",
+            duration: "1m 20s",
+            artifact: {
+              id: "art-plan",
+              type: "TYPE_MARKDOWN",
+              data: { name: "PLAN.md", title: "PLAN.md" },
+            },
+          }),
+        ]}
+      />,
+    );
+
+    const row = screen.getByTestId("split-run-stream-line-planner-agent");
+    const artifact = within(row).getByRole("button", { name: "PLAN.md" });
+    const duration = within(row).getByTestId("split-run-stream-duration-planner-agent");
+
+    expect(artifact.parentElement).toBe(duration.parentElement);
+    expect(artifact.parentElement?.className).toMatch(/ml-auto/);
+    expect(artifact.compareDocumentPosition(duration) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("styles the node line as a table header without a caret", () => {

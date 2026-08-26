@@ -93,6 +93,24 @@ describe("FactoriesHarness work orders", () => {
     expect(screen.queryByTestId("building-blocks-sidebar")).not.toBeInTheDocument();
   }, 15000);
 
+  it("opens an edit session in factory Configure", async () => {
+    const implementerAppId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
+
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${implementerAppId}?configure=1&from=automations`}
+        factoriesFixture={defaultFactoriesFixture}
+        appFixture={refundLineCanvasFixture()}
+      />,
+    );
+
+    expect(await screen.findByTestId("factory-app-canvas-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    // `sp-canvas-editing` marks the active edit session. Without it the canvas
+    // stays live, so a component click opens the run inspector and never the
+    // component editor sidebar.
+    await waitFor(() => expect(document.querySelector(".sp-canvas-editing")).not.toBeNull(), { timeout: 8000 });
+  }, 15000);
+
   it("opens the agent sidebar from the factory Configure header", async () => {
     const user = userEvent.setup();
     const implementerAppId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";

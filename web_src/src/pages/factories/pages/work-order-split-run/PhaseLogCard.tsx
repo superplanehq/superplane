@@ -502,7 +502,7 @@ function LogStatusTime({
       data-testid={testId}
       aria-label={running ? "Running" : undefined}
       className={cn(
-        "ml-auto shrink-0 rounded-sm px-1.5 text-right text-[12px] leading-[1.125rem] tabular-nums [font-feature-settings:'zero']",
+        "shrink-0 rounded-sm px-1.5 text-right text-[12px] leading-[1.125rem] tabular-nums [font-feature-settings:'zero']",
         statusTimeTone(status),
       )}
     >
@@ -630,8 +630,10 @@ function StreamNodeHeader({
           {name}
         </div>
       )}
-      {artifact ? <StreamArtifact artifact={artifact} /> : null}
-      <StreamDuration line={line} />
+      <span className="ml-auto flex min-w-0 shrink-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap">
+        {artifact ? <StreamArtifact artifact={artifact} /> : null}
+        <StreamDuration line={line} />
+      </span>
     </div>
   );
 }
