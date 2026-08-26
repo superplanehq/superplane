@@ -205,6 +205,17 @@ func TestShellSingleQuote(t *testing.T) {
 	assert.Equal(t, `'it'\''s fine'`, runner.ShellSingleQuote("it's fine"))
 }
 
+func requireEnvironmentValue(t *testing.T, environment []runner.BrokerEnvironmentVariable, name string) string {
+	t.Helper()
+	for _, variable := range environment {
+		if variable.Name == name {
+			return variable.Value
+		}
+	}
+	t.Fatalf("missing environment variable %q", name)
+	return ""
+}
+
 func requireTaskFile(t *testing.T, files []runner.BrokerTaskFile, path string) runner.BrokerTaskFile {
 	t.Helper()
 	for _, file := range files {
