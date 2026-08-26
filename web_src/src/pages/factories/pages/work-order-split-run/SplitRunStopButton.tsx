@@ -14,6 +14,7 @@ import {
   availableSplitRunStopChoices,
   DEFAULT_SPLIT_RUN_STOP_CHOICE,
   defaultSplitRunStopChoice,
+  type SplitRunFooterKind,
   type SplitRunStopChoice,
 } from "./splitRunFooter";
 
@@ -28,14 +29,16 @@ export function SplitRunStopButton({
   onStop,
   busy = false,
   status,
+  kind,
 }: {
   onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
   busy?: boolean;
   status?: WorkOrderDisplayStatus;
+  kind?: SplitRunFooterKind;
 }) {
   const choices = availableSplitRunStopChoices(status);
   const [choice, setChoice] = useState<SplitRunStopChoice>(
-    () => defaultSplitRunStopChoice(status) ?? DEFAULT_SPLIT_RUN_STOP_CHOICE,
+    () => defaultSplitRunStopChoice(status, kind) ?? DEFAULT_SPLIT_RUN_STOP_CHOICE,
   );
   const selectedId = choices.some((item) => item.id === choice) ? choice : choices[0]?.id;
   const selected = choices.find((item) => item.id === selectedId);

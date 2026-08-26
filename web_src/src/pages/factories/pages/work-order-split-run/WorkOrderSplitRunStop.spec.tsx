@@ -46,11 +46,11 @@ describe("WorkOrderSplitRunPopup stop actions", () => {
     handleRejectMock.mockReset();
   });
 
-  it("closes as rejected when Stop & Cancel is used", async () => {
+  it("closes as rejected when Stop and Close is used", async () => {
     const user = userEvent.setup();
     renderPopup(SPLIT_RUN_RUNNING);
 
-    await user.click(screen.getByRole("button", { name: "Stop & Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Stop and Close" }));
     expect(handleStopMock).toHaveBeenCalledWith("canceled", expect.objectContaining({ kind: "running" }));
   });
 
@@ -59,19 +59,29 @@ describe("WorkOrderSplitRunPopup stop actions", () => {
     renderPopup(SPLIT_RUN_RUNNING);
 
     await user.click(screen.getByRole("button", { name: "Choose how to stop" }));
-    await user.click(await screen.findByRole("menuitem", { name: /Stop as Completed/ }));
-    await user.click(screen.getByRole("button", { name: "Mark as Complete" }));
+    await user.click(await screen.findByRole("menuitem", { name: /Stop and Complete/ }));
+    await user.click(screen.getByRole("button", { name: "Stop and Complete" }));
     expect(handleStopMock).toHaveBeenCalledWith("completed", expect.objectContaining({ kind: "running" }));
   });
 
-  it("returns to draft after that Stop outcome is chosen", async () => {
+  it("reruns the current step after that Stop outcome is chosen", async () => {
     const user = userEvent.setup();
     renderPopup(SPLIT_RUN_RUNNING);
 
     await user.click(screen.getByRole("button", { name: "Choose how to stop" }));
-    await user.click(await screen.findByRole("menuitem", { name: /Stop and return to Draft/ }));
-    await user.click(screen.getByRole("button", { name: "Return to Draft" }));
-    expect(handleStopMock).toHaveBeenCalledWith("draft", expect.objectContaining({ kind: "running" }));
+    await user.click(await screen.findByRole("menuitem", { name: /Rerun this step/ }));
+    await user.click(screen.getByRole("button", { name: "Rerun step" }));
+    expect(handleStopMock).toHaveBeenCalledWith("rerun-step", expect.objectContaining({ kind: "running" }));
+  });
+
+  it("reruns from the start after that Stop outcome is chosen", async () => {
+    const user = userEvent.setup();
+    renderPopup(SPLIT_RUN_RUNNING);
+
+    await user.click(screen.getByRole("button", { name: "Choose how to stop" }));
+    await user.click(await screen.findByRole("menuitem", { name: /Rerun from the start/ }));
+    await user.click(screen.getByRole("button", { name: "Rerun from start" }));
+    expect(handleStopMock).toHaveBeenCalledWith("rerun-start", expect.objectContaining({ kind: "running" }));
   });
 
   it("closes a draft as canceled from Reject", async () => {
@@ -86,7 +96,7 @@ describe("WorkOrderSplitRunPopup stop actions", () => {
     const user = userEvent.setup();
     renderPopup(splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER));
 
-    expect(screen.queryByRole("button", { name: "Return to Draft" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Rerun step" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Reopen" }));
     expect(handleStopMock).toHaveBeenCalledWith(
       "reopen",
@@ -94,7 +104,7 @@ describe("WorkOrderSplitRunPopup stop actions", () => {
     );
   });
 
-  it("hides Return to Draft when the work order is already a draft", async () => {
+  it("hides Rerun when the work order is already a draft", async () => {
     const user = userEvent.setup();
     renderPopup({
       ...SPLIT_RUN_RUNNING,
@@ -103,8 +113,9 @@ describe("WorkOrderSplitRunPopup stop actions", () => {
 
     await user.click(screen.getByRole("button", { name: "Choose how to stop" }));
     const menu = await screen.findByRole("menu");
-    expect(within(menu).queryByRole("menuitem", { name: /Stop and return to Draft/ })).not.toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: /Stop as Canceled/ })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: /Stop as Completed/ })).toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: /Rerun this step/ })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: /Rerun from the start/ })).not.toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /Stop and Close/ })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /Stop and Complete/ })).toBeInTheDocument();
   });
 });

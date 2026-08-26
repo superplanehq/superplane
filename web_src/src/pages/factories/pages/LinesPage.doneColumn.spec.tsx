@@ -27,6 +27,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
