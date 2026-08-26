@@ -14,17 +14,32 @@ import (
 const (
 	// Node identifiers of a generated intake graph. An intake owns its whole
 	// canvas, so the identifiers are fixed rather than derived from the source.
-	intakeTriggerNodeID   = "trigger"
-	intakeAnalysisNodeID  = "analyze"
-	intakeThresholdNodeID = "threshold"
-	intakeCreateNodeID    = "create-work-order"
+	intakeTriggerNodeID          = "trigger"
+	intakeAnalysisNodeID         = "analyze"
+	intakeThresholdNodeID        = "threshold"
+	intakeCreateNodeID           = "create-work-order"
+	intakeReportConfidenceNodeID = "report-confidence"
 
 	// The threshold expression reads the analysis result by node name, so the
 	// name is part of the generated graph's contract.
 	intakeAnalysisNodeName = "Analyze intake"
+	intakeCreateNodeName   = "Create Work Order"
 
-	intakeThresholdComponent = "if"
-	intakeCreateComponent    = "createWorkOrder"
+	intakeThresholdComponent        = "if"
+	intakeCreateComponent           = "createWorkOrder"
+	intakeReportConfidenceComponent = "reportWorkOrderCheck"
+
+	intakeConfidenceCheckKey  = "confidence"
+	intakeConfidenceCheckName = "Confidence score"
+	intakeConfidenceScoreMax  = 5
+	intakeConfidenceFormat    = "fraction"
+	intakeConfidenceDirection = "higherIsBetter"
+
+	// Band edges of the confidence meter, which reads High from 4, Medium at
+	// 3, and Low below 3. The check has no neutral threshold, so Medium maps
+	// to caution and Low maps to critical.
+	intakeConfidenceCautionAt  = 3
+	intakeConfidenceCriticalAt = 2
 
 	DefaultIntakeConfidencePct = 65
 )
@@ -133,6 +148,7 @@ func buildIntakeCanvas(source, name string, confidencePct int, binding *intakeBi
 				{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeAnalysisNodeID},
 				{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeThresholdNodeID},
 				{Channel: "true", SourceID: intakeThresholdNodeID, TargetID: intakeCreateNodeID},
+				{Channel: "default", SourceID: intakeCreateNodeID, TargetID: intakeReportConfidenceNodeID},
 			},
 			Nodes: []yaml.Node{
 				{
@@ -173,7 +189,7 @@ func buildIntakeCanvas(source, name string, confidencePct int, binding *intakeBi
 				},
 				{
 					ID:        intakeCreateNodeID,
-					Name:      "Create Work Order",
+					Name:      intakeCreateNodeName,
 					Type:      yaml.NodeTypeAction,
 					Component: intakeCreateComponent,
 					Configuration: map[string]any{
@@ -181,6 +197,24 @@ func buildIntakeCanvas(source, name string, confidencePct int, binding *intakeBi
 						"description": spec.createDescription,
 					},
 					Position: yaml.Position{X: 160, Y: 620},
+				},
+				{
+					ID:        intakeReportConfidenceNodeID,
+					Name:      "Report Confidence",
+					Type:      yaml.NodeTypeAction,
+					Component: intakeReportConfidenceComponent,
+					Configuration: map[string]any{
+						"orderId":    intakeWorkOrderIDExpression(),
+						"checkKey":   intakeConfidenceCheckKey,
+						"name":       intakeConfidenceCheckName,
+						"score":      intakeConfidenceScoreExpression(),
+						"maxScore":   strconv.Itoa(intakeConfidenceScoreMax),
+						"format":     intakeConfidenceFormat,
+						"direction":  intakeConfidenceDirection,
+						"cautionAt":  float64(intakeConfidenceCautionAt),
+						"criticalAt": float64(intakeConfidenceCriticalAt),
+					},
+					Position: yaml.Position{X: 160, Y: 800},
 				},
 			},
 		},
@@ -215,6 +249,21 @@ func intakeAnalysisPrompt(subject string) string {
 
 func intakeThresholdExpression(confidencePct int) string {
 	return fmt.Sprintf(`int($[%q].data[0].result.result) >= %d`, intakeAnalysisNodeName, clampIntakeConfidence(confidencePct))
+}
+
+func intakeWorkOrderIDExpression() string {
+	return fmt.Sprintf(`{{ $[%q].data.workOrder.id }}`, intakeCreateNodeName)
+}
+
+// intakeConfidenceScoreExpression maps the analysis percentage to the 0–5
+// scale of the work-order confidence meter. The meter rounds the score it
+// receives, so the expression rounds too and both agree on the bar count.
+func intakeConfidenceScoreExpression() string {
+	pctPerPoint := 100 / intakeConfidenceScoreMax
+	return fmt.Sprintf(
+		`{{ int(round(int($[%q].data[0].result.result) / %d.0)) }}`,
+		intakeAnalysisNodeName, pctPerPoint,
+	)
 }
 
 var intakeThresholdPattern = regexp.MustCompile(`>=\s*(\d+)`)

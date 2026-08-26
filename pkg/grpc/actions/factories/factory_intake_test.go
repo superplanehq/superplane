@@ -65,8 +65,8 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
-		assert.Len(t, liveVersion.Nodes, 4)
-		assert.Len(t, liveVersion.Edges, 3)
+		assert.Len(t, liveVersion.Nodes, 5)
+		assert.Len(t, liveVersion.Edges, 4)
 	})
 
 	t.Run("a GitHub intake listens with the workspace connection", func(t *testing.T) {
