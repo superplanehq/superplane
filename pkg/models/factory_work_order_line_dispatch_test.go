@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -58,6 +59,65 @@ func Test__FactoryLine__Dispatch__SnapshotsLineAndStartsStepZero(t *testing.T) {
 	assert.Equal(t, 0, execution.StepIndex)
 	assert.Equal(t, firstApp.Name, execution.StepName)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, execution.Status)
+}
+
+func Test__FactoryLine__DispatchFrom__StartsRequestedStep(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	line, err := factory.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
+	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
+	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+	}))
+
+	var result *models.FactoryLineStepResult
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		var dispatchErr error
+		_, result, dispatchErr = line.DispatchFrom(tx, order, 1)
+		return dispatchErr
+	}))
+
+	require.NotNil(t, result)
+	assert.Equal(t, 1, result.Execution.StepIndex)
+	assert.Equal(t, secondApp.Name, result.Execution.StepName)
+}
+
+func Test__FactoryWorkOrder__AbandonActiveLineDispatch(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, _, dispatchErr := line.Dispatch(tx, order)
+		return dispatchErr
+	}))
+
+	require.NoError(t, order.AbandonActiveLineDispatch(db))
+
+	_, err = order.FindActiveLineDispatch(db)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
 func Test__FactoryLine__Dispatch__RejectsLineWithNoSteps(t *testing.T) {
@@ -189,4 +249,128 @@ func Test__FactoryWorkOrder__FindActiveLineDispatch(t *testing.T) {
 
 	_, err = order.FindActiveLineDispatch(db)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound, "finished dispatches don't count as active")
+}
+
+func Test__FactoryWorkOrder__RetryLineStep__ReusesDispatchWithEarlierSteps(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(db, "Improve AGENTS.md", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "plan", "start-plan")
+	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start-implement")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+	})
+	require.NoError(t, err)
+
+	var full *models.FactoryWorkOrderLineDispatch
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		var dispatchErr error
+		full, _, dispatchErr = line.Dispatch(tx, order)
+		if dispatchErr != nil {
+			return dispatchErr
+		}
+		if _, startErr := full.EnqueueOrStartStep(tx, order, 1); startErr != nil {
+			return startErr
+		}
+		return full.Finish(tx, models.CanvasRunResultFailed)
+	}))
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, _, dispatchErr := line.DispatchFrom(tx, order, 1)
+		if dispatchErr != nil {
+			return dispatchErr
+		}
+		return order.AbandonActiveLineDispatch(tx)
+	}))
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, retryErr := order.RetryLineStep(tx, line, 1)
+		return retryErr
+	}))
+
+	active, err := order.FindActiveLineDispatch(db)
+	require.NoError(t, err)
+	assert.Equal(t, full.ID, active.ID)
+
+	byOrder, err := models.ListWorkOrderLineDispatchesByWorkOrderIDs(db, []uuid.UUID{order.ID})
+	require.NoError(t, err)
+	var planCount int
+	for _, record := range byOrder[order.ID] {
+		if record.ID != full.ID {
+			continue
+		}
+		for _, execution := range record.Executions {
+			if execution.StepIndex == 0 {
+				planCount++
+			}
+		}
+	}
+	assert.Equal(t, 1, planCount)
+}
+
+func Test__FactoryWorkOrder__RetryLineStep__SettlesInFlightStepBeforeRerun(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(db, "Improve AGENTS.md", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "plan", "start-plan")
+	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start-implement")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+	})
+	require.NoError(t, err)
+
+	var dispatch *models.FactoryWorkOrderLineDispatch
+	var inFlight *models.FactoryWorkOrderExecution
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		var dispatchErr error
+		dispatch, _, dispatchErr = line.Dispatch(tx, order)
+		if dispatchErr != nil {
+			return dispatchErr
+		}
+		result, startErr := dispatch.EnqueueOrStartStep(tx, order, 1)
+		if startErr != nil {
+			return startErr
+		}
+		inFlight = result.Execution
+		return nil
+	}))
+
+	require.NotEqual(t, models.FactoryWorkOrderExecutionStatusFinished, inFlight.Status)
+	require.NotNil(t, inFlight.RunID)
+
+	var retry *models.FactoryLineStepResult
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		var retryErr error
+		retry, retryErr = order.RetryLineStep(tx, line, 1)
+		return retryErr
+	}))
+
+	require.NotNil(t, retry)
+	require.NotNil(t, retry.Execution)
+	assert.NotEqual(t, inFlight.ID, retry.Execution.ID)
+	assert.Equal(t, 1, retry.Execution.StepIndex)
+	assert.NotEqual(t, models.FactoryWorkOrderExecutionStatusFinished, retry.Execution.Status)
+
+	active, err := order.FindActiveLineDispatch(db)
+	require.NoError(t, err)
+	assert.Equal(t, dispatch.ID, active.ID)
+
+	settled, err := models.FindWorkOrderExecutionByRunID(db, *inFlight.RunID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, settled.Status)
+	assert.Equal(t, models.CanvasRunResultCancelled, settled.Result)
 }

@@ -358,13 +358,20 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { orderId: string; lineName: string }) => {
+    mutationFn: async (input: {
+      orderId: string;
+      lineName: string;
+      startStepIndex?: number;
+      replaceActive?: boolean;
+    }) => {
       const response = await factoriesDispatchWorkOrder(
         withOrganizationHeader({
           organizationId,
           path: { factoryId, orderId: input.orderId },
           body: {
             lineName: input.lineName,
+            startStepIndex: input.startStepIndex,
+            replaceActive: input.replaceActive,
           },
         }),
       );

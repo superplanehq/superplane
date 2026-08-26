@@ -272,6 +272,7 @@ export function intakeTicketAnalysisFixture(
     lineName: "Intake",
     lineStatus: view.lineStatus,
     currentPhaseId: view.currentPhaseId,
+    currentStepIndex: 0,
     waitingNotes: [
       {
         key: `${ticket.id}-${view.noteKey}`,
@@ -538,6 +539,7 @@ export function intakeAutomationFixture(source: LineIntakeSource): SplitRunFixtu
     lineName: "Intake",
     lineStatus: "running",
     currentPhaseId: "evaluate",
+    currentStepIndex: 0,
     waitingNotes,
     checks: [],
     // An always-on automation, not a line run — no line actions in the footer.
