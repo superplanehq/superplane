@@ -220,6 +220,8 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 						"direction":  intakeConfidenceDirection,
 						"cautionAt":  float64(intakeConfidenceCautionAt),
 						"criticalAt": float64(intakeConfidenceCriticalAt),
+						"summary":    intakeConfidenceSummaryExpression(),
+						"analysis":   intakeConfidenceWriteupExpression(spec.analysisSubject),
 					},
 					Concurrency: intakeConcurrency(),
 					Position:    yaml.Position{X: 160, Y: 800},
@@ -280,19 +282,36 @@ func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent) map[string
 func intakeAnalysisPrompt(subject string) string {
 	return strings.Join([]string{
 		fmt.Sprintf("Analyze this %s and decide whether it is suitable for an engineering work order.", subject),
-		"Consider impact, clarity, feasibility, and whether an engineer can take a concrete action.",
-		"Return only one integer from 0 through 100. A higher value means greater confidence.",
+		"Consider impact, clarity, feasibility, and whether an agent on this factory line can take a concrete action.",
+		"Return only one JSON object. Do not wrap it in markdown.",
+		"Keys:",
+		`- "score": integer from 0 through 100. A higher value means greater confidence.`,
+		`- "summary": one sentence on how suitable the work is for an agent on this factory line.`,
+		`- "reasons": exactly three short sentences that explain the score.`,
+		"Write three reasons: what the item names, what already exists, and whether an agent can do the work.",
 		"",
 		"Event:",
 		"{{ root().data }}",
 	}, "\n")
 }
 
-// intakeAnalysisScorePath reads the score out of the analysis node's output. A
-// node reference resolves to one event, whose data holds the runner's result,
-// so the path walks straight into it rather than indexing a list.
-func intakeAnalysisScorePath() string {
+// intakeAnalysisResultRaw is the runner's text output. A node reference
+// resolves to one event, whose data holds that text, so the path walks
+// straight into it rather than indexing a list.
+func intakeAnalysisResultRaw() string {
 	return fmt.Sprintf(`$[%q].data.result.result`, intakeAnalysisNodeName)
+}
+
+// intakeAnalysisJSONExpr parses the JSON object the analysis runner returns.
+// Agents often wrap JSON in prose, so the slice is from the first "{" to the
+// last "}".
+func intakeAnalysisJSONExpr() string {
+	raw := intakeAnalysisResultRaw()
+	return fmt.Sprintf(`fromJSON(%s[indexOf(%s, "{"):lastIndexOf(%s, "}") + 1])`, raw, raw, raw)
+}
+
+func intakeAnalysisScorePath() string {
+	return intakeAnalysisJSONExpr() + ".score"
 }
 
 func intakeThresholdExpression(confidencePct int) string {
@@ -301,6 +320,22 @@ func intakeThresholdExpression(confidencePct int) string {
 
 func intakeWorkOrderIDExpression() string {
 	return fmt.Sprintf(`{{ $[%q].data.workOrder.id }}`, intakeCreateNodeName)
+}
+
+func intakeConfidenceSummaryExpression() string {
+	return fmt.Sprintf(`{{ %s.summary }}`, intakeAnalysisJSONExpr())
+}
+
+func intakeConfidenceWriteupExpression(subject string) string {
+	intro := fmt.Sprintf(
+		"The automation read this %s. It scored how suitable the work is for an agent on this factory line.",
+		subject,
+	)
+	return fmt.Sprintf(
+		`{{ %q + "\n\n### Why this score\n- " + join(%s.reasons, "\n- ") }}`,
+		intro,
+		intakeAnalysisJSONExpr(),
+	)
 }
 
 // intakeConfidenceScoreExpression maps the analysis percentage to the 0–5
