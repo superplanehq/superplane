@@ -5,9 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type * as ApiClient from "@/api-client";
 
-const { closeMutateAsync, updateMutateAsync, cancelRunMock } = vi.hoisted(() => ({
+const { closeMutateAsync, updateMutateAsync, dispatchMutateAsync, cancelRunMock } = vi.hoisted(() => ({
   closeMutateAsync: vi.fn(),
   updateMutateAsync: vi.fn(),
+  dispatchMutateAsync: vi.fn(),
   cancelRunMock: vi.fn(),
 }));
 
@@ -22,6 +23,7 @@ vi.mock("@/api-client", async (importOriginal) => {
 vi.mock("@/hooks/useFactoryData", () => ({
   useCloseWorkOrder: () => ({ mutateAsync: closeMutateAsync, isPending: false }),
   useUpdateWorkOrderStatus: () => ({ mutateAsync: updateMutateAsync, isPending: false }),
+  useDispatchWorkOrder: () => ({ mutateAsync: dispatchMutateAsync, isPending: false }),
 }));
 
 vi.mock("@/lib/toast", () => ({
@@ -41,6 +43,7 @@ describe("useSplitRunFooterActions", () => {
   beforeEach(() => {
     closeMutateAsync.mockReset().mockResolvedValue({});
     updateMutateAsync.mockReset().mockResolvedValue({});
+    dispatchMutateAsync.mockReset().mockResolvedValue({});
     cancelRunMock.mockReset().mockResolvedValue({});
     vi.mocked(showSuccessToast).mockReset();
     vi.mocked(showErrorToast).mockReset();
@@ -65,13 +68,40 @@ describe("useSplitRunFooterActions", () => {
     expect(showSuccessToast).toHaveBeenCalledWith("Work order closed as completed.");
   });
 
-  it("moves to draft for Stop and return to Draft", async () => {
+  it("reruns the current step", async () => {
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 
-    await result.current.handleStop("draft", { kind: "waiting" });
+    await result.current.handleStop("rerun-step", {
+      kind: "waiting",
+      lineName: "Software delivery",
+      stepIndex: 1,
+    });
 
-    expect(updateMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", state: "STATE_DRAFT" });
-    expect(showSuccessToast).toHaveBeenCalledWith("Work order moved to draft.");
+    expect(dispatchMutateAsync).toHaveBeenCalledWith({
+      orderId: "wo-1",
+      lineName: "Software delivery",
+      startStepIndex: 1,
+      replaceActive: true,
+    });
+    expect(showSuccessToast).toHaveBeenCalledWith("Work order step started again.");
+  });
+
+  it("reruns from the first step", async () => {
+    const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
+
+    await result.current.handleStop("rerun-start", {
+      kind: "waiting",
+      lineName: "Software delivery",
+      stepIndex: 1,
+    });
+
+    expect(dispatchMutateAsync).toHaveBeenCalledWith({
+      orderId: "wo-1",
+      lineName: "Software delivery",
+      startStepIndex: 0,
+      replaceActive: true,
+    });
+    expect(showSuccessToast).toHaveBeenCalledWith("Work order started from the first step.");
   });
 
   it("reopens a closed work order", async () => {

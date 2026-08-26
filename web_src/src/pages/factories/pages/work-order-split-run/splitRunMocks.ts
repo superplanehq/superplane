@@ -123,6 +123,7 @@ export interface SplitRunFixture {
   costUsd: string;
   tokensLabel: string;
   lineName: string;
+  currentStepIndex: number;
   lineStatus: SplitRunPhaseStatus;
   currentPhaseId: SplitRunPhaseId;
   phases: SplitRunPhase[];
@@ -295,7 +296,8 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     startedLabel: startedLabelForOrder(order),
     costUsd: costUsdForDisplay(order),
     tokensLabel: tokensLabelForDisplay(order),
-    lineName: latestDispatchForLine(order, options?.lineId)?.line?.name ?? SPLIT_RUN_RUNNING.lineName,
+    lineName: visibleDispatchForLine(order, options?.lineId)?.line?.name ?? SPLIT_RUN_RUNNING.lineName,
+    currentStepIndex: current?.stepIndex ?? 0,
     lineStatus: lineStatusForDisplay(displayStatus),
     currentPhaseId: current ? phaseIdForExecution(current) : (phases[0]?.id ?? ""),
     phases,
@@ -820,8 +822,55 @@ function phaseIdForExecution(execution: FactoriesWorkOrderExecution): string {
   return `${name}-${execution.stepIndex ?? 0}`;
 }
 
+function visibleDispatchForLine(order: FactoriesWorkOrder, lineId?: string | null) {
+  const onLine = (order.lineDispatches ?? []).filter((dispatch) => !lineId || dispatch.line?.id === lineId);
+  const active = [...onLine].reverse().find((dispatch) => dispatch.state === "STATE_ACTIVE");
+  return active ?? latestDispatchForLine(order, lineId);
+}
+
 function latestDispatchExecutions(order: FactoriesWorkOrder, lineId?: string | null): FactoriesWorkOrderExecution[] {
-  return latestDispatchForLine(order, lineId)?.stepExecutions ?? [];
+  const latest = visibleDispatchForLine(order, lineId);
+  const current = latest?.stepExecutions ?? [];
+  if (!latest || current.length === 0) {
+    return current;
+  }
+
+  const present = new Set(current.map((execution) => execution.stepIndex ?? 0));
+  const missing = missingEarlierStepIndexes(present);
+  if (missing.length === 0) {
+    return current;
+  }
+
+  const older = (order.lineDispatches ?? [])
+    .filter((dispatch) => dispatch.id !== latest.id && (!lineId || dispatch.line?.id === lineId))
+    .sort((left, right) => (Date.parse(right.createdAt ?? "") || 0) - (Date.parse(left.createdAt ?? "") || 0));
+
+  const prior: FactoriesWorkOrderExecution[] = [];
+  for (const stepIndex of missing) {
+    const match = older
+      .flatMap((dispatch) => dispatch.stepExecutions ?? [])
+      .find((execution) => (execution.stepIndex ?? 0) === stepIndex);
+    if (match) {
+      prior.push(match);
+    }
+  }
+
+  return [...prior, ...current].sort((left, right) => (left.stepIndex ?? 0) - (right.stepIndex ?? 0));
+}
+
+function missingEarlierStepIndexes(present: Set<number>): number[] {
+  const currentMin = Math.min(...present);
+  if (!Number.isFinite(currentMin) || currentMin <= 0) {
+    return [];
+  }
+
+  const missing: number[] = [];
+  for (let index = 0; index < currentMin; index++) {
+    if (!present.has(index)) {
+      missing.push(index);
+    }
+  }
+  return missing;
 }
 
 function pickCurrentExecution(executions: FactoriesWorkOrderExecution[]): FactoriesWorkOrderExecution | undefined {
