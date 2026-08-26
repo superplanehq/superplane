@@ -138,18 +138,27 @@ spec:
               protocol: TCP
           livenessProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
             periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 5
           readinessProbe:
             httpGet:
-              path: /
+              path: /ready
               port: http
             periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 5
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            # docker-entrypoint.sh acquires separate migration locks for schema
+            # and data migrations. Cover both ten-minute waits plus headroom.
+            failureThreshold: 270
           securityContext:
             privileged: false
             readOnlyRootFilesystem: true

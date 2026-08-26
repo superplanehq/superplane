@@ -73,6 +73,9 @@ const (
 
 	// The size of the stage execution outputs can be up to 4k
 	MaxExecutionOutputsSize = 4 * 1024
+
+	readinessCheckTimeout       = time.Second
+	readinessCheckCacheDuration = time.Second
 )
 
 var errUsageServiceUnavailable = errors.New("usage service unavailable")
@@ -95,6 +98,7 @@ type Server struct {
 	authHandler           *authentication.Handler
 	isDev                 bool
 	usageService          usage.Service
+	checkReadiness        func(context.Context) error
 }
 
 // WebsocketHub returns the websocket hub for this server
@@ -201,6 +205,7 @@ func NewServer(
 		encryptor:             encryptor,
 		jwt:                   jwtSigner,
 		usageService:          usageService,
+		checkReadiness:        newCachedReadinessCheck(checkDatabaseReadiness, readinessCheckCacheDuration),
 		oidcProvider:          oidcProvider,
 		registry:              registry,
 		authService:           authorizationService,
@@ -645,6 +650,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Health check
 	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
+	publicRoute.HandleFunc("/ready", s.ReadinessCheck).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
 
 	// OIDC discovery endpoints
@@ -1178,6 +1184,72 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) HealthCheck(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}
+
+func checkDatabaseReadiness(ctx context.Context) error {
+	sqlDB, err := database.DB(ctx).DB()
+	if err != nil {
+		return err
+	}
+
+	return sqlDB.PingContext(ctx)
+}
+
+func newCachedReadinessCheck(check func(context.Context) error, cacheDuration time.Duration) func(context.Context) error {
+	checkToken := make(chan struct{}, 1)
+	checkToken <- struct{}{}
+	var checkedAt time.Time
+	var checkErr error
+
+	return func(ctx context.Context) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-checkToken:
+		}
+		defer func() { checkToken <- struct{}{} }()
+
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		if !checkedAt.IsZero() && time.Since(checkedAt) < cacheDuration {
+			return checkErr
+		}
+
+		// A readiness request may be canceled when its client disconnects. The
+		// shared dependency check must still finish so that one canceled client
+		// cannot poison the cached result for Kubernetes probes. Preserve the
+		// caller's values and deadline while detaching cancellation.
+		checkCtx := context.WithoutCancel(ctx)
+		if deadline, ok := ctx.Deadline(); ok {
+			var cancel context.CancelFunc
+			checkCtx, cancel = context.WithDeadline(checkCtx, deadline)
+			defer cancel()
+		}
+
+		checkErr = check(checkCtx)
+		checkedAt = time.Now()
+		return checkErr
+	}
+}
+
+func (s *Server) ReadinessCheck(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	if s.checkReadiness == nil {
+		http.Error(w, "Service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), readinessCheckTimeout)
+	defer cancel()
+
+	if err := s.checkReadiness(ctx); err != nil {
+		http.Error(w, "Service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
