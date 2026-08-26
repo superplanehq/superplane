@@ -60,15 +60,9 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 	logger = logging.WithWorkOrder(logger, *order)
 	fromState := order.State
 	wasClosed := order.IsClosed()
-
 	order, err = order.Close(db, result, &closedBy)
 	if err != nil {
 		logger.WithError(err).Error("close work order failed")
-		return nil, factoryErrorToStatus(err, "failed to close work order")
-	}
-
-	refreshed, err := factory.FindWorkOrder(db, orderID)
-	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
@@ -96,7 +90,12 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 		}
 	}
 
-	serialized, err := loadAndSerializeWorkOrder(ctx, factory, refreshed)
+	order, err = factory.FindWorkOrder(db, orderID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to close work order")
+	}
+
+	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}

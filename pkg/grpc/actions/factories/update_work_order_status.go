@@ -90,7 +90,7 @@ func UpdateWorkOrderStatus(
 		return nil, factoryErrorToStatus(err, "failed to update work order status")
 	}
 
-	refreshed, err := factory.FindWorkOrder(db, orderID)
+	order, err = factory.FindWorkOrder(db, orderID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order status")
 	}
@@ -119,7 +119,7 @@ func UpdateWorkOrderStatus(
 		}
 	}
 
-	serialized, err := loadAndSerializeWorkOrder(ctx, factory, refreshed)
+	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order status")
 	}

@@ -1,12 +1,9 @@
 package models
 
 import (
-	"errors"
 	"net/url"
 	"slices"
 	"strings"
-
-	"gorm.io/gorm"
 )
 
 var preferredIntakeOriginURLKeys = []string{"html_url", "permalink", "web_url", "url"}
@@ -73,28 +70,6 @@ func applyWorkOrderOrigin(order *FactoryWorkOrder, origin *WorkOrderOrigin) {
 	if label != "" {
 		order.OriginLabel = &label
 	}
-}
-
-func (f *Factory) FindWorkOrderByOriginURL(tx *gorm.DB, originURL string) (*FactoryWorkOrder, error) {
-	trimmed := strings.TrimSpace(originURL)
-	if trimmed == "" {
-		return nil, ErrFactoryWorkOrderNotFound
-	}
-
-	var order FactoryWorkOrder
-	err := tx.
-		Where("organization_id = ? AND factory_id = ? AND origin_url = ?", f.OrganizationID, f.ID, trimmed).
-		Order("created_at DESC").
-		First(&order).
-		Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrFactoryWorkOrderNotFound
-		}
-		return nil, err
-	}
-
-	return f.FindWorkOrder(tx, order.ID)
 }
 
 func firstHTTPURL(value any, depth int) string {
