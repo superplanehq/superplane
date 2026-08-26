@@ -46,6 +46,8 @@ export function PopupHeader({
   canEditTitle = false,
   titleBusy = false,
   onTitleSave,
+  titleTestId = "popup-work-order-title",
+  titleAriaLabel = "Work order title",
 }: {
   title: string;
   children?: ReactNode;
@@ -53,6 +55,8 @@ export function PopupHeader({
   canEditTitle?: boolean;
   titleBusy?: boolean;
   onTitleSave?: (next: string) => void;
+  titleTestId?: string;
+  titleAriaLabel?: string;
 }) {
   return (
     <header className="relative shrink-0 border-b border-border px-5 py-3 pr-12">
@@ -64,8 +68,8 @@ export function PopupHeader({
               onSave={onTitleSave}
               canEdit={canEditTitle}
               busy={titleBusy}
-              testId="popup-work-order-title"
-              ariaLabel="Work order title"
+              testId={titleTestId}
+              ariaLabel={titleAriaLabel}
               className="max-w-full text-[16px] font-semibold tracking-[-0.02em]"
               inputClassName="text-[16px] font-semibold tracking-[-0.02em]"
             />
@@ -253,8 +257,8 @@ export function AgentLogList({ entries }: { entries: PopupLogEntry[] }) {
   );
 }
 
-export function PopupBody({ children }: { children: ReactNode }) {
-  return <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>;
+export function PopupBody({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn("min-h-0 flex-1 overflow-y-auto px-5 py-4", className)}>{children}</div>;
 }
 
 export function SectionTitle({ children }: { children: ReactNode }) {
