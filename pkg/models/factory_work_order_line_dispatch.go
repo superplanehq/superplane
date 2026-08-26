@@ -525,6 +525,18 @@ func (l *FactoryWorkOrderLineDispatch) settleOpenWorkFrom(tx *gorm.DB, stepIndex
 	}
 
 	for i := range executions {
+		if executions[i].RunID != nil {
+			run, err := LockCanvasRunInTransaction(tx, *executions[i].RunID)
+			if err != nil {
+				return err
+			}
+			if run.State != CanvasRunStateFinished && run.State != CanvasRunStateCancelling {
+				if err := run.MarkAsCancelling(tx, nil); err != nil {
+					return err
+				}
+			}
+		}
+
 		if err := executions[i].MarkFinished(tx, CanvasRunResultCancelled); err != nil {
 			return err
 		}

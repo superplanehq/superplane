@@ -501,6 +501,10 @@ func Test__FactoryWorkOrder__RetryLineStep__SettlesInFlightStepBeforeRerun(t *te
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, settled.Status)
 	assert.Equal(t, models.CanvasRunResultCancelled, settled.Result)
+
+	cancelledRun, err := models.FindCanvasRunInTransaction(db, secondApp.ID, *inFlight.RunID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, cancelledRun.State)
 }
 
 func Test__FactoryWorkOrder__RetryLineStep__AdmitsQueuedWorkForFreedSlot(t *testing.T) {
