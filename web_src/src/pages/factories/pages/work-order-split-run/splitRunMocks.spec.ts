@@ -323,6 +323,150 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.phases.some((phase) => phase.name === "Implement")).toBe(true);
   });
 
+  it("keeps earlier passed steps when the latest dispatch only reran a later step", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Improve AGENTS.md",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "d-full",
+            createdAt: "2026-08-25T20:00:00.000Z",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_FINISHED",
+            steps: [{ name: "Planning" }, { name: "Implementation", stepIndex: 1 }, { name: "", stepIndex: 2 }],
+            stepExecutions: [
+              { id: "e-plan", step: "Planning", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+              {
+                id: "e-impl-old",
+                step: "Implementation",
+                stepIndex: 1,
+                state: "STATE_FINISHED",
+                result: "RESULT_FAILED",
+              },
+            ],
+          },
+          {
+            id: "d-rerun",
+            createdAt: "2026-08-25T21:00:00.000Z",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_FINISHED",
+            steps: [{ name: "" }, { name: "Implementation", stepIndex: 1 }, { name: "", stepIndex: 2 }],
+            stepExecutions: [
+              {
+                id: "e-impl-new",
+                step: "Implementation",
+                stepIndex: 1,
+                state: "STATE_FINISHED",
+                result: "RESULT_FAILED",
+              },
+            ],
+          },
+        ],
+      }),
+      { lineId: "line-1" },
+    );
+
+    expect(fixture.phases.map((phase) => phase.name)).toEqual(expect.arrayContaining(["Plan", "Implement"]));
+  });
+
+  it("prefers an older active dispatch over a newer finished rerun", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Improve AGENTS.md",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "d-full",
+            createdAt: "2026-08-25T20:00:00.000Z",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_ACTIVE",
+            stepExecutions: [
+              { id: "e-plan", step: "Planning", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+              {
+                id: "e-impl-new",
+                step: "Implementation",
+                stepIndex: 1,
+                state: "STATE_STARTED",
+                result: "RESULT_UNKNOWN",
+              },
+            ],
+          },
+          {
+            id: "d-rerun",
+            createdAt: "2026-08-25T21:00:00.000Z",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_FINISHED",
+            stepExecutions: [
+              {
+                id: "e-impl-old",
+                step: "Implementation",
+                stepIndex: 1,
+                state: "STATE_FINISHED",
+                result: "RESULT_FAILED",
+              },
+            ],
+          },
+        ],
+      }),
+      { lineId: "line-1" },
+    );
+
+    expect(fixture.phases.map((phase) => phase.name)).toEqual(expect.arrayContaining(["Plan", "Implement"]));
+    expect(fixture.phases.find((phase) => phase.name === "Implement")?.status).toBe("running");
+  });
+
+  it("gives a rerun of the same step its own phase and run", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Test work order 2",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "d-1",
+            createdAt: "2026-08-26T05:58:02.000Z",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_ACTIVE",
+            stepExecutions: [
+              {
+                id: "e-plan",
+                step: "Planning",
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+                run: { id: "run-plan" },
+              },
+              {
+                id: "e-impl-old",
+                step: "Implementation",
+                stepIndex: 1,
+                state: "STATE_FINISHED",
+                result: "RESULT_FAILED",
+                run: { id: "run-old" },
+              },
+              {
+                id: "e-impl-new",
+                step: "Implementation",
+                stepIndex: 1,
+                state: "STATE_STARTED",
+                result: "RESULT_UNKNOWN",
+                run: { id: "run-new" },
+              },
+            ],
+          },
+        ],
+      }),
+      { lineId: "line-1" },
+    );
+
+    const implementPhases = fixture.phases.filter((phase) => phase.name === "Implement");
+    expect(implementPhases).toHaveLength(2);
+    expect(implementPhases[0].id).not.toBe(implementPhases[1].id);
+    expect(implementPhases[0].runId).toBe("run-old");
+    expect(implementPhases[1].runId).toBe("run-new");
+    expect(implementPhases[1].status).toBe("running");
+    expect(fixture.currentPhaseId).toBe(implementPhases[1].id);
+  });
+
   it("uses supplied checks instead of the fixture pills", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({

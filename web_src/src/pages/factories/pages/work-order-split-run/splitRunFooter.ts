@@ -8,7 +8,7 @@ export type SplitRunFooterTone = SplitRunFooterKind;
 
 export type SplitRunFooterActionKind = "start" | "reject" | "stop" | "reopen";
 
-export type SplitRunStopChoice = "canceled" | "completed" | "draft" | "reopen";
+export type SplitRunStopChoice = "canceled" | "completed" | "rerun-step" | "rerun-start" | "reopen";
 
 export const DEFAULT_SPLIT_RUN_STOP_CHOICE: SplitRunStopChoice = "canceled";
 
@@ -17,30 +17,37 @@ export type SplitRunStopChoiceItem = {
   label: string;
   actionLabel: string;
   description: string;
-  status: "cancelled" | "completed" | "draft";
+  status: "cancelled" | "completed" | "draft" | "running";
 };
 
 export const SPLIT_RUN_STOP_CHOICES: SplitRunStopChoiceItem[] = [
   {
     id: "canceled",
-    label: "Stop as Canceled",
-    actionLabel: "Stop & Cancel",
+    label: "Stop and Close",
+    actionLabel: "Stop and Close",
     description: "Marks this task as Canceled",
     status: "cancelled",
   },
   {
     id: "completed",
-    label: "Stop as Completed",
-    actionLabel: "Mark as Complete",
+    label: "Stop and Complete",
+    actionLabel: "Stop and Complete",
     description: "Marks this task as Completed",
     status: "completed",
   },
   {
-    id: "draft",
-    label: "Stop and return to Draft",
-    actionLabel: "Return to Draft",
-    description: "Returns this task to Backlog",
-    status: "draft",
+    id: "rerun-step",
+    label: "Rerun this step",
+    actionLabel: "Rerun step",
+    description: "Starts this step again",
+    status: "running",
+  },
+  {
+    id: "rerun-start",
+    label: "Rerun from the start",
+    actionLabel: "Rerun from start",
+    description: "Starts this task from the first step",
+    status: "running",
   },
 ];
 
@@ -51,6 +58,17 @@ export const SPLIT_RUN_REOPEN_CHOICE: SplitRunStopChoiceItem = {
   description: "Opens this work order again",
   status: "draft",
 };
+
+export function isSplitRunRerunChoice(choice: SplitRunStopChoice): choice is "rerun-step" | "rerun-start" {
+  return choice === "rerun-step" || choice === "rerun-start";
+}
+
+export function rerunStartStepIndex(choice: SplitRunStopChoice, currentStepIndex = 0): number {
+  if (choice === "rerun-start") {
+    return 0;
+  }
+  return Math.max(0, currentStepIndex);
+}
 
 export function isClosedWorkOrderDisplayStatus(status?: WorkOrderDisplayStatus): boolean {
   return status === "completed" || status === "failed" || status === "rejected" || status === "cancelled";
@@ -79,10 +97,14 @@ export function availableSplitRunStopChoices(status?: WorkOrderDisplayStatus): S
   return SPLIT_RUN_STOP_CHOICES.filter((item) => isSplitRunStopChoiceAvailable(item.id, status));
 }
 
-export function defaultSplitRunStopChoice(status?: WorkOrderDisplayStatus): SplitRunStopChoice | undefined {
+export function defaultSplitRunStopChoice(
+  status?: WorkOrderDisplayStatus,
+  kind?: SplitRunFooterKind,
+): SplitRunStopChoice | undefined {
   const available = availableSplitRunStopChoices(status);
-  if (available.some((item) => item.id === DEFAULT_SPLIT_RUN_STOP_CHOICE)) {
-    return DEFAULT_SPLIT_RUN_STOP_CHOICE;
+  const preferred = kind === "failed" ? "rerun-step" : DEFAULT_SPLIT_RUN_STOP_CHOICE;
+  if (available.some((item) => item.id === preferred)) {
+    return preferred;
   }
   return available[0]?.id;
 }
