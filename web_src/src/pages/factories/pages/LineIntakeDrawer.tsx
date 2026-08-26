@@ -2,7 +2,7 @@ import { useUpdateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Plus, Settings, XIcon } from "lucide-react";
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AnalyzingIntakeTicketList } from "./AnalyzingIntakeTicketList";
@@ -28,6 +28,28 @@ import { useIntakeAutomationRuns } from "./useIntakeAutomationRuns";
 import { useLiveIntakeTickets } from "./useLiveIntakeTickets";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 
+/**
+ * Opens the sole intake of a workspace, one time, when the URL names no
+ * intake. Setup opens the drawer this way, and a single collapsed row hides
+ * the work the intake is doing. The intakes load after the drawer, so this
+ * waits for them. It runs one time only, so a collapse holds.
+ */
+function useExpandLoneIntake(
+  configuredSources: ConfiguredLineIntakeSource[],
+  initialIntakeId: string | undefined,
+  setExpandedIntakeIds: (expanded: ReadonlySet<string>) => void,
+) {
+  const expanded = useRef(false);
+
+  useEffect(() => {
+    if (expanded.current || initialIntakeId || configuredSources.length !== 1) {
+      return;
+    }
+    expanded.current = true;
+    setExpandedIntakeIds(new Set([configuredSources[0].intakeId]));
+  }, [configuredSources, initialIntakeId, setExpandedIntakeIds]);
+}
+
 function useLineIntakeDrawerState({
   initialIntakeId,
   initialSettingsOpen,
@@ -44,6 +66,7 @@ function useLineIntakeDrawerState({
   const [expandedIntakeIds, setExpandedIntakeIds] = useState<ReadonlySet<string>>(
     () => new Set(initialIntakeId ? [initialIntakeId] : []),
   );
+  useExpandLoneIntake(configuredSources, initialIntakeId, setExpandedIntakeIds);
   const [openTicket, setOpenTicket] = useState<LineIntakeAnalyzingTicket | null>(null);
   const [previewIntakeId, setPreviewIntakeId] = useState<string | null>(null);
   const [settingsIntakeId, setSettingsIntakeId] = useState<string | null>(
