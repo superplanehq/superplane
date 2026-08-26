@@ -67,6 +67,8 @@ interface WorkOrderBoardLaneProps {
   emptyDescription: string;
   /** When set, replaces the dashed empty copy while the lane holds nothing. */
   emptyContent?: ReactNode;
+  /** Keep the card list when count is 0, unless emptyContent is set. */
+  keepChildrenWhenEmpty?: boolean;
   tone?: BoardLaneTone;
   /**
    * Optional pastel fill from the column color picker. When set, it replaces
@@ -91,6 +93,7 @@ export function WorkOrderBoardLane({
   count,
   emptyDescription,
   emptyContent,
+  keepChildrenWhenEmpty = false,
   tone = "neutral",
   surfaceClassName,
   actions,
@@ -131,14 +134,12 @@ export function WorkOrderBoardLane({
         {actions}
       </header>
 
-      {count === 0 ? (
-        emptyContent ? (
-          <div className={cn(workOrderKanbanLaneScrollClassName, "justify-center")}>{emptyContent}</div>
-        ) : (
-          <p className="mt-2 flex-1 rounded-md border border-dashed border-border/60 px-3 py-6 text-center text-[12px] text-muted-foreground">
-            {emptyDescription}
-          </p>
-        )
+      {count === 0 && emptyContent ? (
+        <div className={cn(workOrderKanbanLaneScrollClassName, "justify-center")}>{emptyContent}</div>
+      ) : count === 0 && !keepChildrenWhenEmpty ? (
+        <p className="mt-2 flex-1 rounded-md border border-dashed border-border/60 px-3 py-6 text-center text-[12px] text-muted-foreground">
+          {emptyDescription}
+        </p>
       ) : (
         children
       )}

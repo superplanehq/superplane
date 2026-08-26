@@ -130,13 +130,14 @@ describe("useSplitRunFooterActions", () => {
     expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
   });
 
-  it("closes a draft as canceled from Reject", async () => {
+  it("deletes a draft from Reject", async () => {
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 
-    await result.current.handleReject();
+    const deleted = await result.current.handleReject();
 
+    expect(deleted).toBe(true);
     expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
-    expect(showSuccessToast).toHaveBeenCalledWith("Work order closed as canceled.");
+    expect(showSuccessToast).toHaveBeenCalledWith("Work order deleted.");
   });
 
   it("does not mutate when the popup has no live order", async () => {
