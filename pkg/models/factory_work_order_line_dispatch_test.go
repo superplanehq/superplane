@@ -115,10 +115,82 @@ func Test__FactoryWorkOrder__AbandonActiveLineDispatch(t *testing.T) {
 		return dispatchErr
 	}))
 
-	require.NoError(t, order.AbandonActiveLineDispatch(db))
+	_, err = order.AbandonActiveLineDispatch(db)
+	require.NoError(t, err)
 
 	_, err = order.FindActiveLineDispatch(db)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+}
+
+func Test__FactoryWorkOrder__AbandonActiveLineDispatch__FreesTheStepSlot(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "plan", "start-plan")
+	limit := 1
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint, MaxParallelism: &limit},
+	})
+	require.NoError(t, err)
+
+	running, err := factory.CreateWorkOrder(db, "Running", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = running.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+	require.NoError(t, err)
+	queued, err := factory.CreateWorkOrder(db, "Queued", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = queued.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+	require.NoError(t, err)
+
+	var inFlight *models.FactoryWorkOrderExecution
+	var queuedDispatch *models.FactoryWorkOrderLineDispatch
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, result, dispatchErr := line.Dispatch(tx, running)
+		if dispatchErr != nil {
+			return dispatchErr
+		}
+		inFlight = result.Execution
+
+		var queuedErr error
+		var queuedResult *models.FactoryLineStepResult
+		queuedDispatch, queuedResult, queuedErr = line.Dispatch(tx, queued)
+		if queuedErr != nil {
+			return queuedErr
+		}
+		if queuedResult.QueueItem == nil {
+			return fmt.Errorf("expected the second order to wait for the step slot")
+		}
+		return nil
+	}))
+
+	var started []*models.FactoryLineStepResult
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		var abandonErr error
+		started, abandonErr = running.AbandonActiveLineDispatch(tx)
+		return abandonErr
+	}))
+
+	require.NotNil(t, inFlight.RunID)
+	settled, err := models.FindWorkOrderExecutionByRunID(db, *inFlight.RunID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, settled.Status)
+	assert.Equal(t, models.CanvasRunResultCancelled, settled.Result)
+
+	byDispatch, err := models.ListFactoryWorkOrderQueueItemsByLineDispatchIDs(db, []uuid.UUID{queuedDispatch.ID})
+	require.NoError(t, err)
+	_, stillQueued := byDispatch[queuedDispatch.ID]
+	assert.False(t, stillQueued, "the freed slot must admit the waiting dispatch")
+
+	var admittedRun *models.CanvasRun
+	for _, result := range started {
+		if result.Execution != nil && result.Execution.WorkOrderID == queued.ID {
+			admittedRun = result.Run
+		}
+	}
+	require.NotNil(t, admittedRun, "admitted waiters must be returned so the caller can publish them")
 }
 
 func Test__FactoryLine__Dispatch__RejectsLineWithNoSteps(t *testing.T) {
@@ -288,7 +360,8 @@ func Test__FactoryWorkOrder__RetryLineStep__ReusesDispatchWithEarlierSteps(t *te
 		if dispatchErr != nil {
 			return dispatchErr
 		}
-		return order.AbandonActiveLineDispatch(tx)
+		_, abandonErr := order.AbandonActiveLineDispatch(tx)
+		return abandonErr
 	}))
 
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {

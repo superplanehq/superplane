@@ -96,12 +96,14 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return nil
 		}
 
+		var abandoned []*models.FactoryLineStepResult
 		_, err = order.FindActiveLineDispatch(tx)
 		if err == nil {
 			if !req.GetReplaceActive() {
 				return models.ErrFactoryWorkOrderLineDispatchActive
 			}
-			if err := order.AbandonActiveLineDispatch(tx); err != nil {
+			abandoned, err = order.AbandonActiveLineDispatch(tx)
+			if err != nil {
 				return err
 			}
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -113,7 +115,7 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return err
 		}
 
-		startedSteps = []*models.FactoryLineStepResult{result}
+		startedSteps = append(abandoned, result)
 		pendingRuns = pendingRunsFromStepResults(startedSteps)
 		return nil
 	})

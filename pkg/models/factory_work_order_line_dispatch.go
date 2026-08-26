@@ -371,21 +371,28 @@ func (l *FactoryWorkOrderLineDispatch) Finish(tx *gorm.DB, result string) error 
 }
 
 // AbandonActiveLineDispatch finishes the current traversal as cancelled
-// so a new dispatch can start. No-op when no active dispatch exists.
-func (o *FactoryWorkOrder) AbandonActiveLineDispatch(tx *gorm.DB) error {
+// so a new dispatch can start. No-op when no active dispatch exists. The
+// return lists every step this abandon started, because the traversal
+// releases its parallelism slots and waiters move in. The caller must
+// publish those runs after commit.
+func (o *FactoryWorkOrder) AbandonActiveLineDispatch(tx *gorm.DB) ([]*FactoryLineStepResult, error) {
 	if err := o.dropQueuedLineWork(tx); err != nil {
-		return err
+		return nil, err
 	}
 
 	dispatch, err := o.FindActiveLineDispatch(tx)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
+			return nil, nil
 		}
-		return err
+		return nil, err
 	}
 
-	return dispatch.Finish(tx, CanvasRunResultCancelled)
+	if err := dispatch.Finish(tx, CanvasRunResultCancelled); err != nil {
+		return nil, err
+	}
+
+	return dispatch.releaseOpenWorkFrom(tx, 0)
 }
 
 // RetryLineStep starts stepIndex again on a traversal that already ran
@@ -416,11 +423,14 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 		return result, startedLineStepResults(result), err
 	}
 
+	var started []*FactoryLineStepResult
 	active, err := o.FindActiveLineDispatch(tx)
 	if err == nil && active.ID != target.ID {
-		if err := o.AbandonActiveLineDispatch(tx); err != nil {
+		abandoned, err := o.AbandonActiveLineDispatch(tx)
+		if err != nil {
 			return nil, nil, err
 		}
+		started = append(started, abandoned...)
 	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil, err
 	}
@@ -429,18 +439,11 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 		return nil, nil, err
 	}
 
-	if err := target.settleOpenWorkFrom(tx, stepIndex); err != nil {
+	released, err := target.releaseOpenWorkFrom(tx, stepIndex)
+	if err != nil {
 		return nil, nil, err
 	}
-
-	var started []*FactoryLineStepResult
-	for index := stepIndex; index < len(target.Steps); index++ {
-		admitted, err := AdmitQueuedForStep(tx, line.ID, index)
-		if err != nil {
-			return nil, nil, err
-		}
-		started = append(started, startedLineStepResults(admitted...)...)
-	}
+	started = append(started, released...)
 
 	result, err := target.EnqueueOrStartStep(tx, o, stepIndex)
 	if err != nil {
@@ -458,6 +461,27 @@ func startedLineStepResults(results ...*FactoryLineStepResult) []*FactoryLineSte
 		}
 	}
 	return started
+}
+
+// releaseOpenWorkFrom cancels the open work this traversal holds at
+// stepIndex and later, then admits the waiters that the freed
+// parallelism slots let in. The caller must publish the returned runs
+// after commit.
+func (l *FactoryWorkOrderLineDispatch) releaseOpenWorkFrom(tx *gorm.DB, stepIndex int) ([]*FactoryLineStepResult, error) {
+	if err := l.settleOpenWorkFrom(tx, stepIndex); err != nil {
+		return nil, err
+	}
+
+	var started []*FactoryLineStepResult
+	for index := stepIndex; index < len(l.Steps); index++ {
+		admitted, err := AdmitQueuedForStep(tx, l.LineID, index)
+		if err != nil {
+			return nil, err
+		}
+		started = append(started, startedLineStepResults(admitted...)...)
+	}
+
+	return started, nil
 }
 
 func (l *FactoryWorkOrderLineDispatch) settleOpenWorkFrom(tx *gorm.DB, stepIndex int) error {
