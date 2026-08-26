@@ -20,7 +20,7 @@ function storybookRepos(setup: OnboardingSetupApi): OnboardingRepo[] {
 }
 
 /**
- * Picks the Start action for the last setup step. The app provisions the
+ * Picks the Finish action for the last setup step. The app provisions the
  * workspace. Provisioning creates a canvas and materializes a template, which
  * the Storybook fixture backend cannot serve, so stories mark the workspace
  * ready through the setup context and open the line board instead.

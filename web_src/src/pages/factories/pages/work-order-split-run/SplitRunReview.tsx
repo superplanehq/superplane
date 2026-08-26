@@ -123,6 +123,7 @@ export function SplitRunReview({
                     key={action.id}
                     action={action}
                     status={footer.status}
+                    kind={footer.kind}
                     onStart={onStart}
                     onStop={onStop}
                     onReject={onReject}
@@ -143,6 +144,7 @@ export function SplitRunReview({
 function FooterAction({
   action,
   status,
+  kind,
   onStart,
   onStop,
   onReject,
@@ -152,6 +154,7 @@ function FooterAction({
 }: {
   action: SplitRunFooterAction;
   status?: WorkOrderDisplayStatus;
+  kind?: SplitRunFooter["kind"];
   onStart?: () => void | Promise<void>;
   onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
   onReject?: () => void | Promise<void>;
@@ -164,7 +167,7 @@ function FooterAction({
   const testId = primary ? "split-run-review-cta" : `split-run-footer-${action.id}`;
 
   if (action.kind === "stop") {
-    return <SplitRunStopButton onStop={onStop} busy={stopBusy} status={status} />;
+    return <SplitRunStopButton onStop={onStop} busy={stopBusy} status={status} kind={kind} />;
   }
 
   if (action.kind === "start") {

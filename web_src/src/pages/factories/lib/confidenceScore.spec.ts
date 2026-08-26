@@ -6,6 +6,7 @@ import {
   confidenceBandForScore,
   confidenceCheckLevel,
   confidenceScoreFromChecks,
+  confidenceScoreFromPercent,
   confidenceSuitabilityAnalysis,
   confidenceSuitabilitySummary,
 } from "./confidenceScore";
@@ -35,6 +36,14 @@ describe("confidenceScore", () => {
     expect(clampConfidenceScore(-1)).toBe(0);
     expect(clampConfidenceScore(5.4)).toBe(5);
     expect(clampConfidenceScore(3.6)).toBe(4);
+  });
+
+  it("turns an intake percentage into a 0 to 5 score", () => {
+    expect(confidenceScoreFromPercent(94)).toBe(5);
+    expect(confidenceScoreFromPercent(58)).toBe(3);
+    expect(confidenceScoreFromPercent(44)).toBe(2);
+    expect(confidenceScoreFromPercent(12)).toBe(1);
+    expect(confidenceScoreFromPercent(0)).toBe(0);
   });
 
   it("bands and levels a 0 to 5 score", () => {

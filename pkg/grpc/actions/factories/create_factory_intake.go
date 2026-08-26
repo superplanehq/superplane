@@ -79,6 +79,7 @@ func CreateFactoryIntake(
 		Name:           name,
 		ConfidencePct:  confidencePct,
 		Binding:        binding,
+		Agent:          resolveIntakeAgent(db, factory),
 	})
 	if err != nil {
 		return nil, err
@@ -121,6 +122,7 @@ type intakeCanvasRequest struct {
 	Name           string
 	ConfidencePct  int
 	Binding        *intakeBinding
+	Agent          *intakeAgent
 }
 
 // createIntakeCanvas builds the intake graph and commits it as the canvas's
@@ -132,7 +134,7 @@ func createIntakeCanvas(
 	request intakeCanvasRequest,
 ) (uuid.UUID, error) {
 	orgID := request.OrganizationID
-	canvasDoc, err := buildIntakeCanvas(request.Source, request.Name, request.ConfidencePct, request.Binding)
+	canvasDoc, err := buildIntakeCanvas(request)
 	if err != nil {
 		return uuid.Nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}

@@ -141,13 +141,18 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	task := buildClaudeCodeBrokerTask(spec)
 	require.Len(t, task.Commands, 5)
 	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
+	assert.Equal(t, runner.LiveLogKindSetup, task.Commands[0].Kind)
 	assert.Equal(t, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`, task.Commands[0].Command)
 
 	assert.Equal(t, "Clone repo", task.Commands[1].Name)
+	assert.Equal(t, runner.LiveLogKindBash, task.Commands[1].Kind)
+	assert.Equal(t, "git clone https://github.com/acme/widgets.git repo", task.Commands[1].Preview)
 	assert.Contains(t, task.Commands[1].Command, `cd '/tmp/workspace'`)
 	assert.Contains(t, task.Commands[1].Command, `source "$SUPERPLANE_TASK_DIR/steps/01-clone-repo.sh"`)
 	assert.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
 	assert.Equal(t, "Fix panic", task.Commands[2].Name)
+	assert.Equal(t, runner.LiveLogKindPrompt, task.Commands[2].Kind)
+	assert.Equal(t, "Fix auth.py's nil panic", task.Commands[2].Preview)
 	assert.Contains(t, task.Commands[2].Command, `cd '/tmp/workspace'`)
 	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/02-fix-panic.txt" 'sonnet'`)
 	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
@@ -198,6 +203,17 @@ func TestShellSingleQuote(t *testing.T) {
 
 	assert.Equal(t, `'hello'`, runner.ShellSingleQuote("hello"))
 	assert.Equal(t, `'it'\''s fine'`, runner.ShellSingleQuote("it's fine"))
+}
+
+func requireEnvironmentValue(t *testing.T, environment []runner.BrokerEnvironmentVariable, name string) string {
+	t.Helper()
+	for _, variable := range environment {
+		if variable.Name == name {
+			return variable.Value
+		}
+	}
+	t.Fatalf("missing environment variable %q", name)
+	return ""
 }
 
 func requireTaskFile(t *testing.T, files []runner.BrokerTaskFile, path string) runner.BrokerTaskFile {

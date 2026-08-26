@@ -70,6 +70,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "work order already has an active line dispatch")
 	case errors.Is(err, models.ErrFactoryLineHasNoSteps):
 		return grpcerrors.FailedPrecondition(err, "factory line has no steps")
+	case errors.Is(err, models.ErrFactoryLineStepOutOfRange):
+		return grpcerrors.InvalidArgument(err, "factory line step index is out of range")
 	case errors.Is(err, models.ErrFactoryLineStepNotOnRun):
 		return grpcerrors.FailedPrecondition(err, "factory line step entrypoint must use the onRun trigger")
 	case errors.Is(err, models.ErrFactoryWorkOrderArtifactInvalid):

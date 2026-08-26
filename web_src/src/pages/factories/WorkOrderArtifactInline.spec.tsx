@@ -56,6 +56,15 @@ describe("WorkOrderArtifactInline", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(screen.getByText("feature/refund-retry")).toBeInTheDocument();
   });
+
+  it("caps a long branch name at 25 letters and keeps the full name in the tooltip", () => {
+    const name = "fix/bug-not-getting-notified-for-status-change-when-reopened";
+    render(<WorkOrderArtifactInline artifact={{ id: "branch-long", type: "TYPE_BRANCH", data: { name } }} />);
+
+    const label = screen.getByText("fix/bug-not-getting-notif…");
+    expect(label).toBeInTheDocument();
+    expect(label).toHaveAttribute("title", name);
+  });
 });
 
 describe("WorkOrderArtifactInline (PR state icons)", () => {

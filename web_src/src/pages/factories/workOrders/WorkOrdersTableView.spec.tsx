@@ -72,7 +72,7 @@ function renderTable() {
           factoryLines={[]}
           canDispatch={true}
           canAssign={true}
-          isDispatching={false}
+          dispatchingOrderIds={new Set()}
           isAssigneesSaving={false}
           onDispatch={vi.fn().mockResolvedValue(undefined)}
           onAssigneesSave={vi.fn().mockResolvedValue(undefined)}

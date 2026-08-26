@@ -22,6 +22,7 @@ import {
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
+import { FactoryPreviewFlagsContext, type FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { LINE_LIST_METRICS_BY_ID } from "./lineListMetricsMockData";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
 import { LinesPage } from "./LinesPage";
@@ -62,6 +63,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -76,7 +78,7 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
 
 vi.mock("@/hooks/useWorkOrderCardActions", () => ({
   useWorkOrderCardActions: () => ({
-    isDispatching: false,
+    dispatchingOrderIds: new Set<string>(),
     isAssigneesSaving: false,
     onDispatch: vi.fn(),
     onAssigneesSave: vi.fn(),
@@ -203,28 +205,31 @@ describe("LinesPage board", () => {
     path = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
     openCreateWorkOrder = vi.fn(),
     factory: FactoriesFactory = REFUND_FACTORY,
+    previewFlags: FactoryPreviewFlags | null = null,
   ) {
     return render(
       <QueryClientProvider client={new QueryClient()}>
         <ThemeProvider>
           <TooltipProvider>
             <MemoryRouter initialEntries={[path]}>
-              <FactoriesLayoutContext.Provider
-                value={{
-                  organizationId: "org-1",
-                  factoryId: factory.id ?? PRIMARY_FACTORY_ID,
-                  factoryKey: factory.key ?? PRIMARY_FACTORY_KEY,
-                  factory,
-                  factories: [factory],
-                  openCreateWorkOrder,
-                }}
-              >
-                <Routes>
-                  <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
-                  <Route path="/org-1/workspaces/:factoryKey/lines/:lineId/edit" element={<div>Edit line</div>} />
-                </Routes>
-                <LocationProbe />
-              </FactoriesLayoutContext.Provider>
+              <FactoryPreviewFlagsContext.Provider value={previewFlags}>
+                <FactoriesLayoutContext.Provider
+                  value={{
+                    organizationId: "org-1",
+                    factoryId: factory.id ?? PRIMARY_FACTORY_ID,
+                    factoryKey: factory.key ?? PRIMARY_FACTORY_KEY,
+                    factory,
+                    factories: [factory],
+                    openCreateWorkOrder,
+                  }}
+                >
+                  <Routes>
+                    <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
+                    <Route path="/org-1/workspaces/:factoryKey/lines/:lineId/edit" element={<div>Edit line</div>} />
+                  </Routes>
+                  <LocationProbe />
+                </FactoriesLayoutContext.Provider>
+              </FactoryPreviewFlagsContext.Provider>
             </MemoryRouter>
           </TooltipProvider>
         </ThemeProvider>
@@ -319,7 +324,7 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Plan and Implement" })).toBeInTheDocument();
     expect(screen.getByTestId("line-intake-close")).toBeInTheDocument();
-    expect(screen.getByTestId("line-intake-add")).toHaveTextContent("Add intake");
+    expect(screen.queryByTestId("line-intake-add")).not.toBeInTheDocument();
     expect(screen.getByTestId(`line-intake-source-${SENTRY_INTAKE_ID}`)).toBeInTheDocument();
     expect(screen.getByTestId(`line-intake-source-${PAGERDUTY_INTAKE_ID}`)).toBeInTheDocument();
     expect(screen.queryByTestId("line-intake-analyzing")).not.toBeInTheDocument();
@@ -341,7 +346,12 @@ describe("LinesPage board", () => {
   it("creates an intake from the picker and opens its canvas", async () => {
     createFactoryIntakeMutateAsync.mockResolvedValueOnce({ id: "intake-new", canvasId: "canvas-new" });
     const user = userEvent.setup();
-    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
+    renderBoard(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`,
+      vi.fn(),
+      REFUND_FACTORY,
+      { addIntakeControl: true },
+    );
 
     await user.click(screen.getByTestId("line-intake-add"));
     await user.click(screen.getByTestId("add-intake-template-github-issues"));

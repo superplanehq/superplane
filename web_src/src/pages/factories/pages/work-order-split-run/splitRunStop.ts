@@ -1,21 +1,29 @@
 import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
 
 import type { WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
-import { isClosedWorkOrderDisplayStatus, type SplitRunFooterKind, type SplitRunStopChoice } from "./splitRunFooter";
+import {
+  isClosedWorkOrderDisplayStatus,
+  isSplitRunRerunChoice,
+  type SplitRunFooterKind,
+  type SplitRunStopChoice,
+} from "./splitRunFooter";
 
 export type SplitRunStopRun = { appId: string; runId: string };
 
+type SplitRunStopHandlers = {
+  onClose: (result: FactoriesWorkOrderResult) => void | Promise<void>;
+  onStatusChange: (state: FactoriesWorkOrderState) => void | Promise<void>;
+  onRerun?: (choice: "rerun-step" | "rerun-start") => void | Promise<void>;
+  status?: WorkOrderDisplayStatus;
+};
+
 /**
- * Stop as Canceled is the former Reject close. Completed and Draft keep
- * the same close and status endpoints.
+ * Stop and Close is the former Reject close. Completed closes. Rerun
+ * starts the current step or the first step again.
  */
 export async function applySplitRunStopChoice(
   choice: SplitRunStopChoice,
-  handlers: {
-    onClose: (result: FactoriesWorkOrderResult) => void | Promise<void>;
-    onStatusChange: (state: FactoriesWorkOrderState) => void | Promise<void>;
-    status?: WorkOrderDisplayStatus;
-  },
+  handlers: SplitRunStopHandlers,
 ): Promise<void> {
   if (choice === "canceled") {
     await handlers.onClose("RESULT_REJECTED");
@@ -25,11 +33,13 @@ export async function applySplitRunStopChoice(
     await handlers.onClose("RESULT_COMPLETED");
     return;
   }
-  if (choice === "reopen" || isClosedWorkOrderDisplayStatus(handlers.status)) {
-    await handlers.onStatusChange("STATE_OPEN");
+  if (isSplitRunRerunChoice(choice)) {
+    await handlers.onRerun?.(choice);
     return;
   }
-  await handlers.onStatusChange("STATE_DRAFT");
+  if (choice === "reopen" || isClosedWorkOrderDisplayStatus(handlers.status)) {
+    await handlers.onStatusChange("STATE_OPEN");
+  }
 }
 
 /**
@@ -44,6 +54,7 @@ export async function applySplitRunStop(
     cancelRun?: (run: SplitRunStopRun) => Promise<void>;
     onClose: (result: FactoriesWorkOrderResult) => void | Promise<void>;
     onStatusChange: (state: FactoriesWorkOrderState) => void | Promise<void>;
+    onRerun?: (choice: "rerun-step" | "rerun-start") => void | Promise<void>;
     status?: WorkOrderDisplayStatus;
   },
 ): Promise<void> {

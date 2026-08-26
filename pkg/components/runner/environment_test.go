@@ -177,14 +177,51 @@ func Test__ResolveEnvironment(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	got := map[string]string{}
-	for _, variable := range resolved {
-		got[variable.Name] = variable.Value
-	}
+	got := environmentValues(resolved)
 
 	assert.Equal(t, "override", got["GITHUB_TOKEN"])
 	assert.Equal(t, "org/repo", got["REPO"])
 	assert.Equal(t, "secret-key-value", got["API_KEY"])
+}
+
+func Test__ResolveEnvironmentDisablesPagers(t *testing.T) {
+	t.Parallel()
+
+	t.Run("pagers are disabled by default", func(t *testing.T) {
+		t.Parallel()
+
+		resolved, err := ResolveEnvironment(nil, nil, nil)
+		require.NoError(t, err)
+
+		got := environmentValues(resolved)
+		assert.Equal(t, "cat", got["GIT_PAGER"])
+		assert.Equal(t, "cat", got["PAGER"])
+	})
+
+	t.Run("configured pager wins", func(t *testing.T) {
+		t.Parallel()
+
+		resolved, err := ResolveEnvironment(nil, nil, []EnvironmentVariable{
+			{Name: "GIT_PAGER", ValueSource: EnvironmentValueSourceLiteral, Value: strPtr("less")},
+		})
+		require.NoError(t, err)
+
+		var names []string
+		for _, variable := range resolved {
+			names = append(names, variable.Name)
+		}
+
+		assert.Equal(t, []string{"PAGER", "GIT_PAGER"}, names)
+		assert.Equal(t, "less", environmentValues(resolved)["GIT_PAGER"])
+	})
+}
+
+func environmentValues(environment []BrokerEnvironmentVariable) map[string]string {
+	values := map[string]string{}
+	for _, variable := range environment {
+		values[variable.Name] = variable.Value
+	}
+	return values
 }
 
 func Test__ValidateEnvironmentFromConfigurationField(t *testing.T) {

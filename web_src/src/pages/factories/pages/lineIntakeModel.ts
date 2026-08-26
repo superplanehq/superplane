@@ -16,7 +16,14 @@ import {
   STORYBOOK_ME_USER_ID,
   STORYBOOK_ME_USER_NAME,
 } from "../__fixtures__/factoryPageResponses";
-import { CONFIDENCE_CHECK_NAME, CONFIDENCE_SCORE_MAX, confidenceCheckLevel } from "../lib/confidenceScore";
+import {
+  CONFIDENCE_CHECK_NAME,
+  CONFIDENCE_SCORE_MAX,
+  confidenceBandForScore,
+  confidenceCheckLevel,
+  confidenceScoreFromPercent,
+  confidenceSuitabilitySummary,
+} from "../lib/confidenceScore";
 import type { WorkOrderCheckPresentation } from "../lib/workOrderChecks";
 import type { WorkOrderStatusNotePresentation } from "../lib/workOrderStatusNote";
 import { intakeSettingsFromApi, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
@@ -182,18 +189,49 @@ export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[
   });
 }
 
+/**
+ * A ticket the intake still analyzes, or one that finished with a score under
+ * the minimum confidence. Tickets over the minimum leave the list for Backlog.
+ */
+export type LineIntakeTicketOutcome = "analyzing" | "below-threshold";
+
 export interface LineIntakeAnalyzingTicket {
   id: string;
   title: string;
   appId?: string;
   runId?: string;
+  outcome?: LineIntakeTicketOutcome;
   detailsMarkdown?: string;
   issueKey?: string;
   issueUrl?: string;
   planMarkdown?: string;
+  /** Score the intake reports, on the same scale as the minimum confidence. */
+  confidencePct?: number;
   confidenceScore?: number;
   confidenceSummary?: string;
   confidenceAnalysis?: string;
+}
+
+export function isBelowThresholdTicket(ticket: LineIntakeAnalyzingTicket): boolean {
+  return ticket.outcome === "below-threshold";
+}
+
+/** Analyzing tickets stay on top. Tickets that did not make it stay below. */
+export function sortIntakeTicketsByOutcome(tickets: LineIntakeAnalyzingTicket[]): LineIntakeAnalyzingTicket[] {
+  return [
+    ...tickets.filter((ticket) => !isBelowThresholdTicket(ticket)),
+    ...tickets.filter((ticket) => isBelowThresholdTicket(ticket)),
+  ];
+}
+
+export function intakeTicketConfidenceScore(ticket: LineIntakeAnalyzingTicket): number | undefined {
+  if (ticket.confidenceScore != null) {
+    return ticket.confidenceScore;
+  }
+  if (ticket.confidencePct != null) {
+    return confidenceScoreFromPercent(ticket.confidencePct);
+  }
+  return undefined;
 }
 
 export const LINE_INTAKE_COPY = {
@@ -201,6 +239,8 @@ export const LINE_INTAKE_COPY = {
   analyzingHelper: "Tickets from this intake.",
   analyzingStatus: "Analyzing",
   analyzingEmpty: "No tickets in analysis.",
+  belowThresholdStatus: "Not accepted",
+  belowThresholdHelper: "Not accepted. The score is below the minimum confidence.",
   needsRepair: "Needs repair",
   needsRepairHelper: "The automation can no longer create work orders. Open it to repair the steps.",
   analysisHeadline: "SuperPlane is analyzing this ticket",
@@ -216,6 +256,12 @@ export const GITHUB_ISSUES_ANALYZING_TICKETS: LineIntakeAnalyzingTicket[] = [
   { id: "gh-issue-3", title: "Show a clearer empty state on the billing page" },
   { id: "gh-issue-4", title: "Upgrade the Node 20 base image" },
   { id: "gh-issue-5", title: "Add a flake retry to the checkout e2e suite" },
+  { id: "gh-issue-6", title: "Document the refund webhook contract", outcome: "below-threshold", confidencePct: 58 },
+  { id: "gh-issue-7", title: "Make the billing dashboard faster", outcome: "below-threshold", confidencePct: 52 },
+  { id: "gh-issue-8", title: "Redesign the invoice settings page", outcome: "below-threshold", confidencePct: 44 },
+  { id: "gh-issue-9", title: "Investigate flaky payouts in staging", outcome: "below-threshold", confidencePct: 38 },
+  { id: "gh-issue-10", title: "Move the ledger to a new database", outcome: "below-threshold", confidencePct: 27 },
+  { id: "gh-issue-11", title: "Payments break for some customers", outcome: "below-threshold", confidencePct: 12 },
 ];
 
 const OWNER = {
@@ -258,7 +304,7 @@ export function intakeTicketAnalysisFixture(
   ticket: LineIntakeAnalyzingTicket,
   options?: { complete?: boolean },
 ): SplitRunFixture {
-  const complete = Boolean(options?.complete);
+  const complete = options?.complete ?? isBelowThresholdTicket(ticket);
   const canvas = ticketAnalysisCanvas(complete);
   const checks = complete ? confidenceChecks(ticket) : [];
   const view = ticketAnalysisPresentation(complete);
@@ -272,6 +318,7 @@ export function intakeTicketAnalysisFixture(
     lineName: "Intake",
     lineStatus: view.lineStatus,
     currentPhaseId: view.currentPhaseId,
+    currentStepIndex: 0,
     waitingNotes: [
       {
         key: `${ticket.id}-${view.noteKey}`,
@@ -374,18 +421,19 @@ function planArtifact(ticket: LineIntakeAnalyzingTicket): FactoriesWorkOrderArti
 }
 
 function confidenceChecks(ticket: LineIntakeAnalyzingTicket): WorkOrderCheckPresentation[] {
-  if (ticket.confidenceScore == null) {
+  const score = intakeTicketConfidenceScore(ticket);
+  if (score == null) {
     return [];
   }
   return [
     {
       id: `${ticket.id}-confidence`,
       name: CONFIDENCE_CHECK_NAME,
-      score: ticket.confidenceScore,
+      score,
       maxScore: CONFIDENCE_SCORE_MAX,
       format: "fraction",
-      level: confidenceCheckLevel(ticket.confidenceScore),
-      summary: ticket.confidenceSummary,
+      level: confidenceCheckLevel(score),
+      summary: ticket.confidenceSummary ?? confidenceSuitabilitySummary(confidenceBandForScore(score)),
       analysis: ticket.confidenceAnalysis,
       sourceName: "Score",
     },
@@ -538,6 +586,7 @@ export function intakeAutomationFixture(source: LineIntakeSource): SplitRunFixtu
     lineName: "Intake",
     lineStatus: "running",
     currentPhaseId: "evaluate",
+    currentStepIndex: 0,
     waitingNotes,
     checks: [],
     // An always-on automation, not a line run — no line actions in the footer.

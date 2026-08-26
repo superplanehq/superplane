@@ -51,7 +51,7 @@ describe("useOnboardingSetupState", () => {
     expect(result.current.agentReady).toBe(true);
   });
 
-  it("lets Start finish when OpenRouter is connected", () => {
+  it("lets setup finish when OpenRouter is connected", () => {
     const connected = new Set<IntegrationId>(["github", "openrouter"]);
     const { result } = renderHook(() =>
       useOnboardingSetupState("Payments", {
@@ -70,7 +70,7 @@ describe("useOnboardingSetupState", () => {
     expect(result.current.canFinish).toBe(true);
   });
 
-  it("lets Start finish when Anthropic is connected or remaining credit is greater than zero", () => {
+  it("lets setup finish when Anthropic is connected or remaining credit is greater than zero", () => {
     const connected = new Set<IntegrationId>(["github", "claude"]);
     const { result } = renderHook(() =>
       useOnboardingSetupState("Payments", {
