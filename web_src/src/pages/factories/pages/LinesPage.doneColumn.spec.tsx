@@ -36,7 +36,6 @@ vi.mock("@/hooks/useFactoryData", () => ({
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useFactoryIntakes: () => ({ data: [] }),
   useFactoryIntakeRuns: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
-  useCreateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
 }));
 

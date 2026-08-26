@@ -31,8 +31,6 @@ const updateFactoryLineMutateAsync = vi.fn();
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
 const useFactoryApps = vi.fn(() => ({ data: [] as FactoryApp[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
-const createFactoryIntakeMutateAsync = vi.fn();
-
 const SENTRY_INTAKE_ID = "intake-sentry";
 const PAGERDUTY_INTAKE_ID = "intake-pagerduty";
 
@@ -71,7 +69,6 @@ vi.mock("@/hooks/useFactoryData", () => ({
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useFactoryIntakes: () => useFactoryIntakes(),
   useFactoryIntakeRuns: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
-  useCreateFactoryIntake: () => ({ mutateAsync: createFactoryIntakeMutateAsync, isPending: false }),
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
 }));
 
@@ -191,7 +188,6 @@ describe("LinesPage board", () => {
     useFactoryWorkOrders.mockReturnValue({ data: [] });
     useFactoryApps.mockReturnValue({ data: [] });
     useFactoryIntakes.mockReturnValue({ data: [] });
-    createFactoryIntakeMutateAsync.mockReset();
     useWorkOrderChecks.mockReset();
     useWorkOrderChecks.mockImplementation(
       (_organizationId: string, _factoryId: string, orderId: string, options?: { enabled?: boolean }) => ({
@@ -320,7 +316,7 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Plan and Implement" })).toBeInTheDocument();
     expect(screen.getByTestId("line-intake-close")).toBeInTheDocument();
-    expect(screen.getByTestId("line-intake-add")).toHaveTextContent("Add intake");
+    expect(screen.queryByTestId("line-intake-add")).not.toBeInTheDocument();
     expect(screen.getByTestId(`line-intake-source-${SENTRY_INTAKE_ID}`)).toBeInTheDocument();
     expect(screen.getByTestId(`line-intake-source-${PAGERDUTY_INTAKE_ID}`)).toBeInTheDocument();
     expect(screen.queryByTestId("line-intake-analyzing")).not.toBeInTheDocument();
@@ -337,24 +333,6 @@ describe("LinesPage board", () => {
 
     expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toHaveTextContent("GitHub issues");
     expect(screen.getByTestId("line-intake-source-intake-triage")).toHaveTextContent("Triage issues");
-  });
-
-  it("creates an intake from the picker and opens its canvas", async () => {
-    createFactoryIntakeMutateAsync.mockResolvedValueOnce({ id: "intake-new", canvasId: "canvas-new" });
-    const user = userEvent.setup();
-    renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
-
-    await user.click(screen.getByTestId("line-intake-add"));
-    await user.click(screen.getByTestId("add-intake-template-github-issues"));
-
-    await waitFor(() => {
-      expect(createFactoryIntakeMutateAsync).toHaveBeenCalledWith({ source: "SOURCE_GITHUB_ISSUES" });
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-        `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/apps/canvas-new`,
-      );
-    });
   });
 
   it("shows a backlog onboarding card on Acme when the backlog is empty", () => {
