@@ -67,6 +67,8 @@ interface WorkOrderBoardLaneProps {
   emptyDescription: string;
   /** When set, replaces the dashed empty copy while the lane holds nothing. */
   emptyContent?: ReactNode;
+  /** Keep the card list when count is 0, unless emptyContent is set. */
+  keepChildrenWhenEmpty?: boolean;
   tone?: BoardLaneTone;
   /**
    * Optional pastel fill from the column color picker. When set, it replaces
@@ -86,11 +88,38 @@ interface WorkOrderBoardLaneProps {
   children?: ReactNode;
 }
 
+function LaneBody({
+  count,
+  emptyContent,
+  emptyDescription,
+  keepChildrenWhenEmpty,
+  children,
+}: {
+  count: number;
+  emptyContent?: ReactNode;
+  emptyDescription: string;
+  keepChildrenWhenEmpty: boolean;
+  children?: ReactNode;
+}) {
+  if (count === 0 && emptyContent) {
+    return <div className={cn(workOrderKanbanLaneScrollClassName, "justify-center")}>{emptyContent}</div>;
+  }
+  if (count === 0 && !keepChildrenWhenEmpty) {
+    return (
+      <p className="mt-2 flex-1 rounded-md border border-dashed border-border/60 px-3 py-6 text-center text-[12px] text-muted-foreground">
+        {emptyDescription}
+      </p>
+    );
+  }
+  return children;
+}
+
 export function WorkOrderBoardLane({
   title,
   count,
   emptyDescription,
   emptyContent,
+  keepChildrenWhenEmpty = false,
   tone = "neutral",
   surfaceClassName,
   actions,
@@ -131,17 +160,14 @@ export function WorkOrderBoardLane({
         {actions}
       </header>
 
-      {count === 0 ? (
-        emptyContent ? (
-          <div className={cn(workOrderKanbanLaneScrollClassName, "justify-center")}>{emptyContent}</div>
-        ) : (
-          <p className="mt-2 flex-1 rounded-md border border-dashed border-border/60 px-3 py-6 text-center text-[12px] text-muted-foreground">
-            {emptyDescription}
-          </p>
-        )
-      ) : (
-        children
-      )}
+      <LaneBody
+        count={count}
+        emptyContent={emptyContent}
+        emptyDescription={emptyDescription}
+        keepChildrenWhenEmpty={keepChildrenWhenEmpty}
+      >
+        {children}
+      </LaneBody>
     </section>
   );
 }

@@ -479,9 +479,37 @@ func SoftDeleteOrganizationFactories(tx *gorm.DB, organizationID uuid.UUID) erro
 }
 
 func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID, sourceRunID *uuid.UUID) (*FactoryWorkOrder, error) {
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil)
+}
+
+func (f *Factory) CreateWorkOrderWithOrigin(
+	tx *gorm.DB,
+	title, description string,
+	createdBy *uuid.UUID,
+	assignees []uuid.UUID,
+	sourceRunID *uuid.UUID,
+	origin WorkOrderOrigin,
+) (*FactoryWorkOrder, error) {
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, &origin)
+}
+
+func (f *Factory) createWorkOrder(
+	tx *gorm.DB,
+	title, description string,
+	createdBy *uuid.UUID,
+	assignees []uuid.UUID,
+	sourceRunID *uuid.UUID,
+	origin *WorkOrderOrigin,
+) (*FactoryWorkOrder, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil, ErrFactoryWorkOrderTitleRequired
+	}
+
+	if existing, err := f.findWorkOrderForOrigin(tx, origin); err == nil {
+		return existing, nil
+	} else if !errors.Is(err, ErrFactoryWorkOrderNotFound) {
+		return nil, err
 	}
 
 	// Allocate the sequence number atomically: the UPDATE ... RETURNING
@@ -509,9 +537,10 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
+	applyWorkOrderOrigin(order, origin)
 
 	if err := tx.Clauses(clause.Returning{}).Create(order).Error; err != nil {
-		return nil, err
+		return f.resolveOriginConflict(tx, order, err)
 	}
 
 	if len(assignees) > 0 {
@@ -542,6 +571,30 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 	}
 
 	return f.FindWorkOrder(tx, order.ID)
+}
+
+func (f *Factory) findWorkOrderForOrigin(tx *gorm.DB, origin *WorkOrderOrigin) (*FactoryWorkOrder, error) {
+	if origin == nil {
+		return nil, ErrFactoryWorkOrderNotFound
+	}
+
+	return f.FindWorkOrderByOriginURL(tx, origin.URL)
+}
+
+func (f *Factory) resolveOriginConflict(tx *gorm.DB, order *FactoryWorkOrder, err error) (*FactoryWorkOrder, error) {
+	if order == nil || order.OriginURL == nil {
+		return nil, err
+	}
+	if !errors.Is(MapFactoryWorkOrderOriginUniqueConstraintError(err), ErrFactoryWorkOrderOriginTaken) {
+		return nil, err
+	}
+
+	existing, findErr := f.FindWorkOrderByOriginURL(tx, *order.OriginURL)
+	if findErr != nil {
+		return nil, err
+	}
+
+	return existing, nil
 }
 
 // FindWorkOrderByArtifactKey resolves a work order from one of its

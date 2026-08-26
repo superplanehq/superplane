@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -69,6 +70,8 @@ type FactoryWorkOrder struct {
 	Result         string
 	CreatedByID    *uuid.UUID
 	SourceRunID    *uuid.UUID
+	OriginURL      *string
+	OriginLabel    *string
 	// StatusNote is the jsonb array of current-wait announcements (see
 	// FactoryWorkOrderStatusNote). Cleared on every state transition.
 	StatusNote datatypes.JSON
@@ -102,6 +105,27 @@ func (o *FactoryWorkOrder) IsClosed() bool {
 // the first dispatch from `draft` also promotes it to `open`.
 func (o *FactoryWorkOrder) IsDispatchable() bool {
 	return o.State == FactoryWorkOrderStateDraft || o.State == FactoryWorkOrderStateOpen
+}
+
+func (o *FactoryWorkOrder) Origin() *WorkOrderOrigin {
+	if o == nil || o.OriginURL == nil {
+		return nil
+	}
+
+	url := strings.TrimSpace(*o.OriginURL)
+	if url == "" {
+		return nil
+	}
+
+	label := ""
+	if o.OriginLabel != nil {
+		label = strings.TrimSpace(*o.OriginLabel)
+	}
+	if label == "" {
+		label = OriginLabelFromURL(url)
+	}
+
+	return &WorkOrderOrigin{URL: url, Label: label}
 }
 
 type FactoryWorkOrderAssignee struct {
@@ -315,6 +339,19 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 	fromResult := o.Result
 	now := time.Now()
 
+	if toState == FactoryWorkOrderStateClosed && nextResult == FactoryWorkOrderResultRejected {
+		discarded, err := o.DiscardIfNeverRan(db)
+		if err != nil {
+			return false, err
+		}
+		if discarded {
+			o.State = FactoryWorkOrderStateClosed
+			o.Result = FactoryWorkOrderResultRejected
+			o.UpdatedAt = now
+			return true, nil
+		}
+	}
+
 	err := db.Transaction(func(tx *gorm.DB) error {
 		// Reverting `open → draft` while a line dispatch is still active would
 		// desync the FSM from the executor. Mirror the dispatch guard here.
@@ -403,7 +440,8 @@ func (o *FactoryWorkOrder) loadSourceRunRefs(tx *gorm.DB) (*factory.RunRef, *fac
 }
 
 // Close is kept for backwards compatibility with existing handlers. New code
-// should call UpdateStatus directly.
+// should call UpdateStatus directly. A draft that never ran is deleted
+// instead of moved to closed, so Reject does not leave it in Done.
 func (o *FactoryWorkOrder) Close(db *gorm.DB, result string, closedBy *uuid.UUID) (*FactoryWorkOrder, error) {
 	if o.IsClosed() {
 		return o, nil
@@ -419,6 +457,52 @@ func (o *FactoryWorkOrder) Close(db *gorm.DB, result string, closedBy *uuid.UUID
 	}
 
 	return o, nil
+}
+
+func (o *FactoryWorkOrder) DiscardIfNeverRan(tx *gorm.DB) (bool, error) {
+	if o.State != FactoryWorkOrderStateDraft {
+		return false, nil
+	}
+
+	var dispatchCount int64
+	if err := tx.Model(&FactoryWorkOrderLineDispatch{}).Where("work_order_id = ?", o.ID).Limit(1).Count(&dispatchCount).Error; err != nil {
+		return false, err
+	}
+	if dispatchCount > 0 {
+		return false, nil
+	}
+
+	if err := o.HardDelete(tx); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (o *FactoryWorkOrder) HardDelete(tx *gorm.DB) error {
+	return tx.Transaction(func(inner *gorm.DB) error {
+		id := o.ID
+		commentIDs := inner.Model(&FactoryWorkOrderComment{}).Select("id").Where("work_order_id = ?", id)
+		if err := inner.Where("comment_id IN (?)", commentIDs).Delete(&FactoryWorkOrderCommentMention{}).Error; err != nil {
+			return err
+		}
+
+		for _, model := range []any{
+			&FactoryWorkOrderQueueItem{},
+			&FactoryWorkOrderExecution{},
+			&FactoryWorkOrderLineDispatch{},
+			&FactoryWorkOrderEvent{},
+			&FactoryWorkOrderCheck{},
+			&FactoryWorkOrderAssignee{},
+			&FactoryWorkOrderArtifact{},
+			&FactoryWorkOrderComment{},
+		} {
+			if err := inner.Where("work_order_id = ?", id).Delete(model).Error; err != nil {
+				return err
+			}
+		}
+
+		return inner.Where("id = ?", id).Delete(&FactoryWorkOrder{}).Error
+	})
 }
 
 // TransitionOnDispatch promotes a draft order to open; open is a no-op.

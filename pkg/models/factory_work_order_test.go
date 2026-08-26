@@ -37,6 +37,148 @@ func TestFactoryWorkOrder_CreateStartsAsDraft(t *testing.T) {
 	assert.Equal(t, FactoryWorkOrderStateDraft, payload.ToState)
 }
 
+func TestFactoryWorkOrder_CreateWithOriginPersistsTicket(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "create-origin")
+	tx := database.DB(t.Context())
+
+	order, err := factoryModel.CreateWorkOrderWithOrigin(
+		tx,
+		"Handle duplicate refunds",
+		"Retrying a refund posts twice.",
+		&userID,
+		nil,
+		nil,
+		WorkOrderOrigin{
+			URL:   "https://github.com/acme/payments/issues/12",
+			Label: "acme/payments#12",
+		},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, order.Origin())
+	assert.Equal(t, "https://github.com/acme/payments/issues/12", order.Origin().URL)
+	assert.Equal(t, "acme/payments#12", order.Origin().Label)
+
+	found, err := factoryModel.FindWorkOrderByOriginURL(tx, "https://github.com/acme/payments/issues/12")
+	require.NoError(t, err)
+	assert.Equal(t, order.ID, found.ID)
+
+	duplicate, err := factoryModel.CreateWorkOrderWithOrigin(
+		tx,
+		"Handle duplicate refunds again",
+		"",
+		&userID,
+		nil,
+		nil,
+		WorkOrderOrigin{URL: "https://github.com/acme/payments/issues/12"},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, order.ID, duplicate.ID)
+}
+
+func TestFactoryWorkOrder_CloseUnusedDraftDeletesAndFreesOrigin(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "discard-origin")
+	tx := database.DB(t.Context())
+	origin := WorkOrderOrigin{URL: "https://github.com/acme/payments/issues/12", Label: "acme/payments#12"}
+
+	order, err := factoryModel.CreateWorkOrderWithOrigin(tx, "Handle duplicate refunds", "", &userID, nil, nil, origin)
+	require.NoError(t, err)
+
+	_, err = order.Close(tx, FactoryWorkOrderResultRejected, &userID)
+	require.NoError(t, err)
+
+	_, err = factoryModel.FindWorkOrder(tx, order.ID)
+	require.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+
+	_, err = factoryModel.FindWorkOrderByOriginURL(tx, origin.URL)
+	require.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+
+	created, err := factoryModel.CreateWorkOrderWithOrigin(tx, "Handle duplicate refunds", "", &userID, nil, nil, origin)
+	require.NoError(t, err)
+	assert.NotEqual(t, order.ID, created.ID)
+}
+
+func TestFactoryWorkOrder_UpdateStatusUnusedDraftRejectDeletesAndFreesOrigin(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "discard-status")
+	tx := database.DB(t.Context())
+	origin := WorkOrderOrigin{URL: "https://github.com/acme/payments/issues/15", Label: "acme/payments#15"}
+
+	order, err := factoryModel.CreateWorkOrderWithOrigin(tx, "Handle duplicate refunds", "", &userID, nil, nil, origin)
+	require.NoError(t, err)
+
+	changed, err := order.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
+		ToState: FactoryWorkOrderStateClosed,
+		Result:  FactoryWorkOrderResultRejected,
+		Actor:   &userID,
+	})
+	require.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, FactoryWorkOrderStateClosed, order.State)
+	assert.Equal(t, FactoryWorkOrderResultRejected, order.Result)
+
+	_, err = factoryModel.FindWorkOrder(tx, order.ID)
+	require.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
+
+	created, err := factoryModel.CreateWorkOrderWithOrigin(tx, "Handle duplicate refunds", "", &userID, nil, nil, origin)
+	require.NoError(t, err)
+	assert.NotEqual(t, order.ID, created.ID)
+}
+
+func TestFactoryWorkOrder_CloseRejectedOpenKeepsRow(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "reject-open")
+	tx := database.DB(t.Context())
+	origin := WorkOrderOrigin{URL: "https://github.com/acme/payments/issues/14", Label: "acme/payments#14"}
+
+	order, err := factoryModel.CreateWorkOrderWithOrigin(tx, "Ran then rejected", "", &userID, nil, nil, origin)
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
+		ToState: FactoryWorkOrderStateOpen,
+		Actor:   &userID,
+	})
+	require.NoError(t, err)
+
+	_, err = order.Close(tx, FactoryWorkOrderResultRejected, &userID)
+	require.NoError(t, err)
+
+	found, err := factoryModel.FindWorkOrder(tx, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, FactoryWorkOrderStateClosed, found.State)
+	assert.Equal(t, FactoryWorkOrderResultRejected, found.Result)
+}
+
+func TestFactoryWorkOrder_ClosedOriginDoesNotBlockNewImport(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "closed-origin")
+	tx := database.DB(t.Context())
+	origin := WorkOrderOrigin{URL: "https://github.com/acme/payments/issues/13", Label: "acme/payments#13"}
+
+	order, err := factoryModel.CreateWorkOrderWithOrigin(tx, "Ran then closed", "", &userID, nil, nil, origin)
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
+		ToState: FactoryWorkOrderStateOpen,
+		Actor:   &userID,
+	})
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{
+		ToState: FactoryWorkOrderStateClosed,
+		Result:  FactoryWorkOrderResultCompleted,
+		Actor:   &userID,
+	})
+	require.NoError(t, err)
+
+	created, err := factoryModel.CreateWorkOrderWithOrigin(tx, "Import again", "", &userID, nil, nil, origin)
+	require.NoError(t, err)
+	assert.NotEqual(t, order.ID, created.ID)
+}
+
 func TestFactoryWorkOrder_UpdateContent(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
@@ -212,26 +354,18 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 			assert.ErrorIs(t, err, ErrFactoryWorkOrderInvalidState)
 		}
 
-		_, err = other.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		changed, err := other.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateClosed,
 			Result:  FactoryWorkOrderResultRejected,
 			Actor:   &userID,
 		})
 		require.NoError(t, err)
+		assert.True(t, changed)
 		assert.Equal(t, FactoryWorkOrderStateClosed, other.State)
 		assert.Equal(t, FactoryWorkOrderResultRejected, other.Result)
 
-		events, err := other.ListEvents(database.Conn(), 10, nil)
-		require.NoError(t, err)
-		// Should have exactly two status.updated events: creation ("" → draft)
-		// and abandonment (draft → closed). No coarse order.opened/closed.
-		statusEvents := filterEventsOfType(events, factory.EventTypeOrderStatusUpdated)
-		require.Len(t, statusEvents, 2)
-		var latest factory.WorkOrderStatusUpdated
-		require.NoError(t, json.Unmarshal(statusEvents[0].Data, &latest))
-		assert.Equal(t, FactoryWorkOrderStateDraft, latest.FromState)
-		assert.Equal(t, FactoryWorkOrderStateClosed, latest.ToState)
-		assert.Equal(t, FactoryWorkOrderResultRejected, latest.ToResult)
+		_, err = factoryModel.FindWorkOrder(database.Conn(), other.ID)
+		require.ErrorIs(t, err, ErrFactoryWorkOrderNotFound)
 	})
 
 	t.Run("reopen from closed emits a fresh status.updated", func(t *testing.T) {
