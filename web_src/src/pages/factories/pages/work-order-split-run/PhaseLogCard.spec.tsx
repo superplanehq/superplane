@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { groupClaudeSteps, PhaseLogCard, toolCallSummary } from "./PhaseLogCard";
-import type { SplitRunPhase, SplitRunStreamLine } from "./splitRunMocks";
+import { idleLiveLogStream, line, PHASE } from "./PhaseLogCard.testHelpers";
+import type { SplitRunStreamLine } from "./splitRunMocks";
 
 const useLiveLogStreamMock = vi.fn();
 
@@ -12,40 +13,11 @@ vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({
 }));
 
 beforeEach(() => {
-  useLiveLogStreamMock.mockReturnValue({
-    sections: [],
-    orphanLines: [],
-    error: null,
-    isStreaming: false,
-    toggleSection: vi.fn(),
-    scrollRef: { current: null },
-  });
+  useLiveLogStreamMock.mockReturnValue(idleLiveLogStream(vi.fn()));
 });
-
-const PHASE: SplitRunPhase = {
-  id: "plan",
-  name: "Plan",
-  status: "passed",
-  duration: "1m",
-  componentName: "Planning",
-  artifacts: [],
-  stream: [],
-  canvasSteps: [],
-};
 
 const LONG_NOTE =
   "Now let me check factories.proto Delete rpc absence explicitly and PermissionTooltip component quickly, plus check showSuccessToast import paths.";
-
-function line(
-  partial: Partial<SplitRunStreamLine> & Pick<SplitRunStreamLine, "id" | "componentName">,
-): SplitRunStreamLine {
-  return {
-    at: "12:00",
-    status: "passed",
-    nodeId: "planner-agent",
-    ...partial,
-  };
-}
 
 function outputIndentOf(text: string | RegExp) {
   const node = screen.getByText(text);

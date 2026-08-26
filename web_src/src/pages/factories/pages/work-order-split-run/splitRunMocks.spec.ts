@@ -5,6 +5,7 @@ import {
   APPROVAL_WORK_ORDER,
   DRAFT_WORK_ORDER,
   INGEST_DRAFT_WORK_ORDER,
+  LINE_RUN_IMPLEMENT_NOTIFY_ID,
   OPEN_WORK_ORDER,
   RUNNING_WORK_ORDER,
   SENTRY_DRAFT_WORK_ORDER,
@@ -14,6 +15,7 @@ import {
   BOARD_DONE_CANCELED_ORDER,
   BOARD_DONE_REJECTED_ORDER,
   BOARD_IMPLEMENT_FAILED_ORDER,
+  BOARD_IMPLEMENT_NOTIFY_ORDER,
 } from "../../__fixtures__/lineMetricsBoardOrders";
 import {
   LINE_BOARD_DONE_RECEIPTS_ORDER,
@@ -806,5 +808,80 @@ describe("line board work-order examples", () => {
       "#513",
     ]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts)).toEqual(["notes.md"]);
+  });
+
+  it("keeps a completed notify log on the extra implement card", () => {
+    const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER);
+    expect(fixture.title).toBe("Notify on status change after a reopen");
+    expect(fixture.lineStatus).toBe("passed");
+    expect(fixture.currentPhaseId).toBe("pr-creation-2");
+    expect(fixture.openPhaseId).toBe("pr-creation-2");
+    expect(fixture.footerTone).toBe("done");
+    expect(fixture.footer.run).toEqual({
+      appId: "app-refund-implementer",
+      runId: LINE_RUN_IMPLEMENT_NOTIFY_ID,
+    });
+    expect(fixture.phases.find((phase) => phase.id === "implementation-1")?.appId).toBe("app-refund-implementer");
+    expect(fixture.phases.find((phase) => phase.id === "implementation-1")?.runId).toBe(LINE_RUN_IMPLEMENT_NOTIFY_ID);
+    expect(fixture.footer.sentence).toBe("Work order completed successfully.");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reopen"]);
+    expect(
+      fixture.phases.map((phase) => [phase.id, phase.name, phase.componentName, phase.status, phase.duration]),
+    ).toEqual([
+      ["backlog", "Backlog", "Created manually", "passed", "2s"],
+      ["planning-0", "Plan", "Planning", "passed", "2m 59s"],
+      ["implementation-1", "Implement", "Implementation", "passed", "23m 56s"],
+      ["pr-creation-2", "PR Creation", "PR Creation", "passed", "1m 23s"],
+      ["ci-loop-3", "Verify", "Risk Assessment", "passed", "10m 12s"],
+      ["risk-assessment-4", "Verify", "Risk Assessment", "passed", "29s"],
+      [
+        "ui-preview-storybook-coverage-5",
+        "UI Preview & Storybook Coverage",
+        "UI Preview & Storybook Coverage",
+        "passed",
+        "1m 26s",
+      ],
+    ]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "backlog")?.artifacts)).toEqual([
+      "description.md",
+    ]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "planning-0")?.artifacts)).toEqual(["PLAN.md"]);
+    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implementation-1")?.artifacts)).toEqual([
+      "fix/bug-not-getting-notified-for-status-change-when-re-1787246840-4193b6d9",
+    ]);
+    const prStream = fixture.phases.find((phase) => phase.id === "pr-creation-2")?.stream ?? [];
+    expect(prStream.map((line) => [line.at, line.componentType, line.componentName, line.action])).toEqual([
+      ["19:51:16", "On Run", "Create", "triggered"],
+      ["19:51:16", "Filter", "PR does not exist?", "passed"],
+      ["19:51:17", "Run Claude Code", "Generate PR title and description", "passed"],
+      ["19:52:37", "github.createPullRequest", "Create Draft Pull Request", "passed"],
+      ["19:52:38", "github.addIssueLabel", "Add Label to Pull Request", "passed"],
+      ["19:52:39", "Add Work Order Artifact", "Attach PR to Work Order", "passed"],
+      ["19:52:39", "setWorkOrderStatusNote", "Set PR closure note", "passed"],
+    ]);
+    expect(prStream.find((line) => line.componentName === "Attach PR to Work Order")?.artifact?.data).toMatchObject({
+      number: 6837,
+      state: "merged",
+      url: "https://github.com/superplanehq/superplane/pull/6837",
+    });
+    const verifyStream = fixture.phases.find((phase) => phase.id === "ci-loop-3")?.stream ?? [];
+    expect(verifyStream.map((line) => [line.at, line.componentType, line.componentName, line.action])).toEqual([
+      ["19:52:40", "On Run", "CI verification", "triggered"],
+      ["20:02:50", "Report Work Order Check", "Report CI Check", "passed"],
+      ["20:02:50", "github.markPullRequestReadyForReview", "Mark Pull Request Ready", "passed"],
+      ["19:52:40", "loop", "loop", "passed"],
+      ["19:52:40", "semaphore.runWorkflow", "Run Semaphore CI", "passed"],
+    ]);
+    const previewStream = fixture.phases.find((phase) => phase.id === "ui-preview-storybook-coverage-5")?.stream ?? [];
+    expect(previewStream.map((line) => [line.at, line.componentType, line.componentName, line.action])).toEqual([
+      ["20:03:22", "On Run", "Start", "triggered"],
+      ["20:03:22", "Run Bash", "Detect UI Changes", "passed"],
+      ["20:03:23", "If", "Has UI changes?", "passed"],
+      ["20:03:23", "Run Claude Code", "Assess Storybook Coverage", "passed"],
+      ["20:03:57", "Run JavaScript", "Format Coverage Review", "passed"],
+      ["20:03:23", "Run Bash", "Deploy Storybook", "passed"],
+      ["20:03:58", "Report Work Order Check", "Report Coverage Check", "passed"],
+      ["20:04:46", "github.updatePullRequest", "Update PR with preview links", "passed"],
+    ]);
   });
 });

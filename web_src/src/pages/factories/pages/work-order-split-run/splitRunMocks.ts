@@ -48,6 +48,7 @@ import type {
 } from "../work-order-run-overlay/workOrderRunOverlayMocks";
 import type { SplitRunCanvasKey, SplitRunCanvasModel } from "./splitRunCanvases";
 import { splitRunSourceForOrder, type SplitRunSource } from "./splitRunSource";
+import { withNotifyImplementLog } from "./splitRunNotifyFixture";
 
 export type SplitRunPhaseId = string;
 
@@ -126,6 +127,8 @@ export interface SplitRunFixture {
   currentStepIndex: number;
   lineStatus: SplitRunPhaseStatus;
   currentPhaseId: SplitRunPhaseId;
+  /** When set, the popup opens this phase even if it already passed. */
+  openPhaseId?: SplitRunPhaseId | null;
   phases: SplitRunPhase[];
   waitingNotes: WorkOrderStatusNotePresentation[];
   checks: WorkOrderCheckPresentation[];
@@ -239,6 +242,9 @@ const AUTO_EXPAND_STATUSES = new Set<SplitRunPhaseStatus>(["running", "waiting",
 
 /** Open the current step only when it is running, waiting, or failed. */
 export function autoExpandedPhaseId(fixture: SplitRunFixture): SplitRunPhaseId | null {
+  if (fixture.openPhaseId) {
+    return fixture.openPhaseId;
+  }
   const current = fixture.phases.find((phase) => phase.id === fixture.currentPhaseId);
   if (!current || !AUTO_EXPAND_STATUSES.has(current.status)) {
     return null;
@@ -287,7 +293,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
   const current = pickCurrentExecution(executions);
   const demoArtifacts = options?.demoArtifacts !== false;
   const phases = phasesForOrder(order, executions, options?.checks, demoArtifacts);
-  return {
+  const fixture: SplitRunFixture = {
     title: order.title ?? "Work order",
     descriptionText: order.description ?? "",
     owner: splitRunOwnerDisplay(order),
@@ -309,6 +315,10 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       demoArtifacts,
     }),
   };
+  if (order.id === "wo-board-implement-notify") {
+    return withNotifyImplementLog(fixture, order);
+  }
+  return fixture;
 }
 
 function reviewSurfaces(
