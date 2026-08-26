@@ -1,10 +1,9 @@
 import { useUpdateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { cn } from "@/lib/utils";
-import { ChevronRight, Plus, Settings, XIcon } from "lucide-react";
+import { ChevronRight, Settings, XIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
-import { AddIntakePicker } from "./AddIntakePicker";
 import { AnalyzingIntakeTicketList } from "./AnalyzingIntakeTicketList";
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
 import {
@@ -18,7 +17,6 @@ import {
   intakeTicketAnalysisFixture,
   isBelowThresholdTicket,
   LINE_INTAKE_COPY,
-  type AddIntakeTemplate,
   type ConfiguredLineIntakeSource,
   type LineIntakeAnalyzingTicket,
   type LineIntakeSource,
@@ -56,13 +54,11 @@ function useLineIntakeDrawerState({
   initialSettingsOpen,
   configuredSources,
   onOpenTicket,
-  onSelectIntakeTemplate,
 }: {
   initialIntakeId?: string;
   initialSettingsOpen: boolean;
   configuredSources: ConfiguredLineIntakeSource[];
   onOpenTicket?: (ticket: LineIntakeAnalyzingTicket) => void;
-  onSelectIntakeTemplate?: (template: AddIntakeTemplate) => void;
 }) {
   const [expandedIntakeIds, setExpandedIntakeIds] = useState<ReadonlySet<string>>(
     () => new Set(initialIntakeId ? [initialIntakeId] : []),
@@ -73,7 +69,6 @@ function useLineIntakeDrawerState({
   const [settingsIntakeId, setSettingsIntakeId] = useState<string | null>(
     initialSettingsOpen ? (initialIntakeId ?? configuredSources[0]?.intakeId ?? null) : null,
   );
-  const [pickerOpen, setPickerOpen] = useState(false);
 
   function toggleIntake(intakeId: string) {
     setExpandedIntakeIds((current) => {
@@ -110,26 +105,17 @@ function useLineIntakeDrawerState({
     onOpenTicket?.(ticket);
   }
 
-  function selectIntakeTemplate(template: AddIntakeTemplate) {
-    setPickerOpen(false);
-    onSelectIntakeTemplate?.(template);
-  }
-
   return {
     expandedIntakeIds,
     openTicket,
-    pickerOpen,
     settingsIntake: configuredSources.find((intake) => intake.intakeId === settingsIntakeId),
     previewIntake: configuredSources.find((intake) => intake.intakeId === previewIntakeId),
     closePreview: () => setPreviewIntakeId(null),
     closeOpenTicket: () => setOpenTicket(null),
-    closePicker: () => setPickerOpen(false),
     closeSettings: () => setSettingsIntakeId(null),
     openAnalyzingTicket,
     openIntakeRun,
-    openPicker: () => setPickerOpen(true),
     openIntakeGear,
-    selectIntakeTemplate,
     toggleIntake,
   };
 }
@@ -142,7 +128,6 @@ export function LineIntakeDrawer({
   configuredSources = [],
   analyzingTickets = [],
   onOpenTicket,
-  onSelectIntakeTemplate,
   organizationId,
   factoryId,
   editAutomationHref,
@@ -155,7 +140,6 @@ export function LineIntakeDrawer({
     initialSettingsOpen,
     configuredSources,
     onOpenTicket,
-    onSelectIntakeTemplate,
   });
 
   return (
@@ -191,12 +175,10 @@ export function LineIntakeDrawer({
           onToggleIntake={drawer.toggleIntake}
           onOpenGear={drawer.openIntakeGear}
           onOpenAnalyzingTicket={drawer.openAnalyzingTicket}
-          onOpenPicker={drawer.openPicker}
         />
       </aside>
 
       <LineIntakeDrawerPopups
-        pickerOpen={drawer.pickerOpen}
         initialSettingsTab={initialSettingsTab}
         organizationId={organizationId}
         factoryId={factoryId}
@@ -206,8 +188,6 @@ export function LineIntakeDrawer({
         }
         previewSource={drawer.previewIntake?.source ?? previewSource}
         openTicket={drawer.openTicket}
-        onClosePicker={drawer.closePicker}
-        onSelectTemplate={drawer.selectIntakeTemplate}
         onOpenRun={drawer.openIntakeRun}
         onSettingsSaved={onSettingsSaved}
         onCloseSettings={drawer.closeSettings}
@@ -228,7 +208,6 @@ function LineIntakeList({
   onToggleIntake,
   onOpenGear,
   onOpenAnalyzingTicket,
-  onOpenPicker,
 }: {
   organizationId?: string;
   factoryId?: string;
@@ -239,7 +218,6 @@ function LineIntakeList({
   onToggleIntake: (intakeId: string) => void;
   onOpenGear: (intake: ConfiguredLineIntakeSource) => void;
   onOpenAnalyzingTicket: (ticket: LineIntakeAnalyzingTicket) => void;
-  onOpenPicker: () => void;
 }) {
   return (
     <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 [scrollbar-width:thin]">
@@ -257,17 +235,6 @@ function LineIntakeList({
           onOpenAnalyzingTicket={onOpenAnalyzingTicket}
         />
       ))}
-      <li>
-        <button
-          type="button"
-          onClick={onOpenPicker}
-          data-testid="line-intake-add"
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/60 px-3 py-3 text-[13px] font-medium tracking-[-0.01em] text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted hover:text-foreground"
-        >
-          <Plus className="size-3.5 shrink-0" aria-hidden />
-          Add intake
-        </button>
-      </li>
     </ul>
   );
 }
@@ -324,7 +291,6 @@ function IntakeListItem({
 }
 
 function LineIntakeDrawerPopups({
-  pickerOpen,
   initialSettingsTab,
   organizationId,
   factoryId,
@@ -332,15 +298,12 @@ function LineIntakeDrawerPopups({
   editAutomationHref,
   previewSource,
   openTicket,
-  onClosePicker,
-  onSelectTemplate,
   onOpenRun,
   onSettingsSaved,
   onCloseSettings,
   onClosePreview,
   onCloseOpenTicket,
 }: {
-  pickerOpen: boolean;
   initialSettingsTab: IntakeSettingsTab;
   organizationId?: string;
   factoryId?: string;
@@ -348,8 +311,6 @@ function LineIntakeDrawerPopups({
   editAutomationHref?: string;
   previewSource?: LineIntakeSource;
   openTicket: LineIntakeAnalyzingTicket | null;
-  onClosePicker: () => void;
-  onSelectTemplate: (template: AddIntakeTemplate) => void;
   onOpenRun: (run: IntakeAutomationRun) => void;
   onSettingsSaved?: () => void;
   onCloseSettings: () => void;
@@ -378,7 +339,6 @@ function LineIntakeDrawerPopups({
 
   return (
     <>
-      <AddIntakePicker open={pickerOpen} onClose={onClosePicker} onSelect={onSelectTemplate} />
       {settingsIntake ? (
         <IntakeSourceSettingsPopup
           key={settingsIntake.intakeId}
