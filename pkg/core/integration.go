@@ -171,6 +171,7 @@ type SyncContext struct {
 	BaseURL         string
 	WebhooksBaseURL string
 	OrganizationID  string
+	ActorUserID     string
 	HTTP            HTTPContext
 	Integration     IntegrationContext
 	OIDC            oidc.Provider

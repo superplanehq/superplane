@@ -7,16 +7,19 @@ import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
 import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { showErrorToast } from "@/lib/toast";
 import { analytics } from "@/lib/analytics";
-import { isCapabilityBasedIntegrationDefinition } from "@/lib/integrations";
+import { isCapabilityBasedIntegrationDefinition, usesHostedGitHubAppInstall } from "@/lib/integrations";
 import { posthog, isPostHogEnabled } from "@/posthog";
 import { integrationDetailPath, integrationSetupPath, useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
 import { buildIntegrationCatalog, filterIntegrationCatalog, integrationNameSet } from "@/lib/integrationCatalog";
+import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
+import { useMe } from "@/hooks/useMe";
 
 const INTEGRATION_SURVEY_NAME = "Integration Survey";
 
 export function useIntegrationCatalog(organizationId: string) {
   const navigate = useNavigate();
+  const { data: me } = useMe();
   const integrationsBasePath = useIntegrationsBasePath(organizationId);
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationDefinition | null>(null);
@@ -50,6 +53,8 @@ export function useIntegrationCatalog(organizationId: string) {
     navigate,
     canCreateIntegrations,
     canUpdateIntegrations,
+    currentUserId: me?.id,
+    organizationIntegrations,
     integrationNames,
     selectedIntegration,
     setSelectedIntegration,
@@ -112,6 +117,8 @@ function useIntegrationCatalogActions({
   navigate,
   canCreateIntegrations,
   canUpdateIntegrations,
+  currentUserId,
+  organizationIntegrations,
   integrationNames,
   selectedIntegration,
   setSelectedIntegration,
@@ -127,6 +134,8 @@ function useIntegrationCatalogActions({
   navigate: ReturnType<typeof useNavigate>;
   canCreateIntegrations: boolean;
   canUpdateIntegrations: boolean;
+  currentUserId?: string;
+  organizationIntegrations: ReturnType<typeof useConnectedIntegrations>["data"];
   integrationNames: Set<string>;
   selectedIntegration: IntegrationsIntegrationDefinition | null;
   setSelectedIntegration: (integration: IntegrationsIntegrationDefinition | null) => void;
@@ -140,6 +149,25 @@ function useIntegrationCatalogActions({
   return {
     handleConnectClick: (integration: IntegrationsIntegrationDefinition) => {
       if (!canCreateIntegrations) {
+        return;
+      }
+      if (usesHostedGitHubAppInstall(integration)) {
+        analytics.integrationConnectStart("github", "integrations_page", organizationId);
+        void startDirectGitHubConnect({
+          organizationId,
+          returnTo: integrationsBasePath,
+          integrationsBasePath,
+          existingNames: integrationNames,
+          connected: organizationIntegrations ?? [],
+          currentUserId,
+          goTo: navigate,
+          create: async (payload) => {
+            const response = await createIntegrationMutation.mutateAsync(payload);
+            return response.data;
+          },
+        }).catch((error) => {
+          showErrorToast(getUsageLimitToastMessage(error, "Failed to connect GitHub"));
+        });
         return;
       }
       if (isCapabilityBasedIntegrationDefinition(integration)) {
