@@ -324,6 +324,34 @@ describe("LineIntakeDrawer", () => {
     expect(within(analyzing).queryByText("Already in Backlog")).not.toBeInTheDocument();
   });
 
+  it("keeps live tickets below the minimum confidence in the Intake list", () => {
+    intakeRuns([
+      { id: "run-1", title: "Handle duplicate refunds on retry", placement: "PLACEMENT_ANALYZING" },
+      { id: "run-2", title: "Already in Backlog", placement: "PLACEMENT_BACKLOG" },
+      {
+        id: "run-3",
+        title: "Document the refund webhook contract",
+        placement: "PLACEMENT_BELOW_THRESHOLD",
+        confidencePct: 52,
+      },
+    ]);
+    renderDrawer({
+      configuredSources: [GITHUB_INTAKE],
+      initialIntakeId: "intake-github",
+      organizationId: "org-1",
+      factoryId: "factory-1",
+    });
+
+    const analyzing = screen.getByTestId("line-intake-analyzing");
+    expect(within(analyzing).getByText("Handle duplicate refunds on retry")).toBeInTheDocument();
+    expect(within(analyzing).queryByText("Already in Backlog")).not.toBeInTheDocument();
+    expect(within(analyzing).getByTestId("line-intake-below-threshold-icon")).toBeInTheDocument();
+    expect(within(analyzing).getByTestId("line-intake-ticket-score-run-3")).toHaveAttribute("aria-valuenow", "3");
+    expect(
+      within(screen.getByTestId("line-intake-source-intake-github")).getByText("1 Not accepted"),
+    ).toBeInTheDocument();
+  });
+
   // A ticket that scores under the minimum confidence never reaches Backlog.
   // It stays under the analyzing tickets so a reader can see what was left out.
   it("keeps tickets below the minimum confidence at the bottom with their score", () => {
