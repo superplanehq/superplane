@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { automationsPath, linesPath } from "../lib/factoryPagePaths";
 import { NewComponentButton, SelectComponentSidebar } from "./SelectComponentSidebar";
 import { WorkOrderCanvas } from "./WorkOrderCanvas";
 
@@ -16,9 +17,9 @@ type ConfigureLocationState = {
  */
 export function ConfigureAutomationPage() {
   const navigate = useNavigate();
-  const { organizationId, factoryId, lineId, phaseId, automationId } = useParams<{
+  const { organizationId, factoryKey, lineId, phaseId, automationId } = useParams<{
     organizationId?: string;
-    factoryId?: string;
+    factoryKey?: string;
     lineId?: string;
     phaseId?: string;
     automationId?: string;
@@ -29,10 +30,10 @@ export function ConfigureAutomationPage() {
 
   const isStandalone = Boolean(automationId);
   const backTo =
-    organizationId && factoryId
+    organizationId && factoryKey
       ? isStandalone
-        ? `/${organizationId}/workspaces/${factoryId}/automations`
-        : `/${organizationId}/workspaces/${factoryId}/lines`
+        ? automationsPath(organizationId, factoryKey)
+        : linesPath(organizationId, factoryKey)
       : isStandalone
         ? "/automations"
         : "/lines";
