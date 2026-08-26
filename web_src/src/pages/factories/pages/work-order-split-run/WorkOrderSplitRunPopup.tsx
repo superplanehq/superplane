@@ -30,13 +30,18 @@ import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
 function footerMutationHandlers(
   canUpdate: boolean,
   footerActions: ReturnType<typeof useSplitRunFooterActions>,
-  footer: SplitRunFixture["footer"],
+  fixture: SplitRunFixture,
 ) {
   if (!canUpdate) {
     return { onStop: undefined, onReject: undefined };
   }
   return {
-    onStop: (choice: Parameters<typeof footerActions.handleStop>[0]) => void footerActions.handleStop(choice, footer),
+    onStop: (choice: Parameters<typeof footerActions.handleStop>[0]) =>
+      void footerActions.handleStop(choice, {
+        ...fixture.footer,
+        lineName: fixture.lineName,
+        stepIndex: fixture.currentStepIndex,
+      }),
     onReject: footerActions.handleReject,
   };
 }
@@ -68,7 +73,7 @@ export function WorkOrderSplitRunBody({
   canUpdate = true,
 }: WorkOrderSplitRunBodyProps) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
-  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture.footer);
+  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture);
   const [phaseId, setPhaseId] = useState<SplitRunPhaseId>(fixture.currentPhaseId);
   const [openPhaseId, setOpenPhaseId] = useState<SplitRunPhaseId | null>(() => autoExpandedPhaseId(fixture));
   const [nodeId, setNodeId] = useState<string | null>(null);
@@ -162,7 +167,7 @@ export function WorkOrderSplitRunPopup({
   fixed?: boolean;
 }) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
-  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture.footer);
+  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture);
   const fixtureArtifacts = collectSplitRunArtifacts(fixture);
   const useLiveArtifacts = Boolean(organizationId && factoryId && orderId);
   const liveArtifactsQuery = useWorkOrderArtifacts(organizationId ?? "", factoryId ?? "", orderId ?? "");

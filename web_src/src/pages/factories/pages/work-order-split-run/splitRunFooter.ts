@@ -8,7 +8,7 @@ export type SplitRunFooterTone = SplitRunFooterKind;
 
 export type SplitRunFooterActionKind = "start" | "reject" | "stop" | "reopen";
 
-export type SplitRunStopChoice = "canceled" | "completed" | "draft" | "reopen";
+export type SplitRunStopChoice = "canceled" | "completed" | "rerun-step" | "rerun-start" | "reopen";
 
 export const DEFAULT_SPLIT_RUN_STOP_CHOICE: SplitRunStopChoice = "canceled";
 
@@ -17,14 +17,14 @@ export type SplitRunStopChoiceItem = {
   label: string;
   actionLabel: string;
   description: string;
-  status: "cancelled" | "completed" | "draft";
+  status: "cancelled" | "completed" | "draft" | "running";
 };
 
 export const SPLIT_RUN_STOP_CHOICES: SplitRunStopChoiceItem[] = [
   {
     id: "canceled",
     label: "Stop as Canceled",
-    actionLabel: "Stop & Cancel",
+    actionLabel: "Stop & Close",
     description: "Marks this task as Canceled",
     status: "cancelled",
   },
@@ -36,11 +36,18 @@ export const SPLIT_RUN_STOP_CHOICES: SplitRunStopChoiceItem[] = [
     status: "completed",
   },
   {
-    id: "draft",
-    label: "Stop and return to Draft",
-    actionLabel: "Return to Draft",
-    description: "Returns this task to Backlog",
-    status: "draft",
+    id: "rerun-step",
+    label: "Rerun this step",
+    actionLabel: "Rerun step",
+    description: "Starts this step again",
+    status: "running",
+  },
+  {
+    id: "rerun-start",
+    label: "Rerun from the start",
+    actionLabel: "Rerun from start",
+    description: "Starts this task from the first step",
+    status: "running",
   },
 ];
 
@@ -51,6 +58,17 @@ export const SPLIT_RUN_REOPEN_CHOICE: SplitRunStopChoiceItem = {
   description: "Opens this work order again",
   status: "draft",
 };
+
+export function isSplitRunRerunChoice(choice: SplitRunStopChoice): choice is "rerun-step" | "rerun-start" {
+  return choice === "rerun-step" || choice === "rerun-start";
+}
+
+export function rerunStartStepIndex(choice: SplitRunStopChoice, currentStepIndex = 0): number {
+  if (choice === "rerun-start") {
+    return 0;
+  }
+  return Math.max(0, currentStepIndex);
+}
 
 export function isClosedWorkOrderDisplayStatus(status?: WorkOrderDisplayStatus): boolean {
   return status === "completed" || status === "failed" || status === "rejected" || status === "cancelled";

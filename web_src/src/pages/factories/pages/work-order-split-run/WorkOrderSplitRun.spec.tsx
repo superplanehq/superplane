@@ -355,7 +355,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).queryByRole("button", { name: /Update manually/ })).not.toBeInTheDocument();
     expect(within(footer).queryByRole("heading", { name: "Listening for user review" })).not.toBeInTheDocument();
     expect(within(footer).getByText("This work order needs attention.")).toBeInTheDocument();
-    expect(within(footer).getByRole("button", { name: "Stop & Cancel" })).toBeInTheDocument();
+    expect(within(footer).getByRole("button", { name: "Stop & Close" })).toBeInTheDocument();
   });
 
   it("hides Stop when the user cannot update the work order", () => {
@@ -364,7 +364,7 @@ describe("WorkOrderSplitRunPopup", () => {
       canUpdate: false,
     });
 
-    expect(screen.queryByRole("button", { name: "Stop & Cancel" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Stop & Close" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stop")).not.toBeInTheDocument();
   });
 
@@ -390,7 +390,7 @@ describe("WorkOrderSplitRunPopup", () => {
     );
     expect(within(footer).getByText("This work order needs attention.")).toBeInTheDocument();
     expect(within(footer).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
-    expect(within(footer).queryByRole("button", { name: "Stop & Cancel" })).not.toBeInTheDocument();
+    expect(within(footer).queryByRole("button", { name: "Stop & Close" })).not.toBeInTheDocument();
   });
 
   it("offers one Stop control with Canceled as the default outcome", async () => {
@@ -399,7 +399,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const footer = screen.getByTestId("split-run-review");
     expect(within(footer).getByTestId("split-run-stop")).toHaveClass("bg-primary", "overflow-hidden", "rounded-md");
-    expect(within(footer).getByRole("button", { name: "Stop & Cancel" })).toBeInTheDocument();
+    expect(within(footer).getByRole("button", { name: "Stop & Close" })).toBeInTheDocument();
     expect(within(footer).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
     expect(within(footer).queryByRole("button", { name: "Stop and send to Draft" })).not.toBeInTheDocument();
 
@@ -408,11 +408,13 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(menu).getByRole("menuitem", { name: /Stop as Canceled/ })).toHaveAttribute("data-selected", "true");
     expect(within(menu).getByText("Marks this task as Canceled")).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: /Stop as Completed/ })).toHaveAttribute("data-selected", "false");
-    expect(within(menu).getByRole("menuitem", { name: /Stop and return to Draft/ })).toHaveAttribute(
+    expect(within(menu).getByRole("menuitem", { name: /Rerun this step/ })).toHaveAttribute("data-selected", "false");
+    expect(within(menu).getByText("Starts this step again")).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /Rerun from the start/ })).toHaveAttribute(
       "data-selected",
       "false",
     );
-    expect(within(menu).getByText("Returns this task to Backlog")).toBeInTheDocument();
+    expect(within(menu).getByText("Starts this task from the first step")).toBeInTheDocument();
 
     await user.click(within(menu).getByRole("menuitem", { name: /Stop as Completed/ }));
     expect(within(footer).getByRole("button", { name: "Mark as Complete" })).toBeInTheDocument();

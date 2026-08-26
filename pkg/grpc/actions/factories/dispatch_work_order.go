@@ -79,22 +79,34 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return models.ErrFactoryLineHasNoSteps
 		}
 
-		_, err = order.FindActiveLineDispatch(tx)
-		if err == nil {
-			return models.ErrFactoryWorkOrderLineDispatchActive
-		}
-
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-
-		// Promote draft → open before the first step; no-op if already open.
+		startIndex := int(req.GetStartStepIndex())
 		fromState = order.State
 		if err := order.TransitionOnDispatch(tx, actor); err != nil {
 			return err
 		}
 
-		_, result, err := line.Dispatch(tx, order)
+		if req.GetReplaceActive() && startIndex > 0 {
+			result, err := order.RetryLineStep(tx, line, startIndex)
+			if err != nil {
+				return err
+			}
+			pendingRun = result.Run
+			return nil
+		}
+
+		_, err = order.FindActiveLineDispatch(tx)
+		if err == nil {
+			if !req.GetReplaceActive() {
+				return models.ErrFactoryWorkOrderLineDispatchActive
+			}
+			if err := order.AbandonActiveLineDispatch(tx); err != nil {
+				return err
+			}
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		_, result, err := line.DispatchFrom(tx, order, startIndex)
 		if err != nil {
 			return err
 		}
