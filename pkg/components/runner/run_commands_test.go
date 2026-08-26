@@ -451,7 +451,7 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 	require.NoError(t, json.Unmarshal(body, &req))
 
 	assert.Equal(t, testRunnerMachineType, req.FleetID)
-	assert.Equal(t, []BrokerCommand{{Command: "echo hello"}}, req.Commands)
+	assert.Equal(t, []BrokerCommand{{Command: "echo hello", Kind: LiveLogKindBash, Preview: "echo hello"}}, req.Commands)
 	assert.Equal(t, config.MaxWebhookPayloadSize, req.WebhookPayloadSizeLimit)
 	assert.Equal(t, map[string]string{
 		"canvas_id":       "canvas-1",

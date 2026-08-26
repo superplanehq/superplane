@@ -78,12 +78,12 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
       />
       <div ref={model.split.containerRef} className="flex min-h-0 flex-1 overflow-hidden">
         <aside
-          className="flex min-h-0 min-w-[12rem] flex-col border-r border-border bg-muted/25"
+          className="flex min-h-0 min-w-[12rem] flex-col overflow-hidden border-r border-border bg-muted/25"
           style={{ width: `${model.split.percent}%` }}
           aria-label="Log"
         >
-          <ol className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-            <li>
+          <ol className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-3">
+            <li className="min-w-0">
               <PhaseLogCard
                 phase={model.phase}
                 expanded
@@ -91,6 +91,8 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
                 stream={model.stream}
                 selectedNodeId={model.nodeId}
                 onSelectNode={model.setNodeId}
+                organizationId={model.organizationId}
+                canvasId={model.phase.appId}
               />
             </li>
           </ol>
