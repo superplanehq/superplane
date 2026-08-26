@@ -389,6 +389,60 @@ func Test__FactoryWorkOrder__RetryLineStep__ReusesDispatchWithEarlierSteps(t *te
 	assert.Equal(t, 1, planCount)
 }
 
+func Test__FactoryWorkOrder__RetryLineStep__EndsTheTraversalOnAnotherLine(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(db, "Improve AGENTS.md", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "plan", "start-plan")
+	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start-implement")
+	steps := []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+	}
+
+	ship, err := factory.CreateLine(db, "ship", steps)
+	require.NoError(t, err)
+	hotfix, err := factory.CreateLine(db, "hotfix", steps)
+	require.NoError(t, err)
+
+	var shipDispatch *models.FactoryWorkOrderLineDispatch
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		var dispatchErr error
+		shipDispatch, _, dispatchErr = ship.Dispatch(tx, order)
+		return dispatchErr
+	}))
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, _, retryErr := order.RetryLineStep(tx, hotfix, 1)
+		return retryErr
+	}))
+
+	active, err := order.FindActiveLineDispatch(db)
+	require.NoError(t, err)
+	assert.Equal(t, hotfix.ID, active.LineID, "the rerun opens the traversal on the requested line")
+
+	byOrder, err := models.ListWorkOrderLineDispatchesByWorkOrderIDs(db, []uuid.UUID{order.ID})
+	require.NoError(t, err)
+	var activeCount int
+	for _, record := range byOrder[order.ID] {
+		if record.State == models.FactoryWorkOrderLineDispatchStateActive {
+			activeCount++
+		}
+	}
+	assert.Equal(t, 1, activeCount, "a work order can only have one active traversal")
+
+	reloaded, err := models.FindWorkOrderLineDispatch(db, shipDispatch.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateFinished, reloaded.State)
+	assert.Equal(t, models.CanvasRunResultCancelled, reloaded.Result)
+}
+
 func Test__FactoryWorkOrder__RetryLineStep__SettlesInFlightStepBeforeRerun(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

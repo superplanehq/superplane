@@ -388,11 +388,18 @@ func (o *FactoryWorkOrder) AbandonActiveLineDispatch(tx *gorm.DB) ([]*FactoryLin
 		return nil, err
 	}
 
+	// Release before finish, so every path takes the line admission lock
+	// before the dispatch row and the two cannot deadlock.
+	released, err := dispatch.releaseOpenWorkFrom(tx, 0)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := dispatch.Finish(tx, CanvasRunResultCancelled); err != nil {
 		return nil, err
 	}
 
-	return dispatch.releaseOpenWorkFrom(tx, 0)
+	return released, nil
 }
 
 // RetryLineStep starts stepIndex again on a traversal that already ran
@@ -417,10 +424,22 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 		}
 	}
 
+	// The order never ran this line, so there is no history to keep. A
+	// traversal on another line is still the one active traversal of the
+	// order, so it must end before the new one opens.
 	target := pickDispatchForStepRetry(onLine, stepIndex)
 	if target == nil {
+		abandoned, err := o.AbandonActiveLineDispatch(tx)
+		if err != nil {
+			return nil, nil, err
+		}
+
 		_, result, err := line.DispatchFrom(tx, o, stepIndex)
-		return result, startedLineStepResults(result), err
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return result, append(abandoned, startedLineStepResults(result)...), nil
 	}
 
 	var started []*FactoryLineStepResult
@@ -435,15 +454,17 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 		return nil, nil, err
 	}
 
-	if err := target.Reactivate(tx); err != nil {
-		return nil, nil, err
-	}
-
+	// Release before reactivate, so every path takes the line admission
+	// lock before the dispatch row and the two cannot deadlock.
 	released, err := target.releaseOpenWorkFrom(tx, stepIndex)
 	if err != nil {
 		return nil, nil, err
 	}
 	started = append(started, released...)
+
+	if err := target.Reactivate(tx); err != nil {
+		return nil, nil, err
+	}
 
 	result, err := target.EnqueueOrStartStep(tx, o, stepIndex)
 	if err != nil {
@@ -579,6 +600,61 @@ func FindWorkOrderLineDispatch(tx *gorm.DB, id uuid.UUID) (*FactoryWorkOrderLine
 	}
 
 	return &dispatch, nil
+}
+
+// LockWorkOrderLineDispatch reads the traversal with a row lock. The
+// finalizer takes it before it decides how the traversal continues, so a
+// rerun cannot reactivate the traversal and start a step between the
+// open-work check and the state change.
+func LockWorkOrderLineDispatch(tx *gorm.DB, id uuid.UUID) (*FactoryWorkOrderLineDispatch, error) {
+	var dispatch FactoryWorkOrderLineDispatch
+	err := tx.
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", id).
+		First(&dispatch).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryWorkOrderLineDispatchNotFound
+		}
+		return nil, err
+	}
+
+	return &dispatch, nil
+}
+
+// HasOpenWork reports whether a step of the traversal is queued, pending,
+// or running. A traversal with open work has a live owner: it must not
+// finish, and no other step run may advance it.
+func (l *FactoryWorkOrderLineDispatch) HasOpenWork(tx *gorm.DB) (bool, error) {
+	var executions int64
+	err := tx.
+		Model(&FactoryWorkOrderExecution{}).
+		Where("line_dispatch_id = ?", l.ID).
+		Where("status IN ?", []string{
+			FactoryWorkOrderExecutionStatusPending,
+			FactoryWorkOrderExecutionStatusRunning,
+		}).
+		Count(&executions).
+		Error
+	if err != nil {
+		return false, err
+	}
+	if executions > 0 {
+		return true, nil
+	}
+
+	var queued int64
+	err = tx.
+		Model(&FactoryWorkOrderQueueItem{}).
+		Where("line_dispatch_id = ?", l.ID).
+		Count(&queued).
+		Error
+	if err != nil {
+		return false, err
+	}
+
+	return queued > 0, nil
 }
 
 // FactoryWorkOrderLineDispatchRecord is a line dispatch with its child step

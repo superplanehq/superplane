@@ -747,6 +747,77 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__KeepsDispatchAfterSettledSt
 	assert.Empty(t, reloaded.Result)
 }
 
+// A rerun can start a step on the traversal while the run of an earlier
+// step is finalized. The finalizer must leave that traversal alone: it
+// must not cancel the live step, and it must not open a second one.
+func Test__RunFinalizer__ExecuteNextFactoryLineStep__KeepsDispatchWithOpenStep(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
+
+	line, err := factory.CreateLine(database.Conn(), "ship", nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
+	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
+	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+	}))
+
+	var dispatch *models.FactoryWorkOrderLineDispatch
+	var finalized *models.FactoryLineStepResult
+	var stillOpen *models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var dispatchErr error
+		dispatch, finalized, dispatchErr = line.Dispatch(tx, order)
+		if dispatchErr != nil {
+			return dispatchErr
+		}
+		var startErr error
+		stillOpen, startErr = dispatch.EnqueueOrStartStep(tx, order, 1)
+		return startErr
+	}))
+	require.NotNil(t, finalized.Run)
+	require.NotNil(t, stillOpen.Run)
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(finalized.Run).Updates(map[string]any{
+		"state":       models.CanvasRunStateFinished,
+		"result":      models.CanvasRunResultCancelled,
+		"updated_at":  &now,
+		"finished_at": &now,
+	}).Error)
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		_, _, advanceErr := finalizer.executeNextFactoryLineStep(tx, finalized.Run.ID)
+		return advanceErr
+	}))
+
+	reloaded, err := models.FindWorkOrderLineDispatch(database.Conn(), dispatch.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateActive, reloaded.State)
+	assert.Empty(t, reloaded.Result)
+
+	open, err := models.FindWorkOrderExecutionByRunID(database.Conn(), stillOpen.Run.ID)
+	require.NoError(t, err)
+	assert.NotEqual(t, models.FactoryWorkOrderExecutionStatusFinished, open.Status,
+		"the step the rerun started keeps running")
+
+	settled, err := models.FindWorkOrderExecutionByRunID(database.Conn(), finalized.Run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, settled.Status,
+		"the finished run still records its own step as finished")
+}
+
 func testExecuteNextFactoryLineStepFinishesDispatchWithResult(t *testing.T, terminalResult string) {
 	r := support.Setup(t)
 	defer r.Close()
