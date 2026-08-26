@@ -8,6 +8,7 @@ import type { ConfigurationField } from "../../api-client";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { toTestId } from "@/lib/testID";
 import { type RefObject, useEffect, useMemo, useState } from "react";
+import { resolveExpressionQuickTip } from "./expressionQuickTip";
 
 interface IntegrationResourceFieldRendererProps {
   field: ConfigurationField;
@@ -230,7 +231,7 @@ export const IntegrationResourceFieldRenderer = ({
         suffix=" }}"
         inputSize="md"
         showValuePreview
-        quickTip="Tip: type {{ to start an expression."
+        quickTip={resolveExpressionQuickTip(field, allowExpressions ?? false)}
         className=""
       />
     );

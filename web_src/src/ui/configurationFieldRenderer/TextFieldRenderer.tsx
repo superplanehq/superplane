@@ -11,6 +11,7 @@ import { toTestId } from "@/lib/testID";
 import { useTheme } from "@/contexts/useTheme";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
+import { resolveExpressionQuickTip } from "./expressionQuickTip";
 
 const PLAIN_TEXT_MIN_HEIGHT_PX = 120;
 
@@ -98,7 +99,7 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
       minHeight={PLAIN_TEXT_MIN_HEIGHT_PX}
       showValuePreview
       valuePreviewLabel={valuePreviewLabel}
-      quickTip="Tip: type `{{` to start an expression."
+      quickTip={resolveExpressionQuickTip(field, allowExpressions)}
       excludedSuggestions={excludedSuggestions}
       data-testid={toTestId(testId)}
     />
@@ -141,7 +142,7 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
               inputSize="md"
               showValuePreview
               valuePreviewLabel={valuePreviewLabel}
-              quickTip="Tip: type `{{` to start an expression."
+              quickTip={resolveExpressionQuickTip(field, allowExpressions)}
               excludedSuggestions={excludedSuggestions}
               fullHeight
               data-testid={toTestId(`${testId}-modal-input`)}

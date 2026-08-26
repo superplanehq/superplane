@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { FieldRendererProps } from "./types";
 import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
+import { resolveExpressionQuickTip } from "./expressionQuickTip";
 
 interface Predicate {
   type: string;
@@ -69,7 +70,7 @@ export const AnyPredicateListFieldRenderer: React.FC<FieldRendererProps> = ({
                 suffix=" }}"
                 inputSize="md"
                 showValuePreview
-                quickTip="Tip: type `{{` to start an expression."
+                quickTip={resolveExpressionQuickTip(field, allowExpressions)}
                 className=""
               />
             ) : (
