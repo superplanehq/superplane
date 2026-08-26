@@ -8,6 +8,7 @@ import {
   LINE_RUN_IMPLEMENT_FAILED_ID,
   LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID,
   LINE_RUN_IMPLEMENT_ID,
+  LINE_RUN_IMPLEMENT_NOTIFY_ID,
   LINE_RUN_IMPLEMENT_PASSED_ID,
   LINE_RUN_VERIFY_PASSED_ID,
   PRIMARY_FACTORY_ID,
@@ -28,6 +29,7 @@ export {
   LINE_RUN_IMPLEMENT_FAILED_ID,
   LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID,
   LINE_RUN_IMPLEMENT_ID,
+  LINE_RUN_IMPLEMENT_NOTIFY_ID,
   LINE_RUN_IMPLEMENT_PASSED_ID,
   LINE_RUN_VERIFY_PASSED_ID,
 };
@@ -112,6 +114,15 @@ export function refundFactoryLineRuns(): NonNullable<CanvasAppFixture["runs"]> {
         },
       },
       {
+        id: LINE_RUN_IMPLEMENT_NOTIFY_ID,
+        canvasId: implementerId,
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        createdAt: HOUR_AGO,
+        updatedAt: HOUR_AGO,
+        rootEvent: { customName: "Notify on status change after a reopen" },
+      },
+      {
         id: LINE_RUN_IMPLEMENT_PASSED_ID,
         canvasId: implementerId,
         state: "STATE_FINISHED",
@@ -130,7 +141,7 @@ export function refundFactoryLineRuns(): NonNullable<CanvasAppFixture["runs"]> {
         rootEvent: { customName: "Backfill refund audit trail" },
       },
     ],
-    totalCount: 4,
+    totalCount: 5,
     hasNextPage: false,
   };
 }

@@ -25,6 +25,7 @@ import {
   YESTERDAY,
 } from "./factoryPageResponses";
 import { OPEN_WORK_ORDER_ARTIFACTS } from "./factoryPageFixtureVariants";
+import { BOARD_IMPLEMENT_NOTIFY_ORDER } from "./lineMetricsBoardOrders";
 
 const REFUND_LINE = { id: "line-plan-and-implement", name: "plan-and-implement" };
 
@@ -600,4 +601,5 @@ export const DEFAULT_ARTIFACTS_BY_ORDER_ID: Record<string, FactoriesWorkOrderArt
   [INGEST_DRAFT_WORK_ORDER.id!]: [descriptionArtifact(INGEST_DRAFT_WORK_ORDER)],
   [SENTRY_DRAFT_WORK_ORDER.id!]: [descriptionArtifact(SENTRY_DRAFT_WORK_ORDER)],
   [SLACK_DRAFT_WORK_ORDER.id!]: [descriptionArtifact(SLACK_DRAFT_WORK_ORDER)],
+  [BOARD_IMPLEMENT_NOTIFY_ORDER.id!]: [descriptionArtifact(BOARD_IMPLEMENT_NOTIFY_ORDER)],
 };
