@@ -61,14 +61,22 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 	logger = logging.WithWorkOrder(logger, *order)
 	fromState := order.State
 	wasClosed := order.IsClosed()
-	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to close work order")
-	}
 
 	order, err = order.Close(db, result, &closedBy)
 	if err != nil {
 		logger.WithError(err).Error("close work order failed")
+		return nil, factoryErrorToStatus(err, "failed to close work order")
+	}
+
+	refreshed, err := factory.FindWorkOrder(db, orderID)
+	if errors.Is(err, models.ErrFactoryWorkOrderNotFound) {
+		serialized, err := serializeWorkOrder(factory, order, nil, nil)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to close work order")
+		}
+		return &pb.CloseWorkOrderResponse{Order: serialized}, nil
+	}
+	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
@@ -78,14 +86,6 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 		factoryevents.EventTypeOrderStatusUpdated,
 	); err != nil {
 		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
-	}
-
-	refreshed, err := factory.FindWorkOrder(db, orderID)
-	if errors.Is(err, models.ErrFactoryWorkOrderNotFound) {
-		return &pb.CloseWorkOrderResponse{Order: serialized}, nil
-	}
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
 	if !wasClosed {
@@ -104,7 +104,7 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 		}
 	}
 
-	serialized, err = loadAndSerializeWorkOrder(ctx, factory, refreshed)
+	serialized, err := loadAndSerializeWorkOrder(ctx, factory, refreshed)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}

@@ -339,6 +339,19 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 	fromResult := o.Result
 	now := time.Now()
 
+	if toState == FactoryWorkOrderStateClosed && nextResult == FactoryWorkOrderResultRejected {
+		discarded, err := o.DiscardIfNeverRan(db)
+		if err != nil {
+			return false, err
+		}
+		if discarded {
+			o.State = FactoryWorkOrderStateClosed
+			o.Result = FactoryWorkOrderResultRejected
+			o.UpdatedAt = now
+			return true, nil
+		}
+	}
+
 	err := db.Transaction(func(tx *gorm.DB) error {
 		// Reverting `open → draft` while a line dispatch is still active would
 		// desync the FSM from the executor. Mirror the dispatch guard here.
@@ -432,16 +445,6 @@ func (o *FactoryWorkOrder) loadSourceRunRefs(tx *gorm.DB) (*factory.RunRef, *fac
 func (o *FactoryWorkOrder) Close(db *gorm.DB, result string, closedBy *uuid.UUID) (*FactoryWorkOrder, error) {
 	if o.IsClosed() {
 		return o, nil
-	}
-
-	if result == FactoryWorkOrderResultRejected {
-		discarded, err := o.DiscardIfNeverRan(db)
-		if err != nil {
-			return nil, err
-		}
-		if discarded {
-			return o, nil
-		}
 	}
 
 	if _, err := o.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
