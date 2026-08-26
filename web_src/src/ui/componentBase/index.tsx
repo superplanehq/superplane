@@ -65,6 +65,8 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   metadata?: MetadataItem[];
   /** Custom content rendered on the node */
   customField?: React.ReactNode | (() => React.ReactNode);
+  /** Extra body content for the larger factory node card. */
+  factoryBody?: React.ReactNode;
   /** Where to render customField: "before" (before events) or "after" (after events, default) */
   customFieldPosition?: "before" | "after";
   /** Whether the custom field should only be shown in live mode */
@@ -128,6 +130,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = (props) => {
         showRuntimeStatus={props.showRuntimeStatus}
         runIsActive={props.runIsActive}
         eventStateMap={props.eventStateMap}
+        body={props.factoryBody}
       />
     );
   }

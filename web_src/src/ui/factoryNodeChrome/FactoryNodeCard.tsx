@@ -53,6 +53,8 @@ export type FactoryNodeCardProps = {
   runIsActive?: boolean;
   /** Mapper eventStateMap — same source the run sidebar uses for badge color. */
   eventStateMap?: EventStateMap;
+  /** Optional content between the node header and status footer. */
+  body?: React.ReactNode;
 };
 
 function useFactoryNodeMetrics(
@@ -140,6 +142,7 @@ export function FactoryNodeCard({
   showRuntimeStatus = true,
   runIsActive = true,
   eventStateMap,
+  body,
 }: FactoryNodeCardProps) {
   const primarySection = eventSections?.[0];
   const runtimeStatus = resolveFactoryRuntimeStatus({
@@ -186,6 +189,7 @@ export function FactoryNodeCard({
         dimBodyBelowHeader={dimBodyBelowHeader}
         isCompactView={isCompactView}
         showStatusFooter={footer.showStatusFooter}
+        body={body}
       />
     </div>
   );

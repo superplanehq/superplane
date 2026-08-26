@@ -14,6 +14,7 @@ import { FACTORY_HANDLE_OUTSET_PX } from "@/ui/CanvasPage/Block/handleStyle";
 import { CustomEdge } from "@/ui/CanvasPage/CustomEdge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { FactoryNodeCardShell } from "@/ui/factoryNodeChrome/FactoryNodeCardShell";
+import { FactoryNodeStepList } from "@/ui/factoryNodeChrome/FactoryNodeStepList";
 
 import { COMPACT_CANVAS_FIT_SETTLE_MS, compactCanvasFitKey, shouldFitCompactCanvas } from "./compactCanvasFit";
 import { compactLineCanvasGraph, type LineNodeData } from "./compactLineCanvasGraph";
@@ -74,6 +75,7 @@ function LineCanvasNode({ data }: NodeProps<Node<LineNodeData>>) {
           status={data.status}
           metrics={data.metrics}
           selected={data.isSelected}
+          body={data.steps.length > 0 ? <FactoryNodeStepList steps={data.steps} /> : undefined}
         />
         <Handle
           id={FACTORY_SPINE_HANDLE_ID}
