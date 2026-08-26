@@ -15,6 +15,7 @@ import {
   firstFactoryLineId,
   firstFactoryLineName,
   legacyWorkOrderDetailPath,
+  organizationSettingsBackPath,
   organizationSettingsPath,
   organizationSettingsSectionPath,
   parseFactoryAppNavFrom,
@@ -190,8 +191,13 @@ describe("parseFactoryAppNavFrom", () => {
 });
 
 describe("organizationSettingsPath", () => {
-  it("builds organization settings under the current workspace", () => {
-    expect(organizationSettingsPath("org-1", "RF")).toBe("/org-1/workspaces/RF/organization");
-    expect(organizationSettingsSectionPath("org-1", "RF", "general")).toBe("/org-1/workspaces/RF/organization/general");
+  it("builds organization settings under the organization, not a workspace", () => {
+    expect(organizationSettingsPath("org-1")).toBe("/org-1/organization");
+    expect(organizationSettingsSectionPath("org-1", "general")).toBe("/org-1/organization/general");
+  });
+
+  it("returns to the workspace when settings opened from a factory, otherwise the list", () => {
+    expect(organizationSettingsBackPath("org-1", "RF")).toBe("/org-1/workspaces/RF");
+    expect(organizationSettingsBackPath("org-1")).toBe("/org-1/workspaces");
   });
 });

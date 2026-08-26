@@ -14,12 +14,15 @@ import (
 const (
 	LLMCreditGrantKindWelcome = "welcome"
 	LLMCreditGrantKindAdmin   = "admin"
+	LLMCreditGrantKindPolar   = "polar"
 )
 
 var (
-	ErrHostedCreditEmpty      = errors.New("hosted LLM credit is empty")
-	ErrHostedRunInFlight      = errors.New("another hosted LLM run is already in progress")
-	ErrCreditGrantNotPositive = errors.New("credit grant must be greater than zero")
+	ErrHostedCreditEmpty        = errors.New("hosted LLM credit is empty")
+	ErrHostedRunInFlight        = errors.New("another hosted LLM run is already in progress")
+	ErrCreditGrantNotPositive   = errors.New("credit grant must be greater than zero")
+	ErrFactoryHostedBudgetEmpty = errors.New("this workspace has no remaining hosted credit")
+	ErrPolarOrderIDRequired     = errors.New("polar order id is required")
 )
 
 // OrganizationLLMCreditGrant is one append-only credit addition.
@@ -30,6 +33,7 @@ type OrganizationLLMCreditGrant struct {
 	AmountMicros   int64
 	Note           string
 	ActorAccountID *uuid.UUID
+	PolarOrderID   *string
 	CreatedAt      time.Time
 }
 
@@ -39,9 +43,10 @@ func (OrganizationLLMCreditGrant) TableName() string {
 
 // OrganizationLLMSettings holds the hidden per-org markup override.
 type OrganizationLLMSettings struct {
-	OrganizationID uuid.UUID `gorm:"primary_key"`
-	MarkupBPS      *int
-	UpdatedAt      time.Time
+	OrganizationID  uuid.UUID `gorm:"primary_key"`
+	MarkupBPS       *int
+	PolarCustomerID *string
+	UpdatedAt       time.Time
 }
 
 func (OrganizationLLMSettings) TableName() string {
@@ -53,6 +58,7 @@ func (OrganizationLLMSettings) TableName() string {
 type OrganizationLLMCreditHold struct {
 	NodeExecutionID uuid.UUID `gorm:"primary_key"`
 	OrganizationID  uuid.UUID
+	FactoryID       *uuid.UUID
 	AmountMicros    int64
 	CreatedAt       time.Time
 }
@@ -124,6 +130,66 @@ func AddAdminLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, no
 		return nil, err
 	}
 	return &grant, nil
+}
+
+func AddPolarLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, polarOrderID string) (*OrganizationLLMCreditGrant, error) {
+	if amountMicros <= 0 {
+		return nil, ErrCreditGrantNotPositive
+	}
+	orderID := strings.TrimSpace(polarOrderID)
+	if orderID == "" {
+		return nil, ErrPolarOrderIDRequired
+	}
+
+	var existing OrganizationLLMCreditGrant
+	err := tx.Where("polar_order_id = ?", orderID).First(&existing).Error
+	if err == nil {
+		return &existing, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	grant := OrganizationLLMCreditGrant{
+		ID:             uuid.New(),
+		OrganizationID: orgID,
+		Kind:           LLMCreditGrantKindPolar,
+		AmountMicros:   amountMicros,
+		PolarOrderID:   &orderID,
+		CreatedAt:      time.Now(),
+	}
+	if err := tx.Create(&grant).Error; err != nil {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			return FindLLMCreditGrantByPolarOrderID(tx, orderID)
+		}
+		return nil, err
+	}
+	return &grant, nil
+}
+
+func FindLLMCreditGrantByPolarOrderID(tx *gorm.DB, polarOrderID string) (*OrganizationLLMCreditGrant, error) {
+	var grant OrganizationLLMCreditGrant
+	err := tx.Where("polar_order_id = ?", polarOrderID).First(&grant).Error
+	if err != nil {
+		return nil, err
+	}
+	return &grant, nil
+}
+
+func SetOrganizationPolarCustomerID(tx *gorm.DB, orgID uuid.UUID, customerID string) error {
+	customerID = strings.TrimSpace(customerID)
+	if customerID == "" {
+		return errors.New("billing customer id is required")
+	}
+	settings := OrganizationLLMSettings{
+		OrganizationID:  orgID,
+		PolarCustomerID: &customerID,
+		UpdatedAt:       time.Now(),
+	}
+	return tx.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "organization_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"polar_customer_id", "updated_at"}),
+	}).Create(&settings).Error
 }
 
 func UpsertOrganizationLLMMarkup(tx *gorm.DB, orgID uuid.UUID, markupBPS *int) error {
@@ -225,19 +291,46 @@ func AssertHostedCreditAvailable(tx *gorm.DB, orgID uuid.UUID) error {
 		return err
 	}
 	if summary.RemainingMicros <= 0 {
-		return fmt.Errorf("%w: ask an installation admin to add credit", ErrHostedCreditEmpty)
+		return ErrHostedCreditEmpty
+	}
+	return nil
+}
+
+func AssertFactoryHostedBudgetAvailable(tx *gorm.DB, factory *Factory) error {
+	if factory == nil {
+		return nil
+	}
+	summary, err := DescribeFactoryHostedBudget(tx, factory)
+	if err != nil {
+		return err
+	}
+	if !summary.Capped {
+		return nil
+	}
+	if summary.RemainingMicros <= 0 {
+		return ErrFactoryHostedBudgetEmpty
 	}
 	return nil
 }
 
 // ReserveHostedCredit takes a short FOR UPDATE lock on organization LLM settings.
 // Pass a committed connection, not a long-lived executor transaction.
-func ReserveHostedCredit(tx *gorm.DB, orgID, nodeExecutionID uuid.UUID) error {
+func ReserveHostedCredit(tx *gorm.DB, orgID, nodeExecutionID uuid.UUID, factoryID *uuid.UUID) error {
 	if orgID == uuid.Nil {
 		return fmt.Errorf("organization is required for hosted LLM credit")
 	}
 	if nodeExecutionID == uuid.Nil {
-		return AssertHostedCreditAvailable(tx, orgID)
+		if err := AssertHostedCreditAvailable(tx, orgID); err != nil {
+			return err
+		}
+		if factoryID != nil && *factoryID != uuid.Nil {
+			factory, err := FindFactory(tx, orgID, *factoryID)
+			if err != nil {
+				return err
+			}
+			return AssertFactoryHostedBudgetAvailable(tx, factory)
+		}
+		return nil
 	}
 
 	return tx.Transaction(func(inner *gorm.DB) error {
@@ -249,6 +342,15 @@ func ReserveHostedCredit(tx *gorm.DB, orgID, nodeExecutionID uuid.UUID) error {
 		}
 		if err := AssertHostedCreditAvailable(inner, orgID); err != nil {
 			return err
+		}
+		if factoryID != nil && *factoryID != uuid.Nil {
+			factory, err := FindFactory(inner, orgID, *factoryID)
+			if err != nil {
+				return err
+			}
+			if err := AssertFactoryHostedBudgetAvailable(inner, factory); err != nil {
+				return err
+			}
 		}
 
 		var inFlight int64
@@ -265,6 +367,7 @@ func ReserveHostedCredit(tx *gorm.DB, orgID, nodeExecutionID uuid.UUID) error {
 		hold := OrganizationLLMCreditHold{
 			NodeExecutionID: nodeExecutionID,
 			OrganizationID:  orgID,
+			FactoryID:       factoryID,
 			AmountMicros:    1,
 			CreatedAt:       time.Now(),
 		}

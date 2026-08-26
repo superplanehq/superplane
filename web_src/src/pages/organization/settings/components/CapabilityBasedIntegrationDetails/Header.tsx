@@ -3,6 +3,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { CopyButton } from "@/ui/CopyButton";
+import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { ArrowLeft, Plug, Trash2 } from "lucide-react";
 import { Link } from "react-router";
 
@@ -23,7 +24,7 @@ export function Header({
   permissionsLoading,
   onRequestDelete,
 }: HeaderProps) {
-  const integrationsHref = `/${organizationId}/settings/integrations`;
+  const integrationsHref = useIntegrationsBasePath(organizationId);
   const integrationId = integration.metadata?.id;
   const integrationName = integration.metadata?.name;
   const integrationStatus = integration.status?.state || "unknown";

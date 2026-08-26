@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useContext, useEffect, useState, type ComponentType, type ReactNode } from "react";
-import { MemoryRouter, Navigate, Outlet, Route, Routes, useParams } from "react-router";
+import { MemoryRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router";
 
 import { requestCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/canvasAgentSidebarOpenRequest";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
@@ -31,6 +31,7 @@ import {
   FactorySettingsProfilePage,
   FactorySettingsSoonPage,
   FactorySettingsUsagePage,
+  FactorySettingsModelsPage,
   FACTORY_SETTINGS_NAV_ITEMS,
   isFactorySettingsComingSoon,
   LegacyWorkOrderDetailRedirect,
@@ -46,7 +47,12 @@ import {
   WorkOrdersPage,
 } from "@/pages/factories";
 import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
-import { createFactoryLinePath, editFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
+import {
+  createFactoryLinePath,
+  editFactoryLinePath,
+  organizationSettingsPath,
+  organizationSettingsSectionPath,
+} from "@/pages/factories/lib/factoryPagePaths";
 import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetailPage";
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
 import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
@@ -211,6 +217,41 @@ function HarnessLegacyAutomationsLineEditRedirect() {
   return <Navigate to={editFactoryLinePath(organizationId, factoryKey, lineId)} replace />;
 }
 
+function HarnessLegacyWorkspaceOrganizationSettingsRedirect() {
+  const {
+    organizationId,
+    factoryKey,
+    "*": rest,
+  } = useParams<{
+    organizationId: string;
+    factoryKey: string;
+    "*": string;
+  }>();
+  const location = useLocation();
+  if (!organizationId) {
+    return <Navigate to="/" replace />;
+  }
+  const suffix = rest ? `/${rest}` : "";
+  const previousState =
+    location.state && typeof location.state === "object" ? (location.state as Record<string, unknown>) : {};
+  return (
+    <Navigate
+      to={`${organizationSettingsPath(organizationId)}${suffix}${location.search}`}
+      replace
+      state={{ ...previousState, fromFactoryKey: factoryKey }}
+    />
+  );
+}
+
+function HarnessLegacyLLMSpendRedirect() {
+  const { organizationId } = useParams<{ organizationId: string }>();
+  const location = useLocation();
+  if (!organizationId) {
+    return <Navigate to="/" replace />;
+  }
+  return <Navigate to={`${organizationSettingsSectionPath(organizationId, "llm-spend")}${location.search}`} replace />;
+}
+
 function OptionalOnboardingGate({ enabled }: { enabled: boolean }) {
   if (!enabled) {
     return <Outlet />;
@@ -280,6 +321,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
             <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
             <Route path="general" element={<FactorySettingsGeneralPage />} />
             <Route path="automations" element={<FactorySettingsAutomationsPage />} />
+            <Route path="models" element={<FactorySettingsModelsPage />} />
             <Route path="usage" element={<FactorySettingsUsagePage />} />
             <Route path="profile" element={<FactorySettingsProfilePage />} />
             <Route path="notifications" element={<FactorySettingsNotificationsPage />} />
@@ -297,10 +339,15 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
               />
             ))}
           </Route>
-          <Route path=":factoryKey/organization" element={factoryRoute(<OrganizationSettingsLayout />)}>
-            {organizationSettingsSectionRoutes}
-          </Route>
+          <Route
+            path=":factoryKey/organization/*"
+            element={factoryRoute(<HarnessLegacyWorkspaceOrganizationSettingsRedirect />)}
+          />
         </Route>
+        <Route path="organization" element={factoryRoute(<OrganizationSettingsLayout />)}>
+          {organizationSettingsSectionRoutes}
+        </Route>
+        <Route path="settings/llm-spend" element={<HarnessLegacyLLMSpendRedirect />} />
         <Route
           path="settings/integrations/:integrationName/setup"
           element={<div data-testid="integration-setup-placeholder">Integration setup</div>}
