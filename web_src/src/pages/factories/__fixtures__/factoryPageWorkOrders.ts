@@ -16,6 +16,22 @@ import {
   minutesAgo,
 } from "./factoryPageIds";
 
+const githubOrigin = (number: number) =>
+  ({
+    url: `https://github.com/acme/payments-service/issues/${number}`,
+    label: `acme/payments-service#${number}`,
+  }) as const;
+
+const SENTRY_ORIGIN = {
+  url: "https://superplane.sentry.io/issues/7670162495/",
+  label: "superplane#7670162495",
+} as const;
+
+const SLACK_ORIGIN = {
+  url: "https://acme.slack.com/archives/C0REFUNDS/p1710000000000000",
+  label: "acme#C0REFUNDS",
+} as const;
+
 export const INGEST_CREATED_BY = {
   automation: { appId: "app-refund-backlog", appName: "Ingest", nodeName: "On Issue Label" },
 } as const;
@@ -54,6 +70,7 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
   createdAt: HOUR_AGO,
   updatedAt: HOUR_AGO,
   createdBy: INGEST_CREATED_BY,
+  origin: githubOrigin(101),
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [],
   // A watcher automation announcing why the order needs attention — the detail
@@ -171,6 +188,7 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
   createdBy: INGEST_CREATED_BY,
+  origin: githubOrigin(103),
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     planLineDispatch([
@@ -312,6 +330,7 @@ export const SENTRY_DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   createdAt: YESTERDAY,
   updatedAt: YESTERDAY,
   createdBy: SENTRY_CREATED_BY,
+  origin: SENTRY_ORIGIN,
   assignees: [],
   lineDispatches: [],
 };
@@ -338,6 +357,7 @@ export const SLACK_DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   createdAt: TWO_HOURS_AGO,
   updatedAt: TWO_HOURS_AGO,
   createdBy: SLACK_CREATED_BY,
+  origin: SLACK_ORIGIN,
   assignees: [],
   lineDispatches: [],
 };
