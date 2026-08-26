@@ -3,6 +3,9 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 type LiveLogRecordEnvelope = {
   type?: string;
   text?: string;
+  kind?: string;
+  preview?: string;
+  id?: string;
   message?: string;
   index?: number;
   status?: "passed" | "failed";
@@ -19,8 +22,10 @@ type LiveLogSessionResponse = {
 export type LiveLogStreamHandlers = {
   onLogLine: (text: string) => void;
   onStreamError: (message: string) => void;
-  onCmdStart?: (index: number, text: string, startedAtMs: number | null) => void;
+  onCmdStart?: (index: number, text: string, startedAtMs: number | null, kind?: string, preview?: string) => void;
   onCmdEnd?: (index: number, status: "passed" | "failed", durationMs: number) => void;
+  onToolStart?: (kind: string, text: string, id?: string) => void;
+  onToolEnd?: (status: "passed" | "failed", durationMs: number, id?: string) => void;
 };
 
 async function fetchRunnerLiveLogSession(
@@ -106,7 +111,37 @@ function dispatchCmdStartRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStr
   if (rec.type !== "cmd_start" || typeof rec.index !== "number" || typeof rec.text !== "string") {
     return false;
   }
-  handlers.onCmdStart?.(rec.index, rec.text, parseStartedAtMs(rec.started_at));
+  handlers.onCmdStart?.(
+    rec.index,
+    rec.text,
+    parseStartedAtMs(rec.started_at),
+    typeof rec.kind === "string" ? rec.kind : undefined,
+    typeof rec.preview === "string" ? rec.preview : undefined,
+  );
+  return true;
+}
+
+function dispatchToolStartRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): boolean {
+  if (rec.type !== "tool_start") {
+    return false;
+  }
+  handlers.onToolStart?.(
+    typeof rec.kind === "string" ? rec.kind : "tool",
+    typeof rec.text === "string" ? rec.text : "",
+    typeof rec.id === "string" ? rec.id : undefined,
+  );
+  return true;
+}
+
+function dispatchToolEndRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): boolean {
+  if (
+    rec.type !== "tool_end" ||
+    (rec.status !== "passed" && rec.status !== "failed") ||
+    typeof rec.duration_ms !== "number"
+  ) {
+    return false;
+  }
+  handlers.onToolEnd?.(rec.status, rec.duration_ms, typeof rec.id === "string" ? rec.id : undefined);
   return true;
 }
 
@@ -133,7 +168,13 @@ function dispatchLiveLogRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStre
   if (dispatchCmdStartRecord(rec, handlers)) {
     return;
   }
-  dispatchCmdEndRecord(rec, handlers);
+  if (dispatchCmdEndRecord(rec, handlers)) {
+    return;
+  }
+  if (dispatchToolStartRecord(rec, handlers)) {
+    return;
+  }
+  dispatchToolEndRecord(rec, handlers);
 }
 
 /** Consumes complete NDJSON lines from buffer; returns the trailing incomplete fragment. */

@@ -113,6 +113,8 @@ export function WorkOrderSplitRunBody({
               stream={streams.get(entry.id) ?? entry.stream}
               selectedNodeId={nodeId}
               onSelectNode={setNodeId}
+              organizationId={organizationId}
+              canvasId={entry.appId}
               onToggle={() => {
                 setPhaseId(entry.id);
                 setNodeId(null);

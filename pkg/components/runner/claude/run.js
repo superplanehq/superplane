@@ -95,7 +95,7 @@ async function runPrompt(promptFile, model) {
     new Promise((resolve) => rl.on("close", resolve)),
   ]).then(([code]) => code);
 
-  formatter.flush();
+  formatter.flush(exitCode !== 0);
   const resultJSON = formatter.resultJSON();
   fs.writeFileSync(resultFile, `${resultJSON}\n`);
   accumulateLLMUsage(resultJSON, model);
@@ -136,6 +136,7 @@ function createFormatter() {
   let textBuf = "";
   let lastLine = "";
   let resultLine = "";
+  const tools = createToolTracker();
 
   return {
     handleLine(raw) {
@@ -171,7 +172,7 @@ function createFormatter() {
           const ended = endTextStream(inText, textBuf);
           inText = ended.inText;
           textBuf = ended.textBuf;
-          formatAssistant(event, streamedText);
+          formatAssistant(event, streamedText, tools);
           streamedText = false;
           break;
         }
@@ -179,7 +180,7 @@ function createFormatter() {
           const ended = endTextStream(inText, textBuf);
           inText = ended.inText;
           textBuf = ended.textBuf;
-          formatUser(event);
+          formatUser(event, tools);
           break;
         }
         case "result": {
@@ -195,10 +196,11 @@ function createFormatter() {
           break;
       }
     },
-    flush() {
+    flush(failed) {
       const ended = endTextStream(inText, textBuf);
       inText = ended.inText;
       textBuf = ended.textBuf;
+      tools.flush(Boolean(failed));
     },
     resultJSON() {
       if (resultLine) {
@@ -212,8 +214,87 @@ function createFormatter() {
   };
 }
 
+function writeLiveLogRecord(rec) {
+  process.stdout.write(`\n${JSON.stringify(rec)}\n`);
+}
+
 function println(text = "") {
   process.stdout.write(`${text}\n`);
+}
+
+function createToolTracker() {
+  const openTools = new Map();
+  const fifo = [];
+  let anonSeq = 0;
+
+  function resolveKey(id, creating) {
+    const key = id != null && String(id).trim() ? String(id).trim() : "";
+    if (key) {
+      return key;
+    }
+    if (creating) {
+      const generated = `anon-${anonSeq}`;
+      anonSeq += 1;
+      fifo.push(generated);
+      return generated;
+    }
+    return fifo.shift() || "";
+  }
+
+  return {
+    start(kind, text, id) {
+      const key = resolveKey(id, true);
+      const startedAt = Date.now();
+      openTools.set(key, { kind, text: text || kind, startedAt, emitted: false });
+    },
+    emitStart(id) {
+      let key = id != null && String(id).trim() ? String(id).trim() : "";
+      if (!key || !openTools.has(key)) {
+        key = fifo[0] || key;
+      }
+      const tool = openTools.get(key);
+      if (!tool || tool.emitted) {
+        return key;
+      }
+      tool.emitted = true;
+      writeLiveLogRecord({
+        type: "tool_start",
+        id: key,
+        kind: tool.kind,
+        text: tool.text,
+        started_at: tool.startedAt,
+      });
+      return key;
+    },
+    end(failed, id) {
+      this.emitStart(id);
+      let key = resolveKey(id, false);
+      if (!openTools.has(key)) {
+        key = fifo.shift() || key;
+      }
+      const tool = openTools.get(key);
+      if (!tool) {
+        return;
+      }
+      openTools.delete(key);
+      const fifoIndex = fifo.indexOf(key);
+      if (fifoIndex >= 0) {
+        fifo.splice(fifoIndex, 1);
+      }
+      writeLiveLogRecord({
+        type: "tool_end",
+        id: key,
+        kind: tool.kind,
+        status: failed ? "failed" : "passed",
+        duration_ms: Math.max(0, Date.now() - tool.startedAt),
+      });
+    },
+    flush(failed) {
+      for (const key of [...openTools.keys()]) {
+        this.end(failed, key);
+      }
+    },
+  };
 }
 
 function formatSystem(event) {
@@ -303,7 +384,7 @@ function endTextStream(inText, textBuf) {
   return { inText: false, textBuf: "" };
 }
 
-function formatAssistant(event, streamedText) {
+function formatAssistant(event, streamedText, tools) {
   const message = event.message;
   if (!message || typeof message !== "object") {
     return;
@@ -324,7 +405,7 @@ function formatAssistant(event, streamedText) {
         println();
       }
     } else if (block.type === "tool_use") {
-      println(formatToolUse(block));
+      formatToolUse(block, tools);
     } else if (block.type === "thinking") {
       const thinking = block.thinking;
       if (typeof thinking === "string" && thinking.trim()) {
@@ -336,7 +417,7 @@ function formatAssistant(event, streamedText) {
   }
 }
 
-function formatUser(event) {
+function formatUser(event, tools) {
   const message = event.message;
   if (!message || typeof message !== "object") {
     return;
@@ -351,11 +432,11 @@ function formatUser(event) {
       continue;
     }
     const body = toolResultText(block.content);
-    if (!body.trim()) {
-      continue;
+    tools.emitStart(block.tool_use_id);
+    if (body.trim()) {
+      println(truncateText(body.replace(/\s+$/, "")));
     }
-    println(indent(truncateText(body.replace(/\s+$/, "")), "     "));
-    println();
+    tools.end(Boolean(block.is_error), block.tool_use_id);
   }
 }
 
@@ -386,17 +467,10 @@ function formatResult(event) {
   }
 }
 
-function formatToolUse(block) {
+function formatToolUse(block, tools) {
   const name = String(block.name || "tool");
-  const detail = toolInputDetail(name, block.input);
-  const header = `-> [${name}]`;
-  if (!detail) {
-    return header;
-  }
-  if (detail.includes("\n")) {
-    return `${header}\n${indent(detail, "     ")}`;
-  }
-  return `${header} ${detail}`;
+  const kind = name.toLowerCase();
+  tools.start(kind, toolInputDetail(name, block.input) || kind, block.id);
 }
 
 function toolInputDetail(name, rawInput) {
@@ -489,11 +563,16 @@ function truncateText(text) {
   return text;
 }
 
-function indent(text, prefix = "  ") {
-  return text
-    .split(/\r?\n/)
-    .map((line) => (line ? prefix + line : prefix.replace(/\s+$/, "")))
-    .join("\n");
+function formatStreamJsonLines(rawLines) {
+  const formatter = createFormatter();
+  for (const line of rawLines) {
+    formatter.handleLine(line);
+  }
+  formatter.flush();
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = { formatStreamJsonLines };

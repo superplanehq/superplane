@@ -1,9 +1,26 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { groupClaudeSteps, PhaseLogCard, toolCallSummary } from "./PhaseLogCard";
 import type { SplitRunPhase, SplitRunStreamLine } from "./splitRunMocks";
+
+const useLiveLogStreamMock = vi.fn();
+
+vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({
+  useLiveLogStream: (...args: unknown[]) => useLiveLogStreamMock(...args),
+}));
+
+beforeEach(() => {
+  useLiveLogStreamMock.mockReturnValue({
+    sections: [],
+    orphanLines: [],
+    error: null,
+    isStreaming: false,
+    toggleSection: vi.fn(),
+    scrollRef: { current: null },
+  });
+});
 
 const PHASE: SplitRunPhase = {
   id: "plan",
@@ -139,6 +156,185 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(screen.getByText("Clone Repo")).toBeInTheDocument();
     expect(screen.getByText("Write Implementation Plan")).toBeInTheDocument();
     expect(screen.queryByText(LONG_NOTE)).not.toBeInTheDocument();
+  });
+
+  it("maps live log sections under an expanded runner node", async () => {
+    const user = userEvent.setup();
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [
+        {
+          index: 0,
+          text: "Prepare Claude Code",
+          kind: "setup",
+          preview: "npm install",
+          lines: [],
+          events: [],
+          status: "passed",
+          duration_ms: 10,
+          started_at: 1,
+          collapsed: true,
+        },
+        {
+          index: 1,
+          text: "Set Up Git User",
+          kind: "bash",
+          preview: 'echo "Using superplaneagent@superplane.com"',
+          lines: ["Using superplaneagent@superplane.com"],
+          events: [],
+          status: "passed",
+          duration_ms: 20,
+          started_at: 1,
+          collapsed: true,
+        },
+        {
+          index: 5,
+          text: "Implementation",
+          kind: "prompt",
+          preview: "You are implementing a fix",
+          lines: [],
+          events: [
+            { kind: "note", text: "Gathering issue context first." },
+            {
+              kind: "tools",
+              id: "5-tools-0",
+              tools: [
+                {
+                  id: "5-tool-0",
+                  kind: "read",
+                  text: "pkg/foo.go",
+                  lines: ["package workers"],
+                  status: "passed",
+                  duration_ms: 80,
+                },
+              ],
+            },
+          ],
+          status: "passed",
+          duration_ms: 900,
+          started_at: 1,
+          collapsed: true,
+        },
+      ],
+      orphanLines: [],
+      error: null,
+      isStreaming: false,
+      toggleSection: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Run Claude Code",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+          }),
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByTestId("split-run-node-toggle-runner-agent"));
+
+    expect(screen.queryByText("Prepare Claude Code")).not.toBeInTheDocument();
+    expect(screen.getByText("bash")).toBeInTheDocument();
+    expect(screen.getByText('echo "Using superplaneagent@superplane.com"')).toBeInTheDocument();
+    expect(screen.getByText("prompt")).toBeInTheDocument();
+    expect(screen.getByText("You are implementing a fix")).toBeInTheDocument();
+
+    await user.click(screen.getByText("You are implementing a fix"));
+    expect(screen.getByText("Gathering issue context first.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Read 1 file" })).toBeInTheDocument();
+  });
+
+  it("keeps yaml notes when live sections are only setup", async () => {
+    const user = userEvent.setup();
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [
+        {
+          index: 0,
+          text: "Prepare Claude Code",
+          kind: "setup",
+          preview: "npm install",
+          lines: [],
+          events: [],
+          status: "passed",
+          duration_ms: 10,
+          started_at: 1,
+          collapsed: true,
+        },
+      ],
+      orphanLines: [],
+      error: null,
+      isStreaming: false,
+      toggleSection: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "planner-agent",
+            nodeId: "planner-agent",
+            componentName: "Agent - Plan for GH Issue",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+          }),
+          ...PLANNING_STREAM.filter((row) => row.id !== "planner-agent"),
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByTestId("split-run-node-toggle-planner-agent"));
+    expect(screen.getByText("Clone Repo")).toBeInTheDocument();
+    expect(screen.queryByText("Prepare Claude Code")).not.toBeInTheDocument();
+  });
+
+  it("shows a live log error on an expanded runner node", async () => {
+    const user = userEvent.setup();
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [],
+      orphanLines: [],
+      error: "boom",
+      isStreaming: false,
+      toggleSection: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Run Claude Code",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+          }),
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByTestId("split-run-node-toggle-runner-agent"));
+    expect(screen.getByText("Something went wrong while fetching logs.")).toBeInTheDocument();
   });
 
   it("expands bash output from the step line", async () => {

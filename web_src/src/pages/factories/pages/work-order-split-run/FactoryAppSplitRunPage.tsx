@@ -91,6 +91,8 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
                 stream={model.stream}
                 selectedNodeId={model.nodeId}
                 onSelectNode={model.setNodeId}
+                organizationId={model.organizationId}
+                canvasId={model.phase.appId}
               />
             </li>
           </ol>
