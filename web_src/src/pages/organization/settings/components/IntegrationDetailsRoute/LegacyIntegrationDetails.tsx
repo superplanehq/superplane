@@ -19,6 +19,7 @@ import { ArrowLeft, CircleX, ExternalLink, Plug, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useIntegrationConfigureOpen } from "@/lib/analytics";
+import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 
 interface LegacyIntegrationDetailsProps {
   organizationId: string;
@@ -44,7 +45,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
 
   const updateMutation = useUpdateIntegration(organizationId, integration.metadata?.id || "");
   const deleteMutation = useDeleteIntegration(organizationId, integration.metadata?.id || "");
-  const integrationsHref = `/${organizationId}/settings/integrations`;
+  const integrationsHref = useIntegrationsBasePath(organizationId);
 
   // Initialize config values when installation loads
   const [configLoaded, setConfigLoaded] = useState(false);
@@ -189,7 +190,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
     if (!canDeleteIntegrations) return;
     try {
       await deleteMutation.mutateAsync({ integrationName: integration?.metadata?.integrationName ?? "" });
-      navigate(`/${organizationId}/settings/integrations`);
+      navigate(integrationsHref);
     } catch {
       showErrorToast("Failed to delete integration");
     }

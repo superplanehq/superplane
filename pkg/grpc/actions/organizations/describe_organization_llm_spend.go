@@ -43,6 +43,8 @@ func DescribeOrganizationLLMSpend(
 		return nil, grpcerrors.Internal(err, "failed to describe organization LLM credit")
 	}
 
+	billingEnabled, hasCustomer := billingState(ctx, organizationID)
+
 	return &pb.DescribeOrganizationLLMSpendResponse{
 		TotalTokens:            totals.TotalTokens,
 		TotalCostCents:         totals.CostCents(),
@@ -52,6 +54,8 @@ func DescribeOrganizationLLMSpend(
 		GrantTotalCents:        pricebook.MicrosToCents(credit.GrantMicros),
 		HostedBilledCents:      pricebook.MicrosToCents(credit.BilledMicros),
 		RemainingCreditWarning: credit.Warning,
+		BillingEnabled:         billingEnabled,
+		HasBillingCustomer:     hasCustomer,
 	}, nil
 }
 

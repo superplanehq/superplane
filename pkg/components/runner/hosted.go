@@ -79,6 +79,16 @@ func PrepareHostedRun(ctx core.ExecutionContext, provider, model string) (core.H
 	return access, nil
 }
 
+func PrepareBYOKRun(ctx core.ExecutionContext, provider, model string) error {
+	if ctx.HostedLLM == nil {
+		return nil
+	}
+	if strings.TrimSpace(model) == "" {
+		return nil
+	}
+	return ctx.HostedLLM.AssertModelSelectable(provider, "byok", model)
+}
+
 func InjectHostedAPIKey(environment []BrokerEnvironmentVariable, envName, apiKey string, extra ...BrokerEnvironmentVariable) []BrokerEnvironmentVariable {
 	environment = append(environment, BrokerEnvironmentVariable{Name: envName, Value: apiKey})
 	return append(environment, extra...)

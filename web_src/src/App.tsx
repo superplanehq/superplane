@@ -40,6 +40,7 @@ import {
   FactorySettingsProfilePage,
   FactorySettingsSoonPage,
   FactorySettingsUsagePage,
+  FactorySettingsModelsPage,
   FACTORY_SETTINGS_NAV_ITEMS,
   isFactorySettingsComingSoon,
   LegacyWorkOrderDetailRedirect,
@@ -56,7 +57,12 @@ import {
   WorkOrdersPage,
   WorkspaceOverviewPage,
 } from "./pages/factories";
-import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
+import {
+  createFactoryLinePath,
+  editFactoryLinePath,
+  organizationSettingsPath,
+  organizationSettingsSectionPath,
+} from "./pages/factories/lib/factoryPagePaths";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { InstallPage } from "./pages/install";
@@ -222,12 +228,21 @@ function AppRouter() {
                     {factorySettingsSectionRoutes}
                   </Route>
                   <Route
-                    path=":factoryKey/organization"
-                    element={withAuthPermissionAndFactoriesFeature(OrganizationSettingsLayout, "factories", "read")}
-                  >
-                    {organizationSettingsSectionRoutes}
-                  </Route>
+                    path=":factoryKey/organization/*"
+                    element={withAuthPermissionAndFactoriesFeature(
+                      LegacyWorkspaceOrganizationSettingsRedirect,
+                      "factories",
+                      "read",
+                    )}
+                  />
                 </Route>
+                <Route
+                  path="organization"
+                  element={withAuthPermissionAndFactoriesFeature(OrganizationSettingsLayout, "factories", "read")}
+                >
+                  {organizationSettingsSectionRoutes}
+                </Route>
+                <Route path="settings/llm-spend" element={withAuthOnly(LegacyLLMSpendRedirect)} />
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
               </Route>
 
@@ -287,6 +302,7 @@ const factorySettingsSectionRoutes = [
   <Route key="factory-settings-index" index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />,
   <Route key="factory-settings-general" path="general" element={<FactorySettingsGeneralPage />} />,
   <Route key="factory-settings-automations" path="automations" element={<FactorySettingsAutomationsPage />} />,
+  <Route key="factory-settings-models" path="models" element={<FactorySettingsModelsPage />} />,
   <Route key="factory-settings-usage" path="usage" element={<FactorySettingsUsagePage />} />,
   <Route key="factory-settings-profile" path="profile" element={<FactorySettingsProfilePage />} />,
   <Route key="factory-settings-notifications" path="notifications" element={<FactorySettingsNotificationsPage />} />,
@@ -323,6 +339,46 @@ function LegacyAutomationsLineEditRedirect() {
     return <Navigate to="/" replace />;
   }
   return <Navigate to={editFactoryLinePath(organizationId, factoryKey, lineId)} replace />;
+}
+
+function LegacyWorkspaceOrganizationSettingsRedirect() {
+  const {
+    organizationId,
+    factoryKey,
+    "*": rest,
+  } = useParams<{
+    organizationId: string;
+    factoryKey: string;
+    "*": string;
+  }>();
+  const location = useLocation();
+
+  if (!organizationId) {
+    return <Navigate to="/" replace />;
+  }
+
+  const suffix = rest ? `/${rest}` : "";
+  const previousState =
+    location.state && typeof location.state === "object" ? (location.state as Record<string, unknown>) : {};
+
+  return (
+    <Navigate
+      to={`${organizationSettingsPath(organizationId)}${suffix}${location.search}`}
+      replace
+      state={{ ...previousState, fromFactoryKey: factoryKey }}
+    />
+  );
+}
+
+function LegacyLLMSpendRedirect() {
+  const { organizationId } = useParams<{ organizationId: string }>();
+  const location = useLocation();
+
+  if (!organizationId) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <Navigate to={`${organizationSettingsSectionPath(organizationId, "llm-spend")}${location.search}`} replace />;
 }
 
 function LegacyCanvasRedirect({ settings = false }: { settings?: boolean }) {
