@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
+import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
+import {
+  DRAFT_WORK_ORDER,
+  FACTORIES_ORGANIZATION_ID,
+  LINE_RUN_IMPLEMENT_NOTIFY_ID,
+  OPEN_WORK_ORDER,
+  PRIMARY_FACTORY_KEY,
+} from "../../__fixtures__/factoryPageResponses";
+import { BOARD_IMPLEMENT_NOTIFY_ORDER } from "../../__fixtures__/lineMetricsBoardOrders";
 import { LINE_BOARD_DONE_RECEIPTS_ORDER } from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import {
@@ -8,6 +16,7 @@ import {
   defaultSplitRunPopupTab,
   resolveSplitRunPopupArtifacts,
   SPLIT_RUN_PANE_GRID_CLASSNAME,
+  splitRunAutomationRunHref,
   splitRunDescriptionMarkdown,
   splitRunLinkedArtifacts,
   splitRunLogTabDotClass,
@@ -20,10 +29,54 @@ describe("splitRunPopupModel", () => {
     expect(SPLIT_RUN_PANE_GRID_CLASSNAME).toContain("minmax(0,3fr)_minmax(0,2fr)");
   });
 
+  it("opens the automation run for the preferred phase, then the latest phase run", () => {
+    const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER);
+    const implementHref = getWorkOrderRunHref(
+      FACTORIES_ORGANIZATION_ID,
+      PRIMARY_FACTORY_KEY,
+      "app-refund-implementer",
+      LINE_RUN_IMPLEMENT_NOTIFY_ID,
+      { orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number },
+    );
+
+    expect(
+      splitRunAutomationRunHref({
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryKey: PRIMARY_FACTORY_KEY,
+        orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
+        fixture,
+        preferredPhaseId: "implementation-1",
+      }),
+    ).toBe(implementHref);
+    expect(
+      splitRunAutomationRunHref({
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryKey: PRIMARY_FACTORY_KEY,
+        orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
+        fixture,
+        preferredPhaseId: "pr-creation-2",
+      }),
+    ).toBe(implementHref);
+    expect(
+      splitRunAutomationRunHref({
+        fixture,
+        preferredPhaseId: "implementation-1",
+      }),
+    ).toBeNull();
+    expect(
+      splitRunAutomationRunHref({
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryKey: PRIMARY_FACTORY_KEY,
+        fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+      }),
+    ).toBeNull();
+  });
+
   it("opens the description tab for drafts and done cards, and the log for later states", () => {
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER))).toBe("description");
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER))).toBe("description");
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER))).toBe("log");
+    expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER))).toBe("log");
   });
 
   it("maps log-tab dots to the line status colors", () => {

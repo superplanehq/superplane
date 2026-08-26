@@ -1,7 +1,8 @@
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
 
 import { extractArtifactMarkdownBody, toArtifactDataRecord } from "../../lib/workOrderArtifact";
-import type { SplitRunFixture, SplitRunPhaseStatus } from "./splitRunMocks";
+import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
+import type { SplitRunFixture, SplitRunPhase, SplitRunPhaseStatus } from "./splitRunMocks";
 import { isOriginTicketArtifact, type SplitRunSource } from "./splitRunSource";
 
 export type SplitRunPopupTab = "description" | "log";
@@ -21,11 +22,48 @@ const LOG_TAB_DOT: Record<SplitRunPhaseStatus, string> = {
 };
 
 export function defaultSplitRunPopupTab(fixture: SplitRunFixture): SplitRunPopupTab {
+  if (fixture.openPhaseId) {
+    return "log";
+  }
   return fixture.footer.kind === "draft" || fixture.footer.kind === "done" ? "description" : "log";
 }
 
 export function splitRunLogTabDotClass(status: SplitRunPhaseStatus): string {
   return LOG_TAB_DOT[status];
+}
+
+function phaseRun(phase: SplitRunPhase | undefined): { appId: string; runId: string } | undefined {
+  const appId = phase?.appId;
+  const runId = phase?.runId;
+  if (!appId || !runId) {
+    return undefined;
+  }
+  return { appId, runId };
+}
+
+/**
+ * Open the automation run for the selected log phase. If that phase has
+ * no run, use the latest phase run or the footer run.
+ */
+export function splitRunAutomationRunHref(args: {
+  organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+  fixture: SplitRunFixture;
+  preferredPhaseId?: string | null;
+}): string | null {
+  const { organizationId, factoryKey, orderNumber, fixture, preferredPhaseId } = args;
+  if (!organizationId || !factoryKey) {
+    return null;
+  }
+  const preferred = phaseRun(fixture.phases.find((phase) => phase.id === preferredPhaseId));
+  const current = phaseRun(fixture.phases.find((phase) => phase.id === fixture.currentPhaseId));
+  const latest = fixture.phases.reduceRight<{ appId: string; runId: string } | undefined>(
+    (found, phase) => found ?? phaseRun(phase),
+    undefined,
+  );
+  const run = preferred ?? current ?? latest ?? fixture.footer.run;
+  return getWorkOrderRunHref(organizationId, factoryKey, run?.appId, run?.runId, { orderNumber });
 }
 
 export function resolveSplitRunPopupArtifacts(args: {
