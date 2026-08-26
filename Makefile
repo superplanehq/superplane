@@ -22,7 +22,16 @@ endif
 PKG_TEST_PACKAGES := ./pkg/...
 E2E_TEST_PACKAGES := ./test/e2e/...
 
-COMPOSE=docker compose -f docker-compose.dev.yml
+# On CI, overlay docker-compose.ci.yml so the Go module and build caches live in
+# host directories that the CI cache can restore and store between jobs.
+COMPOSE_FILES := -f docker-compose.dev.yml
+GO_CACHE_DIRS :=
+ifneq ($(strip $(CI)),)
+COMPOSE_FILES += -f docker-compose.ci.yml
+GO_CACHE_DIRS := tmp/go tmp/go-build
+endif
+
+COMPOSE=docker compose $(COMPOSE_FILES)
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client api/swagger/superplane.swagger.json
 OPENAPI_GENERATOR_IMAGE := openapitools/openapi-generator-cli:v7.13.0
 
@@ -102,7 +111,7 @@ dev.test.is.running:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
 
 dev.up:
-	@mkdir -p tmp/screenshots
+	@mkdir -p tmp/screenshots $(GO_CACHE_DIRS)
 	$(COMPOSE) up -d --wait --build --pull always --quiet-pull
 
 dev.setup:
