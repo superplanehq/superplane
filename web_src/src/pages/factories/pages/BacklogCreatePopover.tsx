@@ -1,6 +1,7 @@
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Loader2, Plus, SquarePen } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
@@ -100,7 +101,17 @@ function SearchLoadingStatus({ label, testId }: { label: string; testId: string 
 
 function IntakeSourceIcon({ source }: { source: BacklogIntakeSource }) {
   if (source.iconSrc) {
-    return <img src={source.iconSrc} alt="" className="size-3.5 shrink-0" />;
+    return (
+      <img
+        src={source.iconSrc}
+        alt=""
+        data-testid={`lines-backlog-create-icon-${source.intakeId}`}
+        className={cn(
+          "size-3.5 shrink-0 object-contain",
+          source.iconAlt === "GitHub" && "dark:brightness-0 dark:invert",
+        )}
+      />
+    );
   }
 
   return (

@@ -1,5 +1,7 @@
 import type { FactoriesFactoryIntake } from "@/api-client";
 
+import { lineIntakeSourceForApiSource } from "./lineIntakeModel";
+
 export const BACKLOG_CREATE_COPY = {
   createWorkOrder: "Create work order",
   createManually: "Create task manually",
@@ -80,11 +82,12 @@ function sourceFromIntake(
   }
 
   const name = intake.name?.trim() || "Intake";
+  const known = lineIntakeSourceForApiSource(intake.source);
   return {
     intakeId,
     name,
-    iconSrc: catalog?.iconSrcByIntakeId?.[intakeId],
-    iconAlt: name,
+    iconSrc: catalog?.iconSrcByIntakeId?.[intakeId] ?? known?.iconSrc,
+    iconAlt: known?.iconAlt ?? name,
   };
 }
 

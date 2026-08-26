@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { FactoriesFactoryIntake } from "@/api-client";
+import githubIcon from "@/assets/icons/integrations/github.svg";
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 
 import {
   listBacklogIntakeSources,
@@ -117,7 +119,23 @@ describe("searchBacklogIntakeItems", () => {
     });
 
     expect(sources.map((source) => source.name)).toEqual(["GitHub issues", "Sentry exceptions", "Linear issues"]);
+    expect(sources[0]?.iconSrc).toBe(githubIcon);
+    expect(sources[0]?.iconAlt).toBe("GitHub");
+    expect(sources[1]?.iconSrc).toBe(sentryIcon);
     expect(sources[2]?.iconSrc).toBe("/linear.svg");
+  });
+
+  it("uses the GitHub icon when the intake has no catalog override", () => {
+    const sources = listBacklogIntakeSources({ intakes: [github] });
+
+    expect(sources).toEqual([
+      {
+        intakeId: "intake-github",
+        name: "GitHub issues",
+        iconSrc: githubIcon,
+        iconAlt: "GitHub",
+      },
+    ]);
   });
 
   it("builds a source-specific search placeholder", () => {

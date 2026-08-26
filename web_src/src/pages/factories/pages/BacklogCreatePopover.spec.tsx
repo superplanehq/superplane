@@ -11,7 +11,7 @@ import {
 } from "./backlogIntakeItems";
 
 const sources: BacklogIntakeSource[] = [
-  { intakeId: "intake-github", name: "GitHub issues", iconAlt: "GitHub" },
+  { intakeId: "intake-github", name: "GitHub issues", iconSrc: "/github.svg", iconAlt: "GitHub" },
   { intakeId: "intake-sentry", name: "Sentry exceptions", iconAlt: "Sentry" },
 ];
 
@@ -57,6 +57,7 @@ describe("BacklogCreatePopover", () => {
     expect(screen.getByRole("button", { name: BACKLOG_CREATE_COPY.createManually })).toBeInTheDocument();
     expect(screen.getByPlaceholderText(searchPlaceholderForIntake("GitHub issues"))).toBeInTheDocument();
     expect(screen.getByPlaceholderText(searchPlaceholderForIntake("Sentry exceptions"))).toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-create-icon-intake-github")).toHaveAttribute("src", "/github.svg");
     expect(screen.queryByTestId("lines-backlog-create-item-gh-1")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: BACKLOG_CREATE_COPY.createManually }));

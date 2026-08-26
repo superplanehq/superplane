@@ -129,6 +129,14 @@ export function lineIntakeSourceById(id: string): LineIntakeSource | undefined {
   return LINE_INTAKE_SOURCES.find((source) => source.id === id);
 }
 
+export function lineIntakeSourceForApiSource(apiSource: string | undefined): LineIntakeSource | undefined {
+  if (!apiSource) {
+    return undefined;
+  }
+  const sourceId = LINE_INTAKE_SOURCE_ID_BY_API_SOURCE[apiSource];
+  return sourceId ? lineIntakeSourceById(sourceId) : undefined;
+}
+
 export function isFirstRunOnboardingFactory(factoryKey: string | undefined): boolean {
   return factoryKey === ACME_ONBOARDING_FACTORY_KEY;
 }
@@ -170,8 +178,7 @@ export function apiIntakeSource(sourceId: LineIntakeSourceId): FactoriesFactoryI
 export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[]): ConfiguredLineIntakeSource[] {
   return intakes.flatMap((intake) => {
     const intakeId = intake.id?.trim();
-    const sourceId = intake.source ? LINE_INTAKE_SOURCE_ID_BY_API_SOURCE[intake.source] : undefined;
-    const source = sourceId ? lineIntakeSourceById(sourceId) : undefined;
+    const source = lineIntakeSourceForApiSource(intake.source);
     if (!intakeId || !source) {
       return [];
     }
