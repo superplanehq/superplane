@@ -105,9 +105,7 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	assert.Contains(t, req.Commands[4].Command, `source "$SUPERPLANE_TASK_DIR/steps/04-status.sh"`)
 	assert.Contains(t, string(body), `"name":"Clone"`)
 	assert.Empty(t, req.DockerImage)
-	require.Len(t, req.Environment, 1)
-	assert.Equal(t, envAnthropicAPIKey, req.Environment[0].Name)
-	assert.Equal(t, "sk-test-key", req.Environment[0].Value)
+	assert.Equal(t, "sk-test-key", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
 	assert.NotContains(t, string(body), `"message_chain"`)
 
 	require.Len(t, req.Files, 7)
@@ -241,9 +239,7 @@ func TestRunClaudeCodeExecuteInjectsHostedAPIKey(t *testing.T) {
 	require.NoError(t, err)
 	var req createTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
-	require.Len(t, req.Environment, 1)
-	assert.Equal(t, envAnthropicAPIKey, req.Environment[0].Name)
-	assert.Equal(t, "sk-hosted", req.Environment[0].Value)
+	assert.Equal(t, "sk-hosted", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
 }
 
 func TestRunClaudeCodeExecuteInjectsHostedBaseURL(t *testing.T) {
@@ -287,11 +283,8 @@ func TestRunClaudeCodeExecuteInjectsHostedBaseURL(t *testing.T) {
 	require.NoError(t, err)
 	var req createTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
-	require.Len(t, req.Environment, 2)
-	assert.Equal(t, envAnthropicAPIKey, req.Environment[0].Name)
-	assert.Equal(t, "sk-hosted", req.Environment[0].Value)
-	assert.Equal(t, envAnthropicBaseURL, req.Environment[1].Name)
-	assert.Equal(t, "https://proxy.example/v1", req.Environment[1].Value)
+	assert.Equal(t, "sk-hosted", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
+	assert.Equal(t, "https://proxy.example/v1", requireEnvironmentValue(t, req.Environment, envAnthropicBaseURL))
 }
 
 func TestRunClaudeCodeExecuteRejectsPrivateHostedBaseURL(t *testing.T) {
