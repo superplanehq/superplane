@@ -1,7 +1,8 @@
 import type { Edge, Node } from "@xyflow/react";
 
 import type { ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import { FACTORY_NODE_CARD_HEIGHT, FACTORY_NODE_CARD_WIDTH } from "@/lib/factoryCanvasChrome";
+import { agentRunnerStepTitles } from "@/lib/agentRunnerSteps";
+import { factoryNodeCardSize } from "@/lib/factoryCanvasChrome";
 import { layoutFactoryRunLeafGraph } from "@/lib/layout/factoryRunLeafLayout";
 import { buildStyledCanvasEdges } from "@/ui/CanvasPage/factoryCanvasEdgeStyle";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
@@ -21,6 +22,7 @@ export type LineNodeData = {
   isSideSource: boolean;
   isSpineSource: boolean;
   isSideTarget: boolean;
+  steps: string[];
 } & Record<string, unknown>;
 
 function origin(nodes: ComponentsNode[]): { x: number; y: number } {
@@ -51,6 +53,8 @@ export function compactLineCanvasGraph(
     .filter((node): node is ComponentsNode & { id: string } => Boolean(node.id))
     .map((node) => {
       const presentation = componentPresentation(node.component);
+      const steps = node.component === "runnerClaudeCode" ? agentRunnerStepTitles(node.configuration) : [];
+      const size = factoryNodeCardSize(steps.length);
       return {
         id: node.id,
         type: "lineCanvas",
@@ -71,17 +75,18 @@ export function compactLineCanvasGraph(
           isSideSource: false,
           isSpineSource: false,
           isSideTarget: false,
+          steps,
         },
         selected: node.id === selectedId,
         draggable: false,
-        width: FACTORY_NODE_CARD_WIDTH,
-        height: FACTORY_NODE_CARD_HEIGHT,
+        width: size.width,
+        height: size.height,
       };
     });
 
   const rawEdges = canvas.edges.map((edge, index) => toFlowEdge(edge, index));
   const layout = layoutFactoryRunLeafGraph(
-    rawNodes.map((node) => ({ id: node.id, position: node.position })),
+    rawNodes.map((node) => ({ id: node.id, position: node.position, width: node.width, height: node.height })),
     rawEdges.map((edge) => ({
       id: edge.id,
       source: edge.source,

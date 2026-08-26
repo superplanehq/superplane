@@ -91,6 +91,19 @@ export const FACTORY_HANDLE_STYLE = {
 /** Keep FactoryNodeCard, append ghost, placement gap, and ELK estimates aligned. */
 export const FACTORY_NODE_CARD_WIDTH = 280;
 export const FACTORY_NODE_CARD_HEIGHT = 104;
+export const FACTORY_NODE_STEP_CARD_WIDTH = 320;
+const FACTORY_NODE_STEP_ROW_HEIGHT = 28;
+const FACTORY_NODE_STEP_LIST_PADDING = 20;
+
+export function factoryNodeCardSize(stepCount = 0): { width: number; height: number } {
+  if (stepCount <= 0) {
+    return { width: FACTORY_NODE_CARD_WIDTH, height: FACTORY_NODE_CARD_HEIGHT };
+  }
+  return {
+    width: FACTORY_NODE_STEP_CARD_WIDTH,
+    height: FACTORY_NODE_CARD_HEIGHT + FACTORY_NODE_STEP_LIST_PADDING + stepCount * FACTORY_NODE_STEP_ROW_HEIGHT,
+  };
+}
 /** Vertical gap below a factory card in persisted ELK layout, live, and run. */
 export const FACTORY_NODE_VERTICAL_GAP = 64;
 /**
