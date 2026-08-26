@@ -4,13 +4,14 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryApps, useFactoryWorkOrders, useUpdateFactoryLine } from "@/hooks/useFactoryData";
-import { useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
+import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useMe } from "@/hooks/useMe";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
+import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
@@ -89,8 +90,10 @@ import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
 import {
+  apiIntakeSource,
   intakeSourcesFromFactoryIntakes,
   isFirstRunOnboardingFactory,
+  isLineIntakeSourceId,
   type ConfiguredLineIntakeSource,
 } from "./lineIntakeModel";
 import { isIntakeSettingsTab } from "./intakeSourceSettingsModel";
@@ -141,6 +144,7 @@ export function LinesPage() {
   const { data: me } = useMe(false);
   const listState = useWorkOrderListState(factoryId);
   const { data: factoryIntakes = [] } = useFactoryIntakes(organizationId, factoryId);
+  const createIntake = useCreateFactoryIntake(organizationId, factoryId);
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
 
@@ -208,6 +212,28 @@ export function LinesPage() {
             organizationId={organizationId}
             factoryId={factoryId}
             editAutomationHrefFor={editAutomationHrefFor}
+            onSelectIntakeTemplate={(template) => {
+              if (!isLineIntakeSourceId(template.id)) {
+                showErrorToast("This intake template is not available yet.");
+                return;
+              }
+              createIntake
+                .mutateAsync({ source: apiIntakeSource(template.id) })
+                .then((intake) => {
+                  if (!intake.canvasId) {
+                    return;
+                  }
+                  navigate(
+                    factoryAppConfigurePath(organizationId, factoryKey, intake.canvasId, {
+                      from: "lines",
+                      lineId: selectedLine.id,
+                    }),
+                  );
+                })
+                .catch((error) => {
+                  showErrorToast(getUsageLimitToastMessage(error, "Failed to create intake automation"));
+                });
+            }}
             onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
           />
         ) : null}

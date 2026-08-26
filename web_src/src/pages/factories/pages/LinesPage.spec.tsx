@@ -31,6 +31,8 @@ const updateFactoryLineMutateAsync = vi.fn();
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
 const useFactoryApps = vi.fn(() => ({ data: [] as FactoryApp[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
+const createFactoryIntakeMutateAsync = vi.fn();
+
 const SENTRY_INTAKE_ID = "intake-sentry";
 const PAGERDUTY_INTAKE_ID = "intake-pagerduty";
 
@@ -69,6 +71,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useFactoryIntakes: () => useFactoryIntakes(),
   useFactoryIntakeRuns: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
+  useCreateFactoryIntake: () => ({ mutateAsync: createFactoryIntakeMutateAsync, isPending: false }),
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
 }));
 
@@ -188,6 +191,7 @@ describe("LinesPage board", () => {
     useFactoryWorkOrders.mockReturnValue({ data: [] });
     useFactoryApps.mockReturnValue({ data: [] });
     useFactoryIntakes.mockReturnValue({ data: [] });
+    createFactoryIntakeMutateAsync.mockReset();
     useWorkOrderChecks.mockReset();
     useWorkOrderChecks.mockImplementation(
       (_organizationId: string, _factoryId: string, orderId: string, options?: { enabled?: boolean }) => ({
