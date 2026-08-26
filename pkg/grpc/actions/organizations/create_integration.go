@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -82,8 +83,9 @@ func CreateIntegrationWithUsage(
 
 	//
 	// If the integration and organization support the new flow, use it.
+	// Public GitHub App install skips the wizard and uses Sync instead.
 	//
-	if registry.UseNewSetupFlow(org, integrationName) {
+	if registry.UseNewSetupFlow(org, integrationName) && !github.UseHostedInstall(org.String(), integrationName) {
 		newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, nil)
 		if err != nil {
 			integrationLogger.WithError(err).Error("failed to create integration")

@@ -71,6 +71,73 @@ func Test__GitHub__Sync(t *testing.T) {
 		assert.Equal(t, metadata.Owner, "testhq")
 		assert.NotEmpty(t, metadata.State)
 	})
+
+	t.Run("hosted public app", func(t *testing.T) {
+		setHostedAppEnv(t)
+		restore := withFactoriesEnabledForTest(func(string) bool { return true })
+		t.Cleanup(restore)
+
+		integrationCtx := &contexts.IntegrationContext{}
+		require.NoError(t, g.Sync(core.SyncContext{
+			OrganizationID: "11111111-1111-1111-1111-111111111111",
+			Integration:    integrationCtx,
+		}))
+
+		require.NotNil(t, integrationCtx.BrowserAction)
+		assert.Equal(t, "GET", integrationCtx.BrowserAction.Method)
+		assert.Empty(t, integrationCtx.BrowserAction.FormFields)
+		assert.Contains(t, integrationCtx.BrowserAction.URL, "https://github.com/apps/superplane/installations/new?state=")
+		assert.NotContains(t, integrationCtx.BrowserAction.URL, "settings/apps/new")
+
+		require.NotNil(t, integrationCtx.Metadata)
+		metadata := integrationCtx.Metadata.(common.Metadata)
+		assert.True(t, metadata.HostedApp)
+		assert.Equal(t, int64(99), metadata.GitHubApp.ID)
+		assert.Equal(t, "superplane", metadata.GitHubApp.Slug)
+		assert.NotEmpty(t, metadata.State)
+		assert.Empty(t, metadata.InstallationID)
+	})
+
+	t.Run("hosted env without factories keeps manifest flow", func(t *testing.T) {
+		setHostedAppEnv(t)
+		restore := withFactoriesEnabledForTest(func(string) bool { return false })
+		t.Cleanup(restore)
+
+		integrationCtx := &contexts.IntegrationContext{}
+		require.NoError(t, g.Sync(core.SyncContext{
+			OrganizationID: "11111111-1111-1111-1111-111111111111",
+			Integration:    integrationCtx,
+		}))
+
+		require.NotNil(t, integrationCtx.BrowserAction)
+		assert.Equal(t, "POST", integrationCtx.BrowserAction.Method)
+		assert.Equal(t, "https://github.com/settings/apps/new", integrationCtx.BrowserAction.URL)
+	})
+}
+
+func Test__ownerFromRepositories(t *testing.T) {
+	assert.Equal(t, "acme", ownerFromRepositories([]common.Repository{
+		{URL: "https://github.com/acme/payments"},
+	}))
+	assert.Empty(t, ownerFromRepositories(nil))
+}
+
+func Test__ownerFromInstallation(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/app/installations/42", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":42,"account":{"login":"acme","type":"Organization"}}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	client := gh.NewClient(srv.Client())
+	baseURL, err := url.Parse(srv.URL + "/")
+	require.NoError(t, err)
+	client.BaseURL = baseURL
+
+	owner, err := ownerFromInstallation(context.Background(), client, "42")
+	require.NoError(t, err)
+	assert.Equal(t, "acme", owner)
 }
 
 func Test__listInstallationRepositories__paginates_all_pages(t *testing.T) {
