@@ -99,6 +99,7 @@ export function useFactoryAppSplitRunPage() {
     isLoading,
     liveError: live.isError,
     nodeId,
+    organizationId,
     phase,
     setNodeId,
     split,

@@ -62,4 +62,53 @@ describe("LiveLogStreamView", () => {
     expect(screen.getByText("Waiting for logs…")).toBeInTheDocument();
     expect(screen.queryByText("No log lines yet.")).not.toBeInTheDocument();
   });
+
+  it("badges kind and lists nested prompt tools", () => {
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [
+        {
+          index: 5,
+          text: "Implementation",
+          kind: "prompt",
+          preview: "You are implementing a fix",
+          lines: [],
+          events: [
+            { kind: "note", text: "Gathering context." },
+            {
+              kind: "tools",
+              id: "5-tools-0",
+              tools: [
+                {
+                  id: "5-tool-0",
+                  kind: "read",
+                  text: "pkg/foo.go",
+                  lines: ["package workers"],
+                  status: "passed",
+                  duration_ms: 80,
+                },
+              ],
+            },
+          ],
+          status: "running",
+          duration_ms: null,
+          started_at: 1,
+          collapsed: false,
+        },
+      ],
+      orphanLines: [],
+      error: null,
+      isStreaming: false,
+      toggleSection: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    render(<LiveLogStreamView execution={startedExecution} />);
+
+    expect(screen.getByText("prompt")).toBeInTheDocument();
+    expect(screen.getByText("You are implementing a fix")).toBeInTheDocument();
+    expect(screen.getByText("Gathering context.")).toBeInTheDocument();
+    expect(screen.getByText("read")).toBeInTheDocument();
+    expect(screen.getByText("pkg/foo.go")).toBeInTheDocument();
+    expect(screen.getByText("package workers")).toBeInTheDocument();
+  });
 });

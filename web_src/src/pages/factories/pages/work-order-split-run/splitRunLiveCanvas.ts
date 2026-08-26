@@ -285,6 +285,8 @@ function streamLineForNode(
     action: liveStreamAction(status, Boolean(execution)),
     iconSlug: presentation.iconSlug,
     iconSrc: presentation.iconSrc,
+    component: node.component,
+    executionId: execution?.id,
   };
 }
 

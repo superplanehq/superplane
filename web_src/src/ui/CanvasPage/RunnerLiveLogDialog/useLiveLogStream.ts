@@ -2,6 +2,14 @@ import { useCanvasId } from "@/hooks/useCanvasId";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { LiveLogStream, type LiveLogStreamHandlers } from "./liveLogStream";
+import {
+  appendLineToLatestSection,
+  closeOpenTool,
+  completeCommandSection,
+  endToolOnLatestSection,
+  startCommandSection,
+  startToolOnLatestSection,
+} from "./liveLogSections";
 import type { CommandSection, LogState } from "./types";
 import { useScrollToBottom } from "./useScrollToBottom";
 import type { ExecutionInfo } from "../../../pages/app/mappers/types";
@@ -54,7 +62,7 @@ export function finalizeRunningCommandSections(
       }
 
       return {
-        ...section,
+        ...closeOpenTool(section, status),
         status,
         duration_ms: commandSectionFinalDuration(section, endedAtMs),
         collapsed: status === "passed",
@@ -89,83 +97,6 @@ function applyStreamFailure(state: LogState, message: string, executionInFlight:
   return state;
 }
 
-function appendLineToLatestSection(state: LogState, text: string, replayLineSkip?: Map<number, number>): LogState {
-  if (state.sections.length === 0) {
-    return {
-      ...state,
-      orphanLines: [...state.orphanLines, text],
-    };
-  }
-
-  const lastSectionIndex = state.sections.length - 1;
-  const section = state.sections[lastSectionIndex];
-  const skipLeft = replayLineSkip?.get(section.index) ?? 0;
-  if (skipLeft > 0) {
-    replayLineSkip?.set(section.index, skipLeft - 1);
-    return state;
-  }
-
-  const nextSections = [...state.sections];
-  nextSections[lastSectionIndex] = {
-    ...section,
-    lines: [...section.lines, text],
-  };
-  return {
-    ...state,
-    sections: nextSections,
-  };
-}
-
-function pushCommandSection(state: LogState, index: number, text: string, startedAtMs: number | null): LogState {
-  if (state.sections.some((section) => section.index === index)) {
-    return state;
-  }
-
-  const section: CommandSection = {
-    index,
-    text,
-    lines: [],
-    status: "running",
-    duration_ms: null,
-    started_at: startedAtMs ?? Date.now(),
-    collapsed: false,
-  };
-
-  return {
-    ...state,
-    sections: [...state.sections, section],
-  };
-}
-
-function completeCommandSection(
-  state: LogState,
-  index: number,
-  status: "passed" | "failed",
-  durationMs: number,
-): LogState {
-  const existing = state.sections.find((section) => section.index === index);
-  if (!existing || existing.status !== "running") {
-    return state;
-  }
-
-  const nextSections = state.sections.map((section) => {
-    if (section.index !== index) {
-      return section;
-    }
-    return {
-      ...section,
-      status,
-      duration_ms: durationMs,
-      collapsed: status === "passed",
-    };
-  });
-
-  return {
-    ...state,
-    sections: nextSections,
-  };
-}
-
 function createStreamHandlers(
   reconnecting: boolean,
   replayLineSkip: Map<number, number>,
@@ -175,7 +106,7 @@ function createStreamHandlers(
   return {
     onLogLine: (text) => setState((prev) => appendLineToLatestSection(prev, text, replayLineSkip)),
     onStreamError: (message) => setState((prev) => applyStreamFailure(prev, message, executionInFlight)),
-    onCmdStart: (index, text, startedAtMs) => {
+    onCmdStart: (index, text, startedAtMs, kind, preview) => {
       setState((prev) => {
         const existing = prev.sections.find((section) => section.index === index);
         if (existing) {
@@ -184,11 +115,13 @@ function createStreamHandlers(
           }
           return prev;
         }
-        return pushCommandSection(prev, index, text, startedAtMs);
+        return startCommandSection(prev, index, text, startedAtMs, kind, preview);
       });
     },
     onCmdEnd: (index, status, durationMs) =>
       setState((prev) => completeCommandSection(prev, index, status, durationMs)),
+    onToolStart: (kind, text, id) => setState((prev) => startToolOnLatestSection(prev, kind, text, id)),
+    onToolEnd: (status, durationMs, id) => setState((prev) => endToolOnLatestSection(prev, status, durationMs, id)),
   };
 }
 
@@ -284,14 +217,22 @@ async function runLiveLogSession({
   }
 }
 
+export type LiveLogStreamSession = {
+  organizationId?: string;
+  canvasId?: string;
+};
+
 export function useLiveLogStream(
   executionId: string,
   executionInFlight: boolean,
   terminalCommandStatus: "passed" | "failed" | null,
   terminalAtMs: number | null,
+  session?: LiveLogStreamSession,
 ) {
-  const organizationId = useOrganizationId();
-  const canvasId = useCanvasId();
+  const routeOrganizationId = useOrganizationId();
+  const routeCanvasId = useCanvasId();
+  const organizationId = session?.organizationId || routeOrganizationId;
+  const canvasId = session?.canvasId || routeCanvasId;
   const [state, setState] = useState<LogState>(() => ({ ...initialLogState, isStreaming: true }));
 
   const scrollTrigger = useMemo(() => {

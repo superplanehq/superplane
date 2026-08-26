@@ -65,7 +65,11 @@ describe("streamFromLiveRun", () => {
 
     expect(stream.map((line) => line.nodeId)).toContain("on-run");
     expect(workflow?.status).toBe("passed");
+    expect(workflow?.component).toBe("semaphore.runWorkflow");
+    expect(workflow?.executionId).toBe("exec-run-workflow");
     expect(claude?.status).toBe("pending");
+    expect(claude?.component).toBe("runnerClaudeCode");
+    expect(claude?.executionId).toBeUndefined();
   });
 
   it("orders log lines by canvas topology, not execution time", () => {

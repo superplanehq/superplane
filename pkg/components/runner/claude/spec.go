@@ -138,6 +138,7 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 	prepareCommand := runner.BrokerCommand{
 		Name:    "Prepare Claude Code",
 		Command: `source "$SUPERPLANE_TASK_DIR/prepare.sh"`,
+		Kind:    runner.LiveLogKindSetup,
 	}
 	return ClaudeCodeBrokerTask{
 		Commands: append([]runner.BrokerCommand{prepareCommand}, stepCommands...),
@@ -159,7 +160,7 @@ func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, model, nodeWorking
 			Path:    "steps/" + scriptName,
 			Content: command,
 			Mode:    "0644",
-		}, claudeBashStepBrokerCommand(step.Name, scriptName, workingDirectory)
+		}, claudeBashStepBrokerCommand(step.Name, scriptName, command, workingDirectory)
 	default:
 		prompt := ""
 		if step.Prompt != nil {
@@ -170,7 +171,7 @@ func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, model, nodeWorking
 			Path:    "prompts/" + promptName,
 			Content: prompt,
 			Mode:    "0644",
-		}, claudePromptStepBrokerCommand(step.Name, promptName, model, workingDirectory)
+		}, claudePromptStepBrokerCommand(step.Name, promptName, prompt, model, workingDirectory)
 	}
 }
 
@@ -198,14 +199,16 @@ func claudePrepareScript(workdir string) string {
 	return prepare.String()
 }
 
-func claudeBashStepBrokerCommand(stepName, scriptName, workingDirectory string) runner.BrokerCommand {
+func claudeBashStepBrokerCommand(stepName, scriptName, command, workingDirectory string) runner.BrokerCommand {
 	return runner.BrokerCommand{
 		Name:    runner.AgentStepLabel(stepName, scriptName),
 		Command: runner.WrapAgentStepCommand(runner.WrapCommandInWorkingDirectory(workingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName))),
+		Kind:    runner.LiveLogKindBash,
+		Preview: runner.LiveLogPreview(command),
 	}
 }
 
-func claudePromptStepBrokerCommand(stepName, promptName, model, workingDirectory string) runner.BrokerCommand {
+func claudePromptStepBrokerCommand(stepName, promptName, prompt, model, workingDirectory string) runner.BrokerCommand {
 	return runner.BrokerCommand{
 		Name: runner.AgentStepLabel(stepName, promptName),
 		Command: runner.WrapAgentStepCommand(
@@ -218,5 +221,7 @@ func claudePromptStepBrokerCommand(stepName, promptName, model, workingDirectory
 				),
 			),
 		),
+		Kind:    runner.LiveLogKindPrompt,
+		Preview: runner.LiveLogPreview(prompt),
 	}
 }
