@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
@@ -12,15 +13,55 @@ function renderPopup(
   props: Omit<ComponentProps<typeof PlanningReviewPopup>, "onClose"> & { onClose?: () => void } = {},
 ) {
   return render(
-    <ThemeProvider>
-      <TooltipProvider>
-        <PlanningReviewPopup onClose={props.onClose ?? vi.fn()} {...props} />
-      </TooltipProvider>
-    </ThemeProvider>,
+    <MemoryRouter>
+      <ThemeProvider>
+        <TooltipProvider>
+          <PlanningReviewPopup onClose={props.onClose ?? vi.fn()} {...props} />
+        </TooltipProvider>
+      </ThemeProvider>
+    </MemoryRouter>,
   );
 }
 
 describe("PlanningReviewPopup", () => {
+  it("uses Editing Agent when the draft has several agents", () => {
+    renderPopup();
+
+    expect(screen.getByRole("heading", { name: "Editing Agent" })).toBeInTheDocument();
+    expect(screen.queryByTestId("planning-review-title-input")).not.toBeInTheDocument();
+  });
+
+  it("uses the agent name when the draft has one agent", () => {
+    renderPopup({
+      initialDraft: {
+        ...PLANNING_REVIEW_DRAFT,
+        components: [PLANNING_REVIEW_DRAFT.components[1]],
+      },
+    });
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Agent - Implement from order description" }),
+    ).toBeInTheDocument();
+  });
+
+  it("notes that agents are part of an automation and links to the automation editor", () => {
+    renderPopup({ automationHref: "/organizations/org-1/factories/refunds/apps/app-1?configure=1" });
+
+    const note = screen.getByTestId("planning-review-automation-note");
+    expect(within(note).getByText(/Agents are part of an automation/)).toBeInTheDocument();
+    expect(within(note).getByRole("link", { name: "Edit Automation" })).toHaveAttribute(
+      "href",
+      "/organizations/org-1/factories/refunds/apps/app-1?configure=1",
+    );
+  });
+
+  it("keeps the note without a link when the automation is unknown", () => {
+    renderPopup();
+
+    const note = screen.getByTestId("planning-review-automation-note");
+    expect(within(note).queryByRole("link")).not.toBeInTheDocument();
+  });
+
   it("shows one collapsed component and one expanded runner component", () => {
     renderPopup();
 
@@ -108,20 +149,6 @@ describe("PlanningReviewPopup", () => {
     expect(implementationToggle).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("renames the column from the title immediately", async () => {
-    const onRename = vi.fn();
-    const user = userEvent.setup();
-    renderPopup({ onRename });
-
-    await user.click(screen.getByTestId("planning-review-title"));
-    const input = screen.getByTestId("planning-review-title-input");
-    await user.clear(input);
-    await user.type(input, "Plan review{Enter}");
-
-    expect(screen.getByTestId("planning-review-title")).toHaveTextContent("Plan review");
-    expect(onRename).toHaveBeenCalledWith("Plan review");
-  });
-
   it("saves component configuration and closes", async () => {
     const onClose = vi.fn();
     const onSave = vi.fn();
@@ -132,6 +159,7 @@ describe("PlanningReviewPopup", () => {
     const max = screen.getByTestId("planning-review-concurrency-max-implementation-agent");
     await user.clear(max);
     await user.type(max, "8");
+    expect(screen.getByTestId("planning-review-save")).toHaveTextContent("Save Agent");
     await user.click(screen.getByTestId("planning-review-save"));
 
     expect(onSave).toHaveBeenCalledWith(

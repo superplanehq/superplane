@@ -782,7 +782,7 @@ describe("WorkOrderSplitRunPopup", () => {
     await user.click(within(plan).getByTestId("split-run-phase-edit-plan"));
 
     const editor = screen.getByTestId("lines-planning-review");
-    expect(within(editor).getByRole("heading", { name: "Create plan" })).toBeInTheDocument();
+    expect(within(editor).getByRole("heading", { name: "Editing Agent" })).toBeInTheDocument();
     expect(screen.getByTestId("split-run-stream-plan")).toBeInTheDocument();
 
     await user.click(within(editor).getByRole("button", { name: "Cancel" }));

@@ -96,3 +96,8 @@ export const PLANNING_REVIEW_DRAFT: PlanningReviewDraft = {
     },
   ],
 };
+
+export const PLANNING_REVIEW_SINGLE_AGENT_DRAFT: PlanningReviewDraft = {
+  title: "Planning review",
+  components: [{ ...PLANNING_REVIEW_DRAFT.components[1], expanded: true }],
+};
