@@ -41,6 +41,12 @@ const (
 	intakeConfidenceCautionAt  = 3
 	intakeConfidenceCriticalAt = 2
 
+	// intakeConcurrencyMax is how many items an intake node works on at once.
+	// A node runs one execution at a time by default, which makes a batch of
+	// items wait for each other: a seeded batch, or a source that reports many
+	// items in a burst, would take as long as the sum of its analyses.
+	intakeConcurrencyMax = 100
+
 	DefaultIntakeConfidencePct = 65
 )
 
@@ -173,6 +179,7 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 					Type:          yaml.NodeTypeAction,
 					Component:     request.Agent.component(),
 					Configuration: intakeAnalysisConfiguration(spec, request.Agent),
+					Concurrency:   intakeConcurrency(),
 					Position:      yaml.Position{X: 160, Y: 260},
 				},
 				{
@@ -183,7 +190,8 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 					Configuration: map[string]any{
 						"expression": intakeThresholdExpression(request.ConfidencePct),
 					},
-					Position: yaml.Position{X: 160, Y: 440},
+					Concurrency: intakeConcurrency(),
+					Position:    yaml.Position{X: 160, Y: 440},
 				},
 				{
 					ID:        intakeCreateNodeID,
@@ -194,7 +202,8 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 						"title":       spec.createTitle,
 						"description": spec.createDescription,
 					},
-					Position: yaml.Position{X: 160, Y: 620},
+					Concurrency: intakeConcurrency(),
+					Position:    yaml.Position{X: 160, Y: 620},
 				},
 				{
 					ID:        intakeReportConfidenceNodeID,
@@ -212,11 +221,20 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 						"cautionAt":  float64(intakeConfidenceCautionAt),
 						"criticalAt": float64(intakeConfidenceCriticalAt),
 					},
-					Position: yaml.Position{X: 160, Y: 800},
+					Concurrency: intakeConcurrency(),
+					Position:    yaml.Position{X: 160, Y: 800},
 				},
 			},
 		},
 	}, nil
+}
+
+// intakeConcurrency returns the concurrency of one intake node. Each node owns
+// its spec, so a later edit to one node cannot reach the others. Only action
+// nodes take a spec; a trigger has no queue to widen.
+func intakeConcurrency() *yaml.ConcurrencySpec {
+	max := intakeConcurrencyMax
+	return &yaml.ConcurrencySpec{Max: &max}
 }
 
 // intakeTriggerConfiguration lays the binding over the template so the trigger
@@ -270,8 +288,15 @@ func intakeAnalysisPrompt(subject string) string {
 	}, "\n")
 }
 
+// intakeAnalysisScorePath reads the score out of the analysis node's output. A
+// node reference resolves to one event, whose data holds the runner's result,
+// so the path walks straight into it rather than indexing a list.
+func intakeAnalysisScorePath() string {
+	return fmt.Sprintf(`$[%q].data.result.result`, intakeAnalysisNodeName)
+}
+
 func intakeThresholdExpression(confidencePct int) string {
-	return fmt.Sprintf(`int($[%q].data[0].result.result) >= %d`, intakeAnalysisNodeName, clampIntakeConfidence(confidencePct))
+	return fmt.Sprintf(`int(%s) >= %d`, intakeAnalysisScorePath(), clampIntakeConfidence(confidencePct))
 }
 
 func intakeWorkOrderIDExpression() string {
@@ -284,8 +309,8 @@ func intakeWorkOrderIDExpression() string {
 func intakeConfidenceScoreExpression() string {
 	pctPerPoint := 100 / intakeConfidenceScoreMax
 	return fmt.Sprintf(
-		`{{ int(round(int($[%q].data[0].result.result) / %d.0)) }}`,
-		intakeAnalysisNodeName, pctPerPoint,
+		`{{ int(round(int(%s) / %d.0)) }}`,
+		intakeAnalysisScorePath(), pctPerPoint,
 	)
 }
 
