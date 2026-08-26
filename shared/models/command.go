@@ -8,10 +8,13 @@ import (
 )
 
 // CommandSpec is one shell directive in a command_list task.
-// JSON must be {"name","command"} (name optional).
+// JSON must be {"name","command"} (name optional). Kind and Preview are
+// optional live-log labels (bash/prompt/setup and a user-facing snippet).
 type CommandSpec struct {
 	Name    string `json:"name,omitempty"`
 	Command string `json:"command"`
+	Kind    string `json:"kind,omitempty"`
+	Preview string `json:"preview,omitempty"`
 }
 
 // DisplayText is the live-log accordion title (name when set, otherwise the shell).
@@ -103,6 +106,8 @@ func parseCommandSpecJSON(item json.RawMessage) (CommandSpec, error) {
 	}
 	spec.Name = strings.TrimSpace(spec.Name)
 	spec.Command = strings.TrimSpace(spec.Command)
+	spec.Kind = strings.TrimSpace(spec.Kind)
+	spec.Preview = strings.TrimSpace(spec.Preview)
 	return spec, nil
 }
 

@@ -155,6 +155,8 @@ func parseRunnerControlRecord(message string) (map[string]any, bool) {
 			Type      string `json:"type"`
 			Index     int    `json:"index"`
 			Text      string `json:"text"`
+			Kind      string `json:"kind"`
+			Preview   string `json:"preview"`
 			StartedAt *int64 `json:"started_at"`
 		}
 		if err := json.Unmarshal([]byte(message), &rec); err != nil {
@@ -168,8 +170,66 @@ func parseRunnerControlRecord(message string) (map[string]any, bool) {
 			"index": rec.Index,
 			"text":  rec.Text,
 		}
+		if kind := strings.TrimSpace(rec.Kind); kind != "" {
+			out["kind"] = kind
+		}
+		if preview := strings.TrimSpace(rec.Preview); preview != "" {
+			out["preview"] = preview
+		}
 		if rec.StartedAt != nil && *rec.StartedAt >= 0 {
 			out["started_at"] = *rec.StartedAt
+		}
+		return out, true
+	case "tool_start":
+		var rec struct {
+			Type      string `json:"type"`
+			ID        string `json:"id"`
+			Kind      string `json:"kind"`
+			Text      string `json:"text"`
+			StartedAt *int64 `json:"started_at"`
+		}
+		if err := json.Unmarshal([]byte(message), &rec); err != nil {
+			return nil, false
+		}
+		out := map[string]any{
+			"type": "tool_start",
+			"kind": strings.TrimSpace(rec.Kind),
+			"text": rec.Text,
+		}
+		if id := strings.TrimSpace(rec.ID); id != "" {
+			out["id"] = id
+		}
+		if rec.StartedAt != nil && *rec.StartedAt >= 0 {
+			out["started_at"] = *rec.StartedAt
+		}
+		return out, true
+	case "tool_end":
+		var rec struct {
+			Type       string `json:"type"`
+			ID         string `json:"id"`
+			Kind       string `json:"kind"`
+			Status     string `json:"status"`
+			DurationMS int64  `json:"duration_ms"`
+		}
+		if err := json.Unmarshal([]byte(message), &rec); err != nil {
+			return nil, false
+		}
+		if rec.DurationMS < 0 {
+			return nil, false
+		}
+		if rec.Status != "passed" && rec.Status != "failed" {
+			return nil, false
+		}
+		out := map[string]any{
+			"type":        "tool_end",
+			"status":      rec.Status,
+			"duration_ms": rec.DurationMS,
+		}
+		if id := strings.TrimSpace(rec.ID); id != "" {
+			out["id"] = id
+		}
+		if kind := strings.TrimSpace(rec.Kind); kind != "" {
+			out["kind"] = kind
 		}
 		return out, true
 	case "cmd_end":

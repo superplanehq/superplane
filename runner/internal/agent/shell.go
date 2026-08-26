@@ -9,8 +9,10 @@ import (
 
 // shellDirective is one command_list entry with optional display name for live logs.
 type shellDirective struct {
-	Text  string
-	Shell string
+	Text    string
+	Shell   string
+	Kind    string
+	Preview string
 }
 
 func normalizeDirectiveLines(directives []string) []string {
@@ -41,8 +43,10 @@ func directivesFromCommands(commands models.CommandList) []shellDirective {
 			continue
 		}
 		out = append(out, shellDirective{
-			Text:  spec.DisplayText(),
-			Shell: shell,
+			Text:    spec.DisplayText(),
+			Shell:   shell,
+			Kind:    spec.Kind,
+			Preview: spec.Preview,
 		})
 	}
 	return out

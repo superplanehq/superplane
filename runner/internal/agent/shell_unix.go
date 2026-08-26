@@ -349,7 +349,7 @@ func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, dir
 			return 1, truncateString(sess.out.String(), max), err
 		}
 		commandStart := time.Now()
-		writeLiveLogCommandStart(sess.live, i, dir.Text, commandStart)
+		writeLiveLogCommandStart(sess.live, i, dir.Text, dir.Kind, dir.Preview, commandStart)
 		start := randomMark("s")
 		end := randomMark("e")
 		// ANSI-C $'…' emits SOH reliably on Bash 3.2 (macOS) and modern Linux; avoid echo -e (\001 via $').

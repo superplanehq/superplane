@@ -104,7 +104,7 @@ func runBashHost(
 
 	startedAt := time.Now()
 	bashIndex := len(setup)
-	writeLiveLogCommandStart(live, bashIndex, "bash "+bashProgramName, startedAt)
+	writeLiveLogCommandStart(live, bashIndex, "bash "+bashProgramName, "bash", liveLogPreview(task.Script), startedAt)
 	runErr := cmd.Run()
 	combinedOut.WriteString(buf.String())
 	out := truncateString(combinedOut.String(), max)
