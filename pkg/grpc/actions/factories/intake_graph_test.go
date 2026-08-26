@@ -95,7 +95,7 @@ func Test__ResolveIntakeGraph(t *testing.T) {
 func intakeSpecFromTemplate(t *testing.T, source string, confidencePct int) models.LiveCanvasSpec {
 	t.Helper()
 
-	canvas, err := buildIntakeCanvas(source, "", confidencePct, nil)
+	canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source, ConfidencePct: confidencePct})
 	require.NoError(t, err)
 
 	return models.LiveCanvasSpec{Nodes: canvas.Nodes(), Edges: canvas.Edges()}
