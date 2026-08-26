@@ -122,9 +122,17 @@ func Test__ownerFromRepositories(t *testing.T) {
 	assert.Empty(t, ownerFromRepositories(nil))
 }
 
-func Test__ownerFromCurrentInstallation(t *testing.T) {
+func Test__ownerFromInstallationAccount(t *testing.T) {
+	assert.Empty(t, ownerFromInstallationAccount(nil))
+	assert.Empty(t, ownerFromInstallationAccount(&gh.Installation{}))
+	assert.Equal(t, "acme", ownerFromInstallationAccount(&gh.Installation{
+		Account: &gh.User{Login: gh.Ptr("acme")},
+	}))
+}
+
+func Test__ownerFromAppInstallation(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "/installation", r.URL.Path)
+		require.Equal(t, "/app/installations/42", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"id":42,"account":{"login":"acme","type":"Organization"}}`))
 	}))
@@ -135,15 +143,25 @@ func Test__ownerFromCurrentInstallation(t *testing.T) {
 	require.NoError(t, err)
 	client.BaseURL = baseURL
 
-	owner, err := ownerFromCurrentInstallation(context.Background(), client)
+	owner, err := ownerFromAppInstallation(context.Background(), client, "42")
 	require.NoError(t, err)
 	assert.Equal(t, "acme", owner)
 }
 
 func Test__resolveInstallationOwner(t *testing.T) {
-	t.Run("uses current installation account", func(t *testing.T) {
+	t.Run("uses repository owner first", func(t *testing.T) {
+		assert.Equal(
+			t,
+			"acme",
+			resolveInstallationOwner(context.Background(), nil, "42", []common.Repository{
+				{URL: "https://github.com/acme/payments"},
+			}),
+		)
+	})
+
+	t.Run("uses app installation when no repositories", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, "/installation", r.URL.Path)
+			require.Equal(t, "/app/installations/42", r.URL.Path)
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"id":42,"account":{"login":"acme"}}`))
 		}))
@@ -154,33 +172,12 @@ func Test__resolveInstallationOwner(t *testing.T) {
 		require.NoError(t, err)
 		client.BaseURL = baseURL
 
-		assert.Equal(t, "acme", resolveInstallationOwner(context.Background(), client, nil))
-	})
-
-	t.Run("falls back to repositories when installation lookup fails", func(t *testing.T) {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, "/installation", r.URL.Path)
-			w.WriteHeader(http.StatusForbidden)
-		}))
-		t.Cleanup(srv.Close)
-
-		client := gh.NewClient(srv.Client())
-		baseURL, err := url.Parse(srv.URL + "/")
-		require.NoError(t, err)
-		client.BaseURL = baseURL
-
-		assert.Equal(
-			t,
-			"acme",
-			resolveInstallationOwner(context.Background(), client, []common.Repository{
-				{URL: "https://github.com/acme/payments"},
-			}),
-		)
+		assert.Equal(t, "acme", resolveInstallationOwner(context.Background(), client, "42", nil))
 	})
 
 	t.Run("empty when installation lookup fails and no repositories", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, "/installation", r.URL.Path)
+			require.Equal(t, "/app/installations/42", r.URL.Path)
 			w.WriteHeader(http.StatusForbidden)
 		}))
 		t.Cleanup(srv.Close)
@@ -190,7 +187,7 @@ func Test__resolveInstallationOwner(t *testing.T) {
 		require.NoError(t, err)
 		client.BaseURL = baseURL
 
-		assert.Empty(t, resolveInstallationOwner(context.Background(), client, nil))
+		assert.Empty(t, resolveInstallationOwner(context.Background(), client, "42", nil))
 	})
 }
 
