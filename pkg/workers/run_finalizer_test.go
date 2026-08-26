@@ -722,7 +722,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__KeepsDispatchAfterSettledSt
 	require.NotNil(t, inFlight.Run)
 
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
-		_, retryErr := order.RetryLineStep(tx, line, 1)
+		_, _, retryErr := order.RetryLineStep(tx, line, 1)
 		return retryErr
 	}))
 

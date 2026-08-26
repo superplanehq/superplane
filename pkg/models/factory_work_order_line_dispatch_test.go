@@ -292,7 +292,7 @@ func Test__FactoryWorkOrder__RetryLineStep__ReusesDispatchWithEarlierSteps(t *te
 	}))
 
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-		_, retryErr := order.RetryLineStep(tx, line, 1)
+		_, _, retryErr := order.RetryLineStep(tx, line, 1)
 		return retryErr
 	}))
 
@@ -356,7 +356,7 @@ func Test__FactoryWorkOrder__RetryLineStep__SettlesInFlightStepBeforeRerun(t *te
 	var retry *models.FactoryLineStepResult
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		var retryErr error
-		retry, retryErr = order.RetryLineStep(tx, line, 1)
+		retry, _, retryErr = order.RetryLineStep(tx, line, 1)
 		return retryErr
 	}))
 
@@ -426,8 +426,10 @@ func Test__FactoryWorkOrder__RetryLineStep__AdmitsQueuedWorkForFreedSlot(t *test
 		return nil
 	}))
 
+	var started []*models.FactoryLineStepResult
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-		_, retryErr := running.RetryLineStep(tx, line, 1)
+		var retryErr error
+		_, started, retryErr = running.RetryLineStep(tx, line, 1)
 		return retryErr
 	}))
 
@@ -447,4 +449,12 @@ func Test__FactoryWorkOrder__RetryLineStep__AdmitsQueuedWorkForFreedSlot(t *test
 	}
 	require.NotNil(t, implement)
 	assert.NotEqual(t, models.FactoryWorkOrderExecutionStatusFinished, implement.Status)
+
+	var admittedRun *models.CanvasRun
+	for _, result := range started {
+		if result.Execution != nil && result.Execution.WorkOrderID == queued.ID {
+			admittedRun = result.Run
+		}
+	}
+	require.NotNil(t, admittedRun, "admitted waiters must be in the started list so dispatch can publish them")
 }

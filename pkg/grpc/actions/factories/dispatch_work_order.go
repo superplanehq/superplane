@@ -48,7 +48,8 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 
 	var factory *models.Factory
 	var order *models.FactoryWorkOrder
-	var pendingRun *models.CanvasRun
+	var pendingRuns []*models.CanvasRun
+	var startedSteps []*models.FactoryLineStepResult
 	var logger *log.Entry
 	var fromState string
 
@@ -86,11 +87,12 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		}
 
 		if req.GetReplaceActive() && startIndex > 0 {
-			result, err := order.RetryLineStep(tx, line, startIndex)
+			_, started, err := order.RetryLineStep(tx, line, startIndex)
 			if err != nil {
 				return err
 			}
-			pendingRun = result.Run
+			startedSteps = started
+			pendingRuns = pendingRunsFromStepResults(started)
 			return nil
 		}
 
@@ -111,7 +113,8 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return err
 		}
 
-		pendingRun = result.Run
+		startedSteps = []*models.FactoryLineStepResult{result}
+		pendingRuns = pendingRunsFromStepResults(startedSteps)
 		return nil
 	})
 
@@ -119,18 +122,36 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}
 
-	if pendingRun != nil {
+	for _, pendingRun := range pendingRuns {
 		if err := messages.NewCanvasRunMessage(pendingRun.WorkflowID.String(), pendingRun.ID.String()).PublishPending(); err != nil {
 			logger.WithError(err).Errorf("Error publishing pending canvas run message: %v", err)
 		}
 	}
 
+	publishedOrders := map[uuid.UUID]struct{}{order.ID: {}}
 	if err := messages.PublishFactoryWorkOrderUpdated(
 		factoryID.String(),
 		order.ID.String(),
 		factoryevents.EventTypeLineStepExecutionCreated,
 	); err != nil {
 		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
+	}
+	for _, result := range startedSteps {
+		if result == nil || result.Execution == nil {
+			continue
+		}
+		extraID := result.Execution.WorkOrderID
+		if _, seen := publishedOrders[extraID]; seen {
+			continue
+		}
+		publishedOrders[extraID] = struct{}{}
+		if err := messages.PublishFactoryWorkOrderUpdated(
+			factoryID.String(),
+			extraID.String(),
+			factoryevents.EventTypeLineStepExecutionCreated,
+		); err != nil {
+			logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", extraID)
+		}
 	}
 
 	if fromState != order.State {
@@ -158,4 +179,14 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 	return &pb.DispatchWorkOrderResponse{
 		Order: serialized,
 	}, nil
+}
+
+func pendingRunsFromStepResults(results []*models.FactoryLineStepResult) []*models.CanvasRun {
+	var runs []*models.CanvasRun
+	for _, result := range results {
+		if result != nil && result.Run != nil {
+			runs = append(runs, result.Run)
+		}
+	}
+	return runs
 }

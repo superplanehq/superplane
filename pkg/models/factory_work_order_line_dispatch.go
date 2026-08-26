@@ -390,15 +390,17 @@ func (o *FactoryWorkOrder) AbandonActiveLineDispatch(tx *gorm.DB) error {
 
 // RetryLineStep starts stepIndex again on a traversal that already ran
 // earlier steps. It does not open a new dispatch, so earlier steps stay
-// on the same history.
-func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepIndex int) (*FactoryLineStepResult, error) {
+// on the same history. The second return lists every started step that
+// has a canvas run, including waiters this retry admitted. The caller
+// must publish those runs after commit.
+func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepIndex int) (*FactoryLineStepResult, []*FactoryLineStepResult, error) {
 	if stepIndex < 0 {
-		return nil, ErrFactoryLineStepOutOfRange
+		return nil, nil, ErrFactoryLineStepOutOfRange
 	}
 
 	byOrder, err := ListWorkOrderLineDispatchesByWorkOrderIDs(tx, []uuid.UUID{o.ID})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var onLine []FactoryWorkOrderLineDispatchRecord
@@ -411,33 +413,51 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 	target := pickDispatchForStepRetry(onLine, stepIndex)
 	if target == nil {
 		_, result, err := line.DispatchFrom(tx, o, stepIndex)
-		return result, err
+		return result, startedLineStepResults(result), err
 	}
 
 	active, err := o.FindActiveLineDispatch(tx)
 	if err == nil && active.ID != target.ID {
 		if err := o.AbandonActiveLineDispatch(tx); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := target.Reactivate(tx); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := target.settleOpenWorkFrom(tx, stepIndex); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
+	var started []*FactoryLineStepResult
 	for index := stepIndex; index < len(target.Steps); index++ {
-		if _, err := AdmitQueuedForStep(tx, line.ID, index); err != nil {
-			return nil, err
+		admitted, err := AdmitQueuedForStep(tx, line.ID, index)
+		if err != nil {
+			return nil, nil, err
+		}
+		started = append(started, startedLineStepResults(admitted...)...)
+	}
+
+	result, err := target.EnqueueOrStartStep(tx, o, stepIndex)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return result, append(started, startedLineStepResults(result)...), nil
+}
+
+func startedLineStepResults(results ...*FactoryLineStepResult) []*FactoryLineStepResult {
+	var started []*FactoryLineStepResult
+	for _, result := range results {
+		if result != nil && result.Run != nil {
+			started = append(started, result)
 		}
 	}
-
-	return target.EnqueueOrStartStep(tx, o, stepIndex)
+	return started
 }
 
 func (l *FactoryWorkOrderLineDispatch) settleOpenWorkFrom(tx *gorm.DB, stepIndex int) error {
