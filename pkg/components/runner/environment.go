@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -15,6 +16,14 @@ const (
 	EnvironmentValueSourceLiteral = "literal"
 	EnvironmentValueSourceSecret  = "secret"
 )
+
+// Runner tasks execute with a terminal attached, so commands like `git log`
+// send their output to a pager that then waits for a key press and blocks the
+// task until it times out. Task environments disable paging by default.
+var pagerDefaults = []BrokerEnvironmentVariable{
+	{Name: "GIT_PAGER", Value: "cat"},
+	{Name: "PAGER", Value: "cat"},
+}
 
 type EnvironmentFromEntry struct {
 	Source      string                       `json:"source" mapstructure:"source"`
@@ -193,7 +202,25 @@ func ResolveEnvironment(
 		resolved = append(resolved, variable)
 	}
 
-	return resolved, nil
+	return prependPagerDefaults(resolved), nil
+}
+
+// prependPagerDefaults keeps the configured environment authoritative: a
+// variable set by the node, an integration, or a secret is never replaced.
+func prependPagerDefaults(environment []BrokerEnvironmentVariable) []BrokerEnvironmentVariable {
+	defaults := make([]BrokerEnvironmentVariable, 0, len(pagerDefaults))
+	for _, variable := range pagerDefaults {
+		configured := slices.ContainsFunc(environment, func(existing BrokerEnvironmentVariable) bool {
+			return existing.Name == variable.Name
+		})
+		if configured {
+			continue
+		}
+
+		defaults = append(defaults, variable)
+	}
+
+	return append(defaults, environment...)
 }
 
 func appendImportedEnvironmentVariables(
