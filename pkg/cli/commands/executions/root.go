@@ -12,6 +12,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	var runID string
 	var limit int64
 	var before string
+	var follow bool
 
 	root := &cobra.Command{
 		Use:     "executions",
@@ -59,12 +60,14 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	logsCmd.Flags().StringVar(&runID, "run-id", "", "run ID")
 	logsCmd.Flags().StringVar(&nodeID, "node-id", "", "node ID")
 	logsCmd.Flags().Int64Var(&limit, "limit", 200, "maximum number of log records to return per execution")
+	logsCmd.Flags().BoolVar(&follow, "follow", false, "keep the command running and print new log records as they arrive, until the runner finishes")
 	core.Bind(logsCmd, &LogsCommand{
 		CanvasID:    &appID,
 		ExecutionID: &executionID,
 		RunID:       &runID,
 		NodeID:      &nodeID,
 		Limit:       &limit,
+		Follow:      &follow,
 	}, options)
 
 	root.AddCommand(listCmd)

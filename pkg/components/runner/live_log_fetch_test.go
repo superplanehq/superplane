@@ -22,7 +22,7 @@ func TestReadLiveLogRecordsReturnsAfterLimitOnOpenStream(t *testing.T) {
 
 	done := make(chan liveLogReadResult, 1)
 	go func() {
-		result, err := readLiveLogRecords(reader, 1)
+		result, err := readLiveLogRecords(reader, 1, nil)
 		done <- liveLogReadResult{result: result, err: err}
 	}()
 
@@ -41,7 +41,7 @@ func TestReadLiveLogRecordsReturnsAfterLimitOnOpenStream(t *testing.T) {
 }
 
 func TestReadLiveLogRecordsStopsAfterLimitEvenWhenNextLineIsInvalid(t *testing.T) {
-	result, err := readLiveLogRecords(strings.NewReader(`{"type":"line","text":"first"}`+"\nnot-json\n"), 1)
+	result, err := readLiveLogRecords(strings.NewReader(`{"type":"line","text":"first"}`+"\nnot-json\n"), 1, nil)
 
 	require.NoError(t, err)
 	require.Len(t, result.Records, 1)
@@ -56,7 +56,7 @@ func TestReadLiveLogRecordsUntilIdleReturnsPartialOpenStream(t *testing.T) {
 
 	done := make(chan liveLogReadResult, 1)
 	go func() {
-		result, err := readLiveLogRecordsUntilIdle(context.Background(), reader, 10, 20*time.Millisecond)
+		result, err := readLiveLogRecordsUntilIdle(context.Background(), reader, 10, 20*time.Millisecond, nil)
 		done <- liveLogReadResult{result: result, err: err}
 	}()
 
@@ -82,7 +82,7 @@ func TestReadLiveLogRecordsUntilIdleReturnsContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan liveLogReadResult, 1)
 	go func() {
-		result, err := readLiveLogRecordsUntilIdle(ctx, reader, 10, time.Minute)
+		result, err := readLiveLogRecordsUntilIdle(ctx, reader, 10, time.Minute, nil)
 		done <- liveLogReadResult{result: result, err: err}
 	}()
 
@@ -105,6 +105,7 @@ func TestDrainReadyLiveLogReadEventsKeepsQueuedRecord(t *testing.T) {
 		[]LiveLogRecord{{Type: "line", Text: "first"}},
 		events,
 		10,
+		nil,
 	)
 
 	require.NoError(t, err)

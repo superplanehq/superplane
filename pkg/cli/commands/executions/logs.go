@@ -21,6 +21,7 @@ type LogsCommand struct {
 	RunID       *string
 	NodeID      *string
 	Limit       *int64
+	Follow      *bool
 }
 
 type runnerLogTarget struct {
@@ -47,6 +48,16 @@ func (c *LogsCommand) Execute(ctx core.CommandContext) error {
 	targets, err := c.resolveTargets(ctx, canvasID)
 	if err != nil {
 		return err
+	}
+
+	if c.Follow != nil && *c.Follow {
+		if !ctx.Renderer.IsText() {
+			return fmt.Errorf("--follow is only supported with text output")
+		}
+		if len(targets) != 1 {
+			return fmt.Errorf("--follow is only supported when exactly one execution is selected, got %d; narrow the target with --execution-id", len(targets))
+		}
+		return c.followExecutionLogs(ctx, canvasID, targets[0])
 	}
 
 	outputs := make([]runnerLogOutput, 0, len(targets))
@@ -249,6 +260,37 @@ func (c *LogsCommand) fetchLiveLogSession(ctx core.CommandContext, canvasID, exe
 		return nil, err
 	}
 	return &session, nil
+}
+
+// followExecutionLogs tails a single execution's runner logs, printing each
+// record as it arrives, and returns once the runner finishes and the broker
+// closes the log stream (or --limit records have been streamed).
+func (c *LogsCommand) followExecutionLogs(ctx core.CommandContext, canvasID string, target runnerLogTarget) error {
+	header := runnerLogOutput{CanvasID: canvasID, ExecutionID: target.ExecutionID, NodeID: target.NodeID}
+
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		if err := renderRunnerLogHeader(stdout, header); err != nil {
+			return err
+		}
+
+		session, err := c.fetchLiveLogSession(ctx, canvasID, target.ExecutionID)
+		if err != nil {
+			return err
+		}
+
+		records, err := runneraction.FetchLiveLogSessionRecords(ctx.Context, *session, runneraction.LiveLogFetchOptions{
+			Limit:      normalizedLogLimit(c.Limit),
+			HTTPClient: logHTTPClient(ctx.API.GetConfig()),
+			OnRecord:   func(record runneraction.LiveLogRecord) { _ = renderRunnerLogRecord(stdout, record) },
+		})
+		if err != nil {
+			return fmt.Errorf("fetch runner logs for execution %s: %w", target.ExecutionID, err)
+		}
+		if records.Truncated {
+			_, _ = fmt.Fprintln(stdout, "... truncated")
+		}
+		return nil
+	})
 }
 
 func responseErrorMessage(status string, body []byte) string {
