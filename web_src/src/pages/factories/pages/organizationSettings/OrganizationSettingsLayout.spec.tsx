@@ -118,6 +118,6 @@ describe("OrganizationSettingsLayout", () => {
     expect(
       await screen.findByText("Review factory token usage and estimated model cost for this organization."),
     ).toBeInTheDocument();
-    expect(await screen.findByText("Hosted credit was added. Refreshing totals.")).toBeInTheDocument();
+    expect(await screen.findByText("Refreshing hosted credit totals.")).toBeInTheDocument();
   }, 10000);
 });

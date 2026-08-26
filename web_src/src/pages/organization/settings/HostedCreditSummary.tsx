@@ -1,5 +1,6 @@
 import { formatUsdCents, parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 import { Button } from "@/components/ui/button";
+import { hostedCreditRefreshMessage, type HostedCreditRefreshStatus } from "@/lib/hostedCredit";
 import { settingsInnerMetricCardClassName } from "./settingsPageStyles";
 
 type HostedCreditProduct = {
@@ -17,7 +18,7 @@ type HostedCreditSummaryProps = {
   hasBillingCustomer?: boolean;
   canManageBilling?: boolean;
   products?: HostedCreditProduct[];
-  creditAdded?: boolean;
+  creditRefreshStatus?: HostedCreditRefreshStatus;
   checkoutPending?: boolean;
   portalPending?: boolean;
   onAddCredit?: (productId: string) => void;
@@ -49,7 +50,7 @@ function HostedCreditSummaryCard({
   hasBillingCustomer = false,
   canManageBilling = false,
   products = [],
-  creditAdded = false,
+  creditRefreshStatus = "idle",
   checkoutPending = false,
   portalPending = false,
   onAddCredit,
@@ -61,6 +62,7 @@ function HostedCreditSummaryCard({
 }: HostedCreditSummaryProps & { remaining: number; grantTotal: number; billed: number }) {
   const warningMessage = hostedCreditWarning(remaining, remainingCreditWarning, billingEnabled);
   const showBillingActions = Boolean(billingEnabled && canManageBilling && (products.length > 0 || hasBillingCustomer));
+  const creditRefreshMessage = hostedCreditRefreshMessage(creditRefreshStatus);
 
   return (
     <div className={cardClassName}>
@@ -86,10 +88,8 @@ function HostedCreditSummaryCard({
           valueClassName={valueClassName}
         />
       </div>
-      {creditAdded ? (
-        <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">
-          Hosted credit was added. Refreshing totals.
-        </p>
+      {creditRefreshMessage ? (
+        <p className={`mt-3 text-sm ${creditRefreshClassName(creditRefreshStatus)}`}>{creditRefreshMessage}</p>
       ) : null}
       {warningMessage ? <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">{warningMessage}</p> : null}
       {showBillingActions ? (
@@ -104,6 +104,13 @@ function HostedCreditSummaryCard({
       ) : null}
     </div>
   );
+}
+
+function creditRefreshClassName(status: HostedCreditRefreshStatus) {
+  if (status === "added") {
+    return "text-emerald-700 dark:text-emerald-400";
+  }
+  return "text-gray-500 dark:text-gray-400";
 }
 
 function CreditMetric({

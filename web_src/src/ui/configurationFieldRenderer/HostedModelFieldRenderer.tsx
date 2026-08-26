@@ -28,13 +28,16 @@ export const HostedModelFieldRenderer: React.FC<FieldRendererProps> = (props) =>
   return <StringFieldRenderer {...props} />;
 };
 
-function useCanvasFactoryId(organizationId: string | undefined) {
+function useCanvasFactoryScope(organizationId: string | undefined) {
   const { appId } = useParams<{ appId?: string }>();
   const canvasQuery = useCanvas(organizationId ?? "", appId ?? "", {
     enabled: Boolean(organizationId && appId),
     staleTime: Infinity,
   });
-  return canvasQuery.data?.metadata?.factoryId;
+  return {
+    factoryId: canvasQuery.data?.metadata?.factoryId,
+    waitingForCanvas: Boolean(appId) && canvasQuery.isPending,
+  };
 }
 
 function SelectableModelField({
@@ -78,14 +81,15 @@ function SelectableModelField({
 }
 
 function useSelectableModels(organizationId: string | undefined, provider: string, fundingSource: "hosted" | "byok") {
-  const factoryId = useCanvasFactoryId(organizationId);
-  const hosted = useHostedLLMModels(organizationId, provider, fundingSource === "hosted", factoryId);
-  const byok = useBYOKLLMModels(organizationId, provider, fundingSource === "byok", factoryId);
+  const { factoryId, waitingForCanvas } = useCanvasFactoryScope(organizationId);
+  const modelsReady = !waitingForCanvas;
+  const hosted = useHostedLLMModels(organizationId, provider, fundingSource === "hosted" && modelsReady, factoryId);
+  const byok = useBYOKLLMModels(organizationId, provider, fundingSource === "byok" && modelsReady, factoryId);
   const query = fundingSource === "hosted" ? hosted : byok;
   const models = (fundingSource === "hosted" ? (hosted.data?.models ?? []) : (byok.data?.selected ?? []))
     .slice()
     .sort((left, right) => compareModelLabels(left.name || left.id || "", right.name || right.id || ""));
-  return { isLoading: query.isLoading, models };
+  return { isLoading: waitingForCanvas || query.isLoading, models };
 }
 
 function EmptyModelField({ fundingSource }: { fundingSource: "hosted" | "byok" }) {

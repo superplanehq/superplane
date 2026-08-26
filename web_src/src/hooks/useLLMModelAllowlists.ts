@@ -9,6 +9,7 @@ import {
   organizationsListHostedCreditProducts,
   organizationsUpdateByokllmModels,
 } from "@/api-client";
+import { hostedLLMModelsQueryKey } from "./useHostedLLMModels";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 import { factoryQueryKeys } from "./useFactoryData";
@@ -58,6 +59,9 @@ export function useUpdateBYOKLLMModels(organizationId: string) {
     onSuccess: (_data, input) => {
       void queryClient.invalidateQueries({
         queryKey: ["organizations", organizationId, "byok-models", input.provider],
+      });
+      void queryClient.invalidateQueries({
+        predicate: (query) => isFactoryBYOKModelsQuery(query.queryKey, organizationId, input.provider),
       });
     },
   });
@@ -176,8 +180,27 @@ export function useUpdateFactoryLLMModels(organizationId: string, factoryId: str
       void queryClient.invalidateQueries({
         queryKey: factoryLLMModelsQueryKey(organizationId, factoryId, input.provider, input.fundingSource),
       });
+      if (input.fundingSource === "hosted") {
+        void queryClient.invalidateQueries({
+          queryKey: hostedLLMModelsQueryKey(organizationId, input.provider, factoryId),
+        });
+        return;
+      }
+      void queryClient.invalidateQueries({
+        queryKey: byokLLMModelsQueryKey(organizationId, input.provider, factoryId),
+      });
     },
   });
 }
 
 export { BYOK_PROVIDERS };
+
+export function isFactoryBYOKModelsQuery(queryKey: readonly unknown[], organizationId: string, provider: string) {
+  return (
+    queryKey[0] === "factories" &&
+    queryKey[1] === organizationId &&
+    queryKey[3] === "llm-models" &&
+    queryKey[4] === provider &&
+    queryKey[5] === "byok"
+  );
+}

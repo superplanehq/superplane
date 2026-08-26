@@ -150,10 +150,11 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 		usePolarTestServer(t, server)
 
 		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-forwarded-for", "203.0.113.10, 10.0.0.1"))
+		spoofedIP := "198.51.100.1"
 		resp, err := CreateHostedCreditCheckout(
 			ctx,
 			r.Organization.ID.String(),
-			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25"},
+			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25", CustomerIpAddress: spoofedIP},
 			"",
 			"http://localhost:8000",
 		)

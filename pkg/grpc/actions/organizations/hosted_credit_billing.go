@@ -89,10 +89,7 @@ func CreateHostedCreditCheckout(
 		return nil, grpcerrors.Internal(err, "failed to create hosted credit checkout")
 	}
 
-	customerIP := strings.TrimSpace(req.GetCustomerIpAddress())
-	if customerIP == "" {
-		customerIP = clientIPFromContext(ctx)
-	}
+	customerIP := clientIPFromContext(ctx)
 
 	session, err := client.CreateCheckout(ctx, productID, organizationID.String(), email, hostedCreditCheckoutSuccessURL(baseURL, organizationID), customerIP)
 	if err != nil {

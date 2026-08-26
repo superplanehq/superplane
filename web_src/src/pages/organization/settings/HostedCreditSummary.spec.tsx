@@ -32,4 +32,21 @@ describe("HostedCreditSummary", () => {
     ]);
     expect(screen.getAllByRole("button", { name: "Add hosted credit" })).toHaveLength(3);
   });
+
+  it("shows the credit refresh message when checkout returns", () => {
+    render(
+      <HostedCreditSummary
+        remainingCreditCents="2500"
+        grantTotalCents="2500"
+        hostedBilledCents="0"
+        billingEnabled
+        creditRefreshStatus="refreshing"
+        cardClassName=""
+        labelClassName=""
+        valueClassName=""
+      />,
+    );
+
+    expect(screen.getByText("Refreshing hosted credit totals.")).toBeInTheDocument();
+  });
 });

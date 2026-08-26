@@ -1,6 +1,6 @@
-import { useEffect } from "react";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useOrganizationLLMSpend } from "@/hooks/useOrganizationLLMSpend";
+import { useHostedCreditReturnRefresh } from "@/hooks/useHostedCreditReturnRefresh";
 import {
   useCreateBillingPortalSession,
   useCreateHostedCreditCheckout,
@@ -8,6 +8,7 @@ import {
 } from "@/hooks/useLLMModelAllowlists";
 import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
+import { clearHostedCreditGrantSnapshot, rememberHostedCreditGrantSnapshot } from "@/lib/hostedCredit";
 import { showErrorToast } from "@/lib/toast";
 import { parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { useParams, useSearchParams } from "react-router";
@@ -24,12 +25,6 @@ export function OrganizationSettingsLLMSpendPage() {
   const [searchParams] = useSearchParams();
   const creditAdded = searchParams.get("credit") === "added";
 
-  useEffect(() => {
-    if (creditAdded) {
-      void refetch();
-    }
-  }, [creditAdded, refetch]);
-
   return (
     <FactorySettingsPageFrame
       title="LLM spend"
@@ -41,6 +36,7 @@ export function OrganizationSettingsLLMSpendPage() {
         error={error}
         isLoading={isLoading}
         organizationId={organizationId || ""}
+        refetch={refetch}
       />
     </FactorySettingsPageFrame>
   );
@@ -52,12 +48,14 @@ function LLMSpendBody({
   isLoading,
   error,
   creditAdded,
+  refetch,
 }: {
   organizationId: string;
   data: ReturnType<typeof useOrganizationLLMSpend>["data"];
   isLoading: boolean;
   error: unknown;
   creditAdded: boolean;
+  refetch: ReturnType<typeof useOrganizationLLMSpend>["refetch"];
 }) {
   if (isLoading) {
     return (
@@ -74,20 +72,29 @@ function LLMSpendBody({
     );
   }
 
-  return <LLMSpendLoaded creditAdded={creditAdded} data={data} organizationId={organizationId} />;
+  return <LLMSpendLoaded creditAdded={creditAdded} data={data} organizationId={organizationId} refetch={refetch} />;
 }
 
 function LLMSpendLoaded({
   organizationId,
   data,
   creditAdded,
+  refetch,
 }: {
   organizationId: string;
   data: NonNullable<ReturnType<typeof useOrganizationLLMSpend>["data"]>;
   creditAdded: boolean;
+  refetch: ReturnType<typeof useOrganizationLLMSpend>["refetch"];
 }) {
   const { canAct } = usePermissions();
-  const billing = useHostedCreditActions(organizationId, data.billingEnabled === true);
+  const grantTotalCents = parseWorkOrderMetric(data.grantTotalCents);
+  const billing = useHostedCreditActions(organizationId, data.billingEnabled === true, grantTotalCents);
+  const creditRefreshStatus = useHostedCreditReturnRefresh({
+    organizationId,
+    creditAdded,
+    grantTotalCents,
+    refetch,
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -105,7 +112,7 @@ function LLMSpendLoaded({
         hasBillingCustomer={data.hasBillingCustomer}
         canManageBilling={canAct("org", "update")}
         products={billing.products}
-        creditAdded={creditAdded}
+        creditRefreshStatus={creditRefreshStatus}
         checkoutPending={billing.checkoutPending}
         portalPending={billing.portalPending}
         onAddCredit={billing.startCheckout}
@@ -120,7 +127,7 @@ function LLMSpendLoaded({
   );
 }
 
-function useHostedCreditActions(organizationId: string, billingEnabled: boolean) {
+function useHostedCreditActions(organizationId: string, billingEnabled: boolean, grantTotalCents: number) {
   const productsQuery = useHostedCreditProducts(organizationId, billingEnabled);
   const checkout = useCreateHostedCreditCheckout(organizationId);
   const portal = useCreateBillingPortalSession(organizationId);
@@ -130,10 +137,12 @@ function useHostedCreditActions(organizationId: string, billingEnabled: boolean)
     checkoutPending: checkout.isPending,
     portalPending: portal.isPending,
     startCheckout: async (productId: string) => {
+      rememberHostedCreditGrantSnapshot(organizationId, grantTotalCents);
       try {
         const url = await checkout.mutateAsync(productId);
         window.location.assign(url);
       } catch (checkoutError) {
+        clearHostedCreditGrantSnapshot(organizationId);
         showErrorToast(getApiErrorMessage(checkoutError, "Unable to start checkout."));
       }
     },
