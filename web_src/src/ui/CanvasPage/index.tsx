@@ -2895,24 +2895,28 @@ function CanvasContent({
     const last = lastFitAllRequestRef.current;
     if (last?.nonce === fitAllRequest && last.runMode === isRunInspectionMode) return;
     let timeoutId: number | null = null;
+    let accepted = false;
     const runFit = (attempt: number) => {
-      const decision = shouldRunFitAllRequest({
-        hasFitted: hasFitToViewRef.current,
-        reactFlowReady: hasReactFlowInitialized,
-        isAutoFocusEnabled,
-        isFirstFitAllOnMount: lastFitAllRequestRef.current == null,
-      });
-      if (decision === "wait") {
-        if (attempt < 20) {
-          timeoutId = window.setTimeout(() => runFit(attempt + 1), 50);
+      if (!accepted) {
+        const decision = shouldRunFitAllRequest({
+          hasFitted: hasFitToViewRef.current,
+          reactFlowReady: hasReactFlowInitialized,
+          isAutoFocusEnabled,
+          isFirstFitAllOnMount: lastFitAllRequestRef.current == null,
+        });
+        if (decision === "wait") {
+          if (attempt < 20) {
+            timeoutId = window.setTimeout(() => runFit(attempt + 1), 50);
+          }
+          return;
         }
-        return;
-      }
-      // Consume the nonce so re-enabling auto-focus later does not retroactively
-      // replay this run's participant fit. The viewport stays where the user is.
-      lastFitAllRequestRef.current = { nonce: fitAllRequest, runMode: isRunInspectionMode };
-      if (decision === "skip") {
-        return;
+        // Consume the nonce so re-enabling auto-focus later does not retroactively
+        // replay this run's participant fit. The viewport stays where the user is.
+        lastFitAllRequestRef.current = { nonce: fitAllRequest, runMode: isRunInspectionMode };
+        if (decision === "skip") {
+          return;
+        }
+        accepted = true;
       }
       const focusIds = fitAllFocusNodeIds?.length ? new Set(fitAllFocusNodeIds) : null;
       const nodesById = new Map(stateRef.current.nodes.map((node) => [node.id, node]));
