@@ -28,6 +28,37 @@ type IntakeDependencies struct {
 	GitProvider    git.Provider
 	WebhookBaseURL string
 	UsageService   usage.Service
+	NewItemSource  IntakeItemSourceFactory
+}
+
+type IntakeItem struct {
+	ID    string
+	Key   string
+	Title string
+	Body  string
+	URL   string
+}
+
+type intakeItemSource interface {
+	Search(ctx context.Context, query string, limit int) ([]IntakeItem, error)
+	Get(ctx context.Context, id string) (*IntakeItem, error)
+}
+
+type IntakeItemSourceFactory func(
+	ctx context.Context,
+	tx *gorm.DB,
+	intake *models.FactoryIntake,
+) (intakeItemSource, error)
+
+func (d IntakeDependencies) itemSource(
+	ctx context.Context,
+	tx *gorm.DB,
+	intake *models.FactoryIntake,
+) (intakeItemSource, error) {
+	if d.NewItemSource != nil {
+		return d.NewItemSource(ctx, tx, intake)
+	}
+	return newLiveIntakeItemSource(ctx, d, tx, intake)
 }
 
 func CreateFactoryIntake(
