@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PhaseLogCard } from "./PhaseLogCard";
@@ -53,10 +54,48 @@ describe("PhaseLogCard title line", () => {
 
     expect(name.compareDocumentPosition(artifact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(artifact.compareDocumentPosition(duration) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(duration.className).toMatch(/ml-auto/);
     expect(artifact.className).toMatch(/font-bold/);
-    expect(name.className).toMatch(/flex-1/);
-    expect(within(row).getByTestId("split-run-phase-artifacts-plan").className).toMatch(/justify-end/);
+    // Artifacts and the duration share one right-aligned cluster. Separate
+    // `ml-auto` margins would split the free space and strand the artifacts
+    // mid-row.
+    const artifacts = within(row).getByTestId("split-run-phase-artifacts-plan");
+    expect(artifacts.parentElement).toBe(duration.parentElement);
+    expect(duration.parentElement?.className).toMatch(/ml-auto/);
+    expect(artifacts.className).not.toMatch(/ml-auto/);
+  });
+});
+
+describe("PhaseLogCard edit control", () => {
+  it("stays off collapsed phases", () => {
+    render(<PhaseLogCard phase={PHASE} expanded={false} onEdit={vi.fn()} />);
+
+    expect(screen.queryByTestId("split-run-phase-edit-plan")).not.toBeInTheDocument();
+  });
+
+  it("sits next to the name of an expanded phase", () => {
+    render(<PhaseLogCard phase={PHASE} expanded onEdit={vi.fn()} />);
+
+    const edit = screen.getByTestId("split-run-phase-edit-plan");
+    expect(edit).toHaveAccessibleName("Edit Plan automation");
+    expect(edit.previousElementSibling).toBe(screen.getByRole("button", { name: "Plan" }));
+  });
+
+  it("opens the automation editor without collapsing the phase", async () => {
+    const onEdit = vi.fn();
+    const onToggle = vi.fn();
+    const user = userEvent.setup();
+    render(<PhaseLogCard phase={PHASE} expanded onEdit={onEdit} onToggle={onToggle} />);
+
+    await user.click(screen.getByTestId("split-run-phase-edit-plan"));
+
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it("is absent when the log cannot edit automations", () => {
+    render(<PhaseLogCard phase={PHASE} expanded />);
+
+    expect(screen.queryByTestId("split-run-phase-edit-plan")).not.toBeInTheDocument();
   });
 });
 
@@ -83,6 +122,35 @@ describe("PhaseLogCard node line", () => {
     const duration = within(row).getByTestId("split-run-stream-duration-planner-agent");
     expect(duration).toHaveTextContent("01:20");
     expect(duration.className).toMatch(/text-right/);
+  });
+
+  it("floats the produced artifact next to the duration", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        stream={[
+          line({
+            id: "planner-agent",
+            componentName: "Agent - Plan for GH Issue",
+            duration: "1m 20s",
+            artifact: {
+              id: "art-plan",
+              type: "TYPE_MARKDOWN",
+              data: { name: "PLAN.md", title: "PLAN.md" },
+            },
+          }),
+        ]}
+      />,
+    );
+
+    const row = screen.getByTestId("split-run-stream-line-planner-agent");
+    const artifact = within(row).getByRole("button", { name: "PLAN.md" });
+    const duration = within(row).getByTestId("split-run-stream-duration-planner-agent");
+
+    expect(artifact.parentElement).toBe(duration.parentElement);
+    expect(artifact.parentElement?.className).toMatch(/ml-auto/);
+    expect(artifact.compareDocumentPosition(duration) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("aligns the node icon with the phase glyph column", () => {

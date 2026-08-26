@@ -1,6 +1,6 @@
 import { formatClockDurationLabel } from "@/lib/duration";
 import { cn, resolveIcon } from "@/lib/utils";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Pencil } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
@@ -190,6 +190,7 @@ export function PhaseLogCard({
   selectedNodeId,
   onToggle,
   onSelectNode,
+  onEdit,
   collapsible = true,
   organizationId,
   canvasId,
@@ -200,6 +201,7 @@ export function PhaseLogCard({
   selectedNodeId?: string | null;
   onToggle?: () => void;
   onSelectNode?: (nodeId: string) => void;
+  onEdit?: () => void;
   collapsible?: boolean;
   organizationId?: string;
   canvasId?: string;
@@ -230,7 +232,7 @@ export function PhaseLogCard({
             type="button"
             onClick={onToggle}
             aria-expanded={expanded}
-            className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+            className="flex min-w-0 items-center gap-1.5 text-left"
           >
             <ChevronRight
               className={cn("size-3 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")}
@@ -240,27 +242,30 @@ export function PhaseLogCard({
             <span className="min-w-0 truncate text-foreground">{phase.name}</span>
           </button>
         ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <div className="flex min-w-0 items-center gap-1.5">
             <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3" />
             <span className="min-w-0 truncate text-foreground">{phase.name}</span>
           </div>
         )}
+        {onEdit && expanded ? <PhaseEditButton phase={phase} onEdit={onEdit} /> : null}
         {phase.checks && phase.checks.length > 0 ? (
           <span className="shrink-0">
             <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
           </span>
         ) : null}
-        {!expanded && producedArtifacts.length > 0 ? (
-          <span
-            data-testid={`split-run-phase-artifacts-${phase.id}`}
-            className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
-          >
-            {producedArtifacts.map((artifact) => (
-              <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
-            ))}
-          </span>
-        ) : null}
-        <PhaseDuration phase={phase} />
+        <span className="ml-auto flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap">
+          {!expanded && producedArtifacts.length > 0 ? (
+            <span
+              data-testid={`split-run-phase-artifacts-${phase.id}`}
+              className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
+            >
+              {producedArtifacts.map((artifact) => (
+                <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
+              ))}
+            </span>
+          ) : null}
+          <PhaseDuration phase={phase} />
+        </span>
       </div>
 
       {expanded ? (
@@ -284,12 +289,28 @@ export function PhaseLogCard({
   );
 }
 
+/** Opens the automation editor for an expanded phase. */
+function PhaseEditButton({ phase, onEdit }: { phase: SplitRunPhase; onEdit: () => void }) {
+  return (
+    <button
+      type="button"
+      data-testid={`split-run-phase-edit-${phase.id}`}
+      aria-label={`Edit ${phase.name} automation`}
+      onClick={onEdit}
+      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-1.5 py-0.5 font-sans text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+    >
+      <Pencil className="size-2.5" aria-hidden />
+      Edit
+    </button>
+  );
+}
+
 function PhaseDuration({ phase }: { phase: SplitRunPhase }) {
   const duration = formatClockDurationLabel(phase.duration);
   return (
     <span
       data-testid={`split-run-phase-duration-${phase.id}`}
-      className="ml-auto min-w-[5ch] shrink-0 text-right tabular-nums [font-feature-settings:'zero'] text-muted-foreground"
+      className="min-w-[5ch] shrink-0 text-right tabular-nums [font-feature-settings:'zero'] text-muted-foreground"
     >
       {duration}
     </span>
@@ -304,7 +325,7 @@ function StreamDuration({ line }: { line: SplitRunStreamLine }) {
   return (
     <span
       data-testid={`split-run-stream-duration-${line.id}`}
-      className="ml-auto min-w-[5ch] shrink-0 text-right tabular-nums [font-feature-settings:'zero'] text-muted-foreground"
+      className="min-w-[5ch] shrink-0 text-right tabular-nums [font-feature-settings:'zero'] text-muted-foreground"
     >
       {duration}
     </span>
@@ -415,8 +436,10 @@ function StreamNodeHeader({
         </span>
         <span className={cn("shrink-0", streamTone(line.status))}>{action}</span>
       </button>
-      {artifact ? <StreamArtifact artifact={artifact} /> : null}
-      <StreamDuration line={line} />
+      <span className="ml-auto flex min-w-0 shrink-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap">
+        {artifact ? <StreamArtifact artifact={artifact} /> : null}
+        <StreamDuration line={line} />
+      </span>
     </div>
   );
 }

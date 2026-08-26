@@ -89,6 +89,8 @@ import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
+import { PlanningReviewPopup } from "./PlanningReviewPopup";
+import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import {
   apiIntakeSource,
   intakeSourcesFromFactoryIntakes,
@@ -1002,6 +1004,7 @@ function PhaseColumn({
   const scrollRef = useRef<HTMLUListElement>(null);
   const [visibleCount, setVisibleCount] = useState(LINE_PHASE_RUNS_PAGE_SIZE);
   const [parallelismOpen, setParallelismOpen] = useState(false);
+  const [planningReviewOpen, setPlanningReviewOpen] = useState(false);
   const totalRuns = column.runs.length;
   const hasMore = visibleCount < totalRuns;
 
@@ -1047,6 +1050,7 @@ function PhaseColumn({
             testId={`lines-phase-menu-${column.stepIndex}`}
             editHref={configureHref}
             editLabel={configureHref ? "Edit Automation" : undefined}
+            onEditAgent={configureHref ? () => setPlanningReviewOpen(true) : undefined}
             onSetParallelism={configureHref ? () => setParallelismOpen(true) : undefined}
             parallelism={parallelism}
             colorId={colorId}
@@ -1076,6 +1080,14 @@ function PhaseColumn({
         }}
         onClose={() => setParallelismOpen(false)}
       />
+      {planningReviewOpen ? (
+        <PlanningReviewPopup
+          onClose={() => setPlanningReviewOpen(false)}
+          organizationId={organizationId}
+          automationHref={configureHref ?? undefined}
+          initialDraft={{ ...PLANNING_REVIEW_DRAFT, title }}
+        />
+      ) : null}
     </>
   );
 }
