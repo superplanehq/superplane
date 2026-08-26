@@ -35,8 +35,9 @@ blocks:
             - make lint
 
         - name: Unit Tests
+          parallelism: 4
           commands:
-            - make test.coverage.check
+            - make test.coverage.autoparallel INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
 
         - name: E2E Tests
           parallelism: 10

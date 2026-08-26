@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -21,6 +21,8 @@ endif
 
 PKG_TEST_PACKAGES := ./pkg/...
 E2E_TEST_PACKAGES := ./test/e2e/...
+INDEX ?= 1
+TOTAL ?= 1
 
 COMPOSE=docker compose -f docker-compose.dev.yml
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client api/swagger/superplane.swagger.json
@@ -65,6 +67,9 @@ test.coverage:
 test.coverage.check:
 	$(MAKE) test.coverage
 	$(MAKE) check.coverage.go
+
+test.coverage.autoparallel:
+	$(COMPOSE) run --rm -e DB_NAME=superplane_test -e INDEX=$(INDEX) -e TOTAL=$(TOTAL) -v $(PWD)/tmp/screenshots:/app/test/screenshots app bash -lc "cd /app && bash scripts/test_unit_autoparallel.sh"
 
 test.coverage.baseline.update:
 	$(MAKE) test.coverage
