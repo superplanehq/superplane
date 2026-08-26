@@ -20,7 +20,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			models.FactoryIntakeSourceSentryExceptions:   "sentry.onIssue",
 			models.FactoryIntakeSourcePagerDutyIncidents: "pagerduty.onIncident",
 		} {
-			canvas, err := buildIntakeCanvas(source, "", DefaultIntakeConfidencePct, nil)
+			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source, ConfidencePct: DefaultIntakeConfidencePct})
 			require.NoError(t, err)
 
 			trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
@@ -30,7 +30,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 	})
 
 	t.Run("the item flows from the trigger to the work order", func(t *testing.T) {
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, nil)
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, ConfidencePct: DefaultIntakeConfidencePct})
 		require.NoError(t, err)
 
 		assert.Equal(t, []yaml.Edge{
@@ -42,7 +42,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 	})
 
 	t.Run("the created work order receives the intake confidence score", func(t *testing.T) {
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, nil)
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, ConfidencePct: DefaultIntakeConfidencePct})
 		require.NoError(t, err)
 
 		report := findSpecNode(t, canvas, intakeReportConfidenceNodeID)
@@ -55,7 +55,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 	})
 
 	t.Run("the score rounds onto the meter scale like the UI does", func(t *testing.T) {
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, nil)
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, ConfidencePct: DefaultIntakeConfidencePct})
 		require.NoError(t, err)
 
 		report := findSpecNode(t, canvas, intakeReportConfidenceNodeID)
@@ -72,7 +72,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 	})
 
 	t.Run("the check level follows the meter bands", func(t *testing.T) {
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, nil)
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, ConfidencePct: DefaultIntakeConfidencePct})
 		require.NoError(t, err)
 
 		report := findSpecNode(t, canvas, intakeReportConfidenceNodeID)
@@ -84,15 +84,64 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 	})
 
 	t.Run("the analysis runner asks for a machine", func(t *testing.T) {
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, nil)
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, ConfidencePct: DefaultIntakeConfidencePct})
 		require.NoError(t, err)
 
 		analysis := findSpecNode(t, canvas, intakeAnalysisNodeID)
 		assert.Equal(t, runner.MachineTypeE1LargeAMD64, analysis.Configuration["machineType"])
 	})
 
+	t.Run("the analysis runner authenticates with the workspace agent", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{
+			Source:        models.FactoryIntakeSourceGitHubIssues,
+			ConfidencePct: DefaultIntakeConfidencePct,
+			Agent: &intakeAgent{
+				Component: "runnerCodex",
+				Credentials: map[string]any{
+					"source":      runner.CredentialsSourceIntegration,
+					"integration": map[string]any{"name": "acme-openai"},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		analysis := findSpecNode(t, canvas, intakeAnalysisNodeID)
+		assert.Equal(t, "runnerCodex", analysis.Component)
+		assert.Equal(t, map[string]any{
+			"source":      runner.CredentialsSourceIntegration,
+			"integration": map[string]any{"name": "acme-openai"},
+		}, analysis.Configuration["credentials"])
+		// Codex reads its own default model, so the node leaves the model out.
+		assert.NotContains(t, analysis.Configuration, "model")
+	})
+
+	t.Run("a hosted agent names the model it runs", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{
+			Source:        models.FactoryIntakeSourceGitHubIssues,
+			ConfidencePct: DefaultIntakeConfidencePct,
+			Agent: &intakeAgent{
+				Component:   "runnerClaudeCode",
+				Credentials: map[string]any{"source": runner.CredentialsSourceHosted},
+				Model:       "claude-sonnet-4-6",
+			},
+		})
+		require.NoError(t, err)
+
+		analysis := findSpecNode(t, canvas, intakeAnalysisNodeID)
+		assert.Equal(t, "claude-sonnet-4-6", analysis.Configuration["model"])
+	})
+
+	t.Run("an intake without an agent leaves the credentials to the user", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, ConfidencePct: DefaultIntakeConfidencePct})
+		require.NoError(t, err)
+
+		analysis := findSpecNode(t, canvas, intakeAnalysisNodeID)
+		assert.Equal(t, intakeAgentSpecs[0].component, analysis.Component)
+		assert.NotContains(t, analysis.Configuration, "credentials")
+	})
+
 	t.Run("the threshold gates on the analysis score", func(t *testing.T) {
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", 80, nil)
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, ConfidencePct: 80})
 		require.NoError(t, err)
 
 		threshold := findSpecNode(t, canvas, intakeThresholdNodeID)
@@ -101,7 +150,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 
 	t.Run("confidence outside the scale is clamped", func(t *testing.T) {
 		for confidence, expected := range map[int]int{-20: 0, 0: 0, 65: 65, 100: 100, 140: 100} {
-			canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", confidence, nil)
+			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, ConfidencePct: confidence})
 			require.NoError(t, err)
 
 			threshold := findSpecNode(t, canvas, intakeThresholdNodeID)
@@ -112,17 +161,17 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 	})
 
 	t.Run("a given name wins over the source default", func(t *testing.T) {
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "Backlog triage", DefaultIntakeConfidencePct, nil)
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, Name: "Backlog triage", ConfidencePct: DefaultIntakeConfidencePct})
 		require.NoError(t, err)
 		assert.Equal(t, "Backlog triage", canvas.Metadata.Name)
 
-		canvas, err = buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "   ", DefaultIntakeConfidencePct, nil)
+		canvas, err = buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, Name: "   ", ConfidencePct: DefaultIntakeConfidencePct})
 		require.NoError(t, err)
 		assert.Equal(t, "GitHub issues", canvas.Metadata.Name)
 	})
 
 	t.Run("an unknown source has no graph", func(t *testing.T) {
-		_, err := buildIntakeCanvas("linear-issues", "", DefaultIntakeConfidencePct, nil)
+		_, err := buildIntakeCanvas(intakeCanvasRequest{Source: "linear-issues", ConfidencePct: DefaultIntakeConfidencePct})
 		assert.ErrorIs(t, err, models.ErrFactoryIntakeSourceInvalid)
 	})
 
@@ -131,7 +180,11 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			Integration:   &yaml.IntegrationRef{ID: "integration-1", Name: "acme-github"},
 			Configuration: map[string]any{"repository": "acme/backlog"},
 		}
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, binding)
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{
+			Source:        models.FactoryIntakeSourceGitHubIssues,
+			ConfidencePct: DefaultIntakeConfidencePct,
+			Binding:       binding,
+		})
 		require.NoError(t, err)
 
 		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
@@ -142,12 +195,16 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 	})
 
 	t.Run("a binding does not leak into the next intake", func(t *testing.T) {
-		_, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, &intakeBinding{
-			Configuration: map[string]any{"repository": "acme/backlog"},
+		_, err := buildIntakeCanvas(intakeCanvasRequest{
+			Source:        models.FactoryIntakeSourceGitHubIssues,
+			ConfidencePct: DefaultIntakeConfidencePct,
+			Binding: &intakeBinding{
+				Configuration: map[string]any{"repository": "acme/backlog"},
+			},
 		})
 		require.NoError(t, err)
 
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, nil)
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, ConfidencePct: DefaultIntakeConfidencePct})
 		require.NoError(t, err)
 
 		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)

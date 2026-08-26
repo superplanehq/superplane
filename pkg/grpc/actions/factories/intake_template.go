@@ -50,12 +50,17 @@ const (
 const intakeAnalysisMachineType = runner.MachineTypeE1LargeAMD64
 
 // intakeAnalysisComponents are the runners an intake can score with. Creation
-// always picks Claude Code, but a graph the user re-pointed at another runner
-// still has to resolve.
-var intakeAnalysisComponents = []string{
-	"runnerClaudeCode",
-	"runnerCodex",
-	"runnerOpenRouter",
+// picks the runner of the workspace agent, but a graph the user re-pointed at
+// another runner still has to resolve.
+var intakeAnalysisComponents = intakeAgentComponents()
+
+func intakeAgentComponents() []string {
+	components := make([]string, 0, len(intakeAgentSpecs))
+	for _, spec := range intakeAgentSpecs {
+		components = append(components, spec.component)
+	}
+
+	return components
 }
 
 type intakeSpec struct {
@@ -125,14 +130,16 @@ func intakeDefaultDescription(source string) string {
 // buildIntakeCanvas returns the canvas document for a new intake: listen on the
 // source, score the item with an agent, and create a work order when the score
 // clears the threshold. The binding tells the trigger which installation and
-// resource to listen on; without one the user completes the trigger by hand.
-func buildIntakeCanvas(source, name string, confidencePct int, binding *intakeBinding) (*yaml.Canvas, error) {
-	spec, ok := intakeSpecsBySource[source]
+// resource to listen on, and the agent tells the analysis node which runner to
+// score with; without them the user completes those nodes by hand.
+func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
+	spec, ok := intakeSpecsBySource[request.Source]
 	if !ok {
 		return nil, models.ErrFactoryIntakeSourceInvalid
 	}
 
-	if strings.TrimSpace(name) == "" {
+	name := strings.TrimSpace(request.Name)
+	if name == "" {
 		name = spec.name
 	}
 
@@ -156,26 +163,17 @@ func buildIntakeCanvas(source, name string, confidencePct int, binding *intakeBi
 					Name:          spec.triggerName,
 					Type:          yaml.NodeTypeTrigger,
 					Component:     spec.triggerComponent,
-					Configuration: intakeTriggerConfiguration(spec, binding),
-					Integration:   binding.integrationRef(),
+					Configuration: intakeTriggerConfiguration(spec, request.Binding),
+					Integration:   request.Binding.integrationRef(),
 					Position:      yaml.Position{X: 160, Y: 80},
 				},
 				{
-					ID:        intakeAnalysisNodeID,
-					Name:      intakeAnalysisNodeName,
-					Type:      yaml.NodeTypeAction,
-					Component: intakeAnalysisComponents[0],
-					Configuration: map[string]any{
-						"machineType": intakeAnalysisMachineType,
-						"steps": []any{
-							map[string]any{
-								"name":   "Analyze and score",
-								"type":   "prompt",
-								"prompt": intakeAnalysisPrompt(spec.analysisSubject),
-							},
-						},
-					},
-					Position: yaml.Position{X: 160, Y: 260},
+					ID:            intakeAnalysisNodeID,
+					Name:          intakeAnalysisNodeName,
+					Type:          yaml.NodeTypeAction,
+					Component:     request.Agent.component(),
+					Configuration: intakeAnalysisConfiguration(spec, request.Agent),
+					Position:      yaml.Position{X: 160, Y: 260},
 				},
 				{
 					ID:        intakeThresholdNodeID,
@@ -183,7 +181,7 @@ func buildIntakeCanvas(source, name string, confidencePct int, binding *intakeBi
 					Type:      yaml.NodeTypeAction,
 					Component: intakeThresholdComponent,
 					Configuration: map[string]any{
-						"expression": intakeThresholdExpression(confidencePct),
+						"expression": intakeThresholdExpression(request.ConfidencePct),
 					},
 					Position: yaml.Position{X: 160, Y: 440},
 				},
@@ -231,6 +229,31 @@ func intakeTriggerConfiguration(spec intakeSpec, binding *intakeBinding) map[str
 	}
 	for name, value := range binding.configuration() {
 		configuration[name] = value
+	}
+
+	return configuration
+}
+
+// intakeAnalysisConfiguration configures the runner that scores an item. The
+// runner components reject a node without a machine type or credentials, so the
+// generated node names the machine and the credentials of the workspace agent.
+func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent) map[string]any {
+	configuration := map[string]any{
+		"machineType": intakeAnalysisMachineType,
+		"steps": []any{
+			map[string]any{
+				"name":   "Analyze and score",
+				"type":   "prompt",
+				"prompt": intakeAnalysisPrompt(spec.analysisSubject),
+			},
+		},
+	}
+
+	if credentials := agent.credentials(); credentials != nil {
+		configuration["credentials"] = credentials
+	}
+	if model := agent.model(); model != "" {
+		configuration["model"] = model
 	}
 
 	return configuration
