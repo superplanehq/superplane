@@ -29,9 +29,6 @@ import { useIntakeAutomationRuns } from "./useIntakeAutomationRuns";
 import { useLiveIntakeTickets } from "./useLiveIntakeTickets";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 
-/** Hidden until operators can add intakes from the board. */
-const SHOW_ADD_INTAKE_CONTROL = false;
-
 /**
  * Opens the sole intake of a workspace, one time, when the URL names no
  * intake. Setup opens the drawer this way, and a single collapsed row hides
@@ -152,6 +149,7 @@ export function LineIntakeDrawer({
   editAutomationHrefFor,
   previewSource,
   onSettingsSaved,
+  showAddIntakeControl = false,
 }: LineIntakeDrawerProps) {
   const drawer = useLineIntakeDrawerState({
     initialIntakeId,
@@ -195,6 +193,7 @@ export function LineIntakeDrawer({
           onOpenGear={drawer.openIntakeGear}
           onOpenAnalyzingTicket={drawer.openAnalyzingTicket}
           onOpenPicker={drawer.openPicker}
+          showAddIntakeControl={showAddIntakeControl}
         />
       </aside>
 
@@ -232,6 +231,7 @@ function LineIntakeList({
   onOpenGear,
   onOpenAnalyzingTicket,
   onOpenPicker,
+  showAddIntakeControl,
 }: {
   organizationId?: string;
   factoryId?: string;
@@ -243,6 +243,7 @@ function LineIntakeList({
   onOpenGear: (intake: ConfiguredLineIntakeSource) => void;
   onOpenAnalyzingTicket: (ticket: LineIntakeAnalyzingTicket) => void;
   onOpenPicker: () => void;
+  showAddIntakeControl: boolean;
 }) {
   return (
     <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 [scrollbar-width:thin]">
@@ -260,7 +261,7 @@ function LineIntakeList({
           onOpenAnalyzingTicket={onOpenAnalyzingTicket}
         />
       ))}
-      {SHOW_ADD_INTAKE_CONTROL ? (
+      {showAddIntakeControl ? (
         <li>
           <button
             type="button"

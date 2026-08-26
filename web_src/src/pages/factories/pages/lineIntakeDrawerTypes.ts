@@ -23,4 +23,6 @@ export interface LineIntakeDrawerProps {
   /** Preview an unconfigured source, used by the picker in Storybook. */
   previewSource?: LineIntakeSource;
   onSettingsSaved?: () => void;
+  /** Show Add intake in Storybook. Hidden on the board until the flow is ready. */
+  showAddIntakeControl?: boolean;
 }

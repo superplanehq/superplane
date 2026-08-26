@@ -97,6 +97,7 @@ import {
   type ConfiguredLineIntakeSource,
 } from "./lineIntakeModel";
 import { isIntakeSettingsTab } from "./intakeSourceSettingsModel";
+import { useFactoryPreviewFlag } from "./factoryPreviewFlagsContext";
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
 import { LineListCard } from "./LineListCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
@@ -146,6 +147,7 @@ export function LinesPage() {
   const { data: factoryIntakes = [] } = useFactoryIntakes(organizationId, factoryId);
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
+  const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
 
   const canUpdate = canAct("factories", "update");
@@ -212,6 +214,7 @@ export function LinesPage() {
             organizationId={organizationId}
             factoryId={factoryId}
             editAutomationHrefFor={editAutomationHrefFor}
+            showAddIntakeControl={showAddIntakeControl}
             onSelectIntakeTemplate={(template) => {
               if (!isLineIntakeSourceId(template.id)) {
                 showErrorToast("This intake template is not available yet.");

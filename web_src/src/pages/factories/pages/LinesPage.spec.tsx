@@ -22,6 +22,7 @@ import {
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
+import { FactoryPreviewFlagsContext, type FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { LINE_LIST_METRICS_BY_ID } from "./lineListMetricsMockData";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
 import { LinesPage } from "./LinesPage";
@@ -204,28 +205,31 @@ describe("LinesPage board", () => {
     path = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
     openCreateWorkOrder = vi.fn(),
     factory: FactoriesFactory = REFUND_FACTORY,
+    previewFlags: FactoryPreviewFlags | null = null,
   ) {
     return render(
       <QueryClientProvider client={new QueryClient()}>
         <ThemeProvider>
           <TooltipProvider>
             <MemoryRouter initialEntries={[path]}>
-              <FactoriesLayoutContext.Provider
-                value={{
-                  organizationId: "org-1",
-                  factoryId: factory.id ?? PRIMARY_FACTORY_ID,
-                  factoryKey: factory.key ?? PRIMARY_FACTORY_KEY,
-                  factory,
-                  factories: [factory],
-                  openCreateWorkOrder,
-                }}
-              >
-                <Routes>
-                  <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
-                  <Route path="/org-1/workspaces/:factoryKey/lines/:lineId/edit" element={<div>Edit line</div>} />
-                </Routes>
-                <LocationProbe />
-              </FactoriesLayoutContext.Provider>
+              <FactoryPreviewFlagsContext.Provider value={previewFlags}>
+                <FactoriesLayoutContext.Provider
+                  value={{
+                    organizationId: "org-1",
+                    factoryId: factory.id ?? PRIMARY_FACTORY_ID,
+                    factoryKey: factory.key ?? PRIMARY_FACTORY_KEY,
+                    factory,
+                    factories: [factory],
+                    openCreateWorkOrder,
+                  }}
+                >
+                  <Routes>
+                    <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
+                    <Route path="/org-1/workspaces/:factoryKey/lines/:lineId/edit" element={<div>Edit line</div>} />
+                  </Routes>
+                  <LocationProbe />
+                </FactoriesLayoutContext.Provider>
+              </FactoryPreviewFlagsContext.Provider>
             </MemoryRouter>
           </TooltipProvider>
         </ThemeProvider>
@@ -337,6 +341,29 @@ describe("LinesPage board", () => {
 
     expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toHaveTextContent("GitHub issues");
     expect(screen.getByTestId("line-intake-source-intake-triage")).toHaveTextContent("Triage issues");
+  });
+
+  it("creates an intake from the picker and opens its canvas", async () => {
+    createFactoryIntakeMutateAsync.mockResolvedValueOnce({ id: "intake-new", canvasId: "canvas-new" });
+    const user = userEvent.setup();
+    renderBoard(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`,
+      vi.fn(),
+      REFUND_FACTORY,
+      { addIntakeControl: true },
+    );
+
+    await user.click(screen.getByTestId("line-intake-add"));
+    await user.click(screen.getByTestId("add-intake-template-github-issues"));
+
+    await waitFor(() => {
+      expect(createFactoryIntakeMutateAsync).toHaveBeenCalledWith({ source: "SOURCE_GITHUB_ISSUES" });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+        `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/apps/canvas-new`,
+      );
+    });
   });
 
   it("shows a backlog onboarding card on Acme when the backlog is empty", () => {
