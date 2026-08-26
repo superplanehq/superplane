@@ -252,7 +252,7 @@ describe("LineIntakeDrawer", () => {
     const analyzing = within(github).getByTestId("line-intake-analyzing");
     expect(within(analyzing).getAllByTestId("line-intake-analyzing-spinner")).toHaveLength(5);
     expect(within(analyzing).getByText("Handle duplicate refunds on retry")).toBeInTheDocument();
-    expect(within(github).getByText("Analyzing")).toBeInTheDocument();
+    expect(within(github).getByText("5 Analyzing")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Collapse GitHub issues" })).toHaveAttribute("aria-expanded", "true");
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
   });
@@ -322,6 +322,43 @@ describe("LineIntakeDrawer", () => {
     const analyzing = screen.getByTestId("line-intake-analyzing");
     expect(within(analyzing).getByText("Handle duplicate refunds on retry")).toBeInTheDocument();
     expect(within(analyzing).queryByText("Already in Backlog")).not.toBeInTheDocument();
+  });
+
+  // A ticket that scores under the minimum confidence never reaches Backlog.
+  // It stays under the analyzing tickets so a reader can see what was left out.
+  it("keeps tickets below the minimum confidence at the bottom with their score", () => {
+    renderDrawer({ initialIntakeId: "intake-github", analyzingTickets: GITHUB_ISSUES_ANALYZING_TICKETS });
+
+    const analyzing = screen.getByTestId("line-intake-analyzing");
+    expect(within(analyzing).getAllByTestId("line-intake-below-threshold-icon")).toHaveLength(6);
+    expect(
+      within(analyzing)
+        .getAllByRole("button")
+        .map((ticket) => ticket.getAttribute("aria-label"))
+        .slice(-6),
+    ).toEqual([
+      "Open Document the refund webhook contract",
+      "Open Make the billing dashboard faster",
+      "Open Redesign the invoice settings page",
+      "Open Investigate flaky payouts in staging",
+      "Open Move the ledger to a new database",
+      "Open Payments break for some customers",
+    ]);
+    expect(within(analyzing).getByTestId("line-intake-ticket-score-gh-issue-6")).toHaveAttribute("aria-valuenow", "3");
+    expect(within(analyzing).getByTestId("line-intake-ticket-score-gh-issue-11")).toHaveAttribute("aria-valuenow", "1");
+    expect(
+      within(screen.getByTestId("line-intake-source-intake-github")).getByText("6 Not accepted"),
+    ).toBeInTheDocument();
+  });
+
+  it("opens the analysis of a ticket below the minimum confidence", async () => {
+    const user = userEvent.setup();
+    renderDrawer({ initialIntakeId: "intake-github", analyzingTickets: GITHUB_ISSUES_ANALYZING_TICKETS });
+
+    await user.click(screen.getByRole("button", { name: "Open Payments break for some customers" }));
+
+    const dialog = screen.getByTestId("work-order-split-run");
+    expect(within(dialog).getByRole("heading", { name: "Payments break for some customers" })).toBeInTheDocument();
   });
 
   it("opens the analysis popup from an analyzing ticket", async () => {
