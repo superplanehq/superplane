@@ -4,16 +4,11 @@ import { Workflow } from "lucide-react";
 import { useState } from "react";
 
 import { PlanningReviewForm } from "./PlanningReviewForm";
-import { PLANNING_REVIEW_DRAFT, type PlanningReviewDraft } from "./planningReviewMockup";
+import { PLANNING_REVIEW_DRAFT, singleAgentDraft, type PlanningReviewDraft } from "./planningReviewMockup";
 import { PopupBody, PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 
-const MULTI_AGENT_TITLE = "Editing Agent";
-
 export function planningReviewPopupTitle(draft: PlanningReviewDraft): string {
-  if (draft.components.length === 1) {
-    return draft.components[0].title;
-  }
-  return MULTI_AGENT_TITLE;
+  return draft.components[0]?.title ?? "Editing Agent";
 }
 
 /**
@@ -42,10 +37,8 @@ function AutomationNote({ href }: { href?: string }) {
 }
 
 /**
- * Simple editing mode for a phase. The canvas stays hidden while each
- * automation component exposes its configuration in a collapsible block.
- * One agent uses the agent name as the title. Two or more agents use
- * Editing Agent.
+ * Simple editing mode for one agent in a phase. Extra agents stay on the
+ * automation canvas, one click away from the note at the top.
  */
 export function PlanningReviewPopup({
   onClose,
@@ -60,7 +53,7 @@ export function PlanningReviewPopup({
   organizationId?: string;
   automationHref?: string;
 }) {
-  const [draft, setDraft] = useState(initialDraft);
+  const [draft, setDraft] = useState(() => singleAgentDraft(initialDraft));
 
   return (
     <PopupShell testId="lines-planning-review" fixed onDismiss={onClose}>

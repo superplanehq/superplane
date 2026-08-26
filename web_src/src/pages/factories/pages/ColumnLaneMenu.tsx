@@ -77,16 +77,16 @@ export function ColumnLaneMenu({
         {hasActions ? (
           <>
             <div className="p-1">
-              {canEdit ? (
-                <DropdownMenuItem onSelect={handleEdit} data-testid={`${testId}-edit`}>
-                  <Pencil className="h-3.5 w-3.5" aria-hidden />
-                  {editLabel}
-                </DropdownMenuItem>
-              ) : null}
               {onEditAgent ? (
                 <DropdownMenuItem onSelect={onEditAgent} data-testid={`${testId}-edit-agent`}>
                   <Bot className="h-3.5 w-3.5" aria-hidden />
                   Edit Agent
+                </DropdownMenuItem>
+              ) : null}
+              {canEdit ? (
+                <DropdownMenuItem onSelect={handleEdit} data-testid={`${testId}-edit`}>
+                  <Pencil className="h-3.5 w-3.5" aria-hidden />
+                  {editLabel}
                 </DropdownMenuItem>
               ) : null}
               {onSetParallelism ? (
