@@ -1,11 +1,6 @@
 import type { FactoriesFactory } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
-import {
-  useCreateFactoryLine,
-  useCreateWorkOrder,
-  useDispatchWorkOrder,
-  useUpdateFactory,
-} from "@/hooks/useFactoryData";
+import { useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { useOrganizationLLMSpend } from "@/hooks/useOrganizationLLMSpend";
@@ -217,8 +212,6 @@ export function useOnboardingPageModel(args: {
   const updateOnboarding = useFactoryOnboarding(args.organizationId, args.factoryId);
   const createLine = useCreateFactoryLine(args.organizationId, args.factoryId);
   const createIntake = useCreateFactoryIntake(args.organizationId, args.factoryId);
-  const createWorkOrder = useCreateWorkOrder(args.organizationId, args.factoryId);
-  const dispatchWorkOrder = useDispatchWorkOrder(args.organizationId, args.factoryId);
   const installer = useInstallFactory();
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
   const githubConnections = useOnboardingGithubConnections({
@@ -260,8 +253,6 @@ export function useOnboardingPageModel(args: {
     createLine: createLine.mutateAsync,
     listIntakes: () => fetchFactoryIntakes(args.organizationId, args.factoryId),
     createIntake: createIntake.mutateAsync,
-    createWorkOrder: createWorkOrder.mutateAsync,
-    dispatchWorkOrder: dispatchWorkOrder.mutateAsync,
     remainingCreditCents: agent.remainingCreditCents,
     hostedModelsLoading: agent.hostedModelsLoading,
     plan: agent.plan,
@@ -293,7 +284,7 @@ export function useOnboardingPageModel(args: {
     repositoriesLoading: github.repositoriesLoading,
     repositoriesError: github.repositoriesError,
     canConfigureWorkspace: canConfigureWorkspace(canAct),
-    saving: saving || installer.isInstalling || createIntake.isPending || createWorkOrder.isPending,
+    saving: saving || installer.isInstalling || createIntake.isPending,
     ...saves,
     finish: finishSetup,
   };
