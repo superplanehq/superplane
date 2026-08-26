@@ -1,3 +1,4 @@
+import { formatClockDurationLabel } from "@/lib/duration";
 import { cn, resolveIcon } from "@/lib/utils";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -10,13 +11,11 @@ import { toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { WorkOrderArtifactInline } from "../../WorkOrderArtifactInline";
 import { PhaseGlyph } from "../linePhaseGlyph";
 import { SplitRunCheckPills } from "./SplitRunReview";
-import {
-  splitRunStatusLabel,
-  type SplitRunPhase,
-  type SplitRunPhaseStatus,
-  type SplitRunStreamLine,
-} from "./splitRunMocks";
+import { type SplitRunPhase, type SplitRunPhaseStatus, type SplitRunStreamLine } from "./splitRunMocks";
 import { isRunnerComponent, notesForLiveStream } from "./streamNotesFromLiveLog";
+
+/** One face and size for every log row, matched to the run log viewer. */
+const LOG_FACE = "font-mono text-[14px]";
 
 function statusGlyph(status: SplitRunPhaseStatus): PhaseGlyphKind {
   if (status === "running") return "running";
@@ -182,7 +181,7 @@ function artifactsProducedBySteps(
  * Terminal log. The automation is the root. Each node hangs under it.
  * Collapsed automations show produced artifacts on the title line.
  * Expanded automations show those artifacts on the producing steps.
- * Node lines indent under the automation.
+ * Node icons keep the phase glyph column. Agent steps indent under them.
  */
 export function PhaseLogCard({
   phase,
@@ -220,25 +219,30 @@ export function PhaseLogCard({
 
   return (
     <div className="min-w-0" data-testid={`split-run-phase-${phase.id}`} aria-current={expanded ? "step" : undefined}>
-      <div className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
+      <div
+        className={cn(
+          "flex w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap leading-tight",
+          LOG_FACE,
+        )}
+      >
         {collapsible ? (
           <button
             type="button"
             onClick={onToggle}
             aria-expanded={expanded}
-            className="flex min-w-0 items-center gap-1.5 text-left font-mono text-[13px] leading-tight"
+            className="flex min-w-0 items-center gap-1.5 text-left"
           >
             <ChevronRight
               className={cn("size-3 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")}
               aria-hidden
             />
             <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3" />
-            <PhaseTitle phase={phase} />
+            <span className="min-w-0 truncate text-foreground">{phase.name}</span>
           </button>
         ) : (
-          <div className="flex min-w-0 items-center gap-1.5 font-mono text-[13px] leading-tight">
+          <div className="flex min-w-0 items-center gap-1.5">
             <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3" />
-            <PhaseTitle phase={phase} />
+            <span className="min-w-0 truncate text-foreground">{phase.name}</span>
           </div>
         )}
         {phase.checks && phase.checks.length > 0 ? (
@@ -256,11 +260,12 @@ export function PhaseLogCard({
             ))}
           </span>
         ) : null}
+        <PhaseDuration phase={phase} />
       </div>
 
       {expanded ? (
         <ol
-          className="mt-0.5 mb-1 min-w-0 overflow-hidden font-mono text-[13px] leading-tight"
+          className={cn("mt-0.5 mb-1 min-w-0 overflow-hidden leading-tight", LOG_FACE)}
           data-testid={`split-run-stream-${phase.id}`}
         >
           {groups.map((group) => (
@@ -279,14 +284,29 @@ export function PhaseLogCard({
   );
 }
 
-function PhaseTitle({ phase }: { phase: SplitRunPhase }) {
-  const duration = phase.duration.replace(/\s+so far$/i, "").trim() || "—";
+function PhaseDuration({ phase }: { phase: SplitRunPhase }) {
+  const duration = formatClockDurationLabel(phase.duration);
   return (
-    <span className="min-w-0 flex-1 whitespace-nowrap">
-      <span className="text-foreground">{phase.name}</span>
-      <span className="text-muted-foreground">{` > ${phase.componentName}`}</span>
-      <span className={cn("ml-2", streamTone(phase.status))}>{splitRunStatusLabel(phase.status)}</span>
-      <span className="ml-2 tabular-nums text-muted-foreground">{duration}</span>
+    <span
+      data-testid={`split-run-phase-duration-${phase.id}`}
+      className="ml-auto min-w-[5ch] shrink-0 text-right tabular-nums [font-feature-settings:'zero'] text-muted-foreground"
+    >
+      {duration}
+    </span>
+  );
+}
+
+function StreamDuration({ line }: { line: SplitRunStreamLine }) {
+  const duration = line.duration ? formatClockDurationLabel(line.duration) : "";
+  if (!duration || duration === "—") {
+    return null;
+  }
+  return (
+    <span
+      data-testid={`split-run-stream-duration-${line.id}`}
+      className="ml-auto min-w-[5ch] shrink-0 text-right tabular-nums [font-feature-settings:'zero'] text-muted-foreground"
+    >
+      {duration}
     </span>
   );
 }
@@ -362,18 +382,17 @@ function StreamNodeHeader({
       data-highlighted={highlighted ? "true" : undefined}
       aria-current={highlighted ? "true" : undefined}
       className={cn(
-        "flex h-[1.375rem] w-full min-w-0 items-center overflow-hidden whitespace-nowrap rounded-sm",
+        "flex h-[1.375rem] w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap rounded-sm",
         highlighted && "bg-accent ring-1 ring-foreground/15",
       )}
     >
-      <NodeIndent />
       <button
         type="button"
         data-testid={`split-run-node-toggle-${line.id}`}
         aria-expanded={hasChildren ? expanded : undefined}
         onClick={onClick}
         className={cn(
-          "flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left",
+          "flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-left",
           (hasChildren || line.nodeId) && "cursor-pointer hover:text-foreground",
         )}
       >
@@ -382,9 +401,7 @@ function StreamNodeHeader({
             <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} aria-hidden />
           ) : null}
         </span>
-        <span className="w-14 shrink-0 tabular-nums text-muted-foreground">{line.at}</span>
         <StreamLineIcon iconSlug={line.iconSlug} iconSrc={line.iconSrc} />
-        {line.componentType ? <span className="shrink-0 text-muted-foreground">{line.componentType}</span> : null}
         <span
           className={cn(
             "min-w-0 overflow-hidden truncate",
@@ -399,6 +416,7 @@ function StreamNodeHeader({
         <span className={cn("shrink-0", streamTone(line.status))}>{action}</span>
       </button>
       {artifact ? <StreamArtifact artifact={artifact} /> : null}
+      <StreamDuration line={line} />
     </div>
   );
 }
@@ -548,7 +566,12 @@ function StreamOutput({ text, indentCh = 12 }: { text: string; indentCh?: number
   return (
     <div className="flex w-full items-start" data-testid="split-run-stream-output">
       <StreamIndent ch={indentCh} testId="split-run-stream-output-indent" />
-      <pre className="min-w-0 flex-1 whitespace-pre-wrap break-words py-0.5 font-mono text-[13px] leading-5 text-muted-foreground">
+      <pre
+        className={cn(
+          "min-w-0 flex-1 whitespace-pre-wrap break-words py-0.5 leading-5 text-muted-foreground",
+          LOG_FACE,
+        )}
+      >
         {text}
       </pre>
     </div>
@@ -571,10 +594,6 @@ function StepStatusMark({ status }: { status: SplitRunPhaseStatus }) {
     );
   }
   return null;
-}
-
-function NodeIndent() {
-  return <StreamIndent ch={4} testId="split-run-node-indent" />;
 }
 
 function StreamIndent({ ch, testId }: { ch: number; testId?: string }) {
@@ -611,7 +630,7 @@ function stepTypeTone(type: string): string {
 function StreamArtifact({ artifact }: { artifact: FactoriesWorkOrderArtifact }) {
   return (
     <WorkOrderArtifactInline
-      className="font-mono text-[13px] font-normal tracking-normal"
+      className={cn(LOG_FACE, "font-bold tracking-normal")}
       artifact={{
         id: artifact.id,
         type: artifact.type ?? "TYPE_UNSPECIFIED",

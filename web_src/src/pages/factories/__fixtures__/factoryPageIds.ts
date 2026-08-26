@@ -45,6 +45,7 @@ export function minutesAgo(minutes: number) {
 export const LINE_RUN_IMPLEMENT_ID = "8f3a1c2e-4b5d-46f0-a789-0b1c2d3e4f50";
 export const LINE_RUN_IMPLEMENT_FAILED_ID = canvasAppIds.publishedRunId ?? "fef4cee8-fdd7-47af-b5da-e739664cd31d";
 export const LINE_RUN_IMPLEMENT_PASSED_ID = "9a4b2d3f-5c6e-47f0-b890-1c2d3e4f5061";
+export const LINE_RUN_IMPLEMENT_NOTIFY_ID = "1c6d4e5b-7e8a-4192-9a12-3e4f50617283";
 export const LINE_RUN_VERIFY_PASSED_ID = "0b5c3e4a-6d7f-4081-8901-2d3e4f506172";
 export const LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID =
   canvasAppIds.rootEventId ?? "755a4430-2481-43f6-94cb-089c331a5d2f";
