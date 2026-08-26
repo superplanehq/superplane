@@ -7,6 +7,8 @@ import type {
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
 import { factoryAppPath, factoryAppRunPath, linesPath } from "./factoryPagePaths";
+import { BOARD_IMPLEMENT_NOTIFY_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
+import { REFUND_LINE_PLAN_ID } from "../__fixtures__/factoryPageIds";
 import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
@@ -247,6 +249,25 @@ describe("buildLinePhaseBoard", () => {
 
     const board = buildLinePhaseBoard(line, [], [{ id: "app-planner", name: "plan" }]);
     expect(board[0]).toMatchObject({ stepName: "plan", appId: "app-planner" });
+  });
+
+  it("places the notify card on Implement", () => {
+    const line: FactoriesFactoryLine = {
+      id: REFUND_LINE_PLAN_ID,
+      name: "plan-and-implement",
+      steps: [{ app: { app: "app-refund-implementer" } }, { app: { app: "app-refund-verifier" } }],
+    };
+    const board = buildLinePhaseBoard(
+      line,
+      [BOARD_IMPLEMENT_NOTIFY_ORDER],
+      [
+        { id: "app-refund-implementer", name: "Implement" },
+        { id: "app-refund-verifier", name: "Verify" },
+      ],
+    );
+
+    expect(board[0].runs.map((run) => run.order.title)).toEqual(["Notify on status change after a reopen"]);
+    expect(board[1].runs).toEqual([]);
   });
 
   it("keeps two columns when the same automation appears twice", () => {
