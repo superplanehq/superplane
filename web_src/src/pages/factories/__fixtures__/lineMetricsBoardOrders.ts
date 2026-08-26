@@ -13,6 +13,7 @@ import {
   LAST_WEEK,
   LINE_RUN_IMPLEMENT_FAILED_ID,
   LINE_RUN_IMPLEMENT_ID,
+  LINE_RUN_IMPLEMENT_NOTIFY_ID,
   LINE_RUN_VERIFY_PASSED_ID,
   OPERATOR_USER,
   REFUND_LINE_FEATURE_ID,
@@ -22,9 +23,44 @@ import {
   STORYBOOK_ME_USER_NAME,
   TWO_HOURS_AGO,
   YESTERDAY,
+  minutesAgo,
 } from "./factoryPageResponses";
 import { INGEST_CREATED_BY, SENTRY_CREATED_BY, SLACK_CREATED_BY } from "./factoryPageWorkOrders";
 import { PLAN_LINE_DONE_APP_ID, planLineActiveDispatch, runAppStep } from "./lineMetricsPlanLine";
+
+export const BOARD_IMPLEMENT_NOTIFY_ORDER: FactoriesWorkOrder = {
+  id: "wo-board-implement-notify",
+  number: "114",
+  key: "RF-114",
+  title: "Notify on status change after a reopen",
+  description: [
+    "A user does not get a status-change notification when a work order is reopened.",
+    "",
+    "Send the same notification that a status change already sends, so the assignee sees the reopen.",
+  ].join("\n"),
+  state: "STATE_OPEN",
+  result: "RESULT_UNSPECIFIED",
+  createdAt: minutesAgo(40),
+  updatedAt: minutesAgo(12),
+  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  totalTokens: "4100",
+  totalCostCents: "128",
+  lineDispatches: [
+    planLineActiveDispatch("wo-board-implement-notify", [
+      {
+        id: "exec-notify-implement",
+        step: "Implement",
+        stepIndex: 0,
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        createdAt: minutesAgo(36),
+        updatedAt: minutesAgo(12),
+        run: { id: LINE_RUN_IMPLEMENT_NOTIFY_ID, appId: "app-refund-implementer", appName: "Implementation" },
+      },
+    ]),
+  ],
+};
 
 export const BOARD_IMPLEMENT_FAILED_ORDER: FactoriesWorkOrder = {
   id: "wo-board-implement-failed",

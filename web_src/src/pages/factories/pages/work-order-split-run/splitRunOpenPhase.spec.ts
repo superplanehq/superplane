@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER, RUNNING_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
-import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../../__fixtures__/lineMetricsBoardOrders";
+import {
+  BOARD_DONE_REJECTED_ORDER,
+  BOARD_IMPLEMENT_FAILED_ORDER,
+  BOARD_IMPLEMENT_NOTIFY_ORDER,
+} from "../../__fixtures__/lineMetricsBoardOrders";
 import { LINE_BOARD_DONE_RECEIPTS_ORDER } from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { autoExpandedPhaseId, splitRunFixtureForWorkOrder } from "./splitRunMocks";
@@ -35,6 +39,12 @@ describe("autoExpandedPhaseId", () => {
     expect(autoExpandedPhaseId(splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]))).toBeNull();
     expect(autoExpandedPhaseId(splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER))).toBeNull();
     expect(autoExpandedPhaseId(splitRunFixtureForWorkOrder(BOARD_DONE_REJECTED_ORDER))).toBeNull();
+  });
+
+  it("expands the completed PR Creation step on the notify implement card", () => {
+    const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER);
+    expect(fixture.openPhaseId).toBe("pr-creation-2");
+    expect(autoExpandedPhaseId(fixture)).toBe("pr-creation-2");
   });
 
   it("does not expand a passed current step while the order waits", () => {

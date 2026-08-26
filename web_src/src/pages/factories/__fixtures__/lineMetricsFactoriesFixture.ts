@@ -30,6 +30,7 @@ import {
   BOARD_DONE_CANCELED_ORDER,
   BOARD_DONE_REJECTED_ORDER,
   BOARD_IMPLEMENT_FAILED_ORDER,
+  BOARD_IMPLEMENT_NOTIFY_ORDER,
   FEATURE_CI_WORK_ORDER,
   FEATURE_DELIVERY_LINE,
   FEATURE_PR_WORK_ORDER,
@@ -171,11 +172,12 @@ export const lineMetricsFactoriesFixture: FactoriesFixture = {
   workOrdersByFactoryId: {
     ...defaultFactoriesFixture.workOrdersByFactoryId,
     [PRIMARY_FACTORY_ID]: [
-      // Board inventory: 4 backlog, 2 implement, 2 verify, 4 done.
+      // Board inventory: 4 backlog, 3 implement, 2 verify, 4 done.
       ...BOARD_REVIEW_CANDIDATE_WORK_ORDERS,
       DRAFT_WORK_ORDER,
       RUNNING_WORK_ORDER,
       APPROVAL_WORK_ORDER,
+      BOARD_IMPLEMENT_NOTIFY_ORDER,
       BOARD_IMPLEMENT_FAILED_ORDER,
       LINE_BOARD_VERIFY_ENUM_ORDER,
       LINE_BOARD_VERIFY_PR_REVIEW_ORDER,
