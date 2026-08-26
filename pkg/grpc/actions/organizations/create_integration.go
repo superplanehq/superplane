@@ -9,10 +9,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -82,8 +84,9 @@ func CreateIntegrationWithUsage(
 
 	//
 	// If the integration and organization support the new flow, use it.
+	// Public GitHub App install skips the wizard and uses Sync instead.
 	//
-	if registry.UseNewSetupFlow(org, integrationName) {
+	if registry.UseNewSetupFlow(org, integrationName) && !github.UseHostedInstall(org.String(), integrationName) {
 		newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, nil)
 		if err != nil {
 			integrationLogger.WithError(err).Error("failed to create integration")
@@ -113,7 +116,8 @@ func CreateIntegrationWithUsage(
 		return nil, grpcerrors.Internal(err, "failed to create integration")
 	}
 
-	return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration)
+	userID, _ := authentication.GetUserIdFromMetadata(ctx)
+	return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration, userID)
 }
 
 func allCapabilities(setupProvider core.IntegrationSetupProvider) []core.Capability {
@@ -169,6 +173,7 @@ func syncIntegration(
 	orgID string,
 	newIntegration *models.Integration,
 	integrationImpl core.Integration,
+	actorUserID string,
 ) (*pb.CreateIntegrationResponse, error) {
 	logrus.Infof("syncing integration %s", newIntegration.ID)
 
@@ -190,6 +195,7 @@ func syncIntegration(
 		BaseURL:         baseURL,
 		WebhooksBaseURL: webhooksBaseURL,
 		OrganizationID:  orgID,
+		ActorUserID:     actorUserID,
 		OIDC:            oidcProvider,
 	})
 

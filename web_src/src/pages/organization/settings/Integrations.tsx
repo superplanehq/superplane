@@ -1,6 +1,7 @@
 import { Loader2, Plug, Search, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import { useMe } from "@/hooks/useMe";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import {
@@ -14,10 +15,13 @@ import { Label } from "@/components/ui/label";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/usePermissions";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
-import type { IntegrationsIntegrationDefinition } from "../../../api-client/types.gen";
+import type {
+  IntegrationsIntegrationDefinition,
+  OrganizationsCreateIntegrationResponse,
+  OrganizationsIntegration,
+} from "../../../api-client/types.gen";
 import { getApiErrorMessage } from "@/lib/errors";
 import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
-import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { Icon } from "@/components/Icon";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { showErrorToast } from "@/lib/toast";
@@ -25,17 +29,241 @@ import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { analytics } from "@/lib/analytics";
-import { isCapabilityBasedIntegrationDefinition } from "@/lib/integrations";
+import { isCapabilityBasedIntegrationDefinition, usesHostedGitHubAppInstall } from "@/lib/integrations";
+import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
 import { posthog, isPostHogEnabled } from "@/posthog";
 import { cn } from "@/lib/utils";
+import { getNextIntegrationName } from "./components/IntegrationSetup/lib";
+import { IntegrationInstanceRow } from "./IntegrationInstanceRow";
 import {
   settingsEmptyStateIconClassName,
   settingsEmptyStateTitleClassName,
   settingsModalClassName,
   settingsPanelClassName,
 } from "./settingsPageStyles";
+import { useIntegrationCatalog } from "./useIntegrationCatalog";
 
 const INTEGRATION_SURVEY_NAME = "Integration Survey";
+
+function resetConnectModal(args: {
+  resetMutation: () => void;
+  setIsModalOpen: (open: boolean) => void;
+  setSelectedIntegration: (value: IntegrationsIntegrationDefinition | null) => void;
+  setIntegrationName: (value: string) => void;
+  setConfiguration: (value: Record<string, unknown>) => void;
+}) {
+  args.setIsModalOpen(false);
+  args.setSelectedIntegration(null);
+  args.setIntegrationName("");
+  args.setConfiguration({});
+  args.resetMutation();
+}
+
+function connectIntegrationDefinition(args: {
+  integration: IntegrationsIntegrationDefinition;
+  canCreateIntegrations: boolean;
+  organizationId: string;
+  integrationNames: Set<string>;
+  organizationIntegrations: OrganizationsIntegration[];
+  currentUserId?: string;
+  navigate: ReturnType<typeof useNavigate>;
+  mutateAsync: (payload: {
+    integrationName: string;
+    name: string;
+    configuration?: Record<string, unknown>;
+  }) => Promise<{ data: OrganizationsCreateIntegrationResponse }>;
+  setSelectedIntegration: (value: IntegrationsIntegrationDefinition | null) => void;
+  setIntegrationName: (value: string) => void;
+  setConfiguration: (value: Record<string, unknown>) => void;
+  setIsModalOpen: (open: boolean) => void;
+}) {
+  if (!args.canCreateIntegrations) return;
+
+  if (usesHostedGitHubAppInstall(args.integration)) {
+    analytics.integrationConnectStart("github", "integrations_page", args.organizationId);
+    void startDirectGitHubConnect({
+      organizationId: args.organizationId,
+      returnTo: `/${args.organizationId}/settings/integrations`,
+      existingNames: args.integrationNames,
+      connected: args.organizationIntegrations,
+      currentUserId: args.currentUserId,
+      goTo: args.navigate,
+      create: async (payload) => {
+        const response = await args.mutateAsync(payload);
+        return response.data;
+      },
+    }).catch((error) => {
+      showErrorToast(getUsageLimitToastMessage(error, "Failed to connect GitHub"));
+    });
+    return;
+  }
+
+  if (isCapabilityBasedIntegrationDefinition(args.integration)) {
+    if (!args.integration.name) return;
+    analytics.integrationConnectStart(args.integration.name, "integrations_page", args.organizationId);
+    args.navigate(`/${args.organizationId}/settings/integrations/${args.integration.name}/setup`);
+    return;
+  }
+
+  args.setSelectedIntegration(args.integration);
+  args.setIntegrationName(getNextIntegrationName(args.integration.name ?? "integration", args.integrationNames));
+  args.setConfiguration({});
+  args.setIsModalOpen(true);
+  analytics.integrationConnectStart(args.integration.name ?? "", "integrations_page", args.organizationId);
+}
+
+async function submitLegacyIntegrationConnect(args: {
+  canCreateIntegrations: boolean;
+  selectedIntegration: IntegrationsIntegrationDefinition | null;
+  integrationName: string;
+  configuration: Record<string, unknown>;
+  organizationId: string;
+  navigate: ReturnType<typeof useNavigate>;
+  mutateAsync: (payload: {
+    integrationName: string;
+    name: string;
+    configuration?: Record<string, unknown>;
+  }) => Promise<{ data: OrganizationsCreateIntegrationResponse }>;
+  setIsModalOpen: (open: boolean) => void;
+  setSelectedIntegration: (value: IntegrationsIntegrationDefinition | null) => void;
+  setIntegrationName: (value: string) => void;
+  setConfiguration: (value: Record<string, unknown>) => void;
+}) {
+  if (!args.canCreateIntegrations) return;
+  if (!args.selectedIntegration?.name) return;
+
+  try {
+    const result = await args.mutateAsync({
+      integrationName: args.selectedIntegration.name,
+      name: args.integrationName,
+      configuration: args.configuration,
+    });
+    args.setIsModalOpen(false);
+    args.setSelectedIntegration(null);
+    args.setIntegrationName("");
+    args.setConfiguration({});
+
+    if (result.data?.integration?.metadata?.id) {
+      args.navigate(`/${args.organizationId}/settings/integrations/${result.data.integration.metadata.id}`);
+    }
+  } catch (_error) {
+    showErrorToast(getUsageLimitToastMessage(_error, "Failed to create integration"));
+  }
+}
+
+function IntegrationConnectModal(props: {
+  selectedIntegration: IntegrationsIntegrationDefinition;
+  selectedInstructions: string;
+  integrationName: string;
+  configuration: Record<string, unknown>;
+  organizationId: string;
+  canCreateIntegrations: boolean;
+  isPending: boolean;
+  isError: boolean;
+  error: unknown;
+  createIntegrationNotice: ReturnType<typeof getUsageLimitNotice>;
+  onNameChange: (value: string) => void;
+  onConfigurationChange: (value: Record<string, unknown>) => void;
+  onConnect: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className={cn(settingsModalClassName, "max-h-[80vh] max-w-2xl overflow-y-auto")}>
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <IntegrationIcon
+                integrationName={props.selectedIntegration.name}
+                iconSlug={props.selectedIntegration.icon}
+                className="w-6 h-6 text-gray-500 dark:text-gray-400"
+              />
+              <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
+                Connect {props.selectedIntegration.label || props.selectedIntegration.name}
+              </h3>
+            </div>
+            <button
+              onClick={props.onClose}
+              className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
+              disabled={props.isPending}
+            >
+              <Icon name="x" size="sm" />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {props.selectedInstructions ? <IntegrationInstructions description={props.selectedInstructions} /> : null}
+            <div>
+              <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                Integration Name
+                <span className="ml-1 text-gray-800 dark:text-gray-100">*</span>
+              </Label>
+              <Input
+                type="text"
+                value={props.integrationName}
+                onChange={(e) => props.onNameChange(e.target.value)}
+                placeholder="e.g., my-app-integration"
+                required
+                disabled={!props.canCreateIntegrations}
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
+            </div>
+
+            {props.selectedIntegration.configuration && props.selectedIntegration.configuration.length > 0 ? (
+              <div className="space-y-4">
+                {props.selectedIntegration.configuration
+                  .filter((field) => Boolean(field.name))
+                  .map((field) => (
+                    <ConfigurationFieldRenderer
+                      key={field.name!}
+                      field={field}
+                      value={props.configuration[field.name!]}
+                      onChange={(value) =>
+                        props.onConfigurationChange({ ...props.configuration, [field.name!]: value })
+                      }
+                      allValues={props.configuration}
+                      organizationId={props.organizationId}
+                    />
+                  ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex justify-start gap-3 mt-6">
+            <Button
+              color="blue"
+              onClick={props.onConnect}
+              disabled={props.isPending || !props.integrationName?.trim() || !props.canCreateIntegrations}
+              className="flex items-center gap-2"
+            >
+              {props.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                "Connect"
+              )}
+            </Button>
+            <Button variant="outline" onClick={props.onClose} disabled={props.isPending}>
+              Cancel
+            </Button>
+          </div>
+
+          {props.isError && props.createIntegrationNotice ? (
+            <UsageLimitAlert notice={props.createIntegrationNotice} className="mt-4" />
+          ) : null}
+          {props.isError && !props.createIntegrationNotice ? (
+            <Alert variant="destructive" className="mt-4">
+              <AlertTitle>Unable to create integration</AlertTitle>
+              <AlertDescription>Failed to create integration: {getApiErrorMessage(props.error)}</AlertDescription>
+            </Alert>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface IntegrationsProps {
   organizationId: string;
@@ -44,6 +272,7 @@ interface IntegrationsProps {
 export function Integrations({ organizationId }: IntegrationsProps) {
   usePageTitle(["Integrations"]);
   const navigate = useNavigate();
+  const { data: me } = useMe();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationDefinition | null>(null);
   const [integrationName, setIntegrationName] = useState("");
@@ -73,178 +302,45 @@ export function Integrations({ organizationId }: IntegrationsProps) {
 
   useReportPageReady(!isLoading && !permissionsLoading);
 
-  const integrationNames = useMemo(() => {
-    return new Set(
-      organizationIntegrations.map((integration) => integration.metadata?.name?.trim()).filter(Boolean) as string[],
-    );
-  }, [organizationIntegrations]);
-  const connectedInstancesByProvider = useMemo(() => {
-    const groups = new Map<string, typeof organizationIntegrations>();
+  const { integrationNames, integrationCatalog, filteredIntegrationCatalog } = useIntegrationCatalog(
+    availableIntegrations,
+    organizationIntegrations,
+    filterQuery,
+  );
 
-    organizationIntegrations.forEach((integration) => {
-      const provider = integration.metadata?.integrationName;
-      if (!provider) return;
-      const current = groups.get(provider) || [];
-      current.push(integration);
-      groups.set(provider, current);
-    });
-
-    return groups;
-  }, [organizationIntegrations]);
-  const integrationCatalog = useMemo(() => {
-    const catalogByProvider = new Map<
-      string,
-      {
-        providerName: string;
-        providerLabel: string;
-        integrationDef: IntegrationsIntegrationDefinition | null;
-        instances: typeof organizationIntegrations;
-      }
-    >();
-
-    availableIntegrations.forEach((integrationDef) => {
-      const providerName = integrationDef.name || "";
-      const providerLabel =
-        integrationDef.label ||
-        getIntegrationTypeDisplayName(undefined, integrationDef.name) ||
-        integrationDef.name ||
-        "Integration";
-      const instances = [...(connectedInstancesByProvider.get(providerName) || [])].sort((a, b) =>
-        (a.metadata?.name || providerLabel).localeCompare(b.metadata?.name || providerLabel),
-      );
-
-      catalogByProvider.set(providerName, {
-        providerName,
-        providerLabel,
-        integrationDef,
-        instances,
-      });
-    });
-
-    connectedInstancesByProvider.forEach((instances, providerName) => {
-      if (catalogByProvider.has(providerName)) {
-        return;
-      }
-
-      const providerLabel = getIntegrationTypeDisplayName(undefined, providerName) || providerName || "Integration";
-      const sortedInstances = [...instances].sort((a, b) =>
-        (a.metadata?.name || providerLabel).localeCompare(b.metadata?.name || providerLabel),
-      );
-
-      catalogByProvider.set(providerName, {
-        providerName,
-        providerLabel,
-        integrationDef: null,
-        instances: sortedInstances,
-      });
-    });
-
-    return [...catalogByProvider.values()].sort((a, b) => {
-      const aHasInstances = a.instances.length > 0;
-      const bHasInstances = b.instances.length > 0;
-      if (aHasInstances !== bHasInstances) {
-        return aHasInstances ? -1 : 1;
-      }
-      return a.providerLabel.localeCompare(b.providerLabel);
-    });
-  }, [availableIntegrations, connectedInstancesByProvider]);
-  const filteredIntegrationCatalog = useMemo(() => {
-    const normalizedQuery = filterQuery.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return integrationCatalog;
-    }
-
-    return integrationCatalog.filter((item) => {
-      const providerText = [item.providerLabel, item.providerName, item.integrationDef?.description]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      if (providerText.includes(normalizedQuery)) {
-        return true;
-      }
-
-      return item.instances.some((instance) =>
-        (instance.metadata?.name || instance.metadata?.integrationName || "").toLowerCase().includes(normalizedQuery),
-      );
-    });
-  }, [filterQuery, integrationCatalog]);
-
-  const selectedInstructions = useMemo(() => {
-    return selectedIntegration?.instructions?.trim() ?? "";
-  }, [selectedIntegration?.instructions]);
-
-  const getNextIntegrationName = (baseName?: string) => {
-    const normalizedBaseName = baseName?.trim() || "integration";
-    if (!integrationNames.has(normalizedBaseName)) {
-      return normalizedBaseName;
-    }
-
-    let suffix = 2;
-    let candidate = `${normalizedBaseName}-${suffix}`;
-    while (integrationNames.has(candidate)) {
-      suffix += 1;
-      candidate = `${normalizedBaseName}-${suffix}`;
-    }
-
-    return candidate;
-  };
+  const selectedInstructions = selectedIntegration?.instructions?.trim() ?? "";
 
   const handleConnectClick = (integration: IntegrationsIntegrationDefinition) => {
-    if (!canCreateIntegrations) return;
-
-    if (isCapabilityBasedIntegrationDefinition(integration)) {
-      if (!integration.name) return;
-      analytics.integrationConnectStart(integration.name, "integrations_page", organizationId);
-      navigate(`/${organizationId}/settings/integrations/${integration.name}/setup`);
-      return;
-    }
-
-    setSelectedIntegration(integration);
-    setIntegrationName(getNextIntegrationName(integration.name));
-    setConfiguration({});
-    setIsModalOpen(true);
-    analytics.integrationConnectStart(integration.name ?? "", "integrations_page", organizationId);
+    connectIntegrationDefinition({
+      integration,
+      canCreateIntegrations,
+      organizationId,
+      integrationNames,
+      organizationIntegrations,
+      currentUserId: me?.id,
+      navigate,
+      mutateAsync: createIntegrationMutation.mutateAsync,
+      setSelectedIntegration,
+      setIntegrationName,
+      setConfiguration,
+      setIsModalOpen,
+    });
   };
   const handleConnect = async () => {
-    if (!canCreateIntegrations) return;
-    if (!selectedIntegration?.name) return;
-
-    try {
-      const result = await createIntegrationMutation.mutateAsync({
-        integrationName: selectedIntegration.name,
-        name: integrationName,
-        configuration,
-      });
-      setIsModalOpen(false);
-      setSelectedIntegration(null);
-      setIntegrationName("");
-      setConfiguration({});
-
-      // Redirect to the integration details page
-      if (result.data?.integration?.metadata?.id) {
-        navigate(`/${organizationId}/settings/integrations/${result.data.integration.metadata.id}`);
-      }
-    } catch (_error) {
-      showErrorToast(getUsageLimitToastMessage(_error, "Failed to create integration"));
-    }
+    await submitLegacyIntegrationConnect({
+      canCreateIntegrations,
+      selectedIntegration,
+      integrationName,
+      configuration,
+      organizationId,
+      navigate,
+      mutateAsync: createIntegrationMutation.mutateAsync,
+      setIsModalOpen,
+      setSelectedIntegration,
+      setIntegrationName,
+      setConfiguration,
+    });
   };
-
-  const handleRequestIntegration = () => {
-    analytics.integrationRequested(organizationId);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedIntegration(null);
-    setIntegrationName("");
-    setConfiguration({});
-    createIntegrationMutation.reset();
-  };
-
-  const createIntegrationNotice = createIntegrationMutation.isError
-    ? getUsageLimitNotice(createIntegrationMutation.error, organizationId)
-    : null;
 
   if (isLoading) {
     return (
@@ -255,6 +351,90 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       </div>
     );
   }
+
+  return (
+    <IntegrationsLoaded
+      organizationId={organizationId}
+      filterQuery={filterQuery}
+      setFilterQuery={setFilterQuery}
+      integrationCatalog={integrationCatalog}
+      filteredIntegrationCatalog={filteredIntegrationCatalog}
+      isIntegrationSurveyActive={isIntegrationSurveyActive}
+      canCreateIntegrations={canCreateIntegrations}
+      canUpdateIntegrations={canUpdateIntegrations}
+      permissionsLoading={permissionsLoading}
+      onConnectClick={handleConnectClick}
+      isModalOpen={isModalOpen}
+      selectedIntegration={selectedIntegration}
+      selectedInstructions={selectedInstructions}
+      integrationName={integrationName}
+      configuration={configuration}
+      createIntegrationMutation={createIntegrationMutation}
+      onNameChange={setIntegrationName}
+      onConfigurationChange={setConfiguration}
+      onConnect={() => {
+        void handleConnect();
+      }}
+      onCloseModal={() =>
+        resetConnectModal({
+          resetMutation: createIntegrationMutation.reset,
+          setIsModalOpen,
+          setSelectedIntegration,
+          setIntegrationName,
+          setConfiguration,
+        })
+      }
+    />
+  );
+}
+
+function IntegrationsLoaded(props: {
+  organizationId: string;
+  filterQuery: string;
+  setFilterQuery: (value: string) => void;
+  integrationCatalog: ReturnType<typeof useIntegrationCatalog>["integrationCatalog"];
+  filteredIntegrationCatalog: ReturnType<typeof useIntegrationCatalog>["filteredIntegrationCatalog"];
+  isIntegrationSurveyActive: boolean;
+  canCreateIntegrations: boolean;
+  canUpdateIntegrations: boolean;
+  permissionsLoading: boolean;
+  onConnectClick: (integration: IntegrationsIntegrationDefinition) => void;
+  isModalOpen: boolean;
+  selectedIntegration: IntegrationsIntegrationDefinition | null;
+  selectedInstructions: string;
+  integrationName: string;
+  configuration: Record<string, unknown>;
+  createIntegrationMutation: ReturnType<typeof useCreateIntegration>;
+  onNameChange: (value: string) => void;
+  onConfigurationChange: (value: Record<string, unknown>) => void;
+  onConnect: () => void;
+  onCloseModal: () => void;
+}) {
+  const {
+    organizationId,
+    filterQuery,
+    setFilterQuery,
+    integrationCatalog,
+    filteredIntegrationCatalog,
+    isIntegrationSurveyActive,
+    canCreateIntegrations,
+    canUpdateIntegrations,
+    permissionsLoading,
+    onConnectClick,
+    isModalOpen,
+    selectedIntegration,
+    selectedInstructions,
+    integrationName,
+    configuration,
+    createIntegrationMutation,
+    onNameChange,
+    onConfigurationChange,
+    onConnect,
+    onCloseModal,
+  } = props;
+  const createIntegrationNotice = createIntegrationMutation.isError
+    ? getUsageLimitNotice(createIntegrationMutation.error, organizationId)
+    : null;
 
   return (
     <div className="pt-6">
@@ -289,7 +469,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
               Can't find your integration?{" "}
               <button
                 type="button"
-                onClick={handleRequestIntegration}
+                onClick={() => analytics.integrationRequested(organizationId)}
                 className="text-blue-600 hover:underline dark:text-blue-400 font-medium"
               >
                 Request it
@@ -335,7 +515,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       size="sm"
                       onClick={() => {
                         if (!item.integrationDef) return;
-                        handleConnectClick(item.integrationDef);
+                        onConnectClick(item.integrationDef);
                       }}
                       className="self-start"
                       disabled={!item.integrationDef || !canCreateIntegrations}
@@ -349,72 +529,16 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                     <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
                       {connectedCount} connected instance{connectedCount === 1 ? "" : "s"}
                     </p>
-                    {item.instances.map((integration, index) => {
-                      const integrationDisplayName = integration.metadata?.name;
-                      const statusLabel = integration.status?.state
-                        ? integration.status.state.charAt(0).toUpperCase() + integration.status.state.slice(1)
-                        : "Unknown";
-
-                      return (
-                        <div
-                          key={integration.metadata?.id}
-                          className={`flex items-center gap-2 py-1.5 border-t border-gray-200 dark:border-gray-700/70 ${index === 0 ? "mt-1" : ""}`}
-                        >
-                          <Plug
-                            className={`w-4 h-4 shrink-0 ${
-                              integration.status?.state === "ready"
-                                ? "text-green-500"
-                                : integration.status?.state === "error"
-                                  ? "text-red-500"
-                                  : "text-amber-600"
-                            }`}
-                          />
-                          <span
-                            className={cn(
-                              "inline-flex w-16 items-center justify-start rounded text-xs font-medium",
-                              integration.status?.state === "ready"
-                                ? "bg-white text-green-500 dark:bg-green-300 dark:text-green-950"
-                                : integration.status?.state === "error"
-                                  ? "bg-white text-red-500 dark:bg-red-300 dark:text-red-950"
-                                  : "bg-white text-amber-600 dark:bg-amber-300 dark:text-amber-950",
-                            )}
-                          >
-                            {statusLabel}
-                          </span>
-                          <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-                            {integrationDisplayName}
-                          </p>
-                          <div className="ml-auto flex items-center gap-4">
-                            <PermissionTooltip
-                              allowed={canUpdateIntegrations || permissionsLoading}
-                              message="You don't have permission to update integrations."
-                            >
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  if (!canUpdateIntegrations) return;
-                                  const providerName = integration.metadata?.integrationName;
-                                  if (providerName && integration.status?.setupState?.currentStep) {
-                                    navigate(`/${organizationId}/settings/integrations/${providerName}/setup`, {
-                                      state: { integrationId: integration.metadata?.id },
-                                    });
-                                    return;
-                                  }
-
-                                  navigate(`/${organizationId}/settings/integrations/${integration.metadata?.id}`, {
-                                    state: { tab: "configuration" },
-                                  });
-                                }}
-                                disabled={!canUpdateIntegrations}
-                              >
-                                Configure
-                              </Button>
-                            </PermissionTooltip>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {item.instances.map((integration, index) => (
+                      <IntegrationInstanceRow
+                        key={integration.metadata?.id}
+                        integration={integration}
+                        index={index}
+                        organizationId={organizationId}
+                        canUpdateIntegrations={canUpdateIntegrations}
+                        permissionsLoading={permissionsLoading}
+                      />
+                    ))}
                   </div>
                 ) : null}
               </div>
@@ -425,7 +549,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
               Can't find your integration?{" "}
               <button
                 type="button"
-                onClick={handleRequestIntegration}
+                onClick={() => analytics.integrationRequested(organizationId)}
                 className="text-blue-600 hover:underline dark:text-blue-400 font-medium"
               >
                 Request it
@@ -435,114 +559,24 @@ export function Integrations({ organizationId }: IntegrationsProps) {
         </div>
       )}
 
-      {/* Connect Modal */}
-      {isModalOpen &&
-        selectedIntegration &&
-        (() => {
-          const integrationTypeName = selectedIntegration.name;
-          return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-              <div className={cn(settingsModalClassName, "max-h-[80vh] max-w-2xl overflow-y-auto")}>
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                      <IntegrationIcon
-                        integrationName={integrationTypeName}
-                        iconSlug={selectedIntegration.icon}
-                        className="w-6 h-6 text-gray-500 dark:text-gray-400"
-                      />
-                      <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
-                        Connect {selectedIntegration.label || selectedIntegration.name}
-                      </h3>
-                    </div>
-                    <button
-                      onClick={handleCloseModal}
-                      className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-                      disabled={createIntegrationMutation.isPending}
-                    >
-                      <Icon name="x" size="sm" />
-                    </button>
-                  </div>
-
-                  <div className="space-y-4">
-                    {selectedInstructions && <IntegrationInstructions description={selectedInstructions} />}
-                    {/* Integration Name Field */}
-                    <div>
-                      <Label className="text-gray-800 dark:text-gray-100 mb-2">
-                        Integration Name
-                        <span className="ml-1 text-gray-800 dark:text-gray-100">*</span>
-                      </Label>
-                      <Input
-                        type="text"
-                        value={integrationName}
-                        onChange={(e) => setIntegrationName(e.target.value)}
-                        placeholder="e.g., my-app-integration"
-                        required
-                        disabled={!canCreateIntegrations}
-                      />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                        A unique name for this integration
-                      </p>
-                    </div>
-
-                    {/* Configuration Fields */}
-                    {selectedIntegration.configuration && selectedIntegration.configuration.length > 0 && (
-                      <div className="space-y-4">
-                        {selectedIntegration.configuration
-                          .filter((field) => Boolean(field.name))
-                          .map((field) => (
-                            <ConfigurationFieldRenderer
-                              key={field.name!}
-                              field={field}
-                              value={configuration[field.name!]}
-                              onChange={(value) => setConfiguration({ ...configuration, [field.name!]: value })}
-                              allValues={configuration}
-                              organizationId={organizationId}
-                            />
-                          ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex justify-start gap-3 mt-6">
-                    <Button
-                      color="blue"
-                      onClick={handleConnect}
-                      disabled={
-                        createIntegrationMutation.isPending || !integrationName?.trim() || !canCreateIntegrations
-                      }
-                      className="flex items-center gap-2"
-                    >
-                      {createIntegrationMutation.isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Connecting...
-                        </>
-                      ) : (
-                        "Connect"
-                      )}
-                    </Button>
-                    <Button variant="outline" onClick={handleCloseModal} disabled={createIntegrationMutation.isPending}>
-                      Cancel
-                    </Button>
-                  </div>
-
-                  {createIntegrationMutation.isError && createIntegrationNotice ? (
-                    <UsageLimitAlert notice={createIntegrationNotice} className="mt-4" />
-                  ) : null}
-                  {createIntegrationMutation.isError && !createIntegrationNotice ? (
-                    <Alert variant="destructive" className="mt-4">
-                      <AlertTitle>Unable to create integration</AlertTitle>
-                      <AlertDescription>
-                        Failed to create integration: {getApiErrorMessage(createIntegrationMutation.error)}
-                      </AlertDescription>
-                    </Alert>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+      {isModalOpen && selectedIntegration ? (
+        <IntegrationConnectModal
+          selectedIntegration={selectedIntegration}
+          selectedInstructions={selectedInstructions}
+          integrationName={integrationName}
+          configuration={configuration}
+          organizationId={organizationId}
+          canCreateIntegrations={canCreateIntegrations}
+          isPending={createIntegrationMutation.isPending}
+          isError={createIntegrationMutation.isError}
+          error={createIntegrationMutation.error}
+          createIntegrationNotice={createIntegrationNotice}
+          onNameChange={onNameChange}
+          onConfigurationChange={onConfigurationChange}
+          onConnect={onConnect}
+          onClose={onCloseModal}
+        />
+      ) : null}
     </div>
   );
 }
