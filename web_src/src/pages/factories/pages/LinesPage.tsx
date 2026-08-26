@@ -99,6 +99,7 @@ import {
   type ConfiguredLineIntakeSource,
 } from "./lineIntakeModel";
 import { isIntakeSettingsTab } from "./intakeSourceSettingsModel";
+import { useFactoryPreviewFlag } from "./factoryPreviewFlagsContext";
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
 import { PRFeedbackSettingsHost } from "./PRFeedbackSettingsHost";
 import { isPRFeedbackSettingsTab } from "./prFeedbackSettingsModel";
@@ -153,6 +154,7 @@ export function LinesPage() {
   const { data: factoryIntakes = [] } = useFactoryIntakes(organizationId, factoryId);
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
+  const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
 
   const canUpdate = canAct("factories", "update");
@@ -219,6 +221,7 @@ export function LinesPage() {
             organizationId={organizationId}
             factoryId={factoryId}
             editAutomationHrefFor={editAutomationHrefFor}
+            showAddIntakeControl={showAddIntakeControl}
             onSelectIntakeTemplate={(template) => {
               if (!isLineIntakeSourceId(template.id)) {
                 showErrorToast("This intake template is not available yet.");
@@ -496,7 +499,7 @@ function LineDetail({
           peekOrder={peekOrder}
           canDispatch={workOrderCardContext.canDispatch}
           canUpdate={workOrderCardContext.canAssign}
-          isDispatching={workOrderCardContext.isDispatching}
+          isDispatching={workOrderCardContext.dispatchingOrderIds.has(peekOrderId)}
           onDispatch={workOrderCardContext.onDispatch}
           onClose={() => setPeekOrderId(null)}
         />

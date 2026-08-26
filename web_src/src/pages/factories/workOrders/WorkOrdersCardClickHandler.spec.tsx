@@ -100,7 +100,7 @@ function renderView(
           preferredLineName={extras.preferredLineName}
           canDispatch={true}
           canAssign={true}
-          isDispatching={false}
+          dispatchingOrderIds={new Set()}
           isAssigneesSaving={false}
           onDispatch={onDispatch}
           onAssigneesSave={onAssigneesSave}
@@ -322,7 +322,7 @@ describe("WorkOrderCard scores", () => {
             factoryLines={[{ id: "line-a", name: "hotfix" }]}
             canDispatch
             canAssign
-            isDispatching={false}
+            dispatchingOrderIds={new Set()}
             isAssigneesSaving={false}
             onDispatch={vi.fn()}
             onAssigneesSave={vi.fn()}
@@ -369,7 +369,7 @@ describe("WorkOrderCard scores", () => {
             factoryLines={[{ id: "line-a", name: "hotfix" }]}
             canDispatch
             canAssign
-            isDispatching={false}
+            dispatchingOrderIds={new Set()}
             isAssigneesSaving={false}
             onDispatch={vi.fn()}
             onAssigneesSave={vi.fn()}

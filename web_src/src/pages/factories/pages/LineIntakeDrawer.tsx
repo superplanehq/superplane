@@ -16,6 +16,7 @@ import {
 import {
   intakeAutomationFixture,
   intakeTicketAnalysisFixture,
+  isBelowThresholdTicket,
   LINE_INTAKE_COPY,
   type AddIntakeTemplate,
   type ConfiguredLineIntakeSource,
@@ -148,6 +149,7 @@ export function LineIntakeDrawer({
   editAutomationHrefFor,
   previewSource,
   onSettingsSaved,
+  showAddIntakeControl = false,
 }: LineIntakeDrawerProps) {
   const drawer = useLineIntakeDrawerState({
     initialIntakeId,
@@ -191,6 +193,7 @@ export function LineIntakeDrawer({
           onOpenGear={drawer.openIntakeGear}
           onOpenAnalyzingTicket={drawer.openAnalyzingTicket}
           onOpenPicker={drawer.openPicker}
+          showAddIntakeControl={showAddIntakeControl}
         />
       </aside>
 
@@ -228,6 +231,7 @@ function LineIntakeList({
   onOpenGear,
   onOpenAnalyzingTicket,
   onOpenPicker,
+  showAddIntakeControl,
 }: {
   organizationId?: string;
   factoryId?: string;
@@ -239,6 +243,7 @@ function LineIntakeList({
   onOpenGear: (intake: ConfiguredLineIntakeSource) => void;
   onOpenAnalyzingTicket: (ticket: LineIntakeAnalyzingTicket) => void;
   onOpenPicker: () => void;
+  showAddIntakeControl: boolean;
 }) {
   return (
     <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 [scrollbar-width:thin]">
@@ -256,17 +261,19 @@ function LineIntakeList({
           onOpenAnalyzingTicket={onOpenAnalyzingTicket}
         />
       ))}
-      <li>
-        <button
-          type="button"
-          onClick={onOpenPicker}
-          data-testid="line-intake-add"
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/60 px-3 py-3 text-[13px] font-medium tracking-[-0.01em] text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted hover:text-foreground"
-        >
-          <Plus className="size-3.5 shrink-0" aria-hidden />
-          Add intake
-        </button>
-      </li>
+      {showAddIntakeControl ? (
+        <li>
+          <button
+            type="button"
+            onClick={onOpenPicker}
+            data-testid="line-intake-add"
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/60 px-3 py-3 text-[13px] font-medium tracking-[-0.01em] text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted hover:text-foreground"
+          >
+            <Plus className="size-3.5 shrink-0" aria-hidden />
+            Add intake
+          </button>
+        </li>
+      ) : null}
     </ul>
   );
 }
@@ -295,13 +302,15 @@ function IntakeListItem({
   const live = useLiveIntakeTickets(organizationId, factoryId, intake, expanded);
   const connected = Boolean(organizationId && factoryId);
   const tickets = connected ? live.tickets : fallbackTickets;
+  const belowThresholdCount = tickets.filter(isBelowThresholdTicket).length;
 
   return (
     <li>
       <IntakeCard
         intake={intake}
         expanded={expanded}
-        childCount={tickets.length}
+        analyzingCount={tickets.length - belowThresholdCount}
+        belowThresholdCount={belowThresholdCount}
         onToggle={() => onToggleIntake(intake.intakeId)}
         onOpenGear={() => onOpenGear(intake)}
       >
@@ -426,14 +435,16 @@ function LineIntakeDrawerPopups({
 function IntakeCard({
   intake,
   expanded,
-  childCount,
+  analyzingCount,
+  belowThresholdCount,
   onToggle,
   onOpenGear,
   children,
 }: {
   intake: ConfiguredLineIntakeSource;
   expanded: boolean;
-  childCount: number;
+  analyzingCount: number;
+  belowThresholdCount: number;
   onToggle: () => void;
   onOpenGear: () => void;
   children?: ReactNode;
@@ -466,11 +477,15 @@ function IntakeCard({
         <div className="relative z-10 min-w-0 flex-1 pointer-events-none">
           <h3 className="flex flex-wrap items-center gap-1.5 text-[13px] font-medium tracking-[-0.01em] leading-[19.5px] text-foreground">
             {displayName}
-            {expanded && childCount > 0 ? (
-              <span className="text-[11px] font-medium tabular-nums text-muted-foreground">{childCount}</span>
+            {expanded && analyzingCount > 0 ? (
+              <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+                {analyzingCount} {LINE_INTAKE_COPY.analyzingStatus}
+              </span>
             ) : null}
-            {expanded && childCount > 0 ? (
-              <span className="text-[11px] font-medium text-muted-foreground">{LINE_INTAKE_COPY.analyzingStatus}</span>
+            {expanded && belowThresholdCount > 0 ? (
+              <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+                {belowThresholdCount} {LINE_INTAKE_COPY.belowThresholdStatus}
+              </span>
             ) : null}
             {intake.healthy ? null : (
               <span

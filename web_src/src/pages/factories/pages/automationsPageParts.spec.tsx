@@ -147,7 +147,7 @@ describe("AutomationDetail tabs", () => {
     factoryLines: [],
     canDispatch: false,
     canAssign: false,
-    isDispatching: false,
+    dispatchingOrderIds: new Set<string>(),
     isAssigneesSaving: false,
     onDispatch: vi.fn().mockResolvedValue(undefined),
     onAssigneesSave: vi.fn().mockResolvedValue(undefined),
