@@ -4,6 +4,7 @@ import type { HomePageFixture, StorybookOrgIntegration } from "@/pages/home/__fi
 import { defaultHomePageFixture } from "@/pages/home/__fixtures__/homePageResponses";
 import { FEATURE_CLAUDE_MANAGED_AGENTS, FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 
+import { FactoryPreviewFlagsContext, type FactoryPreviewFlags } from "../pages/factoryPreviewFlagsContext";
 import { OnboardingStorybookProvider } from "../pages/onboarding/OnboardingStorybookContext";
 import { OnboardingPage } from "../pages/onboarding/OnboardingPage";
 import type { OnboardingStorybookSeed } from "../pages/onboarding/onboardingMocks";
@@ -47,6 +48,9 @@ function DefaultWikiWireframe() {
 }
 
 const defaultFactoryAppFixture = refundLineCanvasFixture();
+
+/** Stories keep hidden-in-app surfaces visible for design review. */
+const PREVIEW_FLAGS: FactoryPreviewFlags = { addIntakeControl: true };
 
 /**
  * Mounts the org home routes with the factories feature enabled and a fixture
@@ -102,11 +106,13 @@ export function FactoriesHarness({
   );
 
   const withMissions = (
-    <MissionAssignmentProvider>
-      <WorkOrderOverviewMissionSlotContext.Provider value={WorkOrderMissionOverviewRow}>
-        {harness}
-      </WorkOrderOverviewMissionSlotContext.Provider>
-    </MissionAssignmentProvider>
+    <FactoryPreviewFlagsContext.Provider value={PREVIEW_FLAGS}>
+      <MissionAssignmentProvider>
+        <WorkOrderOverviewMissionSlotContext.Provider value={WorkOrderMissionOverviewRow}>
+          {harness}
+        </WorkOrderOverviewMissionSlotContext.Provider>
+      </MissionAssignmentProvider>
+    </FactoryPreviewFlagsContext.Provider>
   );
 
   if (!enableOnboarding) {
