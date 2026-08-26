@@ -126,7 +126,7 @@ export function endToolOnLatestSection(
 
 function appendLineToSection(section: CommandSection, text: string): CommandSection {
   const withLine = { ...section, lines: [...section.lines, text] };
-  if (!isPromptSection(section)) {
+  if (!isPromptSection(section) || !text.trim()) {
     return withLine;
   }
 
@@ -147,9 +147,7 @@ function appendLineToSection(section: CommandSection, text: string): CommandSect
       }
       return {
         ...event,
-        tools: event.tools.map((tool) =>
-          tool.id === open.id ? { ...tool, lines: [...tool.lines, text] } : tool,
-        ),
+        tools: event.tools.map((tool) => (tool.id === open.id ? { ...tool, lines: [...tool.lines, text] } : tool)),
       };
     }),
   };

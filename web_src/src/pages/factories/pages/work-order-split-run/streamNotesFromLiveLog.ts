@@ -44,6 +44,9 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
     });
     for (const [eventIndex, event] of section.events.entries()) {
       if (event.kind === "note") {
+        if (!event.text.trim()) {
+          continue;
+        }
         notes.push({
           id: `${stepId}-note-${eventIndex}`,
           nodeId,

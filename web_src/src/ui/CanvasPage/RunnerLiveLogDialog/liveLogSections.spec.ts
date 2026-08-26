@@ -135,6 +135,31 @@ describe("liveLogSections", () => {
     expect(tools.tools[1].lines).toEqual([]);
   });
 
+  it("does not turn blank stdout into prompt notes between tools", () => {
+    let state = startCommandSection(emptyState(), {
+      index: 5,
+      text: "Implementation",
+      startedAtMs: 1,
+      kind: "prompt",
+      preview: "You are implementing",
+    });
+    state = startToolOnLatestSection(state, "bash", "echo a", "toolu_a");
+    state = endToolOnLatestSection(state, "passed", 1, "toolu_a");
+    state = appendLineToLatestSection(state, "");
+    state = appendLineToLatestSection(state, "   ");
+    state = startToolOnLatestSection(state, "bash", "echo b", "toolu_b");
+
+    const section = state.sections[0];
+    expect(section.lines).toEqual(["", "   "]);
+    expect(section.events.filter((event) => event.kind === "note")).toEqual([]);
+    expect(section.events).toHaveLength(1);
+    expect(section.events[0]?.kind).toBe("tools");
+    if (section.events[0]?.kind !== "tools") {
+      throw new Error("expected tools group");
+    }
+    expect(section.events[0].tools.map((tool) => tool.id)).toEqual(["toolu_a", "toolu_b"]);
+  });
+
   it("keeps bash section lines flat", () => {
     let state = startCommandSection(emptyState(), {
       index: 0,

@@ -124,7 +124,7 @@ function accumulateLLMUsage(payload) {
 }
 
 function writeLiveLogRecord(rec) {
-  process.stdout.write(`\n${JSON.stringify(rec)}\n`);
+  process.stdout.write(`${JSON.stringify(rec)}\n`);
 }
 
 function createCodexFormatter() {

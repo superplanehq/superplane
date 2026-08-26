@@ -89,4 +89,36 @@ describe("notesFromLiveLogSections", () => {
 
     expect(notes.some((note) => note.componentType === "bash" && note.componentName.includes("git status"))).toBe(true);
   });
+
+  it("skips blank prompt notes", () => {
+    const notes = notesFromLiveLogSections("agent", [
+      {
+        ...promptSection(),
+        events: [
+          { kind: "note", text: "Claude Code started" },
+          { kind: "note", text: "" },
+          { kind: "note", text: "  " },
+          {
+            kind: "tools",
+            id: "g1",
+            tools: [
+              {
+                id: "t1",
+                kind: "bash",
+                text: "echo a",
+                lines: [],
+                status: "passed",
+                duration_ms: 1,
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    expect(notes.filter((note) => note.componentType === "note").map((note) => note.componentName)).toEqual([
+      "Claude Code started",
+    ]);
+    expect(notes.some((note) => note.componentType === "bash" && note.componentName === "echo a")).toBe(true);
+  });
 });

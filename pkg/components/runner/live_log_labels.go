@@ -9,10 +9,11 @@ const (
 	LiveLogKindJavaScript = "javascript"
 	LiveLogKindPython     = "python"
 
-	liveLogPreviewMaxRunes = 80
+	liveLogPreviewMaxRunes = 2048
 )
 
 // LiveLogPreview is the first non-empty line of user-facing command or prompt text.
+// The log row ellipsizes in the UI. The rune cap only bounds a huge one-line prompt.
 func LiveLogPreview(text string) string {
 	for _, line := range strings.Split(text, "\n") {
 		line = strings.TrimSpace(line)
