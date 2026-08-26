@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
@@ -27,6 +28,11 @@ const (
 
 	DefaultIntakeConfidencePct = 65
 )
+
+// intakeAnalysisMachineType is the machine the analysis runner asks for. The
+// runner components reject a node without one, so the generated graph has to
+// name it.
+const intakeAnalysisMachineType = runner.MachineTypeE1LargeAMD64
 
 // intakeAnalysisComponents are the runners an intake can score with. Creation
 // always picks Claude Code, but a graph the user re-pointed at another runner
@@ -144,6 +150,7 @@ func buildIntakeCanvas(source, name string, confidencePct int, binding *intakeBi
 					Type:      yaml.NodeTypeAction,
 					Component: intakeAnalysisComponents[0],
 					Configuration: map[string]any{
+						"machineType": intakeAnalysisMachineType,
 						"steps": []any{
 							map[string]any{
 								"name":   "Analyze and score",
