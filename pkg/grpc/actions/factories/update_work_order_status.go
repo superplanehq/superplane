@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -90,7 +91,14 @@ func UpdateWorkOrderStatus(
 		return nil, factoryErrorToStatus(err, "failed to update work order status")
 	}
 
-	order, err = factory.FindWorkOrder(db, orderID)
+	refreshed, err := factory.FindWorkOrder(db, orderID)
+	if errors.Is(err, models.ErrFactoryWorkOrderNotFound) {
+		serialized, err := serializeWorkOrder(factory, order, nil, nil)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update work order status")
+		}
+		return &pb.UpdateWorkOrderStatusResponse{Order: serialized}, nil
+	}
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order status")
 	}
@@ -119,7 +127,7 @@ func UpdateWorkOrderStatus(
 		}
 	}
 
-	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
+	serialized, err := loadAndSerializeWorkOrder(ctx, factory, refreshed)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order status")
 	}

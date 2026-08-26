@@ -34,6 +34,7 @@ function footerMutationHandlers(
   canUpdate: boolean,
   footerActions: ReturnType<typeof useSplitRunFooterActions>,
   fixture: SplitRunFixture,
+  onClose?: () => void,
 ) {
   if (!canUpdate) {
     return { onStop: undefined, onReject: undefined };
@@ -45,7 +46,11 @@ function footerMutationHandlers(
         lineName: fixture.lineName,
         stepIndex: fixture.currentStepIndex,
       }),
-    onReject: footerActions.handleReject,
+    onReject: async () => {
+      if (await footerActions.handleReject()) {
+        onClose?.();
+      }
+    },
   };
 }
 
@@ -60,6 +65,7 @@ type WorkOrderSplitRunBodyProps = {
   isDispatching?: boolean;
   canDispatch?: boolean;
   canUpdate?: boolean;
+  onClose?: () => void;
 };
 
 /** Phase log for a work-order popup. The popup wraps this. */
@@ -74,9 +80,10 @@ export function WorkOrderSplitRunBody({
   isDispatching = false,
   canDispatch = false,
   canUpdate = true,
+  onClose,
 }: WorkOrderSplitRunBodyProps) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
-  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture);
+  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, onClose);
   const [phaseId, setPhaseId] = useState<SplitRunPhaseId>(fixture.currentPhaseId);
   const [openPhaseId, setOpenPhaseId] = useState<SplitRunPhaseId | null>(() => autoExpandedPhaseId(fixture));
   const [nodeId, setNodeId] = useState<string | null>(null);
@@ -193,7 +200,7 @@ export function WorkOrderSplitRunPopup({
   fixed?: boolean;
 }) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
-  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture);
+  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, onClose);
   const fixtureArtifacts = collectSplitRunArtifacts(fixture);
   const useLiveArtifacts = Boolean(organizationId && factoryId && orderId);
   const liveArtifactsQuery = useWorkOrderArtifacts(organizationId ?? "", factoryId ?? "", orderId ?? "");
@@ -257,6 +264,7 @@ export function WorkOrderSplitRunPopup({
         canDispatch={canDispatch}
         canUpdate={canUpdate}
         stopBusy={footerActions.busy}
+        onClose={onClose}
       />
     </PopupShell>
   );
@@ -279,6 +287,7 @@ function SplitRunPopupTabs({
   canDispatch,
   canUpdate,
   stopBusy,
+  onClose,
 }: {
   fixture: SplitRunFixture;
   edits: ReturnType<typeof useSplitRunWorkOrderEdits>;
@@ -296,6 +305,7 @@ function SplitRunPopupTabs({
   canDispatch?: boolean;
   canUpdate?: boolean;
   stopBusy: boolean;
+  onClose?: () => void;
 }) {
   const draftStart = fixture.footer.kind === "draft" ? onDispatch : undefined;
 
@@ -352,6 +362,7 @@ function SplitRunPopupTabs({
           isDispatching={isDispatching}
           canDispatch={canDispatch}
           canUpdate={canUpdate}
+          onClose={onClose}
         />
       </TabsContent>
     </Tabs>
