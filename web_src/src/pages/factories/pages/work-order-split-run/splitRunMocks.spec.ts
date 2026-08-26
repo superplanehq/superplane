@@ -416,6 +416,57 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.phases.find((phase) => phase.name === "Implement")?.status).toBe("running");
   });
 
+  it("gives a rerun of the same step its own phase and run", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Test work order 2",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "d-1",
+            createdAt: "2026-08-26T05:58:02.000Z",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_ACTIVE",
+            stepExecutions: [
+              {
+                id: "e-plan",
+                step: "Planning",
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+                run: { id: "run-plan" },
+              },
+              {
+                id: "e-impl-old",
+                step: "Implementation",
+                stepIndex: 1,
+                state: "STATE_FINISHED",
+                result: "RESULT_FAILED",
+                run: { id: "run-old" },
+              },
+              {
+                id: "e-impl-new",
+                step: "Implementation",
+                stepIndex: 1,
+                state: "STATE_STARTED",
+                result: "RESULT_UNKNOWN",
+                run: { id: "run-new" },
+              },
+            ],
+          },
+        ],
+      }),
+      { lineId: "line-1" },
+    );
+
+    const implementPhases = fixture.phases.filter((phase) => phase.name === "Implement");
+    expect(implementPhases).toHaveLength(2);
+    expect(implementPhases[0].id).not.toBe(implementPhases[1].id);
+    expect(implementPhases[0].runId).toBe("run-old");
+    expect(implementPhases[1].runId).toBe("run-new");
+    expect(implementPhases[1].status).toBe("running");
+    expect(fixture.currentPhaseId).toBe(implementPhases[1].id);
+  });
+
   it("uses supplied checks instead of the fixture pills", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({

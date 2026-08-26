@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { applySplitRunStop, applySplitRunStopChoice } from "./splitRunStop";
 
 describe("applySplitRunStopChoice", () => {
-  it("closes as rejected for Stop as Canceled", async () => {
+  it("closes as rejected for Stop and Close", async () => {
     const onClose = vi.fn();
     const onStatusChange = vi.fn();
 
@@ -13,7 +13,7 @@ describe("applySplitRunStopChoice", () => {
     expect(onStatusChange).not.toHaveBeenCalled();
   });
 
-  it("closes as completed for Stop as Completed", async () => {
+  it("closes as completed for Stop and Complete", async () => {
     const onClose = vi.fn();
     const onStatusChange = vi.fn();
 

@@ -18,7 +18,7 @@ type SplitRunStopHandlers = {
 };
 
 /**
- * Stop as Canceled is the former Reject close. Completed closes. Rerun
+ * Stop and Close is the former Reject close. Completed closes. Rerun
  * starts the current step or the first step again.
  */
 export async function applySplitRunStopChoice(

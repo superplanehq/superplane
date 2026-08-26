@@ -686,6 +686,67 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__FinishesDispatchOnCancellat
 	testExecuteNextFactoryLineStepFinishesDispatchWithResult(t, models.CanvasRunResultCancelled)
 }
 
+func Test__RunFinalizer__ExecuteNextFactoryLineStep__KeepsDispatchAfterSettledStepRetry(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
+
+	line, err := factory.CreateLine(database.Conn(), "ship", nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
+	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-two", "start-two")
+	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+	}))
+
+	var dispatch *models.FactoryWorkOrderLineDispatch
+	var inFlight *models.FactoryLineStepResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var dispatchErr error
+		dispatch, _, dispatchErr = line.Dispatch(tx, order)
+		if dispatchErr != nil {
+			return dispatchErr
+		}
+		var startErr error
+		inFlight, startErr = dispatch.EnqueueOrStartStep(tx, order, 1)
+		return startErr
+	}))
+	require.NotNil(t, inFlight.Run)
+
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		_, retryErr := order.RetryLineStep(tx, line, 1)
+		return retryErr
+	}))
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(inFlight.Run).Updates(map[string]any{
+		"state":       models.CanvasRunStateFinished,
+		"result":      models.CanvasRunResultCancelled,
+		"updated_at":  &now,
+		"finished_at": &now,
+	}).Error)
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		_, _, advanceErr := finalizer.executeNextFactoryLineStep(tx, inFlight.Run.ID)
+		return advanceErr
+	}))
+
+	reloaded, err := models.FindWorkOrderLineDispatch(database.Conn(), dispatch.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateActive, reloaded.State)
+	assert.Empty(t, reloaded.Result)
+}
+
 func testExecuteNextFactoryLineStepFinishesDispatchWithResult(t *testing.T, terminalResult string) {
 	r := support.Setup(t)
 	defer r.Close()

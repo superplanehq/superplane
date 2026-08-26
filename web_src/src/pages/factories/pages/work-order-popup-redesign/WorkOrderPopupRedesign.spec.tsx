@@ -267,7 +267,7 @@ describe("Line board job popup", () => {
     dialog = await screen.findByTestId("work-order-split-run");
     expect(within(dialog).getByRole("heading", { name: "Listening for user review" })).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Stop & Close" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Stop and Close" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: /Update manually/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
@@ -277,7 +277,7 @@ describe("Line board job popup", () => {
     expect(within(dialog).getByRole("heading", { name: "Implement did not pass" })).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "Review the run" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: "Stop & Close" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 

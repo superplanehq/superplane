@@ -427,7 +427,39 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 		return nil, err
 	}
 
+	if err := target.settleOpenWorkFrom(tx, stepIndex); err != nil {
+		return nil, err
+	}
+
 	return target.EnqueueOrStartStep(tx, o, stepIndex)
+}
+
+func (l *FactoryWorkOrderLineDispatch) settleOpenWorkFrom(tx *gorm.DB, stepIndex int) error {
+	if err := tx.
+		Where("line_dispatch_id = ? AND step_index >= ?", l.ID, stepIndex).
+		Delete(&FactoryWorkOrderQueueItem{}).Error; err != nil {
+		return err
+	}
+
+	var executions []FactoryWorkOrderExecution
+	err := tx.
+		Where("line_dispatch_id = ? AND step_index >= ?", l.ID, stepIndex).
+		Where("status IN ?", []string{
+			FactoryWorkOrderExecutionStatusPending,
+			FactoryWorkOrderExecutionStatusRunning,
+		}).
+		Find(&executions).Error
+	if err != nil {
+		return err
+	}
+
+	for i := range executions {
+		if err := executions[i].MarkFinished(tx, CanvasRunResultCancelled); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func pickDispatchForStepRetry(records []FactoryWorkOrderLineDispatchRecord, stepIndex int) *FactoryWorkOrderLineDispatch {

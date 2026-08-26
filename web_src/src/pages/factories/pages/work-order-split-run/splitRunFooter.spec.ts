@@ -57,14 +57,14 @@ describe("buildSplitRunFooter", () => {
     expect(footer.actions).toEqual([{ id: "stop", kind: "stop", label: "Stop", emphasis: "quiet" }]);
     expect(DEFAULT_SPLIT_RUN_STOP_CHOICE).toBe("canceled");
     expect(SPLIT_RUN_STOP_CHOICES.map((choice) => choice.label)).toEqual([
-      "Stop as Canceled",
-      "Stop as Completed",
+      "Stop and Close",
+      "Stop and Complete",
       "Rerun this step",
       "Rerun from the start",
     ]);
     expect(SPLIT_RUN_STOP_CHOICES.map((choice) => choice.actionLabel)).toEqual([
-      "Stop & Close",
-      "Mark as Complete",
+      "Stop and Close",
+      "Stop and Complete",
       "Rerun step",
       "Rerun from start",
     ]);
@@ -150,6 +150,8 @@ describe("availableSplitRunStopChoices", () => {
       "rerun-start",
     ]);
     expect(defaultSplitRunStopChoice("running")).toBe("canceled");
+    expect(defaultSplitRunStopChoice("waiting")).toBe("canceled");
+    expect(defaultSplitRunStopChoice("waiting", "failed")).toBe("rerun-step");
   });
 
   it("drops the outcome that already matches the work order", () => {

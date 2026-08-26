@@ -314,3 +314,63 @@ func Test__FactoryWorkOrder__RetryLineStep__ReusesDispatchWithEarlierSteps(t *te
 	}
 	assert.Equal(t, 1, planCount)
 }
+
+func Test__FactoryWorkOrder__RetryLineStep__SettlesInFlightStepBeforeRerun(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factory.CreateWorkOrder(db, "Improve AGENTS.md", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "plan", "start-plan")
+	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start-implement")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
+	})
+	require.NoError(t, err)
+
+	var dispatch *models.FactoryWorkOrderLineDispatch
+	var inFlight *models.FactoryWorkOrderExecution
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		var dispatchErr error
+		dispatch, _, dispatchErr = line.Dispatch(tx, order)
+		if dispatchErr != nil {
+			return dispatchErr
+		}
+		result, startErr := dispatch.EnqueueOrStartStep(tx, order, 1)
+		if startErr != nil {
+			return startErr
+		}
+		inFlight = result.Execution
+		return nil
+	}))
+
+	require.NotEqual(t, models.FactoryWorkOrderExecutionStatusFinished, inFlight.Status)
+	require.NotNil(t, inFlight.RunID)
+
+	var retry *models.FactoryLineStepResult
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		var retryErr error
+		retry, retryErr = order.RetryLineStep(tx, line, 1)
+		return retryErr
+	}))
+
+	require.NotNil(t, retry)
+	require.NotNil(t, retry.Execution)
+	assert.NotEqual(t, inFlight.ID, retry.Execution.ID)
+	assert.Equal(t, 1, retry.Execution.StepIndex)
+	assert.NotEqual(t, models.FactoryWorkOrderExecutionStatusFinished, retry.Execution.Status)
+
+	active, err := order.FindActiveLineDispatch(db)
+	require.NoError(t, err)
+	assert.Equal(t, dispatch.ID, active.ID)
+
+	settled, err := models.FindWorkOrderExecutionByRunID(db, *inFlight.RunID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, settled.Status)
+	assert.Equal(t, models.CanvasRunResultCancelled, settled.Result)
+}

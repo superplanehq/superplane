@@ -49,7 +49,7 @@ describe("useSplitRunFooterActions", () => {
     vi.mocked(showErrorToast).mockReset();
   });
 
-  it("closes as rejected for Stop as Canceled", async () => {
+  it("closes as rejected for Stop and Close", async () => {
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 
     await result.current.handleStop("canceled", { kind: "waiting" });
@@ -59,7 +59,7 @@ describe("useSplitRunFooterActions", () => {
     expect(showSuccessToast).toHaveBeenCalledWith("Work order closed as canceled.");
   });
 
-  it("closes as completed for Stop as Completed", async () => {
+  it("closes as completed for Stop and Complete", async () => {
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 
     await result.current.handleStop("completed", { kind: "failed" });

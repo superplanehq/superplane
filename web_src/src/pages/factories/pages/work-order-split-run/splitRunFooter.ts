@@ -23,15 +23,15 @@ export type SplitRunStopChoiceItem = {
 export const SPLIT_RUN_STOP_CHOICES: SplitRunStopChoiceItem[] = [
   {
     id: "canceled",
-    label: "Stop as Canceled",
-    actionLabel: "Stop & Close",
+    label: "Stop and Close",
+    actionLabel: "Stop and Close",
     description: "Marks this task as Canceled",
     status: "cancelled",
   },
   {
     id: "completed",
-    label: "Stop as Completed",
-    actionLabel: "Mark as Complete",
+    label: "Stop and Complete",
+    actionLabel: "Stop and Complete",
     description: "Marks this task as Completed",
     status: "completed",
   },
@@ -97,10 +97,14 @@ export function availableSplitRunStopChoices(status?: WorkOrderDisplayStatus): S
   return SPLIT_RUN_STOP_CHOICES.filter((item) => isSplitRunStopChoiceAvailable(item.id, status));
 }
 
-export function defaultSplitRunStopChoice(status?: WorkOrderDisplayStatus): SplitRunStopChoice | undefined {
+export function defaultSplitRunStopChoice(
+  status?: WorkOrderDisplayStatus,
+  kind?: SplitRunFooterKind,
+): SplitRunStopChoice | undefined {
   const available = availableSplitRunStopChoices(status);
-  if (available.some((item) => item.id === DEFAULT_SPLIT_RUN_STOP_CHOICE)) {
-    return DEFAULT_SPLIT_RUN_STOP_CHOICE;
+  const preferred = kind === "failed" ? "rerun-step" : DEFAULT_SPLIT_RUN_STOP_CHOICE;
+  if (available.some((item) => item.id === preferred)) {
+    return preferred;
   }
   return available[0]?.id;
 }

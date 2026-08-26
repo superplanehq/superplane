@@ -299,7 +299,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     lineName: visibleDispatchForLine(order, options?.lineId)?.line?.name ?? SPLIT_RUN_RUNNING.lineName,
     currentStepIndex: current?.stepIndex ?? 0,
     lineStatus: lineStatusForDisplay(displayStatus),
-    currentPhaseId: current ? phaseIdForExecution(current) : (phases[0]?.id ?? ""),
+    currentPhaseId: current ? phaseIdForExecution(current, executions) : (phases[0]?.id ?? ""),
     phases,
     source: splitRunSourceForOrder(order),
     ...reviewSurfaces(order, displayStatus, {
@@ -457,7 +457,7 @@ function phasesForOrder(
 ): SplitRunPhase[] {
   return [
     ...sourcePhasesForOrder(order, executions.length > 0, demoArtifacts),
-    ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts)),
+    ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
   ];
 }
 
@@ -664,6 +664,7 @@ function executionToPhase(
   execution: FactoriesWorkOrderExecution,
   apiChecks?: FactoriesWorkOrderCheck[],
   demoArtifacts = true,
+  peers: FactoriesWorkOrderExecution[] = [],
 ): SplitRunPhase {
   const status = statusForExecution(execution);
   const { name, componentName } = lineAutomationPresentation(execution.run, execution.step);
@@ -683,7 +684,7 @@ function executionToPhase(
     iconSlug: "box",
   };
   return {
-    id: phaseIdForExecution(execution),
+    id: phaseIdForExecution(execution, peers),
     name,
     status,
     duration,
@@ -817,9 +818,18 @@ function statusForExecution(execution: FactoriesWorkOrderExecution): SplitRunPha
   return "waiting";
 }
 
-function phaseIdForExecution(execution: FactoriesWorkOrderExecution): string {
+function phaseIdForExecution(
+  execution: FactoriesWorkOrderExecution,
+  peers: FactoriesWorkOrderExecution[] = [],
+): string {
   const name = (execution.step ?? "step").toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  return `${name}-${execution.stepIndex ?? 0}`;
+  const stepIndex = execution.stepIndex ?? 0;
+  const base = `${name}-${stepIndex}`;
+  const sameStep = peers.filter((peer) => (peer.stepIndex ?? 0) === stepIndex);
+  if (sameStep.length <= 1) {
+    return base;
+  }
+  return `${base}-${execution.id ?? String(sameStep.indexOf(execution))}`;
 }
 
 function visibleDispatchForLine(order: FactoriesWorkOrder, lineId?: string | null) {
