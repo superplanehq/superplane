@@ -29,6 +29,9 @@ import { useIntakeAutomationRuns } from "./useIntakeAutomationRuns";
 import { useLiveIntakeTickets } from "./useLiveIntakeTickets";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 
+/** Hidden until operators can add intakes from the board. */
+const SHOW_ADD_INTAKE_CONTROL = false;
+
 /**
  * Opens the sole intake of a workspace, one time, when the URL names no
  * intake. Setup opens the drawer this way, and a single collapsed row hides
@@ -257,17 +260,19 @@ function LineIntakeList({
           onOpenAnalyzingTicket={onOpenAnalyzingTicket}
         />
       ))}
-      <li>
-        <button
-          type="button"
-          onClick={onOpenPicker}
-          data-testid="line-intake-add"
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/60 px-3 py-3 text-[13px] font-medium tracking-[-0.01em] text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted hover:text-foreground"
-        >
-          <Plus className="size-3.5 shrink-0" aria-hidden />
-          Add intake
-        </button>
-      </li>
+      {SHOW_ADD_INTAKE_CONTROL ? (
+        <li>
+          <button
+            type="button"
+            onClick={onOpenPicker}
+            data-testid="line-intake-add"
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/60 px-3 py-3 text-[13px] font-medium tracking-[-0.01em] text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted hover:text-foreground"
+          >
+            <Plus className="size-3.5 shrink-0" aria-hidden />
+            Add intake
+          </button>
+        </li>
+      ) : null}
     </ul>
   );
 }

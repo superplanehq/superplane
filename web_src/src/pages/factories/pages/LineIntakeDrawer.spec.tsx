@@ -201,42 +201,10 @@ describe("LineIntakeDrawer", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("opens a searchable picker with six intake templates", async () => {
-    const user = userEvent.setup();
+  it("does not show an Add intake control", () => {
     renderDrawer();
 
-    await user.click(screen.getByTestId("line-intake-add"));
-
-    const picker = screen.getByTestId("add-intake-picker");
-    expect(within(picker).getByRole("heading", { name: "Add intake" })).toBeInTheDocument();
-    expect(within(picker).getByTestId("add-intake-search")).toBeInTheDocument();
-    expect(within(picker).getByTestId("add-intake-template-improve-ci-runtime")).toHaveTextContent(
-      "Improve CI runtime",
-    );
-    expect(within(picker).getAllByTestId(/^add-intake-template-/)).toHaveLength(6);
-  });
-
-  it("filters templates from the picker search", async () => {
-    const user = userEvent.setup();
-    renderDrawer();
-
-    await user.click(screen.getByTestId("line-intake-add"));
-    await user.type(screen.getByTestId("add-intake-search"), "runtime");
-
-    expect(screen.getByTestId("add-intake-template-improve-ci-runtime")).toBeInTheDocument();
-    expect(screen.queryByTestId("add-intake-template-flaky-tests")).not.toBeInTheDocument();
-  });
-
-  it("reports the chosen template to the caller and closes the picker", async () => {
-    const onSelectIntakeTemplate = vi.fn();
-    const user = userEvent.setup();
-    renderDrawer({ onSelectIntakeTemplate });
-
-    await user.click(screen.getByTestId("line-intake-add"));
-    await user.click(screen.getByTestId("add-intake-template-github-issues"));
-
-    expect(onSelectIntakeTemplate).toHaveBeenCalledWith(expect.objectContaining({ id: "github-issues" }));
-    expect(screen.queryByTestId("add-intake-picker")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("line-intake-add")).not.toBeInTheDocument();
   });
 
   it("lets each intake expand and collapse on its own", async () => {
