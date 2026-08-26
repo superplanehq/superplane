@@ -1,6 +1,6 @@
 /**
  * Builds URLs to https://docs.superplane.com/components/…#anchor
- * matching scripts/generate_components_docs.go (integrationFilename + slugify).
+ * matching scripts/generate_components_docs/main.go (integrationFilename + slugify).
  */
 
 const DOCS_COMPONENTS_BASE = "https://docs.superplane.com/components";
