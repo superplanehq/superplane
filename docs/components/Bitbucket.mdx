@@ -14,7 +14,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-To configure Bitbucket with SuperPlane:
+To connect Bitbucket with SuperPlane, you'll need to create an access token. Choose one of the following methods::
 
 - **API Token mode**:
 	- Go to **Atlassian Settings → Security → Create API token**.
@@ -37,7 +37,7 @@ The On Push trigger starts a workflow execution when code is pushed to a Bitbuck
 
 ### Use Cases
 
-- **CI/CD automation**: Trigger builds and deployments on code pushes
+- **CI/CD automation**: Trigger builds and deployments on every push
 - **Code quality checks**: Run linting and tests on every push
 - **Notification workflows**: Send notifications when code is pushed
 
@@ -55,7 +55,7 @@ Each push event includes:
 
 ### Webhook Setup
 
-This trigger automatically sets up a Bitbucket webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+This trigger automatically sets up a Bitbucket webhook when configured. The webhook is managed by SuperPlane and will be automatically cleaned up when the trigger is removed.
 
 ### Example Data
 
