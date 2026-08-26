@@ -52,3 +52,30 @@ export function stampFittedContentKey(
   }
   ref.current = fitViewContentKey;
 }
+
+/** Outcome of a bumped `fitAllRequest` before `fitView` is called. */
+export type FitAllRequestDecision = "wait" | "skip" | "run";
+
+/**
+ * Decide whether a bumped `fitAllRequest` should call fitView.
+ *
+ * Wait until React Flow has finished its first fit; the caller must retry
+ * without consuming the nonce. Skip when auto-focus is off, except the first
+ * fitAll on this mount — Lines / Automations deep links land in run inspection
+ * without `handleSelectRun`, so that first request has to fit the same way the
+ * "Fit all components in view" control does.
+ */
+export function shouldRunFitAllRequest(params: {
+  hasFitted: boolean;
+  reactFlowReady: boolean;
+  isAutoFocusEnabled: boolean;
+  isFirstFitAllOnMount: boolean;
+}): FitAllRequestDecision {
+  if (!params.hasFitted || !params.reactFlowReady) {
+    return "wait";
+  }
+  if (!params.isAutoFocusEnabled && !params.isFirstFitAllOnMount) {
+    return "skip";
+  }
+  return "run";
+}
