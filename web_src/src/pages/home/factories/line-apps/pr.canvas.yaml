@@ -169,8 +169,10 @@ spec:
       configuration:
         artifactKey: '{{ $["Create Draft Pull Request"].data.html_url }}'
         artifactType: pr
+        draft: true
         number: '{{ $["Create Draft Pull Request"].data.number }}'
         orderId: '{{ order().id }}'
+        state: draft
         title: '{{ $["Create Draft Pull Request"].data.title }}'
         url: '{{ $["Create Draft Pull Request"].data.html_url }}'
       position:

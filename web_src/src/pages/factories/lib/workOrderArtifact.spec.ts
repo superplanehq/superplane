@@ -6,6 +6,7 @@ import {
   extractArtifactName,
   extractArtifactTitle,
   extractArtifactUrl,
+  extractBranchTreeUrl,
   extractPrArtifactState,
   formatPrArtifactLabel,
   overlayLiveArtifactData,
@@ -80,6 +81,47 @@ describe("extractArtifactUrl", () => {
     expect(extractArtifactUrl({ url: "" })).toBeUndefined();
     expect(extractArtifactUrl({ url: "   " })).toBeUndefined();
     expect(extractArtifactUrl({ url: null })).toBeUndefined();
+  });
+
+  it("synthesizes a GitHub tree URL from branch name + repository when url is missing", () => {
+    expect(extractArtifactUrl({ name: "feature/refund-retry", repository: "acme/app" })).toBe(
+      "https://github.com/acme/app/tree/feature/refund-retry",
+    );
+  });
+});
+
+describe("extractBranchTreeUrl", () => {
+  it("builds a github.com tree URL from owner/repo + name", () => {
+    expect(extractBranchTreeUrl({ name: "main", repository: "acme/app" })).toBe(
+      "https://github.com/acme/app/tree/main",
+    );
+  });
+
+  it("falls back to `repo` when `repository` is absent", () => {
+    expect(extractBranchTreeUrl({ name: "fix/thing", repo: "acme/app" })).toBe(
+      "https://github.com/acme/app/tree/fix/thing",
+    );
+  });
+
+  it("encodes path segments without double-encoding slashes", () => {
+    expect(extractBranchTreeUrl({ name: "feat/a b", repository: "acme/app" })).toBe(
+      "https://github.com/acme/app/tree/feat/a%20b",
+    );
+  });
+
+  it("joins a branch onto an http(s) repository URL", () => {
+    expect(
+      extractBranchTreeUrl({
+        name: "release",
+        repository: "https://github.example.com/acme/app",
+      }),
+    ).toBe("https://github.example.com/acme/app/tree/release");
+  });
+
+  it("returns undefined without a usable repository or name", () => {
+    expect(extractBranchTreeUrl({ name: "main" })).toBeUndefined();
+    expect(extractBranchTreeUrl({ repository: "acme/app" })).toBeUndefined();
+    expect(extractBranchTreeUrl({ name: "main", repository: "not-a-repo" })).toBeUndefined();
   });
 });
 
@@ -178,6 +220,19 @@ describe("extractPrArtifactState", () => {
 
   it("still treats state:closed as closed when merged is explicitly false", () => {
     expect(extractPrArtifactState({ state: "closed", merged: false })).toBe("closed");
+  });
+
+  it("treats a mergedAt/merged_at timestamp as merged when the boolean flag is missing", () => {
+    // PR-closure writes mergedAt for Velocity even if `merged` never
+    // lands in the data map. Without this the chip stays green.
+    expect(extractPrArtifactState({ state: "closed", mergedAt: "2026-08-17T12:34:56Z" })).toBe("merged");
+    expect(extractPrArtifactState({ merged_at: "2026-08-17T12:34:56Z" })).toBe("merged");
+  });
+
+  it("does not treat mergedAt as merged when merged is explicitly false", () => {
+    expect(extractPrArtifactState({ state: "closed", merged: false, mergedAt: "2026-08-17T12:34:56Z" })).toBe(
+      "closed",
+    );
   });
 });
 

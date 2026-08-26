@@ -81,6 +81,11 @@ describe("setup factory line apps", () => {
 
     const pr = materializeOnboardingApp("line-pr");
     expect(pr).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
+    // github.createPullRequest opens a draft; the chip defaults to open
+    // (green) unless the attach step records draft/state. Mirror the
+    // implementation line so merged/closed updates have a real starting state.
+    expect(pr).toMatch(/id: attach-pr-artifact[\s\S]*draft: true/);
+    expect(pr).toMatch(/id: attach-pr-artifact[\s\S]*state: draft/);
   });
 
   it("links the pull request back to the work order", () => {
