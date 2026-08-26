@@ -73,9 +73,14 @@ export function useBacklogCreateMenu(
   );
 
   const items = (hasCatalog ? catalogItems : liveItems).slice(0, visibleCount);
-  const hasMore = hasCatalog
-    ? catalogItems.length > visibleCount
-    : canPageLiveItems(liveItems.length, visibleCount, searchQuery.isError);
+  const { hasMore, isLoadingMore } = backlogSearchPaging({
+    hasCatalog,
+    catalogCount: catalogItems.length,
+    liveCount: liveItems.length,
+    visibleCount,
+    isFetching: Boolean(focusedIntakeId) && !hasCatalog && searchQuery.isFetching,
+    isError: searchQuery.isError,
+  });
 
   const setFocusedIntake = (intakeId: string | null) => {
     if (intakeId !== focusedIntakeId) {
@@ -107,8 +112,6 @@ export function useBacklogCreateMenu(
   };
 
   const isSearching = Boolean(focusedIntakeId) && !hasCatalog && (searchQuery.isLoading || query !== debouncedQuery);
-  const isLoadingMore =
-    Boolean(focusedIntakeId) && !hasCatalog && searchQuery.isFetching && items.length > 0 && hasMore;
 
   return {
     sources,
@@ -142,6 +145,26 @@ function liveBacklogItems(
     title: item.title ?? "",
     body: item.body ?? "",
   }));
+}
+
+function backlogSearchPaging(args: {
+  hasCatalog: boolean;
+  catalogCount: number;
+  liveCount: number;
+  visibleCount: number;
+  isFetching: boolean;
+  isError: boolean;
+}): { hasMore: boolean; isLoadingMore: boolean } {
+  if (args.hasCatalog) {
+    return { hasMore: args.catalogCount > args.visibleCount, isLoadingMore: false };
+  }
+
+  const waitingForLargerPage = args.isFetching && args.visibleCount > args.liveCount;
+  const hasMore = waitingForLargerPage || canPageLiveItems(args.liveCount, args.visibleCount, args.isError);
+  return {
+    hasMore,
+    isLoadingMore: waitingForLargerPage || (args.isFetching && args.liveCount > 0 && hasMore),
+  };
 }
 
 function canPageLiveItems(itemCount: number, visibleCount: number, isError: boolean): boolean {

@@ -13,7 +13,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func Test__CloseWorkOrder__UnusedDraftRejectReturnsClosedSnapshot(t *testing.T) {
+func Test__CloseWorkOrder__UnusedDraftRejectClosesRow(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
@@ -34,6 +34,8 @@ func Test__CloseWorkOrder__UnusedDraftRejectReturnsClosedSnapshot(t *testing.T) 
 	assert.Equal(t, pb.WorkOrder_STATE_CLOSED, resp.Order.State)
 	assert.Equal(t, pb.WorkOrder_RESULT_REJECTED, resp.Order.Result)
 
-	_, err = factoryModel.FindWorkOrder(db, order.ID)
-	require.ErrorIs(t, err, models.ErrFactoryWorkOrderNotFound)
+	found, err := factoryModel.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateClosed, found.State)
+	assert.Equal(t, models.FactoryWorkOrderResultRejected, found.Result)
 }

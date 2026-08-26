@@ -167,6 +167,9 @@ export function useSearchFactoryIntakeItems({
       if (previousQuery?.queryKey[4] !== scopedIntakeId) {
         return undefined;
       }
+      if (previousQuery?.queryKey[6] !== query) {
+        return undefined;
+      }
       return previousData;
     },
   });

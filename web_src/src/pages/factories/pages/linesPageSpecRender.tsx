@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
-import { vi } from "vitest";
 
 import type { FactoriesFactory } from "@/api-client";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
@@ -31,7 +30,7 @@ export function LinesListSpecHarness({ factory = REFUND_FACTORY }: { factory?: F
             factoryKey: PRIMARY_FACTORY_KEY,
             factory,
             factories: [factory],
-            openCreateWorkOrder: vi.fn(),
+            openCreateWorkOrder: () => {},
           }}
         >
           <LinesPage />
@@ -44,12 +43,12 @@ export function LinesListSpecHarness({ factory = REFUND_FACTORY }: { factory?: F
 
 export function LinesBoardSpecHarness({
   path = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
-  openCreateWorkOrder = vi.fn(),
+  openCreateWorkOrder = () => {},
   factory = REFUND_FACTORY,
   previewFlags = null,
 }: {
   path?: string;
-  openCreateWorkOrder?: ReturnType<typeof vi.fn>;
+  openCreateWorkOrder?: () => void;
   factory?: FactoriesFactory;
   previewFlags?: FactoryPreviewFlags | null;
 }) {

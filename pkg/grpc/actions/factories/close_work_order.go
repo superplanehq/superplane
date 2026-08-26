@@ -2,7 +2,6 @@ package factories
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -69,13 +68,6 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 	}
 
 	refreshed, err := factory.FindWorkOrder(db, orderID)
-	if errors.Is(err, models.ErrFactoryWorkOrderNotFound) {
-		serialized, err := serializeWorkOrder(factory, order, nil, nil)
-		if err != nil {
-			return nil, factoryErrorToStatus(err, "failed to close work order")
-		}
-		return &pb.CloseWorkOrderResponse{Order: serialized}, nil
-	}
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}

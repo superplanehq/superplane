@@ -48,7 +48,13 @@ function wrapper(catalogItems: { id: string; intakeId: string; key: string; titl
 describe("useBacklogCreateMenu", () => {
   beforeEach(() => {
     useFactoryIntakes.mockReturnValue({ data: [intake], isLoading: false });
-    useSearchFactoryIntakeItems.mockReturnValue({ data: [liveItem], isLoading: false, isError: false });
+    useSearchFactoryIntakeItems.mockReset();
+    useSearchFactoryIntakeItems.mockReturnValue({
+      data: [liveItem],
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+    });
     createWorkOrder.mockReset();
     importFactoryIntakeItem.mockReset();
   });
@@ -163,5 +169,42 @@ describe("useBacklogCreateMenu", () => {
 
     expect(result.current.items).toHaveLength(8);
     expect(result.current.hasMore).toBe(false);
+  });
+
+  it("keeps live paging available while the next page is in flight", async () => {
+    const liveItems = Array.from({ length: 5 }, (_, index) => ({
+      id: `${index}`,
+      key: `#${index}`,
+      title: `Issue ${index}`,
+      body: "",
+    }));
+    useSearchFactoryIntakeItems.mockImplementation((input: { limit?: number }) => ({
+      data: liveItems,
+      isLoading: false,
+      isFetching: (input.limit ?? 0) > 5,
+      isError: false,
+    }));
+
+    const { result } = renderHook(() => useBacklogCreateMenu("org-1", "factory-1"), {
+      wrapper: wrapper(),
+    });
+
+    act(() => {
+      result.current.setFocusedIntake(intake.id);
+    });
+
+    expect(result.current.items).toHaveLength(5);
+    expect(result.current.hasMore).toBe(true);
+    expect(result.current.isLoadingMore).toBe(false);
+
+    act(() => {
+      result.current.loadMore();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoadingMore).toBe(true);
+    });
+    expect(result.current.hasMore).toBe(true);
+    expect(result.current.items).toHaveLength(5);
   });
 });

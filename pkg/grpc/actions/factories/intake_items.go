@@ -10,10 +10,7 @@ import (
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
-	"github.com/superplanehq/superplane/pkg/integrations/pagerduty"
-	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/gorm"
 )
 
@@ -24,19 +21,36 @@ const (
 )
 
 var (
-	errIntakeNotConnected = errors.New("intake is not connected")
-	errIntakeItemNotFound = errors.New("intake item not found")
+	errIntakeNotConnected      = errors.New("intake is not connected")
+	errIntakeItemNotFound      = errors.New("intake item not found")
+	errIntakeSearchUnsupported = errors.New("this intake cannot search items yet")
+	intakeItemSourceByTrigger  = map[string]intakeItemSourceBuilder{}
 )
 
-type liveIntakeItemSource struct {
-	source        string
-	github        *common.Client
-	repository    string
-	sentry        *sentry.Client
-	sentryProject string
-	pagerduty     *pagerduty.Client
-	serviceID     string
+type intakeItemSourceBuilder func(
+	ctx context.Context,
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	trigger *models.Node,
+	integration *models.Integration,
+) (intakeItemSource, error)
+
+// registerIntakeItemSource binds live search and import to an intake trigger
+// component. Unknown triggers return unsupportedIntakeItemSource.
+func registerIntakeItemSource(triggerComponent string, builder intakeItemSourceBuilder) {
+	intakeItemSourceByTrigger[triggerComponent] = builder
 }
+
+func init() {
+	registerIntakeItemSource("github.onIssue", newGitHubIntakeItemSource)
+}
+
+type gitHubIntakeItemSource struct {
+	github     *common.Client
+	repository string
+}
+
+type unsupportedIntakeItemSource struct{}
 
 func newLiveIntakeItemSource(
 	ctx context.Context,
@@ -49,75 +63,44 @@ func newLiveIntakeItemSource(
 		return nil, err
 	}
 
-	source := &liveIntakeItemSource{source: intake.Source}
-	switch intake.Source {
-	case models.FactoryIntakeSourceGitHubIssues:
-		repository, _ := trigger.Configuration["repository"].(string)
-		repository = strings.TrimSpace(repository)
-		if repository == "" {
-			return nil, errIntakeNotConnected
-		}
-		client, err := newIntakeGitHubClient(deps, tx, integration)
-		if err != nil {
-			return nil, fmt.Errorf("%w: %s", errIntakeNotConnected, err)
-		}
-		source.github = client
-		source.repository = repository
-	case models.FactoryIntakeSourceSentryExceptions:
-		client, err := newIntakeSentryClient(deps, tx, integration)
-		if err != nil {
-			return nil, fmt.Errorf("%w: %s", errIntakeNotConnected, err)
-		}
-		source.sentry = client
-		if project, ok := trigger.Configuration["project"].(string); ok {
-			source.sentryProject = strings.TrimSpace(project)
-		}
-	case models.FactoryIntakeSourcePagerDutyIncidents:
-		serviceID, _ := trigger.Configuration["service"].(string)
-		serviceID = strings.TrimSpace(serviceID)
-		if serviceID == "" {
-			return nil, errIntakeNotConnected
-		}
-		client, err := newIntakePagerDutyClient(deps, tx, integration)
-		if err != nil {
-			return nil, fmt.Errorf("%w: %s", errIntakeNotConnected, err)
-		}
-		source.pagerduty = client
-		source.serviceID = serviceID
-	default:
-		return nil, models.ErrFactoryIntakeSourceInvalid
+	builder := intakeItemSourceByTrigger[trigger.ComponentName()]
+	if builder == nil {
+		return unsupportedIntakeItemSource{}, nil
 	}
 
-	return source, nil
+	return builder(ctx, deps, tx, trigger, integration)
 }
 
-func (s *liveIntakeItemSource) Search(ctx context.Context, query string, limit int) ([]IntakeItem, error) {
-	switch s.source {
-	case models.FactoryIntakeSourceGitHubIssues:
-		return s.searchGitHub(ctx, query, limit)
-	case models.FactoryIntakeSourceSentryExceptions:
-		return s.searchSentry(query, limit)
-	case models.FactoryIntakeSourcePagerDutyIncidents:
-		return s.searchPagerDuty(query, limit)
-	default:
-		return nil, models.ErrFactoryIntakeSourceInvalid
+func newGitHubIntakeItemSource(
+	_ context.Context,
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	trigger *models.Node,
+	integration *models.Integration,
+) (intakeItemSource, error) {
+	repository, _ := trigger.Configuration["repository"].(string)
+	repository = strings.TrimSpace(repository)
+	if repository == "" {
+		return nil, errIntakeNotConnected
 	}
-}
 
-func (s *liveIntakeItemSource) Get(ctx context.Context, id string) (*IntakeItem, error) {
-	switch s.source {
-	case models.FactoryIntakeSourceGitHubIssues:
-		return s.getGitHub(ctx, id)
-	case models.FactoryIntakeSourceSentryExceptions:
-		return s.getSentry(id)
-	case models.FactoryIntakeSourcePagerDutyIncidents:
-		return s.getPagerDuty(id)
-	default:
-		return nil, models.ErrFactoryIntakeSourceInvalid
+	client, err := newIntakeGitHubClient(deps, tx, integration)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", errIntakeNotConnected, err)
 	}
+
+	return &gitHubIntakeItemSource{github: client, repository: repository}, nil
 }
 
-func (s *liveIntakeItemSource) searchGitHub(ctx context.Context, query string, limit int) ([]IntakeItem, error) {
+func (unsupportedIntakeItemSource) Search(context.Context, string, int) ([]IntakeItem, error) {
+	return nil, errIntakeSearchUnsupported
+}
+
+func (unsupportedIntakeItemSource) Get(context.Context, string) (*IntakeItem, error) {
+	return nil, errIntakeSearchUnsupported
+}
+
+func (s *gitHubIntakeItemSource) Search(ctx context.Context, query string, limit int) ([]IntakeItem, error) {
 	trimmed := strings.TrimSpace(query)
 	if trimmed == "" {
 		issues, _, err := s.github.ListIssues(ctx, s.repository, &github.IssueListByRepoOptions{
@@ -144,7 +127,7 @@ func (s *liveIntakeItemSource) searchGitHub(ctx context.Context, query string, l
 	return gitHubIssueItems(result.Issues, limit), nil
 }
 
-func (s *liveIntakeItemSource) getGitHub(ctx context.Context, id string) (*IntakeItem, error) {
+func (s *gitHubIntakeItemSource) Get(ctx context.Context, id string) (*IntakeItem, error) {
 	number, err := strconv.Atoi(strings.TrimPrefix(strings.TrimSpace(id), "#"))
 	if err != nil || number <= 0 {
 		return nil, errIntakeItemNotFound
@@ -160,68 +143,6 @@ func (s *liveIntakeItemSource) getGitHub(ctx context.Context, id string) (*Intak
 
 	item := gitHubIssueItem(issue)
 	return &item, nil
-}
-
-func (s *liveIntakeItemSource) searchSentry(query string, limit int) ([]IntakeItem, error) {
-	issues, err := s.sentry.ListIssues()
-	if err != nil {
-		return nil, err
-	}
-
-	items := make([]IntakeItem, 0, len(issues))
-	for _, issue := range issues {
-		if !s.sentryIssueInProject(&issue) {
-			continue
-		}
-		items = append(items, sentryIssueItem(issue))
-	}
-
-	page, _ := pageIntakeItems(items, query, limit, 0)
-	return page, nil
-}
-
-func (s *liveIntakeItemSource) getSentry(id string) (*IntakeItem, error) {
-	issue, err := s.sentry.GetIssue(strings.TrimSpace(id))
-	if err != nil {
-		return nil, err
-	}
-	if issue == nil || issue.ID == "" || !s.sentryIssueInProject(issue) {
-		return nil, errIntakeItemNotFound
-	}
-
-	item := sentryIssueItem(*issue)
-	return &item, nil
-}
-
-func (s *liveIntakeItemSource) searchPagerDuty(query string, limit int) ([]IntakeItem, error) {
-	incidents, err := s.pagerduty.ListIncidents([]string{s.serviceID})
-	if err != nil {
-		return nil, err
-	}
-
-	items := make([]IntakeItem, 0, len(incidents))
-	for _, incident := range incidents {
-		items = append(items, pagerDutyIncidentItem(incident))
-	}
-
-	page, _ := pageIntakeItems(items, query, limit, 0)
-	return page, nil
-}
-
-func (s *liveIntakeItemSource) getPagerDuty(id string) (*IntakeItem, error) {
-	incidents, err := s.pagerduty.ListIncidents([]string{s.serviceID})
-	if err != nil {
-		return nil, err
-	}
-
-	for _, incident := range incidents {
-		if incident.ID == strings.TrimSpace(id) {
-			item := pagerDutyIncidentItem(incident)
-			return &item, nil
-		}
-	}
-
-	return nil, errIntakeItemNotFound
 }
 
 func resolveLiveIntakeTrigger(tx *gorm.DB, intake *models.FactoryIntake) (*models.Node, *models.Integration, error) {
@@ -260,37 +181,6 @@ func resolveLiveIntakeTrigger(tx *gorm.DB, intake *models.FactoryIntake) (*model
 	return trigger, integration, nil
 }
 
-func newIntakeSentryClient(deps IntakeDependencies, tx *gorm.DB, integration *models.Integration) (*sentry.Client, error) {
-	integrationContext, err := newIntakeIntegrationContext(deps, tx, integration)
-	if err != nil {
-		return nil, err
-	}
-	return sentry.NewClient(deps.Registry.HTTPContext(), integrationContext)
-}
-
-func newIntakePagerDutyClient(deps IntakeDependencies, tx *gorm.DB, integration *models.Integration) (*pagerduty.Client, error) {
-	integrationContext, err := newIntakeIntegrationContext(deps, tx, integration)
-	if err != nil {
-		return nil, err
-	}
-	return pagerduty.NewClient(deps.Registry.HTTPContext(), integrationContext)
-}
-
-func newIntakeIntegrationContext(
-	deps IntakeDependencies,
-	tx *gorm.DB,
-	integration *models.Integration,
-) (*contexts.IntegrationContext, error) {
-	if deps.Registry == nil {
-		return nil, fmt.Errorf("integration registry is unavailable")
-	}
-	if integration.State != models.IntegrationStateReady {
-		return nil, fmt.Errorf("integration %s is not ready", integration.ID)
-	}
-
-	return contexts.NewIntegrationContext(tx, nil, integration, deps.Encryptor, deps.Registry, nil), nil
-}
-
 func gitHubIssueItems(issues []*github.Issue, limit int) []IntakeItem {
 	items := make([]IntakeItem, 0, limit)
 	for _, issue := range issues {
@@ -317,53 +207,6 @@ func gitHubIssueItem(issue *github.Issue) IntakeItem {
 
 func gitHubIssueSearchQuery(repository, query string) string {
 	return fmt.Sprintf("repo:%s is:issue is:open %q", repository, query)
-}
-
-func (s *liveIntakeItemSource) sentryIssueInProject(issue *sentry.Issue) bool {
-	if s.sentryProject == "" {
-		return true
-	}
-	return issue != nil && issue.Project != nil && issue.Project.Slug == s.sentryProject
-}
-
-func sentryIssueItem(issue sentry.Issue) IntakeItem {
-	url := strings.TrimSpace(issue.Permalink)
-	if url == "" {
-		url = strings.TrimSpace(issue.WebURL)
-	}
-
-	key := strings.TrimSpace(issue.ShortID)
-	if key == "" {
-		key = strings.TrimSpace(issue.ID)
-	}
-
-	return IntakeItem{
-		ID:    strings.TrimSpace(issue.ID),
-		Key:   key,
-		Title: strings.TrimSpace(issue.Title),
-		Body:  url,
-		URL:   url,
-	}
-}
-
-func pagerDutyIncidentItem(incident pagerduty.Incident) IntakeItem {
-	key := strings.TrimSpace(incident.ID)
-	if incident.IncidentNumber > 0 {
-		key = fmt.Sprintf("#%d", incident.IncidentNumber)
-	}
-
-	body := strings.TrimSpace(incident.Description)
-	if body == "" {
-		body = strings.TrimSpace(incident.HTMLURL)
-	}
-
-	return IntakeItem{
-		ID:    strings.TrimSpace(incident.ID),
-		Key:   key,
-		Title: strings.TrimSpace(incident.Title),
-		Body:  body,
-		URL:   strings.TrimSpace(incident.HTMLURL),
-	}
 }
 
 func filterIntakeItems(items []IntakeItem, query string, limit int) []IntakeItem {

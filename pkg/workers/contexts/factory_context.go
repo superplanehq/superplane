@@ -112,8 +112,7 @@ func (c *FactoryContext) createFactoryWorkOrder(
 }
 
 func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.WorkOrderOrigin {
-	intake, err := models.FindFactoryIntakeByCanvasID(c.tx, c.canvas.ID)
-	if err != nil {
+	if _, err := models.FindFactoryIntakeByCanvasID(c.tx, c.canvas.ID); err != nil {
 		return nil
 	}
 
@@ -122,7 +121,7 @@ func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.Work
 		return nil
 	}
 
-	return models.OriginFromIntakeRootEvent(intake.Source, event)
+	return models.OriginFromIntakeRootEvent(event)
 }
 
 func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {

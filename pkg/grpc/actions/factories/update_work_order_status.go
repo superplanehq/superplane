@@ -2,7 +2,6 @@ package factories
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -92,13 +91,6 @@ func UpdateWorkOrderStatus(
 	}
 
 	refreshed, err := factory.FindWorkOrder(db, orderID)
-	if errors.Is(err, models.ErrFactoryWorkOrderNotFound) {
-		serialized, err := serializeWorkOrder(factory, order, nil, nil)
-		if err != nil {
-			return nil, factoryErrorToStatus(err, "failed to update work order status")
-		}
-		return &pb.UpdateWorkOrderStatusResponse{Order: serialized}, nil
-	}
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order status")
 	}

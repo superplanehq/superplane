@@ -1,9 +1,5 @@
 import type { FactoriesFactoryIntake } from "@/api-client";
 
-import githubIcon from "@/assets/icons/integrations/github.svg";
-import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import sentryIcon from "@/assets/icons/integrations/sentry.svg";
-
 export const BACKLOG_CREATE_COPY = {
   createWorkOrder: "Create work order",
   createManually: "Create task manually",
@@ -84,20 +80,13 @@ function sourceFromIntake(
   }
 
   const name = intake.name?.trim() || "Intake";
-  const sourceIcon = intake.source ? ICON_BY_SOURCE[intake.source] : undefined;
   return {
     intakeId,
     name,
-    iconSrc: catalog?.iconSrcByIntakeId?.[intakeId] ?? sourceIcon?.src,
-    iconAlt: sourceIcon?.alt ?? name,
+    iconSrc: catalog?.iconSrcByIntakeId?.[intakeId],
+    iconAlt: name,
   };
 }
-
-const ICON_BY_SOURCE: Record<string, { src: string; alt: string }> = {
-  SOURCE_GITHUB_ISSUES: { src: githubIcon, alt: "GitHub" },
-  SOURCE_SENTRY_EXCEPTIONS: { src: sentryIcon, alt: "Sentry" },
-  SOURCE_PAGERDUTY_INCIDENTS: { src: pagerdutyIcon, alt: "PagerDuty" },
-};
 
 export function searchBacklogIntakeItems(args: {
   intakes: FactoriesFactoryIntake[];

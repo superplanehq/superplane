@@ -106,6 +106,21 @@ func Test__SearchFactoryIntakeItems(t *testing.T) {
 		assert.Equal(t, codes.FailedPrecondition, code)
 		assert.Contains(t, message, "Connect this intake first.")
 	})
+
+	t.Run("unsupported intake is a failed precondition", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := createIntake(t, factory)
+
+		_, err := SearchFactoryIntakeItems(ctx, deps(nil, errIntakeSearchUnsupported), orgID, &pb.SearchFactoryIntakeItemsRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+		})
+		require.Error(t, err)
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Contains(t, message, "This intake cannot search items yet.")
+	})
 }
 
 func Test__ImportFactoryIntakeItem(t *testing.T) {
@@ -161,7 +176,7 @@ func Test__ImportFactoryIntakeItem(t *testing.T) {
 		assert.Equal(t, r.User.String(), response.GetOrder().GetCreatedBy().GetUser().GetId())
 	})
 
-	t.Run("a second import of the same ticket returns the existing work order", func(t *testing.T) {
+	t.Run("a second import of the same ticket creates a new work order", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := createIntake(t, factory)
 		req := &pb.ImportFactoryIntakeItemRequest{
@@ -174,6 +189,7 @@ func Test__ImportFactoryIntakeItem(t *testing.T) {
 		require.NoError(t, err)
 		second, err := ImportFactoryIntakeItem(ctx, deps, orgID, req)
 		require.NoError(t, err)
-		assert.Equal(t, first.GetOrder().GetId(), second.GetOrder().GetId())
+		assert.NotEqual(t, first.GetOrder().GetId(), second.GetOrder().GetId())
+		assert.Equal(t, item.URL, second.GetOrder().GetOrigin().GetUrl())
 	})
 }

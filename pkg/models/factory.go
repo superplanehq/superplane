@@ -506,12 +506,6 @@ func (f *Factory) createWorkOrder(
 		return nil, ErrFactoryWorkOrderTitleRequired
 	}
 
-	if existing, err := f.findWorkOrderForOrigin(tx, origin); err == nil {
-		return existing, nil
-	} else if !errors.Is(err, ErrFactoryWorkOrderNotFound) {
-		return nil, err
-	}
-
 	// Allocate the sequence number atomically: the UPDATE ... RETURNING
 	// increments `next_work_order_number` and hands back the previous
 	// value in one round-trip, so concurrent inserts cannot collide even
@@ -540,7 +534,7 @@ func (f *Factory) createWorkOrder(
 	applyWorkOrderOrigin(order, origin)
 
 	if err := tx.Clauses(clause.Returning{}).Create(order).Error; err != nil {
-		return f.resolveOriginConflict(tx, order, err)
+		return nil, err
 	}
 
 	if len(assignees) > 0 {
@@ -571,30 +565,6 @@ func (f *Factory) createWorkOrder(
 	}
 
 	return f.FindWorkOrder(tx, order.ID)
-}
-
-func (f *Factory) findWorkOrderForOrigin(tx *gorm.DB, origin *WorkOrderOrigin) (*FactoryWorkOrder, error) {
-	if origin == nil {
-		return nil, ErrFactoryWorkOrderNotFound
-	}
-
-	return f.FindWorkOrderByOriginURL(tx, origin.URL)
-}
-
-func (f *Factory) resolveOriginConflict(tx *gorm.DB, order *FactoryWorkOrder, err error) (*FactoryWorkOrder, error) {
-	if order == nil || order.OriginURL == nil {
-		return nil, err
-	}
-	if !errors.Is(MapFactoryWorkOrderOriginUniqueConstraintError(err), ErrFactoryWorkOrderOriginTaken) {
-		return nil, err
-	}
-
-	existing, findErr := f.FindWorkOrderByOriginURL(tx, *order.OriginURL)
-	if findErr != nil {
-		return nil, err
-	}
-
-	return existing, nil
 }
 
 // FindWorkOrderByArtifactKey resolves a work order from one of its

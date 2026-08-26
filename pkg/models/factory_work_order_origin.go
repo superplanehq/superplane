@@ -3,15 +3,13 @@ package models
 import (
 	"errors"
 	"net/url"
+	"slices"
 	"strings"
 
-	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 )
 
-const factoryWorkOrderOriginUniqueConstraint = "idx_factory_work_orders_factory_origin_url"
-
-var ErrFactoryWorkOrderOriginTaken = errors.New("a work order already exists for this origin")
+var preferredIntakeOriginURLKeys = []string{"html_url", "permalink", "web_url", "url"}
 
 // WorkOrderOrigin is the external ticket a work order was created from.
 type WorkOrderOrigin struct {
@@ -19,8 +17,8 @@ type WorkOrderOrigin struct {
 	Label string
 }
 
-func OriginFromIntakePayload(source string, payload map[string]any) *WorkOrderOrigin {
-	originURL := intakeOriginURL(source, payload)
+func OriginFromIntakePayload(payload map[string]any) *WorkOrderOrigin {
+	originURL := firstHTTPURL(payload, 0)
 	if originURL == "" {
 		return nil
 	}
@@ -31,7 +29,7 @@ func OriginFromIntakePayload(source string, payload map[string]any) *WorkOrderOr
 	}
 }
 
-func OriginFromIntakeRootEvent(source string, event *CanvasEvent) *WorkOrderOrigin {
+func OriginFromIntakeRootEvent(event *CanvasEvent) *WorkOrderOrigin {
 	if event == nil {
 		return nil
 	}
@@ -41,7 +39,7 @@ func OriginFromIntakeRootEvent(source string, event *CanvasEvent) *WorkOrderOrig
 		return nil
 	}
 
-	return OriginFromIntakePayload(source, payload)
+	return OriginFromIntakePayload(payload)
 }
 
 func OriginLabelFromURL(rawURL string) string {
@@ -54,11 +52,7 @@ func OriginLabelFromURL(rawURL string) string {
 		return label
 	}
 
-	if label := hostedOriginLabel(parsed); label != "" {
-		return label
-	}
-
-	return strings.TrimSpace(rawURL)
+	return lastPathSegment(parsed)
 }
 
 func applyWorkOrderOrigin(order *FactoryWorkOrder, origin *WorkOrderOrigin) {
@@ -66,39 +60,19 @@ func applyWorkOrderOrigin(order *FactoryWorkOrder, origin *WorkOrderOrigin) {
 		return
 	}
 
-	url := strings.TrimSpace(origin.URL)
-	if url == "" {
+	originURL := strings.TrimSpace(origin.URL)
+	if originURL == "" {
 		return
 	}
 
-	order.OriginURL = &url
+	order.OriginURL = &originURL
 	label := strings.TrimSpace(origin.Label)
 	if label == "" {
-		label = OriginLabelFromURL(url)
+		label = OriginLabelFromURL(originURL)
 	}
 	if label != "" {
 		order.OriginLabel = &label
 	}
-}
-
-func MapFactoryWorkOrderOriginUniqueConstraintError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) &&
-		(pgErr.ConstraintName == factoryWorkOrderOriginUniqueConstraint ||
-			strings.Contains(pgErr.Message, factoryWorkOrderOriginUniqueConstraint) ||
-			strings.Contains(pgErr.Detail, factoryWorkOrderOriginUniqueConstraint)) {
-		return ErrFactoryWorkOrderOriginTaken
-	}
-
-	if strings.Contains(err.Error(), factoryWorkOrderOriginUniqueConstraint) {
-		return ErrFactoryWorkOrderOriginTaken
-	}
-
-	return err
 }
 
 func (f *Factory) FindWorkOrderByOriginURL(tx *gorm.DB, originURL string) (*FactoryWorkOrder, error) {
@@ -109,10 +83,8 @@ func (f *Factory) FindWorkOrderByOriginURL(tx *gorm.DB, originURL string) (*Fact
 
 	var order FactoryWorkOrder
 	err := tx.
-		Where("organization_id = ? AND factory_id = ? AND origin_url = ? AND state IN ?", f.OrganizationID, f.ID, trimmed, []string{
-			FactoryWorkOrderStateDraft,
-			FactoryWorkOrderStateOpen,
-		}).
+		Where("organization_id = ? AND factory_id = ? AND origin_url = ?", f.OrganizationID, f.ID, trimmed).
+		Order("created_at DESC").
 		First(&order).
 		Error
 	if err != nil {
@@ -125,35 +97,54 @@ func (f *Factory) FindWorkOrderByOriginURL(tx *gorm.DB, originURL string) (*Fact
 	return f.FindWorkOrder(tx, order.ID)
 }
 
-func intakeOriginURL(source string, payload map[string]any) string {
-	switch source {
-	case FactoryIntakeSourceGitHubIssues:
-		return nestedMapString(payload, "issue", "html_url")
-	case FactoryIntakeSourceSentryExceptions:
-		return nestedMapString(payload, "data", "issue", "permalink")
-	case FactoryIntakeSourcePagerDutyIncidents:
-		return nestedMapString(payload, "incident", "html_url")
-	default:
+func firstHTTPURL(value any, depth int) string {
+	if depth > 6 || value == nil {
 		return ""
 	}
+
+	switch current := value.(type) {
+	case string:
+		if isHTTPURL(current) {
+			return strings.TrimSpace(current)
+		}
+	case map[string]any:
+		for _, key := range preferredIntakeOriginURLKeys {
+			if found := firstHTTPURL(current[key], depth+1); found != "" {
+				return found
+			}
+		}
+
+		keys := make([]string, 0, len(current))
+		for key := range current {
+			if slices.Contains(preferredIntakeOriginURLKeys, key) {
+				continue
+			}
+			keys = append(keys, key)
+		}
+		slices.Sort(keys)
+		for _, key := range keys {
+			if found := firstHTTPURL(current[key], depth+1); found != "" {
+				return found
+			}
+		}
+	case []any:
+		for _, child := range current {
+			if found := firstHTTPURL(child, depth+1); found != "" {
+				return found
+			}
+		}
+	}
+
+	return ""
 }
 
-func nestedMapString(payload map[string]any, path ...string) string {
-	current := any(payload)
-	for _, key := range path {
-		record, ok := current.(map[string]any)
-		if !ok {
-			return ""
-		}
-		current = record[key]
+func isHTTPURL(raw string) bool {
+	trimmed := strings.TrimSpace(raw)
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return false
 	}
-
-	value, ok := current.(string)
-	if !ok {
-		return ""
-	}
-
-	return strings.TrimSpace(value)
+	return parsed.Scheme == "http" || parsed.Scheme == "https"
 }
 
 func githubOriginLabel(parsed *url.URL) string {
@@ -177,37 +168,10 @@ func githubOriginLabel(parsed *url.URL) string {
 	return owner + "/" + repo + "#" + number
 }
 
-func hostedOriginLabel(parsed *url.URL) string {
-	host := parsed.Hostname()
+func lastPathSegment(parsed *url.URL) string {
 	parts := strings.FieldsFunc(parsed.Path, func(r rune) bool { return r == '/' })
-	var id string
-	switch {
-	case strings.HasSuffix(host, "sentry.io"):
-		id = nextPathSegment(parts, "issues")
-	case strings.HasSuffix(host, "pagerduty.com"):
-		id = nextPathSegment(parts, "incidents")
-	default:
-		return ""
-	}
-	if id == "" {
-		return ""
-	}
-
-	org := strings.Split(host, ".")[0]
-	if org == "" {
-		return id
-	}
-	return org + "#" + id
-}
-
-func nextPathSegment(parts []string, marker string) string {
-	for i, part := range parts {
-		if part == marker && i+1 < len(parts) {
-			return parts[i+1]
-		}
-	}
 	if len(parts) == 0 {
-		return ""
+		return strings.TrimSpace(parsed.String())
 	}
 	return parts[len(parts)-1]
 }

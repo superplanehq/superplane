@@ -5,8 +5,6 @@ import (
 
 	"github.com/google/go-github/v84/github"
 	"github.com/stretchr/testify/assert"
-	"github.com/superplanehq/superplane/pkg/integrations/pagerduty"
-	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 )
 
 func TestGitHubIssueItem_UsesNumberKeyAndHTMLURL(t *testing.T) {
@@ -28,42 +26,6 @@ func TestGitHubIssueItem_UsesNumberKeyAndHTMLURL(t *testing.T) {
 		Body:  body,
 		URL:   url,
 	}, gitHubIssueItem(issue))
-}
-
-func TestSentryIssueItem_PrefersPermalink(t *testing.T) {
-	item := sentryIssueItem(sentry.Issue{
-		ID:        "7670162495",
-		ShortID:   "API-12",
-		Title:     "HTTP 500 on refunds",
-		Permalink: "https://superplane.sentry.io/issues/7670162495/",
-		WebURL:    "https://sentry.io/issues/7670162495/",
-	})
-
-	assert.Equal(t, IntakeItem{
-		ID:    "7670162495",
-		Key:   "API-12",
-		Title: "HTTP 500 on refunds",
-		Body:  "https://superplane.sentry.io/issues/7670162495/",
-		URL:   "https://superplane.sentry.io/issues/7670162495/",
-	}, item)
-}
-
-func TestPagerDutyIncidentItem_UsesIncidentNumber(t *testing.T) {
-	item := pagerDutyIncidentItem(pagerduty.Incident{
-		ID:             "P123ABC",
-		IncidentNumber: 88,
-		Title:          "Payments API down",
-		Description:    "Latency spike",
-		HTMLURL:        "https://acme.pagerduty.com/incidents/P123ABC",
-	})
-
-	assert.Equal(t, IntakeItem{
-		ID:    "P123ABC",
-		Key:   "#88",
-		Title: "Payments API down",
-		Body:  "Latency spike",
-		URL:   "https://acme.pagerduty.com/incidents/P123ABC",
-	}, item)
 }
 
 func TestFilterIntakeItems_MatchesKeyTitleAndBody(t *testing.T) {
@@ -110,18 +72,10 @@ func TestGitHubIssueSearchQuery_QuotesTheOperatorTerm(t *testing.T) {
 	)
 }
 
-func TestSentryIssueInProject_RequiresConfiguredSlug(t *testing.T) {
-	source := &liveIntakeItemSource{sentryProject: "payments-api"}
-	assert.False(t, source.sentryIssueInProject(&sentry.Issue{ID: "1"}))
-	assert.False(t, source.sentryIssueInProject(&sentry.Issue{
-		ID:      "1",
-		Project: &sentry.IssueProject{Slug: "other-app"},
-	}))
-	assert.True(t, source.sentryIssueInProject(&sentry.Issue{
-		ID:      "1",
-		Project: &sentry.IssueProject{Slug: "payments-api"},
-	}))
-
-	unscoped := &liveIntakeItemSource{}
-	assert.True(t, unscoped.sentryIssueInProject(&sentry.Issue{ID: "1"}))
+func TestUnsupportedIntakeItemSource_DoesNotSearch(t *testing.T) {
+	source := unsupportedIntakeItemSource{}
+	_, err := source.Search(t.Context(), "refund", 5)
+	assert.ErrorIs(t, err, errIntakeSearchUnsupported)
+	_, err = source.Get(t.Context(), "1")
+	assert.ErrorIs(t, err, errIntakeSearchUnsupported)
 }
