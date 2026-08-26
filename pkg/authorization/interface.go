@@ -22,6 +22,7 @@ type GroupManager interface {
 	GetUserGroups(ctx context.Context, domainID string, domainType string, userID string) ([]string, error)
 	GetGroups(ctx context.Context, domainID string, domainType string) ([]string, error)
 	GetGroupRole(ctx context.Context, domainID string, domainType string, group string) (string, error)
+	GetGroupsWithDetails(ctx context.Context, domainID string, domainType string) ([]GroupWithDetails, error)
 }
 
 // Role management interface
@@ -29,6 +30,7 @@ type RoleManager interface {
 	AssignRole(userID, role, domainID string, domainType string) error
 	RemoveRole(userID, role, domainID string, domainType string) error
 	GetOrgUsersForRole(ctx context.Context, role string, orgID string) ([]string, error)
+	GetOrgUsersByRoles(ctx context.Context, orgID string, roleNames []string) (map[string][]string, error)
 }
 
 // Setup and initialization interface
