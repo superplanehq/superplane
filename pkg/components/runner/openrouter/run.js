@@ -150,12 +150,30 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
       for (const call of toolCalls) {
         const name = call.function && call.function.name;
         const args = parseArgs(call.function && call.function.arguments);
-        const output = runTool(name, args);
-        process.stdout.write(`[${name}] ${summarize(output)}\n`);
+        const kind = String(name || "tool").toLowerCase();
+        const startedAt = Date.now();
+        writeLiveLogRecord({
+          type: "tool_start",
+          id: call.id,
+          kind,
+          text: toolPreview(kind, args),
+          started_at: startedAt,
+        });
+        const result = runTool(name, args);
+        if (result.output) {
+          process.stdout.write(`${result.output}\n`);
+        }
+        writeLiveLogRecord({
+          type: "tool_end",
+          id: call.id,
+          kind,
+          status: result.failed ? "failed" : "passed",
+          duration_ms: Math.max(0, Date.now() - startedAt),
+        });
         messages.push({
           role: "tool",
           tool_call_id: call.id,
-          content: output,
+          content: result.output,
         });
       }
     }
@@ -333,35 +351,47 @@ function runTool(name, args) {
       });
       const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
       if (result.status !== 0) {
-        return output || `command failed with exit ${result.status}`;
+        return { output: output || `command failed with exit ${result.status}`, failed: true };
       }
-      return output || "(no output)";
+      return { output: output || "(no output)", failed: false };
     }
     if (name === "read") {
-      return fs.readFileSync(args.path, "utf8");
+      return { output: fs.readFileSync(args.path, "utf8"), failed: false };
     }
     if (name === "write") {
       fs.mkdirSync(path.dirname(args.path), { recursive: true });
       fs.writeFileSync(args.path, args.content ?? "", "utf8");
-      return `wrote ${args.path}`;
+      return { output: `wrote ${args.path}`, failed: false };
     }
     if (name === "edit") {
       const current = fs.readFileSync(args.path, "utf8");
       if (!current.includes(args.old_text)) {
-        return "old_text not found";
+        return { output: "old_text not found", failed: true };
       }
       fs.writeFileSync(args.path, current.replace(args.old_text, args.new_text), "utf8");
-      return `edited ${args.path}`;
+      return { output: `edited ${args.path}`, failed: false };
     }
-    return `unknown tool: ${name}`;
+    return { output: `unknown tool: ${name}`, failed: true };
   } catch (err) {
-    return err && err.message ? err.message : String(err);
+    return { output: err && err.message ? err.message : String(err), failed: true };
   }
 }
 
-function summarize(text) {
-  const line = String(text || "").split(/\r?\n/)[0];
-  return line.length > 120 ? `${line.slice(0, 117)}...` : line;
+function writeLiveLogRecord(rec) {
+  process.stdout.write(`\n${JSON.stringify(rec)}\n`);
+}
+
+function toolPreview(kind, args) {
+  if (!args || typeof args !== "object") {
+    return kind;
+  }
+  if (kind === "bash" && typeof args.command === "string" && args.command.trim()) {
+    return args.command.trim();
+  }
+  if (typeof args.path === "string" && args.path.trim()) {
+    return args.path.trim();
+  }
+  return kind;
 }
 
 function accumulateLLMUsage(payload) {

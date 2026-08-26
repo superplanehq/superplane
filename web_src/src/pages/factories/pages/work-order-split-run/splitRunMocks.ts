@@ -78,6 +78,10 @@ export interface SplitRunStreamLine {
   action?: string;
   iconSlug?: string;
   iconSrc?: string;
+  /** Runner catalog id, e.g. runnerClaudeCode. */
+  component?: string;
+  /** Node execution id for live runner logs. */
+  executionId?: string;
 }
 
 export interface SplitRunPhase {

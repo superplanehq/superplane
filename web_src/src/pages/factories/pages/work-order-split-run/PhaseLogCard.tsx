@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
+import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 
 import type { PhaseGlyphKind } from "../../lib/linePhaseRuns";
 import { toArtifactDataRecord } from "../../lib/workOrderArtifact";
@@ -15,6 +16,7 @@ import {
   type SplitRunPhaseStatus,
   type SplitRunStreamLine,
 } from "./splitRunMocks";
+import { isRunnerComponent, notesFromLiveLogSections } from "./streamNotesFromLiveLog";
 
 function statusGlyph(status: SplitRunPhaseStatus): PhaseGlyphKind {
   if (status === "running") return "running";
@@ -168,6 +170,8 @@ export function PhaseLogCard({
   onToggle,
   onSelectNode,
   collapsible = true,
+  organizationId,
+  canvasId,
 }: {
   phase: SplitRunPhase;
   expanded: boolean;
@@ -176,6 +180,8 @@ export function PhaseLogCard({
   onToggle?: () => void;
   onSelectNode?: (nodeId: string) => void;
   collapsible?: boolean;
+  organizationId?: string;
+  canvasId?: string;
 }) {
   const groups = groupSplitRunStream(stream ?? phase.stream);
   const producedArtifacts = artifactsProducedBySteps(groups, phase.artifacts);
@@ -238,6 +244,8 @@ export function PhaseLogCard({
               group={group}
               highlighted={Boolean(group.line.nodeId && group.line.nodeId === selectedNodeId)}
               onSelect={onSelectNode}
+              organizationId={organizationId}
+              canvasId={canvasId ?? phase.appId}
             />
           ))}
         </ol>
@@ -262,16 +270,21 @@ function StreamNode({
   group,
   highlighted,
   onSelect,
+  organizationId,
+  canvasId,
 }: {
   group: StreamNodeGroup;
   highlighted: boolean;
   onSelect?: (nodeId: string) => void;
+  organizationId?: string;
+  canvasId?: string;
 }) {
   const { line, notes, artifact } = group;
   const action = streamActionOf(line);
-  const steps = groupClaudeSteps(notes);
-  const hasChildren = steps.length > 0;
   const [expanded, setExpanded] = useState(line.status === "running" || highlighted);
+  const liveNotes = useRunnerNodeLiveNotes(line, expanded, organizationId, canvasId);
+  const steps = groupClaudeSteps(liveNotes ?? notes);
+  const hasChildren = steps.length > 0 || isRunnerComponent(line.component);
 
   useEffect(() => {
     if (highlighted && hasChildren) {
@@ -340,7 +353,12 @@ function StreamNode({
 }
 
 function StreamStep({ step }: { step: ClaudeStepGroup }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(step.line.status === "running");
+  useEffect(() => {
+    if (step.line.status === "running") {
+      setExpanded(true);
+    }
+  }, [step.line.status]);
   const hasOutput = Boolean(step.line.detail);
   const hasBody = step.events.length > 0 || hasOutput;
 
@@ -402,7 +420,13 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
 }
 
 function StreamToolGroup({ stepId, tools }: { stepId: string; tools: SplitRunStreamLine[] }) {
-  const [expanded, setExpanded] = useState(false);
+  const streaming = tools.some((tool) => tool.status === "running");
+  const [expanded, setExpanded] = useState(streaming);
+  useEffect(() => {
+    if (streaming) {
+      setExpanded(true);
+    }
+  }, [streaming]);
   const summary = toolCallSummary(tools);
 
   return (
@@ -431,7 +455,12 @@ function StreamToolGroup({ stepId, tools }: { stepId: string; tools: SplitRunStr
 }
 
 function StreamTool({ tool }: { tool: SplitRunStreamLine }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(tool.status === "running");
+  useEffect(() => {
+    if (tool.status === "running") {
+      setExpanded(true);
+    }
+  }, [tool.status]);
   const hasOutput = Boolean(tool.detail);
   const row = (
     <>
@@ -556,6 +585,52 @@ function StreamLineIcon({ iconSlug, iconSrc }: { iconSlug?: string; iconSrc?: st
       {iconSrc ? <img src={iconSrc} alt="" className="size-3 object-contain" /> : <Icon className="size-3" />}
     </span>
   );
+}
+
+function useRunnerNodeLiveNotes(
+  line: SplitRunStreamLine,
+  expanded: boolean,
+  organizationId?: string,
+  canvasId?: string,
+): SplitRunStreamLine[] | undefined {
+  const canStream = Boolean(
+    expanded && organizationId && canvasId && line.executionId && isRunnerComponent(line.component),
+  );
+  const { sections, error, isStreaming } = useLiveLogStream(
+    canStream ? (line.executionId ?? "") : "",
+    line.status === "running",
+    line.status === "failed" ? "failed" : line.status === "passed" ? "passed" : null,
+    null,
+    { organizationId, canvasId },
+  );
+  if (!canStream) {
+    return undefined;
+  }
+  if (sections.length > 0) {
+    const liveNotes = notesFromLiveLogSections(line.nodeId ?? line.id, sections);
+    if (liveNotes.length === 0) {
+      return undefined;
+    }
+    return liveNotes;
+  }
+  if (error) {
+    return [liveStatusNote(line, "Something went wrong while fetching logs.", "failed")];
+  }
+  if (isStreaming || line.status === "running") {
+    return [liveStatusNote(line, "Waiting for logs…", "running")];
+  }
+  return undefined;
+}
+
+function liveStatusNote(line: SplitRunStreamLine, text: string, status: SplitRunPhaseStatus): SplitRunStreamLine {
+  return {
+    id: `${line.nodeId ?? line.id}-live-status`,
+    nodeId: line.nodeId ?? line.id,
+    at: "",
+    note: true,
+    componentName: text,
+    status,
+  };
 }
 
 function streamActionOf(line: SplitRunStreamLine): string {
