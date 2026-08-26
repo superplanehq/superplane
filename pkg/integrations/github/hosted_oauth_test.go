@@ -368,14 +368,6 @@ func Test__afterAppInstallationLegacy_afterZeroInstallOAuth(t *testing.T) {
 
 func Test__afterAppInstallationLegacy_afterZeroInstallWithoutOAuth(t *testing.T) {
 	setHostedAppEnv(t)
-	t.Cleanup(resetBindClientHooks)
-	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
-		return []common.Repository{{ID: 1, Name: "repo", URL: "https://github.com/acme/repo"}}, nil
-	}
-	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
-		return gh.NewClient(nil), nil
-	}
-
 	integration := pendingHostedIntegration("csrf")
 	ctx, rec := hostedRequestContext(
 		integration,
@@ -385,11 +377,9 @@ func Test__afterAppInstallationLegacy_afterZeroInstallWithoutOAuth(t *testing.T)
 
 	(&GitHub{}).afterAppInstallationLegacy(ctx)
 
-	assert.Equal(t, http.StatusSeeOther, rec.Code)
-	assert.Equal(t, "ready", integration.State)
-	metadata := integration.Metadata.(common.Metadata)
-	assert.Equal(t, "11", metadata.InstallationID)
-	assert.Equal(t, "acme", metadata.Owner)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.NotEqual(t, "ready", integration.State)
+	assert.Empty(t, integration.Metadata.(common.Metadata).InstallationID)
 }
 
 func setHostedAppOAuthEnv(t *testing.T) {

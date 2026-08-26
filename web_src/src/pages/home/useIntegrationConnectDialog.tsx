@@ -1,12 +1,13 @@
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import type { OrganizationsIntegration } from "@/api-client";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
+import { useMe } from "@/hooks/useMe";
 import { getApiErrorMessage } from "@/lib/errors";
 import { usesHostedGitHubAppInstall } from "@/lib/integrations";
 import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
 import { showErrorToast } from "@/lib/toast";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
 
 import { HomeIntegrationCreateDialog } from "./HomeIntegrationCreateDialog";
 import {
@@ -52,6 +53,7 @@ export function useIntegrationConnectDialog({
   /** When set, a new connection uses this name instead of the integration type name. */
   preferredCreateNames?: Record<string, string>;
 }) {
+  const { data: me } = useMe();
   const { data: connected = [], refetch } = useConnectedIntegrations(organizationId, {
     enabled: !!organizationId,
   });
@@ -114,23 +116,28 @@ export function useIntegrationConnectDialog({
       setConfigureIntegrationId,
     });
 
-  const connectGitHubWithoutDialog = useCallback(async () => {
-    try {
-      await startDirectGitHubConnect({
-        organizationId,
-        returnTo,
-        existingNames: existingIntegrationNames,
-        connected,
-        goTo: navigate,
-        create: async (payload) => {
-          const response = await createIntegrationMutation.mutateAsync(payload);
-          return response.data;
-        },
-      });
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
-    }
-  }, [connected, createIntegrationMutation, existingIntegrationNames, navigate, organizationId, returnTo]);
+  const connectGitHubWithoutDialog = useCallback(
+    async (forceNew = false) => {
+      try {
+        await startDirectGitHubConnect({
+          organizationId,
+          returnTo,
+          existingNames: existingIntegrationNames,
+          connected,
+          currentUserId: me?.id,
+          forceNew,
+          goTo: navigate,
+          create: async (payload) => {
+            const response = await createIntegrationMutation.mutateAsync(payload);
+            return response.data;
+          },
+        });
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
+      }
+    },
+    [connected, createIntegrationMutation, existingIntegrationNames, me?.id, navigate, organizationId, returnTo],
+  );
 
   const requestConnect = (integrationName: string) => {
     if (integrationName === "github" && useHostedGitHubApp) {
@@ -142,7 +149,7 @@ export function useIntegrationConnectDialog({
 
   const createNew = (integrationName: string) => {
     if (integrationName === "github" && useHostedGitHubApp) {
-      void connectGitHubWithoutDialog();
+      void connectGitHubWithoutDialog(true);
       return;
     }
     openCreateIntegrationModal(integrationName);

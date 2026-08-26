@@ -939,11 +939,9 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 			)
 			return
 		}
-		if len(metadata.PendingInstallations) > 0 {
-			ctx.Logger.Errorf("installation %s is not in the pending allowlist", installationID)
-			http.Error(ctx.Response, "installation is not allowed", http.StatusBadRequest)
-			return
-		}
+		ctx.Logger.Errorf("installation %s is not in the pending allowlist", installationID)
+		http.Error(ctx.Response, "installation is not allowed", http.StatusBadRequest)
+		return
 	}
 
 	if err := g.bindHostedInstallation(ctx, metadata, installationID); err != nil {

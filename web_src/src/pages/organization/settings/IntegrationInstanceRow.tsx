@@ -36,7 +36,7 @@ export function IntegrationInstanceRow({
       />
       <span
         className={cn(
-          "inline-flex min-w-16 items-center justify-center rounded px-2 py-0.5 text-xs font-medium",
+          "inline-flex h-5 min-w-16 items-center justify-center rounded px-2 text-center text-xs font-medium leading-none",
           statusState === "ready"
             ? "bg-white text-green-500 dark:bg-green-300 dark:text-green-950"
             : statusState === "error"

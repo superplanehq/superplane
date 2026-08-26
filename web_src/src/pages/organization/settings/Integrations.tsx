@@ -1,6 +1,7 @@
 import { Loader2, Plug, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import { useMe } from "@/hooks/useMe";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import {
@@ -64,6 +65,7 @@ function connectIntegrationDefinition(args: {
   organizationId: string;
   integrationNames: Set<string>;
   organizationIntegrations: OrganizationsIntegration[];
+  currentUserId?: string;
   navigate: ReturnType<typeof useNavigate>;
   mutateAsync: (payload: {
     integrationName: string;
@@ -84,6 +86,7 @@ function connectIntegrationDefinition(args: {
       returnTo: `/${args.organizationId}/settings/integrations`,
       existingNames: args.integrationNames,
       connected: args.organizationIntegrations,
+      currentUserId: args.currentUserId,
       goTo: args.navigate,
       create: async (payload) => {
         const response = await args.mutateAsync(payload);
@@ -269,6 +272,7 @@ interface IntegrationsProps {
 export function Integrations({ organizationId }: IntegrationsProps) {
   usePageTitle(["Integrations"]);
   const navigate = useNavigate();
+  const { data: me } = useMe();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationDefinition | null>(null);
   const [integrationName, setIntegrationName] = useState("");
@@ -313,6 +317,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       organizationId,
       integrationNames,
       organizationIntegrations,
+      currentUserId: me?.id,
       navigate,
       mutateAsync: createIntegrationMutation.mutateAsync,
       setSelectedIntegration,
