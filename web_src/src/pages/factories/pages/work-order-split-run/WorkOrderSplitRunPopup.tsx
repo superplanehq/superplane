@@ -99,20 +99,22 @@ export function WorkOrderSplitRunBody({
   }, [artifactIndex, demoArtifacts, fixture.phases, selectedPhase?.id, visual.stream]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" data-testid="split-run-log-pane">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="split-run-log-pane">
       <div className="mb-2 px-3 pt-3">
         <SectionTitle>Log</SectionTitle>
       </div>
 
-      <ol className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+      <ol className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-3">
         {fixture.phases.map((entry) => (
-          <li key={entry.id} className="border-b border-border/70 py-1 last:border-b-0">
+          <li key={entry.id} className="min-w-0 border-b border-border/70 py-1 last:border-b-0">
             <PhaseLogCard
               phase={entry}
               expanded={entry.id === openPhaseId}
               stream={streams.get(entry.id) ?? entry.stream}
               selectedNodeId={nodeId}
               onSelectNode={setNodeId}
+              organizationId={organizationId}
+              canvasId={entry.appId}
               onToggle={() => {
                 setPhaseId(entry.id);
                 setNodeId(null);
@@ -207,7 +209,7 @@ export function WorkOrderSplitRunPopup({
           onOwnerSave={edits.saveOwner}
         />
       </PopupHeader>
-      <Tabs defaultValue={initialTab} className="flex min-h-0 flex-1 flex-col">
+      <Tabs defaultValue={initialTab} className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="shrink-0 border-b border-border px-5 py-2">
           <TabsList aria-label="Work order views">
             <TabsTrigger value="description">Description</TabsTrigger>
@@ -247,7 +249,7 @@ export function WorkOrderSplitRunPopup({
             startDisabled={!canDispatch}
           />
         </TabsContent>
-        <TabsContent value="log" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
+        <TabsContent value="log" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <WorkOrderSplitRunBody
             organizationId={organizationId}
             factoryId={factoryId}
