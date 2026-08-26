@@ -15,13 +15,30 @@ export function isExecutionInFlight(execution: ExecutionInfo): boolean {
 export type LiveLogRecord =
   | { type: "line"; text: string }
   | { type: "error"; message: string }
-  | { type: "cmd_start"; index: number; text: string; started_at?: number }
-  | { type: "cmd_end"; index: number; status: "passed" | "failed"; duration_ms: number };
+  | { type: "cmd_start"; index: number; text: string; kind?: string; preview?: string; started_at?: number }
+  | { type: "cmd_end"; index: number; status: "passed" | "failed"; duration_ms: number }
+  | { type: "tool_start"; id?: string; kind?: string; text?: string; started_at?: number }
+  | { type: "tool_end"; id?: string; kind?: string; status: "passed" | "failed"; duration_ms: number };
+
+export type CommandTool = {
+  id: string;
+  sourceId?: string;
+  kind: string;
+  text: string;
+  lines: string[];
+  status: "running" | "passed" | "failed";
+  duration_ms: number | null;
+};
+
+export type CommandSectionEvent = { kind: "note"; text: string } | { kind: "tools"; id: string; tools: CommandTool[] };
 
 export type CommandSection = {
   index: number;
   text: string;
+  kind?: string;
+  preview?: string;
   lines: string[];
+  events: CommandSectionEvent[];
   status: "running" | "passed" | "failed";
   duration_ms: number | null;
   started_at: number | null;

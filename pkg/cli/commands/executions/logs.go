@@ -323,14 +323,31 @@ func renderRunnerLogRecord(stdout io.Writer, record runneraction.LiveLogRecord) 
 		_, err := fmt.Fprintf(stdout, "ERROR: %s\n", record.Message)
 		return err
 	case "cmd_start":
-		_, err := fmt.Fprintf(stdout, "$ %s\n", record.Text)
+		if record.Kind != "" {
+			_, err := fmt.Fprintf(stdout, "$ [%s] %s\n", strings.ToUpper(record.Kind), cmdStartTitle(record))
+			return err
+		}
+		_, err := fmt.Fprintf(stdout, "$ %s\n", cmdStartTitle(record))
 		return err
 	case "cmd_end":
 		_, err := fmt.Fprintf(stdout, "# command %s (%dms)\n", record.Status, int64Value(record.DurationMS))
 		return err
+	case "tool_start":
+		_, err := fmt.Fprintf(stdout, "  -> [%s] %s\n", strings.ToUpper(record.Kind), record.Text)
+		return err
+	case "tool_end":
+		_, err := fmt.Fprintf(stdout, "  # tool %s (%dms)\n", record.Status, int64Value(record.DurationMS))
+		return err
 	default:
 		return nil
 	}
+}
+
+func cmdStartTitle(record runneraction.LiveLogRecord) string {
+	if preview := strings.TrimSpace(record.Preview); preview != "" {
+		return preview
+	}
+	return record.Text
 }
 
 func int64Value(value *int64) int64 {

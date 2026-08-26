@@ -24,6 +24,7 @@ func BuildAgentBrokerTask(
 	commands = append(commands, BrokerCommand{
 		Name:    prepareName,
 		Command: `source "$SUPERPLANE_TASK_DIR/prepare.sh"`,
+		Kind:    LiveLogKindSetup,
 	})
 
 	for i, step := range steps {
@@ -51,6 +52,8 @@ func buildAgentStep(stepNumber int, step AgentStep, nodeWorkingDirectory, model,
 			}, BrokerCommand{
 				Name:    AgentStepLabel(step.Name, scriptName),
 				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(workingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName))),
+				Kind:    LiveLogKindBash,
+				Preview: LiveLogPreview(command),
 			}
 	default:
 		prompt := ""
@@ -65,6 +68,8 @@ func buildAgentStep(stepNumber int, step AgentStep, nodeWorkingDirectory, model,
 			}, BrokerCommand{
 				Name:    AgentStepLabel(step.Name, promptName),
 				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(workingDirectory, promptCommand(promptName, model))),
+				Kind:    LiveLogKindPrompt,
+				Preview: LiveLogPreview(prompt),
 			}
 	}
 }

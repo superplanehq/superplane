@@ -18,7 +18,10 @@ const (
 
 type LiveLogRecord struct {
 	Type       string `json:"type,omitempty"`
+	ID         string `json:"id,omitempty"`
 	Text       string `json:"text,omitempty"`
+	Kind       string `json:"kind,omitempty"`
+	Preview    string `json:"preview,omitempty"`
 	Message    string `json:"message,omitempty"`
 	Index      *int   `json:"index,omitempty"`
 	Status     string `json:"status,omitempty"`

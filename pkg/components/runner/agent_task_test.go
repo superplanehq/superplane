@@ -62,7 +62,12 @@ func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 	)
 
 	require.Len(t, commands, 4)
+	assert.Equal(t, LiveLogKindSetup, commands[0].Kind)
 	assert.Equal(t, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`, commands[0].Command)
+	assert.Equal(t, LiveLogKindBash, commands[1].Kind)
+	assert.Equal(t, "git clone dest repo", commands[1].Preview)
+	assert.Equal(t, LiveLogKindPrompt, commands[2].Kind)
+	assert.Equal(t, "implement the change", commands[2].Preview)
 	assertAgentStepMergesUsage(t, commands[1].Command, `source "$SUPERPLANE_TASK_DIR/steps/01-clone.sh"`)
 	assert.Contains(t, commands[2].Command, `cat "$SUPERPLANE_TASK_DIR/task_cwd"`)
 	assert.Contains(t, commands[2].Command, `cd "$_sp_root"/'repo'`)

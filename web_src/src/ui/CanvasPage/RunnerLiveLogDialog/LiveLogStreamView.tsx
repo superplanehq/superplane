@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "../../../lib/utils";
 import type { ExecutionInfo } from "../../../pages/app/mappers/types";
+import { sectionTitle } from "./liveLogSections";
 import { isExecutionInFlight, type CommandSection } from "./types";
 import { terminalCommandStatusForExecution, terminalTimeMsForExecution, useLiveLogStream } from "./useLiveLogStream";
 
@@ -94,7 +95,12 @@ function CommandSectionHeader({
     >
       <div className="flex items-center gap-2">
         <span>{isCollapsed ? openChevron : closedChevron}</span>
-        <span className="font-medium text-gray-900 dark:text-gray-100">{section.text}</span>
+        {section.kind ? (
+          <span className="shrink-0 font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            {section.kind}
+          </span>
+        ) : null}
+        <span className="font-medium text-gray-900 dark:text-gray-100">{sectionTitle(section)}</span>
       </div>
 
       <div className="flex items-center gap-2">
@@ -108,6 +114,36 @@ function CommandSectionHeader({
 function CommandSectionContent({ section }: { section: CommandSection }) {
   if (section.collapsed) {
     return null;
+  }
+
+  if (section.events.length > 0) {
+    return (
+      <div className="border-t border-slate-200 bg-white px-4 py-2 font-mono text-xs leading-relaxed text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200">
+        {section.events.map((event, index) =>
+          event.kind === "note" ? (
+            <p key={`note-${index}`} className="whitespace-pre-wrap">
+              {event.text}
+            </p>
+          ) : (
+            <ul key={event.id} className="mt-1 space-y-1">
+              {event.tools.map((tool) => (
+                <li key={tool.id}>
+                  <span className="font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {tool.kind}
+                  </span>{" "}
+                  <span>{tool.text}</span>
+                  {tool.lines.some((line) => line.trim()) ? (
+                    <pre className="mt-1 whitespace-pre-wrap text-gray-600 dark:text-gray-400">
+                      {tool.lines.filter((line) => line.trim()).join("\n")}
+                    </pre>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ),
+        )}
+      </div>
+    );
   }
 
   return (
