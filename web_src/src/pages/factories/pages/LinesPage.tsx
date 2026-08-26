@@ -21,6 +21,8 @@ import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
+import { BacklogCreatePopover } from "./BacklogCreatePopover";
+import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
 import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
@@ -444,7 +446,15 @@ function LineDetail({
     [workOrders, line, fullBoard],
   );
   const [peekOrderId, setPeekOrderId] = useState<string | null>(null);
-  const peekOrder = workOrders.find((order) => order.id === peekOrderId);
+  const [peekOrderHint, setPeekOrderHint] = useState<FactoriesWorkOrder | undefined>();
+  const peekOrder =
+    workOrders.find((order) => order.id === peekOrderId) ??
+    (peekOrderHint?.id === peekOrderId ? peekOrderHint : undefined);
+
+  const openWorkOrder = (orderId: string, order?: FactoriesWorkOrder) => {
+    setPeekOrderHint(order);
+    setPeekOrderId(orderId);
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
@@ -463,10 +473,10 @@ function LineDetail({
           canRename={canUpdate}
           onCreateWorkOrder={onCreateWorkOrder}
           workOrderCardContext={workOrderCardContext}
-          onOpenWorkOrder={setPeekOrderId}
+          onOpenWorkOrder={openWorkOrder}
         />
       )}
-      {peekOrderId ? (
+      {peekOrderId && peekOrder ? (
         <LineBoardSplitRunPopup
           organizationId={organizationId}
           factoryId={factoryId}
@@ -479,7 +489,10 @@ function LineDetail({
           canUpdate={workOrderCardContext.canAssign}
           isDispatching={workOrderCardContext.isDispatching}
           onDispatch={workOrderCardContext.onDispatch}
-          onClose={() => setPeekOrderId(null)}
+          onClose={() => {
+            setPeekOrderHint(undefined);
+            setPeekOrderId(null);
+          }}
         />
       ) : null}
     </div>
@@ -506,7 +519,7 @@ function LineBoardSplitRunPopup({
   lineId: string | undefined;
   lineName: string | undefined;
   peekOrderId: string;
-  peekOrder: FactoriesWorkOrder | undefined;
+  peekOrder: FactoriesWorkOrder;
   canDispatch: boolean;
   canUpdate: boolean;
   isDispatching: boolean;
@@ -522,7 +535,7 @@ function LineBoardSplitRunPopup({
       factoryId={factoryId}
       factoryKey={factoryKey}
       orderId={peekOrderId}
-      orderNumber={peekOrder?.number}
+      orderNumber={peekOrder.number}
       fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId, demoArtifacts: false })}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}
@@ -662,7 +675,7 @@ function PhaseBoard({
   canRename: boolean;
   onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
-  onOpenWorkOrder: (orderId: string) => void;
+  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
 }) {
   const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>({});
   const [columnTitles, setColumnTitles] = useState<Record<string, string>>({});
@@ -707,6 +720,8 @@ function PhaseBoard({
     <WorkOrderKanbanBoard testId="lines-phase-board">
       <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
         <BacklogColumn
+          organizationId={organizationId}
+          factoryId={factoryId}
           factoryKey={factoryKey}
           orders={backlogOrders}
           title={columnTitles.backlog ?? "Backlog"}
@@ -774,6 +789,8 @@ function PhaseBoard({
 }
 
 function BacklogColumn({
+  organizationId,
+  factoryId,
   factoryKey,
   orders,
   title,
@@ -791,6 +808,8 @@ function BacklogColumn({
   workOrderCardContext,
   onOpenWorkOrder,
 }: {
+  organizationId: string;
+  factoryId: string;
   factoryKey: string;
   orders: FactoriesWorkOrder[];
   title: string;
@@ -806,11 +825,29 @@ function BacklogColumn({
   onRename: (title: string) => void;
   onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
-  onOpenWorkOrder: (orderId: string) => void;
+  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
 }) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
   const atCapacity = size != null && orders.length >= size;
   const canAdd = canCreateWorkOrder && !atCapacity;
+  const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
+  const createPopover = {
+    canAdd,
+    atCapacity,
+    sources: createMenu.sources,
+    items: createMenu.items,
+    query: createMenu.query,
+    focusedIntakeId: createMenu.focusedIntakeId,
+    onQueryChange: createMenu.setQuery,
+    onFocusedIntakeChange: createMenu.setFocusedIntake,
+    onCreateManually: onCreateWorkOrder,
+    onImportItem: createMenu.importItem,
+    isLoading: createMenu.isLoading,
+    isLoadingMore: createMenu.isLoadingMore,
+    hasMore: createMenu.hasMore,
+    onLoadMore: createMenu.loadMore,
+    errorMessage: createMenu.errorMessage,
+  };
 
   return (
     <>
@@ -825,26 +862,11 @@ function BacklogColumn({
         surfaceClassName={surfaceClassName}
         emptyDescription="No work orders in the backlog."
         emptyContent={isFirstRunOnboardingFactory(factoryKey) ? <BacklogOnboardingCard /> : undefined}
+        keepChildrenWhenEmpty
         className={surfaceClassName ? undefined : "bg-muted"}
         actions={
           <div className="flex shrink-0 items-center gap-0.5">
-            <PermissionTooltip allowed={canCreateWorkOrder} message="You don't have permission to create work orders.">
-              <button
-                type="button"
-                onClick={() => {
-                  if (canAdd) {
-                    onCreateWorkOrder();
-                  }
-                }}
-                disabled={!canAdd}
-                aria-label="Create work order"
-                title={atCapacity ? "The backlog is full." : "Create work order"}
-                data-testid="lines-backlog-create"
-                className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-60"
-              >
-                <Plus className="size-3.5" aria-hidden />
-              </button>
-            </PermissionTooltip>
+            <BacklogCreatePopover {...createPopover} />
             <ColumnLaneMenu
               title={title}
               testId="lines-backlog-menu"
@@ -866,6 +888,11 @@ function BacklogColumn({
               />
             </li>
           ))}
+          {atCapacity ? null : (
+            <li data-testid="lines-backlog-create-ghost-item">
+              <BacklogCreatePopover variant="ghost" {...createPopover} />
+            </li>
+          )}
         </ul>
       </WorkOrderBoardLane>
       <BacklogSettingsDialog
@@ -896,7 +923,7 @@ function DoneColumn({
   canRename: boolean;
   onRename: (title: string) => void;
   workOrderCardContext: WorkOrderCardContext;
-  onOpenWorkOrder: (orderId: string) => void;
+  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
 }) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
 
@@ -994,7 +1021,7 @@ function PhaseColumn({
   canRename: boolean;
   onRename: (title: string) => void;
   workOrderCardContext: WorkOrderCardContext;
-  onOpenWorkOrder: (orderId: string) => void;
+  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
 }) {
   const scrollRef = useRef<HTMLUListElement>(null);
   const [visibleCount, setVisibleCount] = useState(LINE_PHASE_RUNS_PAGE_SIZE);
@@ -1084,7 +1111,7 @@ function PhaseRunCard({
 }: {
   run: LinePhaseRunCard;
   workOrderCardContext: WorkOrderCardContext;
-  onOpenWorkOrder: (orderId: string) => void;
+  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
 }) {
   const queuedLabel = isQueuedStepRow(run.execution) ? resolvePhaseRunStatus(run.execution).label : null;
 
@@ -1116,7 +1143,7 @@ function LineBoardOrderCard({
 }: {
   order: FactoriesWorkOrder;
   workOrderCardContext: WorkOrderCardContext;
-  onOpenWorkOrder: (orderId: string) => void;
+  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
 }) {
   return (
     <LineBoardWorkOrderCard

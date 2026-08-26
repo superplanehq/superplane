@@ -568,6 +568,8 @@ CREATE TABLE public.factory_work_orders (
     source_run_id uuid,
     number bigint NOT NULL,
     status_note jsonb,
+    origin_url text,
+    origin_label text,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
@@ -2180,6 +2182,13 @@ CREATE INDEX idx_factory_work_order_queue_items_step ON public.factory_work_orde
 
 
 --
+-- Name: idx_factory_work_orders_factory_origin_url; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_work_orders_factory_origin_url ON public.factory_work_orders USING btree (factory_id, origin_url) WHERE ((origin_url IS NOT NULL) AND (origin_url <> ''::text) AND ((state)::text = ANY ((ARRAY['draft'::character varying, 'open'::character varying])::text[])));
+
+
+--
 -- Name: idx_factory_work_orders_factory_state; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3405,7 +3414,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260825074144	f
+20260826121739	f
 \.
 
 

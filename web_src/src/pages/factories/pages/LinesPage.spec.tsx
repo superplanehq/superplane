@@ -32,6 +32,12 @@ const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }))
 const useFactoryApps = vi.fn(() => ({ data: [] as FactoryApp[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
 const createFactoryIntakeMutateAsync = vi.fn();
+const searchFactoryIntakeItems = vi.fn(() => ({
+  data: [] as { id: string; key: string; title: string; body: string; url: string }[],
+  isLoading: false,
+  isError: false,
+}));
+const importFactoryIntakeItem = vi.fn();
 
 const SENTRY_INTAKE_ID = "intake-sentry";
 const PAGERDUTY_INTAKE_ID = "intake-pagerduty";
@@ -66,6 +72,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useCreateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
@@ -73,6 +80,8 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useFactoryIntakeRuns: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
   useCreateFactoryIntake: () => ({ mutateAsync: createFactoryIntakeMutateAsync, isPending: false }),
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+  useSearchFactoryIntakeItems: () => searchFactoryIntakeItems(),
+  useImportFactoryIntakeItem: () => ({ mutateAsync: importFactoryIntakeItem, isPending: false }),
 }));
 
 vi.mock("@/hooks/useWorkOrderCardActions", () => ({
@@ -192,6 +201,8 @@ describe("LinesPage board", () => {
     useFactoryApps.mockReturnValue({ data: [] });
     useFactoryIntakes.mockReturnValue({ data: [] });
     createFactoryIntakeMutateAsync.mockReset();
+    searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
+    importFactoryIntakeItem.mockReset();
     useWorkOrderChecks.mockReset();
     useWorkOrderChecks.mockImplementation(
       (_organizationId: string, _factoryId: string, orderId: string, options?: { enabled?: boolean }) => ({
@@ -241,7 +252,48 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("line-intake-drawer")).not.toBeInTheDocument();
   });
 
+  it("keeps a create ghost card at the bottom of the backlog", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
+    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
+    const user = userEvent.setup();
+    renderBoard();
+
+    const list = screen.getByTestId("lines-backlog-column-scroll");
+    const items = within(list).getAllByRole("listitem");
+    expect(items.at(-1)).toHaveAttribute("data-testid", "lines-backlog-create-ghost-item");
+    expect(within(items.at(-1)!).getByRole("button", { name: "Create work order" })).toBeInTheDocument();
+    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("lines-backlog-create-ghost"));
+    expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
+  });
+
+  it("shows the create ghost card when the backlog is empty", () => {
+    renderBoard();
+
+    expect(screen.getByTestId("lines-backlog-create-ghost")).toBeInTheDocument();
+    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
+  });
+
+  it("hides the create ghost card when the backlog is at capacity", async () => {
+    useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
+    const user = userEvent.setup();
+    renderBoard();
+
+    expect(screen.getByTestId("lines-backlog-create-ghost")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-edit"));
+    await user.type(screen.getByLabelText("Size"), "1");
+    await user.click(screen.getByTestId("lines-backlog-settings-save"));
+
+    expect(screen.queryByTestId("lines-backlog-create-ghost")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-create")).toBeDisabled();
+  });
+
   it("creates work orders from the backlog header plus", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
     const openCreateWorkOrder = vi.fn();
     const user = userEvent.setup();
     renderBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, openCreateWorkOrder);
@@ -250,7 +302,46 @@ describe("LinesPage board", () => {
     expect(within(backlog).queryByRole("button", { name: "Add work order" })).not.toBeInTheDocument();
 
     await user.click(within(backlog).getByTestId("lines-backlog-create"));
+    expect(screen.queryByTestId("lines-backlog-create-menu")).not.toBeInTheDocument();
     expect(openCreateWorkOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it("imports an intake item and opens the work order popup", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
+    searchFactoryIntakeItems.mockReturnValue({
+      data: [
+        {
+          id: "12",
+          key: "#12",
+          title: "Handle duplicate refunds",
+          body: "Retrying a refund posts twice.",
+          url: "https://github.com/acme/payments/issues/12",
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+    importFactoryIntakeItem.mockResolvedValue({
+      id: "wo-imported-12",
+      title: "Handle duplicate refunds",
+      state: "STATE_DRAFT",
+    });
+    const user = userEvent.setup();
+    renderBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-create"));
+    await user.click(screen.getByPlaceholderText("Import from GitHub issue"));
+    await user.click(screen.getByTestId("lines-backlog-create-item-12"));
+
+    expect(importFactoryIntakeItem).toHaveBeenCalledWith({
+      intakeId: GITHUB_ISSUES_INTAKE_ID,
+      itemId: "12",
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
   });
 
   it("sets a pastel colour on the backlog from circular swatches", async () => {
@@ -365,6 +456,7 @@ describe("LinesPage board", () => {
     );
 
     expect(screen.getByTestId("backlog-onboarding-card")).toBeInTheDocument();
+    expect(screen.queryByTestId("lines-backlog-create-ghost")).not.toBeInTheDocument();
     expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
   });
 

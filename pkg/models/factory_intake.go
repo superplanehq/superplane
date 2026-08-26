@@ -119,6 +119,22 @@ func (f *Factory) FindIntake(tx *gorm.DB, intakeID uuid.UUID) (*FactoryIntake, e
 	return &intake, nil
 }
 
+func FindFactoryIntakeByCanvasID(tx *gorm.DB, canvasID uuid.UUID) (*FactoryIntake, error) {
+	var intake FactoryIntake
+	err := liveCanvasIntakes(tx).
+		Where("factory_intakes.canvas_id = ?", canvasID).
+		First(&intake).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryIntakeNotFound
+		}
+		return nil, err
+	}
+
+	return &intake, nil
+}
+
 func (f *Factory) ListIntakes(tx *gorm.DB) ([]FactoryIntake, error) {
 	var intakes []FactoryIntake
 	err := liveCanvasIntakes(tx).

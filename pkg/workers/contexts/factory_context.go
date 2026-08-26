@@ -82,13 +82,47 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	}
 
 	sourceRunID := c.execution.RunID
-	order, err := f.CreateWorkOrder(c.tx, params.Title, params.Description, nil, []uuid.UUID{}, &sourceRunID)
+	order, err := c.createFactoryWorkOrder(f, params, sourceRunID)
 	if err != nil {
 		return nil, err
 	}
 
 	c.notifyWorkOrderUpdated(f.ID, order.ID, factory.EventTypeOrderStatusUpdated)
 	return workOrderToCore(order), nil
+}
+
+func (c *FactoryContext) createFactoryWorkOrder(
+	factoryModel *models.Factory,
+	params core.WorkOrderParams,
+	sourceRunID uuid.UUID,
+) (*models.FactoryWorkOrder, error) {
+	if origin := c.originFromSourceRun(sourceRunID); origin != nil {
+		return factoryModel.CreateWorkOrderWithOrigin(
+			c.tx,
+			params.Title,
+			params.Description,
+			nil,
+			[]uuid.UUID{},
+			&sourceRunID,
+			*origin,
+		)
+	}
+
+	return factoryModel.CreateWorkOrder(c.tx, params.Title, params.Description, nil, []uuid.UUID{}, &sourceRunID)
+}
+
+func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.WorkOrderOrigin {
+	intake, err := models.FindFactoryIntakeByCanvasID(c.tx, c.canvas.ID)
+	if err != nil {
+		return nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, sourceRunID)
+	if err != nil {
+		return nil
+	}
+
+	return models.OriginFromIntakeRootEvent(intake.Source, event)
 }
 
 func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
