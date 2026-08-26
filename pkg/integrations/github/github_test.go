@@ -122,9 +122,9 @@ func Test__ownerFromRepositories(t *testing.T) {
 	assert.Empty(t, ownerFromRepositories(nil))
 }
 
-func Test__ownerFromInstallation(t *testing.T) {
+func Test__ownerFromCurrentInstallation(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "/app/installations/42", r.URL.Path)
+		require.Equal(t, "/installation", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"id":42,"account":{"login":"acme","type":"Organization"}}`))
 	}))
@@ -135,9 +135,63 @@ func Test__ownerFromInstallation(t *testing.T) {
 	require.NoError(t, err)
 	client.BaseURL = baseURL
 
-	owner, err := ownerFromInstallation(context.Background(), client, "42")
+	owner, err := ownerFromCurrentInstallation(context.Background(), client)
 	require.NoError(t, err)
 	assert.Equal(t, "acme", owner)
+}
+
+func Test__resolveInstallationOwner(t *testing.T) {
+	t.Run("uses current installation account", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/installation", r.URL.Path)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":42,"account":{"login":"acme"}}`))
+		}))
+		t.Cleanup(srv.Close)
+
+		client := gh.NewClient(srv.Client())
+		baseURL, err := url.Parse(srv.URL + "/")
+		require.NoError(t, err)
+		client.BaseURL = baseURL
+
+		assert.Equal(t, "acme", resolveInstallationOwner(context.Background(), client, nil))
+	})
+
+	t.Run("falls back to repositories when installation lookup fails", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/installation", r.URL.Path)
+			w.WriteHeader(http.StatusForbidden)
+		}))
+		t.Cleanup(srv.Close)
+
+		client := gh.NewClient(srv.Client())
+		baseURL, err := url.Parse(srv.URL + "/")
+		require.NoError(t, err)
+		client.BaseURL = baseURL
+
+		assert.Equal(
+			t,
+			"acme",
+			resolveInstallationOwner(context.Background(), client, []common.Repository{
+				{URL: "https://github.com/acme/payments"},
+			}),
+		)
+	})
+
+	t.Run("empty when installation lookup fails and no repositories", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/installation", r.URL.Path)
+			w.WriteHeader(http.StatusForbidden)
+		}))
+		t.Cleanup(srv.Close)
+
+		client := gh.NewClient(srv.Client())
+		baseURL, err := url.Parse(srv.URL + "/")
+		require.NoError(t, err)
+		client.BaseURL = baseURL
+
+		assert.Empty(t, resolveInstallationOwner(context.Background(), client, nil))
+	})
 }
 
 func Test__listInstallationRepositories__paginates_all_pages(t *testing.T) {

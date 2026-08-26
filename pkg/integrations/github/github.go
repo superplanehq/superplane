@@ -520,16 +520,7 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 	ctx.Logger.Infof("Updated repositories: %v", repos)
 
 	if metadata.Owner == "" {
-		owner, err := ownerFromInstallation(context.Background(), client, metadata.InstallationID)
-		if err != nil {
-			ctx.Logger.Errorf("failed to get installation owner: %v", err)
-			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
-			return
-		}
-		metadata.Owner = owner
-	}
-	if metadata.Owner == "" {
-		metadata.Owner = ownerFromRepositories(repos)
+		metadata.Owner = resolveInstallationOwner(context.Background(), client, repos)
 	}
 
 	metadata.Repositories = repos
@@ -911,17 +902,7 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 	}
 
 	if metadata.Owner == "" {
-		owner, err := ownerFromInstallation(context.Background(), client, installationID)
-		if err != nil {
-			ctx.Logger.Errorf("failed to get installation owner: %v", err)
-			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
-			return
-		}
-		metadata.Owner = owner
-	}
-
-	if metadata.Owner == "" {
-		metadata.Owner = ownerFromRepositories(repos)
+		metadata.Owner = resolveInstallationOwner(context.Background(), client, repos)
 	}
 
 	if metadata.Owner == "" {
@@ -1043,21 +1024,30 @@ func ownerFromRepositories(repos []common.Repository) string {
 	return ""
 }
 
-func ownerFromInstallation(ctx context.Context, client *github.Client, installationID string) (string, error) {
-	id, err := strconv.ParseInt(installationID, 10, 64)
-	if err != nil {
-		return "", fmt.Errorf("invalid installation ID: %w", err)
-	}
-
-	installation, _, err := client.Apps.GetInstallation(ctx, id)
+func ownerFromCurrentInstallation(ctx context.Context, client *github.Client) (string, error) {
+	req, err := client.NewRequest(http.MethodGet, "installation", nil)
 	if err != nil {
 		return "", err
 	}
-	if installation == nil || installation.GetAccount() == nil {
+
+	var installation github.Installation
+	if _, err := client.Do(ctx, req, &installation); err != nil {
+		return "", err
+	}
+	if installation.GetAccount() == nil {
 		return "", nil
 	}
 
 	return installation.GetAccount().GetLogin(), nil
+}
+
+func resolveInstallationOwner(ctx context.Context, client *github.Client, repos []common.Repository) string {
+	owner, err := ownerFromCurrentInstallation(ctx, client)
+	if err == nil && owner != "" {
+		return owner
+	}
+
+	return ownerFromRepositories(repos)
 }
 
 func listInstallationRepositories(ctx context.Context, client *github.Client) ([]common.Repository, error) {
