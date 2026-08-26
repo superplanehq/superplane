@@ -431,6 +431,12 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 		return nil, err
 	}
 
+	for index := stepIndex; index < len(target.Steps); index++ {
+		if _, err := AdmitQueuedForStep(tx, line.ID, index); err != nil {
+			return nil, err
+		}
+	}
+
 	return target.EnqueueOrStartStep(tx, o, stepIndex)
 }
 

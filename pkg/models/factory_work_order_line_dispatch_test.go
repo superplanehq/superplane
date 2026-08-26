@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -373,4 +374,77 @@ func Test__FactoryWorkOrder__RetryLineStep__SettlesInFlightStepBeforeRerun(t *te
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, settled.Status)
 	assert.Equal(t, models.CanvasRunResultCancelled, settled.Result)
+}
+
+func Test__FactoryWorkOrder__RetryLineStep__AdmitsQueuedWorkForFreedSlot(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	firstApp, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "plan", "start-plan")
+	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start-implement")
+	limit := 1
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry, MaxParallelism: &limit},
+	})
+	require.NoError(t, err)
+
+	running, err := factory.CreateWorkOrder(db, "Running", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = running.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+	require.NoError(t, err)
+	queued, err := factory.CreateWorkOrder(db, "Queued", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = queued.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+	require.NoError(t, err)
+
+	var queuedDispatch *models.FactoryWorkOrderLineDispatch
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		runningDispatch, _, dispatchErr := line.Dispatch(tx, running)
+		if dispatchErr != nil {
+			return dispatchErr
+		}
+		if _, startErr := runningDispatch.EnqueueOrStartStep(tx, running, 1); startErr != nil {
+			return startErr
+		}
+
+		var queuedErr error
+		queuedDispatch, _, queuedErr = line.Dispatch(tx, queued)
+		if queuedErr != nil {
+			return queuedErr
+		}
+		result, startErr := queuedDispatch.EnqueueOrStartStep(tx, queued, 1)
+		if startErr != nil {
+			return startErr
+		}
+		if result.QueueItem == nil {
+			return fmt.Errorf("expected the second order to wait for the step slot")
+		}
+		return nil
+	}))
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, retryErr := running.RetryLineStep(tx, line, 1)
+		return retryErr
+	}))
+
+	byDispatch, err := models.ListFactoryWorkOrderQueueItemsByLineDispatchIDs(db, []uuid.UUID{queuedDispatch.ID})
+	require.NoError(t, err)
+	_, stillQueued := byDispatch[queuedDispatch.ID]
+	assert.False(t, stillQueued, "the freed slot must admit the waiting dispatch")
+
+	executions, err := models.ListFactoryWorkOrderExecutionsByLineDispatchIDs(db, []uuid.UUID{queuedDispatch.ID})
+	require.NoError(t, err)
+	var implement *models.FactoryWorkOrderExecution
+	for i := range executions[queuedDispatch.ID] {
+		execution := executions[queuedDispatch.ID][i]
+		if execution.StepIndex == 1 {
+			implement = &execution.FactoryWorkOrderExecution
+		}
+	}
+	require.NotNil(t, implement)
+	assert.NotEqual(t, models.FactoryWorkOrderExecutionStatusFinished, implement.Status)
 }
