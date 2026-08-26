@@ -66,17 +66,15 @@ for package_dir in "${shard_packages[@]}"; do
 done
 echo ""
 
-packages_csv="$(IFS=','; echo "${shard_packages[*]}")"
-
+# gotestsum expects the package patterns separated by spaces.
 gotestsum \
   --format short \
   --junitfile junit-report.xml \
-  --packages="${packages_csv}" \
+  --packages="${shard_packages[*]}" \
   -- \
   -p 1 \
   -coverprofile=coverage-go.out \
-  -covermode=atomic \
-  -coverpkg="${packages_csv}"
+  -covermode=atomic
 
 go tool cover -func=coverage-go.out | grep '^total:'
 
