@@ -48,8 +48,12 @@ async function runPrompt(promptFile, model) {
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
 
+  // --bare skips keychain reads, which is also how Claude Code authenticates a
+  // subscription token: with the flag set, CLAUDE_CODE_OAUTH_TOKEN is ignored
+  // and the run fails with "Not logged in". Keep the flag for API-key runs,
+  // where its isolation is free.
   const claudeArgs = [
-    "--bare",
+    ...(process.env.CLAUDE_CODE_OAUTH_TOKEN ? [] : ["--bare"]),
     "-p",
     "--output-format",
     "stream-json",
