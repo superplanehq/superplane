@@ -230,7 +230,7 @@ export function PhaseLogCard({
             type="button"
             onClick={onToggle}
             aria-expanded={expanded}
-            className="flex min-w-0 items-center gap-1.5 text-left"
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
           >
             <ChevronRight
               className={cn("size-3 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")}
@@ -240,7 +240,7 @@ export function PhaseLogCard({
             <span className="min-w-0 truncate text-foreground">{phase.name}</span>
           </button>
         ) : (
-          <div className="flex min-w-0 items-center gap-1.5">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
             <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3" />
             <span className="min-w-0 truncate text-foreground">{phase.name}</span>
           </div>
@@ -253,7 +253,7 @@ export function PhaseLogCard({
         {!expanded && producedArtifacts.length > 0 ? (
           <span
             data-testid={`split-run-phase-artifacts-${phase.id}`}
-            className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap"
+            className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
           >
             {producedArtifacts.map((artifact) => (
               <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />

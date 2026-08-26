@@ -211,6 +211,8 @@ describe("PhaseLogCard title line", () => {
     expect(artifact.compareDocumentPosition(duration) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(duration.className).toMatch(/ml-auto/);
     expect(artifact.className).toMatch(/font-bold/);
+    expect(name.className).toMatch(/flex-1/);
+    expect(within(row).getByTestId("split-run-phase-artifacts-plan").className).toMatch(/justify-end/);
   });
 });
 
