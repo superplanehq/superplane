@@ -43,6 +43,7 @@ const (
 	authSignupResultParam      = "auth_signup_result"
 	authErrorParam             = "auth_error"
 	authErrorSignupRequired    = "signup_required"
+	authProviderParam          = "provider"
 	jsonContentType            = "application/json"
 )
 
@@ -144,7 +145,7 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err == nil {
-		a.handleSuccessfulAuth(w, r, gothUser, false)
+		a.completeProviderAuth(w, r, gothUser)
 		return
 	}
 
@@ -181,36 +182,7 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 		AccessToken: "dev-token-" + provider,
 	}
 
-	account, wasCreated, err := a.findOrCreateAccountForProvider(mockUser, a.allowSignupFromRequest(r))
-
-	if err != nil {
-		if errors.Is(err, models.ErrAccountBlocked) {
-			redirectAccountBlocked(w, r)
-			return
-		}
-
-		if errors.Is(err, errSignupRequired) {
-			http.Redirect(w, r, getSignupRequiredRedirectURL(r), http.StatusSeeOther)
-			return
-		}
-
-		if errorStatusForAccountError(err) == http.StatusForbidden {
-			http.Error(w, err.Error(), http.StatusForbidden)
-			return
-		}
-
-		log.Errorf("Error finding/creating dev account for %s: %v", mockUser.Email, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	err = updateAccountProviders(a.encryptor, account, mockUser)
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	a.handleSuccessfulAuth(w, r, mockUser, wasCreated)
+	a.completeProviderAuth(w, r, mockUser)
 }
 
 func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
@@ -220,24 +192,13 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.completeProviderAuth(w, r, gothUser)
+}
+
+func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
 	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.allowSignupFromRequest(r))
 	if err != nil {
-		if errors.Is(err, models.ErrAccountBlocked) {
-			redirectAccountBlocked(w, r)
-			return
-		}
-
-		if errors.Is(err, errSignupRequired) {
-			http.Redirect(w, r, getSignupRequiredRedirectURL(r), http.StatusSeeOther)
-			return
-		}
-
-		if errorStatusForAccountError(err) == http.StatusForbidden {
-			http.Error(w, err.Error(), http.StatusForbidden)
-			return
-		}
-		log.Errorf("Error finding/creating account for %s: %v", gothUser.Email, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		a.handleProviderAuthError(w, r, gothUser, err)
 		return
 	}
 
@@ -249,6 +210,26 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.handleSuccessfulAuth(w, r, gothUser, wasCreated)
+}
+
+func (a *Handler) handleProviderAuthError(w http.ResponseWriter, r *http.Request, gothUser goth.User, err error) {
+	if errors.Is(err, models.ErrAccountBlocked) {
+		redirectAccountBlocked(w, r)
+		return
+	}
+
+	if errors.Is(err, errSignupRequired) {
+		http.Redirect(w, r, getSignupRequiredRedirectURL(r), http.StatusSeeOther)
+		return
+	}
+
+	if errorStatusForAccountError(err) == http.StatusForbidden {
+		http.Error(w, err.Error(), http.StatusForbidden)
+		return
+	}
+
+	log.Errorf("Error finding/creating account for %s: %v", gothUser.Email, err)
+	http.Error(w, "Internal server error", http.StatusInternalServerError)
 }
 
 func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User, wasCreated bool) {
@@ -811,12 +792,17 @@ func getSignupRequiredRedirectURL(r *http.Request) string {
 	params := url.Values{}
 	params.Set(authErrorParam, authErrorSignupRequired)
 
+	provider := mux.Vars(r)["provider"]
+	if provider != "" {
+		params.Set(authProviderParam, provider)
+	}
+
 	redirectURL := getRedirectURL(r)
 	if redirectURL != "/" {
 		params.Set("redirect", redirectURL)
 	}
 
-	return fmt.Sprintf("/signup?%s", params.Encode())
+	return fmt.Sprintf("/login?%s", params.Encode())
 }
 
 func generateMagicCode() (string, error) {

@@ -23,7 +23,14 @@ import { hasSignupWaitlistConfig } from "@/lib/signupWaitlistConfig";
 import { buildMagicLinkVerifyRequest } from "./magicLinkVerifyRequest";
 import { getAuthRedirectURL, getWelcomeRedirectPath } from "./authRedirect";
 import { SignupWaitlist } from "./SignupWaitlist";
-import { getSignupUnavailableReason, type SignupUnavailableReason } from "./signupUnavailableReason";
+import {
+  SIGNUP_REQUIRED_AUTH_ERROR,
+  getSignupRequiredAccountBody,
+  getSignupRequiredCreateHref,
+  isKnownAuthProvider,
+  shouldShowSignupRequiredPrompt,
+} from "./signupRequiredPrompt";
+import { getSignupUnavailableReason } from "./signupUnavailableReason";
 
 type AuthConfig = {
   providers: string[];
@@ -86,21 +93,9 @@ interface LoginProps {
   mode?: AuthMode;
 }
 
-const getAuthErrorMessage = (authError: string | null, signupUnavailableReason: SignupUnavailableReason) => {
+const getAuthErrorMessage = (authError: string | null) => {
   if (authError === "account_blocked") {
     return ACCOUNT_BLOCKED_MESSAGE;
-  }
-
-  if (authError === "signup_required") {
-    if (signupUnavailableReason === "waitlist") {
-      return "No account exists for that provider yet. Join the waitlist to request access.";
-    }
-
-    if (signupUnavailableReason === "closed") {
-      return "No account exists for that provider yet. Signups are not available right now.";
-    }
-
-    return "No account exists for that provider yet. Create an account to continue.";
   }
 
   return null;
@@ -299,6 +294,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const magicLinkToken = searchParams.get("magic_link_token");
   const redirectTarget = safeRedirect || "";
   const authError = searchParams.get("auth_error");
+  const authProvider = searchParams.get("provider");
 
   const handleRedirectAfterAuth = useCallback(
     async (response: Response, authRedirectURL?: string) => {
@@ -451,7 +447,8 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const showProviderButtons = hasProviders && (!isSignupMode || canSignup);
   const canUseMagicCode = authConfig.magicCodeEnabled && (!isSignupMode || canSignup);
   const useMagicCodePrimary = canUseMagicCode && !showPasswordLogin;
-  const showSignupUnavailable = !configLoading && isSignupMode && !canSignup;
+  const isSignupRequiredReturn = authError === SIGNUP_REQUIRED_AUTH_ERROR;
+  const showSignupUnavailable = !configLoading && !canSignup && (isSignupMode || isSignupRequiredReturn);
   const hasConfiguredSignupWaitlist = hasSignupWaitlistConfig();
   const signupUnavailableReason = getSignupUnavailableReason(
     showSignupUnavailable,
@@ -462,10 +459,15 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const showSignupClosedNotice = signupUnavailableReason === "closed";
   const showSignupEntryPoint = canSignup || !authConfig.signupsBlockedByEnvironment;
   const showLastUsedMethodHints = !isSignupMode;
-  const authErrorMessage = getAuthErrorMessage(authError, signupUnavailableReason);
+  const authErrorMessage = getAuthErrorMessage(authError);
   const showStandaloneProductUpdatesOptIn =
     isSignupMode && canSignup && magicCodeStep === "email" && !canSignupWithPassword && !useMagicCodePrimary;
   const visibleFormError = formError ?? authErrorMessage;
+  const showSignupRequiredPrompt = !configLoading && shouldShowSignupRequiredPrompt(authError, canSignup);
+  const showSignupRequiredProductUpdates =
+    showSignupRequiredPrompt && !canSignupWithPassword && !authConfig.magicCodeEnabled;
+  const showAuthMethods = !configLoading && !isSignupRequiredReturn;
+  const signupRequiredCreateHref = getSignupRequiredCreateHref(authProvider, redirectQuery);
 
   const handleMagicCodeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -672,6 +674,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const providerButtonsNeedTopSpacing = useMagicCodePrimary && magicCodeStep === "email";
 
   const getHeading = () => {
+    if (showSignupRequiredPrompt) return "No account found";
     if (useMagicCodePrimary && magicCodeStep === "code") return "Check your email";
     if (showSignupClosedNotice) return "Signups are closed";
     if (showSignupWaitlist) return "SuperPlane Cloud";
@@ -680,6 +683,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   };
 
   const getSubheading = () => {
+    if (showSignupRequiredPrompt) return "Create an account to continue.";
     if (showSignupClosedNotice) return "New accounts are not available.";
     if (showSignupWaitlist) return "Join the waitlist for access.";
     if (isSignupMode) return "Set up your account.";
@@ -707,18 +711,53 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
 
           {!configLoading && showSignupWaitlist && <SignupWaitlist />}
           {!configLoading && showSignupClosedNotice && <SignupClosedNotice />}
+          {!configLoading && isSignupRequiredReturn && !canSignup && (
+            <Button variant="outline" className="mt-4 w-full" asChild>
+              <a href="/logout">Back to sign in</a>
+            </Button>
+          )}
 
-          {!configLoading && !isSignupMode && !hasAnyFormMethod && (
+          {!configLoading && showSignupRequiredPrompt && (
+            <div className="space-y-4">
+              <p className="text-left text-sm leading-6 text-gray-600 dark:text-gray-400">
+                {getSignupRequiredAccountBody(authProvider)}
+              </p>
+              {showSignupRequiredProductUpdates && (
+                <ProductUpdatesOptIn
+                  checked={signupProductUpdatesOptIn}
+                  onCheckedChange={setSignupProductUpdatesOptIn}
+                />
+              )}
+              <Button className="w-full" asChild>
+                <a
+                  href={signupRequiredCreateHref}
+                  onClick={() => {
+                    saveSignupPreference(true, signupProductUpdatesOptIn);
+                    if (isKnownAuthProvider(authProvider)) {
+                      recordLastUsedLoginMethod(authProvider);
+                    }
+                  }}
+                >
+                  Create account
+                </a>
+              </Button>
+              <Button variant="outline" className="w-full" asChild>
+                <a href="/logout">Use a different account</a>
+              </Button>
+            </div>
+          )}
+
+          {showAuthMethods && !isSignupMode && !hasAnyFormMethod && (
             <p className="text-sm text-gray-500 dark:text-gray-400">No login methods are configured.</p>
           )}
 
-          {!configLoading && visibleFormError && (
+          {showAuthMethods && visibleFormError && (
             <div className="mb-4 rounded-md border border-red-300 bg-white px-3 py-1 text-sm text-red-500 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-300">
               {visibleFormError}
             </div>
           )}
 
-          {!configLoading && useMagicCodePrimary && magicCodeStep === "email" && (
+          {showAuthMethods && useMagicCodePrimary && magicCodeStep === "email" && (
             <form onSubmit={handleMagicCodeRequest} className="space-y-4">
               <div className="space-y-2">
                 <Label>Email</Label>
@@ -746,7 +785,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             </form>
           )}
 
-          {!configLoading && useMagicCodePrimary && magicCodeStep === "code" && (
+          {showAuthMethods && useMagicCodePrimary && magicCodeStep === "code" && (
             <form onSubmit={handleMagicCodeVerify} className="space-y-4">
               <div className="space-y-2">
                 <Label>Code</Label>
@@ -779,7 +818,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             </form>
           )}
 
-          {!configLoading && !isSignupMode && !useMagicCodePrimary && canLoginWithPassword && (
+          {showAuthMethods && !isSignupMode && !useMagicCodePrimary && canLoginWithPassword && (
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label>Email</Label>
@@ -817,7 +856,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             </form>
           )}
 
-          {!configLoading && isSignupMode && canSignupWithPassword && (
+          {showAuthMethods && isSignupMode && canSignupWithPassword && (
             <form onSubmit={handleSignupSubmit} className="space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -901,7 +940,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             </form>
           )}
 
-          {!configLoading &&
+          {showAuthMethods &&
             useMagicCodePrimary &&
             !isSignupMode &&
             magicCodeStep === "email" &&
@@ -920,7 +959,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
               </div>
             )}
 
-          {!configLoading &&
+          {showAuthMethods &&
             !isSignupMode &&
             showPasswordLogin &&
             !useMagicCodePrimary &&
@@ -939,7 +978,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
               </div>
             )}
 
-          {!configLoading &&
+          {showAuthMethods &&
             showProviderButtons &&
             (isSignupMode
               ? canSignupWithPassword
@@ -953,13 +992,13 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
               </div>
             )}
 
-          {!configLoading && showStandaloneProductUpdatesOptIn && (
+          {showAuthMethods && showStandaloneProductUpdatesOptIn && (
             <div className="mb-4">
               <ProductUpdatesOptIn checked={signupProductUpdatesOptIn} onCheckedChange={setSignupProductUpdatesOptIn} />
             </div>
           )}
 
-          {!configLoading && showProviderButtons && (!useMagicCodePrimary || magicCodeStep === "email") && (
+          {showAuthMethods && showProviderButtons && (!useMagicCodePrimary || magicCodeStep === "email") && (
             <div className={providerButtonsNeedTopSpacing ? "mt-4 space-y-3" : "space-y-3"}>
               {activeProviders.map((provider) => (
                 <div key={provider}>
@@ -1004,7 +1043,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             </div>
           )}
 
-          {!configLoading && !isSignupMode && showSignupEntryPoint && !useMagicCodePrimary && (
+          {showAuthMethods && !isSignupMode && showSignupEntryPoint && !useMagicCodePrimary && (
             <div className="mt-6 text-sm text-gray-500 dark:text-gray-400">
               {"Don't have an account? "}
               <Link
@@ -1016,7 +1055,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             </div>
           )}
 
-          {!configLoading && isSignupMode && (
+          {showAuthMethods && isSignupMode && (
             <div className="mt-6 text-sm text-gray-500 dark:text-gray-400">
               Already have an account?{" "}
               <Link
@@ -1028,7 +1067,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             </div>
           )}
 
-          {!configLoading &&
+          {showAuthMethods &&
             useMagicCodePrimary &&
             magicCodeStep === "email" &&
             !isSignupMode &&

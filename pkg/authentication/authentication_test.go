@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -337,20 +338,82 @@ func TestGetRedirectURL(t *testing.T) {
 }
 
 func TestGetSignupRequiredRedirectURL(t *testing.T) {
-	t.Run("should redirect to signup with an auth error", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/auth/github/callback", nil)
+	t.Run("should redirect to login with an auth error and provider", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/auth/google/callback", nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": "google"})
 
 		redirectURL := getSignupRequiredRedirectURL(req)
 
-		assert.Equal(t, "/signup?auth_error=signup_required", redirectURL)
+		assert.Equal(t, "/login?auth_error=signup_required&provider=google", redirectURL)
 	})
 
 	t.Run("should preserve the original OAuth redirect", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/github/callback?state=%2Finvite%2Fabc", nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": "github"})
 
 		redirectURL := getSignupRequiredRedirectURL(req)
 
-		assert.Equal(t, "/signup?auth_error=signup_required&redirect=%2Finvite%2Fabc", redirectURL)
+		assert.Equal(t, "/login?auth_error=signup_required&provider=github&redirect=%2Finvite%2Fabc", redirectURL)
+	})
+
+	t.Run("should omit provider when it is missing from the request", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/auth/google/callback", nil)
+
+		redirectURL := getSignupRequiredRedirectURL(req)
+
+		assert.Equal(t, "/login?auth_error=signup_required", redirectURL)
+	})
+}
+
+func TestHandler_completeProviderAuth(t *testing.T) {
+	t.Run("should redirect to login when signup intent is missing", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, false)
+		googleUser := goth.User{
+			UserID:      "google-login-no-account",
+			Email:       "google-login-no-account@example.com",
+			Name:        "Google Login User",
+			NickName:    "googlelogin",
+			Provider:    "google",
+			AccessToken: "google-access-token",
+		}
+		req := mux.SetURLVars(
+			httptest.NewRequest(http.MethodGet, "/auth/google", nil),
+			map[string]string{"provider": "google"},
+		)
+		recorder := httptest.NewRecorder()
+
+		handler.completeProviderAuth(recorder, req, googleUser)
+
+		assert.Equal(t, http.StatusSeeOther, recorder.Code)
+		assert.Equal(t, "/login?auth_error=signup_required&provider=google", recorder.Header().Get("Location"))
+
+		_, err := models.FindAccountByEmail(googleUser.Email)
+		assert.Error(t, err)
+	})
+
+	t.Run("should create the account when signup intent is present", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, false)
+		googleUser := goth.User{
+			UserID:      "google-signup-create",
+			Email:       "google-signup-create@example.com",
+			Name:        "Google Signup User",
+			NickName:    "googlesignup",
+			Provider:    "google",
+			AccessToken: "google-access-token",
+		}
+		req := mux.SetURLVars(
+			httptest.NewRequest(http.MethodGet, "/auth/google?signup=true", nil),
+			map[string]string{"provider": "google"},
+		)
+		recorder := httptest.NewRecorder()
+
+		handler.completeProviderAuth(recorder, req, googleUser)
+
+		assert.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
+
+		account, err := models.FindAccountByEmail(googleUser.Email)
+		require.NoError(t, err)
+		assert.Equal(t, googleUser.Name, account.Name)
 	})
 }
 
