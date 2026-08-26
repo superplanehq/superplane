@@ -29,6 +29,7 @@ import {
   splitRunAutomationRunHref,
   splitRunDescriptionMarkdown,
   splitRunLogTabDotClass,
+  splitRunPhaseAutomationHref,
   splitRunSourceDescription,
 } from "./splitRunPopupModel";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
@@ -168,8 +169,8 @@ export function WorkOrderSplitRunBody({
       {editedPhase ? (
         <PlanningReviewPopup
           onClose={() => setEditedPhase(null)}
-          canRename={false}
           organizationId={organizationId}
+          automationHref={splitRunPhaseAutomationHref({ organizationId, factoryKey, orderNumber, phase: editedPhase })}
           initialDraft={{ ...PLANNING_REVIEW_DRAFT, title: editedPhase.name }}
         />
       ) : null}
