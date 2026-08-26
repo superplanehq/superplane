@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -189,7 +189,11 @@ describe("FactoriesHarness work orders", () => {
     await user.click(trigger);
     const orgCog = await screen.findByTestId("factories-sidebar-organization-settings-link");
     await user.click(orgCog);
-    expect(await screen.findByTestId("organization-settings-sidebar", {}, { timeout: 8000 })).toBeInTheDocument();
+    const sidebar = await screen.findByTestId("organization-settings-sidebar", {}, { timeout: 8000 });
+    const backLink = within(sidebar).getByTestId("organization-settings-back");
+    expect(backLink).toHaveTextContent("Back to workspace");
+    expect(backLink).toHaveAttribute("href", `/${FACTORIES_ORGANIZATION_ID}/workspaces/${PRIMARY_FACTORY_KEY}`);
+    expect(within(sidebar).getByTestId("organization-settings-nav-general")).toHaveAttribute("aria-current", "page");
   }, 10000);
 });
 

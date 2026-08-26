@@ -22,7 +22,7 @@ func Test__HostedLLMContext__ReservesCreditOutsideExecutorTransaction(t *testing
 	second := pendingHostedExecution(t, r)
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		hosted := NewHostedLLMContext(tx, nil, r.Organization.ID, first.ID)
+		hosted := NewHostedLLMContext(tx, nil, r.Organization.ID, first.ID, nil)
 		require.NoError(t, hosted.AssertCreditAvailable())
 
 		done := make(chan error, 2)
@@ -31,7 +31,7 @@ func Test__HostedLLMContext__ReservesCreditOutsideExecutorTransaction(t *testing
 			done <- models.UpsertOrganizationLLMMarkup(database.Conn(), r.Organization.ID, &bps)
 		}()
 		go func() {
-			other := NewHostedLLMContext(database.Conn(), nil, r.Organization.ID, second.ID)
+			other := NewHostedLLMContext(database.Conn(), nil, r.Organization.ID, second.ID, nil)
 			done <- other.AssertCreditAvailable()
 		}()
 

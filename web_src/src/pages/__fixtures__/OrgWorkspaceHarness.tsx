@@ -31,6 +31,7 @@ import {
   FactorySettingsProfilePage,
   FactorySettingsSoonPage,
   FactorySettingsUsagePage,
+  FactorySettingsModelsPage,
   FACTORY_SETTINGS_NAV_ITEMS,
   isFactorySettingsComingSoon,
   LegacyWorkOrderDetailRedirect,
@@ -47,6 +48,10 @@ import {
 } from "@/pages/factories";
 import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
 import { createFactoryLinePath, editFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
+import {
+  LegacyLLMSpendRedirect,
+  LegacyWorkspaceOrganizationSettingsRedirect,
+} from "@/pages/factories/lib/organizationSettingsRedirects";
 import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetailPage";
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
 import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
@@ -280,6 +285,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
             <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
             <Route path="general" element={<FactorySettingsGeneralPage />} />
             <Route path="automations" element={<FactorySettingsAutomationsPage />} />
+            <Route path="models" element={<FactorySettingsModelsPage />} />
             <Route path="usage" element={<FactorySettingsUsagePage />} />
             <Route path="profile" element={<FactorySettingsProfilePage />} />
             <Route path="notifications" element={<FactorySettingsNotificationsPage />} />
@@ -297,10 +303,15 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
               />
             ))}
           </Route>
-          <Route path=":factoryKey/organization" element={factoryRoute(<OrganizationSettingsLayout />)}>
-            {organizationSettingsSectionRoutes}
-          </Route>
+          <Route
+            path=":factoryKey/organization/*"
+            element={factoryRoute(<LegacyWorkspaceOrganizationSettingsRedirect />)}
+          />
         </Route>
+        <Route path="organization" element={factoryRoute(<OrganizationSettingsLayout />)}>
+          {organizationSettingsSectionRoutes}
+        </Route>
+        <Route path="settings/llm-spend" element={<LegacyLLMSpendRedirect />} />
         <Route
           path="settings/integrations/:integrationName/setup"
           element={<div data-testid="integration-setup-placeholder">Integration setup</div>}
