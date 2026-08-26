@@ -437,3 +437,40 @@ func (a *Integration) HasCapabilityEnabled(name string) bool {
 
 	return false
 }
+
+// FindGitHubIntegrationByAppState finds the pending GitHub connection that
+// started an install with this CSRF state.
+func FindGitHubIntegrationByAppState(tx *gorm.DB, state string) (*Integration, error) {
+	if state == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	var integration Integration
+	err := tx.
+		Where("app_name = ? AND metadata->>'state' = ?", "github", state).
+		First(&integration).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &integration, nil
+}
+
+// ListGitHubIntegrationsByInstallationID finds GitHub connections bound to a
+// GitHub App installation. One installation can belong to more than one
+// SuperPlane organization.
+func ListGitHubIntegrationsByInstallationID(tx *gorm.DB, installationID string) ([]Integration, error) {
+	if installationID == "" {
+		return nil, nil
+	}
+
+	var integrations []Integration
+	err := tx.
+		Where("app_name = ? AND metadata->>'installationId' = ?", "github", installationID).
+		Find(&integrations).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return integrations, nil
+}

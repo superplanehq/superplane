@@ -1,7 +1,12 @@
 import type { OrganizationsIntegration } from "@/api-client";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
+import { getApiErrorMessage } from "@/lib/errors";
+import { usesHostedGitHubAppInstall } from "@/lib/integrations";
+import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
+import { showErrorToast } from "@/lib/toast";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 
 import { HomeIntegrationCreateDialog } from "./HomeIntegrationCreateDialog";
 import {
@@ -52,6 +57,7 @@ export function useIntegrationConnectDialog({
   });
   const { data: availableIntegrations = [] } = useAvailableIntegrations({ enabled: !!organizationId });
   const createIntegrationMutation = useCreateIntegration(organizationId, "install_wizard");
+  const navigate = useNavigate();
   const [dialogIntegrationName, setDialogIntegrationName] = useState<string | null>(null);
   /** "create" skips resuming a pending instance so "Connect new" always starts fresh. */
   const [dialogMode, setDialogMode] = useState<"create" | "resume">("resume");
@@ -96,6 +102,7 @@ export function useIntegrationConnectDialog({
       }),
     [organizationId, dialogIntegrationName, dialogMode, dialogPendingInstance?.metadata?.id, selections],
   );
+  const useHostedGitHubApp = usesHostedGitHubAppInstall(availableIntegrations.find((item) => item.name === "github"));
   const { openCapabilitySetup, openCreateIntegrationModal, openConnectDialog, openConfigureDialog } =
     useHomeIntegrationConnectActions({
       organizationId,
@@ -106,6 +113,40 @@ export function useIntegrationConnectDialog({
       setDialogIntegrationName,
       setConfigureIntegrationId,
     });
+
+  const connectGitHubWithoutDialog = useCallback(async () => {
+    try {
+      await startDirectGitHubConnect({
+        organizationId,
+        returnTo,
+        existingNames: existingIntegrationNames,
+        connected,
+        goTo: navigate,
+        create: async (payload) => {
+          const response = await createIntegrationMutation.mutateAsync(payload);
+          return response.data;
+        },
+      });
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
+    }
+  }, [connected, createIntegrationMutation, existingIntegrationNames, navigate, organizationId, returnTo]);
+
+  const requestConnect = (integrationName: string) => {
+    if (integrationName === "github" && useHostedGitHubApp) {
+      void connectGitHubWithoutDialog();
+      return;
+    }
+    openConnectDialog(integrationName);
+  };
+
+  const createNew = (integrationName: string) => {
+    if (integrationName === "github" && useHostedGitHubApp) {
+      void connectGitHubWithoutDialog();
+      return;
+    }
+    openCreateIntegrationModal(integrationName);
+  };
 
   const selectInstance = (integrationName: string, integrationId: string) => {
     const next = selectReadyIntegrationInstance(connected, selections, integrationName, integrationId);
@@ -156,8 +197,8 @@ export function useIntegrationConnectDialog({
 
   return {
     integrationData,
-    requestConnect: openConnectDialog,
-    createNew: openCreateIntegrationModal,
+    requestConnect,
+    createNew,
     selectInstance,
     configure: openConfigureDialog,
     dialogs,
