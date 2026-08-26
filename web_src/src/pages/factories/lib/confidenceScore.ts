@@ -20,6 +20,11 @@ export function confidenceScoreFromChecks(
   return clampConfidenceScore(check.score);
 }
 
+/** Intake scores arrive as a percentage. The meter shows five steps. */
+export function confidenceScoreFromPercent(percent: number): number {
+  return clampConfidenceScore((percent / 100) * CONFIDENCE_SCORE_MAX);
+}
+
 export type ConfidenceBand = "High" | "Medium" | "Low";
 
 export function clampConfidenceScore(score: number): number {
