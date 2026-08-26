@@ -102,7 +102,7 @@ releases.
 
 - `feat`: New user-facing features or capabilities.
 - `fix`: Bug fixes or behavior corrections.
-- `chore`: Non user facing changes. Maintenance, dependency bumps, tests, CI, refactoring, etc...
+- `chore`: Non-user-facing changes. Maintenance, dependency bumps, tests, CI, refactoring, etc...
 - `docs`: Documentation-only changes.
 
 ### Examples
