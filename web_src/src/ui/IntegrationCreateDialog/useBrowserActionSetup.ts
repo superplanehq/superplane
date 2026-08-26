@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { OrganizationsBrowserAction } from "@/api-client";
 import { integrationKeys } from "@/hooks/useIntegrations";
 import type { useUpdateIntegration } from "@/hooks/useIntegrations";
+import { followBrowserAction } from "@/lib/browserAction";
 import { rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
 import { showErrorToast } from "@/lib/toast";
 
@@ -48,26 +49,7 @@ export function useBrowserActionSetup({
     // legacy GitHub connect creates a new integration during the round trip, so
     // the marker is stored per organization, not per integration id.
     rememberIntegrationSetupReturn(organizationId, returnTo);
-    const { url, method, formFields } = browserAction;
-    if (method?.toUpperCase() === "POST" && formFields) {
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = url || "";
-      form.style.display = "none";
-      Object.entries(formFields).forEach(([key, value]) => {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = key;
-        input.value = String(value);
-        form.appendChild(input);
-      });
-      document.body.appendChild(form);
-      form.submit();
-      return;
-    }
-    if (url) {
-      window.location.assign(url);
-    }
+    followBrowserAction(browserAction);
   }, [browserAction, organizationId, returnTo]);
 
   // Used for a browser action with no URL (e.g. "fill in more config and save"): submits the

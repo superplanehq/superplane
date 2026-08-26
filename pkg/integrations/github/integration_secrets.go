@@ -66,7 +66,7 @@ func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integration
 		return "", fmt.Errorf("failed to parse installation ID: %v", err)
 	}
 
-	pem, err := common.FindSecret(integrationCtx, common.GitHubAppPEM)
+	pem, err := common.LegacyAppPrivateKey(integrationCtx, metadata)
 	if err != nil {
 		return "", fmt.Errorf("failed to find PEM: %v", err)
 	}
