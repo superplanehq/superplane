@@ -8,6 +8,7 @@ import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { resolveFactoryAppCanvasSubtitle, resolveFactoryLineName } from "../../lib/factoryAppCanvasCopy";
 import { resolveFactoryAppBackNav } from "../../lib/factoryAppNav";
 import { factoryAppConfigurePath, parseFactoryAppNavFrom } from "../../lib/factoryPagePaths";
+import { useWorkOrderPRFeedbackRunHref } from "../useWorkOrderPRFeedbackRunHref";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { canvasKeyForAutomation } from "./splitRunCanvases";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
@@ -46,9 +47,10 @@ export function useFactoryAppSplitRunPage() {
   const split = useSplitRunPanePercent();
   const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
   const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, order?.id ?? "");
+  const prFeedbackRunHref = useWorkOrderPRFeedbackRunHref(organizationId, factoryId, factoryKey, order?.id);
   const fixture = useMemo(
-    () => fixtureForSplitRunPage(order, orderChecks, query.lineId),
-    [order, orderChecks, query.lineId],
+    () => fixtureForSplitRunPage(order, orderChecks, query.lineId, prFeedbackRunHref),
+    [order, orderChecks, prFeedbackRunHref, query.lineId],
   );
   const canvasKey = query.canvasKey ?? canvasKeyForAutomation({ id: appId });
   const phase = useMemo(

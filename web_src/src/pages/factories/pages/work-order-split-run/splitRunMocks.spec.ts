@@ -744,6 +744,18 @@ describe("line board work-order examples", () => {
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
   });
 
+  it("overlays Addressing PR feedback while a matching run is active", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRunHref: "/org-1/workspaces/SP/apps/fb-1?run=run-9",
+    });
+    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Addressing PR feedback"]);
+    expect(fixture.waitingNotes[0]?.cta).toEqual({
+      label: "Open the run",
+      href: "/org-1/workspaces/SP/apps/fb-1?run=run-9",
+    });
+    expect(fixture.footer.note?.headline).toBe("Addressing PR feedback");
+  });
+
   it("keeps ingest analysis and the merged receipts pull request on the done card", () => {
     const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER);
     expect(fixture.phases.map((phase) => phase.id)).toEqual([

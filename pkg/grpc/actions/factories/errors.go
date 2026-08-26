@@ -80,6 +80,14 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.AlreadyExists(err, "canvas already implements an intake")
 	case errors.Is(err, models.ErrFactoryIntakeCanvasRequired):
 		return grpcerrors.InvalidArgument(err, "intake canvas is required")
+	case errors.Is(err, models.ErrFactoryPRFeedbackHandlerNotFound):
+		return grpcerrors.NotFound(err, "factory PR feedback handler not found")
+	case errors.Is(err, models.ErrFactoryPRFeedbackHandlerSourceInvalid):
+		return grpcerrors.InvalidArgument(err, "PR feedback handler source is not supported")
+	case errors.Is(err, models.ErrFactoryPRFeedbackHandlerCanvasInUse):
+		return grpcerrors.AlreadyExists(err, "canvas already implements a PR feedback handler")
+	case errors.Is(err, models.ErrFactoryPRFeedbackHandlerCanvasRequired):
+		return grpcerrors.InvalidArgument(err, "PR feedback handler canvas is required")
 	case errors.Is(err, errInvalidArgument):
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):

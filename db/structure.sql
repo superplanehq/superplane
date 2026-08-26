@@ -390,6 +390,21 @@ CREATE TABLE public.factory_lines (
 
 
 --
+-- Name: factory_pr_feedback_handlers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_pr_feedback_handlers (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    canvas_id uuid NOT NULL,
+    source character varying(64) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_work_order_artifacts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1348,6 +1363,14 @@ ALTER TABLE ONLY public.factory_lines
 
 
 --
+-- Name: factory_pr_feedback_handlers factory_pr_feedback_handlers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pr_feedback_handlers
+    ADD CONSTRAINT factory_pr_feedback_handlers_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: factory_work_order_artifacts factory_work_order_artifacts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2033,6 +2056,20 @@ CREATE INDEX idx_factory_lines_factory_id ON public.factory_lines USING btree (f
 
 
 --
+-- Name: idx_factory_pr_feedback_handlers_canvas_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_pr_feedback_handlers_canvas_id ON public.factory_pr_feedback_handlers USING btree (canvas_id);
+
+
+--
+-- Name: idx_factory_pr_feedback_handlers_factory_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_pr_feedback_handlers_factory_id ON public.factory_pr_feedback_handlers USING btree (factory_id);
+
+
+--
 -- Name: idx_factory_work_order_artifacts_factory_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2715,6 +2752,22 @@ ALTER TABLE ONLY public.factory_intakes
 
 ALTER TABLE ONLY public.factory_lines
     ADD CONSTRAINT factory_lines_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_pr_feedback_handlers factory_pr_feedback_handlers_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pr_feedback_handlers
+    ADD CONSTRAINT factory_pr_feedback_handlers_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_pr_feedback_handlers factory_pr_feedback_handlers_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pr_feedback_handlers
+    ADD CONSTRAINT factory_pr_feedback_handlers_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
 
 
 --
@@ -3405,7 +3458,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260825074144	f
+20260826145810	f
 \.
 
 

@@ -76,6 +76,8 @@ import {
   intakeIdFromSearch,
   intakeSettingsTabFromSearch,
   isIntakeSearchOpen,
+  isPRFeedbackSearchOpen,
+  prFeedbackSettingsTabFromSearch,
   linesPath,
 } from "../lib/factoryPagePaths";
 import { humanizeLineName } from "../lib/humanizeLineName";
@@ -98,6 +100,9 @@ import {
 } from "./lineIntakeModel";
 import { isIntakeSettingsTab } from "./intakeSourceSettingsModel";
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
+import { PRFeedbackSettingsHost } from "./PRFeedbackSettingsHost";
+import { isPRFeedbackSettingsTab } from "./prFeedbackSettingsModel";
+import { useWorkOrderPRFeedbackRunHref } from "./useWorkOrderPRFeedbackRunHref";
 import { LineListCard } from "./LineListCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { descriptionForLine, toLineListMetrics } from "./lineListMetricsMockData";
@@ -139,6 +144,8 @@ export function LinesPage() {
   const intakeOpen = isIntakeSearchOpen(search);
   const intakeId = intakeIdFromSearch(search);
   const intakeSettingsTab = intakeSettingsTabFromSearch(search);
+  const prFeedbackOpen = isPRFeedbackSearchOpen(search);
+  const prFeedbackSettingsTab = prFeedbackSettingsTabFromSearch(search);
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
   const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
   const { data: me } = useMe(false);
@@ -234,6 +241,18 @@ export function LinesPage() {
                   showErrorToast(getUsageLimitToastMessage(error, "Failed to create intake automation"));
                 });
             }}
+            onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
+          />
+        ) : null}
+        {prFeedbackOpen ? (
+          <PRFeedbackSettingsHost
+            organizationId={organizationId}
+            factoryId={factoryId}
+            factoryKey={factoryKey}
+            lineId={selectedLine.id}
+            workOrders={workOrders}
+            canUpdate={canUpdate}
+            initialTab={isPRFeedbackSettingsTab(prFeedbackSettingsTab) ? prFeedbackSettingsTab : "general"}
             onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
           />
         ) : null}
@@ -514,6 +533,7 @@ function LineBoardSplitRunPopup({
   onClose: () => void;
 }) {
   const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
+  const prFeedbackRunHref = useWorkOrderPRFeedbackRunHref(organizationId, factoryId, factoryKey, peekOrderId);
   const resolvedLineName = lineName?.trim();
   return (
     <WorkOrderSplitRunPopup
@@ -523,7 +543,12 @@ function LineBoardSplitRunPopup({
       factoryKey={factoryKey}
       orderId={peekOrderId}
       orderNumber={peekOrder?.number}
-      fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId, demoArtifacts: false })}
+      fixture={splitRunFixtureForWorkOrder(peekOrder, {
+        checks: peekChecks,
+        lineId,
+        demoArtifacts: false,
+        prFeedbackRunHref,
+      })}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}
       isDispatching={isDispatching}

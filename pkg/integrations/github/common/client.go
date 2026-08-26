@@ -200,6 +200,31 @@ func (c *Client) GetPullRequest(ctx context.Context, repository string, pullNumb
 	return c.underlying.PullRequests.Get(ctx, owner, name, pullNumber)
 }
 
+func (c *Client) ListPullRequestReviewComments(
+	ctx context.Context,
+	repository string,
+	pullNumber int,
+	reviewID int64,
+) ([]*github.PullRequestComment, error) {
+	owner, name := c.ownerAndName(repository)
+	opts := &github.ListOptions{PerPage: 100}
+
+	var all []*github.PullRequestComment
+	for {
+		comments, resp, err := c.underlying.PullRequests.ListReviewComments(ctx, owner, name, pullNumber, reviewID, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list review comments: %w", err)
+		}
+
+		all = append(all, comments...)
+		if resp == nil || resp.NextPage == 0 {
+			return all, nil
+		}
+
+		opts.Page = resp.NextPage
+	}
+}
+
 func (c *Client) EditPullRequest(ctx context.Context, repository string, pullNumber int, pullRequest *github.PullRequest) (*github.PullRequest, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.PullRequests.Edit(ctx, owner, name, pullNumber, pullRequest)

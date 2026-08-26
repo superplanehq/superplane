@@ -182,6 +182,45 @@ func parseFactoryIntakeSource(source pb.FactoryIntake_Source) (string, error) {
 	}
 }
 
+func serializeFactoryPRFeedbackHandlers(handlers []models.FactoryPRFeedbackHandler, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryPRFeedbackHandler {
+	result := make([]*pb.FactoryPRFeedbackHandler, len(handlers))
+	for i := range handlers {
+		result[i] = serializeFactoryPRFeedbackHandler(&handlers[i], specs[handlers[i].CanvasID])
+	}
+	return result
+}
+
+func serializeFactoryPRFeedbackHandler(handler *models.FactoryPRFeedbackHandler, spec models.LiveCanvasSpec) *pb.FactoryPRFeedbackHandler {
+	graph := resolvePRFeedbackGraph(spec)
+
+	serialized := &pb.FactoryPRFeedbackHandler{
+		Id:        handler.ID.String(),
+		FactoryId: handler.FactoryID.String(),
+		CanvasId:  handler.CanvasID.String(),
+		Name:      handler.Name(),
+		Source:    serializeFactoryPRFeedbackHandlerSource(handler.Source),
+		Settings:  serializePRFeedbackSettings(prFeedbackSettingsFromGraph(graph, spec)),
+		Healthy:   graph.Healthy(spec),
+		CreatedAt: timestamppb.New(handler.CreatedAt),
+		UpdatedAt: timestamppb.New(handler.UpdatedAt),
+	}
+
+	if handler.Canvas != nil {
+		serialized.Description = handler.Canvas.Description
+	}
+
+	return serialized
+}
+
+func serializeFactoryPRFeedbackHandlerSource(source string) pb.FactoryPRFeedbackHandler_Source {
+	switch source {
+	case models.FactoryPRFeedbackHandlerSourceGitHubPullRequests:
+		return pb.FactoryPRFeedbackHandler_SOURCE_GITHUB_PULL_REQUESTS
+	default:
+		return pb.FactoryPRFeedbackHandler_SOURCE_UNSPECIFIED
+	}
+}
+
 func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 	steps := make([]*pb.FactoryLine_Step, len(line.Steps))
 	for i, step := range line.Steps {

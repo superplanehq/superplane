@@ -97,6 +97,7 @@ describe("setup factory line apps", () => {
     expect(pr).toContain("component: setWorkOrderStatusNote");
     expect(pr).toContain("noteKey: pr-closure");
     expect(pr).toContain("headline: Listening for user review");
+    expect(pr).toContain("Mention `@superplaneagent` in a pull request comment or review to request changes.");
     expect(pr).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data.html_url }}'");
     expect(pr).toContain("showOnlyWhenWaiting: true");
   });

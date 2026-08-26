@@ -12,9 +12,12 @@ import {
   provisionEventApps,
   provisionGithubIntake,
   provisionLine,
+  provisionPRFeedbackHandler,
   type CreateFactoryIntake,
+  type CreateFactoryPRFeedbackHandler,
   type InstallOnboardingApp,
   type ListFactoryIntakes,
+  type ListFactoryPRFeedbackHandlers,
   type UpdateOnboarding,
 } from "./onboardingProvision";
 import { apiIssuesSource } from "./onboardingStatus";
@@ -77,6 +80,8 @@ async function provisionWorkspace(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  listPRFeedbackHandlers: ListFactoryPRFeedbackHandlers;
+  createPRFeedbackHandler: CreateFactoryPRFeedbackHandler;
   workspaceName: string;
   takenNames: string[];
   appRepository: string;
@@ -126,6 +131,11 @@ async function provisionWorkspace(args: {
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
   });
+  await provisionPRFeedbackHandler({
+    listHandlers: args.listPRFeedbackHandlers,
+    createHandler: args.createPRFeedbackHandler,
+    repository: args.appRepository,
+  });
   await args.updateOnboarding({
     provisionedAppId: primaryAppId,
     provisionedLineId: lineId,
@@ -148,6 +158,8 @@ export function useFinishOnboarding(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  listPRFeedbackHandlers: ListFactoryPRFeedbackHandlers;
+  createPRFeedbackHandler: CreateFactoryPRFeedbackHandler;
   takenNames: string[];
   remainingCreditCents: number;
   hostedModelsLoading: boolean;

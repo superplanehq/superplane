@@ -2,6 +2,7 @@ import type { FactoriesFactory } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
+import { fetchFactoryPRFeedbackHandlers, useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
 import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { useOrganizationLLMSpend } from "@/hooks/useOrganizationLLMSpend";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -212,6 +213,7 @@ export function useOnboardingPageModel(args: {
   const updateOnboarding = useFactoryOnboarding(args.organizationId, args.factoryId);
   const createLine = useCreateFactoryLine(args.organizationId, args.factoryId);
   const createIntake = useCreateFactoryIntake(args.organizationId, args.factoryId);
+  const createPRFeedbackHandler = useCreateFactoryPRFeedbackHandler(args.organizationId, args.factoryId);
   const installer = useInstallFactory();
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
   const githubConnections = useOnboardingGithubConnections({
@@ -253,6 +255,8 @@ export function useOnboardingPageModel(args: {
     createLine: createLine.mutateAsync,
     listIntakes: () => fetchFactoryIntakes(args.organizationId, args.factoryId),
     createIntake: createIntake.mutateAsync,
+    listPRFeedbackHandlers: () => fetchFactoryPRFeedbackHandlers(args.organizationId, args.factoryId),
+    createPRFeedbackHandler: createPRFeedbackHandler.mutateAsync,
     remainingCreditCents: agent.remainingCreditCents,
     hostedModelsLoading: agent.hostedModelsLoading,
     plan: agent.plan,
@@ -284,7 +288,7 @@ export function useOnboardingPageModel(args: {
     repositoriesLoading: github.repositoriesLoading,
     repositoriesError: github.repositoriesError,
     canConfigureWorkspace: canConfigureWorkspace(canAct),
-    saving: saving || installer.isInstalling || createIntake.isPending,
+    saving: saving || installer.isInstalling || createIntake.isPending || createPRFeedbackHandler.isPending,
     ...saves,
     finish: finishSetup,
   };

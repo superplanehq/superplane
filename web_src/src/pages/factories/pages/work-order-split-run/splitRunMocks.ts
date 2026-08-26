@@ -31,6 +31,7 @@ import {
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
+import { addressingPRFeedbackNote } from "../prFeedbackSettingsModel";
 import {
   buildSplitRunFooter,
   doneFooterForStatus,
@@ -275,6 +276,8 @@ export type SplitRunFixtureOptions = {
   lineId?: string | null;
   /** Storybook keeps invented files and pull requests. Live orders do not. */
   demoArtifacts?: boolean;
+  /** Overlay the Verify card while a PR feedback run is queued or running. */
+  prFeedbackRunHref?: string;
 };
 
 export function splitRunFixtureForWorkOrder(
@@ -313,6 +316,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       phases,
       apiChecks: options?.checks,
       demoArtifacts,
+      prFeedbackRunHref: options?.prFeedbackRunHref,
     }),
   };
   if (order.id === "wo-board-implement-notify") {
@@ -329,6 +333,7 @@ function reviewSurfaces(
     phases: SplitRunPhase[];
     apiChecks?: FactoriesWorkOrderCheck[];
     demoArtifacts?: boolean;
+    prFeedbackRunHref?: string;
   },
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   const demoArtifacts = input.demoArtifacts !== false;
@@ -351,7 +356,7 @@ function reviewSurfaces(
     return failedReviewSurface(current, displayStatus, checks);
   }
   if (displayStatus === "waiting" || (column === "implement" && current?.state === "STATE_PENDING")) {
-    return waitingReviewSurface(order, displayStatus, checks);
+    return waitingReviewSurface(order, displayStatus, checks, input.prFeedbackRunHref);
   }
   if (displayStatus === "running") {
     return surfaces(
@@ -391,8 +396,11 @@ function waitingReviewSurface(
   order: FactoriesWorkOrder,
   displayStatus: WorkOrderDisplayStatus,
   checks: WorkOrderCheckPresentation[],
+  prFeedbackRunHref?: string,
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
-  const notes = presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
+  const notes = prFeedbackRunHref
+    ? [addressingPRFeedbackNote(prFeedbackRunHref)]
+    : presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
   return surfaces(
     buildSplitRunFooter({
       kind: "waiting",

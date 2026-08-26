@@ -41,11 +41,12 @@ export function fixtureForSplitRunPage(
   order: FactoriesWorkOrder | null,
   orderChecks: FactoriesWorkOrderCheck[],
   lineId: string | null,
+  prFeedbackRunHref?: string,
 ): SplitRunFixture | null {
   if (!order) {
     return null;
   }
-  return splitRunFixtureForWorkOrder(order, { checks: orderChecks, lineId, demoArtifacts: false });
+  return splitRunFixtureForWorkOrder(order, { checks: orderChecks, lineId, demoArtifacts: false, prFeedbackRunHref });
 }
 
 export function phaseForSplitRunCanvas(fixture: SplitRunFixture | null, canvasKey?: SplitRunCanvasKey): SplitRunPhase {

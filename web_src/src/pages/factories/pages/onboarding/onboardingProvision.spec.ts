@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { FactoriesFactory, FactoriesFactoryIntake } from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesFactoryPrFeedbackHandler } from "@/api-client";
 
 import {
   DEFAULT_LINE_NAME,
@@ -8,6 +8,7 @@ import {
   provisionEventApps,
   provisionGithubIntake,
   provisionLine,
+  provisionPRFeedbackHandler,
 } from "./onboardingProvision";
 
 describe("provisionLine", () => {
@@ -129,5 +130,49 @@ describe("provisionGithubIntake", () => {
 
     expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
     expect(intake.id).toBe("intake-2");
+  });
+});
+
+describe("provisionPRFeedbackHandler", () => {
+  it("creates a handler for a workspace that has none", async () => {
+    const listHandlers = vi.fn().mockResolvedValue([]);
+    const createHandler = vi.fn().mockResolvedValue({ id: "handler-1" } as FactoriesFactoryPrFeedbackHandler);
+
+    const handler = await provisionPRFeedbackHandler({
+      listHandlers,
+      createHandler,
+      repository: "acme/app",
+    });
+
+    expect(createHandler).toHaveBeenCalledWith({ repository: "acme/app" });
+    expect(handler.id).toBe("handler-1");
+  });
+
+  it("leaves a handler for the same repository alone so a retry adds no second copy", async () => {
+    const listHandlers = vi.fn().mockResolvedValue([{ id: "handler-1", settings: { repository: "acme/app" } }]);
+    const createHandler = vi.fn();
+
+    const handler = await provisionPRFeedbackHandler({
+      listHandlers,
+      createHandler,
+      repository: "acme/app",
+    });
+
+    expect(createHandler).not.toHaveBeenCalled();
+    expect(handler.id).toBe("handler-1");
+  });
+
+  it("creates a handler next to one that watches a different repository", async () => {
+    const listHandlers = vi.fn().mockResolvedValue([{ id: "handler-1", settings: { repository: "acme/other" } }]);
+    const createHandler = vi.fn().mockResolvedValue({ id: "handler-2" } as FactoriesFactoryPrFeedbackHandler);
+
+    const handler = await provisionPRFeedbackHandler({
+      listHandlers,
+      createHandler,
+      repository: "acme/app",
+    });
+
+    expect(createHandler).toHaveBeenCalledWith({ repository: "acme/app" });
+    expect(handler.id).toBe("handler-2");
   });
 });

@@ -193,6 +193,75 @@ service Factories {
     };
   }
 
+  // Factory PR feedback handler APIs
+
+  rpc ListFactoryPRFeedbackHandlers(
+    ListFactoryPRFeedbackHandlersRequest
+  ) returns (ListFactoryPRFeedbackHandlersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/pr-feedback-handlers"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory PR feedback handlers";
+      description: "Returns the PR feedback handlers of a factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateFactoryPRFeedbackHandler(
+    CreateFactoryPRFeedbackHandlerRequest
+  ) returns (CreateFactoryPRFeedbackHandlerResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/pr-feedback-handlers"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create factory PR feedback handler";
+      description: "Creates a PR feedback handler and the canvas that runs it";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryPRFeedbackHandler(
+    UpdateFactoryPRFeedbackHandlerRequest
+  ) returns (UpdateFactoryPRFeedbackHandlerResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/pr-feedback-handlers/{handler_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory PR feedback handler";
+      description: "Updates the name and settings of a PR feedback handler";
+      tags: "Factory";
+    };
+  }
+
+  rpc DeleteFactoryPRFeedbackHandler(
+    DeleteFactoryPRFeedbackHandlerRequest
+  ) returns (DeleteFactoryPRFeedbackHandlerResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/pr-feedback-handlers/{handler_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete factory PR feedback handler";
+      description: "Deletes a PR feedback handler and its canvas";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListFactoryPRFeedbackHandlerRuns(
+    ListFactoryPRFeedbackHandlerRunsRequest
+  ) returns (ListFactoryPRFeedbackHandlerRunsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/pr-feedback-handlers/{handler_id}/runs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory PR feedback handler runs";
+      description: "Returns the runs that addressed pull request feedback";
+      tags: "Factory";
+    };
+  }
+
   // Work orders APIs
 
   rpc ListWorkOrders(ListWorkOrdersRequest) returns (ListWorkOrdersResponse) {
@@ -666,6 +735,116 @@ message ListFactoryIntakeRunsRequest {
 
 message ListFactoryIntakeRunsResponse {
   repeated FactoryIntakeRun runs = 1;
+  google.protobuf.Timestamp last_timestamp = 2;
+}
+
+// Factory PR feedback handlers
+
+message FactoryPRFeedbackHandler {
+  enum Source {
+    SOURCE_UNSPECIFIED = 0;
+    SOURCE_GITHUB_PULL_REQUESTS = 1;
+  }
+
+  // Settings stored in the canvas graph. This block is a read/write facade
+  // over that graph.
+  message Settings {
+    string repository = 1;
+    string mention = 2;
+    bool ignore_bots = 3;
+  }
+
+  string id = 1;
+  string factory_id = 2;
+  string canvas_id = 3;
+  string name = 4;
+  string description = 5;
+  Source source = 6;
+  Settings settings = 7;
+  // False when the canvas can no longer receive a mention and address it.
+  // The handler stays listed so the user can repair it.
+  bool healthy = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message FactoryPRFeedbackHandlerRun {
+  enum Trigger {
+    TRIGGER_UNSPECIFIED = 0;
+    TRIGGER_PR_COMMENT = 1;
+    TRIGGER_PR_REVIEW = 2;
+    TRIGGER_PR_REVIEW_REPLY = 3;
+  }
+
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_QUEUED = 1;
+    STATUS_RUNNING = 2;
+    STATUS_PASSED = 3;
+    STATUS_FAILED = 4;
+    STATUS_CANCELLED = 5;
+  }
+
+  string id = 1;
+  string title = 2;
+  string work_order_id = 3;
+  string repository = 4;
+  int64 pull_request_number = 5;
+  string pull_request_url = 6;
+  Trigger trigger = 7;
+  string trigger_author = 8;
+  string trigger_url = 9;
+  Status status = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp started_at = 12;
+  google.protobuf.Timestamp finished_at = 13;
+}
+
+message ListFactoryPRFeedbackHandlersRequest {
+  string factory_id = 1;
+}
+
+message ListFactoryPRFeedbackHandlersResponse {
+  repeated FactoryPRFeedbackHandler handlers = 1;
+}
+
+message CreateFactoryPRFeedbackHandlerRequest {
+  string factory_id = 1;
+  string name = 2;
+  string repository = 3;
+}
+
+message CreateFactoryPRFeedbackHandlerResponse {
+  FactoryPRFeedbackHandler handler = 1;
+}
+
+message UpdateFactoryPRFeedbackHandlerRequest {
+  string factory_id = 1;
+  string handler_id = 2;
+  optional string name = 3;
+  optional FactoryPRFeedbackHandler.Settings settings = 4;
+}
+
+message UpdateFactoryPRFeedbackHandlerResponse {
+  FactoryPRFeedbackHandler handler = 1;
+}
+
+message DeleteFactoryPRFeedbackHandlerRequest {
+  string factory_id = 1;
+  string handler_id = 2;
+}
+
+message DeleteFactoryPRFeedbackHandlerResponse {}
+
+message ListFactoryPRFeedbackHandlerRunsRequest {
+  string factory_id = 1;
+  string handler_id = 2;
+  int32 limit = 3;
+  google.protobuf.Timestamp before = 4;
+}
+
+message ListFactoryPRFeedbackHandlerRunsResponse {
+  repeated FactoryPRFeedbackHandlerRun runs = 1;
   google.protobuf.Timestamp last_timestamp = 2;
 }
 

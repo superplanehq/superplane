@@ -568,6 +568,71 @@ func (f *Factory) FindWorkOrderByArtifactKey(tx *gorm.DB, key string) (*FactoryW
 	return f.FindWorkOrder(tx, artifact.WorkOrderID)
 }
 
+// ListWorkOrdersByArtifactKeys resolves work orders from artifact keys in one
+// query. Missing keys are omitted rather than reported as not found.
+func (f *Factory) ListWorkOrdersByArtifactKeys(tx *gorm.DB, keys []string) (map[string]FactoryWorkOrder, error) {
+	ordersByKey := map[string]FactoryWorkOrder{}
+	uniqueKeys := make([]string, 0, len(keys))
+	seen := map[string]bool{}
+	for _, key := range keys {
+		trimmed := strings.TrimSpace(key)
+		if trimmed == "" || seen[trimmed] {
+			continue
+		}
+		seen[trimmed] = true
+		uniqueKeys = append(uniqueKeys, trimmed)
+	}
+	if len(uniqueKeys) == 0 {
+		return ordersByKey, nil
+	}
+
+	var artifacts []FactoryWorkOrderArtifact
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND key IN ?", f.OrganizationID, f.ID, uniqueKeys).
+		Find(&artifacts).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	orderIDs := make([]uuid.UUID, 0, len(artifacts))
+	orderIDSeen := map[uuid.UUID]bool{}
+	for _, artifact := range artifacts {
+		if orderIDSeen[artifact.WorkOrderID] {
+			continue
+		}
+		orderIDSeen[artifact.WorkOrderID] = true
+		orderIDs = append(orderIDs, artifact.WorkOrderID)
+	}
+	if len(orderIDs) == 0 {
+		return ordersByKey, nil
+	}
+
+	var orders []FactoryWorkOrder
+	err = tx.Where("organization_id = ? AND factory_id = ? AND id IN ?", f.OrganizationID, f.ID, orderIDs).Find(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+
+	ordersByID := make(map[uuid.UUID]FactoryWorkOrder, len(orders))
+	for _, order := range orders {
+		ordersByID[order.ID] = order
+	}
+
+	for _, artifact := range artifacts {
+		if artifact.Key == nil {
+			continue
+		}
+		order, ok := ordersByID[artifact.WorkOrderID]
+		if !ok {
+			continue
+		}
+		ordersByKey[*artifact.Key] = order
+	}
+
+	return ordersByKey, nil
+}
+
 func (f *Factory) FindWorkOrder(tx *gorm.DB, orderID uuid.UUID) (*FactoryWorkOrder, error) {
 	var order FactoryWorkOrder
 	err := tx.

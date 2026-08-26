@@ -15,6 +15,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events" />
   <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events" />
   <LinkCard title="On PR Comment" href="#on-pr-comment" description="Listen to PR conversation comment events" />
+  <LinkCard title="On PR Review" href="#on-pr-review" description="Listen to submitted pull request reviews" />
   <LinkCard title="On PR Review Comment" href="#on-pr-review-comment" description="Listen to pull request review comment events" />
   <LinkCard title="On Pull Request" href="#on-pull-request" description="Listen to pull request events" />
   <LinkCard title="On Push" href="#on-push" description="Listen to GitHub push events" />
@@ -732,6 +733,75 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 }
 ```
 
+<a id="on-pr-review"></a>
+
+## On PR Review
+
+**Trigger key:** `github.onPRReview`
+
+The On PR Review trigger starts a workflow execution when a pull request review is submitted.
+
+It loads every inline comment that belongs to that review before it emits an event.
+A review with several comments therefore produces one run, not one run per comment.
+
+### Use Cases
+
+- **Review automation**: Address a submitted review as one unit of work
+- **Factory feedback**: Start one agent run when a reviewer mentions the factory
+- **Review notifications**: Notify a team when a review is submitted
+
+### Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **Content Filter**: Optional filter on the review summary and inline comments. Mentions that start with @ match as an exact GitHub username. Other values are regular expressions.
+- **Ignore Bots**: Skip reviews written by GitHub Apps and bots
+
+### Event Data
+
+This trigger handles the GitHub `pull_request_review` event with action `submitted`.
+
+SuperPlane passes through the full GitHub webhook payload under data and adds:
+
+- **review_comments**: Inline comments fetched for the submitted review
+
+Common expression paths:
+- PR number: `root().data.pull_request.number`
+- PR URL: `root().data.pull_request.html_url`
+- Review body: `root().data.review.body`
+- Review comments: `root().data.review_comments`
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "submitted",
+    "pull_request": {
+      "html_url": "https://github.com/acme-labs/snaketoy/pull/42",
+      "number": 42,
+      "title": "Rename the game title to Snake Toy"
+    },
+    "review": {
+      "body": "Please address the inline comments @superplaneagent",
+      "id": 987654321,
+      "state": "changes_requested"
+    },
+    "review_comments": [
+      {
+        "body": "Small nit: could we also update the page heading to match the new title?",
+        "id": 3179045528,
+        "path": "index.html"
+      }
+    ]
+  },
+  "type": "github.prReview"
+}
+```
+
 <a id="on-pr-review-comment"></a>
 
 ## On PR Review Comment
@@ -749,7 +819,10 @@ The On PR Review Comment trigger starts a workflow execution when review comment
 ### Configuration
 
 - **Repository**: Select the GitHub repository to monitor
-- **Content Filter**: Optional regex pattern to filter comment/review body (e.g., `/solve`)
+- **Content Filter**: Optional filter on comment/review body. Mentions that start with @ match as an exact GitHub username. Other values are regular expressions.
+- **Include Review Submissions**: Also start a run when a pull request review is submitted. Turn this off when a dedicated review trigger handles submissions.
+- **Comment Scope**: All comments, or replies only
+- **Ignore Bots**: Skip comments and reviews written by GitHub Apps and bots
 
 ### Event Data
 

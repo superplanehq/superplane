@@ -112,6 +112,31 @@ func (s *FactoryService) ListFactoryIntakeRuns(ctx context.Context, req *pb.List
 	return actions.ListFactoryIntakeRuns(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ListFactoryPRFeedbackHandlers(ctx context.Context, req *pb.ListFactoryPRFeedbackHandlersRequest) (*pb.ListFactoryPRFeedbackHandlersResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryPRFeedbackHandlers(ctx, organizationID, req)
+}
+
+func (s *FactoryService) CreateFactoryPRFeedbackHandler(ctx context.Context, req *pb.CreateFactoryPRFeedbackHandlerRequest) (*pb.CreateFactoryPRFeedbackHandlerResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.CreateFactoryPRFeedbackHandler(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) UpdateFactoryPRFeedbackHandler(ctx context.Context, req *pb.UpdateFactoryPRFeedbackHandlerRequest) (*pb.UpdateFactoryPRFeedbackHandlerResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.UpdateFactoryPRFeedbackHandler(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) DeleteFactoryPRFeedbackHandler(ctx context.Context, req *pb.DeleteFactoryPRFeedbackHandlerRequest) (*pb.DeleteFactoryPRFeedbackHandlerResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DeleteFactoryPRFeedbackHandler(ctx, organizationID, req)
+}
+
+func (s *FactoryService) ListFactoryPRFeedbackHandlerRuns(ctx context.Context, req *pb.ListFactoryPRFeedbackHandlerRunsRequest) (*pb.ListFactoryPRFeedbackHandlerRunsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryPRFeedbackHandlerRuns(ctx, organizationID, req)
+}
+
 func (s *FactoryService) ListWorkOrders(ctx context.Context, req *pb.ListWorkOrdersRequest) (*pb.ListWorkOrdersResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListWorkOrders(ctx, organizationID, req)
