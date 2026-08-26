@@ -433,7 +433,7 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
 
   const header = (
     <>
-      <StreamIndent ch={4} />
+      <StreamIndent ch={8} />
       <ExpandChevron expanded={expanded} visible={hasBody} />
       {step.line.componentType ? (
         <span className={cn("mr-2 shrink-0", stepTypeTone(step.line.componentType))}>{step.line.componentType}</span>
@@ -470,7 +470,7 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
                 data-testid={`split-run-stream-line-${event.line.id}`}
                 className="flex w-full items-start"
               >
-                <StreamIndent ch={8} />
+                <StreamIndent ch={12} />
                 <span className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground">
                   {event.line.componentName}
                 </span>
@@ -505,7 +505,7 @@ function StreamToolGroup({ stepId, tools }: { stepId: string; tools: SplitRunStr
         onClick={() => setExpanded((open) => !open)}
         className={cn(STREAM_LINE_ROW, "text-muted-foreground")}
       >
-        <StreamIndent ch={8} />
+        <StreamIndent ch={12} />
         <ChevronRight className={cn("mr-1 size-3 transition-transform", expanded && "rotate-90")} aria-hidden />
         <StreamLineTitle>{summary}</StreamLineTitle>
       </button>
@@ -530,7 +530,7 @@ function StreamTool({ tool }: { tool: SplitRunStreamLine }) {
   const hasOutput = Boolean(tool.detail);
   const row = (
     <>
-      <StreamIndent ch={8} />
+      <StreamIndent ch={12} />
       <ExpandChevron expanded={expanded} visible={hasOutput} />
       {tool.componentType ? (
         <span className={cn("mr-2 shrink-0", stepTypeTone(tool.componentType))}>{tool.componentType}</span>
