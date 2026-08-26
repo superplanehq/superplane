@@ -1,40 +1,35 @@
 import type { CommandSection, CommandSectionEvent, CommandTool, LogState } from "./types";
 
-export function emptyCommandSection(
-  index: number,
-  text: string,
-  startedAtMs: number | null,
-  kind?: string,
-  preview?: string,
-): CommandSection {
+export type CommandStart = {
+  index: number;
+  text: string;
+  startedAtMs: number | null;
+  kind?: string;
+  preview?: string;
+};
+
+export function emptyCommandSection(start: CommandStart): CommandSection {
   return {
-    index,
-    text,
-    kind: kind?.trim() || undefined,
-    preview: preview?.trim() || undefined,
+    index: start.index,
+    text: start.text,
+    kind: start.kind?.trim() || undefined,
+    preview: start.preview?.trim() || undefined,
     lines: [],
     events: [],
     status: "running",
     duration_ms: null,
-    started_at: startedAtMs ?? Date.now(),
+    started_at: start.startedAtMs ?? Date.now(),
     collapsed: false,
   };
 }
 
-export function startCommandSection(
-  state: LogState,
-  index: number,
-  text: string,
-  startedAtMs: number | null,
-  kind?: string,
-  preview?: string,
-): LogState {
-  if (state.sections.some((section) => section.index === index)) {
+export function startCommandSection(state: LogState, start: CommandStart): LogState {
+  if (state.sections.some((section) => section.index === start.index)) {
     return state;
   }
   return {
     ...state,
-    sections: [...state.sections, emptyCommandSection(index, text, startedAtMs, kind, preview)],
+    sections: [...state.sections, emptyCommandSection(start)],
   };
 }
 
@@ -135,27 +130,28 @@ function appendLineToSection(section: CommandSection, text: string): CommandSect
     return withLine;
   }
 
-  const open = openToolInSection(section);
-  if (open) {
+  const running = runningToolsInSection(section);
+  if (running.length !== 1) {
     return {
       ...withLine,
-      events: section.events.map((event) => {
-        if (event.kind !== "tools" || event.id !== open.groupId) {
-          return event;
-        }
-        return {
-          ...event,
-          tools: event.tools.map((tool) =>
-            tool.id === open.toolId ? { ...tool, lines: [...tool.lines, text] } : tool,
-          ),
-        };
-      }),
+      events: [...section.events, { kind: "note", text }],
     };
   }
 
+  const open = running[0];
   return {
     ...withLine,
-    events: [...section.events, { kind: "note", text }],
+    events: section.events.map((event) => {
+      if (event.kind !== "tools" || !event.tools.some((tool) => tool.id === open.id)) {
+        return event;
+      }
+      return {
+        ...event,
+        tools: event.tools.map((tool) =>
+          tool.id === open.id ? { ...tool, lines: [...tool.lines, text] } : tool,
+        ),
+      };
+    }),
   };
 }
 
@@ -268,6 +264,12 @@ function findToolInSection(section: CommandSection, sourceId: string): CommandTo
 
 function isPromptSection(section: CommandSection): boolean {
   return section.kind === "prompt";
+}
+
+function runningToolsInSection(section: CommandSection): CommandTool[] {
+  return section.events.flatMap((event) =>
+    event.kind === "tools" ? event.tools.filter((tool) => tool.status === "running") : [],
+  );
 }
 
 function toolCount(section: CommandSection): number {

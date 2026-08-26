@@ -49,6 +49,24 @@ func TestFormatCodexJsonLinesPairsAnonymousItemIDs(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(output, `"type":"tool_start"`))
 }
 
+func TestFormatCodexJsonLinesKeepsOverlappingOutputOnTheRightTool(t *testing.T) {
+	output := runCodexFormatter(t, []string{
+		`{"type":"item.started","item":{"id":"item_a","type":"command_execution","command":"echo a"}}`,
+		`{"type":"item.started","item":{"id":"item_b","type":"command_execution","command":"echo b"}}`,
+		`{"type":"item.completed","item":{"id":"item_b","type":"command_execution","command":"echo b","aggregated_output":"bbb\n","exit_code":0}}`,
+		`{"type":"item.completed","item":{"id":"item_a","type":"command_execution","command":"echo a","aggregated_output":"aaa\n","exit_code":0}}`,
+	})
+
+	records := liveLogRecords(t, output)
+	require.Len(t, records, 4)
+	assert.Equal(t, "item_b", records[0]["id"])
+	assert.Equal(t, "tool_end", records[1]["type"])
+	assert.Equal(t, "item_b", records[1]["id"])
+	assert.Equal(t, "item_a", records[2]["id"])
+	assert.Equal(t, "item_a", records[3]["id"])
+	assert.Regexp(t, `(?s)"id":"item_b".*bbb.*"type":"tool_end".*"id":"item_a".*aaa`, output)
+}
+
 func runCodexFormatter(t *testing.T, lines []string) string {
 	t.Helper()
 	script, err := filepath.Abs("run.js")

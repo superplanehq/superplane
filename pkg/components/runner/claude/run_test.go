@@ -38,13 +38,16 @@ func TestFormatStreamJsonLinesMatchesToolUseID(t *testing.T) {
 
 	records := liveLogRecords(t, output)
 	require.Len(t, records, 4)
-	assert.Equal(t, "read", records[0]["kind"])
+	assert.Equal(t, "tool_start", records[0]["type"])
+	assert.Equal(t, "bash", records[0]["kind"])
+	assert.Equal(t, "tool_end", records[1]["type"])
 	assert.Equal(t, "bash", records[1]["kind"])
-	assert.Equal(t, "tool_end", records[2]["type"])
-	assert.Equal(t, "bash", records[2]["kind"])
-	assert.Equal(t, "failed", records[2]["status"])
+	assert.Equal(t, "failed", records[1]["status"])
+	assert.Equal(t, "read", records[2]["kind"])
+	assert.Equal(t, "tool_end", records[3]["type"])
 	assert.Equal(t, "read", records[3]["kind"])
 	assert.Equal(t, "passed", records[3]["status"])
+	assert.Regexp(t, `(?s)"kind":"bash".*boom.*"type":"tool_end".*"kind":"read".*package a`, output)
 }
 
 func runClaudeFormatter(t *testing.T, lines []string) string {

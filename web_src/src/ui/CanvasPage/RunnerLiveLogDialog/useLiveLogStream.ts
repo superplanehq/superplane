@@ -115,7 +115,7 @@ function createStreamHandlers(
           }
           return prev;
         }
-        return startCommandSection(prev, index, text, startedAtMs, kind, preview);
+        return startCommandSection(prev, { index, text, startedAtMs, kind, preview });
       });
     },
     onCmdEnd: (index, status, durationMs) =>

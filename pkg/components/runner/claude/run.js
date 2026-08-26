@@ -245,16 +245,29 @@ function createToolTracker() {
     start(kind, text, id) {
       const key = resolveKey(id, true);
       const startedAt = Date.now();
-      openTools.set(key, { kind, startedAt });
+      openTools.set(key, { kind, text: text || kind, startedAt, emitted: false });
+    },
+    emitStart(id) {
+      let key = id != null && String(id).trim() ? String(id).trim() : "";
+      if (!key || !openTools.has(key)) {
+        key = fifo[0] || key;
+      }
+      const tool = openTools.get(key);
+      if (!tool || tool.emitted) {
+        return key;
+      }
+      tool.emitted = true;
       writeLiveLogRecord({
         type: "tool_start",
         id: key,
-        kind,
-        text: text || kind,
-        started_at: startedAt,
+        kind: tool.kind,
+        text: tool.text,
+        started_at: tool.startedAt,
       });
+      return key;
     },
     end(failed, id) {
+      this.emitStart(id);
       let key = resolveKey(id, false);
       if (!openTools.has(key)) {
         key = fifo.shift() || key;
@@ -419,6 +432,7 @@ function formatUser(event, tools) {
       continue;
     }
     const body = toolResultText(block.content);
+    tools.emitStart(block.tool_use_id);
     if (body.trim()) {
       println(truncateText(body.replace(/\s+$/, "")));
     }

@@ -16,7 +16,7 @@ import {
   type SplitRunPhaseStatus,
   type SplitRunStreamLine,
 } from "./splitRunMocks";
-import { isRunnerComponent, notesFromLiveLogSections } from "./streamNotesFromLiveLog";
+import { isRunnerComponent, notesForLiveStream } from "./streamNotesFromLiveLog";
 
 function statusGlyph(status: SplitRunPhaseStatus): PhaseGlyphKind {
   if (status === "running") return "running";
@@ -294,53 +294,15 @@ function StreamNode({
 
   return (
     <li>
-      <div
-        data-testid={`split-run-stream-line-${line.id}`}
-        data-highlighted={highlighted ? "true" : undefined}
-        aria-current={highlighted ? "true" : undefined}
-        className={cn(
-          "flex h-[1.375rem] w-full items-center whitespace-nowrap rounded-sm",
-          highlighted && "bg-accent ring-1 ring-foreground/15",
-        )}
-      >
-        <NodeIndent />
-        <button
-          type="button"
-          data-testid={`split-run-node-toggle-${line.id}`}
-          aria-expanded={hasChildren ? expanded : undefined}
-          onClick={() => {
-            if (hasChildren) {
-              setExpanded((open) => !open);
-            }
-            if (line.nodeId) {
-              onSelect?.(line.nodeId);
-            }
-          }}
-          className={cn(
-            "flex min-w-0 flex-1 items-center gap-2 text-left",
-            (hasChildren || line.nodeId) && "cursor-pointer hover:text-foreground",
-          )}
-        >
-          <span className="inline-flex w-3 shrink-0 items-center justify-center text-muted-foreground">
-            {hasChildren ? (
-              <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} aria-hidden />
-            ) : null}
-          </span>
-          <span className="w-14 shrink-0 tabular-nums text-muted-foreground">{line.at}</span>
-          <StreamLineIcon iconSlug={line.iconSlug} iconSrc={line.iconSrc} />
-          {line.componentType ? <span className="shrink-0 text-muted-foreground">{line.componentType}</span> : null}
-          <span
-            className={cn("min-w-0 truncate", line.status === "pending" ? "text-muted-foreground" : "text-foreground")}
-          >
-            {line.componentName}
-          </span>
-          <span className="shrink-0 text-muted-foreground" aria-hidden>
-            {">"}
-          </span>
-          <span className={cn("shrink-0", streamTone(line.status))}>{action}</span>
-        </button>
-        {artifact ? <StreamArtifact artifact={artifact} /> : null}
-      </div>
+      <StreamNodeHeader
+        line={line}
+        expanded={expanded}
+        hasChildren={hasChildren}
+        highlighted={highlighted}
+        action={action}
+        artifact={artifact}
+        onClick={() => toggleStreamNode(hasChildren, line.nodeId, setExpanded, onSelect)}
+      />
       {expanded ? (
         <ol>
           {steps.map((step) => (
@@ -349,6 +311,67 @@ function StreamNode({
         </ol>
       ) : null}
     </li>
+  );
+}
+
+function StreamNodeHeader({
+  line,
+  expanded,
+  hasChildren,
+  highlighted,
+  action,
+  artifact,
+  onClick,
+}: {
+  line: SplitRunStreamLine;
+  expanded: boolean;
+  hasChildren: boolean;
+  highlighted: boolean;
+  action: string;
+  artifact?: FactoriesWorkOrderArtifact;
+  onClick: () => void;
+}) {
+  return (
+    <div
+      data-testid={`split-run-stream-line-${line.id}`}
+      data-highlighted={highlighted ? "true" : undefined}
+      aria-current={highlighted ? "true" : undefined}
+      className={cn(
+        "flex h-[1.375rem] w-full items-center whitespace-nowrap rounded-sm",
+        highlighted && "bg-accent ring-1 ring-foreground/15",
+      )}
+    >
+      <NodeIndent />
+      <button
+        type="button"
+        data-testid={`split-run-node-toggle-${line.id}`}
+        aria-expanded={hasChildren ? expanded : undefined}
+        onClick={onClick}
+        className={cn(
+          "flex min-w-0 flex-1 items-center gap-2 text-left",
+          (hasChildren || line.nodeId) && "cursor-pointer hover:text-foreground",
+        )}
+      >
+        <span className="inline-flex w-3 shrink-0 items-center justify-center text-muted-foreground">
+          {hasChildren ? (
+            <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} aria-hidden />
+          ) : null}
+        </span>
+        <span className="w-14 shrink-0 tabular-nums text-muted-foreground">{line.at}</span>
+        <StreamLineIcon iconSlug={line.iconSlug} iconSrc={line.iconSrc} />
+        {line.componentType ? <span className="shrink-0 text-muted-foreground">{line.componentType}</span> : null}
+        <span
+          className={cn("min-w-0 truncate", line.status === "pending" ? "text-muted-foreground" : "text-foreground")}
+        >
+          {line.componentName}
+        </span>
+        <span className="shrink-0 text-muted-foreground" aria-hidden>
+          {">"}
+        </span>
+        <span className={cn("shrink-0", streamTone(line.status))}>{action}</span>
+      </button>
+      {artifact ? <StreamArtifact artifact={artifact} /> : null}
+    </div>
   );
 }
 
@@ -606,31 +629,27 @@ function useRunnerNodeLiveNotes(
   if (!canStream) {
     return undefined;
   }
-  if (sections.length > 0) {
-    const liveNotes = notesFromLiveLogSections(line.nodeId ?? line.id, sections);
-    if (liveNotes.length === 0) {
-      return undefined;
-    }
-    return liveNotes;
-  }
-  if (error) {
-    return [liveStatusNote(line, "Something went wrong while fetching logs.", "failed")];
-  }
-  if (isStreaming || line.status === "running") {
-    return [liveStatusNote(line, "Waiting for logs…", "running")];
-  }
-  return undefined;
+  return notesForLiveStream({
+    nodeId: line.nodeId ?? line.id,
+    sections,
+    error,
+    isStreaming,
+    nodeStatus: line.status,
+  });
 }
 
-function liveStatusNote(line: SplitRunStreamLine, text: string, status: SplitRunPhaseStatus): SplitRunStreamLine {
-  return {
-    id: `${line.nodeId ?? line.id}-live-status`,
-    nodeId: line.nodeId ?? line.id,
-    at: "",
-    note: true,
-    componentName: text,
-    status,
-  };
+function toggleStreamNode(
+  hasChildren: boolean,
+  nodeId: string | undefined,
+  setExpanded: (update: (open: boolean) => boolean) => void,
+  onSelect?: (nodeId: string) => void,
+) {
+  if (hasChildren) {
+    setExpanded((open) => !open);
+  }
+  if (nodeId) {
+    onSelect?.(nodeId);
+  }
 }
 
 function streamActionOf(line: SplitRunStreamLine): string {

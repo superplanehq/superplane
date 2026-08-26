@@ -16,7 +16,13 @@ function emptyState(): LogState {
 
 describe("liveLogSections", () => {
   it("stores kind and preview on cmd_start", () => {
-    const state = startCommandSection(emptyState(), 1, "Implementation", 10, "prompt", "You are implementing");
+    const state = startCommandSection(emptyState(), {
+      index: 1,
+      text: "Implementation",
+      startedAtMs: 10,
+      kind: "prompt",
+      preview: "You are implementing",
+    });
     expect(state.sections[0]).toMatchObject({
       kind: "prompt",
       preview: "You are implementing",
@@ -26,7 +32,13 @@ describe("liveLogSections", () => {
   });
 
   it("nests tool output under a prompt section and keeps notes between tools", () => {
-    let state = startCommandSection(emptyState(), 5, "Implementation", 1, "prompt", "You are implementing");
+    let state = startCommandSection(emptyState(), {
+      index: 5,
+      text: "Implementation",
+      startedAtMs: 1,
+      kind: "prompt",
+      preview: "You are implementing",
+    });
     state = appendLineToLatestSection(state, "Gathering context.");
     state = startToolOnLatestSection(state, "read", "pkg/foo.go");
     state = appendLineToLatestSection(state, "package workers");
@@ -57,7 +69,13 @@ describe("liveLogSections", () => {
   });
 
   it("ends overlapping tools by source id, not start order", () => {
-    let state = startCommandSection(emptyState(), 5, "Implementation", 1, "prompt", "You are implementing");
+    let state = startCommandSection(emptyState(), {
+      index: 5,
+      text: "Implementation",
+      startedAtMs: 1,
+      kind: "prompt",
+      preview: "You are implementing",
+    });
     state = startToolOnLatestSection(state, "read", "a.go", "toolu_a");
     state = startToolOnLatestSection(state, "bash", "git status", "toolu_b");
     state = endToolOnLatestSection(state, "failed", 10, "toolu_b");
@@ -73,7 +91,13 @@ describe("liveLogSections", () => {
   });
 
   it("ignores replayed tool records with the same source id", () => {
-    let state = startCommandSection(emptyState(), 5, "Implementation", 1, "prompt", "You are implementing");
+    let state = startCommandSection(emptyState(), {
+      index: 5,
+      text: "Implementation",
+      startedAtMs: 1,
+      kind: "prompt",
+      preview: "You are implementing",
+    });
     state = startToolOnLatestSection(state, "read", "a.go", "toolu_a");
     state = endToolOnLatestSection(state, "passed", 20, "toolu_a");
     state = startToolOnLatestSection(state, "read", "a.go", "toolu_a");
@@ -88,8 +112,37 @@ describe("liveLogSections", () => {
     expect(tools.tools[0]).toMatchObject({ status: "passed", duration_ms: 20 });
   });
 
+  it("keeps overlapping tool stdout as notes instead of the newest tool", () => {
+    let state = startCommandSection(emptyState(), {
+      index: 5,
+      text: "Implementation",
+      startedAtMs: 1,
+      kind: "prompt",
+      preview: "You are implementing",
+    });
+    state = startToolOnLatestSection(state, "read", "a.go", "toolu_a");
+    state = startToolOnLatestSection(state, "bash", "git status", "toolu_b");
+    state = appendLineToLatestSection(state, "boom");
+
+    const section = state.sections[0];
+    expect(section.events.at(-1)).toEqual({ kind: "note", text: "boom" });
+    const tools = section.events[0];
+    expect(tools?.kind).toBe("tools");
+    if (tools?.kind !== "tools") {
+      throw new Error("expected tools group");
+    }
+    expect(tools.tools[0].lines).toEqual([]);
+    expect(tools.tools[1].lines).toEqual([]);
+  });
+
   it("keeps bash section lines flat", () => {
-    let state = startCommandSection(emptyState(), 0, "Create Branch", 1, "bash", "git clone");
+    let state = startCommandSection(emptyState(), {
+      index: 0,
+      text: "Create Branch",
+      startedAtMs: 1,
+      kind: "bash",
+      preview: "git clone",
+    });
     state = appendLineToLatestSection(state, "Cloning...");
     expect(state.sections[0].events).toEqual([]);
     expect(state.sections[0].lines).toEqual(["Cloning..."]);

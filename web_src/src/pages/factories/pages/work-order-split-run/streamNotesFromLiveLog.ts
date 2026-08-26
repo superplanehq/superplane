@@ -120,6 +120,37 @@ function fallbackNotesFromPlaintext(nodeId: string, section: CommandSection): Sp
   return notes;
 }
 
+export function notesForLiveStream(input: {
+  nodeId: string;
+  sections: CommandSection[];
+  error: string | null;
+  isStreaming: boolean;
+  nodeStatus: SplitRunPhaseStatus;
+}): SplitRunStreamLine[] | undefined {
+  if (input.sections.length > 0) {
+    const notes = notesFromLiveLogSections(input.nodeId, input.sections);
+    return notes.length > 0 ? notes : undefined;
+  }
+  if (input.error) {
+    return [liveStatusNote(input.nodeId, "Something went wrong while fetching logs.", "failed")];
+  }
+  if (input.isStreaming || input.nodeStatus === "running") {
+    return [liveStatusNote(input.nodeId, "Waiting for logs…", "running")];
+  }
+  return undefined;
+}
+
+function liveStatusNote(nodeId: string, text: string, status: SplitRunPhaseStatus): SplitRunStreamLine {
+  return {
+    id: `${nodeId}-live-status`,
+    nodeId,
+    at: "",
+    note: true,
+    componentName: text,
+    status,
+  };
+}
+
 function streamStatus(status: string): SplitRunPhaseStatus {
   if (status === "failed") {
     return "failed";

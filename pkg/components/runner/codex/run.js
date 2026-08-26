@@ -150,29 +150,41 @@ function createCodexFormatter() {
     return anonQueue.shift() || "";
   }
 
-  function startTool(item) {
+  function rememberTool(item) {
     const id = itemID(item, true);
     if (open.has(id)) {
       return id;
     }
-    const kind = normalizeCodexToolKind(item);
-    const startedAt = Date.now();
-    open.set(id, { kind, startedAt });
+    open.set(id, {
+      kind: normalizeCodexToolKind(item),
+      text: toolTextForItem(item),
+      startedAt: Date.now(),
+      emitted: false,
+    });
+    return id;
+  }
+
+  function emitStart(id) {
+    const tracked = open.get(id);
+    if (!tracked || tracked.emitted) {
+      return;
+    }
+    tracked.emitted = true;
     writeLiveLogRecord({
       type: "tool_start",
       id,
-      kind,
-      text: toolTextForItem(item),
-      started_at: startedAt,
+      kind: tracked.kind,
+      text: tracked.text,
+      started_at: tracked.startedAt,
     });
-    return id;
   }
 
   function completeTool(item) {
     let id = itemID(item, false);
     if (!open.has(id)) {
-      id = startTool(item);
+      id = rememberTool(item);
     }
+    emitStart(id);
     const output = item.aggregated_output || item.output || "";
     if (typeof output === "string" && output.trim()) {
       process.stdout.write(`${output.replace(/\s+$/, "")}\n`);
@@ -212,7 +224,7 @@ function createCodexFormatter() {
         return;
       }
       if (event.type === "item.started") {
-        startTool(item);
+        rememberTool(item);
         return;
       }
       if (event.type === "item.completed") {
@@ -220,7 +232,12 @@ function createCodexFormatter() {
       }
     },
     flush(failed) {
-      for (const [id, tracked] of open.entries()) {
+      for (const id of [...open.keys()]) {
+        emitStart(id);
+        const tracked = open.get(id);
+        if (!tracked) {
+          continue;
+        }
         writeLiveLogRecord({
           type: "tool_end",
           id,
