@@ -35,13 +35,14 @@ blocks:
             - make lint
 
         - name: Unit Tests
+          parallelism: 4
           commands:
-            - make test.coverage.check
+            - make test.coverage.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
 
         - name: E2E Tests
           parallelism: 10
           commands:
-            - make test.e2e.autoparallel INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
+            - make test.e2e.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
 
         - name: Checks
           commands:
@@ -81,7 +82,7 @@ blocks:
         - name: Unit Tests
           parallelism: 4
           commands:
-            - make check.test.ui.shard INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
+            - make check.test.ui.shard SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
 
         - name: Format Check
           commands:
