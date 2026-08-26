@@ -63,7 +63,7 @@ func TestCommandListMarshalRoundTrip(t *testing.T) {
 
 	in := CommandList{
 		{Command: "echo hi"},
-		{Name: "Clone", Command: "git clone"},
+		{Name: "Clone", Command: "git clone", Kind: "bash", Preview: "git clone"},
 	}
 	b, err := json.Marshal(in)
 	if err != nil {
@@ -75,5 +75,26 @@ func TestCommandListMarshalRoundTrip(t *testing.T) {
 	}
 	if len(out) != 2 || out[1].Name != "Clone" || out[0].Command != "echo hi" {
 		t.Fatalf("out=%#v", out)
+	}
+	if out[1].Kind != "bash" || out[1].Preview != "git clone" {
+		t.Fatalf("kind/preview=%#v", out[1])
+	}
+}
+
+func TestCommandListUnmarshalKindAndPreview(t *testing.T) {
+	t.Parallel()
+
+	var list CommandList
+	err := json.Unmarshal([]byte(`[
+		{"name":"Clone","command":"git clone repo","kind":"bash","preview":"git clone repo"}
+	]`), &list)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("len=%d: %#v", len(list), list)
+	}
+	if list[0].Kind != "bash" || list[0].Preview != "git clone repo" {
+		t.Fatalf("list[0]=%#v", list[0])
 	}
 }

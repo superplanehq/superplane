@@ -18,7 +18,23 @@ type liveLogCommandStartRecord struct {
 	Type      string `json:"type"`
 	Index     int    `json:"index"`
 	Text      string `json:"text"`
+	Kind      string `json:"kind,omitempty"`
+	Preview   string `json:"preview,omitempty"`
 	StartedAt int64  `json:"started_at"`
+}
+
+type liveLogToolStartRecord struct {
+	Type      string `json:"type"`
+	Kind      string `json:"kind,omitempty"`
+	Text      string `json:"text,omitempty"`
+	StartedAt int64  `json:"started_at,omitempty"`
+}
+
+type liveLogToolEndRecord struct {
+	Type       string               `json:"type"`
+	Kind       string               `json:"kind,omitempty"`
+	Status     liveLogCommandStatus `json:"status"`
+	DurationMS int64                `json:"duration_ms"`
 }
 
 type liveLogCommandEndRecord struct {
@@ -28,7 +44,7 @@ type liveLogCommandEndRecord struct {
 	DurationMS int64                `json:"duration_ms"`
 }
 
-func writeLiveLogCommandStart(live io.Writer, index int, text string, startedAt time.Time) {
+func writeLiveLogCommandStart(live io.Writer, index int, text, kind, preview string, startedAt time.Time) {
 	if live == nil || index < 0 {
 		return
 	}
@@ -36,9 +52,26 @@ func writeLiveLogCommandStart(live io.Writer, index int, text string, startedAt 
 		Type:      "cmd_start",
 		Index:     index,
 		Text:      strings.TrimSpace(text),
+		Kind:      strings.TrimSpace(kind),
+		Preview:   strings.TrimSpace(preview),
 		StartedAt: startedAt.UnixMilli(),
 	}
 	writeLiveLogRecord(live, rec)
+}
+
+func liveLogPreview(text string) string {
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		runes := []rune(line)
+		if len(runes) > 80 {
+			return string(runes[:80])
+		}
+		return line
+	}
+	return ""
 }
 
 func writeLiveLogCommandEnd(live io.Writer, index int, exitCode int, duration time.Duration) {

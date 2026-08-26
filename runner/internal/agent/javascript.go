@@ -115,7 +115,7 @@ func runJavaScriptHost(
 
 	startedAt := time.Now()
 	jsIndex := len(setup)
-	writeLiveLogCommandStart(live, jsIndex, "node "+javaScriptProgramName, startedAt)
+	writeLiveLogCommandStart(live, jsIndex, "node "+javaScriptProgramName, "javascript", "", startedAt)
 	runErr := cmd.Run()
 	combinedOut.WriteString(buf.String())
 	out := truncateString(combinedOut.String(), max)
