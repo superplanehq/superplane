@@ -10,6 +10,7 @@ import {
 } from "../lib/workOrderListModel";
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
 import { factoryKanbanPageClassName, factoryWorkOrdersBodyClassName } from "../pages/factoryPageLayoutStyles";
+import { useActivePRFeedbackWorkOrderIds } from "../pages/useWorkOrderPRFeedbackRunHref";
 import { WorkOrdersBoardView } from "./WorkOrdersBoardView";
 import {
   WorkOrdersFilteredEmptyState,
@@ -48,6 +49,7 @@ interface WorkOrdersLoadedViewProps {
  */
 export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   const { workOrders, factory, state, currentUserId } = props;
+  const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(props.organizationId, factory.id ?? "");
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [workOrders, factory]);
   const scoped = useMemo(
     () => applyWorkOrderScope(entries, state.scope, currentUserId),
@@ -96,7 +98,13 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
     };
 
     if (state.layout === "board") {
-      return <WorkOrdersBoardView {...sharedProps} />;
+      return (
+        <WorkOrdersBoardView
+          {...sharedProps}
+          factoryId={factory.id}
+          addressingFeedbackOrderIds={addressingFeedbackOrderIds}
+        />
+      );
     }
     if (state.layout === "list") {
       return <WorkOrdersListView {...sharedProps} />;

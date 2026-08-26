@@ -36,12 +36,8 @@ function materializeOnboardingApp(factoryId: string) {
 }
 
 describe("setup factory line apps", () => {
-  it("orders the apps as plan, implement, open PR", () => {
-    expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).toEqual([
-      "line-planning",
-      "line-implementation",
-      "line-pr",
-    ]);
+  it("orders the apps as plan then implement", () => {
+    expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).toEqual(["line-planning", "line-implementation"]);
   });
 
   it("exposes a single onRun entrypoint per app that the line calls", () => {
@@ -74,44 +70,47 @@ describe("setup factory line apps", () => {
     expect(implementation).toMatch(
       /id: add-branch-artifact[\s\S]*component: addWorkOrderArtifact[\s\S]*repository: acme\/app/,
     );
-    expect(implementation).toMatch(/sourceId: implementation-agent\n\s+targetId: create-draft-pr/);
+    expect(implementation).toMatch(/sourceId: implementation-agent\n\s+targetId: generate-pr-text/);
+    expect(implementation).toMatch(/sourceId: generate-pr-text\n\s+targetId: create-draft-pr/);
     expect(implementation).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
     expect(implementation).toMatch(/sourceId: create-draft-pr\n\s+targetId: attach-pr-artifact/);
-    expect(implementation).toMatch(/id: attach-pr-artifact[\s\S]*artifactType: pr/);
-
-    const pr = materializeOnboardingApp("line-pr");
-    expect(pr).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
+    expect(implementation).toMatch(/sourceId: attach-pr-artifact\n\s+targetId: add-pr-label/);
+    expect(implementation).toMatch(/id: attach-pr-artifact[\s\S]*artifactType: pr[\s\S]*state: draft/);
+    expect(implementation).not.toMatch(/id: attach-pr-artifact[\s\S]*draft: true/);
   });
 
-  it("links the pull request back to the work order", () => {
-    const pr = materializeOnboardingApp("line-pr");
+  it("writes the pull request title and description before it opens the draft", () => {
+    const implementation = materializeOnboardingApp("line-implementation");
 
-    expect(pr).toMatch(/component: github\.createPullRequest[\s\S]*\[Work Order\]\(\{\{ order\(\)\.url \}\}\)/);
-    expect(pr).toContain("Created via [SuperPlane](https://superplane.com)");
+    expect(implementation).toContain("id: generate-pr-text");
+    expect(implementation).toContain("Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md");
+    expect(implementation).toMatch(
+      /component: github\.createPullRequest[\s\S]*fromBase64\(previous\(\)\.data\.result\.title\)/,
+    );
+    expect(implementation).toMatch(
+      /component: github\.createPullRequest[\s\S]*\[Work Order\]\(\{\{ order\(\)\.url \}\}\)/,
+    );
+    expect(implementation).toContain("Created via [SuperPlane](https://superplane.com)");
   });
 
   it("announces the PR-merge wait after the work order attaches the pull request", () => {
-    const pr = materializeOnboardingApp("line-pr");
+    const implementation = materializeOnboardingApp("line-implementation");
 
-    expect(pr).toMatch(/sourceId: attach-pr-artifact[\s\S]*targetId: set-pr-closure-note/);
-    expect(pr).toContain("component: setWorkOrderStatusNote");
-    expect(pr).toContain("noteKey: pr-closure");
-    expect(pr).toContain("headline: Listening for user review");
-    expect(pr).toContain("Mention `@superplaneagent` in a pull request comment or review to request changes.");
-    expect(pr).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data.html_url }}'");
-    expect(pr).toContain("showOnlyWhenWaiting: true");
+    expect(implementation).toMatch(/sourceId: add-pr-label[\s\S]*targetId: set-pr-closure-note/);
+    expect(implementation).toContain("component: setWorkOrderStatusNote");
+    expect(implementation).toContain("noteKey: pr-closure");
+    expect(implementation).toContain("headline: Waiting for user review");
+    expect(implementation).toContain(
+      "The pull request is open and waiting for user review. Mention @superplaneagent in a pull request comment or review to request changes.",
+    );
+    expect(implementation).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data.html_url }}'");
+    expect(implementation).toContain("showOnlyWhenWaiting: true");
   });
 
   it("fails planning when the agent does not write the plan file", () => {
     const planning = materializeOnboardingApp("line-planning");
     expect(planning).toContain("No plan produced at /tmp/plan.md");
     expect(planning).toContain("exit 1");
-  });
-
-  it("fails PR title generation when the agent does not write title files", () => {
-    const pr = materializeOnboardingApp("line-pr");
-    expect(pr).toContain("Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md");
-    expect(pr).toContain("exit 1");
   });
 
   it("fails implementation when the agent pushes no file commits", () => {
@@ -151,6 +150,7 @@ describe("setup factory event apps", () => {
   it("provisions PR closure outside the factory line", () => {
     expect(ONBOARDING_EVENT_APPS).toEqual(["pr-closure"]);
     expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("pr-closure");
+    expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("line-pr");
   });
 
   it("closes the work order when a factory pull request is closed", () => {

@@ -296,6 +296,7 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; 
   filter: { title: "Filter", iconSlug: "funnel" },
   addWorkOrderArtifact: { title: "Add Work Order Artifact", iconSlug: "factory" },
   addRunError: { title: "Add Run Error", iconSlug: "triangle-alert" },
+  setWorkOrderStatusNote: { title: "Set Work Order Status Note", iconSlug: "factory" },
   reportWorkOrderCheck: { title: "Report Work Order Check", iconSlug: "factory" },
   "github.createIssueComment": { title: "Create Issue Comment", iconSlug: "github" },
   "github.createPullRequest": { title: "Create Pull Request", iconSlug: "github" },

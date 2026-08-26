@@ -225,13 +225,6 @@ export const ACME_ONBOARDING_APPS: FactoryApp[] = [
     updatedAt: YESTERDAY,
   },
   {
-    id: "app-acme-verifier",
-    name: "Verify",
-    description: "Verifies the change.",
-    createdAt: LAST_WEEK,
-    updatedAt: YESTERDAY,
-  },
-  {
     id: ACME_ONBOARDING_DONE_APP_ID,
     name: "Done",
     description: "Completes the work order.",
@@ -248,7 +241,6 @@ export const ACME_ONBOARDING_LINE: FactoriesFactoryLine = {
   updatedAt: YESTERDAY,
   steps: [
     runAppStep("app-acme-implementer", "start-implementation"),
-    runAppStep("app-acme-verifier", "start-verification"),
     runAppStep(ACME_ONBOARDING_DONE_APP_ID, "start-done"),
   ],
 };

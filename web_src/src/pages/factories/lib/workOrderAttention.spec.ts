@@ -50,7 +50,7 @@ describe("getWorkOrderAttentionReason", () => {
     expect(WORK_ORDER_ATTENTION_LABEL.failed).toBe("Run failed");
   });
 
-  it("labels a visible status note as Review requested", () => {
+  it("labels a visible status note as Waiting for user review", () => {
     expect(
       getWorkOrderAttentionReason(
         order({
@@ -85,7 +85,25 @@ describe("getWorkOrderAttentionReason", () => {
         }),
       ),
     ).toBe("approval");
-    expect(WORK_ORDER_ATTENTION_LABEL.approval).toBe("Review requested");
+    expect(WORK_ORDER_ATTENTION_LABEL.approval).toBe("Waiting for user review");
+  });
+
+  it("labels an active PR-feedback run as Addressing user feedback", () => {
+    expect(
+      getWorkOrderAttentionReason(
+        order({
+          statusNotes: [
+            {
+              key: "pr-closure",
+              headline: "Waiting for user review",
+              body: "Tag `@superplaneagent` to request changes.",
+            },
+          ],
+        }),
+        { addressingFeedback: true },
+      ),
+    ).toBe("feedback");
+    expect(WORK_ORDER_ATTENTION_LABEL.feedback).toBe("Addressing user feedback");
   });
 
   it("labels idle waiting work as No progress", () => {

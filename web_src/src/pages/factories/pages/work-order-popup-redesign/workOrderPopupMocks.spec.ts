@@ -79,7 +79,7 @@ describe("popupFixtureForWorkOrder", () => {
       }),
     );
 
-    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Listening for user review"]);
+    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Waiting for user review"]);
     expect(fixture.checks).toEqual([]);
     expect(fixture.log.at(-1)?.state).toBe("failed");
   });

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { FactoriesFactoryPrFeedbackHandlerRun } from "@/api-client";
 
 import {
+  activePRFeedbackWorkOrderIds,
   addressingPRFeedbackNote,
   isActivePRFeedbackRunStatus,
   oldestActivePRFeedbackRun,
@@ -66,6 +67,20 @@ describe("isActivePRFeedbackRunStatus", () => {
     expect(isActivePRFeedbackRunStatus("STATUS_RUNNING")).toBe(true);
     expect(isActivePRFeedbackRunStatus("STATUS_PASSED")).toBe(false);
     expect(isActivePRFeedbackRunStatus("STATUS_FAILED")).toBe(false);
+  });
+});
+
+describe("activePRFeedbackWorkOrderIds", () => {
+  it("collects work orders with a queued or running PR-feedback run", () => {
+    expect(
+      activePRFeedbackWorkOrderIds([
+        [
+          run({ id: "a", workOrderId: "wo-1", status: "STATUS_RUNNING" }),
+          run({ id: "b", workOrderId: "wo-2", status: "STATUS_PASSED" }),
+        ],
+        [run({ id: "c", workOrderId: "wo-3", status: "STATUS_QUEUED" })],
+      ]),
+    ).toEqual(new Set(["wo-1", "wo-3"]));
   });
 });
 

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
@@ -70,14 +71,33 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackFindNodeID,
 			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackFindNodeID,
 			"found:" + prFeedbackFindNodeID + "->" + prFeedbackRunnerNodeID,
-			"notFound:" + prFeedbackFindNodeID + "->" + prFeedbackFinishNodeID,
 		}, yamlEdgeChannels(canvas))
+
+		for _, node := range canvas.Spec.Nodes {
+			assert.NotEqual(t, "noop", node.Component)
+			assert.NotEqual(t, "finish", node.ID)
+		}
 
 		reply := findSpecNode(t, canvas, prFeedbackReplyTriggerNodeID)
 		assert.Equal(t, false, reply.Configuration["includeReviewSubmissions"])
 		assert.Equal(t, prFeedbackCommentScopeReplies, reply.Configuration["commentScope"])
 		assert.Equal(t, true, reply.Configuration["ignoreBots"])
 		assert.Equal(t, prFeedbackDefaultMention, reply.Configuration["contentFilter"])
+	})
+
+	t.Run("the runner checks out the pull request head branch", func(t *testing.T) {
+		canvas := buildPRFeedbackCanvas(prFeedbackBuildRequest{
+			Repository: "acme/app",
+			Mention:    prFeedbackDefaultMention,
+			IgnoreBots: true,
+		})
+		runner := findSpecNode(t, canvas, prFeedbackRunnerNodeID)
+		assert.Contains(t, runnerEnv(t, runner, "PR_HEAD"), "pull_request.head.ref")
+
+		checkout := runnerStepCommand(t, runner, "Checkout Pull Request")
+		assert.Contains(t, checkout, `git fetch origin "pull/${PR_NUMBER}/head:${PR_HEAD}"`)
+		assert.Contains(t, checkout, `git checkout "${PR_HEAD}"`)
+		assert.NotContains(t, checkout, "pr-feedback")
 	})
 }
 
@@ -87,6 +107,41 @@ func yamlEdgeChannels(canvas *yaml.Canvas) []string {
 		result = append(result, edge.Channel+":"+edge.SourceID+"->"+edge.TargetID)
 	}
 	return result
+}
+
+func runnerEnv(t *testing.T, node yaml.Node, name string) string {
+	t.Helper()
+
+	entries, ok := node.Configuration["environment"].([]any)
+	require.True(t, ok, "runner has no environment")
+	for _, entry := range entries {
+		item, ok := entry.(map[string]any)
+		require.True(t, ok)
+		if item["name"] == name {
+			value, _ := item["value"].(string)
+			return value
+		}
+	}
+	require.Failf(t, "environment variable not found", "runner has no %q", name)
+	return ""
+}
+
+func runnerStepCommand(t *testing.T, node yaml.Node, name string) string {
+	t.Helper()
+
+	steps, ok := node.Configuration["steps"].([]any)
+	require.True(t, ok, "runner has no steps")
+	for _, step := range steps {
+		item, ok := step.(map[string]any)
+		require.True(t, ok)
+		if item["name"] == name {
+			command, ok := item["command"].(string)
+			require.True(t, ok, "step %q has no command", name)
+			return command
+		}
+	}
+	require.Failf(t, "step not found", "runner has no step %q", name)
+	return ""
 }
 
 func prFeedbackSpecFromTemplate(t *testing.T, repository string) models.LiveCanvasSpec {

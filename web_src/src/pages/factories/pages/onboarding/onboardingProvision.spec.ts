@@ -59,11 +59,17 @@ describe("provisionLine", () => {
       updateOnboarding,
     });
 
-    expect(createLine).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: DEFAULT_LINE_NAME,
-      }),
-    );
+    expect(installFactory.mock.calls.map((call) => call[0].factoryId)).toEqual([
+      "line-planning",
+      "line-implementation",
+    ]);
+    expect(createLine).toHaveBeenCalledWith({
+      name: DEFAULT_LINE_NAME,
+      steps: [
+        { type: "runApp", app: { app: "canvas-line-planning", entrypoint: "onrun-create-plan" } },
+        { type: "runApp", app: { app: "canvas-line-implementation", entrypoint: "onrun-implement" } },
+      ],
+    });
     expect(result.lineId).toBe("line-new");
     expect(updateOnboarding).toHaveBeenCalledWith({
       provisionedAppId: result.primaryAppId,

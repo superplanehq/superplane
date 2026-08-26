@@ -166,9 +166,9 @@ describe("splitRunFixtureForWorkOrder", () => {
       }),
     );
     expect(fixture.footerTone).toBe("waiting");
-    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Listening for user review"]);
+    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Waiting for user review"]);
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
-    expect(fixture.footer.note?.headline).toBe("Listening for user review");
+    expect(fixture.footer.note?.headline).toBe("Waiting for user review");
     expect(fixture.footer.attentionCard).toBe(true);
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Stop"]);
     expect(fixture.checks).toEqual([]);

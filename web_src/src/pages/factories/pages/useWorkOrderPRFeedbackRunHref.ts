@@ -7,7 +7,21 @@ import {
 import { useQueries } from "@tanstack/react-query";
 
 import { factoryAppRunPath } from "../lib/factoryPagePaths";
-import { oldestActivePRFeedbackRun } from "./prFeedbackSettingsModel";
+import { activePRFeedbackWorkOrderIds, oldestActivePRFeedbackRun } from "./prFeedbackSettingsModel";
+
+export function useActivePRFeedbackWorkOrderIds(organizationId: string, factoryId: string): ReadonlySet<string> {
+  const handlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
+  const handlers = handlersQuery.data ?? [];
+  const runQueries = useQueries({
+    queries: handlers.map((handler) => ({
+      queryKey: factoryPRFeedbackHandlerRunsKey(organizationId, factoryId, handler.id ?? ""),
+      queryFn: () => fetchFactoryPRFeedbackHandlerRuns(organizationId, factoryId, handler.id ?? ""),
+      enabled: Boolean(organizationId && factoryId && handler.id),
+      refetchInterval: 10_000,
+    })),
+  });
+  return activePRFeedbackWorkOrderIds(runQueries.map((query) => query.data ?? []));
+}
 
 export function useWorkOrderPRFeedbackRunHref(
   organizationId: string,

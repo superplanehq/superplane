@@ -373,9 +373,9 @@ describe("WorkOrderSplitRunPopup", () => {
     const note = screen.getByTestId("split-run-attention-note");
     const footer = screen.getByTestId("split-run-review");
     expect(note.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(note).getByRole("heading", { name: "Listening for user review" })).toBeInTheDocument();
-    expect(note).toHaveTextContent("This automation finished and opened PR #6812.");
-    expect(note).toHaveTextContent("Tag @superplaneagent in comment to request changes.");
+    expect(within(note).getByRole("heading", { name: "Waiting for user review" })).toBeInTheDocument();
+    expect(note).toHaveTextContent("The pull request is open and waiting for user review.");
+    expect(note).toHaveTextContent("Mention @superplaneagent in a pull request comment or review to request changes.");
     expect(note).toHaveTextContent("Task will automatically close when the pull request is closed or merged.");
     expect(within(note).getByRole("link", { name: "Review PR #6812" })).toHaveAttribute(
       "href",
@@ -384,7 +384,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).queryByText("PR Closure")).not.toBeInTheDocument();
     expect(within(note).queryByText(/ago/)).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: /Update manually/ })).not.toBeInTheDocument();
-    expect(within(footer).queryByRole("heading", { name: "Listening for user review" })).not.toBeInTheDocument();
+    expect(within(footer).queryByRole("heading", { name: "Waiting for user review" })).not.toBeInTheDocument();
     expect(within(footer).getByText("This work order needs attention.")).toBeInTheDocument();
     expect(within(footer).getByRole("button", { name: "Stop and Close" })).toBeInTheDocument();
   });

@@ -9,7 +9,6 @@ import lineAppConsoleYaml from "./line-apps/console.yaml?raw";
 import eventAppConsoleYaml from "./line-apps/event-app.console.yaml?raw";
 import planningCanvasYaml from "./line-apps/planning.canvas.yaml?raw";
 import implementationCanvasYaml from "./line-apps/implementation.canvas.yaml?raw";
-import prCanvasYaml from "./line-apps/pr.canvas.yaml?raw";
 import prClosureCanvasYaml from "./line-apps/pr-closure.canvas.yaml?raw";
 
 export type { FactoryDefinition, FactoryStartingTask, FactoryRunDefinition } from "./types";
@@ -131,7 +130,6 @@ export interface OnboardingLineApp {
 export const ONBOARDING_LINE_APPS: OnboardingLineApp[] = [
   { factoryId: "line-planning", entrypointNodeId: "onrun-create-plan" },
   { factoryId: "line-implementation", entrypointNodeId: "onrun-implement" },
-  { factoryId: "line-pr", entrypointNodeId: "onrun-open-pr" },
 ];
 
 // Event-driven factory apps provisioned during onboarding. These listen for
@@ -154,13 +152,6 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
     description: "Create a branch, implement the plan, and open a draft pull request.",
     canvasYaml: implementationCanvasYaml,
     entrypointNodeId: "onrun-implement",
-  }),
-  "line-pr": buildLineApp({
-    id: "line-pr",
-    title: "Verify",
-    description: "Open a draft pull request and hand the work order to review.",
-    canvasYaml: prCanvasYaml,
-    entrypointNodeId: "onrun-open-pr",
   }),
   "pr-closure": buildEventApp({
     id: "pr-closure",

@@ -107,6 +107,20 @@ export function isActivePRFeedbackRunStatus(status: FactoriesFactoryPrFeedbackHa
   return status === "STATUS_QUEUED" || status === "STATUS_RUNNING";
 }
 
+export function activePRFeedbackWorkOrderIds(
+  runsByHandler: FactoriesFactoryPrFeedbackHandlerRun[][],
+): ReadonlySet<string> {
+  const ids = new Set<string>();
+  for (const runs of runsByHandler) {
+    for (const run of runs) {
+      if (run.workOrderId && isActivePRFeedbackRunStatus(run.status)) {
+        ids.add(run.workOrderId);
+      }
+    }
+  }
+  return ids;
+}
+
 export function oldestActivePRFeedbackRun(
   runs: FactoriesFactoryPrFeedbackHandlerRun[],
   workOrderId: string,
@@ -117,9 +131,7 @@ export function oldestActivePRFeedbackRun(
   if (active.length === 0) {
     return undefined;
   }
-  return [...active].sort(
-    (left, right) => Date.parse(left.createdAt ?? "") - Date.parse(right.createdAt ?? ""),
-  )[0];
+  return [...active].sort((left, right) => Date.parse(left.createdAt ?? "") - Date.parse(right.createdAt ?? ""))[0];
 }
 
 export function addressingPRFeedbackNote(runHref: string): WorkOrderStatusNotePresentation {

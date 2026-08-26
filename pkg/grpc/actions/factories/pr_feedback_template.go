@@ -13,10 +13,8 @@ const (
 	prFeedbackReplyTriggerNodeID   = "on-pr-review-reply"
 	prFeedbackFindNodeID           = "find-work-order"
 	prFeedbackRunnerNodeID         = "address-pr-feedback"
-	prFeedbackFinishNodeID         = "finish"
 
-	prFeedbackFindComponent   = "findWorkOrder"
-	prFeedbackFinishComponent = "noop"
+	prFeedbackFindComponent = "findWorkOrder"
 
 	prFeedbackDefaultName         = "Address PR feedback"
 	prFeedbackDefaultDescription  = "Address pull request comments and reviews after a mention."
@@ -67,7 +65,6 @@ func buildPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 				{Channel: "default", SourceID: prFeedbackReviewTriggerNodeID, TargetID: prFeedbackFindNodeID},
 				{Channel: "default", SourceID: prFeedbackReplyTriggerNodeID, TargetID: prFeedbackFindNodeID},
 				{Channel: "found", SourceID: prFeedbackFindNodeID, TargetID: prFeedbackRunnerNodeID},
-				{Channel: "notFound", SourceID: prFeedbackFindNodeID, TargetID: prFeedbackFinishNodeID},
 			},
 			Nodes: []yaml.Node{
 				{
@@ -117,13 +114,6 @@ func buildPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Concurrency:   prFeedbackRunnerConcurrency(),
 					Position:      yaml.Position{X: 640, Y: 260},
 				},
-				{
-					ID:        prFeedbackFinishNodeID,
-					Name:      "Finish",
-					Type:      yaml.NodeTypeAction,
-					Component: prFeedbackFinishComponent,
-					Position:  yaml.Position{X: 640, Y: 440},
-				},
 			},
 		},
 	}
@@ -155,6 +145,10 @@ func prFeedbackPRNumberExpression() string {
 	return "{{ root().data.pull_request.number ?? root().data.issue.number }}"
 }
 
+func prFeedbackPRHeadExpression() string {
+	return "{{ root().data.pull_request.head.ref ?? \"\" }}"
+}
+
 func prFeedbackRunnerConcurrency() *yaml.ConcurrencySpec {
 	max := 1
 	return &yaml.ConcurrencySpec{
@@ -178,6 +172,11 @@ func prFeedbackRunnerConfiguration(request prFeedbackBuildRequest) map[string]an
 			map[string]any{
 				"name":        "PR_NUMBER",
 				"value":       prFeedbackPRNumberExpression(),
+				"valueSource": "literal",
+			},
+			map[string]any{
+				"name":        "PR_HEAD",
+				"value":       prFeedbackPRHeadExpression(),
 				"valueSource": "literal",
 			},
 		},
@@ -227,8 +226,15 @@ func prFeedbackRunnerSteps() []any {
 				"rm -rf repo",
 				`git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo`,
 				"cd repo",
-				`git fetch origin "pull/${PR_NUMBER}/head:pr-feedback"`,
-				"git checkout pr-feedback",
+				`if [ -z "${PR_HEAD:-}" ]; then`,
+				`  PR_HEAD=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}" | jq -r .head.ref)`,
+				"fi",
+				`if [ -z "${PR_HEAD}" ] || [ "${PR_HEAD}" = "null" ]; then`,
+				`  echo "Could not resolve the pull request head branch." >&2`,
+				"  exit 1",
+				"fi",
+				`git fetch origin "pull/${PR_NUMBER}/head:${PR_HEAD}"`,
+				`git checkout "${PR_HEAD}"`,
 			}, "\n"),
 		},
 		map[string]any{
@@ -269,6 +275,7 @@ func prFeedbackPrompt() string {
 	return strings.Join([]string{
 		"You address current pull request feedback for a SuperPlane work order.",
 		"The repository is already checked out in the current working directory.",
+		"Stay on this branch. Push commits to this branch. Do not create a new branch.",
 		"",
 		"Repository: {{ root().data.repository.full_name }}",
 		"Pull request: #{{ root().data.pull_request.number ?? root().data.issue.number }}",

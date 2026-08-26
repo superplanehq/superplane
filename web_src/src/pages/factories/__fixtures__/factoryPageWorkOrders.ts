@@ -62,8 +62,8 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
     {
       key: "pr-closure",
       kind: "info",
-      headline: "Listening for user review",
-      body: "This automation finished and opened [PR #6812](https://github.com/superplanehq/superplane/pull/6812). Mention `@superplaneagent` in a pull request comment or review to request changes. Task will automatically close when the pull request is closed or merged.",
+      headline: "Waiting for user review",
+      body: "The pull request is open and waiting for user review. Mention @superplaneagent in a pull request comment or review to request changes. Task will automatically close when the pull request is closed or merged.",
       ctaLabel: "Review PR #6812",
       ctaUrl: "https://github.com/superplanehq/superplane/pull/6812",
       automation: { appId: "app-refund-verifier", appName: "PR Closure" },

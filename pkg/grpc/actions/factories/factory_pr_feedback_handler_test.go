@@ -68,8 +68,11 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
-		assert.Len(t, liveVersion.Nodes, 6)
-		assert.Len(t, liveVersion.Edges, 5)
+		assert.Len(t, liveVersion.Nodes, 5)
+		assert.Len(t, liveVersion.Edges, 4)
+		for _, node := range liveVersion.Nodes {
+			assert.NotEqual(t, "noop", node.ComponentName())
+		}
 	})
 
 	t.Run("creation fails when no repository is available", func(t *testing.T) {

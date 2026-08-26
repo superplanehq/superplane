@@ -86,8 +86,11 @@ describe("splitRunCanvasForPhase", () => {
     expect(canvas.statuses["create-branch"]).toBe("passed");
     expect(canvas.statuses["implementation-agent"]).toBe("running");
     expect(canvas.statuses["implementation-agent-no-issue"]).toBe("did_not_run");
+    expect(canvas.statuses["generate-pr-text"]).toBe("did_not_run");
     expect(canvas.statuses["create-draft-pr"]).toBe("did_not_run");
+    expect(canvas.statuses["add-pr-label"]).toBe("did_not_run");
     expect(canvas.statuses["attach-pr-artifact"]).toBe("did_not_run");
+    expect(canvas.statuses["set-pr-closure-note"]).toBe("did_not_run");
     expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
   });
 
@@ -104,8 +107,11 @@ describe("splitRunCanvasForPhase", () => {
     });
 
     expect(canvas.statuses["implementation-agent"]).toBe("passed");
+    expect(canvas.statuses["generate-pr-text"]).toBe("passed");
     expect(canvas.statuses["create-draft-pr"]).toBe("passed");
+    expect(canvas.statuses["add-pr-label"]).toBe("passed");
     expect(canvas.statuses["attach-pr-artifact"]).toBe("passed");
+    expect(canvas.statuses["set-pr-closure-note"]).toBe("passed");
     expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
 
     const stream = richStreamForCanvas(canvas);

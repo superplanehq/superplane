@@ -85,6 +85,12 @@ vi.mock("@/hooks/useWorkOrderCardActions", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
+  useFactoryPRFeedbackHandlers: () => ({ data: [] }),
+  factoryPRFeedbackHandlerRunsKey: (...args: string[]) => ["pr-feedback-runs", ...args],
+  fetchFactoryPRFeedbackHandlerRuns: async () => [],
+}));
+
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => true, isLoading: false }),
 }));

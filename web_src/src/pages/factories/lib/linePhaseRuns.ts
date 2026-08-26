@@ -6,6 +6,7 @@ import type {
 } from "@/api-client";
 import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, linesPath } from "./factoryPagePaths";
+import { getWorkOrderDisplayStatus } from "./workOrderProgress";
 import {
   dispatchStepRows,
   isActiveWorkOrderExecution,
@@ -150,9 +151,52 @@ export function collectLineDoneOrders(
   return [...doneById.values()].sort(compareOrdersNewestFirst);
 }
 
+/** Open work that waits for review after the last stage passed. Newest first. */
+export function collectLineVerifyOrders(board: LinePhaseColumn[]): FactoriesWorkOrder[] {
+  const lastStage = lineStageColumns(board).at(-1);
+  if (!lastStage) {
+    return [];
+  }
+
+  const verifyById = new Map<string, FactoriesWorkOrder>();
+  for (const run of lastStage.runs) {
+    if (!run.order.id || !isWaitingAfterPassedStage(run)) {
+      continue;
+    }
+    verifyById.set(run.order.id, run.order);
+  }
+
+  return [...verifyById.values()].sort(compareOrdersNewestFirst);
+}
+
+function isWaitingAfterPassedStage(run: LinePhaseRunCard): boolean {
+  if (run.order.state === "STATE_CLOSED") {
+    return false;
+  }
+  if (getWorkOrderDisplayStatus(run.order) !== "waiting") {
+    return false;
+  }
+  return run.execution.state === "STATE_FINISHED" && run.execution.result === "RESULT_PASSED";
+}
+
 /** Stage columns only. Done is a fixed bookend, not a line step. */
 export function lineStageColumns(columns: LinePhaseColumn[]): LinePhaseColumn[] {
   return columns.filter((column) => !isDoneLineColumn(column));
+}
+
+/** Stage columns with waiting review work already moved to Verify. */
+export function visibleLineStageColumns(
+  columns: LinePhaseColumn[],
+  verifyOrders: FactoriesWorkOrder[],
+): LinePhaseColumn[] {
+  const verifyIds = new Set(verifyOrders.flatMap((order) => (order.id ? [order.id] : [])));
+  return lineStageColumns(columns).map((column) => {
+    const runs = column.runs.filter((run) => !verifyIds.has(run.workOrderId));
+    if (runs.length === column.runs.length) {
+      return column;
+    }
+    return { ...column, runs, tick: resolvePhaseTick(runs) };
+  });
 }
 
 /** Factory-level intake automation. It is not a line step. */
