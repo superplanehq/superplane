@@ -69,8 +69,9 @@ export function SidebarUserMenu({
     ? factorySettingsSectionPath(organizationId, factoryKey, "profile")
     : `/${organizationId}/settings/profile`;
   const organizationHref = factoryKey
-    ? organizationSettingsSectionPath(organizationId, factoryKey, "general")
+    ? organizationSettingsSectionPath(organizationId, "general")
     : `/${organizationId}/settings/general`;
+  const organizationHrefState = factoryKey ? { fromFactoryKey: factoryKey } : undefined;
 
   const handleSignOut = () => {
     posthog.reset();
@@ -104,6 +105,7 @@ export function SidebarUserMenu({
             organizationId={organizationId}
             organizationName={organizationName}
             organizationHref={organizationHref}
+            organizationHrefState={organizationHrefState}
           />
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -141,10 +143,12 @@ function OrganizationMenuHeader({
   organizationId,
   organizationName,
   organizationHref,
+  organizationHrefState,
 }: {
   organizationId: string;
   organizationName: string;
   organizationHref: string;
+  organizationHrefState?: { fromFactoryKey: string };
 }) {
   const navigate = useNavigate();
 
@@ -160,7 +164,7 @@ function OrganizationMenuHeader({
         aria-label="Organization settings"
         data-testid="factories-sidebar-organization-settings-link"
         className={cn(HEADER_ICON_CLASS, "cursor-pointer p-0")}
-        onSelect={() => navigate(organizationHref)}
+        onSelect={() => navigate(organizationHref, { state: organizationHrefState })}
       >
         <Settings className="size-3.5" aria-hidden />
       </DropdownMenuItem>

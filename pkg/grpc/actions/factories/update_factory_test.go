@@ -80,4 +80,26 @@ func Test__UpdateFactory(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})
+
+	t.Run("sets hosted spend limit", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		budget := int64(2500)
+		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id:                     factory.ID.String(),
+			HostedSpendBudgetCents: &budget,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, response.Factory)
+		require.NotNil(t, response.Factory.HostedSpendBudgetCents)
+		assert.Equal(t, int64(2500), *response.Factory.HostedSpendBudgetCents)
+
+		cleared, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id:                     factory.ID.String(),
+			ClearHostedSpendBudget: true,
+		})
+		require.NoError(t, err)
+		assert.Nil(t, cleared.Factory.HostedSpendBudgetCents)
+	})
 }

@@ -1,11 +1,22 @@
 import { render, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { MemoryRouter } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConfigurationField } from "@/api-client";
+import { useBYOKLLMModels } from "@/hooks/useLLMModelAllowlists";
 import { useHostedLLMModels } from "@/hooks/useHostedLLMModels";
 import { HostedModelFieldRenderer } from "./HostedModelFieldRenderer";
 
 vi.mock("@/hooks/useHostedLLMModels", () => ({
   useHostedLLMModels: vi.fn(),
+}));
+
+vi.mock("@/hooks/useLLMModelAllowlists", () => ({
+  useBYOKLLMModels: vi.fn(),
+}));
+
+vi.mock("@/hooks/useCanvasData", () => ({
+  useCanvas: () => ({ data: undefined }),
 }));
 
 function createField(): ConfigurationField {
@@ -25,6 +36,14 @@ function mockHostedModels(value: {
   vi.mocked(useHostedLLMModels).mockReturnValue(value as unknown as ReturnType<typeof useHostedLLMModels>);
 }
 
+function mockBYOKModels(value: { data: { selected: Array<{ id: string; name: string }> }; isLoading: boolean }) {
+  vi.mocked(useBYOKLLMModels).mockReturnValue(value as unknown as ReturnType<typeof useBYOKLLMModels>);
+}
+
+function renderField(ui: ReactElement) {
+  return render(<MemoryRouter>{ui}</MemoryRouter>);
+}
+
 describe("HostedModelFieldRenderer", () => {
   beforeAll(() => {
     Element.prototype.hasPointerCapture ??= () => false;
@@ -41,25 +60,29 @@ describe("HostedModelFieldRenderer", () => {
       },
       isLoading: false,
     });
+    mockBYOKModels({
+      data: { selected: [{ id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" }] },
+      isLoading: false,
+    });
   });
 
-  it("shows a free-text model field for secret credentials", () => {
-    render(
+  it("shows the selected-model list for secret credentials", () => {
+    renderField(
       <HostedModelFieldRenderer
         field={createField()}
-        value="sonnet"
+        value="claude-sonnet-4-6"
         onChange={vi.fn()}
         organizationId="org-1"
         allValues={{ credentials: { source: "secret" } }}
       />,
     );
 
-    expect(screen.getByDisplayValue("sonnet")).toBeInTheDocument();
-    expect(useHostedLLMModels).not.toHaveBeenCalled();
+    expect(screen.getByTestId("field-model-hosted-model")).toBeInTheDocument();
+    expect(useBYOKLLMModels).toHaveBeenCalledWith("org-1", "anthropic", true, undefined);
   });
 
   it("shows the SuperPlane-hosted allowlist when credentials are hosted", () => {
-    render(
+    renderField(
       <HostedModelFieldRenderer
         field={createField()}
         value="claude-sonnet-4-6"
@@ -70,7 +93,7 @@ describe("HostedModelFieldRenderer", () => {
     );
 
     expect(screen.getByTestId("field-model-hosted-model")).toBeInTheDocument();
-    expect(useHostedLLMModels).toHaveBeenCalledWith("org-1", "anthropic", true);
+    expect(useHostedLLMModels).toHaveBeenCalledWith("org-1", "anthropic", true, undefined);
   });
 
   it("explains when SuperPlane-hosted models are not configured", () => {
@@ -79,7 +102,7 @@ describe("HostedModelFieldRenderer", () => {
       isLoading: false,
     });
 
-    render(
+    renderField(
       <HostedModelFieldRenderer
         field={createField()}
         value=""
