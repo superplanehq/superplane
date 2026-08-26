@@ -14,13 +14,8 @@ import { SplitRunCheckPills } from "./SplitRunReview";
 import { type SplitRunPhase, type SplitRunPhaseStatus, type SplitRunStreamLine } from "./splitRunMocks";
 import { isRunnerComponent, notesForLiveStream } from "./streamNotesFromLiveLog";
 
-/**
- * One face and size for every log row, matched to the run log viewer.
- * System mono faces only ship 400 and 700, and `:root` sets
- * `font-synthesis: none`. Medium weight therefore looks regular.
- * JetBrains Mono has a real 600 cut.
- */
-const LOG_FACE = "font-['JetBrains_Mono',ui-monospace,monospace] text-[14px] font-semibold [font-synthesis:weight]";
+/** One face and size for every log row, matched to the run log viewer. */
+const LOG_FACE = "font-mono text-[14px]";
 
 function statusGlyph(status: SplitRunPhaseStatus): PhaseGlyphKind {
   if (status === "running") return "running";

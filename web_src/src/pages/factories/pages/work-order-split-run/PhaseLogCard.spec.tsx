@@ -180,9 +180,9 @@ describe("PhaseLogCard title line", () => {
     expect(within(row).queryByText("Planning")).not.toBeInTheDocument();
     expect(within(row).queryByText("Completed")).not.toBeInTheDocument();
     expect(within(row).getByTestId("split-run-phase-duration-plan")).toHaveTextContent("01:00");
-    expect(row.firstElementChild?.className).toMatch(/font-semibold/);
-    expect(row.firstElementChild?.className).toMatch(/JetBrains_Mono/);
+    expect(row.firstElementChild?.className).toMatch(/font-mono/);
     expect(row.firstElementChild?.className).toMatch(/text-\[14px\]/);
+    expect(row.firstElementChild?.className).not.toMatch(/font-semibold/);
   });
 
   it("puts bold artifacts before the duration on the far right", () => {
