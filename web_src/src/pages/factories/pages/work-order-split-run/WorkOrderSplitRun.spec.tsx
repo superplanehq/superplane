@@ -355,7 +355,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).queryByRole("button", { name: /Update manually/ })).not.toBeInTheDocument();
     expect(within(footer).queryByRole("heading", { name: "Listening for user review" })).not.toBeInTheDocument();
     expect(within(footer).getByText("This work order needs attention.")).toBeInTheDocument();
-    expect(within(footer).getByRole("button", { name: "Stop & Cancel" })).toBeInTheDocument();
+    expect(within(footer).getByRole("button", { name: "Stop and Close" })).toBeInTheDocument();
   });
 
   it("hides Stop when the user cannot update the work order", () => {
@@ -364,7 +364,7 @@ describe("WorkOrderSplitRunPopup", () => {
       canUpdate: false,
     });
 
-    expect(screen.queryByRole("button", { name: "Stop & Cancel" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stop")).not.toBeInTheDocument();
   });
 
@@ -390,7 +390,43 @@ describe("WorkOrderSplitRunPopup", () => {
     );
     expect(within(footer).getByText("This work order needs attention.")).toBeInTheDocument();
     expect(within(footer).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
-    expect(within(footer).queryByRole("button", { name: "Stop & Cancel" })).not.toBeInTheDocument();
+    expect(within(footer).queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
+  });
+
+  it("defaults the failed waiting footer to Rerun this step", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder({
+        id: "wo-2",
+        title: "Test work order 2",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "d-1",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_FINISHED",
+            stepExecutions: [
+              { id: "e-plan", step: "Planning", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+              {
+                id: "e-impl",
+                step: "Implementation",
+                stepIndex: 1,
+                state: "STATE_FINISHED",
+                result: "RESULT_FAILED",
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    const footer = screen.getByTestId("split-run-review");
+    expect(within(footer).getByRole("button", { name: "Rerun step" })).toBeInTheDocument();
+    await user.click(within(footer).getByRole("button", { name: "Choose how to stop" }));
+    expect(within(await screen.findByRole("menu")).getByRole("menuitem", { name: /Rerun this step/ })).toHaveAttribute(
+      "data-selected",
+      "true",
+    );
   });
 
   it("offers one Stop control with Canceled as the default outcome", async () => {
@@ -399,26 +435,28 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const footer = screen.getByTestId("split-run-review");
     expect(within(footer).getByTestId("split-run-stop")).toHaveClass("bg-primary", "overflow-hidden", "rounded-md");
-    expect(within(footer).getByRole("button", { name: "Stop & Cancel" })).toBeInTheDocument();
+    expect(within(footer).getByRole("button", { name: "Stop and Close" })).toBeInTheDocument();
     expect(within(footer).queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
     expect(within(footer).queryByRole("button", { name: "Stop and send to Draft" })).not.toBeInTheDocument();
 
     await user.click(within(footer).getByRole("button", { name: "Choose how to stop" }));
     const menu = await screen.findByRole("menu");
-    expect(within(menu).getByRole("menuitem", { name: /Stop as Canceled/ })).toHaveAttribute("data-selected", "true");
+    expect(within(menu).getByRole("menuitem", { name: /Stop and Close/ })).toHaveAttribute("data-selected", "true");
     expect(within(menu).getByText("Marks this task as Canceled")).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: /Stop as Completed/ })).toHaveAttribute("data-selected", "false");
-    expect(within(menu).getByRole("menuitem", { name: /Stop and return to Draft/ })).toHaveAttribute(
+    expect(within(menu).getByRole("menuitem", { name: /Stop and Complete/ })).toHaveAttribute("data-selected", "false");
+    expect(within(menu).getByRole("menuitem", { name: /Rerun this step/ })).toHaveAttribute("data-selected", "false");
+    expect(within(menu).getByText("Starts this step again")).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /Rerun from the start/ })).toHaveAttribute(
       "data-selected",
       "false",
     );
-    expect(within(menu).getByText("Returns this task to Backlog")).toBeInTheDocument();
+    expect(within(menu).getByText("Starts this task from the first step")).toBeInTheDocument();
 
-    await user.click(within(menu).getByRole("menuitem", { name: /Stop as Completed/ }));
-    expect(within(footer).getByRole("button", { name: "Mark as Complete" })).toBeInTheDocument();
+    await user.click(within(menu).getByRole("menuitem", { name: /Stop and Complete/ }));
+    expect(within(footer).getByRole("button", { name: "Stop and Complete" })).toBeInTheDocument();
     await user.click(within(footer).getByRole("button", { name: "Choose how to stop" }));
     expect(
-      within(await screen.findByRole("menu")).getByRole("menuitem", { name: /Stop as Completed/ }),
+      within(await screen.findByRole("menu")).getByRole("menuitem", { name: /Stop and Complete/ }),
     ).toHaveAttribute("data-selected", "true");
   });
 
@@ -615,6 +653,55 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-stream-implement-0")).toBeInTheDocument();
+  });
+
+  it("expands the new implement run after a rerun of the same step", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      {
+        id: "wo-2",
+        title: "Test work order 2",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "d-1",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_ACTIVE",
+            stepExecutions: [
+              {
+                id: "e-plan",
+                step: "Planning",
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+                run: { id: "run-plan" },
+              },
+              {
+                id: "e-impl-old",
+                step: "Implementation",
+                stepIndex: 1,
+                state: "STATE_FINISHED",
+                result: "RESULT_FAILED",
+                run: { id: "run-old" },
+              },
+              {
+                id: "e-impl-new",
+                step: "Implementation",
+                stepIndex: 1,
+                state: "STATE_STARTED",
+                result: "RESULT_UNKNOWN",
+                run: { id: "run-new" },
+              },
+            ],
+          },
+        ],
+      },
+      { lineId: "line-1" },
+    );
+    const implementPhases = fixture.phases.filter((phase) => phase.name === "Implement");
+
+    renderPopup({ fixture });
+
+    expect(screen.getByTestId(`split-run-phase-${implementPhases[1].id}`)).toHaveAttribute("aria-current", "step");
+    expect(screen.getByTestId(`split-run-phase-${implementPhases[0].id}`)).not.toHaveAttribute("aria-current");
   });
 
   it("opens the selected step log when a log row is clicked", async () => {

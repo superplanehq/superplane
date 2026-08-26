@@ -46,6 +46,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
   costUsd: "$0.73",
   tokensLabel: "2.7k tokens",
   lineName: "plan-and-implement",
+  currentStepIndex: 0,
   lineStatus: "running",
   currentPhaseId: "implement",
   waitingNotes: [],
