@@ -83,4 +83,19 @@ describe("startDirectGitHubConnect", () => {
     expect(remember).toHaveBeenCalledWith("org-1", "/org-1/settings/integrations");
     expect(follow).toHaveBeenCalledWith(action);
   });
+
+  it("throws when create does not return a browser action", async () => {
+    const create = vi.fn().mockResolvedValue({
+      integration: { status: { setupState: { currentStep: { name: "selectOwner" } } } },
+    });
+
+    await expect(
+      startDirectGitHubConnect({
+        organizationId: "org-1",
+        existingNames: new Set(),
+        connected: [],
+        create,
+      }),
+    ).rejects.toThrow("The GitHub App install page did not open.");
+  });
 });

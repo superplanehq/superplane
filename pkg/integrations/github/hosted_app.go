@@ -17,6 +17,12 @@ func UseHostedApp(orgID string) bool {
 	return factoriesEnabled(orgID)
 }
 
+// UseHostedInstall is true when this integration create should skip the
+// SetupProvider wizard and the organization dialog, and install the public app.
+func UseHostedInstall(orgID, integrationName string) bool {
+	return integrationName == "github" && UseHostedApp(orgID)
+}
+
 var factoriesEnabled = factoriesEnabledForOrg
 
 func factoriesEnabledForOrg(orgID string) bool {

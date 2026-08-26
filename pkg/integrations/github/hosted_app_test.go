@@ -34,6 +34,16 @@ func Test__UseHostedApp(t *testing.T) {
 	})
 }
 
+func Test__UseHostedInstall(t *testing.T) {
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+
+	orgID := "11111111-1111-1111-1111-111111111111"
+	assert.True(t, UseHostedInstall(orgID, "github"))
+	assert.False(t, UseHostedInstall(orgID, "slack"))
+}
+
 func setHostedAppEnv(t *testing.T) {
 	t.Helper()
 	t.Setenv(common.EnvGitHubAppID, "99")

@@ -1,8 +1,7 @@
 import type { OrganizationsIntegration } from "@/api-client";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
-import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { getApiErrorMessage } from "@/lib/errors";
+import { usesHostedGitHubAppInstall } from "@/lib/integrations";
 import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
 import { showErrorToast } from "@/lib/toast";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
@@ -101,8 +100,7 @@ export function useIntegrationConnectDialog({
       }),
     [organizationId, dialogIntegrationName, dialogMode, dialogPendingInstance?.metadata?.id, selections],
   );
-  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
-  const useHostedGitHubApp = hasExperimentalFeature(FEATURE_FACTORIES);
+  const useHostedGitHubApp = usesHostedGitHubAppInstall(availableIntegrations.find((item) => item.name === "github"));
   const { openCapabilitySetup, openCreateIntegrationModal, openConnectDialog, openConfigureDialog } =
     useHomeIntegrationConnectActions({
       organizationId,

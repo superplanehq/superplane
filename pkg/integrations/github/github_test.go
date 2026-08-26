@@ -122,6 +122,24 @@ func Test__ownerFromRepositories(t *testing.T) {
 	assert.Empty(t, ownerFromRepositories(nil))
 }
 
+func Test__ownerFromInstallation(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/app/installations/42", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":42,"account":{"login":"acme","type":"Organization"}}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	client := gh.NewClient(srv.Client())
+	baseURL, err := url.Parse(srv.URL + "/")
+	require.NoError(t, err)
+	client.BaseURL = baseURL
+
+	owner, err := ownerFromInstallation(context.Background(), client, "42")
+	require.NoError(t, err)
+	assert.Equal(t, "acme", owner)
+}
+
 func Test__listInstallationRepositories__paginates_all_pages(t *testing.T) {
 	t.Parallel()
 

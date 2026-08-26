@@ -61,6 +61,10 @@ message IntegrationDefinition {
   //
   repeated Configuration.Field configuration = 8;
   string instructions = 9;
+
+  // When true, new GitHub connections install SuperPlane's public GitHub App.
+  // The client skips the organization dialog and the SetupProvider wizard.
+  bool hosted_app_install = 10;
 }
 
 message CapabilityDefinition {

@@ -44,5 +44,9 @@ export async function startDirectGitHubConnect(args: {
   });
 
   rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
-  return followBrowserAction(result.integration?.status?.browserAction);
+  const action = result.integration?.status?.browserAction;
+  if (!action?.url) {
+    throw new Error("The GitHub App install page did not open.");
+  }
+  return followBrowserAction(action);
 }

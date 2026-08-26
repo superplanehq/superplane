@@ -2,18 +2,16 @@ package common
 
 import (
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
 
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 const (
-	EnvGitHubAppID            = "SUPERPLANE_GITHUB_APP_ID"
-	EnvGitHubAppSlug          = "SUPERPLANE_GITHUB_APP_SLUG"
-	EnvGitHubAppPrivateKey    = "SUPERPLANE_GITHUB_APP_PRIVATE_KEY"
-	EnvGitHubAppWebhookSecret = "SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET"
+	EnvGitHubAppID            = config.EnvGitHubAppID
+	EnvGitHubAppSlug          = config.EnvGitHubAppSlug
+	EnvGitHubAppPrivateKey    = config.EnvGitHubAppPrivateKey
+	EnvGitHubAppWebhookSecret = config.EnvGitHubAppWebhookSecret
 )
 
 // HostedApp is SuperPlane Cloud's public GitHub App. The process holds the
@@ -25,33 +23,24 @@ type HostedApp struct {
 	WebhookSecret string
 }
 
-// HostedAppFromEnv returns the public GitHub App when every required
-// environment variable is set. Self-hosted leaves them empty.
+// HostedAppFromEnv returns the public GitHub App when Cloud holds complete
+// credentials. Self-hosted leaves them empty.
 func HostedAppFromEnv() (HostedApp, bool) {
-	idRaw := strings.TrimSpace(os.Getenv(EnvGitHubAppID))
-	slug := strings.TrimSpace(os.Getenv(EnvGitHubAppSlug))
-	privateKey := normalizePEM(os.Getenv(EnvGitHubAppPrivateKey))
-	webhookSecret := strings.TrimSpace(os.Getenv(EnvGitHubAppWebhookSecret))
-	if idRaw == "" || slug == "" || privateKey == "" || webhookSecret == "" {
-		return HostedApp{}, false
-	}
-
-	id, err := strconv.ParseInt(idRaw, 10, 64)
-	if err != nil || id <= 0 {
+	cfg := config.LoadGitHubHostedAppConfig()
+	if !cfg.Enabled() {
 		return HostedApp{}, false
 	}
 
 	return HostedApp{
-		ID:            id,
-		Slug:          slug,
-		PrivateKey:    privateKey,
-		WebhookSecret: webhookSecret,
+		ID:            cfg.ID,
+		Slug:          cfg.Slug,
+		PrivateKey:    cfg.PrivateKey,
+		WebhookSecret: cfg.WebhookSecret,
 	}, true
 }
 
 func HostedAppConfigured() bool {
-	_, ok := HostedAppFromEnv()
-	return ok
+	return config.LoadGitHubHostedAppConfig().Enabled()
 }
 
 func HostedAppInstallURL(slug, state string) string {
@@ -71,9 +60,4 @@ func LegacyAppPrivateKey(ctx core.IntegrationContext, metadata Metadata) (string
 	}
 
 	return FindSecret(ctx, GitHubAppPEM)
-}
-
-func normalizePEM(value string) string {
-	value = strings.TrimSpace(value)
-	return strings.ReplaceAll(value, `\n`, "\n")
 }
