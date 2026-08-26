@@ -14,17 +14,32 @@ import (
 const (
 	// Node identifiers of a generated intake graph. An intake owns its whole
 	// canvas, so the identifiers are fixed rather than derived from the source.
-	intakeTriggerNodeID   = "trigger"
-	intakeAnalysisNodeID  = "analyze"
-	intakeThresholdNodeID = "threshold"
-	intakeCreateNodeID    = "create-work-order"
+	intakeTriggerNodeID          = "trigger"
+	intakeAnalysisNodeID         = "analyze"
+	intakeThresholdNodeID        = "threshold"
+	intakeCreateNodeID           = "create-work-order"
+	intakeReportConfidenceNodeID = "report-confidence"
 
 	// The threshold expression reads the analysis result by node name, so the
 	// name is part of the generated graph's contract.
 	intakeAnalysisNodeName = "Analyze intake"
+	intakeCreateNodeName   = "Create Work Order"
 
-	intakeThresholdComponent = "if"
-	intakeCreateComponent    = "createWorkOrder"
+	intakeThresholdComponent        = "if"
+	intakeCreateComponent           = "createWorkOrder"
+	intakeReportConfidenceComponent = "reportWorkOrderCheck"
+
+	intakeConfidenceCheckKey  = "confidence"
+	intakeConfidenceCheckName = "Confidence score"
+	intakeConfidenceScoreMax  = 5
+	intakeConfidenceFormat    = "fraction"
+	intakeConfidenceDirection = "higherIsBetter"
+
+	// Band edges of the confidence meter, which reads High from 4, Medium at
+	// 3, and Low below 3. The check has no neutral threshold, so Medium maps
+	// to caution and Low maps to critical.
+	intakeConfidenceCautionAt  = 3
+	intakeConfidenceCriticalAt = 2
 
 	DefaultIntakeConfidencePct = 65
 )
@@ -35,12 +50,17 @@ const (
 const intakeAnalysisMachineType = runner.MachineTypeE1LargeAMD64
 
 // intakeAnalysisComponents are the runners an intake can score with. Creation
-// always picks Claude Code, but a graph the user re-pointed at another runner
-// still has to resolve.
-var intakeAnalysisComponents = []string{
-	"runnerClaudeCode",
-	"runnerCodex",
-	"runnerOpenRouter",
+// picks the runner of the workspace agent, but a graph the user re-pointed at
+// another runner still has to resolve.
+var intakeAnalysisComponents = intakeAgentComponents()
+
+func intakeAgentComponents() []string {
+	components := make([]string, 0, len(intakeAgentSpecs))
+	for _, spec := range intakeAgentSpecs {
+		components = append(components, spec.component)
+	}
+
+	return components
 }
 
 type intakeSpec struct {
@@ -110,14 +130,16 @@ func intakeDefaultDescription(source string) string {
 // buildIntakeCanvas returns the canvas document for a new intake: listen on the
 // source, score the item with an agent, and create a work order when the score
 // clears the threshold. The binding tells the trigger which installation and
-// resource to listen on; without one the user completes the trigger by hand.
-func buildIntakeCanvas(source, name string, confidencePct int, binding *intakeBinding) (*yaml.Canvas, error) {
-	spec, ok := intakeSpecsBySource[source]
+// resource to listen on, and the agent tells the analysis node which runner to
+// score with; without them the user completes those nodes by hand.
+func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
+	spec, ok := intakeSpecsBySource[request.Source]
 	if !ok {
 		return nil, models.ErrFactoryIntakeSourceInvalid
 	}
 
-	if strings.TrimSpace(name) == "" {
+	name := strings.TrimSpace(request.Name)
+	if name == "" {
 		name = spec.name
 	}
 
@@ -133,6 +155,7 @@ func buildIntakeCanvas(source, name string, confidencePct int, binding *intakeBi
 				{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeAnalysisNodeID},
 				{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeThresholdNodeID},
 				{Channel: "true", SourceID: intakeThresholdNodeID, TargetID: intakeCreateNodeID},
+				{Channel: "default", SourceID: intakeCreateNodeID, TargetID: intakeReportConfidenceNodeID},
 			},
 			Nodes: []yaml.Node{
 				{
@@ -140,26 +163,17 @@ func buildIntakeCanvas(source, name string, confidencePct int, binding *intakeBi
 					Name:          spec.triggerName,
 					Type:          yaml.NodeTypeTrigger,
 					Component:     spec.triggerComponent,
-					Configuration: intakeTriggerConfiguration(spec, binding),
-					Integration:   binding.integrationRef(),
+					Configuration: intakeTriggerConfiguration(spec, request.Binding),
+					Integration:   request.Binding.integrationRef(),
 					Position:      yaml.Position{X: 160, Y: 80},
 				},
 				{
-					ID:        intakeAnalysisNodeID,
-					Name:      intakeAnalysisNodeName,
-					Type:      yaml.NodeTypeAction,
-					Component: intakeAnalysisComponents[0],
-					Configuration: map[string]any{
-						"machineType": intakeAnalysisMachineType,
-						"steps": []any{
-							map[string]any{
-								"name":   "Analyze and score",
-								"type":   "prompt",
-								"prompt": intakeAnalysisPrompt(spec.analysisSubject),
-							},
-						},
-					},
-					Position: yaml.Position{X: 160, Y: 260},
+					ID:            intakeAnalysisNodeID,
+					Name:          intakeAnalysisNodeName,
+					Type:          yaml.NodeTypeAction,
+					Component:     request.Agent.component(),
+					Configuration: intakeAnalysisConfiguration(spec, request.Agent),
+					Position:      yaml.Position{X: 160, Y: 260},
 				},
 				{
 					ID:        intakeThresholdNodeID,
@@ -167,13 +181,13 @@ func buildIntakeCanvas(source, name string, confidencePct int, binding *intakeBi
 					Type:      yaml.NodeTypeAction,
 					Component: intakeThresholdComponent,
 					Configuration: map[string]any{
-						"expression": intakeThresholdExpression(confidencePct),
+						"expression": intakeThresholdExpression(request.ConfidencePct),
 					},
 					Position: yaml.Position{X: 160, Y: 440},
 				},
 				{
 					ID:        intakeCreateNodeID,
-					Name:      "Create Work Order",
+					Name:      intakeCreateNodeName,
 					Type:      yaml.NodeTypeAction,
 					Component: intakeCreateComponent,
 					Configuration: map[string]any{
@@ -181,6 +195,24 @@ func buildIntakeCanvas(source, name string, confidencePct int, binding *intakeBi
 						"description": spec.createDescription,
 					},
 					Position: yaml.Position{X: 160, Y: 620},
+				},
+				{
+					ID:        intakeReportConfidenceNodeID,
+					Name:      "Report Confidence",
+					Type:      yaml.NodeTypeAction,
+					Component: intakeReportConfidenceComponent,
+					Configuration: map[string]any{
+						"orderId":    intakeWorkOrderIDExpression(),
+						"checkKey":   intakeConfidenceCheckKey,
+						"name":       intakeConfidenceCheckName,
+						"score":      intakeConfidenceScoreExpression(),
+						"maxScore":   strconv.Itoa(intakeConfidenceScoreMax),
+						"format":     intakeConfidenceFormat,
+						"direction":  intakeConfidenceDirection,
+						"cautionAt":  float64(intakeConfidenceCautionAt),
+						"criticalAt": float64(intakeConfidenceCriticalAt),
+					},
+					Position: yaml.Position{X: 160, Y: 800},
 				},
 			},
 		},
@@ -202,6 +234,31 @@ func intakeTriggerConfiguration(spec intakeSpec, binding *intakeBinding) map[str
 	return configuration
 }
 
+// intakeAnalysisConfiguration configures the runner that scores an item. The
+// runner components reject a node without a machine type or credentials, so the
+// generated node names the machine and the credentials of the workspace agent.
+func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent) map[string]any {
+	configuration := map[string]any{
+		"machineType": intakeAnalysisMachineType,
+		"steps": []any{
+			map[string]any{
+				"name":   "Analyze and score",
+				"type":   "prompt",
+				"prompt": intakeAnalysisPrompt(spec.analysisSubject),
+			},
+		},
+	}
+
+	if credentials := agent.credentials(); credentials != nil {
+		configuration["credentials"] = credentials
+	}
+	if model := agent.model(); model != "" {
+		configuration["model"] = model
+	}
+
+	return configuration
+}
+
 func intakeAnalysisPrompt(subject string) string {
 	return strings.Join([]string{
 		fmt.Sprintf("Analyze this %s and decide whether it is suitable for an engineering work order.", subject),
@@ -215,6 +272,21 @@ func intakeAnalysisPrompt(subject string) string {
 
 func intakeThresholdExpression(confidencePct int) string {
 	return fmt.Sprintf(`int($[%q].data[0].result.result) >= %d`, intakeAnalysisNodeName, clampIntakeConfidence(confidencePct))
+}
+
+func intakeWorkOrderIDExpression() string {
+	return fmt.Sprintf(`{{ $[%q].data.workOrder.id }}`, intakeCreateNodeName)
+}
+
+// intakeConfidenceScoreExpression maps the analysis percentage to the 0–5
+// scale of the work-order confidence meter. The meter rounds the score it
+// receives, so the expression rounds too and both agree on the bar count.
+func intakeConfidenceScoreExpression() string {
+	pctPerPoint := 100 / intakeConfidenceScoreMax
+	return fmt.Sprintf(
+		`{{ int(round(int($[%q].data[0].result.result) / %d.0)) }}`,
+		intakeAnalysisNodeName, pctPerPoint,
+	)
 }
 
 var intakeThresholdPattern = regexp.MustCompile(`>=\s*(\d+)`)
