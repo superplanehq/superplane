@@ -77,6 +77,9 @@ func NewClient(baseURL, accessToken string, httpClient *http.Client) *Client {
 }
 
 func APIBaseURL() string {
+	if override := strings.TrimRight(strings.TrimSpace(os.Getenv("POLAR_API_BASE_URL")), "/"); override != "" {
+		return override
+	}
 	if strings.EqualFold(strings.TrimSpace(os.Getenv("POLAR_ENVIRONMENT")), "production") {
 		return productionAPIBaseURL
 	}

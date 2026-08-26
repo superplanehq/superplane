@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/ui/switch";
 import { getApiErrorMessage } from "@/lib/errors";
-import { centsToDollarInput, dollarInputToCents } from "@/lib/hostedCredit";
+import { centsToDollarInput, parseDollarInputToCents } from "@/lib/hostedCredit";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
@@ -66,18 +66,24 @@ function HostedSpendLimitCard() {
   const currentBudget = factory.hostedSpendBudgetCents;
   const hasLimit = currentBudget !== undefined && currentBudget !== null;
   const [noLimit, setNoLimit] = useState(!hasLimit);
-  const [dollars, setDollars] = useState(hasLimit ? centsToDollarInput(Number(currentBudget)) : "0.00");
+  const [dollars, setDollars] = useState(hasLimit ? centsToDollarInput(Number(currentBudget)) : "");
+  const limitCents = parseDollarInputToCents(dollars);
+  const canSaveLimit = noLimit || limitCents !== null;
 
   useEffect(() => {
     const nextHasLimit = currentBudget !== undefined && currentBudget !== null;
     setNoLimit(!nextHasLimit);
-    setDollars(nextHasLimit ? centsToDollarInput(Number(currentBudget)) : "0.00");
+    setDollars(nextHasLimit ? centsToDollarInput(Number(currentBudget)) : "");
   }, [currentBudget]);
 
   const save = async () => {
+    if (!noLimit && limitCents === null) {
+      showErrorToast("Enter a valid spend limit in USD.");
+      return;
+    }
     try {
       await updateFactory.mutateAsync({
-        hostedSpendBudgetCents: noLimit ? null : dollarInputToCents(dollars),
+        hostedSpendBudgetCents: noLimit ? null : limitCents,
       });
       showSuccessToast("Hosted spend limit saved.");
     } catch (error) {
@@ -89,18 +95,32 @@ function HostedSpendLimitCard() {
     <div className={`${factoryCardClassName} p-4`}>
       <p className="workspace-section-title">Hosted spend limit</p>
       <div className="mt-3 flex items-center justify-between gap-3">
-        <Label className="text-[13px]">No limit</Label>
-        <Switch checked={noLimit} disabled={!canUpdate || updateFactory.isPending} onCheckedChange={setNoLimit} />
+        <Label htmlFor="hosted-spend-no-limit" className="text-[13px]">
+          No limit
+        </Label>
+        <Switch
+          id="hosted-spend-no-limit"
+          checked={noLimit}
+          disabled={!canUpdate || updateFactory.isPending}
+          onCheckedChange={setNoLimit}
+        />
       </div>
       {!noLimit ? (
         <div className="mt-3">
-          <Label className="text-[13px]">Limit in USD</Label>
+          <Label htmlFor="hosted-spend-limit-usd" className="text-[13px]">
+            Limit in USD
+          </Label>
           <Input
+            id="hosted-spend-limit-usd"
             className="mt-1"
             value={dollars}
+            placeholder="50.00"
             onChange={(event) => setDollars(event.target.value)}
             disabled={!canUpdate || updateFactory.isPending}
           />
+          <p className="mt-2 text-[13px] text-muted-foreground">
+            Enter an amount in USD. SuperPlane-hosted runs stop when this workspace reaches the limit.
+          </p>
         </div>
       ) : (
         <p className="mt-2 text-[13px] text-muted-foreground">
@@ -119,7 +139,12 @@ function HostedSpendLimitCard() {
         </p>
       ) : null}
       {canUpdate ? (
-        <Button className="mt-3" type="button" onClick={() => void save()} disabled={updateFactory.isPending}>
+        <Button
+          className="mt-3"
+          type="button"
+          onClick={() => void save()}
+          disabled={updateFactory.isPending || !canSaveLimit}
+        >
           {updateFactory.isPending ? "Saving..." : "Save hosted spend limit"}
         </Button>
       ) : null}

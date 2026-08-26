@@ -93,6 +93,10 @@ func Test__ResolveSelectableLLMModels(t *testing.T) {
 	allowed, err := models.ModelIsSelectable(db, r.Organization.ID, &factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, "claude-opus-4-6")
 	require.NoError(t, err)
 	assert.False(t, allowed)
+
+	allowed, err = models.ModelIsSelectable(db, r.Organization.ID, &factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, "")
+	require.NoError(t, err)
+	assert.False(t, allowed)
 }
 
 func Test__CompactModelIDs(t *testing.T) {

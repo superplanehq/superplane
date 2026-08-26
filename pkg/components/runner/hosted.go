@@ -83,9 +83,6 @@ func PrepareBYOKRun(ctx core.ExecutionContext, provider, model string) error {
 	if ctx.HostedLLM == nil {
 		return nil
 	}
-	if strings.TrimSpace(model) == "" {
-		return nil
-	}
 	return ctx.HostedLLM.AssertModelSelectable(provider, "byok", model)
 }
 

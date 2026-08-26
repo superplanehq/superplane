@@ -138,7 +138,10 @@ func Test__CreateCheckoutForwardsCustomerIP(t *testing.T) {
 
 func Test__APIBaseURLUsesSandboxByDefault(t *testing.T) {
 	t.Setenv("POLAR_ENVIRONMENT", "")
+	t.Setenv("POLAR_API_BASE_URL", "")
 	assert.Equal(t, sandboxAPIBaseURL, APIBaseURL())
 	t.Setenv("POLAR_ENVIRONMENT", "production")
 	assert.Equal(t, productionAPIBaseURL, APIBaseURL())
+	t.Setenv("POLAR_API_BASE_URL", "http://polar.example/v1/")
+	assert.Equal(t, "http://polar.example/v1", APIBaseURL())
 }
