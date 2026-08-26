@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PhaseLogCard } from "./PhaseLogCard";
@@ -55,8 +56,41 @@ describe("PhaseLogCard title line", () => {
     expect(artifact.compareDocumentPosition(duration) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(duration.className).toMatch(/ml-auto/);
     expect(artifact.className).toMatch(/font-bold/);
-    expect(name.className).toMatch(/flex-1/);
-    expect(within(row).getByTestId("split-run-phase-artifacts-plan").className).toMatch(/justify-end/);
+    expect(within(row).getByTestId("split-run-phase-artifacts-plan").className).toMatch(/ml-auto/);
+  });
+});
+
+describe("PhaseLogCard edit control", () => {
+  it("stays off collapsed phases", () => {
+    render(<PhaseLogCard phase={PHASE} expanded={false} onEdit={vi.fn()} />);
+
+    expect(screen.queryByTestId("split-run-phase-edit-plan")).not.toBeInTheDocument();
+  });
+
+  it("sits next to the name of an expanded phase", () => {
+    render(<PhaseLogCard phase={PHASE} expanded onEdit={vi.fn()} />);
+
+    const edit = screen.getByTestId("split-run-phase-edit-plan");
+    expect(edit).toHaveAccessibleName("Edit Plan automation");
+    expect(edit.previousElementSibling).toBe(screen.getByRole("button", { name: "Plan" }));
+  });
+
+  it("opens the automation editor without collapsing the phase", async () => {
+    const onEdit = vi.fn();
+    const onToggle = vi.fn();
+    const user = userEvent.setup();
+    render(<PhaseLogCard phase={PHASE} expanded onEdit={onEdit} onToggle={onToggle} />);
+
+    await user.click(screen.getByTestId("split-run-phase-edit-plan"));
+
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it("is absent when the log cannot edit automations", () => {
+    render(<PhaseLogCard phase={PHASE} expanded />);
+
+    expect(screen.queryByTestId("split-run-phase-edit-plan")).not.toBeInTheDocument();
   });
 });
 

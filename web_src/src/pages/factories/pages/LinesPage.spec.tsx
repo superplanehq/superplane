@@ -497,6 +497,23 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("lines-backlog-menu-parallelism")).not.toBeInTheDocument();
   });
 
+  it("opens the phase editor and renames the column from its title", async () => {
+    const user = userEvent.setup();
+    renderBoard();
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    await user.click(screen.getByTestId("lines-phase-menu-0-edit"));
+
+    const implementationToggle = screen.getByTestId("planning-review-component-toggle-implementation-agent");
+    expect(implementationToggle).toHaveAttribute("aria-expanded", "true");
+    await user.click(screen.getByTestId("planning-review-title"));
+    const input = screen.getByTestId("planning-review-title-input");
+    await user.clear(input);
+    await user.type(input, "Planning review{Enter}");
+
+    expect(screen.getByTestId("lines-column-title-phase-0")).toHaveTextContent("Planning review");
+  });
+
   it("opens Set parallelism and saves a new cap", async () => {
     updateFactoryLineMutateAsync.mockResolvedValueOnce({});
     const user = userEvent.setup();

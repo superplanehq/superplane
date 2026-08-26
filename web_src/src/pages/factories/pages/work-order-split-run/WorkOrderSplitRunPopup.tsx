@@ -8,12 +8,20 @@ import { Link } from "@/components/Link/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { OwnerTimeCostRow, PopupHeader, PopupShell, SectionTitle } from "../work-order-popup-redesign/popupShared";
+import { PlanningReviewPopup } from "../PlanningReviewPopup";
+import { PLANNING_REVIEW_DRAFT } from "../planningReviewMockup";
 import { PhaseLogCard } from "./PhaseLogCard";
 import { SplitRunReview } from "./SplitRunReview";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { emptySplitRunCanvas } from "./splitRunCanvases";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
-import { autoExpandedPhaseId, splitRunStatusLabel, type SplitRunFixture, type SplitRunPhaseId } from "./splitRunMocks";
+import {
+  autoExpandedPhaseId,
+  splitRunStatusLabel,
+  type SplitRunFixture,
+  type SplitRunPhase,
+  type SplitRunPhaseId,
+} from "./splitRunMocks";
 import {
   collectSplitRunArtifacts,
   defaultSplitRunPopupTab,
@@ -80,6 +88,7 @@ export function WorkOrderSplitRunBody({
   const [phaseId, setPhaseId] = useState<SplitRunPhaseId>(fixture.currentPhaseId);
   const [openPhaseId, setOpenPhaseId] = useState<SplitRunPhaseId | null>(() => autoExpandedPhaseId(fixture));
   const [nodeId, setNodeId] = useState<string | null>(null);
+  const [editedPhase, setEditedPhase] = useState<SplitRunPhase | null>(null);
   const currentPhaseId = fixture.currentPhaseId;
   const expandedPhaseId = autoExpandedPhaseId(fixture);
   useEffect(() => {
@@ -146,6 +155,7 @@ export function WorkOrderSplitRunBody({
               onSelectNode={setNodeId}
               organizationId={organizationId}
               canvasId={entry.appId}
+              onEdit={() => setEditedPhase(entry)}
               onToggle={() => {
                 setPhaseId(entry.id);
                 setNodeId(null);
@@ -155,6 +165,14 @@ export function WorkOrderSplitRunBody({
           </li>
         ))}
       </ol>
+      {editedPhase ? (
+        <PlanningReviewPopup
+          onClose={() => setEditedPhase(null)}
+          canRename={false}
+          organizationId={organizationId}
+          initialDraft={{ ...PLANNING_REVIEW_DRAFT, title: editedPhase.name }}
+        />
+      ) : null}
       <SplitRunReview
         footer={fixture.footer}
         organizationId={organizationId}
