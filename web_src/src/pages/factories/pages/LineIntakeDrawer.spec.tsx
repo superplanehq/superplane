@@ -95,8 +95,8 @@ const GITHUB_INTAKE_CANVAS = {
   },
 };
 
-function renderDrawer(props: Partial<LineIntakeDrawerProps> = {}) {
-  return render(
+function drawerElement(props: Partial<LineIntakeDrawerProps>) {
+  return (
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
         <ThemeProvider>
@@ -109,8 +109,17 @@ function renderDrawer(props: Partial<LineIntakeDrawerProps> = {}) {
           </TooltipProvider>
         </ThemeProvider>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+}
+
+function renderDrawer(props: Partial<LineIntakeDrawerProps> = {}) {
+  const view = render(drawerElement(props));
+  return {
+    ...view,
+    showSources: (configuredSources: ConfiguredLineIntakeSource[]) =>
+      view.rerender(drawerElement({ ...props, configuredSources })),
+  };
 }
 
 function intakeRuns(runs: unknown[]) {
@@ -257,6 +266,34 @@ describe("LineIntakeDrawer", () => {
     await user.click(screen.getByRole("button", { name: "Collapse GitHub issues" }));
 
     expect(screen.queryByTestId("line-intake-analyzing")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand GitHub issues" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  // Setup can open the drawer without an intake in the URL. A workspace with
+  // one intake must still show what that intake found.
+  it("expands the only intake when the URL names none", () => {
+    renderDrawer({ configuredSources: [GITHUB_INTAKE] });
+
+    expect(screen.getByRole("button", { name: "Collapse GitHub issues" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("expands the only intake when it loads after the drawer opens", async () => {
+    const { showSources } = renderDrawer({ configuredSources: [] });
+    showSources([GITHUB_INTAKE]);
+
+    expect(await screen.findByRole("button", { name: "Collapse GitHub issues" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+  });
+
+  it("keeps the only intake collapsed after the reader collapses it", async () => {
+    const user = userEvent.setup();
+    const { showSources } = renderDrawer({ configuredSources: [GITHUB_INTAKE] });
+
+    await user.click(screen.getByRole("button", { name: "Collapse GitHub issues" }));
+    showSources([GITHUB_INTAKE]);
+
     expect(screen.getByRole("button", { name: "Expand GitHub issues" })).toHaveAttribute("aria-expanded", "false");
   });
 
