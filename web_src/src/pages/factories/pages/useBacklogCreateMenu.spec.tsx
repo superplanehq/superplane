@@ -74,7 +74,14 @@ describe("useBacklogCreateMenu", () => {
         },
       ]);
     });
-    expect(useSearchFactoryIntakeItems).toHaveBeenCalledWith("org-1", "factory-1", intake.id, "", true, 5);
+    expect(useSearchFactoryIntakeItems).toHaveBeenCalledWith({
+      organizationId: "org-1",
+      factoryId: "factory-1",
+      intakeId: intake.id,
+      query: "",
+      enabled: true,
+      limit: 5,
+    });
 
     importFactoryIntakeItem.mockResolvedValue({
       id: "wo-imported-12",
@@ -111,7 +118,14 @@ describe("useBacklogCreateMenu", () => {
       result.current.setFocusedIntake(intake.id);
     });
 
-    expect(useSearchFactoryIntakeItems).toHaveBeenCalledWith("org-1", "factory-1", intake.id, "", false, 5);
+    expect(useSearchFactoryIntakeItems).toHaveBeenCalledWith({
+      organizationId: "org-1",
+      factoryId: "factory-1",
+      intakeId: intake.id,
+      query: "",
+      enabled: false,
+      limit: 5,
+    });
     await act(async () => {
       await result.current.importItem(result.current.items[0]!);
     });

@@ -100,3 +100,28 @@ func TestPageIntakeItems_SkipsOffsetAndReportsMore(t *testing.T) {
 	assert.Equal(t, items[2:], page)
 	assert.False(t, hasMore)
 }
+
+func TestGitHubIssueSearchQuery_QuotesTheOperatorTerm(t *testing.T) {
+	assert.Equal(t, `repo:acme/pay is:issue is:open "refund"`, gitHubIssueSearchQuery("acme/pay", "refund"))
+	assert.Equal(
+		t,
+		`repo:acme/pay is:issue is:open "repo:other/repo org:evil"`,
+		gitHubIssueSearchQuery("acme/pay", "repo:other/repo org:evil"),
+	)
+}
+
+func TestSentryIssueInProject_RequiresConfiguredSlug(t *testing.T) {
+	source := &liveIntakeItemSource{sentryProject: "payments-api"}
+	assert.False(t, source.sentryIssueInProject(&sentry.Issue{ID: "1"}))
+	assert.False(t, source.sentryIssueInProject(&sentry.Issue{
+		ID:      "1",
+		Project: &sentry.IssueProject{Slug: "other-app"},
+	}))
+	assert.True(t, source.sentryIssueInProject(&sentry.Issue{
+		ID:      "1",
+		Project: &sentry.IssueProject{Slug: "payments-api"},
+	}))
+
+	unscoped := &liveIntakeItemSource{}
+	assert.True(t, unscoped.sentryIssueInProject(&sentry.Issue{ID: "1"}))
+}
