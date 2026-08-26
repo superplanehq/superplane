@@ -24,21 +24,35 @@ function renderPopup(
 }
 
 describe("PlanningReviewPopup", () => {
-  it("uses Editing Agent when the draft has several agents", () => {
+  it("uses the agent name as the title", () => {
     renderPopup();
 
-    expect(screen.getByRole("heading", { name: "Editing Agent" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Agent - Implement from order description" }),
+    ).toBeInTheDocument();
     expect(screen.queryByTestId("planning-review-title-input")).not.toBeInTheDocument();
   });
 
-  it("uses the agent name when the draft has one agent", () => {
+  it("keeps one agent even when the draft lists several", () => {
     renderPopup({
       initialDraft: {
         ...PLANNING_REVIEW_DRAFT,
-        components: [PLANNING_REVIEW_DRAFT.components[1]],
+        components: [
+          {
+            id: "plan-agent",
+            title: "Agent - Plan for GH Issue",
+            description: "Read the issue and write an implementation plan.",
+            expanded: false,
+            configuration: PLANNING_REVIEW_DRAFT.components[0].configuration,
+            concurrency: { max: "1", key: "" },
+          },
+          ...PLANNING_REVIEW_DRAFT.components,
+        ],
       },
     });
 
+    expect(screen.queryByTestId("planning-review-component-plan-agent")).not.toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-component-implementation-agent")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { level: 2, name: "Agent - Implement from order description" }),
     ).toBeInTheDocument();
@@ -62,14 +76,11 @@ describe("PlanningReviewPopup", () => {
     expect(within(note).queryByRole("link")).not.toBeInTheDocument();
   });
 
-  it("shows one collapsed component and one expanded runner component", () => {
+  it("shows the runner component expanded", () => {
     renderPopup();
 
-    const planning = screen.getByTestId("planning-review-component-plan-agent");
     const implementation = screen.getByTestId("planning-review-component-implementation-agent");
 
-    expect(within(planning).getByRole("button")).toHaveAttribute("aria-expanded", "false");
-    expect(within(planning).getByText("Read the issue and write an implementation plan.")).toBeInTheDocument();
     expect(within(implementation).getByRole("button", { name: /Agent - Implement/ })).toHaveAttribute(
       "aria-expanded",
       "true",
@@ -87,7 +98,7 @@ describe("PlanningReviewPopup", () => {
     renderPopup();
 
     const implementation = screen.getByTestId("planning-review-component-implementation-agent");
-    const steps = PLANNING_REVIEW_DRAFT.components[1].configuration.steps as PlanningReviewStep[];
+    const steps = PLANNING_REVIEW_DRAFT.components[0].configuration.steps as PlanningReviewStep[];
 
     steps.forEach((step, index) => {
       const row = within(implementation).getByTestId(`planning-review-step-${index}`);
@@ -111,7 +122,7 @@ describe("PlanningReviewPopup", () => {
     const user = userEvent.setup();
     renderPopup();
 
-    const steps = PLANNING_REVIEW_DRAFT.components[1].configuration.steps as PlanningReviewStep[];
+    const steps = PLANNING_REVIEW_DRAFT.components[0].configuration.steps as PlanningReviewStep[];
     await user.click(screen.getByTestId("planning-review-step-remove-0"));
 
     expect(screen.getByTestId("planning-review-step-name-0")).toHaveValue(steps[1].name);
@@ -132,21 +143,15 @@ describe("PlanningReviewPopup", () => {
     expect(within(implementation).getByText("Concurrency")).toBeInTheDocument();
   });
 
-  it("expands and collapses component blocks", async () => {
+  it("collapses the agent block", async () => {
     const user = userEvent.setup();
     renderPopup();
 
-    const planningToggle = screen.getByTestId("planning-review-component-toggle-plan-agent");
     const implementationToggle = screen.getByTestId("planning-review-component-toggle-implementation-agent");
-
-    await user.click(planningToggle);
-    expect(planningToggle).toHaveAttribute("aria-expanded", "true");
-    expect(
-      within(screen.getByTestId("planning-review-component-plan-agent")).getByTestId("planning-review-step-name-0"),
-    ).toHaveValue("Clone Repo");
 
     await user.click(implementationToggle);
     expect(implementationToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Steps")).not.toBeInTheDocument();
   });
 
   it("saves component configuration and closes", async () => {
@@ -164,12 +169,12 @@ describe("PlanningReviewPopup", () => {
 
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
-        components: expect.arrayContaining([
+        components: [
           expect.objectContaining({
             id: "implementation-agent",
             concurrency: expect.objectContaining({ max: "8" }),
           }),
-        ]),
+        ],
       }),
     );
     expect(onClose).toHaveBeenCalled();

@@ -440,14 +440,14 @@ describe("LinesPage board", () => {
     );
   });
 
-  it("opens the agent editor with Editing Agent as the title", async () => {
+  it("opens the agent editor with the agent name as the title", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-phase-menu-0"));
     await user.click(screen.getByTestId("lines-phase-menu-0-edit-agent"));
 
-    expect(screen.getByRole("heading", { name: "Editing Agent" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Agent - Implement from order description" })).toBeInTheDocument();
     expect(screen.getByTestId("planning-review-component-toggle-implementation-agent")).toHaveAttribute(
       "aria-expanded",
       "true",

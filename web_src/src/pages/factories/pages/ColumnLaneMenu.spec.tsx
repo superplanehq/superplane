@@ -87,9 +87,13 @@ describe("ColumnLaneMenu", () => {
     );
 
     await user.click(screen.getByTestId("lines-phase-menu-0"));
-    expect(screen.getByTestId("lines-phase-menu-0-edit")).toHaveTextContent("Edit Automation");
-    expect(screen.getByTestId("lines-phase-menu-0-edit-agent")).toHaveTextContent("Edit Agent");
-    await user.click(screen.getByTestId("lines-phase-menu-0-edit-agent"));
+    const editAgent = screen.getByTestId("lines-phase-menu-0-edit-agent");
+    const editAutomation = screen.getByTestId("lines-phase-menu-0-edit");
+    expect(editAgent).toHaveTextContent("Edit Agent");
+    expect(editAutomation).toHaveTextContent("Edit Automation");
+    // Editing the agent is the common task, so it leads the menu.
+    expect(editAgent.compareDocumentPosition(editAutomation) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await user.click(editAgent);
 
     expect(onEditAgent).toHaveBeenCalledTimes(1);
   });

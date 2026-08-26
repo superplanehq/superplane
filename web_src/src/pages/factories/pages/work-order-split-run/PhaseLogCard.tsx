@@ -253,17 +253,19 @@ export function PhaseLogCard({
             <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
           </span>
         ) : null}
-        {!expanded && producedArtifacts.length > 0 ? (
-          <span
-            data-testid={`split-run-phase-artifacts-${phase.id}`}
-            className="ml-auto flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
-          >
-            {producedArtifacts.map((artifact) => (
-              <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
-            ))}
-          </span>
-        ) : null}
-        <PhaseDuration phase={phase} />
+        <span className="ml-auto flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap">
+          {!expanded && producedArtifacts.length > 0 ? (
+            <span
+              data-testid={`split-run-phase-artifacts-${phase.id}`}
+              className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
+            >
+              {producedArtifacts.map((artifact) => (
+                <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
+              ))}
+            </span>
+          ) : null}
+          <PhaseDuration phase={phase} />
+        </span>
       </div>
 
       {expanded ? (
@@ -308,7 +310,7 @@ function PhaseDuration({ phase }: { phase: SplitRunPhase }) {
   return (
     <span
       data-testid={`split-run-phase-duration-${phase.id}`}
-      className="ml-auto min-w-[5ch] shrink-0 text-right tabular-nums [font-feature-settings:'zero'] text-muted-foreground"
+      className="min-w-[5ch] shrink-0 text-right tabular-nums [font-feature-settings:'zero'] text-muted-foreground"
     >
       {duration}
     </span>
@@ -323,7 +325,7 @@ function StreamDuration({ line }: { line: SplitRunStreamLine }) {
   return (
     <span
       data-testid={`split-run-stream-duration-${line.id}`}
-      className="ml-auto min-w-[5ch] shrink-0 text-right tabular-nums [font-feature-settings:'zero'] text-muted-foreground"
+      className="min-w-[5ch] shrink-0 text-right tabular-nums [font-feature-settings:'zero'] text-muted-foreground"
     >
       {duration}
     </span>
@@ -434,8 +436,10 @@ function StreamNodeHeader({
         </span>
         <span className={cn("shrink-0", streamTone(line.status))}>{action}</span>
       </button>
-      {artifact ? <StreamArtifact artifact={artifact} /> : null}
-      <StreamDuration line={line} />
+      <span className="ml-auto flex min-w-0 shrink-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap">
+        {artifact ? <StreamArtifact artifact={artifact} /> : null}
+        <StreamDuration line={line} />
+      </span>
     </div>
   );
 }

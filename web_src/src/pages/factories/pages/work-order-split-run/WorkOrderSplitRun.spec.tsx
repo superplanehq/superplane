@@ -178,7 +178,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const plan = screen.getByTestId("split-run-phase-plan");
     const planToggle = within(plan).getByRole("button", { name: /^Create plan/ });
     const planArtifacts = within(plan).getByTestId("split-run-phase-artifacts-plan");
-    expect(planToggle.parentElement).toBe(planArtifacts.parentElement);
+    expect(planToggle.parentElement).toBe(planArtifacts.parentElement?.parentElement);
     expect(within(planArtifacts).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stream-plan")).not.toBeInTheDocument();
 
@@ -192,7 +192,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const implement = screen.getByTestId("split-run-phase-implement");
     const implementToggle = within(implement).getByRole("button", { name: /^Implement/ });
     const implementArtifacts = within(implement).getByTestId("split-run-phase-artifacts-implement");
-    expect(implementToggle.parentElement).toBe(implementArtifacts.parentElement);
+    expect(implementToggle.parentElement).toBe(implementArtifacts.parentElement?.parentElement);
     expect(within(implementArtifacts).getByRole("link", { name: /feature\/refund-retry/ })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stream-implement")).not.toBeInTheDocument();
 
@@ -782,7 +782,7 @@ describe("WorkOrderSplitRunPopup", () => {
     await user.click(within(plan).getByTestId("split-run-phase-edit-plan"));
 
     const editor = screen.getByTestId("lines-planning-review");
-    expect(within(editor).getByRole("heading", { name: "Editing Agent" })).toBeInTheDocument();
+    expect(within(editor).getByRole("heading", { level: 2, name: "Agent - Implement from order description" })).toBeInTheDocument();
     expect(screen.getByTestId("split-run-stream-plan")).toBeInTheDocument();
 
     await user.click(within(editor).getByRole("button", { name: "Cancel" }));

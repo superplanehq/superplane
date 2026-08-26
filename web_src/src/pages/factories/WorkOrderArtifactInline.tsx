@@ -13,6 +13,8 @@ import {
 import { useState } from "react";
 
 import {
+  type ArtifactData,
+  branchTreeUrl,
   extractArtifactMarkdownBody,
   extractArtifactName,
   extractArtifactTitle,
@@ -44,7 +46,7 @@ export function WorkOrderArtifactInline({ artifact, className }: WorkOrderArtifa
     return <MarkdownArtifactInline artifact={artifact} className={className} />;
   }
 
-  const safeUrl = safeExternalUrl(extractArtifactUrl(artifact.data));
+  const safeUrl = safeExternalUrl(artifactLinkUrl(kind, artifact.data));
   const { icon: Icon, label, fullLabel, iconClassName } = artifactLinkPresentation(kind, artifact);
   const content = (
     <>
@@ -143,6 +145,14 @@ function artifactLinkPresentation(kind: string, artifact: WorkOrderArtifactPrese
     default:
       return presentation(url ? LinkIcon : FileText, firstLabel(title, name, compactUrlLabel(url), "Artifact"));
   }
+}
+
+function artifactLinkUrl(kind: string, data: ArtifactData): string | undefined {
+  const url = extractArtifactUrl(data);
+  if (url || kind !== "branch") {
+    return url;
+  }
+  return branchTreeUrl(data);
 }
 
 function presentation(icon: typeof FileText, label: string, iconClassName?: string): ArtifactLinkPresentation {

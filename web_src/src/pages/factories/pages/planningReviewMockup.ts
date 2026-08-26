@@ -47,11 +47,6 @@ const implementationSteps: PlanningReviewStep[] = [
   { name: "Commit and Push", type: "bash", command: "git push origin HEAD", workingDirectory: "repo" },
 ];
 
-const planSteps: PlanningReviewStep[] = [
-  { name: "Clone Repo", type: "bash", command: "git clone $REPO repo" },
-  { name: "Write Implementation Plan", type: "prompt", prompt: "Write a concise implementation plan." },
-];
-
 const implementationConfiguration: Record<string, unknown> = {
   machineType: "e1-large-amd64",
   credentials: {
@@ -79,14 +74,6 @@ export const PLANNING_REVIEW_DRAFT: PlanningReviewDraft = {
   title: "Planning review",
   components: [
     {
-      id: "plan-agent",
-      title: "Agent - Plan for GH Issue",
-      description: "Read the issue and write an implementation plan.",
-      expanded: false,
-      configuration: { ...implementationConfiguration, steps: planSteps },
-      concurrency: { max: "1", key: "" },
-    },
-    {
       id: "implementation-agent",
       title: "Agent - Implement from order description",
       description: "Implement the approved plan and prepare the branch for review.",
@@ -97,7 +84,11 @@ export const PLANNING_REVIEW_DRAFT: PlanningReviewDraft = {
   ],
 };
 
-export const PLANNING_REVIEW_SINGLE_AGENT_DRAFT: PlanningReviewDraft = {
-  title: "Planning review",
-  components: [{ ...PLANNING_REVIEW_DRAFT.components[1], expanded: true }],
-};
+/** One editing window shows one agent. Extra agents stay on the canvas. */
+export function singleAgentDraft(draft: PlanningReviewDraft): PlanningReviewDraft {
+  const component = draft.components.find((entry) => entry.expanded) ?? draft.components[0];
+  if (!component) {
+    return { ...draft, components: [] };
+  }
+  return { ...draft, components: [{ ...component, expanded: true }] };
+}

@@ -5,6 +5,7 @@ import { doneFooterForStatus } from "./splitRunFooter";
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./splitRunMocks";
 
 const NOTIFY_BRANCH = "fix/bug-not-getting-notified-for-status-change-when-re-1787246840-4193b6d9";
+const NOTIFY_REPOSITORY = "superplanehq/superplane";
 const NOTIFY_PR_URL = "https://github.com/superplanehq/superplane/pull/6837";
 
 function markdownArtifact(id: string, name: string, body: string): FactoriesWorkOrderArtifact {
@@ -32,7 +33,11 @@ function notifyBranchArtifact(orderId: string): FactoriesWorkOrderArtifact {
   return {
     id: `art-branch-${orderId}`,
     type: "TYPE_BRANCH",
-    data: { name: NOTIFY_BRANCH },
+    data: {
+      name: NOTIFY_BRANCH,
+      repository: NOTIFY_REPOSITORY,
+      url: `https://github.com/${NOTIFY_REPOSITORY}/tree/${NOTIFY_BRANCH}`,
+    },
   };
 }
 
