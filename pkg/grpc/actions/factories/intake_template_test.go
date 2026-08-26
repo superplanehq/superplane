@@ -61,7 +61,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		report := findSpecNode(t, canvas, intakeReportConfidenceNodeID)
 		assert.Equal(
 			t,
-			`{{ int(round(int($["Analyze intake"].data[0].result.result) / 20.0)) }}`,
+			`{{ int(round(int($["Analyze intake"].data.result.result) / 20.0)) }}`,
 			report.Configuration["score"],
 		)
 
@@ -145,7 +145,35 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		require.NoError(t, err)
 
 		threshold := findSpecNode(t, canvas, intakeThresholdNodeID)
-		assert.Equal(t, `int($["Analyze intake"].data[0].result.result) >= 80`, threshold.Configuration["expression"])
+		assert.Equal(t, `int($["Analyze intake"].data.result.result) >= 80`, threshold.Configuration["expression"])
+	})
+
+	t.Run("the threshold reads the score the analysis runner reports", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, ConfidencePct: 70})
+		require.NoError(t, err)
+
+		threshold := findSpecNode(t, canvas, intakeThresholdNodeID)
+		expression := threshold.Configuration["expression"].(string)
+		assert.False(t, evaluateIntakeThreshold(t, expression, 69))
+		assert.True(t, evaluateIntakeThreshold(t, expression, 70))
+	})
+
+	t.Run("every action node works on a whole batch at once", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, ConfidencePct: DefaultIntakeConfidencePct})
+		require.NoError(t, err)
+
+		for _, node := range canvas.Spec.Nodes {
+			// A trigger has no queue of its own, and the parser rejects a
+			// concurrency spec on it.
+			if node.Type == yaml.NodeTypeTrigger {
+				assert.Nilf(t, node.Concurrency, "trigger %s caps its concurrency", node.ID)
+				continue
+			}
+
+			require.NotNilf(t, node.Concurrency, "node %s has no concurrency", node.ID)
+			require.NotNilf(t, node.Concurrency.Max, "node %s has no concurrency max", node.ID)
+			assert.Equalf(t, intakeConcurrencyMax, *node.Concurrency.Max, "node %s", node.ID)
+		}
 	})
 
 	t.Run("confidence outside the scale is clamped", func(t *testing.T) {
@@ -233,21 +261,52 @@ func evaluateIntakeConfidenceScore(t *testing.T, expression string, pct int) int
 	t.Helper()
 
 	inner := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(expression, "{{"), "}}"))
-	analysis := map[string]any{
-		"data": []any{
-			map[string]any{"result": map[string]any{"result": strconv.Itoa(pct)}},
-		},
-	}
-
-	output, err := expr.Eval(inner, map[string]any{
-		"$": map[string]any{intakeAnalysisNodeName: analysis},
-	})
-	require.NoError(t, err)
+	output := evaluateIntakeExpression(t, inner, pct)
 
 	score, ok := output.(int)
 	require.Truef(t, ok, "expression returned %T, want int", output)
 
 	return score
+}
+
+// evaluateIntakeThreshold runs the generated threshold expression. The if
+// component requires a boolean, so a wrong result path fails here instead of at
+// run time.
+func evaluateIntakeThreshold(t *testing.T, expression string, pct int) bool {
+	t.Helper()
+
+	output := evaluateIntakeExpression(t, expression, pct)
+
+	matches, ok := output.(bool)
+	require.Truef(t, ok, "expression returned %T, want bool", output)
+
+	return matches
+}
+
+// evaluateIntakeExpression resolves an expression against the event the
+// analysis runner emits when it finishes, so the generated result path is
+// checked against the shape the graph actually receives.
+func evaluateIntakeExpression(t *testing.T, expression string, pct int) any {
+	t.Helper()
+
+	analysis := map[string]any{
+		"type": intakeAgentSpecs[0].component + ".finished",
+		"data": map[string]any{
+			"status":    "succeeded",
+			"exit_code": 0,
+			"result": map[string]any{
+				"type":   "result",
+				"result": strconv.Itoa(pct),
+			},
+		},
+	}
+
+	output, err := expr.Eval(expression, map[string]any{
+		"$": map[string]any{intakeAnalysisNodeName: analysis},
+	})
+	require.NoError(t, err)
+
+	return output
 }
 
 func findSpecNode(t *testing.T, canvas *yaml.Canvas, nodeID string) yaml.Node {
