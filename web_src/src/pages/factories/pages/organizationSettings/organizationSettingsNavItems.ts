@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Gauge, Key, KeyRound, LayoutGrid, Plug, Settings, Shield, User, Users } from "lucide-react";
+import { CircleDollarSign, Gauge, Key, KeyRound, LayoutGrid, Plug, Settings, Shield, User, Users } from "lucide-react";
 
 export type OrganizationSettingsSection =
   | "general"
@@ -9,6 +9,7 @@ export type OrganizationSettingsSection =
   | "groups"
   | "roles"
   | "integrations"
+  | "llm-spend"
   | "usage"
   | "secrets";
 
@@ -26,11 +27,17 @@ export const ORGANIZATION_SETTINGS_NAV_ITEMS: OrganizationSettingsNavItem[] = [
   { id: "groups", label: "Groups", Icon: Users },
   { id: "roles", label: "Roles", Icon: Shield },
   { id: "integrations", label: "Integrations", Icon: Plug },
+  { id: "llm-spend", label: "LLM spend", Icon: CircleDollarSign },
   { id: "usage", label: "Usage", Icon: Gauge },
   { id: "secrets", label: "Secrets", Icon: Key },
 ];
 
-const IMPLEMENTED_ORGANIZATION_SETTINGS_SECTIONS = new Set<OrganizationSettingsSection>(["general", "workspaces"]);
+const IMPLEMENTED_ORGANIZATION_SETTINGS_SECTIONS = new Set<OrganizationSettingsSection>([
+  "general",
+  "workspaces",
+  "integrations",
+  "llm-spend",
+]);
 
 export function isOrganizationSettingsComingSoon(item: OrganizationSettingsNavItem) {
   return !IMPLEMENTED_ORGANIZATION_SETTINGS_SECTIONS.has(item.id);

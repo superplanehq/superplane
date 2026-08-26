@@ -289,6 +289,7 @@ export interface FactoriesFixture {
   intakeRunsByIntakeId?: Record<string, FactoriesFactoryIntakeRun[]>;
   usageByFactoryId?: Record<string, StorybookUsageReport>;
   organizationLlmSpend?: StorybookUsageReport;
+  hostedCreditProducts?: Array<{ id: string; name: string; amountCents: string }>;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
   /**

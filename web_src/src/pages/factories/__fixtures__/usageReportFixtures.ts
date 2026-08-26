@@ -8,6 +8,12 @@ export interface StorybookUsageReport {
   grantTotalCents?: string;
   hostedBilledCents?: string;
   remainingCreditWarning?: boolean;
+  billingEnabled?: boolean;
+  hasBillingCustomer?: boolean;
+  hostedSpendBudgetCents?: string | number | null;
+  factoryHostedBilledCents?: string;
+  factoryRemainingCreditCents?: string;
+  factoryRemainingCreditWarning?: boolean;
 }
 
 export const EMPTY_USAGE_REPORT: StorybookUsageReport = {

@@ -6,6 +6,7 @@ import type {
 
 import { followBrowserAction } from "@/lib/browserAction";
 import { pendingGitHubInstallations } from "@/lib/hostedGitHubInstall";
+import { integrationDetailPath, legacySettingsIntegrationsPath } from "@/lib/integrationSettingsPaths";
 import { rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
 import { createWithGeneratedName } from "@/ui/IntegrationCreateDialog/generatedName";
 
@@ -53,6 +54,7 @@ export function pendingGitHubInstallPicker(
 export async function startDirectGitHubConnect(args: {
   organizationId: string;
   returnTo?: string;
+  integrationsBasePath?: string;
   existingNames: Set<string>;
   connected: OrganizationsIntegration[];
   currentUserId?: string;
@@ -68,7 +70,7 @@ export async function startDirectGitHubConnect(args: {
     const picker = pendingGitHubInstallPicker(args.connected, args.currentUserId);
     if (picker) {
       rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
-      const path = `/${args.organizationId}/settings/integrations/${picker.id}`;
+      const path = githubInstallPickerPath(args.organizationId, picker.id, args.integrationsBasePath);
       if (args.goTo) {
         args.goTo(path);
         return true;
@@ -96,4 +98,8 @@ export async function startDirectGitHubConnect(args: {
     throw new Error("The GitHub App install page did not open.");
   }
   return followBrowserAction(action);
+}
+
+function githubInstallPickerPath(organizationId: string, integrationId: string, integrationsBasePath?: string) {
+  return integrationDetailPath(integrationsBasePath ?? legacySettingsIntegrationsPath(organizationId), integrationId);
 }
