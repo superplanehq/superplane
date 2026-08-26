@@ -1,14 +1,24 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Button } from "@/components/ui/button";
+import { useTheme } from "@/contexts/useTheme";
+import { getJsonViewStyle, jsonViewClassName } from "@/lib/jsonViewTheme";
 import { resolveIcon, isUrl } from "@/lib/utils";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { SidebarEvent } from "../types";
 import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../SimpleTooltip";
-import type { EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase/eventState";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/defaultEventStateMap";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
+
+function payloadJsonValue(payload: unknown): object {
+  if (typeof payload === "string") {
+    return JSON.parse(payload) as object;
+  }
+
+  return payload as object;
+}
 
 export interface TabData {
   current?: Record<string, any>;
@@ -62,6 +72,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const [payloadCopied, setPayloadCopied] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const { resolvedTheme } = useTheme();
+  const jsonViewStyle = getJsonViewStyle(resolvedTheme);
 
   const eventStateStyle: EventStateStyle = useMemo(() => {
     if (!getExecutionState) return DEFAULT_EVENT_STATE_MAP["neutral"];
@@ -338,16 +350,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
               </div>
               <div className="h-50 overflow-auto rounded -mt-2">
                 <JsonView
-                  value={typeof tabData.payload === "string" ? JSON.parse(tabData.payload) : tabData.payload}
-                  style={{
-                    fontSize: "12px",
-                    fontFamily:
-                      'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
-                    backgroundColor: "#ffffff",
-                    color: "#24292e",
-                    padding: "8px",
-                  }}
-                  className="json-viewer-hide-types"
+                  value={payloadJsonValue(tabData.payload)}
+                  style={{ ...jsonViewStyle, padding: "8px" }}
+                  className={jsonViewClassName}
                   displayObjectSize={false}
                   enableClipboard={false}
                 />
@@ -427,15 +432,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
             <div className="flex-1 overflow-auto bg-white rounded-b-lg dark:bg-gray-900">
               <div className="p-4">
                 <JsonView
-                  value={typeof modalPayload === "string" ? JSON.parse(modalPayload) : modalPayload}
-                  style={{
-                    fontSize: "14px",
-                    fontFamily:
-                      'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
-                    backgroundColor: "#ffffff",
-                    color: "#24292e",
-                  }}
-                  className="json-viewer-hide-types"
+                  value={payloadJsonValue(modalPayload)}
+                  style={{ ...jsonViewStyle, fontSize: "14px" }}
+                  className={jsonViewClassName}
                   displayObjectSize={false}
                   enableClipboard={false}
                 />
