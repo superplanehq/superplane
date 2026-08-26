@@ -95,6 +95,14 @@ func Test__ResolveSelectableLLMModels(t *testing.T) {
 	assert.False(t, allowed)
 }
 
+func Test__CompactModelIDs(t *testing.T) {
+	assert.Equal(t, []string{"gpt-4o", "gpt-4.1"}, models.CompactModelIDs([]string{" gpt-4o ", "", "gpt-4o", "gpt-4.1"}))
+}
+
+func Test__IntersectModelIDs(t *testing.T) {
+	assert.Equal(t, []string{"b"}, models.IntersectModelIDs([]string{"a", "b", "c"}, []string{"gone", "b", "b", ""}))
+}
+
 func Test__BYOKIntegrationAppName(t *testing.T) {
 	name, err := models.BYOKIntegrationAppName(models.UsageProviderAnthropic)
 	require.NoError(t, err)

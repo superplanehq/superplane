@@ -2,7 +2,6 @@ package organizations
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -26,39 +25,23 @@ func ListBYOKLLMModels(
 	req *pb.ListBYOKLLMModelsRequest,
 ) (*pb.ListBYOKLLMModelsResponse, error) {
 	tx := database.DB(ctx)
-	organizationID, err := uuid.Parse(orgID)
+	scope, err := parseLLMModelListScope(tx, orgID, req.GetProvider(), req.GetFactoryId(), "failed to list byok models")
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
-	}
-	provider, err := models.NormalizeHostedLLMProvider(req.GetProvider())
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, err.Error())
-	}
-	factoryID, err := parseOptionalFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid factory id")
-	}
-	if factoryID != nil {
-		if _, err := models.FindFactory(tx, organizationID, *factoryID); err != nil {
-			if errors.Is(err, models.ErrFactoryNotFound) {
-				return nil, grpcerrors.NotFound(err, "factory not found")
-			}
-			return nil, grpcerrors.Internal(err, "failed to list byok models")
-		}
+		return nil, err
 	}
 
 	selected, err := models.ResolveSelectableLLMModels(
 		tx,
-		organizationID,
-		factoryID,
-		provider,
+		scope.OrganizationID,
+		scope.FactoryID,
+		scope.Provider,
 		models.UsageFundingSourceBYOK,
 	)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list byok models")
 	}
 
-	integration, err := models.FindReadyBYOKIntegration(tx, organizationID, provider)
+	integration, err := models.FindReadyBYOKIntegration(tx, scope.OrganizationID, scope.Provider)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list byok models")
 	}
@@ -74,7 +57,7 @@ func ListBYOKLLMModels(
 	resp.IntegrationId = integration.ID.String()
 	candidates, err := listBYOKCandidateModels(tx, reg, integration)
 	if err != nil {
-		return resp, nil
+		return nil, grpcerrors.Internal(err, "failed to list byok models")
 	}
 	resp.Candidates = candidates
 	resp.Selected = namedHostedLLMModels(selected, candidates)

@@ -213,7 +213,7 @@ func ResolveSelectableLLMModels(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UU
 	if subset == nil || !hasAllowedModel(subset.AllowedModels) {
 		return parent, nil
 	}
-	return intersectModelIDs(parent, subset.AllowedModels), nil
+	return IntersectModelIDs(parent, subset.AllowedModels), nil
 }
 
 func ModelIsSelectable(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, provider, fundingSource, model string) (bool, error) {
@@ -281,27 +281,27 @@ func normalizeAllowedModels(models datatypes.JSONSlice[string]) (datatypes.JSONS
 }
 
 func compactModelIDs(models datatypes.JSONSlice[string]) datatypes.JSONSlice[string] {
-	out := make(datatypes.JSONSlice[string], 0, len(models))
-	for _, model := range models {
-		id := strings.TrimSpace(model)
-		if id == "" {
+	return datatypes.JSONSlice[string](CompactModelIDs([]string(models)))
+}
+
+func CompactModelIDs(ids []string) []string {
+	out := make([]string, 0, len(ids))
+	seen := map[string]struct{}{}
+	for _, id := range ids {
+		trimmed := strings.TrimSpace(id)
+		if trimmed == "" {
 			continue
 		}
-		out = append(out, id)
+		if _, dup := seen[trimmed]; dup {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		out = append(out, trimmed)
 	}
 	return out
 }
 
-func hasAllowedModel(models datatypes.JSONSlice[string]) bool {
-	for _, model := range models {
-		if strings.TrimSpace(model) != "" {
-			return true
-		}
-	}
-	return false
-}
-
-func intersectModelIDs(parent, subset datatypes.JSONSlice[string]) []string {
+func IntersectModelIDs(parent, subset []string) []string {
 	allowed := make(map[string]struct{}, len(parent))
 	for _, model := range parent {
 		allowed[model] = struct{}{}
@@ -323,4 +323,13 @@ func intersectModelIDs(parent, subset datatypes.JSONSlice[string]) []string {
 		out = append(out, id)
 	}
 	return out
+}
+
+func hasAllowedModel(models datatypes.JSONSlice[string]) bool {
+	for _, model := range models {
+		if strings.TrimSpace(model) != "" {
+			return true
+		}
+	}
+	return false
 }

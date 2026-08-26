@@ -10,37 +10,55 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"gorm.io/gorm"
 )
+
+type llmModelListScope struct {
+	OrganizationID uuid.UUID
+	Provider       string
+	FactoryID      *uuid.UUID
+}
+
+func parseLLMModelListScope(tx *gorm.DB, orgID, provider, factoryID, internalMessage string) (llmModelListScope, error) {
+	organizationID, err := uuid.Parse(orgID)
+	if err != nil {
+		return llmModelListScope{}, grpcerrors.InvalidArgument(err, "invalid organization id")
+	}
+	normalized, err := models.NormalizeHostedLLMProvider(provider)
+	if err != nil {
+		return llmModelListScope{}, grpcerrors.InvalidArgument(err, err.Error())
+	}
+	parsedFactoryID, err := parseOptionalFactoryID(factoryID)
+	if err != nil {
+		return llmModelListScope{}, grpcerrors.InvalidArgument(err, "invalid factory id")
+	}
+	if parsedFactoryID != nil {
+		if _, err := models.FindFactory(tx, organizationID, *parsedFactoryID); err != nil {
+			if errors.Is(err, models.ErrFactoryNotFound) {
+				return llmModelListScope{}, grpcerrors.NotFound(err, "factory not found")
+			}
+			return llmModelListScope{}, grpcerrors.Internal(err, internalMessage)
+		}
+	}
+	return llmModelListScope{
+		OrganizationID: organizationID,
+		Provider:       normalized,
+		FactoryID:      parsedFactoryID,
+	}, nil
+}
 
 func ListHostedLLMModels(
 	ctx context.Context,
 	orgID string,
 	req *pb.ListHostedLLMModelsRequest,
 ) (*pb.ListHostedLLMModelsResponse, error) {
-	organizationID, err := uuid.Parse(orgID)
+	tx := database.DB(ctx)
+	scope, err := parseLLMModelListScope(tx, orgID, req.GetProvider(), req.GetFactoryId(), "failed to list hosted models")
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
+		return nil, err
 	}
 
-	provider, err := models.NormalizeHostedLLMProvider(req.GetProvider())
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, err.Error())
-	}
-
-	factoryID, err := parseOptionalFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid factory id")
-	}
-	if factoryID != nil {
-		if _, err := models.FindFactory(database.DB(ctx), organizationID, *factoryID); err != nil {
-			if errors.Is(err, models.ErrFactoryNotFound) {
-				return nil, grpcerrors.NotFound(err, "factory not found")
-			}
-			return nil, grpcerrors.Internal(err, "failed to list hosted models")
-		}
-	}
-
-	row, err := models.FindHostedLLMProvider(database.DB(ctx), provider)
+	row, err := models.FindHostedLLMProvider(tx, scope.Provider)
 	if err != nil {
 		if errors.Is(err, models.ErrHostedLLMProviderNotFound) {
 			return &pb.ListHostedLLMModelsResponse{}, nil
@@ -52,10 +70,10 @@ func ListHostedLLMModels(
 	}
 
 	allowed, err := models.ResolveSelectableLLMModels(
-		database.DB(ctx),
-		organizationID,
-		factoryID,
-		provider,
+		tx,
+		scope.OrganizationID,
+		scope.FactoryID,
+		scope.Provider,
 		models.UsageFundingSourceHosted,
 	)
 	if err != nil {
@@ -70,11 +88,7 @@ func ListHostedLLMModels(
 
 func serializeHostedLLMModels(ids []string) []*pb.HostedLLMModel {
 	out := make([]*pb.HostedLLMModel, 0, len(ids))
-	for _, id := range ids {
-		id = strings.TrimSpace(id)
-		if id == "" {
-			continue
-		}
+	for _, id := range models.CompactModelIDs(ids) {
 		out = append(out, &pb.HostedLLMModel{Id: id, Name: id})
 	}
 	return out

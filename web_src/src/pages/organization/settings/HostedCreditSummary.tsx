@@ -28,10 +28,22 @@ type HostedCreditSummaryProps = {
   valueClassName: string;
 };
 
-export function HostedCreditSummary({
-  remainingCreditCents,
-  grantTotalCents,
-  hostedBilledCents,
+export function HostedCreditSummary(props: HostedCreditSummaryProps) {
+  const remaining = parseWorkOrderMetric(props.remainingCreditCents);
+  const grantTotal = parseWorkOrderMetric(props.grantTotalCents);
+  const billed = parseWorkOrderMetric(props.hostedBilledCents);
+
+  if (grantTotal <= 0 && !props.billingEnabled) {
+    return null;
+  }
+
+  return <HostedCreditSummaryCard billed={billed} grantTotal={grantTotal} remaining={remaining} {...props} />;
+}
+
+function HostedCreditSummaryCard({
+  remaining,
+  grantTotal,
+  billed,
   remainingCreditWarning,
   billingEnabled = false,
   hasBillingCustomer = false,
@@ -46,34 +58,33 @@ export function HostedCreditSummary({
   innerCardClassName,
   labelClassName,
   valueClassName,
-}: HostedCreditSummaryProps) {
-  const remaining = parseWorkOrderMetric(remainingCreditCents);
-  const grantTotal = parseWorkOrderMetric(grantTotalCents);
-  const billed = parseWorkOrderMetric(hostedBilledCents);
-
-  if (grantTotal <= 0 && !billingEnabled) {
-    return null;
-  }
-
+}: HostedCreditSummaryProps & { remaining: number; grantTotal: number; billed: number }) {
   const warningMessage = hostedCreditWarning(remaining, remainingCreditWarning, billingEnabled);
+  const showBillingActions = Boolean(billingEnabled && canManageBilling && (products.length > 0 || hasBillingCustomer));
 
   return (
     <div className={cardClassName}>
       <div
         className={innerCardClassName ? `grid gap-3 sm:grid-cols-3 ${innerCardClassName}` : "grid gap-3 sm:grid-cols-3"}
       >
-        <div>
-          <p className={labelClassName}>Remaining hosted credit</p>
-          <p className={valueClassName}>{formatUsdCents(remaining)}</p>
-        </div>
-        <div>
-          <p className={labelClassName}>Grant total</p>
-          <p className={valueClassName}>{formatUsdCents(grantTotal)}</p>
-        </div>
-        <div>
-          <p className={labelClassName}>Hosted billed spend</p>
-          <p className={valueClassName}>{formatUsdCents(billed)}</p>
-        </div>
+        <CreditMetric
+          label="Remaining hosted credit"
+          labelClassName={labelClassName}
+          value={remaining}
+          valueClassName={valueClassName}
+        />
+        <CreditMetric
+          label="Grant total"
+          labelClassName={labelClassName}
+          value={grantTotal}
+          valueClassName={valueClassName}
+        />
+        <CreditMetric
+          label="Hosted billed spend"
+          labelClassName={labelClassName}
+          value={billed}
+          valueClassName={valueClassName}
+        />
       </div>
       {creditAdded ? (
         <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">
@@ -81,7 +92,7 @@ export function HostedCreditSummary({
         </p>
       ) : null}
       {warningMessage ? <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">{warningMessage}</p> : null}
-      {billingEnabled && canManageBilling && (products.length > 0 || hasBillingCustomer) ? (
+      {showBillingActions ? (
         <BillingActions
           products={products}
           hasBillingCustomer={hasBillingCustomer}
@@ -91,6 +102,25 @@ export function HostedCreditSummary({
           onManageInvoices={onManageInvoices}
         />
       ) : null}
+    </div>
+  );
+}
+
+function CreditMetric({
+  label,
+  value,
+  labelClassName,
+  valueClassName,
+}: {
+  label: string;
+  value: number;
+  labelClassName: string;
+  valueClassName: string;
+}) {
+  return (
+    <div>
+      <p className={labelClassName}>{label}</p>
+      <p className={valueClassName}>{formatUsdCents(value)}</p>
     </div>
   );
 }

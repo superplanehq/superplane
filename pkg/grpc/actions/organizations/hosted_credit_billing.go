@@ -2,7 +2,7 @@ package organizations
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"os"
 	"strings"
 
@@ -65,6 +65,14 @@ func CreateHostedCreditCheckout(
 		return nil, grpcerrors.InvalidArgument(nil, "product id is required")
 	}
 
+	client := polar.NewClientFromEnv()
+	if _, err := client.GetCreditPack(ctx, productID); err != nil {
+		if polar.IsNotFound(err) || errors.Is(err, polar.ErrNotCreditPack) {
+			return nil, grpcerrors.InvalidArgument(err, "product is not a hosted credit pack")
+		}
+		return nil, grpcerrors.Internal(err, "failed to create hosted credit checkout")
+	}
+
 	email := ""
 	if strings.TrimSpace(accountID) != "" {
 		account, err := models.FindAccountByID(accountID)
@@ -73,7 +81,6 @@ func CreateHostedCreditCheckout(
 		}
 	}
 
-	client := polar.NewClientFromEnv()
 	customer, err := client.EnsureCustomer(ctx, organizationID.String(), email)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to create hosted credit checkout")
@@ -87,14 +94,7 @@ func CreateHostedCreditCheckout(
 		customerIP = clientIPFromContext(ctx)
 	}
 
-	successURL := strings.TrimRight(strings.TrimSpace(baseURL), "/") +
-		fmt.Sprintf("/%s/organization/llm-spend?credit=added", organizationID.String())
-	if strings.TrimSpace(baseURL) == "" {
-		successURL = strings.TrimRight(os.Getenv("BASE_URL"), "/") +
-			fmt.Sprintf("/%s/organization/llm-spend?credit=added", organizationID.String())
-	}
-
-	session, err := client.CreateCheckout(ctx, productID, organizationID.String(), email, successURL, customerIP)
+	session, err := client.CreateCheckout(ctx, productID, organizationID.String(), email, hostedCreditCheckoutSuccessURL(baseURL, organizationID), customerIP)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to create hosted credit checkout")
 	}
@@ -157,6 +157,14 @@ func billingState(ctx context.Context, orgID uuid.UUID) (enabled bool, hasCustom
 		return true, true
 	}
 	return true, false
+}
+
+func hostedCreditCheckoutSuccessURL(baseURL string, organizationID uuid.UUID) string {
+	origin := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if origin == "" {
+		origin = strings.TrimRight(strings.TrimSpace(os.Getenv("BASE_URL")), "/")
+	}
+	return origin + "/" + organizationID.String() + "/organization/llm-spend?credit=added"
 }
 
 func clientIPFromContext(ctx context.Context) string {

@@ -24,7 +24,10 @@ const (
 	httpTimeout          = 15 * time.Second
 )
 
-var errNotFound = fmt.Errorf("polar resource not found")
+var (
+	errNotFound      = fmt.Errorf("polar resource not found")
+	ErrNotCreditPack = errors.New("product is not a hosted credit pack")
+)
 
 type Client struct {
 	baseURL     string
@@ -121,6 +124,30 @@ func (c *Client) ListCreditPacks(ctx context.Context) ([]Product, error) {
 		return cmp.Compare(left.AmountCents, right.AmountCents)
 	})
 	return packs, nil
+}
+
+func (c *Client) GetCreditPack(ctx context.Context, productID string) (*Product, error) {
+	id := strings.TrimSpace(productID)
+	if id == "" {
+		return nil, fmt.Errorf("product id is required")
+	}
+
+	var payload productJSON
+	if err := c.get(ctx, "/products/"+url.PathEscape(id), &payload); err != nil {
+		return nil, err
+	}
+	if !isCreditPack(payload.Metadata) {
+		return nil, ErrNotCreditPack
+	}
+	amount := payload.faceValueCents()
+	if amount <= 0 {
+		return nil, fmt.Errorf("credit pack face value is missing")
+	}
+	return &Product{
+		ID:          payload.ID,
+		Name:        payload.Name,
+		AmountCents: amount,
+	}, nil
 }
 
 func (c *Client) GetCustomerByExternalID(ctx context.Context, externalID string) (*Customer, error) {

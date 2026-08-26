@@ -2,7 +2,6 @@ package factories
 
 import (
 	"context"
-	"strings"
 
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -37,10 +36,10 @@ func ListFactoryLLMModels(
 		return nil, factoryErrorToStatus(err, "failed to list factory models")
 	}
 
-	inherit := subset == nil || len(compactFactoryModelIDs(subset.AllowedModels)) == 0
+	inherit := subset == nil || len(models.CompactModelIDs(subset.AllowedModels)) == 0
 	selected := parent
 	if !inherit {
-		selected = compactFactoryModelIDs(subset.AllowedModels)
+		selected = models.IntersectModelIDs(parent, subset.AllowedModels)
 	}
 
 	return &pb.ListFactoryLLMModelsResponse{
@@ -76,7 +75,7 @@ func UpdateFactoryLLMModels(
 		return nil, factoryErrorToStatus(err, "failed to update factory models")
 	}
 
-	selected := compactFactoryModelIDs(saved.AllowedModels)
+	selected := models.CompactModelIDs(saved.AllowedModels)
 	return &pb.UpdateFactoryLLMModelsResponse{
 		Selected:      serializeFactoryLLMModels(selected),
 		InheritParent: len(selected) == 0,
@@ -85,25 +84,8 @@ func UpdateFactoryLLMModels(
 
 func serializeFactoryLLMModels(ids []string) []*pb.FactoryLLMModel {
 	out := make([]*pb.FactoryLLMModel, 0, len(ids))
-	for _, id := range ids {
+	for _, id := range models.CompactModelIDs(ids) {
 		out = append(out, &pb.FactoryLLMModel{Id: id, Name: id})
-	}
-	return out
-}
-
-func compactFactoryModelIDs(ids []string) []string {
-	out := make([]string, 0, len(ids))
-	seen := map[string]struct{}{}
-	for _, id := range ids {
-		trimmed := strings.TrimSpace(id)
-		if trimmed == "" {
-			continue
-		}
-		if _, dup := seen[trimmed]; dup {
-			continue
-		}
-		seen[trimmed] = struct{}{}
-		out = append(out, trimmed)
 	}
 	return out
 }

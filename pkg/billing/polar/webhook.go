@@ -25,6 +25,7 @@ const (
 var (
 	ErrInvalidWebhookSignature = errors.New("invalid webhook signature")
 	ErrUnsupportedWebhookEvent = errors.New("unsupported webhook event")
+	ErrWebhookSecretMissing    = errors.New("webhook secret is not configured")
 )
 
 type OrderPaidEvent struct {
@@ -64,6 +65,9 @@ func WebhookSecret() string {
 }
 
 func VerifyAndParseOrderPaid(headers http.Header, body []byte, secret string) (*OrderPaidEvent, error) {
+	if _, err := decodeWebhookSecret(secret); err != nil {
+		return nil, err
+	}
 	if err := verifySignature(headers, body, secret); err != nil {
 		return nil, err
 	}
@@ -129,12 +133,21 @@ func verifySignature(headers http.Header, body []byte, secret string) error {
 
 func decodeWebhookSecret(secret string) ([]byte, error) {
 	trimmed := strings.TrimSpace(secret)
-	trimmed = strings.TrimPrefix(trimmed, "whsec_")
-	decoded, err := base64.StdEncoding.DecodeString(trimmed)
-	if err != nil {
-		return []byte(trimmed), nil
+	if webhookSecretMaterial(trimmed) == "" {
+		return nil, ErrWebhookSecretMissing
 	}
-	return decoded, nil
+	return []byte(trimmed), nil
+}
+
+func webhookSecretMaterial(secret string) string {
+	switch {
+	case strings.HasPrefix(secret, "whsec_"):
+		return strings.TrimPrefix(secret, "whsec_")
+	case strings.HasPrefix(secret, "polar_whs_"):
+		return strings.TrimPrefix(secret, "polar_whs_")
+	default:
+		return secret
+	}
 }
 
 func headerValue(headers http.Header, key string) string {

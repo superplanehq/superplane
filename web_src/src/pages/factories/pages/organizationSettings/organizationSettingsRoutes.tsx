@@ -1,36 +1,17 @@
-import { Navigate, Route, useLocation, useParams } from "react-router";
+import { Route } from "react-router";
 
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
-import { IntegrationDetailsRoute } from "@/pages/organization/settings/components/IntegrationDetailsRoute";
-import { IntegrationSetup } from "@/pages/organization/settings/components/IntegrationSetup";
-import { IntegrationSetupReturn } from "@/pages/organization/settings/components/IntegrationSetupReturn";
 import { FactorySettingsSoonPage } from "../settings/FactorySettingsSoonPage";
 import { OrganizationSettingsIntegrationsPage } from "./OrganizationSettingsIntegrationsPage";
 import { OrganizationSettingsLLMSpendPage } from "./OrganizationSettingsLLMSpendPage";
 import { OrganizationSettingsOverviewPage } from "./OrganizationSettingsOverviewPage";
 import { OrganizationSettingsWorkspacesPage } from "./OrganizationSettingsWorkspacesPage";
+import {
+  OrganizationIntegrationDetailsPage,
+  OrganizationIntegrationSetupPage,
+  PreserveStateNavigate,
+} from "./organizationSettingsRoutePages";
 import { isOrganizationSettingsComingSoon, ORGANIZATION_SETTINGS_NAV_ITEMS } from "./organizationSettingsNavItems";
-
-function PreserveStateNavigate({ to }: { to: string }) {
-  const location = useLocation();
-  return <Navigate to={to} replace state={location.state} />;
-}
-
-function OrganizationIntegrationSetupPage() {
-  const { organizationId = "" } = useParams<{ organizationId: string }>();
-  return <IntegrationSetup organizationId={organizationId} />;
-}
-
-function OrganizationIntegrationDetailsPage() {
-  const { organizationId = "" } = useParams<{ organizationId: string }>();
-  return (
-    <IntegrationSetupReturn organizationId={organizationId}>
-      <RequirePermission resource="integrations" action="read">
-        <IntegrationDetailsRoute organizationId={organizationId} />
-      </RequirePermission>
-    </IntegrationSetupReturn>
-  );
-}
 
 export const organizationSettingsSectionRoutes = [
   <Route

@@ -53,8 +53,6 @@ func (OrganizationLLMSettings) TableName() string {
 	return "organization_llm_settings"
 }
 
-// OrganizationLLMCreditHold marks one in-flight hosted run so concurrent
-// PrepareHostedRun calls cannot all pass the remaining-credit gate.
 type OrganizationLLMCreditHold struct {
 	NodeExecutionID uuid.UUID `gorm:"primary_key"`
 	OrganizationID  uuid.UUID

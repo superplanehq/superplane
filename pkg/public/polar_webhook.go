@@ -19,7 +19,7 @@ func (s *Server) handlePolarWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	event, err := polar.VerifyAndParseOrderPaid(r.Header, body, polar.WebhookSecret())
-	if errors.Is(err, polar.ErrInvalidWebhookSignature) {
+	if errors.Is(err, polar.ErrWebhookSecretMissing) || errors.Is(err, polar.ErrInvalidWebhookSignature) {
 		http.Error(w, "invalid webhook signature", http.StatusForbidden)
 		return
 	}

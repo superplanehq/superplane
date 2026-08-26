@@ -71,6 +71,50 @@ func Test__ListCreditPacksFiltersMetadata(t *testing.T) {
 	assert.Equal(t, []int64{2500, 10000, 50000}, []int64{packs[0].AmountCents, packs[1].AmountCents, packs[2].AmountCents})
 }
 
+func Test__GetCreditPackRejectsNonPackProducts(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/products/prod_other", r.URL.Path)
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":   "prod_other",
+			"name": "Support",
+			"metadata": map[string]string{
+				"superplane_credit_pack": "false",
+			},
+			"prices": []map[string]any{
+				{"amount_type": "fixed", "price_amount": 1000},
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	_, err := client.GetCreditPack(context.Background(), "prod_other")
+	require.ErrorIs(t, err, ErrNotCreditPack)
+}
+
+func Test__GetCreditPackReturnsPack(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/products/prod_25", r.URL.Path)
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":   "prod_25",
+			"name": "Hosted credit 25",
+			"metadata": map[string]string{
+				"superplane_credit_pack": "true",
+			},
+			"prices": []map[string]any{
+				{"amount_type": "fixed", "price_amount": 2500},
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	pack, err := client.GetCreditPack(context.Background(), "prod_25")
+	require.NoError(t, err)
+	assert.Equal(t, "prod_25", pack.ID)
+	assert.Equal(t, int64(2500), pack.AmountCents)
+}
+
 func Test__CreateCheckoutForwardsCustomerIP(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/checkouts/", r.URL.Path)

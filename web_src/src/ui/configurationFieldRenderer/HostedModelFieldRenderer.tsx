@@ -45,39 +45,21 @@ function SelectableModelField({
   readOnly = false,
   fundingSource,
 }: FieldRendererProps & { fundingSource: "hosted" | "byok" }) {
-  const provider = field.typeOptions?.hostedModel?.provider ?? "";
-  const factoryId = useCanvasFactoryId(organizationId);
-  const hosted = useHostedLLMModels(organizationId, provider, fundingSource === "hosted", factoryId);
-  const byok = useBYOKLLMModels(organizationId, provider, fundingSource === "byok", factoryId);
-  const isLoading = fundingSource === "hosted" ? hosted.isLoading : byok.isLoading;
-  const models = (fundingSource === "hosted" ? (hosted.data?.models ?? []) : (byok.data?.selected ?? []))
-    .slice()
-    .sort((left, right) => compareModelLabels(left.name || left.id || "", right.name || right.id || ""));
+  const selection = useSelectableModels(organizationId, field.typeOptions?.hostedModel?.provider ?? "", fundingSource);
 
   if (!organizationId) {
     return <div className="text-sm text-red-500 dark:text-red-400">This field requires organization context.</div>;
   }
-
-  if (isLoading) {
+  if (selection.isLoading) {
     return <Text className="text-sm text-gray-500 dark:text-gray-400">Loading models...</Text>;
   }
-
-  if (models.length === 0) {
-    return (
-      <Text className="text-sm text-gray-500 dark:text-gray-400">
-        {fundingSource === "hosted"
-          ? "SuperPlane-hosted models are not configured for this provider. Ask an installation admin to add a key and allowlist."
-          : "No models are selected for this provider. Select models on LLM spend, or connect a provider key on Integrations."}
-      </Text>
-    );
+  if (selection.models.length === 0) {
+    return <EmptyModelField fundingSource={fundingSource} />;
   }
 
   const current = typeof value === "string" ? value : "";
   const testId = field.name ? toTestId(`field-${field.name}-hosted-model`) : undefined;
-  const placeholder =
-    fundingSource === "hosted"
-      ? field.placeholder || "Select a SuperPlane-hosted model"
-      : field.placeholder || "Select a model";
+  const placeholder = field.placeholder || defaultModelPlaceholder(fundingSource);
 
   return (
     <Select value={current} onValueChange={(next) => onChange(next || undefined)} disabled={readOnly}>
@@ -85,7 +67,7 @@ function SelectableModelField({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent position="popper" className="max-h-60">
-        {models.map((model) => (
+        {selection.models.map((model) => (
           <SelectItem key={model.id} value={model.id ?? ""}>
             {model.name || model.id}
           </SelectItem>
@@ -93,4 +75,30 @@ function SelectableModelField({
       </SelectContent>
     </Select>
   );
+}
+
+function useSelectableModels(organizationId: string | undefined, provider: string, fundingSource: "hosted" | "byok") {
+  const factoryId = useCanvasFactoryId(organizationId);
+  const hosted = useHostedLLMModels(organizationId, provider, fundingSource === "hosted", factoryId);
+  const byok = useBYOKLLMModels(organizationId, provider, fundingSource === "byok", factoryId);
+  const query = fundingSource === "hosted" ? hosted : byok;
+  const models = (fundingSource === "hosted" ? (hosted.data?.models ?? []) : (byok.data?.selected ?? []))
+    .slice()
+    .sort((left, right) => compareModelLabels(left.name || left.id || "", right.name || right.id || ""));
+  return { isLoading: query.isLoading, models };
+}
+
+function EmptyModelField({ fundingSource }: { fundingSource: "hosted" | "byok" }) {
+  const message =
+    fundingSource === "hosted"
+      ? "SuperPlane-hosted models are not configured for this provider. Ask an installation admin to add a key and allowlist."
+      : "No models are selected for this provider. Select models on LLM spend, or connect a provider key on Integrations.";
+  return <Text className="text-sm text-gray-500 dark:text-gray-400">{message}</Text>;
+}
+
+function defaultModelPlaceholder(fundingSource: "hosted" | "byok") {
+  if (fundingSource === "hosted") {
+    return "Select a SuperPlane-hosted model";
+  }
+  return "Select a model";
 }

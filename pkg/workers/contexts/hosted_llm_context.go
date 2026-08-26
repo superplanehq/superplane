@@ -15,8 +15,7 @@ import (
 )
 
 // HostedLLMContext resolves installation-hosted provider credentials.
-// Credit holds use a committed connection, not the node-executor transaction,
-// so the settings row lock does not span the broker CreateTask HTTP call.
+// Credit holds use a committed connection so the lock does not span CreateTask.
 type HostedLLMContext struct {
 	tx             *gorm.DB
 	encryptor      crypto.Encryptor
