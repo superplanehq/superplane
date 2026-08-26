@@ -1,7 +1,7 @@
 package factories
 
 import (
-	"strconv"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -52,6 +52,8 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.Equal(t, "Confidence score", report.Configuration["name"])
 		assert.Equal(t, "5", report.Configuration["maxScore"])
 		assert.Equal(t, "fraction", report.Configuration["format"])
+		assert.Equal(t, intakeConfidenceSummaryExpression(), report.Configuration["summary"])
+		assert.Equal(t, intakeConfidenceWriteupExpression("GitHub issue"), report.Configuration["analysis"])
 	})
 
 	t.Run("the score rounds onto the meter scale like the UI does", func(t *testing.T) {
@@ -61,7 +63,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		report := findSpecNode(t, canvas, intakeReportConfidenceNodeID)
 		assert.Equal(
 			t,
-			`{{ int(round(int($["Analyze intake"].data.result.result) / 20.0)) }}`,
+			`{{ int(round(int(`+intakeAnalysisScorePath()+`) / 20.0)) }}`,
 			report.Configuration["score"],
 		)
 
@@ -69,6 +71,47 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		for pct, expected := range map[int]int{0: 0, 49: 2, 50: 3, 69: 3, 70: 4, 89: 4, 90: 5, 100: 5} {
 			assert.Equal(t, expected, evaluateIntakeConfidenceScore(t, expression, pct), "confidence %d%%", pct)
 		}
+	})
+
+	t.Run("the confidence check stores a short executive summary", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, ConfidencePct: DefaultIntakeConfidencePct})
+		require.NoError(t, err)
+
+		analysis := findSpecNode(t, canvas, intakeAnalysisNodeID)
+		steps := analysis.Configuration["steps"].([]any)
+		prompt := steps[0].(map[string]any)["prompt"].(string)
+		assert.Contains(t, prompt, `"reasons"`)
+		assert.Contains(t, prompt, `"summary"`)
+		assert.Contains(t, prompt, "exactly three short sentences")
+
+		report := findSpecNode(t, canvas, intakeReportConfidenceNodeID)
+		result := `{
+			"score": 72,
+			"summary": "This issue is a mixed fit for an agent on this factory line.",
+			"reasons": [
+				"The GitHub issue names the empty-state title and the create-invoice action.",
+				"The billing page already has an empty branch and a shared empty-state component.",
+				"The change is copy and layout. An agent can do the work, but the copy is a judgment call."
+			]
+		}`
+
+		assert.Equal(
+			t,
+			"This issue is a mixed fit for an agent on this factory line.",
+			evaluateIntakeTemplate(t, report.Configuration["summary"].(string), result),
+		)
+		assert.Equal(
+			t,
+			strings.Join([]string{
+				"The automation read this GitHub issue. It scored how suitable the work is for an agent on this factory line.",
+				"",
+				"### Why this score",
+				"- The GitHub issue names the empty-state title and the create-invoice action.",
+				"- The billing page already has an empty branch and a shared empty-state component.",
+				"- The change is copy and layout. An agent can do the work, but the copy is a judgment call.",
+			}, "\n"),
+			evaluateIntakeTemplate(t, report.Configuration["analysis"].(string), result),
+		)
 	})
 
 	t.Run("the check level follows the meter bands", func(t *testing.T) {
@@ -145,7 +188,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		require.NoError(t, err)
 
 		threshold := findSpecNode(t, canvas, intakeThresholdNodeID)
-		assert.Equal(t, `int($["Analyze intake"].data.result.result) >= 80`, threshold.Configuration["expression"])
+		assert.Equal(t, `int(`+intakeAnalysisScorePath()+`) >= 80`, threshold.Configuration["expression"])
 	})
 
 	t.Run("the threshold reads the score the analysis runner reports", func(t *testing.T) {
@@ -283,10 +326,25 @@ func evaluateIntakeThreshold(t *testing.T, expression string, pct int) bool {
 	return matches
 }
 
+// evaluateIntakeTemplate resolves a {{ }} configuration string against the
+// analysis runner result, the same way report-check fields are filled.
+func evaluateIntakeTemplate(t *testing.T, template string, result string) any {
+	t.Helper()
+
+	inner := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(template, "{{"), "}}"))
+	return evaluateIntakeExpressionResult(t, inner, result)
+}
+
 // evaluateIntakeExpression resolves an expression against the event the
 // analysis runner emits when it finishes, so the generated result path is
 // checked against the shape the graph actually receives.
 func evaluateIntakeExpression(t *testing.T, expression string, pct int) any {
+	t.Helper()
+
+	return evaluateIntakeExpressionResult(t, expression, fmt.Sprintf(`{"score":%d,"reasons":["a","b","c"]}`, pct))
+}
+
+func evaluateIntakeExpressionResult(t *testing.T, expression string, result string) any {
 	t.Helper()
 
 	analysis := map[string]any{
@@ -296,7 +354,7 @@ func evaluateIntakeExpression(t *testing.T, expression string, pct int) any {
 			"exit_code": 0,
 			"result": map[string]any{
 				"type":   "result",
-				"result": strconv.Itoa(pct),
+				"result": "Here is the score:\n" + result,
 			},
 		},
 	}

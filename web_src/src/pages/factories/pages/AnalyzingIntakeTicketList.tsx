@@ -1,8 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 
-import { LINE_INTAKE_COPY, type LineIntakeAnalyzingTicket } from "./lineIntakeModel";
+import { ConfidenceMeter } from "../workOrders/ConfidenceMeter";
+import {
+  intakeTicketConfidenceScore,
+  isBelowThresholdTicket,
+  LINE_INTAKE_COPY,
+  sortIntakeTicketsByOutcome,
+  type LineIntakeAnalyzingTicket,
+} from "./lineIntakeModel";
 
 interface AnalyzingIntakeTicketListProps {
   tickets: LineIntakeAnalyzingTicket[];
@@ -54,32 +61,60 @@ export function AnalyzingIntakeTicketList({
       data-testid="line-intake-analyzing"
       aria-label={LINE_INTAKE_COPY.analyzingTitle}
     >
-      {tickets.map((ticket) => {
-        const selected = openTicketId === ticket.id;
-        return (
-          <li key={ticket.id} data-testid={`line-intake-analyzing-ticket-${ticket.id}`}>
-            <button
-              type="button"
-              onClick={() => onOpenTicket?.(ticket)}
-              aria-label={`Open ${ticket.title}`}
-              aria-pressed={selected}
-              className={cn(
-                "flex w-full items-start gap-2.5 px-3 py-3.5 text-left transition-colors hover:bg-accent/70",
-                selected && "bg-accent",
-              )}
-            >
-              <Loader2
-                className="mt-0.5 size-3.5 shrink-0 animate-spin text-muted-foreground"
-                aria-hidden
-                data-testid="line-intake-analyzing-spinner"
-              />
-              <span className="min-w-0 flex-1 text-left text-[13px] font-medium leading-snug tracking-[-0.01em] text-foreground">
-                {ticket.title}
-              </span>
-            </button>
-          </li>
-        );
-      })}
+      {sortIntakeTicketsByOutcome(tickets).map((ticket) => (
+        <li key={ticket.id} data-testid={`line-intake-analyzing-ticket-${ticket.id}`}>
+          <IntakeTicketRow ticket={ticket} selected={openTicketId === ticket.id} onOpenTicket={onOpenTicket} />
+        </li>
+      ))}
     </ul>
+  );
+}
+
+function IntakeTicketRow({
+  ticket,
+  selected,
+  onOpenTicket,
+}: {
+  ticket: LineIntakeAnalyzingTicket;
+  selected: boolean;
+  onOpenTicket?: (ticket: LineIntakeAnalyzingTicket) => void;
+}) {
+  const belowThreshold = isBelowThresholdTicket(ticket);
+  const score = intakeTicketConfidenceScore(ticket);
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenTicket?.(ticket)}
+      aria-label={`Open ${ticket.title}`}
+      aria-pressed={selected}
+      className={cn(
+        "flex w-full items-start gap-2.5 px-3 py-3.5 text-left transition-colors hover:bg-accent/70",
+        selected && "bg-accent",
+      )}
+    >
+      {belowThreshold ? (
+        <span className="mt-0.5 shrink-0" title={LINE_INTAKE_COPY.belowThresholdHelper}>
+          <X className="size-3.5 text-muted-foreground" aria-hidden data-testid="line-intake-below-threshold-icon" />
+        </span>
+      ) : (
+        <Loader2
+          className="mt-0.5 size-3.5 shrink-0 animate-spin text-muted-foreground"
+          aria-hidden
+          data-testid="line-intake-analyzing-spinner"
+        />
+      )}
+      <span
+        className={cn(
+          "min-w-0 flex-1 text-left text-[13px] font-medium leading-snug tracking-[-0.01em]",
+          belowThreshold ? "text-muted-foreground" : "text-foreground",
+        )}
+      >
+        {ticket.title}
+      </span>
+      {belowThreshold && score != null ? (
+        <ConfidenceMeter score={score} className="mt-0.5 shrink-0" testId={`line-intake-ticket-score-${ticket.id}`} />
+      ) : null}
+    </button>
   );
 }

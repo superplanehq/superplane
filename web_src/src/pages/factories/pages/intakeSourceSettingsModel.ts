@@ -289,19 +289,49 @@ export function intakeRunsFromApi(
   });
 }
 
-/** Runs the intake is still analyzing, shown as tickets under the source. */
+interface IntakeListTicket {
+  id: string;
+  title: string;
+  appId?: string;
+  runId?: string;
+  outcome?: "analyzing" | "below-threshold";
+  confidencePct?: number;
+}
+
+/** Tickets that stay in the Intake list: still analyzing, or below the minimum. */
 export function analyzingTicketsFromApi(
   runs: FactoriesFactoryIntakeRun[],
   appId: string | undefined,
-): Array<{ id: string; title: string; appId?: string; runId?: string }> {
+): IntakeListTicket[] {
   return runs.flatMap((run) => {
-    const id = run.id?.trim();
-    const title = run.title?.trim();
-    if (!id || !title || run.placement !== "PLACEMENT_ANALYZING") {
-      return [];
-    }
-    return [{ id, title, runId: id, ...(appId ? { appId } : {}) }];
+    const ticket = intakeListTicketFromRun(run, appId);
+    return ticket ? [ticket] : [];
   });
+}
+
+function intakeListTicketFromRun(
+  run: FactoriesFactoryIntakeRun,
+  appId: string | undefined,
+): IntakeListTicket | undefined {
+  const id = run.id?.trim();
+  const title = run.title?.trim();
+  if (!id || !title) {
+    return undefined;
+  }
+
+  const ticket: IntakeListTicket = { id, title, runId: id, ...(appId ? { appId } : {}) };
+  if (run.placement === "PLACEMENT_ANALYZING") {
+    return ticket;
+  }
+  if (run.placement !== "PLACEMENT_BELOW_THRESHOLD") {
+    return undefined;
+  }
+
+  return {
+    ...ticket,
+    outcome: "below-threshold",
+    ...(run.confidencePct != null ? { confidencePct: run.confidencePct } : {}),
+  };
 }
 
 function minutesAgo(timestamp: string | undefined, now: Date): number {
