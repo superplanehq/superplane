@@ -52,3 +52,16 @@ func Test__HostedAppInstallURL(t *testing.T) {
 		HostedAppInstallURL("superplane", "abc"),
 	)
 }
+
+func Test__HostedAppAuthorizeURL(t *testing.T) {
+	got := HostedAppAuthorizeURL("Iv1.abc", "https://app.example/api/v1/github/app/oauth/callback", "csrf")
+	assert.Contains(t, got, "https://github.com/login/oauth/authorize?")
+	assert.Contains(t, got, "client_id=Iv1.abc")
+	assert.Contains(t, got, "state=csrf")
+	assert.Contains(t, got, "redirect_uri=")
+}
+
+func Test__HostedAppUserOAuthEnabled(t *testing.T) {
+	assert.False(t, HostedApp{ClientID: "id"}.UserOAuthEnabled())
+	assert.True(t, HostedApp{ClientID: "id", ClientSecret: "secret"}.UserOAuthEnabled())
+}

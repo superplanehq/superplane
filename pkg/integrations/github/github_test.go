@@ -80,6 +80,7 @@ func Test__GitHub__Sync(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
 		require.NoError(t, g.Sync(core.SyncContext{
 			OrganizationID: "11111111-1111-1111-1111-111111111111",
+			ActorUserID:    "starter-user",
 			Integration:    integrationCtx,
 		}))
 
@@ -94,6 +95,7 @@ func Test__GitHub__Sync(t *testing.T) {
 		assert.True(t, metadata.HostedApp)
 		assert.Equal(t, int64(99), metadata.GitHubApp.ID)
 		assert.Equal(t, "superplane", metadata.GitHubApp.Slug)
+		assert.Equal(t, "starter-user", metadata.StartedByUserID)
 		assert.NotEmpty(t, metadata.State)
 		assert.Empty(t, metadata.InstallationID)
 	})
@@ -113,6 +115,13 @@ func Test__GitHub__Sync(t *testing.T) {
 		assert.Equal(t, "POST", integrationCtx.BrowserAction.Method)
 		assert.Equal(t, "https://github.com/settings/apps/new", integrationCtx.BrowserAction.URL)
 	})
+}
+
+func Test__isPendingInstallationSetupAction(t *testing.T) {
+	assert.True(t, isPendingInstallationSetupAction("install"))
+	assert.True(t, isPendingInstallationSetupAction("update"))
+	assert.False(t, isPendingInstallationSetupAction(""))
+	assert.False(t, isPendingInstallationSetupAction("request"))
 }
 
 func Test__ownerFromRepositories(t *testing.T) {

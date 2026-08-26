@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { pendingGitHubBrowserAction, startDirectGitHubConnect } from "./startDirectGitHubConnect";
+import {
+  pendingGitHubBrowserAction,
+  pendingGitHubInstallPicker,
+  startDirectGitHubConnect,
+} from "./startDirectGitHubConnect";
 
 const remember = vi.hoisted(() => vi.fn());
 const follow = vi.hoisted(() => vi.fn(() => true));
@@ -37,10 +41,75 @@ describe("pendingGitHubBrowserAction", () => {
   });
 });
 
+describe("pendingGitHubInstallPicker", () => {
+  it("returns a pending GitHub connection with two or more installs", () => {
+    expect(
+      pendingGitHubInstallPicker([
+        {
+          metadata: { id: "int-1", integrationName: "github" },
+          status: {
+            state: "pending",
+            metadata: {
+              pendingInstallations: [
+                { id: "11", accountLogin: "acme" },
+                { id: "22", accountLogin: "octo" },
+              ],
+            },
+          },
+        },
+      ]),
+    ).toEqual({ id: "int-1" });
+  });
+
+  it("returns undefined when there is no picker", () => {
+    expect(
+      pendingGitHubInstallPicker([
+        {
+          metadata: { id: "int-1", integrationName: "github" },
+          status: { state: "pending", browserAction: { method: "GET", url: "https://github.com" } },
+        },
+      ]),
+    ).toBeUndefined();
+  });
+});
+
 describe("startDirectGitHubConnect", () => {
   beforeEach(() => {
     remember.mockClear();
     follow.mockClear();
+  });
+
+  it("opens the picker page when pending installs exist", async () => {
+    const create = vi.fn();
+    const goTo = vi.fn();
+
+    await startDirectGitHubConnect({
+      organizationId: "org-1",
+      returnTo: "/org-1/settings/integrations",
+      existingNames: new Set(),
+      connected: [
+        {
+          metadata: { id: "int-1", integrationName: "github" },
+          status: {
+            state: "pending",
+            browserAction: { method: "GET", url: "https://github.com/login/oauth/authorize" },
+            metadata: {
+              pendingInstallations: [
+                { id: "11", accountLogin: "acme" },
+                { id: "22", accountLogin: "octo" },
+              ],
+            },
+          },
+        },
+      ],
+      create,
+      goTo,
+    });
+
+    expect(create).not.toHaveBeenCalled();
+    expect(follow).not.toHaveBeenCalled();
+    expect(remember).toHaveBeenCalledWith("org-1", "/org-1/settings/integrations");
+    expect(goTo).toHaveBeenCalledWith("/org-1/settings/integrations/int-1");
   });
 
   it("reuses a pending browser action", async () => {

@@ -6,6 +6,7 @@ import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
 import { showErrorToast } from "@/lib/toast";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 
 import { HomeIntegrationCreateDialog } from "./HomeIntegrationCreateDialog";
 import {
@@ -56,6 +57,7 @@ export function useIntegrationConnectDialog({
   });
   const { data: availableIntegrations = [] } = useAvailableIntegrations({ enabled: !!organizationId });
   const createIntegrationMutation = useCreateIntegration(organizationId, "install_wizard");
+  const navigate = useNavigate();
   const [dialogIntegrationName, setDialogIntegrationName] = useState<string | null>(null);
   /** "create" skips resuming a pending instance so "Connect new" always starts fresh. */
   const [dialogMode, setDialogMode] = useState<"create" | "resume">("resume");
@@ -119,6 +121,7 @@ export function useIntegrationConnectDialog({
         returnTo,
         existingNames: existingIntegrationNames,
         connected,
+        goTo: navigate,
         create: async (payload) => {
           const response = await createIntegrationMutation.mutateAsync(payload);
           return response.data;
@@ -127,7 +130,7 @@ export function useIntegrationConnectDialog({
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
     }
-  }, [connected, createIntegrationMutation, existingIntegrationNames, organizationId, returnTo]);
+  }, [connected, createIntegrationMutation, existingIntegrationNames, navigate, organizationId, returnTo]);
 
   const requestConnect = (integrationName: string) => {
     if (integrationName === "github" && useHostedGitHubApp) {

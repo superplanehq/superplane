@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -92,6 +93,7 @@ func UpdateIntegration(
 		nil,
 	)
 
+	userID, _ := authentication.GetUserIdFromMetadata(ctx)
 	logging.ForIntegration(*instance).WithField("source", "integration_update").Info("Integration operation may write secrets")
 	syncErr := integration.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*instance),
@@ -100,6 +102,7 @@ func UpdateIntegration(
 		BaseURL:         baseURL,
 		WebhooksBaseURL: webhooksBaseURL,
 		OrganizationID:  orgID,
+		ActorUserID:     userID,
 		Integration:     integrationCtx,
 		OIDC:            oidcProvider,
 	})

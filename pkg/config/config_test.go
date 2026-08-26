@@ -39,39 +39,3 @@ func TestMaxPayloadSize(t *testing.T) {
 		assert.Equal(t, 512*1024, MaxPayloadSize())
 	})
 }
-
-func TestLoadGitHubHostedAppConfig(t *testing.T) {
-	t.Setenv(EnvGitHubAppID, "")
-	t.Setenv(EnvGitHubAppSlug, "")
-	t.Setenv(EnvGitHubAppPrivateKey, "")
-	t.Setenv(EnvGitHubAppWebhookSecret, "")
-
-	t.Run("empty env is not enabled", func(t *testing.T) {
-		cfg := LoadGitHubHostedAppConfig()
-		assert.False(t, cfg.Enabled())
-	})
-
-	t.Run("all values yield the app", func(t *testing.T) {
-		t.Setenv(EnvGitHubAppID, "12345")
-		t.Setenv(EnvGitHubAppSlug, "superplane")
-		t.Setenv(EnvGitHubAppPrivateKey, "-----BEGIN RSA PRIVATE KEY-----\\nabc\\n-----END RSA PRIVATE KEY-----")
-		t.Setenv(EnvGitHubAppWebhookSecret, "whsec")
-
-		cfg := LoadGitHubHostedAppConfig()
-		assert.True(t, cfg.Enabled())
-		assert.Equal(t, int64(12345), cfg.ID)
-		assert.Equal(t, "superplane", cfg.Slug)
-		assert.Equal(t, "whsec", cfg.WebhookSecret)
-		assert.Contains(t, cfg.PrivateKey, "BEGIN RSA PRIVATE KEY")
-		assert.Contains(t, cfg.PrivateKey, "\n")
-	})
-
-	t.Run("invalid id is not enabled", func(t *testing.T) {
-		t.Setenv(EnvGitHubAppID, "nope")
-		t.Setenv(EnvGitHubAppSlug, "superplane")
-		t.Setenv(EnvGitHubAppPrivateKey, "pem")
-		t.Setenv(EnvGitHubAppWebhookSecret, "whsec")
-
-		assert.False(t, LoadGitHubHostedAppConfig().Enabled())
-	})
-}

@@ -51,6 +51,12 @@ To complete the GitHub app setup:
 	hostedInstallDescription = `
 Install the SuperPlane GitHub App on the GitHub account or organization that owns your repositories.
 `
+
+	hostedOAuthDescription = `
+Authorize SuperPlane to list GitHub accounts where the SuperPlane GitHub App is already installed.
+
+If no account has the App, GitHub will ask you to install it.
+`
 )
 
 var defaultGitHubAppEvents = []string{
@@ -219,20 +225,27 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext) error {
 		return fmt.Errorf("hosted GitHub App is not configured")
 	}
 
+	var existing common.Metadata
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &existing)
+	if existing.HostedApp && existing.InstallationID == "" && existing.State != "" {
+		g.refreshHostedPendingAction(ctx, app, existing)
+		return nil
+	}
+
 	state, err := crypto.Base64String(32)
 	if err != nil {
 		return fmt.Errorf("Failed to generate GitHub App state: %v", err)
 	}
 
-	ctx.Integration.NewBrowserAction(core.BrowserAction{
-		Description: hostedInstallDescription,
-		URL:         common.HostedAppInstallURL(app.Slug, state),
-		Method:      "GET",
-	})
+	startedBy := ctx.ActorUserID
+	if existing.StartedByUserID != "" {
+		startedBy = existing.StartedByUserID
+	}
 
-	ctx.Integration.SetMetadata(common.Metadata{
-		State:     state,
-		HostedApp: true,
+	g.refreshHostedPendingAction(ctx, app, common.Metadata{
+		State:           state,
+		HostedApp:       true,
+		StartedByUserID: startedBy,
 		GitHubApp: common.GitHubAppMetadata{
 			ID:   app.ID,
 			Slug: app.Slug,
@@ -242,9 +255,40 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext) error {
 	return nil
 }
 
+func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {
+	if len(metadata.PendingInstallations) >= 2 {
+		ctx.Integration.SetMetadata(metadata)
+		return
+	}
+
+	actionURL := common.HostedAppInstallURL(app.Slug, metadata.State)
+	description := hostedInstallDescription
+	if app.UserOAuthEnabled() && ctx.BaseURL != "" && len(metadata.PendingInstallations) == 0 {
+		actionURL = common.HostedAppAuthorizeURL(app.ClientID, common.HostedAppOAuthCallbackURL(ctx.BaseURL), metadata.State)
+		description = hostedOAuthDescription
+	}
+
+	ctx.Integration.NewBrowserAction(core.BrowserAction{
+		Description: description,
+		URL:         actionURL,
+		Method:      "GET",
+	})
+	ctx.Integration.SetMetadata(metadata)
+}
+
 func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
 	if strings.HasSuffix(ctx.Request.URL.Path, "/redirect") {
 		g.afterAppCreation(ctx)
+		return
+	}
+
+	if strings.HasSuffix(ctx.Request.URL.Path, "/oauth/callback") {
+		g.afterHostedAppOAuth(ctx)
+		return
+	}
+
+	if strings.HasSuffix(ctx.Request.URL.Path, "/bind") {
+		g.afterHostedAppBind(ctx)
 		return
 	}
 
@@ -755,8 +799,9 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 	//
 	// Installation updates are handled through the webhook events.
 	//
-	if setupAction != "install" {
+	if !isPendingInstallationSetupAction(setupAction) {
 		ctx.Logger.Infof("Ignoring setup action %s for GitHub App installation %s", setupAction, installationID)
+		redirectToIntegrationSettings(ctx)
 		return
 	}
 
@@ -877,69 +922,37 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 	//
 	// Installation updates are handled through the webhook events.
 	//
-	if setupAction != "install" {
+	if !isPendingInstallationSetupAction(setupAction) {
 		ctx.Logger.Infof("Ignoring setup action %s for GitHub App installation %s", setupAction, installationID)
+		redirectToIntegrationSettings(ctx)
 		return
 	}
 
-	metadata.InstallationID = installationID
-	client, err := newClientForAppInstallation(ctx.Integration, metadata.GitHubApp.ID, installationID)
-	if err != nil {
-		ctx.Logger.Errorf("failed to create client: %v", err)
-		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	if metadata.Owner == "" && !metadata.HostedApp {
-		ghApp, _, err := client.Apps.Get(context.Background(), metadata.GitHubApp.Slug)
-		if err != nil {
-			ctx.Logger.Errorf("failed to get app: %v", err)
-			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+	if metadata.HostedApp && !metadata.AllowsPendingInstallation(installationID) {
+		app, ok := common.HostedAppFromEnv()
+		if ok && app.UserOAuthEnabled() && ctx.BaseURL != "" {
+			http.Redirect(
+				ctx.Response,
+				ctx.Request,
+				common.HostedAppAuthorizeURL(app.ClientID, common.HostedAppOAuthCallbackURL(ctx.BaseURL), metadata.State),
+				http.StatusSeeOther,
+			)
 			return
 		}
-
-		metadata.Owner = ghApp.Owner.GetLogin()
-	}
-
-	repos, err := listInstallationRepositories(context.Background(), client)
-	if err != nil {
-		ctx.Logger.Errorf("failed to list repos: %v", err)
-		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	if metadata.Owner == "" {
-		appClient, err := newClientForApp(ctx.Integration, metadata.GitHubApp.ID)
-		if err != nil {
-			ctx.Logger.Errorf("failed to create app client: %v", err)
+		if len(metadata.PendingInstallations) > 0 {
+			ctx.Logger.Errorf("installation %s is not in the pending allowlist", installationID)
+			http.Error(ctx.Response, "installation is not allowed", http.StatusBadRequest)
+			return
 		}
-		metadata.Owner = resolveInstallationOwner(context.Background(), appClient, installationID, repos)
 	}
 
-	if metadata.Owner == "" {
-		ctx.Logger.Errorf("installation owner is empty for installation %s", installationID)
+	if err := g.bindHostedInstallation(ctx, metadata, installationID); err != nil {
+		ctx.Logger.Errorf("%v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	metadata.Repositories = repos
-	metadata.State = ""
-
-	ctx.Integration.SetMetadata(metadata)
-	ctx.Integration.RemoveBrowserAction()
-	ctx.Integration.Ready()
-
-	ctx.Logger.Infof("Successfully installed GitHub App %s - installation=%s", metadata.GitHubApp.Slug, metadata.InstallationID)
-	ctx.Logger.Infof("Repositories: %v", metadata.Repositories)
-
-	http.Redirect(
-		ctx.Response,
-		ctx.Request,
-		fmt.Sprintf(
-			"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
-		),
-		http.StatusSeeOther,
-	)
+	redirectToIntegrationSettings(ctx)
 }
 
 func (g *GitHub) browserActionURL(organization string) string {
@@ -1022,6 +1035,21 @@ func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, code string) (*
 	}
 
 	return &appData, nil
+}
+
+func isPendingInstallationSetupAction(setupAction string) bool {
+	return setupAction == "install" || setupAction == "update"
+}
+
+func redirectToIntegrationSettings(ctx core.HTTPRequestContext) {
+	http.Redirect(
+		ctx.Response,
+		ctx.Request,
+		fmt.Sprintf(
+			"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
+		),
+		http.StatusSeeOther,
+	)
 }
 
 func ownerFromRepositories(repos []common.Repository) string {
