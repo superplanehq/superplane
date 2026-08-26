@@ -25,7 +25,8 @@ import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { analytics } from "@/lib/analytics";
-import { isCapabilityBasedIntegrationDefinition } from "@/lib/integrations";
+import { isCapabilityBasedIntegrationDefinition, usesHostedGitHubAppInstall } from "@/lib/integrations";
+import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
 import { posthog, isPostHogEnabled } from "@/posthog";
 import { cn } from "@/lib/utils";
 import {
@@ -192,6 +193,23 @@ export function Integrations({ organizationId }: IntegrationsProps) {
 
   const handleConnectClick = (integration: IntegrationsIntegrationDefinition) => {
     if (!canCreateIntegrations) return;
+
+    if (usesHostedGitHubAppInstall(integration)) {
+      analytics.integrationConnectStart("github", "integrations_page", organizationId);
+      void startDirectGitHubConnect({
+        organizationId,
+        returnTo: `/${organizationId}/settings/integrations`,
+        existingNames: integrationNames,
+        connected: organizationIntegrations,
+        create: async (payload) => {
+          const response = await createIntegrationMutation.mutateAsync(payload);
+          return response.data;
+        },
+      }).catch((error) => {
+        showErrorToast(getUsageLimitToastMessage(error, "Failed to connect GitHub"));
+      });
+      return;
+    }
 
     if (isCapabilityBasedIntegrationDefinition(integration)) {
       if (!integration.name) return;

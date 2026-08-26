@@ -318,4 +318,25 @@ func Test__CreateIntegration(t *testing.T) {
 		require.NotNil(t, response.Integration.Status.SetupState)
 		require.NotNil(t, response.Integration.Status.SetupState.CurrentStep)
 	})
+
+	t.Run("github uses hosted install when factories and app env are set even if new setup flow is on", func(t *testing.T) {
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureNewIntegrationSetupFlow))
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
+
+		t.Setenv("SUPERPLANE_GITHUB_APP_ID", "99")
+		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "test-pem")
+		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "whsec")
+
+		name := support.RandomName("integration")
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, nil)
+		require.NoError(t, err)
+		require.NotNil(t, response.Integration)
+		assert.Nil(t, response.Integration.Status.SetupState)
+		require.NotNil(t, response.Integration.Status.BrowserAction)
+		assert.Equal(t, "GET", response.Integration.Status.BrowserAction.Method)
+		assert.Contains(t, response.Integration.Status.BrowserAction.Url, "/apps/superplane/installations/new")
+	})
 }

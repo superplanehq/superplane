@@ -47,6 +47,10 @@ To complete the GitHub app setup:
 To complete the GitHub app setup:
 1. **Install GitHub App**: Install the new GitHub app in the user/organization.
 `
+
+	hostedInstallDescription = `
+Install the SuperPlane GitHub App on the GitHub account or organization that owns your repositories.
+`
 )
 
 var defaultGitHubAppEvents = []string{
@@ -182,6 +186,10 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 		return nil
 	}
 
+	if UseHostedApp(ctx.OrganizationID) {
+		return g.syncHostedApp(ctx)
+	}
+
 	state, err := crypto.Base64String(32)
 	if err != nil {
 		return fmt.Errorf("Failed to generate GitHub App state: %v", err)
@@ -200,6 +208,35 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 	ctx.Integration.SetMetadata(common.Metadata{
 		Owner: config.Organization,
 		State: state,
+	})
+
+	return nil
+}
+
+func (g *GitHub) syncHostedApp(ctx core.SyncContext) error {
+	app, ok := common.HostedAppFromEnv()
+	if !ok {
+		return fmt.Errorf("hosted GitHub App is not configured")
+	}
+
+	state, err := crypto.Base64String(32)
+	if err != nil {
+		return fmt.Errorf("Failed to generate GitHub App state: %v", err)
+	}
+
+	ctx.Integration.NewBrowserAction(core.BrowserAction{
+		Description: hostedInstallDescription,
+		URL:         common.HostedAppInstallURL(app.Slug, state),
+		Method:      "GET",
+	})
+
+	ctx.Integration.SetMetadata(common.Metadata{
+		State:     state,
+		HostedApp: true,
+		GitHubApp: common.GitHubAppMetadata{
+			ID:   app.ID,
+			Slug: app.Slug,
+		},
 	})
 
 	return nil
@@ -227,6 +264,14 @@ func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
 
 func (g *GitHub) findWebhookSecret(ctx core.HTTPRequestContext) (string, error) {
 	if ctx.Integration.LegacySetup() {
+		var metadata common.Metadata
+		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err == nil && metadata.HostedApp {
+			app, ok := common.HostedAppFromEnv()
+			if !ok {
+				return "", fmt.Errorf("hosted GitHub App is not configured")
+			}
+			return app.WebhookSecret, nil
+		}
 		return common.FindSecret(ctx.Integration, GitHubAppWebhookSecret)
 	}
 
@@ -265,7 +310,7 @@ func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext) {
 	// When we receive an installation_repositories event, we always reload the list of repositories using the API.
 	//
 	case *github.InstallationRepositoriesEvent:
-		g.handleInstallationRepositoriesEvent(ctx)
+		g.handleInstallationRepositoriesEvent(ctx, event)
 
 	default:
 		ctx.Logger.Warnf("ignoring eventType %s", eventType)
@@ -441,7 +486,7 @@ func (g *GitHub) handleInstallationDeletion(ctx core.HTTPRequestContext, install
 	}
 }
 
-func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext) {
+func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext, event *github.InstallationRepositoriesEvent) {
 	//
 	// Integrations from new setup flow do not store repositories in metadata,
 	// so this is a no-op for them.
@@ -473,6 +518,17 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 	}
 
 	ctx.Logger.Infof("Updated repositories: %v", repos)
+
+	if metadata.Owner == "" {
+		metadata.Owner = ownerFromInstallationAccount(event.GetInstallation())
+	}
+	if metadata.Owner == "" {
+		appClient, err := newClientForApp(ctx.Integration, metadata.GitHubApp.ID)
+		if err != nil {
+			ctx.Logger.Errorf("failed to create app client: %v", err)
+		}
+		metadata.Owner = resolveInstallationOwner(context.Background(), appClient, metadata.InstallationID, repos)
+	}
 
 	metadata.Repositories = repos
 	ctx.Integration.SetMetadata(metadata)
@@ -834,7 +890,7 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	if metadata.Owner == "" {
+	if metadata.Owner == "" && !metadata.HostedApp {
 		ghApp, _, err := client.Apps.Get(context.Background(), metadata.GitHubApp.Slug)
 		if err != nil {
 			ctx.Logger.Errorf("failed to get app: %v", err)
@@ -848,6 +904,20 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 	repos, err := listInstallationRepositories(context.Background(), client)
 	if err != nil {
 		ctx.Logger.Errorf("failed to list repos: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if metadata.Owner == "" {
+		appClient, err := newClientForApp(ctx.Integration, metadata.GitHubApp.ID)
+		if err != nil {
+			ctx.Logger.Errorf("failed to create app client: %v", err)
+		}
+		metadata.Owner = resolveInstallationOwner(context.Background(), appClient, installationID, repos)
+	}
+
+	if metadata.Owner == "" {
+		ctx.Logger.Errorf("installation owner is empty for installation %s", installationID)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -954,6 +1024,58 @@ func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, code string) (*
 	return &appData, nil
 }
 
+func ownerFromRepositories(repos []common.Repository) string {
+	for _, repo := range repos {
+		path := strings.TrimPrefix(repo.URL, "https://github.com/")
+		owner, _, ok := strings.Cut(path, "/")
+		if ok && owner != "" {
+			return owner
+		}
+	}
+	return ""
+}
+
+func ownerFromInstallationAccount(installation *github.Installation) string {
+	if installation == nil || installation.GetAccount() == nil {
+		return ""
+	}
+
+	return installation.GetAccount().GetLogin()
+}
+
+func ownerFromAppInstallation(ctx context.Context, client *github.Client, installationID string) (string, error) {
+	id, err := strconv.ParseInt(installationID, 10, 64)
+	if err != nil {
+		return "", fmt.Errorf("invalid installation ID: %w", err)
+	}
+
+	installation, _, err := client.Apps.GetInstallation(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	if installation == nil || installation.GetAccount() == nil {
+		return "", nil
+	}
+
+	return installation.GetAccount().GetLogin(), nil
+}
+
+func resolveInstallationOwner(ctx context.Context, appClient *github.Client, installationID string, repos []common.Repository) string {
+	if owner := ownerFromRepositories(repos); owner != "" {
+		return owner
+	}
+	if appClient == nil {
+		return ""
+	}
+
+	owner, err := ownerFromAppInstallation(ctx, appClient, installationID)
+	if err != nil {
+		return ""
+	}
+
+	return owner
+}
+
 func listInstallationRepositories(ctx context.Context, client *github.Client) ([]common.Repository, error) {
 	var allRepos []*github.Repository
 	opts := &github.ListOptions{
@@ -997,6 +1119,20 @@ func (g *GitHub) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }
 
+func newClientForApp(ctx core.IntegrationContext, appID int64) (*github.Client, error) {
+	pem, err := findAppPrivateKey(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find PEM: %v", err)
+	}
+
+	itr, err := ghinstallation.NewAppsTransport(http.DefaultTransport, appID, []byte(pem))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create apps transport: %v", err)
+	}
+
+	return github.NewClient(&http.Client{Transport: itr}), nil
+}
+
 func newClientForAppInstallation(ctx core.IntegrationContext, appID int64, installationID string) (*github.Client, error) {
 	installationNumber, err := strconv.ParseInt(installationID, 10, 64)
 	if err != nil {
@@ -1024,7 +1160,11 @@ func newClientForAppInstallation(ctx core.IntegrationContext, appID int64, insta
 
 func findAppPrivateKey(ctx core.IntegrationContext) (string, error) {
 	if ctx.LegacySetup() {
-		return common.FindSecret(ctx, common.GitHubAppPEM)
+		var metadata common.Metadata
+		if err := mapstructure.Decode(ctx.GetMetadata(), &metadata); err != nil {
+			return "", fmt.Errorf("failed to decode metadata: %v", err)
+		}
+		return common.LegacyAppPrivateKey(ctx, metadata)
 	}
 
 	return ctx.Secrets().Get(common.SecretAppPEM)
