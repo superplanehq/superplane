@@ -45,6 +45,10 @@ interface RequestBody {
   assignee_ids?: unknown;
   lineName?: unknown;
   line_name?: unknown;
+  startStepIndex?: unknown;
+  start_step_index?: unknown;
+  replaceActive?: unknown;
+  replace_active?: unknown;
   result?: unknown;
   state?: unknown;
   steps?: unknown;
@@ -278,10 +282,12 @@ function buildDispatchedLineDispatch(
   lineName: string,
   now: string,
   apps: Array<{ id?: string; name?: string }> = [],
+  startStepIndex = 0,
 ): FactoriesWorkOrderLineDispatch {
-  const firstStep = line?.steps?.[0];
+  const stepIndex = Math.max(0, startStepIndex);
+  const firstStep = line?.steps?.[stepIndex] ?? line?.steps?.[0];
   const firstAppId = firstStep?.app?.app;
-  const firstName = automationNameForLineStep(firstStep, apps, 0);
+  const firstName = automationNameForLineStep(firstStep, apps, stepIndex);
   return {
     id: `dispatch-${Date.now()}`,
     line: line ? { id: line.id, name: line.name } : { id: "line-unknown", name: lineName },
@@ -296,7 +302,7 @@ function buildDispatchedLineDispatch(
       {
         id: `exec-${Date.now()}`,
         step: firstName,
-        stepIndex: 0,
+        stepIndex,
         state: "STATE_STARTED",
         result: "RESULT_UNKNOWN",
         createdAt: now,
@@ -324,7 +330,16 @@ function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: st
   }
 
   const apps = fixture.appsByFactoryId[factoryId] ?? [];
-  const newDispatch = buildDispatchedLineDispatch(line, lineName, now, apps);
+  const startStepIndex = Number(request.startStepIndex ?? request.start_step_index ?? 0) || 0;
+  const replaceActive = request.replaceActive === true || request.replace_active === true;
+  if (replaceActive) {
+    order.lineDispatches = (order.lineDispatches ?? []).map((dispatch) =>
+      dispatch.state === "STATE_ACTIVE"
+        ? { ...dispatch, state: "STATE_FINISHED", result: "RESULT_CANCELLED", finishedAt: now }
+        : dispatch,
+    );
+  }
+  const newDispatch = buildDispatchedLineDispatch(line, lineName, now, apps, startStepIndex);
   order.lineDispatches = [...(order.lineDispatches ?? []), newDispatch];
   return { json: { order } };
 }

@@ -26,6 +26,7 @@ var (
 	ErrFactoryLineNameAlreadyExists = errors.New("factory line name already exists")
 	ErrFactoryLineHasNoSteps        = errors.New("factory line has no steps")
 	ErrFactoryLineStepNotOnRun      = errors.New("factory line step entrypoint must use the onRun trigger")
+	ErrFactoryLineStepOutOfRange    = errors.New("factory line step index is out of range")
 )
 
 type FactoryLineStep struct {
