@@ -21,8 +21,6 @@ endif
 
 PKG_TEST_PACKAGES := ./pkg/...
 E2E_TEST_PACKAGES := ./test/e2e/...
-INDEX ?= 1
-TOTAL ?= 1
 
 COMPOSE=docker compose -f docker-compose.dev.yml
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client api/swagger/superplane.swagger.json
@@ -52,7 +50,7 @@ test.e2e:
 	$(COMPOSE) exec -e DB_NAME=superplane_test app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1 -timeout 30m
 
 test.e2e.autoparallel:
-	$(COMPOSE) exec -e DB_NAME=superplane_test -e INDEX -e TOTAL app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
+	$(COMPOSE) exec -e DB_NAME=superplane_test -e SHARD_INDEX -e SHARD_COUNT app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
 
 test.e2e.single:
 	bash ./scripts/vscode_run_tests.sh line $(FILE) $(LINE)
@@ -69,7 +67,7 @@ test.coverage.check:
 	$(MAKE) check.coverage.go
 
 test.coverage.autoparallel:
-	$(COMPOSE) run --rm -e DB_NAME=superplane_test -e INDEX=$(INDEX) -e TOTAL=$(TOTAL) -v $(PWD)/tmp/screenshots:/app/test/screenshots app bash -lc "cd /app && bash scripts/test_unit_autoparallel.sh"
+	$(COMPOSE) run --rm -e DB_NAME=superplane_test -e SHARD_INDEX -e SHARD_COUNT -v $(PWD)/tmp/screenshots:/app/test/screenshots app bash -lc "cd /app && bash scripts/test_unit_autoparallel.sh"
 
 test.coverage.baseline.update:
 	$(MAKE) test.coverage
@@ -212,7 +210,7 @@ check.test.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run test:run"
 
 check.test.ui.shard:
-	$(COMPOSE) exec -e INDEX -e TOTAL app bash -lc "cd /app && bash scripts/test_ui_autoparallel.sh"
+	$(COMPOSE) exec -e SHARD_INDEX -e SHARD_COUNT app bash -lc "cd /app && bash scripts/test_ui_autoparallel.sh"
 
 check.format.js:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run format:check"

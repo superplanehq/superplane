@@ -3,90 +3,70 @@ set -euo pipefail
 
 # Shard Go unit tests across CI workers.
 # Usage (Semaphore example):
-#   make test.coverage.autoparallel INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
-#
-# Environment:
-#   INDEX - 1-based index of this shard (defaults to 1)
-#   TOTAL - total number of shards (defaults to 1)
+#   make test.coverage.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
 
-INDEX="${INDEX:-${SEMAPHORE_JOB_INDEX:-1}}"
-TOTAL="${TOTAL:-${SEMAPHORE_JOB_COUNT:-1}}"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/shard_args.sh"
 
-if ! [[ "$INDEX" =~ ^[0-9]+$ ]] || ! [[ "$TOTAL" =~ ^[0-9]+$ ]]; then
-  echo "INDEX and TOTAL must be positive integers (got INDEX=${INDEX}, TOTAL=${TOTAL})" >&2
-  exit 1
-fi
-
-if [[ "$TOTAL" -lt 1 ]]; then
-  echo "TOTAL must be >= 1 (got ${TOTAL})" >&2
-  exit 1
-fi
-
-if [[ "$INDEX" -lt 1 || "$INDEX" -gt "$TOTAL" ]]; then
-  echo "INDEX must be between 1 and TOTAL (${TOTAL}), got ${INDEX}" >&2
-  exit 1
-fi
-
-echo "Running unit tests shard ${INDEX}/${TOTAL}"
+echo "Running unit tests shard ${SHARD_INDEX}/${SHARD_COUNT}"
 
 module_prefix="$(go list -m)"
-mapfile -t all_packages < <(go list ./pkg/...)
 
-if [[ "${#all_packages[@]}" -eq 0 ]]; then
+# Weigh each package by its test file count, so that heavy packages do not
+# cluster on one shard.
+weighted_packages=()
+while IFS= read -r import_path; do
+  package_dir="./${import_path#"$module_prefix"/}"
+  test_file_count="$(find "$package_dir" -maxdepth 1 -type f -name '*_test.go' | wc -l | tr -d ' ')"
+  weighted_packages+=("${test_file_count}:${package_dir}")
+done < <(go list ./pkg/...)
+
+if [[ "${#weighted_packages[@]}" -eq 0 ]]; then
   echo "No packages found under ./pkg, nothing to run."
   exit 0
 fi
 
-# Balance shards by *_test.go count so large packages do not cluster on one job.
-package_weights=()
-for import_path in "${all_packages[@]}"; do
-  rel="./${import_path#"${module_prefix}/"}"
-  weight="$(find "$rel" -maxdepth 1 -type f -name '*_test.go' 2>/dev/null | wc -l | tr -d ' ')"
-  package_weights+=("${weight}:${import_path}")
+# Heaviest package first, so the greedy assignment below stays balanced.
+sorted_packages=()
+while IFS= read -r entry; do
+  sorted_packages+=("$entry")
+done < <(printf '%s\n' "${weighted_packages[@]}" | sort -t: -k1,1nr -k2,2)
+
+shard_loads=()
+for ((shard = 0; shard < SHARD_COUNT; shard++)); do
+  shard_loads+=("0")
 done
 
-mapfile -t package_weights < <(printf '%s\n' "${package_weights[@]}" | sort -t: -k1,1nr -k2,2)
+# Assign every package to the least loaded shard, and keep the ones for us.
+shard_packages=()
+for entry in "${sorted_packages[@]}"; do
+  test_file_count="${entry%%:*}"
+  package_dir="${entry#*:}"
 
-shard_weights=()
-for ((i = 0; i < TOTAL; i++)); do
-  shard_weights+=("0")
-done
-
-selected_packages=()
-for entry in "${package_weights[@]}"; do
-  weight="${entry%%:*}"
-  import_path="${entry#*:}"
   lightest_shard=0
-  lightest_weight="${shard_weights[0]}"
-  for ((i = 1; i < TOTAL; i++)); do
-    if [[ "${shard_weights[$i]}" -lt "$lightest_weight" ]]; then
-      lightest_shard="$i"
-      lightest_weight="${shard_weights[$i]}"
+  for ((shard = 1; shard < SHARD_COUNT; shard++)); do
+    if [[ "${shard_loads[$shard]}" -lt "${shard_loads[$lightest_shard]}" ]]; then
+      lightest_shard="$shard"
     fi
   done
 
-  shard_index=$((lightest_shard + 1))
-  shard_weights[$lightest_shard]=$((lightest_weight + weight))
-  if [[ "$shard_index" -eq "$INDEX" ]]; then
-    selected_packages+=("${import_path}")
+  shard_loads[$lightest_shard]=$((shard_loads[lightest_shard] + test_file_count))
+  if [[ $((lightest_shard + 1)) -eq "$SHARD_INDEX" ]]; then
+    shard_packages+=("$package_dir")
   fi
 done
 
-if [[ "${#selected_packages[@]}" -eq 0 ]]; then
-  echo "No packages assigned to shard ${INDEX}/${TOTAL}; exiting successfully."
+if [[ "${#shard_packages[@]}" -eq 0 ]]; then
+  echo "No packages assigned to shard ${SHARD_INDEX}/${SHARD_COUNT}; exiting successfully."
   exit 0
 fi
 
-selected_rel=()
-echo "Selected packages for shard ${INDEX}/${TOTAL}:"
-for import_path in "${selected_packages[@]}"; do
-  rel="./${import_path#"${module_prefix}/"}"
-  selected_rel+=("$rel")
-  echo "  - ${rel}"
+echo "Selected packages for shard ${SHARD_INDEX}/${SHARD_COUNT}:"
+for package_dir in "${shard_packages[@]}"; do
+  echo "  - ${package_dir}"
 done
 echo ""
 
-packages_csv="$(IFS=','; echo "${selected_rel[*]}")"
+packages_csv="$(IFS=','; echo "${shard_packages[*]}")"
 
 gotestsum \
   --format short \
@@ -101,7 +81,7 @@ gotestsum \
 go tool cover -func=coverage-go.out | grep '^total:'
 
 coverage_args=(--profile coverage-go.out)
-if [[ "$TOTAL" -gt 1 ]]; then
+if [[ "$SHARD_COUNT" -gt 1 ]]; then
   coverage_args+=(--ignore-missing-packages)
 fi
 
