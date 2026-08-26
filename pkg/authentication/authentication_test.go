@@ -365,6 +365,26 @@ func TestGetSignupRequiredRedirectURL(t *testing.T) {
 	})
 }
 
+func TestGetPostLogoutRedirectURL(t *testing.T) {
+	t.Run("should return login when no redirect is present", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/logout", nil)
+
+		assert.Equal(t, "/login", getPostLogoutRedirectURL(req))
+	})
+
+	t.Run("should preserve a safe redirect on login", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/logout?redirect=%2Finvite%2Fabc", nil)
+
+		assert.Equal(t, "/login?redirect=%2Finvite%2Fabc", getPostLogoutRedirectURL(req))
+	})
+
+	t.Run("should reject an absolute redirect", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/logout?redirect=http%3A%2F%2Fevil.com", nil)
+
+		assert.Equal(t, "/login", getPostLogoutRedirectURL(req))
+	})
+}
+
 func TestHandler_completeProviderAuth(t *testing.T) {
 	t.Run("should redirect to login when signup intent is missing", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, false)

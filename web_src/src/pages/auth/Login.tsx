@@ -25,6 +25,7 @@ import { getAuthRedirectURL, getWelcomeRedirectPath } from "./authRedirect";
 import { SignupWaitlist } from "./SignupWaitlist";
 import {
   SIGNUP_REQUIRED_AUTH_ERROR,
+  getLogoutHref,
   getSignupRequiredAccountBody,
   getSignupRequiredCreateHref,
   isKnownAuthProvider,
@@ -464,10 +465,9 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
     isSignupMode && canSignup && magicCodeStep === "email" && !canSignupWithPassword && !useMagicCodePrimary;
   const visibleFormError = formError ?? authErrorMessage;
   const showSignupRequiredPrompt = !configLoading && shouldShowSignupRequiredPrompt(authError, canSignup);
-  const showSignupRequiredProductUpdates =
-    showSignupRequiredPrompt && !canSignupWithPassword && !authConfig.magicCodeEnabled;
   const showAuthMethods = !configLoading && !isSignupRequiredReturn;
   const signupRequiredCreateHref = getSignupRequiredCreateHref(authProvider, redirectQuery);
+  const logoutHref = getLogoutHref(redirectQuery);
 
   const handleMagicCodeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -713,7 +713,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
           {!configLoading && showSignupClosedNotice && <SignupClosedNotice />}
           {!configLoading && isSignupRequiredReturn && !canSignup && (
             <Button variant="outline" className="mt-4 w-full" asChild>
-              <a href="/logout">Back to sign in</a>
+              <a href={logoutHref}>Back to sign in</a>
             </Button>
           )}
 
@@ -722,12 +722,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
               <p className="text-left text-sm leading-6 text-gray-600 dark:text-gray-400">
                 {getSignupRequiredAccountBody(authProvider)}
               </p>
-              {showSignupRequiredProductUpdates && (
-                <ProductUpdatesOptIn
-                  checked={signupProductUpdatesOptIn}
-                  onCheckedChange={setSignupProductUpdatesOptIn}
-                />
-              )}
+              <ProductUpdatesOptIn checked={signupProductUpdatesOptIn} onCheckedChange={setSignupProductUpdatesOptIn} />
               <Button className="w-full" asChild>
                 <a
                   href={signupRequiredCreateHref}
@@ -742,7 +737,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
                 </a>
               </Button>
               <Button variant="outline" className="w-full" asChild>
-                <a href="/logout">Use a different account</a>
+                <a href={logoutHref}>Use a different account</a>
               </Button>
             </div>
           )}

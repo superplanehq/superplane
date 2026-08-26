@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getLogoutHref,
   getSignupRequiredAccountBody,
   getSignupRequiredCreateHref,
   isKnownAuthProvider,
@@ -48,6 +49,16 @@ describe("shouldShowSignupRequiredPrompt", () => {
 
   it("ignores other auth errors", () => {
     expect(shouldShowSignupRequiredPrompt("account_blocked", true)).toBe(false);
+  });
+});
+
+describe("getLogoutHref", () => {
+  it("keeps logout on login when no redirect is present", () => {
+    expect(getLogoutHref("")).toBe("/logout");
+  });
+
+  it("preserves the redirect query on logout", () => {
+    expect(getLogoutHref("?redirect=%2Finvite%2Fabc")).toBe("/logout?redirect=%2Finvite%2Fabc");
   });
 });
 

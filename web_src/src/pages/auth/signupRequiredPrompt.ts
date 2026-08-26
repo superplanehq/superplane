@@ -29,3 +29,7 @@ export function getSignupRequiredCreateHref(provider: string | null, redirectQue
   params.set("signup", "true");
   return `/auth/${provider}?${params.toString()}`;
 }
+
+export function getLogoutHref(redirectQuery: string): string {
+  return redirectQuery ? `/logout${redirectQuery}` : "/logout";
+}

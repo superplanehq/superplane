@@ -258,7 +258,16 @@ func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 	ClearAccountCookie(w, r)
 
-	http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+	http.Redirect(w, r, getPostLogoutRedirectURL(r), http.StatusTemporaryRedirect)
+}
+
+func getPostLogoutRedirectURL(r *http.Request) string {
+	redirectURL := getRedirectURL(r)
+	if redirectURL == "/" {
+		return "/login"
+	}
+
+	return "/login?redirect=" + url.QueryEscape(redirectURL)
 }
 
 func (a *Handler) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
