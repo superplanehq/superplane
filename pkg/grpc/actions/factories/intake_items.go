@@ -209,46 +209,11 @@ func gitHubIssueSearchQuery(repository, query string) string {
 	return fmt.Sprintf("repo:%s is:issue is:open %q", repository, query)
 }
 
-func filterIntakeItems(items []IntakeItem, query string, limit int) []IntakeItem {
-	page, _ := pageIntakeItems(items, query, limit, 0)
-	return page
-}
-
-func pageIntakeItems(items []IntakeItem, query string, limit, offset int) ([]IntakeItem, bool) {
-	trimmed := strings.ToLower(strings.TrimSpace(query))
-	matched := make([]IntakeItem, 0, len(items))
-	for _, item := range items {
-		if trimmed != "" && !intakeItemMatches(item, trimmed) {
-			continue
-		}
-		matched = append(matched, item)
-	}
-
-	if offset < 0 {
-		offset = 0
-	}
-	if offset >= len(matched) {
-		return []IntakeItem{}, false
-	}
-
-	end := len(matched)
-	if limit > 0 && offset+limit < end {
-		end = offset + limit
-	}
-
-	return matched[offset:end], end < len(matched)
-}
-
 func gitHubIntakePageSize(limit int) int {
 	if limit > intakeSeedPageSize {
 		return limit
 	}
 	return intakeSeedPageSize
-}
-
-func intakeItemMatches(item IntakeItem, query string) bool {
-	haystack := strings.ToLower(strings.Join([]string{item.Key, item.Title, item.Body, item.ID}, " "))
-	return strings.Contains(haystack, query)
 }
 
 func intakeItemLimit(query string, requested int) int {
