@@ -185,8 +185,14 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 func (c *RunClaudeCode) injectCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials, model string) ([]runner.BrokerEnvironmentVariable, error) {
 	switch credentials.Source {
 	case runner.CredentialsSourceSecret:
+		if err := runner.PrepareBYOKRun(ctx, "anthropic", model); err != nil {
+			return nil, err
+		}
 		return runner.InjectSecretAPIKey(ctx, environment, envAnthropicAPIKey, credentials.Secret)
 	case runner.CredentialsSourceIntegration:
+		if err := runner.PrepareBYOKRun(ctx, "anthropic", model); err != nil {
+			return nil, err
+		}
 		return runner.InjectIntegrationKeys(ctx, environment, credentials.Integration)
 	case runner.CredentialsSourceHosted:
 		access, err := runner.PrepareHostedRun(ctx, "anthropic", model)

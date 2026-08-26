@@ -29,21 +29,23 @@ var ErrFactoryWorkOrderTitleRequired = errors.New("title is required")
 var ErrFactoryKeyRequired = errors.New("factory key is required")
 var ErrFactoryKeyInvalid = errors.New("factory key must be 2 to 5 uppercase letters")
 var ErrFactoryKeyAlreadyExists = errors.New("factory key already exists in this organization")
+var ErrFactoryHostedSpendBudgetNegative = errors.New("hosted spend limit cannot be negative")
 
 var factoryKeyPattern = regexp.MustCompile(`^[A-Z]{2,5}$`)
 
 type Factory struct {
-	ID                    uuid.UUID
-	OrganizationID        uuid.UUID
-	Name                  string
-	Description           string
-	Key                   string
-	NextWorkOrderNumber   int64
-	OnboardingConfig      datatypes.JSONType[FactoryOnboardingConfig]
-	OnboardingCompletedAt *time.Time
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
-	DeletedAt             gorm.DeletedAt `gorm:"index"`
+	ID                     uuid.UUID
+	OrganizationID         uuid.UUID
+	Name                   string
+	Description            string
+	Key                    string
+	NextWorkOrderNumber    int64
+	OnboardingConfig       datatypes.JSONType[FactoryOnboardingConfig]
+	OnboardingCompletedAt  *time.Time
+	HostedSpendBudgetCents *int64
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
+	DeletedAt              gorm.DeletedAt `gorm:"index"`
 }
 
 // NormalizeFactoryKey uppercases and trims whitespace so callers can accept
@@ -324,6 +326,27 @@ func (f *Factory) Update(tx *gorm.DB, name, description, key *string) error {
 	if nextKey, ok := updates["key"].(string); ok {
 		f.Key = nextKey
 	}
+	f.UpdatedAt = now
+	return nil
+}
+
+func (f *Factory) UpdateHostedSpendBudget(tx *gorm.DB, budgetCents *int64) error {
+	if budgetCents != nil && *budgetCents < 0 {
+		return ErrFactoryHostedSpendBudgetNegative
+	}
+
+	now := time.Now()
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select("hosted_spend_budget_cents", "updated_at").
+		Updates(map[string]any{
+			"hosted_spend_budget_cents": budgetCents,
+			"updated_at":                now,
+		}).Error
+	if err != nil {
+		return err
+	}
+	f.HostedSpendBudgetCents = budgetCents
 	f.UpdatedAt = now
 	return nil
 }

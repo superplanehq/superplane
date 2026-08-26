@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
+import { defaultFactoriesFixture } from "../../__fixtures__/factoryPageResponses";
+import { EMPTY_USAGE_REPORT } from "../../__fixtures__/usageReportFixtures";
 import { OrganizationSettingsLayout } from "./OrganizationSettingsLayout";
 
 const meta = {
@@ -15,19 +16,102 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const General: Story = {
+  render: () => <FactoriesHarness pathSuffix="organization/general" factoriesFixture={defaultFactoriesFixture} />,
+};
+
+export const Workspaces: Story = {
+  render: () => <FactoriesHarness pathSuffix="organization/workspaces" factoriesFixture={defaultFactoriesFixture} />,
+};
+
+export const LLMSpend: Story = {
+  name: "LLM spend",
+  render: () => <FactoriesHarness pathSuffix="organization/llm-spend" factoriesFixture={defaultFactoriesFixture} />,
+};
+
+export const LLMSpendEmpty: Story = {
+  name: "LLM spend (empty)",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/organization/general`}
-      factoriesFixture={defaultFactoriesFixture}
+      pathSuffix="organization/llm-spend"
+      factoriesFixture={{ ...defaultFactoriesFixture, organizationLlmSpend: EMPTY_USAGE_REPORT }}
     />
   ),
 };
 
-export const Workspaces: Story = {
+export const LLMSpendBilling: Story = {
+  name: "LLM spend (add hosted credit)",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/organization/workspaces`}
-      factoriesFixture={defaultFactoriesFixture}
+      pathSuffix="organization/llm-spend"
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        organizationLlmSpend: {
+          ...EMPTY_USAGE_REPORT,
+          remainingCreditCents: "0",
+          grantTotalCents: "0",
+          hostedBilledCents: "0",
+          remainingCreditWarning: true,
+          billingEnabled: true,
+          hasBillingCustomer: false,
+        },
+        hostedCreditProducts: [
+          { id: "prod-500", name: "Hosted credit 500", amountCents: "50000" },
+          { id: "prod-25", name: "Hosted credit 25", amountCents: "2500" },
+          { id: "prod-100", name: "Hosted credit 100", amountCents: "10000" },
+        ],
+      }}
     />
   ),
+};
+
+export const LLMSpendBillingInvoices: Story = {
+  name: "LLM spend (manage invoices)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix="organization/llm-spend"
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        organizationLlmSpend: {
+          ...EMPTY_USAGE_REPORT,
+          remainingCreditCents: "2500",
+          grantTotalCents: "2500",
+          hostedBilledCents: "0",
+          remainingCreditWarning: false,
+          billingEnabled: true,
+          hasBillingCustomer: true,
+        },
+        hostedCreditProducts: [
+          { id: "prod-500", name: "Hosted credit 500", amountCents: "50000" },
+          { id: "prod-25", name: "Hosted credit 25", amountCents: "2500" },
+          { id: "prod-100", name: "Hosted credit 100", amountCents: "10000" },
+        ],
+      }}
+    />
+  ),
+};
+
+export const LLMSpendCreditAdded: Story = {
+  name: "LLM spend (credit added)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix="organization/llm-spend?credit=added"
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        organizationLlmSpend: {
+          ...EMPTY_USAGE_REPORT,
+          remainingCreditCents: "2500",
+          grantTotalCents: "2500",
+          hostedBilledCents: "0",
+          remainingCreditWarning: false,
+          billingEnabled: true,
+          hasBillingCustomer: true,
+        },
+        hostedCreditProducts: [{ id: "prod-25", name: "Hosted credit 25", amountCents: "2500" }],
+      }}
+    />
+  ),
+};
+
+export const Integrations: Story = {
+  render: () => <FactoriesHarness pathSuffix="organization/integrations" factoriesFixture={defaultFactoriesFixture} />,
 };
