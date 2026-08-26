@@ -582,9 +582,23 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	// dispatch's steps snapshot — not the live line — is authoritative for
 	// what comes next, so a mid-traversal line edit can't change it.
 	//
-	dispatch, err := models.FindWorkOrderLineDispatch(tx, execution.LineDispatchID)
+	dispatch, err := models.LockWorkOrderLineDispatch(tx, execution.LineDispatchID)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	//
+	// A rerun can start a step on this traversal while the run of an
+	// earlier step is finalized. That step owns the traversal now, so
+	// this pass must neither finish nor advance it — doing so would
+	// cancel a live run or open a second step on the same traversal.
+	//
+	openWork, err := dispatch.HasOpenWork(tx)
+	if err != nil {
+		return nil, nil, err
+	}
+	if openWork {
+		return pendingRuns, orderUpdates, nil
 	}
 
 	if run.Result != models.CanvasRunResultPassed {

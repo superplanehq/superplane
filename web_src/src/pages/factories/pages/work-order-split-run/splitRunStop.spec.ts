@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { applySplitRunStop, applySplitRunStopChoice } from "./splitRunStop";
 
 describe("applySplitRunStopChoice", () => {
-  it("closes as rejected for Stop as Canceled", async () => {
+  it("closes as rejected for Stop and Close", async () => {
     const onClose = vi.fn();
     const onStatusChange = vi.fn();
 
@@ -13,7 +13,7 @@ describe("applySplitRunStopChoice", () => {
     expect(onStatusChange).not.toHaveBeenCalled();
   });
 
-  it("closes as completed for Stop as Completed", async () => {
+  it("closes as completed for Stop and Complete", async () => {
     const onClose = vi.fn();
     const onStatusChange = vi.fn();
 
@@ -23,24 +23,28 @@ describe("applySplitRunStopChoice", () => {
     expect(onStatusChange).not.toHaveBeenCalled();
   });
 
-  it("moves to draft for Stop and return to Draft", async () => {
+  it("reruns the current step", async () => {
     const onClose = vi.fn();
     const onStatusChange = vi.fn();
+    const onRerun = vi.fn();
 
-    await applySplitRunStopChoice("draft", { onClose, onStatusChange });
+    await applySplitRunStopChoice("rerun-step", { onClose, onStatusChange, onRerun });
 
-    expect(onStatusChange).toHaveBeenCalledWith("STATE_DRAFT");
+    expect(onRerun).toHaveBeenCalledWith("rerun-step");
     expect(onClose).not.toHaveBeenCalled();
+    expect(onStatusChange).not.toHaveBeenCalled();
   });
 
-  it("reopens a closed work order instead of moving it to draft", async () => {
+  it("reruns from the first step", async () => {
     const onClose = vi.fn();
     const onStatusChange = vi.fn();
+    const onRerun = vi.fn();
 
-    await applySplitRunStopChoice("draft", { onClose, onStatusChange, status: "failed" });
+    await applySplitRunStopChoice("rerun-start", { onClose, onStatusChange, onRerun });
 
-    expect(onStatusChange).toHaveBeenCalledWith("STATE_OPEN");
+    expect(onRerun).toHaveBeenCalledWith("rerun-start");
     expect(onClose).not.toHaveBeenCalled();
+    expect(onStatusChange).not.toHaveBeenCalled();
   });
 
   it("reopens for the Reopen outcome", async () => {
@@ -95,33 +99,36 @@ describe("applySplitRunStop", () => {
     const cancelRun = vi.fn();
     const onStatusChange = vi.fn();
 
-    await applySplitRunStop("draft", {
+    const onRerun = vi.fn();
+    await applySplitRunStop("rerun-step", {
       kind: "failed",
       run,
       cancelRun,
       onClose: vi.fn(),
       onStatusChange,
+      onRerun,
     });
 
     expect(cancelRun).not.toHaveBeenCalled();
-    expect(onStatusChange).toHaveBeenCalledWith("STATE_DRAFT");
+    expect(onRerun).toHaveBeenCalledWith("rerun-step");
+    expect(onStatusChange).not.toHaveBeenCalled();
   });
 
-  it("reopens a closed failed order instead of moving it to draft", async () => {
-    const cancelRun = vi.fn();
-    const onStatusChange = vi.fn();
+  it("cancels a running step before rerunning it", async () => {
+    const cancelRun = vi.fn().mockResolvedValue(undefined);
+    const onRerun = vi.fn();
 
-    await applySplitRunStop("draft", {
-      kind: "failed",
-      status: "failed",
+    await applySplitRunStop("rerun-step", {
+      kind: "running",
       run,
       cancelRun,
       onClose: vi.fn(),
-      onStatusChange,
+      onStatusChange: vi.fn(),
+      onRerun,
     });
 
-    expect(cancelRun).not.toHaveBeenCalled();
-    expect(onStatusChange).toHaveBeenCalledWith("STATE_OPEN");
+    expect(cancelRun.mock.invocationCallOrder[0]).toBeLessThan(onRerun.mock.invocationCallOrder[0]);
+    expect(onRerun).toHaveBeenCalledWith("rerun-step");
   });
 
   it("still closes when a running order has no run id", async () => {

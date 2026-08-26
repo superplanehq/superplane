@@ -1,6 +1,6 @@
 import { useWorkOrderArtifacts } from "@/hooks/useFactoryData";
 import { Maximize2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { FACTORIES_ORGANIZATION_ID } from "../../__fixtures__/factoryPageResponses";
 
@@ -33,13 +33,18 @@ import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
 function footerMutationHandlers(
   canUpdate: boolean,
   footerActions: ReturnType<typeof useSplitRunFooterActions>,
-  footer: SplitRunFixture["footer"],
+  fixture: SplitRunFixture,
 ) {
   if (!canUpdate) {
     return { onStop: undefined, onReject: undefined };
   }
   return {
-    onStop: (choice: Parameters<typeof footerActions.handleStop>[0]) => void footerActions.handleStop(choice, footer),
+    onStop: (choice: Parameters<typeof footerActions.handleStop>[0]) =>
+      void footerActions.handleStop(choice, {
+        ...fixture.footer,
+        lineName: fixture.lineName,
+        stepIndex: fixture.currentStepIndex,
+      }),
     onReject: footerActions.handleReject,
   };
 }
@@ -71,10 +76,16 @@ export function WorkOrderSplitRunBody({
   canUpdate = true,
 }: WorkOrderSplitRunBodyProps) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
-  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture.footer);
+  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture);
   const [phaseId, setPhaseId] = useState<SplitRunPhaseId>(fixture.currentPhaseId);
   const [openPhaseId, setOpenPhaseId] = useState<SplitRunPhaseId | null>(() => autoExpandedPhaseId(fixture));
   const [nodeId, setNodeId] = useState<string | null>(null);
+  const currentPhaseId = fixture.currentPhaseId;
+  const expandedPhaseId = autoExpandedPhaseId(fixture);
+  useEffect(() => {
+    setPhaseId(currentPhaseId);
+    setOpenPhaseId(expandedPhaseId);
+  }, [currentPhaseId, expandedPhaseId]);
   const selectedPhase = fixture.phases.find((entry) => entry.id === phaseId) ?? fixture.phases[0];
   const live = useSplitRunLiveCanvas(organizationId, selectedPhase);
   const artifactIndex = useSplitRunStreamArtifacts(organizationId, factoryId, orderId);
@@ -182,7 +193,7 @@ export function WorkOrderSplitRunPopup({
   fixed?: boolean;
 }) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
-  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture.footer);
+  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture);
   const fixtureArtifacts = collectSplitRunArtifacts(fixture);
   const useLiveArtifacts = Boolean(organizationId && factoryId && orderId);
   const liveArtifactsQuery = useWorkOrderArtifacts(organizationId ?? "", factoryId ?? "", orderId ?? "");
@@ -229,61 +240,120 @@ export function WorkOrderSplitRunPopup({
           onOwnerSave={edits.saveOwner}
         />
       </PopupHeader>
-      <Tabs defaultValue={initialTab} className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="shrink-0 border-b border-border px-5 py-2">
-          <TabsList aria-label="Work order views">
-            <TabsTrigger value="description">Description</TabsTrigger>
-            <TabsTrigger value="log">
-              <WorkOrderStatusDot
-                colorClassName={splitRunLogTabDotClass(fixture.lineStatus)}
-                pulsing={fixture.lineStatus === "running"}
-                title={splitRunStatusLabel(fixture.lineStatus)}
-                className="size-1.5"
-                data-testid="split-run-log-tab-dot"
-                aria-hidden
-              />
-              Log
-            </TabsTrigger>
-          </TabsList>
-        </div>
-        <TabsContent value="description" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
-          <WorkOrderSplitRunOverview
-            description={edits.description}
-            artifacts={artifacts}
-            checks={fixture.checks}
-            artifactsLoading={useLiveArtifacts && liveArtifactsQuery.isLoading}
-            organizationId={organizationId}
-            factoryKey={factoryKey}
-            orderNumber={orderNumber}
-            expandFirstCheck={fixture.footer.kind === "draft"}
-            canEditDescription={edits.canEditDescription}
-            descriptionBusy={edits.descriptionBusy}
-            onDescriptionSave={edits.saveDescription}
-            source={fixture.source}
-            footer={fixture.footer}
-            onStart={fixture.footer.kind === "draft" ? onDispatch : undefined}
-            onStop={mutations.onStop}
-            onReject={mutations.onReject}
-            startBusy={isDispatching}
-            stopBusy={footerActions.busy}
-            startDisabled={!canDispatch}
-          />
-        </TabsContent>
-        <TabsContent value="log" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <WorkOrderSplitRunBody
-            organizationId={organizationId}
-            factoryId={factoryId}
-            factoryKey={factoryKey}
-            orderId={orderId}
-            orderNumber={orderNumber}
-            fixture={fixture}
-            onDispatch={onDispatch}
-            isDispatching={isDispatching}
-            canDispatch={canDispatch}
-            canUpdate={canUpdate}
-          />
-        </TabsContent>
-      </Tabs>
+      <SplitRunPopupTabs
+        fixture={fixture}
+        edits={edits}
+        artifacts={artifacts}
+        artifactsLoading={useLiveArtifacts && liveArtifactsQuery.isLoading}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        orderId={orderId}
+        orderNumber={orderNumber}
+        initialTab={initialTab}
+        mutations={mutations}
+        onDispatch={onDispatch}
+        isDispatching={isDispatching}
+        canDispatch={canDispatch}
+        canUpdate={canUpdate}
+        stopBusy={footerActions.busy}
+      />
     </PopupShell>
+  );
+}
+
+function SplitRunPopupTabs({
+  fixture,
+  edits,
+  artifacts,
+  artifactsLoading,
+  organizationId,
+  factoryId,
+  factoryKey,
+  orderId,
+  orderNumber,
+  initialTab,
+  mutations,
+  onDispatch,
+  isDispatching,
+  canDispatch,
+  canUpdate,
+  stopBusy,
+}: {
+  fixture: SplitRunFixture;
+  edits: ReturnType<typeof useSplitRunWorkOrderEdits>;
+  artifacts: ReturnType<typeof collectSplitRunArtifacts>;
+  artifactsLoading: boolean;
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  orderId?: string;
+  orderNumber?: string;
+  initialTab: string;
+  mutations: ReturnType<typeof footerMutationHandlers>;
+  onDispatch?: () => Promise<void>;
+  isDispatching?: boolean;
+  canDispatch?: boolean;
+  canUpdate?: boolean;
+  stopBusy: boolean;
+}) {
+  const draftStart = fixture.footer.kind === "draft" ? onDispatch : undefined;
+
+  return (
+    <Tabs defaultValue={initialTab} className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="shrink-0 border-b border-border px-5 py-2">
+        <TabsList aria-label="Work order views">
+          <TabsTrigger value="description">Description</TabsTrigger>
+          <TabsTrigger value="log">
+            <WorkOrderStatusDot
+              colorClassName={splitRunLogTabDotClass(fixture.lineStatus)}
+              pulsing={fixture.lineStatus === "running"}
+              title={splitRunStatusLabel(fixture.lineStatus)}
+              className="size-1.5"
+              data-testid="split-run-log-tab-dot"
+              aria-hidden
+            />
+            Log
+          </TabsTrigger>
+        </TabsList>
+      </div>
+      <TabsContent value="description" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
+        <WorkOrderSplitRunOverview
+          description={edits.description}
+          artifacts={artifacts}
+          checks={fixture.checks}
+          artifactsLoading={artifactsLoading}
+          organizationId={organizationId}
+          factoryKey={factoryKey}
+          orderNumber={orderNumber}
+          expandFirstCheck={fixture.footer.kind === "draft"}
+          canEditDescription={edits.canEditDescription}
+          descriptionBusy={edits.descriptionBusy}
+          onDescriptionSave={edits.saveDescription}
+          source={fixture.source}
+          footer={fixture.footer}
+          onStart={draftStart}
+          onStop={mutations.onStop}
+          onReject={mutations.onReject}
+          startBusy={isDispatching}
+          stopBusy={stopBusy}
+          startDisabled={!canDispatch}
+        />
+      </TabsContent>
+      <TabsContent value="log" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <WorkOrderSplitRunBody
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          orderId={orderId}
+          orderNumber={orderNumber}
+          fixture={fixture}
+          onDispatch={onDispatch}
+          isDispatching={isDispatching}
+          canDispatch={canDispatch}
+          canUpdate={canUpdate}
+        />
+      </TabsContent>
+    </Tabs>
   );
 }
