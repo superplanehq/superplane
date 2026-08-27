@@ -141,15 +141,15 @@ describe("PhaseLogCard collapsed stream", () => {
 
     const node = screen.getByTestId("split-run-stream-line-planner-agent");
     expect(node.querySelector(".lucide-chevron-right")).toBeNull();
-    expect(node.className).toMatch(/\bbg-muted\b/);
-    expect(node.className).toMatch(/border-b/);
+    expect(node.className).not.toMatch(/\bbg-muted\b/);
+    expect(node.className).not.toMatch(/border-b/);
     expect(screen.getByText("Clone Repo")).toBeInTheDocument();
     expect(screen.getByText("Write Implementation Plan")).toBeInTheDocument();
     expect(screen.getByText("Use plan as output")).toBeInTheDocument();
     expect(within(screen.getByTestId("split-run-stream-line-step-clone")).getByText("✓")).toBeInTheDocument();
     expect(within(screen.getByTestId("split-run-stream-line-step-fail")).getByText("✗")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-stream-line-step-clone").querySelector(".lucide-chevron-right")).toBeNull();
-    expect(screen.getByTestId("split-run-stream-line-step-clone").className).toMatch(/\bbg-muted\b/);
+    expect(screen.getByTestId("split-run-stream-line-step-clone").className).not.toMatch(/\bbg-muted\b/);
     expect(screen.getByText("Cloning into 'superplane'...")).toBeInTheDocument();
     expect(screen.getByText(LONG_NOTE)).toBeInTheDocument();
     expect(screen.queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();
@@ -374,24 +374,27 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(screen.queryAllByTestId("split-run-log-line-no")).toHaveLength(0);
   });
 
-  it("gives each log line a hover background", () => {
-    render(<PhaseLogCard phase={PHASE} expanded stream={PLANNING_STREAM} />);
+  it("tints collapsed phases on hover and leaves log lines clear", () => {
+    const { rerender } = render(<PhaseLogCard phase={PHASE} expanded={false} />);
 
-    const phaseRow = screen.getByTestId("split-run-automation-header-plan");
-    expect(phaseRow.className).toMatch(/sticky|flex/);
+    expect(screen.getByTestId("split-run-phase-plan").firstElementChild?.className).toMatch(/hover:bg-/);
+
+    rerender(<PhaseLogCard phase={PHASE} expanded stream={PLANNING_STREAM} />);
+
+    expect(screen.getByTestId("split-run-phase-plan").firstElementChild?.className).not.toMatch(/hover:bg-/);
 
     const node = screen.getByTestId("split-run-stream-line-planner-agent");
-    expect(node.className).toMatch(/hover:bg-/);
+    expect(node.className).not.toMatch(/hover:bg-/);
     const step = screen.getByTestId("split-run-stream-line-step-clone");
-    expect(step.className).toMatch(/hover:bg-/);
+    expect(step.className).not.toMatch(/hover:bg-/);
 
     const outputLine = screen.getAllByTestId("split-run-stream-output")[0]?.firstElementChild;
-    expect(outputLine?.className).toMatch(/hover:bg-/);
+    expect(outputLine?.className).not.toMatch(/hover:bg-/);
 
-    expect(screen.getByText(LONG_NOTE).closest("[data-testid^='split-run-stream-line-']")?.className).toMatch(
+    expect(screen.getByText(LONG_NOTE).closest("[data-testid^='split-run-stream-line-']")?.className).not.toMatch(
       /hover:bg-/,
     );
-    expect(screen.getByRole("button", { name: "Ran 1 command" }).className).toMatch(/hover:bg-/);
+    expect(screen.getByRole("button", { name: "Ran 1 command" }).className).not.toMatch(/hover:bg-/);
   });
 
   it("pins the open phase, node, and step while their output scrolls", () => {
@@ -404,16 +407,19 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(phase.className).toMatch(/top-0/);
     expect(phase.className).toMatch(/\bh-8\b/);
     expect(phase.className).toMatch(/\bbg-muted\b/);
+    expect(phase.className).not.toMatch(/\bbg-background\b/);
 
     const node = screen.getByTestId("split-run-stream-line-planner-agent");
     expect(node.className).toMatch(/sticky/);
     expect(node.className).toMatch(/top-8/);
-    expect(node.className).toMatch(/\bbg-muted\b/);
+    expect(node.className).not.toMatch(/\bbg-muted\b/);
+    expect(node.className).toMatch(/\bbg-background\b/);
 
     const step = screen.getByTestId("split-run-stream-line-step-clone");
     expect(step.className).toMatch(/sticky/);
     expect(step.className).toMatch(/top-\[3\.375rem\]/);
-    expect(step.className).toMatch(/\bbg-muted\b/);
+    expect(step.className).not.toMatch(/\bbg-muted\b/);
+    expect(step.className).toMatch(/\bbg-background\b/);
   });
 
   it("shows agent text and a collapsed tool summary", async () => {

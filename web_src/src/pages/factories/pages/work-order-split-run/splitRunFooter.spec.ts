@@ -11,11 +11,6 @@ import {
   SPLIT_RUN_STOP_CHOICES,
 } from "./splitRunFooter";
 
-const REJECT_APPROVE = [
-  { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" },
-  { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" },
-] as const;
-
 const PR_NOTE = {
   key: "pr",
   headline: "Review the pull request",
@@ -39,19 +34,18 @@ const DRAFT_NOTE = {
 };
 
 describe("buildSplitRunFooter", () => {
-  it("keeps a draft note above the state bar with Start and Reject", () => {
+  it("keeps a draft note above the state bar with Start", () => {
     expect(buildSplitRunFooter({ kind: "draft", note: DRAFT_NOTE })).toEqual({
       kind: "draft",
       sentence: "This work order is a draft.",
       note: { headline: "Review the plan, then start", text: "From GitHub issue PAY-842. Confidence 5/5." },
       actions: [
-        { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" },
         { id: "start", kind: "start", label: "Start", emphasis: "primary" },
       ],
     });
   });
 
-  it("keeps Reject and Approve on a running order", () => {
+  it("keeps no close actions on a running order", () => {
     const footer = buildSplitRunFooter({
       kind: "running",
       note: { key: "running-step", headline: "Implement is running", text: "The log shows live progress." },
@@ -60,7 +54,7 @@ describe("buildSplitRunFooter", () => {
     expect(footer.sentence).toBe("This work order is running.");
     expect(footer.note?.headline).toBe("Implement is running");
     expect(footer.run).toBeUndefined();
-    expect(footer.actions).toEqual([...REJECT_APPROVE]);
+    expect(footer.actions).toEqual([]);
     expect(splitRunCloseNeedsConfirm("running")).toBe(true);
     expect(DEFAULT_SPLIT_RUN_STOP_CHOICE).toBe("canceled");
     expect(SPLIT_RUN_STOP_CHOICES.map((choice) => choice.label)).toEqual([
@@ -83,7 +77,7 @@ describe("buildSplitRunFooter", () => {
     ]);
   });
 
-  it("keeps a waiting note off the bar and shows Reject and Approve", () => {
+  it("keeps a waiting note off the bar without header close actions", () => {
     const footer = buildSplitRunFooter({ kind: "waiting", note: PR_NOTE });
 
     expect(footer.attentionCard).toBeUndefined();
@@ -94,7 +88,7 @@ describe("buildSplitRunFooter", () => {
       cta: PR_NOTE.cta,
     });
     expect(footer.sentence).toBe("This work order needs attention.");
-    expect(footer.actions).toEqual([...REJECT_APPROVE]);
+    expect(footer.actions).toEqual([]);
     expect(splitRunCloseNeedsConfirm("waiting")).toBe(false);
   });
 
@@ -103,25 +97,25 @@ describe("buildSplitRunFooter", () => {
 
     expect(footer.attentionCard).toBe(true);
     expect(footer.note?.cta).toEqual(PR_NOTE.cta);
-    expect(footer.actions).toEqual([...REJECT_APPROVE]);
+    expect(footer.actions).toEqual([]);
   });
 
-  it("still shows Reject and Approve when a waiting order has no run note", () => {
+  it("still has no header close actions when a waiting order has no run note", () => {
     expect(buildSplitRunFooter({ kind: "waiting" })).toEqual({
       kind: "waiting",
       sentence: "This work order needs attention.",
-      actions: [...REJECT_APPROVE],
+      actions: [],
     });
   });
 
-  it("treats a failed open implement as a run note plus Reject and Approve", () => {
+  it("treats a failed open implement as a run note without header close actions", () => {
     const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE, attentionCard: true });
 
     expect(footer.attentionCard).toBe(true);
     expect(footer.note?.headline).toBe("Implement did not pass");
     expect(footer.note?.cta?.label).toBe("Review the run");
     expect(footer.sentence).toBe("This work order needs attention.");
-    expect(footer.actions).toEqual([...REJECT_APPROVE]);
+    expect(footer.actions).toEqual([]);
     expect(splitRunCloseNeedsConfirm("failed")).toBe(false);
   });
 

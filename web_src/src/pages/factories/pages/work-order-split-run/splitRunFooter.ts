@@ -141,10 +141,7 @@ export interface SplitRunFooter {
 }
 
 const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
-const REJECT: SplitRunFooterAction = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
-const APPROVE: SplitRunFooterAction = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
 const REOPEN: SplitRunFooterAction = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
-const REJECT_APPROVE: SplitRunFooterAction[] = [REJECT, APPROVE];
 
 export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFooterNote {
   return {
@@ -158,8 +155,8 @@ export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFoo
 }
 
 /**
- * Header actions for the work-order popup. Draft keeps Reject and Start.
- * Open orders keep Reject and Approve. Closed orders keep Reopen.
+ * Header actions for the work-order popup. Draft keeps Start.
+ * Open orders have no close actions in the header. Closed orders keep Reopen.
  * A visible waiting note sits under the log as an attention card.
  */
 export function buildSplitRunFooter(input: {
@@ -175,7 +172,7 @@ export function buildSplitRunFooter(input: {
   const withStatus = (footer: SplitRunFooter): SplitRunFooter =>
     input.status ? { ...footer, status: input.status } : footer;
   if (input.kind === "draft") {
-    return withStatus({ kind: "draft", sentence: "This work order is a draft.", note, actions: [REJECT, START] });
+    return withStatus({ kind: "draft", sentence: "This work order is a draft.", note, actions: [START] });
   }
   if (isClosedWorkOrderDisplayStatus(input.status) || input.kind === "done") {
     if (input.kind === "failed") {
@@ -201,7 +198,7 @@ export function buildSplitRunFooter(input: {
       sentence: "This work order is running.",
       note,
       run: input.run,
-      actions: REJECT_APPROVE,
+      actions: [],
     });
   }
   if (input.kind === "waiting" || input.kind === "failed") {
@@ -211,7 +208,7 @@ export function buildSplitRunFooter(input: {
       note,
       attentionCard,
       run: input.run,
-      actions: REJECT_APPROVE,
+      actions: [],
     });
   }
   return withStatus({
