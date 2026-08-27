@@ -212,6 +212,7 @@ export function LinesPage() {
             initialSettingsTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
             organizationId={organizationId}
             factoryId={factoryId}
+            factoryKey={factoryKey}
             editAutomationHrefFor={editAutomationHrefFor}
             showAddIntakeControl={showAddIntakeControl}
             onSelectIntakeTemplate={(template) => {
@@ -536,6 +537,7 @@ function LineBoardSplitRunPopup({
       factoryKey={factoryKey}
       orderId={peekOrderId}
       orderNumber={peekOrder.number}
+      lineId={lineId}
       fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId, demoArtifacts: false })}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}

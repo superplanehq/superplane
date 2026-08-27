@@ -1,9 +1,10 @@
 import { formatClockDurationLabel } from "@/lib/duration";
 import { cn, resolveIcon } from "@/lib/utils";
-import { ChevronRight, Pencil } from "lucide-react";
+import { ChevronRight, Maximize2, Pencil } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
+import { Link } from "@/components/Link/link";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 
 import type { PhaseGlyphKind } from "../../lib/linePhaseRuns";
@@ -179,9 +180,9 @@ function artifactsProducedBySteps(
 
 /**
  * Terminal log. The automation is the root. Each node hangs under it.
- * Collapsed automations show produced artifacts on the title line.
- * Expanded automations show those artifacts on the producing steps.
- * Node icons keep the phase glyph column. Agent steps indent under them.
+ * Produced artifacts stay on the title line in both collapsed and expanded
+ * states. Expanded automations also show those artifacts on the producing
+ * steps. Node icons keep the phase glyph column. Agent steps indent under them.
  */
 export function PhaseLogCard({
   phase,
@@ -190,7 +191,8 @@ export function PhaseLogCard({
   selectedNodeId,
   onToggle,
   onSelectNode,
-  onEdit,
+  runHref,
+  editHref,
   collapsible = true,
   organizationId,
   canvasId,
@@ -201,7 +203,10 @@ export function PhaseLogCard({
   selectedNodeId?: string | null;
   onToggle?: () => void;
   onSelectNode?: (nodeId: string) => void;
-  onEdit?: () => void;
+  /** Full-screen run page with the log in the sidebar. */
+  runHref?: string;
+  /** Configure URL of the automation that owns the phase. */
+  editHref?: string;
   collapsible?: boolean;
   organizationId?: string;
   canvasId?: string;
@@ -247,14 +252,14 @@ export function PhaseLogCard({
             <span className="min-w-0 truncate text-foreground">{phase.name}</span>
           </div>
         )}
-        {onEdit && expanded ? <PhaseEditButton phase={phase} onEdit={onEdit} /> : null}
+        {expanded ? <PhaseActionPills phase={phase} runHref={runHref} editHref={editHref} /> : null}
         {phase.checks && phase.checks.length > 0 ? (
           <span className="shrink-0">
             <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
           </span>
         ) : null}
         <span className="ml-auto flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap">
-          {!expanded && producedArtifacts.length > 0 ? (
+          {producedArtifacts.length > 0 ? (
             <span
               data-testid={`split-run-phase-artifacts-${phase.id}`}
               className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
@@ -289,19 +294,28 @@ export function PhaseLogCard({
   );
 }
 
-/** Opens the automation editor for an expanded phase. */
-function PhaseEditButton({ phase, onEdit }: { phase: SplitRunPhase; onEdit: () => void }) {
+const PHASE_ACTION_PILL =
+  "inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-1.5 py-0.5 font-sans text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground";
+
+function PhaseActionPills({ phase, runHref, editHref }: { phase: SplitRunPhase; runHref?: string; editHref?: string }) {
+  if (!runHref && !editHref) {
+    return null;
+  }
   return (
-    <button
-      type="button"
-      data-testid={`split-run-phase-edit-${phase.id}`}
-      aria-label={`Edit ${phase.name} automation`}
-      onClick={onEdit}
-      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-1.5 py-0.5 font-sans text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-    >
-      <Pencil className="size-2.5" aria-hidden />
-      Edit
-    </button>
+    <>
+      {runHref ? (
+        <Link href={runHref} data-testid={`split-run-phase-run-${phase.id}`} className={PHASE_ACTION_PILL}>
+          <Maximize2 className="size-2.5" aria-hidden />
+          View Automation Run
+        </Link>
+      ) : null}
+      {editHref ? (
+        <Link href={editHref} data-testid={`split-run-phase-edit-${phase.id}`} className={PHASE_ACTION_PILL}>
+          <Pencil className="size-2.5" aria-hidden />
+          Edit Automation
+        </Link>
+      ) : null}
+    </>
   );
 }
 
