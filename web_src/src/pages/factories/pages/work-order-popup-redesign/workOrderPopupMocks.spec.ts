@@ -79,7 +79,7 @@ describe("popupFixtureForWorkOrder", () => {
       }),
     );
 
-    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Listening for user review"]);
+    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Waiting for user review"]);
     expect(fixture.checks).toEqual([]);
     expect(fixture.log.at(-1)?.state).toBe("failed");
   });
@@ -137,7 +137,6 @@ describe("popupFixtureForWorkOrder", () => {
     expect(fixture.log.at(-1)).toMatchObject({
       actor: "Done",
       title: "Complete work order from merged pull request",
-      artifactId: "art-pr-closure",
     });
   });
 

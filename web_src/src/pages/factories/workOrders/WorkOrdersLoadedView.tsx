@@ -1,4 +1,9 @@
-import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
+import type {
+  FactoriesFactory,
+  FactoriesFactoryLine,
+  FactoriesFactoryPullRequest,
+  FactoriesWorkOrder,
+} from "@/api-client";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import {
@@ -10,6 +15,7 @@ import {
 } from "../lib/workOrderListModel";
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
 import { factoryKanbanPageClassName, factoryWorkOrdersBodyClassName } from "../pages/factoryPageLayoutStyles";
+import { useActivePRFeedbackWorkOrderIds } from "../pages/useWorkOrderPRFeedbackRunHref";
 import { WorkOrdersBoardView } from "./WorkOrdersBoardView";
 import {
   WorkOrdersFilteredEmptyState,
@@ -26,6 +32,7 @@ interface WorkOrdersLoadedViewProps {
   factory: FactoriesFactory;
   factoryLines: FactoriesFactoryLine[];
   workOrders: FactoriesWorkOrder[];
+  pullRequests?: FactoriesFactoryPullRequest[];
   state: WorkOrderListState;
   currentUserId?: string;
   canCreate: boolean;
@@ -47,7 +54,8 @@ interface WorkOrdersLoadedViewProps {
  * and the shell page only handles fetching + mutations.
  */
 export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
-  const { workOrders, factory, state, currentUserId } = props;
+  const { workOrders, factory, state, currentUserId, pullRequests = [] } = props;
+  const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(pullRequests);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [workOrders, factory]);
   const scoped = useMemo(
     () => applyWorkOrderScope(entries, state.scope, currentUserId),
@@ -96,7 +104,13 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
     };
 
     if (state.layout === "board") {
-      return <WorkOrdersBoardView {...sharedProps} />;
+      return (
+        <WorkOrdersBoardView
+          {...sharedProps}
+          factoryId={factory.id}
+          addressingFeedbackOrderIds={addressingFeedbackOrderIds}
+        />
+      );
     }
     if (state.layout === "list") {
       return <WorkOrdersListView {...sharedProps} />;

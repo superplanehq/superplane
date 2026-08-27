@@ -9,12 +9,17 @@ import {
   toStorybookOrganizationUser,
   type FactoriesFixture,
 } from "./factoryPageResponses";
-import { DEFAULT_ARTIFACTS_BY_ORDER_ID, DEFAULT_EVENTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
+import {
+  DEFAULT_ARTIFACTS_BY_ORDER_ID,
+  DEFAULT_EVENTS_BY_ORDER_ID,
+  DEFAULT_PULL_REQUESTS_BY_ORDER_ID,
+} from "./factoryPageEventFixtures";
 import { DEFAULT_CHECKS_BY_ORDER_ID } from "./workOrderCheckFixtures";
 import type {
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesFactoryOnboarding,
+  FactoriesFactoryPullRequest,
   FactoriesUpdateFactoryOnboardingBody,
   FactoriesWorkOrder,
   FactoriesWorkOrderEvent,
@@ -219,6 +224,37 @@ function factoryOnboardingRoute(fixture: FactoriesFixture): FactoriesRoute {
   };
 }
 
+function factoryPullRequestRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  return [
+    {
+      pattern: re("/api/v1/factories/([^/]+)/prs"),
+      resolve: (match, method, _body, url) => {
+        if (method !== "GET") return { json: {} };
+        const factoryId = match[1];
+        const orderNumber = (url.searchParams.get("order") ?? "").trim();
+        const workOrderIds = [
+          ...url.searchParams.getAll("workOrderIds"),
+          ...url.searchParams.getAll("work_order_ids"),
+        ].filter(Boolean);
+        const orders = fixture.workOrdersByFactoryId[factoryId] ?? [];
+        let pullRequests = orders.flatMap((order) => (order.id ? orderPullRequests(fixture, order.id) : []));
+        if (orderNumber) {
+          const order = orders.find((entry) => entry.number === orderNumber || entry.id === orderNumber);
+          pullRequests = order?.id ? orderPullRequests(fixture, order.id) : [];
+        } else if (workOrderIds.length > 0) {
+          const allowed = new Set(workOrderIds);
+          pullRequests = pullRequests.filter((pr) => pr.workOrderId && allowed.has(pr.workOrderId));
+        }
+        return { json: { pullRequests } };
+      },
+    },
+  ];
+}
+
+function orderPullRequests(fixture: FactoriesFixture, orderId: string): FactoriesFactoryPullRequest[] {
+  return fixture.pullRequestsByOrderId?.[orderId] ?? DEFAULT_PULL_REQUESTS_BY_ORDER_ID[orderId] ?? [];
+}
+
 function factoryLinesRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     {
@@ -317,12 +353,28 @@ function orderEvents(fixture: FactoriesFixture, orderId: string): FactoriesWorkO
   return fixture.eventsByOrderId?.[orderId] ?? DEFAULT_EVENTS_BY_ORDER_ID[orderId] ?? [];
 }
 
+function cancelActiveDispatches(order: FactoriesWorkOrder, now: string) {
+  order.lineDispatches = (order.lineDispatches ?? []).map((dispatch) =>
+    dispatch.state === "STATE_ACTIVE"
+      ? { ...dispatch, state: "STATE_FINISHED", result: "RESULT_CANCELLED", finishedAt: now }
+      : dispatch,
+  );
+}
+
+function dispatchRequestOptions(request: RequestBody) {
+  return {
+    lineName: stringOrEmpty(request.lineName ?? request.line_name),
+    startStepIndex: Number(request.startStepIndex ?? request.start_step_index ?? 0) || 0,
+    replaceActive: request.replaceActive === true || request.replace_active === true,
+  };
+}
+
 function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: string, request: RequestBody) {
   const order = findOrder(fixture, factoryId, orderId);
   if (!order) return { json: {} };
   const factory = fixture.factories.find((entry) => entry.id === factoryId);
-  const lineName = stringOrEmpty(request.lineName ?? request.line_name);
-  const line = factory?.lines?.find((entry) => entry.name === lineName) ?? factory?.lines?.[0];
+  const options = dispatchRequestOptions(request);
+  const line = factory?.lines?.find((entry) => entry.name === options.lineName) ?? factory?.lines?.[0];
   const now = new Date().toISOString();
   order.updatedAt = now;
   if (order.state === "STATE_DRAFT") {
@@ -330,16 +382,10 @@ function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: st
   }
 
   const apps = fixture.appsByFactoryId[factoryId] ?? [];
-  const startStepIndex = Number(request.startStepIndex ?? request.start_step_index ?? 0) || 0;
-  const replaceActive = request.replaceActive === true || request.replace_active === true;
-  if (replaceActive) {
-    order.lineDispatches = (order.lineDispatches ?? []).map((dispatch) =>
-      dispatch.state === "STATE_ACTIVE"
-        ? { ...dispatch, state: "STATE_FINISHED", result: "RESULT_CANCELLED", finishedAt: now }
-        : dispatch,
-    );
+  if (options.replaceActive) {
+    cancelActiveDispatches(order, now);
   }
-  const newDispatch = buildDispatchedLineDispatch(line, lineName, now, apps, startStepIndex);
+  const newDispatch = buildDispatchedLineDispatch(line, options.lineName, now, apps, options.startStepIndex);
   order.lineDispatches = [...(order.lineDispatches ?? []), newDispatch];
   return { json: { order } };
 }
@@ -540,6 +586,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...factoryDetailRoutes(fixture),
     factoryOnboardingRoute(fixture),
     ...factoryLinesRoutes(fixture),
+    ...factoryPullRequestRoutes(fixture),
     ...workOrderRoutes(fixture),
     organizationLlmSpendRoute(fixture),
     hostedLlmModelsRoute(),

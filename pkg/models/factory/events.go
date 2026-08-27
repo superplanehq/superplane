@@ -17,12 +17,12 @@ const (
 	EventTypeOrderCommentAdded  = "order.comment.added"
 	EventTypeOrderArtifactAdded = "order.artifact.added"
 	// EventTypeOrderArtifactUpdated is a websocket-only notification
-	// reason (see FactoryContext.UpdateWorkOrderArtifact) — it does not
-	// back a timeline event/struct. Flipping a PR artifact's state
-	// shouldn't spam the timeline with one entry per open/draft/closed/
-	// merged transition; the row is updated in place and this reason
-	// just tells the frontend which query to invalidate.
-	EventTypeOrderArtifactUpdated = "order.artifact.updated"
+	// reason — it does not back a timeline event/struct. Artifact data
+	// updates re-save the row in place and this reason tells the
+	// frontend which query to invalidate.
+	EventTypeOrderArtifactUpdated    = "order.artifact.updated"
+	EventTypeOrderPullRequestAdded   = "order.pull_request.added"
+	EventTypeOrderPullRequestUpdated = "order.pull_request.updated"
 	// EventTypeOrderCheckReported records every check report, including
 	// re-reports of the same check key. The check row itself is
 	// latest-only state (one row per key, updated in place); the events
@@ -55,7 +55,6 @@ const (
 
 // Artifact types
 const (
-	ArtifactTypePR       = "pr"
 	ArtifactTypeMarkdown = "markdown"
 	ArtifactTypeBranch   = "branch"
 	ArtifactTypeLink     = "link"
@@ -152,6 +151,22 @@ type WorkOrderArtifactAdded struct {
 	Run        *RunRef        `json:"run,omitempty"`
 }
 
+type WorkOrderPullRequestAdded struct {
+	Order       *WorkOrderRef   `json:"order,omitempty"`
+	PullRequest *PullRequestRef `json:"pullRequest,omitempty"`
+	User        *UserRef        `json:"user,omitempty"`
+	Automation  *AutomationRef  `json:"automation,omitempty"`
+	Run         *RunRef         `json:"run,omitempty"`
+}
+
+type WorkOrderPullRequestUpdated struct {
+	Order       *WorkOrderRef   `json:"order,omitempty"`
+	PullRequest *PullRequestRef `json:"pullRequest,omitempty"`
+	User        *UserRef        `json:"user,omitempty"`
+	Automation  *AutomationRef  `json:"automation,omitempty"`
+	Run         *RunRef         `json:"run,omitempty"`
+}
+
 type WorkOrderCheckReported struct {
 	Order      *WorkOrderRef  `json:"order,omitempty"`
 	Check      *CheckRef      `json:"check,omitempty"`
@@ -217,6 +232,16 @@ type ArtifactRef struct {
 	ID   uuid.UUID      `json:"id"`
 	Type string         `json:"type"`
 	Data map[string]any `json:"data,omitempty"`
+}
+
+type PullRequestRef struct {
+	ID         uuid.UUID `json:"id"`
+	Provider   string    `json:"provider,omitempty"`
+	Repository string    `json:"repository,omitempty"`
+	Number     int64     `json:"number,omitempty"`
+	URL        string    `json:"url,omitempty"`
+	Title      string    `json:"title,omitempty"`
+	State      string    `json:"state,omitempty"`
 }
 
 // CheckRef snapshots a check report for the timeline. PreviousScore is

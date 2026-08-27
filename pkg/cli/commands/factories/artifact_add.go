@@ -19,7 +19,6 @@ type artifactAddCommand struct {
 	body    *string
 	file    *string
 	url     *string
-	number  *int64
 	name    *string
 }
 
@@ -84,20 +83,6 @@ func (c *artifactAddCommand) buildData(
 		}
 		return data, openapi_client.FACTORIESWORKORDERARTIFACTTYPE_TYPE_MARKDOWN, nil
 
-	case "pr":
-		url := strings.TrimSpace(stringValue(c.url))
-		if url == "" {
-			return nil, "", fmt.Errorf("--url is required for type pr")
-		}
-		data["url"] = url
-		if title := strings.TrimSpace(stringValue(c.title)); title != "" {
-			data["title"] = title
-		}
-		if ctx.Cmd.Flags().Changed("number") {
-			data["number"] = *c.number
-		}
-		return data, openapi_client.FACTORIESWORKORDERARTIFACTTYPE_TYPE_PR, nil
-
 	case "branch":
 		name := strings.TrimSpace(stringValue(c.name))
 		if name == "" {
@@ -121,7 +106,7 @@ func (c *artifactAddCommand) buildData(
 		return data, openapi_client.FACTORIESWORKORDERARTIFACTTYPE_TYPE_LINK, nil
 
 	default:
-		return nil, "", fmt.Errorf("unknown artifact type %q (expected pr, markdown, branch, or link)", artifactType)
+		return nil, "", fmt.Errorf("unknown artifact type %q (expected markdown, branch, or link)", artifactType)
 	}
 }
 

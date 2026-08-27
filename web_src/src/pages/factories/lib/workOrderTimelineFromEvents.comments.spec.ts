@@ -70,54 +70,52 @@ describe("buildWorkOrderTimelineViewFromEvents: comments, artifacts, and attribu
     expect(view.events[0]?.sourceAppId).toBeUndefined();
   });
 
-  it("captures PR artifact metadata", () => {
+  it("captures pull request metadata", () => {
     const view = buildWorkOrderTimelineViewFromEvents([
       {
         timestamp: "2026-08-04T12:00:00.000Z",
-        type: "order.artifact.added",
+        type: "order.pull_request.added",
         event: {
-          artifact: {
-            id: "art-1",
-            type: "pr",
-            data: {
-              url: "https://github.com/example/repo/pull/1",
-              title: "Add checkout",
-            },
+          pullRequest: {
+            id: "pr-1",
+            url: "https://github.com/example/repo/pull/1",
+            title: "Add checkout",
+            number: 1,
+            state: "open",
           },
         },
       },
     ]);
 
     expect(view.events[0]).toMatchObject({
-      kind: "artifactAdded",
-      artifact: {
-        id: "art-1",
-        type: "pr",
-        data: {
-          url: "https://github.com/example/repo/pull/1",
-          title: "Add checkout",
-        },
+      kind: "pullRequestAdded",
+      pullRequest: {
+        id: "pr-1",
+        url: "https://github.com/example/repo/pull/1",
+        title: "Add checkout",
+        number: "1",
+        state: "STATE_OPEN",
       },
-      title: "attached PR: Add checkout",
+      title: "added pull request #1",
     });
   });
 
-  it("falls back to data.url when data.title is absent", () => {
+  it("falls back to the pull request title when the number is absent", () => {
     const view = buildWorkOrderTimelineViewFromEvents([
       {
         timestamp: "2026-08-04T12:00:00.000Z",
-        type: "order.artifact.added",
+        type: "order.pull_request.added",
         event: {
-          artifact: {
-            id: "art-2",
-            type: "pr",
-            data: { url: "https://github.com/example/repo/pull/2" },
+          pullRequest: {
+            id: "pr-2",
+            url: "https://github.com/example/repo/pull/2",
+            title: "Add checkout",
           },
         },
       },
     ]);
 
-    expect(view.events[0]?.title).toBe("attached PR: https://github.com/example/repo/pull/2");
+    expect(view.events[0]?.title).toBe("added pull request Add checkout");
   });
 
   it("attributes automation-driven status changes with the factory line", () => {
@@ -190,7 +188,7 @@ describe("buildWorkOrderTimelineViewFromEvents: comments, artifacts, and attribu
             lineName: "Plan",
             stepName: "step-01",
           },
-          artifact: { id: "art-1", type: "pr", data: { url: "https://example.com/pull/1", title: "PR" } },
+          artifact: { id: "art-1", type: "markdown", data: { title: "plan.md" } },
         },
       },
     ]);

@@ -380,6 +380,10 @@ func (r *CanvasRun) DeleteChain(db *gorm.DB) (*RunDeletionSummary, error) {
 	}
 	summary.Events += count
 
+	if _, err := deleteRows(db, &FactoryPullRequestRun{}, "run_id = ?", r.ID); err != nil {
+		return nil, err
+	}
+
 	count, err = deleteRows(db, &CanvasRun{}, "id = ?", r.ID)
 	if err != nil {
 		return nil, err

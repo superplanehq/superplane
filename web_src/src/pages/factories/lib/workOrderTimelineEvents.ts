@@ -1,4 +1,5 @@
 import type {
+  FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
   FactoriesWorkOrderEvent,
   FactoriesWorkOrderExecution,
@@ -22,6 +23,8 @@ export type WorkOrderTimelineEventKind =
   | "statusChanged"
   | "commented"
   | "artifactAdded"
+  | "pullRequestAdded"
+  | "pullRequestUpdated"
   | "checkReported"
   | "closed";
 export type UserNameLookup = (userId: string | undefined) => string | undefined;
@@ -36,6 +39,7 @@ export interface WorkOrderTimelineStep {
   finishedAt?: string;
   comments?: WorkOrderTimelineStepComment[];
   artifacts?: WorkOrderTimelineArtifact[];
+  pullRequests?: FactoriesFactoryPullRequest[];
   execution: FactoriesWorkOrderExecution;
 }
 
@@ -101,6 +105,7 @@ export interface WorkOrderTimelineEvent {
   statusChange?: WorkOrderTimelineStatusChange;
   comment?: WorkOrderTimelineComment;
   artifact?: WorkOrderTimelineArtifact;
+  pullRequest?: FactoriesFactoryPullRequest;
   check?: WorkOrderTimelineCheck;
   title: string;
   lineId?: string;

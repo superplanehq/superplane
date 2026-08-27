@@ -1,5 +1,6 @@
 import type {
   FactoriesAutomationRef,
+  FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderCheck,
@@ -31,6 +32,8 @@ import {
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
+import { statusForCanvasRun } from "../../lib/workOrderPullRequest";
+import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import {
   buildSplitRunFooter,
   doneFooterForStatus,
@@ -40,7 +43,7 @@ import {
 } from "./splitRunFooter";
 import { intakeTicketAnalysisFixture, type LineIntakeAnalyzingTicket } from "../lineIntakeModel";
 import { implementationPlanMarkdown, reviewCandidateForWorkOrderId } from "../onboarding/first-run/reviewCandidates";
-import { DESCRIPTION_ARTIFACT, PR_CLOSURE_PR_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
+import { DESCRIPTION_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
 import type {
   RunOverlayProvider,
   RunOverlayStep,
@@ -68,6 +71,7 @@ export interface SplitRunStreamLine {
   duration?: string;
   detail?: string;
   artifact?: FactoriesWorkOrderArtifact;
+  pullRequest?: FactoriesFactoryPullRequest;
   /** Agent transcript line. No checkmark. */
   note?: boolean;
   /** Nested tool call under a Claude Code step. */
@@ -270,13 +274,13 @@ export function splitRunStatusLabel(status: SplitRunPhaseStatus): string {
   return "Pending";
 }
 
-const PR_CLOSURE_APP_NAME = "PR Closure";
-
 export type SplitRunFixtureOptions = {
   checks?: FactoriesWorkOrderCheck[];
   lineId?: string | null;
   /** Storybook keeps invented files and pull requests. Live orders do not. */
   demoArtifacts?: boolean;
+  /** PR-feedback canvas runs for this work order, shown as extra Log phases. */
+  prFeedbackRuns?: PRFeedbackLogRun[];
 };
 
 export function splitRunFixtureForWorkOrder(
@@ -294,7 +298,11 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
   const executions = latestDispatchExecutions(order, options?.lineId);
   const current = pickCurrentExecution(executions);
   const demoArtifacts = options?.demoArtifacts !== false;
-  const phases = phasesForOrder(order, executions, options?.checks, demoArtifacts);
+  const phases = [
+    ...phasesForOrder(order, executions, options?.checks, demoArtifacts),
+    ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? []),
+  ];
+  const activeFeedbackPhaseId = activePRFeedbackPhaseId(phases);
   const fixture: SplitRunFixture = {
     title: order.title ?? "Work order",
     descriptionText: order.description ?? "",
@@ -307,7 +315,9 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     lineName: visibleDispatchForLine(order, options?.lineId)?.line?.name ?? SPLIT_RUN_RUNNING.lineName,
     currentStepIndex: current?.stepIndex ?? 0,
     lineStatus: lineStatusForDisplay(displayStatus),
-    currentPhaseId: current ? phaseIdForExecution(current, executions) : (phases[0]?.id ?? ""),
+    currentPhaseId:
+      activeFeedbackPhaseId ?? (current ? phaseIdForExecution(current, executions) : (phases[0]?.id ?? "")),
+    openPhaseId: activeFeedbackPhaseId,
     phases,
     source: splitRunSourceForOrder(order),
     ...reviewSurfaces(order, displayStatus, {
@@ -315,6 +325,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       phases,
       apiChecks: options?.checks,
       demoArtifacts,
+      addressingFeedback: Boolean(activeFeedbackPhaseId),
     }),
   };
   if (order.id === "wo-board-implement-notify") {
@@ -331,6 +342,7 @@ function reviewSurfaces(
     phases: SplitRunPhase[];
     apiChecks?: FactoriesWorkOrderCheck[];
     demoArtifacts?: boolean;
+    addressingFeedback?: boolean;
   },
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   const demoArtifacts = input.demoArtifacts !== false;
@@ -353,7 +365,7 @@ function reviewSurfaces(
     return failedReviewSurface(current, displayStatus, checks);
   }
   if (displayStatus === "waiting" || (column === "implement" && current?.state === "STATE_PENDING")) {
-    return waitingReviewSurface(order, displayStatus, checks);
+    return waitingReviewSurface(order, displayStatus, checks, input.addressingFeedback);
   }
   if (displayStatus === "running") {
     return surfaces(
@@ -393,8 +405,9 @@ function waitingReviewSurface(
   order: FactoriesWorkOrder,
   displayStatus: WorkOrderDisplayStatus,
   checks: WorkOrderCheckPresentation[],
+  addressingFeedback?: boolean,
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
-  const notes = presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
+  const notes = addressingFeedback ? [] : presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
   return surfaces(
     buildSplitRunFooter({
       kind: "waiting",
@@ -471,6 +484,60 @@ function phasesForOrder(
     ...sourcePhasesForOrder(order, executions.length > 0, demoArtifacts),
     ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
   ];
+}
+
+function phasesForPRFeedbackRuns(runs: PRFeedbackLogRun[]): SplitRunPhase[] {
+  return [...runs]
+    .filter((entry) => Boolean(entry.canvasId && entry.run.id))
+    .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""))
+    .map(prFeedbackRunToPhase);
+}
+
+function activePRFeedbackPhaseId(phases: SplitRunPhase[]): SplitRunPhaseId | undefined {
+  return phases.find(
+    (phase) => phase.id.startsWith("pr-feedback-") && (phase.status === "running" || phase.status === "pending"),
+  )?.id;
+}
+
+function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
+  const status = statusForCanvasRun(entry.run);
+  const description = entry.run.description?.trim();
+  const name = description
+    ? description
+    : entry.pullRequestNumber
+      ? `Address feedback on PR #${String(entry.pullRequestNumber).replace(/^#/, "")}`
+      : "Address PR feedback";
+  const componentName = entry.handlerName?.trim() || "Address PR feedback";
+  const duration = durationForExecution(
+    {
+      createdAt: entry.run.createdAt,
+      updatedAt: entry.run.finishedAt ?? entry.run.updatedAt ?? entry.run.createdAt,
+    },
+    status,
+  );
+  const line: SplitRunStreamLine = {
+    id: entry.run.id ?? name,
+    at: clockLabel(entry.run.createdAt),
+    componentName,
+    status,
+    duration,
+    kind: "action",
+    componentType: componentName,
+    action: status === "passed" ? "passed" : status === "failed" ? "failed" : status === "running" ? "running" : "—",
+    iconSlug: "box",
+  };
+  return {
+    id: `pr-feedback-${entry.run.id}`,
+    name,
+    status,
+    duration,
+    componentName,
+    artifacts: [],
+    stream: [line],
+    canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
+    appId: entry.canvasId,
+    runId: entry.run.id,
+  };
 }
 
 function sourcePhasesForOrder(
@@ -682,6 +749,7 @@ function executionToPhase(
   const { name, componentName } = lineAutomationPresentation(execution.run, execution.step);
   const duration = durationForExecution(execution, status);
   const artifacts = demoArtifacts ? artifactsForLineExecution(order, execution) : [];
+  const pullRequest = demoArtifacts ? pullRequestForLineExecution(order, execution) : undefined;
   const line: SplitRunStreamLine = {
     id: execution.id ?? name,
     at: clockLabel(execution.updatedAt ?? execution.createdAt),
@@ -690,6 +758,7 @@ function executionToPhase(
     duration,
     detail: execution.step,
     artifact: artifacts[0],
+    pullRequest,
     kind: "action",
     componentType: componentName,
     action: status === "passed" ? "passed" : status === "failed" ? "failed" : status === "running" ? "running" : "—",
@@ -732,7 +801,7 @@ function artifactsForLineExecution(
 ): FactoriesWorkOrderArtifact[] {
   const step = (execution.step ?? "").toLowerCase();
   if (step.includes("implement")) {
-    return [branchArtifactForOrder(order), pullRequestArtifactForOrder(order, "open")];
+    return [branchArtifactForOrder(order)];
   }
   if (step.includes("verify")) {
     return [];
@@ -741,12 +810,26 @@ function artifactsForLineExecution(
     if (execution.result === "RESULT_CANCELLED") {
       return [canceledNotesArtifact(order)];
     }
-    if (isPrClosureRun(execution)) {
-      return [PR_CLOSURE_PR_ARTIFACT];
-    }
-    return [pullRequestArtifactForOrder(order, order.result === "RESULT_REJECTED" ? "closed" : "merged")];
+    return [];
   }
   return [];
+}
+
+function pullRequestForLineExecution(
+  order: FactoriesWorkOrder,
+  execution: FactoriesWorkOrderExecution,
+): FactoriesFactoryPullRequest | undefined {
+  const step = (execution.step ?? "").toLowerCase();
+  if (step.includes("implement")) {
+    return pullRequestForOrder(order, "STATE_OPEN");
+  }
+  if (!step.includes("done") || execution.result === "RESULT_CANCELLED") {
+    return undefined;
+  }
+  if (order.result === "RESULT_REJECTED") {
+    return pullRequestForOrder(order, "STATE_CLOSED");
+  }
+  return pullRequestForOrder(order, "STATE_MERGED");
 }
 
 function branchArtifactForOrder(order: FactoriesWorkOrder): FactoriesWorkOrderArtifact {
@@ -772,17 +855,18 @@ function pullRequestNumberForOrder(order: FactoriesWorkOrder): number {
   return Number.isFinite(number) && number > 0 ? number + 400 : 400;
 }
 
-function pullRequestArtifactForOrder(order: FactoriesWorkOrder, state: string): FactoriesWorkOrderArtifact {
+function pullRequestForOrder(
+  order: FactoriesWorkOrder,
+  state: FactoriesFactoryPullRequest["state"],
+): FactoriesFactoryPullRequest {
   const number = pullRequestNumberForOrder(order);
   return {
-    id: `art-pr-${order.id ?? "order"}`,
-    type: "TYPE_PR",
-    data: {
-      url: `https://github.com/example/ledger/pull/${number}`,
-      title: order.title ?? "Pull request",
-      number,
-      state,
-    },
+    id: `pr-${order.id ?? "order"}`,
+    workOrderId: order.id,
+    number: String(number),
+    url: `https://github.com/example/ledger/pull/${number}`,
+    title: order.title ?? "Pull request",
+    state,
   };
 }
 
@@ -911,8 +995,4 @@ function pickCurrentExecution(executions: FactoriesWorkOrderExecution[]): Factor
     }
     return (candidate.stepIndex ?? -1) >= (best.stepIndex ?? -1) ? candidate : best;
   }, undefined);
-}
-
-function isPrClosureRun(execution: FactoriesWorkOrderExecution): boolean {
-  return execution.run?.appName === PR_CLOSURE_APP_NAME;
 }
