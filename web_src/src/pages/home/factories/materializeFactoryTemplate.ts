@@ -35,6 +35,7 @@ export function substituteInstallParams(content: string, params: Record<string, 
 }
 
 type YamlNode = {
+  id?: string;
   component?: string;
   integration?: { id?: string; name?: string };
   configuration?: Record<string, unknown>;

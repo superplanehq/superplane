@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import yaml from "js-yaml";
 
-import { getFactoryDefinition, ONBOARDING_APPS, ONBOARDING_EVENT_APPS } from "./index";
+import { getFactoryDefinition, ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS } from "./index";
 import { FACTORY_CANVAS_ID_PLACEHOLDER, materializeFactoryCanvas } from "./materializeFactoryTemplate";
 
 type AgentStep = { name?: string; command?: string; workingDirectory?: string };
@@ -38,23 +38,20 @@ function materializeOnboardingApp(factoryId: string) {
 }
 
 describe("setup factory line apps", () => {
-  it("installs plan, implement, and verify, but runs only plan and implement on the line", () => {
-    expect(ONBOARDING_APPS.map((app) => app.factoryId)).toEqual(["line-planning", "line-implementation", "line-pr"]);
-    expect(ONBOARDING_APPS.filter((app) => app.runsOnLine).map((app) => app.factoryId)).toEqual([
-      "line-planning",
-      "line-implementation",
-    ]);
+  it("installs plan and implement only, and leaves verify out of the workspace", () => {
+    expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).toEqual(["line-planning", "line-implementation"]);
+    expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("line-pr");
   });
 
   it("exposes a single onRun entrypoint per installed app", () => {
-    for (const app of ONBOARDING_APPS) {
+    for (const app of ONBOARDING_LINE_APPS) {
       const canvasYaml = materializeOnboardingApp(app.factoryId);
       expect(canvasYaml).toMatch(new RegExp(`id: ${app.entrypointNodeId}[\\s\\S]*component: onRun`));
     }
   });
 
   it("materializes repositories and integration wiring, leaving no template placeholders", () => {
-    for (const app of ONBOARDING_APPS) {
+    for (const app of ONBOARDING_LINE_APPS) {
       const canvasYaml = materializeOnboardingApp(app.factoryId);
       expect(canvasYaml).toContain("name: acme-claude");
       expect(canvasYaml).toContain("name: acme-github");
@@ -219,7 +216,7 @@ describe("setup factory event apps", () => {
   // intake API rather than as a bundled app.
   it("provisions PR closure outside the factory line", () => {
     expect(ONBOARDING_EVENT_APPS).toEqual(["pr-closure"]);
-    expect(ONBOARDING_APPS.map((app) => app.factoryId)).not.toContain("pr-closure");
+    expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("pr-closure");
   });
 
   it("closes the work order when a factory pull request is closed", () => {

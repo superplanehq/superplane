@@ -40,7 +40,7 @@ describe("provisionLine", () => {
     expect(installFactory).not.toHaveBeenCalled();
   });
 
-  it("installs all workspace apps and creates a line with plan and implement", async () => {
+  it("installs plan and implement, and creates a line that runs both", async () => {
     const createLine = vi.fn().mockResolvedValue({ id: "line-new" });
     const updateOnboarding = vi.fn().mockResolvedValue({});
     const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
@@ -61,7 +61,6 @@ describe("provisionLine", () => {
     expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual([
       "line-planning",
       "line-implementation",
-      "line-pr",
     ]);
     expect(createLine).toHaveBeenCalledWith({
       name: DEFAULT_LINE_NAME,
