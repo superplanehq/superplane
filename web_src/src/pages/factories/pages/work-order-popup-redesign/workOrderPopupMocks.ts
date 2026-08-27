@@ -1,4 +1,5 @@
 import type {
+  FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderExecution,
@@ -7,7 +8,7 @@ import type {
 import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
 import { workOrderOwnerDisplay } from "../../lib/workOrderCreator";
 
-import { OPEN_WORK_ORDER_ARTIFACTS } from "../../__fixtures__/factoryPageFixtureVariants";
+import { OPEN_WORK_ORDER_ARTIFACTS, OPEN_WORK_ORDER_PULL_REQUESTS } from "../../__fixtures__/factoryPageFixtureVariants";
 import {
   HOUR_AGO,
   OPEN_WORK_ORDER,
@@ -34,6 +35,7 @@ export interface PopupLogEntry {
   duration: string;
   state: PopupLogState;
   artifactId?: string;
+  pullRequestId?: string;
 }
 
 export interface PopupFixture {
@@ -45,6 +47,7 @@ export interface PopupFixture {
   tokensLabel: string;
   description: FactoriesWorkOrderArtifact;
   outputs: FactoriesWorkOrderArtifact[];
+  pullRequests?: FactoriesFactoryPullRequest[];
   checks: WorkOrderCheckPresentation[];
   waitingNotes: WorkOrderStatusNotePresentation[];
   log: PopupLogEntry[];
@@ -76,6 +79,7 @@ export const AGENT_WORK_POPUP: PopupFixture = {
   tokensLabel: "86k tokens",
   description: DESCRIPTION_ARTIFACT,
   outputs: OPEN_WORK_ORDER_ARTIFACTS,
+  pullRequests: OPEN_WORK_ORDER_PULL_REQUESTS,
   checks: presentWorkOrderChecks(OPEN_WORK_ORDER_CHECKS).filter((check) => check.id !== "check-confidence"),
   waitingNotes: presentWorkOrderStatusNotes(OPEN_WORK_ORDER.statusNotes),
   log: [
@@ -108,7 +112,7 @@ export const AGENT_WORK_POPUP: PopupFixture = {
       title: "Open PR #482",
       duration: "5s",
       state: "passed",
-      artifactId: "art-pr-1",
+      pullRequestId: "art-pr-1",
     },
     {
       id: "done",
@@ -164,6 +168,7 @@ export function buildPopupDispatchEvent(fixture: PopupFixture): WorkOrderTimelin
   }
 
   const artifacts = [fixture.description, ...fixture.outputs];
+  const pullRequests = fixture.pullRequests ?? [];
   let cursor = Date.parse(HOUR_AGO);
   const steps: WorkOrderTimelineStep[] = fixture.log.map((entry) => {
     const startedAt = new Date(cursor).toISOString();
@@ -172,6 +177,9 @@ export function buildPopupDispatchEvent(fixture: PopupFixture): WorkOrderTimelin
     cursor += durationMs ?? 60_000;
     const execution = logExecution(entry.state);
     const artifact = entry.artifactId ? artifacts.find((item) => item.id === entry.artifactId) : undefined;
+    const pullRequest = entry.pullRequestId
+      ? pullRequests.find((item) => item.id === entry.pullRequestId)
+      : undefined;
 
     return {
       id: entry.id,
@@ -188,6 +196,7 @@ export function buildPopupDispatchEvent(fixture: PopupFixture): WorkOrderTimelin
             },
           ]
         : undefined,
+      pullRequests: pullRequest ? [pullRequest] : undefined,
       comments: entry.title !== entry.actor ? [{ body: entry.title }] : undefined,
       execution: {
         id: entry.id,

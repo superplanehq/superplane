@@ -440,7 +440,8 @@ The On PR Comment trigger starts a workflow execution when comments are added on
 ### Configuration
 
 - **Repository**: Select the GitHub repository to monitor
-- **Content Filter**: Optional regex pattern to filter comments (e.g., `/solve` to only trigger on comments containing "/solve")
+- **Content Filter**: Optional filter on comments. Mentions that start with @ match as an exact GitHub username. Other values are regular expressions.
+- **Ignore Bots**: Skip comments written by GitHub Apps and bots
 
 ### Event Data
 
@@ -781,23 +782,43 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
   "data": {
     "action": "submitted",
     "pull_request": {
+      "head": {
+        "ref": "feat/rename-title",
+        "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+      },
       "html_url": "https://github.com/acme-labs/snaketoy/pull/42",
       "number": 42,
       "title": "Rename the game title to Snake Toy"
     },
+    "repository": {
+      "full_name": "acme-labs/snaketoy",
+      "name": "snaketoy"
+    },
     "review": {
       "body": "Please address the inline comments @superplaneagent",
+      "html_url": "https://github.com/acme-labs/snaketoy/pull/42#pullrequestreview-987654321",
       "id": 987654321,
-      "state": "changes_requested"
+      "state": "changes_requested",
+      "user": {
+        "login": "jules-ramirez",
+        "type": "User"
+      }
     },
     "review_comments": [
       {
         "body": "Small nit: could we also update the page heading to match the new title?",
+        "html_url": "https://github.com/acme-labs/snaketoy/pull/42#discussion_r3179045528",
         "id": 3179045528,
-        "path": "index.html"
+        "line": 6,
+        "path": "index.html",
+        "user": {
+          "login": "jules-ramirez",
+          "type": "User"
+        }
       }
     ]
   },
+  "timestamp": "2026-02-25T18:22:21.000000000Z",
   "type": "github.prReview"
 }
 ```
@@ -820,7 +841,7 @@ The On PR Review Comment trigger starts a workflow execution when review comment
 
 - **Repository**: Select the GitHub repository to monitor
 - **Content Filter**: Optional filter on comment/review body. Mentions that start with @ match as an exact GitHub username. Other values are regular expressions.
-- **Include Review Submissions**: Also start a run when a pull request review is submitted. Turn this off when a dedicated review trigger handles submissions.
+- **Include Review Submissions**: Also start a run when a pull request review is submitted
 - **Comment Scope**: All comments, or replies only
 - **Ignore Bots**: Skip comments and reviews written by GitHub Apps and bots
 

@@ -62,11 +62,11 @@ describe("buildBuildingBlockCategories", () => {
     expect(categories.find((category) => category.name === "SuperPlane")?.blocks.map((block) => block.name)).toEqual([
       "onBroadcast",
       "onRun",
+      "addPullRequest",
       "addRunError",
       "broadcastMessage",
       "createWorkOrder",
       "runApp",
-      "addPullRequest",
     ]);
   });
 });

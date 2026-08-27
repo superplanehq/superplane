@@ -57,7 +57,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
   <LinkCard title="Update Memory" href="#update-memory" description="Update values in canvas memory by namespace and field matches" />
-  <LinkCard title="Update Pull Request" href="#update-pull-request" description="Update a factory pull request already attached to a work order" />
+  <LinkCard title="Update Pull Request" href="#update-pull-request" description="Update a factory pull request that is already attached to a work order" />
   <LinkCard title="Update Work Order Status" href="#update-work-order-status" description="Transition a work order between lifecycle states" />
   <LinkCard title="Upsert Memory" href="#upsert-memory" description="Update matching memory rows, or create one when no match exists" />
   <LinkCard title="Wait" href="#wait" description="Wait for a certain amount of time" />
@@ -432,6 +432,77 @@ A single `memory.added` event is emitted with all written rows and the total `co
 }
 ```
 
+<a id="add-pull-request"></a>
+
+## Add Pull Request
+
+**Component key:** `addPullRequest`
+
+The Add Pull Request component records a pull request on a work order.
+
+Required fields are `repository`, `number`, and `url`. `provider` defaults to `github`. `state` defaults to `open`.
+
+`state`, `merged`, and `draft` accept expressions, so you can pass a GitHub webhook payload through as-is. A GitHub-shaped `state: "closed"` + `merged: true` becomes SuperPlane state `merged`.
+
+Set `mergedAt` or `closedAt` (RFC3339) when the pull request is already merged or closed so Velocity uses the real day.
+
+`orderId` defaults to `{{ order().id }}`. In a flow that is not dispatched from a factory line, replace it with the work order id from a previous step. This component can only be used in factory-owned apps.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "pullRequest": {
+      "id": "2b3cf24d-c0e2-4d42-bbe7-4c30ff2cb2a4",
+      "number": 42,
+      "provider": "github",
+      "repository": "acme/app",
+      "state": "open",
+      "title": "Fix retry handling",
+      "url": "https://github.com/acme/app/pull/42",
+      "workOrderId": "9ac921bc-68e4-46dc-a78b-60b955f3bbf2"
+    }
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "workOrder.pullRequestAdded"
+}
+```
+
+<a id="add-pull-request-activity"></a>
+
+## Add Pull Request Activity
+
+**Component key:** `addPullRequestActivity`
+
+The Add Pull Request Activity component links the current canvas run to a factory pull request. An existing relation is treated as success.
+
+Set `pullRequestId` from Find Pull Request output. Use `description` to record why this run is linked. The field accepts event data, for example `{{ root().data.comment.body }}`. The output contains the same pull request and work order references as Find Pull Request.
+
+The component rejects a pull request from another factory. It also rejects a run that is already linked to a different pull request. This component can only be used in factory-owned apps.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "description": "Please add tests for the retry path.",
+    "pullRequest": {
+      "id": "2b3cf24d-c0e2-4d42-bbe7-4c30ff2cb2a4",
+      "number": 42,
+      "url": "https://github.com/acme/app/pull/42"
+    },
+    "workOrder": {
+      "id": "9ac921bc-68e4-46dc-a78b-60b955f3bbf2",
+      "key": "SP-123",
+      "number": 123
+    }
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "pullRequest.activityAdded"
+}
+```
+
 <a id="add-run-error"></a>
 
 ## Add Run Error
@@ -503,77 +574,6 @@ Set `artifactKey` to tag the artifact with a queryable key so a later `findWorkO
   },
   "timestamp": "2026-01-01T00:00:00Z",
   "type": "workOrder.artifactAdded"
-}
-```
-
-<a id="add-pull-request"></a>
-
-## Add Pull Request
-
-**Component key:** `addPullRequest`
-
-The Add Pull Request component records a pull request on a work order.
-
-Required fields are `repository`, `number`, and `url`. `provider` defaults to `github`. `state` defaults to `open`.
-
-`state`, `merged`, and `draft` accept expressions, so you can pass a GitHub webhook payload through as-is. A GitHub-shaped `state: "closed"` + `merged: true` becomes SuperPlane state `merged`.
-
-Set `mergedAt` or `closedAt` (RFC3339) when the pull request is already merged or closed so Velocity uses the real day.
-
-`orderId` defaults to `{{ order().id }}`. In a flow that is not dispatched from a factory line, replace it with the work order id from a previous step. This component can only be used in factory-owned apps.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "pullRequest": {
-      "id": "2b3cf24d-c0e2-4d42-bbe7-4c30ff2cb2a4",
-      "number": 42,
-      "provider": "github",
-      "repository": "acme/app",
-      "state": "open",
-      "title": "Fix retry handling",
-      "url": "https://github.com/acme/app/pull/42",
-      "workOrderId": "9ac921bc-68e4-46dc-a78b-60b955f3bbf2"
-    }
-  },
-  "timestamp": "2026-01-01T00:00:00Z",
-  "type": "workOrder.pullRequestAdded"
-}
-```
-
-<a id="add-pull-request-activity"></a>
-
-## Add Pull Request Activity
-
-**Component key:** `addPullRequestActivity`
-
-The Add Pull Request Activity component links the current canvas run to a factory pull request. An existing relation is treated as success.
-
-Set `pullRequestId` from Find Pull Request output. Use `description` to record why this run is linked. The field accepts event data, for example `{{ root().data.comment.body }}`. The output contains the same pull request and work order references as Find Pull Request.
-
-The component rejects a pull request from another factory. It also rejects a run that is already linked to a different pull request. This component can only be used in factory-owned apps.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "description": "Please add tests for the retry path.",
-    "pullRequest": {
-      "id": "2b3cf24d-c0e2-4d42-bbe7-4c30ff2cb2a4",
-      "number": 42,
-      "url": "https://github.com/acme/app/pull/42"
-    },
-    "workOrder": {
-      "id": "9ac921bc-68e4-46dc-a78b-60b955f3bbf2",
-      "key": "SP-123",
-      "number": 123
-    }
-  },
-  "timestamp": "2026-01-01T00:00:00Z",
-  "type": "pullRequest.activityAdded"
 }
 ```
 
@@ -868,6 +868,7 @@ On a match, emits `pullRequest.found` with the pull request and its work order o
     },
     "workOrder": {
       "id": "9ac921bc-68e4-46dc-a78b-60b955f3bbf2",
+      "key": "SP-123",
       "number": 123
     }
   },
@@ -887,7 +888,7 @@ The Find Work Order component resolves a work order without requiring the curren
 Lookup modes:
 
 - **Work Order ID** (`by: id`): resolves `orderId` directly.
-- **Artifact Key** (`by: artifactKey`): resolves the work order that owns the artifact tagged with `artifactKey` (set via `addWorkOrderArtifact`'s `artifactKey` field).
+- **Artifact Key** (`by: artifactKey`): resolves the work order that owns the artifact tagged with `artifactKey` (set via `addWorkOrderArtifact`'s `artifactKey` field — e.g. the pull request's URL).
 
 On a match, emits `workOrder.found` with `{ workOrder }` on the `found` channel, so downstream components can target it with `orderId: {{ previous().data.workOrder.id }}`. When nothing matches, emits on the `notFound` channel instead of failing the run — a PR merge unrelated to any tracked order shouldn't red a flow, and downstream components can wire the `notFound` channel to a no-op if they don't need to react to it. Misconfiguration (invalid id, wrong factory, etc.) still fails the run. This component can only be used in factory-owned apps.
 
@@ -1996,8 +1997,6 @@ The Update Pull Request component updates a factory pull request by `pullRequest
 Mutable fields: repository, external id, URL, title, state, merged timestamp, and closed timestamp. The component does not move the pull request to a different work order.
 
 `state`, `merged`, and `draft` accept expressions. A GitHub-shaped `state: "closed"` + `merged: true` becomes SuperPlane state `merged`. This component can only be used in factory-owned apps.
-
-Typical wiring to stay in sync with GitHub: a `github.onPullRequest` trigger → `findPullRequest` (`url: {{ event.data.pull_request.html_url }}`) → this component.
 
 ### Example Output
 

@@ -94,7 +94,7 @@ describe("buildWorkOrderTimelineViewFromEvents: comments, artifacts, and attribu
         url: "https://github.com/example/repo/pull/1",
         title: "Add checkout",
         number: "1",
-        state: "open",
+        state: "STATE_OPEN",
       },
       title: "added pull request #1",
     });
