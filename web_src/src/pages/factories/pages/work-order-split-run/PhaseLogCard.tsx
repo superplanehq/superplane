@@ -1,6 +1,6 @@
 import { cn, resolveIcon } from "@/lib/utils";
 import { ChevronRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
@@ -49,15 +49,19 @@ const STICKY_PHASE = "sticky top-0 z-30 h-8 bg-muted";
 const STICKY_NODE = cn("sticky top-8 z-20", STREAM_SECTION);
 const STICKY_STEP = cn("sticky top-[3.375rem] z-10", STREAM_SECTION);
 
+const LAST_RUNNING_LINE_PULSE = "data-[last-running-line]:animate-pulse";
+
 const STREAM_LINE_ROW = cn(
   "flex w-full min-w-0 max-w-full items-center justify-start overflow-hidden whitespace-nowrap px-2 text-left",
   LOG_ROW_H,
   LOG_ROW_HOVER,
+  LAST_RUNNING_LINE_PULSE,
 );
 
 const STREAM_LINE_WRAP_ROW = cn(
   "flex w-full min-w-0 max-w-full items-start justify-start px-2 text-left",
   LOG_ROW_HOVER,
+  LAST_RUNNING_LINE_PULSE,
 );
 
 function StreamLineTitle({ children, wrap = false }: { children: string; wrap?: boolean }) {
@@ -209,7 +213,48 @@ function artifactsProducedBySteps(
  * Automations keep produced artifacts on the title line when collapsed or expanded.
  * Expanded automations also show those artifacts on the producing steps.
  * Node icons keep the phase glyph column. Agent steps stay flush under them.
+ * The last visible line of a running automation pulses so collapsed tools still show activity.
  */
+function useLastRunningLine(rootRef: { current: HTMLElement | null }, active: boolean) {
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) {
+      return;
+    }
+
+    const clear = () => {
+      for (const el of root.querySelectorAll("[data-last-running-line]")) {
+        el.removeAttribute("data-last-running-line");
+      }
+    };
+
+    if (!active) {
+      clear();
+      return;
+    }
+
+    const mark = () => {
+      const lines = root.querySelectorAll("[data-stream-line]");
+      const last = lines.item(lines.length - 1);
+      for (const el of lines) {
+        if (el === last) {
+          el.setAttribute("data-last-running-line", "");
+        } else {
+          el.removeAttribute("data-last-running-line");
+        }
+      }
+    };
+
+    mark();
+    const observer = new MutationObserver(mark);
+    observer.observe(root, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      clear();
+    };
+  }, [active, rootRef]);
+}
+
 export function PhaseLogCard({
   phase,
   expanded,
@@ -237,6 +282,8 @@ export function PhaseLogCard({
 }) {
   const groups = groupSplitRunStream(stream ?? phase.stream);
   const producedArtifacts = artifactsProducedBySteps(groups, phase.artifacts);
+  const rootRef = useRef<HTMLDivElement>(null);
+  useLastRunningLine(rootRef, phase.status === "running");
 
   useEffect(() => {
     if (!selectedNodeId) {
@@ -249,7 +296,12 @@ export function PhaseLogCard({
   }, [selectedNodeId]);
 
   return (
-    <div className="min-w-0" data-testid={`split-run-phase-${phase.id}`} aria-current={expanded ? "step" : undefined}>
+    <div
+      ref={rootRef}
+      className="min-w-0"
+      data-testid={`split-run-phase-${phase.id}`}
+      aria-current={expanded ? "step" : undefined}
+    >
       <div
         className={cn(
           "rounded-md border border-border border-l-2 bg-card",
@@ -259,8 +311,10 @@ export function PhaseLogCard({
       >
         <div
           data-testid={`split-run-automation-header-${phase.id}`}
+          data-stream-line=""
           className={cn(
             "flex w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-2 leading-tight",
+            LAST_RUNNING_LINE_PULSE,
             expanded && STICKY_PHASE,
           )}
         >
@@ -463,6 +517,7 @@ function StreamNodeHeader({
   return (
     <div
       data-testid={`split-run-stream-line-${line.id}`}
+      data-stream-line=""
       data-highlighted={highlighted ? "true" : undefined}
       aria-current={highlighted ? "true" : undefined}
       className={cn(
@@ -470,6 +525,7 @@ function StreamNodeHeader({
         LOG_ROW_H,
         LOG_ROW_HOVER,
         STREAM_SECTION,
+        LAST_RUNNING_LINE_PULSE,
         hasChildren && STICKY_NODE,
         highlighted && "ring-1 ring-foreground/15",
       )}
@@ -505,6 +561,7 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
     <li className="min-w-0">
       <div
         data-testid={`split-run-stream-line-${step.line.id}`}
+        data-stream-line=""
         className={cn(STREAM_LINE_WRAP_ROW, STREAM_SECTION, hasBody && STICKY_STEP)}
       >
         {step.line.componentType ? (
@@ -521,7 +578,8 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
               <div
                 key={event.line.id}
                 data-testid={`split-run-stream-line-${event.line.id}`}
-                className={cn("flex w-full items-start px-2", LOG_ROW_HOVER)}
+                data-stream-line=""
+                className={cn("flex w-full items-start px-2", LOG_ROW_HOVER, LAST_RUNNING_LINE_PULSE)}
               >
                 <span className="inline-flex w-4 shrink-0" aria-hidden />
                 <span className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground">
@@ -547,6 +605,7 @@ function StreamToolGroup({ stepId, tools }: { stepId: string; tools: SplitRunStr
       <button
         type="button"
         data-testid={`split-run-tools-toggle-${stepId}`}
+        data-stream-line=""
         aria-expanded={expanded}
         aria-label={summary}
         onClick={() => setExpanded((open) => !open)}
@@ -593,6 +652,7 @@ function StreamTool({ tool }: { tool: SplitRunStreamLine }) {
         <button
           type="button"
           data-testid={`split-run-stream-line-${tool.id}`}
+          data-stream-line=""
           aria-expanded={expanded}
           onClick={() => setExpanded((open) => !open)}
           className={cn(STREAM_LINE_WRAP_ROW, "cursor-pointer hover:text-foreground")}
@@ -600,7 +660,7 @@ function StreamTool({ tool }: { tool: SplitRunStreamLine }) {
           {row}
         </button>
       ) : (
-        <div data-testid={`split-run-stream-line-${tool.id}`} className={STREAM_LINE_WRAP_ROW}>
+        <div data-testid={`split-run-stream-line-${tool.id}`} data-stream-line="" className={STREAM_LINE_WRAP_ROW}>
           {row}
         </div>
       )}
@@ -613,7 +673,11 @@ function StreamOutput({ text }: { text: string }) {
   return (
     <div data-testid="split-run-stream-output" className="min-w-0">
       {text.split("\n").map((line, index) => (
-        <div key={index} className={cn("flex min-w-0 w-full items-start px-2", LOG_FACE, LOG_ROW_HOVER)}>
+        <div
+          key={index}
+          data-stream-line=""
+          className={cn("flex min-w-0 w-full items-start px-2", LOG_FACE, LOG_ROW_HOVER, LAST_RUNNING_LINE_PULSE)}
+        >
           <span className="inline-flex w-4 shrink-0" aria-hidden />
           <pre className="min-w-0 flex-1 whitespace-pre-wrap break-words py-0.5 leading-5 text-muted-foreground">
             {line.length > 0 ? line : " "}
