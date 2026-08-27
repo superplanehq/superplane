@@ -163,6 +163,7 @@ import {
   isNonCanvasAppViewParam,
   useWorkflowUrlViewFlags,
   clearRunInspectionSearchParams,
+  resolveCanvasPageInitialSidebar,
 } from "./viewState";
 import {
   buildExecutionInfo,
@@ -3870,15 +3871,13 @@ export function AppPage({
         <CanvasPage
           key={canvasRenderKey}
           // In run inspection, sidebar/node params restore the run detail pane,
-          // not the live node inspector.
-          initialSidebar={
-            runInspectionChromeActive
-              ? { isOpen: false, nodeId: null }
-              : {
-                  isOpen: searchParams.get("sidebar") === "1",
-                  nodeId: searchParams.get("node") || null,
-                }
-          }
+          // not the live node inspector. Configure reuses those params for the
+          // component editor, including the brief window where `run` is still set.
+          initialSidebar={resolveCanvasPageInitialSidebar({
+            factoryConfigure,
+            runInspectionChromeActive,
+            searchParams,
+          })}
           onSidebarChange={handleSidebarChange}
           onTriggerModalHostReady={registerTriggerModalHost}
           title={canvas?.metadata?.name || liveCanvas?.metadata?.name || "Canvas"}

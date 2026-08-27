@@ -130,20 +130,37 @@ describe("factorySettingsGeneralPathAfterKeyChange", () => {
 });
 
 describe("factoryAppConfigurePath", () => {
-  it("adds configure=1 and keeps the components panel closed", () => {
-    expect(factoryAppConfigurePath("org-1", "SP", "app-1")).toBe("/org-1/workspaces/SP/apps/app-1?configure=1");
+  it("adds configure=1, opens the agent panel, and keeps the components panel closed", () => {
+    expect(factoryAppConfigurePath("org-1", "SP", "app-1")).toBe("/org-1/workspaces/SP/apps/app-1?configure=1&agent=1");
   });
 
   it("keeps the run when entering edit from a run page", () => {
     expect(factoryAppConfigurePath("org-1", "SP", "app-1", { from: "lines", lineId: "line-1", runId: "run-9" })).toBe(
-      "/org-1/workspaces/SP/apps/app-1?run=run-9&configure=1&from=lines&lineId=line-1",
+      "/org-1/workspaces/SP/apps/app-1?run=run-9&configure=1&agent=1&from=lines&lineId=line-1",
     );
   });
 
   it("opens components only when blocks is requested", () => {
     expect(factoryAppConfigurePath("org-1", "SP", "app-1", { blocks: true })).toBe(
-      "/org-1/workspaces/SP/apps/app-1?configure=1&blocks=1",
+      "/org-1/workspaces/SP/apps/app-1?configure=1&agent=1&blocks=1",
     );
+  });
+
+  it("opens the component sidebar on the selected node", () => {
+    expect(factoryAppConfigurePath("org-1", "SP", "app-1", { nodeId: "create-pr" })).toBe(
+      "/org-1/workspaces/SP/apps/app-1?configure=1&agent=1&sidebar=1&node=create-pr",
+    );
+  });
+
+  it("does not keep run inspection when opening a component for edit", () => {
+    expect(
+      factoryAppConfigurePath("org-1", "SP", "app-1", {
+        from: "lines",
+        lineId: "line-1",
+        runId: "run-9",
+        nodeId: "create-pr",
+      }),
+    ).toBe("/org-1/workspaces/SP/apps/app-1?configure=1&agent=1&sidebar=1&node=create-pr&from=lines&lineId=line-1");
   });
 });
 

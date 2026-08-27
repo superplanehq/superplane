@@ -20,21 +20,26 @@ export function factoryCanvasBackground(isDark: boolean, isEditing = false): Fac
   if (isDark) {
     return { gap: 22, size, color: "#33312b", bgColor: "#14120b" };
   }
-  return { gap: 22, size, color: "#e5e7eb", bgColor: "#f9fafb" };
+  return { gap: 22, size, color: "#b8c4d0", bgColor: "#e2e8f0" };
 }
 
+/** Light-mode factory wires. Darker than the canvas dots; used in edit and view. */
+export const FACTORY_EDGE_STROKE = "#94a3b8";
+export const FACTORY_EDGE_STROKE_WIDTH = 2;
+
 export function factoryEdgePalette(isDark: boolean): FactoryEdgePalette {
+  const strokeWidth = FACTORY_EDGE_STROKE_WIDTH;
   if (isDark) {
     return {
-      default: { stroke: "#4a4740", strokeWidth: 1.5 },
-      running: { stroke: "#818cf8", strokeWidth: 1.5 },
-      failed: { stroke: "#f87171", strokeWidth: 1.5 },
+      default: { stroke: "#4a4740", strokeWidth },
+      running: { stroke: "#818cf8", strokeWidth },
+      failed: { stroke: "#f87171", strokeWidth },
     };
   }
   return {
-    default: { stroke: "#cbd5e1", strokeWidth: 1.5 },
-    running: { stroke: "#818cf8", strokeWidth: 1.5 },
-    failed: { stroke: "#fca5a5", strokeWidth: 1.5 },
+    default: { stroke: FACTORY_EDGE_STROKE, strokeWidth },
+    running: { stroke: "#818cf8", strokeWidth },
+    failed: { stroke: "#fca5a5", strokeWidth },
   };
 }
 
