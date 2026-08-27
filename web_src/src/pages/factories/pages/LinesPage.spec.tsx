@@ -255,7 +255,7 @@ describe("LinesPage board", () => {
     expect(within(dialog).getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
     expect(within(dialog).getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
-    expect(within(dialog).getByTestId("split-run-review")).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-review")).not.toBeInTheDocument();
 
     await user.click(within(dialog).getByRole("tab", { name: "Automations" }));
     expect(within(dialog).getByRole("heading", { name: "Automations" })).toBeInTheDocument();

@@ -128,10 +128,12 @@ export function WorkOrderSplitRunBody({
   const actions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const liveOrder = Boolean(organizationId && factoryId && orderId);
   const automationStop = (entry: SplitRunPhase) => {
-    if (!canUpdate || !liveOrder || entry.status !== "running" || !entry.appId || !entry.runId) {
+    const appId = entry.appId;
+    const runId = entry.runId;
+    if (!canUpdate || !liveOrder || entry.status !== "running" || !appId || !runId) {
       return undefined;
     }
-    return () => void actions.handleStopAutomation({ appId: entry.appId, runId: entry.runId });
+    return () => void actions.handleStopAutomation({ appId, runId });
   };
   const automationRerun = (entry: SplitRunPhase) => {
     if (!canUpdate || !liveOrder || entry.status !== "failed") {
@@ -217,9 +219,9 @@ export function WorkOrderSplitRunPopup({
 }) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, onClose);
-  const draftStart = fixture.footer.kind === "draft" ? onDispatch : undefined;
+  const draftStart = draftStartAction(fixture.footer.kind, onDispatch);
   const fixtureArtifacts = collectSplitRunArtifacts(fixture);
-  const useLiveArtifacts = Boolean(organizationId && factoryId && orderId);
+  const useLiveArtifacts = hasLiveWorkOrder(organizationId, factoryId, orderId);
   const liveArtifactsQuery = useWorkOrderArtifacts(organizationId ?? "", factoryId ?? "", orderId ?? "");
   const artifacts = resolveSplitRunPopupArtifacts({
     fixtureArtifacts,
@@ -244,7 +246,7 @@ export function WorkOrderSplitRunPopup({
     footerKind: fixture.footer.kind,
   });
   const initialTab = defaultSplitRunPopupTab(fixture);
-  const ownerOrganizationId = organizationId ?? (edits.canEdit ? FACTORIES_ORGANIZATION_ID : undefined);
+  const ownerOrganizationId = popupOwnerOrganizationId(organizationId, edits.canEdit);
 
   return (
     <PopupShell testId="work-order-split-run" fixed={fixed} onDismiss={onClose}>
@@ -290,6 +292,24 @@ export function WorkOrderSplitRunPopup({
       />
     </PopupShell>
   );
+}
+
+function draftStartAction(kind: SplitRunFixture["footer"]["kind"], onDispatch?: () => Promise<void>) {
+  if (kind !== "draft") {
+    return undefined;
+  }
+  return onDispatch;
+}
+
+function hasLiveWorkOrder(organizationId?: string, factoryId?: string, orderId?: string) {
+  return Boolean(organizationId && factoryId && orderId);
+}
+
+function popupOwnerOrganizationId(organizationId: string | undefined, canEdit: boolean) {
+  if (organizationId) {
+    return organizationId;
+  }
+  return canEdit ? FACTORIES_ORGANIZATION_ID : undefined;
 }
 
 function SplitRunPopupTabs({

@@ -200,7 +200,7 @@ describe("splitRunFixtureForWorkOrder", () => {
         state: "STATE_OPEN",
         title: "Later step",
         lineDispatches: [
-          dispatch("STATE_STARTED", [
+          dispatch("STATE_ACTIVE", [
             { id: "e-plan", step: "Planning", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
             { id: "e-impl", step: "Implement", state: "STATE_FINISHED", result: "RESULT_FAILED" },
             { id: "e-verify", step: "Verify", stepIndex: 2, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },

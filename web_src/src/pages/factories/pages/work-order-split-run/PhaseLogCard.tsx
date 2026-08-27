@@ -309,57 +309,15 @@ export function PhaseLogCard({
           automationAccent(phase.status),
         )}
       >
-        <div
-          data-testid={`split-run-automation-header-${phase.id}`}
-          data-stream-line=""
-          className={cn(
-            "flex w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-2 leading-tight",
-            LAST_RUNNING_LINE_PULSE,
-            expanded && STICKY_PHASE,
-          )}
-        >
-          {collapsible ? (
-            <button
-              type="button"
-              onClick={onToggle}
-              aria-expanded={expanded}
-              className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[13px] font-medium tracking-[-0.01em]"
-            >
-              <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
-              <span className="min-w-0 truncate text-foreground">{phase.name}</span>
-            </button>
-          ) : (
-            <div className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] font-medium tracking-[-0.01em]">
-              <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
-              <span className="min-w-0 truncate text-foreground">{phase.name}</span>
-            </div>
-          )}
-          {producedArtifacts.length > 0 ? (
-            <span
-              data-testid={`split-run-phase-artifacts-${phase.id}`}
-              className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
-            >
-              {producedArtifacts.map((artifact) => (
-                <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
-              ))}
-            </span>
-          ) : null}
-          {phase.checks && phase.checks.length > 0 ? (
-            <span className="shrink-0">
-              <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
-            </span>
-          ) : null}
-          {phase.status === "running" && onStop ? (
-            <Button type="button" size="xs" variant="outline" className="text-destructive" onClick={onStop}>
-              Stop
-            </Button>
-          ) : null}
-          {phase.status === "failed" && onRerun ? (
-            <Button type="button" size="xs" variant="ghost" onClick={onRerun}>
-              Rerun
-            </Button>
-          ) : null}
-        </div>
+        <AutomationHeader
+          phase={phase}
+          expanded={expanded}
+          collapsible={collapsible}
+          producedArtifacts={producedArtifacts}
+          onToggle={onToggle}
+          onStop={onStop}
+          onRerun={onRerun}
+        />
 
         {expanded ? (
           <ol
@@ -379,6 +337,78 @@ export function PhaseLogCard({
           </ol>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function AutomationHeader({
+  phase,
+  expanded,
+  collapsible,
+  producedArtifacts,
+  onToggle,
+  onStop,
+  onRerun,
+}: {
+  phase: SplitRunPhase;
+  expanded: boolean;
+  collapsible: boolean;
+  producedArtifacts: FactoriesWorkOrderArtifact[];
+  onToggle?: () => void;
+  onStop?: () => void;
+  onRerun?: () => void;
+}) {
+  return (
+    <div
+      data-testid={`split-run-automation-header-${phase.id}`}
+      data-stream-line=""
+      className={cn(
+        "flex w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-2 leading-tight",
+        LAST_RUNNING_LINE_PULSE,
+        expanded && STICKY_PHASE,
+      )}
+    >
+      {collapsible ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[13px] font-medium tracking-[-0.01em]"
+        >
+          <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
+          <span className="min-w-0 truncate text-foreground">{phase.name}</span>
+        </button>
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] font-medium tracking-[-0.01em]">
+          <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
+          <span className="min-w-0 truncate text-foreground">{phase.name}</span>
+        </div>
+      )}
+      {producedArtifacts.length > 0 ? (
+        <span
+          data-testid={`split-run-phase-artifacts-${phase.id}`}
+          className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
+        >
+          {producedArtifacts.map((artifact) => (
+            <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
+          ))}
+        </span>
+      ) : null}
+      {phase.checks && phase.checks.length > 0 ? (
+        <span className="shrink-0">
+          <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
+        </span>
+      ) : null}
+      {phase.status === "running" && onStop ? (
+        <Button type="button" size="xs" variant="outline" className="text-destructive" onClick={onStop}>
+          Stop
+        </Button>
+      ) : null}
+      {phase.status === "failed" && onRerun ? (
+        <Button type="button" size="xs" variant="ghost" onClick={onRerun}>
+          Rerun
+        </Button>
+      ) : null}
     </div>
   );
 }

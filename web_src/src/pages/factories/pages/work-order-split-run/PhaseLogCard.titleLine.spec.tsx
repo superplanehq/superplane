@@ -1,9 +1,17 @@
 import { act, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { FactoriesWorkOrderArtifact } from "@/api-client";
+
 import { PhaseLogCard } from "./PhaseLogCard";
 import { idleLiveLogStream, line, PHASE } from "./PhaseLogCard.testHelpers";
 import type { SplitRunStreamLine } from "./splitRunMocks";
+
+const PLAN_MD_ARTIFACT: FactoriesWorkOrderArtifact = {
+  id: "art-plan",
+  type: "TYPE_MARKDOWN",
+  data: { name: "PLAN.md", title: "PLAN.md" },
+};
 
 const useLiveLogStreamMock = vi.fn();
 
@@ -76,13 +84,7 @@ describe("PhaseLogCard title line", () => {
   it("keeps bold artifacts on the automation header when the card is expanded", () => {
     const phase = {
       ...PHASE,
-      artifacts: [
-        {
-          id: "art-plan",
-          type: "TYPE_MARKDOWN",
-          data: { name: "PLAN.md", title: "PLAN.md" },
-        },
-      ],
+      artifacts: [PLAN_MD_ARTIFACT],
     };
     const { rerender } = render(<PhaseLogCard phase={phase} expanded={false} />);
 
@@ -109,13 +111,7 @@ describe("PhaseLogCard title line", () => {
         phase={{
           ...PHASE,
           status: "running",
-          artifacts: [
-            {
-              id: "art-plan",
-              type: "TYPE_MARKDOWN",
-              data: { name: "PLAN.md", title: "PLAN.md" },
-            },
-          ],
+          artifacts: [PLAN_MD_ARTIFACT],
         }}
         expanded={false}
         onStop={vi.fn()}
