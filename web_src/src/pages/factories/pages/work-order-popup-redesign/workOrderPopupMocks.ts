@@ -8,7 +8,10 @@ import type {
 import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
 import { workOrderOwnerDisplay } from "../../lib/workOrderCreator";
 
-import { OPEN_WORK_ORDER_ARTIFACTS, OPEN_WORK_ORDER_PULL_REQUESTS } from "../../__fixtures__/factoryPageFixtureVariants";
+import {
+  OPEN_WORK_ORDER_ARTIFACTS,
+  OPEN_WORK_ORDER_PULL_REQUESTS,
+} from "../../__fixtures__/factoryPageFixtureVariants";
 import {
   HOUR_AGO,
   OPEN_WORK_ORDER,
@@ -177,9 +180,7 @@ export function buildPopupDispatchEvent(fixture: PopupFixture): WorkOrderTimelin
     cursor += durationMs ?? 60_000;
     const execution = logExecution(entry.state);
     const artifact = entry.artifactId ? artifacts.find((item) => item.id === entry.artifactId) : undefined;
-    const pullRequest = entry.pullRequestId
-      ? pullRequests.find((item) => item.id === entry.pullRequestId)
-      : undefined;
+    const pullRequest = entry.pullRequestId ? pullRequests.find((item) => item.id === entry.pullRequestId) : undefined;
 
     return {
       id: entry.id,
