@@ -21,7 +21,7 @@ vi.mock("./useSplitRunFooterActions", () => ({
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { DRAFT_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
+import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
 import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../__fixtures__/lineMetricsBoardOrders";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
@@ -40,48 +40,71 @@ function renderPopup(fixture: ComponentProps<typeof WorkOrderSplitRunPopup>["fix
   );
 }
 
-describe("WorkOrderSplitRunPopup stop actions", () => {
+function headerActions() {
+  return screen.getByTestId("split-run-header-actions");
+}
+
+describe("WorkOrderSplitRunPopup header actions", () => {
   beforeEach(() => {
     handleStopMock.mockReset();
     handleRejectMock.mockReset();
   });
 
-  it("closes as rejected when Stop and Close is used", async () => {
+  it("asks before Reject closes a running work order", async () => {
     const user = userEvent.setup();
     renderPopup(SPLIT_RUN_RUNNING);
 
-    await user.click(screen.getByRole("button", { name: "Stop and Close" }));
+    expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
+    await user.click(within(headerActions()).getByRole("button", { name: "Reject" }));
+    expect(handleStopMock).not.toHaveBeenCalled();
+
+    const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getByRole("heading", { name: "Stop running automations?" })).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/This action stops all running automations on this work order/),
+    ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Reject" }));
     expect(handleStopMock).toHaveBeenCalledWith("canceled", expect.objectContaining({ kind: "running" }));
   });
 
-  it("closes as completed after that Stop outcome is chosen", async () => {
+  it("asks before Approve closes a running work order", async () => {
     const user = userEvent.setup();
     renderPopup(SPLIT_RUN_RUNNING);
 
-    await user.click(screen.getByRole("button", { name: "Choose how to stop" }));
-    await user.click(await screen.findByRole("menuitem", { name: /Stop and Complete/ }));
-    await user.click(screen.getByRole("button", { name: "Stop and Complete" }));
+    await user.click(within(headerActions()).getByRole("button", { name: "Approve" }));
+    expect(handleStopMock).not.toHaveBeenCalled();
+
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "Approve" }));
     expect(handleStopMock).toHaveBeenCalledWith("completed", expect.objectContaining({ kind: "running" }));
   });
 
-  it("reruns the current step after that Stop outcome is chosen", async () => {
+  it("does not close when Cancel is used on the running confirm", async () => {
     const user = userEvent.setup();
     renderPopup(SPLIT_RUN_RUNNING);
 
-    await user.click(screen.getByRole("button", { name: "Choose how to stop" }));
-    await user.click(await screen.findByRole("menuitem", { name: /Rerun this step/ }));
-    await user.click(screen.getByRole("button", { name: "Rerun step" }));
-    expect(handleStopMock).toHaveBeenCalledWith("rerun-step", expect.objectContaining({ kind: "running" }));
+    await user.click(within(headerActions()).getByRole("button", { name: "Reject" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Cancel" }));
+    expect(handleStopMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 
-  it("reruns from the start after that Stop outcome is chosen", async () => {
+  it("rejects a waiting work order without a confirm", async () => {
     const user = userEvent.setup();
-    renderPopup(SPLIT_RUN_RUNNING);
+    renderPopup(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER));
 
-    await user.click(screen.getByRole("button", { name: "Choose how to stop" }));
-    await user.click(await screen.findByRole("menuitem", { name: /Rerun from the start/ }));
-    await user.click(screen.getByRole("button", { name: "Rerun from start" }));
-    expect(handleStopMock).toHaveBeenCalledWith("rerun-start", expect.objectContaining({ kind: "running" }));
+    await user.click(within(headerActions()).getByRole("button", { name: "Reject" }));
+    expect(handleStopMock).toHaveBeenCalledWith("canceled", expect.objectContaining({ kind: "waiting" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("approves a waiting work order without a confirm", async () => {
+    const user = userEvent.setup();
+    renderPopup(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER));
+
+    await user.click(within(headerActions()).getByRole("button", { name: "Approve" }));
+    expect(handleStopMock).toHaveBeenCalledWith("completed", expect.objectContaining({ kind: "waiting" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 
   it("closes the popup after Reject deletes a draft", async () => {
@@ -90,7 +113,7 @@ describe("WorkOrderSplitRunPopup stop actions", () => {
     const onClose = vi.fn();
     renderPopup(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER), onClose);
 
-    await user.click(within(screen.getByTestId("split-run-review")).getByRole("button", { name: "Reject" }));
+    await user.click(within(headerActions()).getByRole("button", { name: "Reject" }));
     expect(handleRejectMock).toHaveBeenCalledTimes(1);
     await waitFor(() => {
       expect(onClose).toHaveBeenCalledTimes(1);
@@ -101,26 +124,11 @@ describe("WorkOrderSplitRunPopup stop actions", () => {
     const user = userEvent.setup();
     renderPopup(splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER));
 
-    expect(screen.queryByRole("button", { name: "Rerun step" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Reopen" }));
+    expect(within(headerActions()).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    await user.click(within(headerActions()).getByRole("button", { name: "Reopen" }));
     expect(handleStopMock).toHaveBeenCalledWith(
       "reopen",
       expect.objectContaining({ kind: "failed", status: "failed" }),
     );
-  });
-
-  it("hides Rerun when the work order is already a draft", async () => {
-    const user = userEvent.setup();
-    renderPopup({
-      ...SPLIT_RUN_RUNNING,
-      footer: { ...SPLIT_RUN_RUNNING.footer, status: "draft" },
-    });
-
-    await user.click(screen.getByRole("button", { name: "Choose how to stop" }));
-    const menu = await screen.findByRole("menu");
-    expect(within(menu).queryByRole("menuitem", { name: /Rerun this step/ })).not.toBeInTheDocument();
-    expect(within(menu).queryByRole("menuitem", { name: /Rerun from the start/ })).not.toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: /Stop and Close/ })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: /Stop and Complete/ })).toBeInTheDocument();
   });
 });

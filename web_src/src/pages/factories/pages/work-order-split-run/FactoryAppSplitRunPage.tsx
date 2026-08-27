@@ -3,8 +3,11 @@ import { cn } from "@/lib/utils";
 import { FactoryAppCanvasHeader } from "../FactoryAppCanvasHeader";
 import { CompactLineCanvas } from "./CompactLineCanvas";
 import { PhaseLogCard } from "./PhaseLogCard";
+import { SplitRunLogHeader } from "./SplitRunLogHeader";
+import { runningSplitRunPhaseId } from "./followLogScroll";
 import { splitRunMissingCopy } from "./splitRunPageModel";
 import { useFactoryAppSplitRunPage } from "./useFactoryAppSplitRunPage";
+import { useFollowLogScroll } from "./useFollowLogScroll";
 
 /**
  * Copy of the factory Automation Run page. The body is a resizable split:
@@ -63,6 +66,7 @@ function SplitRunMissingPage({
 }
 
 function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppSplitRunPage> }) {
+  const follow = useFollowLogScroll(runningSplitRunPhaseId(model.fixture?.phases ?? []), model.stream?.length ?? 0);
   return (
     <div className="absolute inset-0 flex flex-col bg-background" data-testid="factory-app-split-run-page">
       <FactoryAppCanvasHeader
@@ -82,7 +86,16 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
           style={{ width: `${model.split.percent}%` }}
           aria-label="Log"
         >
-          <ol className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-3">
+          <SplitRunLogHeader
+            following={follow.following}
+            onFollowingChange={follow.setFollowing}
+            className="px-4 pt-3"
+          />
+          <ol
+            ref={follow.scrollRef}
+            onScroll={follow.onScroll}
+            className="min-h-0 min-w-0 flex-1 list-none overflow-x-hidden overflow-y-auto px-4 py-3"
+          >
             <li className="min-w-0">
               <PhaseLogCard
                 phase={model.phase}
