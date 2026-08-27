@@ -99,6 +99,28 @@ func Test__GitHub__Sync(t *testing.T) {
 		assert.Empty(t, metadata.InstallationID)
 	})
 
+	t.Run("hosted env with privateApp keeps manifest flow", func(t *testing.T) {
+		setHostedAppEnv(t)
+		restore := withFactoriesEnabledForTest(func(string) bool { return true })
+		t.Cleanup(restore)
+
+		integrationCtx := &contexts.IntegrationContext{}
+		require.NoError(t, g.Sync(core.SyncContext{
+			OrganizationID: "11111111-1111-1111-1111-111111111111",
+			Configuration:  Configuration{PrivateApp: true},
+			Integration:    integrationCtx,
+		}))
+
+		require.NotNil(t, integrationCtx.BrowserAction)
+		assert.Equal(t, "POST", integrationCtx.BrowserAction.Method)
+		assert.Equal(t, "https://github.com/settings/apps/new", integrationCtx.BrowserAction.URL)
+		assert.NotContains(t, integrationCtx.BrowserAction.URL, "/apps/superplane/installations/new")
+
+		require.NotNil(t, integrationCtx.Metadata)
+		metadata := integrationCtx.Metadata.(common.Metadata)
+		assert.False(t, metadata.HostedApp)
+	})
+
 	t.Run("hosted env without factories keeps manifest flow", func(t *testing.T) {
 		setHostedAppEnv(t)
 		restore := withFactoriesEnabledForTest(func(string) bool { return false })
