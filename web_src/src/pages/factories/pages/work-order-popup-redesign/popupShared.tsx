@@ -2,7 +2,7 @@ import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
-import { CircleDollarSign, Clock, FileText, UserPlus, XIcon } from "lucide-react";
+import { CircleDollarSign, Clock, FileText, Maximize2, Minimize2, UserPlus, XIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { FACTORIES_ORGANIZATION_ID } from "../../__fixtures__/factoryPageResponses";
@@ -23,6 +23,7 @@ export function PopupShell({
   fixed = false,
   wide = false,
   canvas = false,
+  fullPage = false,
   onDismiss,
 }: {
   testId: string;
@@ -30,12 +31,40 @@ export function PopupShell({
   fixed?: boolean;
   wide?: boolean;
   canvas?: boolean;
+  fullPage?: boolean;
   onDismiss?: () => void;
 }) {
   return (
-    <RunOverlayFrame testId={testId} fixed={fixed} wide={wide} canvas={canvas} onDismiss={onDismiss}>
+    <RunOverlayFrame
+      testId={testId}
+      fixed={fixed}
+      wide={wide}
+      canvas={canvas}
+      fullPage={fullPage}
+      onDismiss={onDismiss}
+    >
       {children}
     </RunOverlayFrame>
+  );
+}
+
+const OPEN_FULL_SCREEN_LABEL = "Open full screen";
+const EXIT_FULL_SCREEN_LABEL = "Exit full screen";
+const POPUP_HEADER_ICON_BUTTON =
+  "flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10";
+
+function PopupFullScreenButton({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
+  const label = expanded ? EXIT_FULL_SCREEN_LABEL : OPEN_FULL_SCREEN_LABEL;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={POPUP_HEADER_ICON_BUTTON}
+      aria-label={label}
+      data-testid="popup-fullscreen-button"
+    >
+      {expanded ? <Minimize2 className="h-4 w-4" aria-hidden /> : <Maximize2 className="h-4 w-4" aria-hidden />}
+    </button>
   );
 }
 
@@ -44,6 +73,8 @@ export function PopupHeader({
   children,
   onClose,
   actions,
+  expanded = false,
+  onToggleExpanded,
   canEditTitle = false,
   titleBusy = false,
   onTitleSave,
@@ -54,6 +85,8 @@ export function PopupHeader({
   children?: ReactNode;
   onClose?: () => void;
   actions?: ReactNode;
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
   canEditTitle?: boolean;
   titleBusy?: boolean;
   onTitleSave?: (next: string) => void;
@@ -86,12 +119,8 @@ export function PopupHeader({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {actions}
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
-            aria-label="Close"
-          >
+          {onToggleExpanded ? <PopupFullScreenButton expanded={expanded} onToggle={onToggleExpanded} /> : null}
+          <button type="button" onClick={onClose} className={POPUP_HEADER_ICON_BUTTON} aria-label="Close">
             <XIcon className="h-4 w-4" />
           </button>
         </div>

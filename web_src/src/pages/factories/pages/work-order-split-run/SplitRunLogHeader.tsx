@@ -7,6 +7,27 @@ import { useId } from "react";
 
 import { SectionTitle } from "../work-order-popup-redesign/popupShared";
 
+export function SplitRunFollowSwitch({
+  following,
+  onFollowingChange,
+  className,
+}: {
+  following: boolean;
+  onFollowingChange: (next: boolean) => void;
+  className?: string;
+}) {
+  const followId = useId();
+
+  return (
+    <div className={cn("ml-auto flex items-center gap-1.5", className)} data-testid="split-run-follow">
+      <Label htmlFor={followId} className="text-xs font-medium text-muted-foreground">
+        Follow
+      </Label>
+      <Switch id={followId} checked={following} onCheckedChange={onFollowingChange} />
+    </div>
+  );
+}
+
 export function SplitRunLogHeader({
   following,
   onFollowingChange,
@@ -18,19 +39,9 @@ export function SplitRunLogHeader({
   expandHref?: string | null;
   className?: string;
 }) {
-  const followId = useId();
-
   return (
     <div className={cn("flex items-center justify-between gap-2", className)}>
-      <div className="flex min-w-0 items-center gap-3">
-        <SectionTitle>Automations</SectionTitle>
-        <div className="flex items-center gap-1.5">
-          <Label htmlFor={followId} className="text-xs font-medium text-muted-foreground">
-            Follow
-          </Label>
-          <Switch id={followId} checked={following} onCheckedChange={onFollowingChange} />
-        </div>
-      </div>
+      <SectionTitle>Automations</SectionTitle>
       {expandHref ? (
         <Link
           href={expandHref}
@@ -41,6 +52,7 @@ export function SplitRunLogHeader({
           <Maximize2 className="size-3.5" aria-hidden />
         </Link>
       ) : null}
+      <SplitRunFollowSwitch following={following} onFollowingChange={onFollowingChange} />
     </div>
   );
 }
