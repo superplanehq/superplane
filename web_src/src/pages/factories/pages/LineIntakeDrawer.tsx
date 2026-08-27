@@ -7,12 +7,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AnalyzingIntakeTicketList } from "./AnalyzingIntakeTicketList";
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
-import {
-  intakeSettingsToApi,
-  type IntakeAutomationRun,
-  type IntakeSettingsTab,
-  type IntakeSourceSettings,
-} from "./intakeSourceSettingsModel";
+import { intakeSettingsToApi, type IntakeAutomationRun, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
+import type { LineIntakeDrawerPopupsProps, LineIntakeDrawerProps } from "./lineIntakeDrawerTypes";
 import {
   intakeAutomationFixture,
   intakeTicketAnalysisFixture,
@@ -21,9 +17,7 @@ import {
   type AddIntakeTemplate,
   type ConfiguredLineIntakeSource,
   type LineIntakeAnalyzingTicket,
-  type LineIntakeSource,
 } from "./lineIntakeModel";
-import type { LineIntakeDrawerProps } from "./lineIntakeDrawerTypes";
 import { useIntakeAutomationCanvas } from "./useIntakeAutomationCanvas";
 import { useIntakeAutomationRuns } from "./useIntakeAutomationRuns";
 import { useLiveIntakeTickets } from "./useLiveIntakeTickets";
@@ -350,25 +344,7 @@ function LineIntakeDrawerPopups({
   onCloseSettings,
   onClosePreview,
   onCloseOpenTicket,
-}: {
-  pickerOpen: boolean;
-  initialSettingsTab: IntakeSettingsTab;
-  organizationId?: string;
-  factoryId?: string;
-  factoryKey?: string;
-  settingsIntake?: ConfiguredLineIntakeSource;
-  editAutomationHref?: string;
-  previewSource?: LineIntakeSource;
-  previewAppId?: string;
-  openTicket: LineIntakeAnalyzingTicket | null;
-  onClosePicker: () => void;
-  onSelectTemplate: (template: AddIntakeTemplate) => void;
-  onOpenRun: (run: IntakeAutomationRun) => void;
-  onSettingsSaved?: () => void;
-  onCloseSettings: () => void;
-  onClosePreview: () => void;
-  onCloseOpenTicket: () => void;
-}) {
+}: LineIntakeDrawerPopupsProps) {
   const automation = useIntakeAutomationCanvas(organizationId, settingsIntake?.appId);
   const runs = useIntakeAutomationRuns(organizationId, factoryId, settingsIntake);
   const updateIntake = useUpdateFactoryIntake(organizationId ?? "", factoryId ?? "");

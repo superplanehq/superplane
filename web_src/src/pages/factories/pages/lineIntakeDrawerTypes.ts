@@ -1,4 +1,4 @@
-import type { IntakeSettingsTab } from "./intakeSourceSettingsModel";
+import type { IntakeAutomationRun, IntakeSettingsTab } from "./intakeSourceSettingsModel";
 import type {
   AddIntakeTemplate,
   ConfiguredLineIntakeSource,
@@ -26,4 +26,24 @@ export interface LineIntakeDrawerProps {
   onSettingsSaved?: () => void;
   /** Show Add intake in Storybook. Hidden on the board until the flow is ready. */
   showAddIntakeControl?: boolean;
+}
+
+export interface LineIntakeDrawerPopupsProps {
+  pickerOpen: boolean;
+  initialSettingsTab: IntakeSettingsTab;
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  settingsIntake?: ConfiguredLineIntakeSource;
+  editAutomationHref?: string;
+  previewSource?: LineIntakeSource;
+  previewAppId?: string;
+  openTicket: LineIntakeAnalyzingTicket | null;
+  onClosePicker: () => void;
+  onSelectTemplate: (template: AddIntakeTemplate) => void;
+  onOpenRun: (run: IntakeAutomationRun) => void;
+  onSettingsSaved?: () => void;
+  onCloseSettings: () => void;
+  onClosePreview: () => void;
+  onCloseOpenTicket: () => void;
 }

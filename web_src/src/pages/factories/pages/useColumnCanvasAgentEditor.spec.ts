@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvas } from "@/api-client";
 
+import type { CanvasSpecNode } from "../lib/columnCanvasAgent";
 import { persistColumnAgent } from "./useColumnCanvasAgentEditor";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 
@@ -13,7 +14,7 @@ vi.mock("@/pages/app/lib/workflow-spec-files", () => ({
   materializeCanvasSpec: (canvas: CanvasesCanvas) => JSON.stringify(canvas.spec),
 }));
 
-const implementerNode = {
+const implementerNode: CanvasSpecNode = {
   id: "implementation-agent",
   name: "Agent - Implement from order description",
   type: "TYPE_ACTION",

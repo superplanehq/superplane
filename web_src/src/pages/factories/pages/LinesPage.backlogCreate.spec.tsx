@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
+import type * as canvasData from "@/hooks/useCanvasData";
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_KEY,
@@ -84,7 +85,7 @@ vi.mock("@/hooks/useWorkOrderChecks", () => ({
 }));
 
 vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/hooks/useCanvasData")>();
+  const actual = await importOriginal<typeof canvasData>();
   return {
     ...actual,
     useCanvas: () => ({ data: { spec: { nodes: [] } }, isPending: false, isError: false }),

@@ -52,7 +52,12 @@ describe("findAgentNodes", () => {
   });
 
   it("returns runner harness actions and skips bash runners", () => {
-    const bash = { id: "bash-1", type: "TYPE_ACTION", component: "runnerBash", configuration: {} };
+    const bash: CanvasSpecNode = {
+      id: "bash-1",
+      type: "TYPE_ACTION",
+      component: "runnerBash",
+      configuration: {},
+    };
     const claude = agentNode();
     expect(findAgentNodes({ nodes: [triggerNode(), bash, claude] })).toEqual([claude]);
   });

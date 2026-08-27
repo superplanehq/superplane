@@ -7,7 +7,7 @@ import { PlanningReviewForm } from "./PlanningReviewForm";
 import { PLANNING_REVIEW_DRAFT, singleAgentDraft, type PlanningReviewDraft } from "./planningReviewMockup";
 import { PopupBody, PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 
-export function planningReviewPopupTitle(draft: PlanningReviewDraft): string {
+function planningReviewPopupTitle(draft: PlanningReviewDraft): string {
   return draft.components[0]?.title ?? "Editing Agent";
 }
 

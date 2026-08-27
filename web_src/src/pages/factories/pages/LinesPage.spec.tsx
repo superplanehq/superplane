@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
+import type * as canvasData from "@/hooks/useCanvasData";
 import { editFactoryLinePath, factoryAppConfigurePath } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
@@ -18,6 +19,7 @@ import {
 import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
+import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageCanvasFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
 
 function renderLinesBoard(
@@ -125,48 +127,8 @@ const useCanvasMock = vi.hoisted(() => vi.fn());
 const updateCanvasVersionMutateAsync = vi.hoisted(() => vi.fn());
 const commitCanvasStagingMutateAsync = vi.hoisted(() => vi.fn());
 
-const IMPLEMENTER_AGENT_STEPS = [
-  { name: "Clone Repo", type: "bash" as const, command: "git clone $REPO repo" },
-  { name: "Implement", type: "prompt" as const, prompt: "Implement the plan.", workingDirectory: "repo" },
-];
-
-const implementerCanvas = {
-  metadata: { id: "app-refund-implementer", liveVersionId: "version-live" },
-  spec: {
-    nodes: [
-      { id: "on-run", name: "On run", type: "TYPE_TRIGGER", component: "onRun", configuration: {} },
-      {
-        id: "implementation-agent",
-        name: "Agent - Implement from order description",
-        type: "TYPE_ACTION",
-        component: "runnerClaudeCode",
-        concurrency: { max: 5 },
-        configuration: {
-          machineType: "e1-large-amd64",
-          model: "sonnet",
-          credentials: { source: "integration", integration: { name: "claude" } },
-          steps: IMPLEMENTER_AGENT_STEPS,
-        },
-      },
-    ],
-    edges: [],
-  },
-};
-
-const canvasWithoutAgent = {
-  metadata: { id: "app-no-agent", liveVersionId: "version-live" },
-  spec: {
-    nodes: [{ id: "on-run", name: "On run", type: "TYPE_TRIGGER", component: "onRun", configuration: {} }],
-    edges: [],
-  },
-};
-
-function canvasQuery(data: typeof implementerCanvas | typeof canvasWithoutAgent) {
-  return { data, isPending: false, isError: false };
-}
-
 vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/hooks/useCanvasData")>();
+  const actual = await importOriginal<typeof canvasData>();
   return {
     ...actual,
     useCanvas: (organizationId: string, canvasId: string, options?: { enabled?: boolean }) =>

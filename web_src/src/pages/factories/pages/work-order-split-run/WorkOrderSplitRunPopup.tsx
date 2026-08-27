@@ -13,7 +13,13 @@ import { SplitRunReview } from "./SplitRunReview";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { emptySplitRunCanvas } from "./splitRunCanvases";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
-import { autoExpandedPhaseId, splitRunStatusLabel, type SplitRunFixture, type SplitRunPhase, type SplitRunPhaseId } from "./splitRunMocks";
+import {
+  autoExpandedPhaseId,
+  splitRunStatusLabel,
+  type SplitRunFixture,
+  type SplitRunPhase,
+  type SplitRunPhaseId,
+} from "./splitRunMocks";
 import {
   collectSplitRunArtifacts,
   defaultSplitRunPopupTab,
