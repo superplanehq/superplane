@@ -74,6 +74,17 @@ func Test__VerifyAndParseOrderPaidRejectsBadSignature(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidWebhookSignature)
 }
 
+func Test__VerifyAndParseOrderEventRefunded(t *testing.T) {
+	secret := "whsec_test-secret"
+	body := []byte(`{"type":"order.refunded","data":{"id":"order_refund","status":"refunded","refunded_amount":2500}}`)
+	headers := signedHeaders("msg_refund", body, secret)
+
+	event, err := VerifyAndParseOrderEvent(headers, body, secret)
+	require.NoError(t, err)
+	assert.Equal(t, orderRefundedType, event.Type)
+	assert.Equal(t, "order_refund", event.Data.ID)
+}
+
 func Test__VerifyAndParseOrderPaidIgnoresOtherEvents(t *testing.T) {
 	secret := "whsec_test-secret"
 	body := []byte(`{"type":"order.updated","data":{"id":"order_1"}}`)

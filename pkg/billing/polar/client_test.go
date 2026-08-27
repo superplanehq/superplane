@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -134,6 +135,77 @@ func Test__CreateCheckoutForwardsCustomerIP(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "https://buy.polar.sh/polar_c_test", session.URL)
 	assert.Equal(t, "cust_1", session.CustomerID)
+}
+
+func Test__CreateCustomerPostsTrailingSlash(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/customers/", r.URL.Path)
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "team", body["type"])
+		assert.Equal(t, "Acme", body["name"])
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":          "cust_1",
+			"external_id": "org-1",
+			"email":       body["email"],
+			"name":        "Acme",
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	customer, err := client.CreateCustomer(context.Background(), CreateCustomerInput{
+		ExternalID: "org-1",
+		Email:      "billing+org-1@billing.superplane.com",
+		Name:       "Acme",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "cust_1", customer.ID)
+}
+
+func Test__EnsureCustomerUsesExistingAfterConflict(t *testing.T) {
+	created := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/customers/external/"):
+			if !created {
+				http.Error(w, "missing", http.StatusNotFound)
+				return
+			}
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"id":          "cust_existing",
+				"external_id": "org-1",
+				"email":       "billing+org-1@billing.superplane.com",
+			}))
+		case r.Method == http.MethodPost && r.URL.Path == "/customers/":
+			created = true
+			http.Error(w, "conflict", http.StatusConflict)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	customer, err := client.EnsureCustomer(context.Background(), CreateCustomerInput{
+		ExternalID: "org-1",
+		Email:      "billing+org-1@billing.superplane.com",
+		Name:       "Acme",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "cust_existing", customer.ID)
+}
+
+func Test__CreateCheckoutReportsRateLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "30")
+		http.Error(w, "slow down", http.StatusTooManyRequests)
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	_, err := client.CreateCheckout(context.Background(), "prod_1", "org-1", "", "http://localhost/return", "")
+	require.ErrorIs(t, err, ErrRateLimited)
 }
 
 func Test__APIBaseURLUsesSandboxByDefault(t *testing.T) {

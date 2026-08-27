@@ -526,6 +526,7 @@ message ListHostedCreditProductsResponse {
 message CreateHostedCreditCheckoutRequest {
   string id = 1;
   string product_id = 2;
+  // Ignored. SuperPlane sends Polar the client IP from proxy headers only.
   string customer_ip_address = 3;
 }
 

@@ -29,7 +29,7 @@ func ListHostedCreditProducts(
 
 	packs, err := polar.NewClientFromEnv().ListCreditPacks(ctx)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to list hosted credit products")
+		return nil, polarBillingError(err, "failed to list hosted credit products")
 	}
 
 	products := make([]*pb.HostedCreditProduct, 0, len(packs))
@@ -65,35 +65,51 @@ func CreateHostedCreditCheckout(
 		return nil, grpcerrors.InvalidArgument(nil, "product id is required")
 	}
 
+	email := actingUserEmail(accountID)
+	if email == "" {
+		return nil, grpcerrors.FailedPrecondition(nil, "account email is required to start checkout")
+	}
+
+	organization, err := models.FindOrganizationByIDInTransaction(database.DB(ctx), organizationID.String())
+	if err != nil {
+		return nil, grpcerrors.NotFound(err, "organization not found")
+	}
+
 	client := polar.NewClientFromEnv()
 	if _, err := client.GetCreditPack(ctx, productID); err != nil {
 		if polar.IsNotFound(err) || errors.Is(err, polar.ErrNotCreditPack) {
 			return nil, grpcerrors.InvalidArgument(err, "product is not a hosted credit pack")
 		}
-		return nil, grpcerrors.Internal(err, "failed to create hosted credit checkout")
+		return nil, polarBillingError(err, "failed to create hosted credit checkout")
 	}
 
-	email := ""
-	if strings.TrimSpace(accountID) != "" {
-		account, err := models.FindAccountByID(accountID)
-		if err == nil && account != nil {
-			email = account.Email
-		}
-	}
-
-	customer, err := client.EnsureCustomer(ctx, organizationID.String(), email)
+	customer, err := client.EnsureCustomer(ctx, polar.CreateCustomerInput{
+		ExternalID: organizationID.String(),
+		Email:      polar.BillingCustomerEmail(organizationID.String()),
+		Name:       organization.Name,
+	})
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to create hosted credit checkout")
+		if polar.IsConflict(err) {
+			return nil, grpcerrors.FailedPrecondition(err, "hosted billing customer already exists for another organization")
+		}
+		return nil, polarBillingError(err, "failed to create hosted credit checkout")
 	}
 	if err := models.SetOrganizationPolarCustomerID(database.DB(ctx), organizationID, customer.ID); err != nil {
 		return nil, grpcerrors.Internal(err, "failed to create hosted credit checkout")
 	}
 
+	// Polar tax and currency use this IP. Prefer the proxy-set client IP, not a
+	// client-supplied body field (CreateHostedCreditCheckoutRequest.customer_ip_address is ignored).
 	customerIP := clientIPFromContext(ctx)
 
-	session, err := client.CreateCheckout(ctx, productID, organizationID.String(), email, hostedCreditCheckoutSuccessURL(baseURL, organizationID), customerIP)
+	session, err := client.CreateCheckout(ctx, productID, organizationID.String(), "", hostedCreditCheckoutSuccessURL(baseURL, organizationID), customerIP)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to create hosted credit checkout")
+		return nil, polarBillingError(err, "failed to create hosted credit checkout")
+	}
+	if session.CustomerID != "" {
+		if err := models.SetOrganizationPolarCustomerID(database.DB(ctx), organizationID, session.CustomerID); err != nil {
+			return nil, grpcerrors.Internal(err, "failed to create hosted credit checkout")
+		}
 	}
 	return &pb.CreateHostedCreditCheckoutResponse{CheckoutUrl: session.URL}, nil
 }
@@ -122,24 +138,58 @@ func CreateBillingPortalSession(
 		customerID = strings.TrimSpace(*settings.PolarCustomerID)
 	}
 	if customerID == "" {
-		customer, lookupErr := client.GetCustomerByExternalID(ctx, organizationID.String())
+		resolved, lookupErr := lookupPolarCustomer(ctx, client, organizationID)
 		if lookupErr != nil {
-			if polar.IsNotFound(lookupErr) {
-				return nil, grpcerrors.FailedPrecondition(lookupErr, "Add hosted credit first.")
-			}
-			return nil, grpcerrors.Internal(lookupErr, "failed to create billing portal session")
+			return nil, lookupErr
 		}
-		customerID = customer.ID
-		if err := models.SetOrganizationPolarCustomerID(database.DB(ctx), organizationID, customerID); err != nil {
-			return nil, grpcerrors.Internal(err, "failed to create billing portal session")
-		}
+		customerID = resolved
 	}
 
 	session, err := client.CreateCustomerSession(ctx, customerID)
+	if err != nil && polar.IsNotFound(err) {
+		resolved, lookupErr := lookupPolarCustomer(ctx, client, organizationID)
+		if lookupErr != nil {
+			return nil, lookupErr
+		}
+		customerID = resolved
+		session, err = client.CreateCustomerSession(ctx, customerID)
+	}
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to create billing portal session")
+		return nil, polarBillingError(err, "failed to create billing portal session")
 	}
 	return &pb.CreateBillingPortalSessionResponse{PortalUrl: session.PortalURL}, nil
+}
+
+func lookupPolarCustomer(ctx context.Context, client *polar.Client, organizationID uuid.UUID) (string, error) {
+	customer, err := client.GetCustomerByExternalID(ctx, organizationID.String())
+	if err != nil {
+		if polar.IsNotFound(err) {
+			return "", grpcerrors.FailedPrecondition(err, "Add hosted credit first.")
+		}
+		return "", polarBillingError(err, "failed to create billing portal session")
+	}
+	if err := models.SetOrganizationPolarCustomerID(database.DB(ctx), organizationID, customer.ID); err != nil {
+		return "", grpcerrors.Internal(err, "failed to create billing portal session")
+	}
+	return customer.ID, nil
+}
+
+func polarBillingError(err error, fallback string) error {
+	if polar.IsRateLimited(err) {
+		return grpcerrors.ResourceExhausted(err, "Hosted billing is busy. Try again shortly.")
+	}
+	return grpcerrors.Internal(err, fallback)
+}
+
+func actingUserEmail(accountID string) string {
+	if strings.TrimSpace(accountID) == "" {
+		return ""
+	}
+	account, err := models.FindAccountByID(accountID)
+	if err != nil || account == nil {
+		return ""
+	}
+	return strings.TrimSpace(account.Email)
 }
 
 func billingState(ctx context.Context, orgID uuid.UUID) (enabled bool, hasCustomer bool) {
@@ -161,7 +211,7 @@ func hostedCreditCheckoutSuccessURL(baseURL string, organizationID uuid.UUID) st
 	if origin == "" {
 		origin = strings.TrimRight(strings.TrimSpace(os.Getenv("BASE_URL")), "/")
 	}
-	return origin + "/" + organizationID.String() + "/organization/llm-spend?credit=added"
+	return origin + "/" + organizationID.String() + "/organization/llm-spend?credit=added&checkout_id={CHECKOUT_ID}"
 }
 
 func clientIPFromContext(ctx context.Context) string {
@@ -169,12 +219,41 @@ func clientIPFromContext(ctx context.Context) string {
 	if !ok {
 		return ""
 	}
-	for _, key := range []string{"x-forwarded-for", "grpcgateway-x-forwarded-for", "x-real-ip"} {
-		values := md.Get(key)
-		if len(values) == 0 {
-			continue
+	for _, key := range []string{
+		"cf-connecting-ip",
+		"true-client-ip",
+		"x-real-ip",
+		"grpcgateway-x-real-ip",
+	} {
+		if ip := firstMetadataValue(md, key); ip != "" {
+			return ip
 		}
-		return strings.TrimSpace(strings.Split(values[0], ",")[0])
+	}
+	for _, key := range []string{"x-forwarded-for", "grpcgateway-x-forwarded-for"} {
+		if ip := rightMostForwardedIP(md.Get(key)); ip != "" {
+			return ip
+		}
+	}
+	return ""
+}
+
+func firstMetadataValue(md metadata.MD, key string) string {
+	values := md.Get(key)
+	if len(values) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(values[0])
+}
+
+func rightMostForwardedIP(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	parts := strings.Split(values[0], ",")
+	for i := len(parts) - 1; i >= 0; i-- {
+		if ip := strings.TrimSpace(parts[i]); ip != "" {
+			return ip
+		}
 	}
 	return ""
 }

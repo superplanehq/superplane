@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	LLMCreditGrantKindWelcome = "welcome"
-	LLMCreditGrantKindAdmin   = "admin"
-	LLMCreditGrantKindPolar   = "polar"
+	LLMCreditGrantKindWelcome     = "welcome"
+	LLMCreditGrantKindAdmin       = "admin"
+	LLMCreditGrantKindPolar       = "polar"
+	LLMCreditGrantKindPolarRefund = "polar_refund"
 )
 
 var (
@@ -23,6 +24,7 @@ var (
 	ErrCreditGrantNotPositive   = errors.New("credit grant must be greater than zero")
 	ErrFactoryHostedBudgetEmpty = errors.New("this workspace has no remaining hosted credit")
 	ErrPolarOrderIDRequired     = errors.New("polar order id is required")
+	ErrPolarRefundIDRequired    = errors.New("polar refund id is required")
 )
 
 // OrganizationLLMCreditGrant is one append-only credit addition.
@@ -34,6 +36,7 @@ type OrganizationLLMCreditGrant struct {
 	Note           string
 	ActorAccountID *uuid.UUID
 	PolarOrderID   *string
+	PolarRefundID  *string
 	CreatedAt      time.Time
 }
 
@@ -140,7 +143,7 @@ func AddPolarLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, po
 	}
 
 	var existing OrganizationLLMCreditGrant
-	err := tx.Where("polar_order_id = ?", orderID).First(&existing).Error
+	err := tx.Where("polar_order_id = ? AND kind = ?", orderID, LLMCreditGrantKindPolar).First(&existing).Error
 	if err == nil {
 		return &existing, nil
 	}
@@ -167,11 +170,72 @@ func AddPolarLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, po
 
 func FindLLMCreditGrantByPolarOrderID(tx *gorm.DB, polarOrderID string) (*OrganizationLLMCreditGrant, error) {
 	var grant OrganizationLLMCreditGrant
-	err := tx.Where("polar_order_id = ?", polarOrderID).First(&grant).Error
+	err := tx.Where("polar_order_id = ? AND kind = ?", polarOrderID, LLMCreditGrantKindPolar).First(&grant).Error
 	if err != nil {
 		return nil, err
 	}
 	return &grant, nil
+}
+
+func AddPolarLLMCreditRefund(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, polarOrderID, polarRefundID string) (*OrganizationLLMCreditGrant, error) {
+	if amountMicros <= 0 {
+		return nil, ErrCreditGrantNotPositive
+	}
+	orderID := strings.TrimSpace(polarOrderID)
+	if orderID == "" {
+		return nil, ErrPolarOrderIDRequired
+	}
+	refundID := strings.TrimSpace(polarRefundID)
+	if refundID == "" {
+		return nil, ErrPolarRefundIDRequired
+	}
+
+	var existing OrganizationLLMCreditGrant
+	err := tx.Where("polar_refund_id = ?", refundID).First(&existing).Error
+	if err == nil {
+		return &existing, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	grant := OrganizationLLMCreditGrant{
+		ID:             uuid.New(),
+		OrganizationID: orgID,
+		Kind:           LLMCreditGrantKindPolarRefund,
+		AmountMicros:   -amountMicros,
+		PolarOrderID:   &orderID,
+		PolarRefundID:  &refundID,
+		CreatedAt:      time.Now(),
+	}
+	if err := tx.Create(&grant).Error; err != nil {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			return FindLLMCreditRefundByPolarRefundID(tx, refundID)
+		}
+		return nil, err
+	}
+	return &grant, nil
+}
+
+func FindLLMCreditRefundByPolarRefundID(tx *gorm.DB, polarRefundID string) (*OrganizationLLMCreditGrant, error) {
+	var grant OrganizationLLMCreditGrant
+	err := tx.Where("polar_refund_id = ?", polarRefundID).First(&grant).Error
+	if err != nil {
+		return nil, err
+	}
+	return &grant, nil
+}
+
+func PolarRefundMicrosForOrder(tx *gorm.DB, polarOrderID string) (int64, error) {
+	var refundedMicros int64
+	err := tx.Model(&OrganizationLLMCreditGrant{}).
+		Select("COALESCE(SUM(-amount_micros), 0)").
+		Where("polar_order_id = ? AND kind = ?", polarOrderID, LLMCreditGrantKindPolarRefund).
+		Scan(&refundedMicros).Error
+	if err != nil {
+		return 0, err
+	}
+	return refundedMicros, nil
 }
 
 func SetOrganizationPolarCustomerID(tx *gorm.DB, orgID uuid.UUID, customerID string) error {

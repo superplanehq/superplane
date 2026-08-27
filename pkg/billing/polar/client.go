@@ -18,15 +18,18 @@ import (
 )
 
 const (
-	sandboxAPIBaseURL    = "https://sandbox-api.polar.sh/v1"
-	productionAPIBaseURL = "https://api.polar.sh/v1"
-	creditPackMetadata   = "superplane_credit_pack"
-	httpTimeout          = 15 * time.Second
+	sandboxAPIBaseURL          = "https://sandbox-api.polar.sh/v1"
+	productionAPIBaseURL       = "https://api.polar.sh/v1"
+	creditPackMetadata         = "superplane_credit_pack"
+	httpTimeout                = 15 * time.Second
+	defaultCustomerEmailDomain = "billing.superplane.com"
 )
 
 var (
 	errNotFound      = fmt.Errorf("polar resource not found")
 	ErrNotCreditPack = errors.New("product is not a hosted credit pack")
+	ErrRateLimited   = errors.New("polar rate limited")
+	ErrConflict      = errors.New("polar customer conflict")
 )
 
 type Client struct {
@@ -45,6 +48,13 @@ type Customer struct {
 	ID         string
 	ExternalID string
 	Email      string
+	Name       string
+}
+
+type CreateCustomerInput struct {
+	ExternalID string
+	Email      string
+	Name       string
 }
 
 type CheckoutSession struct {
@@ -67,7 +77,12 @@ func NewClientFromEnv() *Client {
 
 func NewClient(baseURL, accessToken string, httpClient *http.Client) *Client {
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: httpTimeout}
+		httpClient = &http.Client{
+			Timeout: httpTimeout,
+			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
 	}
 	return &Client{
 		baseURL:     strings.TrimRight(strings.TrimSpace(baseURL), "/"),
@@ -84,6 +99,14 @@ func APIBaseURL() string {
 		return productionAPIBaseURL
 	}
 	return sandboxAPIBaseURL
+}
+
+func BillingCustomerEmail(organizationID string) string {
+	domain := strings.TrimSpace(os.Getenv("POLAR_CUSTOMER_EMAIL_DOMAIN"))
+	if domain == "" {
+		domain = defaultCustomerEmailDomain
+	}
+	return "billing+" + strings.TrimSpace(organizationID) + "@" + domain
 }
 
 func (c *Client) ListCreditPacks(ctx context.Context) ([]Product, error) {
@@ -162,27 +185,45 @@ func (c *Client) GetCustomerByExternalID(ctx context.Context, externalID string)
 	return payload.toCustomer(), nil
 }
 
-func (c *Client) CreateCustomer(ctx context.Context, externalID, email string) (*Customer, error) {
+func (c *Client) CreateCustomer(ctx context.Context, input CreateCustomerInput) (*Customer, error) {
+	body := map[string]any{
+		"external_id": input.ExternalID,
+		"email":       input.Email,
+		"type":        "team",
+	}
+	if name := strings.TrimSpace(input.Name); name != "" {
+		body["name"] = name
+	}
 	var payload customerJSON
-	err := c.post(ctx, "/customers", map[string]any{
-		"external_id": externalID,
-		"email":       email,
-	}, &payload)
+	err := c.post(ctx, "/customers/", body, &payload)
 	if err != nil {
 		return nil, err
 	}
 	return payload.toCustomer(), nil
 }
 
-func (c *Client) EnsureCustomer(ctx context.Context, externalID, email string) (*Customer, error) {
-	customer, err := c.GetCustomerByExternalID(ctx, externalID)
+func (c *Client) EnsureCustomer(ctx context.Context, input CreateCustomerInput) (*Customer, error) {
+	customer, err := c.GetCustomerByExternalID(ctx, input.ExternalID)
 	if err == nil {
 		return customer, nil
 	}
 	if !IsNotFound(err) {
 		return nil, err
 	}
-	return c.CreateCustomer(ctx, externalID, email)
+
+	customer, err = c.CreateCustomer(ctx, input)
+	if err == nil {
+		return customer, nil
+	}
+	if !isCustomerCreateConflict(err) {
+		return nil, err
+	}
+
+	existing, lookupErr := c.GetCustomerByExternalID(ctx, input.ExternalID)
+	if lookupErr == nil {
+		return existing, nil
+	}
+	return nil, fmt.Errorf("%w: polar customer email is already used by another customer", ErrConflict)
 }
 
 func (c *Client) CreateCheckout(ctx context.Context, productID, externalCustomerID, email, successURL, customerIP string) (*CheckoutSession, error) {
@@ -272,6 +313,16 @@ func (c *Client) do(ctx context.Context, method, path string, body any, dest any
 	if resp.StatusCode == http.StatusNotFound {
 		return fmt.Errorf("%w: %s", errNotFound, strings.TrimSpace(string(payload)))
 	}
+	if resp.StatusCode == http.StatusConflict {
+		return fmt.Errorf("%w: %s", ErrConflict, strings.TrimSpace(string(payload)))
+	}
+	if resp.StatusCode == http.StatusTooManyRequests {
+		retryAfter := strings.TrimSpace(resp.Header.Get("Retry-After"))
+		if retryAfter != "" {
+			return fmt.Errorf("%w: retry after %s", ErrRateLimited, retryAfter)
+		}
+		return ErrRateLimited
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("polar api %s %s: %d %s", method, path, resp.StatusCode, strings.TrimSpace(string(payload)))
 	}
@@ -285,6 +336,24 @@ func IsNotFound(err error) bool {
 	return err != nil && errors.Is(err, errNotFound)
 }
 
+func IsConflict(err error) bool {
+	return err != nil && errors.Is(err, ErrConflict)
+}
+
+func IsRateLimited(err error) bool {
+	return err != nil && errors.Is(err, ErrRateLimited)
+}
+
+func isCustomerCreateConflict(err error) bool {
+	if IsConflict(err) {
+		return true
+	}
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), " 422 ")
+}
+
 type listProductsJSON struct {
 	Items      []productJSON `json:"items"`
 	Pagination struct {
@@ -293,10 +362,11 @@ type listProductsJSON struct {
 }
 
 type productJSON struct {
-	ID       string         `json:"id"`
-	Name     string         `json:"name"`
-	Metadata map[string]any `json:"metadata"`
-	Prices   []priceJSON    `json:"prices"`
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	IsRecurring bool           `json:"is_recurring"`
+	Metadata    map[string]any `json:"metadata"`
+	Prices      []priceJSON    `json:"prices"`
 }
 
 func (p productJSON) faceValueCents() int64 {
@@ -316,10 +386,16 @@ type priceJSON struct {
 	PriceAmount int64  `json:"price_amount"`
 }
 
+type orderItemJSON struct {
+	Amount       int64     `json:"amount"`
+	ProductPrice priceJSON `json:"product_price"`
+}
+
 type customerJSON struct {
 	ID         string `json:"id"`
 	ExternalID string `json:"external_id"`
 	Email      string `json:"email"`
+	Name       string `json:"name"`
 }
 
 func (c customerJSON) toCustomer() *Customer {
@@ -327,6 +403,7 @@ func (c customerJSON) toCustomer() *Customer {
 		ID:         c.ID,
 		ExternalID: c.ExternalID,
 		Email:      c.Email,
+		Name:       c.Name,
 	}
 }
 

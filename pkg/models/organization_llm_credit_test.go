@@ -225,6 +225,29 @@ func Test__PolarGrantIsIdempotentByOrderID(t *testing.T) {
 	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents)+models.CentsToMicros(2500), summary.GrantMicros)
 }
 
+func Test__PolarRefundIsIdempotentAndCapsAtGrant(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	orderID := uuid.NewString()
+
+	_, err := models.AddPolarLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(2500), orderID)
+	require.NoError(t, err)
+
+	first, err := models.AddPolarLLMCreditRefund(db, r.Organization.ID, models.CentsToMicros(1000), orderID, "ref_1")
+	require.NoError(t, err)
+	second, err := models.AddPolarLLMCreditRefund(db, r.Organization.ID, models.CentsToMicros(1000), orderID, "ref_1")
+	require.NoError(t, err)
+	assert.Equal(t, first.ID, second.ID)
+
+	reversed, err := models.PolarRefundMicrosForOrder(db, orderID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(1000), reversed)
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents)+models.CentsToMicros(1500), summary.GrantMicros)
+}
+
 func Test__FactoryHostedBudgetZeroBlocksHostedStart(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)

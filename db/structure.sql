@@ -746,8 +746,9 @@ CREATE TABLE public.organization_llm_credit_grants (
     actor_account_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     polar_order_id text,
-    CONSTRAINT organization_llm_credit_grants_amount_positive CHECK ((amount_micros > 0)),
-    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'polar'::text])))
+    polar_refund_id text,
+    CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'polar_refund'::text) AND (amount_micros < 0)) OR ((kind <> 'polar_refund'::text) AND (amount_micros > 0)))),
+    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'polar'::text, 'polar_refund'::text])))
 );
 
 
@@ -2295,7 +2296,14 @@ CREATE INDEX idx_org_llm_credit_grants_org ON public.organization_llm_credit_gra
 -- Name: idx_org_llm_credit_grants_polar_order; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_org_llm_credit_grants_polar_order ON public.organization_llm_credit_grants USING btree (polar_order_id) WHERE (polar_order_id IS NOT NULL);
+CREATE UNIQUE INDEX idx_org_llm_credit_grants_polar_order ON public.organization_llm_credit_grants USING btree (polar_order_id) WHERE ((polar_order_id IS NOT NULL) AND (kind = 'polar'::text));
+
+
+--
+-- Name: idx_org_llm_credit_grants_polar_refund; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_org_llm_credit_grants_polar_refund ON public.organization_llm_credit_grants USING btree (polar_refund_id) WHERE (polar_refund_id IS NOT NULL);
 
 
 --
@@ -3461,7 +3469,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260826022426	f
+20260827005912	f
 \.
 
 

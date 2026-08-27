@@ -56,12 +56,12 @@ func Test__HandlePolarWebhook(t *testing.T) {
 		assert.Equal(t, http.StatusAccepted, rec.recorder.Code)
 	})
 
-	t.Run("invalid payload", func(t *testing.T) {
+	t.Run("unusable payload", func(t *testing.T) {
 		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
 		body := []byte(`{"type":"order.paid","data":{"id":""}}`)
 		rec := signedPolarWebhook(t, secret, body)
 		server.handlePolarWebhook(rec.recorder, rec.request)
-		assert.Equal(t, http.StatusBadRequest, rec.recorder.Code)
+		assert.Equal(t, http.StatusAccepted, rec.recorder.Code)
 	})
 
 	t.Run("grants credit for paid order", func(t *testing.T) {
@@ -109,7 +109,67 @@ func Test__HandlePolarWebhook(t *testing.T) {
 		}`)
 		rec := signedPolarWebhook(t, secret, body)
 		server.handlePolarWebhook(rec.recorder, rec.request)
-		assert.Equal(t, http.StatusInternalServerError, rec.recorder.Code)
+		assert.Equal(t, http.StatusAccepted, rec.recorder.Code)
+	})
+
+	t.Run("unknown organization is accepted", func(t *testing.T) {
+		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
+		body := []byte(fmt.Sprintf(`{
+			"type": "order.paid",
+			"data": {
+				"id": %q,
+				"customer": {"id": "cust_1", "external_id": %q},
+				"product": {
+					"id": "prod_1",
+					"metadata": {"superplane_credit_pack": true},
+					"prices": [{"amount_type": "fixed", "price_amount": 2500}]
+				}
+			}
+		}`, uuid.NewString(), uuid.NewString()))
+		rec := signedPolarWebhook(t, secret, body)
+		server.handlePolarWebhook(rec.recorder, rec.request)
+		assert.Equal(t, http.StatusAccepted, rec.recorder.Code)
+	})
+
+	t.Run("refund reverses grant", func(t *testing.T) {
+		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
+		orderID := uuid.NewString()
+		paid := []byte(fmt.Sprintf(`{
+			"type": "order.paid",
+			"data": {
+				"id": %q,
+				"customer": {"id": "cust_1", "external_id": %q},
+				"product": {
+					"id": "prod_1",
+					"metadata": {"superplane_credit_pack": true},
+					"prices": [{"amount_type": "fixed", "price_amount": 2500}]
+				}
+			}
+		}`, orderID, r.Organization.ID.String()))
+		rec := signedPolarWebhook(t, secret, paid)
+		server.handlePolarWebhook(rec.recorder, rec.request)
+		require.Equal(t, http.StatusAccepted, rec.recorder.Code)
+
+		refund := []byte(fmt.Sprintf(`{
+			"type": "order.refunded",
+			"data": {
+				"id": %q,
+				"status": "refunded",
+				"refunded_amount": 2500,
+				"customer": {"id": "cust_1", "external_id": %q},
+				"product": {
+					"id": "prod_1",
+					"metadata": {"superplane_credit_pack": true},
+					"prices": [{"amount_type": "fixed", "price_amount": 2500}]
+				}
+			}
+		}`, orderID, r.Organization.ID.String()))
+		rec = signedPolarWebhook(t, secret, refund)
+		server.handlePolarWebhook(rec.recorder, rec.request)
+		assert.Equal(t, http.StatusAccepted, rec.recorder.Code)
+
+		_, err := models.FindLLMCreditRefundByPolarRefundID(database.Conn(), orderID+":full")
+		require.NoError(t, err)
 	})
 }
 

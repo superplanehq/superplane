@@ -20,25 +20,38 @@ const (
 	webhookSignatureHeader = "Webhook-Signature"
 	signatureTolerance     = 5 * time.Minute
 	orderPaidType          = "order.paid"
+	orderRefundedType      = "order.refunded"
+	billingReasonPurchase  = "purchase"
 )
 
 var (
 	ErrInvalidWebhookSignature = errors.New("invalid webhook signature")
 	ErrUnsupportedWebhookEvent = errors.New("unsupported webhook event")
 	ErrWebhookSecretMissing    = errors.New("webhook secret is not configured")
+	ErrUnusableWebhookPayload  = errors.New("polar webhook payload cannot be applied")
 )
 
-type OrderPaidEvent struct {
-	Type string        `json:"type"`
-	Data OrderPaidData `json:"data"`
+type OrderWebhookEvent struct {
+	Type string    `json:"type"`
+	Data OrderData `json:"data"`
 }
 
-type OrderPaidData struct {
-	ID           string        `json:"id"`
-	Customer     OrderCustomer `json:"customer"`
-	Product      OrderProduct  `json:"product"`
-	ProductPrice priceJSON     `json:"product_price"`
+// OrderPaidEvent is the signed order.paid payload. Kept as an alias for apply callers.
+type OrderPaidEvent = OrderWebhookEvent
+
+type OrderData struct {
+	ID             string          `json:"id"`
+	Status         string          `json:"status"`
+	BillingReason  string          `json:"billing_reason"`
+	RefundedAmount int64           `json:"refunded_amount"`
+	NetAmount      int64           `json:"net_amount"`
+	Customer       OrderCustomer   `json:"customer"`
+	Product        OrderProduct    `json:"product"`
+	ProductPrice   priceJSON       `json:"product_price"`
+	Items          []orderItemJSON `json:"items"`
 }
+
+type OrderPaidData = OrderData
 
 type OrderCustomer struct {
 	ID         string `json:"id"`
@@ -46,10 +59,11 @@ type OrderCustomer struct {
 }
 
 type OrderProduct struct {
-	ID       string         `json:"id"`
-	Name     string         `json:"name"`
-	Metadata map[string]any `json:"metadata"`
-	Prices   []priceJSON    `json:"prices"`
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	IsRecurring bool           `json:"is_recurring"`
+	Metadata    map[string]any `json:"metadata"`
+	Prices      []priceJSON    `json:"prices"`
 }
 
 func (p OrderProduct) FaceValueCents() int64 {
@@ -64,7 +78,18 @@ func WebhookSecret() string {
 	return strings.TrimSpace(os.Getenv("POLAR_WEBHOOK_SECRET"))
 }
 
-func VerifyAndParseOrderPaid(headers http.Header, body []byte, secret string) (*OrderPaidEvent, error) {
+func VerifyAndParseOrderPaid(headers http.Header, body []byte, secret string) (*OrderWebhookEvent, error) {
+	event, err := VerifyAndParseOrderEvent(headers, body, secret)
+	if err != nil {
+		return nil, err
+	}
+	if event.Type != orderPaidType {
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedWebhookEvent, event.Type)
+	}
+	return event, nil
+}
+
+func VerifyAndParseOrderEvent(headers http.Header, body []byte, secret string) (*OrderWebhookEvent, error) {
 	if _, err := decodeWebhookSecret(secret); err != nil {
 		return nil, err
 	}
@@ -72,15 +97,17 @@ func VerifyAndParseOrderPaid(headers http.Header, body []byte, secret string) (*
 		return nil, err
 	}
 
-	var event OrderPaidEvent
+	var event OrderWebhookEvent
 	if err := json.Unmarshal(body, &event); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", ErrUnusableWebhookPayload, err)
 	}
-	if event.Type != orderPaidType {
+	switch event.Type {
+	case orderPaidType, orderRefundedType:
+	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnsupportedWebhookEvent, event.Type)
 	}
 	if strings.TrimSpace(event.Data.ID) == "" {
-		return nil, fmt.Errorf("order id is required")
+		return nil, fmt.Errorf("%w: order id is required", ErrUnusableWebhookPayload)
 	}
 	return &event, nil
 }
