@@ -1,5 +1,10 @@
 import { canvasesCancelRun } from "@/api-client";
-import { useCloseWorkOrder, useDispatchWorkOrder, useUpdateWorkOrderStatus } from "@/hooks/useFactoryData";
+import {
+  factoryQueryKeys,
+  useCloseWorkOrder,
+  useDispatchWorkOrder,
+  useUpdateWorkOrderStatus,
+} from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -8,7 +13,7 @@ import { useCallback } from "react";
 
 import type { SplitRunFooter, SplitRunStopChoice } from "./splitRunFooter";
 import { isSplitRunRerunChoice, rerunStartStepIndex } from "./splitRunFooter";
-import { applySplitRunStop, type SplitRunStopRun } from "./splitRunStop";
+import { applySplitRunStop, stopSplitRunAutomation, type SplitRunStopRun } from "./splitRunStop";
 
 type StopFooter = Pick<SplitRunFooter, "kind" | "run" | "status"> & {
   lineName?: string;
@@ -19,6 +24,9 @@ function closeToast(choice: SplitRunStopChoice): string {
   if (choice === "completed") {
     return "Work order closed as completed.";
   }
+  if (choice === "canceled") {
+    return "Work order closed as rejected.";
+  }
   if (choice === "reopen") {
     return "Work order reopened.";
   }
@@ -28,11 +36,11 @@ function closeToast(choice: SplitRunStopChoice): string {
   if (choice === "rerun-step") {
     return "Work order step started again.";
   }
-  return "Work order closed as canceled.";
+  return "Work order closed as failed.";
 }
 
 function rejectToast(): string {
-  return "Work order deleted.";
+  return closeToast("canceled");
 }
 
 function stopErrorFallback(choice: SplitRunStopChoice, footer: StopFooter): string {
@@ -65,6 +73,15 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["canvases"] });
+      if (!organizationId || !factoryId) {
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+      if (orderId) {
+        await queryClient.invalidateQueries({
+          queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId),
+        });
+      }
     },
   });
 
@@ -122,8 +139,24 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
     [cancelRun, closeWorkOrder, dispatchWorkOrder, live, orderId, updateStatus],
   );
 
+  const handleStopAutomation = useCallback(
+    async (run: SplitRunStopRun) => {
+      if (!live) {
+        return;
+      }
+      try {
+        await stopSplitRunAutomation(run, (next) => cancelRun.mutateAsync(next));
+        showSuccessToast("Automation stopped.");
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, "Failed to stop the run"));
+      }
+    },
+    [cancelRun, live],
+  );
+
   return {
     handleStop,
+    handleStopAutomation,
     handleReject,
     busy: cancelRun.isPending || closeWorkOrder.isPending || updateStatus.isPending || dispatchWorkOrder.isPending,
   };

@@ -46,6 +46,13 @@ export async function applySplitRunStopChoice(
  * When a line run is in flight, cancel that canvas run first, then apply
  * the work-order outcome. Waiting and failed orders skip cancel.
  */
+export async function stopSplitRunAutomation(
+  run: SplitRunStopRun,
+  cancelRun: (run: SplitRunStopRun) => Promise<void>,
+): Promise<void> {
+  await cancelRun(run);
+}
+
 export async function applySplitRunStop(
   choice: SplitRunStopChoice,
   input: {

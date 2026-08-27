@@ -1,7 +1,6 @@
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { CircleAlert, CircleCheck, Loader2, Minus, TriangleAlert } from "lucide-react";
+import { CircleAlert, CircleCheck, Minus, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -13,9 +12,7 @@ import {
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import { WorkOrderCheckDialog } from "../../WorkOrderCheckDialog";
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
-import type { WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
-import type { SplitRunFooter, SplitRunFooterAction, SplitRunStopChoice } from "./splitRunFooter";
-import { SplitRunStopButton } from "./SplitRunStopButton";
+import type { SplitRunFooter } from "./splitRunFooter";
 
 const PILL_TONE: Record<WorkOrderCheckLevel, string> = {
   positive: "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300",
@@ -43,25 +40,8 @@ function reviewRunHref(
   return getWorkOrderRunHref(organizationId, factoryKey, run.appId, run.runId, { orderNumber });
 }
 
-function visibleFooterActions(
-  actions: SplitRunFooter["actions"],
-  onStop?: (choice: SplitRunStopChoice) => void | Promise<void>,
-  onReject?: () => void | Promise<void>,
-) {
-  return actions.filter((action) => {
-    if (action.kind === "stop" || action.kind === "reopen") {
-      return Boolean(onStop);
-    }
-    if (action.kind === "reject") {
-      return Boolean(onReject);
-    }
-    return true;
-  });
-}
-
 /**
- * Sticky stack under Description and Log. A waiting note is its own
- * card. The footer bar below it stays a separate bordered strip.
+ * Attention note under Description and Automations. Actions live in the header.
  */
 export function SplitRunReview({
   footer,
@@ -69,159 +49,26 @@ export function SplitRunReview({
   organizationId,
   factoryKey,
   orderNumber,
-  onStart,
-  onStop,
-  onReject,
-  startBusy = false,
-  stopBusy = false,
-  startDisabled = false,
 }: {
   footer: SplitRunFooter;
   className?: string;
   organizationId?: string;
   factoryKey?: string;
   orderNumber?: string;
-  onStart?: () => void | Promise<void>;
-  onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
-  onReject?: () => void | Promise<void>;
-  startBusy?: boolean;
-  stopBusy?: boolean;
-  startDisabled?: boolean;
 }) {
-  const showCard = Boolean(footer.attentionCard && footer.note);
-  const actions = visibleFooterActions(footer.actions, onStop, onReject);
-  const showBar = footer.sentence !== "" || actions.length > 0;
-  if (!showCard && !showBar) {
+  if (!footer.attentionCard || !footer.note) {
     return null;
   }
   const runHref = reviewRunHref(organizationId, factoryKey, footer.run, orderNumber);
 
   return (
-    <div className={cn("shrink-0", className)}>
-      {showCard && footer.note ? (
-        <SplitRunAttentionNote
-          note={footer.note}
-          tone={footer.kind === "failed" ? "failed" : "waiting"}
-          runHref={runHref}
-        />
-      ) : null}
-      {showBar ? (
-        <aside
-          className="border-t border-border bg-background px-4 py-3 text-foreground"
-          role="complementary"
-          aria-label="Work order status"
-          data-testid="split-run-review"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {footer.sentence !== "" ? (
-              <p className="min-w-0 text-[13px] leading-5 text-muted-foreground">{footer.sentence}</p>
-            ) : null}
-            {actions.length > 0 ? (
-              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                {actions.map((action) => (
-                  <FooterAction
-                    key={action.id}
-                    action={action}
-                    status={footer.status}
-                    kind={footer.kind}
-                    onStart={onStart}
-                    onStop={onStop}
-                    onReject={onReject}
-                    startBusy={startBusy}
-                    stopBusy={stopBusy}
-                    startDisabled={startDisabled}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </aside>
-      ) : null}
+    <div className={cn("shrink-0", className)} data-testid="split-run-review">
+      <SplitRunAttentionNote
+        note={footer.note}
+        tone={footer.kind === "failed" ? "failed" : "waiting"}
+        runHref={runHref}
+      />
     </div>
-  );
-}
-
-function FooterAction({
-  action,
-  status,
-  kind,
-  onStart,
-  onStop,
-  onReject,
-  startBusy,
-  stopBusy,
-  startDisabled,
-}: {
-  action: SplitRunFooterAction;
-  status?: WorkOrderDisplayStatus;
-  kind?: SplitRunFooter["kind"];
-  onStart?: () => void | Promise<void>;
-  onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
-  onReject?: () => void | Promise<void>;
-  startBusy: boolean;
-  stopBusy: boolean;
-  startDisabled: boolean;
-}) {
-  const primary = action.emphasis === "primary";
-  const variant = primary ? "default" : "outline";
-  const testId = primary ? "split-run-review-cta" : `split-run-footer-${action.id}`;
-
-  if (action.kind === "stop") {
-    return <SplitRunStopButton onStop={onStop} busy={stopBusy} status={status} kind={kind} />;
-  }
-
-  if (action.kind === "start") {
-    return (
-      <Button
-        type="button"
-        size="sm"
-        variant={variant}
-        disabled={startDisabled || startBusy}
-        onClick={() => void onStart?.()}
-        data-testid={testId}
-      >
-        {startBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
-        {action.label}
-      </Button>
-    );
-  }
-
-  if (action.kind === "reopen") {
-    return (
-      <Button
-        type="button"
-        size="sm"
-        variant={variant}
-        disabled={stopBusy}
-        onClick={() => void onStop?.("reopen")}
-        data-testid={testId}
-      >
-        {stopBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
-        {action.label}
-      </Button>
-    );
-  }
-
-  if (action.kind === "reject") {
-    return (
-      <Button
-        type="button"
-        size="sm"
-        variant={variant}
-        disabled={stopBusy}
-        onClick={() => void onReject?.()}
-        data-testid={testId}
-      >
-        {stopBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
-        {action.label}
-      </Button>
-    );
-  }
-
-  return (
-    <Button type="button" size="sm" variant={variant} data-testid={testId}>
-      {action.label}
-    </Button>
   );
 }
 
