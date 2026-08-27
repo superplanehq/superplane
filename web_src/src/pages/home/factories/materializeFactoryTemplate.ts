@@ -107,6 +107,8 @@ export function wireFactoryIntegrations(
 }
 
 const CLAUDE_CODE_COMPONENT = "runnerClaudeCode";
+const PLANNING_AGENT_NODE_ID = "planner-agent-no-issue";
+const PLANNING_AGENT_MODEL = "opus";
 
 export type FactoryAgentRewrite = {
   component: string;
@@ -128,8 +130,15 @@ function rewriteOnboardingAgentNodes(doc: YamlCanvas, rewrite: FactoryAgentRewri
         integration: { name: rewrite.credentials.name },
       };
     }
-    configuration.model = rewrite.model;
+    configuration.model = planningAgentModel(node.id, rewrite);
   }
+}
+
+function planningAgentModel(nodeId: string | undefined, rewrite: FactoryAgentRewrite): string {
+  if (nodeId === PLANNING_AGENT_NODE_ID && rewrite.component === CLAUDE_CODE_COMPONENT) {
+    return PLANNING_AGENT_MODEL;
+  }
+  return rewrite.model;
 }
 
 export function materializeFactoryCanvas(args: {

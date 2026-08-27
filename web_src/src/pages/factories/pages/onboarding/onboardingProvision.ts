@@ -7,14 +7,14 @@ import type {
   FactoryLineStep,
 } from "@/api-client";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
-import { ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS, type FactoryAgentRewrite } from "@/pages/home/factories";
+import { ONBOARDING_APPS, ONBOARDING_EVENT_APPS, type FactoryAgentRewrite } from "@/pages/home/factories";
 import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
 
 export const DEFAULT_LINE_NAME = "plan-and-implement";
 
 export const GITHUB_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_GITHUB_ISSUES";
 
-const PRIMARY_LINE_APP_ENTRYPOINT = ONBOARDING_LINE_APPS[0].entrypointNodeId;
+const PRIMARY_LINE_APP_ENTRYPOINT = ONBOARDING_APPS[0].entrypointNodeId;
 
 export type InstallOnboardingApp = (
   input: InstallFactoryInput,
@@ -62,7 +62,8 @@ async function installOnboardingApp(args: {
   return installed;
 }
 
-// Install each bundled app in order and return the line steps that call them.
+// Install each bundled workspace app in order. Only apps marked for the line
+// become steps; the other apps remain available as standalone automations.
 // installFactory clears its pending-canvas ref after each success, so the
 // sequential calls create distinct canvases.
 async function provisionLineApps(args: {
@@ -74,7 +75,7 @@ async function provisionLineApps(args: {
   installFactory: InstallOnboardingApp;
 }): Promise<FactoryLineStep[]> {
   const steps: FactoryLineStep[] = [];
-  for (const app of ONBOARDING_LINE_APPS) {
+  for (const app of ONBOARDING_APPS) {
     const installed = await installOnboardingApp({
       factoryId: args.factoryId,
       appFactoryId: app.factoryId,
@@ -84,6 +85,9 @@ async function provisionLineApps(args: {
       agentRewrite: args.agentRewrite,
       installFactory: args.installFactory,
     });
+    if (!app.runsOnLine) {
+      continue;
+    }
     steps.push({
       type: "runApp",
       app: { app: installed.canvasId, entrypoint: app.entrypointNodeId },

@@ -120,18 +120,19 @@ function buildEventApp(args: {
 }
 
 /**
- * Ordered factory-line apps provisioned during onboarding. Each entry maps to a
- * bundled app template and the line step that calls its onRun entrypoint.
+ * Ordered workspace apps provisioned during onboarding. runsOnLine controls
+ * whether the provisioned line calls the app's onRun entrypoint.
  */
-export interface OnboardingLineApp {
+export interface OnboardingApp {
   factoryId: string;
   entrypointNodeId: string;
+  runsOnLine: boolean;
 }
 
-export const ONBOARDING_LINE_APPS: OnboardingLineApp[] = [
-  { factoryId: "line-planning", entrypointNodeId: "onrun-create-plan" },
-  { factoryId: "line-implementation", entrypointNodeId: "onrun-implement" },
-  { factoryId: "line-pr", entrypointNodeId: "onrun-open-pr" },
+export const ONBOARDING_APPS: OnboardingApp[] = [
+  { factoryId: "line-planning", entrypointNodeId: "onrun-create-plan", runsOnLine: true },
+  { factoryId: "line-implementation", entrypointNodeId: "onrun-implement", runsOnLine: true },
+  { factoryId: "line-pr", entrypointNodeId: "onrun-open-pr", runsOnLine: false },
 ];
 
 // Event-driven factory apps provisioned during onboarding. These listen for
